@@ -2,17 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GLOBAL_POLLING_INTERVAL } from "@/lib/constants";
+import { marketLabel, sortByPublishedAtDesc } from "@/lib/utils";
 import type { OpenDartFastItem, OpenDartFastPayload } from "@/lib/opendart-fast";
 import { PageNavigation } from "./page-navigation";
 import styles from "./opendart-fast-page.module.css";
-
-const REFRESH_MS = 5000;
-
-function marketLabel(value: string) {
-  if (value === "Y") return "KOSPI";
-  if (value === "K") return "KOSDAQ";
-  return value || "-";
-}
 
 function sortItems(items: OpenDartFastItem[]) {
   return [...items].sort((left, right) => {
@@ -70,7 +64,7 @@ export function OpenDartFastPage() {
 
       intervalRef.current = window.setInterval(() => {
         void load();
-      }, REFRESH_MS);
+      }, GLOBAL_POLLING_INTERVAL);
     }
 
     function handleVisibility() {
@@ -121,7 +115,7 @@ export function OpenDartFastPage() {
       <section className={styles.stats}>
         <article className={styles.statCard}>
           <span>새로고침</span>
-          <strong>{REFRESH_MS / 1000}초</strong>
+          <strong>{GLOBAL_POLLING_INTERVAL / 1000}초</strong>
         </article>
         <article className={styles.statCard}>
           <span>오늘 추출 건수</span>

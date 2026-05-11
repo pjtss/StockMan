@@ -1,10 +1,12 @@
-import { ensureSchema, getPool } from "./db";
+// import { ensureSchema, getPool } from "./db";
 import { fetchDartFeed, fetchSecFeed, getTodayInSeoul } from "./rss";
 import type { AlertItem, DartItem, FeedPayload, SecItem } from "./types";
+import { minutesAgo } from "./utils";
 
 const DART_BULLISH_LEVELS = ["최강호재", "호재가능"];
 const SEC_BULLISH_LEVELS = ["호재가능"];
 
+/*
 function toPublishedDateSeoul(value: string): string {
   const date = new Date(value);
   return new Intl.DateTimeFormat("en-CA", {
@@ -14,7 +16,9 @@ function toPublishedDateSeoul(value: string): string {
     day: "2-digit",
   }).format(date);
 }
+*/
 
+/*
 function toAlertItem(item: DartItem | SecItem): AlertItem {
   return {
     source: item.source,
@@ -27,8 +31,11 @@ function toAlertItem(item: DartItem | SecItem): AlertItem {
     keywords: item.source === "DART" ? item.keywords : undefined,
   };
 }
+*/
 
 export async function markAlertsDelivered(alerts: AlertItem[]) {
+  // DB 기능 주석 처리
+  /*
   if (alerts.length === 0) {
     return;
   }
@@ -56,8 +63,10 @@ export async function markAlertsDelivered(alerts: AlertItem[]) {
   } finally {
     client.release();
   }
+  */
 }
 
+/*
 async function loadNewAlerts(source: "DART" | "SEC", todayInSeoul: string): Promise<AlertItem[]> {
   const client = await getPool().connect();
 
@@ -95,7 +104,9 @@ async function loadNewAlerts(source: "DART" | "SEC", todayInSeoul: string): Prom
     client.release();
   }
 }
+*/
 
+/*
 async function saveDartItems(items: DartItem[]) {
   const client = await getPool().connect();
 
@@ -143,7 +154,9 @@ async function saveDartItems(items: DartItem[]) {
     client.release();
   }
 }
+*/
 
+/*
 async function saveSecItems(items: SecItem[]) {
   const client = await getPool().connect();
 
@@ -193,14 +206,26 @@ async function saveSecItems(items: SecItem[]) {
     client.release();
   }
 }
+*/
 
 export async function syncDartAlerts(): Promise<FeedPayload<DartItem>> {
-  await ensureSchema();
+  // await ensureSchema();
   const payload = await fetchDartFeed();
-  await saveDartItems(payload.items);
+  // await saveDartItems(payload.items);
 
-  const todayInSeoul = getTodayInSeoul();
-  const newAlerts = await loadNewAlerts("DART", todayInSeoul);
+  // DB 없이 최근 1분 이내의 공시만 알림 주도록 최적화
+  const newAlerts: AlertItem[] = payload.items
+    .filter((item) => minutesAgo(item.publishedAt) === 0)
+    .map((item) => ({
+      source: item.source,
+      externalId: item.link,
+      level: item.judgment,
+      company: item.company,
+      title: item.title,
+      link: item.link,
+      publishedAt: item.publishedAt,
+      keywords: item.keywords,
+    }));
 
   return {
     ...payload,
@@ -209,12 +234,22 @@ export async function syncDartAlerts(): Promise<FeedPayload<DartItem>> {
 }
 
 export async function syncSecAlerts(): Promise<FeedPayload<SecItem>> {
-  await ensureSchema();
+  // await ensureSchema();
   const payload = await fetchSecFeed();
-  await saveSecItems(payload.items);
+  // await saveSecItems(payload.items);
 
-  const todayInSeoul = getTodayInSeoul();
-  const newAlerts = await loadNewAlerts("SEC", todayInSeoul);
+  // DB 없이 최근 1분 이내의 공시만 알림 주도록 최적화
+  const newAlerts: AlertItem[] = payload.items
+    .filter((item) => minutesAgo(item.publishedAt) <= 1)
+    .map((item) => ({
+      source: item.source,
+      externalId: item.accession || item.link,
+      level: item.sentiment,
+      company: item.company,
+      title: item.title,
+      link: item.link,
+      publishedAt: item.publishedAt,
+    }));
 
   return {
     ...payload,
@@ -223,6 +258,10 @@ export async function syncSecAlerts(): Promise<FeedPayload<SecItem>> {
 }
 
 export async function getTodayDartBullishFeed(): Promise<FeedPayload<DartItem>> {
+  // DB 기능 주석 처리로 인해 RSS 직접 호출
+  const payload = await fetchDartFeed();
+  return payload;
+  /*
   await ensureSchema();
   const client = await getPool().connect();
   const todayInSeoul = getTodayInSeoul();
@@ -256,9 +295,14 @@ export async function getTodayDartBullishFeed(): Promise<FeedPayload<DartItem>> 
   } finally {
     client.release();
   }
+  */
 }
 
 export async function getTodaySecBullishFeed(): Promise<FeedPayload<SecItem>> {
+  // DB 기능 주석 처리로 인해 RSS 직접 호출
+  const payload = await fetchSecFeed();
+  return payload;
+  /*
   await ensureSchema();
   const client = await getPool().connect();
   const todayInSeoul = getTodayInSeoul();
@@ -294,4 +338,6 @@ export async function getTodaySecBullishFeed(): Promise<FeedPayload<SecItem>> {
   } finally {
     client.release();
   }
+  */
 }
+

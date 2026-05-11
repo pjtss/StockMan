@@ -10,7 +10,7 @@ export const handler = schedule("*/1 * * * *", async () => {
   const alerts = [...(dartPayload.newAlerts ?? []), ...(secPayload.newAlerts ?? [])];
 
   await sendPushAlerts(alerts);
-  await markAlertsDelivered(alerts);
+  // await markAlertsDelivered(alerts);
 
   return {
     statusCode: 200,
@@ -20,3 +20,4 @@ export const handler = schedule("*/1 * * * *", async () => {
     }),
   };
 });
+

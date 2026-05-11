@@ -2,39 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { GLOBAL_POLLING_INTERVAL } from "@/lib/constants";
+import { formatTime, isStrongBullish, minutesAgo } from "@/lib/utils";
 import type { DartItem, FeedPayload } from "@/lib/types";
 import { PageNavigation } from "./page-navigation";
 import styles from "./rapid-dart-page.module.css";
 
-const REFRESH_MS = 5000;
 const RECENT_WINDOW_MINUTES = 5;
-
-function formatTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-function minutesAgo(value: string): number {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
-}
-
-function isStrongBullish(item: DartItem): boolean {
-  return item.judgment.includes("최강호재");
-}
 
 function sortRapidItems(items: DartItem[]): DartItem[] {
   return [...items].sort((left, right) => {
@@ -94,7 +68,7 @@ export function RapidDartPage() {
 
       intervalRef.current = window.setInterval(() => {
         void loadFeed();
-      }, REFRESH_MS);
+      }, GLOBAL_POLLING_INTERVAL);
     }
 
     function handleVisibilityChange() {
@@ -147,7 +121,7 @@ export function RapidDartPage() {
       <section className={styles.stats}>
         <article className={styles.statCard}>
           <span>새로고침</span>
-          <strong>{REFRESH_MS / 1000}초</strong>
+          <strong>{GLOBAL_POLLING_INTERVAL / 1000}초</strong>
         </article>
         <article className={styles.statCard}>
           <span>금일 호재 수</span>
@@ -183,9 +157,9 @@ export function RapidDartPage() {
               return (
                 <article key={item.link} className={styles.card}>
                   <div className={styles.cardTop}>
-                    <span className={isStrongBullish(item) ? styles.strongBadge : styles.normalBadge}>{item.judgment}</span>
+                    {isStrongBullish(item) ? <span className={styles.strongBadge}>최강호재</span> : <span className={styles.normalBadge}>{item.judgment}</span>}
                     {recent ? <span className={styles.flashBadge}>방금 공시</span> : null}
-                    <time>{formatTime(item.publishedAt)}</time>
+                    <time>{formatTime(item.publishedAt, true)}</time>
                   </div>
                   <strong className={styles.company}>{item.company}</strong>
                   <a href={item.link} target="_blank" rel="noreferrer" className={styles.title}>

@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { GLOBAL_POLLING_INTERVAL, PAGE_SIZE } from "@/lib/constants";
+import { formatTime, getJudgmentStatus, paginateItems, sortByPublishedAtDesc } from "@/lib/utils";
 import type { DartItem, DartJudgment, FeedPayload, SecItem, SecSentiment } from "@/lib/types";
 import { PageNavigation } from "./page-navigation";
 import { usePushDebug } from "./push-provider";
 import styles from "./feed-page.module.css";
-
-const REFRESH_MS = 15000;
-const PAGE_SIZE = 50;
 
 type ViewMode = "latest" | "grouped";
 
@@ -23,43 +22,11 @@ type FeedPageProps =
       description: string;
     };
 
-function formatTime(value: string): string {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    dateStyle: "short",
-    timeStyle: "medium",
-  }).format(date);
-}
-
 function judgmentClass(value: string): string {
-  if (value.includes("최강호재") || value.includes("호재")) {
-    return styles.good;
-  }
-  if (value.includes("중요")) {
-    return styles.warn;
-  }
+  const status = getJudgmentStatus(value);
+  if (status === "good") return styles.good;
+  if (status === "warn") return styles.warn;
   return styles.neutral;
-}
-
-function sortByPublishedAtDesc<T extends { publishedAt: string }>(items: T[]): T[] {
-  return [...items].sort((left, right) => {
-    const leftTime = new Date(left.publishedAt).getTime();
-    const rightTime = new Date(right.publishedAt).getTime();
-    return rightTime - leftTime;
-  });
-}
-
-function paginateItems<T>(items: T[], page: number): T[] {
-  const start = (page - 1) * PAGE_SIZE;
-  return items.slice(start, start + PAGE_SIZE);
 }
 
 function DartSections({ items }: { items: DartItem[] }) {
@@ -244,7 +211,7 @@ export function FeedPage(props: FeedPageProps) {
 
       intervalRef.current = window.setInterval(() => {
         void loadFeed();
-      }, REFRESH_MS);
+      }, GLOBAL_POLLING_INTERVAL);
     }
 
     function handleVisibilityChange() {
@@ -277,8 +244,8 @@ export function FeedPage(props: FeedPageProps) {
   const fetchedAt = props.type === "dart" ? dartData?.fetchedAt : secData?.fetchedAt;
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const dartItems = paginateItems(rawDartItems, currentPage);
-  const secItems = paginateItems(rawSecItems, currentPage);
+  const dartItems = paginateItems(rawDartItems, currentPage, PAGE_SIZE);
+  const secItems = paginateItems(rawSecItems, currentPage, PAGE_SIZE);
 
   async function handleEnablePush() {
     try {
@@ -364,7 +331,7 @@ export function FeedPage(props: FeedPageProps) {
         </div>
         <div className={styles.statusCard}>
           <strong>{loading ? "불러오는 중" : "실행 중"}</strong>
-          <span>새로고침 주기 {REFRESH_MS / 1000}초</span>
+          <span>새로고침 주기 {GLOBAL_POLLING_INTERVAL / 1000}초</span>
           <span>표시 건수 {count}건</span>
           <span>페이지 {currentPage} / {totalPages}</span>
           <span>갱신 시각 {fetchedAt ? formatTime(fetchedAt) : "-"}</span>
