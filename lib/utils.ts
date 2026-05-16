@@ -66,3 +66,7 @@ export function marketLabel(value: string): string {
 export function isStrongBullish(item: DartItem): boolean {
   return item.judgment.includes("최강호재");
 }
+
+export function getNaverFinanceLink(company: string): string {
+  return `https://finance.naver.com/search/searchList.naver?query=${encodeURIComponent(company)}`;
+}

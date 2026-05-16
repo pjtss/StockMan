@@ -6,6 +6,8 @@ import { formatTime, getJudgmentStatus, paginateItems, sortByPublishedAtDesc } f
 import type { DartItem, DartJudgment, FeedPayload, SecItem, SecSentiment } from "@/lib/types";
 import { PageNavigation } from "./page-navigation";
 import { usePushDebug } from "./push-provider";
+import { getWatchlist, toggleWatchlist } from "@/lib/watchlist";
+import { MarketSentiment } from "./market-sentiment";
 import styles from "./feed-page.module.css";
 
 type ViewMode = "latest" | "grouped";
@@ -23,13 +25,14 @@ type FeedPageProps =
     };
 
 function judgmentClass(value: string): string {
+  if (value === "최강호재") return styles.strongGood;
   const status = getJudgmentStatus(value);
   if (status === "good") return styles.good;
   if (status === "warn") return styles.warn;
   return styles.neutral;
 }
 
-function DartSections({ items }: { items: DartItem[] }) {
+function DartSections({ items, watchlist, onToggleWatchlist }: { items: DartItem[]; watchlist: string[]; onToggleWatchlist: (company: string) => void }) {
   const orders: DartJudgment[] = ["최강호재", "호재가능"];
 
   return (
@@ -46,7 +49,7 @@ function DartSections({ items }: { items: DartItem[] }) {
               <h2>{judgment}</h2>
               <span>{sectionItems.length}건</span>
             </div>
-            <DartTable items={sectionItems} />
+            <DartTable items={sectionItems} watchlist={watchlist} onToggleWatchlist={onToggleWatchlist} />
           </section>
         );
       })}
@@ -54,12 +57,13 @@ function DartSections({ items }: { items: DartItem[] }) {
   );
 }
 
-function DartTable({ items }: { items: DartItem[] }) {
+function DartTable({ items, watchlist, onToggleWatchlist }: { items: DartItem[]; watchlist: string[]; onToggleWatchlist: (company: string) => void }) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
+            <th>즐겨찾기</th>
             <th>등급</th>
             <th>회사명</th>
             <th>공시 제목</th>
@@ -68,28 +72,43 @@ function DartTable({ items }: { items: DartItem[] }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
-            <tr key={item.link}>
-              <td>
-                <span className={`${styles.badge} ${judgmentClass(item.judgment)}`}>{item.judgment}</span>
-              </td>
-              <td>{item.company}</td>
-              <td>
-                <a href={item.link} target="_blank" rel="noreferrer">
-                  {item.title}
-                </a>
-              </td>
-              <td>{item.keywords.join(", ") || "-"}</td>
-              <td>{formatTime(item.publishedAt)}</td>
-            </tr>
-          ))}
+          {items.map((item) => {
+            const isWatched = watchlist.includes(item.company);
+            return (
+              <tr key={item.link} className={isWatched ? styles.watchlistRow : ""}>
+                <td>
+                  <button
+                    type="button"
+                    className={`${styles.starButton} ${isWatched ? styles.starActive : ""}`}
+                    onClick={() => onToggleWatchlist(item.company)}
+                  >
+                    {isWatched ? "★" : "☆"}
+                  </button>
+                </td>
+                <td>
+                  <span className={`${styles.badge} ${judgmentClass(item.judgment)}`}>{item.judgment}</span>
+                </td>
+                <td>
+                  {item.company}
+                  {isWatched && <span className={styles.watchlistBadge}>관심</span>}
+                </td>
+                <td>
+                  <a href={item.link} target="_blank" rel="noreferrer">
+                    {item.title}
+                  </a>
+                </td>
+                <td>{item.keywords.join(", ") || "-"}</td>
+                <td>{formatTime(item.publishedAt)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function SecSections({ items }: { items: SecItem[] }) {
+function SecSections({ items, watchlist, onToggleWatchlist }: { items: SecItem[]; watchlist: string[]; onToggleWatchlist: (company: string) => void }) {
   const orders: SecSentiment[] = ["호재가능"];
 
   return (
@@ -106,7 +125,7 @@ function SecSections({ items }: { items: SecItem[] }) {
               <h2>{sentiment}</h2>
               <span>{sectionItems.length}건</span>
             </div>
-            <SecTable items={sectionItems} />
+            <SecTable items={sectionItems} watchlist={watchlist} onToggleWatchlist={onToggleWatchlist} />
           </section>
         );
       })}
@@ -114,12 +133,13 @@ function SecSections({ items }: { items: SecItem[] }) {
   );
 }
 
-function SecTable({ items }: { items: SecItem[] }) {
+function SecTable({ items, watchlist, onToggleWatchlist }: { items: SecItem[]; watchlist: string[]; onToggleWatchlist: (company: string) => void }) {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
+            <th>즐겨찾기</th>
             <th>등급</th>
             <th>폼</th>
             <th>회사명</th>
@@ -128,21 +148,36 @@ function SecTable({ items }: { items: SecItem[] }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
-            <tr key={item.accession || item.link}>
-              <td>
-                <span className={`${styles.badge} ${judgmentClass(item.sentiment)}`}>{item.sentiment}</span>
-              </td>
-              <td>{item.formType}</td>
-              <td>{item.company}</td>
-              <td>
-                <a href={item.link} target="_blank" rel="noreferrer">
-                  {item.title}
-                </a>
-              </td>
-              <td>{formatTime(item.publishedAt)}</td>
-            </tr>
-          ))}
+          {items.map((item) => {
+            const isWatched = watchlist.includes(item.company);
+            return (
+              <tr key={item.accession || item.link} className={isWatched ? styles.watchlistRow : ""}>
+                <td>
+                  <button
+                    type="button"
+                    className={`${styles.starButton} ${isWatched ? styles.starActive : ""}`}
+                    onClick={() => onToggleWatchlist(item.company)}
+                  >
+                    {isWatched ? "★" : "☆"}
+                  </button>
+                </td>
+                <td>
+                  <span className={`${styles.badge} ${judgmentClass(item.sentiment)}`}>{item.sentiment}</span>
+                </td>
+                <td>{item.formType}</td>
+                <td>
+                  {item.company}
+                  {isWatched && <span className={styles.watchlistBadge}>관심</span>}
+                </td>
+                <td>
+                  <a href={item.link} target="_blank" rel="noreferrer">
+                    {item.title}
+                  </a>
+                </td>
+                <td>{formatTime(item.publishedAt)}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -157,8 +192,17 @@ export function FeedPage(props: FeedPageProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("latest");
   const [page, setPage] = useState(1);
   const [pushTesting, setPushTesting] = useState(false);
+  const [watchlist, setWatchlist] = useState<string[]>([]);
   const intervalRef = useRef<number | null>(null);
   const { status: pushStatus, enablePush, updatePreferences, refreshStatus, enabling, saving } = usePushDebug();
+
+  useEffect(() => {
+    setWatchlist(getWatchlist());
+  }, []);
+
+  const handleToggleWatchlist = (company: string) => {
+    setWatchlist(toggleWatchlist(company));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -238,14 +282,28 @@ export function FeedPage(props: FeedPageProps) {
     setPage(1);
   }, [props.type, viewMode]);
 
-  const rawDartItems = sortByPublishedAtDesc(dartData?.items ?? []);
-  const rawSecItems = sortByPublishedAtDesc(secData?.items ?? []);
-  const count = props.type === "dart" ? rawDartItems.length : rawSecItems.length;
-  const fetchedAt = props.type === "dart" ? dartData?.fetchedAt : secData?.fetchedAt;
-  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
   const dartItems = paginateItems(rawDartItems, currentPage, PAGE_SIZE);
   const secItems = paginateItems(rawSecItems, currentPage, PAGE_SIZE);
+
+  // 시장 감성 지수 계산 로직 (DB 없이 현재 데이터 기반)
+  const calculateSentiment = () => {
+    const items = props.type === "dart" ? rawDartItems : rawSecItems;
+    if (items.length === 0) return 50;
+
+    if (props.type === "dart") {
+      const strongCount = (items as DartItem[]).filter(i => i.judgment === "최강호재").length;
+      const normalCount = items.length - strongCount;
+      // 최강호재 100점, 일반호재 60점 기준으로 가중 평균
+      const score = ((strongCount * 100) + (normalCount * 60)) / items.length;
+      return Math.min(100, Math.max(0, score));
+    } else {
+      // SEC는 현재 호재가능만 필터링되므로 75점 기본값에서 데이터 양에 따라 보정
+      return Math.min(90, 60 + (items.length * 2));
+    }
+  };
+
+  const sentimentScore = calculateSentiment();
+  const sentimentLabel = sentimentScore > 80 ? "EXTREME BULLISH" : sentimentScore > 60 ? "BULLISH" : "NEUTRAL";
 
   async function handleEnablePush() {
     try {
@@ -328,6 +386,9 @@ export function FeedPage(props: FeedPageProps) {
           <p className={styles.kicker}>{props.type === "dart" ? "KOREA DISCLOSURES" : "U.S. FILINGS"}</p>
           <h1>{props.title}</h1>
           <p className={styles.description}>{props.description}</p>
+          <div className={styles.sentimentWrap}>
+            <MarketSentiment score={sentimentScore} label={sentimentLabel} />
+          </div>
         </div>
         <div className={styles.statusCard}>
           <strong>{loading ? "불러오는 중" : "실행 중"}</strong>
@@ -401,12 +462,20 @@ export function FeedPage(props: FeedPageProps) {
         </div>
         {props.type === "dart" ? (
           dartItems.length > 0 ? (
-            viewMode === "latest" ? <DartTable items={dartItems} /> : <DartSections items={dartItems} />
+            viewMode === "latest" ? (
+              <DartTable items={dartItems} watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
+            ) : (
+              <DartSections items={dartItems} watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
+            )
           ) : (
             <p className={styles.empty}>현재 조건에 맞는 DART 호재 공시가 없습니다.</p>
           )
         ) : secItems.length > 0 ? (
-          viewMode === "latest" ? <SecTable items={secItems} /> : <SecSections items={secItems} />
+          viewMode === "latest" ? (
+            <SecTable items={secItems} watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
+          ) : (
+            <SecSections items={secItems} watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
+          )
         ) : (
           <p className={styles.empty}>현재 조건에 맞는 SEC 호재 공시가 없습니다.</p>
         )}

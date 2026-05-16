@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import type { DartItem, DartJudgment, FeedPayload, SecItem, SecSentiment } from "@/lib/types";
+import { calculateDartScore } from "./scoring";
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -15,102 +16,7 @@ const SEC_BASE_URL =
   "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&company=&count=100&dateb=&output=atom&owner=include";
 const SEC_USER_AGENT = "MySecWatcher/1.0 your_email@example.com";
 
-const DART_IMPORTANT_KEYWORDS = [
-  "단일판매",
-  "공급계약",
-  "영업이익",
-  "매출액",
-  "잠정",
-  "자기주식",
-  "자사주",
-  "합병",
-  "분할",
-  "최대주주",
-  "투자판단관련",
-  "영업정지",
-  "유상증자",
-  "전환사채",
-  "무상증자",
-  "조회공시",
-  "불성실",
-  "소송",
-  "회생",
-  "특허",
-  "계약",
-  "수주",
-];
-
-const DART_NEGATIVE_KEYWORDS = [
-  "유상증자",
-  "전환사채",
-  "신주인수권부사채",
-  "교환사채",
-  "감자",
-  "소송",
-  "피소",
-  "회생",
-  "파산",
-  "영업정지",
-  "불성실",
-  "불성실공시",
-  "관리종목",
-  "상장적격성",
-  "투자주의",
-  "투자경고",
-  "투자위험",
-  "단기과열",
-  "최대주주변경",
-  "최대주주 변경",
-  "지분변동",
-  "주식등의대량보유상황보고서",
-  "해지",
-  "철회",
-  "정정",
-  "조회공시",
-  "조회공시요구",
-  "반기보고서",
-  "분기보고서",
-  "사업보고서",
-  "감사보고서",
-  "주주총회",
-  "주주총회소집",
-  "참고사항",
-  "안내공시",
-];
-
-const DART_STRONG_POSITIVE_KEYWORDS = [
-  "단일판매ㆍ공급계약체결",
-  "단일판매·공급계약체결",
-  "단일판매공급계약체결",
-  "공급계약체결",
-  "단일판매계약체결",
-  "대규모수주",
-  "수주",
-  "특허권취득",
-  "특허 취득",
-  "자기주식취득",
-  "자기주식 취득",
-  "자사주 취득",
-  "무상증자",
-  "현금ㆍ현물배당결정",
-  "현금·현물배당결정",
-  "배당결정",
-  "흑자전환",
-  "영업이익 증가",
-  "매출액 증가",
-  "당기순이익 증가",
-  "대규모 공급계약",
-  "계약체결",
-];
-
-const DART_WEAK_POSITIVE_KEYWORDS = [
-  "투자판단관련 주요경영사항",
-  "투자판단관련주요경영사항",
-  "잠정실적",
-  "영업이익",
-  "매출액",
-];
-
+// SEC 관련 키워드는 우선 유지 (필요 시 별도 스코어링 모듈화 가능)
 const SEC_POSITIVE_KEYWORDS = [
   "ENTRY INTO A MATERIAL DEFINITIVE AGREEMENT",
   "RESULTS OF OPERATIONS",
@@ -210,22 +116,11 @@ function extractDartCompany(title: string): string {
 }
 
 function classifyDartTitle(title: string): DartJudgment {
-  const normalized = title.trim();
-
-  if (DART_NEGATIVE_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
-    return "악재";
-  }
-  if (DART_STRONG_POSITIVE_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
-    return "최강호재";
-  }
-  if (DART_WEAK_POSITIVE_KEYWORDS.some((keyword) => normalized.includes(keyword))) {
-    return "호재가능";
-  }
-  return "중립";
+  return calculateDartScore(title).judgment;
 }
 
 function extractDartKeywords(title: string): string[] {
-  return DART_IMPORTANT_KEYWORDS.filter((keyword) => title.includes(keyword));
+  return calculateDartScore(title).keywords;
 }
 
 type DartRawItem = {

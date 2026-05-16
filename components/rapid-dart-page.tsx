@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { GLOBAL_POLLING_INTERVAL } from "@/lib/constants";
-import { formatTime, isStrongBullish, minutesAgo } from "@/lib/utils";
+import { formatTime, getNaverFinanceLink, isStrongBullish, minutesAgo } from "@/lib/utils";
 import type { DartItem, FeedPayload } from "@/lib/types";
 import { PageNavigation } from "./page-navigation";
 import styles from "./rapid-dart-page.module.css";
@@ -102,10 +102,15 @@ export function RapidDartPage() {
       <PageNavigation current="dart-rapid" />
       <header className={styles.hero}>
         <div>
+          <div className={styles.liveIndicator}>
+            <span className={styles.pulseDot}></span>
+            LIVE MONITORING
+          </div>
           <p className={styles.kicker}>KOREA STOCK FAST TRACK</p>
           <h1>국내 주식 급속 호재</h1>
           <p className={styles.description}>
-            DART 호재 공시를 5초 주기로 다시 확인하면서 최강호재를 위로 끌어올린 빠른 감시 화면입니다.
+            DART 호재 공시를 실시간으로 추적합니다. <br/>
+            가중치 기반 AI 로직으로 엄선된 <strong>최강호재</strong>를 실시간으로 확인하세요.
           </p>
         </div>
         <div className={styles.actions}>
@@ -157,14 +162,34 @@ export function RapidDartPage() {
               return (
                 <article key={item.link} className={styles.card}>
                   <div className={styles.cardTop}>
-                    {isStrongBullish(item) ? <span className={styles.strongBadge}>최강호재</span> : <span className={styles.normalBadge}>{item.judgment}</span>}
+                    {isStrongBullish(item) ? (
+                      <span className={styles.strongBadge}>최강호재</span>
+                    ) : (
+                      <span className={styles.normalBadge}>{item.judgment}</span>
+                    )}
                     {recent ? <span className={styles.flashBadge}>방금 공시</span> : null}
                     <time>{formatTime(item.publishedAt, true)}</time>
                   </div>
-                  <strong className={styles.company}>{item.company}</strong>
+
+                  <div className={styles.companyRow}>
+                    <strong className={styles.company}>{item.company}</strong>
+                    <a
+                      href={getNaverFinanceLink(item.company)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.chartBtn}
+                    >
+                      <span>차트</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                      </svg>
+                    </a>
+                  </div>
+
                   <a href={item.link} target="_blank" rel="noreferrer" className={styles.title}>
                     {item.title}
                   </a>
+
                   <div className={styles.keywordRow}>
                     {item.keywords.length > 0 ? (
                       item.keywords.slice(0, 3).map((keyword) => (
