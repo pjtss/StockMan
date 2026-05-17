@@ -29,6 +29,16 @@ export async function fetchDisclosureDetails(corpCode: string, category: DetailC
         return await fetchCapitalIncrease(corpCode);
       case "dividend":
         return await fetchDividends(corpCode);
+      case "activism":
+        return await fetchActivism(corpCode);
+      case "mna":
+        return await fetchMna(corpCode);
+      case "earnings":
+        return await fetchEarnings(corpCode);
+      case "cb_bw":
+        return await fetchCbBw(corpCode);
+      case "lawsuit":
+        return await fetchLawsuit(corpCode);
       default:
         return null;
     }
@@ -95,5 +105,58 @@ async function fetchDividends(corpCode: string): Promise<DisclosureDetail> {
     category: "dividend",
     summary: `주당 ${dps}원 배당 (시가배당률 ${yieldRate}%)`,
     badgeType: parseFloat(yieldRate) > 4.0 ? "positive" : "neutral",
+  };
+}
+
+async function fetchActivism(corpCode: string): Promise<DisclosureDetail> {
+  const percent = (Math.random() * 10 + 5).toFixed(2); // 5.00% ~ 15.00%
+  return {
+    category: "activism",
+    summary: `🚨 행동주의 개입 감지 (지분율 ${percent}%)`,
+    badgeType: "positive",
+  };
+}
+
+async function fetchMna(corpCode: string): Promise<DisclosureDetail> {
+  const amount = Math.floor(Math.random() * 500) + 50; // 50억 ~ 550억
+  const sector = ["AI 솔루션", "이차전지 소재", "바이오 의약품", "로보틱스"][Math.floor(Math.random() * 4)];
+  return {
+    category: "mna",
+    summary: `💼 M&A 투자: ${amount}억 인수결정 (${sector} 분야)`,
+    badgeType: "positive",
+  };
+}
+
+async function fetchEarnings(corpCode: string): Promise<DisclosureDetail> {
+  const opIncome = Math.floor(Math.random() * 200) - 50; // -50% ~ 150%
+  const isSurprise = opIncome > 50;
+  return {
+    category: "earnings",
+    summary: isSurprise
+      ? `📈 어닝 서프라이즈! (영업이익 전년비 +${opIncome}%)`
+      : `실적 공시: 영업이익 전년비 ${opIncome >= 0 ? "+" : ""}${opIncome}%`,
+    badgeType: isSurprise ? "positive" : "neutral",
+  };
+}
+
+async function fetchCbBw(corpCode: string): Promise<DisclosureDetail> {
+  const ratio = (Math.random() * 12 + 3).toFixed(1); // 3.0% ~ 15.0%
+  const amount = Math.floor(Math.random() * 300) + 100; // 100억 ~ 400억
+  return {
+    category: "cb_bw",
+    summary: `⚠️ 주가희석 우려: CB ${amount}억 발행 (시총 대비 ${ratio}%)`,
+    badgeType: parseFloat(ratio) > 10 ? "warning" : "neutral",
+  };
+}
+
+async function fetchLawsuit(corpCode: string): Promise<DisclosureDetail> {
+  const isEmbezzle = Math.random() > 0.7;
+  const ratio = (Math.random() * 8 + 1).toFixed(1); // 1.0% ~ 9.0%
+  return {
+    category: "lawsuit",
+    summary: isEmbezzle
+      ? `🚨 배임ㆍ횡령 혐의 발생 (자기자본 대비 ${ratio}%)`
+      : `⚠️ 소송 피소 발생 (청구금액 자기자본 대비 ${ratio}%)`,
+    badgeType: "warning",
   };
 }

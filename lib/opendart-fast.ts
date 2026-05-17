@@ -19,6 +19,16 @@ const STRONG_BULLISH_KEYWORDS = [
   "특허권 취득",
   "유형자산 양수",
   "타법인주식및출자증권취득결정",
+  "대량보유상황보고",
+  "주식대량보유",
+  "타법인주식",
+  "타법인 주식",
+  "전환사채권발행결정",
+  "신주인수권부사채권발행결정",
+  "소송 등의 제기",
+  "소송등의제기",
+  "영업실적",
+  "재무제표",
 ];
 
 type OpenDartListRow = {
@@ -39,7 +49,18 @@ type OpenDartResponse = {
   list?: OpenDartListRow[];
 };
 
-export type DetailCategory = "insider" | "treasury" | "contract" | "capital" | "dividend" | null;
+export type DetailCategory =
+  | "insider"
+  | "treasury"
+  | "contract"
+  | "capital"
+  | "dividend"
+  | "activism"
+  | "mna"
+  | "earnings"
+  | "cb_bw"
+  | "lawsuit"
+  | null;
 
 export type OpenDartFastItem = {
   corpCls: string;
@@ -163,6 +184,11 @@ export async function fetchOpenDartFastFeed(): Promise<OpenDartFastPayload> {
       else if (reportName.includes("단일판매") || reportName.includes("공급계약")) detailCategory = "contract";
       else if (reportName.includes("유상증자") || reportName.includes("무상증자")) detailCategory = "capital";
       else if (reportName.includes("배당")) detailCategory = "dividend";
+      else if (reportName.includes("대량보유상황보고") || reportName.includes("주식대량보유")) detailCategory = "activism";
+      else if (reportName.includes("타법인주식") || reportName.includes("타법인 주식")) detailCategory = "mna";
+      else if (reportName.includes("영업실적") || reportName.includes("재무제표")) detailCategory = "earnings";
+      else if (reportName.includes("전환사채") || reportName.includes("신주인수권부사채")) detailCategory = "cb_bw";
+      else if (reportName.includes("소송")) detailCategory = "lawsuit";
 
       deduped.set(receiptNo, {
         corpCls: row.corp_cls?.trim() || "",
