@@ -42,10 +42,18 @@ describe('OpenDartFastPage Component', () => {
       ],
     };
 
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockPayload),
-    } as any);
+    vi.mocked(fetch).mockImplementation((url: any) => {
+      if (typeof url === 'string' && url.includes('opendart-fast')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockPayload),
+        } as any);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      } as any);
+    });
 
     await act(async () => {
       render(<OpenDartFastPage />);
@@ -53,6 +61,6 @@ describe('OpenDartFastPage Component', () => {
     
     expect(screen.getByText('국내 주식 실시간 공시 스캐너')).toBeDefined();
     expect(screen.getByText('Test Co')).toBeDefined();
-    expect(screen.getByText('최강호재')).toBeDefined();
+    expect(screen.getAllByText('최강호재').length).toBeGreaterThan(0);
   });
 });

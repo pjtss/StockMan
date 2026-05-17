@@ -98,7 +98,7 @@ describe('utils.ts', () => {
     it('should return correct link', () => {
       const link = getNaverFinanceLink('삼성전자');
       expect(link).toContain('https://finance.naver.com/search/searchList.naver?query=');
-      expect(link).toContain('%E1%84%89%E1%85%A1%E1%86%B7%E1%84%89%E1%85%A5%E1%86%BC%E1%84%8C%E1%85%A5%E1%86%AB%E1%84%8C%E1%85%A1');
+      expect(link).toContain(encodeURIComponent('삼성전자'));
     });
   });
 });

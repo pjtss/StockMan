@@ -3,14 +3,23 @@ import { getPool, ensureSchema } from './db';
 import { Pool } from 'pg';
 
 // Mock pg
+const mockClient = {
+  query: vi.fn().mockResolvedValue({}),
+  release: vi.fn(),
+};
+
+const mockPool = {
+  connect: vi.fn().mockResolvedValue(mockClient),
+};
+
 vi.mock('pg', () => {
-  const mPool = {
-    connect: vi.fn().mockResolvedValue({
-      query: vi.fn().mockResolvedValue({}),
-      release: vi.fn(),
-    }),
+  return {
+    Pool: class {
+      connect() {
+        return mockPool.connect();
+      }
+    }
   };
-  return { Pool: vi.fn(() => mPool) };
 });
 
 describe('db.ts', () => {
@@ -35,9 +44,7 @@ describe('db.ts', () => {
 
   it('ensureSchema should call query multiple times', async () => {
     await ensureSchema();
-    const pool = getPool();
-    const client = await pool.connect();
-    expect(client.query).toHaveBeenCalled();
-    expect(client.release).toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenCalled();
+    expect(mockClient.release).toHaveBeenCalled();
   });
 });

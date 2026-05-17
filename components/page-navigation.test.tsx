@@ -19,16 +19,16 @@ vi.mock('./page-navigation.module.css', () => ({
 describe('PageNavigation Component', () => {
   it('renders all links', () => {
     render(<PageNavigation current="home" />);
-    expect(screen.getByText('홈')).toBeDefined();
-    expect(screen.getByText('DART')).toBeDefined();
-    expect(screen.getByText('급속 호재')).toBeDefined();
-    expect(screen.getByText('OPEN DART')).toBeDefined();
-    expect(screen.getByText('SEC')).toBeDefined();
+    expect(screen.getByText('🏠 홈')).toBeDefined();
+    expect(screen.getByText('📋 일반 DART')).toBeDefined();
+    expect(screen.getByText('⚡ 실시간 DART')).toBeDefined();
+    expect(screen.getByText('🇺🇸 SEC')).toBeDefined();
+    expect(screen.getByText('📊 마켓 스캐너')).toBeDefined();
   });
 
   it('highlights the active link', () => {
     const { container } = render(<PageNavigation current="dart" />);
     const activeLink = container.querySelector('.navActive');
-    expect(activeLink?.textContent).toBe('DART');
+    expect(activeLink?.textContent).toBe('📋 일반 DART');
   });
 });
