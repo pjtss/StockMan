@@ -6,6 +6,9 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-17
+- **[오류 수정]** 아이폰 12 Pro(390px) 좁은 뷰포트 GNB 스크롤 오동작 해결 및 홈 화면 히어로 카드 버튼 잘림 전면 차단
+  - **GNB max-width 및 오타 수정**: [page-navigation.module.css](file:///c:/Users/dldbs/Desktop/RSS/components/page-navigation.module.css)의 `.nav` 셀렉터 내에 존재하던 `max-content: 100%`라는 잘못된 CSS 속성명을 `max-width: 100%`로 완벽 복구하고, 모바일 미디어 쿼리(`@media (max-width: 768px)`) 하위에도 `max-width: 100%`를 한번 더 엄밀하게 탑재하여 GNB 가로 스크롤(Swipe)이 깨지지 않고 390px 좁은 화면에서도 정확히 자가 적응하도록 조치.
+  - **홈 화면 액션 버튼 세로 스택 전환**: 모바일 화면(`max-width: 480px`) 진입 시 홈 화면의 메인 히어로 카드 내부 패딩을 `16px`로 줄이고 가로 나열식이었던 3종 액션 버튼(`actions`)들을 **세로 블록 스택 구조(`flex-direction: column; width: 100%;`)**로 완전 개편하여, 글자 길이와 전혀 상관없이 우측이 단 1픽셀도 잘리지 않도록 모바일 최적화 완수 ([page.module.css](file:///c:/Users/dldbs/Desktop/RSS/app/page.module.css)).
 - **[성능 최적화]** Next.js Link prefetching 비활성화를 통한 모바일 네트워크 대역폭 최적화 및 브라우저 preloaded but not used 콘솔 경고 완전 퇴치
   - **prefetch={false} 전면 적용**: 브라우저 뷰포트 내의 모든 메뉴 링크를 백그라운드에서 강제로 로드(Preload)하여 발생하는 리소스 낭비 및 브라우저의 preloaded but not used 경고를 제거하기 위해, GNB 및 주요 네비게이션 링크 전체에 `prefetch={false}` 속성을 명시적으로 전격 실장 ([page-navigation.tsx](file:///c:/Users/dldbs/Desktop/RSS/components/page-navigation.tsx), [opendart-fast-page.tsx](file:///c:/Users/dldbs/Desktop/RSS/components/opendart-fast-page.tsx), [app/page.tsx](file:///c:/Users/dldbs/Desktop/RSS/app/page.tsx)).
   - **동적 프리페치 유지**: 사용자가 실제로 마우스를 올리거나(Hover) 상호작용하는 시점에만 동적으로 프리페치(Hover prefetch)하여 instant 라우팅 속도는 그대로 유지하면서 불필요한 백그라운드 네트워크 낭비와 개발용 콘솔의 경고 노이즈를 완벽하게 차단.
