@@ -82,7 +82,25 @@
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #00ffa3, #00d4ff);
   border-radius: 2px;
   box-shadow: 0 0 10px rgba(0, 255, 163, 0.5);
+}
+
+.cellHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.hotBadge {
+  font-size: 9px;
+  font-weight: 800;
+  color: #ff00a3;
+  background: rgba(255, 0, 163, 0.1);
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 0, 163, 0.3);
+  text-shadow: 0 0 8px rgba(255, 0, 163, 0.5);
+  box-shadow: 0 0 10px rgba(255, 0, 163, 0.1);
 }

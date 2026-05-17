@@ -64,6 +64,17 @@ export async function ensureSchema() {
         enabled BOOLEAN NOT NULL DEFAULT TRUE,
         dart_enabled BOOLEAN NOT NULL DEFAULT TRUE,
         sec_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        only_validated BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS telegram_subscribers (
+        id BIGSERIAL PRIMARY KEY,
+        chat_id TEXT NOT NULL UNIQUE,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -82,6 +93,11 @@ export async function ensureSchema() {
     await client.query(`
       ALTER TABLE push_subscriptions
       ADD COLUMN IF NOT EXISTS sec_enabled BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+
+    await client.query(`
+      ALTER TABLE push_subscriptions
+      ADD COLUMN IF NOT EXISTS only_validated BOOLEAN NOT NULL DEFAULT FALSE
     `);
 
     await client.query(`

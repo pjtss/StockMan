@@ -139,9 +139,44 @@
 .judgment {
   font-size: 10px;
   font-weight: 900;
-  color: var(--neon-green);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+}
+
+.strongBullish {
+  color: #ff00a3;
+  text-shadow: 0 0 10px rgba(255, 0, 163, 0.4);
+}
+
+.bullish {
+  color: #00ffa3;
+  text-shadow: 0 0 10px rgba(0, 255, 163, 0.4);
+}
+
+.bearish {
+  color: #ef4444;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.neutral {
+  color: #94a3b8;
+}
+
+.kicker {
+  font-size: 9px;
+  font-weight: 800;
+  color: #00d4ff;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.loading {
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+  padding: 40px 0;
 }
 
 .title {

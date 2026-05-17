@@ -6,6 +6,12 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-17
+- **[기능 고도화]** RSS 대시보드 -> 퀀트 모니터 터미널(Quant Terminal) 최종 업그레이드 완료
+  - **수급 검증 스마트 푸시 (Smart Push)**: KIS API 실시간 거래대금 폭발 및 외인/기관 순매수 데이터와 공시 정보를 교차 매칭하여 검증된 호재만 스마트 푸시로 수신하는 필터 구현 (`lib/push.ts` 및 `feed-page.tsx` 연동).
+  - **실시간 텔레그램 알림 봇 (Telegram Webhook Bot)**: `telegram_subscribers` 스키마 구축 및 실시간 알림 봇 연동 완료. 대화형 명령어(`/start`, `/stop`, `/summary [종목명]`)를 완전 자동 처리하는 서버리스 웹훅 엔드포인트 `/api/telegram/webhook` 구축.
+  - **프리미엄 Glassmorphic 섹터 Heatmap**: 어두운 유리 질감 테마, 호재 강도에 따른 네온 글로우 테마, 실시간 트랙 바 및 `🔥 HOT` 배지를 탑재한 고성능 섹터 Heatmap UI 개편.
+  - **실시간 메이저 수급 스캐너 위젯 (Real-time KIS Quant Widget)**: 프로그램 매매, 외인/기관 순매수, 거래량 급증, 체결강도 순위를 탭 UI로 통합 조회하는 `<ProgramTradingTracker>` 위젯 신설 및 feed/fast 페이지 사이드바 삽입 완료.
+  - **종목별 공시 히스토리 타임라인 (1년 역사 조회)**: `/api/dart/history` 서버리스 API를 개설하여 Supabase DB에 적재된 1년 치 과거 공시 이력을 완벽한 연대기 모달로 렌더링.
 - **[기능 고도화]** OPEN DART 10대 핵심 상세 공시 감지 및 자동 분석기 완성
   - 5개 추가 보조 API(행동주의 개입, M&A 투자, 실적 서프라이즈, CB/BW 주가 희석, 소송/배임 리스크)를 기존의 Lazy Loading 구조 위에 완벽하게 탑재.
   - `lib/opendart-fast.ts`: `DetailCategory` 타입을 총 10가지로 확장하고 신규 키워드 기반 분류 로직 추가.

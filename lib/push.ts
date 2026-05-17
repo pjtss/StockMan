@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import { getPool } from "./db";
 import type { AlertItem, PushSubscriptionRecord } from "./types";
+import { fetchVolumeSpike, fetchNetBuying } from "./kis";
 
 let configured = false;
 
@@ -52,8 +53,8 @@ export async function savePushSubscription(subscription: PushSubscriptionRecord)
   try {
     await client.query(
       `
-        INSERT INTO push_subscriptions (endpoint, p256dh, auth, user_agent, enabled, dart_enabled, sec_enabled)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO push_subscriptions (endpoint, p256dh, auth, user_agent, enabled, dart_enabled, sec_enabled, only_validated)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (endpoint) DO UPDATE SET
           p256dh = EXCLUDED.p256dh,
           auth = EXCLUDED.auth,
@@ -61,6 +62,7 @@ export async function savePushSubscription(subscription: PushSubscriptionRecord)
           enabled = EXCLUDED.enabled,
           dart_enabled = EXCLUDED.dart_enabled,
           sec_enabled = EXCLUDED.sec_enabled,
+          only_validated = EXCLUDED.only_validated,
           updated_at = NOW()
       `,
       [
@@ -71,6 +73,7 @@ export async function savePushSubscription(subscription: PushSubscriptionRecord)
         subscription.enabled ?? true,
         subscription.dartEnabled ?? true,
         subscription.secEnabled ?? true,
+        subscription.onlyValidated ?? false,
       ],
     );
   } finally {
@@ -89,10 +92,17 @@ export async function updatePushSubscriptionPreferences(subscription: PushSubscr
           enabled = $2,
           dart_enabled = $3,
           sec_enabled = $4,
+          only_validated = $5,
           updated_at = NOW()
         WHERE endpoint = $1
       `,
-      [subscription.endpoint, subscription.enabled ?? true, subscription.dartEnabled ?? true, subscription.secEnabled ?? true],
+      [
+        subscription.endpoint,
+        subscription.enabled ?? true,
+        subscription.dartEnabled ?? true,
+        subscription.secEnabled ?? true,
+        subscription.onlyValidated ?? false,
+      ],
     );
   } finally {
     client.release();
@@ -115,7 +125,7 @@ export async function loadPushSubscriptions(): Promise<PushSubscriptionRecord[]>
   try {
     const { rows } = await client.query(
       `
-        SELECT endpoint, p256dh, auth, user_agent, enabled, dart_enabled, sec_enabled
+        SELECT endpoint, p256dh, auth, user_agent, enabled, dart_enabled, sec_enabled, only_validated
         FROM push_subscriptions
         ORDER BY updated_at DESC
       `,
@@ -129,6 +139,7 @@ export async function loadPushSubscriptions(): Promise<PushSubscriptionRecord[]>
       enabled: row.enabled ?? true,
       dartEnabled: row.dart_enabled ?? true,
       secEnabled: row.sec_enabled ?? true,
+      onlyValidated: row.only_validated ?? false,
     }));
   } finally {
     client.release();
@@ -141,7 +152,7 @@ export async function loadPushSubscriptionDebug(endpoint?: string) {
   try {
     const { rows } = await client.query(
       `
-        SELECT endpoint, user_agent, updated_at, enabled, dart_enabled, sec_enabled
+        SELECT endpoint, user_agent, updated_at, enabled, dart_enabled, sec_enabled, only_validated
         FROM push_subscriptions
         ORDER BY updated_at DESC
       `,
@@ -152,12 +163,13 @@ export async function loadPushSubscriptionDebug(endpoint?: string) {
       enabled: boolean;
       dartEnabled: boolean;
       secEnabled: boolean;
+      onlyValidated: boolean;
     };
 
     if (endpoint) {
       const result = await client.query(
         `
-          SELECT enabled, dart_enabled, sec_enabled
+          SELECT enabled, dart_enabled, sec_enabled, only_validated
           FROM push_subscriptions
           WHERE endpoint = $1
           LIMIT 1
@@ -170,6 +182,7 @@ export async function loadPushSubscriptionDebug(endpoint?: string) {
           enabled: result.rows[0].enabled ?? true,
           dartEnabled: result.rows[0].dart_enabled ?? true,
           secEnabled: result.rows[0].sec_enabled ?? true,
+          onlyValidated: result.rows[0].only_validated ?? false,
         };
       }
     }
@@ -200,6 +213,23 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
   configureWebPush();
   const subscriptions = await loadPushSubscriptions();
 
+  let validatedCompanies: string[] = [];
+  const needsValidation = subscriptions.some((s) => s.onlyValidated);
+  if (needsValidation) {
+    try {
+      const [vol, net] = await Promise.all([
+        fetchVolumeSpike().catch(() => []),
+        fetchNetBuying().catch(() => []),
+      ]);
+      validatedCompanies = [
+        ...vol.map((v) => v.company.replace(/\s+/g, "").toLowerCase()),
+        ...net.map((n) => n.company.replace(/\s+/g, "").toLowerCase()),
+      ];
+    } catch (e) {
+      console.error("Failed to fetch KIS lists for validation:", e);
+    }
+  }
+
   for (const alert of alerts) {
     const payload = JSON.stringify({
       title: `[${alert.level}] ${alert.company}`,
@@ -209,9 +239,17 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
     });
 
     for (const subscription of subscriptions) {
-      const allowed =
+      let allowed =
         subscription.enabled !== false &&
         (alert.source === "DART" ? subscription.dartEnabled !== false : subscription.secEnabled !== false);
+
+      if (allowed && subscription.onlyValidated && alert.source === "DART") {
+        const compClean = alert.company.replace(/\s+/g, "").toLowerCase();
+        const matched = validatedCompanies.some((vc) => vc.includes(compClean) || compClean.includes(vc));
+        if (!matched) {
+          allowed = false;
+        }
+      }
 
       if (!allowed) {
         continue;

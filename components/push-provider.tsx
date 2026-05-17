@@ -20,7 +20,7 @@ declare global {
 type PushContextValue = {
   status: PushDebugStatus | null;
   enablePush: () => Promise<void>;
-  updatePreferences: (next: { enabled?: boolean; dartEnabled?: boolean; secEnabled?: boolean }) => Promise<void>;
+  updatePreferences: (next: { enabled?: boolean; dartEnabled?: boolean; secEnabled?: boolean; onlyValidated?: boolean }) => Promise<void>;
   refreshStatus: () => Promise<void>;
   enabling: boolean;
   saving: boolean;
@@ -72,6 +72,7 @@ export function PushProvider({ children }: { children?: ReactNode }) {
         enabled: data.enabled ?? true,
         dartEnabled: data.dartEnabled ?? true,
         secEnabled: data.secEnabled ?? true,
+        onlyValidated: data.onlyValidated ?? false,
         error: undefined,
       };
 
@@ -180,6 +181,7 @@ export function PushProvider({ children }: { children?: ReactNode }) {
         enabled: result.enabled ?? true,
         dartEnabled: result.dartEnabled ?? true,
         secEnabled: result.secEnabled ?? true,
+        onlyValidated: result.onlyValidated ?? false,
         actionRequired: false,
       };
 
@@ -201,7 +203,7 @@ export function PushProvider({ children }: { children?: ReactNode }) {
     }
   }
 
-  async function updatePreferences(next: { enabled?: boolean; dartEnabled?: boolean; secEnabled?: boolean }) {
+  async function updatePreferences(next: { enabled?: boolean; dartEnabled?: boolean; secEnabled?: boolean; onlyValidated?: boolean }) {
     if (!status?.endpoint || saving) {
       return;
     }
@@ -219,6 +221,7 @@ export function PushProvider({ children }: { children?: ReactNode }) {
           enabled: next.enabled ?? status.enabled ?? true,
           dartEnabled: next.dartEnabled ?? status.dartEnabled ?? true,
           secEnabled: next.secEnabled ?? status.secEnabled ?? true,
+          onlyValidated: next.onlyValidated ?? status.onlyValidated ?? false,
         }),
       });
       const result = await response.json();
@@ -231,6 +234,7 @@ export function PushProvider({ children }: { children?: ReactNode }) {
         enabled: result.enabled ?? true,
         dartEnabled: result.dartEnabled ?? true,
         secEnabled: result.secEnabled ?? true,
+        onlyValidated: result.onlyValidated ?? false,
         lastSaved: result.latestUpdatedAt ?? status.lastSaved,
       };
 

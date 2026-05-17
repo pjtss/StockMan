@@ -2,6 +2,7 @@ import { schedule } from "@netlify/functions";
 import { ensureSchema } from "../../lib/db";
 import { markAlertsDelivered, syncDartAlerts, syncSecAlerts } from "../../lib/alerts";
 import { sendPushAlerts } from "../../lib/push";
+import { sendTelegramAlerts } from "../../lib/telegram";
 
 export const handler = schedule("*/1 * * * *", async () => {
   await ensureSchema();
@@ -9,8 +10,10 @@ export const handler = schedule("*/1 * * * *", async () => {
   const [dartPayload, secPayload] = await Promise.all([syncDartAlerts(), syncSecAlerts()]);
   const alerts = [...(dartPayload.newAlerts ?? []), ...(secPayload.newAlerts ?? [])];
 
-  await sendPushAlerts(alerts);
-  // await markAlertsDelivered(alerts);
+  await Promise.all([
+    sendPushAlerts(alerts),
+    sendTelegramAlerts(alerts)
+  ]);
 
   return {
     statusCode: 200,

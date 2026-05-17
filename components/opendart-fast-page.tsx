@@ -9,6 +9,8 @@ import type { VolumeSpikeItem, NetBuyingItem } from "@/lib/kis";
 import { PageNavigation } from "./page-navigation";
 import { KeywordManager } from "./keyword-manager";
 import { DisclosureDetailBadge } from "./disclosure-detail-badge";
+import { SectorMap } from "./sector-map";
+import { ProgramTradingTracker } from "./program-trading";
 import styles from "./opendart-fast-page.module.css";
 
 function sortItems(items: OpenDartFastItem[]) {
@@ -140,7 +142,16 @@ export function OpenDartFastPage() {
         </article>
       </section>
 
-      <KeywordManager onKeywordsChange={setCustomKeywords} />
+      <div style={{ display: "flex", gap: "24px", marginBottom: "32px", flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: "300px" }}>
+          <KeywordManager onKeywordsChange={setCustomKeywords} />
+        </div>
+        <div style={{ flex: 1, minWidth: "300px", marginTop: "-32px" }}>
+          <SectorMap items={items.map(item => ({ company: item.corpName, title: item.reportName, judgment: item.judgment }))} />
+        </div>
+      </div>
+
+      <ProgramTradingTracker />
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>

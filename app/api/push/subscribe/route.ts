@@ -16,6 +16,7 @@ export async function POST(request: Request) {
       enabled: body.enabled ?? true,
       dartEnabled: body.dartEnabled ?? true,
       secEnabled: body.secEnabled ?? true,
+      onlyValidated: body.onlyValidated ?? false,
     });
 
     const debug = await loadPushSubscriptionDebug(body.endpoint);
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
       enabled: debug.currentDevice?.enabled ?? true,
       dartEnabled: debug.currentDevice?.dartEnabled ?? true,
       secEnabled: debug.currentDevice?.secEnabled ?? true,
+      onlyValidated: debug.currentDevice?.onlyValidated ?? false,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "푸시 구독 저장에 실패했습니다.";
@@ -47,6 +49,7 @@ export async function PATCH(request: Request) {
       enabled: body.enabled ?? true,
       dartEnabled: body.dartEnabled ?? true,
       secEnabled: body.secEnabled ?? true,
+      onlyValidated: body.onlyValidated ?? false,
     });
 
     const debug = await loadPushSubscriptionDebug(body.endpoint);
@@ -58,6 +61,7 @@ export async function PATCH(request: Request) {
       enabled: debug.currentDevice?.enabled ?? true,
       dartEnabled: debug.currentDevice?.dartEnabled ?? true,
       secEnabled: debug.currentDevice?.secEnabled ?? true,
+      onlyValidated: debug.currentDevice?.onlyValidated ?? false,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "푸시 설정 저장에 실패했습니다.";
@@ -81,6 +85,7 @@ export async function GET(request: Request) {
       enabled: debug.currentDevice?.enabled ?? true,
       dartEnabled: debug.currentDevice?.dartEnabled ?? true,
       secEnabled: debug.currentDevice?.secEnabled ?? true,
+      onlyValidated: debug.currentDevice?.onlyValidated ?? false,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "푸시 구독 상태 조회에 실패했습니다.";

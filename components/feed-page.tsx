@@ -13,6 +13,7 @@ import { SectorMap } from "./sector-map";
 import { CompanyTimeline } from "./company-timeline";
 import { TradingIntensity } from "./trading-intensity";
 import { ContractBadge } from "./contract-badge";
+import { ProgramTradingTracker } from "./program-trading";
 import styles from "./feed-page.module.css";
 
 type ViewMode = "latest" | "grouped";
@@ -374,6 +375,25 @@ export function FeedPage(props: FeedPageProps) {
     }
   }
 
+  async function handleToggleValidated() {
+    try {
+      if (!pushStatus?.subscriptionExists) {
+        await handleEnablePush();
+        return;
+      }
+
+      const nextVal = !(pushStatus.onlyValidated ?? false);
+      await updatePreferences({
+        enabled: true,
+        dartEnabled: pushStatus.dartEnabled ?? true,
+        secEnabled: pushStatus.secEnabled ?? true,
+        onlyValidated: nextVal,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "푸시 설정 변경 실패");
+    }
+  }
+
   async function handleTestPush() {
     try {
       setPushTesting(true);
@@ -421,6 +441,7 @@ export function FeedPage(props: FeedPageProps) {
             <span>전체 푸시: {pushStatus?.enabled === false ? "꺼짐" : "켜짐"}</span>
             <span>DART 푸시: {pushStatus?.dartEnabled === false ? "꺼짐" : "켜짐"}</span>
             <span>SEC 푸시: {pushStatus?.secEnabled === false ? "꺼짐" : "켜짐"}</span>
+            <span>수급 매칭 푸시: {pushStatus?.onlyValidated === true ? "켜짐 🔥" : "꺼짐"}</span>
             <span>저장된 구독 수: {pushStatus?.savedCount ?? 0}</span>
             <span>최근 저장 시각: {pushStatus?.lastSaved ? formatTime(pushStatus.lastSaved) : "-"}</span>
             <span>최근 User-Agent: {pushStatus?.latestUserAgent ?? "-"}</span>
@@ -447,6 +468,9 @@ export function FeedPage(props: FeedPageProps) {
             <button type="button" className={styles.toggleButton} onClick={() => handleToggleSource("sec")} disabled={saving}>
               {pushStatus?.secEnabled === false ? "SEC 푸시 켜기" : "SEC 푸시 끄기"}
             </button>
+            <button type="button" className={styles.toggleButton} onClick={handleToggleValidated} disabled={saving}>
+              {pushStatus?.onlyValidated === true ? "수급 필터 끄기" : "수급 필터 켜기 🔥"}
+            </button>
           </div>
 
           <button type="button" className={styles.testButton} onClick={handleTestPush} disabled={pushTesting}>
@@ -454,7 +478,12 @@ export function FeedPage(props: FeedPageProps) {
           </button>
         </div>
         
-        {props.type === "dart" && <TradingIntensity />}
+        {props.type === "dart" && (
+          <>
+            <TradingIntensity />
+            <ProgramTradingTracker />
+          </>
+        )}
       </section>
 
       {error ? <div className={styles.error}>{error}</div> : null}
