@@ -114,3 +114,34 @@
     border-radius: 24px;
   }
 }
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 24px 16px;
+  }
+  
+  .hero h1 {
+    font-size: 28px;
+  }
+  
+  .description {
+    font-size: 14px;
+    margin-top: 16px;
+  }
+
+  .actions {
+    flex-direction: column;
+    width: 100%;
+    align-items: stretch;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .primary,
+  .primaryAlt,
+  .secondary {
+    width: 100%;
+    min-height: 48px;
+    font-size: 14px;
+  }
+}
