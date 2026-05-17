@@ -6,6 +6,9 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-17
+- **[성능 최적화]** Next.js Link prefetching 비활성화를 통한 모바일 네트워크 대역폭 최적화 및 브라우저 preloaded but not used 콘솔 경고 완전 퇴치
+  - **prefetch={false} 전면 적용**: 브라우저 뷰포트 내의 모든 메뉴 링크를 백그라운드에서 강제로 로드(Preload)하여 발생하는 리소스 낭비 및 브라우저의 preloaded but not used 경고를 제거하기 위해, GNB 및 주요 네비게이션 링크 전체에 `prefetch={false}` 속성을 명시적으로 전격 실장 ([page-navigation.tsx](file:///c:/Users/dldbs/Desktop/RSS/components/page-navigation.tsx), [opendart-fast-page.tsx](file:///c:/Users/dldbs/Desktop/RSS/components/opendart-fast-page.tsx), [app/page.tsx](file:///c:/Users/dldbs/Desktop/RSS/app/page.tsx)).
+  - **동적 프리페치 유지**: 사용자가 실제로 마우스를 올리거나(Hover) 상호작용하는 시점에만 동적으로 프리페치(Hover prefetch)하여 instant 라우팅 속도는 그대로 유지하면서 불필요한 백그라운드 네트워크 낭비와 개발용 콘솔의 경고 노이즈를 완벽하게 차단.
 - **[오류 수정]** 아이폰 12 Pro(390px) 좁은 모바일 뷰포트에서 실시간 수급 스캐너 텍스트 줄바꿈 및 가로 잘림 현상 근본 차단
   - **모바일 2행 그리드 배치 구조 도입**: `외인 +x억 | 기관 -y억`과 같이 매우 길게 들어오는 수급 텍스트가 iPhone 12 Pro(390px) 및 iPhone SE(320px) 등 초소형 모바일 화면에서 한 행에 무리하게 표시되어 가로 overflow를 일으키던 문제를 해결하기 위해, 모바일 미디어 쿼리(`max-width: 480px`) 내에서 `.row`를 2행 그리드 구조(`grid-template-rows: auto auto`)로 전격 개정.
   - **수급 텍스트 하단행 자동 배치**: 1행에는 순위, 회사명, 가격을 조화롭게 배치하고, 길이가 긴 수급 텍스트(`.metricCol`)는 2행 전체(`grid-column: 2 / -1`)를 차지하게 하여, 텍스트 크기와 상관없이 우측이 단 1픽셀도 잘리지 않고 화면 전체에 꽉 들어맞는 완벽한 모바일 전용 UI 아키텍처를 실현 ([program-trading.module.css](file:///c:/Users/dldbs/Desktop/RSS/components/program-trading.module.css)).
