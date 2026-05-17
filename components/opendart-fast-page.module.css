@@ -185,6 +185,20 @@
   background-color: rgba(255, 255, 255, 0.03);
 }
 
+.keywordHighlight {
+  background-color: rgba(255, 0, 255, 0.05) !important;
+  box-shadow: inset 0 0 15px rgba(255, 0, 255, 0.2);
+}
+
+.keywordHighlight td {
+  border-bottom: 1px solid rgba(255, 0, 255, 0.2) !important;
+}
+
+.keywordHighlight td a {
+  color: #ffb3ff !important;
+  text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+}
+
 .table th {
   color: #94a3b8;
   font-size: 12px;

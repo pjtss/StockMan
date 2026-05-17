@@ -6,6 +6,7 @@ import { GLOBAL_POLLING_INTERVAL } from "@/lib/constants";
 import { marketLabel, sortByPublishedAtDesc } from "@/lib/utils";
 import type { OpenDartFastItem, OpenDartFastPayload } from "@/lib/opendart-fast";
 import { PageNavigation } from "./page-navigation";
+import { KeywordManager } from "./keyword-manager";
 import styles from "./opendart-fast-page.module.css";
 
 function sortItems(items: OpenDartFastItem[]) {
@@ -20,6 +21,7 @@ function sortItems(items: OpenDartFastItem[]) {
 
 export function OpenDartFastPage() {
   const [payload, setPayload] = useState<OpenDartFastPayload | null>(null);
+  const [customKeywords, setCustomKeywords] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -124,6 +126,8 @@ export function OpenDartFastPage() {
         </article>
       </section>
 
+      <KeywordManager onKeywordsChange={setCustomKeywords} />
+
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
           <div>
@@ -150,25 +154,33 @@ export function OpenDartFastPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr key={item.receiptNo}>
-                    <td>
-                      <span className={item.judgment === "최강호재" ? styles.strongBadge : styles.normalBadge}>
-                        {item.judgment}
-                      </span>
-                    </td>
-                    <td>{marketLabel(item.corpCls)}</td>
-                    <td>{item.corpName}</td>
-                    <td>{item.stockCode || "-"}</td>
-                    <td>
-                      <a href={item.link} target="_blank" rel="noreferrer">
-                        {item.reportName}
-                      </a>
-                    </td>
-                    <td>{item.keywords.join(", ") || "-"}</td>
-                    <td>{item.receiptDate || "-"}</td>
-                  </tr>
-                ))}
+                {items.map((item) => {
+                  const hasKeyword = customKeywords.some(
+                    (kw) =>
+                      item.reportName.includes(kw) ||
+                      item.keywords.some((k) => k.includes(kw))
+                  );
+                  
+                  return (
+                    <tr key={item.receiptNo} className={hasKeyword ? styles.keywordHighlight : ""}>
+                      <td>
+                        <span className={item.judgment === "최강호재" ? styles.strongBadge : styles.normalBadge}>
+                          {item.judgment}
+                        </span>
+                      </td>
+                      <td>{marketLabel(item.corpCls)}</td>
+                      <td>{item.corpName}</td>
+                      <td>{item.stockCode || "-"}</td>
+                      <td>
+                        <a href={item.link} target="_blank" rel="noreferrer">
+                          {item.reportName}
+                        </a>
+                      </td>
+                      <td>{item.keywords.join(", ") || "-"}</td>
+                      <td>{item.receiptDate || "-"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

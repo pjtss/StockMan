@@ -6,6 +6,10 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-17
+- **[신규 기능 구현]** 나만의 맞춤 키워드 스캐너 (Custom Keyword Scanner) 도입
+  - `lib/keywords.ts`: `localStorage` 기반의 유저 커스텀 키워드 관리 모듈 생성.
+  - `components/keyword-manager.tsx`: 키워드 추가/삭제가 가능한 네온 글래스모피즘 테마의 UI 컴포넌트 추가.
+  - `components/opendart-fast-page.tsx`: OPEN DART 스캐너에 연동 완료. 사용자가 등록한 키워드가 공시 제목이나 본문에 포함될 경우, 해당 공시가 네온 핑크(`keywordHighlight`)로 강렬하게 하이라이트되도록 CSS 처리 추가.
 - **[기능 통합 및 코드 정리]** 중복 기능 제거 및 라우팅 최적화
   - OPEN DART 기반의 상위 호환 기능으로 통합됨에 따라, 레거시 컴포넌트인 "RSS 기반 국내 주식 급속 호재(`rapid-dart-page.tsx` 및 `app/dart/rapid` 폴더 전체)" 파일들을 시스템에서 영구 삭제.
   - 홈 화면(`app/page.tsx`) 및 GNB(`components/page-navigation.tsx`)에서 불필요해진 연결 링크 및 라우팅을 깨끗하게 정리.
