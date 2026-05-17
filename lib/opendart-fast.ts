@@ -22,6 +22,7 @@ const STRONG_BULLISH_KEYWORDS = [
 ];
 
 type OpenDartListRow = {
+  corp_code?: string;
   corp_cls?: string;
   corp_name?: string;
   stock_code?: string;
@@ -38,9 +39,12 @@ type OpenDartResponse = {
   list?: OpenDartListRow[];
 };
 
+export type DetailCategory = "insider" | "treasury" | "contract" | "capital" | "dividend" | null;
+
 export type OpenDartFastItem = {
   corpCls: string;
   corpName: string;
+  corpCode: string;
   stockCode: string;
   reportName: string;
   receiptNo: string;
@@ -50,6 +54,7 @@ export type OpenDartFastItem = {
   judgment: "최강호재" | "호재가능";
   keywords: string[];
   link: string;
+  detailCategory: DetailCategory;
 };
 
 export type OpenDartFastPayload = {
@@ -152,9 +157,17 @@ export async function fetchOpenDartFastFeed(): Promise<OpenDartFastPayload> {
         continue;
       }
 
+      let detailCategory: DetailCategory = null;
+      if (reportName.includes("소유보고")) detailCategory = "insider";
+      else if (reportName.includes("자기주식")) detailCategory = "treasury";
+      else if (reportName.includes("단일판매") || reportName.includes("공급계약")) detailCategory = "contract";
+      else if (reportName.includes("유상증자") || reportName.includes("무상증자")) detailCategory = "capital";
+      else if (reportName.includes("배당")) detailCategory = "dividend";
+
       deduped.set(receiptNo, {
         corpCls: row.corp_cls?.trim() || "",
         corpName: row.corp_name?.trim() || "회사명 확인 필요",
+        corpCode: (row as any).corp_code?.trim() || "", // list.json returns corp_code, but might not be in our strict type
         stockCode: row.stock_code?.trim() || "",
         reportName,
         receiptNo,
@@ -164,6 +177,7 @@ export async function fetchOpenDartFastFeed(): Promise<OpenDartFastPayload> {
         judgment: classified.judgment,
         keywords: classified.keywords,
         link: buildViewerLink(receiptNo),
+        detailCategory,
       });
     }
   }

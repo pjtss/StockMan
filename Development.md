@@ -6,6 +6,11 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-17
+- **[기능 고도화]** OPEN DART 5대 핵심 상세 공시 API (내부자, 자사주, 공급계약, 유무상증자, 배당) 지연 로딩 시스템 도입
+  - `lib/opendart-fast.ts`: 공시 리스트 파싱 시 `corpCode` 추출 및 공시 제목을 분석하여 5대 카테고리(`detailCategory`)로 자동 분류하는 로직 추가.
+  - `lib/opendart-details.ts`: 카테고리에 맞춰 실제 상세 계약 규모, 배당률 등을 수치화하여 반환하는 백엔드 서비스 모듈 신설.
+  - `app/api/dart/details/route.ts`: 프론트엔드에서 특정 공시의 상세 내역만 개별적으로 요청할 수 있는 서버리스 엔드포인트 구축.
+  - `components/disclosure-detail-badge.tsx`: 공시 리스트 테이블 내부에 삽입되어, 마운트 시점에만 조용히 개별 데이터를 Fetch 해오는 Lazy Loading(지연 로딩) UI 컴포넌트 추가. OPEN DART 트래픽 제한과 타임아웃을 완벽하게 우회함.
 - **[기능 고도화]** OPEN DART 수급 2차 검증(Secondary Validation) 시스템 결합
   - KIS API 스캐너(거래대금 폭발, 실시간 순매수) 데이터를 OPEN DART 실시간 공시 화면(`opendart-fast-page.tsx`)과 병렬(Promise.all) 폴링으로 가져오도록 통합.
   - 새로 뜬 공시의 종목이 KIS 수급 상위 리스트와 일치할 경우, 회사명 하단에 `🔥 거래대금 폭발`, `📈 수급 포착` 네온 뱃지가 자동으로 렌더링되도록 시각적 교차 검증 구현.

@@ -8,6 +8,7 @@ import type { OpenDartFastItem, OpenDartFastPayload } from "@/lib/opendart-fast"
 import type { VolumeSpikeItem, NetBuyingItem } from "@/lib/kis";
 import { PageNavigation } from "./page-navigation";
 import { KeywordManager } from "./keyword-manager";
+import { DisclosureDetailBadge } from "./disclosure-detail-badge";
 import styles from "./opendart-fast-page.module.css";
 
 function sortItems(items: OpenDartFastItem[]) {
@@ -195,9 +196,14 @@ export function OpenDartFastPage() {
                       </td>
                       <td>{item.stockCode || "-"}</td>
                       <td>
-                        <a href={item.link} target="_blank" rel="noreferrer">
-                          {item.reportName}
-                        </a>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                          <a href={item.link} target="_blank" rel="noreferrer">
+                            {item.reportName}
+                          </a>
+                          {item.detailCategory && item.corpCode && (
+                            <DisclosureDetailBadge corpCode={item.corpCode} category={item.detailCategory} />
+                          )}
+                        </div>
                       </td>
                       <td>{item.keywords.join(", ") || "-"}</td>
                       <td>{item.receiptDate || "-"}</td>
