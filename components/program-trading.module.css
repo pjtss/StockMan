@@ -246,18 +246,44 @@
     padding: 16px;
   }
   .row {
-    padding: 10px 8px;
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    grid-template-rows: auto auto;
+    row-gap: 8px;
+    column-gap: 12px;
+    padding: 12px;
+  }
+  .rankCol {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    display: flex;
+    align-items: center;
+  }
+  .infoCol {
+    grid-column: 2;
+    grid-row: 1;
+    padding-left: 0;
   }
   .priceCol {
-    margin-right: 8px;
+    grid-column: 3;
+    grid-row: 1;
+    margin-right: 0;
+    align-items: flex-end;
+    justify-content: center;
   }
   .metricCol {
-    width: auto;
-    flex-shrink: 1;
+    grid-column: 2 / -1;
+    grid-row: 2;
+    text-align: left;
+    width: 100%;
   }
   .metric {
+    width: 100%;
+    text-align: center;
+    display: block;
     font-size: 11px;
-    padding: 4px 6px;
+    padding: 6px 10px;
   }
   .company {
     font-size: 12px;
