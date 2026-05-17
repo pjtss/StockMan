@@ -12,6 +12,13 @@ export interface AlertItem {
   keywords?: string[];
 }
 
+export interface ContractDetails {
+  contractAmount: string; // 계약금액
+  salesRatio: string; // 최근매출액대비 (%)
+  partner: string; // 계약상대방
+  period: string; // 계약기간
+}
+
 export interface DartItem {
   source: "DART";
   company: string;
@@ -20,6 +27,7 @@ export interface DartItem {
   keywords: string[];
   publishedAt: string;
   link: string;
+  rceptNo: string;
 }
 
 export interface SecItem {

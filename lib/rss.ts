@@ -129,6 +129,11 @@ type DartRawItem = {
   pubDate?: unknown;
 };
 
+function extractRceptNo(link: string): string {
+  const match = link.match(/rcpNo=(\d{14})/);
+  return match ? match[1] : "";
+}
+
 export function parseDartItems(xml: string, todayInSeoul: string): DartItem[] {
   const parsed = parser.parse(xml);
   return ensureArray<DartRawItem>(parsed?.rss?.channel?.item)
@@ -140,6 +145,7 @@ export function parseDartItems(xml: string, todayInSeoul: string): DartItem[] {
         return null;
       }
 
+      const link = normalizeText(item.link);
       return {
         source: "DART" as const,
         company: extractDartCompany(title),
@@ -147,7 +153,8 @@ export function parseDartItems(xml: string, todayInSeoul: string): DartItem[] {
         judgment,
         keywords: extractDartKeywords(title),
         publishedAt,
-        link: normalizeText(item.link),
+        link,
+        rceptNo: extractRceptNo(link),
       };
     })
     .filter((item): item is DartItem => item !== null);

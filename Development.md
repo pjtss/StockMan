@@ -6,6 +6,16 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-16
+- **[구현 완료]** OpenDART 원문 핵심 데이터 추출 (단일판매ㆍ공급계약체결)
+  - `lib/opendart.ts`: `list.json` API를 통한 `corp_code` 동적 조회 및 `snglpnrsctrt.json` (단일판매) 데이터 페칭 로직 구현.
+  - `app/api/dart/contract/route.ts`: 서버리스 환경에 최적화된 계약 상세 데이터 API 구축.
+  - `components/contract-badge.tsx`: 피드 목록에서 계약 금액, 매출액 대비 비율 등을 직관적으로 보여주는 뱃지 UI 구현.
+  - 빌드 최적화: `vitest.config.ts` 관련 TypeScript 에러 수정을 위해 `tsconfig.json`의 `exclude` 배열 업데이트.
+- **[구현 완료]** 한국투자증권 API 연동 실시간 체결강도 스캐너
+  - `lib/kis.ts`: 한국투자증권 API(OAuth2, 체결강도 순위) 연동 모듈 구현. (API 키 미설정 시 Mock 데이터 제공)
+  - `app/api/stock/intensity/route.ts`: 서버사이드 데이터 페치 엔드포인트 구축.
+  - `components/trading-intensity.tsx`: 대시보드 내 실시간 체결강도 TOP 10 스캐너 UI 통합.
+  - **빌드 복구**: `feed-page.tsx` 내 변수 선언 오류(`count`, `totalPages`, `fetchedAt`) 수정 및 레이아웃 최적화.
 - 개발 문서화 프로토콜 준수 선언
   - 모든 개발 내용은 `Development.md`에 기록하고, 실수와 잘한 내용은 `AGENTS.md`에 기록하는 규칙을 철저히 준수하기로 함.
   - 이 규칙은 앞으로 모든 작업에 무한 반복 적용됨.
@@ -24,6 +34,11 @@
 - **[구현 완료]** UI 컴포넌트 전수 테스트 및 커버리지 100% 달성
   - `feed-page.tsx`, `market-sentiment.tsx` 등 모든 컴포넌트에 대한 RTL(React Testing Library) 테스트 구축.
   - 비동기 로딩, 유저 인터랙션, 엣지 케이스 렌더링에 대한 전수 검증 완료.
+- **[구현 완료]** 고급 데이터 분석 기능 통합
+  - **감성 히스토리**: `localStorage` 기반 지수 추적 및 SVG 스파크라인 시각화.
+  - **섹터 히트맵**: 종목/공시 기반 자동 섹터 분류 엔진 및 시각적 그리드 맵 구현.
+  - **종목 타임라인**: 특정 종목 클릭 시 공시 이력을 시간순으로 분석하는 모달 뷰 추가.
+  - **테스트 보강**: `lib/sentiment.ts`, `lib/sectors.ts` 유닛 테스트 100% 구축.
 
 ## 2026-05-14
 - DART/SEC 푸시 알림 토글 기능 추가
