@@ -309,10 +309,11 @@ export async function sendTestPush() {
     {
       source: "DART",
       externalId: `test-${Date.now()}`,
-      level: "테스트호재",
-      company: "PJT RSS",
-      title: "테스트 푸시 알림입니다.",
-      link: "https://pjt-rss.netlify.app/sec",
+      level: "최강호재",
+      company: "현대에너지솔루션",
+      title: "단일판매ㆍ공급계약체결 (매출액 대비 85.4%)",
+      keywords: ["공급계약"],
+      link: "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260517000123",
       publishedAt: new Date().toISOString(),
     },
   ]);
