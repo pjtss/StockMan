@@ -118,6 +118,9 @@
     align-items: center;
     gap: 16px;
     margin-bottom: 24px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .brand {

@@ -241,7 +241,7 @@
   50% { opacity: 1; }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .container {
     padding: 16px;
   }
