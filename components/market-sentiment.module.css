@@ -3,12 +3,12 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 32px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
 }
 
 .gauge {
@@ -16,6 +16,7 @@
   width: 160px;
   height: 80px;
   overflow: hidden;
+  filter: drop-shadow(0 0 10px rgba(0, 255, 163, 0.3));
 }
 
 .track {
@@ -25,7 +26,7 @@
   width: 160px;
   height: 160px;
   border-radius: 50%;
-  border: 12px solid #f1f5f9;
+  border: 12px solid rgba(255, 255, 255, 0.05);
   box-sizing: border-box;
 }
 
@@ -37,8 +38,8 @@
   height: 160px;
   border-radius: 50%;
   border: 12px solid transparent;
-  border-top-color: #3b82f6;
-  border-right-color: #3b82f6;
+  border-top-color: var(--neon-green);
+  border-right-color: var(--neon-green);
   box-sizing: border-box;
   transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: center;
@@ -56,40 +57,45 @@
 }
 
 .score {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 900;
-  color: #0f172a;
+  color: #ffffff;
   line-height: 1;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
 }
 
 .center .label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #666;
+  font-size: 11px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .historyWrap {
-  margin-top: 20px;
+  margin-top: 24px;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .sparkline {
   width: 100%;
   height: 30px;
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .historyLabel {
-  font-size: 9px;
-  font-weight: 700;
-  color: #999;
-  letter-spacing: 0.05em;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--neon-green);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .labels {
@@ -102,5 +108,5 @@
 .labels span {
   font-size: 10px;
   font-weight: 800;
-  color: #94a3b8;
+  color: #64748b;
 }

@@ -5,6 +5,15 @@
 - 기능 추가, 구조 변경, 배포 영향 사항, 환경변수 변경 사항을 남긴다.
 - 최신 항목이 위로 오도록 기록한다.
 
+## 2026-05-17
+- **[UI/UX 개선 완료]** 다크 모드 글래스모피즘(Dark Glassmorphism) 디자인 시스템 전면 적용
+  - `rapid-dart-page.tsx`, `trading-intensity.tsx`의 프리미엄 다크 모드 디자인을 타 컴포넌트에 통일.
+  - `feed-page.module.css`: 메인 피드 목록 및 컨트롤바 배경을 다크 글래스모피즘(`rgba(255,255,255,0.03)` 및 `blur`)으로 변경하고 네온 텍스트 적용.
+  - `market-sentiment.module.css`: 시장 감성 지수 게이지와 백그라운드를 다크 테마 및 네온 글로우 효과로 업그레이드.
+  - `sector-map.module.css`: 섹터 히트맵 그리드 타일 디자인에 호버 애니메이션, 네온 바, 어두운 배경 적용.
+  - `company-timeline.module.css`: 타임라인 모달의 배경, 선, 텍스트 색상을 어두운 테마로 변경.
+  - 모든 디자인 변경은 순수 CSS 수정으로 구현되어 기존 기능 및 테스트 커버리지 유지.
+
 ## 2026-05-16
 - **[구현 완료]** OpenDART 원문 핵심 데이터 추출 (단일판매ㆍ공급계약체결)
   - `lib/opendart.ts`: `list.json` API를 통한 `corp_code` 동적 조회 및 `snglpnrsctrt.json` (단일판매) 데이터 페칭 로직 구현.
