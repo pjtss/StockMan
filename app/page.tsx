@@ -14,13 +14,13 @@ export default function HomePage() {
           실시간 주도주와 강한 호재를 Stockman 알고리즘으로 즉시 감지하세요.
         </p>
         <div className={styles.actions}>
-          <Link href="/dart" className={styles.primary}>
+          <Link href="/dart" className={styles.primary} prefetch={false}>
             DART 페이지 보기
           </Link>
-          <Link href="/dart/opendart-fast" className={styles.primaryAlt}>
+          <Link href="/dart/opendart-fast" className={styles.primaryAlt} prefetch={false}>
             OPEN DART 빠른 공시
           </Link>
-          <Link href="/sec" className={styles.secondary}>
+          <Link href="/sec" className={styles.secondary} prefetch={false}>
             SEC 페이지 보기
           </Link>
         </div>

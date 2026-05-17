@@ -121,7 +121,7 @@ export function OpenDartFastPage() {
           </p>
         </div>
         <div className={styles.links}>
-          <Link href="/dart" className={styles.secondary}>
+          <Link href="/dart" className={styles.secondary} prefetch={false}>
             일반 DART
           </Link>
         </div>
