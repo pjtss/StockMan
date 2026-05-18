@@ -55,22 +55,56 @@ export interface BidAskRatioItem {
   changeRate: string;
 }
 
+import { getPool } from "./db";
+
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
 
-// 토큰 스팸 방지를 위한 메모리 캐시 설정
+// 백그라운드 DB 미설정 또는 테스트용 인메모리 캐시 폴백 설정
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0; // 타임스탬프 (ms)
 
 export async function getAccessToken(): Promise<string | null> {
   if (!KIS_APPKEY || !KIS_APPSECRET) return null;
 
-  // 1. 이미 캐시된 유효한 토큰이 있다면 즉시 반환 (카카오톡 알림 방지)
-  const now = Date.now();
-  if (cachedToken && now < tokenExpiresAt) {
-    return cachedToken;
+  // 1. 데이터베이스(Supabase) 기반 공유 캐시 우선 조회 (서버리스 컨테이너 간 토큰 공유)
+  try {
+    const pool = getPool();
+    if (pool) {
+      const client = await pool.connect();
+      try {
+        // 테이블 존재성 재확인 (방어적 코드)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS kis_tokens (
+            id INT PRIMARY KEY CHECK (id = 1),
+            access_token TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL
+          );
+        `);
+
+        const res = await client.query("SELECT access_token, expires_at FROM kis_tokens WHERE id = 1");
+        if (res.rows.length > 0) {
+          const row = res.rows[0];
+          const expiresAt = new Date(row.expires_at).getTime();
+          // 만료 5분 전 여유를 두고 재사용 결정
+          if (expiresAt > Date.now() + 5 * 60 * 1000) {
+            return row.access_token;
+          }
+        }
+      } finally {
+        client.release();
+      }
+    }
+  } catch (dbErr) {
+    // DATABASE_URL이 없거나 테스트 실행 중일 때는 인메모리 폴백 캐시 조회
+    console.warn("[KIS] DB token cache failed, falling back to memory:", dbErr);
+    const now = Date.now();
+    if (cachedToken && now < tokenExpiresAt) {
+      return cachedToken;
+    }
   }
-  
+
+  // 2. 캐시 만료 또는 조회 불가 시 KIS API 정식 요청 실행
   try {
     const response = await fetch("https://openapi.koreainvestment.com:9443/oauth2/tokenP", {
       method: "POST",
@@ -87,11 +121,32 @@ export async function getAccessToken(): Promise<string | null> {
 
     const data = await response.json();
     if (data.access_token) {
-      cachedToken = data.access_token;
-      // KIS 토큰 만료 시간은 보통 24시간(86400초).
-      // 여유를 두어 20시간(72,000,000ms) 동안 캐싱 유지
-      tokenExpiresAt = Date.now() + 20 * 60 * 60 * 1000;
-      return cachedToken;
+      const token = data.access_token;
+      // 토큰 유효기간은 보통 24시간. 스팸 방지를 위해 20시간만 설정
+      const expTime = Date.now() + 20 * 60 * 60 * 1000;
+      const expDate = new Date(expTime);
+
+      // 데이터베이스 캐시 업데이트 실행 (upsert)
+      try {
+        const pool = getPool();
+        if (pool) {
+          await pool.query(
+            `INSERT INTO kis_tokens (id, access_token, expires_at) 
+             VALUES (1, $1, $2) 
+             ON CONFLICT (id) 
+             DO UPDATE SET access_token = $1, expires_at = $2`,
+            [token, expDate]
+          );
+        }
+      } catch (dbWriteErr) {
+        console.error("[KIS] Failed to write token to DB cache:", dbWriteErr);
+      }
+
+      // 인메모리 캐시 갱신
+      cachedToken = token;
+      tokenExpiresAt = expTime;
+
+      return token;
     }
     return null;
   } catch (err) {

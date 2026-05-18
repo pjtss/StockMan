@@ -45,6 +45,14 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS kis_tokens (
+        id INT PRIMARY KEY CHECK (id = 1),
+        access_token TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS alert_events (
         id BIGSERIAL PRIMARY KEY,
         source TEXT NOT NULL,
