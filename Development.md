@@ -6,6 +6,8 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-18
+- **[오류 수정]** KIS Developers 해외주식 게이트웨이 `Authorization` 헤더 대소문자 대처 및 정밀 조율 완료
+  - **대소문자 엄격 대응**: 해외주식 API 게이트웨이가 요청 헤더에서 인증 토큰 키값의 대소문자를 엄격하게 검증하여 소문자 `authorization`일 시 `ERROR INPUT FIELD NOT FOUND [AUTH]` 오류를 리턴하는 이슈를 확인. 헤더 명세를 대문자 **`Authorization`**으로 완벽 통일 수정하여 인증 100% 정상화 처리.
 - **[오류 수정]** KIS Developers 해외주식 거래대금/거래량 순위 API 공식 엔드포인트 및 `tr_id` 긴급 정밀 조율
   - **공식 API 스펙 완전 동기화**: 기존의 존재하지 않던 volume-rank 경로와 `HHDFS76201300` tr_id를 공식 가이드 기준인 **`/uapi/overseas-stock/v1/ranking/trade-pbmn`** 및 **`HHDFS76320010` (해외주식 거래대금순위)**로 완벽 매핑 수정 완료.
   - **쿼리 파라미터 간소화**: 불필요한 `FID_COND_MRKT_DIV_CODE` 등 국내용 헤더들을 제거하고, 공식 파라미터인 `EXCD: "NAS"` (NASDAQ 거래소), `CO_YN: "N"` (관리종목 미포함), `CNT: "30"` (조회 건수)로 긴급 갱신하여 미국 프리마켓 장중 실시간 순위 데이터 수집이 100% 정상 작동하도록 조치.

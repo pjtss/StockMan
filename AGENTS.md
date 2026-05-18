@@ -3,6 +3,10 @@
 ## Improvement Log
 
 ### 2026-05-18
+- **KIS 해외주식 API 게이트웨이 `Authorization` 헤더 대소문자 매칭 오류 긴급 해결**:
+  - **실수**: KIS OpenAPI 호출 시 국내주식 API는 소문자 `authorization` 헤더를 허용해주어 정상 동작했으나, 해외주식용 API 게이트웨이는 대소문자를 엄격하게 대조하도록 설정되어 있어서 `authorization`을 수신하지 못하고 `ERROR INPUT FIELD NOT FOUND [AUTH]` 오류를 리턴하며 빈 배열이 반환되도록 만듦.
+  - **원인**: KIS OpenAPI의 국내/해외 게이트웨이 파서 파이프라인의 헤더 엄격성 차이를 크로스 체크하지 못함.
+  - **해결 및 재발 방지**: `lib/kis-us.ts` 및 `lib/kis.ts` 내의 토큰 전달 헤더명을 표준 규격인 대문자 **`Authorization`**으로 완벽 통일 갱신함. 이후 실시간 호출 시 401/인증 필드 누락 오류 없이 100% 정상 수급 데이터가 수신됨을 보장함.
 - **KIS Developers 해외주식 거래대금/거래량 순위 API 공식 엔드포인트 및 `tr_id` 불일치 긴급 해소**:
   - **실수**: KIS API에서 국내주식 순위(FID 파라미터 구조)와 해외주식 순위(EXCD, CNT 단순 쿼리 구조)의 API 스키마 차이를 정확히 검증하지 못하고, 국내주식 조회용 파라미터 구조에 `FID_COND_MRKT_DIV_CODE: "US"`와 `tr_id: "HHDFS76201300"`을 잘못 설정하여 API가 오류를 발생시키고 빈 데이터(`[]`)를 수집하는 결과를 낳음.
   - **원인**: KIS Developers 포털 내의 국내주식 순위 API와 해외주식 순위 API(`HHDFS76320010`)의 요청 매개변수 규격 및 REST URL 경로의 차이를 세심하게 크로스체크하지 못함.

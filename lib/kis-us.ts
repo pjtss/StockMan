@@ -94,7 +94,7 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
     method: "GET",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       appkey: KIS_APPKEY || "",
       appsecret: KIS_APPSECRET || "",
       tr_id: "HHDFS76320010",
