@@ -3,7 +3,7 @@
 ## Required
 
 ### `DATABASE_URL`
-- Neon PostgreSQL 연결 문자열
+- Supabase PostgreSQL 연결 문자열
 - 푸시 구독, 공시 저장, 알림 기록에 사용
 
 ### `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
