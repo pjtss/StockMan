@@ -83,7 +83,7 @@ function getDynamicOffset(seed: number): number {
 // 해외 주식 시세 API 직접 조회 헬퍼
 async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
   const params = new URLSearchParams({
-    FID_COND_MRKT_DIV_CODE: "US", // 미국 전체
+    FID_COND_MRKT_DIV_CODE: "NAS", // NASDAQ 시장구분
     FID_COND_SCR_DIV_CODE: "20171",
     FID_INPUT_ISCD: "0000",
     FID_DIV_CLS_CODE: "0",
