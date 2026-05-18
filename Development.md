@@ -6,6 +6,11 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-18
+- **[오류 수정]** OpenDART 계약 상세 API 404 (Not Found) 브라우저 콘솔 네트워크 경고 완전 퇴치
+  - **성공적인 200 OK 처리**: 특정 공시(`rceptNo`)에 대해 실제 계약서 본문 정보가 없거나 모의 영수증일 때 `/api/dart/contract` 라우트에서 `404` 대신 `200 OK` 상태 코드로 `null` 객체를 반환하도록 개선.
+  - **클라이언트 자가 치유**: 브라우저 콘솔의 빨간색 GET 404 경고를 완전히 박멸하였으며, 프론트엔드 `ContractBadge` 컴포넌트는 `null` 값을 수신할 경우 에러나 크래시 없이 안전하게 비노출 처리(Graceful Hidden)되도록 동적 매핑 정비 완료.
+- **[환경설정 변경]** CPU 자원 제약 하에서 Vitest 테스트 타임아웃(Timeout) 방지 적용
+  - **testTimeout 연장**: `vitest.config.ts` 파일의 `test` 구성에 `testTimeout: 30000` (30초) 속성을 반영하여 가상 서버/지연 인스턴스 환경에서도 123대 단위 테스트 모듈이 중간 타임아웃 없이 안정적으로 통과되도록 최적화.
 - **[기능 개선]** 실 운영 환경에서의 KIS OpenAPI Mock Data 사용 완전 제거 및 PostgreSQL persistent cache 복원 시스템 구현
   - **100% 실데이터 무결성 확보**: 실제 상용 운영 환경(Production)에서 가짜 시뮬레이션 종목("가짜 종목 A" 등) 노출을 완전히 차단함. KIS credentials가 존재할 시에만 OpenAPI 직접 조회를 수행하며, 자격증명이 없는 기본 실운영 상태에서는 절대 Mock 데이터를 쓰지 않고 빈 배열(`[]`)을 반환하도록 설계함.
   - **PostgreSQL 기반 Persistent Cache (`kis_cache` 테이블 신설)**: KIS OpenAPI의 정상 수신 성공 시, HTS 한글 실시간 순위 종가 데이터를 Drizzle ORM(`kisCache` 엔티티)을 통해 Supabase 데이터베이스에 실시간 적재(Upsert)함.

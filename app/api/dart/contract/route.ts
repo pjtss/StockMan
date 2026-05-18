@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const details = await getContractDetails(rceptNo);
     
     if (!details) {
-      return NextResponse.json({ error: "Contract details not found" }, { status: 404 });
+      return NextResponse.json(null);
     }
 
     return NextResponse.json(details);
