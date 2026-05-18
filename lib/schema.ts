@@ -1,4 +1,4 @@
-import { pgTable, bigserial, text, timestamp, date, boolean, integer, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, text, timestamp, date, boolean, integer, uniqueIndex, check, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART 및 SEC 공시 이력 엔티티
@@ -81,4 +81,14 @@ export const kisTokens = pgTable(
   (table) => [
     check("single_row_check", sql`id = 1`),
   ]
+);
+
+// 6. 실시간 KIS OpenAPI 데이터 캐시 엔티티 (Mock Data 배제용 장외 시간 실세션 종가 공유 캐시)
+export const kisCache = pgTable(
+  "kis_cache",
+  {
+    key: text("key").primaryKey(),
+    data: jsonb("data").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  }
 );

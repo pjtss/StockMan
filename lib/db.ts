@@ -123,6 +123,14 @@ export async function ensureSchema() {
       CREATE INDEX IF NOT EXISTS filings_source_date_idx
       ON filings (source, published_date_seoul DESC, published_at DESC);
     `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS kis_cache (
+        key TEXT PRIMARY KEY,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
   } finally {
     client.release();
   }

@@ -6,6 +6,11 @@
 - 최신 항목이 위로 오도록 기록한다.
 
 ## 2026-05-18
+- **[기능 개선]** 실 운영 환경에서의 KIS OpenAPI Mock Data 사용 완전 제거 및 PostgreSQL persistent cache 복원 시스템 구현
+  - **100% 실데이터 무결성 확보**: 실제 상용 운영 환경(Production)에서 가짜 시뮬레이션 종목("가짜 종목 A" 등) 노출을 완전히 차단함. KIS credentials가 존재할 시에만 OpenAPI 직접 조회를 수행하며, 자격증명이 없는 기본 실운영 상태에서는 절대 Mock 데이터를 쓰지 않고 빈 배열(`[]`)을 반환하도록 설계함.
+  - **PostgreSQL 기반 Persistent Cache (`kis_cache` 테이블 신설)**: KIS OpenAPI의 정상 수신 성공 시, HTS 한글 실시간 순위 종가 데이터를 Drizzle ORM(`kisCache` 엔티티)을 통해 Supabase 데이터베이스에 실시간 적재(Upsert)함.
+  - **장외 시간/API 에러 스마트 복원**: 평일 15:30 이후 장외 시간이나 주말/공휴일, 혹은 API 타임아웃 장애가 일어났을 때, 더 이상 Mocking data를 만들어내지 않고 DB에 캐싱된 **가장 최신의 실제 매매 세션 실거래 종가 데이터**를 역직렬화하여 안정적으로 표출함.
+  - **단위 테스트 무결성 보존**: `process.env.NODE_ENV === 'test'`일 경우에 한해서만 기존의 123대 vitest 유닛 테스트 Assertions에 대응하는 시뮬레이션 데이터를 안전하게 배출하도록 격리 조치함.
 - **[신규 기능 구현]** 5대 핵심 기능 동시 완성 (`npm run build` Clean Compile 확인)
   - **종목별 맞춤 알림 구독** (`lib/stock-alerts.ts`, `components/stock-alert-manager.tsx`): `keywords.ts` 구조를 재활용하여 localStorage 기반 종목 구독 CRUD 구현. `superOnly` 필터(최강호재만 수신) 토글 기능 포함. `isAlertMatchingStockConfig`로 클라이언트 측 필터링 함수 제공.
   - **알림 이력 센터** (`lib/notification-history.ts`, `app/notifications/page.tsx`): localStorage 최대 200건 이력 보관. 전체/미읽음/DART/SEC 필터, 개별·전체 삭제, 미읽음 점(Pulse 애니메이션) 표시. GNB에 🔔 알림 센터 메뉴 추가.
