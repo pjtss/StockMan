@@ -55,7 +55,9 @@ export interface BidAskRatioItem {
   changeRate: string;
 }
 
-import { getPool } from "./db";
+import { getDb } from "./db";
+import { kisTokens } from "./schema";
+import { eq } from "drizzle-orm";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
@@ -69,30 +71,23 @@ export async function getAccessToken(): Promise<string | null> {
 
   // 1. 데이터베이스(Supabase) 기반 공유 캐시 우선 조회 (서버리스 컨테이너 간 토큰 공유)
   try {
-    const pool = getPool();
-    if (pool) {
-      const client = await pool.connect();
-      try {
-        // 테이블 존재성 재확인 (방어적 코드)
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS kis_tokens (
-            id INT PRIMARY KEY CHECK (id = 1),
-            access_token TEXT NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL
-          );
-        `);
+    const db = getDb();
+    if (db) {
+      const tokenRecord = await db.select({
+        accessToken: kisTokens.accessToken,
+        expiresAt: kisTokens.expiresAt,
+      })
+      .from(kisTokens)
+      .where(eq(kisTokens.id, 1))
+      .limit(1);
 
-        const res = await client.query("SELECT access_token, expires_at FROM kis_tokens WHERE id = 1");
-        if (res.rows.length > 0) {
-          const row = res.rows[0];
-          const expiresAt = new Date(row.expires_at).getTime();
-          // 만료 5분 전 여유를 두고 재사용 결정
-          if (expiresAt > Date.now() + 5 * 60 * 1000) {
-            return row.access_token;
-          }
+      if (tokenRecord.length > 0) {
+        const row = tokenRecord[0];
+        const expiresAt = new Date(row.expiresAt).getTime();
+        // 만료 5분 전 여유를 두고 재사용 결정
+        if (expiresAt > Date.now() + 5 * 60 * 1000) {
+          return row.accessToken;
         }
-      } finally {
-        client.release();
       }
     }
   } catch (dbErr) {
@@ -128,15 +123,14 @@ export async function getAccessToken(): Promise<string | null> {
 
       // 데이터베이스 캐시 업데이트 실행 (upsert)
       try {
-        const pool = getPool();
-        if (pool) {
-          await pool.query(
-            `INSERT INTO kis_tokens (id, access_token, expires_at) 
-             VALUES (1, $1, $2) 
-             ON CONFLICT (id) 
-             DO UPDATE SET access_token = $1, expires_at = $2`,
-            [token, expDate]
-          );
+        const db = getDb();
+        if (db) {
+          await db.insert(kisTokens)
+            .values({ id: 1, accessToken: token, expiresAt: expDate })
+            .onConflictDoUpdate({
+              target: kisTokens.id,
+              set: { accessToken: token, expiresAt: expDate }
+            });
         }
       } catch (dbWriteErr) {
         console.error("[KIS] Failed to write token to DB cache:", dbWriteErr);

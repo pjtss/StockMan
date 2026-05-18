@@ -1,4 +1,6 @@
 import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "./schema";
 
 let pool: Pool | null = null;
 
@@ -18,6 +20,15 @@ export function getPool(): Pool {
   }
 
   return pool;
+}
+
+let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+export function getDb() {
+  if (!dbInstance) {
+    dbInstance = drizzle(getPool(), { schema });
+  }
+  return dbInstance;
 }
 
 export async function ensureSchema() {
