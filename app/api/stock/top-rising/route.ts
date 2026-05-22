@@ -73,7 +73,8 @@ export async function GET() {
           debugReason = "Successfully triggered auto-sync and retrieved valid KIS records.";
         }
       } catch (syncErr: any) {
-        debugReason = `Triggered auto-sync, but it crashed: ${syncErr.message || syncErr}`;
+        const errorMsg = syncErr.message || String(syncErr);
+        debugReason = `Triggered auto-sync, but KIS OpenAPI returned an error: ${errorMsg}`;
         console.warn("[KIS] Auto sync failed, trying DB cache restore:", syncErr);
         
         // 싱크 작업 자체가 크래시 났을 때도 캐시 복원 시도
@@ -93,10 +94,13 @@ export async function GET() {
               price: item.price,
               addedAt: new Date()
             }));
-            debugReason = `Auto-sync crashed, but successfully restored ${filteredRecords.length} items from fallback DB cache (kisCache).`;
+            debugReason = `Auto-sync crashed (${errorMsg}), but successfully restored ${filteredRecords.length} items from fallback DB cache (kisCache).`;
+          } else {
+            debugReason = `Triggered auto-sync failed: ${errorMsg}. DB fallback cache (kisCache) was also empty.`;
           }
         } catch (dbErr: any) {
           console.error("[KIS] DB cache fallback on crash failed:", dbErr);
+          debugReason = `Triggered auto-sync failed: ${errorMsg}. DB fallback cache query also crashed.`;
         }
       }
     }

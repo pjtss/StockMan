@@ -109,11 +109,16 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
     });
 
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
       throw new Error(`KIS Overseas API returned HTTP ${response.status}`);
     }
 
     const resData = await response.json();
+    console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank raw response:`, JSON.stringify(resData, null, 2));
+
     if (resData.rt_cd !== "0") {
+      console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
       throw new Error(`KIS Overseas API Error [${resData.rt_cd}]: ${resData.msg1}`);
     }
 
@@ -143,6 +148,10 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
       });
       if (yfRes.ok) {
         const yfData = await yfRes.json();
+        
+        // Log the Yahoo Finance raw fallback data for high observability
+        console.info(`[KIS-US-DEBUG] Yahoo Finance raw response (first 2 quotes):`, JSON.stringify(yfData.finance?.result?.[0]?.quotes?.slice(0, 2), null, 2));
+
         const quotes = yfData.finance?.result?.[0]?.quotes || [];
         if (quotes.length > 0) {
           console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance live fallback succeeded, fetched ${quotes.length} quotes.`);

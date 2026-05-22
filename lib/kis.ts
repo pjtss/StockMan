@@ -122,11 +122,23 @@ export async function getAccessToken(): Promise<string | null> {
     });
     
     if (!response.ok) {
-      console.warn(`[KIS] Token fetch failed for ${url} with HTTP ${response.status}`);
+      const errText = await response.text();
+      console.warn(`[KIS-DEBUG] Token fetch failed for ${url} with HTTP ${response.status}, body: ${errText}`);
       return null;
     }
 
     const data = await response.json();
+    
+    // Mask the access_token for security while showing all other API metadata
+    const maskedData = { ...data };
+    if (maskedData.access_token && typeof maskedData.access_token === "string") {
+      const len = maskedData.access_token.length;
+      maskedData.access_token = len > 20 
+        ? `${maskedData.access_token.substring(0, 10)}...[MASKED]...${maskedData.access_token.substring(len - 10)}`
+        : "...[MASKED]...";
+    }
+    console.info(`[KIS-DEBUG] Token fetch raw response (masked):`, JSON.stringify(maskedData, null, 2));
+
     if (data.access_token) {
       const token = data.access_token;
       kisMode = "real";
@@ -222,11 +234,16 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
   });
 
   if (!response.ok) {
+    const errText = await response.text();
+    console.error(`[KIS-DEBUG] fetchRealVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
     throw new Error(`KIS API returned HTTP ${response.status}`);
   }
 
   const resData = await response.json();
+  console.info(`[KIS-DEBUG] fetchRealVolumeRank raw response:`, JSON.stringify(resData, null, 2));
+
   if (resData.rt_cd !== "0") {
+    console.error(`[KIS-DEBUG] fetchRealVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
     throw new Error(`KIS API Error [${resData.rt_cd}]: ${resData.msg1}`);
   }
 
@@ -856,11 +873,16 @@ async function fetchRealFluctuationRank(token: string): Promise<KisOutput[]> {
   });
 
   if (!response.ok) {
+    const errText = await response.text();
+    console.error(`[KIS-DEBUG] fetchRealFluctuationRank HTTP error: status ${response.status}, body: ${errText}`);
     throw new Error(`KIS API returned HTTP ${response.status}`);
   }
 
   const resData = await response.json();
+  console.info(`[KIS-DEBUG] fetchRealFluctuationRank raw response:`, JSON.stringify(resData, null, 2));
+
   if (resData.rt_cd !== "0") {
+    console.error(`[KIS-DEBUG] fetchRealFluctuationRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
     throw new Error(`KIS API Error [${resData.rt_cd}]: ${resData.msg1}`);
   }
 
