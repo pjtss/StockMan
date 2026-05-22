@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { topRisingStocks } from "@/lib/schema";
+import { topRisingStocks, kisCache } from "@/lib/schema";
 import { syncTopRisingStocks } from "@/lib/kis";
+import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -48,13 +49,55 @@ export async function GET() {
         records = await db.select().from(topRisingStocks);
         filteredRecords = records.filter(filterFunc);
         if (filteredRecords.length === 0) {
-          debugReason = "Triggered auto-sync, but KIS OpenAPI still returned 0 valid items (possibly outside market hours or invalid credentials).";
+          // KIS OpenAPI 동기화 결과가 0개인 경우 (장외 시간 등), 최후의 보루로 DB의 kisCache 백업 캐시 복원 시도 (무가짜 리얼 데이터 원칙 준수)
+          const cacheRecord = await db.select({ data: kisCache.data })
+            .from(kisCache)
+            .where(eq(kisCache.key, "top_rising_stocks"))
+            .limit(1);
+
+          if (cacheRecord.length > 0 && cacheRecord[0].data) {
+            const cacheData = cacheRecord[0].data as any[];
+            filteredRecords = cacheData.filter(filterFunc).map((item, idx) => ({
+              id: idx + 1,
+              code: item.code,
+              company: item.company,
+              changeRate: item.changeRate,
+              price: item.price,
+              addedAt: new Date()
+            }));
+            debugReason = `Triggered auto-sync but KIS API returned 0 items (possibly outside market hours). Successfully restored ${filteredRecords.length} items from fallback DB cache (kisCache).`;
+          } else {
+            debugReason = "Triggered auto-sync, but KIS OpenAPI still returned 0 valid items and DB fallback cache (kisCache) was empty.";
+          }
         } else {
           debugReason = "Successfully triggered auto-sync and retrieved valid KIS records.";
         }
       } catch (syncErr: any) {
         debugReason = `Triggered auto-sync, but it crashed: ${syncErr.message || syncErr}`;
-        console.warn("[KIS] Auto sync failed:", syncErr);
+        console.warn("[KIS] Auto sync failed, trying DB cache restore:", syncErr);
+        
+        // 싱크 작업 자체가 크래시 났을 때도 캐시 복원 시도
+        try {
+          const cacheRecord = await db.select({ data: kisCache.data })
+            .from(kisCache)
+            .where(eq(kisCache.key, "top_rising_stocks"))
+            .limit(1);
+
+          if (cacheRecord.length > 0 && cacheRecord[0].data) {
+            const cacheData = cacheRecord[0].data as any[];
+            filteredRecords = cacheData.filter(filterFunc).map((item, idx) => ({
+              id: idx + 1,
+              code: item.code,
+              company: item.company,
+              changeRate: item.changeRate,
+              price: item.price,
+              addedAt: new Date()
+            }));
+            debugReason = `Auto-sync crashed, but successfully restored ${filteredRecords.length} items from fallback DB cache (kisCache).`;
+          }
+        } catch (dbErr: any) {
+          console.error("[KIS] DB cache fallback on crash failed:", dbErr);
+        }
       }
     }
 
