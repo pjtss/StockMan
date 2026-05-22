@@ -1,30 +1,12 @@
-import { PageNavigation } from "@/components/page-navigation";
-import { TradingIntensity } from "@/components/trading-intensity";
-import { VolumeSpike } from "@/components/scanners/volume-spike";
-import { NetBuying } from "@/components/scanners/net-buying";
-import { ProgramTrading } from "@/components/scanners/program-trading";
-import { NewHigh } from "@/components/scanners/new-high";
-import { BidAskRatio } from "@/components/scanners/bid-ask-ratio";
-import styles from "./page.module.css";
+import { FeatureDisabled } from "@/components/feature-disabled";
 
 export default function ScannersPage() {
   return (
-    <main className={styles.page}>
-      <PageNavigation current="scanners" />
-      
-      <header className={styles.hero}>
-        <p className={styles.kicker}>REAL-TIME MARKET SCANNERS</p>
-        <h1 className={styles.title}>종합 시장 스캐너</h1>
-      </header>
-
-      <div className={styles.grid}>
-        <TradingIntensity />
-        <VolumeSpike />
-        <NetBuying />
-        <ProgramTrading />
-        <NewHigh />
-        <BidAskRatio />
-      </div>
-    </main>
+    <FeatureDisabled
+      current="scanners"
+      category="국내 스캐너"
+      title="국내 스캐너 기능이 비활성화되었습니다."
+      description="현재 국내 실시간 스캐너 호출과 화면 렌더링을 모두 중단한 상태입니다."
+    />
   );
 }

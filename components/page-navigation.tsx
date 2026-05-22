@@ -4,7 +4,15 @@ import Link from "next/link";
 import styles from "./page-navigation.module.css";
 import { ThemeToggle } from "./theme-toggle";
 
-type PageKey = "home" | "dart" | "dart-opendart-fast" | "sec" | "scanners" | "watchlist" | "notifications" | "scanners-us";
+type PageKey =
+  | "home"
+  | "dart"
+  | "dart-opendart-fast"
+  | "sec"
+  | "scanners"
+  | "watchlist"
+  | "notifications"
+  | "scanners-us";
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
@@ -16,32 +24,32 @@ export function PageNavigation({ current }: { current: PageKey }) {
       </div>
       <nav className={styles.nav}>
         <Link className={current === "home" ? styles.navActive : styles.navLink} href="/" prefetch={false}>
-          🏠 홈
+          홈
         </Link>
         <Link className={current === "dart" ? styles.navActive : styles.navLink} href="/dart" prefetch={false}>
-          📋 일반 DART
+          DART
         </Link>
         <Link
           className={current === "dart-opendart-fast" ? styles.navActive : styles.navLink}
           href="/dart/opendart-fast"
           prefetch={false}
         >
-          ⚡ 실시간 DART
+          OPEN DART
         </Link>
         <Link className={current === "sec" ? styles.navActive : styles.navLink} href="/sec" prefetch={false}>
-          🇺🇸 SEC
+          SEC
         </Link>
         <Link className={current === "scanners" ? styles.navActive : styles.navLink} href="/scanners" prefetch={false}>
-          📊 국내 스캐너
+          국내 스캐너
         </Link>
         <Link className={current === "scanners-us" ? styles.navActive : styles.navLink} href="/scanners/us" prefetch={false}>
-          🇺🇸 미국 스캐너
+          미국 스캐너
         </Link>
         <Link className={current === "watchlist" ? styles.navActive : styles.navLink} href="/watchlist" prefetch={false}>
-          ⭐ 관심 종목
+          관심 종목
         </Link>
         <Link className={current === "notifications" ? styles.navActive : styles.navLink} href="/notifications" prefetch={false}>
-          🔔 알림 센터
+          알림 센터
         </Link>
       </nav>
       <ThemeToggle />

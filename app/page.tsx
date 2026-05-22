@@ -7,30 +7,33 @@ export default function HomePage() {
     <main className={styles.page}>
       <PageNavigation current="home" />
       <section className={styles.hero}>
-        <p className={styles.kicker}>⚡ STOCKMAN QUANT</p>
-        <h1>STOCKMAN 퀀트 모니터 터미널</h1>
+        <p className={styles.kicker}>STOCKMAN QUANT</p>
+        <h1>주식 모니터 터미널</h1>
         <p className={styles.description}>
-          DART와 SEC 공시를 실시간으로 모니터링하고 KIS 수급 데이터와 교차 검증하는 최첨단 퀀트 대시보드입니다.
-          실시간 주도주와 강한 호재를 Stockman 알고리즘으로 즉시 감지하세요.
+          현재 실시간 DART, SEC, 국내 스캐너, 미국 스캐너 기능은 비활성화되어 있습니다.
+          관심 종목과 알림 센터 같은 보조 기능은 계속 사용할 수 있습니다.
         </p>
         <div className={styles.actions}>
-          <Link href="/dart" className={styles.primary} prefetch={false}>
-            DART 페이지 보기
+          <Link href="/dart" className={styles.secondary} prefetch={false}>
+            DART 상태 보기
           </Link>
-          <Link href="/dart/opendart-fast" className={styles.primaryAlt} prefetch={false}>
-            OPEN DART 빠른 공시
+          <Link href="/dart/opendart-fast" className={styles.secondary} prefetch={false}>
+            OPEN DART 상태 보기
           </Link>
           <Link href="/scanners" className={styles.secondary} prefetch={false}>
-            📊 마켓 스캐너
+            국내 스캐너 상태 보기
           </Link>
-          <Link href="/watchlist" className={styles.secondary} prefetch={false}>
-            ⭐ 관심 종목
-          </Link>
-          <Link href="/notifications" className={styles.secondary} prefetch={false}>
-            🔔 알림 센터
+          <Link href="/scanners/us" className={styles.secondary} prefetch={false}>
+            미국 스캐너 상태 보기
           </Link>
           <Link href="/sec" className={styles.secondary} prefetch={false}>
-            🇺🇸 SEC 페이지
+            SEC 상태 보기
+          </Link>
+          <Link href="/watchlist" className={styles.primaryAlt} prefetch={false}>
+            관심 종목
+          </Link>
+          <Link href="/notifications" className={styles.primary} prefetch={false}>
+            알림 센터
           </Link>
         </div>
       </section>

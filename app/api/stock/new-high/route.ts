@@ -1,11 +1,5 @@
-import { NextResponse } from "next/server";
-import { fetchNewHigh } from "@/lib/kis";
+import { createDisabledApiResponse } from "@/lib/feature-flags";
 
 export async function GET() {
-  try {
-    const data = await fetchNewHigh();
-    return NextResponse.json(data);
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to fetch new high" }, { status: 500 });
-  }
+  return createDisabledApiResponse("국내 스캐너");
 }

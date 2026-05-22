@@ -1,11 +1,12 @@
-import { FeedPage } from "@/components/feed-page";
+import { FeatureDisabled } from "@/components/feature-disabled";
 
 export default function SecPage() {
   return (
-    <FeedPage
-      type="sec"
-      title="SEC 금일 호재 공시"
-      description="SEC Latest Filings Atom 피드에서 오늘 공시된 항목 중 호재만 서울 시간 기준으로 추려서 최신순으로 보여줍니다."
+    <FeatureDisabled
+      current="sec"
+      category="SEC"
+      title="실시간 SEC 공시 기능이 비활성화되었습니다."
+      description="현재 SEC 공시 수집, 화면 조회, 관련 알림 흐름을 모두 중단한 상태입니다."
     />
   );
 }

@@ -1,11 +1,5 @@
-import { NextResponse } from "next/server";
-import { fetchTradingIntensity } from "@/lib/kis";
+import { createDisabledApiResponse } from "@/lib/feature-flags";
 
 export async function GET() {
-  try {
-    const data = await fetchTradingIntensity();
-    return NextResponse.json(data);
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to fetch intensity" }, { status: 500 });
-  }
+  return createDisabledApiResponse("국내 스캐너");
 }

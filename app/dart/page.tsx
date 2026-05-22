@@ -1,11 +1,12 @@
-import { FeedPage } from "@/components/feed-page";
+import { FeatureDisabled } from "@/components/feature-disabled";
 
 export default function DartPage() {
   return (
-    <FeedPage
-      type="dart"
-      title="DART 금일 호재 공시"
-      description="한국 DART RSS에서 오늘 공시된 항목 중 호재만 서울 시간 기준으로 추려서 최신순으로 보여줍니다."
+    <FeatureDisabled
+      current="dart"
+      category="DART"
+      title="실시간 DART 기능이 비활성화되었습니다."
+      description="현재 실시간 DART 수집, 화면 조회, 관련 알림 흐름을 모두 중단한 상태입니다."
     />
   );
 }
