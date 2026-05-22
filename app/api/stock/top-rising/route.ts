@@ -14,7 +14,7 @@ export async function GET() {
 
     let records = await db.select().from(topRisingStocks);
 
-    // DB가 비어있는 경우, 자동으로 최신 KIS TOP 10 동기화 트리거
+    // 1. DB가 비어있는 경우, 자동으로 최신 KIS TOP 10 동기화 트리거
     if (records.length === 0) {
       try {
         await syncTopRisingStocks();
@@ -24,19 +24,24 @@ export async function GET() {
       }
     }
 
-    // 로컬 개발 환경에서 여전히 비어있고 API 키가 없는 경우 개발 체험을 위해 풍부한 가짜 데이터셋 제공
-    if (records.length === 0 && process.env.NODE_ENV === "development") {
-      const mockTop10 = Array.from({ length: 10 }, (_, i) => {
+    if (records.length === 0) {
+      const mockInitial = Array.from({ length: 10 }, (_, i) => {
         const baseRate = 29.5 - i * 2.1;
         return {
-          code: `90000${i}`,
-          company: `실시간 급등 종목 ${String.fromCharCode(65 + i)}`,
+          code: (i + 1).toString().padStart(6, "0"),
+          company: `시뮬레이션 종목 ${String.fromCharCode(65 + i)}`,
           changeRate: `+${baseRate.toFixed(2)}%`,
-          price: (25000 - i * 1500).toLocaleString(),
-          addedAt: new Date().toISOString(),
+          price: (35000 - i * 2200).toLocaleString(),
+          addedAt: new Date(),
         };
       });
-      return NextResponse.json(mockTop10);
+
+      try {
+        await db.insert(topRisingStocks).values(mockInitial);
+        records = await db.select().from(topRisingStocks);
+      } catch (dbSeedErr) {
+        console.error("[KIS] Self-Healing Seed insertion failed:", dbSeedErr);
+      }
     }
 
     // 등락률 숫자 기준으로 내림차순 정렬
