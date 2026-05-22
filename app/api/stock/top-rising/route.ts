@@ -24,26 +24,6 @@ export async function GET() {
       }
     }
 
-    if (records.length === 0) {
-      const mockInitial = Array.from({ length: 10 }, (_, i) => {
-        const baseRate = 29.5 - i * 2.1;
-        return {
-          code: (i + 1).toString().padStart(6, "0"),
-          company: `시뮬레이션 종목 ${String.fromCharCode(65 + i)}`,
-          changeRate: `+${baseRate.toFixed(2)}%`,
-          price: (35000 - i * 2200).toLocaleString(),
-          addedAt: new Date(),
-        };
-      });
-
-      try {
-        await db.insert(topRisingStocks).values(mockInitial);
-        records = await db.select().from(topRisingStocks);
-      } catch (dbSeedErr) {
-        console.error("[KIS] Self-Healing Seed insertion failed:", dbSeedErr);
-      }
-    }
-
     // 등락률 숫자 기준으로 내림차순 정렬
     const sortedRecords = records.sort((a, b) => {
       const rateA = parseFloat(a.changeRate.replace(/[+%]/g, "")) || 0;
