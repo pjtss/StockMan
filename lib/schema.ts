@@ -92,3 +92,16 @@ export const kisCache = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   }
 );
+
+// 7. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+export const topRisingStocks = pgTable(
+  "top_rising_stocks",
+  {
+    code: text("code").primaryKey(),
+    company: text("company").notNull(),
+    changeRate: text("change_rate").notNull(),
+    price: text("price").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  }
+);
+

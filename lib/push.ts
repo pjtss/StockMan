@@ -23,6 +23,13 @@ function buildNotificationBody(alert: AlertItem): string {
   const seoulTime = formatSeoulTime(alert.publishedAt);
   const keyword = alert.keywords?.[0];
 
+  if (alert.source === "TOP_RISING") {
+    return [
+      `📈 상승률: ${alert.title}`,
+      `⏱️ 추가시간: ${seoulTime}`
+    ].join("\n");
+  }
+
   if (alert.source === "DART") {
     return [
       `📂 유형: ${alert.title}`,
@@ -242,18 +249,28 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
     const isBullish = alert.level === "호재";
 
     const emoji = isSuperBullish ? "🚨" : isBullish ? "⚡" : "✨";
-    const title = `${emoji} [${alert.level}] ${alert.company}`;
+    let title = `${emoji} [${alert.level}] ${alert.company}`;
+    if (alert.source === "TOP_RISING") {
+      title = `📈 [상승률 TOP 10 신규] ${alert.company}`;
+    }
 
-    const actions = [
-      {
-        action: "open_origin",
-        title: alert.source === "DART" ? "🔍 공시 원문 보기" : "🔍 EDGAR 조회",
-      },
-      {
-        action: "open_terminal",
-        title: "📊 실시간 대시보드",
-      }
-    ];
+    const actions = alert.source === "TOP_RISING"
+      ? [
+          {
+            action: "open_terminal",
+            title: "📊 실시간 대시보드",
+          }
+        ]
+      : [
+          {
+            action: "open_origin",
+            title: alert.source === "DART" ? "🔍 공시 원문 보기" : "🔍 EDGAR 조회",
+          },
+          {
+            action: "open_terminal",
+            title: "📊 실시간 대시보드",
+          }
+        ];
 
     const payload = JSON.stringify({
       title,
@@ -267,7 +284,9 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
     for (const subscription of subscriptions) {
       let allowed =
         subscription.enabled !== false &&
-        (alert.source === "DART" ? subscription.dartEnabled !== false : subscription.secEnabled !== false);
+        (alert.source === "DART" || alert.source === "TOP_RISING"
+          ? subscription.dartEnabled !== false
+          : subscription.secEnabled !== false);
 
       if (allowed && subscription.onlyValidated && alert.source === "DART") {
         const compClean = alert.company.replace(/\s+/g, "").toLowerCase();

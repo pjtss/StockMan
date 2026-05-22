@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export const FEATURE_FLAGS = {
-  dartRealtimeDisabled: true,
+  dartRealtimeDisabled: false,
   secRealtimeDisabled: true,
   domesticScannersDisabled: true,
   usScannersDisabled: true,

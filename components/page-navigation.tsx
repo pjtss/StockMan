@@ -12,7 +12,8 @@ type PageKey =
   | "scanners"
   | "watchlist"
   | "notifications"
-  | "scanners-us";
+  | "scanners-us"
+  | "top-rising";
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
@@ -36,20 +37,12 @@ export function PageNavigation({ current }: { current: PageKey }) {
         >
           OPEN DART
         </Link>
-        <Link className={current === "sec" ? styles.navActive : styles.navLink} href="/sec" prefetch={false}>
-          SEC
-        </Link>
-        <Link className={current === "scanners" ? styles.navActive : styles.navLink} href="/scanners" prefetch={false}>
-          국내 스캐너
-        </Link>
-        <Link className={current === "scanners-us" ? styles.navActive : styles.navLink} href="/scanners/us" prefetch={false}>
-          미국 스캐너
-        </Link>
-        <Link className={current === "watchlist" ? styles.navActive : styles.navLink} href="/watchlist" prefetch={false}>
-          관심 종목
-        </Link>
-        <Link className={current === "notifications" ? styles.navActive : styles.navLink} href="/notifications" prefetch={false}>
-          알림 센터
+        <Link
+          className={current === "top-rising" ? styles.navActive : styles.navLink}
+          href="/scanners/top-rising"
+          prefetch={false}
+        >
+          상승률 TOP 10
         </Link>
       </nav>
       <ThemeToggle />

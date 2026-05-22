@@ -131,6 +131,16 @@ export async function ensureSchema() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS top_rising_stocks (
+        code TEXT PRIMARY KEY,
+        company TEXT NOT NULL,
+        change_rate TEXT NOT NULL,
+        price TEXT NOT NULL,
+        added_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
   } finally {
     client.release();
   }
