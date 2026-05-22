@@ -15,6 +15,15 @@ export function UsBidAskRatio() {
     async function load() {
       try {
         const res = await fetch("/api/stock/us/bid-ask-ratio", { cache: "no-store" });
+        
+        const debugStatus = res.headers.get("x-debug-status");
+        const debugReason = res.headers.get("x-debug-reason");
+        if (debugStatus === "empty" || debugStatus === "error") {
+          console.warn(`🚨 [KIS-US-DEBUG] 나스닥 호가 잔량 비율 데이터 없음 감지! 상태: [${debugStatus}], 원인: ${debugReason}`);
+        } else {
+          console.info(`⚡ [KIS-US-DEBUG] 나스닥 호가 잔량 비율 로드 성공: ${debugReason}`);
+        }
+
         if (!res.ok) throw new Error();
         const data = await res.json();
         if (!cancelled) {

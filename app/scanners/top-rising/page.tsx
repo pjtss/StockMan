@@ -23,8 +23,19 @@ export default function TopRisingPage() {
       setLoading(true);
       setError(null);
       const res = await fetch("/api/stock/top-rising");
+      
+      // 디버그 용 상황별 HTTP 응답 헤더 정보 분석 및 콘솔 로그 출력
+      const debugStatus = res.headers.get("x-debug-status");
+      const debugReason = res.headers.get("x-debug-reason");
+      
+      if (debugStatus === "empty" || debugStatus === "error") {
+        console.warn(`🚨 [KIS-DEBUG-CLIENT] 상승률 TOP 10 데이터 없음 감지! 상태: [${debugStatus}], 원인: ${debugReason}`);
+      } else {
+        console.info(`⚡ [KIS-DEBUG-CLIENT] 상승률 TOP 10 데이터 로드 성공: ${debugReason}`);
+      }
+
       if (!res.ok) {
-        throw new Error("데이터를 가져오는 중 오류가 발생했습니다.");
+        throw new Error(`데이터를 가져오는 중 오류가 발생했습니다. (원인: ${debugReason || "알 수 없음"})`);
       }
       const data = await res.json();
       setStocks(data);
@@ -40,15 +51,17 @@ export default function TopRisingPage() {
     try {
       setSyncing(true);
       setError(null);
+      console.info("⚡ [KIS-DEBUG-CLIENT] 상승률 수동 동기화 요청 시작...");
       const res = await fetch("/api/stock/top-rising/sync", { method: "POST" });
       if (!res.ok) {
-        throw new Error("동기화 중 오류가 발생했습니다.");
+        throw new Error("동기화 API 호출 중 오류가 발생했습니다.");
       }
       const data = await res.json();
+      console.info("⚡ [KIS-DEBUG-CLIENT] 상승률 동기화 완료 응답 수신:", data);
       if (data.success) {
         await fetchStocks();
       } else {
-        throw new Error("동기화가 정상 처리되지 않았습니다.");
+        throw new Error(`동기화가 정상 처리되지 않았습니다: ${data.error || "알 수 없는 오류"}`);
       }
     } catch (err) {
       console.error(err);

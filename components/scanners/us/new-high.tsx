@@ -15,6 +15,15 @@ export function UsNewHigh() {
     async function load() {
       try {
         const res = await fetch("/api/stock/us/new-high", { cache: "no-store" });
+        
+        const debugStatus = res.headers.get("x-debug-status");
+        const debugReason = res.headers.get("x-debug-reason");
+        if (debugStatus === "empty" || debugStatus === "error") {
+          console.warn(`🚨 [KIS-US-DEBUG] 미국 신고가 & 이평돌파 데이터 없음 감지! 상태: [${debugStatus}], 원인: ${debugReason}`);
+        } else {
+          console.info(`⚡ [KIS-US-DEBUG] 미국 신고가 & 이평돌파 로드 성공: ${debugReason}`);
+        }
+
         if (!res.ok) throw new Error();
         const data = await res.json();
         if (!cancelled) {

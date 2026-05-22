@@ -97,6 +97,7 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
   // 해외주식 거래대금/거래량 순위 OpenAPI
   const url = `${baseUrl}/uapi/overseas-stock/v1/ranking/trade-pbmn?${params.toString()}`;
   
+  console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Requesting KIS US Stock rank from ${baseUrl} using mode '${mode}', tr_id '${trId}'`);
   try {
     const response = await fetch(url, {
       method: "GET",
@@ -118,8 +119,11 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
       throw new Error(`KIS Overseas API Error [${resData.rt_cd}]: ${resData.msg1}`);
     }
 
+    const items = resData.output || [];
+    console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: KIS OpenAPI successfully returned ${items.length} items.`);
+
     // 해외 거래량 API output mapping (공식 KIS 해외주식 거래대금순위 필드명 동기화)
-    return (resData.output || []).map((item: any) => ({
+    return items.map((item: any) => ({
       symb: item.symb || "",
       name: item.hts_kor_isnm || "",
       last: item.stck_prpr || "0",
@@ -129,7 +133,7 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
       amount: item.acml_tr_pbmn || "0",
     }));
   } catch (err: any) {
-    console.warn("[KIS-US] KIS live fetch failed or blocked. Activating Yahoo Finance live fallback:", err);
+    console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: KIS live fetch failed ('${err.message || err}'). Trying Yahoo Finance live fallback...`);
     
     // Yahoo Finance Live Screener Fallback (100% Real Live Market Data, No Mock Data!)
     try {
@@ -143,7 +147,7 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
         const yfData = await yfRes.json();
         const quotes = yfData.finance?.result?.[0]?.quotes || [];
         if (quotes.length > 0) {
-          console.info("[KIS-US] Yahoo Finance live fallback fetch successful.");
+          console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance live fallback succeeded, fetched ${quotes.length} quotes.`);
           return quotes.map((q: any) => {
             const price = q.regularMarketPrice || 0;
             const changePercent = q.regularMarketChangePercent || 0;
@@ -161,10 +165,14 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
               amount: String(amount),
             };
           });
+        } else {
+          console.warn("[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance live fallback returned empty quotes array.");
         }
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance fallback failed with status ${yfRes.status}`);
       }
-    } catch (yfErr) {
-      console.error("[KIS-US] Yahoo Finance fallback also failed:", yfErr);
+    } catch (yfErr: any) {
+      console.error("[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance fallback failed with exception:", yfErr.message);
     }
     
     throw err; // Re-throw KIS error if fallback fails
@@ -199,13 +207,22 @@ export async function fetchUsTradingIntensity(): Promise<StockIntensity[]> {
 
   // B. KIS 자격증명 누락 시 -> Supabase DB 캐시 복원 시도
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-US-DEBUG] fetchUsTradingIntensity: API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}).`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-        if (cacheRecord.length > 0) return cacheRecord[0].data as StockIntensity[];
+        if (cacheRecord.length > 0) {
+          console.info(`[KIS-US-DEBUG] fetchUsTradingIntensity: Successfully restored ${(cacheRecord[0].data as any[]).length} items from DB cache.`);
+          return cacheRecord[0].data as StockIntensity[];
+        }
+        console.warn(`[KIS-US-DEBUG] fetchUsTradingIntensity empty return: Credentials missing and DB cache '${cacheKey}' is empty.`);
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchUsTradingIntensity empty return: Credentials missing and DB connection failed.`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error(`[KIS-US-DEBUG] fetchUsTradingIntensity empty return: Credentials missing and DB cache read crashed:`, dbErr.message);
+    }
     return [];
   }
 
@@ -244,13 +261,20 @@ export async function fetchUsTradingIntensity(): Promise<StockIntensity[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch {}
+        } catch (dbErr: any) {
+          console.error(`[KIS-US-DEBUG] fetchUsTradingIntensity: Failed to write cache to DB:`, dbErr.message);
+        }
 
+        console.info(`[KIS-US-DEBUG] fetchUsTradingIntensity: Successfully fetched ${mappedData.length} items in realtime.`);
         return mappedData;
+      } else {
+        console.warn("[KIS-US-DEBUG] fetchUsTradingIntensity: Realtime fetch succeeded but returned 0 items.");
       }
+    } else {
+      console.warn("[KIS-US-DEBUG] fetchUsTradingIntensity: Access token is null or empty.");
     }
-  } catch (err) {
-    console.warn("[KIS-US] fetchUsTradingIntensity live fetch failed, reading DB cache:", err);
+  } catch (err: any) {
+    console.warn(`[KIS-US-DEBUG] fetchUsTradingIntensity live fetch failed, reading DB cache:`, err.message || err);
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 세션 복원
@@ -258,12 +282,19 @@ export async function fetchUsTradingIntensity(): Promise<StockIntensity[]> {
     const db = getDb();
     if (db) {
       const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-      if (cacheRecord.length > 0) return cacheRecord[0].data as StockIntensity[];
+      if (cacheRecord.length > 0) {
+        console.info(`[KIS-US-DEBUG] fetchUsTradingIntensity: Restored ${(cacheRecord[0].data as any[]).length} items from fallback DB cache.`);
+        return cacheRecord[0].data as StockIntensity[];
+      }
+      console.warn(`[KIS-US-DEBUG] fetchUsTradingIntensity empty return: DB cache key '${cacheKey}' is empty.`);
+    } else {
+      console.warn(`[KIS-US-DEBUG] fetchUsTradingIntensity empty return: DB connection failed for fallback cache.`);
     }
-  } catch (dbReadErr) {
-    console.error("[KIS-US] Failed to read us_trading_intensity from DB cache:", dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error(`[KIS-US-DEBUG] fetchUsTradingIntensity empty return: DB cache read failed:`, dbReadErr.message);
   }
 
+  console.warn("[KIS-US-DEBUG] fetchUsTradingIntensity empty return: End of function reached.");
   return [];
 }
 
@@ -289,13 +320,22 @@ export async function fetchUsVolumeSpike(): Promise<VolumeSpikeItem[]> {
   const cacheKey = "us_volume_spike";
 
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-US-DEBUG] fetchUsVolumeSpike: API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}).`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-        if (cacheRecord.length > 0) return cacheRecord[0].data as VolumeSpikeItem[];
+        if (cacheRecord.length > 0) {
+          console.info(`[KIS-US-DEBUG] fetchUsVolumeSpike: Successfully restored ${(cacheRecord[0].data as any[]).length} items from DB cache.`);
+          return cacheRecord[0].data as VolumeSpikeItem[];
+        }
+        console.warn(`[KIS-US-DEBUG] fetchUsVolumeSpike empty return: Credentials missing and DB cache '${cacheKey}' is empty.`);
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchUsVolumeSpike empty return: Credentials missing and DB connection failed.`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error(`[KIS-US-DEBUG] fetchUsVolumeSpike empty return: Credentials missing and DB cache read crashed:`, dbErr.message);
+    }
     return [];
   }
 
@@ -333,25 +373,39 @@ export async function fetchUsVolumeSpike(): Promise<VolumeSpikeItem[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch {}
+        } catch (dbErr: any) {
+          console.error(`[KIS-US-DEBUG] fetchUsVolumeSpike: Failed to write cache to DB:`, dbErr.message);
+        }
 
+        console.info(`[KIS-US-DEBUG] fetchUsVolumeSpike: Successfully fetched ${mappedData.length} items in realtime.`);
         return mappedData;
+      } else {
+        console.warn("[KIS-US-DEBUG] fetchUsVolumeSpike: Realtime fetch succeeded but returned 0 items.");
       }
+    } else {
+      console.warn("[KIS-US-DEBUG] fetchUsVolumeSpike: Access token is null or empty.");
     }
-  } catch (err) {
-    console.warn("[KIS-US] fetchUsVolumeSpike live fetch failed, reading DB cache:", err);
+  } catch (err: any) {
+    console.warn(`[KIS-US-DEBUG] fetchUsVolumeSpike live fetch failed, reading DB cache:`, err.message || err);
   }
 
   try {
     const db = getDb();
     if (db) {
       const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-      if (cacheRecord.length > 0) return cacheRecord[0].data as VolumeSpikeItem[];
+      if (cacheRecord.length > 0) {
+        console.info(`[KIS-US-DEBUG] fetchUsVolumeSpike: Restored ${(cacheRecord[0].data as any[]).length} items from fallback DB cache.`);
+        return cacheRecord[0].data as VolumeSpikeItem[];
+      }
+      console.warn(`[KIS-US-DEBUG] fetchUsVolumeSpike empty return: DB cache key '${cacheKey}' is empty.`);
+    } else {
+      console.warn(`[KIS-US-DEBUG] fetchUsVolumeSpike empty return: DB connection failed for fallback cache.`);
     }
-  } catch (dbReadErr) {
-    console.error("[KIS-US] Failed to read us_volume_spike from DB cache:", dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error("[KIS-US-DEBUG] fetchUsVolumeSpike empty return: DB cache read failed:", dbReadErr.message);
   }
 
+  console.warn("[KIS-US-DEBUG] fetchUsVolumeSpike empty return: End of function reached.");
   return [];
 }
 
@@ -377,13 +431,22 @@ export async function fetchUsNetBuying(): Promise<NetBuyingItem[]> {
   const cacheKey = "us_net_buying";
 
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-US-DEBUG] fetchUsNetBuying: API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}).`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-        if (cacheRecord.length > 0) return cacheRecord[0].data as NetBuyingItem[];
+        if (cacheRecord.length > 0) {
+          console.info(`[KIS-US-DEBUG] fetchUsNetBuying: Successfully restored ${(cacheRecord[0].data as any[]).length} items from DB cache.`);
+          return cacheRecord[0].data as NetBuyingItem[];
+        }
+        console.warn(`[KIS-US-DEBUG] fetchUsNetBuying empty return: Credentials missing and DB cache '${cacheKey}' is empty.`);
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchUsNetBuying empty return: Credentials missing and DB connection failed.`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error(`[KIS-US-DEBUG] fetchUsNetBuying empty return: Credentials missing and DB cache read crashed:`, dbErr.message);
+    }
     return [];
   }
 
@@ -419,25 +482,39 @@ export async function fetchUsNetBuying(): Promise<NetBuyingItem[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch {}
+        } catch (dbErr: any) {
+          console.error(`[KIS-US-DEBUG] fetchUsNetBuying: Failed to write cache to DB:`, dbErr.message);
+        }
 
+        console.info(`[KIS-US-DEBUG] fetchUsNetBuying: Successfully fetched ${mappedData.length} items in realtime.`);
         return mappedData;
+      } else {
+        console.warn("[KIS-US-DEBUG] fetchUsNetBuying: Realtime fetch succeeded but returned 0 items.");
       }
+    } else {
+      console.warn("[KIS-US-DEBUG] fetchUsNetBuying: Access token is null or empty.");
     }
-  } catch (err) {
-    console.warn("[KIS-US] fetchUsNetBuying live fetch failed, reading DB cache:", err);
+  } catch (err: any) {
+    console.warn(`[KIS-US-DEBUG] fetchUsNetBuying live fetch failed, reading DB cache:`, err.message || err);
   }
 
   try {
     const db = getDb();
     if (db) {
       const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-      if (cacheRecord.length > 0) return cacheRecord[0].data as NetBuyingItem[];
+      if (cacheRecord.length > 0) {
+        console.info(`[KIS-US-DEBUG] fetchUsNetBuying: Restored ${(cacheRecord[0].data as any[]).length} items from fallback DB cache.`);
+        return cacheRecord[0].data as NetBuyingItem[];
+      }
+      console.warn(`[KIS-US-DEBUG] fetchUsNetBuying empty return: DB cache key '${cacheKey}' is empty.`);
+    } else {
+      console.warn(`[KIS-US-DEBUG] fetchUsNetBuying empty return: DB connection failed for fallback cache.`);
     }
-  } catch (dbReadErr) {
-    console.error("[KIS-US] Failed to read us_net_buying from DB cache:", dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error("[KIS-US-DEBUG] fetchUsNetBuying empty return: DB cache read failed:", dbReadErr.message);
   }
 
+  console.warn("[KIS-US-DEBUG] fetchUsNetBuying empty return: End of function reached.");
   return [];
 }
 
@@ -462,13 +539,22 @@ export async function fetchUsProgramTrading(): Promise<ProgramTradingItem[]> {
   const cacheKey = "us_program_trading";
 
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-US-DEBUG] fetchUsProgramTrading: API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}).`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-        if (cacheRecord.length > 0) return cacheRecord[0].data as ProgramTradingItem[];
+        if (cacheRecord.length > 0) {
+          console.info(`[KIS-US-DEBUG] fetchUsProgramTrading: Successfully restored ${(cacheRecord[0].data as any[]).length} items from DB cache.`);
+          return cacheRecord[0].data as ProgramTradingItem[];
+        }
+        console.warn(`[KIS-US-DEBUG] fetchUsProgramTrading empty return: Credentials missing and DB cache '${cacheKey}' is empty.`);
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchUsProgramTrading empty return: Credentials missing and DB connection failed.`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error(`[KIS-US-DEBUG] fetchUsProgramTrading empty return: Credentials missing and DB cache read crashed:`, dbErr.message);
+    }
     return [];
   }
 
@@ -503,25 +589,39 @@ export async function fetchUsProgramTrading(): Promise<ProgramTradingItem[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch {}
+        } catch (dbErr: any) {
+          console.error(`[KIS-US-DEBUG] fetchUsProgramTrading: Failed to write cache to DB:`, dbErr.message);
+        }
 
+        console.info(`[KIS-US-DEBUG] fetchUsProgramTrading: Successfully fetched ${mappedData.length} items in realtime.`);
         return mappedData;
+      } else {
+        console.warn("[KIS-US-DEBUG] fetchUsProgramTrading: Realtime fetch succeeded but returned 0 items.");
       }
+    } else {
+      console.warn("[KIS-US-DEBUG] fetchUsProgramTrading: Access token is null or empty.");
     }
-  } catch (err) {
-    console.warn("[KIS-US] fetchUsProgramTrading live fetch failed, reading DB cache:", err);
+  } catch (err: any) {
+    console.warn(`[KIS-US-DEBUG] fetchUsProgramTrading live fetch failed, reading DB cache:`, err.message || err);
   }
 
   try {
     const db = getDb();
     if (db) {
       const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-      if (cacheRecord.length > 0) return cacheRecord[0].data as ProgramTradingItem[];
+      if (cacheRecord.length > 0) {
+        console.info(`[KIS-US-DEBUG] fetchUsProgramTrading: Restored ${(cacheRecord[0].data as any[]).length} items from fallback DB cache.`);
+        return cacheRecord[0].data as ProgramTradingItem[];
+      }
+      console.warn(`[KIS-US-DEBUG] fetchUsProgramTrading empty return: DB cache key '${cacheKey}' is empty.`);
+    } else {
+      console.warn(`[KIS-US-DEBUG] fetchUsProgramTrading empty return: DB connection failed for fallback cache.`);
     }
-  } catch (dbReadErr) {
-    console.error("[KIS-US] Failed to read us_program_trading from DB cache:", dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error("[KIS-US-DEBUG] fetchUsProgramTrading empty return: DB cache read failed:", dbReadErr.message);
   }
 
+  console.warn("[KIS-US-DEBUG] fetchUsProgramTrading empty return: End of function reached.");
   return [];
 }
 
@@ -546,13 +646,22 @@ export async function fetchUsNewHigh(): Promise<NewHighItem[]> {
   const cacheKey = "us_new_high";
 
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-US-DEBUG] fetchUsNewHigh: API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}).`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-        if (cacheRecord.length > 0) return cacheRecord[0].data as NewHighItem[];
+        if (cacheRecord.length > 0) {
+          console.info(`[KIS-US-DEBUG] fetchUsNewHigh: Successfully restored ${(cacheRecord[0].data as any[]).length} items from DB cache.`);
+          return cacheRecord[0].data as NewHighItem[];
+        }
+        console.warn(`[KIS-US-DEBUG] fetchUsNewHigh empty return: Credentials missing and DB cache '${cacheKey}' is empty.`);
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchUsNewHigh empty return: Credentials missing and DB connection failed.`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error(`[KIS-US-DEBUG] fetchUsNewHigh empty return: Credentials missing and DB cache read crashed:`, dbErr.message);
+    }
     return [];
   }
 
@@ -587,25 +696,39 @@ export async function fetchUsNewHigh(): Promise<NewHighItem[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch {}
+        } catch (dbErr: any) {
+          console.error(`[KIS-US-DEBUG] fetchUsNewHigh: Failed to write cache to DB:`, dbErr.message);
+        }
 
+        console.info(`[KIS-US-DEBUG] fetchUsNewHigh: Successfully fetched ${mappedData.length} items in realtime.`);
         return mappedData;
+      } else {
+        console.warn("[KIS-US-DEBUG] fetchUsNewHigh: Realtime fetch succeeded but returned 0 items.");
       }
+    } else {
+      console.warn("[KIS-US-DEBUG] fetchUsNewHigh: Access token is null or empty.");
     }
-  } catch (err) {
-    console.warn("[KIS-US] fetchUsNewHigh live fetch failed, reading DB cache:", err);
+  } catch (err: any) {
+    console.warn(`[KIS-US-DEBUG] fetchUsNewHigh live fetch failed, reading DB cache:`, err.message || err);
   }
 
   try {
     const db = getDb();
     if (db) {
       const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-      if (cacheRecord.length > 0) return cacheRecord[0].data as NewHighItem[];
+      if (cacheRecord.length > 0) {
+        console.info(`[KIS-US-DEBUG] fetchUsNewHigh: Restored ${(cacheRecord[0].data as any[]).length} items from fallback DB cache.`);
+        return cacheRecord[0].data as NewHighItem[];
+      }
+      console.warn(`[KIS-US-DEBUG] fetchUsNewHigh empty return: DB cache key '${cacheKey}' is empty.`);
+    } else {
+      console.warn(`[KIS-US-DEBUG] fetchUsNewHigh empty return: DB connection failed for fallback cache.`);
     }
-  } catch (dbReadErr) {
-    console.error("[KIS-US] Failed to read us_new_high from DB cache:", dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error("[KIS-US-DEBUG] fetchUsNewHigh empty return: DB cache read failed:", dbReadErr.message);
   }
 
+  console.warn("[KIS-US-DEBUG] fetchUsNewHigh empty return: End of function reached.");
   return [];
 }
 
@@ -630,13 +753,22 @@ export async function fetchUsBidAskRatio(): Promise<BidAskRatioItem[]> {
   const cacheKey = "us_bid_ask_ratio";
 
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-US-DEBUG] fetchUsBidAskRatio: API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}).`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-        if (cacheRecord.length > 0) return cacheRecord[0].data as BidAskRatioItem[];
+        if (cacheRecord.length > 0) {
+          console.info(`[KIS-US-DEBUG] fetchUsBidAskRatio: Successfully restored ${(cacheRecord[0].data as any[]).length} items from DB cache.`);
+          return cacheRecord[0].data as BidAskRatioItem[];
+        }
+        console.warn(`[KIS-US-DEBUG] fetchUsBidAskRatio empty return: Credentials missing and DB cache '${cacheKey}' is empty.`);
+      } else {
+        console.warn(`[KIS-US-DEBUG] fetchUsBidAskRatio empty return: Credentials missing and DB connection failed.`);
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error(`[KIS-US-DEBUG] fetchUsBidAskRatio empty return: Credentials missing and DB cache read crashed:`, dbErr.message);
+    }
     return [];
   }
 
@@ -671,24 +803,38 @@ export async function fetchUsBidAskRatio(): Promise<BidAskRatioItem[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch {}
+        } catch (dbErr: any) {
+          console.error(`[KIS-US-DEBUG] fetchUsBidAskRatio: Failed to write cache to DB:`, dbErr.message);
+        }
 
+        console.info(`[KIS-US-DEBUG] fetchUsBidAskRatio: Successfully fetched ${mappedData.length} items in realtime.`);
         return mappedData;
+      } else {
+        console.warn("[KIS-US-DEBUG] fetchUsBidAskRatio: Realtime fetch succeeded but returned 0 items.");
       }
+    } else {
+      console.warn("[KIS-US-DEBUG] fetchUsBidAskRatio: Access token is null or empty.");
     }
-  } catch (err) {
-    console.warn("[KIS-US] fetchUsBidAskRatio live fetch failed, reading DB cache:", err);
+  } catch (err: any) {
+    console.warn(`[KIS-US-DEBUG] fetchUsBidAskRatio live fetch failed, reading DB cache:`, err.message || err);
   }
 
   try {
     const db = getDb();
     if (db) {
       const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
-      if (cacheRecord.length > 0) return cacheRecord[0].data as BidAskRatioItem[];
+      if (cacheRecord.length > 0) {
+        console.info(`[KIS-US-DEBUG] fetchUsBidAskRatio: Restored ${(cacheRecord[0].data as any[]).length} items from fallback DB cache.`);
+        return cacheRecord[0].data as BidAskRatioItem[];
+      }
+      console.warn(`[KIS-US-DEBUG] fetchUsBidAskRatio empty return: DB cache key '${cacheKey}' is empty.`);
+    } else {
+      console.warn(`[KIS-US-DEBUG] fetchUsBidAskRatio empty return: DB connection failed for fallback cache.`);
     }
-  } catch (dbReadErr) {
-    console.error("[KIS-US] Failed to read us_bid_ask_ratio from DB cache:", dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error("[KIS-US-DEBUG] fetchUsBidAskRatio empty return: DB cache read failed:", dbReadErr.message);
   }
 
+  console.warn("[KIS-US-DEBUG] fetchUsBidAskRatio empty return: End of function reached.");
   return [];
 }

@@ -217,6 +217,7 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
   const baseUrl = mode === "mock" 
     ? "https://openapivts.koreainvestment.com:29443" 
     : "https://openapi.koreainvestment.com:9443";
+  const trId = mode === "mock" ? "VTST01710000" : "FHPST01710000";
 
   const url = `${baseUrl}/uapi/domestic-stock/v1/quotations/volume-rank?${params.toString()}`;
   const response = await fetch(url, {
@@ -226,7 +227,7 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
       Authorization: `Bearer ${token}`,
       appkey: KIS_APPKEY || "",
       appsecret: KIS_APPSECRET || "",
-      tr_id: "FHPST01710000",
+      tr_id: trId,
     },
   });
 
@@ -853,6 +854,7 @@ async function fetchRealFluctuationRank(token: string): Promise<KisOutput[]> {
   const baseUrl = mode === "mock" 
     ? "https://openapivts.koreainvestment.com:29443" 
     : "https://openapi.koreainvestment.com:9443";
+  const trId = mode === "mock" ? "VTST01700000" : "FHPST01700000";
 
   const url = `${baseUrl}/uapi/domestic-stock/v1/ranking/fluctuation?${params.toString()}`;
   const response = await fetch(url, {
@@ -862,7 +864,7 @@ async function fetchRealFluctuationRank(token: string): Promise<KisOutput[]> {
       Authorization: `Bearer ${token}`,
       appkey: KIS_APPKEY || "",
       appsecret: KIS_APPSECRET || "",
-      tr_id: "FHPST01700000",
+      tr_id: trId,
     },
   });
 
@@ -917,15 +919,23 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
   // B. 실 운영 환경에서 API 키 누락 시 -> 절대 Mock을 반환하지 않고 DB 캐시 복원 시도 (없을 시 빈 배열)
   if (!KIS_APPKEY || !KIS_APPSECRET) {
+    console.warn(`[KIS-DEBUG] fetchTopRisingStocks: KIS API credentials missing (KIS_APPKEY: ${!!KIS_APPKEY}, KIS_APPSECRET: ${!!KIS_APPSECRET}). Attempting DB Cache restore.`);
     try {
       const db = getDb();
       if (db) {
         const cacheRecord = await db.select({ data: kisCache.data }).from(kisCache).where(eq(kisCache.key, "top_rising_stocks")).limit(1);
         if (cacheRecord.length > 0) {
-          return filterMockRisingStocks(cacheRecord[0].data as TopRisingStockItem[]);
+          const filtered = filterMockRisingStocks(cacheRecord[0].data as TopRisingStockItem[]);
+          console.info(`[KIS-DEBUG] fetchTopRisingStocks: Successfully restored ${filtered.length} items from DB cache.`);
+          return filtered;
         }
+        console.warn("[KIS-DEBUG] fetchTopRisingStocks empty return: API credentials missing and 'top_rising_stocks' DB cache is empty.");
+      } else {
+        console.warn("[KIS-DEBUG] fetchTopRisingStocks empty return: API credentials missing and DB connection not available.");
       }
-    } catch {}
+    } catch (dbErr: any) {
+      console.error("[KIS-DEBUG] fetchTopRisingStocks empty return: API credentials missing and DB cache read crashed:", dbErr.message);
+    }
     return [];
   }
 
@@ -962,15 +972,21 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
                 set: { data: mappedData, updatedAt: new Date() }
               });
           }
-        } catch (dbWriteErr) {
-          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
+        } catch (dbWriteErr: any) {
+          console.error(`[KIS-DEBUG] fetchTopRisingStocks: Failed to write ${cacheKey} to DB Cache:`, dbWriteErr.message);
         }
 
-        return filterMockRisingStocks(mappedData);
+        const filtered = filterMockRisingStocks(mappedData);
+        console.info(`[KIS-DEBUG] fetchTopRisingStocks: Successfully fetched ${filtered.length} real-time items from KIS OpenAPI.`);
+        return filtered;
+      } else {
+        console.warn("[KIS-DEBUG] fetchTopRisingStocks: Realtime fetch succeeded but returned 0 items from KIS OpenAPI.");
       }
+    } else {
+      console.warn("[KIS-DEBUG] fetchTopRisingStocks: Failed to retrieve KIS AccessToken (returned null/empty).");
     }
-  } catch (err) {
-    console.warn(`[KIS] fetchTopRisingStocks live fetch failed, reading closing session DB cache:`, err);
+  } catch (err: any) {
+    console.warn(`[KIS-DEBUG] fetchTopRisingStocks: Realtime fetch failed, falling back to DB cache:`, err.message || err);
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 실거래 기록 복원
@@ -985,13 +1001,19 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
       .limit(1);
 
       if (cacheRecord.length > 0) {
-        return filterMockRisingStocks(cacheRecord[0].data as TopRisingStockItem[]);
+        const restored = filterMockRisingStocks(cacheRecord[0].data as TopRisingStockItem[]);
+        console.info(`[KIS-DEBUG] fetchTopRisingStocks: Successfully restored ${restored.length} items from fallback DB cache.`);
+        return restored;
       }
+      console.warn(`[KIS-DEBUG] fetchTopRisingStocks empty return: DB cache key '${cacheKey}' is empty or does not exist.`);
+    } else {
+      console.warn("[KIS-DEBUG] fetchTopRisingStocks empty return: DB connection not available for cache fallback.");
     }
-  } catch (dbReadErr) {
-    console.error(`[KIS] Failed to read ${cacheKey} from DB cache:`, dbReadErr);
+  } catch (dbReadErr: any) {
+    console.error(`[KIS-DEBUG] fetchTopRisingStocks empty return: Failed to read DB cache:`, dbReadErr.message);
   }
 
+  console.warn("[KIS-DEBUG] fetchTopRisingStocks empty return: End of function reached with no valid real-world data.");
   return [];
 }
 
