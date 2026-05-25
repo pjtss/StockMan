@@ -30,6 +30,13 @@ function buildNotificationBody(alert: AlertItem): string {
     ].join("\n");
   }
 
+  if (alert.source === "INTENSITY") {
+    return [
+      `⚡ 체결강도: ${alert.title}`,
+      `⏱️ 추가시간: ${seoulTime}`
+    ].join("\n");
+  }
+
   if (alert.source === "DART") {
     return [
       `📂 유형: ${alert.title}`,
@@ -252,9 +259,11 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
     let title = `${emoji} [${alert.level}] ${alert.company}`;
     if (alert.source === "TOP_RISING") {
       title = `📈 [상승률 TOP 10 신규] ${alert.company}`;
+    } else if (alert.source === "INTENSITY") {
+      title = `⚡ [체결강도 TOP 10 신규] ${alert.company}`;
     }
 
-    const actions = alert.source === "TOP_RISING"
+    const actions = (alert.source === "TOP_RISING" || alert.source === "INTENSITY")
       ? [
           {
             action: "open_terminal",
@@ -284,7 +293,7 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
     for (const subscription of subscriptions) {
       let allowed =
         subscription.enabled !== false &&
-        (alert.source === "DART" || alert.source === "TOP_RISING"
+        (alert.source === "DART" || alert.source === "TOP_RISING" || alert.source === "INTENSITY"
           ? subscription.dartEnabled !== false
           : subscription.secEnabled !== false);
 

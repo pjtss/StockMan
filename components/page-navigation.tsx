@@ -13,7 +13,8 @@ type PageKey =
   | "watchlist"
   | "notifications"
   | "scanners-us"
-  | "top-rising";
+  | "top-rising"
+  | "trading-intensity";
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
@@ -43,6 +44,13 @@ export function PageNavigation({ current }: { current: PageKey }) {
           prefetch={false}
         >
           상승률 TOP 10
+        </Link>
+        <Link
+          className={current === "trading-intensity" ? styles.navActive : styles.navLink}
+          href="/scanners/trading-intensity"
+          prefetch={false}
+        >
+          체결강도 TOP 10
         </Link>
       </nav>
       <ThemeToggle />

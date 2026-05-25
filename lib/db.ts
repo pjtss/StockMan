@@ -141,6 +141,17 @@ export async function ensureSchema() {
         added_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS top_intensity_stocks (
+        code TEXT PRIMARY KEY,
+        company TEXT NOT NULL,
+        intensity INTEGER NOT NULL,
+        price TEXT NOT NULL,
+        change_rate TEXT NOT NULL,
+        added_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
   } finally {
     client.release();
   }

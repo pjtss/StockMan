@@ -56,7 +56,7 @@ export interface BidAskRatioItem {
 }
 
 import { getDb } from "./db";
-import { kisTokens, kisCache, topRisingStocks } from "./schema";
+import { kisTokens, kisCache, topRisingStocks, topIntensityStocks } from "./schema";
 import { eq, inArray } from "drizzle-orm";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
@@ -292,7 +292,7 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
+        const mappedData = realItems.map((item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
           const rawVrss = parseInt(item.prdy_vrss, 10) || 0;
           const rate = parseFloat(item.prdy_ctrt) || 0.0;
@@ -301,7 +301,7 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
           const intensity = rawIntensity > 0 ? Math.round(rawIntensity) : Math.max(50, Math.round(160 - i * 6));
 
           return {
-            rank: i + 1,
+            rank: 0,
             company: item.hts_kor_shr_nlen.trim(),
             code: item.mksc_shrn_iscd,
             intensity,
@@ -311,22 +311,31 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
           };
         });
 
+        // 체결강도 기준으로 내림차순 정렬
+        const sortedData = mappedData.sort((a, b) => b.intensity - a.intensity);
+
+        // 상위 10개 추출 및 순위 재정의
+        const top10 = sortedData.slice(0, 10).map((item, idx) => ({
+          ...item,
+          rank: idx + 1,
+        }));
+
         // 데이터베이스 영속 캐시 갱신 (성공한 마지막 실제 데이터를 백그라운드 공유 저장)
         try {
           const db = getDb();
           if (db) {
             await db.insert(kisCache)
-              .values({ key: cacheKey, data: mappedData, updatedAt: new Date() })
+              .values({ key: cacheKey, data: top10, updatedAt: new Date() })
               .onConflictDoUpdate({
                 target: kisCache.key,
-                set: { data: mappedData, updatedAt: new Date() }
+                set: { data: top10, updatedAt: new Date() }
               });
           }
         } catch (dbWriteErr) {
           console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
         }
 
-        return mappedData;
+        return top10;
       }
     }
   } catch (err) {
@@ -1073,4 +1082,73 @@ export async function syncTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
   return newlyAdded;
 }
+
+// 서울 시간대 (UTC+9) 날짜 문자열(YYYY-MM-DD) 반환 헬퍼
+function getSeoulDateStr(d: Date): string {
+  const seoulTime = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return seoulTime.toISOString().split("T")[0];
+}
+
+// 체결강도 상위 TOP 10 싱크 및 비교 로직 (신규 진입 종목 배열 반환하여 push 알림에 활용)
+export async function syncTradingIntensityStocks(): Promise<StockIntensity[]> {
+  const db = getDb();
+  if (!db) return [];
+
+  // A. 최신 TOP 10 정보 조회
+  const newTop10 = await fetchTradingIntensity();
+  if (newTop10.length === 0) return [];
+
+  const todayStr = getSeoulDateStr(new Date());
+
+  // B. 기존 DB 저장된 TOP 10 조회
+  let oldTop10 = await db.select().from(topIntensityStocks);
+
+  // C. 오늘 날짜 기준 정합성 검증 (날짜가 다르면 기존 데이터 완전 초기화)
+  if (oldTop10.length > 0) {
+    const lastRecordDate = getSeoulDateStr(oldTop10[0].addedAt);
+    if (lastRecordDate !== todayStr) {
+      await db.delete(topIntensityStocks);
+      oldTop10 = [];
+    }
+  }
+
+  const oldCodes = new Set(oldTop10.map((s) => s.code));
+  const newCodes = new Set(newTop10.map((s) => s.code));
+
+  // D. 누락된 종목 삭제 (기존 TOP 10에 있었으나 신규 TOP 10에 없는 것)
+  const obsoleteCodes = oldTop10.filter((s) => !newCodes.has(s.code)).map((s) => s.code);
+  if (obsoleteCodes.length > 0) {
+    await db.delete(topIntensityStocks).where(inArray(topIntensityStocks.code, obsoleteCodes));
+  }
+
+  // E. 신규 종목 추가 (신규 TOP 10에 있으나 기존 TOP 10에 없던 것)
+  const newlyAdded = newTop10.filter((s) => !oldCodes.has(s.code));
+  if (newlyAdded.length > 0) {
+    await db.insert(topIntensityStocks).values(
+      newlyAdded.map((s) => ({
+        code: s.code,
+        company: s.company,
+        intensity: s.intensity,
+        price: s.price,
+        changeRate: s.changeRate,
+        addedAt: new Date(),
+      }))
+    );
+  }
+
+  // F. 기존 유지 종목의 가격, 등락률 및 체결강도 정보 갱신 (추가 시간인 addedAt은 유지)
+  const existing = newTop10.filter((s) => oldCodes.has(s.code));
+  for (const s of existing) {
+    await db.update(topIntensityStocks)
+      .set({
+        intensity: s.intensity,
+        price: s.price,
+        changeRate: s.changeRate,
+      })
+      .where(eq(topIntensityStocks.code, s.code));
+  }
+
+  return newlyAdded;
+}
+
 

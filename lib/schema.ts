@@ -105,3 +105,17 @@ export const topRisingStocks = pgTable(
   }
 );
 
+// 8. 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+export const topIntensityStocks = pgTable(
+  "top_intensity_stocks",
+  {
+    code: text("code").primaryKey(),
+    company: text("company").notNull(),
+    intensity: integer("intensity").notNull(),
+    price: text("price").notNull(),
+    changeRate: text("change_rate").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  }
+);
+
+
