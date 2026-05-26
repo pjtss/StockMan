@@ -81,12 +81,12 @@ function getDynamicOffset(seed: number): number {
 }
 
 // 해외 주식 시세 API 직접 조회 헬퍼
-async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
+async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUsOutput[]> {
   const params = new URLSearchParams({
-    EXCD: "NAS",      // NASDAQ 거래소 코드
+    EXCD: excd,       // 거래소 코드
     GUBN: "1",        // 상승율/하락율 구분 (1: 상승율)
     NDAY: "0",        // 날짜 구분
-    VOL_RANG: "5",    // 거래량 조건
+    VOL_RANG: "0",    // 거래량 조건 (0: 전체, 어떤 급등주든 누락 방지하기 위해 0만주 이상으로 조건 완화)
   });
 
   // 오직 실전투자 계좌만 지원 (모의투자 완전 배제, 실거래 서버 고정)
@@ -126,15 +126,15 @@ async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
     const items = resData.output || [];
     console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: KIS OpenAPI successfully returned ${items.length} items.`);
 
-    // 해외 거래량 API output mapping (공식 KIS 해외주식 거래대금순위 필드명 동기화)
+    // KIS 해외주식 상승/하락율 API (HHDFS76290000) 규격에 맞추어 올바른 응답 필드명을 매핑
     const result = items.map((item: any) => ({
       symb: item.symb || "",
-      name: item.hts_kor_isnm || "",
-      last: item.stck_prpr || "0",
-      rate: item.prdy_ctrt || "0",
-      diff: item.prdy_vrss || "0",
-      vol: item.acml_vol || "0",
-      amount: item.acml_tr_pbmn || "0",
+      name: item.name || "",
+      last: item.last || "0",
+      rate: item.rate || "0",
+      diff: item.diff || "0",
+      vol: item.tvol || "0",
+      amount: item.tamnt || "0",
     }));
     (result as any).isFallback = false;
     (result as any).fallbackSource = "";
@@ -970,9 +970,39 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
   try {
     if (token) {
-      const realItems = await fetchRealUsVolumeRank(token);
-      if (realItems && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
+      // 3대 주요 거래소(NAS, NYS, AMS)의 실시간 상승율 랭킹 데이터를 병렬로 동시 조회
+      const [nasItems, nysItems, amsItems] = await Promise.all([
+        fetchRealUsVolumeRank(token, "NAS"),
+        fetchRealUsVolumeRank(token, "NYS"),
+        fetchRealUsVolumeRank(token, "AMS"),
+      ]);
+
+      const allItems = [
+        ...(nasItems || []),
+        ...(nysItems || []),
+        ...(amsItems || [])
+      ];
+
+      const isFallback = 
+        (nasItems as any)?.isFallback || 
+        (nysItems as any)?.isFallback || 
+        (amsItems as any)?.isFallback;
+
+      const fallbackSource = 
+        (nasItems as any)?.fallbackSource || 
+        (nysItems as any)?.fallbackSource || 
+        (amsItems as any)?.fallbackSource;
+
+      if (allItems.length > 0) {
+        // 상승률(rate) 기준 내림차순 정렬
+        allItems.sort((a, b) => {
+          const rateA = parseFloat(a.rate) || 0;
+          const rateB = parseFloat(b.rate) || 0;
+          return rateB - rateA;
+        });
+
+        // 병합된 결과에서 상승률 상위 10개 추출
+        const mappedData = allItems.slice(0, 10).map((item, i) => {
           const priceVal = parseFloat(item.last) || 0.0;
           const rateVal = parseFloat(item.rate) || 0.0;
           const isUp = rateVal >= 0;
@@ -1002,8 +1032,8 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
         const filtered = filterMockUsRisingStocks(mappedData);
         console.info(`[KIS-US-DEBUG] fetchTopRisingStocks: Successfully fetched ${filtered.length} real-time items.`);
-        (filtered as any).isFallback = (realItems as any).isFallback;
-        (filtered as any).fallbackSource = (realItems as any).fallbackSource;
+        (filtered as any).isFallback = isFallback;
+        (filtered as any).fallbackSource = fallbackSource;
         return filtered;
       }
     }
