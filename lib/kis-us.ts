@@ -148,7 +148,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     // AUTH 에러인 경우: 토큰 캐시가 오래되거나 잡목된 토큰일 가능성 높음 → 자동 재발급 후 재시도
     if (isAuthError) {
       console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: AUTH error detected ('${kisErrMsg}'). Clearing token cache and retrying with fresh token...`);
-      clearTokenCache();
+      await clearTokenCache();
       try {
         const freshToken = await getAccessToken();
         if (freshToken) {

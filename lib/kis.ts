@@ -185,9 +185,18 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 // 테스트를 위해 캐시를 초기화할 수 있는 헬퍼 함수
-export function clearTokenCache() {
+export async function clearTokenCache() {
   cachedToken = null;
   tokenExpiresAt = 0;
+
+  try {
+    const db = getDb();
+    if (db) {
+      await db.delete(kisTokens).where(eq(kisTokens.id, 1));
+    }
+  } catch (dbErr: any) {
+    console.warn("[KIS] DB token cache clear failed:", dbErr.message || dbErr);
+  }
 }
 
 // 실시간처럼 변화를 주어 극도의 하이엔드 퀀트 대시보드를 체감할 수 있게 해주는 노이즈 함수
@@ -1159,5 +1168,4 @@ export async function syncTradingIntensityStocks(): Promise<StockIntensity[]> {
 
   return newlyAdded;
 }
-
 

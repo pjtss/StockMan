@@ -142,6 +142,12 @@
   - `company-timeline.module.css`: 타임라인 모달의 배경, 선, 텍스트 색상을 어두운 테마로 변경.
   - 모든 디자인 변경은 순수 CSS 수정으로 구현되어 기존 기능 및 테스트 커버리지 유지.
 
+## 2026-05-27
+- **[수정 완료]** KIS AUTH 오류 재발 원인인 DB 토큰 캐시 미삭제 문제를 해결함.
+  - `lib/kis.ts`: `clearTokenCache()`가 인메모리 토큰뿐 아니라 `kis_tokens` 테이블의 `id = 1` 토큰 레코드도 삭제하도록 비동기 처리로 확장함.
+  - `app/api/stock/top-rising/sync/route.ts`: 수동 sync 시작 전 DB 토큰 삭제가 끝난 뒤 새 토큰을 발급받도록 `await clearTokenCache()`로 변경함.
+  - `lib/kis-us.ts`: KIS AUTH 오류 감지 후 재시도 전에 DB stale token까지 제거하도록 `await clearTokenCache()`로 변경함.
+
 ## 2026-05-16
 - **[구현 완료]** OpenDART 원문 핵심 데이터 추출 (단일판매ㆍ공급계약체결)
   - `lib/opendart.ts`: `list.json` API를 통한 `corp_code` 동적 조회 및 `snglpnrsctrt.json` (단일판매) 데이터 페칭 로직 구현.
