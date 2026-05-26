@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { kisCache, topRisingStocks } from "./schema";
 import { eq, inArray } from "drizzle-orm";
 import { getAccessToken, getKisMode, clearTokenCache } from "./kis";
+import { buildKisUsRequestDebug, pushKisUsDebugLog } from "./kis-us-debug";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
@@ -98,6 +99,18 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
   
   console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Requesting KIS US Stock rank from ${baseUrl} using real account tr_id '${trId}'`);
   try {
+    pushKisUsDebugLog(
+      "KIS-US-REQ",
+      buildKisUsRequestDebug("GET", url, {
+        "content-type": "application/json",
+        Authorization: `Bearer ${token}`,
+        appkey: KIS_APPKEY || "",
+        appsecret: KIS_APPSECRET || "",
+        tr_id: trId,
+        custtype: "P",
+        tr_cont: "",
+      })
+    );
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -114,14 +127,17 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     if (!response.ok) {
       const errText = await response.text();
       console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
+      pushKisUsDebugLog("KIS-US-HTTP-ERR", { status: response.status, body: errText });
       throw new Error(`KIS Overseas API returned HTTP ${response.status}`);
     }
 
     const resData = await response.json();
     console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank raw response:`, JSON.stringify(resData, null, 2));
+    pushKisUsDebugLog("KIS-US-RES", { status: response.status, data: resData });
 
     if (resData.rt_cd !== "0") {
       console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
+      pushKisUsDebugLog("KIS-US-BIZ-ERR", { rt_cd: resData.rt_cd, msg1: resData.msg1, data: resData });
       throw new Error(`KIS Overseas API Error [${resData.rt_cd}]: ${resData.msg1}`);
     }
 
@@ -148,10 +164,23 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     // AUTH 에러인 경우: 토큰 캐시가 오래되거나 잡목된 토큰일 가능성 높음 → 자동 재발급 후 재시도
     if (isAuthError) {
       console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: AUTH error detected ('${kisErrMsg}'). Clearing token cache and retrying with fresh token...`);
+      pushKisUsDebugLog("KIS-US-AUTH-ERR", { message: kisErrMsg });
       await clearTokenCache();
       try {
         const freshToken = await getAccessToken();
         if (freshToken) {
+          pushKisUsDebugLog(
+            "KIS-US-REQ-RETRY",
+            buildKisUsRequestDebug("GET", url, {
+              "content-type": "application/json",
+              Authorization: `Bearer ${freshToken}`,
+              appkey: KIS_APPKEY || "",
+              appsecret: KIS_APPSECRET || "",
+              tr_id: trId,
+              custtype: "P",
+              tr_cont: "",
+            })
+          );
           const retryResponse = await fetch(url, {
             method: "GET",
             headers: {
@@ -166,6 +195,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
           });
           if (retryResponse.ok) {
             const retryData = await retryResponse.json();
+            pushKisUsDebugLog("KIS-US-RES-RETRY", { status: retryResponse.status, data: retryData });
             if (retryData.rt_cd === "0") {
               const retryItems = retryData.output || [];
               console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Retry with fresh token succeeded! Got ${retryItems.length} items.`);

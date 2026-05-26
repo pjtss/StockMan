@@ -81,6 +81,43 @@ export default function TopRisingPage() {
     fetchStocks();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const enabled = params.get("kisDebug") === "1";
+    if (!enabled) return;
+
+    let cancelled = false;
+    let lastId = 0;
+
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/debug/kis-us-log?since=${lastId}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        const logs = Array.isArray(json?.logs) ? json.logs : [];
+        for (const entry of logs) {
+          if (typeof entry?.id === "number") lastId = Math.max(lastId, entry.id);
+          console.log("[KIS-US-BRIDGE]", entry);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      if (cancelled) return;
+      tick();
+    }, 1000);
+
+    tick();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const formatTime = (isoString: string) => {
     try {
       const date = new Date(isoString);
