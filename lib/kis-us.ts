@@ -970,39 +970,9 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
   try {
     if (token) {
-      // 3대 주요 거래소(NAS, NYS, AMS)의 실시간 상승율 랭킹 데이터를 병렬로 동시 조회
-      const [nasItems, nysItems, amsItems] = await Promise.all([
-        fetchRealUsVolumeRank(token, "NAS"),
-        fetchRealUsVolumeRank(token, "NYS"),
-        fetchRealUsVolumeRank(token, "AMS"),
-      ]);
-
-      const allItems = [
-        ...(nasItems || []),
-        ...(nysItems || []),
-        ...(amsItems || [])
-      ];
-
-      const isFallback = 
-        (nasItems as any)?.isFallback || 
-        (nysItems as any)?.isFallback || 
-        (amsItems as any)?.isFallback;
-
-      const fallbackSource = 
-        (nasItems as any)?.fallbackSource || 
-        (nysItems as any)?.fallbackSource || 
-        (amsItems as any)?.fallbackSource;
-
-      if (allItems.length > 0) {
-        // 상승률(rate) 기준 내림차순 정렬
-        allItems.sort((a, b) => {
-          const rateA = parseFloat(a.rate) || 0;
-          const rateB = parseFloat(b.rate) || 0;
-          return rateB - rateA;
-        });
-
-        // 병합된 결과에서 상승률 상위 10개 추출
-        const mappedData = allItems.slice(0, 10).map((item, i) => {
+      const realItems = await fetchRealUsVolumeRank(token, "NAS");
+      if (realItems && realItems.length > 0) {
+        const mappedData = realItems.slice(0, 10).map((item, i) => {
           const priceVal = parseFloat(item.last) || 0.0;
           const rateVal = parseFloat(item.rate) || 0.0;
           const isUp = rateVal >= 0;
@@ -1032,8 +1002,8 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
         const filtered = filterMockUsRisingStocks(mappedData);
         console.info(`[KIS-US-DEBUG] fetchTopRisingStocks: Successfully fetched ${filtered.length} real-time items.`);
-        (filtered as any).isFallback = isFallback;
-        (filtered as any).fallbackSource = fallbackSource;
+        (filtered as any).isFallback = (realItems as any).isFallback;
+        (filtered as any).fallbackSource = (realItems as any).fallbackSource;
         return filtered;
       }
     }
