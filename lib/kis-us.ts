@@ -1,7 +1,7 @@
 import { getDb } from "./db";
 import { kisCache, topRisingStocks } from "./schema";
 import { eq, inArray } from "drizzle-orm";
-import { getAccessToken, getKisMode } from "./kis";
+import { getAccessToken, getKisMode, clearTokenCache } from "./kis";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
@@ -143,6 +143,54 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     return result;
   } catch (err: any) {
     const kisErrMsg = err.message || String(err);
+    const isAuthError = kisErrMsg.includes("AUTH") || kisErrMsg.includes("[2]");
+
+    // AUTH 에러인 경우: 토큰 캐시가 오래되거나 잡목된 토큰일 가능성 높음 → 자동 재발급 후 재시도
+    if (isAuthError) {
+      console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: AUTH error detected ('${kisErrMsg}'). Clearing token cache and retrying with fresh token...`);
+      clearTokenCache();
+      try {
+        const freshToken = await getAccessToken();
+        if (freshToken) {
+          const retryResponse = await fetch(url, {
+            method: "GET",
+            headers: {
+              "content-type": "application/json",
+              Authorization: `Bearer ${freshToken}`,
+              appkey: KIS_APPKEY || "",
+              appsecret: KIS_APPSECRET || "",
+              tr_id: trId,
+              custtype: "P",
+              tr_cont: "",
+            },
+          });
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            if (retryData.rt_cd === "0") {
+              const retryItems = retryData.output || [];
+              console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Retry with fresh token succeeded! Got ${retryItems.length} items.`);
+              const retryResult = retryItems.map((item: any) => ({
+                symb: item.symb || "",
+                name: item.name || "",
+                last: item.last || "0",
+                rate: item.rate || "0",
+                diff: item.diff || "0",
+                vol: item.tvol || "0",
+                amount: item.tamnt || "0",
+              }));
+              (retryResult as any).isFallback = false;
+              (retryResult as any).fallbackSource = "";
+              return retryResult;
+            } else {
+              console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Retry also failed: rt_cd=${retryData.rt_cd}, msg=${retryData.msg1}`);
+            }
+          }
+        }
+      } catch (retryErr: any) {
+        console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Token refresh retry failed:`, retryErr.message);
+      }
+    }
+
     console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: KIS live fetch failed ('${kisErrMsg}'). Trying Yahoo Finance day_gainers fallback...`);
     
     // Yahoo Finance Live Screener Fallback - day_gainers: 당일 급등주 (상승률 기준)

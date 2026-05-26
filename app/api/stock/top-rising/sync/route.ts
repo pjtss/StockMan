@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncTopRisingStocks, fetchTopRisingStocks } from "@/lib/kis-us";
 import { sendPushAlerts } from "@/lib/push";
+import { clearTokenCache } from "@/lib/kis";
 import type { AlertItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export async function GET() {
   try {
     const KIS_APPKEY = process.env.KIS_APPKEY;
     const KIS_APPSECRET = process.env.KIS_APPSECRET;
+
+    // 수동 sync 호출 시 항상 캐시 토큰을 초기화하여 stale token 문제 원천 차단
+    clearTokenCache();
 
     // 실시간 fetch를 직접 진단하기 위한 debug
     const rawTop10 = await fetchTopRisingStocks();
