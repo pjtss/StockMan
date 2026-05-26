@@ -140,11 +140,12 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     (result as any).fallbackSource = "";
     return result;
   } catch (err: any) {
-    console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: KIS live fetch failed ('${err.message || err}'). Trying Yahoo Finance live fallback...`);
+    const kisErrMsg = err.message || String(err);
+    console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: KIS live fetch failed ('${kisErrMsg}'). Trying Yahoo Finance day_gainers fallback...`);
     
-    // Yahoo Finance Live Screener Fallback (100% Real Live Market Data, No Mock Data!)
+    // Yahoo Finance Live Screener Fallback - day_gainers: 당일 급등주 (상승률 기준)
     try {
-      const yfUrl = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&scrIds=most_actives&count=30&corsDomain=finance.yahoo.com";
+      const yfUrl = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&scrIds=day_gainers&count=50&corsDomain=finance.yahoo.com";
       const yfRes = await fetch(yfUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -159,25 +160,29 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
         const quotes = yfData.finance?.result?.[0]?.quotes || [];
         if (quotes.length > 0) {
           console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance live fallback succeeded, fetched ${quotes.length} quotes.`);
-          const yfResult = quotes.map((q: any) => {
-            const price = q.regularMarketPrice || 0;
-            const changePercent = q.regularMarketChangePercent || 0;
-            const change = q.regularMarketChange || 0;
-            const volume = q.regularMarketVolume || 0;
-            const amount = volume * price;
-            
-            return {
-              symb: q.symbol || "",
-              name: q.shortName || q.longName || q.symbol || "",
-              last: String(price),
-              rate: String(changePercent),
-              diff: String(Math.abs(change)),
-              vol: String(volume),
-              amount: String(amount),
-            };
-          });
+          const yfResult = quotes
+            .map((q: any) => {
+              const price = q.regularMarketPrice || 0;
+              const changePercent = q.regularMarketChangePercent || 0;
+              const change = q.regularMarketChange || 0;
+              const volume = q.regularMarketVolume || 0;
+              const amount = volume * price;
+              
+              return {
+                symb: q.symbol || "",
+                name: q.shortName || q.longName || q.symbol || "",
+                last: String(price),
+                rate: String(changePercent),   // Yahoo: already a % number (e.g. 5.23)
+                diff: String(Math.abs(change)),
+                vol: String(volume),
+                amount: String(amount),
+              };
+            })
+            // 상승률 내림차순 정렬 (day_gainers이지만 명시적으로 정렬)
+            .sort((a, b) => parseFloat(b.rate) - parseFloat(a.rate));
           (yfResult as any).isFallback = true;
-          (yfResult as any).fallbackSource = "yahoo";
+          (yfResult as any).fallbackSource = "yahoo_day_gainers";
+          (yfResult as any).kisError = kisErrMsg;
           return yfResult;
         } else {
           console.warn("[KIS-US-DEBUG] fetchRealUsVolumeRank: Yahoo Finance live fallback returned empty quotes array.");
