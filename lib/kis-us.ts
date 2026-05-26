@@ -83,17 +83,18 @@ function getDynamicOffset(seed: number): number {
 // 해외 주식 시세 API 직접 조회 헬퍼
 async function fetchRealUsVolumeRank(token: string): Promise<KisUsOutput[]> {
   const params = new URLSearchParams({
-    EXCD: "NAS", // NASDAQ 거래소 코드
-    CO_YN: "N",  // 관리종목 미포함
-    CNT: "30",   // 조회 건수
+    EXCD: "NAS",      // NASDAQ 거래소 코드
+    GUBN: "1",        // 상승율/하락율 구분 (1: 상승율)
+    NDAY: "0",        // 날짜 구분
+    VOL_RANG: "5",    // 거래량 조건
   });
 
   // 오직 실전투자 계좌만 지원 (모의투자 완전 배제, 실거래 서버 고정)
   const baseUrl = "https://openapi.koreainvestment.com:9443";
-  const trId = "HHDFS76320010";
+  const trId = "HHDFS76290000";
 
-  // 해외주식 거래대금/거래량 순위 OpenAPI
-  const url = `${baseUrl}/uapi/overseas-stock/v1/ranking/trade-pbmn?${params.toString()}`;
+  // 해외주식 상승율/하락율 OpenAPI
+  const url = `${baseUrl}/uapi/overseas-stock/v1/ranking/updown-rate?${params.toString()}`;
   
   console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank: Requesting KIS US Stock rank from ${baseUrl} using real account tr_id '${trId}'`);
   try {
