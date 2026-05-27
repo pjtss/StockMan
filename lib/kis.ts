@@ -72,6 +72,7 @@ export function getKisMode(): "real" | "mock" {
 // 백그라운드 DB 미설정 또는 테스트용 인메모리 캐시 폴백 설정
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0; // 타임스탬프 (ms)
+export let lastTokenError: string | null = null;
 
 export async function getAccessToken(): Promise<string | null> {
   if (!KIS_APPKEY || !KIS_APPSECRET) return null;
@@ -132,6 +133,7 @@ export async function getAccessToken(): Promise<string | null> {
     
     if (!response.ok) {
       const errText = await response.text();
+      lastTokenError = `HTTP ${response.status}: ${errText}`;
       console.warn(`[KIS-DEBUG] Token fetch failed for ${url} with HTTP ${response.status}, body: ${errText}`);
       return null;
     }
@@ -176,8 +178,11 @@ export async function getAccessToken(): Promise<string | null> {
       tokenExpiresAt = expTime;
 
       return token;
+    } else {
+      lastTokenError = `No access_token in response: ${JSON.stringify(data)}`;
     }
-  } catch (err) {
+  } catch (err: any) {
+    lastTokenError = `Network/Parse error: ${err.message || String(err)}`;
     console.warn(`[KIS] Token request failed for ${url}:`, err);
   }
 
@@ -329,7 +334,8 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
 
   // token=null: 토큰 발급 실패 → kisError 플래그 설정 후 DB 캐시 복원 시도
   if (!token) {
-    console.warn("[KIS] fetchTradingIntensity: getAccessToken() returned null. Token fetch failed.");
+    const errorReason = lastTokenError || "getAccessToken() returned null (unknown reason)";
+    console.warn(`[KIS] fetchTradingIntensity: Token fetch failed. Reason: ${errorReason}`);
     try {
       const db = getDb();
       if (db) {
@@ -339,13 +345,13 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
           const cached = cacheRecord[0].data as StockIntensity[];
           (cached as any).isFallback = true;
           (cached as any).fallbackSource = "db";
-          (cached as any).kisError = "getAccessToken() returned null";
+          (cached as any).kisError = `Token Error: ${errorReason}`;
           return cached;
         }
       }
     } catch {}
     const empty: StockIntensity[] = [];
-    (empty as any).kisError = "getAccessToken() returned null";
+    (empty as any).kisError = `Token Error: ${errorReason}`;
     return empty;
   }
 
