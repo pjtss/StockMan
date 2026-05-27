@@ -326,6 +326,28 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
   const token = await getAccessToken();
   const cacheKey = "trading_intensity";
 
+  // token=null: 토큰 발급 실패 → kisError 플래그 설정 후 DB 캐시 복원 시도
+  if (!token) {
+    console.warn("[KIS] fetchTradingIntensity: getAccessToken() returned null. Token fetch failed.");
+    try {
+      const db = getDb();
+      if (db) {
+        const cacheRecord = await db.select({ data: kisCache.data })
+          .from(kisCache).where(eq(kisCache.key, cacheKey)).limit(1);
+        if (cacheRecord.length > 0) {
+          const cached = cacheRecord[0].data as StockIntensity[];
+          (cached as any).isFallback = true;
+          (cached as any).fallbackSource = "db";
+          (cached as any).kisError = "getAccessToken() returned null";
+          return cached;
+        }
+      }
+    } catch {}
+    const empty: StockIntensity[] = [];
+    (empty as any).kisError = "getAccessToken() returned null";
+    return empty;
+  }
+
   // C. 실시간 KIS OpenAPI 조회 시도 및 성공 시 DB 캐시 업데이트
   try {
     if (token) {
