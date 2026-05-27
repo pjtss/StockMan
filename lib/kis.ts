@@ -238,34 +238,55 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
 
   const baseUrl = "https://openapi.koreainvestment.com:9443";
   const trId = "FHPST01710000";
-
   const url = `${baseUrl}/uapi/domestic-stock/v1/quotations/volume-rank?${params.toString()}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "content-type": "application/json",
-      Authorization: `Bearer ${token}`,
-      appkey: KIS_APPKEY || "",
-      appsecret: KIS_APPSECRET || "",
-      tr_id: trId,
-    },
-  });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`[KIS-DEBUG] fetchRealVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
-    throw new Error(`KIS API returned HTTP ${response.status}`);
+  const doFetch = async (t: string) => {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${t}`,
+        appkey: KIS_APPKEY || "",
+        appsecret: KIS_APPSECRET || "",
+        tr_id: trId,
+      },
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[KIS-DEBUG] fetchRealVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
+      throw new Error(`KIS API returned HTTP ${response.status}`);
+    }
+
+    const resData = await response.json();
+    console.info(`[KIS-DEBUG] fetchRealVolumeRank raw response:`, JSON.stringify(resData, null, 2));
+
+    if (resData.rt_cd !== "0") {
+      console.error(`[KIS-DEBUG] fetchRealVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
+      throw new Error(`KIS API Error [${resData.rt_cd}]: ${resData.msg1}`);
+    }
+
+    return resData.output || [];
+  };
+
+  try {
+    return await doFetch(token);
+  } catch (err: any) {
+    const kisErrMsg = err.message || String(err);
+    const isAuthError = kisErrMsg.includes("AUTH") || kisErrMsg.includes("[2]");
+
+    // AUTH 에러 감지 → DB 토큰 캐시 무효화 + 신규 토큰 재발급 후 한 번 더 재시도
+    if (isAuthError) {
+      console.warn(`[KIS-DEBUG] fetchRealVolumeRank AUTH error detected ('${kisErrMsg}'). Clearing token cache and retrying with fresh token...`);
+      await clearTokenCache();
+      const freshToken = await getAccessToken();
+      if (freshToken) {
+        console.info(`[KIS-DEBUG] fetchRealVolumeRank: Retrying with fresh token...`);
+        return await doFetch(freshToken);
+      }
+    }
+    throw err;
   }
-
-  const resData = await response.json();
-  console.info(`[KIS-DEBUG] fetchRealVolumeRank raw response:`, JSON.stringify(resData, null, 2));
-
-  if (resData.rt_cd !== "0") {
-    console.error(`[KIS-DEBUG] fetchRealVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
-    throw new Error(`KIS API Error [${resData.rt_cd}]: ${resData.msg1}`);
-  }
-
-  return resData.output || [];
 }
 
 // 1. 체결강도 상위

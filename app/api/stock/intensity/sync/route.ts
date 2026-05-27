@@ -11,8 +11,8 @@ export async function GET() {
     const KIS_APPKEY = process.env.KIS_APPKEY;
     const KIS_APPSECRET = process.env.KIS_APPSECRET;
 
-    // 수동 sync 호출 시 항상 인메모리 토큰 캐시를 초기화
-    clearTokenCache();
+    // 수동 sync 호출 시 항상 인메모리 + DB 토큰 캐시를 완전 초기화 (race condition 방지)
+    await clearTokenCache();
 
     // 실시간 fetch 디버그 진단 및 동기화 수행
     const rawTop10 = await fetchTradingIntensity();
