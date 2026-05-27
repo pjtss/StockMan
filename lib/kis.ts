@@ -503,7 +503,7 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
+            company: (item.hts_kor_isnm || item.hts_kor_shr_nlen || "").trim(),
             code: item.mksc_shrn_iscd,
             volumeRatio: `${Math.round(300 - i * 15 + offset * 5)}%`,
             tradingValue: `${tradingValueBillion > 0 ? tradingValueBillion : Math.round(1500 - i * 100)}억`,
@@ -600,7 +600,7 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
+            company: (item.hts_kor_isnm || item.hts_kor_shr_nlen || "").trim(),
             code: item.mksc_shrn_iscd,
             foreignNetBuy: `+${Math.round(280 - i * 18)}억`,
             instNetBuy: `+${Math.round(220 - i * 12)}억`,
@@ -696,7 +696,7 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
+            company: (item.hts_kor_isnm || item.hts_kor_shr_nlen || "").trim(),
             code: item.mksc_shrn_iscd,
             programNetBuy: `+${Math.round(140 - i * 9)}만주`,
             price: rawPrice.toLocaleString(),
@@ -791,7 +791,7 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
+            company: (item.hts_kor_isnm || item.hts_kor_shr_nlen || "").trim(),
             code: item.mksc_shrn_iscd,
             highType: i < 3 ? "52주 신고가" : "60일 신고가",
             price: rawPrice.toLocaleString(),
@@ -886,7 +886,7 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
+            company: (item.hts_kor_isnm || item.hts_kor_shr_nlen || "").trim(),
             code: item.mksc_shrn_iscd,
             bidAskRatio: Math.round(240 - i * 12),
             price: rawPrice.toLocaleString(),
@@ -1065,7 +1065,7 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
+            company: (item.hts_kor_isnm || item.hts_kor_shr_nlen || "").trim(),
             code: item.mksc_shrn_iscd,
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(2)}%`,
