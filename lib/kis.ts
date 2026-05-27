@@ -315,6 +315,8 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
         price: (75000 + Math.round(offset * 200)).toLocaleString(),
         change: `${isUp ? "+" : "-"}${Math.abs(Math.round(1200 + offset * 150)).toLocaleString()}`,
         changeRate: `${isUp ? "+" : ""}${(1.5 + offset * 0.1).toFixed(2)}%`,
+        volume: "1,000주",
+        tradingValue: "10억"
       };
     });
   }
