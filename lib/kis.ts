@@ -297,6 +297,70 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
   }
 }
 
+// 한국투자증권 실시간 체결강도 상위 OpenAPI 직접 조회 헬퍼
+async function fetchRealVolumePower(token: string): Promise<KisOutput[]> {
+  const params = new URLSearchParams({
+    FID_COND_MRKT_DIV_CODE: "J",
+    FID_COND_SCR_DIV_CODE: "20168",
+    FID_INPUT_ISCD: "0000",
+    FID_DIV_CLS_CODE: "0",
+    FID_INPUT_PRICE_1: "0",
+    FID_INPUT_PRICE_2: "0",
+    FID_VOL_CNT: "0",
+  });
+
+  const baseUrl = "https://openapi.koreainvestment.com:9443";
+  const trId = "FHPST01680000";
+  const url = `${baseUrl}/uapi/domestic-stock/v1/ranking/volume-power?${params.toString()}`;
+
+  const doFetch = async (t: string) => {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${t}`,
+        appkey: KIS_APPKEY || "",
+        appsecret: KIS_APPSECRET || "",
+        tr_id: trId,
+      },
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[KIS-DEBUG] fetchRealVolumePower HTTP error: status ${response.status}, body: ${errText}`);
+      throw new Error(`KIS API returned HTTP ${response.status}`);
+    }
+
+    const resData = await response.json();
+    console.info(`[KIS-DEBUG] fetchRealVolumePower raw response:`, JSON.stringify(resData, null, 2));
+
+    if (resData.rt_cd !== "0") {
+      console.error(`[KIS-DEBUG] fetchRealVolumePower business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
+      throw new Error(`KIS API Error [${resData.rt_cd}]: ${resData.msg1}`);
+    }
+
+    return resData.output || [];
+  };
+
+  try {
+    return await doFetch(token);
+  } catch (err: any) {
+    const kisErrMsg = err.message || String(err);
+    const isAuthError = kisErrMsg.includes("AUTH") || kisErrMsg.includes("[2]");
+
+    if (isAuthError) {
+      console.warn(`[KIS-DEBUG] fetchRealVolumePower AUTH error detected ('${kisErrMsg}'). Clearing token cache and retrying...`);
+      await clearTokenCache();
+      const freshToken = await getAccessToken();
+      if (freshToken) {
+        console.info(`[KIS-DEBUG] fetchRealVolumePower: Retrying with fresh token...`);
+        return await doFetch(freshToken);
+      }
+    }
+    throw err;
+  }
+}
+
 // 1. 체결강도 상위
 export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
   const offset = getDynamicOffset(1);
@@ -362,7 +426,7 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
   // C. 실시간 KIS OpenAPI 조회 시도 및 성공 시 DB 캐시 업데이트
   try {
     if (token) {
-      const realItems = await fetchRealVolumeRank(token);
+      const realItems = await fetchRealVolumePower(token);
       if (realItems && realItems.length > 0) {
         const mappedData = realItems.map((item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
