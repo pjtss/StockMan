@@ -344,8 +344,9 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
 
           return {
             rank: 0,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            // KIS 응답이 간헐적으로 필드를 누락할 수 있어 안전하게 처리한다.
+            company: String(item.hts_kor_shr_nlen || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || ""),
             intensity,
             price: rawPrice.toLocaleString(),
             change: `${isUp ? "+" : "-"}${Math.abs(rawVrss).toLocaleString()}`,
