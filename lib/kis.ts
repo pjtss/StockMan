@@ -218,21 +218,27 @@ function getDynamicOffset(seed: number): number {
 }
 
 interface KisOutput {
-  hts_kor_shr_nlen: string; // 종목명
-  mksc_shrn_iscd: string; // 종목코드
+  // Legacy shape used by other scanners (volume-rank).
+  hts_kor_shr_nlen?: string; // 종목명
+  mksc_shrn_iscd?: string; // 종목코드
+
+  // Shape for 체결강도 상위(volume-power).
+  hts_kor_isnm?: string; // 종목명
+  stck_shrn_iscd?: string; // 종목코드
   stck_prpr: string; // 현재가
   prdy_vrss: string; // 전일대비
   prdy_ctrt: string; // 전일대비율
   acml_vol: string; // 누적거래량
   acml_tr_pbmn: string; // 누적거래대금
-  lsty_chts_rat?: string; // 체결강도
+  tday_rltv?: string; // 체결강도(당일 체결강도)
 }
 
 // 한국투자증권 실시간 거래량/거래대금 순위 OpenAPI 직접 조회 헬퍼
-async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
+async function fetchRealVolumePower(token: string): Promise<KisOutput[]> {
   const params = new URLSearchParams({
     FID_COND_MRKT_DIV_CODE: "J",
-    FID_COND_SCR_DIV_CODE: "20171",
+    // 국내주식 체결강도 상위[v1_국내주식-101]
+    FID_COND_SCR_DIV_CODE: "20168",
     FID_INPUT_ISCD: "0000",
     FID_DIV_CLS_CODE: "0",
     FID_BLNG_CLS_CODE: "0",
@@ -248,9 +254,9 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
   });
 
   const baseUrl = "https://openapi.koreainvestment.com:9443";
-  const trId = "FHPST01710000";
+  const trId = "FHPST01680000";
 
-  const url = `${baseUrl}/uapi/domestic-stock/v1/quotations/volume-rank?${params.toString()}`;
+  const url = `${baseUrl}/uapi/domestic-stock/v1/ranking/volume-power?${params.toString()}`;
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -264,20 +270,23 @@ async function fetchRealVolumeRank(token: string): Promise<KisOutput[]> {
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error(`[KIS-DEBUG] fetchRealVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
+    console.error(`[KIS-DEBUG] fetchRealVolumePower HTTP error: status ${response.status}, body: ${errText}`);
     throw new Error(`KIS API returned HTTP ${response.status}`);
   }
 
   const resData = await response.json();
-  console.info(`[KIS-DEBUG] fetchRealVolumeRank raw response:`, JSON.stringify(resData, null, 2));
+  console.info(`[KIS-DEBUG] fetchRealVolumePower raw response:`, JSON.stringify(resData, null, 2));
 
   if (resData.rt_cd !== "0") {
-    console.error(`[KIS-DEBUG] fetchRealVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
+    console.error(`[KIS-DEBUG] fetchRealVolumePower business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
     throw new Error(`KIS API Error [${resData.rt_cd}]: ${resData.msg1}`);
   }
 
   return resData.output || [];
 }
+
+// Backward compat: other scanners still call the older helper name.
+const fetchRealVolumeRank = fetchRealVolumePower;
 
 // 1. 체결강도 상위
 export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
@@ -332,21 +341,21 @@ export async function fetchTradingIntensity(): Promise<StockIntensity[]> {
       return withError([], "getAccessToken() returned null.");
     }
 
-    const realItems = await fetchRealVolumeRank(token);
+    const realItems = await fetchRealVolumePower(token);
     if (realItems && realItems.length > 0) {
         const mappedData = realItems.map((item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
           const rawVrss = parseInt(item.prdy_vrss, 10) || 0;
           const rate = parseFloat(item.prdy_ctrt) || 0.0;
           const isUp = rate >= 0;
-          const rawIntensity = parseFloat(item.lsty_chts_rat || "") || 0;
+          const rawIntensity = parseFloat(item.tday_rltv || "") || 0;
           const intensity = rawIntensity > 0 ? Math.round(rawIntensity) : Math.max(50, Math.round(160 - i * 6));
 
           return {
             rank: 0,
             // KIS 응답이 간헐적으로 필드를 누락할 수 있어 안전하게 처리한다.
-            company: String(item.hts_kor_shr_nlen || "").trim() || "(UNKNOWN)",
-            code: String(item.mksc_shrn_iscd || ""),
+            company: String(item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.stck_shrn_iscd || ""),
             intensity,
             price: rawPrice.toLocaleString(),
             change: `${isUp ? "+" : "-"}${Math.abs(rawVrss).toLocaleString()}`,
@@ -461,8 +470,8 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
             volumeRatio: `${Math.round(300 - i * 15 + offset * 5)}%`,
             tradingValue: `${tradingValueBillion > 0 ? tradingValueBillion : Math.round(1500 - i * 100)}억`,
             price: rawPrice.toLocaleString(),
@@ -558,8 +567,8 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
             foreignNetBuy: `+${Math.round(280 - i * 18)}억`,
             instNetBuy: `+${Math.round(220 - i * 12)}억`,
             price: rawPrice.toLocaleString(),
@@ -654,8 +663,8 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
             programNetBuy: `+${Math.round(140 - i * 9)}만주`,
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(1)}%`,
@@ -749,8 +758,8 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
             highType: i < 3 ? "52주 신고가" : "60일 신고가",
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(1)}%`,
@@ -844,8 +853,8 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
             bidAskRatio: Math.round(240 - i * 12),
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(1)}%`,
@@ -1023,8 +1032,8 @@ export async function fetchTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
           return {
             rank: i + 1,
-            company: item.hts_kor_shr_nlen.trim(),
-            code: item.mksc_shrn_iscd,
+            company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
+            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(2)}%`,
           };
