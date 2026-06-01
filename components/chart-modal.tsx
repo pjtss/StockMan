@@ -66,7 +66,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
 
     let cancelled = false;
 
-    import("lightweight-charts").then(({ createChart, CrosshairMode }) => {
+    import("lightweight-charts").then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle }) => {
       if (cancelled || !chartRef.current) return;
 
       const chart = createChart(chartRef.current, {
@@ -92,7 +92,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
       });
 
       // 캔들스틱 시리즈
-      const candleSeries = chart.addCandlestickSeries({
+      const candleSeries = chart.addSeries(CandlestickSeries, {
         upColor: "#ff4d4d",
         downColor: "#4d94ff",
         borderUpColor: "#ff4d4d",
@@ -116,9 +116,9 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
         const lastDate = data.candles[data.candles.length - 1].date;
         const t = `${lastDate.slice(0, 4)}-${lastDate.slice(4, 6)}-${lastDate.slice(6, 8)}` as any;
 
-        const bbUpperSeries = chart.addLineSeries({ color: "rgba(255,77,77,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-        const bbMiddleSeries = chart.addLineSeries({ color: "rgba(255,255,255,0.25)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false, lineStyle: 2 });
-        const bbLowerSeries = chart.addLineSeries({ color: "rgba(0,255,163,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+        const bbUpperSeries = chart.addSeries(LineSeries, { color: "rgba(255,77,77,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+        const bbMiddleSeries = chart.addSeries(LineSeries, { color: "rgba(255,255,255,0.25)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false, lineStyle: LineStyle.Dotted });
+        const bbLowerSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
 
         bbUpperSeries.setData([{ time: t, value: bbUpper }]);
         bbMiddleSeries.setData([{ time: t, value: bbMiddle }]);
