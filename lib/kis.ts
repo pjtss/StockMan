@@ -76,17 +76,14 @@ let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0; // 타임스탬프 (ms)
 
 export async function getAccessToken(): Promise<string | null> {
-  if (!KIS_APPKEY || !KIS_APPSECRET) return null;
-
-  // 1. 인메모리 캐시 우선 조회 (동일 프로세스 내 중복 조회 방지 및 성능 극대화)
-  const refreshThresholdMs = 60 * 60 * 1000; // 1 hour
-
   const now = Date.now();
   if (cachedToken && now < tokenExpiresAt - 5 * 60 * 1000) {
     return cachedToken;
   }
 
-  // 2. 데이터베이스(Supabase) 기반 공유 캐시 조회 (서버리스 컨테이너 간 토큰 공유)
+  const refreshThresholdMs = 60 * 60 * 1000;
+
+  // DB를 정본(source of truth)으로 사용하고, 만료 1시간 이내일 때만 재발급한다.
   try {
     const db = getDb();
     if (db) {
@@ -102,9 +99,7 @@ export async function getAccessToken(): Promise<string | null> {
       if (tokenRecord.length > 0) {
         const row = tokenRecord[0];
         const expiresAt = new Date(row.expiresAt).getTime();
-        // 만료 5분 전 여유를 두고 재사용 결정
-        if (expiresAt > Date.now() + refreshThresholdMs) {
-          // 인메모리 캐시 동기화
+        if (expiresAt > now + refreshThresholdMs) {
           cachedToken = row.accessToken;
           tokenExpiresAt = expiresAt;
           return row.accessToken;
@@ -112,21 +107,17 @@ export async function getAccessToken(): Promise<string | null> {
       }
     }
   } catch (dbErr: any) {
-    console.warn("[KIS] DB token cache read failed, using memory fallback if available:", dbErr.message || dbErr);
+    console.warn("[KIS] DB token cache read failed:", dbErr.message || dbErr);
   }
 
-  // DB 읽기 실패 또는 DB에 캐시된 토큰이 없을 때, 인메모리 백업 캐시 최종 재확인
-  if (cachedToken && now < tokenExpiresAt - 5 * 60 * 1000) {
-    return cachedToken;
-  }
+  if (!KIS_APPKEY || !KIS_APPSECRET) return null;
 
-  // 2. 캐시 만료 또는 조회 불가 시 KIS API 정식 요청 실행 (오직 실전투자용)
   const url = "https://openapi.koreainvestment.com:9443/oauth2/tokenP";
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
       },
       body: JSON.stringify({
         grant_type: "client_credentials",
@@ -134,7 +125,7 @@ export async function getAccessToken(): Promise<string | null> {
         appsecret: KIS_APPSECRET,
       }),
     });
-    
+
     if (!response.ok) {
       const errText = await response.text();
       console.warn(`[KIS-DEBUG] Token fetch failed for ${url} with HTTP ${response.status}, body: ${errText}`);
@@ -142,14 +133,14 @@ export async function getAccessToken(): Promise<string | null> {
     }
 
     const data = await response.json();
-    
-    // Mask the access_token for security while showing all other API metadata
+
     const maskedData = { ...data };
     if (maskedData.access_token && typeof maskedData.access_token === "string") {
       const len = maskedData.access_token.length;
-      maskedData.access_token = len > 20 
-        ? `${maskedData.access_token.substring(0, 10)}...[MASKED]...${maskedData.access_token.substring(len - 10)}`
-        : "...[MASKED]...";
+      maskedData.access_token =
+        len > 20
+          ? `${maskedData.access_token.substring(0, 10)}...[MASKED]...${maskedData.access_token.substring(len - 10)}`
+          : "...[MASKED]...";
     }
     console.info(`[KIS-DEBUG] Token fetch raw response (masked):`, JSON.stringify(maskedData, null, 2));
 
@@ -157,32 +148,32 @@ export async function getAccessToken(): Promise<string | null> {
       const token = data.access_token;
       kisMode = "real";
       console.info(`[KIS] Successfully authenticated via real server.`);
-      
+
       const issuedAt = Date.now();
       const expiresInSecRaw = (data as any).expires_in;
       const expiresInSec = typeof expiresInSecRaw === "string" ? Number(expiresInSecRaw) : Number(expiresInSecRaw);
-      const expTime = Number.isFinite(expiresInSec) && expiresInSec > 0
-        ? issuedAt + expiresInSec * 1000
-        : issuedAt + 20 * 60 * 60 * 1000;
+      const expTime =
+        Number.isFinite(expiresInSec) && expiresInSec > 0
+          ? issuedAt + expiresInSec * 1000
+          : issuedAt + 20 * 60 * 60 * 1000;
       const issuedDate = new Date(issuedAt);
       const expDate = new Date(expTime);
 
-      // 데이터베이스 캐시 업데이트 실행 (upsert)
       try {
         const db = getDb();
         if (db) {
-          await db.insert(kisTokens)
+          await db
+            .insert(kisTokens)
             .values({ id: 1, accessToken: token, issuedAt: issuedDate, expiresAt: expDate })
             .onConflictDoUpdate({
               target: kisTokens.id,
-              set: { accessToken: token, issuedAt: issuedDate, expiresAt: expDate }
+              set: { accessToken: token, issuedAt: issuedDate, expiresAt: expDate },
             });
         }
       } catch (dbWriteErr) {
         console.error("[KIS] Failed to write token to DB cache:", dbWriteErr);
       }
 
-      // 인메모리 캐시 갱신
       cachedToken = token;
       tokenExpiresAt = expTime;
 
