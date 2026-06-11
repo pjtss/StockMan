@@ -11,6 +11,13 @@ export function getPool(): Pool {
       throw new Error("DATABASE_URL 환경변수가 설정되지 않았습니다.");
     }
 
+    try {
+      const url = new URL(databaseUrl);
+      console.info("[DB] Connecting to:", `${url.hostname}${url.port ? `:${url.port}` : ""}`);
+    } catch {
+      console.info("[DB] Connecting to: <unparsed DATABASE_URL>");
+    }
+
     pool = new Pool({
       connectionString: databaseUrl,
       ssl: {

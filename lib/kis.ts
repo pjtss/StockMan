@@ -96,9 +96,19 @@ export async function getAccessToken(): Promise<string | null> {
       .where(eq(kisTokens.id, 1))
       .limit(1);
 
+      console.info("[KIS] Token row lookup:", {
+        found: tokenRecord.length > 0,
+        rowCount: tokenRecord.length,
+      });
+
       if (tokenRecord.length > 0) {
         const row = tokenRecord[0];
         const expiresAt = new Date(row.expiresAt).getTime();
+        console.info("[KIS] Token timestamps:", {
+          issuedAt: row.issuedAt instanceof Date ? row.issuedAt.toISOString() : row.issuedAt,
+          expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+          expiresInMs: expiresAt - now,
+        });
         if (expiresAt > now + refreshThresholdMs) {
           cachedToken = row.accessToken;
           tokenExpiresAt = expiresAt;
