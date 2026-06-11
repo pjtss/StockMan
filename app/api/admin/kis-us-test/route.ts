@@ -19,6 +19,8 @@ export async function GET(request: Request) {
   }
 
   const params = new URLSearchParams({
+    KEYB: process.env.KIS_APPKEY || "",
+    AUTH: token,
     EXCD: excd,
     GUBN: gubn,
     NDAY: nday,
@@ -32,8 +34,8 @@ export async function GET(request: Request) {
   const response = await fetch(targetUrl, {
     method: "GET",
     headers: {
-      "content-type": "application/json",
-      Authorization: `Bearer ${token}`,
+      "content-type": "application/json; charset=utf-8",
+      authorization: `Bearer ${token}`,
       appkey: process.env.KIS_APPKEY || "",
       appsecret: process.env.KIS_APPSECRET || "",
       tr_id: trId,
@@ -57,9 +59,10 @@ export async function GET(request: Request) {
       method: "GET",
       url: targetUrl,
       headers: {
-        Authorization: "Bearer <masked>",
+        authorization: "Bearer <masked>",
         appkey: "<masked>",
         appsecret: "<masked>",
+        "content-type": "application/json; charset=utf-8",
         tr_id: trId,
         custtype: "P",
         tr_cont: "",
@@ -71,4 +74,3 @@ export async function GET(request: Request) {
     },
   });
 }
-

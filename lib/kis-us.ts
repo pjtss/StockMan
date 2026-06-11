@@ -41,6 +41,8 @@ function getDynamicOffset(seed: number): number {
 // 해외 주식 시세 API 직접 조회 헬퍼
 async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUsOutput[]> {
   const params = new URLSearchParams({
+    KEYB: KIS_APPKEY || "",
+    AUTH: token,
     EXCD: excd,       // 거래소 코드
     GUBN: "1",        // 상승율/하락율 구분 (1: 상승율)
     NDAY: "0",        // 날짜 구분
@@ -59,8 +61,8 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     pushKisUsDebugLog(
       "KIS-US-REQ",
       buildKisUsRequestDebug("GET", url, {
-        "content-type": "application/json",
-        Authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=utf-8",
+        authorization: `Bearer ${token}`,
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: trId,
@@ -71,8 +73,8 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=utf-8",
+        authorization: `Bearer ${token}`,
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: trId,
@@ -129,8 +131,8 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
           pushKisUsDebugLog(
             "KIS-US-REQ-RETRY",
             buildKisUsRequestDebug("GET", url, {
-              "content-type": "application/json",
-              Authorization: `Bearer ${freshToken}`,
+              "content-type": "application/json; charset=utf-8",
+              authorization: `Bearer ${freshToken}`,
               appkey: KIS_APPKEY || "",
               appsecret: KIS_APPSECRET || "",
               tr_id: trId,
@@ -141,8 +143,8 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
           const retryResponse = await fetch(url, {
             method: "GET",
             headers: {
-              "content-type": "application/json",
-              Authorization: `Bearer ${freshToken}`,
+              "content-type": "application/json; charset=utf-8",
+              authorization: `Bearer ${freshToken}`,
               appkey: KIS_APPKEY || "",
               appsecret: KIS_APPSECRET || "",
               tr_id: trId,
@@ -238,8 +240,8 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
 // 해외 주식 체결강도 API 직접 조회 헬퍼
 async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisUsIntensityOutput[]> {
   const params = new URLSearchParams({
-    KEYB: "",
-    AUTH: "",
+    KEYB: KIS_APPKEY || "",
+    AUTH: token,
     EXCD: excd,       // 거래소 코드
     NDAY: "0",        // 날짜 구분
     VOL_RANG: "5",    // 거래량 조건
@@ -255,8 +257,8 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
     pushKisUsDebugLog(
       "KIS-US-REQ",
       buildKisUsRequestDebug("GET", url, {
-        "content-type": "application/json",
-        Authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=utf-8",
+        authorization: `Bearer ${token}`,
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: trId,
@@ -267,8 +269,8 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "content-type": "application/json",
-        Authorization: `Bearer ${token}`,
+        "content-type": "application/json; charset=utf-8",
+        authorization: `Bearer ${token}`,
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: trId,
