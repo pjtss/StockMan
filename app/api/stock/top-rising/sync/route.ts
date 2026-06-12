@@ -3,7 +3,7 @@ import { syncTopRisingStocks, fetchTopRisingStocks } from "@/lib/kis-us";
 import { sendPushAlerts } from "@/lib/push";
 import { runWithKisUsDebugCapture } from "@/lib/kis-us-debug";
 import type { AlertItem } from "@/lib/types";
-import { isUsScannerOpen } from "@/lib/scanner-hours";
+import { isUsTopRisingOpen } from "@/lib/scanner-hours";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +17,9 @@ export async function GET() {
         { status: 503 },
       );
     }
-    if (!isUsScannerOpen()) {
+    if (!(await isUsTopRisingOpen())) {
       return NextResponse.json(
-        { success: false, error: "미국 스캐너는 KST 17:00~02:00에만 동작합니다." },
+        { success: false, error: "미국 상승률 TOP N은 설정된 시간에만 동작합니다." },
         { status: 503 },
       );
     }

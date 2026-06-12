@@ -13,7 +13,7 @@ interface TopRisingItem {
   addedAt: string;
 }
 
-export function TopRisingScanner() {
+export function TopRisingScanner({ current = "top-rising" }: { current?: "top-rising" | "us-top-rising" } = {}) {
   const [stocks, setStocks] = useState<TopRisingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -75,7 +75,7 @@ export function TopRisingScanner() {
 
   return (
     <main className={styles.page}>
-      <PageNavigation current="top-rising" />
+      <PageNavigation current={current} />
       <div className={styles.container}>
         <div className={styles.headerArea}>
           <div className={styles.titleGroup}>
@@ -124,4 +124,3 @@ export function TopRisingScanner() {
     </main>
   );
 }
-

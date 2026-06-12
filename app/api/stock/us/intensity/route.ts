@@ -19,7 +19,7 @@ export async function GET() {
       headers.set("x-debug-reason", "미국 스캐너 기능이 관리자에 의해 비활성화되었습니다.");
       return NextResponse.json({ error: "US scanner disabled by admin" }, { status: 503, headers });
     }
-    if (!isUsScannerOpen()) {
+    if (!(await isUsScannerOpen())) {
       headers.set("x-debug-status", "disabled");
       headers.set("x-debug-reason", "미국 스캐너는 KST 17:00~02:00에만 동작합니다.");
       return NextResponse.json({ error: "US scanner disabled outside market hours" }, { status: 503, headers });

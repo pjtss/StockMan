@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { topRisingStocks, kisCache } from "@/lib/schema";
 import { syncTopRisingStocks } from "@/lib/kis-us";
 import { eq } from "drizzle-orm";
-import { isUsScannerOpen } from "@/lib/scanner-hours";
+import { isUsTopRisingOpen } from "@/lib/scanner-hours";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +19,10 @@ export async function GET() {
       headers.set("x-debug-reason", "미국 스캐너 기능이 관리자에 의해 비활성화되었습니다.");
       return NextResponse.json({ error: "US scanner disabled by admin" }, { status: 503, headers });
     }
-    if (!isUsScannerOpen()) {
+    if (!(await isUsTopRisingOpen())) {
       headers.set("x-debug-status", "disabled");
-      headers.set("x-debug-reason", "미국 스캐너는 KST 17:00~02:00에만 동작합니다.");
-      return NextResponse.json({ error: "US top-rising disabled outside market hours" }, { status: 503, headers });
+      headers.set("x-debug-reason", "미국 상승률 TOP N은 설정된 시간에만 동작합니다.");
+      return NextResponse.json({ error: "US top-rising disabled outside schedule" }, { status: 503, headers });
     }
 
     const db = getDb();

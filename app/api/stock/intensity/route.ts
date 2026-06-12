@@ -12,7 +12,7 @@ export async function GET() {
   headers.set("Cache-Control", "no-store, max-age=0");
 
   try {
-    if (!isDomesticScannerOpen()) {
+    if (!(await isDomesticScannerOpen())) {
       headers.set("x-debug-status", "disabled");
       headers.set("x-debug-reason", "국내 스캐너는 KST 08:00~15:30에만 동작합니다.");
       return NextResponse.json({ error: "Domestic scanner disabled outside market hours" }, { status: 503, headers });

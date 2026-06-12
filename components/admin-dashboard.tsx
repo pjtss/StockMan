@@ -180,6 +180,24 @@ export function AdminDashboard({ loggedIn }: AdminDashboardProps) {
             >
               KIS 테스트
             </a>
+            <a
+              href="/admin/schedules"
+              style={{
+                minHeight: 48,
+                padding: "0 18px",
+                display: "inline-flex",
+                alignItems: "center",
+                borderRadius: 12,
+                border: "1px solid rgba(16, 185, 129, 0.24)",
+                background: "rgba(16, 185, 129, 0.12)",
+                color: "#6ee7b7",
+                fontWeight: 800,
+                textDecoration: "none",
+                boxShadow: "0 0 18px rgba(16, 185, 129, 0.12)",
+              }}
+            >
+              스케줄 설정
+            </a>
             <button className={styles.logoutButton} onClick={handleLogout}>
               로그아웃
             </button>

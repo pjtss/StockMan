@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { PageNavigation } from "@/components/page-navigation";
 import { GLOBAL_POLLING_INTERVAL } from "@/lib/constants";
-import { isUsScannerOpen } from "@/lib/scanner-hours";
 import styles from "../../trading-intensity/page.module.css";
 
 interface UsIntensityStockItem {
@@ -20,7 +19,6 @@ export default function UsTradingIntensityScannerPage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
-  const isMarketOpen = isUsScannerOpen();
 
   const fetchStocks = async (isAuto = false) => {
     try {
@@ -102,20 +100,12 @@ export default function UsTradingIntensityScannerPage() {
   };
 
   useEffect(() => {
-    if (!isMarketOpen) {
-      setLoading(false);
-      setError("미국 스캐너는 KST 17:00~02:00에만 동작합니다.");
-      return;
-    }
-
     fetchStocks();
-
     const interval = setInterval(() => {
       void handleAutoSync();
     }, GLOBAL_POLLING_INTERVAL);
-
     return () => clearInterval(interval);
-  }, [isMarketOpen]);
+  }, []);
 
   const formatTime = (isoString: string) => {
     try {
@@ -151,31 +141,17 @@ export default function UsTradingIntensityScannerPage() {
           <div className={styles.actions}>
             <div className={styles.autoRefreshBadge}>
               <span className={styles.pulseDot}></span>
-              <span>{isMarketOpen ? "60초 자동 갱신 중" : "장중에만 동작"}</span>
+              <span>60초 자동 갱신 중</span>
             </div>
             <button
               className={styles.syncBtn}
               onClick={handleManualSync}
-              disabled={loading || syncing || !isMarketOpen}
+              disabled={loading || syncing}
             >
-              {syncing ? "⚡ 동기화 중..." : isMarketOpen ? "🔄 실시간 수동 갱신" : "⏸ 장중에만 사용"}
+              {syncing ? "⚡ 동기화 중..." : "🔄 실시간 수동 갱신"}
             </button>
           </div>
         </div>
-
-        {!isMarketOpen && (
-          <div className={styles.warningAlert} style={{
-            background: "rgba(59, 130, 246, 0.1)",
-            border: "1px solid rgba(59, 130, 246, 0.2)",
-            color: "#60a5fa",
-            padding: "12px 16px",
-            borderRadius: "12px",
-            marginBottom: "16px",
-            fontWeight: "bold",
-          }}>
-            미국 스캐너는 KST 17:00~02:00에만 동작합니다.
-          </div>
-        )}
 
         {isFallback && (
           <div className={styles.warningAlert} style={{

@@ -17,7 +17,7 @@ export async function POST() {
         { status: 503 },
       );
     }
-    if (!isUsScannerOpen()) {
+    if (!(await isUsScannerOpen())) {
       return NextResponse.json(
         { success: false, error: "미국 스캐너는 KST 17:00~02:00에만 동작합니다." },
         { status: 503 },

@@ -14,6 +14,7 @@ type PageKey =
   | "notifications"
   | "scanners-us"
   | "us-intensity"
+  | "us-top-rising"
   | "top-rising"
   | "trading-intensity"
   | "admin";
@@ -40,6 +41,13 @@ export function PageNavigation({ current }: { current: PageKey }) {
           prefetch={false}
         >
           미국 체결강도
+        </Link>
+        <Link
+          className={current === "us-top-rising" ? styles.navActive : styles.navLink}
+          href="/scanners/us/top-rising"
+          prefetch={false}
+        >
+          미국 상승률 TOP N
         </Link>
         <Link
           className={current === "trading-intensity" ? styles.navActive : styles.navLink}

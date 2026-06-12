@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncDartAlerts, syncSecAlerts } from "@/lib/alerts";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isDartOpen } from "@/lib/scanner-hours";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,10 @@ export async function GET(request: Request) {
   const flags = await loadAdminFeatureFlags();
   const result: Record<string, unknown> = { success: true };
 
-  if (flags.dart_realtime) {
+  if (flags.dart_realtime && (await isDartOpen())) {
     result.dart = await syncDartAlerts();
   } else {
-    result.dart = { skipped: true, reason: "DART disabled by admin" };
+    result.dart = { skipped: true, reason: flags.dart_realtime ? "DART disabled outside schedule" : "DART disabled by admin" };
   }
 
   if (flags.sec_realtime) {
@@ -27,4 +28,3 @@ export async function GET(request: Request) {
 
   return NextResponse.json(result);
 }
-

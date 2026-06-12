@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    if (!isDomesticScannerOpen()) {
+    if (!(await isDomesticScannerOpen())) {
       return NextResponse.json(
         { success: false, error: "국내 스캐너는 KST 08:00~15:30에만 동작합니다." },
         { status: 503 },

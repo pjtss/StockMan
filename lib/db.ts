@@ -172,6 +172,15 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS scanner_schedules (
+        key TEXT PRIMARY KEY,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
       INSERT INTO feature_flags (key, enabled)
       VALUES ('korean_rising_top_n', TRUE)
       ON CONFLICT (key) DO NOTHING;
@@ -182,6 +191,16 @@ export async function ensureSchema() {
       VALUES
         ('us_updown_rate', '{"KEYB":"","AUTH":"","EXCD":"NAS","GUBN":"1","NDAY":"0","VOL_RANG":"5","tr_id":"HHDFS76290000","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}'),
         ('us_volume_power', '{"KEYB":"","AUTH":"","EXCD":"NAS","NDAY":"0","VOL_RANG":"5","tr_id":"HHDFS76280000","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    await client.query(`
+      INSERT INTO scanner_schedules (key, start_time, end_time)
+      VALUES
+        ('dart', '00:00', '23:59'),
+        ('us_trading_intensity', '17:00', '02:00'),
+        ('domestic_trading_intensity', '08:00', '15:30'),
+        ('us_top_rising', '17:00', '02:00')
       ON CONFLICT (key) DO NOTHING;
     `);
 
