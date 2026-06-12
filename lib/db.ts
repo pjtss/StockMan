@@ -181,6 +181,16 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS scanner_schedule_history (
+        id BIGSERIAL PRIMARY KEY,
+        key TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
       INSERT INTO feature_flags (key, enabled)
       VALUES ('korean_rising_top_n', TRUE)
       ON CONFLICT (key) DO NOTHING;

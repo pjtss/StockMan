@@ -125,7 +125,19 @@ export const scannerSchedules = pgTable(
   }
 );
 
-// 10. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+// 10. 스캐너 시간 변경 이력
+export const scannerScheduleHistory = pgTable(
+  "scanner_schedule_history",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    key: text("key").notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  }
+);
+
+// 11. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const topRisingStocks = pgTable(
   "top_rising_stocks",
   {
@@ -137,7 +149,7 @@ export const topRisingStocks = pgTable(
   }
 );
 
-// 11. 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+// 12. 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const topIntensityStocks = pgTable(
   "top_intensity_stocks",
   {
@@ -149,7 +161,7 @@ export const topIntensityStocks = pgTable(
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
   }
 );
-// 12. 미국 주식 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+// 13. 미국 주식 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const usIntensityStocks = pgTable(
   "us_intensity_stocks",
   {

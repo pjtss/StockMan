@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { DEFAULT_SCANNER_SCHEDULES, loadScannerSchedules, saveScannerSchedule, type ScannerScheduleKey } from "@/lib/scanner-schedules";
+import { getDb } from "@/lib/db";
+import { scannerScheduleHistory } from "@/lib/schema";
+import { desc } from "drizzle-orm";
 
 const keys: ScannerScheduleKey[] = ["dart", "us_trading_intensity", "domestic_trading_intensity", "us_top_rising"];
 
@@ -10,7 +13,9 @@ export async function GET() {
   }
 
   const schedules = await loadScannerSchedules();
-  return NextResponse.json({ schedules, defaults: DEFAULT_SCANNER_SCHEDULES });
+  const db = getDb();
+  const history = db ? await db.select().from(scannerScheduleHistory).orderBy(desc(scannerScheduleHistory.updatedAt)).limit(20) : [];
+  return NextResponse.json({ schedules, defaults: DEFAULT_SCANNER_SCHEDULES, history });
 }
 
 export async function PATCH(request: Request) {
@@ -26,6 +31,9 @@ export async function PATCH(request: Request) {
   if (!keys.includes(key)) return NextResponse.json({ error: "Invalid schedule key" }, { status: 400 });
   if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
     return NextResponse.json({ error: "Invalid time format" }, { status: 400 });
+  }
+  if (body.validateOnly) {
+    return NextResponse.json({ success: true });
   }
 
   await saveScannerSchedule(key, { startTime, endTime });

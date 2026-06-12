@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { scannerSchedules } from "@/lib/schema";
+import { scannerSchedules, scannerScheduleHistory } from "@/lib/schema";
 
 export type ScannerScheduleKey = "dart" | "us_trading_intensity" | "domestic_trading_intensity" | "us_top_rising";
 
@@ -36,8 +36,14 @@ export async function saveScannerSchedule(key: ScannerScheduleKey, schedule: Sca
     .values({ key, startTime: schedule.startTime, endTime: schedule.endTime, updatedAt: new Date() })
     .onConflictDoUpdate({
       target: scannerSchedules.key,
-      set: { startTime: schedule.startTime, endTime: schedule.endTime, updatedAt: new Date() },
+    set: { startTime: schedule.startTime, endTime: schedule.endTime, updatedAt: new Date() },
     });
+  await db.insert(scannerScheduleHistory).values({
+    key,
+    startTime: schedule.startTime,
+    endTime: schedule.endTime,
+    updatedAt: new Date(),
+  });
 }
 
 function toMinutes(value: string): number {
