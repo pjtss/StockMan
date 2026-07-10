@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { buildSecAiPayloadFromDocument } from "@/lib/sec-ai-payload";
+import { evaluateSecFilingWithAi } from "@/lib/sec-ai-evaluator";
 import { prepareSecDocument } from "@/lib/sec-document-parser";
 import { isSecHttpsUrl, parseSecFilingUrl } from "@/lib/sec-filing-url";
 import { fetchSecRawDocument } from "@/lib/sec-raw-document";
@@ -23,6 +24,10 @@ export async function GET(request: Request) {
   const document = await fetchSecRawDocument(urlInfo.canonicalUrl);
   const prepared = prepareSecDocument(document.html, urlInfo);
   const aiPayload = buildSecAiPayloadFromDocument(urlInfo.canonicalUrl, document.html, undefined, urlInfo);
+  const aiEvaluation = await evaluateSecFilingWithAi(aiPayload).catch((error) => ({
+    skipped: true as const,
+    reason: error instanceof Error ? error.message : "AI evaluation failed",
+  }));
 
   return NextResponse.json({
     ok: true,
@@ -45,5 +50,6 @@ export async function GET(request: Request) {
       sections: prepared.sections,
     },
     aiPayload,
+    aiEvaluation,
   });
 }

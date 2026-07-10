@@ -12,6 +12,11 @@
   - AI 전송용 payload에 `promptText`를 추가해 회사명, 티커, Form, 보고일, accession number와 핵심 `Item` 본문을 한 번에 전달할 수 있게 했다.
 - **[기능 개선]** SEC 원문 AI payload의 `title`을 회사명만이 아니라 핵심 이벤트 요약형으로 생성하도록 개선했다.
   - 예: `Broadcom Inc. 8-K: Apple technology collaboration expanded through 2031`
+- **[신규 기능 구현]** SEC 원문 AI 평가 호출을 추가했다.
+  - `lib/sec-ai-evaluator.ts`를 추가해 완성된 SEC AI payload를 OpenAI Responses API로 전송하고, 호재 수준(`level`), 점수(`score`), 신뢰도, 근거, 리스크, 예상 시장 영향, 시간축을 JSON으로 받도록 했다.
+  - `app/api/admin/sec-raw-test/route.ts`는 원문 payload 생성 후 AI 평가를 실행하고 `aiEvaluation`으로 반환한다.
+  - `OPENAI_API_KEY`가 없거나 AI 호출이 실패해도 원문 파싱 결과는 유지하고, 평가만 `skipped`로 반환한다.
+  - 환경변수: `OPENAI_API_KEY` 필수, `OPENAI_MODEL` 선택. 기본 모델은 `gpt-4.1-mini`.
 
 ## 2026-06-18
 - **[신규 기능 구현]** 해외주식 거래대금 추이 페이지를 복수 종목 동시 조회 방식으로 추가했다.
