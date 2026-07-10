@@ -3,6 +3,10 @@ export type SecDocumentMetadata = {
   registrantName: string;
   tradingSymbol: string;
   reportDate: string;
+  cik: string;
+  accessionNumber: string;
+  documentFile: string;
+  canonicalUrl: string;
 };
 
 export type SecDocumentSection = {
@@ -14,6 +18,7 @@ export type SecDocumentSection = {
 export type PreparedSecDocument = {
   fullText: string;
   aiText: string;
+  promptText: string;
   metadata: SecDocumentMetadata;
   sections: SecDocumentSection[];
 };
@@ -65,7 +70,11 @@ function extractInlineValue(html: string, name: string) {
   return match ? stripTags(match[1]) : "";
 }
 
-export function extractSecDocumentMetadata(html: string, text: string): SecDocumentMetadata {
+export function extractSecDocumentMetadata(
+  html: string,
+  text: string,
+  urlInfo?: Partial<Pick<SecDocumentMetadata, "cik" | "accessionNumber" | "documentFile" | "canonicalUrl">>,
+): SecDocumentMetadata {
   const documentType = extractInlineValue(html, "dei:DocumentType") || text.match(/\bFORM\s+([A-Z0-9-]+)/i)?.[1] || "";
   const registrantName = extractInlineValue(html, "dei:EntityRegistrantName");
   const tradingSymbol = extractInlineValue(html, "dei:TradingSymbol");
@@ -76,6 +85,10 @@ export function extractSecDocumentMetadata(html: string, text: string): SecDocum
     registrantName,
     tradingSymbol,
     reportDate,
+    cik: urlInfo?.cik || extractInlineValue(html, "dei:EntityCentralIndexKey"),
+    accessionNumber: urlInfo?.accessionNumber || "",
+    documentFile: urlInfo?.documentFile || "",
+    canonicalUrl: urlInfo?.canonicalUrl || "",
   };
 }
 
@@ -120,14 +133,32 @@ export function buildSecAiText(fullText: string, sections: SecDocumentSection[])
   return removeSentimentNoise(source);
 }
 
-export function prepareSecDocument(html: string): PreparedSecDocument {
+export function buildSecPromptText(metadata: SecDocumentMetadata, aiText: string) {
+  const header = [
+    metadata.registrantName ? `Company: ${metadata.registrantName}` : "",
+    metadata.tradingSymbol ? `Ticker: ${metadata.tradingSymbol}` : "",
+    metadata.documentType ? `Form: ${metadata.documentType}` : "",
+    metadata.reportDate ? `Report date: ${metadata.reportDate}` : "",
+    metadata.accessionNumber ? `Accession: ${metadata.accessionNumber}` : "",
+  ].filter(Boolean);
+
+  return [...header, "", "Material filing text:", aiText].join("\n");
+}
+
+export function prepareSecDocument(
+  html: string,
+  urlInfo?: Partial<Pick<SecDocumentMetadata, "cik" | "accessionNumber" | "documentFile" | "canonicalUrl">>,
+): PreparedSecDocument {
   const fullText = htmlToSecText(html);
   const sections = extractSecItemSections(fullText);
+  const metadata = extractSecDocumentMetadata(html, fullText, urlInfo);
+  const aiText = buildSecAiText(fullText, sections);
 
   return {
     fullText,
-    aiText: buildSecAiText(fullText, sections),
-    metadata: extractSecDocumentMetadata(html, fullText),
+    aiText,
+    promptText: buildSecPromptText(metadata, aiText),
+    metadata,
     sections,
   };
 }

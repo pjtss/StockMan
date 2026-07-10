@@ -6,6 +6,10 @@
   - `app/api/admin/sec-raw-test/route.ts`는 더 이상 공시 HTML을 Atom 피드 파서(`parseSecItems`)에 넣지 않고, 원문 문서 전용 파서를 사용한다.
   - 관리자 테스트 응답은 전체 HTML 대신 `htmlPreview`, `text`, `aiText`, `metadata`, `sections`를 반환해 모달 확인과 AI 전송 준비가 쉬워졌다.
   - `lib/sec-request-headers.ts`를 추가해 SEC 요청의 `User-Agent` 헤더 정책을 원문/피드 요청에서 함께 사용하도록 분리했다.
+- **[기능 개선]** SEC 원문 AI payload의 식별성과 컨텍스트를 보강했다.
+  - `lib/sec-filing-url.ts`를 추가해 SEC Archives URL에서 추적 쿼리를 제거한 canonical URL, CIK, accession number, 문서 파일명, 디렉터리 URL을 추출한다.
+  - `SEC 원문 AI 테스트`는 `utm_source` 같은 쿼리를 제거한 canonical URL로 원문을 조회하고, 응답에 `urlInfo`를 함께 반환한다.
+  - AI 전송용 payload에 `promptText`를 추가해 회사명, 티커, Form, 보고일, accession number와 핵심 `Item` 본문을 한 번에 전달할 수 있게 했다.
 
 ## 2026-06-18
 - **[신규 기능 구현]** 해외주식 거래대금 추이 페이지를 복수 종목 동시 조회 방식으로 추가했다.

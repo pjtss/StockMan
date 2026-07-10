@@ -10,20 +10,27 @@ export type SecAiPayload = {
   sentiment: string;
   link: string;
   text: string;
+  promptText: string;
   metadata: SecDocumentMetadata;
   sections: SecDocumentSection[];
 };
 
-export function buildSecAiPayloadFromDocument(url: string, html: string, fallback?: Partial<SecAiPayload>): SecAiPayload {
-  const prepared = prepareSecDocument(html);
+export function buildSecAiPayloadFromDocument(
+  url: string,
+  html: string,
+  fallback?: Partial<SecAiPayload>,
+  urlInfo?: Partial<Pick<SecDocumentMetadata, "cik" | "accessionNumber" | "documentFile" | "canonicalUrl">>,
+): SecAiPayload {
+  const prepared = prepareSecDocument(html, urlInfo);
   return {
-    accession: fallback?.accession || "",
+    accession: fallback?.accession || prepared.metadata.accessionNumber,
     title: fallback?.title || prepared.metadata.registrantName || prepared.metadata.documentType || "SEC filing",
     summary: fallback?.summary || "",
     formType: fallback?.formType || prepared.metadata.documentType || "",
     sentiment: fallback?.sentiment || "",
-    link: fallback?.link || url,
+    link: fallback?.link || prepared.metadata.canonicalUrl || url,
     text: prepared.aiText,
+    promptText: prepared.promptText,
     metadata: prepared.metadata,
     sections: prepared.sections,
   };
@@ -41,11 +48,16 @@ export async function buildSecAiPayload(item: SecItem): Promise<SecAiPayload> {
     sentiment: item.sentiment,
     link: item.link,
     text: preparedPayload?.text || (document ? extractSecAiText(document) : ""),
+    promptText: preparedPayload?.promptText || "",
     metadata: preparedPayload?.metadata || {
       documentType: item.formType,
       registrantName: item.company,
       tradingSymbol: "",
       reportDate: item.publishedAt,
+      cik: "",
+      accessionNumber: item.accession,
+      documentFile: "",
+      canonicalUrl: item.link,
     },
     sections: preparedPayload?.sections || [],
   };
