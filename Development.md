@@ -10,6 +10,8 @@
   - `lib/sec-filing-url.ts`를 추가해 SEC Archives URL에서 추적 쿼리를 제거한 canonical URL, CIK, accession number, 문서 파일명, 디렉터리 URL을 추출한다.
   - `SEC 원문 AI 테스트`는 `utm_source` 같은 쿼리를 제거한 canonical URL로 원문을 조회하고, 응답에 `urlInfo`를 함께 반환한다.
   - AI 전송용 payload에 `promptText`를 추가해 회사명, 티커, Form, 보고일, accession number와 핵심 `Item` 본문을 한 번에 전달할 수 있게 했다.
+- **[기능 개선]** SEC 원문 AI payload의 `title`을 회사명만이 아니라 핵심 이벤트 요약형으로 생성하도록 개선했다.
+  - 예: `Broadcom Inc. 8-K: Apple technology collaboration expanded through 2031`
 
 ## 2026-06-18
 - **[신규 기능 구현]** 해외주식 거래대금 추이 페이지를 복수 종목 동시 조회 방식으로 추가했다.

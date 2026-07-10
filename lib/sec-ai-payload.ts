@@ -1,6 +1,7 @@
 import type { SecItem } from "./types";
 import { extractSecAiText, fetchSecRawDocument } from "./sec-raw-document";
 import { prepareSecDocument, type SecDocumentMetadata, type SecDocumentSection } from "./sec-document-parser";
+import { buildSecFilingTitle } from "./sec-title";
 
 export type SecAiPayload = {
   accession: string;
@@ -22,9 +23,10 @@ export function buildSecAiPayloadFromDocument(
   urlInfo?: Partial<Pick<SecDocumentMetadata, "cik" | "accessionNumber" | "documentFile" | "canonicalUrl">>,
 ): SecAiPayload {
   const prepared = prepareSecDocument(html, urlInfo);
+  const title = buildSecFilingTitle(prepared.metadata, prepared.sections, fallback?.title);
   return {
     accession: fallback?.accession || prepared.metadata.accessionNumber,
-    title: fallback?.title || prepared.metadata.registrantName || prepared.metadata.documentType || "SEC filing",
+    title,
     summary: fallback?.summary || "",
     formType: fallback?.formType || prepared.metadata.documentType || "",
     sentiment: fallback?.sentiment || "",
