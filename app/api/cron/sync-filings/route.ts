@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { syncDartAlerts, syncSecAlerts } from "@/lib/alerts";
+import { syncDartAlerts } from "@/lib/alerts";
+import { syncSecAlerts } from "@/lib/sec-alerts";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { isDartOpen } from "@/lib/scanner-hours";
 

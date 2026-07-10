@@ -1,13 +1,7 @@
-import { AdminKisTest } from "@/components/admin-kis-test";
-import { AdminDashboard } from "@/components/admin-dashboard";
-import { requireAdminSession } from "@/lib/admin-auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminKisTestPage() {
-  const loggedIn = await requireAdminSession();
-  if (!loggedIn) {
-    return <AdminDashboard loggedIn={false} />;
-  }
-  return <AdminKisTest />;
+export default function AdminKisTestPage() {
+  redirect("/admin/api-tests");
 }

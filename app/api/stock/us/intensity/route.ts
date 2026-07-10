@@ -8,6 +8,10 @@ import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 
 export const dynamic = "force-dynamic";
 
+function asciiOnly(value: string, fallback = "") {
+  return /^[\x00-\x7F]*$/.test(value) ? value : fallback;
+}
+
 export async function GET() {
   const headers = new Headers();
   headers.set("Cache-Control", "no-store, max-age=0");
@@ -16,12 +20,12 @@ export async function GET() {
     const flags = await loadAdminFeatureFlags();
     if (!flags.us_scanners) {
       headers.set("x-debug-status", "disabled");
-      headers.set("x-debug-reason", "미국 스캐너 기능이 관리자에 의해 비활성화되었습니다.");
+      headers.set("x-debug-reason", "US scanner disabled by admin.");
       return NextResponse.json({ error: "US scanner disabled by admin" }, { status: 503, headers });
     }
     if (!(await isUsScannerOpen())) {
       headers.set("x-debug-status", "disabled");
-      headers.set("x-debug-reason", "미국 스캐너는 KST 17:00~02:00에만 동작합니다.");
+      headers.set("x-debug-reason", "US scanner only runs from KST 17:00 to 02:00.");
       return NextResponse.json({ error: "US scanner disabled outside market hours" }, { status: 503, headers });
     }
 
@@ -90,7 +94,7 @@ export async function GET() {
       headers.set("x-debug-status", "hit");
     }
 
-    headers.set("x-debug-reason", debugReason);
+    headers.set("x-debug-reason", asciiOnly(debugReason, "US intensity fetch completed."));
     
     // Sort by intensity descending
     filteredRecords.sort((a, b) => b.intensity - a.intensity);
@@ -99,7 +103,10 @@ export async function GET() {
   } catch (error) {
     console.error("[API] us intensity fetch error:", error);
     headers.set("x-debug-status", "error");
-    headers.set("x-debug-reason", `Server crash: ${error instanceof Error ? error.message : "Unknown error"}`);
+    headers.set(
+      "x-debug-reason",
+      asciiOnly(`Server crash: ${error instanceof Error ? error.message : "Unknown error"}`, "Server crash.")
+    );
     return NextResponse.json(
       { error: "Failed to fetch US intensity stocks" },
       { status: 500, headers }

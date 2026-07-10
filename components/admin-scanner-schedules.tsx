@@ -21,12 +21,6 @@ const presets: Record<string, Record<ScheduleKey, Schedule>> = {
     domestic_trading_intensity: { startTime: "08:00", endTime: "15:30" },
     us_top_rising: { startTime: "17:00", endTime: "02:00" },
   },
-  market: {
-    dart: { startTime: "00:00", endTime: "23:59" },
-    us_trading_intensity: { startTime: "17:00", endTime: "02:00" },
-    domestic_trading_intensity: { startTime: "08:00", endTime: "15:30" },
-    us_top_rising: { startTime: "17:00", endTime: "02:00" },
-  },
   allDay: {
     dart: { startTime: "00:00", endTime: "23:59" },
     us_trading_intensity: { startTime: "00:00", endTime: "23:59" },
@@ -37,33 +31,50 @@ const presets: Record<string, Record<ScheduleKey, Schedule>> = {
 
 export function AdminScannerSchedules() {
   const [schedules, setSchedules] = useState<Record<ScheduleKey, Schedule> | null>(null);
-  const [history, setHistory] = useState<HistoryRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<ScheduleKey | "all" | null>(null);
   const [drafts, setDrafts] = useState<Record<ScheduleKey, Schedule> | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<ScheduleKey | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const dirty = useMemo(() => {
     if (!schedules || !drafts) return false;
     return rows.some(([key]) => schedules[key].startTime !== drafts[key].startTime || schedules[key].endTime !== drafts[key].endTime);
   }, [schedules, drafts]);
 
-  async function load() {
+  async function loadSchedules() {
     const res = await fetch("/api/admin/scanner-schedules", { cache: "no-store" });
-    if (!res.ok) throw new Error("스캐너 시간을 불러오지 못했습니다.");
+    if (res.status === 401) throw new Error("관리자 로그인이 필요합니다.");
+    if (!res.ok) throw new Error("스케줄을 불러오지 못했습니다.");
     const data = await res.json();
     setSchedules(data.schedules);
     setDrafts(data.schedules);
-    setHistory(data.history || []);
+  }
+
+  async function loadHistory() {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch("/api/admin/scanner-schedules/history", { cache: "no-store" });
+      if (res.status === 401) throw new Error("관리자 로그인이 필요합니다.");
+      if (!res.ok) throw new Error("변경 이력을 불러오지 못했습니다.");
+      const data = await res.json();
+      setHistory(data.history || []);
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    void loadSchedules().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
   function validateTime(value: string) {
     return /^\d{2}:\d{2}$/.test(value);
   }
 
-  async function save(key: ScheduleKey, next: Schedule, applyImmediately = true) {
+  async function save(key: ScheduleKey, next: Schedule) {
     setSaving(key);
     setError(null);
     try {
@@ -73,20 +84,30 @@ export function AdminScannerSchedules() {
       const res = await fetch("/api/admin/scanner-schedules", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ key, ...next, validateOnly: false }),
+        body: JSON.stringify({ key, ...next }),
       });
+      if (res.status === 401) {
+        throw new Error("관리자 로그인이 필요합니다.");
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "스캐너 시간 저장 실패");
       }
       setSchedules((prev) => (prev ? { ...prev, [key]: next } : prev));
       setDrafts((prev) => (prev ? { ...prev, [key]: next } : prev));
-      await load();
+      setModalOpen(false);
+      if (historyOpen) await loadHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(null);
     }
+  }
+
+  async function openHistory() {
+    setHistoryOpen(true);
+    setModalOpen(false);
+    await loadHistory().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }
 
   if (!schedules || !drafts) {
@@ -100,7 +121,7 @@ export function AdminScannerSchedules() {
           <div>
             <p className={styles.eyebrow}>ADMIN SCHEDULE</p>
             <h1 className={styles.title}>스캐너 동작 시간 설정</h1>
-            <p className={styles.subtitle}>KST 기준 시작 시간과 종료 시간을 수정하고 즉시 반영합니다.</p>
+            <p className={styles.subtitle}>KST 기준 시작 시간과 종료 시간을 수정합니다. 변경 이력은 버튼 클릭 시에만 조회합니다.</p>
           </div>
         </div>
 
@@ -109,102 +130,112 @@ export function AdminScannerSchedules() {
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div>
-              <h2 className={styles.cardTitle}>프리셋</h2>
-              <p className={styles.cardDesc}>기본 장중 시간, 전체 허용, 기본값을 한 번에 적용합니다.</p>
+              <h2 className={styles.cardTitle}>컨트롤</h2>
+              <p className={styles.cardDesc}>변경은 모달에서만 합니다.</p>
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-            {Object.entries({ default: "기본값", market: "장중", allDay: "전체 허용" }).map(([presetKey, label]) => (
-              <button
-                key={presetKey}
-                className={styles.toggleButton}
-                disabled={saving !== null}
-                onClick={() => {
-                  const next = presets[presetKey];
-                  setDrafts(next);
-                  void Promise.all(rows.map(([key]) => save(key, next[key], false)));
-                }}
-              >
-                {label}
-              </button>
-            ))}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className={styles.toggleButton} onClick={() => setModalOpen(true)}>시간 수정</button>
+              <button className={styles.toggleButton} onClick={() => void openHistory()}>변경 이력</button>
+            </div>
           </div>
         </section>
 
-        <section className={styles.statusGrid}>
-          {rows.map(([key, label, defaultHint]) => {
-            const current = drafts[key];
-            const status = (() => {
-              const now = new Date();
-              const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
-              const hour = Number(parts.find((part) => part.type === "hour")?.value || "0");
-              const minute = Number(parts.find((part) => part.type === "minute")?.value || "0");
-              const currentMin = hour * 60 + minute;
-              const start = Number(current.startTime.slice(0, 2)) * 60 + Number(current.startTime.slice(3, 5));
-              const end = Number(current.endTime.slice(0, 2)) * 60 + Number(current.endTime.slice(3, 5));
-              return start <= end ? currentMin >= start && currentMin < end : currentMin >= start || currentMin < end;
-            })();
-            return (
-              <article key={key} className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <div>
-                    <h2 className={styles.cardTitle}>{label}</h2>
-                    <p className={styles.cardDesc}>기본: {defaultHint}</p>
-                  </div>
-                  <span className={`${styles.state} ${status ? styles.on : styles.off}`}>{status ? "동작 중" : "비동작"}</span>
-                </div>
-                <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-                  <label style={{ display: "grid", gap: 6 }}>
-                    <span style={{ color: "#cbd5e1", fontWeight: 700, fontSize: 13 }}>시작 시간</span>
-                    <input
-                      type="time"
-                      value={current.startTime}
-                      onChange={(e) => setDrafts((prev) => prev ? { ...prev, [key]: { ...prev[key], startTime: e.target.value } } : prev)}
-                      style={{ minHeight: 42, borderRadius: 12, padding: "0 12px", background: "rgba(15,23,42,.88)", color: "#fff", border: "1px solid rgba(148,163,184,.22)" }}
-                    />
-                  </label>
-                  <label style={{ display: "grid", gap: 6 }}>
-                    <span style={{ color: "#cbd5e1", fontWeight: 700, fontSize: 13 }}>종료 시간</span>
-                    <input
-                      type="time"
-                      value={current.endTime}
-                      onChange={(e) => setDrafts((prev) => prev ? { ...prev, [key]: { ...prev[key], endTime: e.target.value } } : prev)}
-                      style={{ minHeight: 42, borderRadius: 12, padding: "0 12px", background: "rgba(15,23,42,.88)", color: "#fff", border: "1px solid rgba(148,163,184,.22)" }}
-                    />
-                  </label>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button className={styles.toggleButton} disabled={saving !== null || !dirty} onClick={() => void save(key, current, true)}>
-                      {saving === key ? "저장 중..." : "저장 후 즉시 반영"}
-                    </button>
-                    <button className={styles.logoutButton} disabled={saving !== null} onClick={() => setDrafts((prev) => prev ? { ...prev, [key]: schedules[key] } : prev)}>
-                      되돌리기
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </section>
-
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <div>
-              <h2 className={styles.cardTitle}>변경 이력</h2>
-              <p className={styles.cardDesc}>최근 저장 내역 20건을 보여줍니다.</p>
-            </div>
-          </div>
-          <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-            {history.slice(0, 20).map((row, index) => (
-              <div key={`${row.key}-${row.updatedAt}-${index}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 12, borderRadius: 12, background: "rgba(15,23,42,.55)", border: "1px solid rgba(255,255,255,.06)" }}>
+        {modalOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,.72)", display: "grid", placeItems: "center", padding: 20, zIndex: 50 }}>
+            <div style={{ width: "min(100%, 860px)", background: "rgba(15,23,42,.98)", border: "1px solid rgba(148,163,184,.18)", borderRadius: 20, padding: 24, maxHeight: "85vh", overflow: "auto" }}>
+              <div className={styles.cardHeader}>
                 <div>
-                  <strong style={{ color: "#f8fafc" }}>{row.key}</strong>
-                  <div style={{ color: "#94a3b8", fontSize: 13 }}>{row.startTime} - {row.endTime}</div>
+                  <h2 className={styles.cardTitle}>스케줄 수정</h2>
+                  <p className={styles.cardDesc}>저장 시 DB에 반영됩니다.</p>
                 </div>
-                <div style={{ color: "#94a3b8", fontSize: 13 }}>{new Date(row.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })}</div>
+                <button className={styles.logoutButton} onClick={() => setModalOpen(false)}>닫기</button>
               </div>
-            ))}
+
+              <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button className={styles.toggleButton} onClick={() => {
+                    const next = presets.default;
+                    setDrafts(next);
+                  }}>기본값</button>
+                  <button className={styles.toggleButton} onClick={() => {
+                    const next = presets.allDay;
+                    setDrafts(next);
+                  }}>전체 허용</button>
+                </div>
+
+                <section className={styles.statusGrid}>
+                  {rows.map(([key, label, defaultHint]) => {
+                    const current = drafts[key];
+                    const status = (() => {
+                      const now = new Date();
+                      const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
+                      const hour = Number(parts.find((part) => part.type === "hour")?.value || "0");
+                      const minute = Number(parts.find((part) => part.type === "minute")?.value || "0");
+                      const currentMin = hour * 60 + minute;
+                      const start = Number(current.startTime.slice(0, 2)) * 60 + Number(current.startTime.slice(3, 5));
+                      const end = Number(current.endTime.slice(0, 2)) * 60 + Number(current.endTime.slice(3, 5));
+                      return start <= end ? currentMin >= start && currentMin < end : currentMin >= start || currentMin < end;
+                    })();
+                    return (
+                      <article key={key} className={styles.card}>
+                        <div className={styles.cardHeader}>
+                          <div>
+                            <h2 className={styles.cardTitle}>{label}</h2>
+                            <p className={styles.cardDesc}>기본: {defaultHint}</p>
+                          </div>
+                          <span className={`${styles.state} ${status ? styles.on : styles.off}`}>{status ? "동작 중" : "비동작"}</span>
+                        </div>
+                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                          <label style={{ display: "grid", gap: 6 }}>
+                            <span style={{ color: "#cbd5e1", fontWeight: 700, fontSize: 13 }}>시작 시간</span>
+                            <input type="time" value={current.startTime} onChange={(e) => setDrafts((prev) => prev ? { ...prev, [key]: { ...prev[key], startTime: e.target.value } } : prev)} style={{ minHeight: 42, borderRadius: 12, padding: "0 12px", background: "rgba(15,23,42,.88)", color: "#fff", border: "1px solid rgba(148,163,184,.22)" }} />
+                          </label>
+                          <label style={{ display: "grid", gap: 6 }}>
+                            <span style={{ color: "#cbd5e1", fontWeight: 700, fontSize: 13 }}>종료 시간</span>
+                            <input type="time" value={current.endTime} onChange={(e) => setDrafts((prev) => prev ? { ...prev, [key]: { ...prev[key], endTime: e.target.value } } : prev)} style={{ minHeight: 42, borderRadius: 12, padding: "0 12px", background: "rgba(15,23,42,.88)", color: "#fff", border: "1px solid rgba(148,163,184,.22)" }} />
+                          </label>
+                          <button className={styles.toggleButton} disabled={saving !== null || !dirty} onClick={() => void save(key, current)}>
+                            {saving === key ? "저장 중..." : "저장"}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </section>
+              </div>
+            </div>
           </div>
-        </section>
+        )}
+
+        {historyOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,.72)", display: "grid", placeItems: "center", padding: 20, zIndex: 50 }}>
+            <div style={{ width: "min(100%, 860px)", background: "rgba(15,23,42,.98)", border: "1px solid rgba(148,163,184,.18)", borderRadius: 20, padding: 24, maxHeight: "85vh", overflow: "auto" }}>
+              <div className={styles.cardHeader}>
+                <div>
+                  <h2 className={styles.cardTitle}>변경 이력</h2>
+                  <p className={styles.cardDesc}>이 모달을 열 때만 DB에서 조회합니다.</p>
+                </div>
+                <button className={styles.logoutButton} onClick={() => setHistoryOpen(false)}>닫기</button>
+              </div>
+
+              {historyLoading ? (
+                <p style={{ color: "#cbd5e1", marginTop: 16 }}>불러오는 중...</p>
+              ) : (
+                <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+                  {(history || []).map((row, index) => (
+                    <div key={`${row.key}-${row.updatedAt}-${index}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 12, borderRadius: 12, background: "rgba(15,23,42,.55)", border: "1px solid rgba(255,255,255,.06)" }}>
+                      <div>
+                        <strong style={{ color: "#f8fafc" }}>{row.key}</strong>
+                        <div style={{ color: "#94a3b8", fontSize: 13 }}>{row.startTime} - {row.endTime}</div>
+                      </div>
+                      <div style={{ color: "#94a3b8", fontSize: 13 }}>{new Date(row.updatedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

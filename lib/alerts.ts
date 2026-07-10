@@ -1,11 +1,9 @@
 // import { ensureSchema, getPool } from "./db";
-import { fetchDartFeed, fetchSecFeed, getTodayInSeoul } from "./rss";
-import type { AlertItem, DartItem, FeedPayload, SecItem } from "./types";
+import { fetchDartFeed } from "./rss";
+import type { AlertItem, DartItem, FeedPayload } from "./types";
 import { minutesAgo } from "./utils";
 
 const DART_BULLISH_LEVELS = ["최강호재", "호재가능"];
-const SEC_BULLISH_LEVELS = ["호재가능"];
-
 /*
 function toPublishedDateSeoul(value: string): string {
   const date = new Date(value);
@@ -233,26 +231,6 @@ export async function syncDartAlerts(): Promise<FeedPayload<DartItem>> {
   };
 }
 
-export async function syncSecAlerts(): Promise<FeedPayload<SecItem>> {
-  const payload = await fetchSecFeed();
-  const recentItems = filterNewItems(payload.items, 1);
-  
-  const newAlerts: AlertItem[] = recentItems.map((item) => ({
-    source: item.source,
-    externalId: item.accession || item.link,
-    level: item.sentiment,
-    company: item.company,
-    title: item.title,
-    link: item.link,
-    publishedAt: item.publishedAt,
-  }));
-
-  return {
-    ...payload,
-    newAlerts,
-  };
-}
-
 export async function getTodayDartBullishFeed(): Promise<FeedPayload<DartItem>> {
   // DB 기능 주석 처리로 인해 RSS 직접 호출
   const payload = await fetchDartFeed();
@@ -293,47 +271,3 @@ export async function getTodayDartBullishFeed(): Promise<FeedPayload<DartItem>> 
   }
   */
 }
-
-export async function getTodaySecBullishFeed(): Promise<FeedPayload<SecItem>> {
-  // DB 기능 주석 처리로 인해 RSS 직접 호출
-  const payload = await fetchSecFeed();
-  return payload;
-  /*
-  await ensureSchema();
-  const client = await getPool().connect();
-  const todayInSeoul = getTodayInSeoul();
-
-  try {
-    const { rows } = await client.query(
-      `
-        SELECT external_id, company, title, judgment, form_type, summary, published_at, link
-        FROM filings
-        WHERE source = 'SEC'
-          AND judgment = ANY($1::text[])
-          AND published_date_seoul = $2::date
-        ORDER BY published_at DESC
-      `,
-      [SEC_BULLISH_LEVELS, todayInSeoul],
-    );
-
-    return {
-      source: "SEC",
-      fetchedAt: new Date().toISOString(),
-      items: rows.map((row) => ({
-        source: "SEC",
-        accession: row.external_id,
-        company: row.company,
-        formType: row.form_type ?? "UNKNOWN",
-        sentiment: row.judgment,
-        publishedAt: new Date(row.published_at).toISOString(),
-        title: row.title,
-        summary: row.summary ?? "",
-        link: row.link,
-      })),
-    };
-  } finally {
-    client.release();
-  }
-  */
-}
-

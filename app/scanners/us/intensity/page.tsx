@@ -81,10 +81,10 @@ export default function UsTradingIntensityScannerPage() {
       setError(null);
       console.info("⚡ [KIS-DEBUG-CLIENT] 미국 체결강도 수동 동기화 요청 시작...");
       const res = await fetch("/api/stock/us/intensity/sync", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error("동기화 API 호출 중 오류가 발생했습니다.");
+        throw new Error(data.error || "동기화 API 호출 중 오류가 발생했습니다.");
       }
-      const data = await res.json();
       console.info("⚡ [KIS-DEBUG-CLIENT] 미국 체결강도 수동 동기화 완료 응답 수신:", data);
       if (data.success) {
         await fetchStocks(false);
@@ -92,6 +92,15 @@ export default function UsTradingIntensityScannerPage() {
         throw new Error(`동기화가 정상 처리되지 않았습니다: ${data.error || "알 수 없는 오류"}`);
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : "동기화에 실패했습니다.";
+      if (
+        message.includes("관리자에 의해 비활성화") ||
+        message.includes("KST 17:00~02:00") ||
+        message.includes("API 호출 중 오류가 발생했습니다.")
+      ) {
+        setError(message);
+        return;
+      }
       console.error(err);
       setError(err instanceof Error ? err.message : "동기화에 실패했습니다.");
     } finally {

@@ -147,7 +147,17 @@ export const scannerScheduleHistory = pgTable(
   }
 );
 
-// 12. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+// 12. 해외주식 거래대금 추이 종목 목록
+export const usTurnoverSymbols = pgTable(
+  "us_turnover_symbols",
+  {
+    key: text("key").primaryKey(),
+    symbols: jsonb("symbols").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  }
+);
+
+// 13. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const topRisingStocks = pgTable(
   "top_rising_stocks",
   {
@@ -159,7 +169,7 @@ export const topRisingStocks = pgTable(
   }
 );
 
-// 13. 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+// 14. 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const topIntensityStocks = pgTable(
   "top_intensity_stocks",
   {
@@ -171,7 +181,7 @@ export const topIntensityStocks = pgTable(
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
   }
 );
-// 14. 미국 주식 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
+// 15. 미국 주식 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const usIntensityStocks = pgTable(
   "us_intensity_stocks",
   {

@@ -66,6 +66,31 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.primaryLink,
+.secondaryLink {
+  min-height: 48px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.primaryLink {
+  border: 1px solid rgba(0, 255, 163, 0.24);
+  background: rgba(0, 255, 163, 0.1);
+  color: #00ffa3;
+  box-shadow: 0 0 18px rgba(0, 255, 163, 0.12);
+}
+
+.secondaryLink {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(148, 163, 184, 0.1);
+  color: #e2e8f0;
 }
 
 .logoutButton {

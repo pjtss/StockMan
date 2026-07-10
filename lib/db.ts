@@ -199,6 +199,20 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS us_turnover_symbols (
+        key TEXT PRIMARY KEY,
+        symbols JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      INSERT INTO us_turnover_symbols (key, symbols)
+      VALUES ('default', '["AAPL","TSLA","NVDA"]')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    await client.query(`
       INSERT INTO feature_flags (key, enabled)
       VALUES ('korean_rising_top_n', TRUE)
       ON CONFLICT (key) DO NOTHING;
@@ -208,7 +222,8 @@ export async function ensureSchema() {
       INSERT INTO kis_api_configs (key, config)
       VALUES
         ('us_updown_rate', '{"KEYB":"","AUTH":"","EXCD":"NAS","GUBN":"1","NDAY":"0","VOL_RANG":"5","tr_id":"HHDFS76290000","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}'),
-        ('us_volume_power', '{"KEYB":"","AUTH":"","EXCD":"NAS","NDAY":"0","VOL_RANG":"5","tr_id":"HHDFS76280000","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}')
+        ('us_volume_power', '{"KEYB":"","AUTH":"","EXCD":"NAS","NDAY":"0","VOL_RANG":"5","tr_id":"HHDFS76280000","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}'),
+        ('us_price_detail', '{"AUTH":"","EXCD":"AMS","tr_id":"HHDFS76200200","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}')
       ON CONFLICT (key) DO NOTHING;
     `);
 

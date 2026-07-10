@@ -15,6 +15,8 @@ type PageKey =
   | "scanners-us"
   | "us-intensity"
   | "us-top-rising"
+  | "us-ams-scout"
+  | "us-turnover-trend"
   | "top-rising"
   | "trading-intensity"
   | "admin"
@@ -37,13 +39,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
 
         <Link
-          className={current === "us-intensity" ? styles.navActive : styles.navLink}
-          href="/scanners/us/intensity"
-          prefetch={false}
-        >
-          미국 체결강도
-        </Link>
-        <Link
           className={current === "us-top-rising" ? styles.navActive : styles.navLink}
           href="/scanners/us/top-rising"
           prefetch={false}
@@ -51,11 +46,11 @@ export function PageNavigation({ current }: { current: PageKey }) {
           미국 상승률 TOP N
         </Link>
         <Link
-          className={current === "trading-intensity" ? styles.navActive : styles.navLink}
-          href="/scanners/trading-intensity"
+          className={current === "us-ams-scout" ? styles.navActive : styles.navLink}
+          href="/scanners/us/ams-scout"
           prefetch={false}
         >
-          체결강도 TOP 10
+          AMS 급등주 탐색
         </Link>
         <Link
           className={current === "notifications" ? styles.navActive : styles.navLink}

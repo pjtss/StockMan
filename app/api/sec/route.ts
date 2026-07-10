@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTodaySecBullishFeed, syncSecAlerts } from "@/lib/alerts";
+import { getTodaySecBullishFeed, syncSecAlerts } from "@/lib/sec-alerts";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 
 export const dynamic = "force-dynamic";

@@ -1,5 +1,15 @@
 # Development
 
+## 2026-06-18
+- **[신규 기능 구현]** 해외주식 거래대금 추이 페이지를 복수 종목 동시 조회 방식으로 추가했다.
+  - `app/scanners/us/turnover-trend/page.tsx`에 일반 페이지를 신설하고, `components/page-navigation.tsx`에 라우팅 링크를 추가했다.
+  - `components/us-turnover-trend.tsx`는 콤마/공백으로 여러 종목코드를 입력받아 각각의 분봉 거래대금 추이를 개별 카드 차트로 동시에 렌더링한다.
+  - `app/api/stock/us/turnover-trend/route.ts`는 KIS 해외주식 분봉조회(`/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice`)를 프록시하고, `AUTH`와 `KEYB`는 기본 빈 문자열로 처리한다.
+  - 거래대금 추이 산출은 분봉조회 응답의 금액 필드를 우선 정규화해 사용하도록 구현했다.
+- **[오류 수정]** KIS 해외주식 설정값에 저장된 `""` 문자열을 빈 문자열로 정규화하도록 보정했다.
+  - 기존 DB 설정에 `AUTH` 또는 `KEYB`가 문자 그대로 `""`로 저장된 경우, 요청 시 `%22%22`로 전송되던 문제를 막기 위해 로드/저장 시점에 빈 문자열로 강제 정규화했다.
+  - `us_turnover_trend` 요청은 이제 쿼리 파라미터와 헤더 모두 실제 빈 값만 사용한다.
+
 ## 2026-05-22
 - 실시간 DART, OPEN DART, SEC, 국내 스캐너, 미국 스캐너 기능을 비활성화했다.
 - 비활성화 대상 페이지는 모두 공통 안내 화면으로 교체했다.

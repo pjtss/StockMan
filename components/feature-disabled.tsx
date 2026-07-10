@@ -10,7 +10,8 @@ type PageKey =
   | "scanners"
   | "watchlist"
   | "notifications"
-  | "scanners-us";
+  | "scanners-us"
+  | "us-turnover-trend";
 
 type FeatureDisabledProps = {
   current: PageKey;

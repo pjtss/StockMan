@@ -75,6 +75,22 @@ export function getKisMode(): "real" | "mock" {
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0; // 타임스탬프 (ms)
 
+async function readStoredKisToken() {
+  const db = getDb();
+  if (!db) return null;
+
+  const tokenRecord = await db.select({
+    accessToken: kisTokens.accessToken,
+    issuedAt: kisTokens.issuedAt,
+    expiresAt: kisTokens.expiresAt,
+  })
+  .from(kisTokens)
+  .where(eq(kisTokens.id, 1))
+  .limit(1);
+
+  return tokenRecord[0] ?? null;
+}
+
 export async function getAccessToken(): Promise<string | null> {
   const now = Date.now();
   if (cachedToken && now < tokenExpiresAt - 5 * 60 * 1000) {
@@ -85,35 +101,23 @@ export async function getAccessToken(): Promise<string | null> {
 
   // DB를 정본(source of truth)으로 사용하고, 만료 1시간 이내일 때만 재발급한다.
   try {
-    const db = getDb();
-    if (db) {
-      const tokenRecord = await db.select({
-        accessToken: kisTokens.accessToken,
-        issuedAt: kisTokens.issuedAt,
-        expiresAt: kisTokens.expiresAt,
-      })
-      .from(kisTokens)
-      .where(eq(kisTokens.id, 1))
-      .limit(1);
+    const row = await readStoredKisToken();
+    console.info("[KIS] Token row lookup:", {
+      found: Boolean(row),
+      rowCount: row ? 1 : 0,
+    });
 
-      console.info("[KIS] Token row lookup:", {
-        found: tokenRecord.length > 0,
-        rowCount: tokenRecord.length,
+    if (row) {
+      const expiresAt = new Date(row.expiresAt).getTime();
+      console.info("[KIS] Token timestamps:", {
+        issuedAt: row.issuedAt instanceof Date ? row.issuedAt.toISOString() : row.issuedAt,
+        expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+        expiresInMs: expiresAt - now,
       });
-
-      if (tokenRecord.length > 0) {
-        const row = tokenRecord[0];
-        const expiresAt = new Date(row.expiresAt).getTime();
-        console.info("[KIS] Token timestamps:", {
-          issuedAt: row.issuedAt instanceof Date ? row.issuedAt.toISOString() : row.issuedAt,
-          expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
-          expiresInMs: expiresAt - now,
-        });
-        if (expiresAt > now + refreshThresholdMs) {
-          cachedToken = row.accessToken;
-          tokenExpiresAt = expiresAt;
-          return row.accessToken;
-        }
+      if (expiresAt > now + refreshThresholdMs) {
+        cachedToken = row.accessToken;
+        tokenExpiresAt = expiresAt;
+        return row.accessToken;
       }
     }
   } catch (dbErr: any) {
@@ -194,6 +198,63 @@ export async function getAccessToken(): Promise<string | null> {
   }
 
   return null;
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  if (!KIS_APPKEY || !KIS_APPSECRET) return null;
+
+  const url = "https://openapi.koreainvestment.com:9443/oauth2/tokenP";
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        grant_type: "client_credentials",
+        appkey: KIS_APPKEY,
+        appsecret: KIS_APPSECRET,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.warn(`[KIS-DEBUG] Token refresh failed for ${url} with HTTP ${response.status}, body: ${errText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data.access_token) return null;
+
+    const token = data.access_token as string;
+    const issuedAt = Date.now();
+    const expiresInSecRaw = (data as any).expires_in;
+    const expiresInSec = typeof expiresInSecRaw === "string" ? Number(expiresInSecRaw) : Number(expiresInSecRaw);
+    const expTime =
+      Number.isFinite(expiresInSec) && expiresInSec > 0
+        ? issuedAt + expiresInSec * 1000
+        : issuedAt + 20 * 60 * 60 * 1000;
+    const issuedDate = new Date(issuedAt);
+    const expDate = new Date(expTime);
+
+    const db = getDb();
+    if (db) {
+      await db
+        .insert(kisTokens)
+        .values({ id: 1, accessToken: token, issuedAt: issuedDate, expiresAt: expDate })
+        .onConflictDoUpdate({
+          target: kisTokens.id,
+          set: { accessToken: token, issuedAt: issuedDate, expiresAt: expDate },
+        });
+    }
+
+    cachedToken = token;
+    tokenExpiresAt = expTime;
+    return token;
+  } catch (err) {
+    console.warn(`[KIS] Token refresh failed for ${url}:`, err);
+    return null;
+  }
 }
 
 // 테스트를 위해 캐시를 초기화할 수 있는 헬퍼 함수

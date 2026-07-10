@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { DEFAULT_KIS_API_CONFIGS, loadKisApiConfig, saveKisApiConfig, type KisApiConfigKey } from "@/lib/kis-api-config";
 
-const allowedKeys: KisApiConfigKey[] = ["us_updown_rate", "us_volume_power"];
+const allowedKeys: KisApiConfigKey[] = ["us_updown_rate", "us_volume_power", "us_turnover_trend", "us_price_detail"];
 
 export async function GET() {
   if (!(await requireAdminSession())) {
