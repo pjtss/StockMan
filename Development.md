@@ -1,5 +1,21 @@
 # Development
 
+## 2026-07-11
+- **[자동화 확장]** SEC 예약 실행 범위에 원문 파싱, AI 평가, Discord 전송을 모두 포함했다.
+  - `lib/sec-filing-processor.ts`: SEC 공시 1건에 대해 원문 조회, 문서 파싱, AI 평가, Discord 전송을 독립 모듈로 순서대로 조율하는 application service를 추가했다.
+  - `lib/sec-primary-document.ts`: SEC Atom 링크의 `*-index.htm` 제출 상세에서 Form Type과 일치하는 주 문서 URL을 추출해 실제 공시 원문을 조회하도록 분리했다.
+  - `lib/sec-automation.ts`: 최근 10분 내 SEC 호재 후보를 선택하고 실행당 1건을 처리하는 예약 batch orchestration을 추가했다.
+  - `lib/sec-automation-store.ts`: `sec_automation_events` DB 테이블을 이용해 공시별 처리 선점, Discord 전달 완료, 실패 및 최대 3회 재시도를 관리한다.
+  - `lib/sec-discord-result.ts`: SEC AI payload와 평가 결과를 Discord 전송 DTO로 변환하는 책임을 분리했다.
+  - `lib/filing-sync.ts`: 관리자 `sec_realtime=true`일 때 기존 피드 조회만이 아니라 전체 SEC 자동화 파이프라인을 실행하도록 연결했다.
+  - OpenAI 또는 Discord 환경변수가 없으면 유료 AI 처리 전에 자동화를 명시적으로 건너뛴다.
+  - 자동화 orchestration과 개별 공시 처리 흐름을 단위 테스트로 검증했다.
+- **[오류 수정]** 관리자 SEC 기능 플래그와 Netlify 예약 실행을 직접 연결하고 `405 Method Not Allowed`를 제거했다.
+  - `lib/filing-sync.ts`: DART/SEC 관리자 플래그를 매 실행 시 DB에서 조회하고, `sec_realtime=true`일 때만 SEC 동기화를 실행하는 공용 예약 로직을 추가했다.
+  - `netlify/functions/sync-filings.ts`: 매분 실행되는 예약 함수가 Next.js API를 다시 호출하지 않고 공용 예약 로직을 직접 실행하도록 변경했다.
+  - `app/api/cron/sync-filings/route.ts`: 기존 GET과 예약 호출용 POST가 같은 로직을 사용하도록 해 POST 요청의 405 오류를 차단했다.
+  - 관리자 플래그 ON/OFF 및 GET/POST 라우트 동작을 단위 테스트로 검증했다.
+
 ## 2026-07-10
 - **[신규 기능 구현]** SEC 분석 결과를 Discord Webhook으로 전송하는 관리자 기능을 추가했다.
   - `lib/discord-sec.ts`: SEC 분석 결과를 Discord 공식 Webhook payload(`content`, `embeds`, `allowed_mentions`)로 변환하고, `SEC_DISCORD_WEBHOOK_URL` 또는 `DISCORD_WEBHOOK_URL`로 전송하는 모듈을 추가했다.

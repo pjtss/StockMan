@@ -328,6 +328,10 @@ function getOpenAiConfig() {
   };
 }
 
+export function isSecAiEvaluationConfigured() {
+  return Boolean(getOpenAiConfig().apiKey);
+}
+
 export async function evaluateSecFilingWithAi(payload: SecAiPayload): Promise<SecAiEvaluationResult> {
   const { apiKey, model } = getOpenAiConfig();
   if (!apiKey) {

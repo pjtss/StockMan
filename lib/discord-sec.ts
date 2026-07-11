@@ -225,6 +225,10 @@ function getDiscordWebhookUrl() {
   return process.env.SEC_DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL || "";
 }
 
+export function isSecDiscordConfigured() {
+  return Boolean(getDiscordWebhookUrl());
+}
+
 export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<DiscordSendResult> {
   const webhookUrl = getDiscordWebhookUrl();
   if (!webhookUrl) {

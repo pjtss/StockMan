@@ -40,6 +40,16 @@ export const alertEvents = pgTable(
   ]
 );
 
+export const secAutomationEvents = pgTable("sec_automation_events", {
+  externalId: text("external_id").primaryKey(),
+  status: text("status").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // 3. 브라우저 웹 푸시 구독 엔티티
 export const pushSubscriptions = pgTable(
   "push_subscriptions",

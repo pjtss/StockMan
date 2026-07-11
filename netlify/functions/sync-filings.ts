@@ -1,23 +1,9 @@
 import { schedule } from "@netlify/functions";
+import { runFilingSync } from "../../lib/filing-sync";
 
 export const handler = schedule("* * * * *", async () => {
-  // Netlify provides the site's primary URL in process.env.URL (e.g. https://your-site.netlify.app)
-  const siteUrl = process.env.URL || "http://localhost:3000";
-  const secret = process.env.CRON_SECRET || "";
-  
   try {
-    const targetUrl = `${siteUrl}/api/cron/sync-filings?secret=${secret}`;
-    console.log(`[Cron] Triggering sync filings at: ${siteUrl}/api/cron/sync-filings`);
-    
-    const response = await fetch(targetUrl, {
-      method: "POST",
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = await runFilingSync();
     console.log("[Cron] Sync filings successful:", data);
 
     return {

@@ -87,6 +87,18 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS sec_automation_events (
+        external_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        claimed_at TIMESTAMPTZ,
+        delivered_at TIMESTAMPTZ,
+        last_error TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id BIGSERIAL PRIMARY KEY,
         endpoint TEXT NOT NULL UNIQUE,
