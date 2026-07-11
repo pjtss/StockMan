@@ -5,6 +5,7 @@
  */
 
 import { getAccessToken } from "./kis";
+import { buildKisAuthorization } from "./kis-authorization";
 
 const KIS_APPKEY = process.env.KIS_APPKEY ?? "";
 const KIS_APPSECRET = process.env.KIS_APPSECRET ?? "";
@@ -62,7 +63,7 @@ async function fetchDailyOHLCV(code: string, token: string): Promise<OHLCVCandle
   const res = await fetch(url.toString(), {
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: buildKisAuthorization(token),
       appkey: KIS_APPKEY,
       appsecret: KIS_APPSECRET,
       tr_id: "FHKST03010100",

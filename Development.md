@@ -1,6 +1,44 @@
 # Development
 
 ## 2026-07-11
+- **[인증 안정화]** KIS 접근토큰의 하루 중복 발급 경로를 제거하고 DB 단일 정본 정책을 강화했다.
+  - `lib/kis-token.ts`: 토큰 조회·발급·DB 저장·만료 판정·캐시 삭제를 하나의 수명주기 모듈로 분리했다.
+  - 같은 서버 인스턴스의 동시 요청은 하나의 Promise로 합치고, 서버리스 인스턴스 간에는 PostgreSQL advisory lock을 획득한 뒤 DB 토큰을 다시 확인한다.
+  - KIS가 반환하는 `access_token_token_expired`를 우선 저장하고, 값이 없을 때만 공식 유효기간인 24시간을 적용한다.
+  - 만료 1시간보다 많이 남은 토큰은 항상 재사용하며, 같은 KST 날짜에 발급된 토큰은 만료 전까지 재발급하지 않는다.
+  - 공유 DB 조회가 실패하면 저장할 수 없는 신규 토큰 발급도 차단한다.
+  - `lib/kis-authorization.ts`: 모든 KIS 요청 헤더를 DB 토큰 기반 `Bearer <token>`으로 통일하고, `EGW00123` 또는 HTTP 401만 토큰 만료로 판단한다.
+  - 관리자 설정의 문자열 `Bearer`가 실제 토큰을 대체하던 해외주식 요청과, AUTH 일반 문자열만으로 DB 토큰을 삭제하던 경로를 제거했다.
+- **[알림 채널 변경]** DART 자동화 전송 채널을 Web Push와 전용 Discord Webhook으로 제한했다.
+  - `lib/discord-dart.ts`: SEC 웹훅과 분리된 `DART_DISCORD_WEBHOOK_URL`만 사용하는 Discord payload·전송 모듈을 추가했다.
+  - DART 자동화에서 Telegram 전송을 제거하고 Web Push와 Discord가 모두 성공한 공시만 전달 완료로 기록한다.
+  - 전용 Discord 환경변수가 없으면 OpenDART 조회와 DB 선점 전에 자동화를 명시적으로 건너뛴다.
+  - 관리자 `/admin/features`의 `dart_realtime` 항목을 `DART 공시 자동화`로 표시해 OpenDART 수집, Web Push, Discord 전송 전체를 ON/OFF 한다.
+  - `.env.example`에 `DART_DISCORD_WEBHOOK_URL`을 추가했다.
+- **[자동화 개선]** DART 매분 자동 수집을 OpenDART 공식 공시검색 페이지네이션으로 분리했다.
+  - `lib/dart-opendart-client.ts`: `list.json`을 `page_count=100`으로 조회하고 응답의 `total_page`까지 순회해 당일 공시 전체를 접수번호 기준으로 중복 제거한다.
+  - `lib/dart-automation-mapper.ts`: 기존 `calculateDartScore` 규칙을 그대로 사용해 `최강호재`, `호재가능` 후보만 자동화 대상으로 변환한다.
+  - `lib/dart-automation-store.ts`: 최초 실행은 기존 후보를 기준선으로 저장하고, 이후 신규 접수번호만 선점한다. 처리 실패는 최대 3회 재시도한다.
+  - `lib/dart-automation.ts`: 수집, 분류, DB 선점, Web Push·Discord 전송을 조율하는 application service를 추가했다.
+  - `lib/filing-sync.ts`: 관리자 DART 플래그와 KST 스케줄이 활성화된 매분 예약 실행에서 신규 OpenDART 자동화를 호출한다.
+  - `netlify/functions/check-bullish.ts`: 중복 DART 조회를 제거하고 KIS 상승률 알림만 담당하도록 책임을 정리했다.
+  - 기존 `todayRSS.xml` 기반 `/api/dart`, DART 화면 및 수동 조회 경로는 변경하지 않았다.
+  - OpenDART 페이지 순회, 후보 매핑, 최초 기준선, 신규 접수번호 전송 및 예약 연결을 단위 테스트로 검증했다.
+- **[오류 수정]** SEC 최신 공시 Atom 피드의 뒤쪽 페이지에 있는 자동화 대상 누락을 방지했다.
+  - `lib/rss.ts`: 페이지 계속 조회 여부를 호재 후보 수가 아니라 KST 기준 오늘 등록된 원본 공시 존재 여부로 판단하도록 수정했다.
+  - 기존 `start <= 1000` 제한을 제거하고 오늘 공시 구간이 끝날 때까지 `start`를 100건 단위로 증가시킨다.
+  - 페이지 이동 중 동일 공시가 겹칠 수 있는 경우 accession 기준으로 중복을 제거하고, 동일 XML 반복 응답은 종료해 무한 순회를 방지한다.
+  - `lib/rss.test.ts`: 앞선 11개 페이지에 후보가 없어도 `start=1100`의 호재 후보를 수집하고 이전 날짜 페이지에서 종료하는 회귀 테스트를 추가했다.
+- **[관리자 구조 개선]** 관리자 대시보드와 하위 기능 화면을 SRP 기준으로 재구성했다.
+  - `app/admin/layout.tsx`: 모든 관리자 페이지의 세션 확인을 하나의 서버 레이아웃으로 통합했다.
+  - `components/admin-login.tsx`: 중복되던 관리자 로그인 폼과 로그인 API 호출을 공통 컴포넌트로 분리했다.
+  - `components/admin-page-shell.tsx`, `lib/admin-navigation.ts`: 공통 헤더, 로그아웃, 관리자 내비게이션과 메뉴 정의를 분리했다.
+  - `components/admin-modal.tsx`: API 설정, 테스트 결과, 스케줄 편집/이력에서 사용하는 접근 가능한 공통 모달을 추가했다.
+  - `components/admin-dashboard.tsx`: 링크 나열형 화면을 운영 제어, API 관리, SEC 분석 작업 그룹으로 재구성했다.
+  - 관리자 기능 토글, API 설정/테스트, 스케줄, SEC 테스트 컴포넌트에서 자체 인증·헤더 책임과 인라인 스타일을 제거했다.
+  - `lib/schedule-time.ts`: KST 시간 구간 판정을 DB 접근 모듈에서 분리해 서버와 관리자 UI가 공유하도록 했다.
+  - `lucide-react` 아이콘을 관리자 명령 버튼과 내비게이션에 적용했다.
+  - 데스크톱과 390px 모바일에서 관리자 주요 경로, 모달, 가로 넘침 및 브라우저 콘솔 오류를 검증했다.
 - **[자동화 확장]** SEC 예약 실행 범위에 원문 파싱, AI 평가, Discord 전송을 모두 포함했다.
   - `lib/sec-filing-processor.ts`: SEC 공시 1건에 대해 원문 조회, 문서 파싱, AI 평가, Discord 전송을 독립 모듈로 순서대로 조율하는 application service를 추가했다.
   - `lib/sec-primary-document.ts`: SEC Atom 링크의 `*-index.htm` 제출 상세에서 Form Type과 일치하는 주 문서 URL을 추출해 실제 공시 원문을 조회하도록 분리했다.

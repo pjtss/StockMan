@@ -1,8 +1,6 @@
 import { schedule } from "@netlify/functions";
 import { ensureSchema } from "../../lib/db";
-import { syncDartAlerts } from "../../lib/alerts";
 import { sendPushAlerts } from "../../lib/push";
-import { sendTelegramAlerts } from "../../lib/telegram";
 import { syncTopRisingStocks } from "../../lib/kis-us";
 import type { AlertItem } from "../../lib/types";
 import { loadAdminFeatureFlags } from "../../lib/admin-flags";
@@ -12,16 +10,7 @@ export const handler = schedule("*/1 * * * *", async () => {
     await ensureSchema();
     const flags = await loadAdminFeatureFlags();
 
-    // 1. DART 공시 동기화 및 알림 발송
-    const dartPayload = flags.dart_realtime ? await syncDartAlerts() : { newAlerts: [] };
-    const alerts = dartPayload.newAlerts ?? [];
-
-    await Promise.all([
-      sendPushAlerts(alerts),
-      sendTelegramAlerts(alerts)
-    ]);
-
-    // 2. KIS 상승률 TOP 10 동기화 및 알림 발송
+    // DART/SEC filings are handled by sync-filings. This job only handles KIS alerts.
     let risingSent = 0;
     try {
       if (!flags.us_scanners) {
@@ -49,7 +38,7 @@ export const handler = schedule("*/1 * * * *", async () => {
       statusCode: 200,
       body: JSON.stringify({
         ok: true,
-        sent: alerts.length,
+        sent: 0,
         risingSent,
       }),
     };

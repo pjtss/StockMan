@@ -276,17 +276,22 @@ export function parseSecItems(xml: string, todayInSeoul: string): { items: SecIt
 
   let foundToday = false;
   const items = entries.reduce<SecItem[]>((acc, entry) => {
+    const publishedAt = normalizeText(entry.published) || normalizeText(entry.updated);
+    if (toSeoulDateKey(publishedAt) !== todayInSeoul) {
+      return acc;
+    }
+
+    // Pagination follows the raw filing date, independently from bullish filtering.
+    foundToday = true;
+
     const title = normalizeText(entry.title);
     const summary = normalizeText(entry.summary);
     const formType = extractSecFormType(entry, title, summary);
     const sentiment = classifySecEntry(formType, title, summary);
-    const publishedAt = normalizeText(entry.published) || normalizeText(entry.updated);
 
-    if (toSeoulDateKey(publishedAt) !== todayInSeoul || sentiment !== "호재가능") {
+    if (sentiment !== "호재가능") {
       return acc;
     }
-
-    foundToday = true;
 
     acc.push({
       source: "SEC" as const,
@@ -308,9 +313,10 @@ export function parseSecItems(xml: string, todayInSeoul: string): { items: SecIt
 
 export async function fetchSecFeed(): Promise<FeedPayload<SecItem>> {
   const todayInSeoul = getTodayInSeoul();
-  const allItems: SecItem[] = [];
+  const itemsById = new Map<string, SecItem>();
+  let previousPageXml = "";
 
-  for (let start = 0; start <= 1000; start += SEC_PAGE_SIZE) {
+  for (let start = 0; ; start += SEC_PAGE_SIZE) {
     const response = await fetch(`${SEC_BASE_URL}&start=${start}`, {
       cache: "no-store",
       headers: createSecRequestHeaders("application/atom+xml, application/xml, text/xml"),
@@ -321,15 +327,23 @@ export async function fetchSecFeed(): Promise<FeedPayload<SecItem>> {
     }
 
     const xml = await response.text();
-    const { items, foundToday } = parseSecItems(xml, todayInSeoul);
-    allItems.push(...items);
+    if (xml === previousPageXml) {
+      break;
+    }
+    previousPageXml = xml;
 
-    if (!foundToday || items.length === 0) {
+    const { items, foundToday } = parseSecItems(xml, todayInSeoul);
+    for (const item of items) {
+      const identity = item.accession || item.link || `${item.publishedAt}:${item.title}`;
+      itemsById.set(identity, item);
+    }
+
+    if (!foundToday) {
       break;
     }
   }
 
-  const items = sortByPublishedAtDesc(allItems);
+  const items = sortByPublishedAtDesc([...itemsById.values()]);
 
   return {
     source: "SEC",

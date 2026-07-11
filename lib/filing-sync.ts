@@ -1,5 +1,5 @@
 import { loadAdminFeatureFlags } from "./admin-flags";
-import { syncDartAlerts } from "./alerts";
+import { runDartAutomation } from "./dart-automation";
 import { isDartOpen } from "./scanner-hours";
 import { runSecAutomation } from "./sec-automation";
 
@@ -13,7 +13,7 @@ export async function runFilingSync(): Promise<FilingSyncResult> {
   const flags = await loadAdminFeatureFlags();
 
   const dart = flags.dart_realtime && (await isDartOpen())
-    ? await syncDartAlerts()
+    ? await runDartAutomation()
     : {
         skipped: true,
         reason: flags.dart_realtime

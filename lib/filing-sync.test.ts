@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   isDartOpen: vi.fn(),
   loadAdminFeatureFlags: vi.fn(),
+  runDartAutomation: vi.fn(),
   runSecAutomation: vi.fn(),
-  syncDartAlerts: vi.fn(),
 }));
 
 vi.mock("./admin-flags", () => ({
   loadAdminFeatureFlags: mocks.loadAdminFeatureFlags,
 }));
-vi.mock("./alerts", () => ({ syncDartAlerts: mocks.syncDartAlerts }));
+vi.mock("./dart-automation", () => ({ runDartAutomation: mocks.runDartAutomation }));
 vi.mock("./scanner-hours", () => ({ isDartOpen: mocks.isDartOpen }));
 vi.mock("./sec-automation", () => ({ runSecAutomation: mocks.runSecAutomation }));
 
@@ -20,8 +20,22 @@ describe("runFilingSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isDartOpen.mockResolvedValue(true);
-    mocks.syncDartAlerts.mockResolvedValue({ source: "DART", items: [] });
+    mocks.runDartAutomation.mockResolvedValue({ source: "DART", results: [] });
     mocks.runSecAutomation.mockResolvedValue({ source: "SEC", items: [], automation: {} });
+  });
+
+  it("runs paginated DART automation when the flag and schedule are enabled", async () => {
+    mocks.loadAdminFeatureFlags.mockResolvedValue({
+      dart_realtime: true,
+      sec_realtime: false,
+      us_scanners: true,
+      us_turnover_trend: true,
+    });
+
+    const result = await runFilingSync();
+
+    expect(mocks.runDartAutomation).toHaveBeenCalledTimes(1);
+    expect(result.dart).toEqual({ source: "DART", results: [] });
   });
 
   it("runs SEC synchronization when the admin flag is enabled", async () => {

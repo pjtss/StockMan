@@ -58,218 +58,19 @@ export interface BidAskRatioItem {
 }
 
 import { getDb } from "./db";
-import { kisTokens, kisCache, topRisingStocks, topIntensityStocks } from "./schema";
+import { kisCache, topRisingStocks, topIntensityStocks } from "./schema";
 import { eq, inArray } from "drizzle-orm";
+import { buildKisAuthorization } from "./kis-authorization";
+import { getAccessToken } from "./kis-token";
+
+export { clearTokenCache, getAccessToken, refreshAccessToken } from "./kis-token";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
 
-let kisMode: "real" | "mock" = "real";
-
 export function getKisMode(): "real" | "mock" {
   if (process.env.NODE_ENV === "test") return "mock"; // 유닛 테스트용 격리만 허용
   return "real"; // 실전투자 100% 무조건 고정!
-}
-
-// 백그라운드 DB 미설정 또는 테스트용 인메모리 캐시 폴백 설정
-let cachedToken: string | null = null;
-let tokenExpiresAt: number = 0; // 타임스탬프 (ms)
-
-async function readStoredKisToken() {
-  const db = getDb();
-  if (!db) return null;
-
-  const tokenRecord = await db.select({
-    accessToken: kisTokens.accessToken,
-    issuedAt: kisTokens.issuedAt,
-    expiresAt: kisTokens.expiresAt,
-  })
-  .from(kisTokens)
-  .where(eq(kisTokens.id, 1))
-  .limit(1);
-
-  return tokenRecord[0] ?? null;
-}
-
-export async function getAccessToken(): Promise<string | null> {
-  const now = Date.now();
-  if (cachedToken && now < tokenExpiresAt - 5 * 60 * 1000) {
-    return cachedToken;
-  }
-
-  const refreshThresholdMs = 60 * 60 * 1000;
-
-  // DB를 정본(source of truth)으로 사용하고, 만료 1시간 이내일 때만 재발급한다.
-  try {
-    const row = await readStoredKisToken();
-    console.info("[KIS] Token row lookup:", {
-      found: Boolean(row),
-      rowCount: row ? 1 : 0,
-    });
-
-    if (row) {
-      const expiresAt = new Date(row.expiresAt).getTime();
-      console.info("[KIS] Token timestamps:", {
-        issuedAt: row.issuedAt instanceof Date ? row.issuedAt.toISOString() : row.issuedAt,
-        expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
-        expiresInMs: expiresAt - now,
-      });
-      if (expiresAt > now + refreshThresholdMs) {
-        cachedToken = row.accessToken;
-        tokenExpiresAt = expiresAt;
-        return row.accessToken;
-      }
-    }
-  } catch (dbErr: any) {
-    console.warn("[KIS] DB token cache read failed:", dbErr.message || dbErr);
-  }
-
-  if (!KIS_APPKEY || !KIS_APPSECRET) return null;
-
-  const url = "https://openapi.koreainvestment.com:9443/oauth2/tokenP";
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        grant_type: "client_credentials",
-        appkey: KIS_APPKEY,
-        appsecret: KIS_APPSECRET,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[KIS-DEBUG] Token fetch failed for ${url} with HTTP ${response.status}, body: ${errText}`);
-      return null;
-    }
-
-    const data = await response.json();
-
-    const maskedData = { ...data };
-    if (maskedData.access_token && typeof maskedData.access_token === "string") {
-      const len = maskedData.access_token.length;
-      maskedData.access_token =
-        len > 20
-          ? `${maskedData.access_token.substring(0, 10)}...[MASKED]...${maskedData.access_token.substring(len - 10)}`
-          : "...[MASKED]...";
-    }
-    console.info(`[KIS-DEBUG] Token fetch raw response (masked):`, JSON.stringify(maskedData, null, 2));
-
-    if (data.access_token) {
-      const token = data.access_token;
-      kisMode = "real";
-      console.info(`[KIS] Successfully authenticated via real server.`);
-
-      const issuedAt = Date.now();
-      const expiresInSecRaw = (data as any).expires_in;
-      const expiresInSec = typeof expiresInSecRaw === "string" ? Number(expiresInSecRaw) : Number(expiresInSecRaw);
-      const expTime =
-        Number.isFinite(expiresInSec) && expiresInSec > 0
-          ? issuedAt + expiresInSec * 1000
-          : issuedAt + 20 * 60 * 60 * 1000;
-      const issuedDate = new Date(issuedAt);
-      const expDate = new Date(expTime);
-
-      try {
-        const db = getDb();
-        if (db) {
-          await db
-            .insert(kisTokens)
-            .values({ id: 1, accessToken: token, issuedAt: issuedDate, expiresAt: expDate })
-            .onConflictDoUpdate({
-              target: kisTokens.id,
-              set: { accessToken: token, issuedAt: issuedDate, expiresAt: expDate },
-            });
-        }
-      } catch (dbWriteErr) {
-        console.error("[KIS] Failed to write token to DB cache:", dbWriteErr);
-      }
-
-      cachedToken = token;
-      tokenExpiresAt = expTime;
-
-      return token;
-    }
-  } catch (err) {
-    console.warn(`[KIS] Token request failed for ${url}:`, err);
-  }
-
-  return null;
-}
-
-export async function refreshAccessToken(): Promise<string | null> {
-  if (!KIS_APPKEY || !KIS_APPSECRET) return null;
-
-  const url = "https://openapi.koreainvestment.com:9443/oauth2/tokenP";
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        grant_type: "client_credentials",
-        appkey: KIS_APPKEY,
-        appsecret: KIS_APPSECRET,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[KIS-DEBUG] Token refresh failed for ${url} with HTTP ${response.status}, body: ${errText}`);
-      return null;
-    }
-
-    const data = await response.json();
-    if (!data.access_token) return null;
-
-    const token = data.access_token as string;
-    const issuedAt = Date.now();
-    const expiresInSecRaw = (data as any).expires_in;
-    const expiresInSec = typeof expiresInSecRaw === "string" ? Number(expiresInSecRaw) : Number(expiresInSecRaw);
-    const expTime =
-      Number.isFinite(expiresInSec) && expiresInSec > 0
-        ? issuedAt + expiresInSec * 1000
-        : issuedAt + 20 * 60 * 60 * 1000;
-    const issuedDate = new Date(issuedAt);
-    const expDate = new Date(expTime);
-
-    const db = getDb();
-    if (db) {
-      await db
-        .insert(kisTokens)
-        .values({ id: 1, accessToken: token, issuedAt: issuedDate, expiresAt: expDate })
-        .onConflictDoUpdate({
-          target: kisTokens.id,
-          set: { accessToken: token, issuedAt: issuedDate, expiresAt: expDate },
-        });
-    }
-
-    cachedToken = token;
-    tokenExpiresAt = expTime;
-    return token;
-  } catch (err) {
-    console.warn(`[KIS] Token refresh failed for ${url}:`, err);
-    return null;
-  }
-}
-
-// 테스트를 위해 캐시를 초기화할 수 있는 헬퍼 함수
-export async function clearTokenCache() {
-  cachedToken = null;
-  tokenExpiresAt = 0;
-
-  try {
-    const db = getDb();
-    if (db) {
-      await db.delete(kisTokens).where(eq(kisTokens.id, 1));
-    }
-  } catch (dbErr: any) {
-    console.warn("[KIS] DB token cache clear failed:", dbErr.message || dbErr);
-  }
 }
 
 // 실시간처럼 변화를 주어 극도의 하이엔드 퀀트 대시보드를 체감할 수 있게 해주는 노이즈 함수
@@ -323,7 +124,7 @@ async function fetchRealVolumePower(token: string): Promise<KisOutput[]> {
     method: "GET",
     headers: {
       "content-type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: buildKisAuthorization(token),
       appkey: KIS_APPKEY || "",
       appsecret: KIS_APPSECRET || "",
       tr_id: trId,
@@ -996,7 +797,7 @@ async function fetchRealFluctuationRank(token: string): Promise<KisOutput[]> {
     method: "GET",
     headers: {
       "content-type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: buildKisAuthorization(token),
       appkey: KIS_APPKEY || "",
       appsecret: KIS_APPSECRET || "",
       tr_id: trId,

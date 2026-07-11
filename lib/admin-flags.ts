@@ -9,8 +9,12 @@ export type AdminFeatureKey =
   | "us_turnover_trend";
 
 export const ADMIN_FEATURES: Array<{ key: AdminFeatureKey; label: string; description: string }> = [
-  { key: "dart_realtime", label: "DART 공시", description: "DART 공시 수집/조회/알림 흐름" },
-  { key: "sec_realtime", label: "SEC 공시", description: "SEC 공시 수집/조회/알림 흐름" },
+  {
+    key: "dart_realtime",
+    label: "DART 공시 자동화",
+    description: "OpenDART 전체 페이지 수집, Web Push, 전용 Discord 전송",
+  },
+  { key: "sec_realtime", label: "SEC 공시 자동화", description: "원문 수집, AI 평가, Discord 전송 스케줄러" },
   { key: "us_scanners", label: "미국 스캐너", description: "미국 체결강도/상승률 스캐너" },
   { key: "us_turnover_trend", label: "해외 거래대금 추이", description: "해외주식 거래대금 추이 페이지" },
 ];

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncTradingIntensityStocks, fetchTradingIntensity } from "@/lib/kis";
 import { sendPushAlerts } from "@/lib/push";
-import { clearTokenCache } from "@/lib/kis";
 import type { AlertItem } from "@/lib/types";
 import { isDomesticScannerOpen } from "@/lib/scanner-hours";
 

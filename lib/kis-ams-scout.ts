@@ -1,5 +1,6 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
+import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 
 export type AmsScoutCandidate = {
   symb: string;
@@ -56,22 +57,6 @@ function sum(values: number[]) {
   return values.reduce((a, b) => a + b, 0);
 }
 
-function resolveAuthorization(prefix: string | undefined, token: string) {
-  const value = String(prefix ?? "").trim();
-  if (!value || value.toLowerCase() === "bearer") {
-    return `Bearer ${token}`;
-  }
-  if (value.toLowerCase().startsWith("bearer ")) {
-    return value;
-  }
-  return `${value} ${token}`.trim();
-}
-
-function buildAuthHeaders(prefix: string | undefined, token: string) {
-  const authorization = resolveAuthorization(prefix, token);
-  return { authorization };
-}
-
 async function fetchJson(url: string, headers: Record<string, string>) {
   const res = await fetch(url, { method: "GET", headers });
   const rawText = await res.text();
@@ -82,12 +67,6 @@ async function fetchJson(url: string, headers: Record<string, string>) {
     parsed = null;
   }
   return { res, rawText, parsed };
-}
-
-function isExpiredTokenResponse(parsed: any) {
-  const msgCd = String(parsed?.msg_cd ?? "");
-  const msg1 = String(parsed?.msg1 ?? "");
-  return msgCd === "EGW00123" || msg1.includes("token");
 }
 
 export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
@@ -106,14 +85,18 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     tr_id: "HHDFS76320010",
     custtype: "P",
     tr_cont: "",
-    ...buildAuthHeaders(rankConfig.authorization, activeToken),
+    authorization: buildKisAuthorization(activeToken),
   };
 
+  let refreshAttempt: Promise<string | null> | null = null;
   const refreshTokenOnce = async () => {
-    const freshToken = await refreshAccessToken();
+    if (!refreshAttempt) {
+      refreshAttempt = refreshAccessToken();
+    }
+    const freshToken = await refreshAttempt;
     if (freshToken) {
       activeToken = freshToken;
-      baseHeaders.authorization = resolveAuthorization(rankConfig.authorization, freshToken);
+      baseHeaders.authorization = buildKisAuthorization(freshToken);
     }
     return freshToken;
   };
@@ -126,7 +109,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
   const rankingRows = Array.isArray(rankingOutput) ? rankingOutput.slice(0, topN) : [];
   const detailRequestHeaders = {
     ...baseHeaders,
-    ...buildAuthHeaders(detailConfig.authorization, activeToken),
+    authorization: buildKisAuthorization(activeToken),
     tr_id: detailConfig.tr_id || "HHDFS76200200",
   };
 
@@ -139,12 +122,12 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     const detailUrl =
       `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price-detail?AUTH=&EXCD=AMS&SYMB=${encodeURIComponent(symb)}`;
     let detailRes = await fetchJson(detailUrl, detailRequestHeaders);
-    if (isExpiredTokenResponse(detailRes.parsed)) {
+    if (isKisTokenExpiredResponse(detailRes.res.status, detailRes.parsed)) {
       const freshToken = await refreshTokenOnce();
       if (freshToken) {
         const refreshedDetailHeaders = {
           ...baseHeaders,
-          ...buildAuthHeaders(detailConfig.authorization, freshToken),
+          authorization: buildKisAuthorization(freshToken),
           tr_id: detailConfig.tr_id || "HHDFS76200200",
         };
         detailRes = await fetchJson(detailUrl, {
@@ -160,7 +143,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
       ...baseHeaders,
       tr_id: "HHDFS76950200",
     });
-    if (isExpiredTokenResponse(chartRes.parsed)) {
+    if (isKisTokenExpiredResponse(chartRes.res.status, chartRes.parsed)) {
       const freshToken = await refreshTokenOnce();
       if (freshToken) {
         chartRes = await fetchJson(chartUrl, {

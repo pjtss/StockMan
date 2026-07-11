@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
-import { clearTokenCache, getAccessToken } from "@/lib/kis";
+import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
+import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 
 function asciiOnly(value: string | undefined | null, fallback = "") {
   const text = String(value ?? fallback);
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
       method: "GET",
       headers: {
         "content-type": contentType,
-        authorization: `Bearer ${token}`,
+        authorization: buildKisAuthorization(token),
         appkey,
         appsecret,
         tr_id: trId,
@@ -72,9 +73,8 @@ export async function GET(request: Request) {
   }
 
   let result = await fetchOnce(token);
-  if (result.parsed?.msg_cd === "EGW00123" || String(result.parsed?.msg1 || "").includes("token")) {
-    await clearTokenCache();
-    token = await getAccessToken();
+  if (isKisTokenExpiredResponse(result.response.status, result.parsed)) {
+    token = await refreshAccessToken();
     if (!token) {
       return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
     }

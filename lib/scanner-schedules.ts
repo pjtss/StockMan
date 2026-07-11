@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { scannerSchedules, scannerScheduleHistory } from "@/lib/schema";
+export { isWithinSchedule } from "./schedule-time";
 
 export type ScannerScheduleKey = "dart" | "us_trading_intensity" | "domestic_trading_intensity" | "us_top_rising";
 
@@ -44,24 +45,4 @@ export async function saveScannerSchedule(key: ScannerScheduleKey, schedule: Sca
     endTime: schedule.endTime,
     updatedAt: new Date(),
   });
-}
-
-function toMinutes(value: string): number {
-  const [h, m] = value.split(":").map(Number);
-  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-}
-
-export function isWithinSchedule(schedule: ScannerSchedule, now = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const hour = Number(parts.find((part) => part.type === "hour")?.value || "0");
-  const minute = Number(parts.find((part) => part.type === "minute")?.value || "0");
-  const current = hour * 60 + minute;
-  const start = toMinutes(schedule.startTime);
-  const end = toMinutes(schedule.endTime);
-  return start <= end ? current >= start && current < end : current >= start || current < end;
 }

@@ -1,7 +1,8 @@
 import { getDb } from "./db";
 import { kisCache, topRisingStocks, usIntensityStocks } from "./schema";
 import { eq, inArray } from "drizzle-orm";
-import { getAccessToken, getKisMode, clearTokenCache } from "./kis";
+import { getAccessToken, getKisMode, refreshAccessToken } from "./kis";
+import { buildKisAuthorization, isKisTokenExpiredErrorMessage } from "./kis-authorization";
 import { loadKisApiConfig } from "./kis-api-config";
 import { loadUsTopRisingCount } from "./kis-top-n";
 import { buildKisUsRequestDebug, pushKisUsDebugLog } from "./kis-us-debug";
@@ -65,7 +66,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
       "KIS-US-REQ",
       buildKisUsRequestDebug("GET", url, {
       "content-type": "application/json; charset=utf-8",
-        authorization: config.authorization || `Bearer ${token}`,
+        authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
@@ -77,7 +78,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
       method: "GET",
       headers: {
         "content-type": "application/json; charset=utf-8",
-        authorization: config.authorization || `Bearer ${token}`,
+        authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
@@ -100,7 +101,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     if (resData.rt_cd !== "0") {
       console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
       pushKisUsDebugLog("KIS-US-BIZ-ERR", { rt_cd: resData.rt_cd, msg1: resData.msg1, data: resData });
-      throw new Error(`KIS Overseas API Error [${resData.rt_cd}]: ${resData.msg1}`);
+      throw new Error(`KIS Overseas API Error [${resData.msg_cd || "UNKNOWN"}]: ${resData.msg1}`);
     }
 
     const items = resData.output || [];
@@ -121,21 +122,20 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
     return result;
   } catch (err: any) {
     const kisErrMsg = err.message || String(err);
-    const isAuthError = (kisErrMsg.includes("AUTH") && !kisErrMsg.includes("INPUT FIELD")) || kisErrMsg.includes("401") || kisErrMsg.includes("만료된") || kisErrMsg.includes("유효하지 않은") || kisErrMsg.includes("토큰");
+    const isAuthError = isKisTokenExpiredErrorMessage(kisErrMsg);
 
     // AUTH 에러인 경우: 토큰 캐시가 오래되거나 잡목된 토큰일 가능성 높음 → 자동 재발급 후 재시도
     if (isAuthError) {
-      console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: AUTH error detected ('${kisErrMsg}'). Clearing token cache and retrying with fresh token...`);
+      console.warn(`[KIS-US-DEBUG] fetchRealUsVolumeRank: token expiry detected ('${kisErrMsg}'). Reloading the DB token...`);
       pushKisUsDebugLog("KIS-US-AUTH-ERR", { message: kisErrMsg });
-      await clearTokenCache();
       try {
-        const freshToken = await getAccessToken();
+        const freshToken = await refreshAccessToken();
         if (freshToken) {
           pushKisUsDebugLog(
             "KIS-US-REQ-RETRY",
             buildKisUsRequestDebug("GET", url, {
               "content-type": "application/json; charset=utf-8",
-              authorization: config.authorization || `Bearer ${freshToken}`,
+              authorization: buildKisAuthorization(freshToken),
               appkey: KIS_APPKEY || "",
               appsecret: KIS_APPSECRET || "",
               tr_id: config.tr_id || trId,
@@ -147,7 +147,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
             method: "GET",
             headers: {
               "content-type": "application/json; charset=utf-8",
-              authorization: config.authorization || `Bearer ${freshToken}`,
+              authorization: buildKisAuthorization(freshToken),
               appkey: KIS_APPKEY || "",
               appsecret: KIS_APPSECRET || "",
               tr_id: config.tr_id || trId,
@@ -262,7 +262,7 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
       "KIS-US-REQ",
       buildKisUsRequestDebug("GET", url, {
         "content-type": "application/json; charset=utf-8",
-        authorization: config.authorization || `Bearer ${token}`,
+        authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
@@ -274,7 +274,7 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
       method: "GET",
       headers: {
         "content-type": "application/json; charset=utf-8",
-        authorization: config.authorization || `Bearer ${token}`,
+        authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
@@ -297,7 +297,7 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
     if (resData.rt_cd !== "0") {
       console.error(`[KIS-US-DEBUG] fetchRealUsVolumePower business error: rt_cd ${resData.rt_cd}, msg: ${resData.msg1}`);
       pushKisUsDebugLog("KIS-US-BIZ-ERR", { rt_cd: resData.rt_cd, msg1: resData.msg1, data: resData });
-      throw new Error(`KIS Overseas API Error [${resData.rt_cd}]: ${resData.msg1}`);
+      throw new Error(`KIS Overseas API Error [${resData.msg_cd || "UNKNOWN"}]: ${resData.msg1}`);
     }
 
     const items = resData.output2 || [];

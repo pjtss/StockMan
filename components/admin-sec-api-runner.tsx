@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Play, RotateCcw, Send } from "lucide-react";
+import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/page.module.css";
-
-type AdminSecApiRunnerProps = {
-  loggedIn: boolean;
-};
 
 type SecTestResult = {
   ok?: boolean;
@@ -76,102 +74,33 @@ type SecTestResult = {
 const DEFAULT_SEC_URL =
   "https://www.sec.gov/Archives/edgar/data/1730168/000119312526295589/d84378d8k.htm?utm_source=chatgpt.com";
 
-function LoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function login(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "로그인에 실패했습니다.");
-      }
-      onLoggedIn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <main className={styles.loginShell}>
-      <section className={styles.loginCard}>
-        <p className={styles.loginKicker}>ADMIN ACCESS</p>
-        <h1 className={styles.loginTitle}>SEC API 테스트 로그인</h1>
-        <form onSubmit={login} className={styles.loginForm}>
-          <input
-            className={styles.passwordInput}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="관리자 비밀번호"
-          />
-          <button className={styles.submitButton} type="submit" disabled={loading}>
-            {loading ? "로그인 중..." : "로그인"}
-          </button>
-          {error && <p className={`${styles.alert} ${styles.error}`}>{error}</p>}
-        </form>
-      </section>
-    </main>
-  );
-}
-
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   return (
-    <div
-      style={{
-        minWidth: 0,
-        padding: 12,
-        borderRadius: 12,
-        border: "1px solid rgba(148, 163, 184, 0.14)",
-        background: "rgba(2, 6, 23, 0.28)",
-      }}
-    >
-      <p style={{ margin: 0, color: "#94a3b8", fontSize: 12, fontWeight: 800 }}>{label}</p>
-      <p style={{ margin: "6px 0 0", color: "#f8fafc", fontWeight: 800, overflowWrap: "anywhere" }}>
-        {value ?? "-"}
-      </p>
+    <div className={styles.dataField}>
+      <p>{label}</p>
+      <strong>{value ?? "-"}</strong>
     </div>
   );
 }
 
 function ListBlock({ title, items }: { title: string; items?: string[] }) {
   return (
-    <div
-      style={{
-        minWidth: 0,
-        padding: 14,
-        borderRadius: 12,
-        border: "1px solid rgba(148, 163, 184, 0.14)",
-        background: "rgba(2, 6, 23, 0.28)",
-      }}
-    >
-      <h3 style={{ margin: 0, color: "#f8fafc", fontSize: 16, fontWeight: 900 }}>{title}</h3>
+    <div className={styles.listBlock}>
+      <h3>{title}</h3>
       {items && items.length > 0 ? (
-        <ul style={{ margin: "12px 0 0", paddingLeft: 18, color: "#cbd5e1", lineHeight: 1.7 }}>
+        <ul>
           {items.map((item, index) => (
             <li key={`${title}-${index}`}>{item}</li>
           ))}
         </ul>
       ) : (
-        <p style={{ margin: "10px 0 0", color: "#94a3b8", lineHeight: 1.5 }}>표시할 항목이 없습니다.</p>
+        <p>표시할 항목이 없습니다.</p>
       )}
     </div>
   );
 }
 
-export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunnerProps) {
-  const [loggedIn, setLoggedIn] = useState(initialLoggedIn);
+export function AdminSecApiRunner() {
   const [secUrl, setSecUrl] = useState(DEFAULT_SEC_URL);
   const [loading, setLoading] = useState(false);
   const [sendingDiscord, setSendingDiscord] = useState(false);
@@ -232,42 +161,15 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
     }
   }
 
-  async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    setLoggedIn(false);
-    setResult(null);
-  }
-
-  if (!loggedIn) {
-    return <LoginForm onLoggedIn={() => setLoggedIn(true)} />;
-  }
-
   const metadata = result?.document?.metadata;
   const evaluation = result?.aiEvaluation?.evaluation;
 
   return (
-    <main className={styles.page}>
-      <section className={styles.shell}>
-        <div className={styles.header}>
-          <div>
-            <p className={styles.eyebrow}>SEC API RUNNER</p>
-            <h1 className={styles.title}>SEC 공시 분석 테스트</h1>
-            <p className={styles.subtitle}>
-              SEC 원문 URL을 입력하면 Next.js API가 URL 정규화, 원문 다운로드, 이벤트 파싱, AI 평가까지 실행하고 결과를 화면에 표시합니다.
-            </p>
-          </div>
-          <div className={styles.actions}>
-            <a href="/admin" className={styles.secondaryLink}>
-              대시보드
-            </a>
-            <a href="/admin/api-tests" className={styles.secondaryLink}>
-              API 테스트
-            </a>
-            <button className={styles.logoutButton} onClick={logout}>
-              로그아웃
-            </button>
-          </div>
-        </div>
+    <AdminPageShell
+      eyebrow="SEC ANALYSIS"
+      title="SEC 공시 분석 테스트"
+      description="SEC 원문 파싱, 이벤트 구조화, AI 평가, Discord 전송을 한 건씩 검증합니다."
+    >
 
         {error && <div className={`${styles.alert} ${styles.error}`}>{error}</div>}
         {notice && <div className={`${styles.alert} ${styles.on}`}>{notice}</div>}
@@ -280,29 +182,24 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
             </div>
             <span className={`${styles.state} ${loading ? styles.on : styles.off}`}>{loading ? "실행 중" : "대기"}</span>
           </div>
-          <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+          <div className={styles.controlStack}>
             <input
+              className={styles.textInput}
               value={secUrl}
               onChange={(e) => setSecUrl(e.target.value)}
               placeholder="https://www.sec.gov/Archives/edgar/data/..."
-              style={{
-                minHeight: 52,
-                borderRadius: 12,
-                padding: "0 14px",
-                border: "1px solid rgba(148, 163, 184, 0.22)",
-                background: "rgba(15, 23, 42, 0.88)",
-                color: "#f8fafc",
-                outline: "none",
-              }}
             />
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className={styles.toolbar}>
               <button className={styles.toggleButton} onClick={() => void runSecTest()} disabled={loading || !secUrl.trim()}>
+                <Play size={16} />
                 {loading ? "분석 중..." : "SEC API 실행"}
               </button>
               <button className={styles.toggleButton} onClick={() => void sendDiscord()} disabled={!result || loading || sendingDiscord}>
+                <Send size={16} />
                 {sendingDiscord ? "Discord 전송 중..." : "Discord로 결과 전송"}
               </button>
               <button className={styles.logoutButton} onClick={() => setSecUrl(DEFAULT_SEC_URL)} disabled={loading}>
+                <RotateCcw size={16} />
                 Broadcom 예시 입력
               </button>
             </div>
@@ -339,17 +236,9 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
                   {result.document?.events?.length || 0}
                 </span>
               </div>
-              <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+              <div className={styles.eventList}>
                 {(result.document?.events || []).map((event, index) => (
-                  <article
-                    key={`${event.type}-${index}`}
-                    style={{
-                      padding: 14,
-                      borderRadius: 12,
-                      border: "1px solid rgba(148, 163, 184, 0.14)",
-                      background: "rgba(2, 6, 23, 0.28)",
-                    }}
-                  >
+                  <article key={`${event.type}-${index}`} className={styles.eventItem}>
                     <div className={styles.cardHeader}>
                       <div>
                         <h3 className={styles.cardTitle}>{event.title || `Event ${index + 1}`}</h3>
@@ -358,7 +247,7 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
                         </p>
                       </div>
                     </div>
-                    <p style={{ margin: "12px 0 0", color: "#e2e8f0", lineHeight: 1.7 }}>{event.text}</p>
+                    <p className={styles.eventText}>{event.text}</p>
                   </article>
                 ))}
               </div>
@@ -381,7 +270,7 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
 
               {evaluation && (
                 <>
-                  <div className={styles.statusGrid} style={{ marginTop: 16 }}>
+                  <div className={`${styles.statusGrid} ${styles.sectionGap}`}>
                     <Field label="Fundamental" value={evaluation.fundamentalScore} />
                     <Field label="Catalyst" value={evaluation.catalystScore} />
                     <Field label="Short Term" value={evaluation.shortTermImpactScore} />
@@ -389,12 +278,12 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
                     <Field label="Confidence" value={evaluation.confidence} />
                     <Field label="Requires Market Data" value={String(evaluation.requiresMarketData)} />
                   </div>
-                  <div className={styles.statusGrid} style={{ marginTop: 14 }}>
+                  <div className={`${styles.statusGrid} ${styles.sectionGap}`}>
                     <ListBlock title="Facts" items={evaluation.facts} />
                     <ListBlock title="Inferences" items={evaluation.inferences} />
                     <ListBlock title="Unknowns" items={evaluation.unknowns} />
                   </div>
-                  <div className={styles.statusGrid} style={{ marginTop: 14 }}>
+                  <div className={`${styles.statusGrid} ${styles.sectionGap}`}>
                     <ListBlock title="Event Risks" items={evaluation.eventRisks} />
                     <ListBlock title="Analysis Limitations" items={evaluation.analysisLimitations} />
                     <ListBlock title="Recommended Next Checks" items={evaluation.recommendedNextChecks} />
@@ -405,50 +294,19 @@ export function AdminSecApiRunner({ loggedIn: initialLoggedIn }: AdminSecApiRunn
 
             <section className={styles.card}>
               <h2 className={styles.cardTitle}>Prompt Text</h2>
-              <pre
-                style={{
-                  margin: "14px 0 0",
-                  padding: 16,
-                  borderRadius: 12,
-                  overflowX: "auto",
-                  background: "rgba(2, 6, 23, 0.9)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "#e2e8f0",
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  maxHeight: 320,
-                }}
-              >
+              <pre className={`${styles.codeBlock} ${styles.codeBlockPrompt}`}>
                 {result.document?.promptText || ""}
               </pre>
             </section>
 
             <section className={styles.card}>
               <h2 className={styles.cardTitle}>Raw API Result</h2>
-              <pre
-                style={{
-                  margin: "14px 0 0",
-                  padding: 16,
-                  borderRadius: 12,
-                  overflowX: "auto",
-                  background: "rgba(2, 6, 23, 0.9)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "#e2e8f0",
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  maxHeight: 520,
-                }}
-              >
+              <pre className={`${styles.codeBlock} ${styles.codeBlockTall}`}>
                 {JSON.stringify(result, null, 2)}
               </pre>
             </section>
           </>
         )}
-      </section>
-    </main>
+    </AdminPageShell>
   );
 }

@@ -1,5 +1,6 @@
 import { loadKisApiConfig, type KisApiConfig } from "@/lib/kis-api-config";
 import { getAccessToken } from "@/lib/kis";
+import { buildKisAuthorization } from "@/lib/kis-authorization";
 
 export type KisUsTopRisingApiRequest = {
   excd?: string;
@@ -78,7 +79,7 @@ export async function fetchKisUsTopRisingApi(request: KisUsTopRisingApiRequest =
     method: "GET",
     headers: {
       "content-type": prepared.config.content_type || "application/json; charset=utf-8",
-      authorization: prepared.config.authorization || `Bearer ${prepared.token}`,
+      authorization: buildKisAuthorization(prepared.token),
       appkey: process.env.KIS_APPKEY || "",
       appsecret: process.env.KIS_APPSECRET || "",
       tr_id: prepared.config.tr_id || "HHDFS76290000",

@@ -74,8 +74,7 @@ describe('KIS API Module', () => {
       process.env.KIS_APPKEY = 'test-key';
       process.env.KIS_APPSECRET = 'test-secret';
       
-      const { fetchTradingIntensity, clearTokenCache } = await import('./kis');
-      clearTokenCache(); // 캐시 초기화하여 반드시 fetch가 불리도록 유도
+      const { fetchTradingIntensity } = await import('./kis');
 
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
