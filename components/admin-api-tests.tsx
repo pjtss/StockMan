@@ -53,7 +53,7 @@ const TESTS: ApiTestDefinition[] = [
   {
     key: "us_turnover_ratio",
     label: "시총 대비 거래대금 스캐너",
-    description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~5% 필터 응답",
+    description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~10% 필터 응답",
     endpoint: "/api/admin/us-turnover-ratio-test",
     query: "",
   },

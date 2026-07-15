@@ -124,7 +124,7 @@ export function AdminKisSettings() {
           </article>
           <article className={styles.card}>
             <h2 className={styles.cardTitle}>시총 대비 거래대금 스캐너</h2>
-            <p className={styles.cardDesc}>미국 상승률 API를 TOP 100 기준으로 재사용하며 1~5% 필터를 적용합니다.</p>
+            <p className={styles.cardDesc}>미국 상승률 API를 TOP 100 기준으로 재사용하며 1~10% 필터를 적용합니다.</p>
             <div style={{ marginTop: 14 }}><button className={styles.toggleButton} onClick={() => void openConfig("us_updown_rate")}>공통 API 설정</button></div>
           </article>
         </section>

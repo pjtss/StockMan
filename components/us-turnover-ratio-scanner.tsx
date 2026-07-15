@@ -30,7 +30,7 @@ export function UsTurnoverRatioScanner() {
   return <main className={styles.page}>
     <PageNavigation current="us-turnover-trend" />
     <div className={styles.container}>
-      <div className={styles.headerArea}><div className={styles.titleGroup}><p className={styles.kicker}>LIVE QUANT TERMINAL</p><h1>시총 대비 거래대금 스캐너</h1><p className={styles.subtitle}>미국 상승률 TOP 100 중 당일 거래대금이 시총의 1~5%인 종목</p></div></div>
+      <div className={styles.headerArea}><div className={styles.titleGroup}><p className={styles.kicker}>LIVE QUANT TERMINAL</p><h1>시총 대비 거래대금 스캐너</h1><p className={styles.subtitle}>미국 상승률 TOP 100 중 당일 거래대금이 시총의 1~10%인 종목</p></div></div>
       {error && <div className={styles.errorAlert}>ERROR: {error}</div>}
       {loading ? <div className={styles.loaderArea}><p>실시간 데이터를 분석하는 중...</p></div> : items.length === 0 ? <div className={styles.emptyArea}><p>조건에 맞는 종목이 없습니다.</p></div> : <div className={styles.tableWrapper}><table className={styles.table}><thead><tr><th>순위</th><th>종목</th><th>등락률</th><th>현재가</th><th>시가총액</th><th>거래대금</th><th>시총 대비</th></tr></thead><tbody>{items.map((item) => <tr key={item.code}><td>{item.rank}</td><td>{item.name || item.code}<small> {item.code}</small></td><td>{item.changeRate}</td><td>{item.price}</td><td>{formatValue(item.marketCap)}</td><td>{formatValue(item.tradingValue)}</td><td>{item.turnoverRatio.toFixed(2)}%</td></tr>)}</tbody></table></div>}
     </div>

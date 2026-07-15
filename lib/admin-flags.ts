@@ -18,7 +18,7 @@ export const ADMIN_FEATURES: Array<{ key: AdminFeatureKey; label: string; descri
   { key: "sec_realtime", label: "SEC 공시 자동화", description: "원문 수집, AI 평가, Discord 전송 스케줄러" },
   { key: "us_scanners", label: "미국 스캐너", description: "미국 체결강도/상승률 스캐너" },
   { key: "us_turnover_trend", label: "해외 거래대금 추이", description: "해외주식 거래대금 추이 페이지" },
-  { key: "us_turnover_ratio", label: "시총 대비 거래대금 스캐너", description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~5% 종목" },
+  { key: "us_turnover_ratio", label: "시총 대비 거래대금 스캐너", description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~10% 종목" },
 ];
 
 export async function loadAdminFeatureFlags(): Promise<Record<AdminFeatureKey, boolean>> {

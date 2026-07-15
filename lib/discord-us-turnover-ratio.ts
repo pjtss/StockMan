@@ -12,7 +12,7 @@ function formatNumber(value: number) {
 
 export function buildUsTurnoverRatioDiscordPayload(items: UsTurnoverRatioItem[]) {
   return {
-    content: `시총 대비 거래대금 1~5% 종목 ${items.length}건을 감지했습니다.`,
+    content: `시총 대비 거래대금 1~10% 종목 ${items.length}건을 감지했습니다.`,
     username: "STOCKMAN AMS TURNOVER",
     allowed_mentions: { parse: [] as string[] },
     embeds: items.slice(0, 10).map((item) => ({

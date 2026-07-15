@@ -39,6 +39,12 @@ function firstNumber(item: Record<string, unknown>, keys: string[]) {
   return null;
 }
 
+function isInverseOrLeveraged(item: Record<string, unknown>) {
+  const name = String(item.name ?? "");
+  const englishName = String(item.ename ?? item.enName ?? "");
+  return /인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i.test(`${name} ${englishName}`);
+}
+
 async function enrichWithPriceDetails(output: unknown[], market: string) {
   const result: unknown[] = Array.from({ length: output.length });
   const debug: UsTurnoverRatioDebug = { sourceCount: output.length, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] };
@@ -64,7 +70,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string) {
       const marketCap = firstNumber(outputDetail, ["tomv", "marketCap", "mcap"]);
       const tradingValue = firstNumber(outputDetail, ["tamt", "tamnt", "amount", "tradingValue"]);
       const turnoverRatio = marketCap !== null && tradingValue !== null ? (tradingValue / marketCap) * 100 : null;
-      debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, included: turnoverRatio !== null && turnoverRatio >= 1 && turnoverRatio <= 5 };
+      debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, included: turnoverRatio !== null && turnoverRatio >= 1 && turnoverRatio <= 10 };
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, output.length) }, () => worker()));
@@ -80,12 +86,13 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100): UsTurn
   return output.flatMap((raw, index) => {
     if (!raw || typeof raw !== "object") return [];
     const item = raw as Record<string, unknown>;
+    if (isInverseOrLeveraged(item)) return [];
     const marketCap = firstNumber(item, ["tomv", "marketCap", "mcap"]);
     const tradingValue = firstNumber(item, ["tamt", "tamnt", "amount", "tradingValue"]);
     if (marketCap === null || tradingValue === null) return [];
 
     const turnoverRatio = (tradingValue / marketCap) * 100;
-    if (turnoverRatio < 1 || turnoverRatio > 5) return [];
+    if (turnoverRatio < 1 || turnoverRatio > 10) return [];
 
     return [{
       rank: Number(item.rank ?? item.rnum ?? index + 1),
