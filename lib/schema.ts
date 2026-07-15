@@ -54,6 +54,11 @@ export const usTurnoverRatioSnapshots = pgTable(
   (table) => [uniqueIndex("us_turnover_ratio_snapshot_code_time").on(table.code, table.observedAt)]
 );
 
+export const usTurnoverRatioBlacklist = pgTable("us_turnover_ratio_blacklist", {
+  ticker: text("ticker").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const secAutomationEvents = pgTable("sec_automation_events", {
   externalId: text("external_id").primaryKey(),
   status: text("status").notNull(),

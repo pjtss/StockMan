@@ -8,6 +8,7 @@ import {
   Clock3,
   FlaskConical,
   LayoutDashboard,
+  ListFilter,
   LogOut,
   Settings2,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const NAV_ICONS = {
   schedules: Clock3,
   "api-config": Settings2,
   "api-tests": FlaskConical,
+  blacklist: ListFilter,
   "sec-test": ChartNoAxesCombined,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;
 

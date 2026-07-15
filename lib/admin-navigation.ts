@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "features" | "schedules" | "api-config" | "api-tests" | "sec-test";
+export type AdminNavId = "dashboard" | "features" | "schedules" | "api-config" | "api-tests" | "blacklist" | "sec-test";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -43,6 +43,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "API 테스트",
     description: "KIS 및 스캐너 API 응답 확인",
     href: "/admin/api-tests",
+  },
+  {
+    id: "blacklist",
+    group: "API 관리",
+    label: "AMS 블랙리스트",
+    description: "AMS 스캐너 제외 티커 관리",
+    href: "/admin/us-turnover-blacklist",
   },
   {
     id: "sec-test",

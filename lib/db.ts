@@ -102,6 +102,12 @@ export async function ensureSchema() {
       CREATE INDEX IF NOT EXISTS us_turnover_ratio_snapshots_code_observed_idx
       ON us_turnover_ratio_snapshots (code, observed_at DESC);
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS us_turnover_ratio_blacklist (
+        ticker TEXT PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS sec_automation_events (

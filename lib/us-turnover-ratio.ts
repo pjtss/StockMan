@@ -1,5 +1,6 @@
 import { fetchKisUsTopRisingApi, type KisUsTopRisingApiRequest } from "@/lib/kis-us-api";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
+import { loadUsTurnoverBlacklist } from "@/lib/us-turnover-blacklist";
 
 export type UsTurnoverRatioItem = {
   rank: number;
@@ -122,9 +123,14 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
   const source = parsed?.output ?? parsed?.output2 ?? parsed?.output1;
   const output = Array.isArray(source) ? source.slice(0, 100) : [];
   const enriched = await enrichWithPriceDetails(output, request.excd || "AMS");
+  const blacklist = new Set(await loadUsTurnoverBlacklist());
+  const filteredOutput = enriched.output.filter((item) => {
+    const code = String((item as Record<string, unknown>)?.symb ?? "").toUpperCase();
+    return !blacklist.has(code);
+  });
   return {
     ...result,
-    filtered: filterUsTurnoverRatioItems({ output: enriched.output }, 100),
+    filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100),
     debug: enriched.debug,
   };
 }
