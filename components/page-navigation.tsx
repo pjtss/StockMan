@@ -17,6 +17,7 @@ type PageKey =
   | "us-top-rising"
   | "us-ams-scout"
   | "us-turnover-trend"
+  | "us-turnover-ratio"
   | "top-rising"
   | "trading-intensity"
   | "admin"
@@ -44,6 +45,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
           prefetch={false}
         >
           미국 상승률 TOP N
+        </Link>
+        <Link className={current === "us-turnover-ratio" ? styles.navActive : styles.navLink} href="/scanners/us/turnover-ratio" prefetch={false}>
+          시총 대비 거래대금
         </Link>
         <Link
           className={current === "us-ams-scout" ? styles.navActive : styles.navLink}

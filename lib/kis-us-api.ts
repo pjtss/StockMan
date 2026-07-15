@@ -79,7 +79,7 @@ export async function fetchKisUsTopRisingApi(request: KisUsTopRisingApiRequest =
     method: "GET",
     headers: {
       "content-type": prepared.config.content_type || "application/json; charset=utf-8",
-      authorization: buildKisAuthorization(prepared.token),
+      Authorization: buildKisAuthorization(prepared.token),
       appkey: process.env.KIS_APPKEY || "",
       appsecret: process.env.KIS_APPSECRET || "",
       tr_id: prepared.config.tr_id || "HHDFS76290000",

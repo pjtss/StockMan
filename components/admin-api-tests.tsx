@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_turnover" | "us_intensity" | "us_top_rising" | "sec_raw";
+type TestKey = "us_updown" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -48,6 +48,13 @@ const TESTS: ApiTestDefinition[] = [
     label: "미국 상승률 스캐너",
     description: "상승률 TOP N 스캐너 가공 응답",
     endpoint: "/api/stock/top-rising",
+    query: "",
+  },
+  {
+    key: "us_turnover_ratio",
+    label: "시총 대비 거래대금 스캐너",
+    description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~5% 필터 응답",
+    endpoint: "/api/admin/us-turnover-ratio-test",
     query: "",
   },
   {

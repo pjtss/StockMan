@@ -231,6 +231,12 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      INSERT INTO feature_flags (key, enabled)
+      VALUES ('us_turnover_ratio', TRUE)
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    await client.query(`
       INSERT INTO kis_api_configs (key, config)
       VALUES
         ('us_updown_rate', '{"KEYB":"","AUTH":"","EXCD":"NAS","GUBN":"1","NDAY":"0","VOL_RANG":"5","tr_id":"HHDFS76290000","custtype":"P","content_type":"application/json; charset=utf-8","authorization":"Bearer"}'),
@@ -252,6 +258,7 @@ export async function ensureSchema() {
         ('us_trading_intensity', '17:00', '02:00'),
         ('domestic_trading_intensity', '08:00', '15:30'),
         ('us_top_rising', '17:00', '02:00')
+        ,('us_turnover_ratio', '17:00', '02:00')
       ON CONFLICT (key) DO NOTHING;
     `);
 

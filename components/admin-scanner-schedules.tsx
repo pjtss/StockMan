@@ -7,7 +7,7 @@ import { AdminPageShell } from "@/components/admin-page-shell";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import styles from "@/app/admin/page.module.css";
 
-type ScheduleKey = "dart" | "us_trading_intensity" | "domestic_trading_intensity" | "us_top_rising";
+type ScheduleKey = "dart" | "us_trading_intensity" | "domestic_trading_intensity" | "us_top_rising" | "us_turnover_ratio";
 type Schedule = { startTime: string; endTime: string };
 type HistoryRow = { key: ScheduleKey; startTime: string; endTime: string; updatedAt: string };
 
@@ -16,6 +16,7 @@ const rows: Array<[ScheduleKey, string, string]> = [
   ["us_trading_intensity", "미국 체결강도", "17:00 - 02:00"],
   ["domestic_trading_intensity", "국내 체결강도", "08:00 - 15:30"],
   ["us_top_rising", "미국 상승률 TOP N", "17:00 - 02:00"],
+  ["us_turnover_ratio", "시총 대비 거래대금 스캐너", "17:00 - 02:00"],
 ];
 
 const labels = Object.fromEntries(rows.map(([key, label]) => [key, label])) as Record<ScheduleKey, string>;
@@ -26,12 +27,14 @@ const presets: Record<"default" | "allDay", Record<ScheduleKey, Schedule>> = {
     us_trading_intensity: { startTime: "17:00", endTime: "02:00" },
     domestic_trading_intensity: { startTime: "08:00", endTime: "15:30" },
     us_top_rising: { startTime: "17:00", endTime: "02:00" },
+    us_turnover_ratio: { startTime: "17:00", endTime: "02:00" },
   },
   allDay: {
     dart: { startTime: "00:00", endTime: "23:59" },
     us_trading_intensity: { startTime: "00:00", endTime: "23:59" },
     domestic_trading_intensity: { startTime: "00:00", endTime: "23:59" },
     us_top_rising: { startTime: "00:00", endTime: "23:59" },
+    us_turnover_ratio: { startTime: "00:00", endTime: "23:59" },
   },
 };
 
