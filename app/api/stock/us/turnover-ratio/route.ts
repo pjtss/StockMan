@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     gubn: url.searchParams.get("gubn") || undefined,
     nday: url.searchParams.get("nday") || undefined,
     volRang: url.searchParams.get("volRang") || undefined,
-  });
+  }, ["AMS", "NAS"]);
   if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
   return NextResponse.json(result.filtered, { status: result.ok ? 200 : result.status, headers: { "Cache-Control": "no-store" } });
 }

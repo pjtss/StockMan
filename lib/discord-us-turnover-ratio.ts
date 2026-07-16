@@ -24,6 +24,9 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
         { name: "시가총액", value: formatKoreanAmount(item.marketCap), inline: true },
         { name: "당일 거래대금", value: formatKoreanAmount(item.tradingValue), inline: true },
         ...( "trend" in item ? [
+          { name: "1분 거래대금 변화", value: item.trend.oneMinuteTradingValueIncrease === null ? "데이터 수집 중" : `${item.trend.oneMinuteTradingValueIncrease >= 0 ? "+" : ""}${formatKoreanAmount(item.trend.oneMinuteTradingValueIncrease)}`, inline: true },
+          { name: "3분 거래대금 변화", value: item.trend.threeMinuteTradingValueIncrease === null ? "데이터 수집 중" : `${item.trend.threeMinuteTradingValueIncrease >= 0 ? "+" : ""}${formatKoreanAmount(item.trend.threeMinuteTradingValueIncrease)}`, inline: true },
+          { name: "5분 거래대금 변화", value: item.trend.fiveMinuteTradingValueIncrease === null ? "데이터 수집 중" : `${item.trend.fiveMinuteTradingValueIncrease >= 0 ? "+" : ""}${formatKoreanAmount(item.trend.fiveMinuteTradingValueIncrease)}`, inline: true },
           { name: "1분 변화", value: item.trend.oneMinuteIncrease === null ? "데이터 수집 중" : `${item.trend.oneMinuteIncrease >= 0 ? "+" : ""}${item.trend.oneMinuteIncrease.toFixed(2)}%p`, inline: true },
           { name: "3분 변화", value: item.trend.threeMinuteIncrease === null ? "데이터 수집 중" : `${item.trend.threeMinuteIncrease >= 0 ? "+" : ""}${item.trend.threeMinuteIncrease.toFixed(2)}%p`, inline: true },
           { name: "5분 변화", value: item.trend.fiveMinuteIncrease === null ? "데이터 수집 중" : `${item.trend.fiveMinuteIncrease >= 0 ? "+" : ""}${item.trend.fiveMinuteIncrease.toFixed(2)}%p`, inline: true },
