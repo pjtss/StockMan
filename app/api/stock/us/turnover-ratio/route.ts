@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { isUsTurnoverRatioOpen } from "@/lib/scanner-hours";
 import { fetchUsTurnoverRatioScanner } from "@/lib/us-turnover-ratio";
+import { saveAndCalculateUsTurnoverRatioTrends } from "@/lib/us-turnover-ratio-trend";
 
 export const dynamic = "force-dynamic";
 
@@ -22,5 +23,6 @@ export async function GET(request: Request) {
     volRang: url.searchParams.get("volRang") || undefined,
   }, ["AMS", "NAS"]);
   if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
-  return NextResponse.json(result.filtered, { status: result.ok ? 200 : result.status, headers: { "Cache-Control": "no-store" } });
+  const itemsWithTrend = await saveAndCalculateUsTurnoverRatioTrends(result.filtered);
+  return NextResponse.json(itemsWithTrend, { status: result.ok ? 200 : result.status, headers: { "Cache-Control": "no-store" } });
 }
