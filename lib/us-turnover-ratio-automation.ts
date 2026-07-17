@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { alertEvents } from "@/lib/schema";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
@@ -33,6 +33,14 @@ export async function runUsTurnoverRatioAutomation() {
   const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(result.filtered);
   const date = seoulDate();
   const minute = seoulMinute();
+  const sentToday = await db.select({ externalId: alertEvents.externalId })
+    .from(alertEvents)
+    .where(eq(alertEvents.source, "US_TURNOVER_RATIO"));
+  const alertedTodayCodes = new Set(
+    sentToday
+      .map(({ externalId }) => externalId.match(new RegExp(`^us-turnover-ratio:${date}:([^:]+):`))?.[1])
+      .filter((code): code is string => Boolean(code)),
+  );
   const pendingNew: UsTurnoverRatioItemWithTrend[] = [];
   const pendingIncrease: UsTurnoverRatioItemWithTrend[] = [];
   const pendingByWebhook = new Map<string, UsTurnoverRatioItemWithTrend[]>();
@@ -44,18 +52,19 @@ export async function runUsTurnoverRatioAutomation() {
     const hasOnePercentGain = Number.isFinite(changeRate) && changeRate >= 1;
     const hasTradingValueIncrease = item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease >= 10_000;
     const hasRateIncrease = item.trend.oneMinuteChangeRateIncrease !== null && item.trend.oneMinuteChangeRateIncrease > 0;
+    const code = item.code.toUpperCase();
+    const isNewToday = item.trend.isNew && !alertedTodayCodes.has(code);
     const shouldAlert = hasOnePercentGain && (
-      item.trend.isNew ||
+      isNewToday ||
       (hasRateIncrease && hasTradingValueIncrease)
     );
     if (!shouldAlert) continue;
     const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
     const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
     const overheatedWebhook = process.env.OVERHEATED_DISCORD_WEBHOOK_URL?.trim() || "";
-    const code = item.code.toUpperCase();
     if (seenCodes.has(code)) continue;
     seenCodes.add(code);
-    const alertType = item.trend.isNew ? "new" : "1m-increase";
+    const alertType = isNewToday ? "new" : "1m-increase";
     const externalId = `us-turnover-ratio:${date}:${code}:${alertType}:${minute}`;
     const claimed = await db.insert(alertEvents)
       .values({ source: "US_TURNOVER_RATIO", externalId })
@@ -63,11 +72,11 @@ export async function runUsTurnoverRatioAutomation() {
       .returning({ id: alertEvents.id });
     if (claimed.length > 0) {
       claimedIds.push(claimed[0].id);
-      if (item.trend.isNew) pendingNew.push(item);
+      if (isNewToday) pendingNew.push(item);
       else pendingIncrease.push(item);
       const webhook = item.turnoverRatio >= 10
         ? overheatedWebhook
-        : item.trend.isNew
+        : isNewToday
           ? newWebhook
           : increaseWebhook;
       const webhookItems = pendingByWebhook.get(webhook) ?? [];
