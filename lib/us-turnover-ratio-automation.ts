@@ -42,7 +42,7 @@ export async function runUsTurnoverRatioAutomation() {
     if (pendingNew.length + pendingIncrease.length >= 100) break;
     const changeRate = Number(String(item.changeRate).replace(/%/g, "").replace(/,/g, "").trim());
     const hasOnePercentGain = Number.isFinite(changeRate) && changeRate >= 1;
-    const hasTradingValueIncrease = item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease > 0;
+    const hasTradingValueIncrease = item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease >= 10_000;
     const hasRateIncrease = item.trend.oneMinuteChangeRateIncrease !== null && item.trend.oneMinuteChangeRateIncrease > 0;
     const shouldAlert = hasOnePercentGain && (
       item.trend.isNew ||
