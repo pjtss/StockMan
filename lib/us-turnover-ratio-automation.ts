@@ -33,10 +33,12 @@ export async function runUsTurnoverRatioAutomation() {
   const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(result.filtered);
   const date = seoulDate();
   const minute = seoulMinute();
-  const pending: UsTurnoverRatioItemWithTrend[] = [];
+  const pendingNew: UsTurnoverRatioItemWithTrend[] = [];
+  const pendingIncrease: UsTurnoverRatioItemWithTrend[] = [];
   const seenCodes = new Set<string>();
   const claimedIds: number[] = [];
   for (const item of trendedItems) {
+    if (pendingNew.length + pendingIncrease.length >= 100) break;
     const shouldAlert = item.trend.isNew || (item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease > 0);
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
@@ -50,15 +52,24 @@ export async function runUsTurnoverRatioAutomation() {
       .returning({ id: alertEvents.id });
     if (claimed.length > 0) {
       claimedIds.push(claimed[0].id);
-      pending.push(item);
+      if (item.trend.isNew) pendingNew.push(item);
+      else pendingIncrease.push(item);
     }
   }
 
-  if (pending.length === 0) return { skipped: false, sent: 0, matched: trendedItems.length };
-  const discord = await sendUsTurnoverRatioToDiscord(pending);
-  if (!discord.ok) {
+  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: trendedItems.length };
+  const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
+  const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
+  const newDiscord = pendingNew.length > 0
+    ? await sendUsTurnoverRatioToDiscord(pendingNew, newWebhook)
+    : null;
+  const increaseDiscord = pendingIncrease.length > 0
+    ? await sendUsTurnoverRatioToDiscord(pendingIncrease, increaseWebhook)
+    : null;
+  if (newDiscord && !newDiscord.ok || increaseDiscord && !increaseDiscord.ok) {
     await db.delete(alertEvents).where(inArray(alertEvents.id, claimedIds));
-    throw new Error(`US turnover ratio Discord failed with HTTP ${discord.status}`);
+    const failed = [newDiscord, increaseDiscord].find((result) => result && !result.ok);
+    throw new Error(`US turnover ratio Discord failed with HTTP ${failed?.status}`);
   }
-  return { skipped: false, sent: pending.length, matched: result.filtered.length };
+  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length };
 }

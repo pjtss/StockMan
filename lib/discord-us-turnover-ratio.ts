@@ -9,7 +9,10 @@ function formatWholeMan(value: number) {
 }
 
 export function isUsTurnoverRatioDiscordConfigured() {
-  return Boolean(process.env.US_TURNOVER_RATIO_DISCORD_WEBHOOK_URL?.trim());
+  return Boolean(
+    process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() &&
+    process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim(),
+  );
 }
 
 export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioItem | UsTurnoverRatioItemWithTrend>) {
@@ -20,10 +23,10 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
       title: `${item.code} | ${item.name || item.code}`,
       color: 0x00ffa3,
       fields: [
-        { name: "등락률", value: item.changeRate || "-", inline: true },
-        { name: "시총 대비 거래대금", value: `${item.turnoverRatio.toFixed(2)}%`, inline: true },
         { name: "시가총액", value: formatWholeMan(item.marketCap), inline: true },
         { name: "당일 거래대금", value: formatWholeMan(item.tradingValue), inline: true },
+        { name: "등락률", value: item.changeRate || "-", inline: true },
+        { name: "시총 대비 거래대금", value: `${item.turnoverRatio.toFixed(2)}%`, inline: true },
         { name: "시가 대비 고점", value: `${item.openToHighRate.toFixed(2)}%`, inline: true },
       ],
       timestamp: new Date().toISOString(),
@@ -32,14 +35,30 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
   };
 }
 
-export async function sendUsTurnoverRatioToDiscord(items: UsTurnoverRatioItem[]) {
-  const webhook = process.env.US_TURNOVER_RATIO_DISCORD_WEBHOOK_URL?.trim();
+export async function sendUsTurnoverRatioToDiscord(items: UsTurnoverRatioItem[], webhookUrl: string) {
+  const webhook = webhookUrl.trim();
   if (!webhook) throw new Error("US_TURNOVER_RATIO_DISCORD_WEBHOOK_URL is not configured");
-  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(buildUsTurnoverRatioDiscordPayload(items)),
-  });
-  const responseText = await response.text();
-  return { ok: SUCCESS_STATUSES.has(response.status), status: response.status, responseText };
+  const chunks: UsTurnoverRatioItem[][] = [];
+  for (let index = 0; index < items.length; index += 10) {
+    chunks.push(items.slice(index, index + 10));
+  }
+
+  const results = [];
+  for (const chunk of chunks) {
+    const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(buildUsTurnoverRatioDiscordPayload(chunk)),
+    });
+    results.push({ status: response.status, responseText: await response.text() });
+    if (!SUCCESS_STATUSES.has(response.status)) {
+      return { ok: false, status: response.status, responseText: results.map((result) => result.responseText).join("\n") };
+    }
+  }
+
+  return {
+    ok: true,
+    status: results.at(-1)?.status ?? 204,
+    responseText: results.map((result) => result.responseText).join("\n"),
+  };
 }
