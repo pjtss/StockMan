@@ -1,6 +1,7 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
+import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
 
 export type AmsScoutCandidate = {
   symb: string;
@@ -171,16 +172,16 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     const tradeAmount = parseNumber(row.tamt);
     const prevTradeAmount = parseNumber(detail.pamt);
     const prevVolume = parseNumber(detail.pvol);
-    const marketCap = parseNumber(detail.tomv ?? detail.mcap);
+    const marketCap = calculateKisUsMarketCap(detail);
     const price = parseNumber(detail.last ?? detail.lastprice ?? row.last);
     const changeRate = parseNumber(row.rate);
     const volumeRatio = minute5 > 0 && tradeAmount > 0 ? tradeAmount / minute5 : 0;
-    const marketCapRatio = marketCap > 0 ? tradeAmount / marketCap : 0;
+    const marketCapRatio = marketCap !== null && marketCap > 0 ? tradeAmount / marketCap : 0;
 
     const reason = [
       `거래대금순위 ${row.rank}`,
       `당일 거래대금 ${tradeAmount.toLocaleString()}`,
-      `시총 대비 ${marketCap > 0 ? marketCapRatio.toFixed(4) : "N/A"}`,
+      `시총 대비 ${marketCap !== null && marketCap > 0 ? marketCapRatio.toFixed(4) : "N/A"}`,
       `최근 5분 거래대금 ${minute5.toLocaleString()}`,
     ];
 

@@ -1,6 +1,7 @@
 import { fetchKisUsTopRisingApi, type KisUsTopRisingApiRequest } from "@/lib/kis-us-api";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { loadUsTurnoverBlacklist } from "@/lib/us-turnover-blacklist";
+import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
 
 export type UsTurnoverRatioItem = {
   market: string;
@@ -87,7 +88,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string) {
       const detail = await fetchKisUsPriceDetail({ code, market });
       if (detail?.ok) debug.priceDetailSuccessCount += 1;
       const outputDetail = getKisUsPriceDetailOutput(detail?.parsed);
-      const detailMarketCap = firstNumber(outputDetail, ["tomv", "mcap"]);
+      const detailMarketCap = calculateKisUsMarketCap(outputDetail);
       const detailTradingValue = firstNumber(outputDetail, ["tamt", "tamnt"]);
       const detailOpen = firstNumber(outputDetail, ["open"]);
       const detailHigh = firstNumber(outputDetail, ["high"]);
