@@ -95,6 +95,7 @@ export async function ensureSchema() {
         market_cap DOUBLE PRECISION NOT NULL,
         trading_value DOUBLE PRECISION NOT NULL,
         turnover_ratio DOUBLE PRECISION NOT NULL,
+        change_rate DOUBLE PRECISION NOT NULL DEFAULT 0,
         observed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE (market, code, observed_at)
       );
@@ -102,6 +103,10 @@ export async function ensureSchema() {
     await client.query(`
       ALTER TABLE us_turnover_ratio_snapshots
       ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT 'AMS'
+    `);
+    await client.query(`
+      ALTER TABLE us_turnover_ratio_snapshots
+      ADD COLUMN IF NOT EXISTS change_rate DOUBLE PRECISION NOT NULL DEFAULT 0
     `);
     await client.query(`
       DROP INDEX IF EXISTS us_turnover_ratio_snapshot_code_time

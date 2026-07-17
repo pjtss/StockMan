@@ -6,6 +6,7 @@ import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 export type UsTurnoverRatioTrend = {
   isNew: boolean;
   oneMinuteTradingValueIncrease: number | null;
+  oneMinuteChangeRateIncrease: number | null;
   threeMinuteTradingValueIncrease: number | null;
   fiveMinuteTradingValueIncrease: number | null;
   oneMinuteIncrease: number | null;
@@ -56,9 +57,11 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
 
     const increases = previous.map((row) => row ? item.turnoverRatio - row.turnoverRatio : null);
     const tradingValueIncreases = previous.map((row) => row ? item.tradingValue - row.tradingValue : null);
+    const changeRateIncrease = previous[0] ? itemChangeRate(item) - previous[0].changeRate : null;
     const trend: UsTurnoverRatioTrend = {
       isNew: previous[0] === null,
       oneMinuteTradingValueIncrease: tradingValueIncreases[0],
+      oneMinuteChangeRateIncrease: changeRateIncrease,
       threeMinuteTradingValueIncrease: tradingValueIncreases[1],
       fiveMinuteTradingValueIncrease: tradingValueIncreases[2],
       oneMinuteIncrease: increases[0],
@@ -77,10 +80,16 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
         marketCap: item.marketCap,
         tradingValue: item.tradingValue,
         turnoverRatio: item.turnoverRatio,
+        changeRate: itemChangeRate(item),
         observedAt,
       }).onConflictDoNothing();
     }
     result.push({ ...item, trend });
   }
   return result;
+}
+
+function itemChangeRate(item: UsTurnoverRatioItem) {
+  const value = Number(String(item.changeRate).replace(/%/g, "").replace(/,/g, "").trim());
+  return Number.isFinite(value) ? value : 0;
 }
