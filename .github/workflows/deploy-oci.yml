@@ -1,0 +1,76 @@
+name: Deploy OCI
+
+on:
+  push:
+    branches:
+      - oci
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-oci
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js standalone
+        run: |
+          npm run build
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          mkdir -p .next/standalone/scripts
+          cp scripts/oci-cron.sh .next/standalone/scripts/oci-cron.sh
+          tar -czf stockman-oci.tar.gz -C .next/standalone .
+
+      - name: Configure SSH
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H "$OCI_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          printf '%s\n' '${{ secrets.OCI_SSH_PRIVATE_KEY }}' > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+
+      - name: Upload release
+        run: |
+          scp -i ~/.ssh/oci_key stockman-oci.tar.gz \
+            "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:/tmp/stockman-oci-${{ github.sha }}.tar.gz"
+
+      - name: Activate release
+        env:
+          OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/oci_key "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
+            "DEPLOY_PATH='$OCI_DEPLOY_PATH' RELEASE='/tmp/stockman-oci-${{ github.sha }}.tar.gz' bash -s" <<'REMOTE'
+          set -euo pipefail
+          TEMP_PATH="${DEPLOY_PATH}.incoming"
+          rm -rf "$TEMP_PATH"
+          mkdir -p "$TEMP_PATH"
+          tar -xzf "$RELEASE" -C "$TEMP_PATH"
+          chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
+          rm -f "$RELEASE"
+          rm -rf "$DEPLOY_PATH.previous"
+          if [ -d "$DEPLOY_PATH" ]; then mv "$DEPLOY_PATH" "$DEPLOY_PATH.previous"; fi
+          mv "$TEMP_PATH" "$DEPLOY_PATH"
+          sudo chown -R stockman:stockman "$DEPLOY_PATH"
+          sudo systemctl restart stockman.service
+          sudo systemctl restart stockman-cron.timer
+          sudo systemctl is-active --quiet stockman.service
+          sudo systemctl is-active --quiet stockman-cron.timer
+          REMOTE
