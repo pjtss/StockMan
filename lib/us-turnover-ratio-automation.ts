@@ -51,7 +51,7 @@ export async function runUsTurnoverRatioAutomation() {
     if (!shouldAlert) continue;
     const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
     const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
-    const overheatedWebhook = process.env.US_TURNOVER_RATIO_OVERHEATED_DISCORD_WEBHOOK_URL?.trim() || "";
+    const overheatedWebhook = process.env.OVERHEATED_DISCORD_WEBHOOK_URL?.trim() || "";
     const code = item.code.toUpperCase();
     if (seenCodes.has(code)) continue;
     seenCodes.add(code);

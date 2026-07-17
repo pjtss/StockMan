@@ -10,7 +10,7 @@ function formatWholeMan(value: number) {
 
 export function isUsTurnoverRatioDiscordConfigured() {
   return Boolean(
-    process.env.US_TURNOVER_RATIO_OVERHEATED_DISCORD_WEBHOOK_URL?.trim() ||
+    process.env.OVERHEATED_DISCORD_WEBHOOK_URL?.trim() ||
     process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() ||
     process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim(),
   );
