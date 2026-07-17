@@ -39,12 +39,11 @@ export async function runUsTurnoverRatioAutomation() {
   const claimedIds: number[] = [];
   for (const item of trendedItems) {
     if (pendingNew.length + pendingIncrease.length >= 100) break;
-    const shouldAlert = item.trend.isNew || (
-      item.trend.oneMinuteTradingValueIncrease !== null &&
-      item.trend.oneMinuteTradingValueIncrease > 0 &&
-      item.trend.oneMinuteChangeRateIncrease !== null &&
-      item.trend.oneMinuteChangeRateIncrease > 0
-    );
+    const changeRate = Number(String(item.changeRate).replace(/%/g, "").replace(/,/g, "").trim());
+    const hasOnePercentGain = Number.isFinite(changeRate) && changeRate >= 1;
+    const hasTradingValueIncrease = item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease > 0;
+    const hasRateIncrease = item.trend.oneMinuteChangeRateIncrease !== null && item.trend.oneMinuteChangeRateIncrease > 0;
+    const shouldAlert = hasOnePercentGain && hasRateIncrease && hasTradingValueIncrease;
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
     if (seenCodes.has(code)) continue;
