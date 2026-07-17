@@ -9,7 +9,7 @@ User=stockman
 WorkingDirectory=/opt/stockman/current
 EnvironmentFile=/etc/stockman/stockman.env
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /opt/stockman/current/.next/standalone/server.js
+ExecStart=/usr/bin/node /opt/stockman/current/server.js
 Restart=always
 RestartSec=5
 KillSignal=SIGTERM
