@@ -39,13 +39,16 @@ jobs:
       - name: Configure SSH
         env:
           OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           ssh-keyscan -H "$OCI_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          printf '%s\n' '${{ secrets.OCI_SSH_PRIVATE_KEY }}' > ~/.ssh/oci_key
+          printf '%s\n' "$OCI_SSH_PRIVATE_KEY" > ~/.ssh/oci_key
           chmod 600 ~/.ssh/oci_key
+          ssh-keygen -y -f ~/.ssh/oci_key > ~/.ssh/oci_key.pub
+          ssh-keygen -lf ~/.ssh/oci_key.pub
 
       - name: Upload release
         run: |
