@@ -13,7 +13,7 @@ export type UsTurnoverRatioItem = {
   marketCap: number;
   tradingValue: number;
   turnoverRatio: number;
-  openToHighRate: number;
+  previousCloseToHighRate: number;
 };
 
 export type UsTurnoverRatioDebug = {
@@ -26,7 +26,7 @@ export type UsTurnoverRatioDebug = {
     marketCap: number | null;
     tradingValue: number | null;
     turnoverRatio: number | null;
-    openToHighRate: number | null;
+    previousCloseToHighRate: number | null;
     included: boolean;
   }>;
 };
@@ -90,10 +90,10 @@ async function enrichWithPriceDetails(output: unknown[], market: string) {
       const outputDetail = getKisUsPriceDetailOutput(detail?.parsed);
       const detailMarketCap = calculateKisUsMarketCap(outputDetail);
       const detailTradingValue = firstNumber(outputDetail, ["tamt", "tamnt"]);
-      const detailOpen = firstNumber(outputDetail, ["open"]);
+      const detailBase = firstNumber(outputDetail, ["base"]);
       const detailHigh = firstNumber(outputDetail, ["high"]);
-      const openToHighRate = detailOpen !== null && detailHigh !== null && detailOpen > 0
-        ? ((detailHigh - detailOpen) / detailOpen) * 100
+      const previousCloseToHighRate = detailBase !== null && detailHigh !== null && detailBase > 0
+        ? ((detailHigh - detailBase) / detailBase) * 100
         : null;
       result[index] = {
         ...item,
@@ -101,14 +101,14 @@ async function enrichWithPriceDetails(output: unknown[], market: string) {
         symb: item.symb ?? code,
         __priceDetailMarketCap: detailMarketCap,
         __priceDetailTradingValue: detailTradingValue,
-        __priceDetailOpen: detailOpen,
+        __priceDetailBase: detailBase,
         __priceDetailHigh: detailHigh,
-        __openToHighRate: openToHighRate,
+        __previousCloseToHighRate: previousCloseToHighRate,
       };
       const marketCap = detailMarketCap;
       const tradingValue = detailTradingValue;
       const turnoverRatio = marketCap !== null && tradingValue !== null ? (tradingValue / marketCap) * 100 : null;
-      debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, openToHighRate, included: turnoverRatio !== null && turnoverRatio >= 1 && turnoverRatio <= 10 && openToHighRate !== null && openToHighRate < 30 };
+      debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, previousCloseToHighRate, included: turnoverRatio !== null && turnoverRatio >= 1 && turnoverRatio < 10 && previousCloseToHighRate !== null && previousCloseToHighRate < 30 };
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, output.length) }, () => worker()));
@@ -129,13 +129,13 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100): UsTurn
     if (changeRate === null || changeRate < 0) return [];
     const marketCap = numberValue(item.__priceDetailMarketCap);
     const tradingValue = numberValue(item.__priceDetailTradingValue);
-    const openToHighRate = finiteNumberValue(item.__openToHighRate);
+    const previousCloseToHighRate = finiteNumberValue(item.__previousCloseToHighRate);
     if (marketCap === null || tradingValue === null) return [];
-    if (openToHighRate === null || openToHighRate >= 30) return [];
+    if (previousCloseToHighRate === null || previousCloseToHighRate >= 30) return [];
     if (marketCap < 1_000_000 || marketCap > 100_000_000) return [];
 
     const turnoverRatio = (tradingValue / marketCap) * 100;
-    if (turnoverRatio < 1 || turnoverRatio > 10) return [];
+    if (turnoverRatio < 1 || turnoverRatio >= 10) return [];
 
     return [{
       market: String(item.__market ?? item.excd ?? "AMS"),
@@ -147,7 +147,7 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100): UsTurn
       marketCap,
       tradingValue,
       turnoverRatio,
-      openToHighRate,
+      previousCloseToHighRate,
     }];
   }).slice(0, limit);
 }
@@ -164,7 +164,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
       const row = item as Record<string, unknown>;
       const price = parsePrice(row.last ?? row.price);
       const rate = signedNumber(row.rate ?? row.changeRate ?? row.n_rate);
-      return price !== null && price < 10 && rate !== null && rate < 20;
+      return price !== null && price < 70 && rate !== null && rate < 20;
     });
     const enriched = await enrichWithPriceDetails(detailEligibleOutput, market);
     enriched.debug.sourceCount = output.length;
@@ -191,7 +191,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
     priceDetailAttemptCount: acc.priceDetailAttemptCount + value.enriched.debug.priceDetailAttemptCount,
     priceDetailSuccessCount: acc.priceDetailSuccessCount + value.enriched.debug.priceDetailSuccessCount,
     details: [...acc.details, ...value.enriched.debug.details],
-  }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }> });
+  }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; previousCloseToHighRate: number | null; included: boolean }> });
   return {
     ...first,
     filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100),

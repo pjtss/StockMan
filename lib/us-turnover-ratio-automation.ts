@@ -43,7 +43,10 @@ export async function runUsTurnoverRatioAutomation() {
     const hasOnePercentGain = Number.isFinite(changeRate) && changeRate >= 1;
     const hasTradingValueIncrease = item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease > 0;
     const hasRateIncrease = item.trend.oneMinuteChangeRateIncrease !== null && item.trend.oneMinuteChangeRateIncrease > 0;
-    const shouldAlert = hasOnePercentGain && hasRateIncrease && hasTradingValueIncrease;
+    const shouldAlert = hasOnePercentGain && (
+      item.trend.isNew ||
+      (hasRateIncrease && hasTradingValueIncrease)
+    );
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
     if (seenCodes.has(code)) continue;
