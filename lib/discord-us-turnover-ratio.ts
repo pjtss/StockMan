@@ -10,6 +10,7 @@ function formatWholeMan(value: number) {
 
 export function isUsTurnoverRatioDiscordConfigured() {
   return Boolean(
+    process.env.US_TURNOVER_RATIO_OVERHEATED_DISCORD_WEBHOOK_URL?.trim() ||
     process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() ||
     process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim(),
   );
@@ -27,7 +28,7 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
         { name: "당일 거래대금", value: formatWholeMan(item.tradingValue), inline: true },
         { name: "등락률", value: item.changeRate || "-", inline: true },
         { name: "시총 대비 거래대금", value: `${item.turnoverRatio.toFixed(2)}%`, inline: true },
-        { name: "시가 대비 고점", value: `${item.openToHighRate.toFixed(2)}%`, inline: true },
+        { name: "전일 종가 대비 고점", value: item.previousCloseToHighRate === null ? "-" : `${item.previousCloseToHighRate.toFixed(2)}%`, inline: true },
       ],
       timestamp: new Date().toISOString(),
       footer: { text: "STOCKMAN US Turnover Ratio Automation" },
