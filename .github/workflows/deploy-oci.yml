@@ -53,11 +53,11 @@ jobs:
       - name: Upload release
         run: |
           scp -i ~/.ssh/oci_key stockman-oci.tar.gz \
-            "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}:/tmp/stockman-oci-${{ github.sha }}.tar.gz"
+            "ubuntu@${{ secrets.OCI_HOST }}:/tmp/stockman-oci-${{ github.sha }}.tar.gz"
 
       - name: Activate release
         env:
           OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH }}
         run: |
-          ssh -i ~/.ssh/oci_key "${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}" \
+          ssh -i ~/.ssh/oci_key "ubuntu@${{ secrets.OCI_HOST }}" \
             "sudo -n /usr/local/sbin/stockman-activate '$OCI_DEPLOY_PATH' '/tmp/stockman-oci-${{ github.sha }}.tar.gz'"
