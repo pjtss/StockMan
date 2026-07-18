@@ -5,6 +5,8 @@ import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-p
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
 import { listUsTurnoverWatches } from "@/lib/us-turnover-watch-repository";
 import { sendUsTurnoverWatchToDiscord } from "@/lib/discord-us-turnover-watch";
+import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isUsTurnoverWatchOpen } from "@/lib/scanner-hours";
 
 const MARKETS = ["NAS", "AMS", "NYS"];
 
@@ -18,6 +20,9 @@ function seoulDate() {
 }
 
 export async function runUsTurnoverWatchAutomation() {
+  const flags = await loadAdminFeatureFlags();
+  if (!flags.us_turnover_watch) return { skipped: true, reason: "disabled", watched: 0, matched: 0, sent: 0 };
+  if (!(await isUsTurnoverWatchOpen())) return { skipped: true, reason: "outside_schedule", watched: 0, matched: 0, sent: 0 };
   const watches = await listUsTurnoverWatches();
   if (watches.length === 0) return { watched: 0, matched: 0, sent: 0 };
   const db = getDb();

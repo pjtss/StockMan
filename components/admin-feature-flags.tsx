@@ -5,7 +5,7 @@ import { Power } from "lucide-react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/page.module.css";
 
-type FeatureKey = "dart_realtime" | "sec_realtime" | "us_scanners" | "us_turnover_trend";
+type FeatureKey = "dart_realtime" | "sec_realtime" | "us_scanners" | "us_turnover_trend" | "us_turnover_ratio" | "us_turnover_watch";
 type FeatureInfo = { key: FeatureKey; label: string; description: string };
 
 export function AdminFeatureFlags() {

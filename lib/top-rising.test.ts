@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDb = {
   select: vi.fn().mockReturnThis(),
-  from: vi.fn().mockResolvedValue([]),
+  from: vi.fn(() => {
+    const rows: any[] = [];
+    rows.where = vi.fn(() => ({ limit: vi.fn().mockResolvedValue([]) }));
+    return rows;
+  }),
   delete: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
   insert: vi.fn().mockReturnThis(),

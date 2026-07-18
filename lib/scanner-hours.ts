@@ -21,6 +21,11 @@ export async function isUsTurnoverRatioOpen(now = new Date()): Promise<boolean> 
   return isWithinSchedule(schedules.us_turnover_ratio, now);
 }
 
+export async function isUsTurnoverWatchOpen(now = new Date()): Promise<boolean> {
+  const schedules = await loadScannerSchedules();
+  return isWithinSchedule(schedules.us_turnover_watch, now);
+}
+
 export async function isDartOpen(now = new Date()): Promise<boolean> {
   const schedules = await loadScannerSchedules();
   return isWithinSchedule(schedules.dart, now);

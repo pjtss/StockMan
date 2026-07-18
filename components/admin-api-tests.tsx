@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watch" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -62,6 +62,13 @@ const TESTS: ApiTestDefinition[] = [
     label: "시총 대비 거래대금 스캐너",
     description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~10% 필터 응답",
     endpoint: "/api/admin/us-turnover-ratio-test",
+    query: "",
+  },
+  {
+    key: "us_turnover_watch",
+    label: "특정 종목 거래대금 감시",
+    description: "등록 티커의 NAS·AMS·NYS 상세 API와 계산 결과",
+    endpoint: "/api/admin/us-turnover-watch-test",
     query: "",
   },
   {

@@ -7,7 +7,8 @@ export type AdminFeatureKey =
   | "sec_realtime"
   | "us_scanners"
   | "us_turnover_trend"
-  | "us_turnover_ratio";
+  | "us_turnover_ratio"
+  | "us_turnover_watch";
 
 export const ADMIN_FEATURES: Array<{ key: AdminFeatureKey; label: string; description: string }> = [
   {
@@ -19,6 +20,7 @@ export const ADMIN_FEATURES: Array<{ key: AdminFeatureKey; label: string; descri
   { key: "us_scanners", label: "미국 스캐너", description: "미국 체결강도/상승률 스캐너" },
   { key: "us_turnover_trend", label: "해외 거래대금 추이", description: "해외주식 거래대금 추이 페이지" },
   { key: "us_turnover_ratio", label: "시총 대비 거래대금 스캐너", description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~10% 종목" },
+  { key: "us_turnover_watch", label: "특정 종목 거래대금 감시", description: "등록 티커의 시총 대비 거래대금 임계값 감시" },
 ];
 
 export async function loadAdminFeatureFlags(): Promise<Record<AdminFeatureKey, boolean>> {
@@ -28,6 +30,7 @@ export async function loadAdminFeatureFlags(): Promise<Record<AdminFeatureKey, b
     us_scanners: true,
     us_turnover_trend: true,
     us_turnover_ratio: true,
+    us_turnover_watch: true,
   };
 
   const db = getDb();

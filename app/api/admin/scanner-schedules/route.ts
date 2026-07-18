@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { DEFAULT_SCANNER_SCHEDULES, loadScannerSchedules, saveScannerSchedule, type ScannerScheduleKey } from "@/lib/scanner-schedules";
 
-const keys: ScannerScheduleKey[] = ["dart", "us_trading_intensity", "domestic_trading_intensity", "us_top_rising", "us_turnover_ratio"];
+const keys: ScannerScheduleKey[] = ["dart", "us_trading_intensity", "domestic_trading_intensity", "us_top_rising", "us_turnover_ratio", "us_turnover_watch"];
 
 export async function GET() {
   if (!(await requireAdminSession())) {
