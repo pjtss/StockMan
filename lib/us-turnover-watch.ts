@@ -1,10 +1,10 @@
-import { inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { alertEvents } from "@/lib/schema";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
 import { listUsTurnoverWatches, recordUsTurnoverWatchObservation } from "@/lib/us-turnover-watch-repository";
-import { sendUsTurnoverWatchToDiscord } from "@/lib/discord-us-turnover-watch";
+import { buildUsTurnoverWatchPayload } from "@/lib/discord-us-turnover-watch";
+import { enqueueDiscordDelivery, processDiscordDeliveryQueue } from "@/lib/discord-delivery-queue";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { isUsTurnoverWatchOpen } from "@/lib/scanner-hours";
 
@@ -28,7 +28,8 @@ export async function runUsTurnoverWatchAutomation() {
   const db = getDb();
   const date = seoulDate();
   const sent: Array<Record<string, unknown>> = [];
-  const claimedIds: number[] = [];
+  const webhook = process.env.US_TURNOVER_WATCH_DISCORD_WEBHOOK_URL?.trim();
+  if (!webhook) throw new Error("US_TURNOVER_WATCH_DISCORD_WEBHOOK_URL is not configured");
 
   for (const watch of watches) {
     for (const market of MARKETS) {
@@ -51,7 +52,6 @@ export async function runUsTurnoverWatchAutomation() {
         .onConflictDoNothing()
         .returning({ id: alertEvents.id });
       if (claimed.length === 0) continue;
-      claimedIds.push(claimed[0].id);
       await recordUsTurnoverWatchObservation(watch.ticker, { market, ratio, checkedAt, alertedAt: checkedAt });
       sent.push({
         code: watch.ticker,
@@ -65,13 +65,7 @@ export async function runUsTurnoverWatchAutomation() {
     }
   }
 
-  if (sent.length > 0) {
-    try {
-      await sendUsTurnoverWatchToDiscord(sent);
-    } catch (error) {
-      await db.delete(alertEvents).where(inArray(alertEvents.id, claimedIds));
-      throw error;
-    }
-  }
-  return { watched: watches.length, matched: sent.length, sent: sent.length };
+  if (sent.length > 0) await enqueueDiscordDelivery("US_TURNOVER_RATIO_WATCH", webhook, buildUsTurnoverWatchPayload(sent));
+  const delivery = await processDiscordDeliveryQueue();
+  return { watched: watches.length, matched: sent.length, sent: delivery.sent, delivery };
 }

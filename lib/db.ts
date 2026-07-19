@@ -102,6 +102,36 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS automation_runs (
+        id BIGSERIAL PRIMARY KEY,
+        key TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        finished_at TIMESTAMPTZ,
+        matched_count INTEGER NOT NULL DEFAULT 0,
+        sent_count INTEGER NOT NULL DEFAULT 0,
+        error TEXT
+      );
+      CREATE INDEX IF NOT EXISTS automation_runs_key_started_idx ON automation_runs (key, started_at DESC);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS discord_delivery_queue (
+        id BIGSERIAL PRIMARY KEY,
+        source TEXT NOT NULL,
+        webhook_url TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_error TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        sent_at TIMESTAMPTZ
+      );
+      CREATE INDEX IF NOT EXISTS discord_delivery_queue_pending_idx ON discord_delivery_queue (status, next_attempt_at);
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS us_turnover_ratio_snapshots (
         id BIGSERIAL PRIMARY KEY,
         market TEXT NOT NULL DEFAULT 'AMS',

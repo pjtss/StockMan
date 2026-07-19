@@ -40,6 +40,30 @@ export const alertEvents = pgTable(
   ]
 );
 
+export const automationRuns = pgTable("automation_runs", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  key: text("key").notNull(),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  matchedCount: integer("matched_count").notNull().default(0),
+  sentCount: integer("sent_count").notNull().default(0),
+  error: text("error"),
+});
+
+export const discordDeliveryQueue = pgTable("discord_delivery_queue", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  source: text("source").notNull(),
+  webhookUrl: text("webhook_url").notNull(),
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+});
+
 export const usTurnoverRatioSnapshots = pgTable(
   "us_turnover_ratio_snapshots",
   {
