@@ -1,9 +1,17 @@
 import { schedule } from "@netlify/functions";
 import { runFilingSync } from "../../lib/filing-sync";
+import { ensureSchema, withAdvisoryLock } from "../../lib/db";
+import { runTrackedAutomation } from "../../lib/tracked-automation";
 
 export const handler = schedule("* * * * *", async () => {
   try {
-    const data = await runFilingSync();
+    await ensureSchema();
+    const locked = await withAdvisoryLock("stockman:filing-sync", async () => runTrackedAutomation("filing-sync", async () => {
+      const result = await runFilingSync();
+      return { matched: 0, sent: 0, result };
+    }));
+    if (!locked.locked) return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: "already_running" }) };
+    const data = locked.value.result;
     console.log("[Cron] Sync filings successful:", data);
 
     return {
