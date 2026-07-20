@@ -60,7 +60,7 @@ export async function runUsTurnoverWatchAutomation() {
         marketCap,
         tradingValue,
         turnoverRatio: ratio,
-        changeRate: output.rate ?? output.last_rate ?? "-",
+        changeRate: output.rate ?? output.last_rate ?? output.t_xrat ?? output.n_rate ?? "-",
       });
     }
   }
