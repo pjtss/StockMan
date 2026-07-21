@@ -8,6 +8,13 @@ function formatWholeMan(value: number) {
   return formatKoreanAmount(Math.floor(value / 10_000) * 10_000);
 }
 
+function formatTradingValueIncrease(item: UsTurnoverRatioItem | UsTurnoverRatioItemWithTrend) {
+  const increase = "trend" in item ? item.trend.oneMinuteTradingValueIncrease : null;
+  if (increase === null || increase === undefined) return "직전 데이터 없음";
+  const sign = increase > 0 ? "+" : increase < 0 ? "-" : "";
+  return `${sign}${Math.abs(increase / 10_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}만 달러`;
+}
+
 export function isUsTurnoverRatioDiscordConfigured() {
   return Boolean(
     process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() ||
@@ -23,6 +30,7 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
       title: `${item.code} | ${item.name || item.code}`,
       color: 0x00ffa3,
       fields: [
+        { name: "직전 대비 거래대금", value: formatTradingValueIncrease(item), inline: false },
         { name: "시가총액", value: formatWholeMan(item.marketCap), inline: true },
         { name: "당일 거래대금", value: formatWholeMan(item.tradingValue), inline: true },
         { name: "등락률", value: item.changeRate || "-", inline: true },
