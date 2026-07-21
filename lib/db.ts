@@ -52,6 +52,7 @@ export async function ensureSchema() {
       VALUES ('global', 30)
       ON CONFLICT (key) DO NOTHING;
     `);
+    await client.query(`CREATE TABLE IF NOT EXISTS us_turnover_filter_settings (key TEXT PRIMARY KEY, settings JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
     await client.query(`
       CREATE TABLE IF NOT EXISTS filings (
         id BIGSERIAL PRIMARY KEY,

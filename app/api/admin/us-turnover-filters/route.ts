@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server";
+import { requireAdminSession } from "@/lib/admin-auth";
+import { loadUsTurnoverFilterSettings, saveUsTurnoverFilterSettings, DEFAULT_US_TURNOVER_FILTER_SETTINGS } from "@/lib/us-turnover-settings";
+export async function GET(){ if(!(await requireAdminSession())) return NextResponse.json({error:"Unauthorized"},{status:401}); return NextResponse.json(await loadUsTurnoverFilterSettings()); }
+export async function PATCH(request:Request){ if(!(await requireAdminSession())) return NextResponse.json({error:"Unauthorized"},{status:401}); const body=await request.json().catch(()=>({})); const next={...DEFAULT_US_TURNOVER_FILTER_SETTINGS,...body}; const keys=Object.keys(DEFAULT_US_TURNOVER_FILTER_SETTINGS) as Array<keyof typeof DEFAULT_US_TURNOVER_FILTER_SETTINGS>; if(keys.some((key)=>!Number.isFinite(Number(next[key]))||Number(next[key])<0)) return NextResponse.json({error:"모든 필터 값은 0 이상의 숫자여야 합니다."},{status:400}); return NextResponse.json(await saveUsTurnoverFilterSettings(Object.fromEntries(keys.map((key)=>[key,Number(next[key])])) as typeof DEFAULT_US_TURNOVER_FILTER_SETTINGS)); }

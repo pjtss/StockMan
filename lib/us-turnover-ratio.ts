@@ -2,6 +2,7 @@ import { fetchKisUsTopRisingApi, type KisUsTopRisingApiRequest } from "@/lib/kis
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { loadUsTurnoverBlacklist } from "@/lib/us-turnover-blacklist";
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
+import { loadUsTurnoverFilterSettings, DEFAULT_US_TURNOVER_FILTER_SETTINGS } from "@/lib/us-turnover-settings";
 
 export type UsTurnoverRatioItem = {
   market: string;
@@ -116,7 +117,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string) {
   return { output: result, debug };
 }
 
-export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100): UsTurnoverRatioItem[] {
+export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, settings = DEFAULT_US_TURNOVER_FILTER_SETTINGS): UsTurnoverRatioItem[] {
   const response = parsed as { output?: unknown; output1?: unknown; output2?: unknown };
   const output = response?.output ?? response?.output2 ?? response?.output1;
   if (!Array.isArray(output)) return [];
@@ -131,11 +132,11 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100): UsTurn
     const tradingValue = numberValue(item.__priceDetailTradingValue);
     const openToHighRate = finiteNumberValue(item.__openToHighRate);
     if (marketCap === null || tradingValue === null) return [];
-    if (openToHighRate === null || openToHighRate >= 30) return [];
-    if (marketCap < 1_000_000 || marketCap > 100_000_000) return [];
+    if (openToHighRate === null || openToHighRate > settings.maxOpenToHighRate) return [];
+    if (marketCap < settings.minMarketCap || marketCap > settings.maxMarketCap) return [];
 
     const turnoverRatio = (tradingValue / marketCap) * 100;
-    if (turnoverRatio < 1 || turnoverRatio > 10) return [];
+    if (turnoverRatio < settings.minTurnoverRatio || turnoverRatio > settings.maxTurnoverRatio) return [];
 
     return [{
       market: String(item.__market ?? item.excd ?? "AMS"),
@@ -153,6 +154,7 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100): UsTurn
 }
 
 export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequest = {}, markets = [request.excd || "AMS"]) {
+  const settings = await loadUsTurnoverFilterSettings();
   const results = await Promise.all(markets.map(async (market) => {
     const result = await fetchKisUsTopRisingApi({ ...request, excd: market });
     if (!result) return null;
@@ -164,7 +166,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
       const row = item as Record<string, unknown>;
       const price = parsePrice(row.last ?? row.price);
       const rate = signedNumber(row.rate ?? row.changeRate ?? row.n_rate);
-      return price !== null && price < 10 && rate !== null && rate < 30;
+      return price !== null && price < settings.maxPrice && rate !== null && rate < settings.maxRate;
     });
     const enriched = await enrichWithPriceDetails(detailEligibleOutput, market);
     enriched.debug.sourceCount = output.length;
@@ -194,7 +196,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
   }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }> });
   return {
     ...first,
-    filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100),
+    filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings),
     debug,
   };
 }

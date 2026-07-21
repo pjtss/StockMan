@@ -6,6 +6,7 @@ import { isUsTurnoverRatioOpen } from "@/lib/scanner-hours";
 import { fetchUsTurnoverRatioScanner, type UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { saveAndCalculateUsTurnoverRatioTrends, type UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
 import { isUsTurnoverRatioDiscordConfigured, sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
+import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 
 function seoulDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
@@ -31,6 +32,7 @@ export async function runUsTurnoverRatioAutomation() {
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");
   const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(result.filtered);
+  const settings = await loadUsTurnoverFilterSettings();
   const date = seoulDate();
   const minute = seoulMinute();
   const pendingNew: UsTurnoverRatioItemWithTrend[] = [];
@@ -39,7 +41,7 @@ export async function runUsTurnoverRatioAutomation() {
   const claimedIds: number[] = [];
   for (const item of trendedItems) {
     if (pendingNew.length + pendingIncrease.length >= 100) break;
-    const shouldAlert = item.trend.isNew || (item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease > 0);
+    const shouldAlert = item.trend.isNew || (item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease >= settings.tradingValueIncreaseAlert);
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
     if (seenCodes.has(code)) continue;
