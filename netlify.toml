@@ -12,4 +12,4 @@ package = "@netlify/plugin-nextjs"
 [build.environment]
 # ADMIN_PASSWORD is an intentional server-side environment variable reference.
 # Keep it out of false-positive secret matches; the value itself remains Netlify-managed.
-SECRETS_SCAN_OMIT_KEYS = "ADMIN_PASSWORD,ADMIN_DASHBOARD_PASSWORD,NEXT_PUBLIC_VAPID_PUBLIC_KEY,NEXT_DIST_DIR,KIS_MODE,OPENAI_MODEL"
+SECRETS_SCAN_OMIT_KEYS = "ADMIN_PASSWORD,ADMIN_DASHBOARD_PASSWORD,NEXT_PUBLIC_VAPID_PUBLIC_KEY,NEXT_DIST_DIR,KIS_MODE,OPENAI_MODEL,NODE_ENV"
