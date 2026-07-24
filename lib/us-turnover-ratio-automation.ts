@@ -41,13 +41,15 @@ export async function runUsTurnoverRatioAutomation() {
   const claimedIds: number[] = [];
   for (const item of trendedItems) {
     if (pendingNew.length + pendingIncrease.length >= 100) break;
-    const shouldAlert = item.trend.isNew || (item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease >= settings.tradingValueIncreaseAlert);
+    const hasTradingValueIncrease = item.trend.oneMinuteTradingValueIncrease !== null && item.trend.oneMinuteTradingValueIncrease >= settings.tradingValueIncreaseAlert;
+    const shouldAlert = item.trend.isNew || hasTradingValueIncrease;
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
-    if (seenCodes.has(code)) continue;
-    seenCodes.add(code);
+    const marketCode = `${item.market.toUpperCase()}:${code}`;
+    if (seenCodes.has(marketCode)) continue;
+    seenCodes.add(marketCode);
     const alertType = item.trend.isNew ? "new" : "1m-increase";
-    const externalId = `us-turnover-ratio:${date}:${code}:${alertType}:${minute}`;
+    const externalId = `us-turnover-ratio:${date}:${item.market.toUpperCase()}:${code}:${alertType}:${minute}`;
     const claimed = await db.insert(alertEvents)
       .values({ source: "US_TURNOVER_RATIO", externalId })
       .onConflictDoNothing()
@@ -62,6 +64,8 @@ export async function runUsTurnoverRatioAutomation() {
   if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: trendedItems.length };
   const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
   const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
+  if (pendingNew.length > 0 && !newWebhook) throw new Error("New turnover ratio Discord webhook is not configured");
+  if (pendingIncrease.length > 0 && !increaseWebhook) throw new Error("Increase turnover ratio Discord webhook is not configured");
   const newDiscord = pendingNew.length > 0
     ? await sendUsTurnoverRatioToDiscord(pendingNew, newWebhook)
     : null;
