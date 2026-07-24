@@ -171,16 +171,16 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
     const enriched = await enrichWithPriceDetails(detailEligibleOutput, market);
     enriched.debug.sourceCount = output.length;
     enriched.debug.preDetailFilteredOutCount = output.length - detailEligibleOutput.length;
-    return { result, enriched };
+    return { result, enriched, market };
   }));
   const validResults = results.filter((value): value is NonNullable<typeof value> => value !== null);
   if (validResults.length === 0) return null;
   const blacklist = new Set(await loadUsTurnoverBlacklist());
-  const filteredOutput = validResults.flatMap(({ enriched }) => enriched.output.map((rawItem) => {
+  const filteredOutput = validResults.flatMap(({ enriched, market }) => enriched.output.map((rawItem) => {
     const item = rawItem as Record<string, unknown>;
     return {
     ...item,
-    __market: item.excd,
+    __market: market,
     };
   })).filter((item) => {
     const code = String((item as Record<string, unknown>)?.symb ?? "").toUpperCase();

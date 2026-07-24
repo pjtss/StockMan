@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     gubn: url.searchParams.get("gubn") || undefined,
     nday: url.searchParams.get("nday") || undefined,
     volRang: url.searchParams.get("volRang") || undefined,
-  }, ["AMS", "NAS"]);
+  }, ["AMS", "NAS", "NYS"]);
   if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
   const itemsWithTrend = await saveAndCalculateUsTurnoverRatioTrends(result.filtered, new Date(), false);
   return NextResponse.json(itemsWithTrend, { status: result.ok ? 200 : result.status, headers: { "Cache-Control": "no-store" } });

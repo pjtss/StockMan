@@ -25,7 +25,7 @@ export async function runUsTurnoverRatioAutomation() {
   if (!(await isUsTurnoverRatioOpen())) return { skipped: true, reason: "outside_schedule", sent: 0 };
   if (!isUsTurnoverRatioDiscordConfigured()) return { skipped: true, reason: "webhook_missing", sent: 0 };
 
-  const result = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS"]);
+  const result = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"]);
   if (!result) throw new Error("KIS access token is unavailable");
   if (!result.ok) throw new Error(`KIS turnover ratio API failed with HTTP ${result.status}`);
 
