@@ -1,11 +1,12 @@
 import { schedule } from "@netlify/functions";
 import { ensureSchema } from "../../lib/db";
 import { runUsTurnoverRatioAutomation } from "../../lib/us-turnover-ratio-automation";
+import { withAutomationLock } from "../../lib/automation-lock";
 
 export const handler = schedule("*/1 * * * *", async () => {
   try {
     await ensureSchema();
-    const data = await runUsTurnoverRatioAutomation();
+    const data = await withAutomationLock("us-turnover-ratio", runUsTurnoverRatioAutomation);
     console.log("[Cron] US turnover ratio completed:", data);
     return { statusCode: 200, body: JSON.stringify({ ok: true, data }) };
   } catch (error) {
