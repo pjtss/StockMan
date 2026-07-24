@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDb = {
   select: vi.fn().mockReturnThis(),
-  from: vi.fn().mockReturnThis(),
+  from: vi.fn().mockImplementationOnce(() => ({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }) })).mockImplementation(() => Promise.resolve([])),
   delete: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue([]),
   insert: vi.fn().mockReturnThis(),
   values: vi.fn().mockReturnThis(),
   update: vi.fn().mockReturnThis(),
@@ -22,6 +23,7 @@ import { fetchTopRisingStocks, syncTopRisingStocks } from "./kis-us";
 describe("Top Rising Stocks Scanner Logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDb.from.mockReset().mockImplementationOnce(() => ({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }) })).mockImplementation(() => Promise.resolve([]));
   });
 
   it("fetchTopRisingStocks returns an array", async () => {
