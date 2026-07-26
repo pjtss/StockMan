@@ -49,6 +49,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         <Link className={current === "us-turnover-ratio" ? styles.navActive : styles.navLink} href="/scanners/us/turnover-ratio" prefetch={false}>
           시총 대비 거래대금
         </Link>
+        <Link className={styles.navLink} href="/short-borrow" prefetch={false}>
+          공매도 대차
+        </Link>
         <Link
           className={current === "us-ams-scout" ? styles.navActive : styles.navLink}
           href="/scanners/us/ams-scout"

@@ -111,6 +111,30 @@ export async function ensureSchema() {
       );
     `);
     await client.query(`
+      CREATE TABLE IF NOT EXISTS short_borrow_snapshots (
+        id BIGSERIAL PRIMARY KEY,
+        symbol TEXT NOT NULL,
+        tradable BOOLEAN NOT NULL,
+        shortable BOOLEAN NOT NULL,
+        borrow_status TEXT NOT NULL,
+        quote_status TEXT NOT NULL,
+        available_qty INTEGER,
+        locate_price_per_share DOUBLE PRECISION,
+        current_price DOUBLE PRECISION,
+        locate_fee_rate_percent DOUBLE PRECISION,
+        pressure_score INTEGER NOT NULL,
+        pressure_level TEXT NOT NULL,
+        quoted_at TIMESTAMPTZ,
+        fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        source TEXT NOT NULL DEFAULT 'ALPACA',
+        scope TEXT NOT NULL DEFAULT 'ALPACA_ACCOUNT_SPECIFIC'
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS short_borrow_snapshots_symbol_fetched_idx
+        ON short_borrow_snapshots (symbol, fetched_at);
+      CREATE INDEX IF NOT EXISTS short_borrow_snapshots_pressure_idx
+        ON short_borrow_snapshots (pressure_level, fetched_at DESC);
+    `);
+    await client.query(`
       ALTER TABLE us_turnover_ratio_snapshots
       ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT 'AMS'
     `);

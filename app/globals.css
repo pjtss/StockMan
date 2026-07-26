@@ -108,6 +108,29 @@
   --scrollbar-thumb-hover: #94a3b8;
 }
 
+.shortBorrowPage { max-width: 1100px; margin: 0 auto; padding: 48px 20px; color: var(--groupHeader-h2); }
+.shortBorrowHero { margin-bottom: 24px; }
+.shortBorrowEyebrow { color: #38bdf8; font-size: 12px; letter-spacing: .16em; font-weight: 700; }
+.shortBorrowHero h1 { margin: 8px 0; font-size: clamp(28px, 5vw, 44px); }
+.shortBorrowHero p:not(.shortBorrowEyebrow) { color: var(--groupHeader-span); }
+.shortBorrowForm { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.shortBorrowForm input, .shortBorrowForm button { border: 1px solid var(--panel-border); border-radius: 10px; padding: 12px 14px; background: var(--panel-bg); color: inherit; }
+.shortBorrowForm input:first-child { width: 180px; text-transform: uppercase; }
+.shortBorrowForm button { cursor: pointer; background: #0ea5e9; color: white; font-weight: 700; }
+.shortBorrowForm button:disabled { opacity: .6; cursor: wait; }
+.shortBorrowError { color: #fb7185; }
+.shortBorrowCard { border: 1px solid var(--panel-border); border-radius: 16px; padding: 22px; background: var(--panel-bg); box-shadow: var(--panel-shadow); }
+.shortBorrowCardHeader { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.shortBorrowCardHeader strong { font-size: 24px; margin-right: 12px; }
+.shortBorrowCardHeader span { color: var(--groupHeader-span); }
+.shortBorrowLevel { border-radius: 999px; padding: 7px 12px; font-size: 13px; }
+.shortBorrowLevel.low { background: #334155; }.shortBorrowLevel.medium { background: #ca8a04; }.shortBorrowLevel.high { background: #ea580c; }.shortBorrowLevel.extreme { background: #dc2626; }
+.shortBorrowGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+.shortBorrowGrid div { border: 1px solid var(--panel-border); border-radius: 10px; padding: 14px; }
+.shortBorrowGrid small { display: block; color: var(--groupHeader-span); margin-bottom: 6px; }.shortBorrowGrid strong { font-size: 18px; }
+.shortBorrowCard li { color: #fbbf24; margin: 5px 0; }.shortBorrowNotice { color: var(--groupHeader-span); font-size: 12px; margin-top: 20px; }
+@media (max-width: 640px) { .shortBorrowGrid { grid-template-columns: repeat(2, 1fr); }.shortBorrowCardHeader { align-items: flex-start; flex-direction: column; } }
+
 * {
   box-sizing: border-box;
   margin: 0;

@@ -1,4 +1,4 @@
-import { pgTable, bigserial, text, timestamp, date, boolean, integer, uniqueIndex, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART 및 SEC 공시 이력 엔티티
@@ -222,4 +222,30 @@ export const usIntensityStocks = pgTable(
     changeRate: text("change_rate").notNull(),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
   }
+);
+
+export const shortBorrowSnapshots = pgTable(
+  "short_borrow_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    symbol: text("symbol").notNull(),
+    tradable: boolean("tradable").notNull(),
+    shortable: boolean("shortable").notNull(),
+    borrowStatus: text("borrow_status").notNull(),
+    quoteStatus: text("quote_status").notNull(),
+    availableQty: integer("available_qty"),
+    locatePricePerShare: doublePrecision("locate_price_per_share"),
+    currentPrice: doublePrecision("current_price"),
+    locateFeeRatePercent: doublePrecision("locate_fee_rate_percent"),
+    pressureScore: integer("pressure_score").notNull(),
+    pressureLevel: text("pressure_level").notNull(),
+    quotedAt: timestamp("quoted_at", { withTimezone: true }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    source: text("source").notNull().default("ALPACA"),
+    scope: text("scope").notNull().default("ALPACA_ACCOUNT_SPECIFIC"),
+  },
+  (table) => [
+    uniqueIndex("short_borrow_snapshots_symbol_fetched_idx").on(table.symbol, table.fetchedAt),
+    index("short_borrow_snapshots_pressure_idx").on(table.pressureLevel, table.fetchedAt),
+  ],
 );
