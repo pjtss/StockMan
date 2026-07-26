@@ -8,6 +8,7 @@ import { isUsTurnoverRatioDiscordConfigured, sendUsTurnoverRatioToDiscord } from
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
 
 export function meetsTradingValueIncreaseAlert(value: number | null, threshold: number) {
   return value !== null && Number.isFinite(value) && value >= threshold;
@@ -17,7 +18,7 @@ function seoulDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
 }
 
-export async function runUsTurnoverRatioAutomation() {
+async function executeUsTurnoverRatioAutomation() {
   const flags = await loadAdminFeatureFlags();
   const moduleSettings = await loadFeatureModuleSettings("us-turnover-ratio");
   if (!flags.us_turnover_ratio || !moduleSettings.enabled) return { skipped: true, reason: "disabled", sent: 0 };
@@ -77,4 +78,16 @@ export async function runUsTurnoverRatioAutomation() {
     throw new Error(`US turnover ratio Discord failed with HTTP ${failed?.status}`);
   }
   return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+}
+
+export async function runUsTurnoverRatioAutomation() {
+  const runId = await startAutomationRun("us-turnover-ratio");
+  try {
+    const result = await executeUsTurnoverRatioAutomation();
+    await finishAutomationRun(runId, "SUCCESS", result);
+    return result;
+  } catch (error) {
+    await finishAutomationRun(runId, "FAILED", {}, error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 }
