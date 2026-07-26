@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "features" | "schedules" | "api-config" | "api-tests" | "blacklist" | "sec-test";
+export type AdminNavId = "dashboard" | "features" | "schedules" | "turnover-filters" | "api-config" | "api-tests" | "blacklist" | "sec-test";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -29,6 +29,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "스케줄",
     description: "KST 기준 스캐너 동작 시간 관리",
     href: "/admin/schedules",
+  },
+  {
+    id: "turnover-filters",
+    group: "운영 제어",
+    label: "거래대금 필터",
+    description: "시총 대비 거래대금 탐지 조건 관리",
+    href: "/admin/us-turnover-filters",
   },
   {
     id: "api-config",
