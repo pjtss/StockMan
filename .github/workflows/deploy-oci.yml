@@ -63,10 +63,12 @@ jobs:
         run: |
           scp -i ~/.ssh/oci_key stockman-oci.tar.gz \
             "ubuntu@${{ secrets.OCI_HOST }}:/tmp/stockman-oci-${{ github.sha }}.tar.gz"
+          scp -i ~/.ssh/oci_key deploy/oci/stockman-activate \
+            "ubuntu@${{ secrets.OCI_HOST }}:/tmp/stockman-activate-${{ github.sha }}"
 
       - name: Activate release
         env:
           OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH }}
         run: |
           ssh -i ~/.ssh/oci_key "ubuntu@${{ secrets.OCI_HOST }}" \
-            "sudo -n /usr/local/sbin/stockman-activate '$OCI_DEPLOY_PATH' '/tmp/stockman-oci-${{ github.sha }}.tar.gz'"
+            "sudo -n install -m 0755 '/tmp/stockman-activate-${{ github.sha }}' /usr/local/sbin/stockman-activate && sudo -n /usr/local/sbin/stockman-activate '$OCI_DEPLOY_PATH' '/tmp/stockman-oci-${{ github.sha }}.tar.gz'"
