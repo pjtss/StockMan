@@ -4,6 +4,12 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "stockman_admin_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
+// OCI에서 HTTP(포트 3000)로 직접 접속하는 환경에서는 Secure 쿠키가 브라우저에 전송되지 않는다.
+// HTTPS 리버스 프록시를 사용하는 경우에만 환경변수로 명시적으로 활성화한다.
+function isSecureCookieEnabled() {
+  return process.env.ADMIN_COOKIE_SECURE === "true";
+}
+
 function getSecret() {
   return process.env.ADMIN_DASHBOARD_PASSWORD || process.env.ADMIN_PASSWORD || "";
 }
@@ -49,7 +55,7 @@ export function createAdminSessionCookie() {
     options: {
       httpOnly: true,
       sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureCookieEnabled(),
       path: "/",
       maxAge: SESSION_TTL_MS / 1000,
     },
@@ -63,7 +69,7 @@ export function destroyAdminSessionCookie() {
     options: {
       httpOnly: true,
       sameSite: "lax" as const,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureCookieEnabled(),
       path: "/",
       maxAge: 0,
     },
