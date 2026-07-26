@@ -11,13 +11,20 @@ export type CommonModuleSettings = {
   updatedAt?: string;
 };
 
-const defaults: CommonModuleSettings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 };
+const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
+  "dart-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60 },
+  "sec-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60 },
+  "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
+  "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
+  "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
+  "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
+};
 
 export async function loadFeatureModuleSettings(key: FeatureModuleKey): Promise<CommonModuleSettings> {
   if (!getFeatureModule(key)) throw new Error("FEATURE_MODULE_NOT_FOUND");
   const db = getDb();
   const rows = await db.select().from(featureModuleSettings).where(eq(featureModuleSettings.moduleKey, key)).limit(1);
-  return { ...defaults, ...((rows[0]?.settings || {}) as Partial<CommonModuleSettings>), updatedAt: rows[0]?.updatedAt?.toISOString() };
+  return { ...defaultsByModule[key], ...((rows[0]?.settings || {}) as Partial<CommonModuleSettings>), updatedAt: rows[0]?.updatedAt?.toISOString() };
 }
 
 export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings: CommonModuleSettings) {
