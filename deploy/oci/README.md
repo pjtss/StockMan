@@ -1,5 +1,24 @@
 # OCI 배포
 
+## Flyway 스키마 관리
+
+데이터베이스 DDL은 Flyway만 관리합니다. Next.js 프로세스는 데이터베이스
+연결만 확인하며 런타임에 테이블을 생성하거나 변경하지 않습니다.
+
+OCI 인스턴스에 Flyway를 설치하고 `sudo /usr/local/sbin/stockman-activate`
+환경에서 `flyway` 명령이 실행되는지 확인해야 합니다. 배포 스크립트는
+`/etc/stockman/stockman.env`를 읽어 `DATABASE_URL`에 번들된 migration을
+먼저 적용하고, `flyway migrate`가 성공한 경우에만 Stockman을 재시작합니다.
+
+기존 런타임 bootstrap으로 이미 스키마가 생성된 데이터베이스는 최초 1회만
+baseline 처리합니다.
+
+```bash
+sudo bash -lc 'set -a; . /etc/stockman/stockman.env; set +a; flyway -url="$DATABASE_URL" -baselineVersion=1 baseline'
+```
+
+빈 데이터베이스에는 `baseline`을 실행하지 말고 배포 시 `migrate`를 사용합니다.
+
 ## 1. 빌드
 
 CI 또는 로컬의 빌드 머신에서 실행합니다.

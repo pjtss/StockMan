@@ -42,9 +42,9 @@ describe('db.ts', () => {
     expect(() => getPool()).toThrow('DATABASE_URL 환경변수가 설정되지 않았습니다.');
   });
 
-  it('ensureSchema should call query multiple times', async () => {
+  it('ensureSchema only verifies the connection because Flyway owns DDL', async () => {
     await ensureSchema();
-    expect(mockClient.query).toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenCalledWith('SELECT 1');
     expect(mockClient.release).toHaveBeenCalled();
   });
 });

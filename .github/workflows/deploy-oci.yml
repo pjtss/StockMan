@@ -34,6 +34,8 @@ jobs:
           cp -r .next/static .next/standalone/.next/static
           mkdir -p .next/standalone/scripts
           cp scripts/oci-cron.sh .next/standalone/scripts/oci-cron.sh
+          mkdir -p .next/standalone/db/migration
+          cp db/migration/*.sql .next/standalone/db/migration/
           tar -czf stockman-oci.tar.gz -C .next/standalone .
 
       - name: Configure SSH

@@ -9,6 +9,20 @@ rm -rf "$TEMP_PATH"
 mkdir -p "$TEMP_PATH"
 tar -xzf "$RELEASE" -C "$TEMP_PATH"
 chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
+if ! command -v flyway >/dev/null 2>&1; then
+  echo "flyway is required for deployment but was not found on OCI" >&2
+  exit 1
+fi
+if [ ! -f /etc/stockman/stockman.env ]; then
+  echo "/etc/stockman/stockman.env is required for Flyway DATABASE_URL" >&2
+  exit 1
+fi
+set -a
+# shellcheck disable=SC1091
+. /etc/stockman/stockman.env
+set +a
+: "${DATABASE_URL:?DATABASE_URL is required for Flyway}"
+flyway -url="$DATABASE_URL" -locations="filesystem:$TEMP_PATH/db/migration" migrate
 rm -f "$RELEASE"
 rm -rf "$DEPLOY_PATH.previous"
 if [ -d "$DEPLOY_PATH" ]; then mv "$DEPLOY_PATH" "$DEPLOY_PATH.previous"; fi

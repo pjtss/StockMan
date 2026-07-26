@@ -42,6 +42,12 @@ export async function ensureSchema() {
   const client = await getPool().connect();
 
   try {
+    // Flyway owns schema changes. This compatibility hook only verifies that
+    // the configured database is reachable; the app never executes DDL.
+    await client.query("SELECT 1");
+    return;
+
+    /* Legacy DDL retained temporarily as migration source. */
     await client.query(`
       CREATE TABLE IF NOT EXISTS automation_settings (
         key TEXT PRIMARY KEY,
