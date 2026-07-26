@@ -12,6 +12,14 @@ curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/us-turnover-ratio"
 
+if [[ -n "${ALPACA_API_KEY:-}" && -n "${ALPACA_API_SECRET:-}" ]]; then
+  curl --fail-with-body --silent --show-error --max-time 50 \
+    -H "x-cron-secret: ${CRON_SECRET}" \
+    -X POST "${BASE_URL}/api/cron/short-borrow"
+else
+  echo "[Cron] Alpaca credentials are not configured; skipping short-borrow collection" >&2
+fi
+
 curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/check-bullish"
