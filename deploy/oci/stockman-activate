@@ -23,10 +23,23 @@ set -a
 set +a
 : "${DATABASE_URL:?DATABASE_URL is required for Flyway}"
 FLYWAY_IMAGE="${FLYWAY_IMAGE:-flyway/flyway:latest}"
+DB_URL_WITHOUT_SCHEME="${DATABASE_URL#postgresql://}"
+DB_URL_WITHOUT_SCHEME="${DB_URL_WITHOUT_SCHEME#postgres://}"
+DB_AUTH="${DB_URL_WITHOUT_SCHEME%@*}"
+DB_HOST_AND_NAME="${DB_URL_WITHOUT_SCHEME#*@}"
+if [ "$DB_AUTH" = "$DB_URL_WITHOUT_SCHEME" ] || [ -z "$DB_AUTH" ] || [ -z "$DB_HOST_AND_NAME" ]; then
+  echo "DATABASE_URL must include PostgreSQL credentials for Flyway" >&2
+  exit 1
+fi
+FLYWAY_USER="${DB_AUTH%%:*}"
+FLYWAY_PASSWORD="${DB_AUTH#*:}"
+FLYWAY_JDBC_URL="jdbc:postgresql://${DB_HOST_AND_NAME}"
 docker run --rm --network host \
   -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
   "$FLYWAY_IMAGE" \
-  -url="$DATABASE_URL" \
+  -url="$FLYWAY_JDBC_URL" \
+  -user="$FLYWAY_USER" \
+  -password="$FLYWAY_PASSWORD" \
   -locations="filesystem:/flyway/sql" \
   migrate
 rm -f "$RELEASE"
