@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { featureModuleSettings } from "@/lib/schema";
 import { getFeatureModule, type FeatureModuleKey } from "@/lib/feature-modules";
+import type { ShortBorrowScorePolicy } from "@/lib/short-borrow-policy";
 
 export type CommonModuleSettings = {
   enabled: boolean;
@@ -9,6 +10,7 @@ export type CommonModuleSettings = {
   endTime: string;
   cooldownSeconds: number;
   updatedAt?: string;
+  featureSettings?: { shortBorrowPolicy?: Partial<ShortBorrowScorePolicy> };
 };
 
 const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
@@ -33,6 +35,8 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
   const db = getDb();
   const updatedAt = new Date();
-  await db.insert(featureModuleSettings).values({ moduleKey: key, settings, updatedAt }).onConflictDoUpdate({ target: featureModuleSettings.moduleKey, set: { settings, updatedAt } });
+  const existing = await db.select().from(featureModuleSettings).where(eq(featureModuleSettings.moduleKey, key)).limit(1);
+  const merged = { ...(existing[0]?.settings || {}), ...settings };
+  await db.insert(featureModuleSettings).values({ moduleKey: key, settings: merged, updatedAt }).onConflictDoUpdate({ target: featureModuleSettings.moduleKey, set: { settings: merged, updatedAt } });
   return { ...settings, updatedAt: updatedAt.toISOString() };
 }

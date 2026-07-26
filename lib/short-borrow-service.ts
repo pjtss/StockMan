@@ -1,6 +1,8 @@
 import { alpacaGet } from "@/lib/alpaca-client";
 import { calculatePercent, normalizeAlpacaSymbol, scoreShortPressure, type BorrowStatus, type ShortBorrowResult } from "@/lib/alpaca-short-borrow";
 import { loadPreviousShortBorrow, saveShortBorrowSnapshot } from "@/lib/short-borrow-repository";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { DEFAULT_SHORT_BORROW_POLICY, type ShortBorrowScorePolicy } from "@/lib/short-borrow-policy";
 
 type AssetResponse = { symbol?: string; tradable?: boolean; shortable?: boolean; borrow_status?: string };
 type QuoteResponse = { quotes?: Array<{ symbol?: string; available_qty?: number; price?: string | number; quoted_at?: string }>; errors?: Array<{ symbol?: string; code?: string; message?: string }> };
@@ -44,7 +46,15 @@ export async function fetchShortBorrow(symbolInput: string, options: { currentPr
   const availableQtyChangePercent = calculatePercent(availableQty, previous?.availableQty ?? null);
   const locatePriceChangePercent = calculatePercent(locatePricePerShare, previous?.locatePricePerShare ?? null);
   const locateFeeRatePercent = currentPrice !== null && currentPrice > 0 && locatePricePerShare !== null ? (locatePricePerShare / currentPrice) * 100 : null;
-  const score = scoreShortPressure({ shortable: asset.shortable !== false, borrowStatus: status, availableQtyChangePercent, locateFeeRatePercent, locatePriceChangePercent });
+  let policy: ShortBorrowScorePolicy = DEFAULT_SHORT_BORROW_POLICY;
+  try {
+    const settings = await loadFeatureModuleSettings("us-short-borrow");
+    const configured = settings.featureSettings?.shortBorrowPolicy;
+    if (configured) policy = { ...DEFAULT_SHORT_BORROW_POLICY, ...configured } as ShortBorrowScorePolicy;
+  } catch (error) {
+    console.warn("[ShortBorrow] scoring policy unavailable; using defaults", error instanceof Error ? error.message : error);
+  }
+  const score = scoreShortPressure({ shortable: asset.shortable !== false, borrowStatus: status, availableQtyChangePercent, locateFeeRatePercent, locatePriceChangePercent }, policy);
   const fetchedAt = new Date().toISOString();
   const result: ShortBorrowResult = {
     symbol, tradable: asset.tradable !== false, shortable: asset.shortable !== false, borrowStatus: status, quoteStatus,
