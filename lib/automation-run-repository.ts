@@ -19,3 +19,8 @@ export async function loadRecentAutomationRuns(moduleKey: FeatureModuleKey, limi
   const db = getDb();
   return db.select().from(automationRuns).where(eq(automationRuns.moduleKey, moduleKey)).orderBy(desc(automationRuns.startedAt)).limit(limit);
 }
+
+export async function loadLatestAutomationRun(moduleKey: FeatureModuleKey) {
+  const rows = await loadRecentAutomationRuns(moduleKey, 1);
+  return rows[0] || null;
+}
