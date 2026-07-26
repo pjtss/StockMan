@@ -15,7 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
     const { key } = await context.params;
     const body = await request.json();
     const settings = await saveFeatureModuleSettings(key as FeatureModuleKey, {
-      enabled: Boolean(body.enabled), startTime: String(body.startTime || ""), endTime: String(body.endTime || ""), cooldownSeconds: Number(body.cooldownSeconds),
+      enabled: Boolean(body.enabled), startTime: String(body.startTime || ""), endTime: String(body.endTime || ""), cooldownSeconds: Number(body.cooldownSeconds), featureSettings: body.featureSettings,
     });
     return NextResponse.json(settings);
   } catch (error) {
