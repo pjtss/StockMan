@@ -16,4 +16,9 @@ describe("isWithinSchedule", () => {
     const twoAmKst = new Date("2026-07-10T17:00:00.000Z");
     expect(isWithinSchedule({ startTime: "17:00", endTime: "02:00" }, twoAmKst)).toBe(false);
   });
+
+  it("blocks inactive weekdays", () => {
+    const sunday = new Date("2026-07-26T00:00:00.000Z");
+    expect(isWithinSchedule({ startTime: "00:00", endTime: "23:59", activeDays: [1, 2, 3, 4, 5] }, sunday)).toBe(false);
+  });
 });
