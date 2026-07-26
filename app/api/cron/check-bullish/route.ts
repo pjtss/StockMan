@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       settings = await loadFeatureModuleSettings("us-scanners");
     } catch (error) {
       console.warn("[OCI Cron] scanner feature settings unavailable; using legacy behavior", error instanceof Error ? error.message : error);
-      settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 };
+      settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] };
     }
     if (!flags.us_scanners || !settings.enabled) {
       return NextResponse.json({ ok: true, skipped: true, reason: "disabled", sent: 0 });

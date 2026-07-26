@@ -21,7 +21,7 @@ export async function runFilingSync(): Promise<FilingSyncResult> {
       return await loadFeatureModuleSettings(key);
     } catch (error) {
       console.warn(`[FilingSync] feature settings unavailable for ${key}; using legacy behavior`, error instanceof Error ? error.message : error);
-      return { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60 };
+      return { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [0, 1, 2, 3, 4, 5, 6] };
     }
   };
   const dartSettings = await loadSettings("dart-realtime");

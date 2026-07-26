@@ -17,7 +17,7 @@ async function handle(request: Request) {
     settings = await loadFeatureModuleSettings("us-short-borrow");
   } catch (error) {
     console.warn("[ShortBorrow] feature settings unavailable; using defaults", error instanceof Error ? error.message : error);
-    settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 };
+    settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] };
   }
   if (!settings.enabled) return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
   if (!isWithinSchedule(settings)) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" });

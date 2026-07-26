@@ -9,17 +9,18 @@ export type CommonModuleSettings = {
   startTime: string;
   endTime: string;
   cooldownSeconds: number;
+  activeDays: number[];
   updatedAt?: string;
   featureSettings?: FeatureSpecificSettings & { shortBorrowPolicy?: Partial<ShortBorrowScorePolicy> };
 };
 
 const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
-  "dart-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60 },
-  "sec-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60 },
-  "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
-  "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
-  "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
-  "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60 },
+  "dart-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "sec-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
 };
 
 export async function loadFeatureModuleSettings(key: FeatureModuleKey): Promise<CommonModuleSettings> {
@@ -33,6 +34,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (!getFeatureModule(key)) throw new Error("FEATURE_MODULE_NOT_FOUND");
   if (!/^\d{2}:\d{2}$/.test(settings.startTime) || !/^\d{2}:\d{2}$/.test(settings.endTime)) throw new Error("INVALID_SCHEDULE");
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
+  if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
   const updatedAt = new Date();
   const existing = await db.select().from(featureModuleSettings).where(eq(featureModuleSettings.moduleKey, key)).limit(1);

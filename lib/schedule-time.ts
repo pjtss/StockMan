@@ -1,4 +1,4 @@
-export type TimeWindow = { startTime: string; endTime: string };
+export type TimeWindow = { startTime: string; endTime: string; activeDays?: number[] };
 
 function toMinutes(value: string): number {
   const [hours, minutes] = value.split(":").map(Number);
@@ -15,6 +15,7 @@ export function isWithinSchedule(schedule: TimeWindow, now = new Date()): boolea
   const hour = Number(parts.find((part) => part.type === "hour")?.value || "0");
   const minute = Number(parts.find((part) => part.type === "minute")?.value || "0");
   const current = hour * 60 + minute;
+  if (schedule.activeDays && !schedule.activeDays.includes(Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", weekday: "short" }).format(now).replace(/^Sun$/, "0").replace(/^Mon$/, "1").replace(/^Tue$/, "2").replace(/^Wed$/, "3").replace(/^Thu$/, "4").replace(/^Fri$/, "5").replace(/^Sat$/, "6")))) return false;
   const start = toMinutes(schedule.startTime);
   const end = toMinutes(schedule.endTime);
   return start <= end ? current >= start && current < end : current >= start || current < end;
