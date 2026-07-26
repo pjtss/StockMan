@@ -1,5 +1,14 @@
 export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "us-scanners" | "us-turnover-trend" | "us-turnover-ratio" | "us-short-borrow";
 
+/** Feature-specific settings never share the common ON/OFF/schedule contract. */
+export type FeatureSpecificSettings = {
+  kisRequest?: Record<string, string | number | boolean>;
+  turnoverFilter?: Record<string, string | number | boolean>;
+  shortBorrowPolicy?: Record<string, unknown>;
+  evaluation?: Record<string, string | number | boolean>;
+  discordFormat?: Record<string, string | number | boolean>;
+};
+
 export type FeatureModuleDefinition = {
   key: FeatureModuleKey;
   label: string;

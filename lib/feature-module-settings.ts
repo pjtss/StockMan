@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { featureModuleSettings } from "@/lib/schema";
-import { getFeatureModule, type FeatureModuleKey } from "@/lib/feature-modules";
+import { getFeatureModule, type FeatureModuleKey, type FeatureSpecificSettings } from "@/lib/feature-modules";
 import type { ShortBorrowScorePolicy } from "@/lib/short-borrow-policy";
 
 export type CommonModuleSettings = {
@@ -10,7 +10,7 @@ export type CommonModuleSettings = {
   endTime: string;
   cooldownSeconds: number;
   updatedAt?: string;
-  featureSettings?: { shortBorrowPolicy?: Partial<ShortBorrowScorePolicy> };
+  featureSettings?: FeatureSpecificSettings & { shortBorrowPolicy?: Partial<ShortBorrowScorePolicy> };
 };
 
 const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
