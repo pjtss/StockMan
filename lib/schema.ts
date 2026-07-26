@@ -249,3 +249,19 @@ export const shortBorrowSnapshots = pgTable(
     index("short_borrow_snapshots_pressure_idx").on(table.pressureLevel, table.fetchedAt),
   ],
 );
+
+export const featureModuleSettings = pgTable("feature_module_settings", {
+  moduleKey: text("module_key").primaryKey(),
+  settings: jsonb("settings").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const automationRuns = pgTable("automation_runs", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  moduleKey: text("module_key").notNull(),
+  status: text("status").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  summary: jsonb("summary").notNull().default({}),
+  errorMessage: text("error_message"),
+});

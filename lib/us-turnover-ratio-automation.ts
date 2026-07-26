@@ -2,11 +2,12 @@ import { inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { alertEvents } from "@/lib/schema";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
-import { isUsTurnoverRatioOpen } from "@/lib/scanner-hours";
 import { fetchUsTurnoverRatioScanner, type UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { saveAndCalculateUsTurnoverRatioTrends, type UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
 import { isUsTurnoverRatioDiscordConfigured, sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { isWithinSchedule } from "@/lib/scanner-schedules";
 
 export function meetsTradingValueIncreaseAlert(value: number | null, threshold: number) {
   return value !== null && Number.isFinite(value) && value >= threshold;
@@ -16,17 +17,11 @@ function seoulDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
 }
 
-function seoulMinute() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hour12: false,
-  }).format(new Date()).replace(/[^0-9]/g, "");
-}
-
 export async function runUsTurnoverRatioAutomation() {
   const flags = await loadAdminFeatureFlags();
-  if (!flags.us_turnover_ratio) return { skipped: true, reason: "disabled", sent: 0 };
-  if (!(await isUsTurnoverRatioOpen())) return { skipped: true, reason: "outside_schedule", sent: 0 };
+  const moduleSettings = await loadFeatureModuleSettings("us-turnover-ratio");
+  if (!flags.us_turnover_ratio || !moduleSettings.enabled) return { skipped: true, reason: "disabled", sent: 0 };
+  if (!isWithinSchedule(moduleSettings, new Date())) return { skipped: true, reason: "outside_schedule", sent: 0 };
   if (!isUsTurnoverRatioDiscordConfigured()) return { skipped: true, reason: "webhook_missing", sent: 0 };
 
   const result = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"]);
@@ -38,7 +33,6 @@ export async function runUsTurnoverRatioAutomation() {
   const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(result.filtered);
   const settings = await loadUsTurnoverFilterSettings();
   const date = seoulDate();
-  const minute = seoulMinute();
   const pendingNew: UsTurnoverRatioItemWithTrend[] = [];
   const pendingIncrease: UsTurnoverRatioItemWithTrend[] = [];
   const seenCodes = new Set<string>();
@@ -53,7 +47,8 @@ export async function runUsTurnoverRatioAutomation() {
     if (seenCodes.has(marketCode)) continue;
     seenCodes.add(marketCode);
     const alertType = item.trend.isNew ? "new" : "1m-increase";
-    const externalId = `us-turnover-ratio:${date}:${item.market.toUpperCase()}:${code}:${alertType}:${minute}`;
+    const cooldownBucket = Math.floor(Date.now() / 1000 / Math.max(1, moduleSettings.cooldownSeconds));
+    const externalId = `us-turnover-ratio:${date}:${item.market.toUpperCase()}:${code}:${alertType}:${cooldownBucket}`;
     const claimed = await db.insert(alertEvents)
       .values({ source: "US_TURNOVER_RATIO", externalId })
       .onConflictDoNothing()
