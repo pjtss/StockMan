@@ -23,3 +23,7 @@ fi
 curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/check-bullish"
+
+curl --fail-with-body --silent --show-error --max-time 50 \
+  -H "x-cron-secret: ${CRON_SECRET}" \
+  -X POST "${BASE_URL}/api/cron/us-news-radar"
