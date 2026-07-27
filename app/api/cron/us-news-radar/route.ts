@@ -10,6 +10,7 @@ import { alertEvents } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();
+const MIN_NEWS_ALERT_RATE = 5;
 
 async function handle(request: Request) {
   const secret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret") || "";
@@ -22,7 +23,7 @@ async function handle(request: Request) {
   try {
     const result = await withAutomationRun("us-news-radar", () => detectNewsCandidates());
     const alerts: AlertItem[] = [];
-    for (const item of result.candidates.filter((item) => item.valid)) {
+    for (const item of result.candidates.filter((item) => item.valid && item.marketReaction.rate !== null && item.marketReaction.rate >= MIN_NEWS_ALERT_RATE)) {
       const externalId = `news-radar:${item.event.id}:${item.symbol.ticker}`;
       if (sentEvents.has(externalId)) continue;
       sentEvents.add(externalId);
@@ -35,7 +36,7 @@ async function handle(request: Request) {
       alerts.push({ source: "NEWS_RADAR", externalId, level: "뉴스 검증 완료", company: item.symbol.name || item.symbol.ticker, title: item.event.title, link: `/scanners/us?symbol=${encodeURIComponent(item.symbol.ticker)}`, publishedAt: `${item.event.date.slice(0, 4)}-${item.event.date.slice(4, 6)}-${item.event.date.slice(6, 8)}T${item.event.time.slice(0, 2)}:${item.event.time.slice(2, 4)}:${item.event.time.slice(4, 6)}+09:00` });
     }
     if (alerts.length) await sendPushAlerts(alerts);
-    return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, sent: alerts.length, candidates: result.candidates });
+    return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, alertEligibleCount: result.candidates.filter((item) => item.valid && item.marketReaction.rate !== null && item.marketReaction.rate >= MIN_NEWS_ALERT_RATE).length, sent: alerts.length, candidates: result.candidates });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
   }
