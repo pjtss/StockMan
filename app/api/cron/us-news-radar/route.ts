@@ -5,6 +5,8 @@ import { isWithinSchedule } from "@/lib/schedule-time";
 import { detectNewsCandidates } from "@/lib/kis-news-radar";
 import { sendPushAlerts } from "@/lib/push";
 import type { AlertItem } from "@/lib/types";
+import { getDb } from "@/lib/db";
+import { alertEvents } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();
@@ -19,12 +21,19 @@ async function handle(request: Request) {
   if (!isWithinSchedule(settings)) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" });
   try {
     const result = await withAutomationRun("us-news-radar", () => detectNewsCandidates());
-    const alerts: AlertItem[] = result.candidates.filter((item) => item.valid).flatMap((item) => {
+    const alerts: AlertItem[] = [];
+    for (const item of result.candidates.filter((item) => item.valid)) {
       const externalId = `news-radar:${item.event.id}:${item.symbol.ticker}`;
-      if (sentEvents.has(externalId)) return [];
+      if (sentEvents.has(externalId)) continue;
       sentEvents.add(externalId);
-      return [{ source: "NEWS_RADAR", externalId, level: "뉴스 검증 완료", company: item.symbol.name || item.symbol.ticker, title: item.event.title, link: `/scanners/us?symbol=${encodeURIComponent(item.symbol.ticker)}`, publishedAt: `${item.event.date.slice(0, 4)}-${item.event.date.slice(4, 6)}-${item.event.date.slice(6, 8)}T${item.event.time.slice(0, 2)}:${item.event.time.slice(2, 4)}:${item.event.time.slice(4, 6)}+09:00` }];
-    });
+      // Persistent claim prevents duplicate notifications after OCI restarts.
+      const db = getDb();
+      if (db) {
+        const claimed = await db.insert(alertEvents).values({ source: "NEWS_RADAR", externalId }).onConflictDoNothing({ target: [alertEvents.source, alertEvents.externalId] }).returning({ id: alertEvents.id });
+        if (claimed.length === 0) continue;
+      }
+      alerts.push({ source: "NEWS_RADAR", externalId, level: "뉴스 검증 완료", company: item.symbol.name || item.symbol.ticker, title: item.event.title, link: `/scanners/us?symbol=${encodeURIComponent(item.symbol.ticker)}`, publishedAt: `${item.event.date.slice(0, 4)}-${item.event.date.slice(4, 6)}-${item.event.date.slice(6, 8)}T${item.event.time.slice(0, 2)}:${item.event.time.slice(2, 4)}:${item.event.time.slice(4, 6)}+09:00` });
+    }
     if (alerts.length) await sendPushAlerts(alerts);
     return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, sent: alerts.length, candidates: result.candidates });
   } catch (error) {
