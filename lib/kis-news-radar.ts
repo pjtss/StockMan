@@ -65,7 +65,9 @@ export async function detectNewsCandidates(options: { date?: string; time?: stri
           const detail = await fetchKisUsPriceDetail({ code: symbol.ticker, market });
           if (detail?.ok) { quote = getKisUsPriceDetailOutput(detail.parsed); break; }
         }
-      candidates.push({ event, symbol, verified: matched, valid: matched.length > 0, quote });
+      const rate = Number(quote.t_xrat ?? quote.t_rate ?? NaN);
+      const tradingValue = Number(quote.tamt ?? NaN);
+      candidates.push({ event, symbol, verified: matched, valid: matched.length > 0, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
     }
   }
   return { radar, candidates };
