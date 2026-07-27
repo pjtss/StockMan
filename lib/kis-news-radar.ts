@@ -1,5 +1,6 @@
 import { getAccessToken } from "@/lib/kis";
 import { buildKisAuthorization } from "@/lib/kis-authorization";
+import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({
@@ -59,7 +60,12 @@ export async function detectNewsCandidates(options: { date?: string; time?: stri
     for (const symbol of event.symbols) {
       const verified = await fetchNewsTitles(symbol.ticker, { date: event.date, time: event.time });
       const matched = verified.filter((item) => item.title === event.title || item.ticker === symbol.ticker);
-      candidates.push({ event, symbol, verified: matched, valid: matched.length > 0 });
+      let quote: Record<string, unknown> = {};
+      if (matched.length > 0) for (const market of ["NAS", "NYS", "AMS"]) {
+          const detail = await fetchKisUsPriceDetail({ code: symbol.ticker, market });
+          if (detail?.ok) { quote = getKisUsPriceDetailOutput(detail.parsed); break; }
+        }
+      candidates.push({ event, symbol, verified: matched, valid: matched.length > 0, quote });
     }
   }
   return { radar, candidates };
