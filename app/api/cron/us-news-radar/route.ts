@@ -3,7 +3,7 @@ import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { detectNewsCandidates } from "@/lib/kis-news-radar";
-import { sendPushAlerts } from "@/lib/push";
+import { isNewsRadarDiscordConfigured, sendNewsRadarAlertToDiscord } from "@/lib/discord-news-radar";
 import type { AlertItem } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { alertEvents } from "@/lib/schema";
@@ -35,7 +35,13 @@ async function handle(request: Request) {
       }
       alerts.push({ source: "NEWS_RADAR", externalId, level: "뉴스 검증 완료", company: item.symbol.name || item.symbol.ticker, title: item.event.title, link: `/scanners/us?symbol=${encodeURIComponent(item.symbol.ticker)}`, publishedAt: `${item.event.date.slice(0, 4)}-${item.event.date.slice(4, 6)}-${item.event.date.slice(6, 8)}T${item.event.time.slice(0, 2)}:${item.event.time.slice(2, 4)}:${item.event.time.slice(4, 6)}+09:00` });
     }
-    if (alerts.length) await sendPushAlerts(alerts);
+    if (alerts.length && !isNewsRadarDiscordConfigured()) throw new Error("NEWS_RADAR_DISCORD_WEBHOOK_URL is not configured");
+    for (const alert of alerts) {
+      const candidate = result.candidates.find((item) => `news-radar:${item.event.id}:${item.symbol.ticker}` === alert.externalId);
+      if (!candidate) continue;
+      const sent = await sendNewsRadarAlertToDiscord(alert, candidate.marketReaction);
+      if (!sent.ok) throw new Error(`News radar Discord webhook failed with HTTP ${sent.status}`);
+    }
     return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, alertEligibleCount: result.candidates.filter((item) => item.valid && item.marketReaction.rate !== null && item.marketReaction.rate >= MIN_NEWS_ALERT_RATE).length, sent: alerts.length, candidates: result.candidates });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
