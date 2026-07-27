@@ -36,6 +36,10 @@ function buildNotificationBody(alert: AlertItem): string {
     ].join("\n");
   }
 
+  if (alert.source === "NEWS_RADAR") {
+    return [`📰 뉴스: ${alert.title}`, `⏱️ 시각: ${seoulTime}`].join("\n");
+  }
+
   if (alert.source === "DART") {
     return [
       `📂 유형: ${alert.title}`,
@@ -243,6 +247,8 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
       title = `📈 [상승률 TOP 10 신규] ${alert.company}`;
     } else if (alert.source === "INTENSITY") {
       title = `⚡ [체결강도 TOP 10 신규] ${alert.company}`;
+    } else if (alert.source === "NEWS_RADAR") {
+      title = `🚨 [해외 뉴스 급등 후보] ${alert.company}`;
     }
 
     const actions = (alert.source === "TOP_RISING" || alert.source === "INTENSITY")
@@ -281,6 +287,8 @@ export async function sendPushAlerts(alerts: AlertItem[]) {
           allowed = subscription.intensityEnabled !== false;
         } else if (alert.source === "TOP_RISING") {
           allowed = subscription.risingEnabled !== false;
+        } else if (alert.source === "NEWS_RADAR") {
+          allowed = true;
         } else {
           allowed = false; // Fallback for unknown sources
         }
