@@ -209,6 +209,12 @@ export function AdminApiTests() {
               <strong>{String((result.debug as any).sourceCount ?? 0)}개 TOP 100 → price-detail {String((result.debug as any).priceDetailSuccessCount ?? 0)}건 성공 → 최종 {Array.isArray((result as any).filtered) ? (result as any).filtered.length : 0}개</strong>
             </div>
           )}
+          {Boolean(activeTest.key === "us_news_radar" && Array.isArray(result.stages)) && (
+            <div className={styles.resultHeader}>
+              <span>처리 단계</span>
+              <strong>{(result.stages as Array<{ name: string; count: number }>).map((stage) => `${stage.name}: ${stage.count}`).join(" → ")}</strong>
+            </div>
+          )}
           <div className={styles.cardActions}>
             <button
               className={styles.toggleButton}

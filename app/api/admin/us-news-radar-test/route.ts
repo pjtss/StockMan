@@ -21,7 +21,16 @@ export async function GET() {
       stats[source] = (stats[source] || 0) + 1;
       return stats;
     }, {})).sort((a, b) => b[1] - a[1]).map(([source, count]) => ({ source, count }));
-    return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, sourceStats, verifiedSourceStats, candidates: result.candidates });
+    return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, stages: [
+      { name: "KIS brknews-title 수집", count: result.debug.radarCount },
+      { name: "제목 촉매 필터 통과", count: result.debug.titleEligibleCount },
+      { name: "티커 추출", count: result.debug.tickerCount },
+      { name: "KIS news-title 검증 시도", count: result.debug.newsVerificationAttemptCount },
+      { name: "news-title 매칭 성공", count: result.debug.newsVerificationMatchedCount },
+      { name: "현재가·거래소 검증 시도", count: result.debug.priceDetailAttemptCount },
+      { name: "거래소 검증 성공", count: result.debug.exchangeValidationSuccessCount },
+      { name: "최종 알림 후보", count: result.candidates.filter((item) => item.valid).length },
+    ], debug: result.debug, sourceStats, verifiedSourceStats, candidates: result.candidates });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
   }

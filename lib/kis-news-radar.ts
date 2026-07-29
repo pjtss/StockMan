@@ -92,25 +92,31 @@ export async function fetchNewsTitles(ticker: string, options: { date?: string; 
 export async function detectNewsCandidates(options: { date?: string; time?: string } = {}) {
   const radar = await fetchBreakingNews(options);
   const candidates = [];
+  const debug = { radarCount: radar.length, titleEligibleCount: 0, titleRejectedCount: 0, tickerCount: 0, tickerRejectedCount: 0, newsVerificationAttemptCount: 0, newsVerificationMatchedCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, exchangeValidationSuccessCount: 0 };
   for (const event of radar) {
     const titleFilter = scoreNewsTitle(event.title);
-    if (!titleFilter.eligible) continue;
+    if (!titleFilter.eligible) { debug.titleRejectedCount += 1; continue; }
+    debug.titleEligibleCount += 1;
     for (const symbol of event.symbols) {
-      if (!isUsTicker(symbol.ticker)) continue;
+      debug.tickerCount += 1;
+      if (!isUsTicker(symbol.ticker)) { debug.tickerRejectedCount += 1; continue; }
+      debug.newsVerificationAttemptCount += 1;
       const verified = await fetchNewsTitles(symbol.ticker, { date: event.date, time: event.time });
       const matched = verified.filter((item) => item.title === event.title || item.ticker === symbol.ticker);
+      if (matched.length > 0) debug.newsVerificationMatchedCount += 1;
       let quote: Record<string, unknown> = {};
       let resolvedMarket: string | null = null;
       const markets = matched.length > 0 ? [await cachedMarket(symbol.ticker), "NAS", "NYS", "AMS"] : [];
       for (const market of [...new Set(markets.filter((value): value is string => Boolean(value)))]) {
+          debug.priceDetailAttemptCount += 1;
           const detail = await fetchKisUsPriceDetail({ code: symbol.ticker, market });
           const output = getKisUsPriceDetailOutput(detail?.parsed);
-          if (detail?.ok && responseTicker(output) === symbol.ticker) { quote = output; resolvedMarket = market; await cacheMarket(symbol.ticker, market); break; }
+          if (detail?.ok && responseTicker(output) === symbol.ticker) { debug.priceDetailSuccessCount += 1; debug.exchangeValidationSuccessCount += 1; quote = output; resolvedMarket = market; await cacheMarket(symbol.ticker, market); break; }
       }
       const rate = Number(quote.t_xrat ?? quote.t_rate ?? NaN);
       const tradingValue = Number(quote.tamt ?? NaN);
       candidates.push({ event, symbol, titleFilter, market: resolvedMarket, verified: matched, valid: matched.length > 0 && resolvedMarket !== null, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
     }
   }
-  return { radar, candidates };
+  return { radar, candidates, debug };
 }
