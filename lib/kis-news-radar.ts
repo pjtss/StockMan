@@ -24,6 +24,17 @@ export type KisBreakingNews = {
 };
 
 export type KisNewsTitle = { newsKey: string; date: string; time: string; title: string; source: string; ticker: string; name: string };
+const US_TICKER_PATTERN = /^[A-Z][A-Z0-9.-]{0,14}$/;
+
+function isUsTicker(ticker: string) {
+  return US_TICKER_PATTERN.test(ticker) && !/^\d+$/.test(ticker);
+}
+
+function responseTicker(output: Record<string, unknown>) {
+  const raw = String(output.rsym ?? output.symb ?? output.code ?? "").trim().toUpperCase();
+  // KIS may return the market prefix (for example NAS:AAPL) in rsym.
+  return raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
+}
 
 async function kisGet(path: string, params: Record<string, string>, trId: string) {
   const token = await getAccessToken();
@@ -58,16 +69,19 @@ export async function detectNewsCandidates(options: { date?: string; time?: stri
   const candidates = [];
   for (const event of radar) {
     for (const symbol of event.symbols) {
+      if (!isUsTicker(symbol.ticker)) continue;
       const verified = await fetchNewsTitles(symbol.ticker, { date: event.date, time: event.time });
       const matched = verified.filter((item) => item.title === event.title || item.ticker === symbol.ticker);
       let quote: Record<string, unknown> = {};
+      let resolvedMarket: string | null = null;
       if (matched.length > 0) for (const market of ["NAS", "NYS", "AMS"]) {
           const detail = await fetchKisUsPriceDetail({ code: symbol.ticker, market });
-          if (detail?.ok) { quote = getKisUsPriceDetailOutput(detail.parsed); break; }
+          const output = getKisUsPriceDetailOutput(detail?.parsed);
+          if (detail?.ok && responseTicker(output) === symbol.ticker) { quote = output; resolvedMarket = market; break; }
         }
       const rate = Number(quote.t_xrat ?? quote.t_rate ?? NaN);
       const tradingValue = Number(quote.tamt ?? NaN);
-      candidates.push({ event, symbol, verified: matched, valid: matched.length > 0, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
+      candidates.push({ event, symbol, market: resolvedMarket, verified: matched, valid: matched.length > 0 && resolvedMarket !== null, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
     }
   }
   return { radar, candidates };
