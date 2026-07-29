@@ -1,0 +1,8 @@
+"use client";
+import { useState } from "react";
+
+export function BreakingNewsForwarderTest() {
+  const [date, setDate] = useState(""); const [time, setTime] = useState(""); const [result, setResult] = useState<unknown>(null); const [busy, setBusy] = useState(false);
+  async function run(send: boolean) { setBusy(true); setResult(null); const query = new URLSearchParams({ send: String(send) }); if (date) query.set("date", date.replaceAll("-", "")); if (time) query.set("time", time.replaceAll(":", "")); try { const response = await fetch(`/api/admin/us-breaking-news-forwarder-test?${query}`, { cache: "no-store" }); setResult(await response.json()); } catch (error) { setResult({ ok: false, error: String(error) }); } finally { setBusy(false); } }
+  return <section style={{ marginTop: 24, padding: 20, border: "1px solid rgba(130,150,175,.2)", borderRadius: 8 }}><h2>해외 속보 전달 디버깅</h2><p>1단계 미리보기로 KIS 수집 결과를 확인하고, 2단계 전송 테스트에서 신규 속보만 Webhook으로 보냅니다.</p><div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}><label>조회일<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>조회시각<input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label></div><div style={{ display: "flex", gap: 8, marginTop: 14 }}><button disabled={busy} onClick={() => void run(false)}>1. 미리보기</button><button disabled={busy} onClick={() => void run(true)}>2. 실제 Webhook 전송</button></div><pre style={{ marginTop: 14, maxHeight: 500, overflow: "auto", whiteSpace: "pre-wrap" }}>{result ? JSON.stringify(result, null, 2) : "결과가 여기에 표시됩니다."}</pre></section>;
+}

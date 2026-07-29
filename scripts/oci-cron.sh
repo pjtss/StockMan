@@ -27,3 +27,7 @@ curl --fail-with-body --silent --show-error --max-time 50 \
 curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/us-news-radar"
+
+curl --fail-with-body --silent --show-error --max-time 50 \
+  -H "x-cron-secret: ${CRON_SECRET}" \
+  -X POST "${BASE_URL}/api/cron/us-breaking-news-forwarder"

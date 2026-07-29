@@ -274,6 +274,18 @@ export const usNewsRadarEvents = pgTable("us_news_radar_events", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usBreakingNewsDiscordDeliveries = pgTable("us_breaking_news_discord_delivery", {
+  externalId: text("external_id").primaryKey(),
+  title: text("title").notNull(),
+  source: text("source"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  status: text("status").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const automationRuns = pgTable("automation_runs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   moduleKey: text("module_key").notNull(),
