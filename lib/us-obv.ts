@@ -28,17 +28,18 @@ function calculateObvValue(points: UsMinuteTurnoverPoint[]) {
 }
 
 export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
-  const scanner = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"], { includeBelowMinTurnover: true });
+  const scanner = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"], { includeBelowMinTurnover: false });
   if (!scanner) throw new Error("KIS access token is unavailable");
-  const candidates = [...scanner.filtered];
+  const candidates = scanner.filtered.filter((item) => Number.isFinite(item.turnoverRatio) && item.turnoverRatio >= 1);
   const db = getDb();
   if (db) {
     const now = new Date();
     const seoul = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const sessionStart = new Date(Date.UTC(seoul.getUTCFullYear(), seoul.getUTCMonth(), seoul.getUTCDate(), 9) - 9 * 60 * 60 * 1000);
-    const sessionRows = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, name: usTurnoverRatioSnapshots.name }).from(usTurnoverRatioSnapshots).where(and(gte(usTurnoverRatioSnapshots.observedAt, sessionStart), lte(usTurnoverRatioSnapshots.observedAt, now)));
+    const sessionRows = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, name: usTurnoverRatioSnapshots.name, turnoverRatio: usTurnoverRatioSnapshots.turnoverRatio }).from(usTurnoverRatioSnapshots).where(and(gte(usTurnoverRatioSnapshots.observedAt, sessionStart), lte(usTurnoverRatioSnapshots.observedAt, now)));
     const seen = new Set(candidates.map((item) => `${item.market}:${item.code}`.toUpperCase()));
     for (const row of sessionRows) {
+      if (row.turnoverRatio === null || row.turnoverRatio < 1) continue;
       const key = `${row.market}:${row.code}`.toUpperCase();
       if (seen.has(key)) continue;
       seen.add(key);
