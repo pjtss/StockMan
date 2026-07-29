@@ -10,7 +10,7 @@ function optionValue(data: any, name: string) {
 }
 
 async function updateOriginalResponse(applicationId: string, token: string, content: string) {
-  await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`, { method: "PATCH", headers: { authorization: `Bot ${process.env.DISCORD_BOT_TOKEN || ""}`, "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }) });
+  await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }) });
 }
 
 export async function POST(request: Request) {
