@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     gubn: url.searchParams.get("gubn") || undefined,
     nday: url.searchParams.get("nday") || undefined,
     volRang: url.searchParams.get("volRang") || undefined,
-  }, market === "AMS" || market === "NAS" ? [market] : ["AMS", "NAS"]);
+  }, ["AMS", "NAS", "NYS"].includes(market) ? [market] : ["AMS", "NAS", "NYS"]);
   if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
   return NextResponse.json(result);
 }
