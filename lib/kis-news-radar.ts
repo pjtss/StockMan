@@ -4,6 +4,7 @@ import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-p
 import { getDb } from "@/lib/db";
 import { usNewsTickerExchangeCache } from "@/lib/schema";
 import { and, eq, gte } from "drizzle-orm";
+import { scoreNewsTitle } from "@/lib/news-title-filter";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({
@@ -92,6 +93,8 @@ export async function detectNewsCandidates(options: { date?: string; time?: stri
   const radar = await fetchBreakingNews(options);
   const candidates = [];
   for (const event of radar) {
+    const titleFilter = scoreNewsTitle(event.title);
+    if (!titleFilter.eligible) continue;
     for (const symbol of event.symbols) {
       if (!isUsTicker(symbol.ticker)) continue;
       const verified = await fetchNewsTitles(symbol.ticker, { date: event.date, time: event.time });
@@ -106,7 +109,7 @@ export async function detectNewsCandidates(options: { date?: string; time?: stri
       }
       const rate = Number(quote.t_xrat ?? quote.t_rate ?? NaN);
       const tradingValue = Number(quote.tamt ?? NaN);
-      candidates.push({ event, symbol, market: resolvedMarket, verified: matched, valid: matched.length > 0 && resolvedMarket !== null, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
+      candidates.push({ event, symbol, titleFilter, market: resolvedMarket, verified: matched, valid: matched.length > 0 && resolvedMarket !== null, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
     }
   }
   return { radar, candidates };
