@@ -14,8 +14,12 @@ export async function getTickerInfo(rawTicker: string): Promise<TickerInfo | nul
     const response = await fetchKisUsPriceDetail({ code: ticker, market });
     const output = getKisUsPriceDetailOutput(response?.parsed);
     if (!response?.ok) continue;
-    const returned = String(output.rsym ?? output.symb ?? ticker).trim().toUpperCase();
-    if (!(returned === ticker || returned.endsWith(`:${ticker}`))) continue;
+    const returned = String(output.rsym ?? output.symb ?? output.code ?? "").trim().toUpperCase();
+    const tickerMatches = returned === ticker || returned.endsWith(`:${ticker}`) || returned.endsWith(`_${ticker}`);
+    const hasQuoteData = [output.last, output.t_xrat, output.t_rate, output.t_prpr].some((value) => value !== undefined && value !== null && String(value).trim() !== "");
+    // Some KIS price-detail responses omit the symbol field. The requested
+    // EXCD/SYMB pair is still authoritative when a non-empty quote is present.
+    if (!tickerMatches && !hasQuoteData) continue;
     return { ticker, market, name: String(output.name ?? output.enname ?? output.kor_name ?? ticker), price: numberValue(output.last), rate: numberValue(output.t_xrat ?? output.t_rate), tradingValue: numberValue(output.tamt ?? output.tamnt), marketCap: numberValue(output.tomv) };
   }
   return null;
