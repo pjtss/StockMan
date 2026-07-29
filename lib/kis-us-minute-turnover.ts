@@ -59,6 +59,7 @@ function buildRequest(code: string, market: string, config: Awaited<ReturnType<t
     PINC: asciiOnly(config.FID_PW_DATA_INCU_YN, "N") || "N",
     NEXT: "",
     NREC: "120",
+    FILL: "0",
     NMIN: "1",
   });
   const url = `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice?${params.toString()}`;
