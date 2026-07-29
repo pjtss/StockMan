@@ -67,7 +67,11 @@ function buildRequest(code: string, market: string, config: Awaited<ReturnType<t
 }
 
 function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
-  const output = parsed?.output ?? parsed?.output1 ?? parsed?.output2 ?? {};
+  const output = Array.isArray(parsed?.output)
+    ? parsed.output
+    : Array.isArray(parsed?.output2)
+      ? parsed.output2
+      : parsed?.output ?? parsed?.output1 ?? {};
   const rows = Array.isArray(output) ? output : Array.isArray(output?.data) ? output.data : [];
   return rows
     .map((row: any, index: number) => ({
@@ -76,7 +80,7 @@ function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
       price: parseNumber(row.last ?? row.price ?? row.stck_prpr ?? row.close ?? row.cprc),
       amount: parseNumber(
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??
-        row.amount ?? row.tvol ?? row.cum_amount ?? row.cumTradeAmount ?? row.cntg_pbmn ?? row.value
+        row.amount ?? row.tvol ?? row.cum_amount ?? row.cumTradeAmount ?? row.cntg_pbmn ?? row.value ?? row.eamt ?? row.evol
       ),
       raw: row,
     }))
