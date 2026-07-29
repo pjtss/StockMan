@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play } from "lucide-react";
+import { Copy, Play } from "lucide-react";
 import { AdminModal } from "@/components/admin-modal";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/page.module.css";
@@ -95,6 +95,7 @@ export function AdminApiTests() {
   const [secUrl, setSecUrl] = useState("https://www.sec.gov/");
   const [priceDetailCode, setPriceDetailCode] = useState("TOPS");
   const [priceDetailMarket, setPriceDetailMarket] = useState("AMS");
+  const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
     setRunning(test.key);
@@ -207,6 +208,19 @@ export function AdminApiTests() {
               <strong>{String((result.debug as any).sourceCount ?? 0)}개 TOP 100 → price-detail {String((result.debug as any).priceDetailSuccessCount ?? 0)}건 성공 → 최종 {Array.isArray((result as any).filtered) ? (result as any).filtered.length : 0}개</strong>
             </div>
           )}
+          <div className={styles.cardActions}>
+            <button
+              className={styles.toggleButton}
+              onClick={async () => {
+                await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1600);
+              }}
+            >
+              <Copy size={16} />
+              {copied ? "복사 완료" : "결과 JSON 복사"}
+            </button>
+          </div>
           <pre className={styles.codeBlock}>{JSON.stringify(result, null, 2)}</pre>
         </AdminModal>
       )}
