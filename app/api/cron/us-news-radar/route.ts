@@ -10,7 +10,6 @@ import { alertEvents } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();
-const MIN_NEWS_ALERT_RATE = 5;
 
 async function handle(request: Request) {
   const secret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret") || "";
@@ -23,7 +22,7 @@ async function handle(request: Request) {
   try {
     const result = await withAutomationRun("us-news-radar", () => detectNewsCandidates());
     const alerts: AlertItem[] = [];
-    for (const item of result.candidates.filter((item) => item.valid && item.marketReaction.rate !== null && item.marketReaction.rate >= MIN_NEWS_ALERT_RATE)) {
+    for (const item of result.candidates.filter((item) => item.valid)) {
       const externalId = `news-radar:${item.event.id}:${item.symbol.ticker}`;
       if (sentEvents.has(externalId)) continue;
       sentEvents.add(externalId);
@@ -42,7 +41,7 @@ async function handle(request: Request) {
       const sent = await sendNewsRadarAlertToDiscord(alert, candidate.marketReaction);
       if (!sent.ok) throw new Error(`News radar Discord webhook failed with HTTP ${sent.status}`);
     }
-    return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, alertEligibleCount: result.candidates.filter((item) => item.valid && item.marketReaction.rate !== null && item.marketReaction.rate >= MIN_NEWS_ALERT_RATE).length, sent: alerts.length, candidates: result.candidates });
+    return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, alertEligibleCount: result.candidates.filter((item) => item.valid).length, sent: alerts.length, candidates: result.candidates });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
   }
