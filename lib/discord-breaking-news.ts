@@ -7,7 +7,7 @@ export function isBreakingNewsDiscordConfigured() { return Boolean(webhookUrl())
 
 export function buildBreakingNewsPayload(event: KisBreakingNews) {
   return {
-    content: truncate(event.title, 2000),
+    content: truncate(`🚨 ${event.title}`, 2000),
     username: "STOCKMAN KIS BREAKING NEWS",
     allowed_mentions: { parse: [] as string[] },
   };
