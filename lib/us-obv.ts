@@ -53,8 +53,16 @@ export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
       if (index >= candidates.length) return;
       const item = candidates[index];
       try {
-        const data = await fetchUsMinuteTurnover({ code: item.code, market: item.market });
-        if (!data?.ok) throw new Error(`minute API HTTP ${data?.status ?? 0}`);
+        let data = await fetchUsMinuteTurnover({ code: item.code, market: item.market });
+        if (data && !data.ok && data.status >= 500) {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          data = await fetchUsMinuteTurnover({ code: item.code, market: item.market });
+        }
+        if (!data?.ok) {
+          const parsed = data?.response.parsed as Record<string, unknown> | null;
+          results.push({ market: item.market, code: item.code, name: item.name, error: `minute API HTTP ${data?.status ?? 0}`, httpStatus: data?.status ?? 0, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawText: data?.response.rawText?.slice(0, 1000) ?? null, fetchedPointCount: 0 });
+          continue;
+        }
         if (data.points.length === 0) {
           const parsed = data.response.parsed as Record<string, unknown> | null;
           results.push({ market: item.market, code: item.code, name: item.name, error: "minute API returned no bars", httpStatus: data.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawText: data.response.rawText.slice(0, 1000), fetchedPointCount: 0 });
