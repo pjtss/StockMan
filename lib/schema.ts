@@ -262,6 +262,18 @@ export const usNewsTickerExchangeCache = pgTable("us_news_ticker_exchange_cache"
   validatedAt: timestamp("validated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usNewsRadarEvents = pgTable("us_news_radar_events", {
+  externalId: text("external_id").primaryKey(),
+  ticker: text("ticker").notNull(),
+  market: text("market"),
+  title: text("title").notNull(),
+  status: text("status").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const automationRuns = pgTable("automation_runs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   moduleKey: text("module_key").notNull(),

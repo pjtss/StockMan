@@ -6,10 +6,20 @@ import { detectNewsCandidates } from "@/lib/kis-news-radar";
 import { isNewsRadarDiscordConfigured, sendNewsRadarAlertToDiscord } from "@/lib/discord-news-radar";
 import type { AlertItem } from "@/lib/types";
 import { getDb } from "@/lib/db";
-import { alertEvents } from "@/lib/schema";
+import { alertEvents, usNewsRadarEvents } from "@/lib/schema";
+import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();
+
+async function recordRadarEvent(input: { externalId: string; ticker: string; market: string | null; title: string; status: string; error?: string; sent?: boolean }) {
+  try {
+    const db = getDb();
+    if (!db) return;
+    await db.insert(usNewsRadarEvents).values({ externalId: input.externalId, ticker: input.ticker, market: input.market, title: input.title, status: input.status, attempts: 1, lastError: input.error ?? null, sentAt: input.sent ? new Date() : null, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: usNewsRadarEvents.externalId, set: { market: input.market, status: input.status, attempts: sql`${usNewsRadarEvents.attempts} + 1`, lastError: input.error ?? null, sentAt: input.sent ? new Date() : undefined, updatedAt: new Date() } });
+  } catch { /* diagnostics must not stop the radar */ }
+}
 
 async function handle(request: Request) {
   const secret = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret") || "";
@@ -33,13 +43,18 @@ async function handle(request: Request) {
         if (claimed.length === 0) continue;
       }
       alerts.push({ source: "NEWS_RADAR", externalId, level: "뉴스 검증 완료", company: item.symbol.name || item.symbol.ticker, title: item.event.title, link: `/scanners/us?symbol=${encodeURIComponent(item.symbol.ticker)}`, publishedAt: `${item.event.date.slice(0, 4)}-${item.event.date.slice(4, 6)}-${item.event.date.slice(6, 8)}T${item.event.time.slice(0, 2)}:${item.event.time.slice(2, 4)}:${item.event.time.slice(4, 6)}+09:00` });
+      await recordRadarEvent({ externalId, ticker: item.symbol.ticker, market: item.market, title: item.event.title, status: "VERIFIED" });
     }
     if (alerts.length && !isNewsRadarDiscordConfigured()) throw new Error("NEWS_RADAR_DISCORD_WEBHOOK_URL is not configured");
     for (const alert of alerts) {
       const candidate = result.candidates.find((item) => `news-radar:${item.event.id}:${item.symbol.ticker}` === alert.externalId);
       if (!candidate) continue;
       const sent = await sendNewsRadarAlertToDiscord(alert, candidate.marketReaction);
-      if (!sent.ok) throw new Error(`News radar Discord webhook failed with HTTP ${sent.status}`);
+      if (!sent.ok) {
+        await recordRadarEvent({ externalId: alert.externalId, ticker: candidate.symbol.ticker, market: candidate.market, title: candidate.event.title, status: "DISCORD_FAILED", error: `HTTP ${sent.status}` });
+        throw new Error(`News radar Discord webhook failed with HTTP ${sent.status}`);
+      }
+      await recordRadarEvent({ externalId: alert.externalId, ticker: candidate.symbol.ticker, market: candidate.market, title: candidate.event.title, status: "DISCORD_SENT", sent: true });
     }
     return NextResponse.json({ ok: true, radarCount: result.radar.length, candidateCount: result.candidates.length, verifiedCount: result.candidates.filter((item) => item.valid).length, alertEligibleCount: result.candidates.filter((item) => item.valid).length, sent: alerts.length, candidates: result.candidates });
   } catch (error) {
