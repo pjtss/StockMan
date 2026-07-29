@@ -27,7 +27,7 @@ function calculateObvValue(points: UsMinuteTurnoverPoint[]) {
   return value;
 }
 
-export async function runUsObvScan() {
+export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
   const scanner = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"], { includeBelowMinTurnover: true });
   if (!scanner) throw new Error("KIS access token is unavailable");
   const candidates = [...scanner.filtered];
@@ -68,7 +68,7 @@ export async function runUsObvScan() {
   }
   await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, () => worker()));
   const rising = results.filter((item) => item["trend"] === "RISING");
-  const discord = await sendUsObvToDiscord(rising);
-  if (!discord.ok) throw new Error(`US OBV Discord failed with HTTP ${discord.status}`);
-  return { candidateCount: candidates.length, successCount: results.filter((item) => !item.error).length, failureCount: results.filter((item) => item.error).length, rising, discordSentCount: rising.length, results };
+  const discord = options.sendDiscord ? await sendUsObvToDiscord(rising) : null;
+  if (discord && !discord.ok) throw new Error(`US OBV Discord failed with HTTP ${discord.status}`);
+  return { candidateCount: candidates.length, successCount: results.filter((item) => !item.error).length, failureCount: results.filter((item) => item.error).length, rising, discordSentCount: discord ? rising.length : 0, discordMode: options.sendDiscord ? "SENT" : "PREVIEW", results };
 }

@@ -21,6 +21,6 @@ export async function POST(request: Request) {
   const externalId = `us-obv:${now.date}`;
   const claimed = await db.insert(alertEvents).values({ source: "US_OBV", externalId }).onConflictDoNothing().returning({ id: alertEvents.id });
   if (claimed.length === 0) return NextResponse.json({ ok: true, skipped: true, reason: "already_sent", date: now.date });
-  try { return NextResponse.json({ ok: true, date: now.date, ...(await runUsObvScan()) }); }
+  try { return NextResponse.json({ ok: true, date: now.date, ...(await runUsObvScan({ sendDiscord: true })) }); }
   catch (error) { await db.delete(alertEvents).where(eq(alertEvents.externalId, externalId)); return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }

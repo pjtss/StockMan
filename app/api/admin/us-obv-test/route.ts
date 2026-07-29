@@ -4,6 +4,6 @@ import { runUsObvScan } from "@/lib/us-obv";
 export const dynamic = "force-dynamic";
 export async function GET() {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  try { return NextResponse.json({ ok: true, ...(await runUsObvScan()) }); }
+  try { return NextResponse.json({ ok: true, ...(await runUsObvScan({ sendDiscord: false })) }); }
   catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }
