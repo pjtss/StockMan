@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_news_radar" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -62,6 +62,13 @@ const TESTS: ApiTestDefinition[] = [
     label: "시총 대비 거래대금 스캐너",
     description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~10% 필터 응답",
     endpoint: "/api/admin/us-turnover-ratio-test",
+    query: "",
+  },
+  {
+    key: "us_news_radar",
+    label: "해외 뉴스 속보 레이더",
+    description: "KIS 속보·미국 티커 검증 결과 확인",
+    endpoint: "/api/admin/us-news-radar-test",
     query: "",
   },
   {
