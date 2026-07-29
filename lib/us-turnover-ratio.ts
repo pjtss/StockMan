@@ -41,6 +41,15 @@ export type UsTurnoverRatioDebug = {
     tradingValue: number | null;
     turnoverRatio: number | null;
   }>;
+  markets?: Array<{
+    market: string;
+    sourceCount: number;
+    preDetailFilteredOutCount: number;
+    priceDetailAttemptCount: number;
+    priceDetailSuccessCount: number;
+    priceDetailFailureCount: number;
+    finalIncludedCount: number;
+  }>;
 };
 
 function numberValue(value: unknown): number | null {
@@ -208,9 +217,22 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
     details: [...acc.details, ...value.enriched.debug.details],
     snapshotAttempts: [...acc.snapshotAttempts, ...value.enriched.debug.snapshotAttempts],
   }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }>, snapshotAttempts: [] as UsTurnoverRatioDebug["snapshotAttempts"] });
+  const marketBreakdown = validResults.map(({ enriched, market }) => {
+    const marketItems = enriched.output.filter((item) => item && typeof item === "object");
+    const included = filterUsTurnoverRatioItems({ output: marketItems }, 100, settings, options).length;
+    return {
+      market,
+      sourceCount: enriched.debug.sourceCount,
+      preDetailFilteredOutCount: enriched.debug.preDetailFilteredOutCount || 0,
+      priceDetailAttemptCount: enriched.debug.priceDetailAttemptCount,
+      priceDetailSuccessCount: enriched.debug.priceDetailSuccessCount,
+      priceDetailFailureCount: enriched.debug.priceDetailAttemptCount - enriched.debug.priceDetailSuccessCount,
+      finalIncludedCount: included,
+    };
+  });
   return {
     ...first,
     filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings, options),
-    debug,
+    debug: { ...debug, markets: marketBreakdown },
   };
 }
