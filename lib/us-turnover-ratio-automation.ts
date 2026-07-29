@@ -25,7 +25,7 @@ async function executeUsTurnoverRatioAutomation() {
   if (!isWithinSchedule(moduleSettings, new Date())) return { skipped: true, reason: "outside_schedule", sent: 0 };
   if (!isUsTurnoverRatioDiscordConfigured()) return { skipped: true, reason: "webhook_missing", sent: 0 };
 
-  const result = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"]);
+  const result = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"], { includeBelowMinTurnover: true });
   if (!result) throw new Error("KIS access token is unavailable");
   if (!result.ok) throw new Error(`KIS turnover ratio API failed with HTTP ${result.status}`);
 
@@ -35,9 +35,7 @@ async function executeUsTurnoverRatioAutomation() {
   // The scanner applies these filters, but enforce the ratio bounds again at
   // the notification boundary so no stale or bypassed candidate can alert.
   const filteredItems = result.filtered.filter((item) =>
-    Number.isFinite(item.turnoverRatio) &&
-    item.turnoverRatio >= settings.minTurnoverRatio &&
-    item.turnoverRatio <= settings.maxTurnoverRatio,
+    Number.isFinite(item.turnoverRatio) && item.turnoverRatio <= settings.maxTurnoverRatio,
   );
   const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(filteredItems);
   const date = seoulDate();
@@ -47,6 +45,7 @@ async function executeUsTurnoverRatioAutomation() {
   const claimedIds: number[] = [];
   for (const item of trendedItems) {
     if (pendingNew.length + pendingIncrease.length >= 100) break;
+    if (!item.trend.isNew && item.turnoverRatio < settings.minTurnoverRatio) continue;
     const hasTradingValueIncrease = meetsTradingValueIncreaseAlert(item.trend.oneMinuteTradingValueIncrease, settings.tradingValueIncreaseAlert);
     const shouldAlert = item.trend.isNew || hasTradingValueIncrease;
     if (!shouldAlert) continue;

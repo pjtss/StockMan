@@ -117,7 +117,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string, setting
   return { output: result, debug };
 }
 
-export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, settings = DEFAULT_US_TURNOVER_FILTER_SETTINGS): UsTurnoverRatioItem[] {
+export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, settings = DEFAULT_US_TURNOVER_FILTER_SETTINGS, options: { includeBelowMinTurnover?: boolean } = {}): UsTurnoverRatioItem[] {
   const response = parsed as { output?: unknown; output1?: unknown; output2?: unknown };
   const output = response?.output ?? response?.output2 ?? response?.output1;
   if (!Array.isArray(output)) return [];
@@ -136,7 +136,8 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, setting
     if (marketCap < settings.minMarketCap || marketCap > settings.maxMarketCap) return [];
 
     const turnoverRatio = (tradingValue / marketCap) * 100;
-    if (turnoverRatio < settings.minTurnoverRatio || turnoverRatio > settings.maxTurnoverRatio) return [];
+    if (turnoverRatio > settings.maxTurnoverRatio) return [];
+    if (!options.includeBelowMinTurnover && turnoverRatio < settings.minTurnoverRatio) return [];
 
     return [{
       market: String(item.__market ?? item.excd ?? "AMS"),
@@ -153,7 +154,7 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, setting
   }).slice(0, limit);
 }
 
-export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequest = {}, markets = [request.excd || "AMS"]) {
+export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequest = {}, markets = [request.excd || "AMS"], options: { includeBelowMinTurnover?: boolean } = {}) {
   const settings = await loadUsTurnoverFilterSettings();
   const results = await Promise.all(markets.map(async (market) => {
     const result = await fetchKisUsTopRisingApi({ ...request, excd: market });
@@ -196,7 +197,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
   }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }> });
   return {
     ...first,
-    filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings),
+    filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings, options),
     debug,
   };
 }
