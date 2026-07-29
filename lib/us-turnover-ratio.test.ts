@@ -11,4 +11,6 @@ describe("US turnover ratio filters", () => {
     expect(filterUsTurnoverRatioItems({ output: [row({ __priceDetailMarketCap: 101_000_000 })] }, 100, settings)).toHaveLength(0);
   });
   it("keeps the configured open-to-high boundary inclusive", () => { expect(filterUsTurnoverRatioItems({ output: [row({ __openToHighRate: 30 })] }, 100, settings)).toHaveLength(1); });
+  it("rejects a candidate below the turnover-ratio floor", () => { expect(filterUsTurnoverRatioItems({ output: [row({ __priceDetailTradingValue: 99_000 })] }, 100, settings)).toHaveLength(0); });
+  it("rejects a candidate above the turnover-ratio ceiling", () => { expect(filterUsTurnoverRatioItems({ output: [row({ __priceDetailTradingValue: 1_100_000 })] }, 100, settings)).toHaveLength(0); });
 });
