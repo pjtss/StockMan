@@ -31,8 +31,7 @@ function startOfSeoulDay(value: Date) {
     seoulTime.getUTCFullYear(),
     seoulTime.getUTCMonth(),
     seoulTime.getUTCDate(),
-    8,
-    30,
+    9,
   ) - 9 * 60 * 60 * 1000);
 }
 
