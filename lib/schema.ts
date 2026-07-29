@@ -224,6 +224,25 @@ export const usIntensityStocks = pgTable(
   }
 );
 
+export const usTurnoverRatioSnapshotAttempts = pgTable(
+  "us_turnover_ratio_snapshot_attempts",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    market: text("market").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull().default(""),
+    rawPrice: text("raw_price"),
+    rawRate: text("raw_rate"),
+    snapshotStatus: text("snapshot_status").notNull(),
+    marketCap: doublePrecision("market_cap"),
+    tradingValue: doublePrecision("trading_value"),
+    turnoverRatio: doublePrecision("turnover_ratio"),
+    errorMessage: text("error_message"),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("us_turnover_ratio_attempt_market_code_time").on(table.market, table.code, table.observedAt)],
+);
+
 export const shortBorrowSnapshots = pgTable(
   "short_borrow_snapshots",
   {

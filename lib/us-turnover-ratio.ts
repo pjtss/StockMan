@@ -30,6 +30,17 @@ export type UsTurnoverRatioDebug = {
     openToHighRate: number | null;
     included: boolean;
   }>;
+  snapshotAttempts: Array<{
+    market: string;
+    code: string;
+    name: string;
+    rawPrice: string;
+    rawRate: string;
+    snapshotStatus: "DETAIL_OK" | "DETAIL_FAILED";
+    marketCap: number | null;
+    tradingValue: number | null;
+    turnoverRatio: number | null;
+  }>;
 };
 
 function numberValue(value: unknown): number | null {
@@ -70,7 +81,7 @@ function isInverseOrLeveraged(item: Record<string, unknown>) {
 
 async function enrichWithPriceDetails(output: unknown[], market: string, settings = DEFAULT_US_TURNOVER_FILTER_SETTINGS) {
   const result: unknown[] = Array.from({ length: output.length });
-  const debug: UsTurnoverRatioDebug = { sourceCount: output.length, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] };
+  const debug: UsTurnoverRatioDebug = { sourceCount: output.length, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [], snapshotAttempts: [] };
   const concurrency = 8;
   let nextIndex = 0;
   async function worker() {
@@ -109,6 +120,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string, setting
       const marketCap = detailMarketCap;
       const tradingValue = detailTradingValue;
       const turnoverRatio = marketCap !== null && tradingValue !== null ? (tradingValue / marketCap) * 100 : null;
+      debug.snapshotAttempts.push({ market, code, name: String(item.name ?? item.company ?? ""), rawPrice: String(item.last ?? item.price ?? ""), rawRate: String(item.rate ?? item.changeRate ?? item.n_rate ?? ""), snapshotStatus: marketCap !== null && tradingValue !== null ? "DETAIL_OK" : "DETAIL_FAILED", marketCap, tradingValue, turnoverRatio });
       debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, openToHighRate, included: turnoverRatio !== null && turnoverRatio >= settings.minTurnoverRatio && turnoverRatio <= settings.maxTurnoverRatio && openToHighRate !== null && openToHighRate <= settings.maxOpenToHighRate };
     }
   }
@@ -194,7 +206,8 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
     priceDetailAttemptCount: acc.priceDetailAttemptCount + value.enriched.debug.priceDetailAttemptCount,
     priceDetailSuccessCount: acc.priceDetailSuccessCount + value.enriched.debug.priceDetailSuccessCount,
     details: [...acc.details, ...value.enriched.debug.details],
-  }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }> });
+    snapshotAttempts: [...acc.snapshotAttempts, ...value.enriched.debug.snapshotAttempts],
+  }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }>, snapshotAttempts: [] as UsTurnoverRatioDebug["snapshotAttempts"] });
   return {
     ...first,
     filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings, options),

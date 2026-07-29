@@ -1,6 +1,6 @@
 import { inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { alertEvents } from "@/lib/schema";
+import { alertEvents, usTurnoverRatioSnapshotAttempts } from "@/lib/schema";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { fetchUsTurnoverRatioScanner, type UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { saveAndCalculateUsTurnoverRatioTrends, type UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
@@ -31,6 +31,10 @@ async function executeUsTurnoverRatioAutomation() {
 
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");
+  const observedAt = new Date();
+  for (const attempt of result.debug?.snapshotAttempts ?? []) {
+    await db.insert(usTurnoverRatioSnapshotAttempts).values({ ...attempt, observedAt });
+  }
   const settings = await loadUsTurnoverFilterSettings();
   // The scanner applies these filters, but enforce the ratio bounds again at
   // the notification boundary so no stale or bypassed candidate can alert.
