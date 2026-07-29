@@ -6,15 +6,10 @@ function truncate(value: string, max: number) { return value.length <= max ? val
 export function isBreakingNewsDiscordConfigured() { return Boolean(webhookUrl()); }
 
 export function buildBreakingNewsPayload(event: KisBreakingNews) {
-  const publishedAt = `${event.date.slice(0, 4)}-${event.date.slice(4, 6)}-${event.date.slice(6, 8)}T${event.time.slice(0, 2)}:${event.time.slice(2, 4)}:${event.time.slice(4, 6)}+09:00`;
   return {
-    content: truncate(`🚨 해외 속보: ${event.title}`, 2000),
+    content: truncate(event.title, 2000),
     username: "STOCKMAN KIS BREAKING NEWS",
     allowed_mentions: { parse: [] as string[] },
-    embeds: [{
-      title: truncate(event.title, 256), description: truncate(event.symbols.map((symbol) => `${symbol.name || symbol.ticker} (${symbol.ticker})`).join(", ") || "관련 종목 없음", 4096),
-      color: 0xff4d4f, fields: [{ name: "출처", value: event.source || "확인 불가", inline: true }, { name: "제공기관 코드", value: event.providerCode || "확인 불가", inline: true }, { name: "속보 ID", value: event.id, inline: false }], timestamp: publishedAt, footer: { text: "KIS 해외 속보 원문 전달" },
-    }],
   };
 }
 
