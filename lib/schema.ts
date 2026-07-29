@@ -50,6 +50,11 @@ export const usTurnoverRatioSnapshots = pgTable(
     marketCap: doublePrecision("market_cap").notNull(),
     tradingValue: doublePrecision("trading_value").notNull(),
     turnoverRatio: doublePrecision("turnover_ratio").notNull(),
+    price: doublePrecision("price"),
+    open: doublePrecision("open"),
+    high: doublePrecision("high"),
+    low: doublePrecision("low"),
+    changeRate: doublePrecision("change_rate"),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("us_turnover_ratio_snapshot_market_code_time").on(table.market, table.code, table.observedAt)]

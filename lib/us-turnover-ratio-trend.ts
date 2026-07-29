@@ -85,6 +85,11 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
         marketCap: item.marketCap,
         tradingValue: item.tradingValue,
         turnoverRatio: item.turnoverRatio,
+        price: Number(item.price) || null,
+        open: item.open ?? null,
+        high: item.high ?? null,
+        low: item.low ?? null,
+        changeRate: Number.parseFloat(item.changeRate) || null,
         observedAt,
       }).onConflictDoNothing();
     }

@@ -15,6 +15,9 @@ export type UsTurnoverRatioItem = {
   tradingValue: number;
   turnoverRatio: number;
   openToHighRate: number;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
 };
 
 export type UsTurnoverRatioDebug = {
@@ -113,6 +116,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string, setting
       const detailTradingValue = firstNumber(outputDetail, ["tamt", "tamnt"]);
       const detailOpen = firstNumber(outputDetail, ["open"]);
       const detailHigh = firstNumber(outputDetail, ["high"]);
+      const detailLow = firstNumber(outputDetail, ["low", "lw", "lowest"]);
       const openToHighRate = detailOpen !== null && detailHigh !== null && detailOpen > 0
         ? ((detailHigh - detailOpen) / detailOpen) * 100
         : null;
@@ -124,6 +128,7 @@ async function enrichWithPriceDetails(output: unknown[], market: string, setting
         __priceDetailTradingValue: detailTradingValue,
         __priceDetailOpen: detailOpen,
         __priceDetailHigh: detailHigh,
+        __priceDetailLow: detailLow,
         __openToHighRate: openToHighRate,
       };
       const marketCap = detailMarketCap;
@@ -171,6 +176,9 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, setting
       tradingValue,
       turnoverRatio,
       openToHighRate,
+      open: parsePrice(item.__priceDetailOpen),
+      high: parsePrice(item.__priceDetailHigh),
+      low: finiteNumberValue(item.__priceDetailLow),
     }];
   }).slice(0, limit);
 }
