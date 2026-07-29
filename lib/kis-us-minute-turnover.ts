@@ -57,6 +57,7 @@ function buildRequest(code: string, market: string, config: Awaited<ReturnType<t
     FID_INPUT_ISCD: code,
     FID_HOUR_CLS_CODE: asciiOnly(config.FID_HOUR_CLS_CODE, "0") || "0",
     PINC: asciiOnly(config.FID_PW_DATA_INCU_YN, "N") || "N",
+    NEXT: "",
     NMIN: "1",
   });
   const url = `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice?${params.toString()}`;
