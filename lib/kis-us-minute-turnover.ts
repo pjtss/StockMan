@@ -12,6 +12,8 @@ export type UsMinuteTurnoverPoint = {
   time: string;
   price: number;
   amount: number;
+  bid?: number;
+  ask?: number;
   raw: unknown;
 };
 
@@ -82,6 +84,8 @@ function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??
         row.amount ?? row.tvol ?? row.cum_amount ?? row.cumTradeAmount ?? row.cntg_pbmn ?? row.value ?? row.eamt ?? row.evol
       ),
+      bid: parseNumber(row.pbid ?? row.bid) || undefined,
+      ask: parseNumber(row.pask ?? row.ask) || undefined,
       raw: row,
     }))
     .filter((row: UsMinuteTurnoverPoint) => row.price > 0 || row.amount > 0);

@@ -14,8 +14,23 @@ export function calculateObv(points: UsMinuteTurnoverPoint[]) {
     else if (ordered[index].price < ordered[index - 1].price) obv -= ordered[index].amount;
   }
   const recent = ordered.slice(-30);
+  const prior = ordered.slice(-60, -30);
   const recentObv = calculateObvValue(recent);
-  return { pointCount: ordered.length, obv, recentObv, risingBars, trend: recentObv > 0 ? "RISING" : recentObv < 0 ? "FALLING" : "FLAT" };
+  const priorObv = calculateObvValue(prior);
+  const recentRisingBars = recent.slice(1).filter((point, index) => point.price > recent[index].price).length;
+  const vwapAmount = recent.reduce((sum, point) => sum + point.amount, 0);
+  const vwap = vwapAmount > 0 ? recent.reduce((sum, point) => sum + point.price * point.amount, 0) / vwapAmount : null;
+  const recentHigh = recent.length ? Math.max(...recent.map((point) => point.price)) : null;
+  const lastPrice = ordered.at(-1)?.price ?? 0;
+  const drawdownFromHigh = recentHigh && recentHigh > 0 ? ((recentHigh - lastPrice) / recentHigh) * 100 : null;
+  const recentAvg = recent.length ? recent.reduce((sum, point) => sum + point.amount, 0) / recent.length : 0;
+  const priorAvg = prior.length ? prior.reduce((sum, point) => sum + point.amount, 0) / prior.length : 0;
+  const minuteRvol = priorAvg > 0 ? recentAvg / priorAvg : null;
+  const spreads = recent.filter((point) => point.bid && point.ask && point.bid > 0).map((point) => ((point.ask! - point.bid!) / point.bid!) * 100);
+  const maxSpread = spreads.length ? Math.max(...spreads) : null;
+  const risingBarRate = recent.length > 1 ? recentRisingBars / (recent.length - 1) : 0;
+  const qualifies = ordered.length >= 30 && recentObv > priorObv && risingBarRate >= 0.6 && vwap !== null && lastPrice >= vwap && (drawdownFromHigh === null || drawdownFromHigh <= 5) && minuteRvol !== null && minuteRvol >= 1.5 && (maxSpread === null || maxSpread <= 2);
+  return { pointCount: ordered.length, obv, recentObv, priorObv, risingBars, risingBarRate, vwap, lastPrice, drawdownFromHigh, minuteRvol, maxSpread, trend: qualifies ? "RISING" : "FILTERED" };
 }
 
 function calculateObvValue(points: UsMinuteTurnoverPoint[]) {
