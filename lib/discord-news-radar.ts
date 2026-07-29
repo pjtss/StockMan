@@ -55,7 +55,13 @@ export async function sendNewsRadarAlertToDiscord(alert: AlertItem, context: New
   if (!configured) throw new Error("NEWS_RADAR_DISCORD_WEBHOOK_URL is not configured");
   const url = new URL(configured);
   url.searchParams.set("wait", "true");
-  const response = await fetch(url.toString(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildNewsRadarDiscordPayload(alert, context)) });
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = await fetch(url.toString(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildNewsRadarDiscordPayload(alert, context)) });
+    if (response.status === 200 || response.status === 204 || response.status < 400 || attempt === 2) break;
+    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  if (!response) return { ok: false, status: 0, responseText: "Discord request was not made" };
   const responseText = await response.text();
   return { ok: response.status === 200 || response.status === 204, status: response.status, responseText };
 }
