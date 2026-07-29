@@ -256,6 +256,12 @@ export const featureModuleSettings = pgTable("feature_module_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usNewsTickerExchangeCache = pgTable("us_news_ticker_exchange_cache", {
+  ticker: text("ticker").primaryKey(),
+  market: text("market").notNull(),
+  validatedAt: timestamp("validated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const automationRuns = pgTable("automation_runs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   moduleKey: text("module_key").notNull(),

@@ -1,6 +1,9 @@
 import { getAccessToken } from "@/lib/kis";
 import { buildKisAuthorization } from "@/lib/kis-authorization";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
+import { getDb } from "@/lib/db";
+import { usNewsTickerExchangeCache } from "@/lib/schema";
+import { and, eq, gte } from "drizzle-orm";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({
@@ -34,6 +37,27 @@ function responseTicker(output: Record<string, unknown>) {
   const raw = String(output.rsym ?? output.symb ?? output.code ?? "").trim().toUpperCase();
   // KIS may return the market prefix (for example NAS:AAPL) in rsym.
   return raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
+}
+
+async function cachedMarket(ticker: string) {
+  try {
+    const db = getDb();
+    if (!db) return null;
+    const validSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const rows = await db.select().from(usNewsTickerExchangeCache)
+      .where(and(eq(usNewsTickerExchangeCache.ticker, ticker), gte(usNewsTickerExchangeCache.validatedAt, validSince)))
+      .limit(1);
+    return rows[0]?.market ?? null;
+  } catch { return null; }
+}
+
+async function cacheMarket(ticker: string, market: string) {
+  try {
+    const db = getDb();
+    if (!db) return;
+    await db.insert(usNewsTickerExchangeCache).values({ ticker, market, validatedAt: new Date() })
+      .onConflictDoUpdate({ target: usNewsTickerExchangeCache.ticker, set: { market, validatedAt: new Date() } });
+  } catch { /* cache is an optimization; KIS validation remains authoritative */ }
 }
 
 async function kisGet(path: string, params: Record<string, string>, trId: string) {
@@ -74,11 +98,12 @@ export async function detectNewsCandidates(options: { date?: string; time?: stri
       const matched = verified.filter((item) => item.title === event.title || item.ticker === symbol.ticker);
       let quote: Record<string, unknown> = {};
       let resolvedMarket: string | null = null;
-      if (matched.length > 0) for (const market of ["NAS", "NYS", "AMS"]) {
+      const markets = matched.length > 0 ? [await cachedMarket(symbol.ticker), "NAS", "NYS", "AMS"] : [];
+      for (const market of [...new Set(markets.filter((value): value is string => Boolean(value)))]) {
           const detail = await fetchKisUsPriceDetail({ code: symbol.ticker, market });
           const output = getKisUsPriceDetailOutput(detail?.parsed);
-          if (detail?.ok && responseTicker(output) === symbol.ticker) { quote = output; resolvedMarket = market; break; }
-        }
+          if (detail?.ok && responseTicker(output) === symbol.ticker) { quote = output; resolvedMarket = market; await cacheMarket(symbol.ticker, market); break; }
+      }
       const rate = Number(quote.t_xrat ?? quote.t_rate ?? NaN);
       const tradingValue = Number(quote.tamt ?? NaN);
       candidates.push({ event, symbol, market: resolvedMarket, verified: matched, valid: matched.length > 0 && resolvedMarket !== null, quote, marketReaction: { rate: Number.isFinite(rate) ? rate : null, tradingValue: Number.isFinite(tradingValue) ? tradingValue : null } });
