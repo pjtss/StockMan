@@ -31,8 +31,15 @@ async function executeUsTurnoverRatioAutomation() {
 
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");
-  const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(result.filtered);
   const settings = await loadUsTurnoverFilterSettings();
+  // The scanner applies these filters, but enforce the ratio bounds again at
+  // the notification boundary so no stale or bypassed candidate can alert.
+  const filteredItems = result.filtered.filter((item) =>
+    Number.isFinite(item.turnoverRatio) &&
+    item.turnoverRatio >= settings.minTurnoverRatio &&
+    item.turnoverRatio <= settings.maxTurnoverRatio,
+  );
+  const trendedItems = await saveAndCalculateUsTurnoverRatioTrends(filteredItems);
   const date = seoulDate();
   const pendingNew: UsTurnoverRatioItemWithTrend[] = [];
   const pendingIncrease: UsTurnoverRatioItemWithTrend[] = [];
