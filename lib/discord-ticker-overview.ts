@@ -69,7 +69,7 @@ export function formatTickerOverview(overview: TickerOverview | null) {
   if (short.metric.shortInterestChangePercent != null) lines.push(`잔고 증감률 ${number(short.metric.shortInterestChangePercent, "%")}`);
   lines.push(`Threshold List ${short.metric.thresholdListed === true ? "포함" : short.metric.thresholdListed === false ? "미포함" : "확인 불가"}`);
   const borrow = overview.shortBorrow;
-  lines.push("", "**대차·Locate**", borrow ? `대차 가능 여부 ${borrow.borrowStatus} · 대차 가능 수량 ${number(borrow.availableQty)} · Locate 비용 $${number(borrow.locatePricePerShare)} · 기준 ${borrow.quotedAt ?? borrow.fetchedAt}` : `대차 데이터 없음${overview.shortBorrowError ? ` · ${overview.shortBorrowError}` : ""}`);
+  lines.push("", "**대차·Locate**", borrow ? `대차 가능 여부 ${borrow.borrowStatus} · 대차 가능 수량 ${number(borrow.availableQty)} · 예상 Locate 비용 $${number(borrow.locatePricePerShare)} · 기준 ${borrow.quotedAt ?? borrow.fetchedAt}` : `대차 데이터 없음${overview.shortBorrowError ? ` · ${overview.shortBorrowError}` : ""}`);
   if (intensity) {
     const m = intensity.metrics;
     lines.push("", "**최근 체결강도**", `최근 평균 ${number(m.recentAverageIntensity)} · 직전 대비 ${number(m.intensityChange)}`, `100 이상 비율 ${number(m.intensityAbove100Rate == null ? null : m.intensityAbove100Rate * 100, "%")} · 판정 **${intensity.score.level}**`);

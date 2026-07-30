@@ -8,4 +8,4 @@ FINRA 일별 공매도 거래량은 공매도 잔고가 아니다. 현재 compos
 
 거래대금 증가 알림은 최신 5분 이내 저장된 미국 체결강도가 관리자 설정의 `minIntensity` 이상인 경우에만 전송한다. 기본값은 100이며, 신규 종목 알림에는 적용하지 않고 거래대금 증가 알림에만 적용한다. 체결강도 스냅샷이 없거나 오래된 경우에는 증가 알림을 보내지 않는다.
 
-Discord `/ticker`는 FINRA와 Alpaca 대차를 독립적으로 조회한다. FINRA에는 `당일 공매도 거래량/비율`, `공매도 잔고`, `Days to Cover`, `잔고 기준일`을 표시하고, Alpaca에는 계정 범위의 `대차 가능 여부`, `available_qty`, `Locate 가격`, `quotedAt`을 표시한다. 대차 API가 실패해도 FINRA·KIS 결과는 유지한다. FINRA 일별 거래 기준일(`shortVolumeAsOf`)과 잔고 정산일(`shortInterestAsOf`)은 서로 다른 값이므로 합쳐서 표시하지 않는다. 잔고 기준일이 45일을 초과하면 `STALE`로 표시한다.
+Discord `/ticker`는 FINRA와 Alpaca 대차를 독립적으로 조회한다. FINRA에는 `당일 공매도 거래량/비율`, `공매도 잔고`, `Days to Cover`, `잔고 기준일`을 표시하고, Alpaca에는 계정 범위의 `대차 가능 여부`, `available_qty`, `예상 Locate 가격`, `quotedAt`을 표시한다. Alpaca Locate 가격은 견적이며 실제 대차 체결 비용이 아니다. 대차 API가 실패해도 FINRA·KIS 결과는 유지한다. FINRA 일별 거래 기준일(`shortVolumeAsOf`)과 잔고 정산일(`shortInterestAsOf`)은 서로 다른 값이므로 합쳐서 표시하지 않는다. 잔고 기준일이 45일을 초과하면 `STALE`로 표시한다.
