@@ -197,16 +197,11 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
     const parsed = result.response.parsed as { output?: unknown; output1?: unknown; output2?: unknown };
     const source = parsed?.output ?? parsed?.output2 ?? parsed?.output1;
     const output = Array.isArray(source) ? source.slice(0, 100) : [];
-    const detailEligibleOutput = output.filter((item) => {
-      if (!item || typeof item !== "object") return false;
-      const row = item as Record<string, unknown>;
-      const price = parsePrice(row.last ?? row.price);
-      const rate = signedNumber(row.rate ?? row.changeRate ?? row.n_rate);
-      return price !== null && price < settings.maxPrice && rate !== null && rate < settings.maxRate;
-    });
-    const enriched = await enrichWithPriceDetails(detailEligibleOutput, market, settings);
+    // Never discard TOP 100 rows before detail lookup.  The rising-rate/price
+    // filters belong to alert eligibility; snapshots must retain outliers.
+    const enriched = await enrichWithPriceDetails(output, market, settings);
     enriched.debug.sourceCount = output.length;
-    enriched.debug.preDetailFilteredOutCount = output.length - detailEligibleOutput.length;
+    enriched.debug.preDetailFilteredOutCount = 0;
     return { result, enriched, market };
   }));
   const validResults = results.filter((value): value is NonNullable<typeof value> => value !== null);
@@ -246,6 +241,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
   });
   return {
     ...first,
+    output: filteredOutput,
     filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings, options),
     debug: { ...debug, markets: marketBreakdown },
   };

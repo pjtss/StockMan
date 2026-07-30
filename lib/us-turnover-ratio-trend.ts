@@ -9,8 +9,10 @@ export type UsTurnoverRatioTrend = {
   snapshotState: UsTurnoverSnapshotState;
   oneMinuteTradingValueIncrease: number | null;
   oneMinuteTradingValueRvol: number | null;
+  oneMinuteTradingValueIncreaseRate: number | null;
   threeMinuteTradingValueIncrease: number | null;
   fiveMinuteTradingValueIncrease: number | null;
+  persistenceWindowCount: number;
   oneMinuteIncrease: number | null;
   threeMinuteIncrease: number | null;
   fiveMinuteIncrease: number | null;
@@ -66,14 +68,19 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
 
     const increases = previous.map((row) => row ? item.turnoverRatio - row.turnoverRatio : null);
     const tradingValueIncreases = previous.map((row) => row ? item.tradingValue - row.tradingValue : null);
+    const tradingValueIncreaseRates = previous.map((row) => row && row.tradingValue > 0
+      ? ((item.tradingValue - row.tradingValue) / row.tradingValue) * 100
+      : null);
     const snapshotState = classifyUsTurnoverSnapshotState({ hasCurrentSessionSnapshot: sessionRows.length > 0, hadPreviousSessionSnapshot: previousSessionRows.length > 0, hasComparisonSnapshot: previous.some(Boolean), lastObservedAt: sessionRows[0]?.observedAt ?? null, now: observedAt });
     const trend: UsTurnoverRatioTrend = {
       isNew: sessionRows.length === 0,
       snapshotState,
       oneMinuteTradingValueIncrease: tradingValueIncreases[0],
       oneMinuteTradingValueRvol: tradingValueIncreases[0] !== null && baseline !== null && baseline > 0 ? tradingValueIncreases[0] / baseline : null,
+      oneMinuteTradingValueIncreaseRate: tradingValueIncreaseRates[0],
       threeMinuteTradingValueIncrease: tradingValueIncreases[1],
       fiveMinuteTradingValueIncrease: tradingValueIncreases[2],
+      persistenceWindowCount: tradingValueIncreases.slice(1, 3).filter((value) => value !== null && value > 0).length,
       oneMinuteIncrease: increases[0],
       threeMinuteIncrease: increases[1],
       fiveMinuteIncrease: increases[2],
