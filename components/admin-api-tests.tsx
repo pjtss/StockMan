@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -78,6 +78,13 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/us-trade-intensity-collect-test",
     query: "symbols=AAPL,TSLA&market=NAS&maxSymbols=2&delayMs=350",
   },
+  {
+    key: "discord_ticker",
+    label: "Discord /ticker 종합 조회",
+    description: "현재가·유동성·최근 체결강도 종합 응답",
+    endpoint: "/api/admin/discord-ticker-overview-test",
+    query: "code=AAPL",
+  },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   {
     key: "us_news_radar",
@@ -117,6 +124,7 @@ export function AdminApiTests() {
   const [tradeStrongScore, setTradeStrongScore] = useState("80");
   const [tradeWatchScore, setTradeWatchScore] = useState("60");
   const [tradeCollectSymbols, setTradeCollectSymbols] = useState("AAPL,TSLA");
+  const [tickerOverviewCode, setTickerOverviewCode] = useState("AAPL");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -129,9 +137,11 @@ export function AdminApiTests() {
           ? `code=${encodeURIComponent(priceDetailCode)}&market=${encodeURIComponent(priceDetailMarket)}`
           : test.key === "us_trade_trend"
             ? `code=${encodeURIComponent(tradeTrendCode)}${tradeTrendMarket ? `&market=${encodeURIComponent(tradeTrendMarket)}` : ""}&day=1&minSamples=${tradeMinSamples}&minIntensity=${tradeMinIntensity}&strongScore=${tradeStrongScore}&watchScore=${tradeWatchScore}`
-            : test.key === "us_trade_collect"
-              ? `symbols=${encodeURIComponent(tradeCollectSymbols)}&maxSymbols=10&delayMs=350`
-          : test.query;
+              : test.key === "us_trade_collect"
+                ? `symbols=${encodeURIComponent(tradeCollectSymbols)}&maxSymbols=10&delayMs=350`
+                : test.key === "discord_ticker"
+                  ? `code=${encodeURIComponent(tickerOverviewCode)}`
+              : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "API 테스트 호출에 실패했습니다.");
@@ -209,12 +219,15 @@ export function AdminApiTests() {
               {test.key === "us_trade_collect" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커 목록(쉼표 구분)</span><input className={styles.textInput} value={tradeCollectSymbols} onChange={(event) => setTradeCollectSymbols(event.target.value.toUpperCase())} placeholder="AAPL,TSLA,NVDA" /></label>
               )}
+              {test.key === "discord_ticker" && (
+                <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={tickerOverviewCode} onChange={(event) => setTickerOverviewCode(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
+              )}
 
               <div className={styles.cardActions}>
                 <button
                   className={styles.toggleButton}
                   onClick={() => void runTest(test)}
-                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim())}
+                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim())}
                 >
                   <Play size={16} />
                   {isRunning ? "호출 중" : "실행"}

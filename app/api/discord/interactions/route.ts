@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyDiscordSignature } from "@/lib/discord-interaction-security";
-import { formatTickerInfo, getTickerInfo } from "@/lib/discord-ticker-command";
+import { formatTickerOverview, getTickerOverview } from "@/lib/discord-ticker-overview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +21,6 @@ export async function POST(request: Request) {
   if (interaction.type !== 2 || interaction.data?.name !== "ticker") return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
-  void getTickerInfo(ticker).then((info) => updateOriginalResponse(applicationId, interaction.token, formatTickerInfo(info))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
+  void getTickerOverview(ticker).then((overview) => updateOriginalResponse(applicationId, interaction.token, formatTickerOverview(overview))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
   return NextResponse.json({ type: 5, data: { flags: 64 } });
 }
