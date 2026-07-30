@@ -34,7 +34,12 @@ export async function fetchFinraComposite(rawTicker: string): Promise<FinraCompo
       const average = num(row.averageDailyVolumeQuantity ?? row.averageDailyVolume);
       const change = current != null && previous != null ? current - previous : null;
       const changePercent = num(row.changePercent) ?? (change != null && previous ? change / previous * 100 : null);
-      metric.shortInterest = current; metric.previousShortInterest = previous; metric.shortInterestChange = change; metric.shortInterestChangePercent = changePercent; metric.averageDailyVolume = average; metric.daysToCover = num(row.daysToCoverQuantity ?? row.daysToCover) ?? (current != null && average ? current / average : null); metric.asOf = String(row.settlementDate ?? metric.asOf ?? "") || null; metric.status = current == null ? "NULL_FIELD" : "OK"; shortInterestStatus = metric.status;
+      const shortInterestAsOf = String(row.settlementDate ?? "").trim() || null;
+      metric.shortInterest = current; metric.previousShortInterest = previous; metric.shortInterestChange = change; metric.shortInterestChangePercent = changePercent; metric.averageDailyVolume = average; metric.daysToCover = num(row.daysToCoverQuantity ?? row.daysToCover) ?? (current != null && average ? current / average : null); metric.shortInterestAsOf = shortInterestAsOf; metric.status = current == null ? "NULL_FIELD" : "OK"; shortInterestStatus = metric.status;
+      if (shortInterestAsOf) {
+        const ageDays = (Date.now() - Date.parse(shortInterestAsOf)) / 86_400_000;
+        if (Number.isFinite(ageDays) && ageDays > 45) shortInterestStatus = "STALE";
+      }
     }
   } catch (error) { shortInterestStatus = error instanceof Error ? error.message : "API_ERROR"; }
   try {

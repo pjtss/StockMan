@@ -277,6 +277,8 @@ export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
   thresholdListed: boolean("threshold_listed"),
   thresholdAsOf: text("threshold_as_of"),
   asOf: text("as_of"),
+  shortVolumeAsOf: text("short_volume_as_of"),
+  shortInterestAsOf: text("short_interest_as_of"),
   source: text("source").notNull(),
   status: text("status").notNull(),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
