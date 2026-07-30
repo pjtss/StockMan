@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { kisApiConfigs } from "@/lib/schema";
 
-export type KisApiConfigKey = "us_updown_rate" | "us_volume_power" | "us_turnover_trend" | "us_price_detail";
+export type KisApiConfigKey = "us_updown_rate" | "us_volume_power" | "us_turnover_trend" | "us_price_detail" | "us_trade_trend";
 
 export type KisApiConfig = {
   KEYB?: string;
@@ -88,6 +88,15 @@ export const DEFAULT_KIS_API_CONFIGS: Record<KisApiConfigKey, KisApiConfig> = {
     AUTH: "",
     EXCD: "AMS",
     tr_id: "HHDFS76200200",
+    custtype: "P",
+    content_type: "application/json; charset=utf-8",
+    authorization: "Bearer",
+  },
+  us_trade_trend: {
+    AUTH: "",
+    KEYB: "",
+    EXCD: "NAS",
+    tr_id: "HHDFS76200300",
     custtype: "P",
     content_type: "application/json; charset=utf-8",
     authorization: "Bearer",

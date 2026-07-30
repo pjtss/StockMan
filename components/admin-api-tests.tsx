@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -64,6 +64,13 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/us-turnover-ratio-test",
     query: "",
   },
+  {
+    key: "us_trade_trend",
+    label: "미국 단일종목 체결강도",
+    description: "KIS 체결추이 원본·vpow 체결강도·응답 진단",
+    endpoint: "/api/admin/kis-us-trade-trend-test",
+    query: "code=AAPL&market=NAS&day=1",
+  },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   {
     key: "us_news_radar",
@@ -96,6 +103,8 @@ export function AdminApiTests() {
   const [secUrl, setSecUrl] = useState("https://www.sec.gov/");
   const [priceDetailCode, setPriceDetailCode] = useState("TOPS");
   const [priceDetailMarket, setPriceDetailMarket] = useState("AMS");
+  const [tradeTrendCode, setTradeTrendCode] = useState("AAPL");
+  const [tradeTrendMarket, setTradeTrendMarket] = useState("NAS");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -106,6 +115,8 @@ export function AdminApiTests() {
         ? `url=${encodeURIComponent(secUrl)}`
         : test.key === "us_price_detail"
           ? `code=${encodeURIComponent(priceDetailCode)}&market=${encodeURIComponent(priceDetailMarket)}`
+          : test.key === "us_trade_trend"
+            ? `code=${encodeURIComponent(tradeTrendCode)}&market=${encodeURIComponent(tradeTrendMarket)}&day=1`
           : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -171,12 +182,18 @@ export function AdminApiTests() {
                   </label>
                 </div>
               )}
+              {test.key === "us_trade_trend" && (
+                <div className={styles.fieldGrid}>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>종목코드</span><input className={styles.textInput} value={tradeTrendCode} onChange={(event) => setTradeTrendCode(event.target.value.toUpperCase())} /></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>거래소</span><select className={styles.textInput} value={tradeTrendMarket} onChange={(event) => setTradeTrendMarket(event.target.value)}><option>NAS</option><option>NYSE</option><option>AMS</option></select></label>
+                </div>
+              )}
 
               <div className={styles.cardActions}>
                 <button
                   className={styles.toggleButton}
                   onClick={() => void runTest(test)}
-                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim())}
+                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim())}
                 >
                   <Play size={16} />
                   {isRunning ? "호출 중" : "실행"}
