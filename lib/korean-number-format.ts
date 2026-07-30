@@ -19,7 +19,7 @@ export function formatKoreanCompact(value: number | null | undefined, suffix = "
   const sign = value < 0 ? "-" : "";
   const amount = Math.abs(value);
   const unit = amount >= 100_000_000 ? { divisor: 100_000_000, label: "억" } : amount >= 10_000 ? { divisor: 10_000, label: "만" } : null;
-  if (!unit) return `${sign}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
+  if (!unit) return `${sign}${amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}${suffix}`;
   const scaled = amount / unit.divisor;
-  return `${sign}${scaled.toLocaleString("en-US", { maximumFractionDigits: 2 })}${unit.label}${suffix}`;
+  return `${sign}${scaled.toLocaleString("en-US", { maximumFractionDigits: 0 })}${unit.label}${suffix}`;
 }
