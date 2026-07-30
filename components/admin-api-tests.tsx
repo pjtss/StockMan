@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -85,6 +85,13 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/discord-ticker-overview-test",
     query: "code=AAPL",
   },
+  {
+    key: "us_free_float",
+    label: "미국 유통주 조회",
+    description: "FMP 무료 Free Float API 및 일일 DB 캐시",
+    endpoint: "/api/admin/us-free-float-test",
+    query: "ticker=AAPL",
+  },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   {
     key: "us_news_radar",
@@ -125,6 +132,7 @@ export function AdminApiTests() {
   const [tradeWatchScore, setTradeWatchScore] = useState("60");
   const [tradeCollectSymbols, setTradeCollectSymbols] = useState("AAPL,TSLA");
   const [tickerOverviewCode, setTickerOverviewCode] = useState("AAPL");
+  const [freeFloatTicker, setFreeFloatTicker] = useState("AAPL");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -141,6 +149,8 @@ export function AdminApiTests() {
                 ? `symbols=${encodeURIComponent(tradeCollectSymbols)}&maxSymbols=10&delayMs=350`
                 : test.key === "discord_ticker"
                   ? `code=${encodeURIComponent(tickerOverviewCode)}`
+                : test.key === "us_free_float"
+                  ? `ticker=${encodeURIComponent(freeFloatTicker)}`
               : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -222,12 +232,15 @@ export function AdminApiTests() {
               {test.key === "discord_ticker" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={tickerOverviewCode} onChange={(event) => setTickerOverviewCode(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
+              {test.key === "us_free_float" && (
+                <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={freeFloatTicker} onChange={(event) => setFreeFloatTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
+              )}
 
               <div className={styles.cardActions}>
                 <button
                   className={styles.toggleButton}
                   onClick={() => void runTest(test)}
-                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim())}
+                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim()) || (test.key === "us_free_float" && !freeFloatTicker.trim())}
                 >
                   <Play size={16} />
                   {isRunning ? "호출 중" : "실행"}

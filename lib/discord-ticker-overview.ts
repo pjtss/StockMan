@@ -2,27 +2,30 @@ import { fetchKisUsTradeTrend, type KisUsTradeMarket } from "@/lib/kis-us-trade-
 import { calculateTradeIntensityMetrics, scoreTradeIntensity, type TradeIntensityMetrics, type TradeIntensityScore } from "@/lib/us-trade-intensity-metrics";
 import { loadUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
 import { getTickerInfo, type TickerInfo } from "@/lib/discord-ticker-command";
+import { getUsFreeFloat, type UsFreeFloatOverview } from "@/lib/us-free-float";
 
 export type TickerOverview = {
   quote: TickerInfo;
   intensity: { metrics: TradeIntensityMetrics; score: TradeIntensityScore } | null;
   intensityStatus: "OK" | "UNAVAILABLE";
+  freeFloat: UsFreeFloatOverview;
 };
 
 /** Composes independent ticker data sources; formatting remains the Discord adapter's responsibility. */
 export async function getTickerOverview(rawTicker: string): Promise<TickerOverview | null> {
   const quote = await getTickerInfo(rawTicker);
   if (!quote) return null;
+  const freeFloatPromise = getUsFreeFloat(quote.ticker);
   try {
     const trend = await fetchKisUsTradeTrend({ code: quote.ticker, market: quote.market as KisUsTradeMarket, day: "1" });
-    if (!trend?.ok || trend.trades.length === 0) return { quote, intensity: null, intensityStatus: "UNAVAILABLE" };
+    if (!trend?.ok || trend.trades.length === 0) return { quote, intensity: null, intensityStatus: "UNAVAILABLE", freeFloat: await freeFloatPromise };
     const fetchedAt = new Date();
     const stored = await loadUsTradeIntensityTicks({ market: quote.market, code: quote.ticker }, new Date(fetchedAt.getTime() - 30 * 60_000), fetchedAt);
     const trades = stored.length > 0 ? stored.map((row) => ({ time: row.tradeTime, price: row.price, changeRate: row.changeRate, volume: row.volume, totalVolume: row.totalVolume, marketType: row.marketType ?? "", bid: row.bid, ask: row.ask, intensity: row.intensity })) : trend.trades;
     const metrics = calculateTradeIntensityMetrics(trades);
-    return { quote, intensity: { metrics, score: scoreTradeIntensity(metrics) }, intensityStatus: "OK" };
+    return { quote, intensity: { metrics, score: scoreTradeIntensity(metrics) }, intensityStatus: "OK", freeFloat: await freeFloatPromise };
   } catch {
-    return { quote, intensity: null, intensityStatus: "UNAVAILABLE" };
+    return { quote, intensity: null, intensityStatus: "UNAVAILABLE", freeFloat: await freeFloatPromise };
   }
 }
 
@@ -38,6 +41,9 @@ export function formatTickerOverview(overview: TickerOverview | null) {
     "", "**시세**", `시가 ${number(quote.open)} · 고가 ${number(quote.high)} · 저가 ${number(quote.low)}`,
     `거래량 ${number(quote.volume)} · 거래대금 ${number(quote.tradingValue)} · 시가총액 ${number(quote.marketCap)}`,
   ];
+  const float = overview.freeFloat;
+  lines.push("", "**유통주**", float.ok ? `유통주식수 ${number(float.floatShares)} · 유통비율 ${number(float.freeFloatPercent, "%")}` : "유통주 데이터 없음");
+  if (float.ok) lines.push(`유통 시가총액 ${number(quote.price == null ? null : quote.price * (float.floatShares ?? 0))}`, `기준일 ${float.asOf ?? "-"} · 출처 ${float.source}${float.cached ? " · DB 캐시" : ""}`);
   if (intensity) {
     const m = intensity.metrics;
     lines.push("", "**최근 체결강도**", `최근 평균 ${number(m.recentAverageIntensity)} · 직전 대비 ${number(m.intensityChange)}`, `100 이상 비율 ${number(m.intensityAbove100Rate == null ? null : m.intensityAbove100Rate * 100, "%")} · 판정 **${intensity.score.level}**`);
