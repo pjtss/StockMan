@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -71,6 +71,13 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/kis-us-trade-trend-test",
     query: "code=AAPL&market=NAS&day=1",
   },
+  {
+    key: "us_trade_collect",
+    label: "미국 체결강도 수집·저장",
+    description: "최근 체결추이를 DB에 중복 제거 저장(Discord 미전송)",
+    endpoint: "/api/admin/us-trade-intensity-collect-test",
+    query: "symbols=AAPL,TSLA&market=NAS&maxSymbols=2&delayMs=350",
+  },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   {
     key: "us_news_radar",
@@ -109,6 +116,7 @@ export function AdminApiTests() {
   const [tradeMinIntensity, setTradeMinIntensity] = useState("100");
   const [tradeStrongScore, setTradeStrongScore] = useState("80");
   const [tradeWatchScore, setTradeWatchScore] = useState("60");
+  const [tradeCollectSymbols, setTradeCollectSymbols] = useState("AAPL,TSLA");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -121,6 +129,8 @@ export function AdminApiTests() {
           ? `code=${encodeURIComponent(priceDetailCode)}&market=${encodeURIComponent(priceDetailMarket)}`
           : test.key === "us_trade_trend"
             ? `code=${encodeURIComponent(tradeTrendCode)}${tradeTrendMarket ? `&market=${encodeURIComponent(tradeTrendMarket)}` : ""}&day=1&minSamples=${tradeMinSamples}&minIntensity=${tradeMinIntensity}&strongScore=${tradeStrongScore}&watchScore=${tradeWatchScore}`
+            : test.key === "us_trade_collect"
+              ? `symbols=${encodeURIComponent(tradeCollectSymbols)}&maxSymbols=10&delayMs=350`
           : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -196,12 +206,15 @@ export function AdminApiTests() {
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>관찰 후보 점수</span><input type="number" min="0" className={styles.textInput} value={tradeWatchScore} onChange={(event) => setTradeWatchScore(event.target.value)} /></label>
                 </div>
               )}
+              {test.key === "us_trade_collect" && (
+                <label className={styles.inlineField}><span className={styles.fieldLabel}>티커 목록(쉼표 구분)</span><input className={styles.textInput} value={tradeCollectSymbols} onChange={(event) => setTradeCollectSymbols(event.target.value.toUpperCase())} placeholder="AAPL,TSLA,NVDA" /></label>
+              )}
 
               <div className={styles.cardActions}>
                 <button
                   className={styles.toggleButton}
                   onClick={() => void runTest(test)}
-                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim())}
+                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim())}
                 >
                   <Play size={16} />
                   {isRunning ? "호출 중" : "실행"}
