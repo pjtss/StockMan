@@ -1,6 +1,7 @@
 import { fetchKisUsTradeTrend, type KisUsTradeMarket } from "@/lib/kis-us-trade-trend";
 import { loadUsTradeIntensityTicks, saveUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
 import { calculateTradeIntensityMetrics, scoreTradeIntensity } from "@/lib/us-trade-intensity-metrics";
+import { decideTradeIntensityAlert } from "@/lib/us-trade-intensity-alert";
 
 export type TradeIntensityCollectionOptions = {
   market?: KisUsTradeMarket;
@@ -15,7 +16,7 @@ export type TradeIntensityCollectionResult = {
   failureCount: number;
   insertedCount: number;
   duplicateCount: number;
-  results: Array<{ code: string; market: string; ok: boolean; tradeCount: number; insertedCount: number; duplicateCount: number; score?: number; level?: "STRONG" | "WATCH" | "REJECT"; error?: string }>;
+  results: Array<{ code: string; market: string; ok: boolean; tradeCount: number; insertedCount: number; duplicateCount: number; score?: number; level?: "STRONG" | "WATCH" | "REJECT"; alertState?: "NORMAL" | "WATCH" | "QUALIFIED" | "COOLDOWN"; shouldAlert?: boolean; error?: string }>;
 };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -42,7 +43,8 @@ export async function collectUsTradeIntensity(symbols: string[], options: TradeI
         const sessionTicks = currentMarketType ? stored.filter((tick) => (tick.marketType || "") === currentMarketType) : stored;
         const analysisTrades = sessionTicks.map((tick) => ({ time: tick.tradeTime, price: tick.price, changeRate: tick.changeRate, volume: tick.volume, totalVolume: tick.totalVolume, marketType: tick.marketType ?? "", bid: tick.bid, ask: tick.ask, intensity: tick.intensity }));
         const score = scoreTradeIntensity(calculateTradeIntensityMetrics(analysisTrades));
-        results.push({ code, market: result.market, ok: true, tradeCount: result.trades.length, insertedCount: saved.insertedCount, duplicateCount: saved.skippedCount, score: score.score, level: score.level });
+        const alert = decideTradeIntensityAlert({ market: result.market, code, score });
+        results.push({ code, market: result.market, ok: true, tradeCount: result.trades.length, insertedCount: saved.insertedCount, duplicateCount: saved.skippedCount, score: score.score, level: score.level, alertState: alert.state, shouldAlert: alert.shouldAlert });
       }
     } catch (error) {
       results.push({ code, market: options.market ?? "UNRESOLVED", ok: false, tradeCount: 0, insertedCount: 0, duplicateCount: 0, error: error instanceof Error ? error.message : String(error) });
