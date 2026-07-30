@@ -38,7 +38,9 @@ export async function collectUsTradeIntensity(symbols: string[], options: TradeI
         insertedCount += saved.insertedCount;
         duplicateCount += saved.skippedCount;
         const stored = await loadUsTradeIntensityTicks({ market: result.market, code }, new Date(Date.now() - 30 * 60 * 1000));
-        const analysisTrades = stored.map((tick) => ({ time: tick.tradeTime, price: tick.price, changeRate: tick.changeRate, volume: tick.volume, totalVolume: tick.totalVolume, marketType: tick.marketType ?? "", bid: tick.bid, ask: tick.ask, intensity: tick.intensity }));
+        const currentMarketType = result.trades[0]?.marketType || "";
+        const sessionTicks = currentMarketType ? stored.filter((tick) => (tick.marketType || "") === currentMarketType) : stored;
+        const analysisTrades = sessionTicks.map((tick) => ({ time: tick.tradeTime, price: tick.price, changeRate: tick.changeRate, volume: tick.volume, totalVolume: tick.totalVolume, marketType: tick.marketType ?? "", bid: tick.bid, ask: tick.ask, intensity: tick.intensity }));
         const score = scoreTradeIntensity(calculateTradeIntensityMetrics(analysisTrades));
         results.push({ code, market: result.market, ok: true, tradeCount: result.trades.length, insertedCount: saved.insertedCount, duplicateCount: saved.skippedCount, score: score.score, level: score.level });
       }
