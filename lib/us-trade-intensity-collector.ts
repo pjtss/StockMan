@@ -1,5 +1,6 @@
 import { fetchKisUsTradeTrend, type KisUsTradeMarket } from "@/lib/kis-us-trade-trend";
 import { saveUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
+import { calculateTradeIntensityMetrics, scoreTradeIntensity } from "@/lib/us-trade-intensity-metrics";
 
 export type TradeIntensityCollectionOptions = {
   market?: KisUsTradeMarket;
@@ -14,7 +15,7 @@ export type TradeIntensityCollectionResult = {
   failureCount: number;
   insertedCount: number;
   duplicateCount: number;
-  results: Array<{ code: string; market: string; ok: boolean; tradeCount: number; insertedCount: number; duplicateCount: number; error?: string }>;
+  results: Array<{ code: string; market: string; ok: boolean; tradeCount: number; insertedCount: number; duplicateCount: number; score?: number; level?: "STRONG" | "WATCH" | "REJECT"; error?: string }>;
 };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,7 +37,8 @@ export async function collectUsTradeIntensity(symbols: string[], options: TradeI
         const saved = await saveUsTradeIntensityTicks({ market: result.market, code }, result.trades);
         insertedCount += saved.insertedCount;
         duplicateCount += saved.skippedCount;
-        results.push({ code, market: result.market, ok: true, tradeCount: result.trades.length, insertedCount: saved.insertedCount, duplicateCount: saved.skippedCount });
+        const score = scoreTradeIntensity(calculateTradeIntensityMetrics(result.trades));
+        results.push({ code, market: result.market, ok: true, tradeCount: result.trades.length, insertedCount: saved.insertedCount, duplicateCount: saved.skippedCount, score: score.score, level: score.level });
       }
     } catch (error) {
       results.push({ code, market: options.market ?? "UNRESOLVED", ok: false, tradeCount: 0, insertedCount: 0, duplicateCount: 0, error: error instanceof Error ? error.message : String(error) });
