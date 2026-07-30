@@ -9,11 +9,13 @@ export async function fetchFreeShortInterest(rawTicker: string): Promise<ShortIn
   const ticker = rawTicker.trim().toUpperCase();
   try {
     const cached = await loadTodayShortInterest(ticker, "FINRA");
-    if (cached) return { ticker, shortVolume: cached.shortVolume, totalVolume: cached.totalVolume, shortVolumeRatio: cached.shortVolumeRatio, shortInterest: cached.shortInterest, daysToCover: cached.daysToCover, asOf: cached.asOf, source: "FINRA", status: cached.status as ShortInterestMetric["status"] };
+    if (cached) return { ticker, shortVolume: cached.shortVolume, totalVolume: cached.totalVolume, shortVolumeRatio: cached.shortVolumeRatio, shortInterest: cached.shortInterest, daysToCover: cached.daysToCover, previousShortInterest: cached.previousShortInterest, shortInterestChange: cached.shortInterestChange, shortInterestChangePercent: cached.shortInterestChangePercent, averageDailyVolume: cached.averageDailyVolume, thresholdListed: cached.thresholdListed, thresholdAsOf: cached.thresholdAsOf, asOf: cached.asOf, source: "FINRA", status: cached.status as ShortInterestMetric["status"] };
   } catch { /* Flyway V9 may not be applied yet; live lookup remains available. */ }
   const url = process.env.FINRA_SHORT_VOLUME_URL?.trim() || FINRA_REG_SHO_URL;
   try {
-    const response = await fetch(url, { method: "POST", headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify({ limit: 20, fields: ["tradeReportDate", "securitiesInformationProcessorSymbolIdentifier", "shortParQuantity", "shortExemptParQuantity", "totalParQuantity"], compareFilters: [{ compareType: "equal", fieldName: "securitiesInformationProcessorSymbolIdentifier", fieldValue: ticker }] }), cache: "no-store" });
+    const headers: Record<string, string> = { accept: "application/json", "content-type": "application/json" };
+    if (process.env.FINRA_API_TOKEN?.trim()) headers.Authorization = `Bearer ${process.env.FINRA_API_TOKEN.trim()}`;
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ limit: 20, fields: ["tradeReportDate", "securitiesInformationProcessorSymbolIdentifier", "shortParQuantity", "shortExemptParQuantity", "totalParQuantity"], compareFilters: [{ compareType: "equal", fieldName: "securitiesInformationProcessorSymbolIdentifier", fieldValue: ticker }] }), cache: "no-store" });
     if (!response.ok) return unavailableShortInterest(ticker, "FINRA", "API_ERROR", `FINRA HTTP ${response.status}`);
     const raw = await response.json() as any;
     const rows = Array.isArray(raw) ? raw : raw?.data || raw?.results || [];

@@ -15,5 +15,10 @@ export function scoreShortInterest(metric: ShortInterestMetric): ShortInterestSc
     if (metric.daysToCover >= 5) { score += 2; reasons.push("Days to Cover 5일 이상"); }
     else if (metric.daysToCover >= 2) { score += 1; reasons.push("Days to Cover 2일 이상"); }
   }
+  if (metric.shortInterestChangePercent != null) {
+    if (metric.shortInterestChangePercent >= 50) { score += 2; reasons.push("공매도 잔고 50% 이상 증가"); }
+    else if (metric.shortInterestChangePercent >= 20) { score += 1; reasons.push("공매도 잔고 20% 이상 증가"); }
+  }
+  if (metric.thresholdListed === true) { score += 2; reasons.push("FINRA Threshold List 포함"); }
   return { score, level: score >= 4 ? "HIGH" : score >= 2 ? "MEDIUM" : "LOW", reasons };
 }

@@ -4,7 +4,7 @@ import { loadUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
 import { getTickerInfo, type TickerInfo } from "@/lib/discord-ticker-command";
 import { getUsFreeFloat, type UsFreeFloatOverview } from "@/lib/us-free-float";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
-import { fetchFreeShortInterest } from "@/lib/short-interest-service";
+import { fetchFinraComposite } from "@/lib/finra-short-composite";
 import { scoreShortInterest, type ShortInterestScore } from "@/lib/short-interest-score";
 import type { ShortInterestMetric } from "@/lib/short-interest-types";
 
@@ -13,7 +13,7 @@ export type TickerOverview = {
   intensity: { metrics: TradeIntensityMetrics; score: TradeIntensityScore } | null;
   intensityStatus: "OK" | "UNAVAILABLE";
   freeFloat: UsFreeFloatOverview;
-  shortInterest: { metric: ShortInterestMetric; score: ShortInterestScore };
+  shortInterest: { metric: ShortInterestMetric; score: ShortInterestScore; shortInterestStatus: string; thresholdStatus: string };
 };
 
 /** Composes independent ticker data sources; formatting remains the Discord adapter's responsibility. */
@@ -21,19 +21,19 @@ export async function getTickerOverview(rawTicker: string): Promise<TickerOvervi
   const quote = await getTickerInfo(rawTicker);
   if (!quote) return null;
   const freeFloatPromise = getUsFreeFloat(quote.ticker);
-  const shortInterestPromise = fetchFreeShortInterest(quote.ticker);
+  const shortInterestPromise = fetchFinraComposite(quote.ticker);
   try {
     const trend = await fetchKisUsTradeTrend({ code: quote.ticker, market: quote.market as KisUsTradeMarket, day: "1" });
-    if (!trend?.ok || trend.trades.length === 0) { const metric = await shortInterestPromise; return { quote, intensity: null, intensityStatus: "UNAVAILABLE", freeFloat: await freeFloatPromise, shortInterest: { metric, score: scoreShortInterest(metric) } }; }
+    if (!trend?.ok || trend.trades.length === 0) { const composite = await shortInterestPromise; return { quote, intensity: null, intensityStatus: "UNAVAILABLE", freeFloat: await freeFloatPromise, shortInterest: { ...composite, score: scoreShortInterest(composite.metric) } }; }
     const fetchedAt = new Date();
     const stored = await loadUsTradeIntensityTicks({ market: quote.market, code: quote.ticker }, new Date(fetchedAt.getTime() - 30 * 60_000), fetchedAt);
     const trades = stored.length > 0 ? stored.map((row) => ({ time: row.tradeTime, price: row.price, changeRate: row.changeRate, volume: row.volume, totalVolume: row.totalVolume, marketType: row.marketType ?? "", bid: row.bid, ask: row.ask, intensity: row.intensity })) : trend.trades;
     const metrics = calculateTradeIntensityMetrics(trades);
-    const metric = await shortInterestPromise;
-    return { quote, intensity: { metrics, score: scoreTradeIntensity(metrics) }, intensityStatus: "OK", freeFloat: await freeFloatPromise, shortInterest: { metric, score: scoreShortInterest(metric) } };
+    const composite = await shortInterestPromise;
+    return { quote, intensity: { metrics, score: scoreTradeIntensity(metrics) }, intensityStatus: "OK", freeFloat: await freeFloatPromise, shortInterest: { ...composite, score: scoreShortInterest(composite.metric) } };
   } catch {
-    const metric = await shortInterestPromise;
-    return { quote, intensity: null, intensityStatus: "UNAVAILABLE", freeFloat: await freeFloatPromise, shortInterest: { metric, score: scoreShortInterest(metric) } };
+    const composite = await shortInterestPromise;
+    return { quote, intensity: null, intensityStatus: "UNAVAILABLE", freeFloat: await freeFloatPromise, shortInterest: { ...composite, score: scoreShortInterest(composite.metric) } };
   }
 }
 
@@ -55,6 +55,9 @@ export function formatTickerOverview(overview: TickerOverview | null) {
   const short = overview.shortInterest;
   lines.push("", "**공매도**", short.metric.status === "OK" || short.metric.status === "ZERO_SHORT_VOLUME" ? `일별 공매도 비율 ${number(short.metric.shortVolumeRatio, "%")} · 공매도 거래량 ${number(short.metric.shortVolume)} · 판정 **${short.score.level}**` : `공매도 데이터 ${short.metric.status} · ${short.metric.reason || "원인 확인 필요"}`);
   if (short.metric.status === "OK") lines.push(`기준일 ${short.metric.asOf ?? "-"} · 출처 ${short.metric.source}`);
+  if (short.metric.shortInterest != null) lines.push(`공매도 잔고 ${number(short.metric.shortInterest)} · Days to Cover ${number(short.metric.daysToCover)}`);
+  if (short.metric.shortInterestChangePercent != null) lines.push(`잔고 증감률 ${number(short.metric.shortInterestChangePercent, "%")}`);
+  lines.push(`Threshold List ${short.metric.thresholdListed === true ? "포함" : short.metric.thresholdListed === false ? "미포함" : "확인 불가"}`);
   if (intensity) {
     const m = intensity.metrics;
     lines.push("", "**최근 체결강도**", `최근 평균 ${number(m.recentAverageIntensity)} · 직전 대비 ${number(m.intensityChange)}`, `100 이상 비율 ${number(m.intensityAbove100Rate == null ? null : m.intensityAbove100Rate * 100, "%")} · 판정 **${intensity.score.level}**`);
