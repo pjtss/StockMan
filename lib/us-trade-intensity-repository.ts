@@ -28,3 +28,8 @@ export async function loadUsTradeIntensityTicks(scope: TradeIntensityScope, from
     lte(usTradeIntensityTicks.fetchedAt, to),
   )).orderBy(desc(usTradeIntensityTicks.fetchedAt), desc(usTradeIntensityTicks.id));
 }
+
+export async function loadLatestUsTradeIntensity(scope: TradeIntensityScope, from: Date, to = new Date()) {
+  const rows = await loadUsTradeIntensityTicks(scope, from, to);
+  return rows.find((row) => row.intensity != null)?.intensity ?? null;
+}

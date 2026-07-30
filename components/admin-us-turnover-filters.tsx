@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminModal } from "@/components/admin-modal";
 import styles from "./admin-us-turnover-filters.module.css";
 
-type FilterKey = "maxPrice" | "maxRate" | "maxOpenToHighRate" | "minMarketCap" | "maxMarketCap" | "minTurnoverRatio" | "maxTurnoverRatio" | "tradingValueIncreaseAlert";
+type FilterKey = "maxPrice" | "maxRate" | "maxOpenToHighRate" | "minMarketCap" | "maxMarketCap" | "minTurnoverRatio" | "maxTurnoverRatio" | "tradingValueIncreaseAlert" | "minIntensity";
 type FilterValues = Record<FilterKey, number>;
 
-const DEFAULTS: FilterValues = { maxPrice: 10, maxRate: 30, maxOpenToHighRate: 30, minMarketCap: 1_000_000, maxMarketCap: 100_000_000, minTurnoverRatio: 1, maxTurnoverRatio: 10, tradingValueIncreaseAlert: 20_000 };
+const DEFAULTS: FilterValues = { maxPrice: 10, maxRate: 30, maxOpenToHighRate: 30, minMarketCap: 1_000_000, maxMarketCap: 100_000_000, minTurnoverRatio: 1, maxTurnoverRatio: 10, tradingValueIncreaseAlert: 20_000, minIntensity: 100 };
 const fields: Array<{ key: FilterKey; label: string; unit: string; hint: string; step?: string }> = [
   { key: "maxPrice", label: "주가 상한", unit: "USD", hint: "현재 주가가 이 값 미만인 종목만 통과합니다.", step: "0.01" },
   { key: "maxRate", label: "상승률 상한", unit: "%", hint: "현재 상승률이 이 값 미만인 종목만 통과합니다." },
@@ -17,6 +17,7 @@ const fields: Array<{ key: FilterKey; label: string; unit: string; hint: string;
   { key: "minTurnoverRatio", label: "시총 대비 거래대금 하한", unit: "%", hint: "당일 거래대금 ÷ 시가총액 × 100의 최소값입니다." },
   { key: "maxTurnoverRatio", label: "시총 대비 거래대금 상한", unit: "%", hint: "당일 거래대금 ÷ 시가총액 × 100의 최대값입니다." },
   { key: "tradingValueIncreaseAlert", label: "거래대금 상승 알림 기준", unit: "달러", hint: "직전 스냅샷 대비 거래대금 증가액 기준입니다." },
+  { key: "minIntensity", label: "최소 체결강도", unit: "%", hint: "거래대금 증가 알림에 필요한 최신 체결강도입니다." },
 ];
 
 function formatMoney(value: number) {
@@ -45,6 +46,7 @@ export function AdminUsTurnoverFilters() {
     if (data.minMarketCap <= 0 || data.maxMarketCap <= data.minMarketCap) return "시총 상한은 시총 하한보다 커야 합니다.";
     if (data.minTurnoverRatio < 0 || data.maxTurnoverRatio <= data.minTurnoverRatio) return "거래대금 비율 상한은 하한보다 커야 합니다.";
     if (data.tradingValueIncreaseAlert < 0) return "거래대금 상승 기준은 0 이상이어야 합니다.";
+    if (data.minIntensity < 0) return "최소 체결강도는 0 이상이어야 합니다.";
     return "";
   }, [data]);
 

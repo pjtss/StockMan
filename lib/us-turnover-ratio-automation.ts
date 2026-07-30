@@ -9,8 +9,13 @@ import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/scanner-schedules";
 import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
+import { loadLatestUsTradeIntensity } from "@/lib/us-trade-intensity-repository";
 
 export function meetsTradingValueIncreaseAlert(value: number | null, threshold: number) {
+  return value !== null && Number.isFinite(value) && value >= threshold;
+}
+
+export function meetsTradeIntensityFilter(value: number | null, threshold: number) {
   return value !== null && Number.isFinite(value) && value >= threshold;
 }
 
@@ -58,7 +63,9 @@ async function executeUsTurnoverRatioAutomation() {
     const firstAppearance = item.trend.snapshotState === "NEW" || item.trend.snapshotState === "RECOVERED";
     if (!firstAppearance && item.turnoverRatio < settings.minTurnoverRatio) continue;
     const hasTradingValueIncrease = meetsTradingValueIncreaseAlert(item.trend.oneMinuteTradingValueIncrease, settings.tradingValueIncreaseAlert);
-    const shouldAlert = firstAppearance || hasTradingValueIncrease;
+    const intensity = firstAppearance ? null : await loadLatestUsTradeIntensity({ market: item.market, code: item.code }, new Date(Date.now() - 5 * 60_000));
+    const meetsIntensityFilter = firstAppearance || meetsTradeIntensityFilter(intensity, settings.minIntensity);
+    const shouldAlert = firstAppearance || (hasTradingValueIncrease && meetsIntensityFilter);
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
     const marketCode = `${item.market.toUpperCase()}:${code}`;
