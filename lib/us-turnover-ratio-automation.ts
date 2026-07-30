@@ -47,15 +47,16 @@ async function executeUsTurnoverRatioAutomation() {
   const claimedIds: number[] = [];
   for (const item of trendedItems) {
     if (pendingNew.length + pendingIncrease.length >= 100) break;
-    if (!item.trend.isNew && item.turnoverRatio < settings.minTurnoverRatio) continue;
+    const firstAppearance = item.trend.snapshotState === "NEW" || item.trend.snapshotState === "RECOVERED";
+    if (!firstAppearance && item.turnoverRatio < settings.minTurnoverRatio) continue;
     const hasTradingValueIncrease = meetsTradingValueIncreaseAlert(item.trend.oneMinuteTradingValueIncrease, settings.tradingValueIncreaseAlert);
-    const shouldAlert = item.trend.isNew || hasTradingValueIncrease;
+    const shouldAlert = firstAppearance || hasTradingValueIncrease;
     if (!shouldAlert) continue;
     const code = item.code.toUpperCase();
     const marketCode = `${item.market.toUpperCase()}:${code}`;
     if (seenCodes.has(marketCode)) continue;
     seenCodes.add(marketCode);
-    const alertType = item.trend.isNew ? "new" : "1m-increase";
+    const alertType = firstAppearance ? item.trend.snapshotState.toLowerCase() : "1m-increase";
     const cooldownBucket = Math.floor(Date.now() / 1000 / Math.max(1, moduleSettings.cooldownSeconds));
     const externalId = `us-turnover-ratio:${date}:${item.market.toUpperCase()}:${code}:${alertType}:${cooldownBucket}`;
     const claimed = await db.insert(alertEvents)
@@ -64,7 +65,7 @@ async function executeUsTurnoverRatioAutomation() {
       .returning({ id: alertEvents.id });
     if (claimed.length > 0) {
       claimedIds.push(claimed[0].id);
-      if (item.trend.isNew) pendingNew.push(item);
+      if (firstAppearance) pendingNew.push(item);
       else pendingIncrease.push(item);
     }
   }

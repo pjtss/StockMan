@@ -2,9 +2,11 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usTurnoverRatioSnapshots } from "@/lib/schema";
 import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
+import { classifyUsTurnoverSnapshotState, type UsTurnoverSnapshotState } from "@/lib/us-turnover-snapshot-state";
 
 export type UsTurnoverRatioTrend = {
   isNew: boolean;
+  snapshotState: UsTurnoverSnapshotState;
   oneMinuteTradingValueIncrease: number | null;
   oneMinuteTradingValueRvol: number | null;
   threeMinuteTradingValueIncrease: number | null;
@@ -42,8 +44,9 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
   const dayStart = startOfSeoulDay(observedAt);
 
   for (const item of items) {
-    const [sessionRows, ...previous] = await Promise.all([
-      db.select({ id: usTurnoverRatioSnapshots.id }).from(usTurnoverRatioSnapshots).where(and(eq(usTurnoverRatioSnapshots.market, item.market), eq(usTurnoverRatioSnapshots.code, item.code), gte(usTurnoverRatioSnapshots.observedAt, dayStart), lte(usTurnoverRatioSnapshots.observedAt, observedAt))).limit(1),
+    const [sessionRows, previousSessionRows, ...previous] = await Promise.all([
+      db.select({ id: usTurnoverRatioSnapshots.id, observedAt: usTurnoverRatioSnapshots.observedAt }).from(usTurnoverRatioSnapshots).where(and(eq(usTurnoverRatioSnapshots.market, item.market), eq(usTurnoverRatioSnapshots.code, item.code), gte(usTurnoverRatioSnapshots.observedAt, dayStart), lte(usTurnoverRatioSnapshots.observedAt, observedAt))).orderBy(desc(usTurnoverRatioSnapshots.observedAt)).limit(1),
+      db.select({ id: usTurnoverRatioSnapshots.id }).from(usTurnoverRatioSnapshots).where(and(eq(usTurnoverRatioSnapshots.market, item.market), eq(usTurnoverRatioSnapshots.code, item.code), lte(usTurnoverRatioSnapshots.observedAt, dayStart))).limit(1),
       ...windows.map(async ({ minutes }) => {
       const cutoff = new Date(observedAt.getTime() - minutes * 60_000);
       const rows = await db.select().from(usTurnoverRatioSnapshots)
@@ -63,8 +66,10 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
 
     const increases = previous.map((row) => row ? item.turnoverRatio - row.turnoverRatio : null);
     const tradingValueIncreases = previous.map((row) => row ? item.tradingValue - row.tradingValue : null);
+    const snapshotState = classifyUsTurnoverSnapshotState({ hasCurrentSessionSnapshot: sessionRows.length > 0, hadPreviousSessionSnapshot: previousSessionRows.length > 0, hasComparisonSnapshot: previous.some(Boolean), lastObservedAt: sessionRows[0]?.observedAt ?? null, now: observedAt });
     const trend: UsTurnoverRatioTrend = {
       isNew: sessionRows.length === 0,
+      snapshotState,
       oneMinuteTradingValueIncrease: tradingValueIncreases[0],
       oneMinuteTradingValueRvol: tradingValueIncreases[0] !== null && baseline !== null && baseline > 0 ? tradingValueIncreases[0] / baseline : null,
       threeMinuteTradingValueIncrease: tradingValueIncreases[1],

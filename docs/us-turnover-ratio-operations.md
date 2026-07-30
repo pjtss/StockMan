@@ -11,6 +11,8 @@
 5. 알림 후보 및 cooldown 판정
 6. Discord 전송과 전송 실패 재처리
 
+스냅샷 상태는 `NEW`, `CONTINUING`, `RECOVERED`, `INSUFFICIENT`, `STALE`로 별도 계산하며, `INSUFFICIENT`는 신규 알림으로 간주하지 않는다.
+
 Discord Webhook이 없거나 전송에 실패해도 1~5번은 실행되어야 한다. 따라서 Webhook 설정 확인은 수집·저장 전에 수행하지 않고, 알림 후보가 확정된 뒤 전송 경계에서만 수행한다.
 
 ## 실행 흐름
