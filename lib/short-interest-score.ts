@@ -4,7 +4,7 @@ export type ShortInterestScore = { score: number; level: "LOW" | "MEDIUM" | "HIG
 
 /** Scores only supplied market-wide metrics; missing data never becomes a bullish/bearish guess. */
 export function scoreShortInterest(metric: ShortInterestMetric): ShortInterestScore {
-  if (metric.status !== "OK") return { score: 0, level: "UNKNOWN", reasons: ["공매도 데이터 없음 또는 지연"] };
+  if (metric.status !== "OK" && metric.status !== "ZERO_SHORT_VOLUME") return { score: 0, level: "UNKNOWN", reasons: [metric.reason || `공매도 상태: ${metric.status}`] };
   let score = 0;
   const reasons: string[] = [];
   if (metric.shortVolumeRatio != null) {

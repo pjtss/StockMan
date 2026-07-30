@@ -7,7 +7,8 @@ export type ShortInterestMetric = {
   daysToCover: number | null;
   asOf: string | null;
   source: "FINRA" | "NASDAQ" | "SEC";
-  status: "OK" | "UNAVAILABLE" | "STALE";
+  status: "OK" | "ZERO_SHORT_VOLUME" | "NO_RECORD" | "NULL_FIELD" | "API_ERROR" | "NOT_PUBLISHED" | "STALE";
+  reason?: string;
 };
 
 export type ShortInterestSnapshot = ShortInterestMetric & { fetchedAt: Date };

@@ -14,10 +14,11 @@ export async function fetchFreeShortInterest(rawTicker: string): Promise<ShortIn
   const url = process.env.FINRA_SHORT_VOLUME_URL?.trim() || FINRA_REG_SHO_URL;
   try {
     const response = await fetch(url, { method: "POST", headers: { accept: "application/json", "content-type": "application/json" }, body: JSON.stringify({ limit: 20, fields: ["tradeReportDate", "securitiesInformationProcessorSymbolIdentifier", "shortParQuantity", "shortExemptParQuantity", "totalParQuantity"], compareFilters: [{ compareType: "equal", fieldName: "securitiesInformationProcessorSymbolIdentifier", fieldValue: ticker }] }), cache: "no-store" });
-    if (!response.ok) return unavailableShortInterest(ticker, "FINRA");
+    if (!response.ok) return unavailableShortInterest(ticker, "FINRA", "API_ERROR", `FINRA HTTP ${response.status}`);
     const raw = await response.json() as any;
     const rows = Array.isArray(raw) ? raw : raw?.data || raw?.results || [];
     const row = rows.find((item: any) => String(item?.securitiesInformationProcessorSymbolIdentifier || "").toUpperCase() === ticker) || rows[0] || null;
+    if (!row) return unavailableShortInterest(ticker, "FINRA", "NO_RECORD", "FINRA 응답에 해당 티커 행이 없음");
     const metric = normalizeFinraShortVolume(ticker, row as Record<string, unknown> | null);
     try { await saveShortInterest(metric); } catch { /* return live metric if cache is unavailable */ }
     return metric;

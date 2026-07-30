@@ -8,5 +8,5 @@ export async function GET(request: Request) {
   const ticker = new URL(request.url).searchParams.get("ticker")?.trim().toUpperCase() || "";
   if (!ticker) return NextResponse.json({ error: "티커를 입력하세요." }, { status: 400 });
   const metric = await fetchFreeShortInterest(ticker);
-  return NextResponse.json({ ok: metric.status === "OK", request: { endpoint: "FINRA_SHORT_VOLUME_URL", ticker }, metric, score: scoreShortInterest(metric) });
+  return NextResponse.json({ ok: metric.status === "OK" || metric.status === "ZERO_SHORT_VOLUME", request: { endpoint: "FINRA_SHORT_VOLUME_URL", ticker }, metric, score: scoreShortInterest(metric) });
 }
