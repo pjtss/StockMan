@@ -232,6 +232,12 @@ export function AdminApiTests() {
               <strong>{(result.stages as Array<{ name: string; count: number }>).map((stage) => `${stage.name}: ${stage.count}`).join(" → ")}</strong>
             </div>
           )}
+          {Boolean(activeTest.key === "us_trade_trend" && result.analysis && typeof result.analysis === "object") && (() => {
+            const analysis = result.analysis as { metrics?: { sampleCount?: number; latestIntensity?: number | null; recentAverageIntensity?: number | null; previousAverageIntensity?: number | null; intensityChange?: number | null; priceChange?: number | null; volumeChangeRate?: number | null }; score?: { score?: number; level?: string } };
+            const metrics = analysis.metrics || {};
+            const score = analysis.score || {};
+            return <div className={styles.resultHeader}><span>체결강도 분석</span><strong>{score.level ?? "-"} {score.score ?? 0}점 · {metrics.sampleCount ?? 0}건 · 최근 평균 {metrics.recentAverageIntensity ?? "-"} · 직전 평균 {metrics.previousAverageIntensity ?? "-"} · 변화 {metrics.intensityChange ?? "-"}</strong></div>;
+          })()}
           <div className={styles.cardActions}>
             <button
               className={styles.toggleButton}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { fetchKisUsTradeTrend } from "@/lib/kis-us-trade-trend";
+import { calculateTradeIntensityMetrics, scoreTradeIntensity } from "@/lib/us-trade-intensity-metrics";
 
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -9,5 +10,7 @@ export async function GET(request: Request) {
   if (marketParam && !["NAS", "AMS", "NYS"].includes(marketParam)) return NextResponse.json({ error: "지원하지 않는 거래소입니다. (NAS, AMS, NYS)" }, { status: 400 });
   const result = await fetchKisUsTradeTrend({ code, market: marketParam ? marketParam as "NAS" | "AMS" | "NYS" : undefined, day });
   if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
-  return NextResponse.json({ ok: result.ok, status: result.status, request: { method: "GET", endpoint: "/uapi/overseas-price/v1/quotations/inquire-ccnl", tr_id: "HHDFS76200300", fallbackOrder: marketParam ? undefined : ["NAS", "AMS", "NYS"], params: { EXCD: result.market, SYMB: code, TDAY: day, AUTH: "", KEYB: "" } }, diagnostics: result.diagnostics, trades: result.trades, raw: result.raw, rawText: result.rawText });
+  const metrics = calculateTradeIntensityMetrics(result.trades);
+  const score = scoreTradeIntensity(metrics);
+  return NextResponse.json({ ok: result.ok, status: result.status, request: { method: "GET", endpoint: "/uapi/overseas-price/v1/quotations/inquire-ccnl", tr_id: "HHDFS76200300", fallbackOrder: marketParam ? undefined : ["NAS", "AMS", "NYS"], params: { EXCD: result.market, SYMB: code, TDAY: day, AUTH: "", KEYB: "" } }, diagnostics: result.diagnostics, analysis: { metrics, score }, trades: result.trades, raw: result.raw, rawText: result.rawText });
 }
