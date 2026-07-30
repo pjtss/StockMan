@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { calculateTradeIntensityMetrics, scoreTradeIntensity } from "./us-trade-intensity-metrics";
+import { calculateTradeIntensityMetrics, deduplicateTradeIntensityTrades, scoreTradeIntensity } from "./us-trade-intensity-metrics";
 import type { KisUsTrade } from "./kis-us-trade-trend";
 
 const trade = (time: string, intensity: number, price: number, volume: number, bid = 100, ask = 101): KisUsTrade => ({ time, intensity, price, volume, totalVolume: volume, changeRate: 0, marketType: "0", bid, ask });
 
 describe("US trade intensity metrics", () => {
+  it("removes repeated polling results before calculating metrics", () => {
+    const first = trade("100003", 130, 110, 300);
+    expect(deduplicateTradeIntensityTrades([first, first, trade("100002", 125, 109, 200)])).toHaveLength(2);
+  });
   it("compares newest and previous execution samples", () => {
     const metrics = calculateTradeIntensityMetrics([
       trade("100003", 130, 110, 300), trade("100002", 125, 109, 200),

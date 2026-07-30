@@ -32,13 +32,23 @@ const average = (values: Array<number | null>) => {
   return usable.length ? usable.reduce((sum, value) => sum + value, 0) / usable.length : null;
 };
 
+export function deduplicateTradeIntensityTrades(trades: KisUsTrade[]): KisUsTrade[] {
+  const seen = new Set<string>();
+  return trades.filter((trade) => {
+    const key = [trade.time, trade.price ?? "", trade.volume ?? "", trade.totalVolume ?? ""].join("|");
+    if (!trade.time || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /**
  * The API returns newest-first data. The first half is treated as recent and
  * the second half as the previous comparable sample. This deliberately uses
  * samples, not wall-clock minutes, because KIS returns irregular executions.
  */
 export function calculateTradeIntensityMetrics(trades: KisUsTrade[]): TradeIntensityMetrics {
-  const ordered = trades.filter((trade) => trade.time).slice();
+  const ordered = deduplicateTradeIntensityTrades(trades.filter((trade) => trade.time));
   const split = Math.max(1, Math.floor(ordered.length / 2));
   const recent = ordered.slice(0, split);
   const previous = ordered.slice(split);
