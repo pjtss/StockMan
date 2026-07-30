@@ -1,5 +1,5 @@
 import { fetchKisUsTradeTrend, type KisUsTradeMarket } from "@/lib/kis-us-trade-trend";
-import { saveUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
+import { loadUsTradeIntensityTicks, saveUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
 import { calculateTradeIntensityMetrics, scoreTradeIntensity } from "@/lib/us-trade-intensity-metrics";
 
 export type TradeIntensityCollectionOptions = {
@@ -37,7 +37,9 @@ export async function collectUsTradeIntensity(symbols: string[], options: TradeI
         const saved = await saveUsTradeIntensityTicks({ market: result.market, code }, result.trades);
         insertedCount += saved.insertedCount;
         duplicateCount += saved.skippedCount;
-        const score = scoreTradeIntensity(calculateTradeIntensityMetrics(result.trades));
+        const stored = await loadUsTradeIntensityTicks({ market: result.market, code }, new Date(Date.now() - 30 * 60 * 1000));
+        const analysisTrades = stored.map((tick) => ({ time: tick.tradeTime, price: tick.price, changeRate: tick.changeRate, volume: tick.volume, totalVolume: tick.totalVolume, marketType: tick.marketType ?? "", bid: tick.bid, ask: tick.ask, intensity: tick.intensity }));
+        const score = scoreTradeIntensity(calculateTradeIntensityMetrics(analysisTrades));
         results.push({ code, market: result.market, ok: true, tradeCount: result.trades.length, insertedCount: saved.insertedCount, duplicateCount: saved.skippedCount, score: score.score, level: score.level });
       }
     } catch (error) {
