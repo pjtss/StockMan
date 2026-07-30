@@ -63,15 +63,20 @@ export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
   }
   const results: Array<Record<string, unknown>> = [];
   let next = 0;
+  let lastRequestAt = 0;
   async function worker() {
     while (true) {
       const index = next++;
       if (index >= candidates.length) return;
       const item = candidates[index];
       try {
+        const wait = Math.max(0, 350 - (Date.now() - lastRequestAt));
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        lastRequestAt = Date.now();
         let data = await fetchUsMinuteTurnover({ code: item.code, market: item.market });
         if (data && !data.ok && data.status >= 500) {
-          await new Promise((resolve) => setTimeout(resolve, 400));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          lastRequestAt = Date.now();
           data = await fetchUsMinuteTurnover({ code: item.code, market: item.market });
         }
         if (!data?.ok) {
@@ -90,7 +95,7 @@ export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(1, candidates.length) }, () => worker()));
   const rising = results.filter((item) => item["trend"] === "RISING");
   const discord = options.sendDiscord && rising.length > 0 ? await sendUsObvToDiscord(rising) : null;
   if (discord && !discord.ok) throw new Error(`US OBV Discord failed with HTTP ${discord.status}`);
