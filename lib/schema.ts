@@ -262,6 +262,20 @@ export const usFreeFloatSnapshots = pgTable("us_free_float_snapshots", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  ticker: text("ticker").notNull(),
+  shortVolume: doublePrecision("short_volume"),
+  totalVolume: doublePrecision("total_volume"),
+  shortVolumeRatio: doublePrecision("short_volume_ratio"),
+  shortInterest: doublePrecision("short_interest"),
+  daysToCover: doublePrecision("days_to_cover"),
+  asOf: text("as_of"),
+  source: text("source").notNull(),
+  status: text("status").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("us_short_interest_ticker_source_asof_unique").on(table.ticker, table.source, table.asOf), index("us_short_interest_ticker_fetched_idx").on(table.ticker, table.fetchedAt)]);
+
 export const usTurnoverRatioSnapshotAttempts = pgTable(
   "us_turnover_ratio_snapshot_attempts",
   {
