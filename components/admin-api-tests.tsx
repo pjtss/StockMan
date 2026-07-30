@@ -104,7 +104,7 @@ export function AdminApiTests() {
   const [priceDetailCode, setPriceDetailCode] = useState("TOPS");
   const [priceDetailMarket, setPriceDetailMarket] = useState("AMS");
   const [tradeTrendCode, setTradeTrendCode] = useState("AAPL");
-  const [tradeTrendMarket, setTradeTrendMarket] = useState("NAS");
+  const [tradeTrendMarket, setTradeTrendMarket] = useState("");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -116,7 +116,7 @@ export function AdminApiTests() {
         : test.key === "us_price_detail"
           ? `code=${encodeURIComponent(priceDetailCode)}&market=${encodeURIComponent(priceDetailMarket)}`
           : test.key === "us_trade_trend"
-            ? `code=${encodeURIComponent(tradeTrendCode)}&market=${encodeURIComponent(tradeTrendMarket)}&day=1`
+            ? `code=${encodeURIComponent(tradeTrendCode)}${tradeTrendMarket ? `&market=${encodeURIComponent(tradeTrendMarket)}` : ""}&day=1`
           : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -185,7 +185,7 @@ export function AdminApiTests() {
               {test.key === "us_trade_trend" && (
                 <div className={styles.fieldGrid}>
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>종목코드</span><input className={styles.textInput} value={tradeTrendCode} onChange={(event) => setTradeTrendCode(event.target.value.toUpperCase())} /></label>
-                  <label className={styles.inlineField}><span className={styles.fieldLabel}>거래소</span><select className={styles.textInput} value={tradeTrendMarket} onChange={(event) => setTradeTrendMarket(event.target.value)}><option>NAS</option><option>NYSE</option><option>AMS</option></select></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>거래소(선택)</span><select className={styles.textInput} value={tradeTrendMarket} onChange={(event) => setTradeTrendMarket(event.target.value)}><option value="">미입력: NAS → AMS → NYS</option><option>NAS</option><option>AMS</option><option>NYS</option></select></label>
                 </div>
               )}
 
