@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageNavigation } from "@/components/page-navigation";
 import styles from "@/components/us-turnover-trend.module.css";
+import { formatKoreanCompact } from "@/lib/korean-number-format";
 
 type Candidate = {
   symb: string;
@@ -30,9 +31,7 @@ type Response = {
 };
 
 function formatMoney(value: number) {
-  if (value >= 100000000) return `${(value / 100000000).toFixed(2)}억`;
-  if (value >= 10000) return `${Math.floor(value / 10000)}만`;
-  return value.toLocaleString();
+  return formatKoreanCompact(value);
 }
 
 export function AmsScoutPage() {

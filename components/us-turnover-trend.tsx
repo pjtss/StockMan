@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageNavigation } from "@/components/page-navigation";
 import styles from "./us-turnover-trend.module.css";
+import { formatKoreanCompact } from "@/lib/korean-number-format";
 
 type TrendPoint = {
   index: number;
@@ -23,9 +24,7 @@ type TrendResponse = {
 };
 
 function formatAmount(value: number) {
-  if (value >= 100000000) return `${(value / 100000000).toFixed(1)}억`;
-  if (value >= 10000) return `${(value / 10000).toFixed(1)}만`;
-  return value.toLocaleString();
+  return formatKoreanCompact(value);
 }
 
 function normalizeSymbols(input: string) {

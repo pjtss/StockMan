@@ -1,4 +1,5 @@
 import type { AlertItem } from "./types";
+import { formatKoreanCompact } from "@/lib/korean-number-format";
 
 export type NewsRadarDiscordContext = {
   rate: number | null;
@@ -24,7 +25,7 @@ export type NewsRadarDiscordSendResult = { ok: boolean; status: number; response
 
 function webhookUrl() { return process.env.NEWS_RADAR_DISCORD_WEBHOOK_URL?.trim() || ""; }
 function truncate(value: string, max: number) { return value.length <= max ? value : `${value.slice(0, max - 1)}…`; }
-function formatNumber(value: number | null) { return value === null ? "확인 불가" : value.toLocaleString("en-US", { maximumFractionDigits: 2 }); }
+function formatNumber(value: number | null) { return value === null ? "확인 불가" : formatKoreanCompact(value, " 달러"); }
 
 export function isNewsRadarDiscordConfigured() { return Boolean(webhookUrl()); }
 
