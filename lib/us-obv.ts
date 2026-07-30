@@ -92,7 +92,7 @@ export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
   }
   await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, () => worker()));
   const rising = results.filter((item) => item["trend"] === "RISING");
-  const discord = options.sendDiscord ? await sendUsObvToDiscord(rising) : null;
+  const discord = options.sendDiscord && rising.length > 0 ? await sendUsObvToDiscord(rising) : null;
   if (discord && !discord.ok) throw new Error(`US OBV Discord failed with HTTP ${discord.status}`);
-  return { candidateCount: candidates.length, successCount: results.filter((item) => !item.error).length, failureCount: results.filter((item) => item.error).length, rising, discordSentCount: discord ? rising.length : 0, discordMode: options.sendDiscord ? "SENT" : "PREVIEW", results };
+  return { candidateCount: candidates.length, successCount: results.filter((item) => !item.error).length, failureCount: results.filter((item) => item.error).length, rising, discordSentCount: discord ? rising.length : 0, discordMode: options.sendDiscord ? (rising.length > 0 ? "SENT" : "NO_CANDIDATES") : "PREVIEW", results };
 }
