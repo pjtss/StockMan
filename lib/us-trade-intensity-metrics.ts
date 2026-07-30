@@ -16,6 +16,7 @@ export type TradeIntensityMetrics = {
   volumeChangeRate: number | null;
   spreadRate: number | null;
   marketTypeCounts: Record<string, number>;
+  dataQuality: "SUFFICIENT" | "INSUFFICIENT";
 };
 
 export type TradeIntensityScore = {
@@ -70,19 +71,33 @@ export function calculateTradeIntensityMetrics(trades: KisUsTrade[]): TradeInten
     volumeChangeRate: previousVolume > 0 ? ((recentVolume - previousVolume) / previousVolume) * 100 : null,
     spreadRate,
     marketTypeCounts,
+    dataQuality: ordered.length >= 4 && previous.length >= 2 ? "SUFFICIENT" : "INSUFFICIENT",
   };
 }
 
-export function scoreTradeIntensity(metrics: TradeIntensityMetrics): TradeIntensityScore {
+export type TradeIntensityScoringOptions = {
+  minSamples?: number;
+  strongScore?: number;
+  watchScore?: number;
+  minimumAverageIntensity?: number;
+};
+
+export function scoreTradeIntensity(metrics: TradeIntensityMetrics, options: TradeIntensityScoringOptions = {}): TradeIntensityScore {
+  const minSamples = options.minSamples ?? 4;
+  const strongScore = options.strongScore ?? 80;
+  const watchScore = options.watchScore ?? 60;
+  const minimumAverageIntensity = options.minimumAverageIntensity ?? 100;
   let score = 0;
   const reasons: string[] = [];
   const failedConditions: string[] = [];
-  if (metrics.recentAverageIntensity != null && metrics.recentAverageIntensity >= 100) { score += 20; reasons.push("최근 평균 체결강도 100 이상"); } else failedConditions.push("최근 평균 체결강도 100 미만 또는 데이터 없음");
+  if (metrics.sampleCount < minSamples || metrics.dataQuality === "INSUFFICIENT") failedConditions.push(`분석 표본 부족 (${metrics.sampleCount}/${minSamples})`);
+  if (metrics.recentAverageIntensity != null && metrics.recentAverageIntensity >= minimumAverageIntensity) { score += 20; reasons.push(`최근 평균 체결강도 ${minimumAverageIntensity} 이상`); } else failedConditions.push("최근 평균 체결강도 기준 미달 또는 데이터 없음");
   if (metrics.recentAverageIntensity != null && metrics.recentAverageIntensity >= 120) { score += 15; reasons.push("최근 평균 체결강도 120 이상"); }
   if (metrics.intensityChange != null && metrics.intensityChange > 0) { score += 20; reasons.push("직전 구간 대비 체결강도 상승"); } else failedConditions.push("직전 구간 대비 체결강도 상승 아님");
   if (metrics.intensityAbove100Rate != null && metrics.intensityAbove100Rate >= 0.6) { score += 15; reasons.push("최근 체결강도 100 이상 비율 60% 이상"); } else failedConditions.push("체결강도 100 이상 유지 비율 부족");
   if (metrics.priceChange != null && metrics.priceChange >= 0) { score += 10; reasons.push("분석 구간 가격 상승 또는 보합"); } else failedConditions.push("분석 구간 가격 하락");
   if (metrics.volumeChangeRate != null && metrics.volumeChangeRate > 0) { score += 10; reasons.push("최근 체결량 증가"); } else failedConditions.push("최근 체결량 증가 아님");
   if (metrics.spreadRate == null || metrics.spreadRate <= 2) { score += 5; reasons.push("호가 스프레드 2% 이하 또는 미제공"); } else failedConditions.push("호가 스프레드 2% 초과");
-  return { score, level: score >= 80 ? "STRONG" : score >= 60 ? "WATCH" : "REJECT", reasons, failedConditions };
+  const level = metrics.sampleCount < minSamples || metrics.dataQuality === "INSUFFICIENT" ? "REJECT" : score >= strongScore ? "STRONG" : score >= watchScore ? "WATCH" : "REJECT";
+  return { score, level, reasons, failedConditions };
 }

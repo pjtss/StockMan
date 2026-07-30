@@ -26,4 +26,12 @@ describe("US trade intensity metrics", () => {
     expect(score.level).toBe("STRONG");
     expect(score.score).toBeGreaterThanOrEqual(80);
   });
+
+  it("rejects an undersampled response even when one tick is strong", () => {
+    const metrics = calculateTradeIntensityMetrics([trade("100003", 180, 110, 300)]);
+    const score = scoreTradeIntensity(metrics);
+    expect(metrics.dataQuality).toBe("INSUFFICIENT");
+    expect(score.level).toBe("REJECT");
+    expect(score.failedConditions.some((reason) => reason.includes("표본 부족"))).toBe(true);
+  });
 });
