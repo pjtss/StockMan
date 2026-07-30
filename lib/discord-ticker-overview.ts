@@ -3,6 +3,7 @@ import { calculateTradeIntensityMetrics, scoreTradeIntensity, type TradeIntensit
 import { loadUsTradeIntensityTicks } from "@/lib/us-trade-intensity-repository";
 import { getTickerInfo, type TickerInfo } from "@/lib/discord-ticker-command";
 import { getUsFreeFloat, type UsFreeFloatOverview } from "@/lib/us-free-float";
+import { formatKoreanCompact } from "@/lib/korean-number-format";
 
 export type TickerOverview = {
   quote: TickerInfo;
@@ -30,7 +31,7 @@ export async function getTickerOverview(rawTicker: string): Promise<TickerOvervi
 }
 
 function number(value: number | null, suffix = "") {
-  return value == null ? "-" : `${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
+  return formatKoreanCompact(value, suffix);
 }
 
 export function formatTickerOverview(overview: TickerOverview | null) {

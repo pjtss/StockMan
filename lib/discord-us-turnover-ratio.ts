@@ -1,18 +1,14 @@
 import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import type { UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
-import { formatKoreanAmount } from "@/lib/korean-number-format";
+import { formatKoreanCompact } from "@/lib/korean-number-format";
 
 const SUCCESS_STATUSES = new Set([200, 204]);
-
-function formatWholeMan(value: number) {
-  return formatKoreanAmount(Math.floor(value / 10_000) * 10_000);
-}
 
 function formatTradingValueIncrease(item: UsTurnoverRatioItem | UsTurnoverRatioItemWithTrend) {
   const increase = "trend" in item ? item.trend.oneMinuteTradingValueIncrease : null;
   if (increase === null || increase === undefined) return "직전 데이터 없음";
   const sign = increase > 0 ? "+" : increase < 0 ? "-" : "";
-  return `${sign}${Math.abs(increase / 10_000).toLocaleString("en-US", { maximumFractionDigits: 1 })}만 달러`;
+  return `${sign}${formatKoreanCompact(Math.abs(increase), " 달러")}`;
 }
 
 export function isUsTurnoverRatioDiscordConfigured() {
@@ -32,8 +28,8 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
       fields: [
         { name: "직전 대비 거래대금", value: formatTradingValueIncrease(item), inline: false },
         { name: "거래대금 RVOL", value: "trend" in item && item.trend.oneMinuteTradingValueRvol !== null ? `${item.trend.oneMinuteTradingValueRvol.toFixed(2)}x` : "-", inline: true },
-        { name: "시가총액", value: formatWholeMan(item.marketCap), inline: true },
-        { name: "당일 거래대금", value: formatWholeMan(item.tradingValue), inline: true },
+        { name: "시가총액", value: formatKoreanCompact(item.marketCap, " 달러"), inline: true },
+        { name: "당일 거래대금", value: formatKoreanCompact(item.tradingValue, " 달러"), inline: true },
         { name: "등락률", value: item.changeRate || "-", inline: true },
         { name: "시총 대비 거래대금", value: `${item.turnoverRatio.toFixed(2)}%`, inline: true },
         { name: "시가 대비 고점", value: `${item.openToHighRate.toFixed(2)}%`, inline: true },
