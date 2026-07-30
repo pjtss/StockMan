@@ -3,6 +3,7 @@ import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-p
 import { loadUsTurnoverBlacklist } from "@/lib/us-turnover-blacklist";
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
 import { loadUsTurnoverFilterSettings, DEFAULT_US_TURNOVER_FILTER_SETTINGS } from "@/lib/us-turnover-settings";
+import { explainUsTurnoverFilters } from "@/lib/us-turnover-filter-explanation";
 
 export type UsTurnoverRatioItem = {
   market: string;
@@ -32,6 +33,8 @@ export type UsTurnoverRatioDebug = {
     turnoverRatio: number | null;
     openToHighRate: number | null;
     included: boolean;
+    passedFilters?: string[];
+    failedFilters?: string[];
   }>;
   snapshotAttempts: Array<{
     market: string;
@@ -135,7 +138,10 @@ async function enrichWithPriceDetails(output: unknown[], market: string, setting
       const tradingValue = detailTradingValue;
       const turnoverRatio = marketCap !== null && tradingValue !== null ? (tradingValue / marketCap) * 100 : null;
       debug.snapshotAttempts.push({ market, code, name: String(item.name ?? item.company ?? ""), rawPrice: String(item.last ?? item.price ?? ""), rawRate: String(item.rate ?? item.changeRate ?? item.n_rate ?? ""), snapshotStatus: marketCap !== null && tradingValue !== null ? "DETAIL_OK" : "DETAIL_FAILED", marketCap, tradingValue, turnoverRatio });
-      debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, openToHighRate, included: turnoverRatio !== null && turnoverRatio >= settings.minTurnoverRatio && turnoverRatio <= settings.maxTurnoverRatio && openToHighRate !== null && openToHighRate <= settings.maxOpenToHighRate };
+      const explanation = detailMarketCap !== null && detailTradingValue !== null && openToHighRate !== null
+        ? explainUsTurnoverFilters({ market, rank: index + 1, code, name: String(item.name ?? item.company ?? ""), price: String(item.last ?? item.price ?? ""), changeRate: String(item.rate ?? item.changeRate ?? item.n_rate ?? ""), marketCap: detailMarketCap, tradingValue: detailTradingValue, turnoverRatio: turnoverRatio ?? 0, openToHighRate }, settings)
+        : null;
+      debug.details[index] = { code, marketCap, tradingValue, turnoverRatio, openToHighRate, included: explanation?.passed ?? false, passedFilters: explanation?.passedFilters, failedFilters: explanation?.failedFilters };
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, output.length) }, () => worker()));
@@ -224,7 +230,7 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
     priceDetailSuccessCount: acc.priceDetailSuccessCount + value.enriched.debug.priceDetailSuccessCount,
     details: [...acc.details, ...value.enriched.debug.details],
     snapshotAttempts: [...acc.snapshotAttempts, ...value.enriched.debug.snapshotAttempts],
-  }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as Array<{ code: string; marketCap: number | null; tradingValue: number | null; turnoverRatio: number | null; openToHighRate: number | null; included: boolean }>, snapshotAttempts: [] as UsTurnoverRatioDebug["snapshotAttempts"] });
+  }), { sourceCount: 0, preDetailFilteredOutCount: 0, priceDetailAttemptCount: 0, priceDetailSuccessCount: 0, details: [] as UsTurnoverRatioDebug["details"], snapshotAttempts: [] as UsTurnoverRatioDebug["snapshotAttempts"] });
   const marketBreakdown = validResults.map(({ enriched, market }) => {
     const marketItems = enriched.output.filter((item) => item && typeof item === "object");
     const included = filterUsTurnoverRatioItems({ output: marketItems }, 100, settings, options).length;
