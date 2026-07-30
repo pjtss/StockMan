@@ -105,6 +105,10 @@ export function AdminApiTests() {
   const [priceDetailMarket, setPriceDetailMarket] = useState("AMS");
   const [tradeTrendCode, setTradeTrendCode] = useState("AAPL");
   const [tradeTrendMarket, setTradeTrendMarket] = useState("");
+  const [tradeMinSamples, setTradeMinSamples] = useState("4");
+  const [tradeMinIntensity, setTradeMinIntensity] = useState("100");
+  const [tradeStrongScore, setTradeStrongScore] = useState("80");
+  const [tradeWatchScore, setTradeWatchScore] = useState("60");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -116,7 +120,7 @@ export function AdminApiTests() {
         : test.key === "us_price_detail"
           ? `code=${encodeURIComponent(priceDetailCode)}&market=${encodeURIComponent(priceDetailMarket)}`
           : test.key === "us_trade_trend"
-            ? `code=${encodeURIComponent(tradeTrendCode)}${tradeTrendMarket ? `&market=${encodeURIComponent(tradeTrendMarket)}` : ""}&day=1`
+            ? `code=${encodeURIComponent(tradeTrendCode)}${tradeTrendMarket ? `&market=${encodeURIComponent(tradeTrendMarket)}` : ""}&day=1&minSamples=${tradeMinSamples}&minIntensity=${tradeMinIntensity}&strongScore=${tradeStrongScore}&watchScore=${tradeWatchScore}`
           : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -186,6 +190,10 @@ export function AdminApiTests() {
                 <div className={styles.fieldGrid}>
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>종목코드</span><input className={styles.textInput} value={tradeTrendCode} onChange={(event) => setTradeTrendCode(event.target.value.toUpperCase())} /></label>
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>거래소(선택)</span><select className={styles.textInput} value={tradeTrendMarket} onChange={(event) => setTradeTrendMarket(event.target.value)}><option value="">미입력: NAS → AMS → NYS</option><option>NAS</option><option>AMS</option><option>NYS</option></select></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>최소 표본</span><input type="number" min="1" className={styles.textInput} value={tradeMinSamples} onChange={(event) => setTradeMinSamples(event.target.value)} /></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>평균 체결강도</span><input type="number" min="0" className={styles.textInput} value={tradeMinIntensity} onChange={(event) => setTradeMinIntensity(event.target.value)} /></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>강한 후보 점수</span><input type="number" min="0" className={styles.textInput} value={tradeStrongScore} onChange={(event) => setTradeStrongScore(event.target.value)} /></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>관찰 후보 점수</span><input type="number" min="0" className={styles.textInput} value={tradeWatchScore} onChange={(event) => setTradeWatchScore(event.target.value)} /></label>
                 </div>
               )}
 

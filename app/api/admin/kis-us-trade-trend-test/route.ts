@@ -11,6 +11,9 @@ export async function GET(request: Request) {
   const result = await fetchKisUsTradeTrend({ code, market: marketParam ? marketParam as "NAS" | "AMS" | "NYS" : undefined, day });
   if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
   const metrics = calculateTradeIntensityMetrics(result.trades);
-  const score = scoreTradeIntensity(metrics);
-  return NextResponse.json({ ok: result.ok, status: result.status, request: { method: "GET", endpoint: "/uapi/overseas-price/v1/quotations/inquire-ccnl", tr_id: "HHDFS76200300", fallbackOrder: marketParam ? undefined : ["NAS", "AMS", "NYS"], params: { EXCD: result.market, SYMB: code, TDAY: day, AUTH: "", KEYB: "" } }, diagnostics: result.diagnostics, analysis: { metrics, score }, trades: result.trades, raw: result.raw, rawText: result.rawText });
+  const option = (name: string) => { const value = Number(p.get(name)); return Number.isFinite(value) ? value : undefined; };
+  const scoringOptions = { minSamples: option("minSamples"), minimumAverageIntensity: option("minIntensity"), strongScore: option("strongScore"), watchScore: option("watchScore") };
+  const score = scoreTradeIntensity(metrics, scoringOptions);
+  const activeScoringOptions = Object.fromEntries(Object.entries(scoringOptions).filter(([, value]) => value !== undefined));
+  return NextResponse.json({ ok: result.ok, status: result.status, request: { method: "GET", endpoint: "/uapi/overseas-price/v1/quotations/inquire-ccnl", tr_id: "HHDFS76200300", fallbackOrder: marketParam ? undefined : ["NAS", "AMS", "NYS"], params: { EXCD: result.market, SYMB: code, TDAY: day, AUTH: "", KEYB: "" } }, diagnostics: result.diagnostics, analysis: { metrics, score, scoringOptions: activeScoringOptions }, trades: result.trades, raw: result.raw, rawText: result.rawText });
 }
