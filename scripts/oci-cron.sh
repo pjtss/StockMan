@@ -12,6 +12,10 @@ curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/us-turnover-ratio"
 
+curl --fail-with-body --silent --show-error --max-time 120 \
+  -H "x-cron-secret: ${CRON_SECRET}" \
+  -X POST "${BASE_URL}/api/cron/us-trade-intensity"
+
 if [[ -n "${ALPACA_API_KEY:-}" && -n "${ALPACA_API_SECRET:-}" ]]; then
   curl --fail-with-body --silent --show-error --max-time 50 \
     -H "x-cron-secret: ${CRON_SECRET}" \
