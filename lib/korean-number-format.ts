@@ -18,7 +18,6 @@ export function formatKoreanCompact(value: number | null | undefined, suffix = "
   if (value == null || !Number.isFinite(value)) return "-";
   const sign = value < 0 ? "-" : "";
   const amount = Math.abs(value);
-  if (amount < 10_000) return "-";
   const unit = amount >= 100_000_000 ? { divisor: 100_000_000, label: "억" } : amount >= 10_000 ? { divisor: 10_000, label: "만" } : null;
   if (!unit) return `${sign}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
   const scaled = amount / unit.divisor;

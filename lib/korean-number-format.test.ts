@@ -11,6 +11,6 @@ describe("formatKoreanCompact", () => {
 
   it("preserves missing and small values", () => {
     expect(formatKoreanCompact(null)).toBe("-");
-    expect(formatKoreanCompact(1_234, "주")).toBe("-");
+    expect(formatKoreanCompact(1_234, "주")).toBe("1,234주");
   });
 });
