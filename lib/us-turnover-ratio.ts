@@ -26,6 +26,7 @@ export type UsTurnoverRatioDebug = {
   preDetailFilteredOutCount?: number;
   priceDetailAttemptCount: number;
   priceDetailSuccessCount: number;
+  filterFailureCounts?: Record<string, number>;
   details: Array<{
     code: string;
     marketCap: number | null;
@@ -239,10 +240,14 @@ export async function fetchUsTurnoverRatioScanner(request: KisUsTopRisingApiRequ
       finalIncludedCount: included,
     };
   });
+  const filterFailureCounts = debug.details.reduce<Record<string, number>>((counts, detail) => {
+    for (const reason of detail.failedFilters ?? []) counts[reason] = (counts[reason] || 0) + 1;
+    return counts;
+  }, {});
   return {
     ...first,
     output: filteredOutput,
     filtered: filterUsTurnoverRatioItems({ output: filteredOutput }, 100, settings, options),
-    debug: { ...debug, markets: marketBreakdown },
+    debug: { ...debug, markets: marketBreakdown, filterFailureCounts },
   };
 }

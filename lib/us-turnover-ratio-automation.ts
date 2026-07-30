@@ -100,7 +100,8 @@ async function executeUsTurnoverRatioAutomation() {
   }
 
   const stateCounts = snapshotStateCounts(trendedItems);
-  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: alertItems.length, snapshotCount: trendedItems.length, newCount: 0, increaseCount: 0, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+  const filterFailureCounts = result.debug?.filterFailureCounts ?? {};
+  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: alertItems.length, snapshotCount: trendedItems.length, newCount: 0, increaseCount: 0, stateCounts, filterFailureCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
   const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
   const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
   if (pendingNew.length > 0 && !newWebhook || pendingIncrease.length > 0 && !increaseWebhook) {
@@ -117,7 +118,7 @@ async function executeUsTurnoverRatioAutomation() {
     const failed = [newDiscord, increaseDiscord].find((result) => result && !result.ok);
     throw new Error(`US turnover ratio Discord failed with HTTP ${failed?.status}`);
   }
-  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, snapshotCount: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, filterFailureCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
 }
 
 export async function runUsTurnoverRatioAutomation() {
