@@ -37,6 +37,7 @@ Discord Webhook이 없거나 전송에 실패해도 1~5번은 실행되어야 �
 - 필터별 탈락 사유
 - 신규·기존·복귀·비교 데이터 부족 상태
 - Discord 전송 성공·실패 및 재시도 상태
+- 실행별 스냅샷 상태 집계(`NEW`, `CONTINUING`, `RECOVERED`, `INSUFFICIENT`, `STALE`)
 
 ## 문서·코드 관리 원칙
 

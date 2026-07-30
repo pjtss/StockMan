@@ -18,6 +18,14 @@ function seoulDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
 }
 
+function snapshotStateCounts(items: UsTurnoverRatioItemWithTrend[]) {
+  return items.reduce<Record<string, number>>((counts, item) => {
+    const state = item.trend.snapshotState;
+    counts[state] = (counts[state] || 0) + 1;
+    return counts;
+  }, {});
+}
+
 async function executeUsTurnoverRatioAutomation() {
   const flags = await loadAdminFeatureFlags();
   const moduleSettings = await loadFeatureModuleSettings("us-turnover-ratio");
@@ -70,11 +78,12 @@ async function executeUsTurnoverRatioAutomation() {
     }
   }
 
-  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: trendedItems.length, newCount: 0, increaseCount: 0, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+  const stateCounts = snapshotStateCounts(trendedItems);
+  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: trendedItems.length, newCount: 0, increaseCount: 0, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
   const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
   const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
   if (pendingNew.length > 0 && !newWebhook || pendingIncrease.length > 0 && !increaseWebhook) {
-    return { skipped: true, reason: "webhook_missing_after_snapshot", sent: 0, matched: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+    return { skipped: true, reason: "webhook_missing_after_snapshot", sent: 0, matched: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
   }
   const newDiscord = pendingNew.length > 0
     ? await sendUsTurnoverRatioToDiscord(pendingNew, newWebhook)
@@ -87,7 +96,7 @@ async function executeUsTurnoverRatioAutomation() {
     const failed = [newDiscord, increaseDiscord].find((result) => result && !result.ok);
     throw new Error(`US turnover ratio Discord failed with HTTP ${failed?.status}`);
   }
-  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
 }
 
 export async function runUsTurnoverRatioAutomation() {
