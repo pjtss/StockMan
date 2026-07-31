@@ -1,6 +1,7 @@
 import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import type { UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
+import { scoreCandidate } from "@/lib/candidate-score";
 
 const SUCCESS_STATUSES = new Set([200, 204]);
 
@@ -26,6 +27,7 @@ export function buildUsTurnoverRatioDiscordPayload(items: Array<UsTurnoverRatioI
       title: `${item.market} ${item.code} | ${item.name || item.code}`,
       color: 0x00ffa3,
       fields: [
+        { name: "후보 점수", value: `${scoreCandidate({ changeRate: Number.parseFloat(item.changeRate), turnoverRatio: item.turnoverRatio, tradingValueRvol: "trend" in item ? item.trend.oneMinuteTradingValueRvol : null, tradeIntensity: null }).score}점`, inline: false },
         { name: "직전 대비 거래대금", value: formatTradingValueIncrease(item), inline: false },
         { name: "거래대금 RVOL", value: "trend" in item && item.trend.oneMinuteTradingValueRvol !== null ? `${item.trend.oneMinuteTradingValueRvol.toFixed(2)}x` : "-", inline: true },
         { name: "시가총액", value: formatKoreanCompact(item.marketCap, " 달러"), inline: true },
