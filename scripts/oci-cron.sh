@@ -6,6 +6,10 @@ CRON_SECRET="${CRON_SECRET:?CRON_SECRET is required}"
 
 curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
+  -X POST "${BASE_URL}/api/cron/discord-delivery-retry"
+
+curl --fail-with-body --silent --show-error --max-time 50 \
+  -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/sync-filings"
 
 curl --fail-with-body --silent --show-error --max-time 50 \
