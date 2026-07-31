@@ -4,7 +4,8 @@ import { alertEvents, usTurnoverRatioSnapshotAttempts } from "@/lib/schema";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { fetchUsTurnoverRatioScanner, type UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { saveAndCalculateUsTurnoverRatioTrends, type UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
-import { sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
+import { buildUsTurnoverRatioDiscordPayload, sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
+import { enqueueDiscordDelivery } from "@/lib/discord-delivery-queue";
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/scanner-schedules";
@@ -114,6 +115,12 @@ async function executeUsTurnoverRatioAutomation() {
     ? await sendUsTurnoverRatioToDiscord(pendingIncrease, increaseWebhook)
     : null;
   if (newDiscord && !newDiscord.ok || increaseDiscord && !increaseDiscord.ok) {
+    if (newDiscord && !newDiscord.ok && pendingNew.length > 0) {
+      await enqueueDiscordDelivery({ externalId: `retry:US_TURNOVER_RATIO_NEW:${date}:${Date.now()}`, channelKey: "US_TURNOVER_RATIO_NEW", payload: buildUsTurnoverRatioDiscordPayload(pendingNew) });
+    }
+    if (increaseDiscord && !increaseDiscord.ok && pendingIncrease.length > 0) {
+      await enqueueDiscordDelivery({ externalId: `retry:US_TURNOVER_RATIO_INCREASE:${date}:${Date.now()}`, channelKey: "US_TURNOVER_RATIO_INCREASE", payload: buildUsTurnoverRatioDiscordPayload(pendingIncrease) });
+    }
     await db.delete(alertEvents).where(inArray(alertEvents.id, claimedIds));
     const failed = [newDiscord, increaseDiscord].find((result) => result && !result.ok);
     throw new Error(`US turnover ratio Discord failed with HTTP ${failed?.status}`);

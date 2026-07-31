@@ -19,6 +19,11 @@ export async function markDiscordDeliveryRetry(id: number, error: string, attemp
   await db.update(discordDeliveryQueue).set({ status: "PENDING", attempts, lastError: error, nextAttemptAt: new Date(Date.now() + delaySeconds * 1000), updatedAt: new Date() }).where(eq(discordDeliveryQueue.id, id));
 }
 
+export async function markDiscordDeliveryProcessing(id: number) {
+  const db = getDb();
+  await db.update(discordDeliveryQueue).set({ status: "PROCESSING", updatedAt: new Date() }).where(and(eq(discordDeliveryQueue.id, id), eq(discordDeliveryQueue.status, "PENDING")));
+}
+
 export async function markDiscordDeliverySent(id: number) {
   const db = getDb();
   await db.update(discordDeliveryQueue).set({ status: "SENT", sentAt: new Date(), updatedAt: new Date() }).where(eq(discordDeliveryQueue.id, id));
