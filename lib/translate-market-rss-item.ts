@@ -7,3 +7,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client: Transl
   const [title, summary] = await Promise.all([client.translate(item.title), item.summary ? client.translate(item.summary) : Promise.resolve({ translatedText: "", fallback: false })]);
   return { ...item, translatedTitle: title.translatedText, translatedSummary: summary.translatedText, translationFallback: title.fallback || summary.fallback };
 }
+
+export async function translateMarketRssItems(items: MarketRssItem[], client: TranslationClient = new LibreTranslateClient()) {
+  return Promise.all(items.map((item) => translateMarketRssItem(item, client)));
+}
