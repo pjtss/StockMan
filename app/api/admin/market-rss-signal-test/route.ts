@@ -3,6 +3,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { fetchAllMarketRss } from "@/lib/market-rss-sources";
 import { analyzeMarketNews } from "@/lib/market-news-signal";
 import { fetchSecRssBody } from "@/lib/sec-rss-body";
+import { extractSecCik, resolveSecCompanyTickers } from "@/lib/sec-company-ticker";
 
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,6 +14,12 @@ export async function GET(request: Request) {
   let bodySuccesses = 0;
   const bodyErrors: string[] = [];
   const secBodyCandidates: Array<{ item: unknown; signal: ReturnType<typeof analyzeMarketNews>; formType: string; itemSections: string[] }> = [];
+  const secCiks = fetched.results.flatMap((result) => result.ok && result.source === "SEC_EDGAR" ? result.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : []);
+  let secTickers: Awaited<ReturnType<typeof resolveSecCompanyTickers>> = [];
+  const resolveTickers = new URL(request.url).searchParams.get("resolveTickers") !== "false";
+  if (resolveTickers && secCiks.length) {
+    try { secTickers = await resolveSecCompanyTickers(secCiks); } catch (error) { bodyErrors.push(error instanceof Error ? error.message : String(error)); }
+  }
   const results = fetched.results.map((result) => {
     if (!result.ok) return { source: result.source, ok: false, error: result.error, itemCount: 0, positiveCount: 0, candidates: [] };
     const analyzed = result.feed.items.map((item) => ({ item, signal: analyzeMarketNews(item) }));
@@ -35,5 +42,5 @@ export async function GET(request: Request) {
       }
     }
   }
-  return NextResponse.json({ ok: true, fetchedAt: fetched.fetchedAt, totalPositiveCount: results.reduce((sum, result) => sum + result.positiveCount, 0), secBody: { enabled: resolveBodies, attempts: bodyAttempts, successes: bodySuccesses, errors: bodyErrors, candidates: secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").sort((a, b) => b.signal.score - a.signal.score).slice(0, 20) }, results });
+  return NextResponse.json({ ok: true, fetchedAt: fetched.fetchedAt, totalPositiveCount: results.reduce((sum, result) => sum + result.positiveCount, 0), secTickers: { enabled: resolveTickers, mappedCount: secTickers.length, rows: secTickers }, secBody: { enabled: resolveBodies, attempts: bodyAttempts, successes: bodySuccesses, errors: bodyErrors, candidates: secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").sort((a, b) => b.signal.score - a.signal.score).slice(0, 20) }, results });
 }
