@@ -37,7 +37,11 @@ export function extractSecPrimaryDocumentUrl(indexUrl: string, html: string, for
     const href = row.match(/<a\b[^>]*href=["']([^"']+)["']/i)?.[1];
     if (!href || cells.length < 3) continue;
 
-    const resolvedUrl = new URL(href.replace(/&amp;/gi, "&"), indexUrl).toString();
+    const normalizedHref = href.replace(/&amp;/gi, "&");
+    // SEC의 iXBRL 링크(/ix?doc=/Archives/...)는 뷰어 래퍼가 아니라
+    // doc 파라미터의 실제 원문 경로를 사용해야 한다.
+    const ixDocumentPath = normalizedHref.match(/^\/ix\?doc=(\/Archives\/[^&]+)$/i)?.[1];
+    const resolvedUrl = new URL(ixDocumentPath || normalizedHref, indexUrl).toString();
     if (cells[0] === "1" && !sequenceOneUrl) sequenceOneUrl = resolvedUrl;
 
     const description = cells[1] || "";

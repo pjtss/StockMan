@@ -35,4 +35,8 @@ describe("SEC primary document resolver", () => {
     expect(isSecFilingIndexUrl(indexUrl)).toBe(true);
     expect(isSecFilingIndexUrl(indexUrl.replace("-index.htm", ".htm"))).toBe(false);
   });
+  it("unwraps SEC iXBRL viewer links to the source document", () => {
+    const html = `<table class="tableFile"><tr><td>1</td><td>8-K</td><td><a href="/ix?doc=/Archives/edgar/data/1506983/000149315226035503/form8-k.htm">form8-k.htm</a></td><td>8-K</td></tr></table>`;
+    expect(extractSecPrimaryDocumentUrl(indexUrl, html, "8-K")).toBe("https://www.sec.gov/Archives/edgar/data/1506983/000149315226035503/form8-k.htm");
+  });
 });
