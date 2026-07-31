@@ -229,6 +229,33 @@ export const usIntensityStocks = pgTable(
   }
 );
 
+export const marketRssArticles = pgTable(
+  "market_rss_articles",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    source: text("source").notNull(),
+    externalId: text("external_id").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    link: text("link").notNull().default(""),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    translatedTitle: text("translated_title"),
+    translatedSummary: text("translated_summary"),
+    translationStatus: text("translation_status").notNull().default("PENDING"),
+    translationFallback: boolean("translation_fallback").notNull().default(false),
+    notificationStatus: text("notification_status").notNull().default("PENDING"),
+    notificationAttempts: integer("notification_attempts").notNull().default(0),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("market_rss_articles_source_external_unique").on(table.source, table.externalId),
+    index("market_rss_articles_notification_idx").on(table.notificationStatus, table.createdAt),
+  ],
+);
+
 export const usTradeIntensityTicks = pgTable(
   "us_trade_intensity_ticks",
   {
