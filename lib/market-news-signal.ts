@@ -18,7 +18,8 @@ const positiveRules: Rule[] = [
   { pattern: /fda (approval|clears?|authori[sz]es?)/i, weight: 35, evidence: "FDA 승인/허가" },
   { pattern: /(phase [123].{0,30}(success|met|positive)|positive (clinical|trial) results)/i, weight: 35, evidence: "임상 긍정 결과" },
   { pattern: /(material definitive agreement|major contract|strategic partnership|definitive agreement)/i, weight: 30, evidence: "중요 계약/파트너십" },
-  { pattern: /(acquire|acquisition|merger|takeover).{0,40}(company|agreement|approved)?/i, weight: 25, evidence: "인수·합병" },
+  // "Acquisition Corp."처럼 회사명에 포함된 단어는 사건으로 세지 않는다.
+  { pattern: /(?:acquires?|acquired|acquisition of|merger with|takeover of|business combination).{0,50}(?:company|agreement|approved|shares|transaction)?/i, weight: 25, evidence: "인수·합병" },
   { pattern: /(raises?|raised|secures?)\s+\$?[\d,.]+\s*(million|billion|m|b)/i, weight: 18, evidence: "자금 유치" },
   { pattern: /(launches?| receives? approval|grants? approval|wins? contract|record revenue|raises? guidance)/i, weight: 22, evidence: "사업 호재 표현" },
 ];

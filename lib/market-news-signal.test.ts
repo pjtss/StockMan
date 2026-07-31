@@ -29,4 +29,8 @@ describe("market news signal", () => {
     expect(signal.score).toBeLessThan(25);
     expect(signal.risks).toContain("SEC Item 3.02 미등록 주식 발행/희석");
   });
+  it("does not score Acquisition Corp. as an acquisition event", () => {
+    const signal = analyzeMarketNews({ source: "SEC_EDGAR", title: "8-K - Example Acquisition Corp. (0001234567)", summary: "Item 8.01: Other Events" });
+    expect(signal.evidence).not.toContain("인수·합병");
+  });
 });
