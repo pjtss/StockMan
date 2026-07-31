@@ -126,7 +126,7 @@ const TESTS: ApiTestDefinition[] = [
     label: "RSS 호재 탐지 테스트",
     description: "실제 RSS 원문·SEC 8-K 본문에서 호재 신호·근거 점수 확인",
     endpoint: "/api/admin/market-rss-signal-test",
-    query: "resolveSec=true",
+    query: "resolveSec=true&resolveMarket=true",
   },
   {
     key: "sec_raw",

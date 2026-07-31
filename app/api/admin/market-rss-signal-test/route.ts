@@ -4,6 +4,7 @@ import { fetchAllMarketRss } from "@/lib/market-rss-sources";
 import { analyzeMarketNews } from "@/lib/market-news-signal";
 import { fetchSecRssBody } from "@/lib/sec-rss-body";
 import { extractSecCik, resolveSecCompanyTickers } from "@/lib/sec-company-ticker";
+import { resolveMarketNewsReactions } from "@/lib/market-news-market-reaction";
 
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
   const secCiks = fetched.results.flatMap((result) => result.ok && result.source === "SEC_EDGAR" ? result.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : []);
   let secTickers: Awaited<ReturnType<typeof resolveSecCompanyTickers>> = [];
   const resolveTickers = new URL(request.url).searchParams.get("resolveTickers") !== "false";
+  const resolveMarket = new URL(request.url).searchParams.get("resolveMarket") === "true";
   if (resolveTickers && secCiks.length) {
     try { secTickers = await resolveSecCompanyTickers(secCiks); } catch (error) { bodyErrors.push(error instanceof Error ? error.message : String(error)); }
   }
@@ -42,5 +44,7 @@ export async function GET(request: Request) {
       }
     }
   }
-  return NextResponse.json({ ok: true, fetchedAt: fetched.fetchedAt, totalPositiveCount: results.reduce((sum, result) => sum + result.positiveCount, 0), secTickers: { enabled: resolveTickers, mappedCount: secTickers.length, rows: secTickers }, secBody: { enabled: resolveBodies, attempts: bodyAttempts, successes: bodySuccesses, errors: bodyErrors, candidates: secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").sort((a, b) => b.signal.score - a.signal.score).slice(0, 20) }, results });
+  const marketCandidates = [...secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE"), ...results.flatMap((result) => result.ok ? result.candidates.filter(({ signal }) => signal.direction === "POSITIVE") : [])].slice(0, Number(process.env.SEC_SIGNAL_MARKET_LIMIT || 5));
+  const marketReactions = resolveMarket ? await resolveMarketNewsReactions(marketCandidates.map(({ item }) => item as { title: string }), secTickers, Number(process.env.SEC_SIGNAL_MARKET_LIMIT || 5)) : [];
+  return NextResponse.json({ ok: true, fetchedAt: fetched.fetchedAt, totalPositiveCount: results.reduce((sum, result) => sum + result.positiveCount, 0), secTickers: { enabled: resolveTickers, mappedCount: secTickers.length, rows: secTickers }, secBody: { enabled: resolveBodies, attempts: bodyAttempts, successes: bodySuccesses, errors: bodyErrors, candidates: secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").sort((a, b) => b.signal.score - a.signal.score).slice(0, 20) }, marketReaction: { enabled: resolveMarket, attempted: marketReactions.length, results: marketReactions }, results });
 }
