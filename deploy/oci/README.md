@@ -98,3 +98,49 @@ systemctl status stockman-cron.timer
 journalctl -u stockman.service -f
 journalctl -u stockman-cron.service -f
 ```
+# LibreTranslate (선택 설치)
+
+StockMan의 RSS 번역을 OCI 내부에서만 제공하려면 다음처럼 설치한다. 이 compose 파일은 포트 5000을 `127.0.0.1`에만 공개하므로 인터넷에 번역 서버가 노출되지 않는다.
+
+```bash
+sudo mkdir -p /opt/stockman/libretranslate
+sudo cp /opt/stockman/current/deploy/oci/libretranslate.compose.yml /opt/stockman/libretranslate/compose.yml
+cd /opt/stockman/libretranslate
+sudo docker compose -f compose.yml pull
+sudo docker compose -f compose.yml up -d
+sudo docker compose -f compose.yml ps
+curl -fsS http://127.0.0.1:5000/health
+```
+
+첫 기동은 영어·한국어 모델을 내려받아 1~2분 이상 걸릴 수 있다. 정상 확인 후 `/etc/stockman/stockman.env`에 다음을 추가하고 애플리케이션을 재시작한다.
+
+```env
+TRANSLATION_ENABLED=true
+TRANSLATION_PROVIDER=libretranslate
+LIBRETRANSLATE_URL=http://127.0.0.1:5000
+LIBRETRANSLATE_API_KEY=
+TRANSLATION_SOURCE_LANGUAGE=en
+TRANSLATION_TARGET_LANGUAGE=ko
+TRANSLATION_TIMEOUT_MS=10000
+```
+
+```bash
+sudo systemctl restart stockman.service
+```
+
+검증:
+
+```bash
+curl -fsS http://127.0.0.1:5000/translate \
+  -H 'content-type: application/json' \
+  -d '{"q":"Sky Quarry raises funds","source":"en","target":"ko","format":"text"}'
+```
+
+중지·업데이트:
+
+```bash
+cd /opt/stockman/libretranslate
+sudo docker compose -f compose.yml down
+sudo docker compose -f compose.yml pull
+sudo docker compose -f compose.yml up -d
+```
