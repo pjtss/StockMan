@@ -1,9 +1,12 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss } from "./market-rss-sources";
 import { translateMarketRssItem } from "./translate-market-rss-item";
 import { LibreTranslateClient } from "./libretranslate-client";
+import { classifyMarketRssItem } from "./market-rss-classifier";
+
+const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
 export async function ingestMarketRssArticles() {
   const db = getDb();
@@ -12,14 +15,27 @@ export async function ingestMarketRssArticles() {
   for (const result of fetched.results) {
     if (!result.ok) continue;
     for (const item of result.feed.items) {
+      const classification = classifyMarketRssItem(item);
+      const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
+      const isBacklog = Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
       const rows = await db.insert(marketRssArticles).values({
         source: item.source,
         externalId: item.id,
         title: item.title,
         summary: item.summary,
         link: item.link,
-        publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
-      }).onConflictDoNothing().returning({ id: marketRssArticles.id });
+        publishedAt,
+        category: classification.category,
+        priority: classification.priority,
+        notifyEligible: classification.notifyEligible,
+        isBacklog,
+      }).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
+        title: sql`excluded.title`, summary: sql`excluded.summary`,
+        link: sql`CASE WHEN ${marketRssArticles.link} = '' THEN excluded.link ELSE ${marketRssArticles.link} END`,
+        publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,
+        category: sql`excluded.category`, priority: sql`excluded.priority`,
+        notifyEligible: sql`excluded.notify_eligible`, isBacklog: sql`excluded.is_backlog`, updatedAt: new Date(),
+      }}).returning({ id: marketRssArticles.id });
       inserted += rows.length;
     }
   }
@@ -28,28 +44,44 @@ export async function ingestMarketRssArticles() {
 
 export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
-  const rows = await db.select().from(marketRssArticles).where(eq(marketRssArticles.translationStatus, "PENDING")).orderBy(asc(marketRssArticles.createdAt)).limit(limit);
+  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.translationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
   const client = new LibreTranslateClient();
   let translated = 0;
+  let fallback = 0;
+  let failed = 0;
+  const fallbackReasons: Record<string, number> = {};
   for (const row of rows) {
     try {
       const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, client);
-      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translationFallback: result.translationFallback, translationStatus: result.translationFallback ? "FALLBACK" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translationFallback: result.translationFallback, translationError: result.translationFallbackReason || null, translationAttempts: row.translationAttempts + 1, translationStatus: result.translationFallback ? "FALLBACK" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       translated++;
+      if (result.translationFallback) {
+        fallback++;
+        const reason = result.translationFallbackReason || "unknown";
+        fallbackReasons[reason] = (fallbackReasons[reason] || 0) + 1;
+      }
     } catch (error) {
-      await db.update(marketRssArticles).set({ translationStatus: "FAILED", lastError: error instanceof Error ? error.message : String(error), updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      failed++;
+      await db.update(marketRssArticles).set({ translationStatus: "FAILED", translationAttempts: row.translationAttempts + 1, translationError: error instanceof Error ? error.message : String(error), updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
     }
   }
-  return { attempted: rows.length, translated };
+  return { attempted: rows.length, translated, fallback, failed, fallbackReasons };
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {
   const webhook = process.env.MARKET_RSS_DISCORD_WEBHOOK_URL;
   if (!webhook) return { attempted: 0, sent: 0, skipped: true, reason: "webhook_not_configured" };
   const db = getDb();
-  const rows = await db.select().from(marketRssArticles).where(eq(marketRssArticles.notificationStatus, "PENDING")).orderBy(asc(marketRssArticles.createdAt)).limit(limit);
+  const now = Date.now();
+  const staleCutoff = new Date(now - articleAgeLimitMs());
+  await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "backlog_or_stale_article", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), or(eq(marketRssArticles.isBacklog, true), lt(marketRssArticles.publishedAt, staleCutoff))));
+  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false), or(isNull(marketRssArticles.publishedAt), gte(marketRssArticles.publishedAt, staleCutoff)))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.publishedAt)).limit(limit);
+  const perMinuteLimit = Math.max(1, Number(process.env.RSS_DISCORD_PER_MINUTE || 5));
+  const recent = await db.select({ count: sql<number>`count(*)` }).from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "SENT"), gte(marketRssArticles.notifiedAt, new Date(now - 60_000))));
+  let remaining = Math.max(0, perMinuteLimit - Number(recent[0]?.count || 0));
   let sent = 0;
   for (const row of rows) {
+    if (remaining <= 0) break;
     const title = row.translatedTitle || row.title;
     const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
     const body = [
@@ -64,9 +96,10 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
       await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: row.notificationAttempts + 1, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       sent++;
+      remaining--;
     } catch (error) {
       await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: row.notificationAttempts + 1, lastError: error instanceof Error ? error.message : String(error), updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
     }
   }
-  return { attempted: rows.length, sent, skipped: false };
+  return { attempted: rows.length, sent, skipped: false, perMinuteLimit, remainingAfterSend: remaining };
 }
