@@ -374,3 +374,17 @@ export const automationRuns = pgTable("automation_runs", {
   summary: jsonb("summary").notNull().default({}),
   errorMessage: text("error_message"),
 });
+
+export const discordDeliveryQueue = pgTable("discord_delivery_queue", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  externalId: text("external_id").notNull().unique(),
+  channelKey: text("channel_key").notNull(),
+  payload: jsonb("payload").notNull(),
+  status: text("status").notNull().default("PENDING"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
