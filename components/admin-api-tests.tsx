@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -120,6 +120,13 @@ const TESTS: ApiTestDefinition[] = [
     description: "GlobeNewswire·NASDAQ·NASDAQ Trader·SEC RSS를 한국어 번역과 함께 확인",
     endpoint: "/api/admin/market-rss-test",
     query: "translate=true",
+  },
+  {
+    key: "market_rss_signal",
+    label: "RSS 호재 탐지 테스트",
+    description: "실제 RSS 원문에서 호재 신호·SEC Item·티커·근거 점수 확인",
+    endpoint: "/api/admin/market-rss-signal-test",
+    query: "",
   },
   {
     key: "sec_raw",
