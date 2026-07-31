@@ -27,6 +27,7 @@ const NAV_ICONS = {
   modules: Settings2,
   blacklist: ListFilter,
   "sec-test": ChartNoAxesCombined,
+  observability: Activity,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;
 
 type AdminPageShellProps = {

@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "turnover-filters" | "api-config" | "api-tests" | "blacklist" | "sec-test";
+export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "turnover-filters" | "api-config" | "api-tests" | "blacklist" | "sec-test" | "observability";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -36,6 +36,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "기능별 관리",
     description: "기능별 공통 운영 설정과 전용 설정",
     href: "/admin/modules",
+  },
+  {
+    id: "observability",
+    group: "운영 제어",
+    label: "실행 진단",
+    description: "기능별 자동화 실행 이력과 오류 확인",
+    href: "/admin/observability",
   },
   {
     id: "api-config",
