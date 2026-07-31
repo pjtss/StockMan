@@ -24,4 +24,9 @@ describe("market news signal", () => {
     expect(signal.category).toBe("INSIDER");
     expect(signal.direction).toBe("UNKNOWN");
   });
+  it("offsets a material agreement when the filing also contains dilution", () => {
+    const signal = analyzeMarketNews({ source: "SEC_EDGAR", title: "8-K - ACME (ACM) filer", summary: "Item 1.01: Entry into a Material Definitive Agreement Item 3.02: Unregistered Sales of Equity Securities" });
+    expect(signal.score).toBeLessThan(25);
+    expect(signal.risks).toContain("SEC Item 3.02 미등록 주식 발행/희석");
+  });
 });
