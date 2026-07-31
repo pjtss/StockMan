@@ -1,6 +1,7 @@
 import { fetchUsTurnoverRatioScanner } from "@/lib/us-turnover-ratio";
 import { fetchUsMinuteTurnover, type UsMinuteTurnoverPoint } from "@/lib/kis-us-minute-turnover";
-import { sendUsObvToDiscord } from "@/lib/discord-us-obv";
+import { buildUsObvDiscordPayload, sendUsObvToDiscord } from "@/lib/discord-us-obv";
+import { enqueueDiscordDelivery } from "@/lib/discord-delivery-queue";
 import { getDb } from "@/lib/db";
 import { usTurnoverRatioSnapshots } from "@/lib/schema";
 import { and, gte, lte } from "drizzle-orm";
@@ -98,6 +99,9 @@ export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
   await Promise.all(Array.from({ length: Math.min(1, candidates.length) }, () => worker()));
   const rising = results.filter((item) => item["trend"] === "RISING");
   const discord = options.sendDiscord && rising.length > 0 ? await sendUsObvToDiscord(rising) : null;
-  if (discord && !discord.ok) throw new Error(`US OBV Discord failed with HTTP ${discord.status}`);
+  if (discord && !discord.ok) {
+    await enqueueDiscordDelivery({ externalId: `retry:OBV:${new Date().toISOString()}`, channelKey: "OBV", payload: buildUsObvDiscordPayload(rising) });
+    throw new Error(`US OBV Discord failed with HTTP ${discord.status}`);
+  }
   return { candidateCount: candidates.length, successCount: results.filter((item) => !item.error).length, failureCount: results.filter((item) => item.error).length, rising, discordSentCount: discord ? rising.length : 0, discordMode: options.sendDiscord ? (rising.length > 0 ? "SENT" : "NO_CANDIDATES") : "PREVIEW", results };
 }
