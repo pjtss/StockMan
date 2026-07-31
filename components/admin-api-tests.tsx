@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -113,6 +113,13 @@ const TESTS: ApiTestDefinition[] = [
     description: "검증·Discord 전송·실패 상태와 재시도 횟수",
     endpoint: "/api/admin/us-news-radar-events",
     query: "",
+  },
+  {
+    key: "market_rss",
+    label: "시장 RSS 번역 테스트",
+    description: "GlobeNewswire·NASDAQ·NASDAQ Trader·SEC RSS를 한국어 번역과 함께 확인",
+    endpoint: "/api/admin/market-rss-test",
+    query: "translate=true",
   },
   {
     key: "sec_raw",
@@ -245,7 +252,7 @@ export function AdminApiTests() {
               {test.key === "us_free_float" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={freeFloatTicker} onChange={(event) => setFreeFloatTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
-              {test.key === "short_interest" && (
+          {test.key === "short_interest" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={shortInterestTicker} onChange={(event) => setShortInterestTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
 
