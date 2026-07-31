@@ -6,6 +6,7 @@ function webhookFor(channelKey: string) {
     US_TURNOVER_RATIO_INCREASE: process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL,
     OBV: process.env.US_OBV_DISCORD_WEBHOOK_URL,
     NEWS_RADAR: process.env.NEWS_RADAR_DISCORD_WEBHOOK_URL,
+    BREAKING_NEWS: process.env.KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL,
   };
   return map[channelKey]?.trim() || "";
 }

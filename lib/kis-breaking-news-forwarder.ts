@@ -2,7 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { usBreakingNewsDiscordDeliveries } from "./schema";
 import { fetchBreakingNews, type KisBreakingNews } from "./kis-news-radar";
-import { isBreakingNewsDiscordConfigured, sendBreakingNewsToDiscord } from "./discord-breaking-news";
+import { buildBreakingNewsPayload, isBreakingNewsDiscordConfigured, sendBreakingNewsToDiscord } from "./discord-breaking-news";
+import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 
 function publishedAt(event: KisBreakingNews) { return new Date(`${event.date.slice(0, 4)}-${event.date.slice(4, 6)}-${event.date.slice(6, 8)}T${event.time.slice(0, 2)}:${event.time.slice(2, 4)}:${event.time.slice(4, 6)}+09:00`); }
 
@@ -24,6 +25,7 @@ export async function forwardBreakingNews(options: { send: boolean; date?: strin
       result.push({ externalId, title: event.title, status: "SENT" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      await enqueueDiscordDelivery({ externalId: `retry:BREAKING_NEWS:${externalId}:${Date.now()}`, channelKey: "BREAKING_NEWS", payload: buildBreakingNewsPayload(event) });
       if (db) await db.insert(usBreakingNewsDiscordDeliveries).values({ externalId, title: event.title, source: event.source, publishedAt: publishedAt(event), status: "FAILED", attempts: 1, lastError: message, updatedAt: new Date() }).onConflictDoUpdate({ target: usBreakingNewsDiscordDeliveries.externalId, set: { status: "FAILED", attempts: 1, lastError: message, updatedAt: new Date() } });
       result.push({ externalId, title: event.title, status: "FAILED", error: message });
     }

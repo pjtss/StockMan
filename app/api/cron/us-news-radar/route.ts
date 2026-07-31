@@ -3,7 +3,8 @@ import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { detectNewsCandidates } from "@/lib/kis-news-radar";
-import { isNewsRadarDiscordConfigured, sendNewsRadarAlertToDiscord } from "@/lib/discord-news-radar";
+import { buildNewsRadarDiscordPayload, isNewsRadarDiscordConfigured, sendNewsRadarAlertToDiscord } from "@/lib/discord-news-radar";
+import { enqueueDiscordDelivery } from "@/lib/discord-delivery-queue";
 import type { AlertItem } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { alertEvents, usNewsRadarEvents } from "@/lib/schema";
@@ -51,6 +52,7 @@ async function handle(request: Request) {
       if (!candidate) continue;
       const sent = await sendNewsRadarAlertToDiscord(alert, candidate.marketReaction);
       if (!sent.ok) {
+        await enqueueDiscordDelivery({ externalId: `retry:NEWS_RADAR:${alert.externalId}:${Date.now()}`, channelKey: "NEWS_RADAR", payload: buildNewsRadarDiscordPayload(alert, candidate.marketReaction) });
         await recordRadarEvent({ externalId: alert.externalId, ticker: candidate.symbol.ticker, market: candidate.market, title: candidate.event.title, status: "DISCORD_FAILED", error: `HTTP ${sent.status}` });
         throw new Error(`News radar Discord webhook failed with HTTP ${sent.status}`);
       }
