@@ -50,10 +50,13 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   const rows = await db.select().from(marketRssArticles).where(eq(marketRssArticles.notificationStatus, "PENDING")).orderBy(asc(marketRssArticles.createdAt)).limit(limit);
   let sent = 0;
   for (const row of rows) {
+    const title = row.translatedTitle || row.title;
+    const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
     const body = [
-      `**${row.translatedTitle || row.title}**`,
-      row.translatedSummary || row.summary,
-      row.link ? `[원문 보기](${row.link})` : "",
+      "🚨 **해외시장 RSS 속보**",
+      titleLine,
+      row.translatedTitle && row.translatedTitle !== row.title ? `원문 제목: ${row.title}` : "",
+      row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
       `출처: ${row.source}${row.translationFallback ? " · 번역 fallback" : ""}`,
     ].filter(Boolean).join("\n");
     try {

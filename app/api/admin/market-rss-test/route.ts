@@ -6,6 +6,14 @@ import { translateMarketRssItems } from "@/lib/translate-market-rss-item";
 const withTranslation = async (feed: Awaited<ReturnType<typeof fetchMarketRssSource>>, translate: boolean) =>
   translate ? { ...feed, items: await translateMarketRssItems(feed.items) } : feed;
 
+async function translateResultsSequentially(result: Awaited<ReturnType<typeof fetchAllMarketRss>>) {
+  const results = [];
+  for (const item of result.results) {
+    results.push(item.ok ? { ...item, feed: await withTranslation(item.feed, true) } : item);
+  }
+  return results;
+}
+
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const source = new URL(request.url).searchParams.get("source")?.toUpperCase();
@@ -13,7 +21,7 @@ export async function GET(request: Request) {
   if (!source) {
     const result = await fetchAllMarketRss();
     if (!translate) return NextResponse.json(result);
-    return NextResponse.json({ ...result, results: await Promise.all(result.results.map(async (item) => item.ok ? { ...item, feed: await withTranslation(item.feed, true) } : item)) });
+    return NextResponse.json({ ...result, results: await translateResultsSequentially(result) });
   }
   if (!MARKET_RSS_SOURCES.includes(source as MarketRssSource)) return NextResponse.json({ error: "지원하지 않는 RSS source", sources: MARKET_RSS_SOURCES }, { status: 400 });
   try {
