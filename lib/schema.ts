@@ -56,6 +56,7 @@ export const usTurnoverRatioSnapshots = pgTable(
     low: doublePrecision("low"),
     changeRate: doublePrecision("change_rate"),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
   },
   (table) => [uniqueIndex("us_turnover_ratio_snapshot_market_code_time").on(table.market, table.code, table.observedAt)]
 );
