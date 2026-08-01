@@ -1,4 +1,4 @@
-import { pgTable, bigserial, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART 및 SEC 공시 이력 엔티티
@@ -306,9 +306,22 @@ export const usDailyBreakoutWatchlist = pgTable(
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
   },
   (table) => [uniqueIndex("us_daily_breakout_watchlist_market_code_unique").on(table.market, table.code)]
 );
+
+export const usInstruments = pgTable("us_instruments", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code").notNull(),
+  name: text("name").notNull().default(""),
+  exchange: text("exchange").notNull().default(""),
+  currency: text("currency").notNull().default("USD"),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("us_instruments_market_code_unique").on(table.market, table.code)]);
 
 export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
   id: bigserial("id", { mode: "number" }).primaryKey(),

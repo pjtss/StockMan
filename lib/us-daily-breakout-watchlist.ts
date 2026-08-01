@@ -1,6 +1,6 @@
 import { and, asc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usDailyBreakoutWatchlist } from "@/lib/schema";
+import { usDailyBreakoutWatchlist, usInstruments } from "@/lib/schema";
 import { usTurnoverRatioSnapshots } from "@/lib/schema";
 
 export async function listUsDailyBreakoutWatchlist() {
@@ -15,7 +15,8 @@ export async function addUsDailyBreakoutWatchlist(input: { market: string; code:
   const market = input.market.trim().toUpperCase();
   const code = input.code.trim().toUpperCase();
   if (!["NAS", "NYS", "AMS"].includes(market) || !code) throw new Error("market must be NAS, NYS, or AMS and code is required");
-  const [row] = await db.insert(usDailyBreakoutWatchlist).values({ market, code, name: input.name?.trim() ?? "", enabled: true }).onConflictDoUpdate({ target: [usDailyBreakoutWatchlist.market, usDailyBreakoutWatchlist.code], set: { name: input.name?.trim() ?? "", enabled: true, updatedAt: new Date() } }).returning();
+  const [instrument] = await db.insert(usInstruments).values({ market, code, name: input.name?.trim() ?? "" }).onConflictDoUpdate({ target: [usInstruments.market, usInstruments.code], set: { name: input.name?.trim() ?? "", updatedAt: new Date() } }).returning();
+  const [row] = await db.insert(usDailyBreakoutWatchlist).values({ market, code, name: input.name?.trim() ?? "", instrumentId: instrument.id, enabled: true }).onConflictDoUpdate({ target: [usDailyBreakoutWatchlist.market, usDailyBreakoutWatchlist.code], set: { name: input.name?.trim() ?? "", instrumentId: instrument.id, enabled: true, updatedAt: new Date() } }).returning();
   return row;
 }
 
@@ -36,7 +37,8 @@ export async function syncUsDailyBreakoutWatchlistFromTurnoverSnapshots() {
     const market = item.market.trim().toUpperCase(); const code = item.code.trim().toUpperCase();
     if (!["NAS", "NYS", "AMS"].includes(market) || !code || keys.has(`${market}:${code}`)) continue;
     keys.add(`${market}:${code}`);
-    await db.insert(usDailyBreakoutWatchlist).values({ market, code, name: item.name, source: "TURNOVER_SNAPSHOT", enabled: true }).onConflictDoUpdate({ target: [usDailyBreakoutWatchlist.market, usDailyBreakoutWatchlist.code], set: { name: item.name, source: "TURNOVER_SNAPSHOT", enabled: true, updatedAt: new Date() } });
+    const [instrument] = await db.insert(usInstruments).values({ market, code, name: item.name }).onConflictDoUpdate({ target: [usInstruments.market, usInstruments.code], set: { name: item.name, updatedAt: new Date() } }).returning();
+    await db.insert(usDailyBreakoutWatchlist).values({ market, code, name: item.name, instrumentId: instrument.id, source: "TURNOVER_SNAPSHOT", enabled: true }).onConflictDoUpdate({ target: [usDailyBreakoutWatchlist.market, usDailyBreakoutWatchlist.code], set: { name: item.name, instrumentId: instrument.id, source: "TURNOVER_SNAPSHOT", enabled: true, updatedAt: new Date() } });
   }
   return { source: "TURNOVER_SNAPSHOT", importedCount: keys.size };
 }
