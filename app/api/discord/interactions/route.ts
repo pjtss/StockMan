@@ -15,7 +15,7 @@ async function updateOriginalResponse(applicationId: string, token: string, cont
 }
 
 function formatBreakoutResult(result: Awaited<ReturnType<typeof runUsDailyBreakoutScan>>) {
-  if (!result.qualified.length) return `오늘 5거래일 고가 돌파 종목이 없습니다. (관심종목 ${result.watchlistCount}개)`;
+  if (!result.qualified.length) return [`오늘 5거래일 고가 돌파 종목이 없습니다. (관심종목 ${result.watchlistCount}개)`, "", "분석 대상", ...result.results.map((item) => `- ${item.market} ${item.code}: ${item.error || `현재가 ${item.currentPrice} / 직전 5일 최고가 ${item.previousFiveDayHigh} (미돌파)`}`)].join("\n");
   return [`🚨 **일봉 5거래일 고가 돌파 후보**`, `관심종목 ${result.watchlistCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [
     `**${item.market} ${item.code}**`,
     `현재가 ${item.currentPrice} · 직전 5일 최고가 ${item.previousFiveDayHigh}`,
