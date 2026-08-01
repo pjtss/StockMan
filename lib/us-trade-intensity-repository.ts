@@ -2,16 +2,18 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usTradeIntensityTicks } from "@/lib/schema";
 import type { KisUsTrade } from "@/lib/kis-us-trade-trend";
+import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 
 export type TradeIntensityScope = { market: string; code: string };
 
 export async function saveUsTradeIntensityTicks(scope: TradeIntensityScope, trades: KisUsTrade[], fetchedAt = new Date()) {
   const db = getDb();
   if (!db || trades.length === 0) return { insertedCount: 0, skippedCount: trades.length };
+  const instrumentId = await ensureUsInstrument(scope);
   const values = trades.filter((trade) => trade.time).map((trade) => ({
     market: scope.market.toUpperCase(), code: scope.code.toUpperCase(), tradeTime: trade.time,
     price: trade.price, changeRate: trade.changeRate, volume: trade.volume, totalVolume: trade.totalVolume,
-    marketType: trade.marketType || null, bid: trade.bid, ask: trade.ask, intensity: trade.intensity, fetchedAt,
+    marketType: trade.marketType || null, bid: trade.bid, ask: trade.ask, intensity: trade.intensity, fetchedAt, instrumentId,
   }));
   if (values.length === 0) return { insertedCount: 0, skippedCount: trades.length };
   const inserted = await db.insert(usTradeIntensityTicks).values(values).onConflictDoNothing().returning({ id: usTradeIntensityTicks.id });

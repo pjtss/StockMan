@@ -9,6 +9,15 @@ export async function listUsDailyBreakoutWatchlist() {
   return db.select().from(usDailyBreakoutWatchlist).where(eq(usDailyBreakoutWatchlist.enabled, true)).orderBy(asc(usDailyBreakoutWatchlist.market), asc(usDailyBreakoutWatchlist.code));
 }
 
+export async function ensureUsInstrument(input: { market: string; code: string; name?: string }) {
+  const db = getDb();
+  if (!db) return null;
+  const market = input.market.trim().toUpperCase(); const code = input.code.trim().toUpperCase();
+  if (!market || !code) return null;
+  const [row] = await db.insert(usInstruments).values({ market, code, name: input.name?.trim() ?? "" }).onConflictDoUpdate({ target: [usInstruments.market, usInstruments.code], set: { name: input.name?.trim() ?? "", updatedAt: new Date() } }).returning({ id: usInstruments.id });
+  return row?.id ?? null;
+}
+
 export async function addUsDailyBreakoutWatchlist(input: { market: string; code: string; name?: string }) {
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");

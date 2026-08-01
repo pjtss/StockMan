@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usTurnoverRatioSnapshots } from "@/lib/schema";
+import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { classifyUsTurnoverSnapshotState, type UsTurnoverSnapshotState } from "@/lib/us-turnover-snapshot-state";
 
@@ -90,6 +91,7 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
     };
 
     if (persist) {
+      const instrumentId = await ensureUsInstrument({ market: item.market, code: item.code, name: item.name });
       await db.insert(usTurnoverRatioSnapshots).values({
         market: item.market,
         code: item.code,
@@ -103,6 +105,7 @@ export async function saveAndCalculateUsTurnoverRatioTrends(items: UsTurnoverRat
         low: item.low ?? null,
         changeRate: Number.parseFloat(item.changeRate) || null,
         observedAt,
+        instrumentId,
       }).onConflictDoNothing();
     }
     result.push({ ...item, trend });
