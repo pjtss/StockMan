@@ -9,6 +9,7 @@ import type { AlertItem } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { alertEvents, usNewsRadarEvents } from "@/lib/schema";
 import { sql } from "drizzle-orm";
+import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();
@@ -17,7 +18,8 @@ async function recordRadarEvent(input: { externalId: string; ticker: string; mar
   try {
     const db = getDb();
     if (!db) return;
-    await db.insert(usNewsRadarEvents).values({ externalId: input.externalId, ticker: input.ticker, market: input.market, title: input.title, status: input.status, attempts: 1, lastError: input.error ?? null, sentAt: input.sent ? new Date() : null, updatedAt: new Date() })
+    const instrumentId = input.market ? await ensureUsInstrument({ market: input.market, code: input.ticker }) : null;
+    await db.insert(usNewsRadarEvents).values({ externalId: input.externalId, ticker: input.ticker, market: input.market, instrumentId, title: input.title, status: input.status, attempts: 1, lastError: input.error ?? null, sentAt: input.sent ? new Date() : null, updatedAt: new Date() })
       .onConflictDoUpdate({ target: usNewsRadarEvents.externalId, set: { market: input.market, status: input.status, attempts: sql`${usNewsRadarEvents.attempts} + 1`, lastError: input.error ?? null, sentAt: input.sent ? new Date() : undefined, updatedAt: new Date() } });
   } catch { /* diagnostics must not stop the radar */ }
 }
