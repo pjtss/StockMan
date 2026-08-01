@@ -73,13 +73,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/admin/us-daily-breakout",
   },
   {
-    id: "api-tests",
-    group: "API 관리",
-    label: "API 테스트",
-    description: "KIS 및 스캐너 API 응답 확인",
-    href: "/admin/api-tests",
-  },
-  {
     id: "sec-test",
     group: "SEC 분석",
     label: "SEC 분석 테스트",
