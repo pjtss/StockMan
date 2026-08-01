@@ -329,6 +329,7 @@ export const usInstruments = pgTable("us_instruments", {
 export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   ticker: text("ticker").notNull(),
+  instrumentId: bigint("instrument_id", { mode: "number" }),
   shortVolume: doublePrecision("short_volume"),
   totalVolume: doublePrecision("total_volume"),
   shortVolumeRatio: doublePrecision("short_volume_ratio"),
