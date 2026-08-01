@@ -11,6 +11,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/scanner-schedules";
 import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
 import { loadLatestUsTradeIntensity } from "@/lib/us-trade-intensity-repository";
+import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 
 export function meetsTradingValueIncreaseAlert(value: number | null, threshold: number) {
   return value !== null && Number.isFinite(value) && value >= threshold;
@@ -45,7 +46,8 @@ async function executeUsTurnoverRatioAutomation() {
   if (!db) throw new Error("Database connection is not available.");
   const observedAt = new Date();
   for (const attempt of result.debug?.snapshotAttempts ?? []) {
-    await db.insert(usTurnoverRatioSnapshotAttempts).values({ ...attempt, observedAt });
+    const instrumentId = await ensureUsInstrument({ market: attempt.market, code: attempt.code, name: attempt.name });
+    await db.insert(usTurnoverRatioSnapshotAttempts).values({ ...attempt, instrumentId, observedAt });
   }
   const settings = await loadUsTurnoverFilterSettings();
   // Persist every successful detailed quote first. Alert eligibility is a
