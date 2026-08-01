@@ -1,6 +1,7 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usDailyBreakoutWatchlist } from "@/lib/schema";
+import { usTurnoverRatioSnapshots } from "@/lib/schema";
 
 export async function listUsDailyBreakoutWatchlist() {
   const db = getDb();
@@ -22,4 +23,20 @@ export async function removeUsDailyBreakoutWatchlist(market: string, code: strin
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");
   await db.update(usDailyBreakoutWatchlist).set({ enabled: false, updatedAt: new Date() }).where(and(eq(usDailyBreakoutWatchlist.market, market.trim().toUpperCase()), eq(usDailyBreakoutWatchlist.code, code.trim().toUpperCase())));
+}
+
+/** Copies recent scanner symbols into the dedicated daily-breakout table. Detection never reads snapshots directly. */
+export async function syncUsDailyBreakoutWatchlistFromTurnoverSnapshots() {
+  const db = getDb();
+  if (!db) throw new Error("Database connection is not available.");
+  const since = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+  const snapshots = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, name: usTurnoverRatioSnapshots.name }).from(usTurnoverRatioSnapshots).where(gte(usTurnoverRatioSnapshots.observedAt, since));
+  const keys = new Set<string>();
+  for (const item of snapshots) {
+    const market = item.market.trim().toUpperCase(); const code = item.code.trim().toUpperCase();
+    if (!["NAS", "NYS", "AMS"].includes(market) || !code || keys.has(`${market}:${code}`)) continue;
+    keys.add(`${market}:${code}`);
+    await db.insert(usDailyBreakoutWatchlist).values({ market, code, name: item.name, source: "TURNOVER_SNAPSHOT", enabled: true }).onConflictDoUpdate({ target: [usDailyBreakoutWatchlist.market, usDailyBreakoutWatchlist.code], set: { name: item.name, source: "TURNOVER_SNAPSHOT", enabled: true, updatedAt: new Date() } });
+  }
+  return { source: "TURNOVER_SNAPSHOT", importedCount: keys.size };
 }

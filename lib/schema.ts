@@ -302,6 +302,7 @@ export const usDailyBreakoutWatchlist = pgTable(
     market: text("market").notNull(),
     code: text("code").notNull(),
     name: text("name").notNull().default(""),
+    source: text("source").notNull().default("MANUAL"),
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

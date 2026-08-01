@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runUsDailyBreakoutScan } from "@/lib/us-daily-breakout-automation";
 import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
+import { syncUsDailyBreakoutWatchlistFromTurnoverSnapshots } from "@/lib/us-daily-breakout-watchlist";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -11,6 +12,6 @@ export async function POST(request: Request) {
   const hour = now.getUTCHours();
   const minute = now.getUTCMinutes();
   if (day === 0 || day === 6 || hour !== 9 || minute !== 1) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule", schedule: "weekdays 09:01 KST" });
-  try { const result = await runUsDailyBreakoutScan(); const discord = await sendUsDailyBreakoutToDiscord(result.qualified); return NextResponse.json({ ok: discord.ok, ...result, discord }); }
+  try { const sync = await syncUsDailyBreakoutWatchlistFromTurnoverSnapshots(); const result = await runUsDailyBreakoutScan(); const discord = await sendUsDailyBreakoutToDiscord(result.qualified); return NextResponse.json({ ok: discord.ok, sync, ...result, discord }); }
   catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }

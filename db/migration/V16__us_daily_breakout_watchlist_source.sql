@@ -1,0 +1,1 @@
+ALTER TABLE us_daily_breakout_watchlist ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'MANUAL';
