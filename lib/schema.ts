@@ -295,6 +295,20 @@ export const usFreeFloatSnapshots = pgTable("us_free_float_snapshots", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usDailyBreakoutWatchlist = pgTable(
+  "us_daily_breakout_watchlist",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    market: text("market").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull().default(""),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("us_daily_breakout_watchlist_market_code_unique").on(table.market, table.code)]
+);
+
 export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   ticker: text("ticker").notNull(),
