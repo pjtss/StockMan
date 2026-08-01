@@ -160,6 +160,7 @@ export function AdminApiTests() {
 
   async function runTest(test: ApiTestDefinition) {
     setRunning(test.key);
+    setCopied(false);
     setError(null);
     try {
       const query = test.key === "sec_raw"
@@ -183,7 +184,11 @@ export function AdminApiTests() {
       setResult(data);
       setActive(test.key);
     } catch (testError) {
-      setError(testError instanceof Error ? testError.message : String(testError));
+      const message = testError instanceof Error ? testError.message : String(testError);
+      const errorResult = { ok: false, error: message, endpoint: test.endpoint, query: test.query, checkedAt: new Date().toISOString() };
+      setResult(errorResult);
+      setActive(test.key);
+      setError(message);
     } finally {
       setRunning(null);
     }
