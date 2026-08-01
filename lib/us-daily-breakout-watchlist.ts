@@ -1,21 +1,11 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usDailyBreakoutWatchlist, usTurnoverRatioSnapshots } from "@/lib/schema";
+import { usDailyBreakoutWatchlist } from "@/lib/schema";
 
 export async function listUsDailyBreakoutWatchlist() {
   const db = getDb();
   if (!db) return [];
-  const registered = await db.select().from(usDailyBreakoutWatchlist).where(eq(usDailyBreakoutWatchlist.enabled, true)).orderBy(asc(usDailyBreakoutWatchlist.market), asc(usDailyBreakoutWatchlist.code));
-  const since = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
-  const snapshots = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, name: usTurnoverRatioSnapshots.name }).from(usTurnoverRatioSnapshots).where(gte(usTurnoverRatioSnapshots.observedAt, since));
-  const merged = new Map(registered.map((item) => [`${item.market}:${item.code}`, item]));
-  for (const item of snapshots) {
-    const market = item.market.trim().toUpperCase(); const code = item.code.trim().toUpperCase();
-    if (!["NAS", "NYS", "AMS"].includes(market) || !code) continue;
-    const key = `${market}:${code}`;
-    if (!merged.has(key)) merged.set(key, { id: 0, market, code, name: item.name, enabled: true, createdAt: new Date(), updatedAt: new Date() });
-  }
-  return Array.from(merged.values()).sort((a, b) => `${a.market}:${a.code}`.localeCompare(`${b.market}:${b.code}`));
+  return db.select().from(usDailyBreakoutWatchlist).where(eq(usDailyBreakoutWatchlist.enabled, true)).orderBy(asc(usDailyBreakoutWatchlist.market), asc(usDailyBreakoutWatchlist.code));
 }
 
 export async function addUsDailyBreakoutWatchlist(input: { market: string; code: string; name?: string }) {
