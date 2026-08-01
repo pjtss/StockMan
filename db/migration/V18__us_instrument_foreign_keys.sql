@@ -1,0 +1,17 @@
+ALTER TABLE us_trade_intensity_ticks ADD COLUMN IF NOT EXISTS instrument_id BIGINT;
+ALTER TABLE us_free_float_snapshots ADD COLUMN IF NOT EXISTS instrument_id BIGINT;
+ALTER TABLE us_turnover_ratio_snapshots ADD COLUMN IF NOT EXISTS instrument_id BIGINT;
+ALTER TABLE us_turnover_ratio_snapshot_attempts ADD COLUMN IF NOT EXISTS instrument_id BIGINT;
+ALTER TABLE us_news_radar_events ADD COLUMN IF NOT EXISTS instrument_id BIGINT;
+UPDATE us_trade_intensity_ticks t SET instrument_id = i.id FROM us_instruments i WHERE i.market = t.market AND i.code = t.code AND t.instrument_id IS NULL;
+UPDATE us_turnover_ratio_snapshots t SET instrument_id = i.id FROM us_instruments i WHERE i.market = t.market AND i.code = t.code AND t.instrument_id IS NULL;
+UPDATE us_turnover_ratio_snapshot_attempts t SET instrument_id = i.id FROM us_instruments i WHERE i.market = t.market AND i.code = t.code AND t.instrument_id IS NULL;
+UPDATE us_news_radar_events e SET instrument_id = i.id FROM us_instruments i WHERE i.market = e.market AND i.code = e.ticker AND e.instrument_id IS NULL;
+CREATE INDEX IF NOT EXISTS us_trade_intensity_ticks_instrument_idx ON us_trade_intensity_ticks (instrument_id);
+CREATE INDEX IF NOT EXISTS us_turnover_ratio_snapshots_instrument_idx ON us_turnover_ratio_snapshots (instrument_id);
+CREATE INDEX IF NOT EXISTS us_turnover_ratio_attempts_instrument_idx ON us_turnover_ratio_snapshot_attempts (instrument_id);
+ALTER TABLE us_trade_intensity_ticks ADD CONSTRAINT us_trade_intensity_ticks_instrument_fk FOREIGN KEY (instrument_id) REFERENCES us_instruments(id);
+ALTER TABLE us_free_float_snapshots ADD CONSTRAINT us_free_float_snapshots_instrument_fk FOREIGN KEY (instrument_id) REFERENCES us_instruments(id);
+ALTER TABLE us_turnover_ratio_snapshots ADD CONSTRAINT us_turnover_ratio_snapshots_instrument_fk FOREIGN KEY (instrument_id) REFERENCES us_instruments(id);
+ALTER TABLE us_turnover_ratio_snapshot_attempts ADD CONSTRAINT us_turnover_ratio_attempts_instrument_fk FOREIGN KEY (instrument_id) REFERENCES us_instruments(id);
+ALTER TABLE us_news_radar_events ADD CONSTRAINT us_news_radar_events_instrument_fk FOREIGN KEY (instrument_id) REFERENCES us_instruments(id);

@@ -273,6 +273,7 @@ export const usTradeIntensityTicks = pgTable(
     changeRate: doublePrecision("change_rate"),
     volume: doublePrecision("volume"),
     totalVolume: doublePrecision("total_volume"),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
     marketType: text("market_type"),
     bid: doublePrecision("bid"),
     ask: doublePrecision("ask"),
@@ -293,6 +294,7 @@ export const usFreeFloatSnapshots = pgTable("us_free_float_snapshots", {
   asOf: text("as_of"),
   source: text("source").notNull().default("FMP"),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  instrumentId: bigint("instrument_id", { mode: "number" }),
 });
 
 export const usDailyBreakoutWatchlist = pgTable(
@@ -360,6 +362,7 @@ export const usTurnoverRatioSnapshotAttempts = pgTable(
     turnoverRatio: doublePrecision("turnover_ratio"),
     errorMessage: text("error_message"),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
   },
   (table) => [index("us_turnover_ratio_attempt_market_code_time").on(table.market, table.code, table.observedAt)],
 );
@@ -406,6 +409,7 @@ export const usNewsRadarEvents = pgTable("us_news_radar_events", {
   externalId: text("external_id").primaryKey(),
   ticker: text("ticker").notNull(),
   market: text("market"),
+  instrumentId: bigint("instrument_id", { mode: "number" }),
   title: text("title").notNull(),
   status: text("status").notNull(),
   attempts: integer("attempts").notNull().default(0),
