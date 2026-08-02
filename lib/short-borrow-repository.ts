@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { shortBorrowSnapshots } from "@/lib/schema";
 import type { ShortBorrowResult } from "@/lib/alpaca-short-borrow";
+import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 
 export async function loadPreviousShortBorrow(symbol: string) {
   const db = getDb();
@@ -11,8 +12,10 @@ export async function loadPreviousShortBorrow(symbol: string) {
 
 export async function saveShortBorrowSnapshot(result: ShortBorrowResult) {
   const db = getDb();
+  const instrumentId = await ensureUsInstrument({ market: "NAS", code: result.symbol });
   await db.insert(shortBorrowSnapshots).values({
     symbol: result.symbol,
+    instrumentId: instrumentId ?? undefined,
     tradable: result.tradable,
     shortable: result.shortable,
     borrowStatus: result.borrowStatus,

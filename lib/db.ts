@@ -120,6 +120,7 @@ export async function ensureSchema() {
       CREATE TABLE IF NOT EXISTS short_borrow_snapshots (
         id BIGSERIAL PRIMARY KEY,
         symbol TEXT NOT NULL,
+        instrument_id BIGINT,
         tradable BOOLEAN NOT NULL,
         shortable BOOLEAN NOT NULL,
         borrow_status TEXT NOT NULL,

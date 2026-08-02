@@ -384,6 +384,7 @@ export const shortBorrowSnapshots = pgTable(
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     symbol: text("symbol").notNull(),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
     tradable: boolean("tradable").notNull(),
     shortable: boolean("shortable").notNull(),
     borrowStatus: text("borrow_status").notNull(),
