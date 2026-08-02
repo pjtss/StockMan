@@ -63,6 +63,7 @@ export const usTurnoverRatioSnapshots = pgTable(
 
 export const usTurnoverRatioBlacklist = pgTable("us_turnover_ratio_blacklist", {
   ticker: text("ticker").primaryKey(),
+  instrumentId: bigint("instrument_id", { mode: "number" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -227,8 +228,17 @@ export const usIntensityStocks = pgTable(
     price: text("price").notNull(),
     changeRate: text("change_rate").notNull(),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
   }
 );
+
+/** Canonical instrument membership for the turnover-trend watchlist. */
+export const usTurnoverWatchlist = pgTable("us_turnover_watchlist", {
+  instrumentId: bigint("instrument_id", { mode: "number" }).primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const marketRssArticles = pgTable(
   "market_rss_articles",
@@ -404,6 +414,7 @@ export const featureModuleSettings = pgTable("feature_module_settings", {
 export const usNewsTickerExchangeCache = pgTable("us_news_ticker_exchange_cache", {
   ticker: text("ticker").primaryKey(),
   market: text("market").notNull(),
+  instrumentId: bigint("instrument_id", { mode: "number" }),
   validatedAt: timestamp("validated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

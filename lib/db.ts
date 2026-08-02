@@ -162,9 +162,13 @@ export async function ensureSchema() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS us_turnover_ratio_blacklist (
         ticker TEXT PRIMARY KEY,
+        instrument_id BIGINT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await client.query(`ALTER TABLE us_turnover_ratio_blacklist ADD COLUMN IF NOT EXISTS instrument_id BIGINT`);
+    await client.query(`ALTER TABLE IF EXISTS us_news_ticker_exchange_cache ADD COLUMN IF NOT EXISTS instrument_id BIGINT`);
+    await client.query(`ALTER TABLE IF EXISTS us_intensity_stocks ADD COLUMN IF NOT EXISTS instrument_id BIGINT`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS sec_automation_events (

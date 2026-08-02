@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { usNewsTickerExchangeCache } from "@/lib/schema";
 import { and, eq, gte } from "drizzle-orm";
 import { scoreNewsTitle } from "@/lib/news-title-filter";
+import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({
@@ -56,8 +57,9 @@ async function cacheMarket(ticker: string, market: string) {
   try {
     const db = getDb();
     if (!db) return;
-    await db.insert(usNewsTickerExchangeCache).values({ ticker, market, validatedAt: new Date() })
-      .onConflictDoUpdate({ target: usNewsTickerExchangeCache.ticker, set: { market, validatedAt: new Date() } });
+    const instrument = await ensureUsInstrument({ market, code: ticker });
+    await db.insert(usNewsTickerExchangeCache).values({ ticker, market, instrumentId: instrument ?? undefined, validatedAt: new Date() })
+      .onConflictDoUpdate({ target: usNewsTickerExchangeCache.ticker, set: { market, instrumentId: instrument ?? undefined, validatedAt: new Date() } });
   } catch { /* cache is an optimization; KIS validation remains authoritative */ }
 }
 

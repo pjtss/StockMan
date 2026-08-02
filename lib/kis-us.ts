@@ -6,6 +6,7 @@ import { buildKisAuthorization, isKisTokenExpiredErrorMessage } from "./kis-auth
 import { loadKisApiConfig } from "./kis-api-config";
 import { loadUsTopRisingCount } from "./kis-top-n";
 import { buildKisUsRequestDebug, pushKisUsDebugLog } from "./kis-us-debug";
+import { ensureUsInstrument } from "./us-daily-breakout-watchlist";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
@@ -568,6 +569,7 @@ export async function syncUsTradingIntensityStocks(): Promise<UsIntensityStockIt
       console.info("[SYNC-US] usIntensityStocks table empty, performing initial insert.");
       await db.delete(usIntensityStocks);
       for (const s of newTop10) {
+        const instrument = await ensureUsInstrument({ market: "NAS", code: s.code, name: s.company });
         await db.insert(usIntensityStocks).values({
           code: s.code,
           company: s.company,
@@ -575,6 +577,7 @@ export async function syncUsTradingIntensityStocks(): Promise<UsIntensityStockIt
           price: s.price,
           changeRate: s.changeRate,
           addedAt: new Date(),
+          instrumentId: instrument ?? undefined,
         }).onConflictDoNothing();
       }
       return newTop10;
@@ -591,6 +594,7 @@ export async function syncUsTradingIntensityStocks(): Promise<UsIntensityStockIt
     for (const s of newTop10) {
       const existing = oldTop10.find((x) => x.code === s.code);
       if (!existing) {
+        const instrument = await ensureUsInstrument({ market: "NAS", code: s.code, name: s.company });
         await db.insert(usIntensityStocks).values({
           code: s.code,
           company: s.company,
@@ -598,13 +602,18 @@ export async function syncUsTradingIntensityStocks(): Promise<UsIntensityStockIt
           price: s.price,
           changeRate: s.changeRate,
           addedAt: new Date(),
+          instrumentId: instrument ?? undefined,
         }).onConflictDoNothing();
       } else {
+        const instrument = existing.instrumentId
+          ? null
+          : await ensureUsInstrument({ market: "NAS", code: s.code, name: s.company });
         await db.update(usIntensityStocks)
           .set({
             intensity: s.intensity,
             price: s.price,
             changeRate: s.changeRate,
+            ...(instrument ? { instrumentId: instrument } : {}),
           })
           .where(eq(usIntensityStocks.code, s.code));
       }
