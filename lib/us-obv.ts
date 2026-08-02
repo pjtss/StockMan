@@ -30,8 +30,20 @@ export function calculateObv(points: UsMinuteTurnoverPoint[]) {
   const spreads = recent.filter((point) => point.bid && point.ask && point.bid > 0).map((point) => ((point.ask! - point.bid!) / point.bid!) * 100);
   const maxSpread = spreads.length ? Math.max(...spreads) : null;
   const risingBarRate = recent.length > 1 ? recentRisingBars / (recent.length - 1) : 0;
-  const qualifies = ordered.length >= 30 && recentObv > priorObv && risingBarRate >= 0.6 && vwap !== null && lastPrice >= vwap && (drawdownFromHigh === null || drawdownFromHigh <= 5) && minuteRvol !== null && minuteRvol >= 1.5 && (maxSpread === null || maxSpread <= 2);
-  return { pointCount: ordered.length, obv, recentObv, priorObv, risingBars, risingBarRate, vwap, lastPrice, drawdownFromHigh, minuteRvol, maxSpread, trend: qualifies ? "RISING" : "FILTERED" };
+  const filterReasons: string[] = [];
+  if (ordered.length < 30) filterReasons.push("insufficient_bars");
+  if (recentObv <= priorObv) filterReasons.push("obv_not_rising");
+  // 30-minute windows can contain many unchanged bars, so 40% is the
+  // candidate threshold; stronger callers can rank 60%+ separately.
+  if (risingBarRate < 0.4) filterReasons.push("rising_bar_rate_below_0.4");
+  if (vwap === null) filterReasons.push("vwap_unavailable");
+  else if (lastPrice < vwap) filterReasons.push("below_vwap");
+  if (drawdownFromHigh !== null && drawdownFromHigh > 5) filterReasons.push("drawdown_over_5pct");
+  if (minuteRvol === null) filterReasons.push("rvol_unavailable");
+  else if (minuteRvol < 1.5) filterReasons.push("rvol_below_1.5");
+  if (maxSpread !== null && maxSpread > 2) filterReasons.push("spread_over_2pct");
+  const qualifies = filterReasons.length === 0;
+  return { pointCount: ordered.length, obv, recentObv, priorObv, risingBars, risingBarRate, vwap, lastPrice, drawdownFromHigh, minuteRvol, maxSpread, spreadAvailable: maxSpread !== null, filterReasons, trend: qualifies ? "RISING" : "FILTERED" };
 }
 
 function calculateObvValue(points: UsMinuteTurnoverPoint[]) {
