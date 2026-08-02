@@ -398,6 +398,36 @@ export const shortBorrowSnapshots = pgTable(
   ],
 );
 
+/** 공매도·대차 원천을 공통 조회할 수 있는 정규화 스냅샷. */
+export const usShortMetrics = pgTable(
+  "us_short_metrics",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    instrumentId: bigint("instrument_id", { mode: "number" }),
+    ticker: text("ticker").notNull(),
+    metricType: text("metric_type").notNull(),
+    source: text("source").notNull(),
+    accountScope: text("account_scope").notNull().default("MARKET"),
+    status: text("status").notNull(),
+    asOf: text("as_of"),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    shortVolume: doublePrecision("short_volume"),
+    totalVolume: doublePrecision("total_volume"),
+    shortVolumeRatio: doublePrecision("short_volume_ratio"),
+    shortInterest: doublePrecision("short_interest"),
+    daysToCover: doublePrecision("days_to_cover"),
+    availableQty: integer("available_qty"),
+    locateFeeRatePercent: doublePrecision("locate_fee_rate_percent"),
+    pressureScore: integer("pressure_score"),
+    pressureLevel: text("pressure_level"),
+    rawPayload: jsonb("raw_payload").notNull().default({}),
+  },
+  (table) => [
+    index("us_short_metrics_instrument_observed_idx").on(table.instrumentId, table.observedAt),
+    index("us_short_metrics_type_observed_idx").on(table.metricType, table.observedAt),
+  ],
+);
+
 export const featureModuleSettings = pgTable("feature_module_settings", {
   moduleKey: text("module_key").primaryKey(),
   settings: jsonb("settings").notNull(),

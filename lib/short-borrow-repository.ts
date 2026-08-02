@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { shortBorrowSnapshots } from "@/lib/schema";
 import type { ShortBorrowResult } from "@/lib/alpaca-short-borrow";
 import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { saveShortMetric } from "@/lib/short-metrics-repository";
 
 export async function loadPreviousShortBorrow(symbol: string) {
   const db = getDb();
@@ -28,6 +29,18 @@ export async function saveShortBorrowSnapshot(result: ShortBorrowResult) {
     pressureLevel: result.pressureLevel,
     quotedAt: result.quotedAt ? new Date(result.quotedAt) : null,
     fetchedAt: new Date(result.fetchedAt),
+  });
+  await saveShortMetric({
+    ticker: result.symbol,
+    metricType: "BORROW_AVAILABILITY",
+    source: result.source ?? "ALPACA",
+    accountScope: "ALPACA_ACCOUNT_SPECIFIC",
+    status: result.borrowStatus,
+    availableQty: result.availableQty,
+    locateFeeRatePercent: result.locateFeeRatePercent,
+    pressureScore: result.pressureScore,
+    pressureLevel: result.pressureLevel,
+    rawPayload: result,
   });
   return result;
 }

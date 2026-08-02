@@ -1,6 +1,7 @@
 import { and, desc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usShortInterestSnapshots, usNewsTickerExchangeCache } from "@/lib/schema";
+import { saveShortMetric } from "@/lib/short-metrics-repository";
 import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
 import type { ShortInterestMetric } from "@/lib/short-interest-types";
 
@@ -15,5 +16,6 @@ export async function saveShortInterest(metric: ShortInterestMetric, fetchedAt =
   const [marketRow] = await db.select({ market: usNewsTickerExchangeCache.market }).from(usNewsTickerExchangeCache).where(eq(usNewsTickerExchangeCache.ticker, metric.ticker.toUpperCase())).limit(1);
   const instrumentId = marketRow?.market ? await ensureUsInstrument({ market: marketRow.market, code: metric.ticker }) : null;
   const [row] = await db.insert(usShortInterestSnapshots).values({ ticker: metric.ticker, instrumentId, shortVolume: metric.shortVolume, totalVolume: metric.totalVolume, shortVolumeRatio: metric.shortVolumeRatio, shortInterest: metric.shortInterest, daysToCover: metric.daysToCover, previousShortInterest: metric.previousShortInterest ?? null, shortInterestChange: metric.shortInterestChange ?? null, shortInterestChangePercent: metric.shortInterestChangePercent ?? null, averageDailyVolume: metric.averageDailyVolume ?? null, thresholdListed: metric.thresholdListed ?? null, thresholdAsOf: metric.thresholdAsOf ?? null, asOf: metric.asOf, shortVolumeAsOf: metric.shortVolumeAsOf ?? null, shortInterestAsOf: metric.shortInterestAsOf ?? null, source: metric.source, status: metric.status, fetchedAt }).onConflictDoUpdate({ target: [usShortInterestSnapshots.ticker, usShortInterestSnapshots.source, usShortInterestSnapshots.asOf], set: { instrumentId, shortVolume: metric.shortVolume, totalVolume: metric.totalVolume, shortVolumeRatio: metric.shortVolumeRatio, shortInterest: metric.shortInterest, daysToCover: metric.daysToCover, previousShortInterest: metric.previousShortInterest ?? null, shortInterestChange: metric.shortInterestChange ?? null, shortInterestChangePercent: metric.shortInterestChangePercent ?? null, averageDailyVolume: metric.averageDailyVolume ?? null, thresholdListed: metric.thresholdListed ?? null, thresholdAsOf: metric.thresholdAsOf ?? null, shortVolumeAsOf: metric.shortVolumeAsOf ?? null, shortInterestAsOf: metric.shortInterestAsOf ?? null, status: metric.status, fetchedAt } }).returning();
+  await saveShortMetric({ ticker: metric.ticker, metricType: "SHORT_INTEREST", source: metric.source, status: metric.status, asOf: metric.asOf, shortVolume: metric.shortVolume, totalVolume: metric.totalVolume, shortVolumeRatio: metric.shortVolumeRatio, shortInterest: metric.shortInterest, daysToCover: metric.daysToCover, rawPayload: metric });
   return row ?? null;
 }
