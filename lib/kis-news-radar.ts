@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db";
 import { usNewsTickerExchangeCache } from "@/lib/schema";
 import { and, eq, gte } from "drizzle-orm";
 import { scoreNewsTitle } from "@/lib/news-title-filter";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({

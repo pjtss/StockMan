@@ -1,7 +1,7 @@
 import { and, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usFreeFloatSnapshots, usNewsTickerExchangeCache } from "@/lib/schema";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 import type { FreeFloatResult } from "@/lib/fmp-free-float";
 
 export async function loadFreshFreeFloat(ticker: string, now = new Date()) {

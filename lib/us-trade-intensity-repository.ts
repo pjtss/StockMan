@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usTradeIntensityTicks } from "@/lib/schema";
 import type { KisUsTrade } from "@/lib/kis-us-trade-trend";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 
 export type TradeIntensityScope = { market: string; code: string };
 

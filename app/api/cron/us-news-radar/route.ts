@@ -9,7 +9,7 @@ import type { AlertItem } from "@/lib/types";
 import { getDb } from "@/lib/db";
 import { alertEvents, usNewsRadarEvents } from "@/lib/schema";
 import { sql } from "drizzle-orm";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();

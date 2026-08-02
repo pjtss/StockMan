@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usTurnoverRatioSnapshots } from "@/lib/schema";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { classifyUsTurnoverSnapshotState, type UsTurnoverSnapshotState } from "@/lib/us-turnover-snapshot-state";
 

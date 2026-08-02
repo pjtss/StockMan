@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usTurnoverRatioBlacklist } from "@/lib/schema";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 
 export function normalizeUsTicker(value: unknown) {
   return String(value ?? "").trim().toUpperCase();

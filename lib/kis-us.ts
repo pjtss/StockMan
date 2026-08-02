@@ -6,7 +6,7 @@ import { buildKisAuthorization, isKisTokenExpiredErrorMessage } from "./kis-auth
 import { loadKisApiConfig } from "./kis-api-config";
 import { loadUsTopRisingCount } from "./kis-top-n";
 import { buildKisUsRequestDebug, pushKisUsDebugLog } from "./kis-us-debug";
-import { ensureUsInstrument } from "./us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "./us-instruments";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;

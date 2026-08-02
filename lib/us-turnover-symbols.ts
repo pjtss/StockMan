@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { usInstruments, usTurnoverWatchlist } from "./schema";
-import { ensureUsInstrument } from "./us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "./us-instruments";
 import { asc, eq } from "drizzle-orm";
 
 function normalizeSymbols(symbols: string[]) {

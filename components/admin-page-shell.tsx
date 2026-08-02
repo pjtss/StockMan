@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
-  CandlestickChart,
   ChartNoAxesCombined,
   Clock3,
   FlaskConical,
@@ -27,7 +26,6 @@ const NAV_ICONS = {
   "turnover-filters": ListFilter,
   modules: Settings2,
   blacklist: ListFilter,
-  "daily-breakout": CandlestickChart,
   "sec-test": ChartNoAxesCombined,
   observability: Activity,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;

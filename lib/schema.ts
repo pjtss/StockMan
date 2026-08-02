@@ -300,22 +300,6 @@ export const usFreeFloatSnapshots = pgTable("us_free_float_snapshots", {
   instrumentId: bigint("instrument_id", { mode: "number" }),
 });
 
-export const usDailyBreakoutWatchlist = pgTable(
-  "us_daily_breakout_watchlist",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    market: text("market").notNull(),
-    code: text("code").notNull(),
-    name: text("name").notNull().default(""),
-    source: text("source").notNull().default("MANUAL"),
-    enabled: boolean("enabled").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-    instrumentId: bigint("instrument_id", { mode: "number" }),
-  },
-  (table) => [uniqueIndex("us_daily_breakout_watchlist_market_code_unique").on(table.market, table.code)]
-);
-
 export const usInstruments = pgTable("us_instruments", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   market: text("market").notNull(),

@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usShortMetrics } from "@/lib/schema";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 
 type SaveShortMetricInput = {
   ticker: string;

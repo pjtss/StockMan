@@ -4,7 +4,7 @@ import { KIS_APPKEY, KIS_APPSECRET, getDynamicOffset } from "./kis-runtime";
 
 import { getDb } from "./db";
 import { topRisingStocks, topIntensityStocks } from "./schema";
-import { ensureUsInstrument } from "./us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "./us-instruments";
 import { eq, inArray } from "drizzle-orm";
 import { getAccessToken } from "./kis-token";
 import { readKisCache, writeKisCache } from "./kis-cache";

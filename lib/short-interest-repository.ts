@@ -2,7 +2,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usShortInterestSnapshots, usNewsTickerExchangeCache } from "@/lib/schema";
 import { saveShortMetric } from "@/lib/short-metrics-repository";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 import type { ShortInterestMetric } from "@/lib/short-interest-types";
 
 export async function loadTodayShortInterest(ticker: string, source: ShortInterestMetric["source"], now = new Date()) {

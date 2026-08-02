@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { shortBorrowSnapshots } from "@/lib/schema";
 import type { ShortBorrowResult } from "@/lib/alpaca-short-borrow";
-import { ensureUsInstrument } from "@/lib/us-daily-breakout-watchlist";
+import { ensureUsInstrument } from "@/lib/us-instruments";
 import { saveShortMetric } from "@/lib/short-metrics-repository";
 
 export async function loadPreviousShortBorrow(symbol: string) {
