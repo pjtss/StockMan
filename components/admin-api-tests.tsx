@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_daily_breakout" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -100,6 +100,9 @@ const TESTS: ApiTestDefinition[] = [
     query: "ticker=AAPL",
   },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
+  { key: "us_mfi", label: "미국 MFI 과매도", description: "통합 종목의 저장 데이터 기반 MFI 과매도 스캔", endpoint: "/api/admin/us-mfi-test", query: "period=14&threshold=20" },
+  { key: "us_macd", label: "미국 MACD", description: "통합 종목의 저장 데이터 기반 MACD 추세 스캔", endpoint: "/api/admin/us-macd-test", query: "" },
+  { key: "us_dmi", label: "미국 DMI·ADX", description: "통합 종목의 저장 데이터 기반 DMI·ADX 추세 스캔", endpoint: "/api/admin/us-dmi-test", query: "" },
   { key: "us_daily_breakout", label: "미국 일봉 5일 고가 돌파", description: "통합 종목 테이블 전체의 현재가와 직전 5거래일 최고가 비교", endpoint: "/api/admin/us-daily-breakout-test", query: "" },
   {
     key: "us_news_radar",
@@ -156,6 +159,8 @@ export function AdminApiTests() {
   const [tickerOverviewCode, setTickerOverviewCode] = useState("AAPL");
   const [freeFloatTicker, setFreeFloatTicker] = useState("AAPL");
   const [shortInterestTicker, setShortInterestTicker] = useState("AAPL");
+  const [mfiPeriod, setMfiPeriod] = useState("14");
+  const [mfiThreshold, setMfiThreshold] = useState("20");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
@@ -177,6 +182,8 @@ export function AdminApiTests() {
                   ? `ticker=${encodeURIComponent(freeFloatTicker)}`
                 : test.key === "short_interest"
                   ? `ticker=${encodeURIComponent(shortInterestTicker)}`
+                : test.key === "us_mfi"
+                  ? `period=${encodeURIComponent(mfiPeriod)}&threshold=${encodeURIComponent(mfiThreshold)}`
               : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -268,12 +275,18 @@ export function AdminApiTests() {
           {test.key === "short_interest" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={shortInterestTicker} onChange={(event) => setShortInterestTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
+              {test.key === "us_mfi" && (
+                <div className={styles.fieldGrid}>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>기간</span><input type="number" min="2" className={styles.textInput} value={mfiPeriod} onChange={(event) => setMfiPeriod(event.target.value)} /></label>
+                  <label className={styles.inlineField}><span className={styles.fieldLabel}>과매도 기준</span><input type="number" min="0" max="100" className={styles.textInput} value={mfiThreshold} onChange={(event) => setMfiThreshold(event.target.value)} /></label>
+                </div>
+              )}
 
               <div className={styles.cardActions}>
                 <button
                   className={styles.toggleButton}
                   onClick={() => void runTest(test)}
-                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim()) || (test.key === "us_free_float" && !freeFloatTicker.trim()) || (test.key === "short_interest" && !shortInterestTicker.trim())}
+                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim()) || (test.key === "us_free_float" && !freeFloatTicker.trim()) || (test.key === "short_interest" && !shortInterestTicker.trim()) || (test.key === "us_mfi" && (!mfiPeriod.trim() || !mfiThreshold.trim()))}
                 >
                   <Play size={16} />
                   {isRunning ? "호출 중" : "실행"}
