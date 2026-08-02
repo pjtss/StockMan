@@ -4,6 +4,7 @@ import { KIS_APPKEY, KIS_APPSECRET, getDynamicOffset } from "./kis-runtime";
 
 import { getDb } from "./db";
 import { topRisingStocks, topIntensityStocks } from "./schema";
+import { ensureUsInstrument } from "./us-daily-breakout-watchlist";
 import { eq, inArray } from "drizzle-orm";
 import { getAccessToken } from "./kis-token";
 import { readKisCache, writeKisCache } from "./kis-cache";
@@ -672,6 +673,9 @@ export async function syncTopRisingStocks(): Promise<TopRisingStockItem[]> {
   // D. 신규 종목 추가 (신규 TOP 10에 있으나 기존 TOP 10에 없던 것)
   const newlyAdded = newTop10.filter((s) => !oldCodes.has(s.code));
   if (newlyAdded.length > 0) {
+    const instrumentIds = new Map(await Promise.all(newlyAdded.map(async (s) => {
+      try { return [s.code, await ensureUsInstrument({ market: "KRX", code: s.code, name: s.company })] as const; } catch { return [s.code, null] as const; }
+    })));
     await db.insert(topRisingStocks).values(
       newlyAdded.map((s) => ({
         code: s.code,
@@ -679,6 +683,7 @@ export async function syncTopRisingStocks(): Promise<TopRisingStockItem[]> {
         changeRate: s.changeRate,
         price: s.price,
         addedAt: new Date(),
+        instrumentId: instrumentIds.get(s.code) ?? undefined,
       }))
     );
   }
@@ -738,6 +743,9 @@ export async function syncTradingIntensityStocks(): Promise<StockIntensity[]> {
   // E. 신규 종목 추가 (신규 TOP 10에 있으나 기존 TOP 10에 없던 것)
   const newlyAdded = newTop10.filter((s) => !oldCodes.has(s.code));
   if (newlyAdded.length > 0) {
+    const instrumentIds = new Map(await Promise.all(newlyAdded.map(async (s) => {
+      try { return [s.code, await ensureUsInstrument({ market: "KRX", code: s.code, name: s.company })] as const; } catch { return [s.code, null] as const; }
+    })));
     await db.insert(topIntensityStocks).values(
       newlyAdded.map((s) => ({
         code: s.code,
@@ -746,6 +754,7 @@ export async function syncTradingIntensityStocks(): Promise<StockIntensity[]> {
         price: s.price,
         changeRate: s.changeRate,
         addedAt: new Date(),
+        instrumentId: instrumentIds.get(s.code) ?? undefined,
       }))
     );
   }

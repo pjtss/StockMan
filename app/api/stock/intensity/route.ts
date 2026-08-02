@@ -71,7 +71,8 @@ export async function GET() {
               intensity: item.intensity,
               changeRate: item.changeRate,
               price: item.price,
-              addedAt: new Date()
+              addedAt: new Date(),
+              instrumentId: null,
             }));
             debugReason = `Triggered auto-sync but KIS API returned 0 items (possibly outside market hours). Successfully restored ${filteredRecords.length} items from fallback DB cache (kisCache).`;
           } else {
@@ -101,7 +102,8 @@ export async function GET() {
               intensity: item.intensity,
               changeRate: item.changeRate,
               price: item.price,
-              addedAt: new Date()
+              addedAt: new Date(),
+              instrumentId: null,
             }));
             debugReason = `Auto-sync crashed (${errorMsg}), but successfully restored ${filteredRecords.length} items from fallback DB cache (kisCache).`;
           } else {
