@@ -1,9 +1,7 @@
 import { getDb } from "./db";
-import { usInstruments, usTurnoverSymbols, usTurnoverWatchlist } from "./schema";
+import { usInstruments, usTurnoverWatchlist } from "./schema";
 import { ensureUsInstrument } from "./us-daily-breakout-watchlist";
-import { asc, eq, inArray } from "drizzle-orm";
-
-const STORAGE_KEY = "default";
+import { asc, eq } from "drizzle-orm";
 
 function normalizeSymbols(symbols: string[]) {
   return Array.from(
@@ -21,10 +19,7 @@ export async function loadUsTurnoverSymbols(): Promise<string[]> {
   const canonical = await db.select({ code: usInstruments.code }).from(usTurnoverWatchlist)
     .innerJoin(usInstruments, eq(usInstruments.id, usTurnoverWatchlist.instrumentId))
     .where(eq(usTurnoverWatchlist.enabled, true)).orderBy(asc(usInstruments.code));
-  if (canonical.length > 0) return normalizeSymbols(canonical.map((row) => row.code));
-  const rows = await db.select().from(usTurnoverSymbols).where(eq(usTurnoverSymbols.key, STORAGE_KEY)).limit(1);
-  const raw = (rows[0]?.symbols as string[] | undefined) ?? ["AAPL", "TSLA", "NVDA"];
-  return normalizeSymbols(raw);
+  return normalizeSymbols(canonical.map((row) => row.code));
 }
 
 export async function saveUsTurnoverSymbols(symbols: string[]) {
@@ -39,16 +34,13 @@ export async function saveUsTurnoverSymbols(symbols: string[]) {
   if (instruments.length > 0) {
     await db.insert(usTurnoverWatchlist).values(instruments.map((instrumentId) => ({ instrumentId, enabled: true, updatedAt: new Date() })))
       .onConflictDoUpdate({ target: usTurnoverWatchlist.instrumentId, set: { enabled: true, updatedAt: new Date() } });
-    await db.update(usTurnoverWatchlist).set({ enabled: false, updatedAt: new Date() })
-      .where(inArray(usTurnoverWatchlist.instrumentId, (await db.select({ id: usTurnoverWatchlist.instrumentId }).from(usTurnoverWatchlist)).map((r) => r.id).filter((id) => !instruments.includes(id))));
   }
-  await db.insert(usTurnoverSymbols).values({
-    key: STORAGE_KEY,
-    symbols: normalized,
-    updatedAt: new Date(),
-  }).onConflictDoUpdate({
-    target: usTurnoverSymbols.key,
-    set: { symbols: normalized, updatedAt: new Date() },
-  });
+  const current = await db.select({ id: usTurnoverWatchlist.instrumentId }).from(usTurnoverWatchlist);
+  for (const row of current) {
+    if (!instruments.includes(row.id)) {
+      await db.update(usTurnoverWatchlist).set({ enabled: false, updatedAt: new Date() })
+        .where(eq(usTurnoverWatchlist.instrumentId, row.id));
+    }
+  }
   return normalized;
 }
