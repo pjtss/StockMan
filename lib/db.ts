@@ -296,20 +296,6 @@ export async function ensureSchema() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS us_turnover_symbols (
-        key TEXT PRIMARY KEY,
-        symbols JSONB NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-    await client.query(`
-      INSERT INTO us_turnover_symbols (key, symbols)
-      VALUES ('default', '["AAPL","TSLA","NVDA"]')
-      ON CONFLICT (key) DO NOTHING;
-    `);
-
-    await client.query(`
       INSERT INTO feature_flags (key, enabled)
       VALUES ('korean_rising_top_n', TRUE)
       ON CONFLICT (key) DO NOTHING;

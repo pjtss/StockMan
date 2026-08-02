@@ -184,16 +184,6 @@ export const scannerScheduleHistory = pgTable(
   }
 );
 
-// 12. 해외주식 거래대금 추이 종목 목록
-export const usTurnoverSymbols = pgTable(
-  "us_turnover_symbols",
-  {
-    key: text("key").primaryKey(),
-    symbols: jsonb("symbols").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  }
-);
-
 // 13. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
 export const topRisingStocks = pgTable(
   "top_rising_stocks",
