@@ -654,6 +654,9 @@ export async function syncTopRisingStocks(): Promise<TopRisingStockItem[]> {
 
   const newlyAdded = newTop10.filter((s) => !oldCodes.has(s.code));
   if (newlyAdded.length > 0) {
+    const instrumentIds = new Map(await Promise.all(newlyAdded.map(async (s) => {
+      try { return [s.code, await ensureUsInstrument({ market: "NAS", code: s.code, name: s.company })] as const; } catch { return [s.code, null] as const; }
+    })));
     await db.insert(topRisingStocks).values(
       newlyAdded.map((s) => ({
         code: s.code,
@@ -661,6 +664,7 @@ export async function syncTopRisingStocks(): Promise<TopRisingStockItem[]> {
         changeRate: s.changeRate,
         price: s.price,
         addedAt: new Date(),
+        instrumentId: instrumentIds.get(s.code) ?? undefined,
       }))
     );
   }
