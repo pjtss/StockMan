@@ -3,6 +3,7 @@ import { verifyDiscordSignature } from "@/lib/discord-interaction-security";
 import { formatTickerOverview, getTickerOverview } from "@/lib/discord-ticker-overview";
 import { runUsDailyBreakoutScan } from "@/lib/us-daily-breakout-automation";
 import { scanStoredUsMfiOversold } from "@/lib/us-mfi-oversold";
+import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,19 +31,25 @@ function formatMfiResult(result: Awaited<ReturnType<typeof scanStoredUsMfiOverso
   if (!result.qualified.length) return [`일봉 MFI ${result.threshold} 이하 종목이 없습니다.`, `분석 종목 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
   return [`📉 **일봉 MFI 과매도 후보**`, `기준: MFI ≤ ${result.threshold} · 기간: ${result.period}`, `분석 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `MFI ${item.mfi?.toFixed(2)} · 기준일 ${item.mfiDate} · 일봉 ${item.candleCount}개`].join("\n"))].join("\n\n");
 }
+function formatDmiResult(result: Awaited<ReturnType<typeof scanStoredUsDmi>>) {
+  if (!result.qualified.length) return [`일봉 DMI 상승 방향(+DI > -DI) 종목이 없습니다.`, `분석 종목 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
+  return [`📈 **일봉 DMI 후보**`, `기준: +DI > -DI · 기간: ${result.period}`, `분석 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `+DI ${item.plusDi.toFixed(2)} · -DI ${item.minusDi.toFixed(2)} · ADX ${item.adx.toFixed(2)} · 기준일 ${item.date}`].join("\n"))].join("\n\n");
+}
 
 export async function POST(request: Request) {
   const body = await request.text();
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "daily-breakout", "mfi-oversold"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["ticker", "daily-breakout", "mfi-oversold", "dmi"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (interaction.data.name === "daily-breakout") {
     void runUsDailyBreakoutScan().then((result) => updateOriginalResponse(applicationId, interaction.token, formatBreakoutResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 돌파 후보를 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "mfi-oversold") {
     void scanStoredUsMfiOversold().then((result) => updateOriginalResponse(applicationId, interaction.token, formatMfiResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "MFI 과매도 종목을 조회하는 중 오류가 발생했습니다."));
+  } else if (interaction.data.name === "dmi") {
+    void scanStoredUsDmi().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDmiResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "DMI 종목을 조회하는 중 오류가 발생했습니다."));
   } else {
     void getTickerOverview(ticker).then((overview) => updateOriginalResponse(applicationId, interaction.token, formatTickerOverview(overview))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
   }
