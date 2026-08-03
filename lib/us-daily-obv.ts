@@ -20,13 +20,13 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; concurr
     try {
       const daily = await fetchUsDailyPrice({ code: item.code, market: item.market });
       const candles = daily?.candles ?? [];
-      if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, rising: false, error: `fewer than ${lookback * 2 + 1} daily candles` }); continue; }
+      if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, rising: false, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
       const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
       const recent = ordered.slice(-lookback);
       const prior = ordered.slice(-(lookback * 2), -lookback);
       const recentObv = obvValue(recent), priorObv = obvValue(prior), change = recentObv - priorObv;
       const risingBars = recent.slice(1).filter((candle, i) => candle.close > recent[i].close).length;
-      results.push({ market: item.market, code: item.code, name: item.name, candleCount: ordered.length, obv: obvValue(ordered), recentObv, priorObv, change, risingBars, risingBarRate: risingBars / Math.max(1, recent.length - 1), lastClose: ordered.at(-1)?.close ?? null, date: ordered.at(-1)?.date ?? null, rising: change > 0 && risingBars / Math.max(1, recent.length - 1) >= 0.4 });
+      results.push({ market: item.market, code: item.code, name: item.name, candleCount: ordered.length, obv: obvValue(ordered), recentObv, priorObv, change, risingBars, risingBarRate: risingBars / Math.max(1, recent.length - 1), lastClose: ordered.at(-1)?.close ?? null, date: ordered.at(-1)?.date ?? null, rising: change > 0 && risingBars / Math.max(1, recent.length - 1) >= 0.4, dailyDiagnostics: daily.diagnostics });
     } catch (error) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: 0, rising: false, error: error instanceof Error ? error.message : String(error) }); }
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 1, Math.max(1, instruments.length)) }, worker));

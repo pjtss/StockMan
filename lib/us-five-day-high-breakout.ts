@@ -18,7 +18,7 @@ export type UsFiveDayHighBreakoutResult = {
   freeFloatShares?: number | null;
   freeFloatPercent?: number | null;
   qualifies: boolean;
-  daily: { ok: boolean; status: number; candleCount: number; rawText?: string };
+  daily: { ok: boolean; status: number; candleCount: number; rawText?: string; diagnostics?: unknown };
   price: { ok: boolean; status: number; raw?: unknown };
   error?: string;
 };
@@ -62,14 +62,14 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     }
     const previous = selectPreviousFiveTradingDays(daily.candles, asOfDate);
     if (!daily.ok || previous.length < 5) {
-      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000) }, price: { ok: false, status: 0 }, error: !daily.ok ? `daily price API failed (${daily.status})` : "fewer than five prior trading days" };
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000), diagnostics: daily.diagnostics }, price: { ok: false, status: 0 }, error: !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient prior candles (${previous.length}/5)` };
       continue;
     }
     const price = await fetchKisUsPriceDetail({ code, market });
     const output = getKisUsPriceDetailOutput(price?.parsed);
     const currentPrice = valueNumber(output.last ?? output.stck_prpr ?? output.ovrs_nmix_prpr ?? output.price);
     if (!price?.ok || currentPrice === null) {
-      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: Math.max(...previous.map((candle) => candle.high)), previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length }, price: { ok: Boolean(price?.ok), status: price?.status ?? 0, raw: price?.parsed }, error: "current price unavailable" };
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: Math.max(...previous.map((candle) => candle.high)), previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, diagnostics: daily.diagnostics }, price: { ok: Boolean(price?.ok), status: price?.status ?? 0, raw: price?.parsed }, error: !price ? "KIS price detail response unavailable" : !price.ok ? `KIS price detail API failed (${price.status})` : "current price field missing or invalid" };
       continue;
     }
     const rate = signedNumber(output.t_xrat ?? output.rate ?? output.prdy_ctrt ?? output.changeRate);
@@ -77,7 +77,7 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     const marketCap = valueNumber(output.tomv ?? output.hts_avls ?? output.marketCap);
     const tradingValue = valueNumber(output.tamt ?? output.tamnt ?? output.tot_tr_pbmn ?? output.tradingValue);
     const previousFiveDayHigh = Math.max(...previous.map((candle) => candle.high));
-    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate, volume, marketCap, tradingValue, turnoverRatio: marketCap && tradingValue ? tradingValue / marketCap * 100 : null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length }, price: { ok: true, status: price.status, raw: price.parsed } };
+    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate, volume, marketCap, tradingValue, turnoverRatio: marketCap && tradingValue ? tradingValue / marketCap * 100 : null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, diagnostics: daily.diagnostics }, price: { ok: true, status: price.status, raw: price.parsed } };
   }
   return lastFailure ?? { ok: false, code, market: requestedMarket, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "no market response" };
 }

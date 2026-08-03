@@ -26,6 +26,7 @@ export type UsDailyPriceResponse = {
   request: { method: "GET"; url: string; headers: Record<string, string> };
   response: { rawText: string; parsed: unknown };
   candles: UsDailyCandle[];
+  diagnostics: { httpStatus: number; kisOk: boolean; rtCd: string | null; msgCd: string | null; msg1: string | null; outputKey: string | null; rawOutputCount: number; parsedCandleCount: number; firstDate: string | null; lastDate: string | null };
 };
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
@@ -55,6 +56,12 @@ function parseCandles(parsed: any): UsDailyCandle[] {
     volume: number(row.xvol ?? row.tvol ?? row.acml_vol ?? row.volume),
     raw: row,
   })).filter((candle: UsDailyCandle) => candle.date && candle.close > 0);
+}
+
+function dailyDiagnostics(parsed: any, status: number, candles: UsDailyCandle[]) {
+  const outputKey = Array.isArray(parsed?.output) ? "output" : Array.isArray(parsed?.output2) ? "output2" : null;
+  const rawRows = outputKey ? parsed[outputKey] : [];
+  return { httpStatus: status, kisOk: parsed?.rt_cd === "0", rtCd: parsed?.rt_cd == null ? null : String(parsed.rt_cd), msgCd: parsed?.msg_cd == null ? null : String(parsed.msg_cd), msg1: parsed?.msg1 == null ? null : String(parsed.msg1), outputKey, rawOutputCount: Array.isArray(rawRows) ? rawRows.length : 0, parsedCandleCount: candles.length, firstDate: candles[0]?.date ?? null, lastDate: candles.at(-1)?.date ?? null };
 }
 
 export function buildUsDailyPriceUrl(request: UsDailyPriceRequest, config: Record<string, unknown> = {}) {
@@ -107,11 +114,13 @@ export async function fetchUsDailyPrice(request: UsDailyPriceRequest): Promise<U
     if (!token) return null;
     result = await once(token);
   }
+  const candles = parseCandles(result.parsed);
   return {
     ok: result.response.ok && result.parsed?.rt_cd === "0",
     status: result.response.status,
     request: { method: "GET", url, headers: { ...headers("masked"), authorization: "Bearer <masked>", appkey: "<masked>", appsecret: "<masked>" } },
     response: { rawText: result.rawText, parsed: result.parsed },
-    candles: parseCandles(result.parsed),
+    candles,
+    diagnostics: dailyDiagnostics(result.parsed, result.response.status, candles),
   };
 }

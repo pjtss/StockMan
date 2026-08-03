@@ -20,5 +20,8 @@ export async function runUsDailyBreakoutScan(options: { limit?: number } = {}) {
     const float = await getUsFreeFloat(item.code).catch(() => null);
     results.push({ ...result, freeFloatShares: float?.ok ? float.floatShares : null, freeFloatPercent: float?.ok ? float.freeFloatPercent : null });
   }
-  return { watchlistCount: watchlist.length, instrumentCount: scanList.length, limited: Boolean(limit && limit < watchlist.length), qualified: results.filter((result) => result.qualifies), successCount: results.filter((result) => result.ok).length, failureCount: results.filter((result) => !result.ok).length, results };
+  const failures = results.filter((result) => !result.ok);
+  const failureReasons = failures.reduce<Record<string, number>>((counts, result) => { const reason = result.error ?? "unknown"; counts[reason] = (counts[reason] ?? 0) + 1; return counts; }, {});
+  const marketCounts = results.reduce<Record<string, number>>((counts, result) => { counts[result.market] = (counts[result.market] ?? 0) + 1; return counts; }, {});
+  return { watchlistCount: watchlist.length, instrumentCount: scanList.length, limited: Boolean(limit && limit < watchlist.length), qualified: results.filter((result) => result.qualifies), successCount: results.filter((result) => result.ok).length, failureCount: failures.length, failureReasons, resolvedMarketCounts: marketCounts, results };
 }
