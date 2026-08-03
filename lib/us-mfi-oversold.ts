@@ -3,9 +3,10 @@ import { getDb } from "@/lib/db";
 import { usInstruments } from "@/lib/schema";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { latestMfi } from "@/lib/us-mfi";
+import { getMfiThreshold } from "@/lib/automation-settings";
 
 export const DEFAULT_MFI_PERIOD = 14;
-export const DEFAULT_MFI_OVERSOLD_THRESHOLD = 20;
+export const DEFAULT_MFI_OVERSOLD_THRESHOLD = 30;
 const US_MARKETS = ["NAS", "NYS", "AMS"] as const;
 
 export type MfiOversoldResult = {
@@ -36,7 +37,7 @@ export async function listStoredUsInstruments() {
 
 export async function scanStoredUsMfiOversold(options: { period?: number; threshold?: number; concurrency?: number } = {}) {
   const period = options.period ?? DEFAULT_MFI_PERIOD;
-  const threshold = options.threshold ?? DEFAULT_MFI_OVERSOLD_THRESHOLD;
+  const threshold = options.threshold ?? await getMfiThreshold();
   const instruments = await listStoredUsInstruments();
   const results: MfiOversoldResult[] = [];
   // KIS rate limits are shared across the instance; serialize daily requests

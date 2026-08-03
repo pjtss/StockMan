@@ -50,6 +50,9 @@ export function AdminScannerSchedules() {
   const [intervalSeconds, setIntervalSeconds] = useState(30);
   const [intervalDraft, setIntervalDraft] = useState("30");
   const [intervalSaving, setIntervalSaving] = useState(false);
+  const [mfiThreshold, setMfiThreshold] = useState(30);
+  const [mfiThresholdDraft, setMfiThresholdDraft] = useState("30");
+  const [mfiSaving, setMfiSaving] = useState(false);
 
   async function loadSchedules() {
     const response = await fetch("/api/admin/scanner-schedules", { cache: "no-store" });
@@ -75,6 +78,7 @@ export function AdminScannerSchedules() {
     void loadSchedules().catch((loadError) => setError(loadError instanceof Error ? loadError.message : String(loadError)));
     void fetch("/api/admin/automation-settings", { cache: "no-store" }).then((r) => r.json()).then((data) => {
       if (Number.isFinite(data.intervalSeconds)) { setIntervalSeconds(data.intervalSeconds); setIntervalDraft(String(data.intervalSeconds)); }
+      if (Number.isFinite(data.mfiThreshold)) { setMfiThreshold(data.mfiThreshold); setMfiThresholdDraft(String(data.mfiThreshold)); }
     }).catch(() => undefined);
   }, []);
 
@@ -87,6 +91,17 @@ export function AdminScannerSchedules() {
       setIntervalSeconds(data.intervalSeconds); setIntervalDraft(String(data.intervalSeconds));
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setIntervalSaving(false); }
+  }
+
+  async function saveMfi() {
+    setMfiSaving(true);
+    try {
+      const response = await fetch("/api/admin/automation-settings", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ mfiThreshold: Number(mfiThresholdDraft) }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "MFI 기준 저장에 실패했습니다.");
+      setMfiThreshold(data.mfiThreshold); setMfiThresholdDraft(String(data.mfiThreshold));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setMfiSaving(false); }
   }
 
   function updateDraft(key: ScheduleKey, field: keyof Schedule, value: string) {
@@ -175,6 +190,8 @@ export function AdminScannerSchedules() {
           <div className={styles.toolbar}>
             <label className={styles.fieldGroup}><span className={styles.fieldLabel}>자동화 주기(초)</span><input className={styles.textInput} type="number" min={5} max={3600} value={intervalDraft} onChange={(event) => setIntervalDraft(event.target.value)} /></label>
             <button className={styles.toggleButton} disabled={intervalSaving || intervalDraft === String(intervalSeconds)} onClick={() => void saveInterval()}><Save size={16} />{intervalSaving ? "저장 중" : "주기 저장"}</button>
+            <label className={styles.fieldGroup}><span className={styles.fieldLabel}>MFI 과매도 기준 이하</span><input className={styles.textInput} type="number" min={0} max={100} value={mfiThresholdDraft} onChange={(event) => setMfiThresholdDraft(event.target.value)} /></label>
+            <button className={styles.toggleButton} disabled={mfiSaving || mfiThresholdDraft === String(mfiThreshold)} onClick={() => void saveMfi()}><Save size={16} />{mfiSaving ? "저장 중" : "MFI 기준 저장"}</button>
             <button className={styles.secondaryButton} onClick={() => setDrafts(structuredClone(presets.default))}>
               <RotateCcw size={16} />
               기본값

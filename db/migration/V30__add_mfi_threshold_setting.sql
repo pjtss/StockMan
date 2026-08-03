@@ -1,0 +1,1 @@
+ALTER TABLE automation_settings ADD COLUMN IF NOT EXISTS mfi_threshold INTEGER NOT NULL DEFAULT 30;
