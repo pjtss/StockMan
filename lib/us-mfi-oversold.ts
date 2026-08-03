@@ -16,6 +16,12 @@ export type MfiOversoldResult = {
   mfiDate: string | null;
   candleCount: number;
   qualifies: boolean;
+  httpStatus?: number;
+  rtCd?: unknown;
+  msgCd?: unknown;
+  msg1?: unknown;
+  rawText?: string | null;
+  rawOutputCount?: number;
   error?: string;
 };
 
@@ -33,21 +39,29 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
   const threshold = options.threshold ?? DEFAULT_MFI_OVERSOLD_THRESHOLD;
   const instruments = await listStoredUsInstruments();
   const results: MfiOversoldResult[] = [];
-  const concurrency = Math.max(1, Math.min(options.concurrency ?? 4, 8));
+  // KIS rate limits are shared across the instance; serialize daily requests
+  // by default so a full-table diagnostic does not turn into 500 responses.
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? 1, 2));
   let cursor = 0;
+  let lastRequestAt = 0;
   async function worker() {
     while (true) {
       const instrument = instruments[cursor++];
       if (!instrument) return;
       try {
+        const wait = Math.max(0, 300 - (Date.now() - lastRequestAt));
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        lastRequestAt = Date.now();
         const daily = await fetchUsDailyPrice({ code: instrument.code, market: instrument.market });
         if (!daily?.ok) {
-          results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})` });
+          const parsed = daily?.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown } | null;
+          results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})`, httpStatus: daily?.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });
           continue;
         }
         const latest = latestMfi(daily.candles, period);
         if (!latest) {
-          results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: `fewer than ${period + 1} daily candles` });
+          const parsed = daily.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown } | null;
+          results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: `fewer than ${period + 1} daily candles`, httpStatus: daily.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : 0 });
           continue;
         }
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: latest.value, mfiDate: latest.date, candleCount: daily.candles.length, qualifies: latest.value <= threshold });

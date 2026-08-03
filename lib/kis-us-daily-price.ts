@@ -47,11 +47,11 @@ function parseCandles(parsed: any): UsDailyCandle[] {
   const output = Array.isArray(parsed?.output) ? parsed.output : [];
   return output.map((row: any) => ({
     date: String(row.xymd ?? row.stck_bsop_date ?? row.bass_dt ?? row.date ?? "").trim(),
-    open: number(row.open ?? row.stck_oprc ?? row.oprc),
-    high: number(row.high ?? row.stck_hgpr ?? row.hgpr),
-    low: number(row.low ?? row.stck_lwpr ?? row.lwpr),
-    close: number(row.last ?? row.close ?? row.stck_clpr ?? row.clpr),
-    volume: number(row.tvol ?? row.acml_vol ?? row.volume),
+    open: number(row.xopn ?? row.open ?? row.stck_oprc ?? row.oprc),
+    high: number(row.xhgh ?? row.high ?? row.stck_hgpr ?? row.hgpr),
+    low: number(row.xlow ?? row.low ?? row.stck_lwpr ?? row.lwpr),
+    close: number(row.xclo ?? row.xprc ?? row.last ?? row.close ?? row.stck_clpr ?? row.clpr),
+    volume: number(row.xvol ?? row.tvol ?? row.acml_vol ?? row.volume),
     raw: row,
   })).filter((candle: UsDailyCandle) => candle.date && candle.close > 0);
 }
