@@ -59,13 +59,18 @@ function parseCandles(parsed: any): UsDailyCandle[] {
 export function buildUsDailyPriceUrl(request: UsDailyPriceRequest, config: Record<string, unknown> = {}) {
   const code = request.code.trim().toUpperCase();
   const market = request.market.trim().toUpperCase();
+  // KIS dailyprice requires BYMD. An empty date can return HTTP 200 with an
+  // empty output array, which would make every technical indicator look like
+  // it has insufficient history. Use the current UTC date when omitted.
+  const defaultEndDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const endDate = request.endDate?.replace(/-/g, "") || defaultEndDate;
   const params = new URLSearchParams({
     AUTH: ascii(config.AUTH),
     KEYB: ascii(config.KEYB),
     EXCD: market,
     SYMB: code,
     GUBN: "0",
-    BYMD: request.endDate?.replace(/-/g, "") ?? "",
+    BYMD: endDate,
     MODP: request.adjusted === false ? "0" : "1",
   });
   return `${BASE_URL}/uapi/overseas-price/v1/quotations/dailyprice?${params.toString()}`;
