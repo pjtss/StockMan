@@ -31,7 +31,8 @@ export async function resolveMarketNewsReactions(items: Array<{ title: string }>
       const response = await fetchKisUsPriceDetail({ code: mapping.ticker, market });
       if (!response) { results.push({ cik, ticker: mapping.ticker, exchange: mapping.exchange, market, ok: false, error: "kis_response_missing" }); continue; }
       const output = getKisUsPriceDetailOutput(response.parsed) as Record<string, unknown>;
-      results.push({ cik, ticker: mapping.ticker, exchange: mapping.exchange, market, ok: response.ok, status: response.status, last: numberValue(output.last || output.stck_prpr || output.price), rate: numberValue(output.rate || output.prdy_ctrt || output.changeRate), volume: numberValue(output.tvol || output.volume), tradingValue: numberValue(output.tot_tr_pbmn || output.tradingValue), marketCap: numberValue(output.hts_avls || output.marketCap), error: response.ok ? undefined : `kis_http_${response.status}` });
+      // price-detail 실제 응답 필드(t_xrat/tamt/tomv)를 우선하고, 구형·대체 응답 필드는 뒤에서만 사용한다.
+      results.push({ cik, ticker: mapping.ticker, exchange: mapping.exchange, market, ok: response.ok, status: response.status, last: numberValue(output.last ?? output.t_prpr ?? output.stck_prpr ?? output.price), rate: numberValue(output.t_xrat ?? output.t_rate ?? output.rate ?? output.prdy_ctrt ?? output.changeRate), volume: numberValue(output.tvol ?? output.pvol ?? output.vol ?? output.volume), tradingValue: numberValue(output.tamt ?? output.tamnt ?? output.tot_tr_pbmn ?? output.tradingValue), marketCap: numberValue(output.tomv ?? output.hts_avls ?? output.marketCap), error: response.ok ? undefined : `kis_http_${response.status}` });
     } catch (error) { results.push({ cik, ticker: mapping.ticker, exchange: mapping.exchange, market, ok: false, error: error instanceof Error ? error.message : String(error) }); }
   }
   return results;

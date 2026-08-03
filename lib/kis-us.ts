@@ -116,7 +116,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
       rate: item.rate || "0",
       diff: item.diff || "0",
       vol: item.tvol || "0",
-      amount: item.tamnt || "0",
+      amount: item.tamt || item.tamnt || "0",
     }));
     (result as any).isFallback = false;
     (result as any).fallbackSource = "";
@@ -169,7 +169,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
                 rate: item.rate || "0",
                 diff: item.diff || "0",
                 vol: item.tvol || "0",
-                amount: item.tamnt || "0",
+                amount: item.tamt || item.tamnt || "0",
               }));
               (retryResult as any).isFallback = false;
               (retryResult as any).fallbackSource = "";
