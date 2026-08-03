@@ -103,7 +103,7 @@ const TESTS: ApiTestDefinition[] = [
   { key: "us_mfi", label: "미국 MFI 과매도", description: "통합 종목의 저장 데이터 기반 MFI 과매도 스캔", endpoint: "/api/admin/us-mfi-test", query: "period=14&threshold=20" },
   { key: "us_macd", label: "미국 MACD", description: "통합 종목의 저장 데이터 기반 MACD 추세 스캔", endpoint: "/api/admin/us-macd-test", query: "" },
   { key: "us_dmi", label: "미국 DMI·ADX", description: "통합 종목의 저장 데이터 기반 DMI·ADX 추세 스캔", endpoint: "/api/admin/us-dmi-test", query: "" },
-  { key: "us_daily_breakout", label: "미국 일봉 5일 고가 돌파", description: "통합 종목 테이블 전체의 현재가와 직전 5거래일 최고가 비교", endpoint: "/api/admin/us-daily-breakout-test", query: "" },
+  { key: "us_daily_breakout", label: "미국 일봉 5일 고가 돌파", description: "통합 종목 일부를 진단해 현재가와 직전 5거래일 최고가 비교", endpoint: "/api/admin/us-daily-breakout-test", query: "limit=30" },
   {
     key: "us_news_radar",
     label: "해외 뉴스 속보 레이더",
@@ -187,7 +187,10 @@ export function AdminApiTests() {
               : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "API 테스트 호출에 실패했습니다.");
+      if (!response.ok) {
+        const detail = data.error || data.message || data.msg1 || `HTTP ${response.status}`;
+        throw new Error(`${detail} [${test.endpoint}]`);
+      }
       setResult(data);
       setActive(test.key);
     } catch (testError) {
