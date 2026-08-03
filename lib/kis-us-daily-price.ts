@@ -44,13 +44,13 @@ function json(raw: string) {
 }
 
 function parseCandles(parsed: any): UsDailyCandle[] {
-  const output = Array.isArray(parsed?.output) ? parsed.output : [];
+  const output = Array.isArray(parsed?.output) ? parsed.output : Array.isArray(parsed?.output2) ? parsed.output2 : [];
   return output.map((row: any) => ({
     date: String(row.xymd ?? row.stck_bsop_date ?? row.bass_dt ?? row.date ?? "").trim(),
     open: number(row.xopn ?? row.open ?? row.stck_oprc ?? row.oprc),
     high: number(row.xhgh ?? row.high ?? row.stck_hgpr ?? row.hgpr),
     low: number(row.xlow ?? row.low ?? row.stck_lwpr ?? row.lwpr),
-    close: number(row.xclo ?? row.xprc ?? row.last ?? row.close ?? row.stck_clpr ?? row.clpr),
+    close: number(row.xclo ?? row.clos ?? row.xprc ?? row.last ?? row.close ?? row.stck_clpr ?? row.clpr),
     volume: number(row.xvol ?? row.tvol ?? row.acml_vol ?? row.volume),
     raw: row,
   })).filter((candle: UsDailyCandle) => candle.date && candle.close > 0);
