@@ -11,6 +11,12 @@ export async function runUsDailyBreakoutScan(options: { limit?: number } = {}) {
   const results: UsFiveDayHighBreakoutResult[] = [];
   for (const item of scanList) {
     const result = await findUsFiveDayHighBreakout({ code: item.code, market: item.market });
+    // Free-float is only needed for an actual breakout notification. Avoid an
+    // FMP request for every non-breakout instrument in the full-table scan.
+    if (!result.qualifies) {
+      results.push({ ...result, freeFloatShares: null, freeFloatPercent: null });
+      continue;
+    }
     const float = await getUsFreeFloat(item.code).catch(() => null);
     results.push({ ...result, freeFloatShares: float?.ok ? float.floatShares : null, freeFloatPercent: float?.ok ? float.freeFloatPercent : null });
   }

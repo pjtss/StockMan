@@ -28,6 +28,11 @@ function valueNumber(value: unknown) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function signedNumber(value: unknown) {
+  const parsed = Number(String(value ?? "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function dateKey(value: string) { return value.replace(/[^0-9]/g, ""); }
 
 function currentKstDate() {
@@ -54,7 +59,7 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
   const price = await fetchKisUsPriceDetail({ code, market });
   const output = getKisUsPriceDetailOutput(price?.parsed);
   const currentPrice = valueNumber(output.last ?? output.stck_prpr ?? output.ovrs_nmix_prpr ?? output.price);
-  const rate = valueNumber(output.rate ?? output.prdy_ctrt ?? output.changeRate);
+  const rate = signedNumber(output.rate ?? output.prdy_ctrt ?? output.changeRate);
   const volume = valueNumber(output.tvol ?? output.acml_vol ?? output.volume);
   const marketCap = valueNumber(output.tomv ?? output.hts_avls ?? output.marketCap);
   const tradingValue = valueNumber(output.tamnt ?? output.tot_tr_pbmn ?? output.tradingValue);
