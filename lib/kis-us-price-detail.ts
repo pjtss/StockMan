@@ -1,6 +1,7 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
+import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 export type KisUsPriceDetailRequest = { code: string; market?: string };
 
@@ -33,7 +34,7 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   });
 
   async function fetchOnce(token: string) {
-    const response = await fetch(url, { method: "GET", headers: headers(token) });
+    const response = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers: headers(token) }));
     const rawText = await response.text();
     return { response, parsed: parseJson(rawText) };
   }

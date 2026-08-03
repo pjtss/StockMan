@@ -1,6 +1,7 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
+import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 export type UsDailyPriceRequest = {
   code: string;
@@ -94,7 +95,7 @@ export async function fetchUsDailyPrice(request: UsDailyPriceRequest): Promise<U
     tr_cont: "",
   });
   async function once(token: string) {
-    const response = await fetch(url, { method: "GET", headers: headers(token) });
+    const response = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers: headers(token) }));
     const rawText = await response.text();
     return { response, rawText, parsed: json(rawText) };
   }

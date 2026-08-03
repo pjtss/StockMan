@@ -50,19 +50,34 @@ export function selectPreviousFiveTradingDays(candles: UsDailyCandle[], asOfDate
 
 export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMarket, asOfDate }: UsFiveDayHighBreakoutRequest): Promise<UsFiveDayHighBreakoutResult> {
   const code = rawCode.trim().toUpperCase();
-  const market = rawMarket.trim().toUpperCase();
-  if (!code || !market) throw new Error("code and market are required");
-  const daily = await fetchUsDailyPrice({ code, market, endDate: asOfDate });
-  if (!daily) return { ok: false, code, market, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "KIS access token unavailable" };
-  const previous = selectPreviousFiveTradingDays(daily.candles, asOfDate);
-  if (!daily.ok || previous.length < 5) return { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000) }, price: { ok: false, status: 0 }, error: !daily.ok ? `daily price API failed (${daily.status})` : "fewer than five prior trading days" };
-  const price = await fetchKisUsPriceDetail({ code, market });
-  const output = getKisUsPriceDetailOutput(price?.parsed);
-  const currentPrice = valueNumber(output.last ?? output.stck_prpr ?? output.ovrs_nmix_prpr ?? output.price);
-  const rate = signedNumber(output.t_xrat ?? output.rate ?? output.prdy_ctrt ?? output.changeRate);
-  const volume = valueNumber(output.tvol ?? output.acml_vol ?? output.volume);
-  const marketCap = valueNumber(output.tomv ?? output.hts_avls ?? output.marketCap);
-  const tradingValue = valueNumber(output.tamt ?? output.tamnt ?? output.tot_tr_pbmn ?? output.tradingValue);
-  const previousFiveDayHigh = Math.max(...previous.map((candle) => candle.high));
-  return { ok: Boolean(price?.ok && currentPrice !== null), code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate, volume, marketCap, tradingValue, turnoverRatio: marketCap && tradingValue ? tradingValue / marketCap * 100 : null, qualifies: currentPrice !== null && currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length }, price: { ok: Boolean(price?.ok), status: price?.status ?? 0, raw: price?.parsed }, error: currentPrice === null ? "current price unavailable" : undefined };
+  const requestedMarket = rawMarket.trim().toUpperCase();
+  if (!code || !requestedMarket) throw new Error("code and market are required");
+  const markets = [requestedMarket, ...["AMS", "NAS", "NYS"].filter((value) => value !== requestedMarket)];
+  let lastFailure: UsFiveDayHighBreakoutResult | null = null;
+  for (const market of markets) {
+    const daily = await fetchUsDailyPrice({ code, market, endDate: asOfDate });
+    if (!daily) {
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "KIS access token unavailable" };
+      continue;
+    }
+    const previous = selectPreviousFiveTradingDays(daily.candles, asOfDate);
+    if (!daily.ok || previous.length < 5) {
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000) }, price: { ok: false, status: 0 }, error: !daily.ok ? `daily price API failed (${daily.status})` : "fewer than five prior trading days" };
+      continue;
+    }
+    const price = await fetchKisUsPriceDetail({ code, market });
+    const output = getKisUsPriceDetailOutput(price?.parsed);
+    const currentPrice = valueNumber(output.last ?? output.stck_prpr ?? output.ovrs_nmix_prpr ?? output.price);
+    if (!price?.ok || currentPrice === null) {
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: Math.max(...previous.map((candle) => candle.high)), previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length }, price: { ok: Boolean(price?.ok), status: price?.status ?? 0, raw: price?.parsed }, error: "current price unavailable" };
+      continue;
+    }
+    const rate = signedNumber(output.t_xrat ?? output.rate ?? output.prdy_ctrt ?? output.changeRate);
+    const volume = valueNumber(output.tvol ?? output.acml_vol ?? output.volume);
+    const marketCap = valueNumber(output.tomv ?? output.hts_avls ?? output.marketCap);
+    const tradingValue = valueNumber(output.tamt ?? output.tamnt ?? output.tot_tr_pbmn ?? output.tradingValue);
+    const previousFiveDayHigh = Math.max(...previous.map((candle) => candle.high));
+    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate, volume, marketCap, tradingValue, turnoverRatio: marketCap && tradingValue ? tradingValue / marketCap * 100 : null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length }, price: { ok: true, status: price.status, raw: price.parsed } };
+  }
+  return lastFailure ?? { ok: false, code, market: requestedMarket, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "no market response" };
 }
