@@ -17,6 +17,7 @@ export type KisUsPriceDetailResult = {
   code: string;
   market: string;
   parsed: unknown;
+  stale?: boolean;
 };
 
 function parseJson(rawText: string) {
@@ -30,6 +31,11 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   const cached = detailCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.result;
   const db = getDb();
+  const loadStale = async () => {
+    if (!db) return null;
+    const row = (await db.select().from(usPriceDetailCache).where(and(eq(usPriceDetailCache.market, market), eq(usPriceDetailCache.code, code))).limit(1).catch(() => []))[0];
+    return row ? { ok: row.status >= 200 && row.status < 300, status: row.status, code, market, parsed: row.parsed, stale: true } : null;
+  };
   if (db) {
     const row = (await db.select().from(usPriceDetailCache).where(and(eq(usPriceDetailCache.market, market), eq(usPriceDetailCache.code, code), gt(usPriceDetailCache.fetchedAt, new Date(Date.now() - DETAIL_TTL_MS)))).limit(1).catch(() => []))[0];
     if (row) {
@@ -58,11 +64,11 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   }
 
   let token = await getAccessToken();
-  if (!token) return null;
+  if (!token) return loadStale();
   let result = await fetchOnce(token);
   if (isKisTokenExpiredResponse(result.response.status, result.parsed)) {
     token = await refreshAccessToken();
-    if (!token) return null;
+    if (!token) return loadStale();
     result = await fetchOnce(token);
   }
   const value = { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
@@ -70,7 +76,7 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
     detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
     if (db) await db.insert(usPriceDetailCache).values({ market, code, status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() }).onConflictDoUpdate({ target: [usPriceDetailCache.market, usPriceDetailCache.code], set: { status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() } }).catch(() => undefined);
   }
-  return value;
+  return value.ok ? value : await loadStale();
 }
 
 export function getKisUsPriceDetailOutput(parsed: unknown): Record<string, unknown> {

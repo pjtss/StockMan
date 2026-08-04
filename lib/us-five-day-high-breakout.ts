@@ -74,8 +74,8 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     const price = await fetchKisUsPriceDetail({ code, market });
     const output = getKisUsPriceDetailOutput(price?.parsed);
     const currentPrice = valueNumber(output.last ?? output.stck_prpr ?? output.ovrs_nmix_prpr ?? output.price);
-    if (!price?.ok || currentPrice === null) {
-      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: Math.max(...previous.map((candle) => candle.high)), previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, diagnostics: daily.diagnostics }, price: { ok: Boolean(price?.ok), status: price?.status ?? 0, raw: price?.parsed }, error: !price ? "KIS price detail response unavailable" : !price.ok ? `KIS price detail API failed (${price.status})` : "current price field missing or invalid" };
+    if (!price?.ok || price.stale || currentPrice === null) {
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: Math.max(...previous.map((candle) => candle.high)), previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, diagnostics: daily.diagnostics }, price: { ok: Boolean(price?.ok) && !price?.stale, status: price?.status ?? 0, raw: price?.parsed }, error: price?.stale ? "stale KIS price detail cache" : !price ? "KIS price detail response unavailable" : !price.ok ? `KIS price detail API failed (${price.status})` : "current price field missing or invalid" };
       continue;
     }
     const rate = signedNumber(output.t_xrat ?? output.rate ?? output.prdy_ctrt ?? output.changeRate);
