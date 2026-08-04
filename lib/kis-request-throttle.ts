@@ -1,5 +1,7 @@
 /** Serializes KIS calls in this process and backs off on gateway rate limits. */
-const MIN_INTERVAL_MS = 250;
+// Keep the conservative default, but allow operations to tune latency without
+// rebuilding the application. Never set this below the KIS account/API limit.
+const MIN_INTERVAL_MS = Math.max(50, Number(process.env.KIS_MIN_REQUEST_INTERVAL_MS ?? 250) || 250);
 const RETRY_DELAYS_MS = [500, 1000, 2000];
 let tail: Promise<void> = Promise.resolve();
 let lastStartedAt = 0;
