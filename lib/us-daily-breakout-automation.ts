@@ -1,6 +1,7 @@
 import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
 import { findUsFiveDayHighBreakout, type UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { getUsFreeFloat } from "@/lib/us-free-float";
+import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 
 export async function runUsDailyBreakoutScan(options: { limit?: number; concurrency?: number } = {}) {
   // Automatic detection uses the canonical instrument registry, not the
@@ -8,6 +9,7 @@ export async function runUsDailyBreakoutScan(options: { limit?: number; concurre
   const watchlist = await listStoredUsInstruments();
   const limit = Number.isFinite(options.limit) && (options.limit ?? 0) > 0 ? Math.floor(options.limit as number) : null;
   const scanList = limit ? watchlist.slice(0, limit) : watchlist;
+  const cachedCandles = await loadCachedUsDailyCandlesBulk(scanList, 10).catch(() => new Map<string, any[]>());
   // Run several instruments concurrently while the shared KIS limiter still
   // serializes the actual requests. This overlaps network latency without
   // increasing the API request rate.
@@ -19,7 +21,7 @@ export async function runUsDailyBreakoutScan(options: { limit?: number; concurre
       const index = cursor++;
       const item = scanList[index];
       if (!item) return;
-      const result = await findUsFiveDayHighBreakout({ code: item.code, market: item.market });
+      const result = await findUsFiveDayHighBreakout({ code: item.code, market: item.market, cachedCandles: cachedCandles.get(`${item.market}:${item.code}`) });
       // Free-float is only needed for an actual breakout notification. Avoid an
       // FMP request for every non-breakout instrument in the full-table scan.
       if (!result.qualifies) {

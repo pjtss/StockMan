@@ -49,14 +49,14 @@ export function selectPreviousFiveTradingDays(candles: UsDailyCandle[], asOfDate
     .slice(0, 5);
 }
 
-export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMarket, asOfDate }: UsFiveDayHighBreakoutRequest): Promise<UsFiveDayHighBreakoutResult> {
+export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMarket, asOfDate, cachedCandles: prefetchedCandles }: UsFiveDayHighBreakoutRequest & { cachedCandles?: UsDailyCandle[] }): Promise<UsFiveDayHighBreakoutResult> {
   const code = rawCode.trim().toUpperCase();
   const requestedMarket = rawMarket.trim().toUpperCase();
   if (!code || !requestedMarket) throw new Error("code and market are required");
   const markets = [requestedMarket, ...["AMS", "NAS", "NYS"].filter((value) => value !== requestedMarket)];
   let lastFailure: UsFiveDayHighBreakoutResult | null = null;
   for (const market of markets) {
-    const cachedCandles = await loadCachedUsDailyCandles(market, code, 10).catch(() => []);
+    const cachedCandles = market === requestedMarket && prefetchedCandles ? prefetchedCandles : await loadCachedUsDailyCandles(market, code, 10).catch(() => []);
     const cachedPrevious = selectPreviousFiveTradingDays(cachedCandles, asOfDate);
     const daily = cachedPrevious.length >= 5
       ? { ok: true, status: 200, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE", parsedCandleCount: cachedCandles.length, firstDate: cachedCandles.at(-1)?.date ?? null, lastDate: cachedCandles[0]?.date ?? null } }

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usDailyPriceCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
@@ -6,6 +6,37 @@ import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily
 
 const memoryCache = new Map<string, { expiresAt: number; candles: UsDailyCandle[] }>();
 const MEMORY_TTL_MS = 60_000;
+
+export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 10) {
+  const normalized = items.map((item) => ({ market: item.market.trim().toUpperCase(), code: item.code.trim().toUpperCase() }));
+  const result = new Map<string, UsDailyCandle[]>();
+  const missing: typeof normalized = [];
+  for (const item of normalized) {
+    const key = `${item.market}:${item.code}:${limit}`;
+    const memory = memoryCache.get(key);
+    if (memory && memory.expiresAt > Date.now()) result.set(`${item.market}:${item.code}`, memory.candles);
+    else missing.push(item);
+  }
+  if (missing.length === 0) return result;
+  const db = getDb();
+  if (!db) return result;
+  const filters = missing.map((item) => and(eq(usDailyPriceCandles.market, item.market), eq(usDailyPriceCandles.code, item.code)));
+  const rows = await db.select().from(usDailyPriceCandles).where(or(...filters)).orderBy(desc(usDailyPriceCandles.candleDate));
+  const grouped = new Map<string, UsDailyCandle[]>();
+  for (const row of rows) {
+    const key = `${row.market}:${row.code}`;
+    const candles = grouped.get(key) ?? [];
+    if (candles.length < limit) candles.push({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } });
+    grouped.set(key, candles);
+  }
+  for (const item of missing) {
+    const key = `${item.market}:${item.code}`;
+    const candles = grouped.get(key) ?? [];
+    result.set(key, candles);
+    memoryCache.set(`${key}:${limit}`, { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
+  }
+  return result;
+}
 
 export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10): Promise<UsDailyCandle[]> {
   const cacheKey = `${market}:${code}:${limit}`;
