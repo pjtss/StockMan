@@ -2,7 +2,9 @@ import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
-export async function warmUsDailyPriceCache(options: { concurrency?: number } = {}) {
+let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
+
+async function executeWarm(options: { concurrency?: number } = {}) {
   const startedAt = new Date().toISOString();
   const instruments = await listStoredUsInstruments();
   const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
@@ -27,4 +29,9 @@ export async function warmUsDailyPriceCache(options: { concurrency?: number } = 
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
   return { startedAt, completedAt: new Date().toISOString(), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
+}
+
+export function warmUsDailyPriceCache(options: { concurrency?: number } = {}) {
+  if (!activeWarm) activeWarm = executeWarm(options).finally(() => { activeWarm = null; });
+  return activeWarm;
 }
