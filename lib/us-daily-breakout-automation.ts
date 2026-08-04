@@ -3,7 +3,9 @@ import { findUsFiveDayHighBreakout, type UsFiveDayHighBreakoutResult } from "@/l
 import { getUsFreeFloat } from "@/lib/us-free-float";
 import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 
-export async function runUsDailyBreakoutScan(options: { limit?: number; concurrency?: number } = {}) {
+let activeScan: Promise<Awaited<ReturnType<typeof executeScan>>> | null = null;
+
+async function executeScan(options: { limit?: number; concurrency?: number } = {}) {
   const startedAt = Date.now();
   // Automatic detection uses the canonical instrument registry, not the
   // legacy/manual breakout watchlist. Only enabled US exchanges are included.
@@ -39,4 +41,10 @@ export async function runUsDailyBreakoutScan(options: { limit?: number; concurre
   const failureReasons = failures.reduce<Record<string, number>>((counts, result) => { const reason = result.error ?? "unknown"; counts[reason] = (counts[reason] ?? 0) + 1; return counts; }, {});
   const marketCounts = completedResults.reduce<Record<string, number>>((counts, result) => { counts[result.market] = (counts[result.market] ?? 0) + 1; return counts; }, {});
   return { watchlistCount: watchlist.length, instrumentCount: scanList.length, concurrency, limited: Boolean(limit && limit < watchlist.length), durationMs: Date.now() - startedAt, throughputPerSecond: completedResults.length ? Number((completedResults.length / ((Date.now() - startedAt) / 1000)).toFixed(2)) : 0, qualified: completedResults.filter((result) => result.qualifies), successCount: completedResults.filter((result) => result.ok).length, failureCount: failures.length, failureReasons, resolvedMarketCounts: marketCounts, results: completedResults };
+}
+
+/** Coalesces concurrent timer/manual requests into one scan. */
+export function runUsDailyBreakoutScan(options: { limit?: number; concurrency?: number } = {}) {
+  if (!activeScan) activeScan = executeScan(options).finally(() => { activeScan = null; });
+  return activeScan;
 }

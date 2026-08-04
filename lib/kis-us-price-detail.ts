@@ -2,6 +2,9 @@ import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
+import { getDb } from "@/lib/db";
+import { usPriceDetailCache } from "@/lib/schema";
+import { and, eq, gt } from "drizzle-orm";
 
 const detailCache = new Map<string, { expiresAt: number; result: KisUsPriceDetailResult }>();
 const DETAIL_TTL_MS = 10_000;
@@ -26,6 +29,15 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   const cacheKey = `${market}:${code}`;
   const cached = detailCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.result;
+  const db = getDb();
+  if (db) {
+    const row = (await db.select().from(usPriceDetailCache).where(and(eq(usPriceDetailCache.market, market), eq(usPriceDetailCache.code, code), gt(usPriceDetailCache.fetchedAt, new Date(Date.now() - DETAIL_TTL_MS)))).limit(1).catch(() => []))[0];
+    if (row) {
+      const result = { ok: row.status >= 200 && row.status < 300, status: row.status, code, market, parsed: row.parsed };
+      detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result });
+      return result;
+    }
+  }
   const config = await loadKisApiConfig("us_price_detail");
   const params = new URLSearchParams({ AUTH: "", EXCD: market, SYMB: code });
   const url = `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price-detail?${params.toString()}`;
@@ -54,7 +66,10 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
     result = await fetchOnce(token);
   }
   const value = { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
-  if (value.ok) detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
+  if (value.ok) {
+    detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
+    if (db) await db.insert(usPriceDetailCache).values({ market, code, status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() }).onConflictDoUpdate({ target: [usPriceDetailCache.market, usPriceDetailCache.code], set: { status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() } }).catch(() => undefined);
+  }
   return value;
 }
 

@@ -432,6 +432,15 @@ export const featureModuleSettings = pgTable("feature_module_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usPriceDetailCache = pgTable("us_price_detail_cache", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code").notNull(),
+  status: integer("status").notNull(),
+  parsed: jsonb("parsed").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("us_price_detail_cache_market_code_unique").on(table.market, table.code), index("us_price_detail_cache_fetched_idx").on(table.fetchedAt)]);
+
 export const usNewsTickerExchangeCache = pgTable("us_news_ticker_exchange_cache", {
   ticker: text("ticker").primaryKey(),
   market: text("market").notNull(),
