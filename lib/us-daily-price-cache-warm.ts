@@ -3,6 +3,7 @@ import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
 export async function warmUsDailyPriceCache(options: { concurrency?: number } = {}) {
+  const startedAt = new Date().toISOString();
   const instruments = await listStoredUsInstruments();
   const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
   let cursor = 0;
@@ -25,5 +26,5 @@ export async function warmUsDailyPriceCache(options: { concurrency?: number } = 
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
-  return { instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
+  return { startedAt, completedAt: new Date().toISOString(), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
 }

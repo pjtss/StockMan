@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -101,10 +101,11 @@ const TESTS: ApiTestDefinition[] = [
   },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   { key: "us_daily_obv", label: "미국 일봉 OBV", description: "통합 종목의 최근 5거래일 대비 일봉 OBV 상승 탐지", endpoint: "/api/admin/us-daily-obv-test", query: "" },
-  { key: "us_mfi", label: "미국 MFI 과매도", description: "통합 종목의 저장 데이터 기반 MFI 과매도 스캔", endpoint: "/api/admin/us-mfi-test", query: "period=14&threshold=20" },
+  { key: "us_mfi", label: "미국 MFI 과매도", description: "통합 종목의 저장 데이터 기반 MFI 30 이하 과매도 스캔", endpoint: "/api/admin/us-mfi-test", query: "period=14&threshold=30" },
   { key: "us_macd", label: "미국 MACD", description: "통합 종목의 저장 데이터 기반 MACD 추세 스캔", endpoint: "/api/admin/us-macd-test", query: "" },
   { key: "us_dmi", label: "미국 DMI·ADX", description: "통합 종목의 저장 데이터 기반 DMI·ADX 추세 스캔", endpoint: "/api/admin/us-dmi-test", query: "" },
   { key: "us_daily_breakout", label: "미국 일봉 5일 고가 돌파", description: "통합 종목 일부를 진단해 현재가와 직전 5거래일 최고가 비교", endpoint: "/api/admin/us-daily-breakout-test", query: "limit=30" },
+  { key: "us_daily_cache", label: "미국 전체 일봉 데이터 갱신", description: "통합 티커 전체의 과거 일봉을 DB에 저장하고 갱신 시각을 기록", endpoint: "/api/admin/us-daily-cache-test", query: "" },
   {
     key: "us_news_radar",
     label: "해외 뉴스 속보 레이더",
@@ -161,7 +162,7 @@ export function AdminApiTests() {
   const [freeFloatTicker, setFreeFloatTicker] = useState("AAPL");
   const [shortInterestTicker, setShortInterestTicker] = useState("AAPL");
   const [mfiPeriod, setMfiPeriod] = useState("14");
-  const [mfiThreshold, setMfiThreshold] = useState("20");
+  const [mfiThreshold, setMfiThreshold] = useState("30");
   const [copied, setCopied] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
