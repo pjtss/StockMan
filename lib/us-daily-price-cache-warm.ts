@@ -1,0 +1,29 @@
+import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
+import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
+import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
+
+export async function warmUsDailyPriceCache(options: { concurrency?: number } = {}) {
+  const instruments = await listStoredUsInstruments();
+  const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
+  let cursor = 0;
+  let successCount = 0;
+  let candleCount = 0;
+  const failures: Array<{ market: string; code: string; error: string }> = [];
+  async function worker() {
+    while (true) {
+      const item = instruments[cursor++];
+      if (!item) return;
+      try {
+        const daily = await fetchUsDailyPrice({ code: item.code, market: item.market });
+        if (!daily?.ok || daily.candles.length === 0) {
+          failures.push({ market: item.market, code: item.code, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "KIS returned no daily candles" });
+          continue;
+        }
+        candleCount += await saveUsDailyCandles(item.market, item.code, daily.candles);
+        successCount += 1;
+      } catch (error) { failures.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) }); }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
+  return { instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
+}

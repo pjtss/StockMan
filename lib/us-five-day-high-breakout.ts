@@ -1,5 +1,6 @@
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { fetchUsDailyPrice, type UsDailyCandle } from "@/lib/kis-us-daily-price";
+import { loadCachedUsDailyCandles, saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
 export type UsFiveDayHighBreakoutRequest = { code: string; market: string; asOfDate?: string };
 
@@ -55,11 +56,16 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
   const markets = [requestedMarket, ...["AMS", "NAS", "NYS"].filter((value) => value !== requestedMarket)];
   let lastFailure: UsFiveDayHighBreakoutResult | null = null;
   for (const market of markets) {
-    const daily = await fetchUsDailyPrice({ code, market, endDate: asOfDate });
+    const cachedCandles = await loadCachedUsDailyCandles(market, code, 10).catch(() => []);
+    const cachedPrevious = selectPreviousFiveTradingDays(cachedCandles, asOfDate);
+    const daily = cachedPrevious.length >= 5
+      ? { ok: true, status: 200, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE", parsedCandleCount: cachedCandles.length, firstDate: cachedCandles.at(-1)?.date ?? null, lastDate: cachedCandles[0]?.date ?? null } }
+      : await fetchUsDailyPrice({ code, market, endDate: asOfDate });
     if (!daily) {
       lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "KIS access token unavailable" };
       continue;
     }
+    if ((daily.diagnostics as { source?: string } | undefined)?.source !== "DB_CACHE") await saveUsDailyCandles(market, code, daily.candles).catch(() => undefined);
     const previous = selectPreviousFiveTradingDays(daily.candles, asOfDate);
     if (!daily.ok || previous.length < 5) {
       lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000), diagnostics: daily.diagnostics }, price: { ok: false, status: 0 }, error: !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient prior candles (${previous.length}/5)` };

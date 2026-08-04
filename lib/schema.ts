@@ -312,6 +312,20 @@ export const usInstruments = pgTable("us_instruments", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("us_instruments_market_code_unique").on(table.market, table.code)]);
 
+export const usDailyPriceCandles = pgTable("us_daily_price_candles", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code").notNull(),
+  candleDate: text("candle_date").notNull(),
+  open: doublePrecision("open").notNull(),
+  high: doublePrecision("high").notNull(),
+  low: doublePrecision("low").notNull(),
+  close: doublePrecision("close").notNull(),
+  volume: doublePrecision("volume").notNull().default(0),
+  source: text("source").notNull().default("KIS"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("us_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.candleDate), index("us_daily_price_candles_lookup_idx").on(table.market, table.code, table.candleDate)]);
+
 export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   ticker: text("ticker").notNull(),
