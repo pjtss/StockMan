@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usInstruments } from "@/lib/schema";
-import { fetchUsDailyPriceCached } from "@/lib/us-daily-price-cache";
+import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { latestMfi } from "@/lib/us-mfi";
 import { getMfiThreshold } from "@/lib/automation-settings";
 
@@ -40,6 +40,7 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
   const period = options.period ?? DEFAULT_MFI_PERIOD;
   const threshold = options.threshold ?? await getMfiThreshold();
   const instruments = await listStoredUsInstruments();
+  const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
   const results: MfiOversoldResult[] = [];
   // KIS rate limits are shared across the instance; serialize daily requests
   // by default so a full-table diagnostic does not turn into 500 responses.
@@ -54,7 +55,10 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
         const wait = Math.max(0, 300 - (Date.now() - lastRequestAt));
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         lastRequestAt = Date.now();
-        const daily = await fetchUsDailyPriceCached({ code: instrument.code, market: instrument.market }, period + 1);
+        const prefetched = cachedCandles.get(`${instrument.market}:${instrument.code}`);
+        const daily = prefetched && prefetched.length >= period + 1
+          ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } }
+          : await fetchUsDailyPriceCached({ code: instrument.code, market: instrument.market }, period + 1);
         if (!daily?.ok) {
           const parsed = daily?.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown; output2?: unknown } | null;
           results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})`, httpStatus: daily?.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });
