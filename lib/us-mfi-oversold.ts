@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usInstruments } from "@/lib/schema";
-import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
+import { fetchUsDailyPriceCached } from "@/lib/us-daily-price-cache";
 import { latestMfi } from "@/lib/us-mfi";
 import { getMfiThreshold } from "@/lib/automation-settings";
 
@@ -54,7 +54,7 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
         const wait = Math.max(0, 300 - (Date.now() - lastRequestAt));
         if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
         lastRequestAt = Date.now();
-        const daily = await fetchUsDailyPrice({ code: instrument.code, market: instrument.market });
+        const daily = await fetchUsDailyPriceCached({ code: instrument.code, market: instrument.market }, period + 1);
         if (!daily?.ok) {
           const parsed = daily?.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown; output2?: unknown } | null;
           results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})`, httpStatus: daily?.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });

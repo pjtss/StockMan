@@ -26,7 +26,7 @@ export type UsDailyPriceResponse = {
   request: { method: "GET"; url: string; headers: Record<string, string> };
   response: { rawText: string; parsed: unknown };
   candles: UsDailyCandle[];
-  diagnostics: { httpStatus: number; kisOk: boolean; rtCd: string | null; msgCd: string | null; msg1: string | null; outputKey: string | null; rawOutputCount: number; parsedCandleCount: number; firstDate: string | null; lastDate: string | null };
+  diagnostics: { source?: string; httpStatus: number; kisOk: boolean; rtCd: string | null; msgCd: string | null; msg1: string | null; outputKey: string | null; rawOutputCount: number; parsedCandleCount: number; firstDate: string | null; lastDate: string | null };
 };
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
