@@ -1,5 +1,5 @@
 import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
-import { fetchUsDailyPriceCached } from "@/lib/us-daily-price-cache";
+import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
 
 function obvValue(candles: UsDailyCandle[]) {
@@ -14,12 +14,14 @@ function obvValue(candles: UsDailyCandle[]) {
 export async function scanStoredUsDailyObv(options: { lookback?: number; concurrency?: number } = {}) {
   const lookback = Math.max(3, Math.floor(options.lookback ?? 5));
   const instruments = await listStoredUsInstruments();
+  const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, lookback * 2 + 1).catch(() => new Map<string, any[]>());
   const results: any[] = [];
   let cursor = 0;
   const worker = async () => { while (cursor < instruments.length) {
     const item = instruments[cursor++];
     try {
-      const daily = await fetchUsDailyPriceCached({ code: item.code, market: item.market }, lookback * 2 + 1);
+      const prefetched = cachedCandles.get(`${item.market}:${item.code}`);
+      const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : await fetchUsDailyPriceCached({ code: item.code, market: item.market }, lookback * 2 + 1);
       const candles = daily?.candles ?? [];
       if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, rising: false, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
       const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
