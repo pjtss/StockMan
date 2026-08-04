@@ -4,17 +4,26 @@ import { usDailyPriceCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily-price";
 
+const memoryCache = new Map<string, { expiresAt: number; candles: UsDailyCandle[] }>();
+const MEMORY_TTL_MS = 60_000;
+
 export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10): Promise<UsDailyCandle[]> {
+  const cacheKey = `${market}:${code}:${limit}`;
+  const memory = memoryCache.get(cacheKey);
+  if (memory && memory.expiresAt > Date.now()) return memory.candles;
   const db = getDb();
   if (!db) return [];
   const rows = await db.select().from(usDailyPriceCandles).where(and(eq(usDailyPriceCandles.market, market), eq(usDailyPriceCandles.code, code))).orderBy(desc(usDailyPriceCandles.candleDate)).limit(limit);
-  return rows.map((row) => ({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } }));
+  const candles = rows.map((row) => ({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } }));
+  memoryCache.set(cacheKey, { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
+  return candles;
 }
 
 export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[]) {
   const db = getDb();
   if (!db || candles.length === 0) return 0;
   await db.insert(usDailyPriceCandles).values(candles.map((candle) => ({ market, code, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usDailyPriceCandles.market, usDailyPriceCandles.code, usDailyPriceCandles.candleDate], set: { fetchedAt: new Date() } });
+  for (const limit of [10, 100]) memoryCache.delete(`${market}:${code}:${limit}`);
   return candles.length;
 }
 

@@ -3,6 +3,9 @@ import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
+const detailCache = new Map<string, { expiresAt: number; result: KisUsPriceDetailResult }>();
+const DETAIL_TTL_MS = 10_000;
+
 export type KisUsPriceDetailRequest = { code: string; market?: string };
 
 export type KisUsPriceDetailResult = {
@@ -20,6 +23,9 @@ function parseJson(rawText: string) {
 export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket = "AMS" }: KisUsPriceDetailRequest): Promise<KisUsPriceDetailResult | null> {
   const code = rawCode.trim().toUpperCase();
   const market = rawMarket.trim().toUpperCase();
+  const cacheKey = `${market}:${code}`;
+  const cached = detailCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
   const config = await loadKisApiConfig("us_price_detail");
   const params = new URLSearchParams({ AUTH: "", EXCD: market, SYMB: code });
   const url = `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price-detail?${params.toString()}`;
@@ -47,7 +53,9 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
     if (!token) return null;
     result = await fetchOnce(token);
   }
-  return { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
+  const value = { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
+  if (value.ok) detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
+  return value;
 }
 
 export function getKisUsPriceDetailOutput(parsed: unknown): Record<string, unknown> {
