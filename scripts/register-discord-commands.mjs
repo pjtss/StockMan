@@ -11,6 +11,10 @@ const response = await fetch(endpoint, { method: "PUT", headers: { authorization
   { name: "dmi", description: "저장된 미국 종목의 일봉 DMI를 조회합니다.", type: 1 },
   { name: "macd", description: "저장된 미국 종목의 일봉 MACD를 조회합니다.", type: 1 },
   { name: "refresh-daily", description: "통합 종목 전체의 일봉 데이터를 DB에 갱신합니다.", type: 1 },
+  { name: "turnover-list", description: "시총 대비 거래대금 지속 탐지 종목 목록을 조회합니다.", type: 1 },
+  { name: "turnover-add", description: "시총 대비 거래대금 지속 탐지 종목을 추가합니다.", type: 1, options: [{ name: "symbol", description: "예: AAPL", type: 3, required: true, max_length: 15 }] },
+  { name: "turnover-remove", description: "시총 대비 거래대금 지속 탐지 종목을 삭제합니다.", type: 1, options: [{ name: "symbol", description: "예: AAPL", type: 3, required: true, max_length: 15 }] },
+  { name: "turnover-clear", description: "시총 대비 거래대금 지속 탐지 종목을 모두 삭제합니다.", type: 1 },
 ]) });
 if (!response.ok) throw new Error(`Discord command registration failed: ${response.status} ${await response.text()}`);
 console.log(`Registered /ticker (${guildId ? "guild" : "global"})`);
@@ -19,3 +23,7 @@ console.log(`Registered /mfi-oversold (${guildId ? "guild" : "global"})`);
 console.log(`Registered /dmi (${guildId ? "guild" : "global"})`);
 console.log(`Registered /macd (${guildId ? "guild" : "global"})`);
 console.log(`Registered /refresh-daily (${guildId ? "guild" : "global"})`);
+console.log(`Registered /turnover-list (${guildId ? "guild" : "global"})`);
+console.log(`Registered /turnover-add (${guildId ? "guild" : "global"})`);
+console.log(`Registered /turnover-remove (${guildId ? "guild" : "global"})`);
+console.log(`Registered /turnover-clear (${guildId ? "guild" : "global"})`);

@@ -7,6 +7,7 @@ import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
+import { addUsTurnoverSymbol, clearUsTurnoverSymbols, loadUsTurnoverSymbols, removeUsTurnoverSymbol } from "@/lib/us-turnover-symbols";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,10 +56,18 @@ export async function POST(request: Request) {
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
-  if (interaction.data.name === "refresh-daily") {
+  if (interaction.data.name === "turnover-list") {
+    void loadUsTurnoverSymbols().then((symbols) => updateOriginalResponse(applicationId, interaction.token, symbols.length ? `📋 **시총 대비 거래대금 탐지 목록 (${symbols.length}개)**\n${symbols.map((symbol) => `- ${symbol}`).join("\n")}` : "현재 등록된 시총 대비 거래대금 탐지 종목이 없습니다.")).catch(() => updateOriginalResponse(applicationId, interaction.token, "탐지 목록을 조회하지 못했습니다."));
+  } else if (interaction.data.name === "turnover-add") {
+    void addUsTurnoverSymbol(ticker).then((symbol) => updateOriginalResponse(applicationId, interaction.token, `✅ **${symbol}**을(를) 시총 대비 거래대금 탐지 목록에 추가했습니다.`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `종목 추가 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+  } else if (interaction.data.name === "turnover-remove") {
+    void removeUsTurnoverSymbol(ticker).then((symbol) => updateOriginalResponse(applicationId, interaction.token, `✅ **${symbol}**을(를) 시총 대비 거래대금 탐지 목록에서 삭제했습니다.`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `종목 삭제 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+  } else if (interaction.data.name === "turnover-clear") {
+    void clearUsTurnoverSymbols().then(() => updateOriginalResponse(applicationId, interaction.token, "✅ 시총 대비 거래대금 탐지 종목을 모두 삭제했습니다.")).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 삭제에 실패했습니다."));
+  } else if (interaction.data.name === "refresh-daily") {
     void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-breakout") {
     void runUsDailyBreakoutScan().then((result) => updateOriginalResponse(applicationId, interaction.token, formatBreakoutResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 돌파 후보를 조회하는 중 오류가 발생했습니다."));
