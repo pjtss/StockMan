@@ -87,7 +87,7 @@ function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
   return rows
     .map((row: any, index: number) => ({
       index,
-      time: String(row.xymd || row.stck_cntg_hour || row.todt || row.time || row.date || "").trim(),
+      time: String(row.kymd && row.khms ? `${row.kymd}T${row.khms}` : row.xymd && row.xhms ? `${row.xymd}T${row.xhms}` : row.stck_cntg_hour || row.todt || row.time || row.date || "").trim(),
       price: parseNumber(row.last ?? row.price ?? row.stck_prpr ?? row.close ?? row.cprc),
       amount: parseNumber(
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??

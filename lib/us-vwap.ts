@@ -5,8 +5,7 @@ import { fetchUsMinuteTurnover } from "@/lib/kis-us-minute-turnover";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
-import { usInstruments } from "@/lib/schema";
-import { usTurnoverRatioSnapshots } from "@/lib/schema";
+import { usInstruments, usTurnoverRatioSnapshotAttempts, usTurnoverRatioSnapshots } from "@/lib/schema";
 import { upsertUsTopRisingUniverse } from "@/lib/us-top-rising-universe";
 
 export const VWAP_MARKETS = ["AMS", "NAS", "NYS"] as const;
@@ -35,6 +34,10 @@ async function loadTurnoverRatios(scopes: Scope[]) {
   const allowed = new Set(scopes.map((scope) => `${scope.market}:${scope.code}`));
   const rows = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, turnoverRatio: usTurnoverRatioSnapshots.turnoverRatio }).from(usTurnoverRatioSnapshots).where(gte(usTurnoverRatioSnapshots.observedAt, new Date(Date.now() - 24 * 60 * 60 * 1000))).orderBy(desc(usTurnoverRatioSnapshots.observedAt));
   for (const row of rows) { const key = `${row.market}:${row.code}`; if (allowed.has(key) && !map.has(key)) map.set(key, row.turnoverRatio); }
+  if (map.size < allowed.size) {
+    const attempts = await db.select({ market: usTurnoverRatioSnapshotAttempts.market, code: usTurnoverRatioSnapshotAttempts.code, turnoverRatio: usTurnoverRatioSnapshotAttempts.turnoverRatio }).from(usTurnoverRatioSnapshotAttempts).where(gte(usTurnoverRatioSnapshotAttempts.observedAt, new Date(Date.now() - 24 * 60 * 60 * 1000))).orderBy(desc(usTurnoverRatioSnapshotAttempts.observedAt));
+    for (const row of attempts) { const key = `${row.market}:${row.code}`; if (allowed.has(key) && row.turnoverRatio != null && !map.has(key)) map.set(key, row.turnoverRatio); }
+  }
   return map;
 }
 
@@ -53,18 +56,21 @@ async function loadRecentCache(scopes: Scope[], sessionDate: string, ttlMs: numb
 async function executeUsVwapScan(options: { scopes?: Scope[]; concurrency?: number; cacheTtlMs?: number } = {}) {
   const sessionDate = dateKst(); const module = await loadFeatureModuleSettings("us-vwap"); const policy = { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true, ...module.featureSettings?.vwapPolicy }; const scopes = options.scopes ?? await watchlistScopes(); const turnoverRatios = await loadTurnoverRatios(scopes); const cache = await loadRecentCache(scopes, sessionDate, options.cacheTtlMs ?? 45_000, policy, turnoverRatios);
   const results: VwapResult[] = [...cache.values()]; const errors: Array<Record<string, unknown>> = []; const pending = scopes.filter((scope) => !cache.has(`${scope.market}:${scope.code}`)); let nextIndex = 0;
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   async function worker() {
     while (true) {
       const scope = pending[nextIndex++]; if (!scope) return;
       try {
+        await delay(250);
         const response = await fetchUsMinuteTurnover({ code: scope.code, market: scope.market });
         if (!response) throw new Error("KIS access token unavailable");
         const points = response.points.map((point: any) => { const raw = (point.raw ?? {}) as Row; const volume = number(raw.evol ?? raw.volume ?? raw.cntg_vol ?? raw.tvol) ?? 0; const tradeValue = number(raw.eamt ?? raw.trade_amount ?? raw.pbmn) ?? (point.price * volume); return { price: point.price, volume, tradeValue, time: point.time }; }).filter((point) => point.price > 0 && point.volume > 0);
+        if (!response.ok || response.status < 200 || response.status >= 300 || points.length === 0) { errors.push({ ...scope, status: response.status, error: points.length === 0 ? "no_points" : "kis_http_error", rawTextPreview: response.response.rawText.slice(0, 500) }); return; }
         results.push(derive(points, response.points[0]?.price ?? null, response.complete !== false, { httpStatus: response.status, rawPointCount: response.points.length, parsedPointCount: points.length, pageCount: response.pageCount ?? 1, endpoint: response.request.url, rawTextPreview: response.response.rawText.slice(0, 1000), cacheHit: false, sessionCoverage: { firstPointTime: points.at(-1)?.time ?? null, lastPointTime: points[0]?.time ?? null }, note: response.complete === false ? "KIS continuation cursor remained after page limit" : "all available intraday pages included" }, scope, sessionDate, policy, turnoverRatios.get(`${scope.market}:${scope.code}`) ?? null));
       } catch (error) { errors.push({ ...scope, error: error instanceof Error ? error.message : String(error) }); }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 8, Math.max(1, pending.length)) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 2, Math.max(1, pending.length)) }, () => worker()));
   return { ok: errors.length === 0, checkedAt: new Date().toISOString(), sessionDate, marketScope: [...VWAP_MARKETS], instrumentCount: scopes.length, watchlistCount: scopes.length, attemptedCount: pending.length, cacheHitCount: cache.size, kisRequestCount: pending.length, successCount: results.length, failureCount: errors.length, qualified: results.filter((row) => row.qualifies), results, errors };
 }
 
