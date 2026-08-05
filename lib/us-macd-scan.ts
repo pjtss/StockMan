@@ -1,10 +1,11 @@
 import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
-import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
+import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 import { latestMacd } from "@/lib/us-macd";
 
 export async function scanStoredUsMacd(options: { fast?: number; slow?: number; signal?: number; concurrency?: number } = {}) {
   const fast = options.fast ?? 12, slow = options.slow ?? 26, signal = options.signal ?? 9;
-  const instruments = await listStoredUsInstruments(), results: any[] = [];
+  const universe = await loadUsTopRisingScopes();
+  const instruments = universe.scopes, results: any[] = [];
   const requiredCandles = slow + signal;
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, requiredCandles).catch(() => new Map<string, any[]>());
   const getDaily = (item: (typeof instruments)[number]) => {
@@ -24,5 +25,5 @@ export async function scanStoredUsMacd(options: { fast?: number; slow?: number; 
   } }
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.histogram ?? -Infinity) - (a.histogram ?? -Infinity));
-  return { fast, slow, signal, instrumentCount: instruments.length, successCount: results.filter((item) => item.macd != null).length, failureCount: results.filter((item) => item.macd == null).length, qualified: results.filter((item) => item.bullish), results };
+  return { universe: universe.universe, fast, slow, signal, instrumentCount: instruments.length, successCount: results.filter((item) => item.macd != null).length, failureCount: results.filter((item) => item.macd == null).length, qualified: results.filter((item) => item.bullish), results };
 }

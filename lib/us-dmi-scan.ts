@@ -1,10 +1,11 @@
 import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { latestDmi } from "@/lib/us-dmi";
-import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
+import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 
 export async function scanStoredUsDmi(options: { period?: number; concurrency?: number } = {}) {
   const period = options.period ?? 14;
-  const instruments = await listStoredUsInstruments();
+  const universe = await loadUsTopRisingScopes();
+  const instruments = universe.scopes;
   const results: any[] = [];
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
   const getDaily = (item: (typeof instruments)[number]) => {
@@ -24,5 +25,5 @@ export async function scanStoredUsDmi(options: { period?: number; concurrency?: 
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.adx ?? -1) - (a.adx ?? -1));
-  return { period, instrumentCount: instruments.length, successCount: results.filter((x) => x.adx !== null).length, failureCount: results.filter((x) => x.adx === null).length, qualified: results.filter((x) => x.qualifies), results };
+  return { universe: universe.universe, period, instrumentCount: instruments.length, successCount: results.filter((x) => x.adx !== null).length, failureCount: results.filter((x) => x.adx === null).length, qualified: results.filter((x) => x.qualifies), results };
 }

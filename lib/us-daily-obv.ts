@@ -1,6 +1,6 @@
 import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
-import { listStoredUsInstruments } from "@/lib/us-mfi-oversold";
+import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 
 function obvValue(candles: UsDailyCandle[]) {
   let value = 0;
@@ -13,7 +13,8 @@ function obvValue(candles: UsDailyCandle[]) {
 
 export async function scanStoredUsDailyObv(options: { lookback?: number; concurrency?: number } = {}) {
   const lookback = Math.max(3, Math.floor(options.lookback ?? 5));
-  const instruments = await listStoredUsInstruments();
+  const universe = await loadUsTopRisingScopes();
+  const instruments = universe.scopes;
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, lookback * 2 + 1).catch(() => new Map<string, any[]>());
   const results: any[] = [];
   let cursor = 0;
@@ -34,5 +35,5 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; concurr
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 1, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.change ?? -Infinity) - (a.change ?? -Infinity));
-  return { lookback, instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.rising), results };
+  return { universe: universe.universe, lookback, instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.rising), results };
 }

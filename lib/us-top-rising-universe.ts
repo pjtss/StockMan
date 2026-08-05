@@ -9,6 +9,30 @@ const EXCLUDED = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+
 function rows(parsed: any) { const output = parsed?.output ?? parsed?.output2 ?? parsed?.output1; return Array.isArray(output) ? output.slice(0, 100) : []; }
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
+export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null };
+
+/**
+ * Canonical live universe for scanners. Every scanner that used to iterate
+ * the integrated instrument table must use this source instead.
+ */
+export async function loadUsTopRisingScopes() {
+  const scopes: UsTopRisingScope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
+  for (const market of US_EXCHANGES) {
+    const response = await fetchKisUsTopRisingApi({ excd: market });
+    const sourceRows = rows(response?.response?.parsed); let productExcluded = 0;
+    for (const [index, item] of sourceRows.entries()) {
+      const ticker = code(item); const name = String(item.name ?? item.company ?? item.enName ?? "").trim();
+      const excluded = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i.test(`${name} ${String(item.ename ?? "")} ${String(item.etyp_nm ?? "")}`);
+      if (!ticker || excluded) { if (excluded) productExcluded += 1; continue; }
+      const key = `${market}:${ticker}`; if (seen.has(key)) continue; seen.add(key);
+      const numeric = (value: unknown) => { const parsed = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : null; };
+      scopes.push({ market, code: ticker, name, rank: index + 1, changeRate: numeric(item.rate ?? item.changeRate ?? item.n_rate), rankingVolume: numeric(item.tvol ?? item.vol ?? item.volume), rankingTradeValue: numeric(item.tamt ?? item.tamnt ?? item.amount) });
+    }
+    markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, productExcluded, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "" });
+  }
+  return { scopes, universe: { source: "KIS_UPDOWN_RATE_TOP100", markets, criteria: { exchanges: [...US_EXCHANGES], topN: 100, excludeEtfAndLeveraged: true } } };
+}
+
 export async function upsertUsTopRisingUniverse() {
   const db = getDb(); const results: any[] = []; const seen = new Set<string>();
   for (const market of US_EXCHANGES) {

@@ -4,6 +4,7 @@ import { usInstruments } from "@/lib/schema";
 import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { latestMfi } from "@/lib/us-mfi";
 import { getMfiThreshold } from "@/lib/automation-settings";
+import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 
 export const DEFAULT_MFI_PERIOD = 14;
 export const DEFAULT_MFI_OVERSOLD_THRESHOLD = 30;
@@ -39,7 +40,8 @@ export async function listStoredUsInstruments() {
 export async function scanStoredUsMfiOversold(options: { period?: number; threshold?: number; concurrency?: number } = {}) {
   const period = options.period ?? DEFAULT_MFI_PERIOD;
   const threshold = options.threshold ?? await getMfiThreshold();
-  const instruments = await listStoredUsInstruments();
+  const universe = await loadUsTopRisingScopes();
+  const instruments = universe.scopes;
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
   const results: MfiOversoldResult[] = [];
   // KIS rate limits are shared across the instance; serialize daily requests
@@ -61,22 +63,22 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
           : await fetchUsDailyPriceCached({ code: instrument.code, market: instrument.market }, period + 1);
         if (!daily?.ok) {
           const parsed = daily?.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown; output2?: unknown } | null;
-          results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})`, httpStatus: daily?.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });
+          results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})`, httpStatus: daily?.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });
           continue;
         }
         const latest = latestMfi(daily.candles, period);
         if (!latest) {
           const parsed = daily.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown; output2?: unknown } | null;
-          results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: `fewer than ${period + 1} daily candles`, httpStatus: daily.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0 });
+          results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: `fewer than ${period + 1} daily candles`, httpStatus: daily.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0 });
           continue;
         }
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: latest.value, mfiDate: latest.date, candleCount: daily.candles.length, dailyDiagnostics: daily.diagnostics, qualifies: latest.value <= threshold });
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: latest.value, mfiDate: latest.date, candleCount: daily.candles.length, dailyDiagnostics: daily.diagnostics, qualifies: latest.value <= threshold });
       } catch (error) {
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name, mfi: null, mfiDate: null, candleCount: 0, qualifies: false, error: error instanceof Error ? error.message : String(error) });
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: 0, qualifies: false, error: error instanceof Error ? error.message : String(error) });
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, instruments.length || 1) }, () => worker()));
   results.sort((a, b) => (a.mfi ?? 101) - (b.mfi ?? 101) || a.market.localeCompare(b.market) || a.code.localeCompare(b.code));
-  return { period, threshold, instrumentCount: instruments.length, successCount: results.filter((item) => item.mfi !== null).length, failureCount: results.filter((item) => item.mfi === null).length, qualified: results.filter((item) => item.qualifies), results };
+  return { universe: universe.universe, period, threshold, instrumentCount: instruments.length, successCount: results.filter((item) => item.mfi !== null).length, failureCount: results.filter((item) => item.mfi === null).length, qualified: results.filter((item) => item.qualifies), results };
 }
