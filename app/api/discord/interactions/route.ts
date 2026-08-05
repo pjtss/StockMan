@@ -7,6 +7,7 @@ import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
+import { scanUsVwap } from "@/lib/us-vwap";
 import { addUsTurnoverSymbol, clearUsTurnoverSymbols, loadUsTurnoverSymbols, removeUsTurnoverSymbol } from "@/lib/us-turnover-symbols";
 
 export const runtime = "nodejs";
@@ -50,13 +51,17 @@ function formatDailyObvResult(result: Awaited<ReturnType<typeof scanStoredUsDail
 function formatDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPriceCache>>) {
   return [`✅ **전체 일봉 데이터 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 일봉 데이터가 DB에 저장되었습니다."].join("\n");
 }
+function formatVwapResult(result: Awaited<ReturnType<typeof scanUsVwap>>) {
+  if (!result.qualified.length) return [`당일 VWAP 상회 종목이 없습니다.`, `관심종목 ${result.watchlistCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
+  return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => `**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}\n현재가 ${item.currentPrice} · VWAP ${item.vwap?.toFixed(4)}\n포인트 ${item.pointCount} · 거래량 ${item.totalVolume.toLocaleString()}`).join("\n\n")].join("\n");
+}
 
 export async function POST(request: Request) {
   const body = await request.text();
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (interaction.data.name === "turnover-list") {
@@ -79,6 +84,8 @@ export async function POST(request: Request) {
     void scanStoredUsDmi().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDmiResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "DMI 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "macd") {
     void scanStoredUsMacd().then((result) => updateOriginalResponse(applicationId, interaction.token, formatMacdResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
+  } else if (interaction.data.name === "vwap") {
+    void scanUsVwap().then((result) => updateOriginalResponse(applicationId, interaction.token, formatVwapResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "당일 VWAP 종목을 조회하는 중 오류가 발생했습니다."));
   } else {
     void getTickerOverview(ticker).then((overview) => updateOriginalResponse(applicationId, interaction.token, formatTickerOverview(overview))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
   }

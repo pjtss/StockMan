@@ -20,6 +20,10 @@ curl --fail-with-body --silent --show-error --max-time 120 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/us-turnover-watchlist"
 
+curl --fail-with-body --silent --show-error --max-time 180 \
+  -H "x-cron-secret: ${CRON_SECRET}" \
+  -X POST "${BASE_URL}/api/cron/us-vwap"
+
 curl --fail-with-body --silent --show-error --max-time 120 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/us-trade-intensity"

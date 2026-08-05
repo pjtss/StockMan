@@ -12,7 +12,7 @@ type Result = {
   [key: string]: unknown;
 };
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -71,6 +71,7 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/us-turnover-watchlist-test",
     query: "send=false",
   },
+  { key: "us_vwap", label: "미국 당일 VWAP 상회", description: "AMS·NAS·NYS 관심종목의 당일 전체 세션 VWAP 비교", endpoint: "/api/admin/us-vwap-test", query: "" },
   {
     key: "us_trade_trend",
     label: "미국 단일종목 체결강도",

@@ -30,6 +30,8 @@ export type UsMinuteTurnoverResponse = {
     parsed: unknown;
   };
   points: UsMinuteTurnoverPoint[];
+  pageCount?: number;
+  complete?: boolean;
 };
 
 function asciiOnly(value: string | undefined | null, fallback = "") {
@@ -49,7 +51,7 @@ function parseJson(rawText: string) {
   }
 }
 
-function buildRequest(code: string, market: string, config: Awaited<ReturnType<typeof loadKisApiConfig>>) {
+function buildRequest(code: string, market: string, config: Awaited<ReturnType<typeof loadKisApiConfig>>, next = "") {
   const params = new URLSearchParams({
     AUTH: asciiOnly(config.AUTH, ""),
     KEYB: asciiOnly(config.KEYB, ""),
@@ -59,7 +61,7 @@ function buildRequest(code: string, market: string, config: Awaited<ReturnType<t
     FID_INPUT_ISCD: code,
     FID_HOUR_CLS_CODE: asciiOnly(config.FID_HOUR_CLS_CODE, "0") || "0",
     PINC: asciiOnly(config.FID_PW_DATA_INCU_YN, "N") || "N",
-    NEXT: "",
+    NEXT: next,
     NREC: "120",
     FILL: "0",
     NMIN: "1",
@@ -95,14 +97,14 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
   const code = rawCode.trim().toUpperCase();
   const config = await loadKisApiConfig("us_turnover_trend");
   const market = rawMarket.trim().toUpperCase();
-  const { url } = buildRequest(code, market, config);
   const appkey = asciiOnly(process.env.KIS_APPKEY);
   const appsecret = asciiOnly(process.env.KIS_APPSECRET);
   const contentType = asciiOnly(config.content_type, "application/json; charset=utf-8");
   const trId = asciiOnly(config.tr_id, "HHDFS76950200") || "HHDFS76950200";
   const custtype = asciiOnly(config.custtype, "P") || "P";
 
-  async function fetchOnce(token: string) {
+  async function fetchOnce(token: string, next = "") {
+    const { url } = buildRequest(code, market, config, next);
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -116,7 +118,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
       },
     });
     const rawText = await response.text();
-    return { response, rawText, parsed: parseJson(rawText) };
+    return { response, rawText, parsed: parseJson(rawText), url };
   }
 
   let token = await getAccessToken();
@@ -128,7 +130,19 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
     result = await fetchOnce(token);
   }
 
-  console.info("[US-TURNOVER] request", { url, market, code, trId, contentType });
+  const allPoints = [...parsePoints(result.parsed)];
+  let pageCount = 1;
+  let next = String((result.parsed as any)?.output1?.next ?? (result.parsed as any)?.output1?.nextkey ?? (result.parsed as any)?.output1?.NEXT ?? "").trim();
+  while (next && pageCount < 10) {
+    const page = await fetchOnce(token, next);
+    const pagePoints = parsePoints(page.parsed);
+    if (!page.response.ok || pagePoints.length === 0) break;
+    allPoints.push(...pagePoints); pageCount += 1;
+    const following = String((page.parsed as any)?.output1?.next ?? (page.parsed as any)?.output1?.nextkey ?? (page.parsed as any)?.output1?.NEXT ?? "").trim();
+    if (!following || following === next) break;
+    next = following;
+  }
+  console.info("[US-TURNOVER] request", { url: result.url, market, code, trId, contentType, pageCount });
   console.info("[US-TURNOVER] raw response", result.rawText);
 
   return {
@@ -136,7 +150,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
     status: result.response.status,
     request: {
       method: "GET",
-      url,
+      url: result.url,
       headers: {
         authorization: "Bearer <masked>",
         appkey: "<masked>",
@@ -148,6 +162,8 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
       },
     },
     response: { rawText: result.rawText, parsed: result.parsed },
-    points: parsePoints(result.parsed),
+    points: allPoints,
+    pageCount,
+    complete: !next || pageCount >= 10,
   };
 }
