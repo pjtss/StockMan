@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usIntradayVwapSnapshots } from "@/lib/schema-vwap";
 import { fetchUsMinuteTurnover } from "@/lib/kis-us-minute-turnover";
@@ -27,19 +27,40 @@ function derive(points: Array<{ price: number; volume: number; tradeValue: numbe
   return { ...scope, sessionDate, vwap, currentPrice, totalVolume, totalTradeValue, pointCount: points.length, complete, qualifies: vwap != null && currentPrice != null && currentPrice > vwap, diagnostics };
 }
 
-export async function scanUsVwap(options: { scopes?: Scope[] } = {}) {
-  const sessionDate = dateKst(); const scopes = options.scopes ?? await watchlistScopes();
-  const results: VwapResult[] = []; const errors: Array<Record<string, unknown>> = [];
-  for (const scope of scopes) {
-    try {
-      const response = await fetchUsMinuteTurnover({ code: scope.code, market: scope.market });
-      if (!response) throw new Error("KIS access token unavailable");
-      const points = response.points.map((point: any) => { const raw = (point.raw ?? {}) as Row; const volume = number(raw.evol ?? raw.volume ?? raw.cntg_vol ?? raw.tvol) ?? 0; const tradeValue = number(raw.eamt ?? raw.trade_amount ?? raw.pbmn) ?? (point.price * volume); return { price: point.price, volume, tradeValue }; }).filter((point) => point.price > 0 && point.volume > 0);
-      const result = derive(points, response.points[0]?.price ?? null, response.complete !== false, { httpStatus: response.status, rawPointCount: response.points.length, parsedPointCount: points.length, pageCount: response.pageCount ?? 1, endpoint: response.request.url, rawTextPreview: response.response.rawText.slice(0, 1000), note: response.complete === false ? "KIS continuation cursor remained after page limit" : "all available intraday pages included" }, scope, sessionDate);
-      results.push(result);
-    } catch (error) { errors.push({ ...scope, error: error instanceof Error ? error.message : String(error) }); }
+async function loadRecentCache(scopes: Scope[], sessionDate: string, ttlMs: number) {
+  const db = getDb(); const map = new Map<string, VwapResult>();
+  if (!db || !scopes.length) return map;
+  const rows = await db.select().from(usIntradayVwapSnapshots).where(and(eq(usIntradayVwapSnapshots.sessionDate, sessionDate), gte(usIntradayVwapSnapshots.observedAt, new Date(Date.now() - ttlMs))));
+  const allowed = new Set(scopes.map((scope) => `${scope.market}:${scope.code}`));
+  for (const row of rows) if (allowed.has(`${row.market}:${row.code}`) && row.vwap != null && row.currentPrice != null && row.pointCount > 0) {
+    const scope = scopes.find((item) => item.market === row.market && item.code === row.code);
+    if (scope) map.set(`${row.market}:${row.code}`, { ...scope, sessionDate, vwap: row.vwap, currentPrice: row.currentPrice, totalVolume: row.totalVolume, totalTradeValue: row.totalTradeValue, pointCount: row.pointCount, complete: row.complete, qualifies: row.currentPrice > row.vwap, diagnostics: { ...(row.diagnostics as Record<string, unknown>), cacheHit: true, cacheAgeMs: Date.now() - row.observedAt.getTime() } });
   }
-  return { ok: errors.length === 0, checkedAt: new Date().toISOString(), sessionDate, marketScope: [...VWAP_MARKETS], watchlistCount: scopes.length, attemptedCount: scopes.length, successCount: results.length, failureCount: errors.length, qualified: results.filter((row) => row.qualifies), results, errors };
+  return map;
+}
+
+async function executeUsVwapScan(options: { scopes?: Scope[]; concurrency?: number; cacheTtlMs?: number } = {}) {
+  const sessionDate = dateKst(); const scopes = options.scopes ?? await watchlistScopes(); const cache = await loadRecentCache(scopes, sessionDate, options.cacheTtlMs ?? 45_000);
+  const results: VwapResult[] = [...cache.values()]; const errors: Array<Record<string, unknown>> = []; const pending = scopes.filter((scope) => !cache.has(`${scope.market}:${scope.code}`)); let nextIndex = 0;
+  async function worker() {
+    while (true) {
+      const scope = pending[nextIndex++]; if (!scope) return;
+      try {
+        const response = await fetchUsMinuteTurnover({ code: scope.code, market: scope.market });
+        if (!response) throw new Error("KIS access token unavailable");
+        const points = response.points.map((point: any) => { const raw = (point.raw ?? {}) as Row; const volume = number(raw.evol ?? raw.volume ?? raw.cntg_vol ?? raw.tvol) ?? 0; const tradeValue = number(raw.eamt ?? raw.trade_amount ?? raw.pbmn) ?? (point.price * volume); return { price: point.price, volume, tradeValue }; }).filter((point) => point.price > 0 && point.volume > 0);
+        results.push(derive(points, response.points[0]?.price ?? null, response.complete !== false, { httpStatus: response.status, rawPointCount: response.points.length, parsedPointCount: points.length, pageCount: response.pageCount ?? 1, endpoint: response.request.url, rawTextPreview: response.response.rawText.slice(0, 1000), cacheHit: false, note: response.complete === false ? "KIS continuation cursor remained after page limit" : "all available intraday pages included" }, scope, sessionDate));
+      } catch (error) { errors.push({ ...scope, error: error instanceof Error ? error.message : String(error) }); }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 8, Math.max(1, pending.length)) }, () => worker()));
+  return { ok: errors.length === 0, checkedAt: new Date().toISOString(), sessionDate, marketScope: [...VWAP_MARKETS], instrumentCount: scopes.length, watchlistCount: scopes.length, attemptedCount: pending.length, cacheHitCount: cache.size, kisRequestCount: pending.length, successCount: results.length, failureCount: errors.length, qualified: results.filter((row) => row.qualifies), results, errors };
+}
+
+let activeScan: Promise<Awaited<ReturnType<typeof executeUsVwapScan>>> | null = null;
+export function scanUsVwap(options: { scopes?: Scope[]; concurrency?: number; cacheTtlMs?: number } = {}) {
+  if (!activeScan) activeScan = executeUsVwapScan(options).finally(() => { activeScan = null; });
+  return activeScan;
 }
 
 export async function persistAndScanUsVwap() {

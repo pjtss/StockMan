@@ -53,8 +53,9 @@ function formatDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPri
   return [`✅ **전체 일봉 데이터 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 일봉 데이터가 DB에 저장되었습니다."].join("\n");
 }
 function formatVwapResult(result: Awaited<ReturnType<typeof scanUsVwap>>) {
-  if (!result.qualified.length) return [`당일 VWAP 상회 종목이 없습니다.`, `관심종목 ${result.watchlistCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
-  return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => `**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}\n현재가 ${item.currentPrice} · VWAP ${item.vwap?.toFixed(4)}\n포인트 ${item.pointCount} · 거래량 ${item.totalVolume.toLocaleString()}`).join("\n\n")].join("\n");
+  const summary = `통합 종목 ${result.instrumentCount}개 · DB 캐시 ${result.cacheHitCount}개 · KIS 조회 ${result.kisRequestCount}개 · 실패 ${result.failureCount}개`;
+  if (!result.qualified.length) return [`당일 VWAP 상회 종목이 없습니다.`, summary].join("\n");
+  return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, summary, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => `**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}\n현재가 ${item.currentPrice} · VWAP ${item.vwap?.toFixed(4)}\n포인트 ${item.pointCount} · 거래량 ${item.totalVolume.toLocaleString()}`).join("\n\n")].join("\n");
 }
 
 export async function POST(request: Request) {
