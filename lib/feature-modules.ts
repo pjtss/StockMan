@@ -7,6 +7,7 @@ export type FeatureSpecificSettings = {
   shortBorrowPolicy?: Record<string, unknown>;
   evaluation?: Record<string, string | number | boolean>;
   discordFormat?: Record<string, string | number | boolean>;
+  vwapPolicy?: { minAbovePercent: number; minVolume: number; minTradeValue: number; minPointCount: number; requireComplete: boolean };
 };
 
 export type FeatureModuleDefinition = {

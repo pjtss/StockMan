@@ -51,6 +51,13 @@ function parseJson(rawText: string) {
   }
 }
 
+function continuation(parsed: any) {
+  const output1 = parsed?.output1 ?? {};
+  const next = String(output1.next ?? output1.nextkey ?? output1.NEXT ?? "").trim();
+  const more = String(output1.more ?? output1.MORE ?? "").trim();
+  return { next, more, hasMore: more ? more !== "0" : Boolean(next) };
+}
+
 function buildRequest(code: string, market: string, config: Awaited<ReturnType<typeof loadKisApiConfig>>, next = "") {
   const params = new URLSearchParams({
     AUTH: asciiOnly(config.AUTH, ""),
@@ -132,15 +139,16 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
 
   const allPoints = [...parsePoints(result.parsed)];
   let pageCount = 1;
-  let next = String((result.parsed as any)?.output1?.next ?? (result.parsed as any)?.output1?.nextkey ?? (result.parsed as any)?.output1?.NEXT ?? "").trim();
+  let cursor = continuation(result.parsed);
+  let next = cursor.hasMore ? cursor.next : "";
   while (next && pageCount < 10) {
     const page = await fetchOnce(token, next);
     const pagePoints = parsePoints(page.parsed);
     if (!page.response.ok || pagePoints.length === 0) break;
     allPoints.push(...pagePoints); pageCount += 1;
-    const following = String((page.parsed as any)?.output1?.next ?? (page.parsed as any)?.output1?.nextkey ?? (page.parsed as any)?.output1?.NEXT ?? "").trim();
-    if (!following || following === next) break;
-    next = following;
+    const following = continuation(page.parsed);
+    if (!following.hasMore || !following.next || following.next === next) { next = ""; break; }
+    next = following.next;
   }
   console.info("[US-TURNOVER] request", { url: result.url, market, code, trId, contentType, pageCount });
   console.info("[US-TURNOVER] raw response", result.rawText);
@@ -164,6 +172,6 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
     response: { rawText: result.rawText, parsed: result.parsed },
     points: allPoints,
     pageCount,
-    complete: !next || pageCount >= 10,
+    complete: !next,
   };
 }
