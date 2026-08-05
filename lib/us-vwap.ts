@@ -22,19 +22,18 @@ async function watchlistScopes(): Promise<{ scopes: Scope[]; universe: Record<st
   const scopes: Scope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
   for (const market of VWAP_MARKETS) {
     const response = await fetchKisUsTopRisingApi({ excd: market });
-    const sourceRows = topRows(response?.response?.parsed); let rateExcluded = 0; let productExcluded = 0;
+    const sourceRows = topRows(response?.response?.parsed); let productExcluded = 0;
     for (const [index, row] of sourceRows.entries()) {
       const code = topCode(row); const name = String(row.name ?? row.company ?? row.enName ?? "").trim();
       const rate = number(row.rate ?? row.changeRate ?? row.n_rate);
       const excluded = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i.test(`${name} ${String(row.ename ?? "")} ${String(row.etyp_nm ?? "")}`);
       if (!code || excluded) { if (excluded) productExcluded += 1; continue; }
-      if (rate == null || rate < 10) { rateExcluded += 1; continue; }
       const key = `${market}:${code}`; if (seen.has(key)) continue; seen.add(key);
       scopes.push({ market, code, name, rank: index + 1, changeRate: rate, rankingVolume: number(row.tvol ?? row.vol ?? row.volume), rankingTradeValue: number(row.tamt ?? row.tamnt ?? row.amount) });
     }
-    markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, rateExcluded, productExcluded, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "" });
+    markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, productExcluded, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "" });
   }
-  return { scopes, universe: { source: "KIS_UPDOWN_RATE_TOP100", markets, criteria: { exchanges: [...VWAP_MARKETS], topN: 100, minChangeRate: 10, excludeEtfAndLeveraged: true } } };
+  return { scopes, universe: { source: "KIS_UPDOWN_RATE_TOP100", markets, criteria: { exchanges: [...VWAP_MARKETS], topN: 100, excludeEtfAndLeveraged: true } } };
 }
 
 function derive(points: Array<{ price: number; volume: number; tradeValue: number; time?: string }>, currentPrice: number | null, complete: boolean, diagnostics: Record<string, unknown>, scope: Scope, sessionDate: string, policy: VwapPolicy, turnoverRatio: number | null): VwapResult {
