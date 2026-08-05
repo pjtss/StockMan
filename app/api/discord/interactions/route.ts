@@ -8,6 +8,7 @@ import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
 import { scanUsVwap } from "@/lib/us-vwap";
+import { upsertUsTopRisingUniverse } from "@/lib/us-top-rising-universe";
 import { addUsTurnoverSymbol, clearUsTurnoverSymbols, loadUsTurnoverSymbols, removeUsTurnoverSymbol } from "@/lib/us-turnover-symbols";
 
 export const runtime = "nodejs";
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap", "sync-top100"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (interaction.data.name === "turnover-list") {
@@ -86,6 +87,8 @@ export async function POST(request: Request) {
     void scanStoredUsMacd().then((result) => updateOriginalResponse(applicationId, interaction.token, formatMacdResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "vwap") {
     void scanUsVwap().then((result) => updateOriginalResponse(applicationId, interaction.token, formatVwapResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "당일 VWAP 종목을 조회하는 중 오류가 발생했습니다."));
+  } else if (interaction.data.name === "sync-top100") {
+    void upsertUsTopRisingUniverse().then((result) => updateOriginalResponse(applicationId, interaction.token, `✅ TOP100 통합 티커 갱신 완료\n거래소 ${result.exchanges.join(", ")} · 현재 통합 종목 ${result.activeInstrumentCount}개\n${result.results.map((row) => `${row.market}: 원본 ${row.sourceCount} · UPSERT ${row.upsertedCount} · 제외 ${row.excludedCount}`).join("\n")}`)).catch(() => updateOriginalResponse(applicationId, interaction.token, "TOP100 통합 티커 갱신에 실패했습니다."));
   } else {
     void getTickerOverview(ticker).then((overview) => updateOriginalResponse(applicationId, interaction.token, formatTickerOverview(overview))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
   }

@@ -1,10 +1,12 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usIntradayVwapSnapshots } from "@/lib/schema-vwap";
 import { fetchUsMinuteTurnover } from "@/lib/kis-us-minute-turnover";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
+import { usInstruments } from "@/lib/schema";
+import { upsertUsTopRisingUniverse } from "@/lib/us-top-rising-universe";
 
 export const VWAP_MARKETS = ["AMS", "NAS", "NYS"] as const;
 type Scope = { market: string; code: string; name?: string };
@@ -13,9 +15,10 @@ export type VwapResult = { market: string; code: string; name?: string; sessionD
 
 function dateKst() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date()).replaceAll("-", ""); }
 function number(value: unknown) { const n = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : null; }
-function watchlistScopes(): Promise<Scope[]> {
-  const db = getDb(); if (!db) return Promise.resolve([]);
-  return db.execute(`SELECT i.market, i.code, COALESCE(i.name, '') AS name FROM us_turnover_watchlist w JOIN us_instruments i ON i.id=w.instrument_id WHERE w.enabled=true AND i.market IN ('AMS','NAS','NYS') ORDER BY i.market,i.code`).then((res: any) => (res.rows ?? []) as Scope[]);
+async function watchlistScopes(): Promise<Scope[]> {
+  const db = getDb(); if (!db) return [];
+  const rows = await db.select({ market: usInstruments.market, code: usInstruments.code, name: usInstruments.name, instrumentType: usInstruments.instrumentType }).from(usInstruments).where(and(eq(usInstruments.enabled, true), inArray(usInstruments.market, [...VWAP_MARKETS])));
+  return rows.filter((row) => row.instrumentType !== "ETF" && row.instrumentType !== "LEVERAGED" && !/ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i.test(row.name)).map(({ market, code, name }) => ({ market, code, name }));
 }
 
 function derive(points: Array<{ price: number; volume: number; tradeValue: number }>, currentPrice: number | null, complete: boolean, diagnostics: Record<string, unknown>, scope: Scope, sessionDate: string): VwapResult {
@@ -46,6 +49,7 @@ export async function persistAndScanUsVwap() {
 }
 
 export async function runUsVwapAutomation() {
+  const universe = await upsertUsTopRisingUniverse();
   const result = await persistAndScanUsVwap();
   const webhook = process.env.US_VWAP_DISCORD_WEBHOOK_URL?.trim() || "";
   let discord: Record<string, unknown> = { configured: Boolean(webhook), sent: 0 };
@@ -54,7 +58,7 @@ export async function runUsVwapAutomation() {
     const sent = await sendUsTurnoverRatioToDiscord(items, webhook);
     discord = { configured: true, sent: sent?.ok ? items.length : 0, status: sent?.status ?? 0 };
   }
-  return { ...result, discord };
+  return { ...result, universe, discord };
 }
 
 export async function vwapSettings() { return { module: await loadFeatureModuleSettings("us-turnover-ratio"), filters: await loadUsTurnoverFilterSettings() }; }
