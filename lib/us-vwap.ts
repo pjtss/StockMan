@@ -82,4 +82,4 @@ export async function runUsVwapAutomation() {
   return { ...result, universe, discord };
 }
 
-export async function vwapSettings() { return { module: await loadFeatureModuleSettings("us-turnover-ratio"), filters: await loadUsTurnoverFilterSettings() }; }
+export async function vwapSettings() { return { module: await loadFeatureModuleSettings("us-vwap"), filters: await loadUsTurnoverFilterSettings() }; }
