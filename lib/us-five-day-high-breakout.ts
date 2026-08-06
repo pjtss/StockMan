@@ -1,5 +1,5 @@
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
-import { fetchUsDailyPrice, type UsDailyCandle } from "@/lib/kis-us-daily-price";
+import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { loadCachedUsDailyCandles, saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
 export type UsFiveDayHighBreakoutRequest = { code: string; market: string; asOfDate?: string };
@@ -60,7 +60,7 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     const cachedPrevious = selectPreviousFiveTradingDays(cachedCandles, asOfDate);
     const daily = cachedPrevious.length >= 5
       ? { ok: true, status: 200, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE", parsedCandleCount: cachedCandles.length, firstDate: cachedCandles.at(-1)?.date ?? null, lastDate: cachedCandles[0]?.date ?? null } }
-      : await fetchUsDailyPrice({ code, market, endDate: asOfDate });
+      : { ok: false, status: 0, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: cachedCandles.length } };
     if (!daily) {
       lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "KIS access token unavailable" };
       continue;

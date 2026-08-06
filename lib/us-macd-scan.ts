@@ -1,4 +1,4 @@
-import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 import { latestMacd } from "@/lib/us-macd";
 
@@ -12,7 +12,7 @@ export async function scanStoredUsMacd(options: { fast?: number; slow?: number; 
     const cached = cachedCandles.get(`${item.market}:${item.code}`);
     return cached && cached.length >= requiredCandles
       ? Promise.resolve({ ok: true, status: 200, candles: cached, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: cached.length } })
-      : fetchUsDailyPriceCached({ code: item.code, market: item.market }, requiredCandles);
+      : Promise.resolve({ ok: false, status: 0, candles: cached ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: cached?.length ?? 0 } });
   };
   let cursor = 0;
   async function worker() { while (cursor < instruments.length) {

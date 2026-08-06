@@ -1,5 +1,5 @@
 import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
-import { fetchUsDailyPriceCached, loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 
 function obvValue(candles: UsDailyCandle[]) {
@@ -22,7 +22,7 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; concurr
     const item = instruments[cursor++];
     try {
       const prefetched = cachedCandles.get(`${item.market}:${item.code}`);
-      const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : await fetchUsDailyPriceCached({ code: item.code, market: item.market }, lookback * 2 + 1);
+      const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : { ok: false, status: 0, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: prefetched?.length ?? 0 } };
       const candles = daily?.candles ?? [];
       if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, rising: false, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
       const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
