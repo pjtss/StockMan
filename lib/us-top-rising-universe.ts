@@ -18,8 +18,14 @@ export type UsTopRisingScope = { market: string; code: string; name?: string; ra
 export async function loadUsTopRisingScopes() {
   const scopes: UsTopRisingScope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
   for (const market of US_EXCHANGES) {
-    const response = await fetchKisUsTopRisingApi({ excd: market });
-    const sourceRows = rows(response?.response?.parsed); let productExcluded = 0;
+    let response = await fetchKisUsTopRisingApi({ excd: market });
+    let sourceRows = rows(response?.response?.parsed); let fallbackUsed = false;
+    if (sourceRows.length === 0) {
+      const fallback = await fetchKisUsTopRisingApi({ excd: market, volRang: "0" });
+      const fallbackRows = rows(fallback?.response?.parsed);
+      if (fallbackRows.length > 0) { response = fallback; sourceRows = fallbackRows; fallbackUsed = true; }
+    }
+    let productExcluded = 0;
     for (const [index, item] of sourceRows.entries()) {
       const ticker = code(item); const name = String(item.name ?? item.company ?? item.enName ?? "").trim();
       const excluded = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i.test(`${name} ${String(item.ename ?? "")} ${String(item.etyp_nm ?? "")}`);
@@ -29,7 +35,7 @@ export async function loadUsTopRisingScopes() {
       scopes.push({ market, code: ticker, name, rank: index + 1, changeRate: numeric(item.rate ?? item.changeRate ?? item.n_rate), rankingVolume: numeric(item.tvol ?? item.vol ?? item.volume), rankingTradeValue: numeric(item.tamt ?? item.tamnt ?? item.amount) });
     }
     const parsed = response?.response?.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output1?: { nrec?: unknown } } | null;
-    markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, productExcluded, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange" : undefined });
+    markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, productExcluded, fallbackUsed, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange; verify market hours and KIS ranking availability" : undefined });
   }
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
   return { scopes, universe: { ok: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topN: 100, excludeEtfAndLeveraged: true } } };
