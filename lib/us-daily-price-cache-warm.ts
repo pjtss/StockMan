@@ -3,6 +3,7 @@ import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
+function currentKstDate() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date()).replaceAll("-", ""); }
 
 async function executeWarm(options: { concurrency?: number } = {}) {
   const startedAt = new Date().toISOString();
@@ -23,7 +24,13 @@ async function executeWarm(options: { concurrency?: number } = {}) {
           failures.push({ market: item.market, code: item.code, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "KIS returned no daily candles" });
           continue;
         }
-        candleCount += await saveUsDailyCandles(item.market, item.code, daily.candles);
+        const today = currentKstDate();
+        const historicalCandles = daily.candles.filter((candle) => String(candle.date).replace(/[^0-9]/g, "") !== today);
+        if (historicalCandles.length === 0) {
+          failures.push({ market: item.market, code: item.code, error: "KIS returned no prior-day candles after excluding current date" });
+          continue;
+        }
+        candleCount += await saveUsDailyCandles(item.market, item.code, historicalCandles);
         successCount += 1;
       } catch (error) { failures.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) }); }
     }
