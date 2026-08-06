@@ -83,7 +83,7 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     const marketCap = valueNumber(output.tomv ?? output.hts_avls ?? output.marketCap);
     const tradingValue = valueNumber(output.tamt ?? output.tamnt ?? output.tot_tr_pbmn ?? output.tradingValue);
     const previousFiveDayHigh = Math.max(...previous.map((candle) => candle.high));
-    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate, volume, marketCap, tradingValue, turnoverRatio: marketCap && tradingValue ? tradingValue / marketCap * 100 : null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, diagnostics: daily.diagnostics }, price: { ok: true, status: price.status, raw: price.parsed } };
+    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate, volume, marketCap, tradingValue, turnoverRatio: marketCap && tradingValue ? tradingValue / marketCap * 100 : null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText || undefined, diagnostics: daily.diagnostics }, price: { ok: true, status: price.status, raw: price.parsed } };
   }
   return lastFailure ?? { ok: false, code, market: requestedMarket, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "no market response" };
 }

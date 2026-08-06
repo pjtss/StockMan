@@ -72,7 +72,7 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
           results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: `fewer than ${period + 1} daily candles`, httpStatus: daily.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0 });
           continue;
         }
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: latest.value, mfiDate: latest.date, candleCount: daily.candles.length, dailyDiagnostics: daily.diagnostics, qualifies: latest.value <= threshold });
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: latest.value, mfiDate: latest.date, candleCount: daily.candles.length, dailyDiagnostics: daily.diagnostics, rawText: daily.response.rawText || undefined, qualifies: latest.value <= threshold });
       } catch (error) {
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: 0, qualifies: false, error: error instanceof Error ? error.message : String(error) });
       }

@@ -20,7 +20,7 @@ export async function scanStoredUsDmi(options: { period?: number; concurrency?: 
     try {
       const daily = await getDaily(item);
       const dmi = daily?.ok ? latestDmi(daily.candles, period) : null;
-      results.push({ market: item.market, code: item.code, name: item.name, plusDi: dmi?.plusDi ?? null, minusDi: dmi?.minusDi ?? null, adx: dmi?.adx ?? null, date: dmi?.date ?? null, candleCount: daily?.candles.length ?? 0, dailyDiagnostics: daily?.diagnostics ?? null, qualifies: Boolean(dmi && dmi.plusDi > dmi.minusDi), error: dmi ? undefined : !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "insufficient parsed candles for DMI" });
+      results.push({ market: item.market, code: item.code, name: item.name, plusDi: dmi?.plusDi ?? null, minusDi: dmi?.minusDi ?? null, adx: dmi?.adx ?? null, date: dmi?.date ?? null, candleCount: daily?.candles.length ?? 0, dailyDiagnostics: daily?.diagnostics ?? null, rawText: daily?.response?.rawText || undefined, qualifies: Boolean(dmi && dmi.plusDi > dmi.minusDi), error: dmi ? undefined : !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "insufficient parsed candles for DMI" });
     } catch (error) { results.push({ market: item.market, code: item.code, name: item.name, plusDi: null, minusDi: null, adx: null, date: null, candleCount: 0, qualifies: false, error: error instanceof Error ? error.message : String(error) }); }
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));
