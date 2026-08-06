@@ -12,6 +12,22 @@ type Result = {
   [key: string]: unknown;
 };
 
+type RawResponse = { path: string; value: string };
+
+function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawResponse[] = []) {
+  if (depth > 8 || value == null) return output;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      const childPath = `${path}.${key}`;
+      if (key === "rawText" && typeof child === "string" && child.trim()) output.push({ path: childPath, value: child });
+      else if (key !== "rawTextPreview") collectRawResponses(child, childPath, depth + 1, output);
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((child, index) => collectRawResponses(child, `${path}[${index}]`, depth + 1, output));
+  }
+  return output;
+}
+
 type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
 type ApiTestDefinition = {
   key: TestKey;
@@ -173,10 +189,12 @@ export function AdminApiTests() {
   const [mfiPeriod, setMfiPeriod] = useState("14");
   const [mfiThreshold, setMfiThreshold] = useState("30");
   const [copied, setCopied] = useState(false);
+  const [rawOpen, setRawOpen] = useState(false);
 
   async function runTest(test: ApiTestDefinition) {
     setRunning(test.key);
     setCopied(false);
+    setRawOpen(false);
     setError(null);
     try {
       const query = test.key === "sec_raw"
@@ -318,6 +336,7 @@ export function AdminApiTests() {
           onClose={() => {
             setActive(null);
             setResult(null);
+            setRawOpen(false);
           }}
           wide
         >
@@ -346,6 +365,11 @@ export function AdminApiTests() {
             return <div className={styles.resultHeader}><span>체결강도 분석</span><strong>{score.level ?? "-"} {score.score ?? 0}점 · {metrics.sampleCount ?? 0}건 · 최근 평균 {metrics.recentAverageIntensity ?? "-"} · 직전 평균 {metrics.previousAverageIntensity ?? "-"} · 변화 {metrics.intensityChange ?? "-"}</strong></div>;
           })()}
           <div className={styles.cardActions}>
+            {collectRawResponses(result).length > 0 && (
+              <button className={styles.toggleButton} onClick={() => setRawOpen(true)}>
+                원본 응답 보기
+              </button>
+            )}
             <button
               className={styles.toggleButton}
               onClick={async () => {
@@ -361,6 +385,20 @@ export function AdminApiTests() {
           <pre className={styles.codeBlock}>{JSON.stringify(result, null, 2)}</pre>
         </AdminModal>
       )}
+      {result && activeTest && rawOpen && (() => {
+        const rawResponses = collectRawResponses(result);
+        const rawText = rawResponses.map((item) => `===== ${item.path} =====\n${item.value}`).join("\n\n");
+        return <AdminModal title={`${activeTest.label} · KIS 원본 응답`} description="가공하지 않은 API 원문입니다. 필요한 경우 아래 버튼으로 복사할 수 있습니다." onClose={() => setRawOpen(false)} wide>
+          <div className={styles.resultHeader}><span>원본 블록</span><strong>{rawResponses.length}개</strong></div>
+          <div className={styles.cardActions}>
+            <button className={styles.toggleButton} onClick={async () => { await navigator.clipboard.writeText(rawText); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>
+              <Copy size={16} />
+              {copied ? "원본 복사 완료" : "KIS 원본 응답 복사"}
+            </button>
+          </div>
+          <pre className={styles.codeBlock}>{rawText}</pre>
+        </AdminModal>;
+      })()}
     </AdminPageShell>
   );
 }
