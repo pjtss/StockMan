@@ -35,5 +35,5 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; concurr
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 1, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.change ?? -Infinity) - (a.change ?? -Infinity));
-  return { universe: universe.universe, lookback, instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.rising), results };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, lookback, instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.rising), results };
 }

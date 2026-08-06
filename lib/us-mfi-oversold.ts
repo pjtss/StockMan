@@ -80,5 +80,5 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, instruments.length || 1) }, () => worker()));
   results.sort((a, b) => (a.mfi ?? 101) - (b.mfi ?? 101) || a.market.localeCompare(b.market) || a.code.localeCompare(b.code));
-  return { universe: universe.universe, period, threshold, instrumentCount: instruments.length, successCount: results.filter((item) => item.mfi !== null).length, failureCount: results.filter((item) => item.mfi === null).length, qualified: results.filter((item) => item.qualifies), results };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, period, threshold, instrumentCount: instruments.length, successCount: results.filter((item) => item.mfi !== null).length, failureCount: results.filter((item) => item.mfi === null).length, qualified: results.filter((item) => item.qualifies), results };
 }

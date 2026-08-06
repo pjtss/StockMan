@@ -67,7 +67,7 @@ async function executeUsVwapScan(options: { scopes?: Scope[]; universe?: Record<
     }
   }
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 2, Math.max(1, pending.length)) }, () => worker()));
-  return { ok: errors.length === 0, checkedAt: new Date().toISOString(), sessionDate, marketScope: [...VWAP_MARKETS], universe: selected.universe, instrumentCount: scopes.length, watchlistCount: scopes.length, attemptedCount: pending.length, cacheHitCount: cache.size, kisRequestCount: pending.length, successCount: results.length, failureCount: errors.length, qualified: results.filter((row) => row.qualifies), results, errors };
+  return { ok: Boolean((selected.universe as any).ok) && errors.length === 0, checkedAt: new Date().toISOString(), sessionDate, marketScope: [...VWAP_MARKETS], universe: selected.universe, instrumentCount: scopes.length, watchlistCount: scopes.length, attemptedCount: pending.length, cacheHitCount: cache.size, kisRequestCount: pending.length, successCount: results.length, failureCount: errors.length, qualified: results.filter((row) => row.qualifies), results, errors };
 }
 
 let activeScan: Promise<Awaited<ReturnType<typeof executeUsVwapScan>>> | null = null;

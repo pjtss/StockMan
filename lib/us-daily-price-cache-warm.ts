@@ -29,7 +29,7 @@ async function executeWarm(options: { concurrency?: number } = {}) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
-  return { universe: universe.universe, startedAt, completedAt: new Date().toISOString(), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, startedAt, completedAt: new Date().toISOString(), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
 }
 
 export function warmUsDailyPriceCache(options: { concurrency?: number } = {}) {

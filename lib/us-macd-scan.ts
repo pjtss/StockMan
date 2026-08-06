@@ -25,5 +25,5 @@ export async function scanStoredUsMacd(options: { fast?: number; slow?: number; 
   } }
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.histogram ?? -Infinity) - (a.histogram ?? -Infinity));
-  return { universe: universe.universe, fast, slow, signal, instrumentCount: instruments.length, successCount: results.filter((item) => item.macd != null).length, failureCount: results.filter((item) => item.macd == null).length, qualified: results.filter((item) => item.bullish), results };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, fast, slow, signal, instrumentCount: instruments.length, successCount: results.filter((item) => item.macd != null).length, failureCount: results.filter((item) => item.macd == null).length, qualified: results.filter((item) => item.bullish), results };
 }

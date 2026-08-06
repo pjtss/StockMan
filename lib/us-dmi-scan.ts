@@ -25,5 +25,5 @@ export async function scanStoredUsDmi(options: { period?: number; concurrency?: 
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.adx ?? -1) - (a.adx ?? -1));
-  return { universe: universe.universe, period, instrumentCount: instruments.length, successCount: results.filter((x) => x.adx !== null).length, failureCount: results.filter((x) => x.adx === null).length, qualified: results.filter((x) => x.qualifies), results };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, period, instrumentCount: instruments.length, successCount: results.filter((x) => x.adx !== null).length, failureCount: results.filter((x) => x.adx === null).length, qualified: results.filter((x) => x.qualifies), results };
 }
