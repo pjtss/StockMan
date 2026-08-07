@@ -13,6 +13,7 @@ const response = await fetch(endpoint, { method: "PUT", headers: { authorization
   { name: "vwap", description: "관심종목 중 당일 VWAP 상회 종목을 조회합니다.", type: 1 },
   { name: "sync-top100", description: "NAS·AMS·NYS 상승률 TOP100을 통합 티커 테이블에 갱신합니다.", type: 1 },
   { name: "refresh-daily", description: "통합 종목 전체의 일봉 데이터를 DB에 갱신합니다.", type: 1 },
+  { name: "daily-filter-refresh", description: "DB의 최신 일봉 데이터로 전체 일봉 필터를 재평가하고 Webhook으로 전송합니다.", type: 1 },
   { name: "turnover-list", description: "시총 대비 거래대금 지속 탐지 종목 목록을 조회합니다.", type: 1 },
   { name: "turnover-add", description: "시총 대비 거래대금 지속 탐지 종목을 추가합니다.", type: 1, options: [{ name: "symbol", description: "예: AAPL", type: 3, required: true, max_length: 15 }] },
   { name: "turnover-remove", description: "시총 대비 거래대금 지속 탐지 종목을 삭제합니다.", type: 1, options: [{ name: "symbol", description: "예: AAPL", type: 3, required: true, max_length: 15 }] },
@@ -27,6 +28,7 @@ console.log(`Registered /macd (${guildId ? "guild" : "global"})`);
 console.log(`Registered /vwap (${guildId ? "guild" : "global"})`);
 console.log(`Registered /sync-top100 (${guildId ? "guild" : "global"})`);
 console.log(`Registered /refresh-daily (${guildId ? "guild" : "global"})`);
+console.log(`Registered /daily-filter-refresh (${guildId ? "guild" : "global"})`);
 console.log(`Registered /turnover-list (${guildId ? "guild" : "global"})`);
 console.log(`Registered /turnover-add (${guildId ? "guild" : "global"})`);
 console.log(`Registered /turnover-remove (${guildId ? "guild" : "global"})`);
