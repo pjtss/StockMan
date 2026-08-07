@@ -1,10 +1,10 @@
 import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
-import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { latestMacd } from "@/lib/us-macd";
 
 export async function scanStoredUsMacd(options: { fast?: number; slow?: number; signal?: number; concurrency?: number } = {}) {
   const fast = options.fast ?? 12, slow = options.slow ?? 26, signal = options.signal ?? 9;
-  const universe = await loadUsTopRisingScopes();
+  const universe = await loadStoredUsInstrumentScopes();
   const instruments = universe.scopes, results: any[] = [];
   const requiredCandles = slow + signal;
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, requiredCandles).catch(() => new Map<string, any[]>());

@@ -4,7 +4,7 @@ import { usInstruments } from "@/lib/schema";
 import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { latestMfi } from "@/lib/us-mfi";
 import { getMfiThreshold } from "@/lib/automation-settings";
-import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
 export const DEFAULT_MFI_PERIOD = 14;
 export const DEFAULT_MFI_OVERSOLD_THRESHOLD = 30;
@@ -40,7 +40,7 @@ export async function listStoredUsInstruments() {
 export async function scanStoredUsMfiOversold(options: { period?: number; threshold?: number; concurrency?: number } = {}) {
   const period = options.period ?? DEFAULT_MFI_PERIOD;
   const threshold = options.threshold ?? await getMfiThreshold();
-  const universe = await loadUsTopRisingScopes();
+  const universe = await loadStoredUsInstrumentScopes();
   const instruments = universe.scopes;
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
   const results: MfiOversoldResult[] = [];

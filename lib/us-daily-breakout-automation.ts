@@ -1,4 +1,4 @@
-import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { findUsFiveDayHighBreakout, type UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { getUsFreeFloat } from "@/lib/us-free-float";
 import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
@@ -9,7 +9,7 @@ async function executeScan(options: { limit?: number; concurrency?: number } = {
   const startedAt = Date.now();
   // Automatic detection uses the canonical instrument registry, not the
   // legacy/manual breakout watchlist. Only enabled US exchanges are included.
-  const universe = await loadUsTopRisingScopes();
+  const universe = await loadStoredUsInstrumentScopes();
   const watchlist = universe.scopes;
   const limit = Number.isFinite(options.limit) && (options.limit ?? 0) > 0 ? Math.floor(options.limit as number) : null;
   const scanList = limit ? watchlist.slice(0, limit) : watchlist;

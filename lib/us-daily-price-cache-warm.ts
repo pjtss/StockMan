@@ -1,4 +1,4 @@
-import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
@@ -7,7 +7,7 @@ function currentKstDate() { return new Intl.DateTimeFormat("en-CA", { timeZone: 
 
 async function executeWarm(options: { concurrency?: number } = {}) {
   const startedAt = new Date().toISOString();
-  const universe = await loadUsTopRisingScopes();
+  const universe = await loadStoredUsInstrumentScopes();
   const instruments = universe.scopes;
   const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
   let cursor = 0;

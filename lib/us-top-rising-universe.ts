@@ -11,6 +11,16 @@ function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").
 
 export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null };
 
+/** Canonical persisted universe used by daily indicators. No live ranking API is called. */
+export async function loadStoredUsInstrumentScopes() {
+  const db = getDb();
+  const rows = db ? await db.select({ market: usInstruments.market, code: usInstruments.code, name: usInstruments.name })
+    .from(usInstruments).where(and(eq(usInstruments.enabled, true), inArray(usInstruments.market, [...US_EXCHANGES])))
+    : [];
+  const scopes = rows.map((row, index) => ({ market: row.market, code: row.code, name: row.name, rank: index + 1, changeRate: null, rankingVolume: null, rankingTradeValue: null }));
+  return { scopes, universe: { ok: true, source: "DB_INTEGRATED_US_INSTRUMENTS", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instruments" } } };
+}
+
 /**
  * Canonical live universe for scanners. Every scanner that used to iterate
  * the integrated instrument table must use this source instead.

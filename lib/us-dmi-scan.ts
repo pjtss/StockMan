@@ -1,10 +1,10 @@
 import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
 import { latestDmi } from "@/lib/us-dmi";
-import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
 export async function scanStoredUsDmi(options: { period?: number; concurrency?: number } = {}) {
   const period = options.period ?? 14;
-  const universe = await loadUsTopRisingScopes();
+  const universe = await loadStoredUsInstrumentScopes();
   const instruments = universe.scopes;
   const results: any[] = [];
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
