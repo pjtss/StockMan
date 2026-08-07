@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "turnover-filters" | "api-config" | "api-tests" | "blacklist" | "sec-test" | "observability";
+export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "turnover-filters" | "api-config" | "api-tests" | "blacklist" | "product-classification" | "sec-test" | "observability";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -64,6 +64,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "AMS 블랙리스트",
     description: "AMS 스캐너 제외 티커 관리",
     href: "/admin/us-turnover-blacklist",
+  },
+  {
+    id: "product-classification",
+    group: "API 관리",
+    label: "상품 분류",
+    description: "ETF·레버리지·인버스 상품 자동 분류와 예외 관리",
+    href: "/admin/us-instrument-products",
   },
   {
     id: "sec-test",

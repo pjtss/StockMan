@@ -26,6 +26,7 @@ const NAV_ICONS = {
   "turnover-filters": ListFilter,
   modules: Settings2,
   blacklist: ListFilter,
+  "product-classification": ListFilter,
   "sec-test": ChartNoAxesCombined,
   observability: Activity,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;
