@@ -7,7 +7,7 @@ describe("ADMIN_NAV_ITEMS", () => {
     expect(new Set(ADMIN_NAV_ITEMS.map((item) => item.href)).size).toBe(ADMIN_NAV_ITEMS.length);
     expect(ADMIN_NAV_ITEMS.every((item) => item.href.startsWith("/admin"))).toBe(true);
     expect(new Set(ADMIN_NAV_ITEMS.map((item) => item.group))).toEqual(
-      new Set(["운영 제어", "API 관리", "SEC 분석"]),
+      new Set(["운영", "API", "종목", "자동화", "진단"]),
     );
   });
 });

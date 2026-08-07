@@ -23,7 +23,6 @@ const NAV_ICONS = {
   schedules: Clock3,
   "api-config": Settings2,
   "api-tests": FlaskConical,
-  "turnover-filters": ListFilter,
   modules: Settings2,
   blacklist: ListFilter,
   "product-classification": ListFilter,

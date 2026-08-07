@@ -11,9 +11,11 @@ describe("AdminDashboard", () => {
     render(<AdminDashboard />);
 
     expect(screen.getByRole("heading", { name: "관리자 대시보드" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "운영 제어" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "API 관리" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "SEC 분석" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "운영" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "API" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "종목" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "자동화" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "진단" })).toBeDefined();
     expect(screen.getAllByRole("link", { name: /기능 ON\/OFF/ }).some((link) => link.getAttribute("href") === "/admin/features")).toBe(true);
     expect(screen.getAllByRole("link", { name: /SEC 분석 테스트/ }).some((link) => link.getAttribute("href") === "/admin/sec-test")).toBe(true);
   });

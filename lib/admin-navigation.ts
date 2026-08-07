@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "turnover-filters" | "api-config" | "api-tests" | "blacklist" | "product-classification" | "sec-test" | "observability";
+export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "api-config" | "api-tests" | "blacklist" | "product-classification" | "sec-test" | "observability";
 
 export type AdminNavItem = {
   id: AdminNavId;
