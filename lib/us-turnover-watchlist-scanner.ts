@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usInstruments, usTurnoverWatchlist, usTurnoverWatchlistAlertState } from "@/lib/schema";
+import { usInstruments, usTurnoverWatchlist, usTurnoverWatchlistAlertState, usTurnoverRatioSnapshotAttempts } from "@/lib/schema";
 import { ensureUsInstrument } from "@/lib/us-instruments";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
@@ -69,6 +69,15 @@ export async function scanUsTurnoverWatchlist(options: { send?: boolean } = {}):
     if (resolvedMarket !== item.market && detail?.ok) {
       const reboundId = await rebindWatchlistInstrument(item.instrumentId, resolvedMarket, item.code, item.name);
       if (reboundId !== null) resolvedInstruments.set(item.instrumentId, reboundId);
+    }
+    const db = getDb();
+    if (db) {
+      const resolvedId = resolvedInstruments.get(item.instrumentId) ?? item.instrumentId;
+      await db.insert(usTurnoverRatioSnapshotAttempts).values(attempts.map((attempt) => ({
+        market: String(attempt.market), code: item.code, name: item.name, instrumentType: "COMMON_STOCK",
+        snapshotStatus: attempt.ok ? "WATCHLIST_DETAIL_SUCCESS" : "WATCHLIST_MARKET_RETRY_FAILED",
+        errorMessage: attempt.ok ? null : "KIS 상세 응답 누락 또는 필수 필드 부족", observedAt: new Date(), instrumentId: resolvedId,
+      })));
     }
     const output = getKisUsPriceDetailOutput(detail?.parsed);
     const marketCap = calculateKisUsMarketCap(output);
