@@ -8,7 +8,7 @@ export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutR
   if (!items.length) return { ok: true, sent: 0 };
   const content = items.map((item) => [
     `🚨 **${item.market} ${item.code} 5일 고가 돌파**`,
-    `현재가: ${item.currentPrice}`, `직전 5거래일 최고가: ${item.previousFiveDayHigh}`,
+    `당일 시가: ${item.currentPrice}`, `직전 5거래일 최고가: ${item.previousFiveDayHigh}`,
     `등락률: ${item.rate ?? "확인 불가"}%`,
     `거래량: ${formatKoreanCompact(item.volume, "주")}`,
     `시가총액: ${formatKoreanCompact(item.marketCap, " 달러")}`,

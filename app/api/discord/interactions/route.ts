@@ -28,7 +28,7 @@ function formatBreakoutResult(result: Awaited<ReturnType<typeof runUsDailyBreako
   if (!result.qualified.length) return [`오늘 5거래일 고가 돌파 종목이 없습니다. (통합 종목 ${result.instrumentCount}개)`, "", "분석 대상", ...result.results.map((item) => `- ${item.market} ${item.code}: ${item.error || `현재가 ${item.currentPrice} / 직전 5일 최고가 ${item.previousFiveDayHigh} (미돌파)`}`)].join("\n");
   return [`🚨 **일봉 5거래일 고가 돌파 후보**`, `통합 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [
     `**${item.market} ${item.code}**`,
-    `현재가 ${item.currentPrice} · 직전 5일 최고가 ${item.previousFiveDayHigh}`,
+    `당일 시가 ${item.currentPrice} · 직전 5일 최고가 ${item.previousFiveDayHigh}`,
     `등락률 ${item.rate ?? "확인 불가"}% · 거래량 ${item.volume ?? "확인 불가"}`,
     `시총 ${item.marketCap ?? "확인 불가"} · 거래대금 ${item.tradingValue ?? "확인 불가"} · 시총 대비 ${item.turnoverRatio == null ? "확인 불가" : `${item.turnoverRatio.toFixed(2)}%`}`,
     `유통주 ${item.freeFloatShares ?? "확인 불가"} · 유통비율 ${item.freeFloatPercent == null ? "확인 불가" : `${item.freeFloatPercent}%`}`,
