@@ -63,6 +63,7 @@ export async function upsertUsTopRisingUniverse() {
       const product = classifyUsInstrumentProduct({ name, englishName: row.ename, type: row.etyp_nm });
       const isExcluded = !isEligibleUsCommonStock(product);
       if (isExcluded) { excluded += 1; }
+      if (isExcluded) continue;
       if (seen.has(`${market}:${ticker}`)) continue; seen.add(`${market}:${ticker}`);
       if (await ensureUsInstrument({ market, code: ticker, name, englishName: String(row.ename ?? ""), productType: String(row.etyp_nm ?? "") })) upserted += 1;
     }
