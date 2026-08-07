@@ -75,9 +75,8 @@ export async function translatePendingMarketRssArticles(limit = 10) {
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {
-  const defaultWebhook = process.env.MARKET_RSS_DISCORD_WEBHOOK_URL;
-  const stockTitanWebhook = process.env.STOCKTITAN_DISCORD_WEBHOOK_URL || defaultWebhook;
-  if (!defaultWebhook && !stockTitanWebhook) return { attempted: 0, sent: 0, skipped: true, reason: "webhook_not_configured" };
+  const webhook = process.env.MARKET_RSS_DISCORD_WEBHOOK_URL;
+  if (!webhook) return { attempted: 0, sent: 0, skipped: true, reason: "webhook_not_configured" };
   const db = getDb();
   const now = Date.now();
   const staleCutoff = new Date(now - articleAgeLimitMs());
@@ -89,11 +88,6 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   let sent = 0;
   for (const row of rows) {
     if (remaining <= 0) break;
-    const webhook = row.source === "STOCKTITAN" ? stockTitanWebhook : defaultWebhook;
-    if (!webhook) {
-      await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: row.notificationAttempts + 1, lastError: `${row.source}_webhook_not_configured`, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
-      continue;
-    }
     const title = row.translatedTitle || row.title;
     const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
     const body = [
@@ -113,5 +107,5 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: row.notificationAttempts + 1, lastError: error instanceof Error ? error.message : String(error), updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
     }
   }
-  return { attempted: rows.length, sent, skipped: false, perMinuteLimit, remainingAfterSend: remaining, webhookRouting: { stockTitan: Boolean(stockTitanWebhook), default: Boolean(defaultWebhook) } };
+  return { attempted: rows.length, sent, skipped: false, perMinuteLimit, remainingAfterSend: remaining, webhookConfigured: true };
 }
