@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminModal } from "@/components/admin-modal";
 import styles from "./admin-us-turnover-filters.module.css";
 
-type FilterKey = "maxPrice" | "maxRate" | "maxOpenToHighRate" | "minMarketCap" | "maxMarketCap" | "minTurnoverRatio" | "maxTurnoverRatio" | "tradingValueIncreaseAlert" | "minIntensity" | "minTradingValueRvol" | "minTradingValueIncreaseRate" | "minPersistenceWindows";
+type FilterKey = "maxPrice" | "maxRate" | "maxOpenToHighRate" | "minMarketCap" | "maxMarketCap" | "globalMinMarketCap" | "globalMaxMarketCap" | "minTurnoverRatio" | "maxTurnoverRatio" | "tradingValueIncreaseAlert" | "minIntensity" | "minTradingValueRvol" | "minTradingValueIncreaseRate" | "minPersistenceWindows";
 type FilterValues = Record<FilterKey, number>;
 
-const DEFAULTS: FilterValues = { maxPrice: 10, maxRate: 30, maxOpenToHighRate: 30, minMarketCap: 1_000_000, maxMarketCap: 100_000_000, minTurnoverRatio: 1, maxTurnoverRatio: 10, tradingValueIncreaseAlert: 20_000, minIntensity: 100, minTradingValueRvol: 2, minTradingValueIncreaseRate: 0.1, minPersistenceWindows: 1 };
+const DEFAULTS: FilterValues = { maxPrice: 10, maxRate: 30, maxOpenToHighRate: 30, minMarketCap: 1_000_000, maxMarketCap: 100_000_000, globalMinMarketCap: 0, globalMaxMarketCap: 0, minTurnoverRatio: 1, maxTurnoverRatio: 10, tradingValueIncreaseAlert: 20_000, minIntensity: 100, minTradingValueRvol: 2, minTradingValueIncreaseRate: 0.1, minPersistenceWindows: 1 };
 const PRESETS: Record<string, FilterValues> = {
   기본: DEFAULTS,
   보수적: { ...DEFAULTS, minTurnoverRatio: 3, tradingValueIncreaseAlert: 50_000, minIntensity: 120, minTradingValueRvol: 3, minTradingValueIncreaseRate: 0.2, minPersistenceWindows: 2 },
@@ -19,6 +19,8 @@ const fields: Array<{ key: FilterKey; label: string; unit: string; hint: string;
   { key: "maxOpenToHighRate", label: "시가 대비 고점 상한", unit: "%", hint: "시가 대비 고점 상승률의 최대 허용값입니다." },
   { key: "minMarketCap", label: "시총 하한", unit: "달러", hint: "최소 시가총액입니다." },
   { key: "maxMarketCap", label: "시총 상한", unit: "달러", hint: "최대 시가총액입니다." },
+  { key: "globalMinMarketCap", label: "전체 API 공통 시총 하한", unit: "달러", hint: "일봉·OBV·MACD·DMI·MFI·돌파 등 공통 종목 풀에 적용합니다. 0이면 제한하지 않습니다." },
+  { key: "globalMaxMarketCap", label: "전체 API 공통 시총 상한", unit: "달러", hint: "모든 공통 종목 풀에서 이 값을 초과한 종목을 제외합니다. 0이면 제한하지 않습니다." },
   { key: "minTurnoverRatio", label: "시총 대비 거래대금 하한", unit: "%", hint: "당일 거래대금 ÷ 시가총액 × 100의 최소값입니다." },
   { key: "maxTurnoverRatio", label: "시총 대비 거래대금 상한", unit: "%", hint: "당일 거래대금 ÷ 시가총액 × 100의 최대값입니다." },
   { key: "tradingValueIncreaseAlert", label: "거래대금 상승 알림 기준", unit: "달러", hint: "직전 스냅샷 대비 거래대금 증가액 기준입니다." },
@@ -52,6 +54,7 @@ export function AdminUsTurnoverFilters() {
     if (data.maxPrice <= 0) return "주가 상한은 0보다 커야 합니다.";
     if (data.maxRate < 0 || data.maxOpenToHighRate < 0) return "상승률 기준은 0 이상이어야 합니다.";
     if (data.minMarketCap <= 0 || data.maxMarketCap <= data.minMarketCap) return "시총 상한은 시총 하한보다 커야 합니다.";
+    if (data.globalMinMarketCap < 0 || data.globalMaxMarketCap < 0 || (data.globalMaxMarketCap > 0 && data.globalMaxMarketCap <= data.globalMinMarketCap)) return "전체 API 공통 시총 상한은 하한보다 커야 합니다.";
     if (data.minTurnoverRatio < 0 || data.maxTurnoverRatio <= data.minTurnoverRatio) return "거래대금 비율 상한은 하한보다 커야 합니다.";
     if (data.tradingValueIncreaseAlert < 0) return "거래대금 상승 기준은 0 이상이어야 합니다.";
     if (data.minIntensity < 0) return "최소 체결강도는 0 이상이어야 합니다.";
