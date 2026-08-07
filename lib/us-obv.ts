@@ -5,6 +5,7 @@ import { enqueueDiscordDelivery } from "@/lib/discord-delivery-queue";
 import { getDb } from "@/lib/db";
 import { usTurnoverRatioSnapshots } from "@/lib/schema";
 import { and, gte, lte } from "drizzle-orm";
+import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 
 export function calculateObv(points: UsMinuteTurnoverPoint[]) {
   const ordered = [...points].sort((a, b) => a.time.localeCompare(b.time));
@@ -56,18 +57,21 @@ function calculateObvValue(points: UsMinuteTurnoverPoint[]) {
 }
 
 export async function runUsObvScan(options: { sendDiscord?: boolean } = {}) {
+  const commonSettings = await loadUsTurnoverFilterSettings();
+  const commonMarketCapEnabled = commonSettings.globalMinMarketCap > 0 || commonSettings.globalMaxMarketCap > 0;
   const scanner = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"], { includeBelowMinTurnover: false });
   if (!scanner) throw new Error("KIS access token is unavailable");
-  const candidates = scanner.filtered.filter((item) => Number.isFinite(item.turnoverRatio) && item.turnoverRatio >= 1 && Number.parseFloat(item.changeRate) >= 0);
+  const inCommonMarketCapRange = (marketCap: number | null | undefined) => !commonMarketCapEnabled ? true : marketCap != null && Number.isFinite(marketCap) && marketCap >= commonSettings.globalMinMarketCap && (commonSettings.globalMaxMarketCap <= 0 || marketCap <= commonSettings.globalMaxMarketCap);
+  const candidates = scanner.filtered.filter((item) => Number.isFinite(item.turnoverRatio) && item.turnoverRatio >= 1 && Number.parseFloat(item.changeRate) >= 0 && inCommonMarketCapRange(item.marketCap));
   const db = getDb();
   if (db) {
     const now = new Date();
     const seoul = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const sessionStart = new Date(Date.UTC(seoul.getUTCFullYear(), seoul.getUTCMonth(), seoul.getUTCDate(), 9) - 9 * 60 * 60 * 1000);
-    const sessionRows = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, name: usTurnoverRatioSnapshots.name, turnoverRatio: usTurnoverRatioSnapshots.turnoverRatio, changeRate: usTurnoverRatioSnapshots.changeRate }).from(usTurnoverRatioSnapshots).where(and(gte(usTurnoverRatioSnapshots.observedAt, sessionStart), lte(usTurnoverRatioSnapshots.observedAt, now)));
+    const sessionRows = await db.select({ market: usTurnoverRatioSnapshots.market, code: usTurnoverRatioSnapshots.code, name: usTurnoverRatioSnapshots.name, turnoverRatio: usTurnoverRatioSnapshots.turnoverRatio, changeRate: usTurnoverRatioSnapshots.changeRate, marketCap: usTurnoverRatioSnapshots.marketCap }).from(usTurnoverRatioSnapshots).where(and(gte(usTurnoverRatioSnapshots.observedAt, sessionStart), lte(usTurnoverRatioSnapshots.observedAt, now)));
     const seen = new Set(candidates.map((item) => `${item.market}:${item.code}`.toUpperCase()));
     for (const row of sessionRows) {
-      if (row.turnoverRatio === null || row.turnoverRatio < 1 || row.changeRate === null || row.changeRate < 0) continue;
+      if (row.turnoverRatio === null || row.turnoverRatio < 1 || row.changeRate === null || row.changeRate < 0 || !inCommonMarketCapRange(row.marketCap)) continue;
       const key = `${row.market}:${row.code}`.toUpperCase();
       if (seen.has(key)) continue;
       seen.add(key);
