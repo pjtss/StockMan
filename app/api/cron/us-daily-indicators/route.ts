@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const intervalSeconds = Math.max(60, Number.parseInt(process.env.US_DAILY_INDICATORS_INTERVAL_SECONDS || "600", 10) || 600);
   const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const epochSeconds = Math.floor(Date.now() / 1000);
-  if ([0, 6].includes(now.getUTCDay()) || epochSeconds % intervalSeconds >= 60) return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "weekdays" });
+  if (now.getUTCDay() === 0 || epochSeconds % intervalSeconds >= 60) return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "monday-saturday" });
   try {
     const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd()]);
     const discord = await sendUsDailyIndicatorSignals({ mfi: mfi.qualified, dmi: dmi.qualified, macd: macd.qualified });
