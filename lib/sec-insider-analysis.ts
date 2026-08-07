@@ -1,0 +1,2 @@
+export type SecInsiderAnalysis = { detected: boolean; action: "BUY" | "SELL" | "MIXED" | "UNKNOWN"; evidence: string[] };
+export function analyzeSecInsider(text: string): SecInsiderAnalysis { const source = text || ""; const buy = /purchase|bought|acquired|buying/i.test(source); const sell = /sale|sold|disposed|selling/i.test(source); return { detected: buy || sell, action: buy && sell ? "MIXED" : buy ? "BUY" : sell ? "SELL" : "UNKNOWN", evidence: [buy ? "purchase" : "", sell ? "sale" : ""].filter(Boolean) }; }

@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "api-config" | "api-tests" | "blacklist" | "product-classification" | "sec-test" | "observability";
+export type AdminNavId = "dashboard" | "features" | "schedules" | "modules" | "api-config" | "api-tests" | "blacklist" | "product-classification" | "sec-test" | "observability" | "stocktitan-rss";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -44,6 +44,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     description: "기능별 자동화 실행 이력과 오류 확인",
     href: "/admin/observability",
   },
+  { id: "stocktitan-rss", group: "진단", label: "StockTitan RSS", description: "일별 원문·번역·필터·알림 디버깅", href: "/admin/stocktitan-rss" },
   {
     id: "api-config",
     group: "API",

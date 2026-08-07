@@ -23,6 +23,7 @@ export async function ingestMarketRssArticles() {
         externalId: item.id,
         title: item.title,
         summary: item.summary,
+        rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
         link: item.link,
         publishedAt,
         category: classification.category,
@@ -30,7 +31,7 @@ export async function ingestMarketRssArticles() {
         notifyEligible: classification.notifyEligible,
         isBacklog,
       }).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
-        title: sql`excluded.title`, summary: sql`excluded.summary`,
+        title: sql`excluded.title`, summary: sql`excluded.summary`, rawPayload: sql`excluded.raw_payload`,
         link: sql`CASE WHEN ${marketRssArticles.link} = '' THEN excluded.link ELSE ${marketRssArticles.link} END`,
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,
         category: sql`excluded.category`, priority: sql`excluded.priority`,

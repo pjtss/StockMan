@@ -11,6 +11,7 @@ import {
   ListFilter,
   LogOut,
   Settings2,
+  Newspaper,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -28,6 +29,7 @@ const NAV_ICONS = {
   "product-classification": ListFilter,
   "sec-test": ChartNoAxesCombined,
   observability: Activity,
+  "stocktitan-rss": Newspaper,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;
 
 type AdminPageShellProps = {

@@ -247,6 +247,7 @@ export const marketRssArticles = pgTable(
     externalId: text("external_id").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
+    rawPayload: text("raw_payload"),
     link: text("link").notNull().default(""),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     translatedTitle: text("translated_title"),
@@ -511,4 +512,20 @@ export const discordDeliveryQueue = pgTable("discord_delivery_queue", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const secCompanies = pgTable("sec_companies", {
+  cik: text("cik").primaryKey(), name: text("name").notNull(), tickers: text("tickers").array().notNull().default(sql`'{}'::text[]`), exchanges: text("exchanges").array().notNull().default(sql`'{}'::text[]`), sic: text("sic"), sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const secSubmissions = pgTable("sec_submissions", {
+  accession: text("accession").primaryKey(), cik: text("cik").notNull(), form: text("form").notNull(), filingDate: date("filing_date").notNull(), reportDate: date("report_date"), primaryDocument: text("primary_document").notNull().default(""), primaryDocDescription: text("primary_doc_description"), items: text("items"), acceptanceDateTime: text("acceptance_datetime"), filingUrl: text("filing_url").notNull(), rawPayload: jsonb("raw_payload").notNull().default({}), classifiedCategory: text("classified_category"), classifiedDirection: text("classified_direction"), classifiedScore: integer("classified_score"), matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("sec_submissions_cik_filing_idx").on(table.cik, table.filingDate), index("sec_submissions_form_date_idx").on(table.form, table.filingDate)]);
+
+export const secFilingEvents = pgTable("sec_filing_events", {
+  accession: text("accession").primaryKey(), cik: text("cik").notNull(), category: text("category").notNull(), direction: text("direction").notNull(), score: integer("score").notNull(), matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`), bodyExcerpt: text("body_excerpt").notNull().default(""), financingAmountUsd: doublePrecision("financing_amount_usd"), dilutionRisk: text("dilution_risk"), insiderAction: text("insider_action"), discordStatus: text("discord_status").notNull().default("PENDING"), discordSentAt: timestamp("discord_sent_at", { withTimezone: true }), lastError: text("last_error"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const secXbrlSnapshots = pgTable("sec_xbrl_snapshots", {
+  cik: text("cik").primaryKey(), payload: jsonb("payload").notNull(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });

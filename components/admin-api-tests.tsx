@@ -28,7 +28,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -166,6 +166,7 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/sec-raw-test",
     query: "",
   },
+  { key: "sec_edgar", label: "SEC EDGAR 수집·분류·XBRL", description: "티커·CIK 매핑, Submissions 저장, Form/Item 분류, 선택적 Company Facts 저장", endpoint: "/api/admin/sec-edgar-test", query: "ticker=AAPL&facts=true" },
 ];
 
 export function AdminApiTests() {
@@ -186,6 +187,7 @@ export function AdminApiTests() {
   const [tickerOverviewCode, setTickerOverviewCode] = useState("AAPL");
   const [freeFloatTicker, setFreeFloatTicker] = useState("AAPL");
   const [shortInterestTicker, setShortInterestTicker] = useState("AAPL");
+  const [secEdgarTicker, setSecEdgarTicker] = useState("AAPL");
   const [mfiPeriod, setMfiPeriod] = useState("14");
   const [mfiThreshold, setMfiThreshold] = useState("30");
   const [copied, setCopied] = useState(false);
@@ -199,6 +201,8 @@ export function AdminApiTests() {
     try {
       const query = test.key === "sec_raw"
         ? `url=${encodeURIComponent(secUrl)}`
+        : test.key === "sec_edgar"
+          ? `ticker=${encodeURIComponent(secEdgarTicker)}&facts=true`
         : test.key === "us_price_detail"
           ? `code=${encodeURIComponent(priceDetailCode)}&market=${encodeURIComponent(priceDetailMarket)}`
           : test.key === "us_trade_trend"
@@ -285,6 +289,7 @@ export function AdminApiTests() {
                   </label>
                 </div>
               )}
+              {test.key === "sec_edgar" && <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={secEdgarTicker} onChange={(event) => setSecEdgarTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>}
               {test.key === "us_trade_trend" && (
                 <div className={styles.fieldGrid}>
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>종목코드</span><input className={styles.textInput} value={tradeTrendCode} onChange={(event) => setTradeTrendCode(event.target.value.toUpperCase())} /></label>

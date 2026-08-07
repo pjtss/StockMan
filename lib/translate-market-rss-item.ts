@@ -4,10 +4,10 @@ import type { TranslationClient } from "./translation-types";
 
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translationFallback: boolean; translationFallbackReason?: string };
 export async function translateMarketRssItem(item: MarketRssItem, client: TranslationClient = new LibreTranslateClient()): Promise<TranslatedMarketRssItem> {
-  // RSS 번역은 알림에 필요한 제목만 대상으로 한다. 요약은 원문을 보존해
-  // LibreTranslate 요청 수와 OCI CPU 사용량을 제한한다.
   const title = await client.translate(item.title);
-  return { ...item, translatedTitle: title.translatedText, translatedSummary: "", translationFallback: title.fallback, translationFallbackReason: title.fallbackReason };
+  const summary = item.summary.trim() ? await client.translate(item.summary) : { translatedText: "", fallback: false, fallbackReason: undefined };
+  const fallbackReason = [title.fallbackReason, summary.fallbackReason].filter(Boolean).join(",") || undefined;
+  return { ...item, translatedTitle: title.translatedText, translatedSummary: summary.translatedText, translationFallback: title.fallback || summary.fallback, translationFallbackReason: fallbackReason };
 }
 
 export async function translateMarketRssItems(items: MarketRssItem[], client: TranslationClient = new LibreTranslateClient()) {

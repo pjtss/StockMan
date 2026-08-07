@@ -12,6 +12,14 @@ curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/sync-filings"
 
+if [[ -n "${SEC_SYNC_CIKS:-}" ]]; then
+  curl --fail-with-body --silent --show-error --max-time 180 \
+    -H "x-cron-secret: ${CRON_SECRET}" \
+    -X POST "${BASE_URL}/api/cron/sec-edgar"
+else
+  echo "[Cron] SEC_SYNC_CIKS is not configured; skipping EDGAR Submissions sync" >&2
+fi
+
 curl --fail-with-body --silent --show-error --max-time 50 \
   -H "x-cron-secret: ${CRON_SECRET}" \
   -X POST "${BASE_URL}/api/cron/us-turnover-ratio"

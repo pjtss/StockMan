@@ -26,3 +26,9 @@ export async function resolveSecCompanyTickers(ciks: string[]) {
   const wanted = new Set(ciks.filter(Boolean).map((cik) => cik.padStart(10, "0")));
   return rows.filter((row) => wanted.has(row.cik));
 }
+
+export async function resolveSecTicker(ticker: string) {
+  const rows = await loadRows();
+  const value = ticker.trim().toUpperCase();
+  return rows.find((row) => row.ticker === value) || null;
+}

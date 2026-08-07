@@ -9,6 +9,8 @@ import { scoreShortInterest, type ShortInterestScore } from "@/lib/short-interes
 import type { ShortInterestMetric } from "@/lib/short-interest-types";
 import { fetchShortBorrow } from "@/lib/short-borrow-service";
 import type { ShortBorrowResult } from "@/lib/alpaca-short-borrow";
+import { loadSecTickerSnapshot } from "@/lib/sec-edgar-repository";
+import { summarizeSecCompanyFacts } from "@/lib/sec-xbrl-analysis";
 
 export type TickerOverview = {
   quote: TickerInfo;
@@ -19,6 +21,7 @@ export type TickerOverview = {
   shortBorrow: ShortBorrowResult | null;
   shortBorrowStatus: "OK" | "UNAVAILABLE";
   shortBorrowError?: string;
+  sec: { available: boolean; cik?: string; recentForms: string[]; events: Array<{ category: string; direction: string; score: number }>; xbrl?: ReturnType<typeof summarizeSecCompanyFacts> };
 };
 
 /** Composes independent ticker data sources; formatting remains the Discord adapter's responsibility. */
@@ -28,11 +31,12 @@ export async function getTickerOverview(rawTicker: string): Promise<TickerOvervi
   const freeFloatPromise = getUsFreeFloat(quote.ticker);
   const shortInterestPromise = fetchFinraComposite(quote.ticker);
   const shortBorrowPromise = fetchShortBorrow(quote.ticker, { currentPrice: quote.price }).catch((error) => ({ error: error instanceof Error ? error.message : String(error) }));
+  const secPromise = loadSecTickerSnapshot(quote.ticker).catch(() => null);
   const compose = async (intensityResult: TickerOverview["intensity"]): Promise<TickerOverview> => {
-    const [composite, freeFloat, borrow] = await Promise.all([shortInterestPromise, freeFloatPromise, shortBorrowPromise]);
+    const [composite, freeFloat, borrow, secSnapshot] = await Promise.all([shortInterestPromise, freeFloatPromise, shortBorrowPromise, secPromise]);
     const borrowAvailable = "error" in borrow ? null : borrow;
     const borrowError = "error" in borrow ? borrow.error : undefined;
-    return { quote, intensity: intensityResult, intensityStatus: intensityResult ? "OK" : "UNAVAILABLE", freeFloat, shortInterest: { ...composite, score: scoreShortInterest(composite.metric) }, shortBorrow: borrowAvailable, shortBorrowStatus: borrowAvailable ? "OK" : "UNAVAILABLE", ...(borrowError ? { shortBorrowError: borrowError } : {}) };
+    return { quote, intensity: intensityResult, intensityStatus: intensityResult ? "OK" : "UNAVAILABLE", freeFloat, shortInterest: { ...composite, score: scoreShortInterest(composite.metric) }, shortBorrow: borrowAvailable, shortBorrowStatus: borrowAvailable ? "OK" : "UNAVAILABLE", ...(borrowError ? { shortBorrowError: borrowError } : {}), sec: { available: Boolean(secSnapshot), cik: secSnapshot?.company.cik, recentForms: secSnapshot?.submissions.map((row) => row.form) || [], events: secSnapshot?.events.map((event) => ({ category: event.category, direction: event.direction, score: event.score })) || [], ...(secSnapshot?.facts ? { xbrl: summarizeSecCompanyFacts(secSnapshot.facts.payload) } : {}) } };
   };
   try {
     const trend = await fetchKisUsTradeTrend({ code: quote.ticker, market: quote.market as KisUsTradeMarket, day: "1" });
@@ -68,6 +72,9 @@ export function formatTickerOverview(overview: TickerOverview | null) {
   if (short.metric.shortInterest != null) lines.push(`공매도 잔고 ${number(short.metric.shortInterest)} · Days to Cover ${number(short.metric.daysToCover)} · 잔고 기준일 ${short.metric.shortInterestAsOf ?? "-"}${short.shortInterestStatus === "STALE" ? " · 오래된 데이터" : ""}`);
   if (short.metric.shortInterestChangePercent != null) lines.push(`잔고 증감률 ${number(short.metric.shortInterestChangePercent, "%")}`);
   lines.push(`Threshold List ${short.metric.thresholdListed === true ? "포함" : short.metric.thresholdListed === false ? "미포함" : "확인 불가"}`);
+  lines.push("", "**SEC EDGAR**", overview.sec.available ? `CIK ${overview.sec.cik} · 최근 Form ${overview.sec.recentForms.slice(0, 5).join(", ") || "없음"}` : "SEC 제출 이력 없음");
+  if (overview.sec.events.length) lines.push(...overview.sec.events.slice(0, 3).map((event) => `공시 이벤트 ${event.category} · ${event.direction} · 점수 ${event.score}`));
+  if (overview.sec.xbrl) lines.push(`XBRL Facts ${overview.sec.xbrl.latestFacts.total}건 · 매출 ${overview.sec.xbrl.revenueFacts}건 · 현금 ${overview.sec.xbrl.cashFacts}건 · 부채 ${overview.sec.xbrl.debtFacts}건`);
   const borrow = overview.shortBorrow;
   lines.push("", "**대차·Locate**", borrow ? `대차 가능 여부 ${borrow.borrowStatus} · 대차 가능 수량 ${number(borrow.availableQty)} · 예상 Locate 비용 $${number(borrow.locatePricePerShare)} · 기준 ${borrow.quotedAt ?? borrow.fetchedAt}` : `대차 데이터 없음${overview.shortBorrowError ? ` · ${overview.shortBorrowError}` : ""}`);
   if (intensity) {
