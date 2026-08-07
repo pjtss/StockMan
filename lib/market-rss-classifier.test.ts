@@ -11,4 +11,7 @@ describe("market RSS classifier", () => {
   it("allows ticker-specific general articles", () => {
     expect(classifyMarketRssItem({ source: "NASDAQ", title: "ACME (ACM) outlook improves" })).toMatchObject({ category: "GENERAL", notifyEligible: true });
   });
+  it("extracts StockTitan suffix ticker and models financing dilution", () => {
+    expect(classifyMarketRssItem({ source: "STOCKTITAN", title: "red violet Announces Closing of $115 Million Underwritten Public Offering | RDVT Stock News" })).toMatchObject({ category: "FINANCING", ticker: "RDVT", direction: "MIXED", financingAmountUsd: 115000000, dilutionRisk: "HIGH", notifyEligible: true });
+  });
 });

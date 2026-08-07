@@ -8,10 +8,13 @@ export class LibreTranslateClient implements TranslationClient {
     if (process.env.TRANSLATION_ENABLED === "false") return fallback("disabled");
     try {
       const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/translate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ q: text, source, target, format: "text", ...(this.apiKey ? { api_key: this.apiKey } : {}) }), signal: AbortSignal.timeout(Number(process.env.TRANSLATION_TIMEOUT_MS || 10000)) });
-      if (!response.ok) return fallback(`http_${response.status}`);
+      if (!response.ok) {
+        const responseText = (await response.text().catch(() => "")).slice(0, 240).replace(/\s+/g, " ");
+        return fallback(`http_${response.status}${responseText ? `:${responseText}` : ""}`);
+      }
       const body = await response.json() as { translatedText?: unknown };
       if (!(typeof body.translatedText === "string" && body.translatedText.trim())) return fallback("empty_response");
       return { translatedText: body.translatedText.trim(), source, target, provider: "libretranslate", fallback: false };
-    } catch (error) { return fallback(error instanceof Error ? error.name : "request_failed"); }
+    } catch (error) { return fallback(error instanceof Error ? `${error.name}:${error.message}`.slice(0, 240) : "request_failed"); }
   }
 }
