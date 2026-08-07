@@ -25,12 +25,20 @@ export async function getHealthSnapshot() {
   const requiredEnv = ["DATABASE_URL", "CRON_SECRET"];
   const optionalIntegrations = ["KIS_APPKEY", "KIS_APPSECRET", "ALPACA_API_KEY", "ALPACA_API_SECRET"];
   const checks = { database: database.ok, flyway: database.ok && Boolean(database.flywayVersion), requiredEnv: requiredEnv.every((key) => Boolean(process.env[key]?.trim())) };
+  let automation: Record<string, { status: string; startedAt: string | null; finishedAt: string | null; error: string | null }> = {};
+  if (database.ok) {
+    try {
+      const result = await getPool().query<{ module_key: string; status: string; started_at: Date; finished_at: Date | null; error_message: string | null }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message FROM automation_runs ORDER BY module_key, started_at DESC");
+      automation = Object.fromEntries(result.rows.map((row) => [row.module_key, { status: row.status, startedAt: row.started_at?.toISOString() ?? null, finishedAt: row.finished_at?.toISOString() ?? null, error: row.error_message }]));
+    } catch (error) { console.warn("[Health] automation status unavailable:", error instanceof Error ? error.message : error); }
+  }
   return {
     status: Object.values(checks).every(Boolean) ? "ok" : "degraded",
     checkedAt: new Date().toISOString(),
     responseTimeMs: Date.now() - startedAt,
     service: { name: "stockman", version: buildInfo().version, commit: buildInfo().commit, builtAt: buildInfo().builtAt, node: process.version, next: "15.5.15", uptimeSeconds: Math.floor(process.uptime()) },
     database: { ok: database.ok, flywayVersion: database.flywayVersion, latencyMs: database.latencyMs, error: database.ok ? undefined : "database check failed" },
+    automation,
     checks,
     environment: Object.fromEntries(optionalIntegrations.map((key) => [key, Boolean(process.env[key]?.trim())])),
   };
