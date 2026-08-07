@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usInstruments, usTurnoverWatchlist, usTurnoverWatchlistAlertState, usTurnoverRatioSnapshotAttempts } from "@/lib/schema";
 import { ensureUsInstrument } from "@/lib/us-instruments";
@@ -23,7 +23,7 @@ async function loadWatchlist(): Promise<WatchItem[]> {
   if (!db) return [];
   return db.select({ instrumentId: usInstruments.id, market: usInstruments.market, code: usInstruments.code, name: usInstruments.name })
     .from(usTurnoverWatchlist).innerJoin(usInstruments, eq(usInstruments.id, usTurnoverWatchlist.instrumentId))
-    .where(eq(usTurnoverWatchlist.enabled, true)).orderBy(asc(usInstruments.market), asc(usInstruments.code));
+    .where(and(eq(usTurnoverWatchlist.enabled, true), or(eq(usInstruments.manualProductAction, "ALLOW"), and(eq(usInstruments.isEtf, false), eq(usInstruments.isLeveraged, false), eq(usInstruments.isInverse, false), eq(usInstruments.isDerivativeProduct, false), eq(usInstruments.instrumentType, "COMMON_STOCK"))))).orderBy(asc(usInstruments.market), asc(usInstruments.code));
 }
 
 async function rebindWatchlistInstrument(oldInstrumentId: number, market: string, code: string, name: string) {

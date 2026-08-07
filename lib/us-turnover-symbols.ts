@@ -1,7 +1,7 @@
 import { getDb } from "./db";
 import { usInstruments, usTurnoverWatchlist } from "./schema";
 import { ensureUsInstrument } from "./us-instruments";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 
 function normalizeSymbols(symbols: string[]) {
   return Array.from(
@@ -18,7 +18,7 @@ export async function loadUsTurnoverSymbols(): Promise<string[]> {
   if (!db) return ["AAPL", "TSLA", "NVDA"];
   const canonical = await db.select({ code: usInstruments.code }).from(usTurnoverWatchlist)
     .innerJoin(usInstruments, eq(usInstruments.id, usTurnoverWatchlist.instrumentId))
-    .where(eq(usTurnoverWatchlist.enabled, true)).orderBy(asc(usInstruments.code));
+    .where(and(eq(usTurnoverWatchlist.enabled, true), or(eq(usInstruments.manualProductAction, "ALLOW"), and(eq(usInstruments.isEtf, false), eq(usInstruments.isLeveraged, false), eq(usInstruments.isInverse, false), eq(usInstruments.isDerivativeProduct, false), eq(usInstruments.instrumentType, "COMMON_STOCK"))))).orderBy(asc(usInstruments.code));
   return normalizeSymbols(canonical.map((row) => row.code));
 }
 
