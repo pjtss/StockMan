@@ -1,9 +1,10 @@
 import type { UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
+import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
 
 export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutResult[]) {
-  const webhook = process.env.US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL?.trim();
-  if (!webhook) throw new Error("US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL is not configured");
+  const webhook = getUsDailyIndicatorsWebhook() || process.env.US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL?.trim() || "";
+  if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   if (!items.length) return { ok: true, sent: 0 };
   const content = items.map((item) => [
     `🚨 **${item.market} ${item.code} 5일 고가 돌파**`,

@@ -1,4 +1,5 @@
 import type { UsMinuteTurnoverPoint } from "@/lib/kis-us-minute-turnover";
+import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
 
 export function buildUsObvDiscordPayload(items: Array<Record<string, unknown>>) {
   return {
@@ -9,8 +10,8 @@ export function buildUsObvDiscordPayload(items: Array<Record<string, unknown>>) 
 }
 
 export async function sendUsObvToDiscord(items: Array<Record<string, unknown>>) {
-  const webhook = process.env.US_OBV_DISCORD_WEBHOOK_URL?.trim() || "";
-  if (!webhook) throw new Error("US_OBV_DISCORD_WEBHOOK_URL is not configured");
+  const webhook = getUsDailyIndicatorsWebhook() || process.env.US_OBV_DISCORD_WEBHOOK_URL?.trim() || "";
+  if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildUsObvDiscordPayload(items)) });
   return { ok: response.ok, status: response.status, responseText: await response.text() };
 }
