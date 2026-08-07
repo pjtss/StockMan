@@ -18,6 +18,7 @@ export type CommonModuleSettings = {
 const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "dart-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "sec-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "market-rss": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
   "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
@@ -26,6 +27,12 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
+  "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
+  "us-daily-cache": { enabled: true, startTime: "08:00", endTime: "08:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:01", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-trade-intensity": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
+  "short-borrow": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "discord-delivery-retry": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
 };
 
 export async function loadFeatureModuleSettings(key: FeatureModuleKey): Promise<CommonModuleSettings> {
