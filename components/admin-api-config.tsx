@@ -6,7 +6,7 @@ import { AdminModal } from "@/components/admin-modal";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/page.module.css";
 
-type KisApiConfigKey = "us_updown_rate" | "us_volume_power" | "us_turnover_trend" | "us_price_detail";
+type KisApiConfigKey = "us_updown_rate" | "us_volume_power" | "us_turnover_trend" | "us_price_detail" | "us_trade_trend" | "us_daily_price";
 type KisApiConfig = {
   KEYB?: string;
   AUTH?: string;
@@ -28,6 +28,8 @@ const labels: Record<KisApiConfigKey, string> = {
   us_volume_power: "미국 체결강도",
   us_turnover_trend: "해외 거래대금 추이",
   us_price_detail: "AMS 시총 조회",
+  us_trade_trend: "해외 체결 추이",
+  us_daily_price: "해외 일봉 조회",
 };
 
 const fieldLabels: Partial<Record<keyof KisApiConfig, string>> = {

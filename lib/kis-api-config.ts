@@ -26,27 +26,27 @@ function normalizeBlank(value: unknown) {
   return text;
 }
 
-function normalizeKisApiConfig(config: Partial<KisApiConfig>): KisApiConfig {
+function normalizeKisApiConfig(config: Partial<KisApiConfig>, base: KisApiConfig = DEFAULT_KIS_API_CONFIGS.us_updown_rate): KisApiConfig {
   return {
-    ...DEFAULT_KIS_API_CONFIGS.us_updown_rate,
+    ...base,
     ...config,
     KEYB: normalizeBlank(config.KEYB),
     AUTH: normalizeBlank(config.AUTH),
-    EXCD: normalizeBlank(config.EXCD) || DEFAULT_KIS_API_CONFIGS.us_updown_rate.EXCD,
+    EXCD: normalizeBlank(config.EXCD) || base.EXCD,
     FID_COND_MRKT_DIV_CODE: normalizeBlank(config.FID_COND_MRKT_DIV_CODE),
     FID_HOUR_CLS_CODE: normalizeBlank(config.FID_HOUR_CLS_CODE),
     FID_PW_DATA_INCU_YN: normalizeBlank(config.FID_PW_DATA_INCU_YN),
     GUBN: normalizeBlank(config.GUBN),
     NDAY: normalizeBlank(config.NDAY),
     VOL_RANG: normalizeBlank(config.VOL_RANG),
-    tr_id: normalizeBlank(config.tr_id) || DEFAULT_KIS_API_CONFIGS.us_updown_rate.tr_id,
-    custtype: normalizeBlank(config.custtype) || DEFAULT_KIS_API_CONFIGS.us_updown_rate.custtype,
+    tr_id: normalizeBlank(config.tr_id) || base.tr_id,
+    custtype: normalizeBlank(config.custtype) || base.custtype,
     content_type:
       normalizeBlank(config.content_type) ||
-      DEFAULT_KIS_API_CONFIGS.us_updown_rate.content_type,
+      base.content_type,
     authorization:
       normalizeBlank(config.authorization) ||
-      DEFAULT_KIS_API_CONFIGS.us_updown_rate.authorization,
+      base.authorization,
   };
 }
 
@@ -119,13 +119,13 @@ export async function loadKisApiConfig(key: KisApiConfigKey): Promise<KisApiConf
 
   const rows = await db.select().from(kisApiConfigs).where(eq(kisApiConfigs.key, key)).limit(1);
   if (rows.length === 0) return defaults;
-  return normalizeKisApiConfig({ ...defaults, ...(rows[0].config as Partial<KisApiConfig>) });
+  return normalizeKisApiConfig({ ...defaults, ...(rows[0].config as Partial<KisApiConfig>) }, defaults);
 }
 
 export async function saveKisApiConfig(key: KisApiConfigKey, config: KisApiConfig) {
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");
-  const normalized = normalizeKisApiConfig(config);
+  const normalized = normalizeKisApiConfig(config, DEFAULT_KIS_API_CONFIGS[key]);
   await db.insert(kisApiConfigs)
     .values({ key, config: normalized, updatedAt: new Date() })
     .onConflictDoUpdate({
