@@ -8,6 +8,11 @@ type FilterKey = "maxPrice" | "maxRate" | "maxOpenToHighRate" | "minMarketCap" |
 type FilterValues = Record<FilterKey, number>;
 
 const DEFAULTS: FilterValues = { maxPrice: 10, maxRate: 30, maxOpenToHighRate: 30, minMarketCap: 1_000_000, maxMarketCap: 100_000_000, minTurnoverRatio: 1, maxTurnoverRatio: 10, tradingValueIncreaseAlert: 20_000, minIntensity: 100, minTradingValueRvol: 2, minTradingValueIncreaseRate: 0.1, minPersistenceWindows: 1 };
+const PRESETS: Record<string, FilterValues> = {
+  기본: DEFAULTS,
+  보수적: { ...DEFAULTS, minTurnoverRatio: 3, tradingValueIncreaseAlert: 50_000, minIntensity: 120, minTradingValueRvol: 3, minTradingValueIncreaseRate: 0.2, minPersistenceWindows: 2 },
+  공격적: { ...DEFAULTS, minTurnoverRatio: 0.5, maxTurnoverRatio: 50, tradingValueIncreaseAlert: 10_000, minIntensity: 80, minTradingValueRvol: 1.2, minTradingValueIncreaseRate: 0, minPersistenceWindows: 0 },
+};
 const fields: Array<{ key: FilterKey; label: string; unit: string; hint: string; step?: string }> = [
   { key: "maxPrice", label: "주가 상한", unit: "USD", hint: "현재 주가가 이 값 미만인 종목만 통과합니다.", step: "0.01" },
   { key: "maxRate", label: "상승률 상한", unit: "%", hint: "현재 상승률이 이 값 미만인 종목만 통과합니다." },
@@ -69,7 +74,7 @@ export function AdminUsTurnoverFilters() {
 
   return <section className={styles.section}>
     <div className={styles.heading}><div><p className={styles.eyebrow}>US TURNOVER RATIO</p><h2>시총 대비 거래대금 필터</h2><p className={styles.description}>필터 값은 달러 기준으로 저장되며, 거래대금 상승 알림은 직전 스냅샷 대비 증가액을 기준으로 판정합니다.</p></div><span className={changed ? styles.dirty : styles.clean}>{changed ? "저장되지 않은 변경" : "적용 중"}</span></div>
-    <div className={styles.grid}>{fields.map((field) => <label className={styles.row} key={field.key}><span className={styles.label}>{field.label}<small>{field.hint}</small></span><span className={styles.inputWrap}><input type="number" min="0" step={field.step || "0.01"} value={data[field.key]} onChange={(event) => setData({ ...data, [field.key]: Number(event.target.value) })} /><em>{field.unit}</em></span></label>)}</div>
+    <div className={styles.presetBar}><span>빠른 프리셋</span>{Object.entries(PRESETS).map(([name, values]) => <button type="button" key={name} className={styles.presetButton} onClick={() => setData({ ...values })}>{name}</button>)}</div><div className={styles.grid}>{fields.map((field) => <label className={styles.row} key={field.key}><span className={styles.label}>{field.label}<small>{field.hint}</small></span><span className={styles.inputWrap}><input type="number" min="0" step={field.step || "0.01"} value={data[field.key]} onChange={(event) => setData({ ...data, [field.key]: Number(event.target.value) })} /><em>{field.unit}</em></span></label>)}</div>
     {validationError && <p className={styles.error}>{validationError}</p>}
     {error && <p className={styles.error}>{error}</p>}
     <div className={styles.footer}><span>{message || (changed ? "변경사항을 저장하려면 버튼을 눌러주세요." : "현재 설정이 자동화에 적용 중입니다.")}</span><button className={styles.saveButton} disabled={!changed || Boolean(validationError)} onClick={() => setModalOpen(true)}>필터 저장</button></div>
