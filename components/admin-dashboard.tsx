@@ -6,7 +6,7 @@ import { AdminPageShell } from "@/components/admin-page-shell";
 import { ADMIN_NAV_ITEMS } from "@/lib/admin-navigation";
 import styles from "@/app/admin/page.module.css";
 
-const GROUPS = ["운영 제어", "API 관리", "SEC 분석"] as const;
+const GROUPS = ["운영", "API", "종목", "자동화", "진단"] as const;
 
 export function AdminDashboard() {
   const destinations = ADMIN_NAV_ITEMS.filter((item) => item.id !== "dashboard");
@@ -15,7 +15,7 @@ export function AdminDashboard() {
     <AdminPageShell
       eyebrow="CONTROL CENTER"
       title="관리자 대시보드"
-      description="운영 상태, 외부 API 설정, 분석 도구를 기능 단위로 관리합니다."
+      description="운영, API, 종목, 자동화, 진단 기능을 한 곳에서 관리합니다."
     >
       <div className={styles.dashboardGroups}>
         {GROUPS.map((group) => (
