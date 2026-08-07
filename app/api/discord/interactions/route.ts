@@ -13,6 +13,7 @@ import { addUsTurnoverSymbol, clearUsTurnoverSymbols, loadUsTurnoverSymbols, rem
 import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { runUsDailyFilterRefresh } from "@/lib/us-daily-filter-refresh";
+import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,27 +92,32 @@ export async function POST(request: Request) {
     void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-breakout") {
     void runUsDailyBreakoutScan().then(async (result) => {
-      const webhookStatus = await notifyDailyWebhook("5거래일 고가 돌파", () => sendUsDailyBreakoutToDiscord(result.qualified));
+      const filtered = await filterUsDailyCandidates(result.qualified as any);
+      const webhookStatus = await notifyDailyWebhook("5거래일 고가 돌파", () => sendUsDailyBreakoutToDiscord(filtered.filtered as any));
       return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 돌파 후보를 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-obv") {
     void scanStoredUsDailyObv().then(async (result) => {
-      const webhookStatus = await notifyDailyWebhook("일봉 OBV", () => sendUsDailyIndicatorSignals({ obv: result.qualified as any }));
+      const filtered = await filterUsDailyCandidates(result.qualified as any);
+      const webhookStatus = await notifyDailyWebhook("일봉 OBV", () => sendUsDailyIndicatorSignals({ obv: filtered.filtered as any }));
       return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 OBV 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "mfi-oversold") {
     void scanStoredUsMfiOversold().then(async (result) => {
-      const webhookStatus = await notifyDailyWebhook("MFI 과매도", () => sendUsDailyIndicatorSignals({ mfi: result.qualified as any }));
+      const filtered = await filterUsDailyCandidates(result.qualified as any);
+      const webhookStatus = await notifyDailyWebhook("MFI 과매도", () => sendUsDailyIndicatorSignals({ mfi: filtered.filtered as any }));
       return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "MFI 과매도 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "dmi") {
     void scanStoredUsDmi().then(async (result) => {
-      const webhookStatus = await notifyDailyWebhook("DMI", () => sendUsDailyIndicatorSignals({ dmi: result.qualified as any }));
+      const filtered = await filterUsDailyCandidates(result.qualified as any);
+      const webhookStatus = await notifyDailyWebhook("DMI", () => sendUsDailyIndicatorSignals({ dmi: filtered.filtered as any }));
       return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "DMI 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "macd") {
     void scanStoredUsMacd().then(async (result) => {
-      const webhookStatus = await notifyDailyWebhook("MACD", () => sendUsDailyIndicatorSignals({ macd: result.qualified as any }));
+      const filtered = await filterUsDailyCandidates(result.qualified as any);
+      const webhookStatus = await notifyDailyWebhook("MACD", () => sendUsDailyIndicatorSignals({ macd: filtered.filtered as any }));
       return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "vwap") {
