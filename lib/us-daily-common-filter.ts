@@ -11,17 +11,23 @@ export async function filterUsDailyCandidates<T extends Record<string, any>>(ite
     for (const row of result.rows) metrics.set(`${row.market}:${row.code}`, { marketCap: Number(row.market_cap), turnoverRatio: Number(row.turnover_ratio), tradingValue: Number(row.trading_value) });
     void keys;
   }
+  const failureReasons: Record<string, number> = {};
   const filtered = items.filter((item) => {
+    const reject = (reason: string) => { failureReasons[reason] = (failureReasons[reason] || 0) + 1; return false; };
     const price = Number(item.price ?? item.currentPrice);
     const rate = Number(item.rate ?? item.changeRate);
     const metric = metrics.get(`${String(item.market || "").toUpperCase()}:${String(item.code || "").toUpperCase()}`);
     const marketCap = Number(item.marketCap ?? metric?.marketCap);
     const turnover = Number(item.turnoverRatio ?? metric?.turnoverRatio);
-    if (Number.isFinite(price) && price > settings.maxPrice) return false;
-    if (Number.isFinite(rate) && rate > settings.maxRate) return false;
-    if (Number.isFinite(marketCap) && (marketCap < settings.minMarketCap || marketCap > settings.maxMarketCap)) return false;
-    if (Number.isFinite(turnover) && (turnover < settings.minTurnoverRatio || turnover > settings.maxTurnoverRatio)) return false;
+    if (settings.maxPrice > 0 && !Number.isFinite(price)) return reject("missing_price");
+    if (Number.isFinite(price) && price > settings.maxPrice) return reject("max_price");
+    if (settings.maxRate > 0 && !Number.isFinite(rate)) return reject("missing_rate");
+    if (Number.isFinite(rate) && rate > settings.maxRate) return reject("max_rate");
+    if (settings.minMarketCap > 0 && !Number.isFinite(marketCap)) return reject("missing_market_cap");
+    if (Number.isFinite(marketCap) && (marketCap < settings.minMarketCap || marketCap > settings.maxMarketCap)) return reject("market_cap_range");
+    if (settings.minTurnoverRatio > 0 && !Number.isFinite(turnover)) return reject("missing_turnover_ratio");
+    if (Number.isFinite(turnover) && (turnover < settings.minTurnoverRatio || turnover > settings.maxTurnoverRatio)) return reject("turnover_ratio_range");
     return true;
   });
-  return { filtered, settings, excludedCount: items.length - filtered.length };
+  return { filtered, settings, excludedCount: items.length - filtered.length, failureReasons };
 }
