@@ -5,13 +5,15 @@ import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { runUsDailyBreakoutScan } from "@/lib/us-daily-breakout-automation";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
+import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 
 export async function runUsDailyFilterRefresh() {
   const startedAt = new Date().toISOString();
   const [obv, mfi, dmi, macd, breakout] = await Promise.all([
     scanStoredUsDailyObv(), scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd(), runUsDailyBreakoutScan(),
   ]);
-  const indicatorSend = await sendUsDailyIndicatorSignals({ obv: obv.qualified as any, mfi: mfi.qualified as any, dmi: dmi.qualified as any, macd: macd.qualified as any });
-  const breakoutSend = await sendUsDailyBreakoutToDiscord(breakout.qualified);
-  return { ok: true, startedAt, completedAt: new Date().toISOString(), counts: { obv: obv.qualified.length, mfi: mfi.qualified.length, dmi: dmi.qualified.length, macd: macd.qualified.length, breakout: breakout.qualified.length }, instruments: { obv: obv.instrumentCount, mfi: mfi.instrumentCount, dmi: dmi.instrumentCount, macd: macd.instrumentCount, breakout: breakout.instrumentCount }, webhook: { indicators: indicatorSend, breakout: breakoutSend } };
+  const [obvF, mfiF, dmiF, macdF, breakoutF] = await Promise.all([obv.qualified, mfi.qualified, dmi.qualified, macd.qualified, breakout.qualified].map((items) => filterUsDailyCandidates(items as any)));
+  const indicatorSend = await sendUsDailyIndicatorSignals({ obv: obvF.filtered as any, mfi: mfiF.filtered as any, dmi: dmiF.filtered as any, macd: macdF.filtered as any });
+  const breakoutSend = await sendUsDailyBreakoutToDiscord(breakoutF.filtered as any);
+  return { ok: true, startedAt, completedAt: new Date().toISOString(), counts: { obv: obvF.filtered.length, mfi: mfiF.filtered.length, dmi: dmiF.filtered.length, macd: macdF.filtered.length, breakout: breakoutF.filtered.length }, excluded: { obv: obvF.excludedCount, mfi: mfiF.excludedCount, dmi: dmiF.excludedCount, macd: macdF.excludedCount, breakout: breakoutF.excludedCount }, instruments: { obv: obv.instrumentCount, mfi: mfi.instrumentCount, dmi: dmi.instrumentCount, macd: macd.instrumentCount, breakout: breakout.instrumentCount }, webhook: { indicators: indicatorSend, breakout: breakoutSend } };
 }
