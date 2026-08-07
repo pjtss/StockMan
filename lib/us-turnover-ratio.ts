@@ -166,7 +166,9 @@ export function filterUsTurnoverRatioItems(parsed: unknown, limit = 100, setting
     const openToHighRate = finiteNumberValue(item.__openToHighRate);
     if (marketCap === null || tradingValue === null) return [];
     if (openToHighRate === null || openToHighRate > settings.maxOpenToHighRate) return [];
-    if (marketCap < settings.minMarketCap || marketCap > settings.maxMarketCap) return [];
+    const effectiveMinMarketCap = Math.max(settings.minMarketCap, settings.globalMinMarketCap || 0);
+    const effectiveMaxMarketCap = settings.globalMaxMarketCap > 0 ? Math.min(settings.maxMarketCap, settings.globalMaxMarketCap) : settings.maxMarketCap;
+    if (marketCap < effectiveMinMarketCap || marketCap > effectiveMaxMarketCap) return [];
 
     const turnoverRatio = (tradingValue / marketCap) * 100;
     if (turnoverRatio > settings.maxTurnoverRatio) return [];
