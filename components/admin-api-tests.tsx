@@ -148,7 +148,7 @@ const TESTS: ApiTestDefinition[] = [
   {
     key: "market_rss",
     label: "시장 RSS 번역 테스트",
-    description: "GlobeNewswire·NASDAQ·NASDAQ Trader·SEC RSS를 한국어 번역과 함께 확인",
+    description: "GlobeNewswire·NASDAQ·NASDAQ Trader·SEC·StockTitan RSS를 한국어 번역과 함께 확인",
     endpoint: "/api/admin/market-rss-test",
     query: "translate=true",
   },
