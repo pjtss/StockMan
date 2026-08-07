@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usDailyPriceCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
@@ -53,8 +53,8 @@ export async function loadCachedUsDailyCandles(market: string, code: string, lim
 export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[]) {
   const db = getDb();
   if (!db || candles.length === 0) return 0;
-  await db.insert(usDailyPriceCandles).values(candles.map((candle) => ({ market, code, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usDailyPriceCandles.market, usDailyPriceCandles.code, usDailyPriceCandles.candleDate], set: { fetchedAt: new Date() } });
-  for (const limit of [10, 100]) memoryCache.delete(`${market}:${code}:${limit}`);
+  await db.insert(usDailyPriceCandles).values(candles.map((candle) => ({ market, code, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usDailyPriceCandles.market, usDailyPriceCandles.code, usDailyPriceCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
+  for (const key of memoryCache.keys()) if (key.startsWith(`${market}:${code}:`)) memoryCache.delete(key);
   return candles.length;
 }
 
