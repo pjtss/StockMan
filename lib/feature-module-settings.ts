@@ -9,6 +9,7 @@ export type CommonModuleSettings = {
   startTime: string;
   endTime: string;
   cooldownSeconds: number;
+  intervalSeconds?: number;
   activeDays: number[];
   updatedAt?: string;
   featureSettings?: FeatureSpecificSettings & { shortBorrowPolicy?: Partial<ShortBorrowScorePolicy> };
@@ -24,6 +25,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
 };
 
 export async function loadFeatureModuleSettings(key: FeatureModuleKey): Promise<CommonModuleSettings> {
@@ -37,6 +39,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (!getFeatureModule(key)) throw new Error("FEATURE_MODULE_NOT_FOUND");
   if (!/^\d{2}:\d{2}$/.test(settings.startTime) || !/^\d{2}:\d{2}$/.test(settings.endTime)) throw new Error("INVALID_SCHEDULE");
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
+  if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < 60)) throw new Error("INVALID_INTERVAL");
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
   const updatedAt = new Date();

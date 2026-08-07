@@ -1,4 +1,4 @@
-export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "us-scanners" | "us-turnover-trend" | "us-turnover-ratio" | "us-vwap" | "us-short-borrow" | "us-news-radar" | "us-breaking-news-forwarder";
+export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "us-scanners" | "us-turnover-trend" | "us-turnover-ratio" | "us-vwap" | "us-short-borrow" | "us-news-radar" | "us-breaking-news-forwarder" | "us-daily-indicators";
 
 /** Feature-specific settings never share the common ON/OFF/schedule contract. */
 export type FeatureSpecificSettings = {
@@ -29,6 +29,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "us-short-borrow", label: "공매도 대차 압박", description: "Alpaca 계정별 대차·Locate 상태", settingsPath: "/admin/modules/us-short-borrow" },
   { key: "us-news-radar", label: "해외 뉴스 급등주 레이더", description: "KIS 해외속보·뉴스 검증 기반 후보 탐지", settingsPath: "/admin/modules/us-news-radar" },
   { key: "us-breaking-news-forwarder", label: "해외 속보 Discord 전달", description: "KIS 해외 속보 원문을 별도 Discord 채널로 전달", settingsPath: "/admin/modules/us-breaking-news-forwarder" },
+  { key: "us-daily-indicators", label: "일봉 지표 알림", description: "MFI·DMI·MACD 일봉 후보 통합 알림", settingsPath: "/admin/modules/us-daily-indicators" },
 ];
 
 export function getFeatureModule(key: string) {
