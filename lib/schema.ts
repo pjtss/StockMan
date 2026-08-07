@@ -232,6 +232,13 @@ export const usTurnoverWatchlist = pgTable("us_turnover_watchlist", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usTurnoverWatchlistAlertState = pgTable("us_turnover_watchlist_alert_state", {
+  instrumentId: bigint("instrument_id", { mode: "number" }).primaryKey(),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  lastFingerprint: text("last_fingerprint"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const marketRssArticles = pgTable(
   "market_rss_articles",
   {
