@@ -5,6 +5,7 @@ import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -19,7 +20,8 @@ export async function POST(request: Request) {
   if (now.getUTCDay() === 0 || epochSeconds % intervalSeconds >= 60) return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "monday-saturday" });
   try {
     const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd()]);
-    const discord = await sendUsDailyIndicatorSignals({ mfi: mfi.qualified, dmi: dmi.qualified, macd: macd.qualified });
-    return NextResponse.json({ ok: discord.ok, mfi, dmi, macd, discord });
+    const [mfiFiltered, dmiFiltered, macdFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified].map((items) => filterUsDailyCandidates(items as any)));
+    const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any });
+    return NextResponse.json({ ok: discord.ok, mfi, dmi, macd, commonFilter: { excluded: { mfi: mfiFiltered.excludedCount, dmi: dmiFiltered.excludedCount, macd: macdFiltered.excludedCount }, settings: mfiFiltered.settings }, discord });
   } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }
