@@ -10,6 +10,8 @@ import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
 import { scanUsVwap } from "@/lib/us-vwap";
 import { upsertUsTopRisingUniverse } from "@/lib/us-top-rising-universe";
 import { addUsTurnoverSymbol, clearUsTurnoverSymbols, loadUsTurnoverSymbols, removeUsTurnoverSymbol } from "@/lib/us-turnover-symbols";
+import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
+import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +60,16 @@ function formatVwapResult(result: Awaited<ReturnType<typeof scanUsVwap>>) {
   return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, summary, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => `**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}\n현재가 ${item.currentPrice} · VWAP ${item.vwap?.toFixed(4)}\n포인트 ${item.pointCount} · 거래량 ${item.totalVolume.toLocaleString()}`).join("\n\n")].join("\n");
 }
 
+async function notifyDailyWebhook(task: string, send: () => Promise<unknown>) {
+  try {
+    await send();
+    return `\n\n✅ 통합 일봉 Webhook 전송 완료 (${task})`;
+  } catch (error) {
+    console.error(`[Discord] daily webhook failed (${task})`, error);
+    return `\n\n⚠️ 통합 일봉 Webhook 전송 실패 (${task})`;
+  }
+}
+
 export async function POST(request: Request) {
   const body = await request.text();
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
@@ -77,15 +89,30 @@ export async function POST(request: Request) {
   } else if (interaction.data.name === "refresh-daily") {
     void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-breakout") {
-    void runUsDailyBreakoutScan().then((result) => updateOriginalResponse(applicationId, interaction.token, formatBreakoutResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 돌파 후보를 조회하는 중 오류가 발생했습니다."));
+    void runUsDailyBreakoutScan().then(async (result) => {
+      const webhookStatus = await notifyDailyWebhook("5거래일 고가 돌파", () => sendUsDailyBreakoutToDiscord(result.qualified));
+      return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
+    }).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 돌파 후보를 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-obv") {
-    void scanStoredUsDailyObv().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyObvResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 OBV 종목을 조회하는 중 오류가 발생했습니다."));
+    void scanStoredUsDailyObv().then(async (result) => {
+      const webhookStatus = await notifyDailyWebhook("일봉 OBV", () => sendUsDailyIndicatorSignals({ obv: result.qualified as any }));
+      return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
+    }).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 OBV 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "mfi-oversold") {
-    void scanStoredUsMfiOversold().then((result) => updateOriginalResponse(applicationId, interaction.token, formatMfiResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "MFI 과매도 종목을 조회하는 중 오류가 발생했습니다."));
+    void scanStoredUsMfiOversold().then(async (result) => {
+      const webhookStatus = await notifyDailyWebhook("MFI 과매도", () => sendUsDailyIndicatorSignals({ mfi: result.qualified as any }));
+      return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
+    }).catch(() => updateOriginalResponse(applicationId, interaction.token, "MFI 과매도 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "dmi") {
-    void scanStoredUsDmi().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDmiResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "DMI 종목을 조회하는 중 오류가 발생했습니다."));
+    void scanStoredUsDmi().then(async (result) => {
+      const webhookStatus = await notifyDailyWebhook("DMI", () => sendUsDailyIndicatorSignals({ dmi: result.qualified as any }));
+      return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
+    }).catch(() => updateOriginalResponse(applicationId, interaction.token, "DMI 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "macd") {
-    void scanStoredUsMacd().then((result) => updateOriginalResponse(applicationId, interaction.token, formatMacdResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
+    void scanStoredUsMacd().then(async (result) => {
+      const webhookStatus = await notifyDailyWebhook("MACD", () => sendUsDailyIndicatorSignals({ macd: result.qualified as any }));
+      return updateOriginalResponse(applicationId, interaction.token, webhookStatus.trim());
+    }).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "vwap") {
     void scanUsVwap().then((result) => updateOriginalResponse(applicationId, interaction.token, formatVwapResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "당일 VWAP 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "sync-top100") {
