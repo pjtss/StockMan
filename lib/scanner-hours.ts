@@ -1,5 +1,6 @@
 import { loadScannerSchedules } from "./scanner-schedules";
-import { isWithinSchedule } from "./scanner-schedules";
+import { isWithinSchedule } from "./schedule-time";
+import { loadFeatureModuleSettings } from "./feature-module-settings";
 
 export async function isDomesticScannerOpen(now = new Date()): Promise<boolean> {
   const schedules = await loadScannerSchedules();
@@ -7,21 +8,17 @@ export async function isDomesticScannerOpen(now = new Date()): Promise<boolean> 
 }
 
 export async function isUsScannerOpen(now = new Date()): Promise<boolean> {
-  const schedules = await loadScannerSchedules();
-  return isWithinSchedule(schedules.us_trading_intensity, now);
+  try { return isWithinSchedule(await loadFeatureModuleSettings("us-scanners"), now); } catch { return isWithinSchedule({ startTime: "17:00", endTime: "02:00" }, now); }
 }
 
 export async function isUsTopRisingOpen(now = new Date()): Promise<boolean> {
-  const schedules = await loadScannerSchedules();
-  return isWithinSchedule(schedules.us_top_rising, now);
+  try { return isWithinSchedule(await loadFeatureModuleSettings("us-scanners"), now); } catch { return isWithinSchedule({ startTime: "17:00", endTime: "02:00" }, now); }
 }
 
 export async function isUsTurnoverRatioOpen(now = new Date()): Promise<boolean> {
-  const schedules = await loadScannerSchedules();
-  return isWithinSchedule(schedules.us_turnover_ratio, now);
+  try { return isWithinSchedule(await loadFeatureModuleSettings("us-turnover-ratio"), now); } catch { return isWithinSchedule({ startTime: "17:00", endTime: "02:00" }, now); }
 }
 
 export async function isDartOpen(now = new Date()): Promise<boolean> {
-  const schedules = await loadScannerSchedules();
-  return isWithinSchedule(schedules.dart, now);
+  try { return isWithinSchedule(await loadFeatureModuleSettings("dart-realtime"), now); } catch { return isWithinSchedule({ startTime: "00:00", endTime: "23:59" }, now); }
 }
