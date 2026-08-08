@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   const moduleKey = params.get("module") || undefined;
   const status = params.get("status")?.toUpperCase() || undefined;
   const limitValue = Number(params.get("limit") || 10);
+  const failureLimitValue = Number(params.get("failureLimit") || 10);
   const staleAfterValue = Number(params.get("staleAfterSeconds") || 900);
   const sinceValue = params.get("since");
   const untilValue = params.get("until");
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
   if (moduleKey && !getFeatureModule(moduleKey)) return json({ ok: false, stage: "validate_filter", errorCode: "UNKNOWN_FEATURE_MODULE", module: moduleKey }, { status: 400 });
   if (status && !["RUNNING", "SUCCESS", "PARTIAL", "FAILED", "SKIPPED"].includes(status)) return json({ ok: false, stage: "validate_filter", errorCode: "UNKNOWN_RUN_STATUS", status }, { status: 400 });
   if (!Number.isFinite(limitValue) || limitValue < 1) return json({ ok: false, stage: "validate_filter", errorCode: "INVALID_LIMIT", limit: params.get("limit") }, { status: 400 });
+  if (!Number.isFinite(failureLimitValue) || failureLimitValue < 1 || failureLimitValue > 50) return json({ ok: false, stage: "validate_filter", errorCode: "INVALID_FAILURE_LIMIT", failureLimit: params.get("failureLimit") }, { status: 400 });
   if (!Number.isFinite(staleAfterValue) || staleAfterValue < 60 || staleAfterValue > 86_400) return json({ ok: false, stage: "validate_filter", errorCode: "INVALID_STALE_THRESHOLD", staleAfterSeconds: params.get("staleAfterSeconds") }, { status: 400 });
   if ((sinceValue && Number.isNaN(since?.getTime())) || (untilValue && Number.isNaN(until?.getTime()))) return json({ ok: false, stage: "validate_filter", errorCode: "INVALID_DATE", since: sinceValue || null, until: untilValue || null }, { status: 400 });
   if (since && until && since >= until) return json({ ok: false, stage: "validate_filter", errorCode: "INVALID_DATE_RANGE", since: since.toISOString(), until: until.toISOString() }, { status: 400 });
@@ -38,6 +40,7 @@ export async function GET(request: Request) {
       since,
       until,
       limit: limitValue,
+      failureLimit: failureLimitValue,
       includeSummary: params.get("includeSummary") !== "false",
       staleAfterSeconds: staleAfterValue,
     }));

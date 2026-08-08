@@ -4,6 +4,7 @@
 .toolbar p { margin: 5px 0 0; color: #8497ab; font-size: 12px; }
 .toolbarActions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .count { color: #8497ab; font-size: 12px; font-weight: 800; }
+.diagnosticsBar { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 10px 12px; border: 1px solid rgba(251,191,36,.2); border-radius: 8px; color: #fbd38d; background: rgba(120,76,0,.12); font-size: 11px; line-height: 1.5; }
 .refreshButton, .detailButton { min-height: 34px; padding: 0 11px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgba(130,150,175,.24); border-radius: 6px; color: #c7d3df; background: rgba(130,150,175,.08); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
 .refreshButton:disabled { opacity: .55; cursor: wait; }
 .spin { animation: spin 1s linear infinite; }
@@ -19,8 +20,10 @@
 .preview { min-height: 34px; margin: 0; color: #91a3b7; font-size: 11px; line-height: 1.5; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .detailButton { width: 100%; color: #00e79b; border-color: rgba(0,231,155,.28); background: rgba(0,231,155,.07); }
 .success, .successText { color: #00e79b; }
+.skipped { color: #fbbf24; }
 .failure, .failureText, .error, .runError { color: #fca5a5; }
 .muted { color: #8497ab; }
+.moduleMeta { margin: -7px 0 0; color: #8497ab; font-size: 10px; }
 .empty, .error { padding: 18px; border: 1px dashed rgba(130,150,175,.22); border-radius: 8px; font-size: 13px; }
 .modalList { display: grid; gap: 12px; }
 .run { padding: 12px; border: 1px solid rgba(130,150,175,.16); border-radius: 8px; background: rgba(5,11,18,.48); }

@@ -10,6 +10,7 @@ export type AutomationDebugFilter = {
   since?: Date;
   until?: Date;
   limit?: number;
+  failureLimit?: number;
   includeSummary?: boolean;
   staleAfterSeconds?: number;
 };
@@ -51,6 +52,8 @@ type AutomationDebugStatsRow = {
 };
 
 type AutomationDebugModuleRow = AutomationDebugStatsRow & { module_key: string };
+type AutomationDebugFailureCategoryRow = { error_code: string; count: number | string };
+type AutomationDebugSkipReasonRow = { module_key: string; reason: string; count: number | string };
 
 const DEFAULT_STALE_AFTER_SECONDS = 15 * 60;
 
@@ -129,6 +132,7 @@ function moduleDefinitions(filter: AutomationDebugFilter) {
 export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter = {}) {
   const pool = getPool();
   const limit = Math.min(50, Math.max(1, Math.trunc(filter.limit ?? 10)));
+  const failureLimit = Math.min(50, Math.max(1, Math.trunc(filter.failureLimit ?? 10)));
   const includeSummary = filter.includeSummary !== false;
   const staleAfterSeconds = Math.min(86_400, Math.max(60, Math.trunc(filter.staleAfterSeconds ?? DEFAULT_STALE_AFTER_SECONDS)));
 
@@ -187,7 +191,7 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
     recentParams,
   );
 
-  const failureParams = [...statsParams, 20];
+  const failureParams = [...statsParams, failureLimit];
   const failureRows = await pool.query<AutomationDebugDbRow>(
     `SELECT id, module_key, status, started_at, finished_at,
             CASE WHEN finished_at IS NULL THEN ROUND(EXTRACT(EPOCH FROM (NOW() - started_at)) * 1000)::bigint
@@ -200,6 +204,36 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
       ORDER BY started_at DESC
       LIMIT $${failureParams.length}`,
     failureParams,
+  );
+
+  const failureCategoryResult = await pool.query<AutomationDebugFailureCategoryRow>(
+    `SELECT CASE
+              WHEN summary->'diagnostics'->>'errorCode' IS NOT NULL THEN summary->'diagnostics'->>'errorCode'
+              WHEN error_message ILIKE '%EGW00201%' OR error_message ILIKE '%초당 거래건수를 초과%' OR error_message ILIKE '%rate limit%' THEN 'KIS_RATE_LIMIT'
+              WHEN error_message ILIKE '%EGW00123%' OR error_message ILIKE '%AUTH error%' OR error_message ILIKE '%인증%오류%' THEN 'KIS_AUTH_ERROR'
+              WHEN error_message ~* 'Discord.*HTTP[[:space:]]+429' THEN 'DISCORD_WEBHOOK_RATE_LIMIT'
+              WHEN error_message ~* 'Discord.*HTTP[[:space:]]+5[0-9]{2}' THEN 'DISCORD_WEBHOOK_SERVER_ERROR'
+              ELSE 'INTEGRATION_ERROR'
+            END AS error_code,
+            COUNT(*)::int AS count
+       FROM automation_runs
+      WHERE ${where}
+        AND status IN ('FAILED', 'PARTIAL')
+      GROUP BY 1
+      ORDER BY count DESC, error_code` ,
+    statsParams,
+  );
+
+  const skipReasonResult = await pool.query<AutomationDebugSkipReasonRow>(
+    `SELECT module_key,
+            COALESCE(NULLIF(summary->>'reason', ''), 'unknown') AS reason,
+            COUNT(*)::int AS count
+       FROM automation_runs
+      WHERE ${where}
+        AND status = 'SKIPPED'
+      GROUP BY module_key, reason
+      ORDER BY count DESC, module_key, reason`,
+    statsParams,
   );
 
   const stats = statsResult.rows[0];
@@ -242,7 +276,7 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
   return {
     ok: true,
     queriedAt: new Date().toISOString(),
-    filters: { module: filter.moduleKey || null, status: filter.status || null, since: iso(filter.since), until: iso(filter.until), limit, includeSummary, staleAfterSeconds },
+    filters: { module: filter.moduleKey || null, status: filter.status || null, since: iso(filter.since), until: iso(filter.until), limit, failureLimit, includeSummary, staleAfterSeconds },
     totals: {
       runs: totalRuns,
       success: successCount,
@@ -264,6 +298,8 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
       optionalButNeverObservedModuleKeys: modules.filter((module) => module.scheduler === "OPTIONAL_CRON" && module.coverage === "NO_RUN").map((module) => module.key),
       scheduledButNeverObservedModuleKeys: modules.filter((module) => module.scheduler === "OCI_CRON" && module.coverage === "NO_RUN").map((module) => module.key),
     },
+    failureCategories: failureCategoryResult.rows.map((row) => ({ errorCode: row.error_code, count: numeric(row.count) ?? 0 })),
+    skipReasons: skipReasonResult.rows.map((row) => ({ moduleKey: row.module_key, reason: row.reason, count: numeric(row.count) ?? 0 })),
     modules,
     recentRuns,
     failures: failureRows.rows.map((row) => normalizeAutomationDebugRun(row, includeSummary, staleAfterSeconds)),
