@@ -4,7 +4,7 @@ import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutResult[]) {
-  const webhook = await loadFeatureDiscordWebhook("us-daily-breakout", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL"]);
+  const webhook = await loadFeatureDiscordWebhook("us-daily-indicators", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   if (!items.length) return { ok: true, sent: 0 };
   const content = items.map((item) => [

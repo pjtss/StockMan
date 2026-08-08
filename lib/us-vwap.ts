@@ -7,6 +7,7 @@ import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
 import { usTurnoverRatioSnapshotAttempts, usTurnoverRatioSnapshots } from "@/lib/schema";
 import { loadUsTopRisingScopes, type UsTopRisingScope } from "@/lib/us-top-rising-universe";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export const VWAP_MARKETS = ["AMS", "NAS", "NYS"] as const;
 type Scope = UsTopRisingScope;
@@ -84,7 +85,7 @@ export async function persistAndScanUsVwap() {
 
 export async function runUsVwapAutomation() {
   const result = await persistAndScanUsVwap();
-  const webhook = process.env.US_VWAP_DISCORD_WEBHOOK_URL?.trim() || "";
+  const webhook = await loadFeatureDiscordWebhook("us-vwap", ["US_VWAP_DISCORD_WEBHOOK_URL", "US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL"]);
   let discord: Record<string, unknown> = { configured: Boolean(webhook), sent: 0 };
   if (webhook && result.qualified.length) {
     const db = getDb();

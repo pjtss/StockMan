@@ -11,7 +11,7 @@ export function buildUsObvDiscordPayload(items: Array<Record<string, unknown>>) 
 }
 
 export async function sendUsObvToDiscord(items: Array<Record<string, unknown>>) {
-  const webhook = await loadFeatureDiscordWebhook("us-obv", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_OBV_DISCORD_WEBHOOK_URL"]);
+  const webhook = await loadFeatureDiscordWebhook("us-daily-indicators", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_OBV_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildUsObvDiscordPayload(items)) });
   return { ok: response.ok, status: response.status, responseText: await response.text() };

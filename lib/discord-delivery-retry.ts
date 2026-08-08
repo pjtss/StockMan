@@ -5,7 +5,7 @@ async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
     US_TURNOVER_RATIO_NEW: { module: "us-turnover-ratio", env: ["US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL"] },
     US_TURNOVER_RATIO_INCREASE: { module: "us-turnover-ratio", env: ["US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL"] },
-    OBV: { module: "us-obv", env: ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_OBV_DISCORD_WEBHOOK_URL"] },
+    OBV: { module: "us-daily-indicators", env: ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_OBV_DISCORD_WEBHOOK_URL"] },
     NEWS_RADAR: { module: "us-news-radar", env: ["NEWS_RADAR_DISCORD_WEBHOOK_URL"] },
     BREAKING_NEWS: { module: "us-breaking-news-forwarder", env: ["KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL"] },
   };
