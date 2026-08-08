@@ -48,7 +48,7 @@ async function handle(request: Request) {
       alerts.push({ source: "NEWS_RADAR", externalId, level: "뉴스 검증 완료", company: item.symbol.name || item.symbol.ticker, title: item.event.title, link: `/scanners/us?symbol=${encodeURIComponent(item.symbol.ticker)}`, publishedAt: `${item.event.date.slice(0, 4)}-${item.event.date.slice(4, 6)}-${item.event.date.slice(6, 8)}T${item.event.time.slice(0, 2)}:${item.event.time.slice(2, 4)}:${item.event.time.slice(4, 6)}+09:00` });
       await recordRadarEvent({ externalId, ticker: item.symbol.ticker, market: item.market, title: item.event.title, status: "VERIFIED" });
     }
-    if (alerts.length && !isNewsRadarDiscordConfigured()) throw new Error("NEWS_RADAR_DISCORD_WEBHOOK_URL is not configured");
+    if (alerts.length && !(await isNewsRadarDiscordConfigured())) throw new Error("NEWS_RADAR_DISCORD_WEBHOOK_URL is not configured");
     for (const alert of alerts) {
       const candidate = result.candidates.find((item) => `news-radar:${item.event.id}:${item.symbol.ticker}` === alert.externalId);
       if (!candidate) continue;

@@ -33,8 +33,8 @@ function getDartDiscordWebhookUrl() {
   return process.env.DART_DISCORD_WEBHOOK_URL?.trim() || "";
 }
 
-export function isDartDiscordConfigured() {
-  return Boolean(getDartDiscordWebhookUrl());
+export async function isDartDiscordConfigured() {
+  return Boolean(await loadFeatureDiscordWebhook("dart-realtime", ["DART_DISCORD_WEBHOOK_URL"]));
 }
 
 export function buildDartDiscordWebhookPayload(alert: AlertItem): DiscordWebhookPayload {

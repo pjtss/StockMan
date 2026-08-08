@@ -39,7 +39,7 @@ async function deliverCandidate(candidate: DartAutomationCandidate, detectedAt: 
 }
 
 export async function runDartAutomation() {
-  if (!isDartDiscordConfigured()) {
+  if (!(await isDartDiscordConfigured())) {
     return {
       source: "DART" as const,
       skipped: true,

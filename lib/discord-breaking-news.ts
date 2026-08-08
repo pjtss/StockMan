@@ -4,7 +4,7 @@ import { loadFeatureDiscordWebhook } from "./discord-config";
 function webhookUrl() { return process.env.KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL?.trim() || ""; }
 function truncate(value: string, max: number) { return value.length <= max ? value : `${value.slice(0, max - 1)}…`; }
 
-export function isBreakingNewsDiscordConfigured() { return Boolean(webhookUrl()); }
+export async function isBreakingNewsDiscordConfigured() { return Boolean(await loadFeatureDiscordWebhook("us-breaking-news-forwarder", ["KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL"])); }
 
 export function buildBreakingNewsPayload(event: KisBreakingNews) {
   return {

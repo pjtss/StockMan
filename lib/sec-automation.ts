@@ -23,10 +23,10 @@ function getExternalId(item: SecItem) {
   return item.accession || item.link;
 }
 
-function getMissingConfiguration() {
+async function getMissingConfiguration() {
   return [
     isSecAiEvaluationConfigured() ? "" : "OPENAI_API_KEY",
-    isSecDiscordConfigured() ? "" : "SEC_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL",
+    (await isSecDiscordConfigured()) ? "" : "SEC_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL",
   ].filter(Boolean);
 }
 
@@ -46,7 +46,7 @@ async function processClaimedItem(item: SecItem): Promise<SecAutomationItemResul
 
 export async function runSecAutomation() {
   const feed = await syncSecAlerts();
-  const missingConfiguration = getMissingConfiguration();
+  const missingConfiguration = await getMissingConfiguration();
   if (missingConfiguration.length > 0) {
     return {
       ...feed,

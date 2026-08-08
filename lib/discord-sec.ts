@@ -225,8 +225,8 @@ function getDiscordWebhookUrl() {
   return process.env.SEC_DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL || "";
 }
 
-export function isSecDiscordConfigured() {
-  return Boolean(getDiscordWebhookUrl());
+export async function isSecDiscordConfigured() {
+  return Boolean(await loadFeatureDiscordWebhook("sec-realtime", ["MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL"]));
 }
 
 export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<DiscordSendResult> {

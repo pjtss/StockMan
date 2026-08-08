@@ -9,6 +9,7 @@ import { explainUsTurnoverFilters } from "@/lib/us-turnover-filter-explanation";
 import { saveAndCalculateUsTurnoverRatioTrends } from "@/lib/us-turnover-ratio-trend";
 import { sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 type WatchItem = { instrumentId: number; market: string; code: string; name: string };
 export type WatchlistScanResult = {
@@ -118,7 +119,7 @@ export async function scanUsTurnoverWatchlist(options: { send?: boolean } = {}):
   }
   steps.push({ step: "중복·쿨다운 제외", count: suppressedCount });
   if (options.send && alertCandidates.length) {
-    const webhook = process.env.US_TURNOVER_RATIO_WATCHLIST_DISCORD_WEBHOOK_URL?.trim() || process.env.US_TURNOVER_WATCH_DISCORD_WEBHOOK_URL?.trim() || process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
+    const webhook = await loadFeatureDiscordWebhook("us-turnover-ratio", ["US_TURNOVER_RATIO_WATCHLIST_DISCORD_WEBHOOK_URL", "US_TURNOVER_WATCH_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL"]);
     if (!webhook) errors.push({ error: "US_TURNOVER_RATIO_WATCHLIST_DISCORD_WEBHOOK_URL 미설정" });
     else {
       const payloadItems = alertCandidates.map((row) => ({ ...row, rank: 0, changeRate: String(row.rate ?? ""), openToHighRate: Number(row.openToHighRate ?? 0) })) as any;

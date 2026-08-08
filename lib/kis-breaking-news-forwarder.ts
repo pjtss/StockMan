@@ -30,5 +30,5 @@ export async function forwardBreakingNews(options: { send: boolean; date?: strin
       result.push({ externalId, title: event.title, status: "FAILED", error: message });
     }
   }
-  return { configured: isBreakingNewsDiscordConfigured(), fetchedCount: events.length, sentCount: result.filter((item) => item.status === "SENT").length, duplicateCount: result.filter((item) => item.status === "ALREADY_SENT").length, results: result };
+  return { configured: await isBreakingNewsDiscordConfigured(), fetchedCount: events.length, sentCount: result.filter((item) => item.status === "SENT").length, duplicateCount: result.filter((item) => item.status === "ALREADY_SENT").length, results: result };
 }
