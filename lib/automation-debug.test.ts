@@ -25,7 +25,7 @@ describe("automation debug diagnostics", () => {
       summary: { error: "KIS failed" },
       error_message: "KIS failed",
     });
-    expect(run).toMatchObject({ id: 42, moduleKey: "us-obv", durationMs: 1250, errorMessage: "KIS failed", summary: { error: "KIS failed" } });
+    expect(run).toMatchObject({ id: 42, moduleKey: "us-obv", durationMs: 1250, stale: false, errorMessage: "KIS failed", errorDiagnostics: { errorCode: "INTEGRATION_ERROR" }, summary: { error: "KIS failed" } });
     expect(normalizeAutomationDebugRun({
       id: 42,
       module_key: "us-obv",
@@ -36,5 +36,17 @@ describe("automation debug diagnostics", () => {
       summary: { response: { rawText: "raw" } },
       error_message: null,
     }, false).summary).toBeUndefined();
+
+    const stale = normalizeAutomationDebugRun({
+      id: 43,
+      module_key: "us-obv",
+      status: "RUNNING",
+      started_at: "2026-08-08T00:00:00.000Z",
+      finished_at: null,
+      duration_ms: "901000",
+      summary: {},
+      error_message: null,
+    });
+    expect(stale.stale).toBe(true);
   });
 });
