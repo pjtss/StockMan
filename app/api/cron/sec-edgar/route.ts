@@ -6,14 +6,15 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { resolveSecEdgarRuntimeConfig } from "@/lib/sec-edgar-config";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
+import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-cron-secret")?.trim();
   if (!secret || secret !== process.env.CRON_SECRET) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   try {
     const settings = await loadFeatureModuleSettings("sec-realtime");
-    if (!settings.enabled) return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "disabled" });
-    if (!isWithinSchedule(settings, new Date())) return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" });
+    if (!settings.enabled) { await recordSkippedAutomationRun("sec-realtime", "disabled"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "disabled" }); }
+    if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("sec-realtime", "outside_schedule"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" }); }
     const result = await withAutomationRun("sec-realtime", async () => {
       const { ciks, syncXbrl, discordBatch } = resolveSecEdgarRuntimeConfig(settings.featureSettings);
       const results = [];

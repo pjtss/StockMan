@@ -7,18 +7,19 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 import { withAutomationRun } from "@/lib/automation-run";
+import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
   const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const moduleSettings = await loadFeatureModuleSettings("us-daily-indicators");
-  if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings, new Date())) return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule" });
+  if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings, new Date())) { await recordSkippedAutomationRun("us-daily-indicators", moduleSettings.enabled ? "outside_schedule" : "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule" }); }
   const envInterval = Number.parseInt(process.env.US_DAILY_INDICATORS_INTERVAL_SECONDS || "600", 10) || 600;
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? envInterval);
   const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const epochSeconds = Math.floor(Date.now() / 1000);
-  if (now.getUTCDay() === 0 || epochSeconds % intervalSeconds >= 60) return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "monday-saturday" });
+  if (now.getUTCDay() === 0 || epochSeconds % intervalSeconds >= 60) { await recordSkippedAutomationRun("us-daily-indicators", "outside_interval", { intervalSeconds }); return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "monday-saturday" }); }
   try {
     return NextResponse.json(await withAutomationRun("us-daily-indicators", async () => {
     const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd()]);

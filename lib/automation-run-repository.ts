@@ -37,6 +37,24 @@ export async function startAutomationRun(moduleKey: FeatureModuleKey) {
   return rows[0]?.id;
 }
 
+/** Persist schedule/feature no-ops so the debug API can distinguish disabled
+ * modules from modules that were never wired to the scheduler. */
+export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, reason: string, details: Record<string, unknown> = {}) {
+  try {
+    const db = getDb();
+    const now = new Date();
+    await db.insert(automationRuns).values({
+      moduleKey,
+      status: "SKIPPED",
+      startedAt: now,
+      finishedAt: now,
+      summary: { skipped: true, reason, ...details },
+    });
+  } catch (error) {
+    console.warn(`[Automation] unable to record skipped run for ${moduleKey}:`, error instanceof Error ? error.message : error);
+  }
+}
+
 export async function finishAutomationRun(id: number | undefined, status: "SUCCESS" | "PARTIAL" | "FAILED", summary: Record<string, unknown> = {}, errorMessage?: string) {
   if (!id) return;
   const db = getDb();

@@ -10,6 +10,7 @@ import { getDb } from "@/lib/db";
 import { alertEvents, usNewsRadarEvents } from "@/lib/schema";
 import { sql } from "drizzle-orm";
 import { ensureUsInstrument } from "@/lib/us-instruments";
+import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export const dynamic = "force-dynamic";
 const sentEvents = new Set<string>();
@@ -30,8 +31,8 @@ async function handle(request: Request) {
   let settings;
   try { settings = await loadFeatureModuleSettings("us-news-radar"); }
   catch { settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] }; }
-  if (!settings.enabled) return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
-  if (!isWithinSchedule(settings)) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" });
+  if (!settings.enabled) { await recordSkippedAutomationRun("us-news-radar", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
+  if (!isWithinSchedule(settings)) { await recordSkippedAutomationRun("us-news-radar", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
   try {
     const result = await withAutomationRun("us-news-radar", () => detectNewsCandidates());
     const alerts: AlertItem[] = [];

@@ -3,6 +3,7 @@ import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
+import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -10,11 +11,13 @@ export async function POST(request: Request) {
   if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const moduleSettings = await loadFeatureModuleSettings("us-daily-cache");
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings)) {
+    await recordSkippedAutomationRun("us-daily-cache", moduleSettings.enabled ? "outside_schedule" : "disabled");
     return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 43_200, schedule: "weekdays" });
   }
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 43_200);
   const epochSeconds = Math.floor(Date.now() / 1000);
   if (epochSeconds % intervalSeconds >= 60) {
+    await recordSkippedAutomationRun("us-daily-cache", "outside_interval", { intervalSeconds });
     return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "weekdays, every 12 hours" });
   }
   try { return NextResponse.json({ ok: true, ...(await withAutomationRun("us-daily-cache", warmUsDailyPriceCache)) }); }

@@ -6,6 +6,7 @@ import type { AlertItem } from "@/lib/types";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
+import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +26,10 @@ export async function POST(request: Request) {
       settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] };
     }
     if (!settings.enabled) {
+      await recordSkippedAutomationRun("us-scanners", "disabled");
       return NextResponse.json({ ok: true, skipped: true, reason: "disabled", sent: 0 });
     }
-    if (!isWithinSchedule(settings)) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule", sent: 0 });
+    if (!isWithinSchedule(settings)) { await recordSkippedAutomationRun("us-scanners", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule", sent: 0 }); }
 
     return NextResponse.json(await withAutomationRun("us-scanners", async () => {
       const newlyAdded = await syncTopRisingStocks();

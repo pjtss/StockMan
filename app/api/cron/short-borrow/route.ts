@@ -6,6 +6,7 @@ import { withAutomationLock } from "@/lib/automation-lock";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { withAutomationRun } from "@/lib/automation-run";
+import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,8 @@ async function handle(request: Request) {
     console.warn("[ShortBorrow] feature settings unavailable; using defaults", error instanceof Error ? error.message : error);
     settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] };
   }
-  if (!settings.enabled) return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
-  if (!isWithinSchedule(settings)) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" });
+  if (!settings.enabled) { await recordSkippedAutomationRun("us-short-borrow", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
+  if (!isWithinSchedule(settings)) { await recordSkippedAutomationRun("us-short-borrow", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
   const data = await withAutomationRun("us-short-borrow", () => withAutomationLock("short-borrow", async () => {
     await ensureSchema();
     const scanner = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"]);

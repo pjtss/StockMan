@@ -3,6 +3,7 @@ import { isDartOpen } from "./scanner-hours";
 import { loadFeatureModuleSettings } from "./feature-module-settings";
 import { isWithinSchedule } from "./schedule-time";
 import { withAutomationRun } from "./automation-run";
+import { recordSkippedAutomationRun } from "./automation-run-repository";
 
 export type FilingSyncResult = {
   success: true;
@@ -24,16 +25,14 @@ export async function runFilingSync(): Promise<FilingSyncResult> {
   const dartOpen = await isDartOpen();
   const dartInWindow = isWithinSchedule(dartSettings);
 
+  const dartSkippedReason = !dartSettings.enabled
+    ? "disabled"
+    : !dartInWindow || !dartOpen
+      ? "outside_schedule"
+      : "outside_schedule";
   const dart = dartSettings.enabled && dartInWindow && dartOpen
     ? await withAutomationRun("dart-realtime", runDartAutomation)
-    : {
-        skipped: true,
-        reason: !dartSettings.enabled
-          ? "DART disabled by admin"
-          : !dartInWindow || !dartOpen
-          ? "DART disabled outside schedule"
-          : "DART disabled outside schedule",
-      };
+    : (await recordSkippedAutomationRun("dart-realtime", dartSkippedReason), { skipped: true, reason: dartSkippedReason });
 
   return {
     success: true,

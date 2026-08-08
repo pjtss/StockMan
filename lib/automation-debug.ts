@@ -213,6 +213,7 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
       label: definition.label,
       description: definition.description,
       coverage: row ? "OBSERVED" : "NO_RUN",
+      scheduler: definition.scheduler,
       runCount: numeric(row?.total_runs) ?? 0,
       counts: {
         success: numeric(row?.success_count) ?? 0,
@@ -251,6 +252,8 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
       configuredModuleCount: modules.length,
       observedModuleCount: observedModuleKeys.length,
       noRunModuleKeys: modules.filter((module) => module.coverage === "NO_RUN").map((module) => module.key),
+      notScheduledModuleKeys: modules.filter((module) => module.scheduler === "NOT_SCHEDULED").map((module) => module.key),
+      scheduledButNeverObservedModuleKeys: modules.filter((module) => module.scheduler === "OCI_CRON" && module.coverage === "NO_RUN").map((module) => module.key),
     },
     modules,
     recentRuns,
