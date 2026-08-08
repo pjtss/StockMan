@@ -1,9 +1,22 @@
+import fs from "node:fs";
+import path from "node:path";
 import { getPool } from "@/lib/db";
 import { inspectDatabaseSchema } from "@/lib/schema-health";
 
 type BuildInfo = { version?: string; commit?: string; builtAt?: string };
 
 function buildInfo(): BuildInfo {
+  try {
+    const file = path.join(process.cwd(), "build-info.json");
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as BuildInfo;
+    return {
+      version: parsed.version || process.env.npm_package_version || "0.1.0",
+      commit: parsed.commit || process.env.STOCKMAN_BUILD_VERSION || "unknown",
+      builtAt: parsed.builtAt || process.env.STOCKMAN_BUILD_TIME || undefined,
+    };
+  } catch {
+    // Local development may not have a CI build-info file yet.
+  }
   return {
     version: process.env.npm_package_version || "0.1.0",
     commit: process.env.STOCKMAN_BUILD_VERSION || "unknown",
