@@ -5,6 +5,7 @@ import { fetchAllMarketRss } from "./market-rss-sources";
 import { translateMarketRssItem } from "./translate-market-rss-item";
 import { LibreTranslateClient } from "./libretranslate-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
+import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -89,6 +90,7 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   for (const row of rows) {
     if (remaining <= 0) break;
     const title = row.translatedTitle || row.title;
+    const reaction = row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
     const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
     const body = [
       "🚨 **해외시장 RSS 속보**",
@@ -96,6 +98,8 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       row.translatedTitle && row.translatedTitle !== row.title ? `원문 제목: ${row.title}` : "",
       row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
       `출처: ${row.source}${row.translationFallback ? " · 번역 fallback" : ""}`,
+      row.detectedTicker ? `티커: ${row.detectedTicker}${reaction?.exchange ? ` · ${reaction.exchange}` : ""}` : "",
+      reaction?.ok ? `등락률: ${reaction.rate ?? "-"}% · 거래대금: ${reaction.tradingValue ?? "-"}달러` : "",
     ].filter(Boolean).join("\n");
     try {
       const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body }) });
