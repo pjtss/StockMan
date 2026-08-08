@@ -1,5 +1,5 @@
 import { claimDueDiscordDeliveries, markDiscordDeliveryProcessing, markDiscordDeliveryRetry, markDiscordDeliverySent } from "@/lib/discord-delivery-queue";
-import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -15,7 +15,7 @@ async function webhookFor(channelKey: string) {
 
 export async function retryDiscordDeliveries(limit = 50) {
   const deliveries = await claimDueDiscordDeliveries(limit);
-  const results = { claimed: deliveries.length, sent: 0, failed: 0 };
+  const results = { claimed: deliveries.length, sent: 0, failed: 0, recovered: 0, repeatedFailure: 0, attempts: 0 };
   for (const delivery of deliveries) {
     await markDiscordDeliveryProcessing(delivery.id);
     const webhook = await webhookFor(delivery.channelKey);
@@ -25,9 +25,21 @@ export async function retryDiscordDeliveries(limit = 50) {
       if (!response.ok) throw new Error(`discord_http_${response.status}`);
       await markDiscordDeliverySent(delivery.id);
       results.sent += 1;
+      results.attempts += delivery.attempts + 1;
+      if (delivery.attempts > 0) results.recovered += 1;
     } catch (error) {
       await markDiscordDeliveryRetry(delivery.id, error instanceof Error ? error.message : String(error), delivery.attempts + 1);
       results.failed += 1;
+      results.attempts += delivery.attempts + 1;
+      if (delivery.attempts + 1 >= 5) results.repeatedFailure += 1;
+    }
+  }
+  if (deliveries.length > 0) {
+    const debugWebhook = await loadFeatureDiscordDebugWebhook("discord-delivery-retry");
+    if (debugWebhook) {
+      const status = results.repeatedFailure > 0 ? "CRITICAL" : results.recovered > 0 ? "RECOVERED" : results.failed > 0 ? "WARNING" : "INFO";
+      const content = [`🛠️ **Discord 재전송 통계 · ${status}**`, `대상: ${results.claimed}건`, `최종 성공: ${results.sent}건`, `재시도 후 복구: ${results.recovered}건`, `실패 유지: ${results.failed}건`, `5회 이상 반복 실패: ${results.repeatedFailure}건`, `총 시도 횟수: ${results.attempts}회`, `확인 시각: ${new Date().toISOString()}`].join("\n");
+      try { await fetch(`${debugWebhook}${debugWebhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DEBUG", content, allowed_mentions: { parse: [] } }) }); } catch { /* debug delivery must never fail the retry job */ }
     }
   }
   return results;
