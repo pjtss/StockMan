@@ -6,17 +6,25 @@ import { translateMarketRssItem } from "./translate-market-rss-item";
 import { LibreTranslateClient } from "./libretranslate-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
+import { extractSecCik, resolveSecCompanyTickers } from "./sec-company-ticker";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
 export async function ingestMarketRssArticles() {
   const db = getDb();
   const fetched = await fetchAllMarketRss();
+  const secItems = fetched.results.find((result) => result.ok && result.source === "SEC_EDGAR");
+  const secCiks = secItems?.ok ? secItems.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : [];
+  let secTickerMap = new Map<string, string>();
+  if (secCiks.length) {
+    try { secTickerMap = new Map((await resolveSecCompanyTickers(secCiks)).map((row) => [row.cik, row.ticker])); } catch { secTickerMap = new Map(); }
+  }
   let inserted = 0;
   for (const result of fetched.results) {
     if (!result.ok) continue;
     for (const item of result.feed.items) {
       const classification = classifyMarketRssItem(item);
+      const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
       const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
       const isBacklog = Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
       const rows = await db.insert(marketRssArticles).values({
@@ -25,7 +33,7 @@ export async function ingestMarketRssArticles() {
         title: item.title,
         summary: item.summary,
         rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
-        detectedTicker: classification.ticker,
+        detectedTicker: classification.ticker || mappedTicker,
         eventDirection: classification.direction,
         matchedTerms: classification.matchedTerms,
         financingAmountUsd: classification.financingAmountUsd,
