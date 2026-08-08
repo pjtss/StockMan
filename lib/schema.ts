@@ -131,16 +131,6 @@ export const kisCache = pgTable(
   }
 );
 
-// 7. 관리자 기능 플래그 저장소
-export const featureFlags = pgTable(
-  "feature_flags",
-  {
-    key: text("key").primaryKey(),
-    enabled: boolean("enabled").notNull().default(true),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  }
-);
-
 // 8. 관리자 KIS 요청 설정 저장소
 export const kisApiConfigs = pgTable(
   "kis_api_configs",
@@ -157,29 +147,6 @@ export const usTopRisingConfig = pgTable(
   {
     key: text("key").primaryKey(),
     topN: integer("top_n").notNull().default(10),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  }
-);
-
-// 10. 스캐너 시간대 설정 저장소
-export const scannerSchedules = pgTable(
-  "scanner_schedules",
-  {
-    key: text("key").primaryKey(),
-    startTime: text("start_time").notNull(),
-    endTime: text("end_time").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  }
-);
-
-// 11. 스캐너 시간 변경 이력
-export const scannerScheduleHistory = pgTable(
-  "scanner_schedule_history",
-  {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    key: text("key").notNull(),
-    startTime: text("start_time").notNull(),
-    endTime: text("end_time").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   }
 );
