@@ -5,8 +5,8 @@ import type { FeatureModuleKey } from "@/lib/feature-modules";
 
 const STALE_RUN_AFTER_SECONDS = 15 * 60;
 
-/** Mark abandoned workers before creating a new run for the same module. */
-async function reconcileStaleRuns(moduleKey: FeatureModuleKey) {
+/** Mark abandoned workers before creating a new run. */
+async function reconcileStaleRuns() {
   try {
     await getPool().query(
       `UPDATE automation_runs
@@ -19,21 +19,20 @@ async function reconcileStaleRuns(moduleKey: FeatureModuleKey) {
                 )
               ),
               error_message = 'The worker stopped before finalizing the run'
-        WHERE module_key = $1
-          AND status = 'RUNNING'
-          AND started_at < NOW() - ($2 * INTERVAL '1 second')`,
-      [moduleKey, STALE_RUN_AFTER_SECONDS],
+        WHERE status = 'RUNNING'
+          AND started_at < NOW() - ($1 * INTERVAL '1 second')`,
+      [STALE_RUN_AFTER_SECONDS],
     );
   } catch (error) {
     // Observability recovery must never prevent the actual feature from
     // running (for example while the database is temporarily unavailable).
-    console.warn(`[Automation] stale-run reconciliation failed for ${moduleKey}:`, error instanceof Error ? error.message : error);
+    console.warn("[Automation] stale-run reconciliation failed:", error instanceof Error ? error.message : error);
   }
 }
 
 export async function startAutomationRun(moduleKey: FeatureModuleKey) {
   const db = getDb();
-  await reconcileStaleRuns(moduleKey);
+  await reconcileStaleRuns();
   const rows = await db.insert(automationRuns).values({ moduleKey, status: "RUNNING", startedAt: new Date() }).returning({ id: automationRuns.id });
   return rows[0]?.id;
 }
