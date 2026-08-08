@@ -1,4 +1,4 @@
-export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "market-rss" | "us-scanners" | "us-turnover-trend" | "us-turnover-ratio" | "us-vwap" | "us-short-borrow" | "us-news-radar" | "us-breaking-news-forwarder" | "us-daily-indicators" | "us-obv" | "us-daily-cache" | "us-daily-breakout" | "us-trade-intensity" | "short-borrow" | "discord-delivery-retry";
+export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "market-rss" | "us-scanners" | "domestic-trade-intensity" | "us-turnover-trend" | "us-turnover-ratio" | "us-vwap" | "us-short-borrow" | "us-news-radar" | "us-breaking-news-forwarder" | "us-daily-indicators" | "us-obv" | "us-daily-cache" | "us-daily-breakout" | "us-trade-intensity" | "short-borrow" | "discord-delivery-retry";
 
 /** Feature-specific settings never share the common ON/OFF/schedule contract. */
 export type FeatureSpecificSettings = {
@@ -24,6 +24,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "sec-realtime", label: "SEC 공시 자동화", description: "SEC 원문 수집·평가·알림", legacyFlag: "sec_realtime", settingsPath: "/admin/modules/sec-realtime" },
   { key: "market-rss", label: "시장 RSS 통합", description: "SEC·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss" },
   { key: "us-scanners", label: "미국 스캐너", description: "미국 상승률·체결강도 스캐너", legacyFlag: "us_scanners", settingsPath: "/admin/modules/us-scanners" },
+  { key: "domestic-trade-intensity", label: "국내 체결강도", description: "국내 주식 체결강도 스캐너", settingsPath: "/admin/modules/domestic-trade-intensity" },
   { key: "us-turnover-trend", label: "해외 거래대금 추이", description: "해외주식 거래대금 추이", legacyFlag: "us_turnover_trend", settingsPath: "/admin/modules/us-turnover-trend" },
   { key: "us-turnover-ratio", label: "시총 대비 거래대금", description: "시총 대비 거래대금 필터·알림", legacyFlag: "us_turnover_ratio", legacySchedule: "us_turnover_ratio", settingsPath: "/admin/modules/us-turnover-ratio" },
   { key: "us-vwap", label: "당일 VWAP 상회", description: "당일 전체 세션 VWAP 상회 종목 탐지·Discord 알림", settingsPath: "/admin/modules/us-vwap" },
