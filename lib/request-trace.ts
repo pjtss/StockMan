@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
@@ -21,6 +22,18 @@ export function resolveRequestId(request: Request): string {
 
 export function responseTimeMs(startedAt: number): number {
   return Math.max(0, Date.now() - startedAt);
+}
+
+export async function readRequestTrace(): Promise<{ requestId: string | null; cronRunId: string | null } | undefined> {
+  try {
+    const requestHeaders = await headers();
+    const requestId = normalizeRequestId(requestHeaders.get("x-request-id"));
+    const cronRunId = normalizeRequestId(requestHeaders.get("x-cron-run-id"));
+    return requestId || cronRunId ? { requestId, cronRunId } : undefined;
+  } catch {
+    // Direct library calls (tests/CLI) do not have a Next request context.
+    return undefined;
+  }
 }
 
 export function withRequestTrace<T extends NextResponse>(response: T, requestId: string, startedAt?: number): T {

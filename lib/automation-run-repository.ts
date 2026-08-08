@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, getPool } from "@/lib/db";
 import { automationRuns } from "@/lib/schema";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
+import { readRequestTrace } from "@/lib/request-trace";
 
 const STALE_RUN_AFTER_SECONDS = 15 * 60;
 const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
@@ -42,7 +43,8 @@ export async function startAutomationRun(moduleKey: FeatureModuleKey) {
  * modules from modules that were never wired to the scheduler. */
 export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, reason: string, details: Record<string, unknown> = {}) {
   try {
-    const summary = JSON.stringify({ skipped: true, reason, observationWindowSeconds: SKIP_OBSERVATION_WINDOW_SECONDS, ...details });
+    const trace = await readRequestTrace();
+    const summary = JSON.stringify({ skipped: true, reason, observationWindowSeconds: SKIP_OBSERVATION_WINDOW_SECONDS, ...details, ...(trace ? { observability: trace } : {}) });
     await getPool().query(
       `INSERT INTO automation_runs (module_key, status, started_at, finished_at, summary)
        SELECT $1, 'SKIPPED', NOW(), NOW(), $3::jsonb
