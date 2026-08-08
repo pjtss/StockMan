@@ -16,6 +16,7 @@
   - OCI cron은 HTTP 2xx만으로 성공을 단정하지 않고 JSON의 `ok:false`와 `skipped:true`도 판정해 요약 통계에 반영한다.
   - `/health-check` 화면에도 DB 연결, 스키마 준비, Flyway 버전, 누락 테이블을 구분해 표시한다.
   - OCI standalone 산출물에 `build-info.json`을 포함해 운영 `/api/health`와 `/health-check`에서 실제 Git 커밋과 빌드 시각을 확인할 수 있게 했다.
+  - `GET /api/debug/automation-runs`는 `module`, `status`, `since`, `until`, `limit`, `includeSummary` 필터를 지원하며, 전체 실행 통계·기능별 실행 커버리지·최근 실행·실패 목록·민감값 제거 요약을 반환한다. 관리자 세션 또는 `x-cron-secret`으로 호출할 수 있고, 스키마 오류는 `stage=load_automation_runs`와 구조화된 진단으로 응답한다.
 
 ## 2026-07-11
 - **[인증 안정화]** KIS 접근토큰의 하루 중복 발급 경로를 제거하고 DB 단일 정본 정책을 강화했다.

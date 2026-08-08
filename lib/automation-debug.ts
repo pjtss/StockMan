@@ -1,0 +1,241 @@
+import { getPool } from "@/lib/db";
+import { FEATURE_MODULES, type FeatureModuleKey } from "@/lib/feature-modules";
+
+const SENSITIVE_KEY = /(appkey|appsecret|access[_-]?token|authorization|webhook|cron[_-]?secret|database[_-]?url|password|private[_-]?key|secret)/i;
+
+export type AutomationDebugFilter = {
+  moduleKey?: FeatureModuleKey;
+  status?: string;
+  since?: Date;
+  until?: Date;
+  limit?: number;
+  includeSummary?: boolean;
+};
+
+export type AutomationDebugRun = {
+  id: number;
+  moduleKey: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  summary?: unknown;
+  errorMessage: string | null;
+};
+
+type AutomationDebugDbRow = {
+  id: number | string;
+  module_key: string;
+  status: string;
+  started_at: Date | string;
+  finished_at: Date | string | null;
+  duration_ms: number | string | null;
+  summary: unknown;
+  error_message: string | null;
+};
+
+type AutomationDebugStatsRow = {
+  total_runs: number | string;
+  success_count: number | string;
+  partial_count: number | string;
+  failed_count: number | string;
+  running_count: number | string;
+  skipped_count: number | string;
+  average_duration_ms: number | string | null;
+  latest_started_at: Date | string | null;
+};
+
+type AutomationDebugModuleRow = AutomationDebugStatsRow & { module_key: string };
+
+function numeric(value: number | string | null | undefined) {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function iso(value: Date | string | null | undefined) {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/** Remove credentials from arbitrary JSON summaries without hiding API raw data. */
+export function redactDebugValue(value: unknown, key = ""): unknown {
+  if (SENSITIVE_KEY.test(key)) return "[REDACTED]";
+  if (Array.isArray(value)) return value.map((child) => redactDebugValue(child));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([childKey, child]) => [childKey, redactDebugValue(child, childKey)]));
+  }
+  return value;
+}
+
+export function normalizeAutomationDebugRun(row: AutomationDebugDbRow, includeSummary = true): AutomationDebugRun {
+  const normalized: AutomationDebugRun = {
+    id: Number(row.id),
+    moduleKey: row.module_key,
+    status: row.status,
+    startedAt: iso(row.started_at) || String(row.started_at),
+    finishedAt: iso(row.finished_at),
+    durationMs: numeric(row.duration_ms),
+    errorMessage: row.error_message,
+  };
+  if (includeSummary) normalized.summary = redactDebugValue(row.summary);
+  return normalized;
+}
+
+function buildWhere(filter: AutomationDebugFilter, params: unknown[]) {
+  const clauses = ["1 = 1"];
+  if (filter.moduleKey) {
+    params.push(filter.moduleKey);
+    clauses.push(`module_key = $${params.length}`);
+  }
+  if (filter.status) {
+    params.push(filter.status);
+    clauses.push(`status = $${params.length}`);
+  }
+  if (filter.since) {
+    params.push(filter.since);
+    clauses.push(`started_at >= $${params.length}`);
+  }
+  if (filter.until) {
+    params.push(filter.until);
+    clauses.push(`started_at < $${params.length}`);
+  }
+  return clauses.join(" AND ");
+}
+
+function moduleDefinitions(filter: AutomationDebugFilter) {
+  return filter.moduleKey ? FEATURE_MODULES.filter((module) => module.key === filter.moduleKey) : FEATURE_MODULES;
+}
+
+export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter = {}) {
+  const pool = getPool();
+  const limit = Math.min(50, Math.max(1, Math.trunc(filter.limit ?? 10)));
+  const includeSummary = filter.includeSummary !== false;
+
+  const statsParams: unknown[] = [];
+  const where = buildWhere(filter, statsParams);
+  const statsResult = await pool.query<AutomationDebugStatsRow>(
+    `SELECT COUNT(*)::int AS total_runs,
+            COUNT(*) FILTER (WHERE status = 'SUCCESS')::int AS success_count,
+            COUNT(*) FILTER (WHERE status = 'PARTIAL')::int AS partial_count,
+            COUNT(*) FILTER (WHERE status = 'FAILED')::int AS failed_count,
+            COUNT(*) FILTER (WHERE status = 'RUNNING')::int AS running_count,
+            COUNT(*) FILTER (WHERE status = 'SKIPPED')::int AS skipped_count,
+            COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (finished_at - started_at)) * 1000) FILTER (WHERE finished_at IS NOT NULL)), 0)::bigint AS average_duration_ms,
+            MAX(started_at) AS latest_started_at
+       FROM automation_runs
+      WHERE ${where}`,
+    statsParams,
+  );
+
+  const moduleParams = [...statsParams];
+  const moduleResult = await pool.query<AutomationDebugModuleRow>(
+    `SELECT module_key,
+            COUNT(*)::int AS total_runs,
+            COUNT(*) FILTER (WHERE status = 'SUCCESS')::int AS success_count,
+            COUNT(*) FILTER (WHERE status = 'PARTIAL')::int AS partial_count,
+            COUNT(*) FILTER (WHERE status = 'FAILED')::int AS failed_count,
+            COUNT(*) FILTER (WHERE status = 'RUNNING')::int AS running_count,
+            COUNT(*) FILTER (WHERE status = 'SKIPPED')::int AS skipped_count,
+            COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (finished_at - started_at)) * 1000) FILTER (WHERE finished_at IS NOT NULL)), 0)::bigint AS average_duration_ms,
+            MAX(started_at) AS latest_started_at
+       FROM automation_runs
+      WHERE ${where}
+      GROUP BY module_key`,
+    moduleParams,
+  );
+
+  const recentParams = [...statsParams, limit];
+  const recentRows = await pool.query<AutomationDebugDbRow>(
+    `SELECT id, module_key, status, started_at, finished_at,
+            CASE WHEN finished_at IS NULL THEN NULL
+                 ELSE ROUND(EXTRACT(EPOCH FROM (finished_at - started_at)) * 1000)::bigint
+            END AS duration_ms,
+            summary, error_message
+       FROM (
+         SELECT automation_runs.*,
+                ROW_NUMBER() OVER (PARTITION BY module_key ORDER BY started_at DESC) AS row_number
+           FROM automation_runs
+          WHERE ${where}
+       ) runs
+      WHERE row_number <= $${recentParams.length}
+      ORDER BY started_at DESC`,
+    recentParams,
+  );
+
+  const failureParams = [...statsParams, 20];
+  const failureRows = await pool.query<AutomationDebugDbRow>(
+    `SELECT id, module_key, status, started_at, finished_at,
+            CASE WHEN finished_at IS NULL THEN NULL
+                 ELSE ROUND(EXTRACT(EPOCH FROM (finished_at - started_at)) * 1000)::bigint
+            END AS duration_ms,
+            summary, error_message
+       FROM automation_runs
+      WHERE ${where}
+        AND status IN ('FAILED', 'PARTIAL')
+      ORDER BY started_at DESC
+      LIMIT $${failureParams.length}`,
+    failureParams,
+  );
+
+  const stats = statsResult.rows[0];
+  const moduleStats = new Map(moduleResult.rows.map((row) => [row.module_key, row]));
+  const runsByModule = new Map<string, AutomationDebugRun[]>();
+  const recentRuns = recentRows.rows.map((row) => {
+    const run = normalizeAutomationDebugRun(row, includeSummary);
+    const runs = runsByModule.get(run.moduleKey) || [];
+    runs.push(run);
+    runsByModule.set(run.moduleKey, runs);
+    return run;
+  });
+  const modules = moduleDefinitions(filter).map((definition) => {
+    const row = moduleStats.get(definition.key);
+    const runs = runsByModule.get(definition.key) || [];
+    return {
+      key: definition.key,
+      label: definition.label,
+      description: definition.description,
+      coverage: row ? "OBSERVED" : "NO_RUN",
+      runCount: numeric(row?.total_runs) ?? 0,
+      counts: {
+        success: numeric(row?.success_count) ?? 0,
+        partial: numeric(row?.partial_count) ?? 0,
+        failed: numeric(row?.failed_count) ?? 0,
+        running: numeric(row?.running_count) ?? 0,
+        skipped: numeric(row?.skipped_count) ?? 0,
+      },
+      averageDurationMs: numeric(row?.average_duration_ms) ?? 0,
+      latestStartedAt: iso(row?.latest_started_at),
+      runs,
+    };
+  });
+  const observedModuleKeys = modules.filter((module) => module.coverage === "OBSERVED").map((module) => module.key);
+  const totalRuns = numeric(stats?.total_runs) ?? 0;
+  const successCount = numeric(stats?.success_count) ?? 0;
+
+  return {
+    ok: true,
+    queriedAt: new Date().toISOString(),
+    filters: { module: filter.moduleKey || null, status: filter.status || null, since: iso(filter.since), until: iso(filter.until), limit, includeSummary },
+    totals: {
+      runs: totalRuns,
+      success: successCount,
+      partial: numeric(stats?.partial_count) ?? 0,
+      failed: numeric(stats?.failed_count) ?? 0,
+      running: numeric(stats?.running_count) ?? 0,
+      skipped: numeric(stats?.skipped_count) ?? 0,
+      successRate: totalRuns ? Number((successCount / totalRuns * 100).toFixed(2)) : 0,
+      averageDurationMs: numeric(stats?.average_duration_ms) ?? 0,
+      latestStartedAt: iso(stats?.latest_started_at),
+    },
+    coverage: {
+      configuredModuleCount: modules.length,
+      observedModuleCount: observedModuleKeys.length,
+      noRunModuleKeys: modules.filter((module) => module.coverage === "NO_RUN").map((module) => module.key),
+    },
+    modules,
+    recentRuns,
+    failures: failureRows.rows.map((row) => normalizeAutomationDebugRun(row, includeSummary)),
+  };
+}
