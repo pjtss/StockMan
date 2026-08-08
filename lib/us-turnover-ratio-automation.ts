@@ -8,7 +8,7 @@ import { enqueueDiscordDelivery } from "@/lib/discord-delivery-queue";
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
-import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
+import { recordSkippedAutomationRun, startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
 import { loadLatestUsTradeIntensity } from "@/lib/us-trade-intensity-repository";
 import { ensureUsInstrument } from "@/lib/us-instruments";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
@@ -140,6 +140,12 @@ async function executeUsTurnoverRatioAutomation() {
 }
 
 export async function runUsTurnoverRatioAutomation() {
+  const moduleSettings = await loadFeatureModuleSettings("us-turnover-ratio");
+  const skipReason = !moduleSettings.enabled ? "disabled" : !isWithinSchedule(moduleSettings, new Date()) ? "outside_schedule" : null;
+  if (skipReason) {
+    await recordSkippedAutomationRun("us-turnover-ratio", skipReason);
+    return { skipped: true, reason: skipReason, sent: 0 };
+  }
   const runId = await startAutomationRun("us-turnover-ratio");
   try {
     const result = await executeUsTurnoverRatioAutomation();
