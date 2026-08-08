@@ -4,11 +4,13 @@ import { getAutomationIntervalSeconds, saveAutomationIntervalSeconds, getMfiThre
 
 export async function GET() {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json({ intervalSeconds: await getAutomationIntervalSeconds(), mfiThreshold: await getMfiThreshold() });
+  console.warn("[Legacy API] GET /api/admin/automation-settings");
+  return NextResponse.json({ intervalSeconds: await getAutomationIntervalSeconds(), mfiThreshold: await getMfiThreshold() }, { headers: { Deprecation: "true", Link: "</api/admin/feature-modules>; rel=successor-version" } });
 }
 
 export async function PATCH(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  console.warn("[Legacy API] PATCH /api/admin/automation-settings");
   const body = await request.json().catch(() => ({}));
   if (body.mfiThreshold !== undefined) {
     const threshold = Number(body.mfiThreshold);

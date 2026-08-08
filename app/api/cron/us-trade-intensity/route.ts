@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
-import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { isWithinSchedule } from "@/lib/schedule-time";
 import { withAutomationLock } from "@/lib/automation-lock";
 import { loadUsTurnoverSymbols } from "@/lib/us-turnover-symbols";
 import { collectUsTradeIntensity } from "@/lib/us-trade-intensity-collector";

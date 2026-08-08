@@ -4,7 +4,7 @@ import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
-import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { isWithinSchedule } from "@/lib/schedule-time";
 import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 import { withAutomationRun } from "@/lib/automation-run";
 

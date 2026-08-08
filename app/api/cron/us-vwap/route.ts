@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
-import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { isWithinSchedule } from "@/lib/schedule-time";
 import { withAutomationLock } from "@/lib/automation-lock";
 import { runUsVwapAutomation } from "@/lib/us-vwap";
 import { withAutomationRun } from "@/lib/automation-run";

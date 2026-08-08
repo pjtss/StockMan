@@ -7,12 +7,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  console.warn("[Legacy API] GET /api/admin/flags");
   const flags = await loadAdminFeatureFlags();
   return NextResponse.json({
     flags,
     features: ADMIN_FEATURES,
     configured: isAdminConfigured(),
-  });
+  }, { headers: { Deprecation: "true", Link: "</api/admin/feature-modules>; rel=successor-version" } });
 }
 
 export async function PATCH(request: Request) {
@@ -20,6 +21,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  console.warn("[Legacy API] PATCH /api/admin/flags");
   const body = await request.json().catch(() => ({}));
   const key = String(body.key ?? "");
   const enabled = Boolean(body.enabled);

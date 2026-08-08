@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
-import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { isWithinSchedule } from "@/lib/schedule-time";
 import { withAutomationLock } from "@/lib/automation-lock";
 import { withAutomationRun } from "@/lib/automation-run";
 import { ensureSchema } from "@/lib/db";

@@ -8,7 +8,7 @@ import { buildUsTurnoverRatioDiscordPayload, sendUsTurnoverRatioToDiscord } from
 import { enqueueDiscordDelivery } from "@/lib/discord-delivery-queue";
 import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
-import { isWithinSchedule } from "@/lib/scanner-schedules";
+import { isWithinSchedule } from "@/lib/schedule-time";
 import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
 import { loadLatestUsTradeIntensity } from "@/lib/us-trade-intensity-repository";
 import { ensureUsInstrument } from "@/lib/us-instruments";
