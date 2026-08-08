@@ -55,7 +55,7 @@ export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, re
   }
 }
 
-export async function finishAutomationRun(id: number | undefined, status: "SUCCESS" | "PARTIAL" | "FAILED", summary: Record<string, unknown> = {}, errorMessage?: string) {
+export async function finishAutomationRun(id: number | undefined, status: "SUCCESS" | "PARTIAL" | "FAILED" | "SKIPPED", summary: Record<string, unknown> = {}, errorMessage?: string) {
   if (!id) return;
   const db = getDb();
   await db.update(automationRuns).set({ status, finishedAt: new Date(), summary, errorMessage: errorMessage || null }).where(eq(automationRuns.id, id));

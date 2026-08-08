@@ -143,7 +143,7 @@ export async function runUsTurnoverRatioAutomation() {
   const runId = await startAutomationRun("us-turnover-ratio");
   try {
     const result = await executeUsTurnoverRatioAutomation();
-    await finishAutomationRun(runId, "SUCCESS", result);
+    await finishAutomationRun(runId, result.skipped ? "SKIPPED" : "SUCCESS", result);
     return result;
   } catch (error) {
     const diagnostics = describeError(error);
