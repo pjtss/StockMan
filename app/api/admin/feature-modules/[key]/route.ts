@@ -17,8 +17,29 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
   try {
     const { key } = await context.params;
     const body = await request.json();
+    const current = await loadFeatureModuleSettings(key as FeatureModuleKey);
+    const has = (field: string) => Object.prototype.hasOwnProperty.call(body, field);
+    const incomingFeatureSettings = body.featureSettings;
+    const featureSettings = incomingFeatureSettings === undefined
+      ? current.featureSettings
+      : {
+        ...current.featureSettings,
+        ...incomingFeatureSettings,
+        discordFormat: incomingFeatureSettings.discordFormat === undefined ? current.featureSettings?.discordFormat : { ...current.featureSettings?.discordFormat, ...incomingFeatureSettings.discordFormat },
+        evaluation: incomingFeatureSettings.evaluation === undefined ? current.featureSettings?.evaluation : { ...current.featureSettings?.evaluation, ...incomingFeatureSettings.evaluation },
+        vwapPolicy: incomingFeatureSettings.vwapPolicy === undefined ? current.featureSettings?.vwapPolicy : { ...current.featureSettings?.vwapPolicy, ...incomingFeatureSettings.vwapPolicy },
+      };
     const settings = await saveFeatureModuleSettings(key as FeatureModuleKey, {
-      enabled: Boolean(body.enabled), startTime: String(body.startTime || ""), endTime: String(body.endTime || ""), cooldownSeconds: Number(body.cooldownSeconds), intervalSeconds: body.intervalSeconds === undefined ? undefined : Number(body.intervalSeconds), activeDays: Array.isArray(body.activeDays) ? body.activeDays.map(Number) : [1, 2, 3, 4, 5], featureSettings: body.featureSettings,
+      enabled: has("enabled") ? Boolean(body.enabled) : current.enabled,
+      startTime: has("startTime") ? String(body.startTime || "") : current.startTime,
+      endTime: has("endTime") ? String(body.endTime || "") : current.endTime,
+      scheduleMode: has("scheduleMode") ? (body.scheduleMode === "weekly-range" ? "weekly-range" : "daily-window") : current.scheduleMode,
+      startDay: has("startDay") ? Number(body.startDay) : current.startDay,
+      endDay: has("endDay") ? Number(body.endDay) : current.endDay,
+      cooldownSeconds: has("cooldownSeconds") ? Number(body.cooldownSeconds) : current.cooldownSeconds,
+      intervalSeconds: has("intervalSeconds") ? Number(body.intervalSeconds) : current.intervalSeconds,
+      activeDays: Array.isArray(body.activeDays) ? body.activeDays.map(Number) : current.activeDays,
+      featureSettings,
     });
     return NextResponse.json(settings);
   } catch (error) {

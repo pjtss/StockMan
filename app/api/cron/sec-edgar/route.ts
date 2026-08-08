@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { analyzeSecSubmission, loadPendingSecEvents, loadRecentSecSubmissions, markSecEventDiscord, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { isWithinSchedule } from "@/lib/schedule-time";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-cron-secret")?.trim();
   if (!secret || secret !== process.env.CRON_SECRET) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const settings = await loadFeatureModuleSettings("sec-realtime");
+  if (!settings.enabled) return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
+  if (!isWithinSchedule(settings, new Date())) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" });
   const result = await withAutomationRun("sec-realtime", async () => {
     const ciks = (process.env.SEC_SYNC_CIKS || "").split(",").map((value) => value.replace(/\D/g, "").padStart(10, "0")).filter((value) => value !== "0000000000");
     const results = [];

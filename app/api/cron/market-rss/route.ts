@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { ingestMarketRssArticles, notifyPendingMarketRssArticles, translatePendingMarketRssArticles } from "@/lib/market-rss-pipeline";
 import { withAutomationRun } from "@/lib/automation-run";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { isWithinSchedule } from "@/lib/schedule-time";
 
 function authorized(request: Request) { return Boolean(process.env.CRON_SECRET && request.headers.get("x-cron-secret") === process.env.CRON_SECRET); }
 
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const settings = await loadFeatureModuleSettings("market-rss");
+  if (!settings.enabled) return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
+  if (!isWithinSchedule(settings, new Date())) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" });
   try {
     const result = await withAutomationRun("market-rss", async () => {
       const ingested = await ingestMarketRssArticles();

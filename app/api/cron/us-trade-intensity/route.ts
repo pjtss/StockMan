@@ -10,7 +10,7 @@ async function handle(request: Request) {
   const secret = request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret") || "";
   if (!secret || secret !== process.env.CRON_SECRET) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const settings = await loadFeatureModuleSettings("us-scanners");
+    const settings = await loadFeatureModuleSettings("us-trade-intensity");
     if (!settings.enabled || !isWithinSchedule(settings, new Date())) return NextResponse.json({ ok: true, skipped: true, reason: settings.enabled ? "outside_schedule" : "disabled" });
     const data = await withAutomationRun("us-trade-intensity", () => withAutomationLock("us-trade-intensity", async () => collectUsTradeIntensity(await loadUsTurnoverSymbols(), { maxSymbols: 10, delayMs: 350 })));
     return NextResponse.json({ ok: true, data: data ?? { skipped: true, reason: "already_running" } });

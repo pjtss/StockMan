@@ -8,6 +8,10 @@ export type CommonModuleSettings = {
   enabled: boolean;
   startTime: string;
   endTime: string;
+  scheduleMode?: "daily-window" | "weekly-range";
+  /** Optional weekly-range schedule. Omitted values keep the legacy activeDays behavior. */
+  startDay?: number;
+  endDay?: number;
   cooldownSeconds: number;
   intervalSeconds?: number;
   activeDays: number[];
@@ -30,7 +34,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30 } } },
   "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "us-daily-cache": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 43_200, activeDays: [1, 2, 3, 4, 5] },
-  "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:01", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:02", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-trade-intensity": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "short-borrow": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "discord-delivery-retry": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
@@ -40,12 +44,24 @@ export async function loadFeatureModuleSettings(key: FeatureModuleKey): Promise<
   if (!getFeatureModule(key)) throw new Error("FEATURE_MODULE_NOT_FOUND");
   const db = getDb();
   const rows = await db.select().from(featureModuleSettings).where(eq(featureModuleSettings.moduleKey, key)).limit(1);
-  return { ...defaultsByModule[key], ...((rows[0]?.settings || {}) as Partial<CommonModuleSettings>), updatedAt: rows[0]?.updatedAt?.toISOString() };
+  const settings = { ...defaultsByModule[key], ...((rows[0]?.settings || {}) as Partial<CommonModuleSettings>) };
+  return { ...settings, scheduleMode: settings.scheduleMode ?? "daily-window", updatedAt: rows[0]?.updatedAt?.toISOString() };
 }
 
 export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings: CommonModuleSettings) {
   if (!getFeatureModule(key)) throw new Error("FEATURE_MODULE_NOT_FOUND");
-  if (!/^\d{2}:\d{2}$/.test(settings.startTime) || !/^\d{2}:\d{2}$/.test(settings.endTime)) throw new Error("INVALID_SCHEDULE");
+  const validTime = (value: string) => {
+    if (!/^\d{2}:\d{2}$/.test(value)) return false;
+    const [hours, minutes] = value.split(":").map(Number);
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+  };
+  if (!validTime(settings.startTime) || !validTime(settings.endTime)) throw new Error("INVALID_SCHEDULE");
+  if (settings.scheduleMode !== undefined && settings.scheduleMode !== "daily-window" && settings.scheduleMode !== "weekly-range") throw new Error("INVALID_SCHEDULE_MODE");
+  const hasStartDay = settings.startDay !== undefined;
+  const hasEndDay = settings.endDay !== undefined;
+  if (settings.scheduleMode === "weekly-range" && (!hasStartDay || !hasEndDay)) throw new Error("INVALID_SCHEDULE_DAYS");
+  if (hasStartDay !== hasEndDay || (hasStartDay && (!Number.isInteger(settings.startDay) || !Number.isInteger(settings.endDay) || (settings.startDay as number) < 0 || (settings.startDay as number) > 6 || (settings.endDay as number) < 0 || (settings.endDay as number) > 6))) throw new Error("INVALID_SCHEDULE_DAYS");
+  if (hasStartDay && settings.startDay === settings.endDay && settings.startTime === settings.endTime) throw new Error("INVALID_SCHEDULE_RANGE");
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
   if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < 5)) throw new Error("INVALID_INTERVAL");
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");

@@ -8,6 +8,9 @@ type ModuleSettings = {
   enabled: boolean;
   startTime: string;
   endTime: string;
+  scheduleMode: "daily-window" | "weekly-range";
+  startDay: number;
+  endDay: number;
   cooldownSeconds: number;
   intervalSeconds: number;
   activeDays: number[];
@@ -22,6 +25,9 @@ const DEFAULT_SETTINGS: ModuleSettings = {
   enabled: true,
   startTime: "17:00",
   endTime: "02:00",
+  scheduleMode: "daily-window",
+  startDay: 1,
+  endDay: 5,
   cooldownSeconds: 60,
   intervalSeconds: 600,
   activeDays: [1, 2, 3, 4, 5],
@@ -38,7 +44,10 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   useEffect(() => {
     void fetch(`/api/admin/feature-modules/${moduleKey}`, { cache: "no-store" })
       .then((response) => response.json())
-      .then((value) => setSettings({ ...DEFAULT_SETTINGS, ...value, featureSettings: { ...DEFAULT_SETTINGS.featureSettings, ...value.featureSettings, discordFormat: { ...DEFAULT_SETTINGS.featureSettings?.discordFormat, ...value.featureSettings?.discordFormat }, evaluation: { ...DEFAULT_SETTINGS.featureSettings?.evaluation, ...value.featureSettings?.evaluation }, vwapPolicy: { ...DEFAULT_SETTINGS.featureSettings?.vwapPolicy, ...value.featureSettings?.vwapPolicy } } }));
+      .then((value) => {
+        const days = Array.isArray(value.activeDays) && value.activeDays.length ? value.activeDays.map(Number).sort((a: number, b: number) => a - b) : [1, 2, 3, 4, 5];
+        setSettings({ ...DEFAULT_SETTINGS, ...value, scheduleMode: value.scheduleMode === "weekly-range" ? "weekly-range" : "daily-window", startDay: Number.isInteger(value.startDay) ? Number(value.startDay) : days[0], endDay: Number.isInteger(value.endDay) ? Number(value.endDay) : days[days.length - 1], featureSettings: { ...DEFAULT_SETTINGS.featureSettings, ...value.featureSettings, discordFormat: { ...DEFAULT_SETTINGS.featureSettings?.discordFormat, ...value.featureSettings?.discordFormat }, evaluation: { ...DEFAULT_SETTINGS.featureSettings?.evaluation, ...value.featureSettings?.evaluation }, vwapPolicy: { ...DEFAULT_SETTINGS.featureSettings?.vwapPolicy, ...value.featureSettings?.vwapPolicy } } });
+      });
   }, [moduleKey]);
 
   async function save() {
@@ -57,10 +66,11 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   const updateMfiThreshold = (value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, evaluation: { ...settings.featureSettings?.evaluation, mfiThreshold: value } } });
 
   return <section className={styles.panel}>
-    <div><h2>공통 운영 설정</h2><p>ON/OFF, KST 스케줄, 활성화 요일, 알림 쿨다운은 기능별로 관리합니다.</p></div>
+    <div><h2>공통 운영 설정</h2><p>ON/OFF, KST 활성화 범위, 실행 간격, 알림 쿨다운은 기능별로 관리합니다.</p></div>
     <label className={styles.toggle}><input type="checkbox" checked={settings.enabled} onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })} /><span>기능 활성화</span></label>
-    <div className={styles.fields}><label>시작 시각<input type="time" value={settings.startTime} onChange={(event) => setSettings({ ...settings, startTime: event.target.value })} /></label><label>종료 시각<input type="time" value={settings.endTime} onChange={(event) => setSettings({ ...settings, endTime: event.target.value })} /></label><label>알림 쿨다운(초)<input type="number" min="0" value={settings.cooldownSeconds} onChange={(event) => setSettings({ ...settings, cooldownSeconds: Number(event.target.value) })} /></label>{settings.intervalSeconds !== undefined && <label>실행 간격(초)<input type="number" min="5" value={settings.intervalSeconds} onChange={(event) => setSettings({ ...settings, intervalSeconds: Number(event.target.value) })} /></label>}</div>
-    <div className={styles.fields}>{weekdays.map((label, day) => <label key={day}><input type="checkbox" checked={settings.activeDays.includes(day)} onChange={(event) => setSettings({ ...settings, activeDays: event.target.checked ? [...settings.activeDays, day].sort() : settings.activeDays.filter((value) => value !== day) })} /> {label}</label>)}</div>
+    <div className={styles.fields}><label>스케줄 방식<select value={settings.scheduleMode} onChange={(event) => setSettings({ ...settings, scheduleMode: event.target.value as ModuleSettings["scheduleMode"] })}><option value="daily-window">선택 요일마다 반복</option><option value="weekly-range">주간 연속 범위</option></select></label>{settings.scheduleMode === "weekly-range" ? <><label>시작 요일<select value={settings.startDay} onChange={(event) => setSettings({ ...settings, startDay: Number(event.target.value) })}>{weekdays.map((label, day) => <option key={day} value={day}>{label}요일</option>)}</select></label><label>시작 시각<input type="time" value={settings.startTime} onChange={(event) => setSettings({ ...settings, startTime: event.target.value })} /></label><label>종료 요일<select value={settings.endDay} onChange={(event) => setSettings({ ...settings, endDay: Number(event.target.value) })}>{weekdays.map((label, day) => <option key={day} value={day}>{label}요일</option>)}</select></label><label>종료 시각<input type="time" value={settings.endTime} onChange={(event) => setSettings({ ...settings, endTime: event.target.value })} /></label></> : <><label>시작 시각<input type="time" value={settings.startTime} onChange={(event) => setSettings({ ...settings, startTime: event.target.value })} /></label><label>종료 시각<input type="time" value={settings.endTime} onChange={(event) => setSettings({ ...settings, endTime: event.target.value })} /></label></>}<label>알림 쿨다운(초)<input type="number" min="0" value={settings.cooldownSeconds} onChange={(event) => setSettings({ ...settings, cooldownSeconds: Number(event.target.value) })} /></label>{settings.intervalSeconds !== undefined && <label>실행 간격(초)<input type="number" min="5" value={settings.intervalSeconds} onChange={(event) => setSettings({ ...settings, intervalSeconds: Number(event.target.value) })} /></label>}</div>
+    {settings.scheduleMode === "daily-window" && <div className={styles.fields}>{weekdays.map((label, day) => <label key={day}><input type="checkbox" checked={settings.activeDays.includes(day)} onChange={(event) => setSettings({ ...settings, activeDays: event.target.checked ? [...settings.activeDays, day].sort() : settings.activeDays.filter((value) => value !== day) })} /> {label}</label>)}</div>}
+    <p className={styles.scheduleHint}>KST 기준입니다. 주간 연속 범위는 시작 시점부터 종료 시점까지, 반복 방식은 선택한 요일마다 적용됩니다. 종료 시각은 포함하지 않습니다.</p>
     <label>기능 전용 Discord Webhook URL<p>비워두면 해당 기능의 환경변수 fallback을 사용합니다.</p><input type="url" value={webhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateWebhook(event.target.value)} /></label>
     <label>디버깅 전용 Discord Webhook URL<p>실패·재시도·복구 통계만 전송합니다. 비워두면 STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL을 사용합니다.</p><input type="url" value={debugWebhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateDebugWebhook(event.target.value)} /></label>
     {moduleKey === "us-daily-indicators" && <div className={styles.fields}><label>MFI 과매도 기준<input type="number" min="0" max="100" value={mfiThreshold} onChange={(event) => updateMfiThreshold(Number(event.target.value))} /></label></div>}
