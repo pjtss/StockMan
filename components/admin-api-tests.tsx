@@ -13,6 +13,15 @@ type Result = {
   [key: string]: unknown;
 };
 
+function readRequestTrace(response: Response) {
+  return {
+    requestId: response.headers.get("x-request-id"),
+    serverTiming: response.headers.get("server-timing"),
+    debugStatus: response.headers.get("x-debug-status"),
+    debugReason: response.headers.get("x-debug-reason"),
+  };
+}
+
 type RawResponse = { path: string; value: string };
 
 function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawResponse[] = []) {
@@ -224,15 +233,16 @@ export function AdminApiTests() {
               : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
+      const requestTrace = readRequestTrace(response);
       if (!response.ok) {
         const detail = data.error || data.message || data.msg1 || `HTTP ${response.status}`;
-        const errorResult = { ...(typeof data === "object" && data !== null ? data : {}), ok: false, httpStatus: response.status, endpoint: test.endpoint, query, checkedAt: new Date().toISOString() } as Result;
+        const errorResult = { ...(typeof data === "object" && data !== null ? data : {}), ok: false, httpStatus: response.status, endpoint: test.endpoint, query, requestTrace, checkedAt: new Date().toISOString() } as Result;
         setResult(errorResult);
         setActive(test.key);
         setError(`${detail} [${test.endpoint}]`);
         return;
       }
-      setResult({ ...(typeof data === "object" && data !== null ? data : {}), httpStatus: response.status });
+      setResult({ ...(typeof data === "object" && data !== null ? data : {}), httpStatus: response.status, requestTrace });
       setActive(test.key);
     } catch (testError) {
       const message = testError instanceof Error ? testError.message : String(testError);
@@ -369,6 +379,12 @@ export function AdminApiTests() {
               {String(result.httpStatus ?? result.status ?? "완료")}
             </strong>
           </div>
+          {Boolean(result.requestTrace && typeof result.requestTrace === "object") && (
+            <div className={styles.resultHeader}>
+              <span>요청 추적</span>
+              <strong>{String((result.requestTrace as { requestId?: string | null }).requestId || "자동 생성됨")} · {String((result.requestTrace as { serverTiming?: string | null }).serverTiming || "타이밍 없음")}</strong>
+            </div>
+          )}
           {Boolean(activeTest.key === "us_turnover_ratio" && result.debug && typeof result.debug === "object") && (
             <div className={styles.resultHeader}>
               <span>필터링 흐름</span>
