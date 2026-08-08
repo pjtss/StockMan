@@ -4,6 +4,7 @@ import { automationRuns } from "@/lib/schema";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 
 const STALE_RUN_AFTER_SECONDS = 15 * 60;
+const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
 
 /** Mark abandoned workers before creating a new run. */
 async function reconcileStaleRuns() {
@@ -41,15 +42,20 @@ export async function startAutomationRun(moduleKey: FeatureModuleKey) {
  * modules from modules that were never wired to the scheduler. */
 export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, reason: string, details: Record<string, unknown> = {}) {
   try {
-    const db = getDb();
-    const now = new Date();
-    await db.insert(automationRuns).values({
-      moduleKey,
-      status: "SKIPPED",
-      startedAt: now,
-      finishedAt: now,
-      summary: { skipped: true, reason, ...details },
-    });
+    const summary = JSON.stringify({ skipped: true, reason, observationWindowSeconds: SKIP_OBSERVATION_WINDOW_SECONDS, ...details });
+    await getPool().query(
+      `INSERT INTO automation_runs (module_key, status, started_at, finished_at, summary)
+       SELECT $1, 'SKIPPED', NOW(), NOW(), $3::jsonb
+        WHERE NOT EXISTS (
+          SELECT 1
+            FROM automation_runs
+           WHERE module_key = $1
+             AND status = 'SKIPPED'
+             AND summary->>'reason' = $2
+             AND started_at >= NOW() - ($4 * INTERVAL '1 second')
+        )`,
+      [moduleKey, reason, summary, SKIP_OBSERVATION_WINDOW_SECONDS],
+    );
   } catch (error) {
     console.warn(`[Automation] unable to record skipped run for ${moduleKey}:`, error instanceof Error ? error.message : error);
   }
