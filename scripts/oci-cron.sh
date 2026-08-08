@@ -21,8 +21,20 @@ run_cron_endpoint() {
   if output=$(curl --fail-with-body --silent --show-error --max-time "$timeout" \
     -H "x-cron-secret: ${CRON_SECRET}" \
     -X POST "${BASE_URL}${path}" 2>&1); then
-    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-    printf '[Cron] %s success %s\n' "$label" "$output"
+    # A few cron routes intentionally return HTTP 2xx for a controlled
+    # no-op, while other routes may expose an application-level failure in a
+    # JSON body. Classify the body so CronSummary reflects the actual result
+    # instead of treating every HTTP 2xx as success.
+    if [[ "$output" =~ \"ok\"[[:space:]]*:[[:space:]]*false ]]; then
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      printf '[Cron] %s failed application_response=%s\n' "$label" "$output" >&2
+    elif [[ "$output" =~ \"skipped\"[[:space:]]*:[[:space:]]*true ]]; then
+      SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+      printf '[Cron] %s skipped %s\n' "$label" "$output"
+    else
+      SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+      printf '[Cron] %s success %s\n' "$label" "$output"
+    fi
   else
     exit_code=$?
     FAILED_COUNT=$((FAILED_COUNT + 1))

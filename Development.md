@@ -13,6 +13,7 @@
   - cron 및 SEC 관리자 테스트는 `stage`, `errorCode`, `databaseCode`, `table`을 포함한 구조화된 오류를 반환한다. Drizzle/PostgreSQL 래핑 오류도 원인 체인을 풀어 `SCHEMA_TABLE_MISSING` 등으로 식별한다.
   - 관리자 API 테스트 화면에서 RSS 실행 모드를 선택할 수 있고, 모든 결과는 기존 JSON 복사·원본 응답 모달과 함께 확인할 수 있다.
   - OCI cron은 개별 기능의 실패로 전체 주기를 중단하지 않고 모든 엔드포인트를 계속 실행한다. 마지막에 `[CronSummary]`로 전체·성공·실패·건너뜀·소요 시간을 기록하고 하나라도 실패하면 systemd에는 실패로 반환한다.
+  - OCI cron은 HTTP 2xx만으로 성공을 단정하지 않고 JSON의 `ok:false`와 `skipped:true`도 판정해 요약 통계에 반영한다.
   - `/health-check` 화면에도 DB 연결, 스키마 준비, Flyway 버전, 누락 테이블을 구분해 표시한다.
   - OCI standalone 산출물에 `build-info.json`을 포함해 운영 `/api/health`와 `/health-check`에서 실제 Git 커밋과 빌드 시각을 확인할 수 있게 했다.
 
