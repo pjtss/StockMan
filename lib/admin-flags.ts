@@ -1,6 +1,5 @@
-import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/db";
-import { featureFlags } from "@/lib/schema";
+import { loadFeatureModuleSettings, saveFeatureModuleSettings } from "@/lib/feature-module-settings";
+import type { FeatureModuleKey } from "@/lib/feature-modules";
 
 export type AdminFeatureKey =
   | "dart_realtime"
@@ -30,26 +29,29 @@ export async function loadAdminFeatureFlags(): Promise<Record<AdminFeatureKey, b
     us_turnover_ratio: true,
   };
 
-  const db = getDb();
-  if (!db) return defaults;
-
-  const rows = await db.select().from(featureFlags);
-  for (const row of rows) {
-    if ((row.key as AdminFeatureKey) in defaults) {
-      defaults[row.key as AdminFeatureKey] = row.enabled;
-    }
-  }
+  const moduleByLegacyKey: Record<AdminFeatureKey, FeatureModuleKey> = {
+    dart_realtime: "dart-realtime",
+    sec_realtime: "sec-realtime",
+    us_scanners: "us-scanners",
+    us_turnover_trend: "us-turnover-trend",
+    us_turnover_ratio: "us-turnover-ratio",
+  };
+  await Promise.all(Object.entries(moduleByLegacyKey).map(async ([legacyKey, moduleKey]) => {
+    try { defaults[legacyKey as AdminFeatureKey] = (await loadFeatureModuleSettings(moduleKey)).enabled; } catch { /* keep safe default */ }
+  }));
   return defaults;
 }
 
 export async function setAdminFeatureFlag(key: AdminFeatureKey, enabled: boolean) {
-  const db = getDb();
-  if (!db) throw new Error("Database connection is not available.");
-
-  await db.insert(featureFlags)
-    .values({ key, enabled, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: featureFlags.key,
-      set: { enabled, updatedAt: new Date() },
-    });
+  const moduleByLegacyKey: Record<AdminFeatureKey, FeatureModuleKey> = {
+    dart_realtime: "dart-realtime",
+    sec_realtime: "sec-realtime",
+    us_scanners: "us-scanners",
+    us_turnover_trend: "us-turnover-trend",
+    us_turnover_ratio: "us-turnover-ratio",
+  };
+  const moduleKey = moduleByLegacyKey[key];
+  if (!moduleKey) throw new Error("Unknown feature flag");
+  const current = await loadFeatureModuleSettings(moduleKey);
+  await saveFeatureModuleSettings(moduleKey, { ...current, enabled });
 }
