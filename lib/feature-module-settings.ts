@@ -29,7 +29,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30 } } },
   "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
-  "us-daily-cache": { enabled: true, startTime: "08:00", endTime: "08:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-daily-cache": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 43_200, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:01", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-trade-intensity": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "short-borrow": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
