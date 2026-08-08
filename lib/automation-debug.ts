@@ -79,6 +79,12 @@ export function redactDebugValue(value: unknown, key = ""): unknown {
 export function normalizeAutomationDebugRun(row: AutomationDebugDbRow, includeSummary = true, staleAfterSeconds = DEFAULT_STALE_AFTER_SECONDS): AutomationDebugRun {
   const durationMs = numeric(row.duration_ms);
   const stale = row.status === "RUNNING" && durationMs !== null && durationMs >= staleAfterSeconds * 1000;
+  const summaryDiagnostics = row.summary && typeof row.summary === "object" && !Array.isArray(row.summary)
+    ? (row.summary as Record<string, unknown>).diagnostics
+    : null;
+  const hasSummaryDiagnostics = summaryDiagnostics && typeof summaryDiagnostics === "object" && !Array.isArray(summaryDiagnostics)
+    && typeof (summaryDiagnostics as Record<string, unknown>).errorCode === "string"
+    && typeof (summaryDiagnostics as Record<string, unknown>).message === "string";
   const normalized: AutomationDebugRun = {
     id: Number(row.id),
     moduleKey: row.module_key,
@@ -89,7 +95,8 @@ export function normalizeAutomationDebugRun(row: AutomationDebugDbRow, includeSu
     stale,
     errorMessage: row.error_message,
   };
-  if (row.error_message) normalized.errorDiagnostics = describeError(row.error_message);
+  if (hasSummaryDiagnostics) normalized.errorDiagnostics = summaryDiagnostics as ErrorDiagnostics;
+  else if (row.error_message) normalized.errorDiagnostics = describeError(row.error_message);
   if (includeSummary) normalized.summary = redactDebugValue(row.summary);
   return normalized;
 }

@@ -48,5 +48,17 @@ describe("automation debug diagnostics", () => {
       error_message: null,
     });
     expect(stale.stale).toBe(true);
+
+    const reconciled = normalizeAutomationDebugRun({
+      id: 44,
+      module_key: "us-obv",
+      status: "FAILED",
+      started_at: "2026-08-08T00:00:00.000Z",
+      finished_at: "2026-08-08T00:16:00.000Z",
+      duration_ms: "960000",
+      summary: { diagnostics: { errorCode: "AUTOMATION_RUN_STALE", message: "worker stopped" } },
+      error_message: "The worker stopped before finalizing the run",
+    });
+    expect(reconciled.errorDiagnostics).toMatchObject({ errorCode: "AUTOMATION_RUN_STALE" });
   });
 });

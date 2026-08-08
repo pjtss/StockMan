@@ -24,4 +24,9 @@ describe("error-diagnostics", () => {
   it("classifies Discord server failures", () => {
     expect(describeError(new Error("US OBV Discord failed with HTTP 503")).errorCode).toBe("DISCORD_WEBHOOK_SERVER_ERROR");
   });
+
+  it("classifies KIS rate-limit and authentication failures", () => {
+    expect(describeError(new Error("KIS_NEWS_API_ERROR:EGW00201:초당 거래건수를 초과하였습니다.")).errorCode).toBe("KIS_RATE_LIMIT");
+    expect(describeError(new Error("KIS request failed EGW00123 AUTH error")).errorCode).toBe("KIS_AUTH_ERROR");
+  });
 });

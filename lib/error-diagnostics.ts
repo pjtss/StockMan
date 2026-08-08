@@ -46,6 +46,12 @@ export function describeError(error: unknown): ErrorDiagnostics {
           ? "DISCORD_WEBHOOK_RATE_LIMIT"
           : /Discord.*HTTP\s+5\d{2}/i.test(allMessages)
             ? "DISCORD_WEBHOOK_SERVER_ERROR"
+        : /EGW00201|초당 거래건수를 초과|rate limit/i.test(allMessages)
+          ? "KIS_RATE_LIMIT"
+          : /EGW00123|AUTH(?:ORIZATION)?(?:\s+ERROR)?|인증.*오류/i.test(allMessages)
+            ? "KIS_AUTH_ERROR"
+            : /KIS_[A-Z0-9_]+_API_ERROR|KIS API/i.test(allMessages)
+              ? "KIS_API_ERROR"
         : "INTEGRATION_ERROR";
   const message = rawMessage.replace(/(?:postgres(?:ql)?:\/\/)[^\s)]+/gi, "postgresql://[redacted]");
   return { errorCode, message, databaseCode, table, column, constraint };
