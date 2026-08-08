@@ -1,4 +1,5 @@
 import type { AlertItem } from "./types";
+import { loadFeatureDiscordWebhook } from "./discord-config";
 
 type DiscordWebhookPayload = {
   content: string;
@@ -62,7 +63,7 @@ export function buildDartDiscordWebhookPayload(alert: AlertItem): DiscordWebhook
 }
 
 export async function sendDartAlertToDiscord(alert: AlertItem): Promise<DartDiscordSendResult> {
-  const webhookUrl = getDartDiscordWebhookUrl();
+  const webhookUrl = await loadFeatureDiscordWebhook("dart-realtime", ["DART_DISCORD_WEBHOOK_URL"]);
   if (!webhookUrl) {
     throw new Error("DART_DISCORD_WEBHOOK_URL is not configured");
   }

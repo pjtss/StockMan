@@ -1,4 +1,5 @@
 import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 type Signal = { market: string; code: string; name?: string; [key: string]: unknown };
 
@@ -8,7 +9,7 @@ function line(signal: Signal, metric: string) {
 }
 
 export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?: Signal[]; macd?: Signal[]; obv?: Signal[] }) {
-  const webhook = getUsDailyIndicatorsWebhook();
+  const webhook = await loadFeatureDiscordWebhook("us-daily-indicators", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   const sections = [
     input.mfi?.length ? `**MFI 과매도 후보**\n${input.mfi.slice(0, 20).map((item) => line(item, "mfi")).join("\n")}` : "",

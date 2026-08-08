@@ -230,7 +230,7 @@ export function isSecDiscordConfigured() {
 }
 
 export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<DiscordSendResult> {
-  const webhookUrl = getDiscordWebhookUrl();
+  const webhookUrl = await loadFeatureDiscordWebhook("sec-realtime", ["MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL"]);
   if (!webhookUrl) {
     throw new Error("SEC_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL is not configured");
   }
@@ -253,3 +253,4 @@ export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<
     responseText,
   };
 }
+import { loadFeatureDiscordWebhook } from "./discord-config";
