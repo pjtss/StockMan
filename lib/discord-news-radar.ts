@@ -1,5 +1,6 @@
 import type { AlertItem } from "./types";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export type NewsRadarDiscordContext = {
   rate: number | null;
@@ -52,7 +53,7 @@ export function buildNewsRadarDiscordPayload(alert: AlertItem, context: NewsRada
 }
 
 export async function sendNewsRadarAlertToDiscord(alert: AlertItem, context: NewsRadarDiscordContext): Promise<NewsRadarDiscordSendResult> {
-  const configured = webhookUrl();
+  const configured = await loadFeatureDiscordWebhook("us-news-radar", ["NEWS_RADAR_DISCORD_WEBHOOK_URL"]);
   if (!configured) throw new Error("NEWS_RADAR_DISCORD_WEBHOOK_URL is not configured");
   const url = new URL(configured);
   url.searchParams.set("wait", "true");

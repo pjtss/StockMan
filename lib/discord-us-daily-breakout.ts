@@ -1,9 +1,10 @@
 import type { UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
 import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutResult[]) {
-  const webhook = getUsDailyIndicatorsWebhook() || process.env.US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL?.trim() || "";
+  const webhook = await loadFeatureDiscordWebhook("us-daily-breakout", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   if (!items.length) return { ok: true, sent: 0 };
   const content = items.map((item) => [

@@ -12,6 +12,7 @@ import { isWithinSchedule } from "@/lib/scanner-schedules";
 import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-repository";
 import { loadLatestUsTradeIntensity } from "@/lib/us-trade-intensity-repository";
 import { ensureUsInstrument } from "@/lib/us-instruments";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export function meetsTradingValueIncreaseAlert(value: number | null, threshold: number) {
   return value !== null && Number.isFinite(value) && value >= threshold;
@@ -105,8 +106,9 @@ async function executeUsTurnoverRatioAutomation() {
   const stateCounts = snapshotStateCounts(trendedItems);
   const filterFailureCounts = result.debug?.filterFailureCounts ?? {};
   if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: alertItems.length, snapshotCount: trendedItems.length, newCount: 0, increaseCount: 0, stateCounts, filterFailureCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
-  const newWebhook = process.env.US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL?.trim() || "";
-  const increaseWebhook = process.env.US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL?.trim() || "";
+  const unifiedWebhook = await loadFeatureDiscordWebhook("us-turnover-ratio", ["US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL"]);
+  const newWebhook = unifiedWebhook;
+  const increaseWebhook = unifiedWebhook;
   if (pendingNew.length > 0 && !newWebhook || pendingIncrease.length > 0 && !increaseWebhook) {
     return { skipped: true, reason: "webhook_missing_after_snapshot", sent: 0, matched: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
   }
