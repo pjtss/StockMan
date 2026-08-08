@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { getTodayDartBullishFeed, syncDartAlerts } from "@/lib/alerts";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 import { isDartOpen } from "@/lib/scanner-hours";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const flags = await loadAdminFeatureFlags();
-    if (!flags.dart_realtime) {
+    if (!(await isFeatureModuleEnabled("dart-realtime"))) {
       return NextResponse.json({ error: "DART 기능이 관리자에 의해 비활성화되었습니다.", disabled: true }, { status: 503 });
     }
     if (!(await isDartOpen())) {

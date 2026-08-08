@@ -1,12 +1,11 @@
 import { FeatureDisabled } from "@/components/feature-disabled";
 import { UsTurnoverTrend } from "@/components/us-turnover-trend";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsTurnoverTrendPage() {
-  const flags = await loadAdminFeatureFlags();
-  if (!flags.us_turnover_trend) {
+  if (!(await isFeatureModuleEnabled("us-turnover-trend"))) {
     return (
       <FeatureDisabled
         current="scanners-us"

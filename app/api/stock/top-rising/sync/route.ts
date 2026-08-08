@@ -4,14 +4,13 @@ import { sendPushAlerts } from "@/lib/push";
 import { runWithKisUsDebugCapture } from "@/lib/kis-us-debug";
 import type { AlertItem } from "@/lib/types";
 import { isUsTopRisingOpen } from "@/lib/scanner-hours";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const flags = await loadAdminFeatureFlags();
-    if (!flags.us_scanners) {
+    if (!(await isFeatureModuleEnabled("us-scanners"))) {
       return NextResponse.json(
         { success: false, error: "미국 스캐너 기능이 관리자에 의해 비활성화되었습니다." },
         { status: 503 },

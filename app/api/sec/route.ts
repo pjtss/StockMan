@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { getTodaySecBullishFeed, syncSecAlerts } from "@/lib/sec-alerts";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const flags = await loadAdminFeatureFlags();
-  if (!flags.sec_realtime) {
+  if (!(await isFeatureModuleEnabled("sec-realtime"))) {
     return NextResponse.json(
       { error: "SEC 공시 기능은 현재 비활성화 상태입니다.", disabled: true },
       { status: 503 },

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { ensureSchema } from "@/lib/db";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { sendPushAlerts } from "@/lib/push";
 import { syncTopRisingStocks } from "@/lib/kis-us";
 import type { AlertItem } from "@/lib/types";
@@ -18,15 +17,14 @@ export async function POST(request: Request) {
 
   try {
     await ensureSchema();
-    const flags = await loadAdminFeatureFlags();
     let settings;
     try {
       settings = await loadFeatureModuleSettings("us-scanners");
     } catch (error) {
-      console.warn("[OCI Cron] scanner feature settings unavailable; using legacy behavior", error instanceof Error ? error.message : error);
+      console.warn("[OCI Cron] scanner feature settings unavailable; using default settings", error instanceof Error ? error.message : error);
       settings = { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] };
     }
-    if (!flags.us_scanners || !settings.enabled) {
+    if (!settings.enabled) {
       return NextResponse.json({ ok: true, skipped: true, reason: "disabled", sent: 0 });
     }
     if (!isWithinSchedule(settings)) return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule", sent: 0 });

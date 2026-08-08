@@ -1,13 +1,11 @@
 import { FeatureDisabled } from "@/components/feature-disabled";
 import { TopRisingScanner } from "@/components/top-rising-scanner";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 
 export const dynamic = "force-dynamic";
 
 export default async function TopRisingPage() {
-  const flags = await loadAdminFeatureFlags();
-
-  if (!flags.us_scanners) {
+  if (!(await isFeatureModuleEnabled("us-scanners"))) {
     return (
       <FeatureDisabled
         current="scanners-us"

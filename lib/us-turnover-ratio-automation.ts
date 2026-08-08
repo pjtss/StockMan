@@ -1,7 +1,6 @@
 import { inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { alertEvents, usTurnoverRatioSnapshotAttempts } from "@/lib/schema";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { fetchUsTurnoverRatioScanner, type UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import { saveAndCalculateUsTurnoverRatioTrends, type UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
 import { buildUsTurnoverRatioDiscordPayload, sendUsTurnoverRatioToDiscord } from "@/lib/discord-us-turnover-ratio";
@@ -35,9 +34,8 @@ function snapshotStateCounts(items: UsTurnoverRatioItemWithTrend[]) {
 }
 
 async function executeUsTurnoverRatioAutomation() {
-  const flags = await loadAdminFeatureFlags();
   const moduleSettings = await loadFeatureModuleSettings("us-turnover-ratio");
-  if (!flags.us_turnover_ratio || !moduleSettings.enabled) return { skipped: true, reason: "disabled", sent: 0 };
+  if (!moduleSettings.enabled) return { skipped: true, reason: "disabled", sent: 0 };
   if (!isWithinSchedule(moduleSettings, new Date())) return { skipped: true, reason: "outside_schedule", sent: 0 };
   const result = await fetchUsTurnoverRatioScanner({ excd: "AMS" }, ["AMS", "NAS", "NYS"], { includeBelowMinTurnover: true });
   if (!result) throw new Error("KIS access token is unavailable");

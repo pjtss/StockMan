@@ -1,4 +1,3 @@
-import { loadAdminFeatureFlags } from "./admin-flags";
 import { runDartAutomation } from "./dart-automation";
 import { isDartOpen } from "./scanner-hours";
 import { runSecAutomation } from "./sec-automation";
@@ -13,15 +12,12 @@ export type FilingSyncResult = {
 };
 
 export async function runFilingSync(): Promise<FilingSyncResult> {
-  const flags = await loadAdminFeatureFlags();
-  // The legacy flags remain a compatibility gate while the feature-module
-  // settings become the authoritative per-feature operational controls.
   const loadSettings = async (key: "dart-realtime" | "sec-realtime") => {
     try {
       return await loadFeatureModuleSettings(key);
     } catch (error) {
-      console.warn(`[FilingSync] feature settings unavailable for ${key}; using legacy behavior`, error instanceof Error ? error.message : error);
-      return { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [0, 1, 2, 3, 4, 5, 6] };
+      console.warn(`[FilingSync] feature settings unavailable for ${key}; using default settings`, error instanceof Error ? error.message : error);
+      return { enabled: key !== "sec-realtime", startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [0, 1, 2, 3, 4, 5, 6] };
     }
   };
   const dartSettings = await loadSettings("dart-realtime");
@@ -30,22 +26,22 @@ export async function runFilingSync(): Promise<FilingSyncResult> {
   const dartInWindow = isWithinSchedule(dartSettings);
   const secInWindow = isWithinSchedule(secSettings);
 
-  const dart = flags.dart_realtime && dartSettings.enabled && dartInWindow && dartOpen
+  const dart = dartSettings.enabled && dartInWindow && dartOpen
     ? await withAutomationRun("dart-realtime", runDartAutomation)
     : {
         skipped: true,
-        reason: !flags.dart_realtime || !dartSettings.enabled
+        reason: !dartSettings.enabled
           ? "DART disabled by admin"
           : !dartInWindow || !dartOpen
           ? "DART disabled outside schedule"
           : "DART disabled outside schedule",
       };
 
-  const sec = flags.sec_realtime && secSettings.enabled && secInWindow
+  const sec = secSettings.enabled && secInWindow
     ? await withAutomationRun("sec-realtime", runSecAutomation)
     : {
         skipped: true,
-        reason: !flags.sec_realtime || !secSettings.enabled
+        reason: !secSettings.enabled
           ? "SEC disabled by admin"
           : "SEC disabled outside schedule",
       };

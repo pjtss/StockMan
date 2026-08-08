@@ -3,17 +3,15 @@ import { ensureSchema } from "../../lib/db";
 import { sendPushAlerts } from "../../lib/push";
 import { syncTopRisingStocks } from "../../lib/kis-us";
 import type { AlertItem } from "../../lib/types";
-import { loadAdminFeatureFlags } from "../../lib/admin-flags";
+import { isFeatureModuleEnabled } from "../../lib/feature-module-gates";
 
 export const handler = schedule("*/1 * * * *", async () => {
   try {
     await ensureSchema();
-    const flags = await loadAdminFeatureFlags();
-
     // DART/SEC filings are handled by sync-filings. This job only handles KIS alerts.
     let risingSent = 0;
     try {
-      if (!flags.us_scanners) {
+      if (!(await isFeatureModuleEnabled("us-scanners"))) {
         throw new Error("US scanners disabled by admin");
       }
       const newlyAdded = await syncTopRisingStocks();

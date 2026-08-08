@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { withAutomationLock } from "@/lib/automation-lock";
@@ -11,8 +10,6 @@ async function handle(request: Request) {
   const secret = request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret") || "";
   if (!secret || secret !== process.env.CRON_SECRET) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const flags = await loadAdminFeatureFlags();
-    if (!flags.us_scanners) return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
     const settings = await loadFeatureModuleSettings("us-scanners");
     if (!settings.enabled || !isWithinSchedule(settings, new Date())) return NextResponse.json({ ok: true, skipped: true, reason: settings.enabled ? "outside_schedule" : "disabled" });
     const data = await withAutomationRun("us-trade-intensity", () => withAutomationLock("us-trade-intensity", async () => collectUsTradeIntensity(await loadUsTurnoverSymbols(), { maxSymbols: 10, delayMs: 350 })));

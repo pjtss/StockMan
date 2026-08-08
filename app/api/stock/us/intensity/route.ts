@@ -4,7 +4,7 @@ import { usIntensityStocks, kisCache } from "@/lib/schema";
 import { syncUsTradingIntensityStocks } from "@/lib/kis-us";
 import { eq } from "drizzle-orm";
 import { isUsScannerOpen } from "@/lib/scanner-hours";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,7 @@ export async function GET() {
   headers.set("Cache-Control", "no-store, max-age=0");
 
   try {
-    const flags = await loadAdminFeatureFlags();
-    if (!flags.us_scanners) {
+    if (!(await isFeatureModuleEnabled("us-scanners"))) {
       headers.set("x-debug-status", "disabled");
       headers.set("x-debug-reason", "US scanner disabled by admin.");
       return NextResponse.json({ error: "US scanner disabled by admin" }, { status: 503, headers });

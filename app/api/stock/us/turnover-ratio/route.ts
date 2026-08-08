@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 import { isUsTurnoverRatioOpen } from "@/lib/scanner-hours";
 import { fetchUsTurnoverRatioScanner } from "@/lib/us-turnover-ratio";
 import { saveAndCalculateUsTurnoverRatioTrends } from "@/lib/us-turnover-ratio-trend";
@@ -7,8 +7,7 @@ import { saveAndCalculateUsTurnoverRatioTrends } from "@/lib/us-turnover-ratio-t
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const flags = await loadAdminFeatureFlags();
-  if (!flags.us_turnover_ratio) {
+  if (!(await isFeatureModuleEnabled("us-turnover-ratio"))) {
     return NextResponse.json({ error: "시총 대비 거래대금 스캐너가 비활성화되어 있습니다." }, { status: 503 });
   }
   if (!(await isUsTurnoverRatioOpen())) {

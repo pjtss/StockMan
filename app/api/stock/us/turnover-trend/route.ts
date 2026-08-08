@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { loadAdminFeatureFlags } from "@/lib/admin-flags";
+import { isFeatureModuleEnabled } from "@/lib/feature-module-gates";
 import { fetchUsMinuteTurnover } from "@/lib/kis-us-minute-turnover";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const flags = await loadAdminFeatureFlags();
-  if (!flags.us_turnover_trend) {
+  if (!(await isFeatureModuleEnabled("us-turnover-trend"))) {
     return NextResponse.json({ error: "해외주식 거래대금 추이 기능이 비활성화되었습니다." }, { status: 503 });
   }
 
