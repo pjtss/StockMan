@@ -11,6 +11,8 @@ type Run = {
   status: string;
   startedAt: string;
   finishedAt?: string | null;
+  durationMs?: number | null;
+  observability?: { requestId?: string | null; cronRunId?: string | null; durationMs?: number | null };
   summary?: Record<string, unknown>;
   errorMessage?: string | null;
 };
@@ -137,6 +139,7 @@ export function AdminObservability() {
             {selected.runs.map((run) => (
               <article className={styles.run} key={run.id}>
                 <header className={styles.runHeader}><strong>{run.status}</strong><time>{formatDate(run.startedAt)}</time></header>
+                {(run.observability?.requestId || run.durationMs != null) && <p className={styles.runMeta}>requestId: {run.observability?.requestId || "-"} · duration: {run.durationMs ?? run.observability?.durationMs ?? "-"}ms</p>}
                 {run.errorMessage && <p className={styles.runError}>{run.errorMessage}</p>}
                 <pre>{JSON.stringify(run.summary || {}, null, 2)}</pre>
               </article>

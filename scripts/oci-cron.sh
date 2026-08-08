@@ -9,6 +9,7 @@ SUCCESS_COUNT=0
 FAILED_COUNT=0
 SKIPPED_COUNT=0
 START_MS="$(date +%s%3N)"
+CRON_RUN_ID="${CRON_RUN_ID:-cron-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 
 run_cron_endpoint() {
   local label="$1"
@@ -16,29 +17,37 @@ run_cron_endpoint() {
   local path="$3"
   local output
   local exit_code
+  local request_id="${CRON_RUN_ID}:${label}"
+  local endpoint_start_ms
+  local duration_ms
   TOTAL_COUNT=$((TOTAL_COUNT + 1))
+  endpoint_start_ms="$(date +%s%3N)"
 
   if output=$(curl --fail-with-body --silent --show-error --max-time "$timeout" \
     -H "x-cron-secret: ${CRON_SECRET}" \
+    -H "x-request-id: ${request_id}" \
+    -H "x-cron-run-id: ${CRON_RUN_ID}" \
     -X POST "${BASE_URL}${path}" 2>&1); then
+    duration_ms=$(( $(date +%s%3N) - endpoint_start_ms ))
     # A few cron routes intentionally return HTTP 2xx for a controlled
     # no-op, while other routes may expose an application-level failure in a
     # JSON body. Classify the body so CronSummary reflects the actual result
     # instead of treating every HTTP 2xx as success.
     if [[ "$output" =~ \"ok\"[[:space:]]*:[[:space:]]*false ]]; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      printf '[Cron] %s failed application_response=%s\n' "$label" "$output" >&2
+      printf '[Cron] %s failed requestId=%s durationMs=%s application_response=%s\n' "$label" "$request_id" "$duration_ms" "$output" >&2
     elif [[ "$output" =~ \"skipped\"[[:space:]]*:[[:space:]]*true ]]; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-      printf '[Cron] %s skipped %s\n' "$label" "$output"
+      printf '[Cron] %s skipped requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
     else
       SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-      printf '[Cron] %s success %s\n' "$label" "$output"
+      printf '[Cron] %s success requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
     fi
   else
     exit_code=$?
+    duration_ms=$(( $(date +%s%3N) - endpoint_start_ms ))
     FAILED_COUNT=$((FAILED_COUNT + 1))
-    printf '[Cron] %s failed exit=%s response=%s\n' "$label" "$exit_code" "$output" >&2
+    printf '[Cron] %s failed requestId=%s durationMs=%s exit=%s response=%s\n' "$label" "$request_id" "$duration_ms" "$exit_code" "$output" >&2
   fi
 }
 

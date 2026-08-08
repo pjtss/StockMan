@@ -23,6 +23,7 @@ export type AutomationDebugRun = {
   finishedAt: string | null;
   durationMs: number | null;
   stale: boolean;
+  observability?: { requestId?: string | null; cronRunId?: string | null; durationMs?: number | null };
   errorDiagnostics?: ErrorDiagnostics;
   summary?: unknown;
   errorMessage: string | null;
@@ -88,6 +89,9 @@ export function normalizeAutomationDebugRun(row: AutomationDebugDbRow, includeSu
   const hasSummaryDiagnostics = summaryDiagnostics && typeof summaryDiagnostics === "object" && !Array.isArray(summaryDiagnostics)
     && typeof (summaryDiagnostics as Record<string, unknown>).errorCode === "string"
     && typeof (summaryDiagnostics as Record<string, unknown>).message === "string";
+  const summaryObservability = row.summary && typeof row.summary === "object" && !Array.isArray(row.summary)
+    ? (row.summary as Record<string, unknown>).observability
+    : null;
   const normalized: AutomationDebugRun = {
     id: Number(row.id),
     moduleKey: row.module_key,
@@ -98,6 +102,14 @@ export function normalizeAutomationDebugRun(row: AutomationDebugDbRow, includeSu
     stale,
     errorMessage: row.error_message,
   };
+  if (summaryObservability && typeof summaryObservability === "object" && !Array.isArray(summaryObservability)) {
+    const value = summaryObservability as Record<string, unknown>;
+    normalized.observability = {
+      requestId: typeof value.requestId === "string" ? value.requestId : null,
+      cronRunId: typeof value.cronRunId === "string" ? value.cronRunId : null,
+      durationMs: numeric(typeof value.durationMs === "number" || typeof value.durationMs === "string" ? value.durationMs : null),
+    };
+  }
   if (hasSummaryDiagnostics) normalized.errorDiagnostics = summaryDiagnostics as ErrorDiagnostics;
   else if (row.error_message) normalized.errorDiagnostics = describeError(row.error_message);
   if (includeSummary) normalized.summary = redactDebugValue(row.summary);

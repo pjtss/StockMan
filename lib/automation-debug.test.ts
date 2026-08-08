@@ -26,6 +26,17 @@ describe("automation debug diagnostics", () => {
       error_message: "KIS failed",
     });
     expect(run).toMatchObject({ id: 42, moduleKey: "us-obv", durationMs: 1250, stale: false, errorMessage: "KIS failed", errorDiagnostics: { errorCode: "INTEGRATION_ERROR" }, summary: { error: "KIS failed" } });
+    const traced = normalizeAutomationDebugRun({
+      id: 45,
+      module_key: "us-obv",
+      status: "SUCCESS",
+      started_at: "2026-08-08T00:00:00.000Z",
+      finished_at: "2026-08-08T00:00:00.100Z",
+      duration_ms: "100",
+      summary: { observability: { requestId: "cron-1:us-obv", cronRunId: "cron-1", durationMs: 100 } },
+      error_message: null,
+    }, false);
+    expect(traced.observability).toEqual({ requestId: "cron-1:us-obv", cronRunId: "cron-1", durationMs: 100 });
     expect(normalizeAutomationDebugRun({
       id: 42,
       module_key: "us-obv",

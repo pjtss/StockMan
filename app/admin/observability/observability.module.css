@@ -29,6 +29,7 @@
 .run { padding: 12px; border: 1px solid rgba(130,150,175,.16); border-radius: 8px; background: rgba(5,11,18,.48); }
 .runHeader { display: flex; justify-content: space-between; gap: 12px; color: #dce6ef; font-size: 12px; }
 .runHeader time { color: #8497ab; font-weight: 400; }
+.runMeta { margin: 7px 0 0; color: #8497ab; font-size: 10px; overflow-wrap: anywhere; }
 .runError { margin: 9px 0 0; font-size: 12px; }
 .run pre { max-height: 280px; margin: 10px 0 0; padding: 10px; overflow: auto; border-radius: 6px; background: #050b12; color: #c7d3df; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 @keyframes spin { to { transform: rotate(360deg); } }
