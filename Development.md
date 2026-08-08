@@ -1,5 +1,20 @@
 # Development
 
+## 2026-08-08
+- **[SEC/RSS 파이프라인 통합]** SEC EDGAR RSS 중복 자동화를 제거하고 역할을 분리했다.
+  - `market-rss`가 GlobeNewswire·NASDAQ·NASDAQ Trader·SEC EDGAR·StockTitan RSS를 수집·정규화·분류·번역·Discord 전송하는 유일한 RSS 자동화 경로가 된다.
+  - `sync-filings`는 DART 자동화만 수행하고, 응답의 기존 `sec` 필드는 `market-rss`/`sec-edgar`로 위임되었음을 명시하는 호환용 skipped 결과를 반환한다.
+  - `sec-realtime`은 CIK 기반 SEC Submissions, Form/Item 분류, 선택적 Company Facts/XBRL, SEC 공시 이벤트 Discord 전송만 담당한다.
+  - SEC Submissions의 CIK·XBRL·Discord 배치 설정과 Market RSS의 출처별 활성화 설정은 관리자 기능 모듈에서 DB에 저장하고 환경변수는 fallback으로 유지한다.
+  - SEC RSS 알림은 `MARKET_RSS_DISCORD_WEBHOOK_URL`, SEC Submissions 알림은 `SEC_DISCORD_WEBHOOK_URL`로 채널 경계를 분리한다.
+  - 관리자 `/admin/observability`에서 `market-rss`와 `sec-realtime` 실행을 별도로 확인하고, `/admin/api-tests` 및 `/admin/stocktitan-rss`에서 원문·분류·등급·원본 JSON을 검증한다.
+  - `/api/health`는 DB 연결 여부와 Flyway 버전뿐 아니라 핵심 테이블별 누락 목록, 스키마 준비 상태, 최근 자동화 실행 상태를 함께 반환한다. 스키마가 불완전하면 상태를 `degraded`로 유지하고 런타임 DDL은 실행하지 않는다.
+  - RSS 관리자 테스트는 `FETCH_ONLY`(수집·번역)와 `PREVIEW`(분류·호재 등급) 모드를 분리한다. 두 모드 모두 DB 저장과 Discord 전송을 하지 않으며, 실제 저장·전송은 cron `COMMIT` 경로만 담당한다.
+  - cron 및 SEC 관리자 테스트는 `stage`, `errorCode`, `databaseCode`, `table`을 포함한 구조화된 오류를 반환한다. Drizzle/PostgreSQL 래핑 오류도 원인 체인을 풀어 `SCHEMA_TABLE_MISSING` 등으로 식별한다.
+  - 관리자 API 테스트 화면에서 RSS 실행 모드를 선택할 수 있고, 모든 결과는 기존 JSON 복사·원본 응답 모달과 함께 확인할 수 있다.
+  - OCI cron은 개별 기능의 실패로 전체 주기를 중단하지 않고 모든 엔드포인트를 계속 실행한다. 마지막에 `[CronSummary]`로 전체·성공·실패·건너뜀·소요 시간을 기록하고 하나라도 실패하면 systemd에는 실패로 반환한다.
+  - `/health-check` 화면에도 DB 연결, 스키마 준비, Flyway 버전, 누락 테이블을 구분해 표시한다.
+
 ## 2026-07-11
 - **[인증 안정화]** KIS 접근토큰의 하루 중복 발급 경로를 제거하고 DB 단일 정본 정책을 강화했다.
   - `lib/kis-token.ts`: 토큰 조회·발급·DB 저장·만료 판정·캐시 삭제를 하나의 수명주기 모듈로 분리했다.

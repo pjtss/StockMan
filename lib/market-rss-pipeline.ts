@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
-import { fetchAllMarketRss } from "./market-rss-sources";
+import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
 import { translateMarketRssItem } from "./translate-market-rss-item";
 import { LibreTranslateClient } from "./libretranslate-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
@@ -11,9 +11,9 @@ import { loadFeatureDiscordWebhook } from "./discord-config";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
-export async function ingestMarketRssArticles() {
+export async function ingestMarketRssArticles(options?: { sources?: MarketRssSource[] }) {
   const db = getDb();
-  const fetched = await fetchAllMarketRss();
+  const fetched = await fetchAllMarketRss(options?.sources);
   const secItems = fetched.results.find((result) => result.ok && result.source === "SEC_EDGAR");
   const secCiks = secItems?.ok ? secItems.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : [];
   let secTickerMap = new Map<string, string>();

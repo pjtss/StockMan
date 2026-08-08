@@ -10,6 +10,14 @@ import { processSecFiling } from "./sec-filing-processor";
 import { filterRecentSecItems } from "./sec-filters";
 import type { SecItem } from "./types";
 
+/**
+ * Legacy direct SEC RSS application service.
+ *
+ * Scheduled execution is intentionally disabled: SEC EDGAR RSS is now owned by
+ * the market-rss pipeline. This module remains available for compatibility and
+ * isolated tests until the legacy public SEC feed surface is retired.
+ */
+
 const AUTOMATION_LOOKBACK_MINUTES = 10;
 const MAX_FILINGS_PER_RUN = 1;
 
@@ -26,7 +34,7 @@ function getExternalId(item: SecItem) {
 async function getMissingConfiguration() {
   return [
     isSecAiEvaluationConfigured() ? "" : "OPENAI_API_KEY",
-    (await isSecDiscordConfigured()) ? "" : "SEC_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL",
+    (await isSecDiscordConfigured()) ? "" : "SEC_DISCORD_WEBHOOK_URL",
   ].filter(Boolean);
 }
 

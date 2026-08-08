@@ -9,6 +9,7 @@ import styles from "@/app/admin/page.module.css";
 type Result = {
   ok?: boolean;
   status?: number;
+  httpStatus?: number;
   [key: string]: unknown;
 };
 
@@ -190,6 +191,7 @@ export function AdminApiTests() {
   const [secEdgarTicker, setSecEdgarTicker] = useState("AAPL");
   const [mfiPeriod, setMfiPeriod] = useState("14");
   const [mfiThreshold, setMfiThreshold] = useState("30");
+  const [marketRssMode, setMarketRssMode] = useState<"FETCH_ONLY" | "PREVIEW">("FETCH_ONLY");
   const [copied, setCopied] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
 
@@ -217,14 +219,20 @@ export function AdminApiTests() {
                   ? `ticker=${encodeURIComponent(shortInterestTicker)}`
                 : test.key === "us_mfi"
                   ? `period=${encodeURIComponent(mfiPeriod)}&threshold=${encodeURIComponent(mfiThreshold)}`
+              : test.key === "market_rss"
+                ? `mode=${marketRssMode}&translate=true`
               : test.query;
       const response = await fetch(`${test.endpoint}${query ? `?${query}` : ""}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const detail = data.error || data.message || data.msg1 || `HTTP ${response.status}`;
-        throw new Error(`${detail} [${test.endpoint}]`);
+        const errorResult = { ...(typeof data === "object" && data !== null ? data : {}), ok: false, httpStatus: response.status, endpoint: test.endpoint, query, checkedAt: new Date().toISOString() } as Result;
+        setResult(errorResult);
+        setActive(test.key);
+        setError(`${detail} [${test.endpoint}]`);
+        return;
       }
-      setResult(data);
+      setResult({ ...(typeof data === "object" && data !== null ? data : {}), httpStatus: response.status });
       setActive(test.key);
     } catch (testError) {
       const message = testError instanceof Error ? testError.message : String(testError);
@@ -318,6 +326,16 @@ export function AdminApiTests() {
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>과매도 기준</span><input type="number" min="0" max="100" className={styles.textInput} value={mfiThreshold} onChange={(event) => setMfiThreshold(event.target.value)} /></label>
                 </div>
               )}
+              {test.key === "market_rss" && (
+                <label className={styles.inlineField}>
+                  <span className={styles.fieldLabel}>실행 모드</span>
+                  <select className={styles.textInput} value={marketRssMode} onChange={(event) => setMarketRssMode(event.target.value as "FETCH_ONLY" | "PREVIEW")}>
+                    <option value="FETCH_ONLY">FETCH_ONLY · 원문·번역 조회만</option>
+                    <option value="PREVIEW">PREVIEW · 분류·호재 등급까지</option>
+                  </select>
+                  <small className={styles.cardDesc}>관리자 테스트는 저장·Discord 전송을 하지 않습니다. 실제 자동화는 cron COMMIT 경로에서 수행됩니다.</small>
+                </label>
+              )}
 
               <div className={styles.cardActions}>
                 <button
@@ -348,7 +366,7 @@ export function AdminApiTests() {
           <div className={styles.resultHeader}>
             <span>HTTP 상태</span>
             <strong className={result.ok === false ? styles.resultError : styles.resultSuccess}>
-              {String(result.status ?? "완료")}
+              {String(result.httpStatus ?? result.status ?? "완료")}
             </strong>
           </div>
           {Boolean(activeTest.key === "us_turnover_ratio" && result.debug && typeof result.debug === "object") && (

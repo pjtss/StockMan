@@ -7,6 +7,8 @@ export type FeatureSpecificSettings = {
   shortBorrowPolicy?: Record<string, unknown>;
   evaluation?: Record<string, string | number | boolean>;
   discordFormat?: Record<string, string | number | boolean>;
+  marketRss?: { enabledSources?: string[] };
+  secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
   vwapPolicy?: { minAbovePercent: number; minVolume: number; minTradeValue: number; minPointCount: number; minTurnoverRatio: number; requireComplete: boolean };
 };
 
@@ -19,8 +21,8 @@ export type FeatureModuleDefinition = {
 
 export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "dart-realtime", label: "DART 공시 자동화", description: "OpenDART 수집·평가·알림", settingsPath: "/admin/modules/dart-realtime" },
-  { key: "sec-realtime", label: "SEC 공시 자동화", description: "SEC 원문 수집·평가·알림", settingsPath: "/admin/modules/sec-realtime" },
-  { key: "market-rss", label: "시장 RSS 통합", description: "SEC·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss" },
+  { key: "sec-realtime", label: "SEC Submissions 자동화", description: "CIK 기반 SEC Submissions·Form/Item·XBRL 수집·알림", settingsPath: "/admin/modules/sec-realtime" },
+  { key: "market-rss", label: "시장 RSS 통합", description: "SEC EDGAR·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss" },
   { key: "us-scanners", label: "미국 스캐너", description: "미국 상승률·체결강도 스캐너", settingsPath: "/admin/modules/us-scanners" },
   { key: "domestic-trade-intensity", label: "국내 체결강도", description: "국내 주식 체결강도 스캐너", settingsPath: "/admin/modules/domestic-trade-intensity" },
   { key: "us-turnover-trend", label: "해외 거래대금 추이", description: "해외주식 거래대금 추이", settingsPath: "/admin/modules/us-turnover-trend" },

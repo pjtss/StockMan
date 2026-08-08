@@ -88,6 +88,13 @@ Accept-Encoding: gzip, deflate
 
 ## StockMan 적용 원칙
 
+### 현재 파이프라인 경계
+
+- SEC EDGAR **RSS**는 `market-rss` 통합 파이프라인에서만 수집한다. `market_rss_articles`에 `source=SEC_EDGAR`로 저장되고 공통 분류·등급·번역·RSS Discord 전송을 따른다.
+- SEC EDGAR **Submissions/XBRL**은 `sec-realtime`의 `/api/cron/sec-edgar`에서 CIK 목록을 기준으로 수집한다. 결과는 `sec_companies`, `sec_submissions`, `sec_filing_events`, `sec_xbrl_snapshots`에 저장한다.
+- `sync-filings`는 DART 전용이며 SEC RSS 자동화를 호출하지 않는다. 따라서 같은 SEC RSS 공시를 두 자동화가 각각 Discord로 보내지 않도록 한다.
+- 관리자 설정은 `/admin/modules/market-rss`와 `/admin/modules/sec-realtime`, 원문·분류 테스트는 `/admin/api-tests`, 저장 결과는 `/admin/stocktitan-rss`, 실행 상태는 `/admin/observability`에서 확인한다.
+
 1. SEC 호출은 `lib/`의 단일 클라이언트 모듈로 통합한다.
 2. CIK 정규화, User-Agent 생성, rate limit, timeout, retry를 공통 모듈에서 담당한다.
 3. 수집·원문 해석·호재 분류·AI 평가·Discord 전송·처리 상태 저장을 각각 분리한다.

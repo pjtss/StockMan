@@ -30,7 +30,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     description: "기능별 자동화 실행 이력과 오류 확인",
     href: "/admin/observability",
   },
-  { id: "stocktitan-rss", group: "진단", label: "StockTitan RSS", description: "일별 원문·번역·필터·알림 디버깅", href: "/admin/stocktitan-rss" },
+  { id: "stocktitan-rss", group: "진단", label: "RSS 공시", description: "출처·호재 등급별 원문·번역·알림 디버깅", href: "/admin/stocktitan-rss" },
   {
     id: "api-config",
     group: "API",

@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { featureModuleSettings } from "@/lib/schema";
 import { getFeatureModule, type FeatureModuleKey, type FeatureSpecificSettings } from "@/lib/feature-modules";
 import type { ShortBorrowScorePolicy } from "@/lib/short-borrow-policy";
+import { MARKET_RSS_SOURCES } from "@/lib/market-rss-sources";
 
 export type CommonModuleSettings = {
   enabled: boolean;
@@ -22,7 +23,7 @@ export type CommonModuleSettings = {
 const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "dart-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "sec-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "market-rss": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
+  "market-rss": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0], featureSettings: { marketRss: { enabledSources: [...MARKET_RSS_SOURCES] } } },
   "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, intervalSeconds: 30, activeDays: [1, 2, 3, 4, 5] },
   "domestic-trade-intensity": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },

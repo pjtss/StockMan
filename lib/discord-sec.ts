@@ -221,18 +221,14 @@ export function buildSecDiscordWebhookPayload(result: SecDiscordResult): Discord
   };
 }
 
-function getDiscordWebhookUrl() {
-  return process.env.SEC_DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL || "";
-}
-
 export async function isSecDiscordConfigured() {
-  return Boolean(await loadFeatureDiscordWebhook("sec-realtime", ["MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL"]));
+  return Boolean(await loadFeatureDiscordWebhook("sec-realtime", ["SEC_DISCORD_WEBHOOK_URL"]));
 }
 
 export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<DiscordSendResult> {
-  const webhookUrl = await loadFeatureDiscordWebhook("sec-realtime", ["MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL"]);
+  const webhookUrl = await loadFeatureDiscordWebhook("sec-realtime", ["SEC_DISCORD_WEBHOOK_URL"]);
   if (!webhookUrl) {
-    throw new Error("SEC_DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URL is not configured");
+    throw new Error("SEC_DISCORD_WEBHOOK_URL is not configured");
   }
 
   const url = new URL(webhookUrl);
