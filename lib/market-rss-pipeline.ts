@@ -7,6 +7,7 @@ import { LibreTranslateClient } from "./libretranslate-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolveSecCompanyTickers } from "./sec-company-ticker";
+import { loadFeatureDiscordWebhook } from "./discord-config";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -84,7 +85,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {
-  const webhook = process.env.MARKET_RSS_DISCORD_WEBHOOK_URL;
+  const webhook = await loadFeatureDiscordWebhook("market-rss", ["MARKET_RSS_DISCORD_WEBHOOK_URL"]);
   if (!webhook) return { attempted: 0, sent: 0, skipped: true, reason: "webhook_not_configured" };
   const db = getDb();
   const now = Date.now();

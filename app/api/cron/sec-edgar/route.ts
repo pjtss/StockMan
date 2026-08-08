@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { analyzeSecSubmission, loadPendingSecEvents, loadRecentSecSubmissions, markSecEventDiscord, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
 import { withAutomationRun } from "@/lib/automation-run";
+import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-cron-secret")?.trim();
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
     const ciks = (process.env.SEC_SYNC_CIKS || "").split(",").map((value) => value.replace(/\D/g, "").padStart(10, "0")).filter((value) => value !== "0000000000");
     const results = [];
     for (const cik of ciks) { const submissions = await syncSecCompany(cik); const facts = process.env.SEC_SYNC_XBRL === "true" ? await syncSecCompanyFacts(cik) : null; results.push({ cik, submissions, facts }); }
-    const webhook = process.env.MARKET_RSS_DISCORD_WEBHOOK_URL || process.env.SEC_DISCORD_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+    const webhook = await loadFeatureDiscordWebhook("sec-realtime", ["MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "DISCORD_WEBHOOK_URL"]);
     let sent = 0;
     if (webhook) {
     const [events, submissions] = await Promise.all([loadPendingSecEvents(Number(process.env.SEC_EDGAR_DISCORD_BATCH || 10)), loadRecentSecSubmissions(100)]);
