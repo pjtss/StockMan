@@ -18,7 +18,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
     const { key } = await context.params;
     const body = await request.json();
     const settings = await saveFeatureModuleSettings(key as FeatureModuleKey, {
-      enabled: Boolean(body.enabled), startTime: String(body.startTime || ""), endTime: String(body.endTime || ""), cooldownSeconds: Number(body.cooldownSeconds), activeDays: Array.isArray(body.activeDays) ? body.activeDays.map(Number) : [1, 2, 3, 4, 5], featureSettings: body.featureSettings,
+      enabled: Boolean(body.enabled), startTime: String(body.startTime || ""), endTime: String(body.endTime || ""), cooldownSeconds: Number(body.cooldownSeconds), intervalSeconds: body.intervalSeconds === undefined ? undefined : Number(body.intervalSeconds), activeDays: Array.isArray(body.activeDays) ? body.activeDays.map(Number) : [1, 2, 3, 4, 5], featureSettings: body.featureSettings,
     });
     return NextResponse.json(settings);
   } catch (error) {
