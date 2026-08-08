@@ -13,6 +13,7 @@ type ModuleSettings = {
   activeDays: number[];
   featureSettings?: {
     discordFormat?: { webhookUrl?: string; debugWebhookUrl?: string };
+    evaluation?: { mfiThreshold?: number };
     vwapPolicy?: Record<string, number | boolean>;
   };
 };
@@ -37,7 +38,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   useEffect(() => {
     void fetch(`/api/admin/feature-modules/${moduleKey}`, { cache: "no-store" })
       .then((response) => response.json())
-      .then((value) => setSettings({ ...DEFAULT_SETTINGS, ...value, featureSettings: { ...DEFAULT_SETTINGS.featureSettings, ...value.featureSettings, discordFormat: { ...DEFAULT_SETTINGS.featureSettings?.discordFormat, ...value.featureSettings?.discordFormat }, vwapPolicy: { ...DEFAULT_SETTINGS.featureSettings?.vwapPolicy, ...value.featureSettings?.vwapPolicy } } }));
+      .then((value) => setSettings({ ...DEFAULT_SETTINGS, ...value, featureSettings: { ...DEFAULT_SETTINGS.featureSettings, ...value.featureSettings, discordFormat: { ...DEFAULT_SETTINGS.featureSettings?.discordFormat, ...value.featureSettings?.discordFormat }, evaluation: { ...DEFAULT_SETTINGS.featureSettings?.evaluation, ...value.featureSettings?.evaluation }, vwapPolicy: { ...DEFAULT_SETTINGS.featureSettings?.vwapPolicy, ...value.featureSettings?.vwapPolicy } } }));
   }, [moduleKey]);
 
   async function save() {
@@ -49,17 +50,20 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   const policy = settings.featureSettings?.vwapPolicy || {};
   const webhookUrl = settings.featureSettings?.discordFormat?.webhookUrl || "";
   const debugWebhookUrl = settings.featureSettings?.discordFormat?.debugWebhookUrl || "";
+  const mfiThreshold = settings.featureSettings?.evaluation?.mfiThreshold ?? 30;
   const updatePolicy = (key: string, value: number | boolean) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, vwapPolicy: { ...policy, [key]: value } } });
   const updateWebhook = (value: string) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, discordFormat: { ...settings.featureSettings?.discordFormat, webhookUrl: value } } });
   const updateDebugWebhook = (value: string) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, discordFormat: { ...settings.featureSettings?.discordFormat, debugWebhookUrl: value } } });
+  const updateMfiThreshold = (value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, evaluation: { ...settings.featureSettings?.evaluation, mfiThreshold: value } } });
 
   return <section className={styles.panel}>
     <div><h2>공통 운영 설정</h2><p>ON/OFF, KST 스케줄, 활성화 요일, 알림 쿨다운은 기능별로 관리합니다.</p></div>
     <label className={styles.toggle}><input type="checkbox" checked={settings.enabled} onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })} /><span>기능 활성화</span></label>
-    <div className={styles.fields}><label>시작 시각<input type="time" value={settings.startTime} onChange={(event) => setSettings({ ...settings, startTime: event.target.value })} /></label><label>종료 시각<input type="time" value={settings.endTime} onChange={(event) => setSettings({ ...settings, endTime: event.target.value })} /></label><label>알림 쿨다운(초)<input type="number" min="0" value={settings.cooldownSeconds} onChange={(event) => setSettings({ ...settings, cooldownSeconds: Number(event.target.value) })} /></label>{settings.intervalSeconds !== undefined && <label>실행 간격(초)<input type="number" min="60" value={settings.intervalSeconds} onChange={(event) => setSettings({ ...settings, intervalSeconds: Number(event.target.value) })} /></label>}</div>
+    <div className={styles.fields}><label>시작 시각<input type="time" value={settings.startTime} onChange={(event) => setSettings({ ...settings, startTime: event.target.value })} /></label><label>종료 시각<input type="time" value={settings.endTime} onChange={(event) => setSettings({ ...settings, endTime: event.target.value })} /></label><label>알림 쿨다운(초)<input type="number" min="0" value={settings.cooldownSeconds} onChange={(event) => setSettings({ ...settings, cooldownSeconds: Number(event.target.value) })} /></label>{settings.intervalSeconds !== undefined && <label>실행 간격(초)<input type="number" min="5" value={settings.intervalSeconds} onChange={(event) => setSettings({ ...settings, intervalSeconds: Number(event.target.value) })} /></label>}</div>
     <div className={styles.fields}>{weekdays.map((label, day) => <label key={day}><input type="checkbox" checked={settings.activeDays.includes(day)} onChange={(event) => setSettings({ ...settings, activeDays: event.target.checked ? [...settings.activeDays, day].sort() : settings.activeDays.filter((value) => value !== day) })} /> {label}</label>)}</div>
     <label>기능 전용 Discord Webhook URL<p>비워두면 해당 기능의 환경변수 fallback을 사용합니다.</p><input type="url" value={webhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateWebhook(event.target.value)} /></label>
     <label>디버깅 전용 Discord Webhook URL<p>실패·재시도·복구 통계만 전송합니다. 비워두면 STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL을 사용합니다.</p><input type="url" value={debugWebhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateDebugWebhook(event.target.value)} /></label>
+    {moduleKey === "us-daily-indicators" && <div className={styles.fields}><label>MFI 과매도 기준<input type="number" min="0" max="100" value={mfiThreshold} onChange={(event) => updateMfiThreshold(Number(event.target.value))} /></label></div>}
     {moduleKey === "us-vwap" && <><h3>VWAP 필터</h3><div className={styles.fields}><label>최소 상회율(%)<input type="number" min="0" step="0.1" value={Number(policy.minAbovePercent ?? 0)} onChange={(event) => updatePolicy("minAbovePercent", Number(event.target.value))} /></label><label>시총 대비 거래대금 최소(%)<input type="number" min="0" step="0.1" value={Number(policy.minTurnoverRatio ?? 0)} onChange={(event) => updatePolicy("minTurnoverRatio", Number(event.target.value))} /></label><label>최소 거래량<input type="number" min="0" value={Number(policy.minVolume ?? 0)} onChange={(event) => updatePolicy("minVolume", Number(event.target.value))} /></label><label>최소 거래대금(USD)<input type="number" min="0" value={Number(policy.minTradeValue ?? 0)} onChange={(event) => updatePolicy("minTradeValue", Number(event.target.value))} /></label><label>최소 데이터 포인트<input type="number" min="1" value={Number(policy.minPointCount ?? 1)} onChange={(event) => updatePolicy("minPointCount", Number(event.target.value))} /></label></div><label className={styles.toggle}><input type="checkbox" checked={policy.requireComplete !== false} onChange={(event) => updatePolicy("requireComplete", event.target.checked)} /><span>전체 세션 데이터 완료만 허용</span></label></>}
     <div className={styles.footer}><span>{message}</span><button onClick={() => void save()}>설정 저장</button></div>
   </section>;

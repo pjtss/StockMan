@@ -19,7 +19,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "dart-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "sec-realtime": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "market-rss": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
-  "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, intervalSeconds: 30, activeDays: [1, 2, 3, 4, 5] },
   "domestic-trade-intensity": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
@@ -27,7 +27,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
+  "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30 } } },
   "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "us-daily-cache": { enabled: true, startTime: "08:00", endTime: "08:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:01", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
@@ -47,7 +47,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (!getFeatureModule(key)) throw new Error("FEATURE_MODULE_NOT_FOUND");
   if (!/^\d{2}:\d{2}$/.test(settings.startTime) || !/^\d{2}:\d{2}$/.test(settings.endTime)) throw new Error("INVALID_SCHEDULE");
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
-  if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < 60)) throw new Error("INVALID_INTERVAL");
+  if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < 5)) throw new Error("INVALID_INTERVAL");
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
   const updatedAt = new Date();
