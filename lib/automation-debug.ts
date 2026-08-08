@@ -260,6 +260,8 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
       observedModuleCount: observedModuleKeys.length,
       noRunModuleKeys: modules.filter((module) => module.coverage === "NO_RUN").map((module) => module.key),
       notScheduledModuleKeys: modules.filter((module) => module.scheduler === "NOT_SCHEDULED").map((module) => module.key),
+      optionalSchedulerModuleKeys: modules.filter((module) => module.scheduler === "OPTIONAL_CRON").map((module) => module.key),
+      optionalButNeverObservedModuleKeys: modules.filter((module) => module.scheduler === "OPTIONAL_CRON" && module.coverage === "NO_RUN").map((module) => module.key),
       scheduledButNeverObservedModuleKeys: modules.filter((module) => module.scheduler === "OCI_CRON" && module.coverage === "NO_RUN").map((module) => module.key),
     },
     modules,

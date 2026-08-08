@@ -18,7 +18,7 @@ export type FeatureModuleDefinition = {
   description: string;
   settingsPath: string;
   /** Whether the module is invoked by the OCI cron pipeline. */
-  scheduler: "OCI_CRON" | "NOT_SCHEDULED";
+  scheduler: "OCI_CRON" | "OPTIONAL_CRON" | "NOT_SCHEDULED";
 };
 
 export const FEATURE_MODULES: FeatureModuleDefinition[] = [
@@ -30,7 +30,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "us-turnover-trend", label: "해외 거래대금 추이", description: "해외주식 거래대금 추이", settingsPath: "/admin/modules/us-turnover-trend", scheduler: "NOT_SCHEDULED" },
   { key: "us-turnover-ratio", label: "시총 대비 거래대금", description: "시총 대비 거래대금 필터·알림", settingsPath: "/admin/modules/us-turnover-ratio", scheduler: "OCI_CRON" },
   { key: "us-vwap", label: "당일 VWAP 상회", description: "당일 전체 세션 VWAP 상회 종목 탐지·Discord 알림", settingsPath: "/admin/modules/us-vwap", scheduler: "OCI_CRON" },
-  { key: "us-short-borrow", label: "공매도 대차 압박", description: "Alpaca 계정별 대차·Locate 상태", settingsPath: "/admin/modules/us-short-borrow", scheduler: "OCI_CRON" },
+  { key: "us-short-borrow", label: "공매도 대차 압박", description: "Alpaca 계정별 대차·Locate 상태", settingsPath: "/admin/modules/us-short-borrow", scheduler: "OPTIONAL_CRON" },
   { key: "us-news-radar", label: "해외 뉴스 급등주 레이더", description: "KIS 해외속보·뉴스 검증 기반 후보 탐지", settingsPath: "/admin/modules/us-news-radar", scheduler: "OCI_CRON" },
   { key: "us-breaking-news-forwarder", label: "해외 속보 Discord 전달", description: "KIS 해외 속보 원문을 별도 Discord 채널로 전달", settingsPath: "/admin/modules/us-breaking-news-forwarder", scheduler: "OCI_CRON" },
   { key: "us-daily-indicators", label: "일봉 지표 알림", description: "MFI·DMI·MACD 일봉 후보 통합 알림", settingsPath: "/admin/modules/us-daily-indicators", scheduler: "OCI_CRON" },
