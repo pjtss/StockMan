@@ -20,4 +20,8 @@ describe("error-diagnostics", () => {
     const error = Object.assign(new Error("Failed query: insert into ..."), { cause });
     expect(describeError(error)).toMatchObject({ errorCode: "DATABASE_FOREIGN_KEY_VIOLATION", databaseCode: "23503", constraint: "us_turnover_ratio_attempts_instrument_fk" });
   });
+
+  it("classifies Discord server failures", () => {
+    expect(describeError(new Error("US OBV Discord failed with HTTP 503")).errorCode).toBe("DISCORD_WEBHOOK_SERVER_ERROR");
+  });
 });

@@ -13,6 +13,13 @@ export function buildUsObvDiscordPayload(items: Array<Record<string, unknown>>) 
 export async function sendUsObvToDiscord(items: Array<Record<string, unknown>>) {
   const webhook = await loadFeatureDiscordWebhook("us-daily-indicators", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_OBV_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
-  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildUsObvDiscordPayload(items)) });
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildUsObvDiscordPayload(items)) });
+    const retryable = response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === 2) break;
+    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  if (!response) return { ok: false, status: 0, responseText: "Discord request was not made" };
   return { ok: response.ok, status: response.status, responseText: await response.text() };
 }

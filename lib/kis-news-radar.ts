@@ -11,7 +11,7 @@ import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({
   "content-type": "application/json; charset=utf-8",
-  authorization: buildKisAuthorization(token),
+  Authorization: buildKisAuthorization(token),
   appkey: process.env.KIS_APPKEY || "",
   appsecret: process.env.KIS_APPSECRET || "",
   tr_id: trId,

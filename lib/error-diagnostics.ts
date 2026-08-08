@@ -42,6 +42,10 @@ export function describeError(error: unknown): ErrorDiagnostics {
               ? "DATABASE_QUERY_TIMEOUT"
       : databaseCode === "ECONNREFUSED" || databaseCode === "ENOTFOUND" || databaseCode === "ETIMEDOUT"
         ? "DATABASE_CONNECTION_FAILED"
+        : /Discord.*HTTP\s+429/i.test(allMessages)
+          ? "DISCORD_WEBHOOK_RATE_LIMIT"
+          : /Discord.*HTTP\s+5\d{2}/i.test(allMessages)
+            ? "DISCORD_WEBHOOK_SERVER_ERROR"
         : "INTEGRATION_ERROR";
   const message = rawMessage.replace(/(?:postgres(?:ql)?:\/\/)[^\s)]+/gi, "postgresql://[redacted]");
   return { errorCode, message, databaseCode, table, column, constraint };
