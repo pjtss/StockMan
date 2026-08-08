@@ -1,5 +1,5 @@
-import { AdminFeatureFlags } from "@/components/admin-feature-flags";
+import { redirect } from "next/navigation";
 
 export default function AdminFeaturesPage() {
-  return <AdminFeatureFlags />;
+  redirect("/admin/modules");
 }

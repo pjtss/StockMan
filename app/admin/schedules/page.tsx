@@ -1,5 +1,5 @@
-import { AdminScannerSchedules } from "@/components/admin-scanner-schedules";
+import { redirect } from "next/navigation";
 
 export default function AdminSchedulesPage() {
-  return <AdminScannerSchedules />;
+  redirect("/admin/modules");
 }

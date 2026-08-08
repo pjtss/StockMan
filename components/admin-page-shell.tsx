@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   ChartNoAxesCombined,
-  Clock3,
   FlaskConical,
   LayoutDashboard,
   ListFilter,
@@ -20,8 +19,6 @@ import styles from "./admin-shell.module.css";
 
 const NAV_ICONS = {
   dashboard: LayoutDashboard,
-  features: Activity,
-  schedules: Clock3,
   "api-config": Settings2,
   "api-tests": FlaskConical,
   modules: Settings2,
