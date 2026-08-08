@@ -111,7 +111,15 @@ function removeSentimentNoise(value: string) {
 
 export function extractSecItemSections(text: string): SecDocumentSection[] {
   const body = trimAtFirstPattern(text, [/\bSIGNATURE\b/i]);
-  const matches = [...body.matchAll(/\bItem\s+(\d{1,2}\.\d{2})\s+([\s\S]*?)(?=\bItem\s+\d{1,2}\.\d{2}\b|$)/gi)];
+  // SEC filings commonly format headings as `Item 1.01: ...`, while some
+  // issuers use a space, period, parenthesis, or dash after the item number.
+  // Accept all documented/common separators so the body parser does not
+  // silently drop every section from otherwise valid 8-K documents.
+  const itemHeading = String.raw`\bItem\s+\d{1,2}\.\d{2}(?:\s*[:.)\-–—]\s*|\s+)`;
+  const matches = [...body.matchAll(new RegExp(
+    String.raw`\bItem\s+(\d{1,2}\.\d{2})(?:\s*[:.)\-–—]\s*|\s+)([\s\S]*?)(?=${itemHeading}|$)`,
+    "gi",
+  ))];
 
   return matches
     .map((match) => {
