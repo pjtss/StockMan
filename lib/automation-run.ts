@@ -1,5 +1,6 @@
 import { finishAutomationRun, startAutomationRun } from "@/lib/automation-run-repository";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
+import { describeError } from "@/lib/error-diagnostics";
 
 export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: () => Promise<T>) {
   // History is observability; it must never prevent an existing automation
@@ -15,7 +16,8 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
     await finishSafely("SUCCESS", result && typeof result === "object" ? result as Record<string, unknown> : { result });
     return result;
   } catch (error) {
-    await finishSafely("FAILED", {}, error instanceof Error ? error.message : String(error));
+    const diagnostics = describeError(error);
+    await finishSafely("FAILED", { diagnostics }, diagnostics.message);
     throw error;
   }
 }

@@ -14,4 +14,10 @@ describe("error-diagnostics", () => {
     expect(diagnostics.message).not.toContain("secret");
     expect(diagnostics.message).toContain("postgresql://[redacted]");
   });
+
+  it("classifies wrapped constraint errors for automation debugging", () => {
+    const cause = Object.assign(new Error('insert failed: violates foreign key constraint "us_turnover_ratio_attempts_instrument_fk"'), { code: "23503" });
+    const error = Object.assign(new Error("Failed query: insert into ..."), { cause });
+    expect(describeError(error)).toMatchObject({ errorCode: "DATABASE_FOREIGN_KEY_VIOLATION", databaseCode: "23503", constraint: "us_turnover_ratio_attempts_instrument_fk" });
+  });
 });

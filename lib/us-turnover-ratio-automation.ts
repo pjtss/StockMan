@@ -12,6 +12,7 @@ import { startAutomationRun, finishAutomationRun } from "@/lib/automation-run-re
 import { loadLatestUsTradeIntensity } from "@/lib/us-trade-intensity-repository";
 import { ensureUsInstrument } from "@/lib/us-instruments";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { describeError } from "@/lib/error-diagnostics";
 
 export function meetsTradingValueIncreaseAlert(value: number | null, threshold: number) {
   return value !== null && Number.isFinite(value) && value >= threshold;
@@ -44,9 +45,17 @@ async function executeUsTurnoverRatioAutomation() {
   const db = getDb();
   if (!db) throw new Error("Database connection is not available.");
   const observedAt = new Date();
+  const snapshotPersistFailures: Array<Record<string, unknown>> = [];
   for (const attempt of result.debug?.snapshotAttempts ?? []) {
-    const instrumentId = await ensureUsInstrument({ market: attempt.market, code: attempt.code, name: attempt.name });
-    await db.insert(usTurnoverRatioSnapshotAttempts).values({ ...attempt, instrumentId, observedAt });
+    try {
+      const instrumentId = await ensureUsInstrument({ market: attempt.market, code: attempt.code, name: attempt.name });
+      await db.insert(usTurnoverRatioSnapshotAttempts).values({ ...attempt, instrumentId: instrumentId ?? null, observedAt });
+    } catch (error) {
+      // Preserve the rest of the scan when one stale/malformed instrument
+      // cannot be linked. The debug API receives the exact symbol and safe
+      // database diagnostics for follow-up.
+      snapshotPersistFailures.push({ market: attempt.market, code: attempt.code, diagnostics: describeError(error) });
+    }
   }
   const settings = await loadUsTurnoverFilterSettings();
   // Persist every successful detailed quote first. Alert eligibility is a
@@ -103,12 +112,12 @@ async function executeUsTurnoverRatioAutomation() {
 
   const stateCounts = snapshotStateCounts(trendedItems);
   const filterFailureCounts = result.debug?.filterFailureCounts ?? {};
-  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: alertItems.length, snapshotCount: trendedItems.length, newCount: 0, increaseCount: 0, stateCounts, filterFailureCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+  if (pendingNew.length + pendingIncrease.length === 0) return { skipped: false, sent: 0, matched: alertItems.length, snapshotCount: trendedItems.length, newCount: 0, increaseCount: 0, stateCounts, filterFailureCounts, snapshotPersistFailureCount: snapshotPersistFailures.length, snapshotPersistFailures: snapshotPersistFailures.slice(0, 25), sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
   const unifiedWebhook = await loadFeatureDiscordWebhook("us-turnover-ratio", ["US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL"]);
   const newWebhook = unifiedWebhook;
   const increaseWebhook = unifiedWebhook;
   if (pendingNew.length > 0 && !newWebhook || pendingIncrease.length > 0 && !increaseWebhook) {
-    return { skipped: true, reason: "webhook_missing_after_snapshot", sent: 0, matched: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+    return { skipped: true, reason: "webhook_missing_after_snapshot", sent: 0, matched: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, snapshotPersistFailureCount: snapshotPersistFailures.length, snapshotPersistFailures: snapshotPersistFailures.slice(0, 25), sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
   }
   const newDiscord = pendingNew.length > 0
     ? await sendUsTurnoverRatioToDiscord(pendingNew, newWebhook)
@@ -127,7 +136,7 @@ async function executeUsTurnoverRatioAutomation() {
     const failed = [newDiscord, increaseDiscord].find((result) => result && !result.ok);
     throw new Error(`US turnover ratio Discord failed with HTTP ${failed?.status}`);
   }
-  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, snapshotCount: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, filterFailureCounts, sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
+  return { skipped: false, sent: pendingNew.length + pendingIncrease.length, matched: result.filtered.length, snapshotCount: trendedItems.length, newCount: pendingNew.length, increaseCount: pendingIncrease.length, stateCounts, filterFailureCounts, snapshotPersistFailureCount: snapshotPersistFailures.length, snapshotPersistFailures: snapshotPersistFailures.slice(0, 25), sourceCount: result.debug?.sourceCount ?? 0, priceDetailAttemptCount: result.debug?.priceDetailAttemptCount ?? 0, priceDetailSuccessCount: result.debug?.priceDetailSuccessCount ?? 0 };
 }
 
 export async function runUsTurnoverRatioAutomation() {
@@ -137,7 +146,8 @@ export async function runUsTurnoverRatioAutomation() {
     await finishAutomationRun(runId, "SUCCESS", result);
     return result;
   } catch (error) {
-    await finishAutomationRun(runId, "FAILED", {}, error instanceof Error ? error.message : String(error));
+    const diagnostics = describeError(error);
+    await finishAutomationRun(runId, "FAILED", { diagnostics }, diagnostics.message);
     throw error;
   }
 }

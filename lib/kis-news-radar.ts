@@ -6,6 +6,7 @@ import { usNewsTickerExchangeCache } from "@/lib/schema";
 import { and, eq, gte } from "drizzle-orm";
 import { scoreNewsTitle } from "@/lib/news-title-filter";
 import { ensureUsInstrument } from "@/lib/us-instruments";
+import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 const headers = (token: string, trId: string) => ({
@@ -66,10 +67,16 @@ async function cacheMarket(ticker: string, market: string) {
 async function kisGet(path: string, params: Record<string, string>, trId: string) {
   const token = await getAccessToken();
   if (!token) throw new Error("KIS_ACCESS_TOKEN_UNAVAILABLE");
-  const response = await fetch(`${BASE_URL}${path}?${new URLSearchParams(params)}`, { headers: headers(token, trId), cache: "no-store" });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body.rt_cd !== "0") throw new Error(`KIS_NEWS_API_ERROR:${body.msg_cd || response.status}:${body.msg1 || "request failed"}`);
-  return body;
+  // Radar and forwarder share the account-wide KIS request quota with all
+  // other features. Keep these calls on the same process-wide queue so two
+  // cron endpoints cannot burst concurrently and trigger EGW00201.
+  const result = await withKisRequestThrottle(async () => {
+    const response = await fetch(`${BASE_URL}${path}?${new URLSearchParams(params)}`, { headers: headers(token, trId), cache: "no-store" });
+    const body = await response.json().catch(() => ({}));
+    return { response, body };
+  });
+  if (!result.response.ok || result.body.rt_cd !== "0") throw new Error(`KIS_NEWS_API_ERROR:${result.body.msg_cd || result.response.status}:${result.body.msg1 || "request failed"}`);
+  return result.body;
 }
 
 export async function fetchBreakingNews(options: { date?: string; time?: string } = {}): Promise<KisBreakingNews[]> {
