@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { claimDueDiscordDeliveries, markDiscordDeliveryProcessing, markDiscordDeliveryRetry, markDiscordDeliverySent } from "@/lib/discord-delivery-queue";
+import { claimDueDiscordDeliveries, markDiscordDeliveryRetry, markDiscordDeliverySent } from "@/lib/discord-delivery-queue";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { getDb } from "@/lib/db";
 import { marketRssArticles } from "@/lib/schema";
@@ -32,7 +32,6 @@ export async function retryDiscordDeliveries(limit = 50) {
   const deliveries = await claimDueDiscordDeliveries(limit);
   const results = { claimed: deliveries.length, sent: 0, failed: 0, recovered: 0, repeatedFailure: 0, attempts: 0 };
   for (const delivery of deliveries) {
-    await markDiscordDeliveryProcessing(delivery.id);
     const webhook = await webhookFor(delivery.channelKey);
     try {
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
