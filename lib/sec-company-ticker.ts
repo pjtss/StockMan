@@ -30,6 +30,18 @@ export async function resolveSecCompanyTickers(ciks: string[]) {
 const nonCommonTicker = /(?:^|[-.])(UN|U|WT|W|WS|WW|RT|R|P[A-Z]?)$/i;
 const nonCommonName = /\b(?:units?|warrants?|rights?|preferred)\b/i;
 
+function isLikelyDerivative(row: SecTickerRow, candidates: SecTickerRow[]) {
+  if (nonCommonTicker.test(row.ticker) || nonCommonName.test(row.name)) return true;
+  // SEC's exchange map also contains compact SPAC unit/warrant symbols such
+  // as CSTAF/CSTUF/CSTWF without a delimiter.  Only apply this heuristic to
+  // acquisition-company issuers; ordinary symbols ending in W/F are kept.
+  if (/acquisition\s+(?:corp|company)|blank check/i.test(row.name) && /(?:AF|UF|WF)$/i.test(row.ticker)) return true;
+  // A compact W/U suffix is treated as derivative only when the same CIK has
+  // another symbol that looks like the base common share.
+  if (/[WU]$/i.test(row.ticker) && candidates.some((candidate) => candidate !== row && row.ticker.startsWith(candidate.ticker))) return true;
+  return false;
+}
+
 /**
  * Select one ordinary-share ticker per CIK for market reaction lookups.
  * The SEC mapping can contain units, warrants, rights and preferred classes
@@ -40,7 +52,7 @@ const nonCommonName = /\b(?:units?|warrants?|rights?|preferred)\b/i;
 export function selectPreferredSecCompanyTicker(rows: SecTickerRow[], cik?: string) {
   const wanted = cik ? cik.padStart(10, "0") : undefined;
   const candidates = rows.filter((row) => (!wanted || row.cik === wanted) && row.ticker);
-  const common = candidates.filter((row) => !nonCommonTicker.test(row.ticker) && !nonCommonName.test(row.name));
+  const common = candidates.filter((row) => !isLikelyDerivative(row, candidates));
   const pool = common;
   return [...pool].sort((a, b) => {
     const classRank = (ticker: string) => /-[A-Z]$/.test(ticker) ? 1 : 0;

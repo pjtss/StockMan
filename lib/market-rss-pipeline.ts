@@ -28,6 +28,10 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
     for (const item of result.feed.items) {
       const classification = classifyMarketRssItem(item);
       const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
+      // SEC filings without a preferred common-share mapping (for example
+      // trusts, units and warrants) cannot produce a useful stock alert.
+      // Keep the filing for diagnostics, but suppress the notification.
+      const notifyEligible = classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker));
       const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
       const isBacklog = Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
       const rows = await db.insert(marketRssArticles).values({
@@ -45,7 +49,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         publishedAt,
         category: classification.category,
         priority: classification.priority,
-        notifyEligible: classification.notifyEligible,
+        notifyEligible,
         isBacklog,
       }).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
         title: sql`excluded.title`, summary: sql`excluded.summary`, rawPayload: sql`excluded.raw_payload`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,

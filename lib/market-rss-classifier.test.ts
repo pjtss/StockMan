@@ -14,6 +14,13 @@ describe("market RSS classifier", () => {
   it("extracts StockTitan suffix ticker and models financing dilution", () => {
     expect(classifyMarketRssItem({ source: "STOCKTITAN", title: "red violet Announces Closing of $115 Million Underwritten Public Offering | RDVT Stock News" })).toMatchObject({ category: "FINANCING", ticker: "RDVT", direction: "MIXED", financingAmountUsd: 115000000, dilutionRisk: "HIGH", notifyEligible: true });
   });
+  it("prefers the StockTitan symbol over parenthesized clinical abbreviations", () => {
+    expect(classifyMarketRssItem({ source: "STOCKTITAN", title: "Scholar Rock Announces FDA Review of Apitegromab Biologics License Application (BLA) | SRRK Stock News" })).toMatchObject({ ticker: "SRRK", category: "ACTIONABLE", notifyEligible: true });
+  });
+  it("does not treat treatment text as an ATM financing signal", () => {
+    expect(classifyMarketRssItem({ source: "STOCKTITAN", title: "AbCellera Announces Phase 2 Clinical Trial Results for the Treatment of Moderate-to-Severe Disease | ABCL Stock News" })).toMatchObject({ category: "ACTIONABLE", ticker: "ABCL", notifyEligible: true, matchedTerms: ["clinical trial"] });
+    expect(classifyMarketRssItem({ source: "STOCKTITAN", title: "AbCellera Announces Phase 2 Clinical Trial Results for the Treatment of Moderate-to-Severe Disease | ABCL Stock News" }).dilutionRisk).toBe("UNKNOWN");
+  });
   it("does not treat an SEC issuer legal name as an actionable event", () => {
     expect(classifyMarketRssItem({
       source: "SEC_EDGAR",

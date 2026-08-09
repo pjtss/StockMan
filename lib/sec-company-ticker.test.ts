@@ -16,6 +16,11 @@ describe("SEC company ticker selection", () => {
     expect(selectPreferredSecCompanyTicker([row("KCA-UN"), row("KCA-WT")], "0000000001")).toBeNull();
   });
 
+  it("does not resolve compact SPAC unit/warrant symbols", () => {
+    const name = "Constellation Acquisition Corp I";
+    expect(selectPreferredSecCompanyTicker([row("CSTAF", name), row("CSTUF", name), row("CSTWF", name)], "0000000001")).toBeNull();
+  });
+
   it("keeps ordinary class shares such as BH-A", () => {
     expect(selectPreferredSecCompanyTicker([row("BH-A"), row("BH-PA")], "0000000001")?.ticker).toBe("BH-A");
   });
