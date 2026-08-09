@@ -6,7 +6,7 @@ import { translateMarketRssItem } from "./translate-market-rss-item";
 import { LibreTranslateClient } from "./libretranslate-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
-import { extractSecCik, resolveSecCompanyTickers } from "./sec-company-ticker";
+import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
 import { loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
@@ -20,7 +20,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
   const secCiks = secItems?.ok ? secItems.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : [];
   let secTickerMap = new Map<string, string>();
   if (secCiks.length) {
-    try { secTickerMap = new Map((await resolveSecCompanyTickers(secCiks)).map((row) => [row.cik, row.ticker])); } catch { secTickerMap = new Map(); }
+    try { secTickerMap = new Map((await resolvePreferredSecCompanyTickers(secCiks)).map((row) => [row.cik, row.ticker])); } catch { secTickerMap = new Map(); }
   }
   let inserted = 0;
   for (const result of fetched.results) {
@@ -52,7 +52,11 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         link: sql`CASE WHEN ${marketRssArticles.link} = '' THEN excluded.link ELSE ${marketRssArticles.link} END`,
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,
         category: sql`excluded.category`, priority: sql`excluded.priority`,
-        notifyEligible: sql`excluded.notify_eligible`, isBacklog: sql`excluded.is_backlog`, updatedAt: new Date(),
+        notifyEligible: sql`excluded.notify_eligible`,
+        // Backlog is an ingestion-time fact.  A later RSS refresh must not
+        // turn an already delivered article into a backlog item merely
+        // because the article is now older than RSS_MAX_ARTICLE_AGE_MINUTES.
+        isBacklog: sql`CASE WHEN ${marketRssArticles.notificationStatus} = 'PENDING' THEN excluded.is_backlog ELSE ${marketRssArticles.isBacklog} END`, updatedAt: new Date(),
       }}).returning({ id: marketRssArticles.id });
       inserted += rows.length;
     }

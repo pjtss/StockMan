@@ -3,7 +3,7 @@ import type { MarketRssItem } from "./market-rss";
 export type MarketRssCategory = "FINANCING" | "ACTIONABLE" | "TRANSCRIPT" | "MARKET" | "GENERAL";
 export type MarketRssClassification = { category: MarketRssCategory; priority: number; notifyEligible: boolean; ticker: string | null; direction: "POSITIVE" | "NEGATIVE" | "MIXED" | "NEUTRAL"; matchedTerms: string[]; financingAmountUsd: number | null; dilutionRisk: "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN" };
 
-const actionable = /fda|clinical trial|phase [123]|approval|contract|partnership|acquisition|merger|funding|offering|financing|raises? funds|launch|上장|인수|계약|임상|승인|자금 조달/i;
+const actionable = /fda|clinical trial|phase [123]|approval|contract|partnership|acquir(?:es?|ed)|acquisition\s+(?:of|agreement|completed|announced|to)|merger(?:\s+with| agreement)|funding|offering|financing|raises? funds|launch|material definitive agreement|business combination|上장|인수|계약|임상|승인|자금 조달/i;
 const transcript = /earnings call transcript|conference call transcript|quarterly results transcript/i;
 const market = /market update|market commentary|stock market|index|etf|nasdaq composite|s\s*&\s*p 500|dow jones/i;
 const ticker = /\(([A-Z]{1,5})\)/;
@@ -14,14 +14,38 @@ const dilution = /ATM|offering|registered direct|PIPE|convertible|warrant/i;
 function extractTicker(title: string, source: string) { return title.match(ticker)?.[1]?.toUpperCase() || (source === "STOCKTITAN" ? title.match(stockTitanTicker)?.[1]?.toUpperCase() || null : null); }
 function amount(title: string) { const values = [...title.matchAll(/\$\s*([\d,.]+)\s*(million|billion|m|bn)?/gi)].map((match) => { const base = Number(match[1].replace(/,/g, "")); const unit = (match[2] || "").toLowerCase(); return base * (unit === "billion" || unit === "bn" ? 1e9 : unit === "million" || unit === "m" ? 1e6 : 1); }); return values.length ? Math.max(...values) : null; }
 
-export function classifyMarketRssItem(item: Pick<MarketRssItem, "title" | "source">): MarketRssClassification {
+function stripMarkup(value: string) {
+  return value.replace(/<[^>]+>/g, " ").replace(/&(?:lt|gt|amp|quot|#39|#x27|#160);/gi, " ").replace(/\s+/g, " ").trim();
+}
+
+type ClassifiableMarketRssItem = Pick<MarketRssItem, "title" | "source"> & { summary?: string | null };
+
+function classificationText(item: ClassifiableMarketRssItem) {
+  // SEC Atom titles contain the issuer's legal name (for example,
+  // "Kensington Capital Acquisition Corp.").  Legal-name words must not be
+  // treated as a market event; SEC item descriptions are the event signal.
+  if (item.source === "SEC_EDGAR") {
+    const form = item.title.match(/^(?:\s*)(8-K|10-K|10-Q|20-F|6-K|4|5|3|SCHEDULE\s+13[DG](?:\/A)?)\b/i)?.[1] || "";
+    return stripMarkup(`${form} ${item.summary || ""}`);
+  }
+  return stripMarkup(`${item.title} ${item.summary || ""}`);
+}
+
+export function classifyMarketRssItem(item: ClassifiableMarketRssItem): MarketRssClassification {
   const title = item.title.trim();
+  const text = classificationText(item);
   const symbol = extractTicker(title, item.source);
-  const matchedTerms = ["FDA", "clinical trial", "approval", "contract", "partnership", "acquisition", "merger", "funding", "offering", "financing", "ATM", "convertible", "warrant", "launch"].filter((term) => new RegExp(term, "i").test(title));
-  const base = { ticker: symbol, matchedTerms, financingAmountUsd: financing.test(title) ? amount(title) : null, dilutionRisk: dilution.test(title) ? "HIGH" as const : "UNKNOWN" as const };
-  if (transcript.test(title)) return { ...base, category: "TRANSCRIPT", priority: 0, notifyEligible: false, direction: "NEUTRAL" };
-  if (financing.test(title)) return { ...base, category: "FINANCING", priority: 100, notifyEligible: true, direction: "MIXED" };
-  if (actionable.test(title)) return { ...base, category: "ACTIONABLE", priority: 100, notifyEligible: true, direction: "POSITIVE" };
-  if (market.test(title) && !symbol) return { ...base, category: "MARKET", priority: 10, notifyEligible: false, direction: "NEUTRAL" };
-  return { ...base, category: "GENERAL", priority: symbol ? 50 : 20, notifyEligible: Boolean(symbol), direction: "NEUTRAL" };
+  const matchedTerms = ["FDA", "clinical trial", "approval", "contract", "partnership", "acquisition", "merger", "funding", "offering", "financing", "ATM", "convertible", "warrant", "launch", "material definitive agreement", "business combination"].filter((term) => {
+    if (term === "acquisition") return /acquir(?:es?|ed)|acquisition\s+(?:of|agreement|completed|announced|to)/i.test(text);
+    if (term === "merger") return /merger(?:\s+with| agreement)/i.test(text);
+    return new RegExp(term, "i").test(text);
+  });
+  const base = { ticker: symbol, matchedTerms, financingAmountUsd: financing.test(text) ? amount(text) : null, dilutionRisk: dilution.test(text) ? "HIGH" as const : "UNKNOWN" as const };
+  if (transcript.test(text)) return { ...base, category: "TRANSCRIPT", priority: 0, notifyEligible: false, direction: "NEUTRAL" };
+  if (financing.test(text)) return { ...base, category: "FINANCING", priority: 100, notifyEligible: true, direction: "MIXED" };
+  if (actionable.test(text)) return { ...base, category: "ACTIONABLE", priority: 100, notifyEligible: true, direction: "POSITIVE" };
+  if (market.test(text) && !symbol) return { ...base, category: "MARKET", priority: 10, notifyEligible: false, direction: "NEUTRAL" };
+  // SEC generic filings are handled by the SEC event/body pipeline.  Do not
+  // notify merely because a CIK-to-ticker mapping exists.
+  return { ...base, category: "GENERAL", priority: 20, notifyEligible: false, direction: "NEUTRAL" };
 }

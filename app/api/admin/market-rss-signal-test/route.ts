@@ -3,7 +3,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { fetchAllMarketRss } from "@/lib/market-rss-sources";
 import { analyzeMarketNews } from "@/lib/market-news-signal";
 import { fetchSecRssBody } from "@/lib/sec-rss-body";
-import { extractSecCik, resolveSecCompanyTickers } from "@/lib/sec-company-ticker";
+import { extractSecCik, resolvePreferredSecCompanyTickers, resolveSecCompanyTickers } from "@/lib/sec-company-ticker";
 import { resolveMarketNewsReactions } from "@/lib/market-news-market-reaction";
 import { classifyMarketRssItem } from "@/lib/market-rss-classifier";
 
@@ -18,17 +18,21 @@ export async function GET(request: Request) {
   const secBodyCandidates: Array<{ item: unknown; signal: ReturnType<typeof analyzeMarketNews>; formType: string; itemSections: string[] }> = [];
   const secCiks = fetched.results.flatMap((result) => result.ok && result.source === "SEC_EDGAR" ? result.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : []);
   let secTickers: Awaited<ReturnType<typeof resolveSecCompanyTickers>> = [];
+  let preferredSecTickers: Awaited<ReturnType<typeof resolvePreferredSecCompanyTickers>> = [];
   const resolveTickers = new URL(request.url).searchParams.get("resolveTickers") !== "false";
   const resolveMarket = new URL(request.url).searchParams.get("resolveMarket") === "true";
   if (resolveTickers && secCiks.length) {
-    try { secTickers = await resolveSecCompanyTickers(secCiks); } catch (error) { bodyErrors.push(error instanceof Error ? error.message : String(error)); }
+    try {
+      secTickers = await resolveSecCompanyTickers(secCiks);
+      preferredSecTickers = await resolvePreferredSecCompanyTickers(secCiks);
+    } catch (error) { bodyErrors.push(error instanceof Error ? error.message : String(error)); }
   }
   const results = fetched.results.map((result) => {
     if (!result.ok) return { source: result.source, ok: false, error: result.error, itemCount: 0, positiveCount: 0, candidates: [] };
     const analyzed = result.feed.items.map((item) => {
       const signal = analyzeMarketNews(item);
       const classified = classifyMarketRssItem(item);
-      const mappedTicker = result.source === "SEC_EDGAR" ? secTickers.find((row) => row.cik === extractSecCik(item.title))?.ticker : undefined;
+      const mappedTicker = result.source === "SEC_EDGAR" ? preferredSecTickers.find((row) => row.cik === extractSecCik(item.title))?.ticker : undefined;
       const tickers = [...new Set([...signal.tickers, ...(classified.ticker ? [classified.ticker] : []), ...(mappedTicker ? [mappedTicker] : [])])];
       return { item, signal: { ...signal, tickers }, tickerResolved: tickers.length > 0, reactionSkippedReason: tickers.length ? undefined : "ticker_unresolved" };
     });
@@ -45,7 +49,7 @@ export async function GET(request: Request) {
         try {
           const body = await fetchSecRssBody(item);
           const baseSignal = analyzeMarketNews({ ...item, summary: `${item.summary}\n${body.text}` });
-          const mappedTicker = secTickers.find((row) => row.cik === extractSecCik(item.title))?.ticker;
+          const mappedTicker = preferredSecTickers.find((row) => row.cik === extractSecCik(item.title))?.ticker;
           const signal = { ...baseSignal, tickers: [...new Set([...baseSignal.tickers, ...(mappedTicker ? [mappedTicker] : [])])] };
           secBodyCandidates.push({ item, signal, formType: body.formType, itemSections: body.itemSections });
           bodySuccesses++;
@@ -55,6 +59,6 @@ export async function GET(request: Request) {
   }
   const marketCandidates = [...secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").map(({ item, signal }) => ({ item, signal, tickerResolved: signal.tickers.length > 0 })), ...results.flatMap((result) => result.ok ? result.candidates.filter(({ signal }) => signal.direction === "POSITIVE") : [])].filter(({ tickerResolved }) => tickerResolved).slice(0, Number(process.env.SEC_SIGNAL_MARKET_LIMIT || 5));
   const marketReactionSkippedReason = marketCandidates.length === 0 ? "no_positive_candidate_with_resolved_ticker" : undefined;
-  const marketReactions = resolveMarket ? await resolveMarketNewsReactions(marketCandidates.map(({ item, signal }) => { const value = item as { title: string }; return { title: value.title, ticker: signal.tickers[0], cik: extractSecCik(value.title) }; }), secTickers, Number(process.env.SEC_SIGNAL_MARKET_LIMIT || 5)) : [];
-  return NextResponse.json({ ok: true, fetchedAt: fetched.fetchedAt, totalPositiveCount: results.reduce((sum, result) => sum + result.positiveCount, 0), secTickers: { enabled: resolveTickers, mappedCount: secTickers.length, rows: secTickers }, secBody: { enabled: resolveBodies, attempts: bodyAttempts, successes: bodySuccesses, errors: bodyErrors, candidates: secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").sort((a, b) => b.signal.score - a.signal.score).slice(0, 20) }, marketReaction: { enabled: resolveMarket, attempted: marketReactions.length, tickerResolved: marketCandidates.length, reactionSkippedReason: marketReactionSkippedReason, results: marketReactions }, results });
+  const marketReactions = resolveMarket ? await resolveMarketNewsReactions(marketCandidates.map(({ item, signal }) => { const value = item as { title: string }; return { title: value.title, ticker: signal.tickers[0], cik: extractSecCik(value.title) }; }), preferredSecTickers, Number(process.env.SEC_SIGNAL_MARKET_LIMIT || 5)) : [];
+  return NextResponse.json({ ok: true, fetchedAt: fetched.fetchedAt, totalPositiveCount: results.reduce((sum, result) => sum + result.positiveCount, 0), secTickers: { enabled: resolveTickers, mappedCount: secTickers.length, preferredMappedCount: preferredSecTickers.length, rows: secTickers, preferredRows: preferredSecTickers }, secBody: { enabled: resolveBodies, attempts: bodyAttempts, successes: bodySuccesses, errors: bodyErrors, candidates: secBodyCandidates.filter(({ signal }) => signal.direction === "POSITIVE").sort((a, b) => b.signal.score - a.signal.score).slice(0, 20) }, marketReaction: { enabled: resolveMarket, attempted: marketReactions.length, tickerResolved: marketCandidates.length, reactionSkippedReason: marketReactionSkippedReason, results: marketReactions }, results });
 }
