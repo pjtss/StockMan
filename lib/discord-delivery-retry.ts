@@ -1,5 +1,9 @@
+import { eq, sql } from "drizzle-orm";
 import { claimDueDiscordDeliveries, markDiscordDeliveryProcessing, markDiscordDeliveryRetry, markDiscordDeliverySent } from "@/lib/discord-delivery-queue";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { getDb } from "@/lib/db";
+import { marketRssArticles } from "@/lib/schema";
+import { parseMarketRssDeliveryArticleId } from "@/lib/discord-delivery-policy";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -8,9 +12,20 @@ async function webhookFor(channelKey: string) {
     OBV: { module: "us-daily-indicators", env: ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_OBV_DISCORD_WEBHOOK_URL"] },
     NEWS_RADAR: { module: "us-news-radar", env: ["NEWS_RADAR_DISCORD_WEBHOOK_URL"] },
     BREAKING_NEWS: { module: "us-breaking-news-forwarder", env: ["KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL"] },
+    MARKET_RSS: { module: "market-rss", env: ["MARKET_RSS_DISCORD_WEBHOOK_URL"] },
   };
   const target = map[channelKey];
   return target ? loadFeatureDiscordWebhook(target.module, target.env) : "";
+}
+
+async function markMarketRssDelivery(articleId: number, status: "SENT" | "FAILED", error?: string) {
+  const db = getDb();
+  await db.update(marketRssArticles).set({
+    notificationStatus: status,
+    notificationAttempts: sql`${marketRssArticles.notificationAttempts} + 1`,
+    ...(status === "SENT" ? { notifiedAt: new Date(), lastError: null } : { lastError: error || "Discord delivery failed" }),
+    updatedAt: new Date(),
+  }).where(eq(marketRssArticles.id, articleId));
 }
 
 export async function retryDiscordDeliveries(limit = 50) {
@@ -24,11 +39,16 @@ export async function retryDiscordDeliveries(limit = 50) {
       const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(delivery.payload) });
       if (!response.ok) throw new Error(`discord_http_${response.status}`);
       await markDiscordDeliverySent(delivery.id);
+      const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
+      if (articleId) await markMarketRssDelivery(articleId, "SENT");
       results.sent += 1;
       results.attempts += delivery.attempts + 1;
       if (delivery.attempts > 0) results.recovered += 1;
     } catch (error) {
-      await markDiscordDeliveryRetry(delivery.id, error instanceof Error ? error.message : String(error), delivery.attempts + 1);
+      const message = error instanceof Error ? error.message : String(error);
+      await markDiscordDeliveryRetry(delivery.id, message, delivery.attempts + 1);
+      const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
+      if (articleId) await markMarketRssDelivery(articleId, "FAILED", message);
       results.failed += 1;
       results.attempts += delivery.attempts + 1;
       if (delivery.attempts + 1 >= 5) results.repeatedFailure += 1;

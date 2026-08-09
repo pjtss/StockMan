@@ -35,4 +35,5 @@ StockTitan RSS
 - `source=STOCKTITAN`으로 원문 출처를 보존한다.
 - `source + externalId`로 중복을 방지한다.
 - 기존 RSS 분류·번역 fallback·Discord rate limit·알림 상태 저장을 재사용한다.
+- Discord `408/425/429/5xx` 또는 네트워크 오류는 `discord_delivery_queue`에 등록하고 OCI의 `discord-delivery-retry` 작업에서 재전송한다. 재전송 성공·실패 결과는 원본 `market_rss_articles` 행에도 반영한다.
 - StockTitan 페이지 HTML을 직접 요청하거나 스크래핑하지 않는다.

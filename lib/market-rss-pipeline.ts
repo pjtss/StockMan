@@ -8,6 +8,8 @@ import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolveSecCompanyTickers } from "./sec-company-ticker";
 import { loadFeatureDiscordWebhook } from "./discord-config";
+import { enqueueDiscordDelivery } from "./discord-delivery-queue";
+import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -117,7 +119,16 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       sent++;
       remaining--;
     } catch (error) {
-      await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: row.notificationAttempts + 1, lastError: error instanceof Error ? error.message : String(error), updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      const message = error instanceof Error ? error.message : String(error);
+      const nextAttempt = row.notificationAttempts + 1;
+      await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: nextAttempt, lastError: message, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      if (isRetryableDiscordError(error)) {
+        await enqueueDiscordDelivery({
+          externalId: marketRssDeliveryExternalId(row.id, nextAttempt),
+          channelKey: "MARKET_RSS",
+          payload: { content: body, allowed_mentions: { parse: [] } },
+        });
+      }
     }
   }
   return { attempted: rows.length, sent, skipped: false, perMinuteLimit, remainingAfterSend: remaining, webhookConfigured: true };
