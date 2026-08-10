@@ -25,7 +25,19 @@ export async function POST(request: Request) {
     const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd()]);
     const [mfiFiltered, dmiFiltered, macdFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified].map((items) => filterUsDailyCandidates(items as any)));
     const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any });
-    return { ok: discord.ok, mfi, dmi, macd, commonFilter: { excluded: { mfi: mfiFiltered.excludedCount, dmi: dmiFiltered.excludedCount, macd: macdFiltered.excludedCount }, settings: mfiFiltered.settings }, discord };
+    return {
+      ok: discord.ok,
+      mfi,
+      dmi,
+      macd,
+      commonFilter: {
+        excluded: { mfi: mfiFiltered.excludedCount, dmi: dmiFiltered.excludedCount, macd: macdFiltered.excludedCount },
+        failureReasons: { mfi: mfiFiltered.failureReasons, dmi: dmiFiltered.failureReasons, macd: macdFiltered.failureReasons },
+        matchedMetricCount: { mfi: mfiFiltered.matchedMetricCount, dmi: dmiFiltered.matchedMetricCount, macd: macdFiltered.matchedMetricCount },
+        settings: mfiFiltered.settings,
+      },
+      discord,
+    };
     }));
   } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }
