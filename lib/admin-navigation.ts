@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "modules" | "api-config" | "api-tests" | "blacklist" | "product-classification" | "sec-test" | "observability" | "stocktitan-rss";
+export type AdminNavId = "dashboard" | "modules" | "api-config" | "api-tests" | "daily-indicators" | "blacklist" | "product-classification" | "sec-test" | "observability" | "stocktitan-rss";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -44,6 +44,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "API 테스트",
     description: "KIS 및 스캐너 API 응답 확인",
     href: "/admin/api-tests",
+  },
+  {
+    id: "daily-indicators",
+    group: "진단",
+    label: "일봉 통합 진단",
+    description: "돌파·MFI·DMI·MACD·OBV 결과를 한 번에 확인",
+    href: "/admin/daily-indicators",
   },
   {
     id: "blacklist",

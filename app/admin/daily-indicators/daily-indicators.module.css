@@ -1,0 +1,188 @@
+.policyCard,
+.outputCard,
+.summaryCard,
+.details details {
+  border: 1px solid rgba(130, 150, 175, 0.18);
+  border-radius: 8px;
+  background: rgba(14, 22, 34, 0.68);
+}
+
+.policyCard {
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.policyCard h2,
+.outputHeader h2 {
+  margin: 0;
+  color: #eef3f8;
+  font-size: 16px;
+}
+
+.policyCard p,
+.outputHeader p,
+.summaryCard p {
+  margin: 7px 0 0;
+  color: #91a3b7;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar label {
+  display: grid;
+  gap: 5px;
+  color: #91a3b7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.toolbar input {
+  width: 100px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(130, 150, 175, 0.24);
+  border-radius: 6px;
+  background: #050b12;
+  color: #eef3f8;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 36px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 6px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid rgba(0, 231, 155, 0.42);
+  background: rgba(0, 231, 155, 0.14);
+  color: #00e79b;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(130, 150, 175, 0.24);
+  background: rgba(130, 150, 175, 0.08);
+  color: #d8e2ec;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summaryCard {
+  min-width: 0;
+  padding: 14px;
+}
+
+.summaryTop,
+.outputHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.summaryTop h2 {
+  margin: 0;
+  color: #eef3f8;
+  font-size: 15px;
+}
+
+.summaryCard strong {
+  display: block;
+  margin-top: 13px;
+  color: #d8e2ec;
+  font-size: 13px;
+}
+
+.success,
+.failure {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.success { color: #00e79b; }
+.failure { color: #fca5a5; }
+
+.error {
+  padding: 12px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  border-radius: 7px;
+  background: rgba(127, 29, 29, 0.25);
+  color: #fecaca;
+  font-size: 13px;
+}
+
+.outputCard {
+  padding: 16px;
+}
+
+.outputCard pre,
+.details pre {
+  max-height: 620px;
+  margin: 14px 0 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid rgba(130, 150, 175, 0.14);
+  border-radius: 6px;
+  background: #050b12;
+  color: #d8e2ec;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.details {
+  display: grid;
+  gap: 8px;
+}
+
+.details summary {
+  padding: 14px;
+  color: #d8e2ec;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.details details {
+  overflow: hidden;
+}
+
+.details pre {
+  margin: 0;
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+
+@media (max-width: 960px) {
+  .summaryGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .summaryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .toolbar > button { flex: 1 1 150px; }
+}

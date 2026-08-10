@@ -21,6 +21,7 @@ const NAV_ICONS = {
   dashboard: LayoutDashboard,
   "api-config": Settings2,
   "api-tests": FlaskConical,
+  "daily-indicators": ChartNoAxesCombined,
   modules: Settings2,
   blacklist: ListFilter,
   "product-classification": ListFilter,
