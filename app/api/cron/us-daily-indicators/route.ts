@@ -7,7 +7,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 import { withAutomationRun } from "@/lib/automation-run";
-import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -17,9 +17,14 @@ export async function POST(request: Request) {
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings, new Date())) { await recordSkippedAutomationRun("us-daily-indicators", moduleSettings.enabled ? "outside_schedule" : "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule" }); }
   const envInterval = Number.parseInt(process.env.US_DAILY_INDICATORS_INTERVAL_SECONDS || "600", 10) || 600;
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? envInterval);
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const epochSeconds = Math.floor(Date.now() / 1000);
-  if (now.getUTCDay() === 0 || epochSeconds % intervalSeconds >= 60) { await recordSkippedAutomationRun("us-daily-indicators", "outside_interval", { intervalSeconds }); return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, schedule: "monday-saturday" }); }
+  const latestRun = await loadLatestExecutedAutomationRun("us-daily-indicators").catch(() => null);
+  const latestStartedAt = latestRun?.started_at ? new Date(latestRun.started_at).getTime() : null;
+  const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
+  if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
+    const reason = latestRun?.status === "RUNNING" ? "already_running" : "outside_interval";
+    await recordSkippedAutomationRun("us-daily-indicators", reason, { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+    return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+  }
   try {
     return NextResponse.json(await withAutomationRun("us-daily-indicators", async () => {
     const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd()]);

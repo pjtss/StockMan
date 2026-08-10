@@ -78,3 +78,26 @@ export async function loadLatestAutomationRun(moduleKey: FeatureModuleKey) {
   const rows = await loadRecentAutomationRuns(moduleKey, 1);
   return rows[0] || null;
 }
+
+/**
+ * Return the latest actual execution while ignoring schedule observations.
+ * A scheduler may record many SKIPPED rows between executions; those rows
+ * must not reset an interval-based feature's cooldown.
+ */
+export async function loadLatestExecutedAutomationRun(moduleKey: FeatureModuleKey) {
+  const rows = await getPool().query<{
+    id: number;
+    status: string;
+    started_at: string;
+    finished_at: string | null;
+  }>(
+    `SELECT id, status, started_at, finished_at
+       FROM automation_runs
+      WHERE module_key = $1
+        AND status <> 'SKIPPED'
+      ORDER BY started_at DESC
+      LIMIT 1`,
+    [moduleKey],
+  );
+  return rows.rows[0] || null;
+}
