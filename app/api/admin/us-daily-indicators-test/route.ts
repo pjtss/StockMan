@@ -5,6 +5,8 @@ import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsMfiOversold } from "@/lib/us-mfi-oversold";
+import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,10 +30,12 @@ export async function GET(request: Request) {
   const limitValue = Number(params.get("breakoutLimit") || "");
   const breakoutLimit = Number.isFinite(limitValue) && limitValue > 0 ? Math.min(Math.floor(limitValue), 1000) : undefined;
 
-  // Warm the shared daily-candle cache with the breakout scan first. The
-  // remaining indicators then reuse that cache instead of issuing several
-  // heavyweight PostgreSQL bulk queries at the same time on the small OCI
-  // instance.
+  // Warm the complete shared daily-candle cache before running any module.
+  // The breakout limit only controls its result set; warming just that slice
+  // would force MFI/DMI/MACD/OBV to issue their own heavyweight full-table
+  // PostgreSQL queries on the small OCI instance.
+  const sharedUniverse = await loadStoredUsInstrumentScopes();
+  await loadCachedUsDailyCandlesBulk(sharedUniverse.scopes, 100).catch(() => new Map());
   const dailyBreakout = await settle(runUsDailyBreakoutScan({ limit: breakoutLimit }));
   const [mfi, dmi, macd, obv] = await Promise.all([
     settle(scanStoredUsMfiOversold()),
