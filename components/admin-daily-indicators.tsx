@@ -74,9 +74,43 @@ export function AdminDailyIndicators() {
 
   async function copyResult() {
     if (!formatted) return;
-    await navigator.clipboard.writeText(formatted);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(formatted);
+        } catch {
+          // Some mobile browsers or embedded contexts expose the Clipboard API
+          // but reject it when permission is unavailable. Fall through to the
+          // selection-based compatibility path below.
+          const textarea = document.createElement("textarea");
+          textarea.value = formatted;
+          textarea.setAttribute("readonly", "");
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          const copied = document.execCommand("copy");
+          textarea.remove();
+          if (!copied) throw new Error("document.execCommand copy failed");
+        }
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = formatted;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand("copy");
+        textarea.remove();
+        if (!copied) throw new Error("document.execCommand copy failed");
+      }
+      setError(null);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch (copyError) {
+      setError(copyError instanceof Error ? `클립보드 복사에 실패했습니다: ${copyError.message}` : "클립보드 복사에 실패했습니다.");
+    }
   }
 
   return (
