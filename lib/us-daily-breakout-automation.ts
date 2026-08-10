@@ -1,19 +1,19 @@
-import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { findUsFiveDayHighBreakout, type UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { getUsFreeFloat } from "@/lib/us-free-float";
-import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 
 let activeScan: Promise<Awaited<ReturnType<typeof executeScan>>> | null = null;
 
-async function executeScan(options: { limit?: number; concurrency?: number } = {}) {
+async function executeScan(options: { limit?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const startedAt = Date.now();
   // Automatic detection uses the canonical instrument registry, not the
   // legacy/manual breakout watchlist. Only enabled US exchanges are included.
-  const universe = await loadStoredUsInstrumentScopes();
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: 100 });
+  const universe = context.universe;
   const watchlist = universe.scopes;
   const limit = Number.isFinite(options.limit) && (options.limit ?? 0) > 0 ? Math.floor(options.limit as number) : null;
   const scanList = limit ? watchlist.slice(0, limit) : watchlist;
-  const cachedCandles = await loadCachedUsDailyCandlesBulk(scanList, 10).catch(() => new Map<string, any[]>());
+  const cachedCandles = context.candles;
   // Run several instruments concurrently while the shared KIS limiter still
   // serializes the actual requests. This overlaps network latency without
   // increasing the API request rate.
@@ -45,7 +45,7 @@ async function executeScan(options: { limit?: number; concurrency?: number } = {
 }
 
 /** Coalesces concurrent timer/manual requests into one scan. */
-export function runUsDailyBreakoutScan(options: { limit?: number; concurrency?: number } = {}) {
+export function runUsDailyBreakoutScan(options: { limit?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   if (!activeScan) activeScan = executeScan(options).finally(() => { activeScan = null; });
   return activeScan;
 }

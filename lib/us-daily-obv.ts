@@ -1,6 +1,5 @@
 import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
-import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
-import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
+import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 
 function obvValue(candles: UsDailyCandle[]) {
   let value = 0;
@@ -11,11 +10,12 @@ function obvValue(candles: UsDailyCandle[]) {
   return value;
 }
 
-export async function scanStoredUsDailyObv(options: { lookback?: number; concurrency?: number } = {}) {
+export async function scanStoredUsDailyObv(options: { lookback?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const lookback = Math.max(3, Math.floor(options.lookback ?? 5));
-  const universe = await loadStoredUsInstrumentScopes();
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: lookback * 2 + 1 });
+  const universe = context.universe;
   const instruments = universe.scopes;
-  const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, lookback * 2 + 1).catch(() => new Map<string, any[]>());
+  const cachedCandles = context.candles;
   const results: any[] = [];
   let cursor = 0;
   const worker = async () => { while (cursor < instruments.length) {

@@ -1,13 +1,13 @@
-import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
-import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
+import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestMacd } from "@/lib/us-macd";
 
-export async function scanStoredUsMacd(options: { fast?: number; slow?: number; signal?: number; concurrency?: number } = {}) {
+export async function scanStoredUsMacd(options: { fast?: number; slow?: number; signal?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const fast = options.fast ?? 12, slow = options.slow ?? 26, signal = options.signal ?? 9;
-  const universe = await loadStoredUsInstrumentScopes();
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: slow + signal });
+  const universe = context.universe;
   const instruments = universe.scopes, results: any[] = [];
   const requiredCandles = slow + signal;
-  const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, requiredCandles).catch(() => new Map<string, any[]>());
+  const cachedCandles = context.candles;
   const getDaily = (item: (typeof instruments)[number]) => {
     const cached = cachedCandles.get(`${item.market}:${item.code}`);
     return cached && cached.length >= requiredCandles

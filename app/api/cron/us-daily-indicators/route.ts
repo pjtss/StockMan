@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { scanStoredUsMfiOversold } from "@/lib/us-mfi-oversold";
 import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
+import { createUsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
   }
   try {
     return NextResponse.json(await withAutomationRun("us-daily-indicators", async () => {
-    const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold(), scanStoredUsDmi(), scanStoredUsMacd()]);
+    const context = await createUsDailyScanContext({ candleLimit: 100 });
+    const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold({ context }), scanStoredUsDmi({ context }), scanStoredUsMacd({ context })]);
     const [mfiFiltered, dmiFiltered, macdFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified].map((items) => filterUsDailyCandidates(items as any)));
     const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any });
     return {

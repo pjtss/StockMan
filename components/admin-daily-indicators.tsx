@@ -30,7 +30,8 @@ function countQualified(result: ModuleResult | undefined) {
 }
 
 function countResults(result: ModuleResult | undefined) {
-  return result?.ok && result.data && Array.isArray(result.data.results) ? result.data.results.length : 0;
+  if (!result?.ok || !result.data) return 0;
+  return Array.isArray(result.data.results) ? result.data.results.length : Number(result.data.resultCount ?? 0);
 }
 
 export function AdminDailyIndicators() {
@@ -38,6 +39,7 @@ export function AdminDailyIndicators() {
   const [running, setRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [breakoutLimit, setBreakoutLimit] = useState("");
+  const [responseMode, setResponseMode] = useState<"full" | "summary">("full");
   const [error, setError] = useState<string | null>(null);
 
   const formatted = useMemo(() => (result ? JSON.stringify(result, null, 2) : ""), [result]);
@@ -47,8 +49,9 @@ export function AdminDailyIndicators() {
     setCopied(false);
     setError(null);
     try {
-      const query = breakoutLimit.trim() ? `?breakoutLimit=${encodeURIComponent(breakoutLimit.trim())}` : "";
-      const response = await fetch(`/api/admin/us-daily-indicators-test${query}`, { cache: "no-store" });
+      const queryParams = new URLSearchParams({ mode: responseMode });
+      if (breakoutLimit.trim()) queryParams.set("breakoutLimit", breakoutLimit.trim());
+      const response = await fetch(`/api/admin/us-daily-indicators-test?${queryParams.toString()}`, { cache: "no-store" });
       const rawBody = await response.text();
       let data: AggregateResult;
       try {
@@ -128,6 +131,13 @@ export function AdminDailyIndicators() {
           <label>
             <span>돌파 검사 제한</span>
             <input value={breakoutLimit} onChange={(event) => setBreakoutLimit(event.target.value.replace(/[^0-9]/g, ""))} placeholder="전체" inputMode="numeric" />
+          </label>
+          <label>
+            <span>응답 모드</span>
+            <select value={responseMode} onChange={(event) => setResponseMode(event.target.value === "summary" ? "summary" : "full")}>
+              <option value="full">전체 JSON</option>
+              <option value="summary">요약 JSON (빠름)</option>
+            </select>
           </label>
           <button className={styles.primaryButton} onClick={() => void runAll()} disabled={running}>
             <Play size={16} />

@@ -1,13 +1,13 @@
-import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestDmi } from "@/lib/us-dmi";
-import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
-export async function scanStoredUsDmi(options: { period?: number; concurrency?: number } = {}) {
+export async function scanStoredUsDmi(options: { period?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const period = options.period ?? 14;
-  const universe = await loadStoredUsInstrumentScopes();
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: period + 1 });
+  const universe = context.universe;
   const instruments = universe.scopes;
   const results: any[] = [];
-  const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
+  const cachedCandles = context.candles;
   const getDaily = (item: (typeof instruments)[number]) => {
     const cached = cachedCandles.get(`${item.market}:${item.code}`);
     return cached && cached.length >= period + 1

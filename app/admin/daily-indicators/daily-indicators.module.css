@@ -44,7 +44,8 @@
   font-weight: 800;
 }
 
-.toolbar input {
+.toolbar input,
+.toolbar select {
   width: 100px;
   height: 36px;
   padding: 0 10px;
@@ -53,6 +54,8 @@
   background: #050b12;
   color: #eef3f8;
 }
+
+.toolbar select { width: 132px; }
 
 .primaryButton,
 .secondaryButton {

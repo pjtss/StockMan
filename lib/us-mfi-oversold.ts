@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usInstruments } from "@/lib/schema";
-import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestMfi } from "@/lib/us-mfi";
 import { getMfiThreshold } from "@/lib/automation-settings";
 import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
@@ -37,12 +37,13 @@ export async function listStoredUsInstruments() {
     .orderBy(asc(usInstruments.market), asc(usInstruments.code));
 }
 
-export async function scanStoredUsMfiOversold(options: { period?: number; threshold?: number; concurrency?: number } = {}) {
+export async function scanStoredUsMfiOversold(options: { period?: number; threshold?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const period = options.period ?? DEFAULT_MFI_PERIOD;
   const threshold = options.threshold ?? await getMfiThreshold();
-  const universe = await loadStoredUsInstrumentScopes();
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: period + 1 });
+  const universe = context.universe;
   const instruments = universe.scopes;
-  const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
+  const cachedCandles = context.candles;
   const results: MfiOversoldResult[] = [];
   // This scanner reads the prefetched DB cache only. There is no KIS request
   // in the worker, so applying an API rate-limit delay here would make a
