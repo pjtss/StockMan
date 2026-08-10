@@ -17,6 +17,8 @@ type AggregateResult = {
   error?: string;
 };
 
+type CopyTarget = "all" | (typeof MODULES)[number]["key"];
+
 const MODULES = [
   { key: "dailyBreakout", label: "일봉 돌파", description: "당일 시가와 이전 5거래일 고가 비교" },
   { key: "mfi", label: "MFI", description: "DB 저장 일봉 기준 과매도 탐지" },
@@ -37,7 +39,7 @@ function countResults(result: ModuleResult | undefined) {
 export function AdminDailyIndicators() {
   const [result, setResult] = useState<AggregateResult | null>(null);
   const [running, setRunning] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null);
   const [breakoutLimit, setBreakoutLimit] = useState("");
   const [responseMode, setResponseMode] = useState<"full" | "summary">("full");
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function AdminDailyIndicators() {
 
   async function runAll() {
     setRunning(true);
-    setCopied(false);
+    setCopiedTarget(null);
     setError(null);
     try {
       const queryParams = new URLSearchParams({ mode: responseMode });
@@ -75,18 +77,19 @@ export function AdminDailyIndicators() {
     }
   }
 
-  async function copyResult() {
-    if (!formatted) return;
+  async function copyJson(target: CopyTarget, value: unknown) {
+    const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    if (!text) return;
     try {
       if (navigator.clipboard?.writeText) {
         try {
-          await navigator.clipboard.writeText(formatted);
+          await navigator.clipboard.writeText(text);
         } catch {
           // Some mobile browsers or embedded contexts expose the Clipboard API
           // but reject it when permission is unavailable. Fall through to the
           // selection-based compatibility path below.
           const textarea = document.createElement("textarea");
-          textarea.value = formatted;
+          textarea.value = text;
           textarea.setAttribute("readonly", "");
           textarea.style.position = "fixed";
           textarea.style.opacity = "0";
@@ -98,7 +101,7 @@ export function AdminDailyIndicators() {
         }
       } else {
         const textarea = document.createElement("textarea");
-        textarea.value = formatted;
+        textarea.value = text;
         textarea.setAttribute("readonly", "");
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
@@ -109,11 +112,15 @@ export function AdminDailyIndicators() {
         if (!copied) throw new Error("document.execCommand copy failed");
       }
       setError(null);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      setCopiedTarget(target);
+      window.setTimeout(() => setCopiedTarget((current) => (current === target ? null : current)), 1600);
     } catch (copyError) {
       setError(copyError instanceof Error ? `클립보드 복사에 실패했습니다: ${copyError.message}` : "클립보드 복사에 실패했습니다.");
     }
+  }
+
+  async function copyResult() {
+    await copyJson("all", formatted);
   }
 
   return (
@@ -145,7 +152,7 @@ export function AdminDailyIndicators() {
           </button>
           <button className={styles.secondaryButton} onClick={() => void copyResult()} disabled={!formatted}>
             <Copy size={16} />
-            {copied ? "복사 완료" : "전체 JSON 복사"}
+            {copiedTarget === "all" ? "복사 완료" : "전체 JSON 복사"}
           </button>
         </div>
       </section>
@@ -162,6 +169,15 @@ export function AdminDailyIndicators() {
                   <div className={styles.summaryTop}><h2>{module.label}</h2><span className={moduleResult?.ok ? styles.success : styles.failure}>{moduleResult?.ok ? "정상" : "실패"}</span></div>
                   <p>{module.description}</p>
                   <strong>{countQualified(moduleResult)}개 후보 · {countResults(moduleResult)}개 결과</strong>
+                  <button
+                    className={styles.cardCopyButton}
+                    onClick={() => void copyJson(module.key, moduleResult)}
+                    disabled={!moduleResult}
+                    type="button"
+                  >
+                    <Copy size={14} />
+                    {copiedTarget === module.key ? "복사 완료" : `${module.label} JSON 복사`}
+                  </button>
                 </article>
               );
             })}
@@ -170,7 +186,7 @@ export function AdminDailyIndicators() {
           <section className={styles.outputCard}>
             <div className={styles.outputHeader}>
               <div><h2>통합 결과 JSON</h2><p>{result.checkedAt || "완료 시각 없음"} · {result.durationMs ?? "-"}ms</p></div>
-              <button className={styles.secondaryButton} onClick={() => void copyResult()}><Copy size={16} />{copied ? "복사 완료" : "JSON 복사"}</button>
+              <button className={styles.secondaryButton} onClick={() => void copyResult()}><Copy size={16} />{copiedTarget === "all" ? "복사 완료" : "JSON 복사"}</button>
             </div>
             <pre>{formatted}</pre>
           </section>
