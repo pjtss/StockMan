@@ -49,7 +49,18 @@ export function AdminDailyIndicators() {
     try {
       const query = breakoutLimit.trim() ? `?breakoutLimit=${encodeURIComponent(breakoutLimit.trim())}` : "";
       const response = await fetch(`/api/admin/us-daily-indicators-test${query}`, { cache: "no-store" });
-      const data = await response.json().catch(() => ({ ok: false, error: "JSON 응답을 읽을 수 없습니다." }));
+      const rawBody = await response.text();
+      let data: AggregateResult;
+      try {
+        data = JSON.parse(rawBody) as AggregateResult;
+      } catch {
+        const contentType = response.headers.get("content-type") || "알 수 없음";
+        const preview = rawBody.replace(/\s+/g, " ").trim().slice(0, 180);
+        data = {
+          ok: false,
+          error: `HTTP ${response.status} 응답이 JSON이 아닙니다. content-type=${contentType}${preview ? ` · ${preview}` : ""}`,
+        };
+      }
       setResult(data);
       if (!response.ok) setError(data.error || `HTTP ${response.status}`);
     } catch (requestError) {
