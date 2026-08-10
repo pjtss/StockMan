@@ -28,8 +28,12 @@ export async function GET(request: Request) {
   const limitValue = Number(params.get("breakoutLimit") || "");
   const breakoutLimit = Number.isFinite(limitValue) && limitValue > 0 ? Math.min(Math.floor(limitValue), 1000) : undefined;
 
-  const [dailyBreakout, mfi, dmi, macd, obv] = await Promise.all([
-    settle(runUsDailyBreakoutScan({ limit: breakoutLimit })),
+  // Warm the shared daily-candle cache with the breakout scan first. The
+  // remaining indicators then reuse that cache instead of issuing several
+  // heavyweight PostgreSQL bulk queries at the same time on the small OCI
+  // instance.
+  const dailyBreakout = await settle(runUsDailyBreakoutScan({ limit: breakoutLimit }));
+  const [mfi, dmi, macd, obv] = await Promise.all([
     settle(scanStoredUsMfiOversold()),
     settle(scanStoredUsDmi()),
     settle(scanStoredUsMacd()),
