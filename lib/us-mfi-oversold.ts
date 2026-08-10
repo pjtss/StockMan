@@ -44,19 +44,16 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
   const instruments = universe.scopes;
   const cachedCandles = await loadCachedUsDailyCandlesBulk(instruments, period + 1).catch(() => new Map<string, any[]>());
   const results: MfiOversoldResult[] = [];
-  // KIS rate limits are shared across the instance; serialize daily requests
-  // by default so a full-table diagnostic does not turn into 500 responses.
-  const concurrency = Math.max(1, Math.min(options.concurrency ?? 1, 2));
+  // This scanner reads the prefetched DB cache only. There is no KIS request
+  // in the worker, so applying an API rate-limit delay here would make a
+  // full-table admin diagnostic exceed the reverse-proxy timeout.
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? 4, 8));
   let cursor = 0;
-  let lastRequestAt = 0;
   async function worker() {
     while (true) {
       const instrument = instruments[cursor++];
       if (!instrument) return;
       try {
-        const wait = Math.max(0, 300 - (Date.now() - lastRequestAt));
-        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-        lastRequestAt = Date.now();
         const prefetched = cachedCandles.get(`${instrument.market}:${instrument.code}`);
         const daily = prefetched && prefetched.length >= period + 1
           ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } }
