@@ -63,7 +63,7 @@ export function calculateBollingerBands(candles: UsDailyCandle[], period = DEFAU
       middle: Number(middle.toFixed(6)),
       upper: Number(upper.toFixed(6)),
       lower: Number(lower.toFixed(6)),
-      distanceToLowerPercent: lower === 0 ? 0 : Number(((rows[index].low - lower) / Math.abs(lower) * 100).toFixed(4)),
+      distanceToLowerPercent: lower === 0 ? 0 : Number(((close - lower) / Math.abs(lower) * 100).toFixed(4)),
     });
   }
   return points;
@@ -134,7 +134,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const volumePass = volume !== null && (policy.minVolume <= 0 || volume >= policy.minVolume);
         const turnoverPass = policy.minTurnoverRatio <= 0 || (metric?.turnoverRatio != null && metric.turnoverRatio >= policy.minTurnoverRatio);
         const passesFilters = pricePass && volumePass && turnoverPass;
-        const qualifies = Boolean(latest && passesFilters && latest.low <= latest.lower);
+        const qualifies = Boolean(latest && passesFilters && latest.close <= latest.lower);
         const status = !latest ? "FAILED" : !passesFilters ? "FILTERED" : qualifies ? "QUALIFIED" : "NOT_TOUCHING";
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, filter: { minPrice: pricePass, minVolume: volumePass, minTurnoverRatio: turnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
       } catch (error) {
@@ -151,7 +151,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_daily_price_candles", completedDailyCandleOnly: false, exclusionRule: "당일 봉 포함, 최신 저장 일봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 일봉 저가 <= 하단선" },
+    dataPolicy: { source: "us_daily_price_candles", completedDailyCandleOnly: false, exclusionRule: "당일 봉 포함, 최신 저장 일봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 일봉 종가 <= 하단선" },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED").length,
     failureCount: results.filter((result) => result.status === "FAILED").length,
