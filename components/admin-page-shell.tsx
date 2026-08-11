@@ -22,6 +22,7 @@ const NAV_ICONS = {
   "api-config": Settings2,
   "api-tests": FlaskConical,
   "daily-indicators": ChartNoAxesCombined,
+  "daily-rss": Newspaper,
   modules: Settings2,
   blacklist: ListFilter,
   "product-classification": ListFilter,
