@@ -2,7 +2,6 @@ import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { getUsDailyObvSignalPolicy } from "@/lib/automation-settings";
 import { analyzeUsObvSignal, calculateUsObvSeries } from "@/lib/us-obv-signal";
-import { excludeCurrentUsMarketCandle } from "@/lib/us-market-date";
 
 export async function scanStoredUsDailyObv(options: { lookback?: number; signalPeriod?: number; signalAboveDays?: number; signalCrossLookback?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const lookback = Math.max(3, Math.floor(options.lookback ?? 5));
@@ -19,7 +18,7 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
   const worker = async () => { while (cursor < instruments.length) {
     const item = instruments[cursor++];
     try {
-      const prefetched = excludeCurrentUsMarketCandle(cachedCandles.get(`${item.market}:${item.code}`) ?? []);
+      const prefetched = cachedCandles.get(`${item.market}:${item.code}`) ?? [];
       const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : { ok: false, status: 0, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: prefetched?.length ?? 0 } };
       const candles = daily?.candles ?? [];
       if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, obvSignal: null, signalGap: null, aboveSignalDays: 0, signalAbove: false, signalCrossedRecently: false, rising: false, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }

@@ -1,6 +1,5 @@
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestMacd } from "@/lib/us-macd";
-import { excludeCurrentUsMarketCandle } from "@/lib/us-market-date";
 
 export async function scanStoredUsMacd(options: { fast?: number; slow?: number; signal?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const fast = options.fast ?? 12, slow = options.slow ?? 26, signal = options.signal ?? 9;
@@ -10,7 +9,7 @@ export async function scanStoredUsMacd(options: { fast?: number; slow?: number; 
   const requiredCandles = slow + signal;
   const cachedCandles = context.candles;
   const getDaily = (item: (typeof instruments)[number]) => {
-    const cached = excludeCurrentUsMarketCandle(cachedCandles.get(`${item.market}:${item.code}`) ?? []);
+    const cached = cachedCandles.get(`${item.market}:${item.code}`) ?? [];
     return cached && cached.length >= requiredCandles
       ? Promise.resolve({ ok: true, status: 200, candles: cached, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: cached.length } })
       : Promise.resolve({ ok: false, status: 0, candles: cached ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: cached?.length ?? 0 } });

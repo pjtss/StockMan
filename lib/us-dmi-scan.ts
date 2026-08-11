@@ -1,6 +1,5 @@
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestDmi } from "@/lib/us-dmi";
-import { excludeCurrentUsMarketCandle } from "@/lib/us-market-date";
 
 export async function scanStoredUsDmi(options: { period?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const period = options.period ?? 14;
@@ -10,7 +9,7 @@ export async function scanStoredUsDmi(options: { period?: number; concurrency?: 
   const results: any[] = [];
   const cachedCandles = context.candles;
   const getDaily = (item: (typeof instruments)[number]) => {
-    const cached = excludeCurrentUsMarketCandle(cachedCandles.get(`${item.market}:${item.code}`) ?? []);
+    const cached = cachedCandles.get(`${item.market}:${item.code}`) ?? [];
     return cached && cached.length >= period + 1
       ? Promise.resolve({ ok: true, status: 200, candles: cached, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: cached.length } })
       : Promise.resolve({ ok: false, status: 0, candles: cached ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: cached?.length ?? 0 } });

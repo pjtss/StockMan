@@ -1,7 +1,6 @@
 import { getPool } from "@/lib/db";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
-import { excludeCurrentUsMarketCandle } from "@/lib/us-market-date";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 
 export const DEFAULT_BOLLINGER_PERIOD = 20;
@@ -124,7 +123,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
       if (!instrument) return;
       const key = `${instrument.market}:${instrument.code}`;
       try {
-        const candles = excludeCurrentUsMarketCandle(context.candles.get(key) ?? []);
+        const candles = context.candles.get(key) ?? [];
         const points = calculateBollingerBands(candles, policy.period, policy.stdDevMultiplier);
         const latest = points.at(-1);
         const latestCandle = candles.find((candle) => candle.date === latest?.date);
@@ -152,7 +151,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_daily_price_candles", completedDailyCandleOnly: true, exclusionRule: "현재 미국 시장일 캔들은 제외", bandCalculation: "종가 기반", touchRule: "최근 완료 일봉 저가 <= 하단선" },
+    dataPolicy: { source: "us_daily_price_candles", completedDailyCandleOnly: false, exclusionRule: "당일 봉 포함, 최신 저장 일봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 일봉 저가 <= 하단선" },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED").length,
     failureCount: results.filter((result) => result.status === "FAILED").length,

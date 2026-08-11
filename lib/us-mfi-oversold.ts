@@ -5,7 +5,6 @@ import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-dail
 import { latestMfi } from "@/lib/us-mfi";
 import { getMfiThreshold } from "@/lib/automation-settings";
 import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
-import { excludeCurrentUsMarketCandle } from "@/lib/us-market-date";
 
 export const DEFAULT_MFI_PERIOD = 14;
 export const DEFAULT_MFI_OVERSOLD_THRESHOLD = 30;
@@ -56,7 +55,7 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
       const instrument = instruments[cursor++];
       if (!instrument) return;
       try {
-        const prefetched = excludeCurrentUsMarketCandle(cachedCandles.get(`${instrument.market}:${instrument.code}`) ?? []);
+        const prefetched = cachedCandles.get(`${instrument.market}:${instrument.code}`) ?? [];
         const daily = prefetched && prefetched.length >= period + 1
           ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } }
           : { ok: false, status: 0, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: prefetched?.length ?? 0 } };
