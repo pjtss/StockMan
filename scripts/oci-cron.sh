@@ -103,6 +103,8 @@ run_cron_endpoint "kr-daily-cache" 300 "/api/cron/kr-daily-cache"
 
 run_cron_endpoint "us-free-float" 900 "/api/cron/us-free-float"
 
+run_cron_endpoint "us-product-classification" 900 "/api/cron/us-product-classification"
+
 ELAPSED_MS=$(( $(date +%s%3N) - START_MS ))
 printf '[CronSummary] total=%s success=%s failed=%s skipped=%s elapsedMs=%s\n' \
   "$TOTAL_COUNT" "$SUCCESS_COUNT" "$FAILED_COUNT" "$SKIPPED_COUNT" "$ELAPSED_MS"

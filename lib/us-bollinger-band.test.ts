@@ -14,4 +14,13 @@ describe("calculateBollingerBands", () => {
   it("returns no point when the period is not available", () => {
     expect(calculateBollingerBands([{ date: "20260801", open: 1, high: 1, low: 1, close: 1, volume: 1, raw: null }], 20)).toEqual([]);
   });
+
+  it("keeps the candle low for lower-band touch evaluation", () => {
+    const candles = Array.from({ length: 20 }, (_, index) => ({ date: `202608${String(index + 1).padStart(2, "0")}`, open: index === 1 ? 9 : 10, high: 10, low: index === 1 ? 9 : 10, close: index === 1 ? 9 : 10, volume: 100, raw: null }));
+    candles.push({ date: "20260901", open: 10, high: 11, low: 1, close: 10, volume: 100, raw: null });
+    const point = calculateBollingerBands(candles, 20, 2).at(-1)!;
+    expect(point.low).toBe(1);
+    expect(point.close).toBeGreaterThan(point.lower);
+    expect(point.low).toBeLessThanOrEqual(point.lower);
+  });
 });

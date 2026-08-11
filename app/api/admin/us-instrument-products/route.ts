@@ -12,7 +12,7 @@ export async function PATCH(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await request.json();
-    if (!body.market || !body.code || !["ALLOW", "BLOCK", null].includes(body.action)) throw new Error("market, code, action(ALLOW|BLOCK|null)가 필요합니다.");
+    if (!body.market || !body.code || !["BLOCK", null].includes(body.action)) throw new Error("market, code, action(BLOCK|null)가 필요합니다. ETF·레버리지 예외 허용은 지원하지 않습니다.");
     return NextResponse.json({ success: true, row: await setUsProductOverride({ market: body.market, code: body.code, action: body.action }) });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 }); }
 }

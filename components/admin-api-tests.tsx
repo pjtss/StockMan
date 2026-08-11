@@ -38,7 +38,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "us_free_float_refresh" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -132,6 +132,7 @@ const TESTS: ApiTestDefinition[] = [
     query: "ticker=AAPL",
   },
   { key: "us_free_float_refresh", label: "미국 유통주 전체 갱신", description: "통합 티커 전체를 대상으로 FMP 유통주 강제 갱신", endpoint: "/api/admin/us-free-float-refresh-test", query: "" },
+  { key: "us_product_classification", label: "미국 ETF·레버리지 비활성화", description: "KIS 상품 유형을 확인하고 제외 상품을 INACTIVE_EXCLUDED 처리", endpoint: "/api/admin/us-product-classification-refresh-test", query: "" },
   {
     key: "short_interest",
     label: "미국 단일종목 공매도",

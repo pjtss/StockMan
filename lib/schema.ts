@@ -312,6 +312,9 @@ export const usInstruments = pgTable("us_instruments", {
   classificationSource: text("classification_source").notNull().default("UNCLASSIFIED"),
   classificationConfidence: doublePrecision("classification_confidence"),
   manualProductAction: text("manual_product_action"),
+  productStatus: text("product_status").notNull().default("ACTIVE"),
+  classificationCheckedAt: timestamp("classification_checked_at", { withTimezone: true }),
+  classificationReason: text("classification_reason"),
   exchange: text("exchange").notNull().default(""),
   currency: text("currency").notNull().default("USD"),
   enabled: boolean("enabled").notNull().default(true),
@@ -340,6 +343,8 @@ export const krInstruments = pgTable("kr_instruments", {
   name: text("name").notNull().default(""),
   enabled: boolean("enabled").notNull().default(true),
   source: text("source").notNull().default("KIS"),
+  productStatus: text("product_status").notNull().default("ACTIVE"),
+  classificationReason: text("classification_reason"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("kr_instruments_market_code_unique").on(table.market, table.code), index("kr_instruments_enabled_code_idx").on(table.enabled, table.code)]);
