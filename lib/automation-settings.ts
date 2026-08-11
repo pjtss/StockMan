@@ -2,6 +2,9 @@ import { loadFeatureModuleSettings, saveFeatureModuleSettings } from "./feature-
 
 export const DEFAULT_AUTOMATION_INTERVAL_SECONDS = 30;
 export const DEFAULT_MFI_THRESHOLD = 30;
+export const DEFAULT_OBV_SIGNAL_PERIOD = 9;
+export const DEFAULT_OBV_SIGNAL_ABOVE_DAYS = 3;
+export const DEFAULT_OBV_SIGNAL_CROSS_LOOKBACK = 5;
 
 /**
  * 공개 피드 폴링과 기존 호출부가 사용하는 최소 호환 계층이다.
@@ -36,6 +39,26 @@ export async function saveMfiThreshold(threshold: number) {
     },
   });
   return value;
+}
+
+export type UsDailyObvSignalPolicy = {
+  signalPeriod: number;
+  aboveDays: number;
+  crossLookback: number;
+};
+
+export async function getUsDailyObvSignalPolicy(): Promise<UsDailyObvSignalPolicy> {
+  try {
+    const settings = await loadFeatureModuleSettings("us-daily-indicators");
+    const evaluation = settings.featureSettings?.evaluation;
+    return {
+      signalPeriod: Math.max(2, Math.min(100, Math.floor(Number(evaluation?.obvSignalPeriod ?? DEFAULT_OBV_SIGNAL_PERIOD)))),
+      aboveDays: Math.max(1, Math.min(20, Math.floor(Number(evaluation?.obvSignalAboveDays ?? DEFAULT_OBV_SIGNAL_ABOVE_DAYS)))),
+      crossLookback: Math.max(1, Math.min(30, Math.floor(Number(evaluation?.obvSignalCrossLookback ?? DEFAULT_OBV_SIGNAL_CROSS_LOOKBACK)))),
+    };
+  } catch {
+    return { signalPeriod: DEFAULT_OBV_SIGNAL_PERIOD, aboveDays: DEFAULT_OBV_SIGNAL_ABOVE_DAYS, crossLookback: DEFAULT_OBV_SIGNAL_CROSS_LOOKBACK };
+  }
 }
 
 export async function saveAutomationIntervalSeconds(seconds: number) {

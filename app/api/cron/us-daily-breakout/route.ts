@@ -4,7 +4,7 @@ import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
-import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -13,6 +13,15 @@ export async function POST(request: Request) {
   const settings = await loadFeatureModuleSettings("us-daily-breakout");
   if (!settings.enabled) { await recordSkippedAutomationRun("us-daily-breakout", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
   if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("us-daily-breakout", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
-  try { const result = await withAutomationRun("us-daily-breakout", async () => { const scan = await runUsDailyBreakoutScan(); const discord = await sendUsDailyBreakoutToDiscord(scan.qualified); return { ...scan, discord }; }); return NextResponse.json({ ok: result.discord.ok, ...result }); }
+  const intervalSeconds = Math.max(60, settings.intervalSeconds ?? 60);
+  const latestRun = await loadLatestExecutedAutomationRun("us-daily-breakout").catch(() => null);
+  const latestStartedAt = latestRun?.started_at ? new Date(latestRun.started_at).getTime() : null;
+  const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
+  if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
+    const reason = latestRun?.status === "RUNNING" ? "already_running" : "outside_interval";
+    await recordSkippedAutomationRun("us-daily-breakout", reason, { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+    return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+  }
+  try { const result = await withAutomationRun("us-daily-breakout", async () => { const scan = await runUsDailyBreakoutScan(); const discord = await sendUsDailyBreakoutToDiscord(scan.qualified); return { ...scan, discord }; }); return NextResponse.json({ ok: result.discord.ok, intervalSeconds, ...result }); }
   catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }

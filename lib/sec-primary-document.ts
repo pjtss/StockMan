@@ -4,6 +4,7 @@ import type { SecItem } from "./types";
 
 export type ResolvedSecPrimaryDocument = {
   indexUrl: string;
+  indexDocument: SecRawDocument;
   urlInfo: SecFilingUrlInfo;
   document: SecRawDocument;
 };
@@ -61,10 +62,12 @@ export async function fetchSecPrimaryDocument(item: SecItem): Promise<ResolvedSe
 
   const indexUrl = parseSecFilingUrl(item.link).canonicalUrl;
   if (!isSecFilingIndexUrl(indexUrl)) {
+    const document = await fetchSecRawDocument(indexUrl);
     return {
       indexUrl,
+      indexDocument: document,
       urlInfo: parseSecFilingUrl(indexUrl),
-      document: await fetchSecRawDocument(indexUrl),
+      document,
     };
   }
 
@@ -76,6 +79,7 @@ export async function fetchSecPrimaryDocument(item: SecItem): Promise<ResolvedSe
 
   return {
     indexUrl,
+    indexDocument,
     urlInfo: parseSecFilingUrl(primaryUrl),
     document: await fetchSecRawDocument(primaryUrl),
   };

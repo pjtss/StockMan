@@ -3,7 +3,7 @@ import { createSecRequestHeaders } from "./sec-request-headers";
 export const SEC_DATA_BASE_URL = "https://data.sec.gov";
 export const SEC_WEB_BASE_URL = "https://www.sec.gov";
 
-export type SecHttpResult<T> = { ok: true; status: number; url: string; data: T; fetchedAt: string; responseHeaders: Record<string, string> } | { ok: false; status: number; url: string; error: string; rawText: string; fetchedAt: string };
+export type SecHttpResult<T> = { ok: true; status: number; url: string; data: T; rawText: string; fetchedAt: string; responseHeaders: Record<string, string> } | { ok: false; status: number; url: string; error: string; rawText: string; fetchedAt: string };
 
 function baseUrl() { return (process.env.SEC_API_BASE_URL || SEC_DATA_BASE_URL).replace(/\/$/, ""); }
 function timeoutMs() { return Math.max(1000, Number(process.env.SEC_REQUEST_TIMEOUT_MS || 15000)); }
@@ -24,9 +24,9 @@ export async function fetchSecJson<T>(path: string, init: RequestInit = {}): Pro
     await waitForSecRateLimit();
     const response = await fetch(url, { ...init, headers: { ...createSecRequestHeaders("application/json"), ...(init.headers || {}) }, cache: "no-store", signal: init.signal || AbortSignal.timeout(timeoutMs()) });
     const rawText = await response.text();
-    if (!response.ok) return { ok: false, status: response.status, url, error: `SEC HTTP ${response.status}`, rawText: rawText.slice(0, 10000), fetchedAt };
-    try { return { ok: true, status: response.status, url, data: JSON.parse(rawText) as T, fetchedAt, responseHeaders: Object.fromEntries(response.headers.entries()) }; }
-    catch { return { ok: false, status: response.status, url, error: "SEC returned invalid JSON", rawText: rawText.slice(0, 10000), fetchedAt }; }
+    if (!response.ok) return { ok: false, status: response.status, url, error: `SEC HTTP ${response.status}`, rawText, fetchedAt };
+    try { return { ok: true, status: response.status, url, data: JSON.parse(rawText) as T, rawText, fetchedAt, responseHeaders: Object.fromEntries(response.headers.entries()) }; }
+    catch { return { ok: false, status: response.status, url, error: "SEC returned invalid JSON", rawText, fetchedAt }; }
   } catch (error) { return { ok: false, status: 0, url, error: error instanceof Error ? error.message : String(error), rawText: "", fetchedAt }; }
 }
 

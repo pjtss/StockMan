@@ -215,6 +215,7 @@ export const marketRssArticles = pgTable(
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
     rawPayload: text("raw_payload"),
+    sourceSnapshotId: bigint("source_snapshot_id", { mode: "number" }),
     detectedTicker: text("detected_ticker"),
     eventDirection: text("event_direction").notNull().default("NEUTRAL"),
     matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`),
@@ -243,6 +244,24 @@ export const marketRssArticles = pgTable(
     uniqueIndex("market_rss_articles_source_external_unique").on(table.source, table.externalId),
     index("market_rss_articles_notification_idx").on(table.notificationStatus, table.createdAt),
   ],
+);
+
+/** Content-addressed archive of the exact RSS response returned by a source. */
+export const marketRssFetchSnapshots = pgTable(
+  "market_rss_fetch_snapshots",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    source: text("source").notNull(),
+    url: text("url").notNull(),
+    status: integer("status").notNull(),
+    responseHeaders: jsonb("response_headers").notNull().default({}),
+    rawPayload: text("raw_payload").notNull(),
+    contentHash: text("content_hash").notNull(),
+    itemCount: integer("item_count").notNull().default(0),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("market_rss_fetch_source_hash_unique").on(table.source, table.contentHash), index("market_rss_fetch_fetched_idx").on(table.source, table.fetchedAt)],
 );
 
 export const usTradeIntensityTicks = pgTable(
@@ -494,8 +513,37 @@ export const secSubmissions = pgTable("sec_submissions", {
   accession: text("accession").primaryKey(), cik: text("cik").notNull(), form: text("form").notNull(), filingDate: date("filing_date").notNull(), reportDate: date("report_date"), primaryDocument: text("primary_document").notNull().default(""), primaryDocDescription: text("primary_doc_description"), items: text("items"), acceptanceDateTime: text("acceptance_datetime"), filingUrl: text("filing_url").notNull(), rawPayload: jsonb("raw_payload").notNull().default({}), classifiedCategory: text("classified_category"), classifiedDirection: text("classified_direction"), classifiedScore: integer("classified_score"), matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [index("sec_submissions_cik_filing_idx").on(table.cik, table.filingDate), index("sec_submissions_form_date_idx").on(table.form, table.filingDate)]);
 
+/** Content-addressed archive for full SEC JSON responses (submissions/facts). */
+export const secSourceSnapshots = pgTable("sec_source_snapshots", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  sourceType: text("source_type").notNull(),
+  sourceKey: text("source_key").notNull(),
+  url: text("url").notNull(),
+  status: integer("status").notNull(),
+  responseHeaders: jsonb("response_headers").notNull().default({}),
+  rawPayload: text("raw_payload").notNull(),
+  contentHash: text("content_hash").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("sec_source_snapshot_key_hash_unique").on(table.sourceType, table.sourceKey, table.contentHash), index("sec_source_snapshot_fetched_idx").on(table.sourceType, table.fetchedAt)]);
+
 export const secFilingEvents = pgTable("sec_filing_events", {
   accession: text("accession").primaryKey(), cik: text("cik").notNull(), category: text("category").notNull(), direction: text("direction").notNull(), score: integer("score").notNull(), matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`), bodyExcerpt: text("body_excerpt").notNull().default(""), financingAmountUsd: doublePrecision("financing_amount_usd"), dilutionRisk: text("dilution_risk"), insiderAction: text("insider_action"), discordStatus: text("discord_status").notNull().default("PENDING"), discordSentAt: timestamp("discord_sent_at", { withTimezone: true }), lastError: text("last_error"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Full SEC index/primary document captured for later AI analysis. */
+export const secFilingDocuments = pgTable("sec_filing_documents", {
+  accession: text("accession").primaryKey(),
+  cik: text("cik").notNull(),
+  form: text("form").notNull(),
+  indexUrl: text("index_url").notNull(),
+  primaryUrl: text("primary_url").notNull(),
+  indexHtml: text("index_html").notNull().default(""),
+  primaryHtml: text("primary_html").notNull().default(""),
+  primaryText: text("primary_text").notNull().default(""),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const secXbrlSnapshots = pgTable("sec_xbrl_snapshots", {

@@ -30,19 +30,22 @@ export async function POST(request: Request) {
       }
       const webhook = await loadFeatureDiscordWebhook("sec-realtime", ["SEC_DISCORD_WEBHOOK_URL"]);
       let sent = 0;
-      if (webhook) {
-        const [events, submissions] = await Promise.all([loadPendingSecEvents(discordBatch), loadRecentSecSubmissions(100)]);
-        const byAccession = new Map(submissions.map((row) => [row.accession, row]));
-        for (const event of events) {
-          const filing = byAccession.get(event.accession); if (!filing) continue;
-          const analysis = await analyzeSecSubmission(event.accession);
-          const financing = analysis.ok ? analysis.financing : null;
-          const insider = analysis.ok ? analysis.insider : null;
-          const body = [`🚨 **SEC EDGAR 공시 이벤트**`, `Form ${filing.form} · ${filing.cik}`, `분류 ${event.category} · ${event.direction} · 점수 ${event.score}`, event.matchedTerms.length ? `근거 ${event.matchedTerms.join(", ")}` : "", financing?.detected ? `자금조달 ${financing.amountUsd ?? "금액 확인 불가"} · 희석위험 ${financing.dilutionRisk}` : "", insider?.detected ? `내부자 ${insider.action}` : "", filing.filingUrl].filter(Boolean).join("\n");
-          try { const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body }) }); if (!response.ok) throw new Error(`Discord HTTP ${response.status}`); await markSecEventDiscord(event.accession, "SENT"); sent++; } catch (error) { await markSecEventDiscord(event.accession, "FAILED", error instanceof Error ? error.message : String(error)); }
-        }
+      let documentCaptured = 0;
+      let documentCaptureFailed = 0;
+      const [events, submissions] = await Promise.all([loadPendingSecEvents(discordBatch), loadRecentSecSubmissions(100)]);
+      const byAccession = new Map(submissions.map((row) => [row.accession, row]));
+      for (const event of events) {
+        const filing = byAccession.get(event.accession); if (!filing) continue;
+        const analysis = await analyzeSecSubmission(event.accession);
+        if (analysis.ok) documentCaptured++;
+        else documentCaptureFailed++;
+        if (!webhook || !analysis.ok) continue;
+        const financing = analysis.financing;
+        const insider = analysis.insider;
+        const body = [`🚨 **SEC EDGAR 공시 이벤트**`, `Form ${filing.form} · ${filing.cik}`, `분류 ${event.category} · ${event.direction} · 점수 ${event.score}`, event.matchedTerms.length ? `근거 ${event.matchedTerms.join(", ")}` : "", financing?.detected ? `자금조달 ${financing.amountUsd ?? "금액 확인 불가"} · 희석위험 ${financing.dilutionRisk}` : "", insider?.detected ? `내부자 ${insider.action}` : "", filing.filingUrl].filter(Boolean).join("\n");
+        try { const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body }) }); if (!response.ok) throw new Error(`Discord HTTP ${response.status}`); await markSecEventDiscord(event.accession, "SENT"); sent++; } catch (error) { await markSecEventDiscord(event.accession, "FAILED", error instanceof Error ? error.message : String(error)); }
       }
-      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, syncXbrl, discordBatch, results, failedCikCount: results.filter((item) => !item.ok).length, discordSent: sent, webhookConfigured: Boolean(webhook) };
+      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, syncXbrl, discordBatch, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook) };
     });
     return NextResponse.json(result);
   } catch (error) {

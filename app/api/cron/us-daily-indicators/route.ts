@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { scanStoredUsMfiOversold } from "@/lib/us-mfi-oversold";
 import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
+import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { createUsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
@@ -27,24 +28,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
   }
   try {
-    return NextResponse.json(await withAutomationRun("us-daily-indicators", async () => {
+    const result = await withAutomationRun("us-daily-indicators", async () => {
     const context = await createUsDailyScanContext({ candleLimit: 100 });
-    const [mfi, dmi, macd] = await Promise.all([scanStoredUsMfiOversold({ context }), scanStoredUsDmi({ context }), scanStoredUsMacd({ context })]);
-    const [mfiFiltered, dmiFiltered, macdFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified].map((items) => filterUsDailyCandidates(items as any)));
-    const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any });
+    const [mfi, dmi, macd, obv] = await Promise.all([scanStoredUsMfiOversold({ context }), scanStoredUsDmi({ context }), scanStoredUsMacd({ context }), scanStoredUsDailyObv({ context })]);
+    const [mfiFiltered, dmiFiltered, macdFiltered, obvFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified, obv.qualified].map((items) => filterUsDailyCandidates(items as any)));
+    const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any, obv: obvFiltered.filtered as any });
     return {
       ok: discord.ok,
       mfi,
       dmi,
       macd,
+      obv,
       commonFilter: {
-        excluded: { mfi: mfiFiltered.excludedCount, dmi: dmiFiltered.excludedCount, macd: macdFiltered.excludedCount },
-        failureReasons: { mfi: mfiFiltered.failureReasons, dmi: dmiFiltered.failureReasons, macd: macdFiltered.failureReasons },
-        matchedMetricCount: { mfi: mfiFiltered.matchedMetricCount, dmi: dmiFiltered.matchedMetricCount, macd: macdFiltered.matchedMetricCount },
+        excluded: { mfi: mfiFiltered.excludedCount, dmi: dmiFiltered.excludedCount, macd: macdFiltered.excludedCount, obv: obvFiltered.excludedCount },
+        failureReasons: { mfi: mfiFiltered.failureReasons, dmi: dmiFiltered.failureReasons, macd: macdFiltered.failureReasons, obv: obvFiltered.failureReasons },
+        matchedMetricCount: { mfi: mfiFiltered.matchedMetricCount, dmi: dmiFiltered.matchedMetricCount, macd: macdFiltered.matchedMetricCount, obv: obvFiltered.matchedMetricCount },
         settings: mfiFiltered.settings,
       },
       discord,
     };
-    }));
+    });
+    return NextResponse.json({ intervalSeconds, ...result });
   } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }

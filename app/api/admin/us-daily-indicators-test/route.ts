@@ -6,6 +6,7 @@ import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsMfiOversold } from "@/lib/us-mfi-oversold";
 import { createUsDailyScanContext } from "@/lib/us-daily-scan-context";
+import { currentUsMarketDate } from "@/lib/us-market-date";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +73,7 @@ async function executeUnified(breakoutLimit: number | undefined, mode: "summary"
       source: "us_daily_price_candles",
       storage: "PostgreSQL DB cache",
       kstToday: currentKstDate(),
+      usMarketDate: currentUsMarketDate(),
       cacheRefreshExcludesToday: true,
       historicalIndicators: ["mfi", "dmi", "macd", "obv"],
       historicalIndicatorRule: "MFI·DMI·MACD·일봉 OBV는 DB에 저장된 일봉만 사용하며 KIS 실시간 보충 조회를 하지 않습니다.",

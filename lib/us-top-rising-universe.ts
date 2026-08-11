@@ -9,6 +9,10 @@ import { loadUsTurnoverFilterSettings, type UsTurnoverFilterSettings } from "@/l
 
 export const US_EXCHANGES = ["NAS", "AMS", "NYS"] as const;
 const EXCLUDED = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i;
+// KIS occasionally omits etyp_nm for exchange-traded products. These issuer
+// and product-name hints prevent the live VWAP universe from treating an ETF
+// as a common stock when provider metadata is incomplete.
+const ETF_NAME_HINT = /\b(?:ISHARES|VISTASHARES|ROUNDHILL|KRANESHARES|KFA|SPDR|VANECK|PROSHARES|DIREXION|GLOBAL\s+X|INVESCO|GRANITESHARES|AMPLIFY|JANUS\s+HENDERSON)\b/i;
 function rows(parsed: any) { const output = parsed?.output ?? parsed?.output2 ?? parsed?.output1; return Array.isArray(output) ? output.slice(0, 100) : []; }
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
@@ -84,7 +88,9 @@ export async function loadUsTopRisingScopes() {
     let productExcluded = 0;
     for (const [index, item] of sourceRows.entries()) {
       const ticker = code(item); const name = String(item.name ?? item.company ?? item.enName ?? "").trim();
-      const excluded = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i.test(`${name} ${String(item.ename ?? "")} ${String(item.etyp_nm ?? "")}`);
+      const product = classifyUsInstrumentProduct({ name, englishName: item.ename, type: item.etyp_nm, market });
+      const productText = `${name} ${String(item.ename ?? "")} ${String(item.etyp_nm ?? "")}`;
+      const excluded = !isEligibleUsCommonStock(product) || EXCLUDED.test(productText) || ETF_NAME_HINT.test(productText);
       if (!ticker || excluded) { if (excluded) productExcluded += 1; continue; }
       const key = `${market}:${ticker}`; if (seen.has(key)) continue; seen.add(key);
       const numeric = (value: unknown) => { const parsed = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : null; };

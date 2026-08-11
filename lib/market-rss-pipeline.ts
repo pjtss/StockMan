@@ -10,6 +10,7 @@ import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-
 import { loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
+import { archiveMarketRssFeed } from "./source-payload-archive";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -25,6 +26,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
   let inserted = 0;
   for (const result of fetched.results) {
     if (!result.ok) continue;
+    const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
     for (const item of result.feed.items) {
       const classification = classifyMarketRssItem(item);
       const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
@@ -40,6 +42,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         title: item.title,
         summary: item.summary,
         rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
+        sourceSnapshotId,
         detectedTicker: classification.ticker || mappedTicker,
         eventDirection: classification.direction,
         matchedTerms: classification.matchedTerms,
@@ -52,7 +55,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         notifyEligible,
         isBacklog,
       }).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
-        title: sql`excluded.title`, summary: sql`excluded.summary`, rawPayload: sql`excluded.raw_payload`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
+        title: sql`excluded.title`, summary: sql`excluded.summary`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         link: sql`CASE WHEN ${marketRssArticles.link} = '' THEN excluded.link ELSE ${marketRssArticles.link} END`,
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,
         category: sql`excluded.category`, priority: sql`excluded.priority`,

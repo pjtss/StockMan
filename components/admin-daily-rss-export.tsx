@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import styles from "./admin-daily-rss-export.module.css";
 
 type CopyItem = { title: string; link: string; grade: string };
+type AnalysisItem = Record<string, unknown>;
 type ExportResponse = {
   ok: boolean;
   date?: string;
@@ -14,7 +15,10 @@ type ExportResponse = {
   duplicateCount?: number;
   sourceCounts?: Record<string, number>;
   gradeCounts?: Record<string, number>;
-  items?: CopyItem[];
+  items?: AnalysisItem[];
+  compactItems?: CopyItem[];
+  rawItems?: AnalysisItem[];
+  rawIncluded?: boolean;
   error?: string;
 };
 
@@ -29,13 +33,16 @@ export function AdminDailyRssExport() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const items = response?.items || [];
+  const compactItems = response?.compactItems || [];
   const copiedJson = useMemo(() => JSON.stringify(items, null, 2), [items]);
+  const compactJson = useMemo(() => JSON.stringify(compactItems, null, 2), [compactItems]);
+  const rawJson = useMemo(() => JSON.stringify(response?.rawItems || [], null, 2), [response?.rawItems]);
 
-  async function load() {
+  async function load(includeRaw = false) {
     setLoading(true);
     setError("");
     try {
-      const result = await fetch(`/api/admin/daily-rss?date=${encodeURIComponent(date)}`, { cache: "no-store" });
+      const result = await fetch(`/api/admin/daily-rss?date=${encodeURIComponent(date)}&includeRaw=${includeRaw ? "true" : "false"}`, { cache: "no-store" });
       const value = await result.json() as ExportResponse;
       if (!result.ok || !value.ok) throw new Error(value.error || `HTTP ${result.status}`);
       setResponse(value);
@@ -49,14 +56,14 @@ export function AdminDailyRssExport() {
 
   useEffect(() => { void load(); }, []);
 
-  async function copyItems() {
+  async function copyText(value: string) {
     try {
       if (navigator.clipboard?.writeText) {
         try {
-          await navigator.clipboard.writeText(copiedJson);
+          await navigator.clipboard.writeText(value);
         } catch {
           const textarea = document.createElement("textarea");
-          textarea.value = copiedJson;
+          textarea.value = value;
           textarea.setAttribute("readonly", "");
           textarea.style.position = "fixed";
           textarea.style.opacity = "0";
@@ -68,7 +75,7 @@ export function AdminDailyRssExport() {
         }
       } else {
         const textarea = document.createElement("textarea");
-        textarea.value = copiedJson;
+        textarea.value = value;
         textarea.setAttribute("readonly", "");
         textarea.style.position = "fixed";
         textarea.style.opacity = "0";
@@ -85,17 +92,25 @@ export function AdminDailyRssExport() {
     }
   }
 
+  async function copyItems() { await copyText(copiedJson); }
+  async function copyCompactItems() { await copyText(compactJson); }
+  async function loadAndCopyRaw() { await load(true); }
+  async function copyRawItems() { await copyText(rawJson); }
+
   return (
     <section className={styles.container}>
       <div className={styles.toolbar}>
         <div>
           <strong>일별 해외 RSS · SEC 복사</strong>
-          <p>선택한 KST 날짜의 RSS·SEC 공시에서 제목, 링크, 호재 등급만 추려 복사합니다.</p>
+          <p>선택한 KST 날짜의 RSS·SEC 공시에서 AI 분석 필드와 원본 보존 데이터를 확인합니다.</p>
         </div>
         <div className={styles.actions}>
           <input type="date" value={date} onChange={(event) => setDate(event.target.value)} aria-label="조회 날짜" />
           <button onClick={() => void load()} disabled={loading} type="button"><RefreshCw size={15} className={loading ? styles.spin : undefined} /> 조회</button>
-          <button onClick={() => void copyItems()} disabled={!response || loading} type="button"><Clipboard size={15} /> {copied ? "복사됨" : "3개 필드 JSON 복사"}</button>
+          <button onClick={() => void copyItems()} disabled={!response || loading} type="button"><Clipboard size={15} /> {copied ? "복사됨" : "AI 분석 JSON 복사"}</button>
+          <button onClick={() => void copyCompactItems()} disabled={!response || loading} type="button"><Clipboard size={15} /> 간단 JSON 복사</button>
+          <button onClick={() => void loadAndCopyRaw()} disabled={!response || loading} type="button"><Clipboard size={15} /> 원본 포함 조회</button>
+          {response?.rawIncluded && <button onClick={() => void copyRawItems()} disabled={loading} type="button"><Clipboard size={15} /> 원본 JSON 복사</button>}
         </div>
       </div>
 
@@ -112,14 +127,19 @@ export function AdminDailyRssExport() {
           {Object.entries(response.gradeCounts || {}).map(([grade, count]) => <span key={grade}>{grade} {count}건</span>)}
         </div>
         <section className={styles.outputCard}>
-          <div className={styles.outputHeader}><div><h2>복사 대상 JSON</h2><p>항목당 title · link · grade 3개 필드만 포함합니다.</p></div><button onClick={() => void copyItems()} disabled={!items.length} type="button"><Clipboard size={15} /> {copied ? "복사됨" : "JSON 복사"}</button></div>
+          <div className={styles.outputHeader}><div><h2>AI 분석용 JSON</h2><p>출처·시각·기업·SEC 메타데이터·분류 근거·위험·본문 발췌를 포함합니다.</p></div><button onClick={() => void copyItems()} disabled={!items.length} type="button"><Clipboard size={15} /> {copied ? "복사됨" : "JSON 복사"}</button></div>
           <pre>{copiedJson}</pre>
         </section>
+        {response.rawIncluded && <section className={styles.outputCard}>
+          <div className={styles.outputHeader}><div><h2>저장 원본 JSON</h2><p>RSS 원본 항목·전체 RSS 응답·SEC 제출 JSON·SEC 원문을 포함합니다.</p></div><button onClick={() => void copyRawItems()} disabled={loading} type="button"><Clipboard size={15} /> 원본 복사</button></div>
+          <pre>{rawJson}</pre>
+        </section>}
         {items.length === 0 ? <p className={styles.empty}>선택한 날짜에 저장된 해외 RSS·SEC 공시가 없습니다.</p> : <div className={styles.list}>
-          {items.map((item, index) => <article className={styles.card} key={`${item.link}-${index}`}>
-            <div className={styles.cardTop}><span className={styles.index}>#{index + 1}</span><span className={styles.grade}>{item.grade}</span></div>
-            <h2>{item.title}</h2>
-            <a href={item.link} target="_blank" rel="noreferrer"><span>{item.link}</span><ExternalLink size={14} /></a>
+          {items.map((item, index) => <article className={styles.card} key={`${String(item.link || item.externalId || index)}-${index}`}>
+            <div className={styles.cardTop}><span className={styles.index}>#{index + 1}</span><span className={styles.grade}>{String(item.grade || "")}</span></div>
+            <h2>{String(item.titleTranslated || item.titleOriginal || "")}</h2>
+            <a href={String(item.link || "")} target="_blank" rel="noreferrer"><span>{String(item.link || "")}</span><ExternalLink size={14} /></a>
+            <p>{String(item.source || "")} · {String(item.category || "")} · {String(item.direction || "")}</p>
           </article>)}
         </div>}
       </>}

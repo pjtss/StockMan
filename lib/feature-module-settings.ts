@@ -32,10 +32,11 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30 } } },
-  "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
+  "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5 } } },
+  "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "us-daily-cache": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 43_200, activeDays: [1, 2, 3, 4, 5] },
-  "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:02", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-daily-open-cache": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 3_600, activeDays: [1, 2, 3, 4, 5] },
+  "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:02", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-trade-intensity": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "short-borrow": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "discord-delivery-retry": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
@@ -64,7 +65,19 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (hasStartDay !== hasEndDay || (hasStartDay && (!Number.isInteger(settings.startDay) || !Number.isInteger(settings.endDay) || (settings.startDay as number) < 0 || (settings.startDay as number) > 6 || (settings.endDay as number) < 0 || (settings.endDay as number) > 6))) throw new Error("INVALID_SCHEDULE_DAYS");
   if (hasStartDay && settings.startDay === settings.endDay && settings.startTime === settings.endTime) throw new Error("INVALID_SCHEDULE_RANGE");
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
-  if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < 5)) throw new Error("INVALID_INTERVAL");
+  const minuteScheduledModules: FeatureModuleKey[] = ["us-daily-indicators", "us-obv", "us-daily-cache", "us-daily-open-cache", "us-daily-breakout"];
+  const minimumIntervalSeconds = minuteScheduledModules.includes(key) ? 60 : 5;
+  if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < minimumIntervalSeconds)) throw new Error("INVALID_INTERVAL");
+  if (key === "us-daily-indicators") {
+    const evaluation = settings.featureSettings?.evaluation;
+    const validateInteger = (name: string, value: unknown, min: number, max: number) => {
+      if (value === undefined) return;
+      if (!Number.isInteger(Number(value)) || Number(value) < min || Number(value) > max) throw new Error(`INVALID_${name.toUpperCase()}`);
+    };
+    validateInteger("obv_signal_period", evaluation?.obvSignalPeriod, 2, 100);
+    validateInteger("obv_signal_above_days", evaluation?.obvSignalAboveDays, 1, 20);
+    validateInteger("obv_signal_cross_lookback", evaluation?.obvSignalCrossLookback, 1, 30);
+  }
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
   const updatedAt = new Date();

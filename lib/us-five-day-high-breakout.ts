@@ -1,5 +1,6 @@
 import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { loadCachedUsDailyCandles } from "@/lib/us-daily-price-cache";
+import { currentUsMarketDate, dateKey } from "@/lib/us-market-date";
 
 export type UsFiveDayHighBreakoutRequest = { code: string; market: string; asOfDate?: string };
 
@@ -23,15 +24,8 @@ export type UsFiveDayHighBreakoutResult = {
   error?: string;
 };
 
-function dateKey(value: string) { return value.replace(/[^0-9]/g, ""); }
-
-function currentKstDate() {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  return `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}`;
-}
-
 export function selectPreviousFiveTradingDays(candles: UsDailyCandle[], asOfDate?: string) {
-  const cutoff = dateKey(asOfDate || currentKstDate());
+  const cutoff = dateKey(asOfDate || currentUsMarketDate());
   return [...candles]
     .filter((candle) => !cutoff || dateKey(candle.date) < cutoff)
     .sort((a, b) => dateKey(b.date).localeCompare(dateKey(a.date)))
@@ -59,7 +53,7 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
       lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000), diagnostics: daily.diagnostics }, price: { ok: false, status: 0 }, error: !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient prior candles (${previous.length}/5)` };
       continue;
     }
-    const cutoff = dateKey(asOfDate || currentKstDate());
+    const cutoff = dateKey(asOfDate || currentUsMarketDate());
     const currentCandle = daily.candles.find((candle) => dateKey(candle.date) === cutoff);
     const currentPrice = currentCandle?.open ?? null;
     if (!currentCandle || currentPrice == null || !Number.isFinite(currentPrice) || currentPrice <= 0) {

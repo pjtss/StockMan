@@ -43,7 +43,7 @@ export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?:
     input.mfi?.length ? `**MFI 과매도 후보**\n${input.mfi.slice(0, 20).map((item) => line(item, "mfi")).join("\n")}` : "",
     input.dmi?.length ? `**DMI 상승 후보**\n${input.dmi.slice(0, 20).map((item) => `${line(item, "plusDi")} · -DI ${item.minusDi ?? "-"} · ADX ${item.adx ?? "-"}`).join("\n")}` : "",
     input.macd?.length ? `**MACD 상승 후보**\n${input.macd.slice(0, 20).map((item) => `${line(item, "histogram")} · MACD ${item.macd ?? "-"} · Signal ${item.signal ?? "-"}`).join("\n")}` : "",
-    input.obv?.length ? `**일봉 OBV 상승 후보**\n${input.obv.slice(0, 20).map((item) => `${line(item, "change")} · 상승 바 비율 ${item.risingBarRate == null ? "-" : `${(Number(item.risingBarRate) * 100).toFixed(1)}%`}`).join("\n")}` : "",
+    input.obv?.length ? `**일봉 OBV Signal 상승 후보**\n${input.obv.slice(0, 20).map((item) => `${line(item, "change")} · OBV ${item.obv ?? "-"} · Signal ${item.obvSignal ?? "-"} · 상회 ${item.aboveSignalDays ?? 0}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`).join("\n")}` : "",
   ].filter(Boolean);
   if (!sections.length) return { ok: true, sent: 0, skipped: true, reason: "no_candidates" };
   const chunks = buildUsDailyIndicatorDiscordChunks(sections);

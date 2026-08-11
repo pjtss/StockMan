@@ -89,6 +89,8 @@ run_cron_endpoint "us-obv" 120 "/api/cron/us-obv"
 
 run_cron_endpoint "us-daily-cache" 300 "/api/cron/us-daily-cache"
 
+run_cron_endpoint "us-daily-open-cache" 300 "/api/cron/us-daily-open-cache"
+
 run_cron_endpoint "us-daily-breakout" 120 "/api/cron/us-daily-breakout"
 
 run_cron_endpoint "us-daily-indicators" 180 "/api/cron/us-daily-indicators"

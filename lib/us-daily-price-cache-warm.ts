@@ -1,9 +1,9 @@
 import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
+import { currentUsMarketDate } from "@/lib/us-market-date";
 
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
-function currentKstDate() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date()).replaceAll("-", ""); }
 
 async function executeWarm(options: { concurrency?: number } = {}) {
   const startedAt = new Date().toISOString();
@@ -24,7 +24,7 @@ async function executeWarm(options: { concurrency?: number } = {}) {
           failures.push({ market: item.market, code: item.code, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "KIS returned no daily candles" });
           continue;
         }
-        const today = currentKstDate();
+        const today = currentUsMarketDate();
         const historicalCandles = daily.candles.filter((candle) => String(candle.date).replace(/[^0-9]/g, "") !== today);
         if (historicalCandles.length === 0) {
           failures.push({ market: item.market, code: item.code, error: "KIS returned no prior-day candles after excluding current date" });

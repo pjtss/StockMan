@@ -38,7 +38,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -141,6 +141,7 @@ const TESTS: ApiTestDefinition[] = [
   { key: "us_dmi", label: "미국 DMI·ADX", description: "TOP100 종목의 DB 저장 일봉만으로 DMI·ADX 추세 스캔", endpoint: "/api/admin/us-dmi-test", query: "" },
   { key: "us_daily_breakout", label: "미국 일봉 5일 고가 돌파", description: "TOP100 종목의 DB 저장 일봉과 현재가를 비교(일봉 KIS 보충 조회 없음)", endpoint: "/api/admin/us-daily-breakout-test", query: "limit=30" },
   { key: "us_daily_cache", label: "미국 전체 일봉 데이터 갱신", description: "KIS에서 이전 일봉을 받아 DB에 저장하는 별도 갱신 기능", endpoint: "/api/admin/us-daily-cache-test", query: "" },
+  { key: "us_daily_open_cache", label: "미국 당일 시가 DB 갱신", description: "현재 미국 시장일의 캔들만 KIS에서 조회해 DB에 UPSERT", endpoint: "/api/admin/us-daily-open-cache-test", query: "" },
   {
     key: "us_news_radar",
     label: "해외 뉴스 속보 레이더",

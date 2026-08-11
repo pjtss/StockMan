@@ -1,7 +1,16 @@
 import { XMLParser } from "fast-xml-parser";
 
 export type MarketRssItem = { id: string; title: string; link: string; summary: string; publishedAt: string | null; source: string; raw?: unknown };
-export type MarketRssFeed = { source: string; url: string; fetchedAt: string; items: MarketRssItem[] };
+export type MarketRssFeed = {
+  source: string;
+  url: string;
+  fetchedAt: string;
+  items: MarketRssItem[];
+  /** The exact response body returned by the publisher feed. */
+  rawPayload?: string;
+  responseStatus?: number;
+  responseHeaders?: Record<string, string>;
+};
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", trimValues: true, processEntities: false });
 const text = (value: unknown) => typeof value === "string" ? value.trim() : value && typeof value === "object" && "#text" in value ? String((value as Record<string, unknown>)["#text"]).trim() : "";
@@ -29,5 +38,11 @@ export function parseMarketRss(xml: string, source: string, url: string): Market
 export async function fetchMarketRss(source: string, url: string, init: RequestInit = {}): Promise<MarketRssFeed> {
   const response = await fetch(url, { ...init, headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml", ...(init.headers || {}) }, cache: "no-store" });
   if (!response.ok) throw new Error(`${source} RSS 요청 실패: ${response.status}`);
-  return parseMarketRss(await response.text(), source, url);
+  const rawPayload = await response.text();
+  return {
+    ...parseMarketRss(rawPayload, source, url),
+    rawPayload,
+    responseStatus: response.status,
+    responseHeaders: Object.fromEntries(response.headers.entries()),
+  };
 }

@@ -1,18 +1,20 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
-import { secCompanies, secFilingEvents, secSubmissions, secXbrlSnapshots } from "./schema";
+import { secCompanies, secFilingDocuments, secFilingEvents, secSubmissions, secXbrlSnapshots } from "./schema";
 import { fetchSecSubmissions, type SecSubmissionRow } from "./sec-submissions";
 import { classifySecEvent } from "./sec-event-classifier";
 import { fetchSecJson, companyFactsUrl } from "./sec-edgar-client";
 import { fetchSecPrimaryDocument } from "./sec-primary-document";
 import { analyzeSecFinancing } from "./sec-financing-analyzer";
 import { analyzeSecInsider } from "./sec-insider-analysis";
+import { archiveSecFilingDocument, archiveSecSourceSnapshot } from "./source-payload-archive";
 
 export function secFilingUrl(cik: string, accession: string, primaryDocument: string) { return `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${accession.replace(/-/g, "")}/${primaryDocument}`; }
 
 export async function syncSecCompany(cik: string) {
   const result = await fetchSecSubmissions(cik);
   if (!result.source.ok) return { ok: false, cik: result.cik, error: result.source.error, status: result.source.status, source: result.source, submissions: 0, inserted: 0 };
+  await archiveSecSourceSnapshot({ sourceType: "SUBMISSIONS", sourceKey: result.cik, url: result.source.url, status: result.source.status, responseHeaders: result.source.responseHeaders, rawPayload: result.source.rawText, fetchedAt: result.source.fetchedAt });
   const db = getDb();
   await db.insert(secCompanies).values({ cik: result.cik, name: result.name, tickers: result.tickers, exchanges: result.exchanges, sic: result.sic || null, sourceUpdatedAt: new Date(), updatedAt: new Date() }).onConflictDoUpdate({ target: secCompanies.cik, set: { name: result.name, tickers: result.tickers, exchanges: result.exchanges, sic: result.sic || null, sourceUpdatedAt: new Date(), updatedAt: new Date() } });
   let inserted = 0;
@@ -29,6 +31,7 @@ export async function syncSecCompany(cik: string) {
 export async function syncSecCompanyFacts(cik: string) {
   const source = await fetchSecJson<Record<string, unknown>>(companyFactsUrl(cik));
   if (!source.ok) return { ok: false, cik, status: source.status, error: source.error };
+  await archiveSecSourceSnapshot({ sourceType: "COMPANY_FACTS", sourceKey: cik.replace(/\D/g, "").padStart(10, "0"), url: source.url, status: source.status, responseHeaders: source.responseHeaders, rawPayload: source.rawText, fetchedAt: source.fetchedAt });
   await getDb().insert(secXbrlSnapshots).values({ cik: cik.replace(/\D/g, "").padStart(10, "0"), payload: source.data, fetchedAt: new Date() }).onConflictDoUpdate({ target: secXbrlSnapshots.cik, set: { payload: source.data, fetchedAt: new Date() } });
   return { ok: true, cik, status: source.status, fetchedAt: source.fetchedAt, factCount: Object.keys((source.data as any).facts || {}).length };
 }
@@ -42,10 +45,29 @@ export async function analyzeSecSubmission(accession: string) {
   const row = await loadSecSubmission(accession);
   if (!row) return { ok: false, accession, error: "submission_not_found" };
   try {
+    const cachedDocuments = await getDb().select().from(secFilingDocuments).where(eq(secFilingDocuments.accession, accession)).limit(1);
+    if (cachedDocuments[0]?.primaryText) {
+      const cached = cachedDocuments[0];
+      const financing = analyzeSecFinancing(cached.primaryText);
+      const insider = analyzeSecInsider(cached.primaryText);
+      await getDb().update(secFilingEvents).set({ bodyExcerpt: cached.primaryText.slice(0, 12000), financingAmountUsd: financing.amountUsd, dilutionRisk: financing.dilutionRisk, insiderAction: insider.action, updatedAt: new Date() }).where(eq(secFilingEvents.accession, accession));
+      return { ok: true, cached: true, accession, url: cached.primaryUrl, financing, insider, excerpt: cached.primaryText.slice(0, 12000) };
+    }
     const document = await fetchSecPrimaryDocument({ source: "SEC", accession: row.accession, company: row.cik, formType: row.form, sentiment: "중요공시", publishedAt: `${row.filingDate}T00:00:00Z`, title: row.primaryDocDescription || row.form, summary: "", link: row.filingUrl });
     const text = document.document.text || document.document.html || "";
     const financing = analyzeSecFinancing(text);
     const insider = analyzeSecInsider(text);
+    await archiveSecFilingDocument({
+      accession: row.accession,
+      cik: row.cik,
+      form: row.form,
+      indexUrl: document.indexUrl,
+      primaryUrl: document.urlInfo.canonicalUrl,
+      indexHtml: document.indexDocument.html,
+      primaryHtml: document.document.html,
+      primaryText: text,
+      fetchedAt: new Date().toISOString(),
+    });
     await getDb().update(secFilingEvents).set({ bodyExcerpt: text.slice(0, 12000), financingAmountUsd: financing.amountUsd, dilutionRisk: financing.dilutionRisk, insiderAction: insider.action, updatedAt: new Date() }).where(eq(secFilingEvents.accession, accession));
     return { ok: true, accession, url: document.urlInfo.canonicalUrl, financing, insider, excerpt: text.slice(0, 12000) };
   } catch (error) { return { ok: false, accession, error: error instanceof Error ? error.message : String(error) }; }
