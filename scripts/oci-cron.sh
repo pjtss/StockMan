@@ -95,6 +95,8 @@ run_cron_endpoint "us-daily-breakout" 120 "/api/cron/us-daily-breakout"
 
 run_cron_endpoint "us-daily-indicators" 180 "/api/cron/us-daily-indicators"
 
+run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
+
 ELAPSED_MS=$(( $(date +%s%3N) - START_MS ))
 printf '[CronSummary] total=%s success=%s failed=%s skipped=%s elapsedMs=%s\n' \
   "$TOTAL_COUNT" "$SUCCESS_COUNT" "$FAILED_COUNT" "$SKIPPED_COUNT" "$ELAPSED_MS"

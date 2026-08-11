@@ -38,7 +38,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "us_free_float" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -98,6 +98,7 @@ const TESTS: ApiTestDefinition[] = [
     query: "send=false",
   },
   { key: "us_vwap", label: "미국 당일 VWAP 상회", description: "AMS·NAS·NYS 관심종목의 당일 전체 세션 VWAP 비교", endpoint: "/api/admin/us-vwap-test", query: "" },
+  { key: "us_bollinger_band", label: "미국 일봉 볼린저밴드 하단 이탈", description: "통합 티커 전체의 DB 완료 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/us-bollinger-band-test", query: "" },
   { key: "us_top100_upsert", label: "미국 TOP100 통합 티커 UPSERT", description: "NAS·AMS·NYS TOP100에서 ETF·레버리지 제외 후 통합 테이블 반영", endpoint: "/api/admin/us-top-rising-upsert-test", query: "" },
   {
     key: "us_trade_trend",

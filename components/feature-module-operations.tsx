@@ -21,6 +21,7 @@ type ModuleSettings = {
     marketRss?: { enabledSources?: string[] };
     secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
     vwapPolicy?: Record<string, number | boolean>;
+    bollingerPolicy?: { period?: number; stdDevMultiplier?: number; minPrice?: number; minVolume?: number; minTurnoverRatio?: number };
   };
 };
 
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: ModuleSettings = {
     discordFormat: { webhookUrl: "" },
     evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5 },
     vwapPolicy: { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true },
+    bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
     marketRss: { enabledSources: [...MARKET_RSS_SOURCES] },
     secEdgar: { ciks: [], syncXbrl: false, discordBatch: 10 },
   },
@@ -53,7 +55,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
       .then((value) => {
         const days = Array.isArray(value.activeDays) && value.activeDays.length ? value.activeDays.map(Number).sort((a: number, b: number) => a - b) : [1, 2, 3, 4, 5];
         const defaultInterval = moduleKey === "us-obv" || moduleKey === "us-daily-breakout" ? 60 : moduleKey === "us-daily-open-cache" ? 3600 : DEFAULT_SETTINGS.intervalSeconds;
-        setSettings({ ...DEFAULT_SETTINGS, intervalSeconds: defaultInterval, ...value, scheduleMode: value.scheduleMode === "weekly-range" ? "weekly-range" : "daily-window", startDay: Number.isInteger(value.startDay) ? Number(value.startDay) : days[0], endDay: Number.isInteger(value.endDay) ? Number(value.endDay) : days[days.length - 1], featureSettings: { ...DEFAULT_SETTINGS.featureSettings, ...value.featureSettings, discordFormat: { ...DEFAULT_SETTINGS.featureSettings?.discordFormat, ...value.featureSettings?.discordFormat }, evaluation: { ...DEFAULT_SETTINGS.featureSettings?.evaluation, ...value.featureSettings?.evaluation }, marketRss: { ...DEFAULT_SETTINGS.featureSettings?.marketRss, ...value.featureSettings?.marketRss }, secEdgar: { ...DEFAULT_SETTINGS.featureSettings?.secEdgar, ...value.featureSettings?.secEdgar }, vwapPolicy: { ...DEFAULT_SETTINGS.featureSettings?.vwapPolicy, ...value.featureSettings?.vwapPolicy } } });
+        setSettings({ ...DEFAULT_SETTINGS, intervalSeconds: defaultInterval, ...value, scheduleMode: value.scheduleMode === "weekly-range" ? "weekly-range" : "daily-window", startDay: Number.isInteger(value.startDay) ? Number(value.startDay) : days[0], endDay: Number.isInteger(value.endDay) ? Number(value.endDay) : days[days.length - 1], featureSettings: { ...DEFAULT_SETTINGS.featureSettings, ...value.featureSettings, discordFormat: { ...DEFAULT_SETTINGS.featureSettings?.discordFormat, ...value.featureSettings?.discordFormat }, evaluation: { ...DEFAULT_SETTINGS.featureSettings?.evaluation, ...value.featureSettings?.evaluation }, marketRss: { ...DEFAULT_SETTINGS.featureSettings?.marketRss, ...value.featureSettings?.marketRss }, secEdgar: { ...DEFAULT_SETTINGS.featureSettings?.secEdgar, ...value.featureSettings?.secEdgar }, vwapPolicy: { ...DEFAULT_SETTINGS.featureSettings?.vwapPolicy, ...value.featureSettings?.vwapPolicy }, bollingerPolicy: { ...DEFAULT_SETTINGS.featureSettings?.bollingerPolicy, ...value.featureSettings?.bollingerPolicy } } });
       });
   }, [moduleKey]);
 
@@ -64,6 +66,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
 
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
   const policy = settings.featureSettings?.vwapPolicy || {};
+  const bollingerPolicy = settings.featureSettings?.bollingerPolicy || {};
   const webhookUrl = settings.featureSettings?.discordFormat?.webhookUrl || "";
   const debugWebhookUrl = settings.featureSettings?.discordFormat?.debugWebhookUrl || "";
   const mfiThreshold = settings.featureSettings?.evaluation?.mfiThreshold ?? 30;
@@ -73,6 +76,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   const enabledRssSources = settings.featureSettings?.marketRss?.enabledSources || [...MARKET_RSS_SOURCES];
   const secEdgar = settings.featureSettings?.secEdgar || { ciks: [], syncXbrl: false, discordBatch: 10 };
   const updatePolicy = (key: string, value: number | boolean) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, vwapPolicy: { ...policy, [key]: value } } });
+  const updateBollingerPolicy = (key: "period" | "stdDevMultiplier" | "minPrice" | "minVolume" | "minTurnoverRatio", value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, bollingerPolicy: { ...bollingerPolicy, [key]: value } } });
   const updateWebhook = (value: string) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, discordFormat: { ...settings.featureSettings?.discordFormat, webhookUrl: value } } });
   const updateDebugWebhook = (value: string) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, discordFormat: { ...settings.featureSettings?.discordFormat, debugWebhookUrl: value } } });
   const updateMfiThreshold = (value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, evaluation: { ...settings.featureSettings?.evaluation, mfiThreshold: value } } });
@@ -92,6 +96,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
     <label>디버깅 전용 Discord Webhook URL<p>실패·재시도·복구 통계만 전송합니다. 비워두면 STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL을 사용합니다.</p><input type="url" value={debugWebhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateDebugWebhook(event.target.value)} /></label>
     {moduleKey === "us-daily-indicators" && <><div className={styles.fields}><label>MFI 과매도 기준<input type="number" min="0" max="100" value={mfiThreshold} onChange={(event) => updateMfiThreshold(Number(event.target.value))} /></label></div><h3>일봉 OBV Signal 조건</h3><div className={styles.fields}><label>Signal EMA 기간<input type="number" min="2" max="100" value={obvSignalPeriod} onChange={(event) => updateObvPolicy("obvSignalPeriod", Number(event.target.value))} /></label><label>Signal 상회 연속 일수<input type="number" min="1" max="20" value={obvSignalAboveDays} onChange={(event) => updateObvPolicy("obvSignalAboveDays", Number(event.target.value))} /></label><label>최근 골든크로스 확인 기간<input type="number" min="1" max="30" value={obvSignalCrossLookback} onChange={(event) => updateObvPolicy("obvSignalCrossLookback", Number(event.target.value))} /></label></div><p className={styles.scheduleHint}>최근 OBV가 이전 구간보다 증가하고, OBV가 Signal 선 위에 설정 일수만큼 연속 유지되며, 설정 기간 내 골든크로스가 발생한 종목만 후보가 됩니다.</p></>}
     {moduleKey === "us-vwap" && <><h3>VWAP 필터</h3><div className={styles.fields}><label>최소 상회율(%)<input type="number" min="0" step="0.1" value={Number(policy.minAbovePercent ?? 0)} onChange={(event) => updatePolicy("minAbovePercent", Number(event.target.value))} /></label><label>시총 대비 거래대금 최소(%)<input type="number" min="0" step="0.1" value={Number(policy.minTurnoverRatio ?? 0)} onChange={(event) => updatePolicy("minTurnoverRatio", Number(event.target.value))} /></label><label>최소 거래량<input type="number" min="0" value={Number(policy.minVolume ?? 0)} onChange={(event) => updatePolicy("minVolume", Number(event.target.value))} /></label><label>최소 거래대금(USD)<input type="number" min="0" value={Number(policy.minTradeValue ?? 0)} onChange={(event) => updatePolicy("minTradeValue", Number(event.target.value))} /></label><label>최소 데이터 포인트<input type="number" min="1" value={Number(policy.minPointCount ?? 1)} onChange={(event) => updatePolicy("minPointCount", Number(event.target.value))} /></label></div><label className={styles.toggle}><input type="checkbox" checked={policy.requireComplete !== false} onChange={(event) => updatePolicy("requireComplete", event.target.checked)} /><span>전체 세션 데이터 완료만 허용</span></label></>}
+    {moduleKey === "us-bollinger-band" && <><h3>일봉 볼린저밴드 하단 이탈 필터</h3><div className={styles.fields}><label>기간(거래일)<input type="number" min="2" max="200" value={Number(bollingerPolicy.period ?? 20)} onChange={(event) => updateBollingerPolicy("period", Number(event.target.value))} /></label><label>표준편차 배수<input type="number" min="0.1" max="10" step="0.1" value={Number(bollingerPolicy.stdDevMultiplier ?? 2)} onChange={(event) => updateBollingerPolicy("stdDevMultiplier", Number(event.target.value))} /></label><label>최소 주가(USD)<input type="number" min="0" step="0.01" value={Number(bollingerPolicy.minPrice ?? 0)} onChange={(event) => updateBollingerPolicy("minPrice", Number(event.target.value))} /></label><label>최소 거래량<input type="number" min="0" value={Number(bollingerPolicy.minVolume ?? 0)} onChange={(event) => updateBollingerPolicy("minVolume", Number(event.target.value))} /></label><label>시총 대비 거래대금 최소(%)<input type="number" min="0" step="0.1" value={Number(bollingerPolicy.minTurnoverRatio ?? 0)} onChange={(event) => updateBollingerPolicy("minTurnoverRatio", Number(event.target.value))} /></label></div><p className={styles.scheduleHint}>최근 완료 일봉의 종가가 하단선 이하인 종목만 통과합니다. 현재 진행 중인 미국 시장일 캔들은 계산에서 제외합니다.</p></>}
     <div className={styles.footer}><span>{message}</span><button onClick={() => void save()}>설정 저장</button></div>
   </section>;
 }
