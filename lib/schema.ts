@@ -333,6 +333,35 @@ export const usDailyPriceCandles = pgTable("us_daily_price_candles", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("us_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.candleDate), index("us_daily_price_candles_lookup_idx").on(table.market, table.code, table.candleDate)]);
 
+export const krInstruments = pgTable("kr_instruments", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull().default("KRX"),
+  code: text("code").notNull(),
+  name: text("name").notNull().default(""),
+  enabled: boolean("enabled").notNull().default(true),
+  source: text("source").notNull().default("KIS"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("kr_instruments_market_code_unique").on(table.market, table.code), index("kr_instruments_enabled_code_idx").on(table.enabled, table.code)]);
+
+export const krDailyPriceCandles = pgTable("kr_daily_price_candles", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull().default("KRX"),
+  code: text("code").notNull(),
+  candleDate: text("candle_date").notNull(),
+  open: doublePrecision("open").notNull(),
+  high: doublePrecision("high").notNull(),
+  low: doublePrecision("low").notNull(),
+  close: doublePrecision("close").notNull(),
+  volume: doublePrecision("volume").notNull(),
+  source: text("source").notNull().default("KIS"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("kr_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.candleDate), index("kr_daily_price_candles_lookup_idx").on(table.market, table.code, table.candleDate)]);
+
+export const krMarketSnapshots = pgTable("kr_market_snapshots", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull().default("KRX"), code: text("code").notNull(), price: doublePrecision("price"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), turnoverRatio: doublePrecision("turnover_ratio"), changeRate: doublePrecision("change_rate"), rawPayload: text("raw_payload"), observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("kr_market_snapshots_market_code_unique").on(table.market, table.code), index("kr_market_snapshots_observed_idx").on(table.observedAt)]);
+
 export const usShortInterestSnapshots = pgTable("us_short_interest_snapshots", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   ticker: text("ticker").notNull(),

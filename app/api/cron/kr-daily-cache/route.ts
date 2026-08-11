@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { isWithinSchedule } from "@/lib/schedule-time";
+import { syncKrInstrumentUniverseFromKis, loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
+import { refreshKrDailyCandles, refreshKrMarketSnapshot } from "@/lib/kr-daily-price-cache";
+export async function POST(request:Request){const secret=process.env.CRON_SECRET?.trim();const supplied=request.headers.get("x-cron-secret")||request.headers.get("authorization")?.replace(/^Bearer\s+/i,"");if(!secret||secret!==supplied)return NextResponse.json({ok:false,error:"Unauthorized"},{status:401});const settings=await loadFeatureModuleSettings("kr-daily-cache");if(!settings.enabled||!isWithinSchedule(settings,new Date()))return NextResponse.json({ok:true,skipped:true,reason:settings.enabled?"outside_schedule":"disabled"});const sync=await syncKrInstrumentUniverseFromKis();const {scopes}=await loadStoredKrInstrumentScopes();let successCount=0;for(const item of scopes){const [daily,quote]=await Promise.all([refreshKrDailyCandles(item.code),refreshKrMarketSnapshot(item.code)]);if(daily?.ok&&quote?.ok)successCount++;}return NextResponse.json({ok:true,instrumentCount:scopes.length,successCount,universeSync:sync});}

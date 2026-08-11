@@ -97,6 +97,12 @@ run_cron_endpoint "us-daily-indicators" 180 "/api/cron/us-daily-indicators"
 
 run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
 
+run_cron_endpoint "kr-bollinger-band" 180 "/api/cron/kr-bollinger-band"
+
+run_cron_endpoint "kr-daily-cache" 300 "/api/cron/kr-daily-cache"
+
+run_cron_endpoint "us-free-float" 900 "/api/cron/us-free-float"
+
 ELAPSED_MS=$(( $(date +%s%3N) - START_MS ))
 printf '[CronSummary] total=%s success=%s failed=%s skipped=%s elapsedMs=%s\n' \
   "$TOTAL_COUNT" "$SUCCESS_COUNT" "$FAILED_COUNT" "$SKIPPED_COUNT" "$ELAPSED_MS"

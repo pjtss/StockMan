@@ -30,6 +30,9 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-vwap": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { vwapPolicy: { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true } } },
   "us-bollinger-band": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 } } },
+  "kr-bollinger-band": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 } } },
+  "kr-daily-cache": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 43_200, activeDays: [1, 2, 3, 4, 5] },
+  "us-free-float": { enabled: true, startTime: "09:30", endTime: "10:00", cooldownSeconds: 60, intervalSeconds: 86_400, activeDays: [1, 2, 3, 4, 5] },
   "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
@@ -66,7 +69,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (hasStartDay !== hasEndDay || (hasStartDay && (!Number.isInteger(settings.startDay) || !Number.isInteger(settings.endDay) || (settings.startDay as number) < 0 || (settings.startDay as number) > 6 || (settings.endDay as number) < 0 || (settings.endDay as number) > 6))) throw new Error("INVALID_SCHEDULE_DAYS");
   if (hasStartDay && settings.startDay === settings.endDay && settings.startTime === settings.endTime) throw new Error("INVALID_SCHEDULE_RANGE");
   if (!Number.isInteger(settings.cooldownSeconds) || settings.cooldownSeconds < 0) throw new Error("INVALID_COOLDOWN");
-  const minuteScheduledModules: FeatureModuleKey[] = ["us-daily-indicators", "us-obv", "us-daily-cache", "us-daily-open-cache", "us-daily-breakout", "us-bollinger-band"];
+  const minuteScheduledModules: FeatureModuleKey[] = ["us-daily-indicators", "us-obv", "us-daily-cache", "us-daily-open-cache", "us-daily-breakout", "us-bollinger-band", "kr-bollinger-band", "kr-daily-cache"];
   const minimumIntervalSeconds = minuteScheduledModules.includes(key) ? 60 : 5;
   if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < minimumIntervalSeconds)) throw new Error("INVALID_INTERVAL");
   if (key === "us-daily-indicators") {
@@ -91,6 +94,12 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     validateNumber("bollinger_min_price", policy?.minPrice, 0);
     validateNumber("bollinger_min_volume", policy?.minVolume, 0);
     validateNumber("bollinger_min_turnover_ratio", policy?.minTurnoverRatio, 0);
+  }
+  if (key === "kr-bollinger-band") {
+    const policy = settings.featureSettings?.krBollingerPolicy;
+    for (const [name, value, min, max] of [["period", policy?.period, 2, 200], ["multiplier", policy?.stdDevMultiplier, 0.1, 10], ["min_price", policy?.minPrice, 0, undefined], ["min_volume", policy?.minVolume, 0, undefined], ["min_turnover_ratio", policy?.minTurnoverRatio, 0, undefined]] as const) {
+      if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < min || (max !== undefined && Number(value) > max))) throw new Error(`INVALID_KR_BOLLINGER_${name.toUpperCase()}`);
+    }
   }
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
