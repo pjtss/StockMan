@@ -37,5 +37,6 @@ export function fetchDomesticFluctuation(token: string) {
     FID_COND_MRKT_DIV_CODE: "J", FID_COND_SCR_DIV_CODE: "20170", FID_INPUT_ISCD: "0000",
     FID_DIV_CLS_CODE: "0", FID_RANK_SORT_CLS_CODE: "0", FID_PRC_CLS_CODE: "0",
     FID_TRGT_CLS_CODE: "000000000", FID_TRGT_EXLS_CLS_CODE: "000000000",
+    FID_INPUT_CNT_1: "0", FID_INPUT_CNT_2: "0",
   }, token);
 }

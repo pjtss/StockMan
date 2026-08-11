@@ -8,10 +8,10 @@ export type KrInstrumentProductClassification = {
   reason: string;
 };
 
-const ETF = /(?:\bETF\b|\bETN\b|\bETP\b|상장지수|인덱스|펀드|수익증권)/i;
+const ETF = /(?:\bETF\b|\bETN\b|\bETP\b|상장지수|인덱스|펀드|수익증권|(?:^|\s)(?:KODEX|TIGER|PLUS|SOL|ACE|HANARO|KBSTAR|KOSEF|KIWOOM|TREX)\b)/i;
 const LEVERAGED = /(?:레버리지|leverag|\b(?:2|3|4|5)\s*x\b|\b(?:2|3|4|5)x\b|울트라|ultra|bull|bullish)/i;
 const INVERSE = /(?:인버스|inverse|\bshort\b|bear|하락배율)/i;
-const DERIVATIVE = /(?:ETN|ETP|ELW|warrant|선물|옵션|option|권리주|신주인수권|우선주)/i;
+const DERIVATIVE = /(?:ETN|ETP|ELW|warrant|선물|옵션|option|권리주|신주인수권|우선주|통안채|국고채|회사채|채권|SOFR|MSCI|S&P|KRX)/i;
 
 export function classifyKrInstrumentProduct(input: { name?: unknown; productType?: unknown }): KrInstrumentProductClassification {
   const name = String(input.name ?? "").trim();

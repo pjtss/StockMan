@@ -53,11 +53,11 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
   if (storedScopeInflight) return storedScopeInflight;
   storedScopeInflight = (async () => {
     const db = getDb();
-    const rows = db ? await db.select({ market: usInstruments.market, code: usInstruments.code, name: usInstruments.name, instrumentType: usInstruments.instrumentType, isEtf: usInstruments.isEtf, isLeveraged: usInstruments.isLeveraged, isInverse: usInstruments.isInverse, isDerivativeProduct: usInstruments.isDerivativeProduct, manualProductAction: usInstruments.manualProductAction })
+    const rows = db ? await db.select({ market: usInstruments.market, code: usInstruments.code, name: usInstruments.name, instrumentType: usInstruments.instrumentType, isEtf: usInstruments.isEtf, isLeveraged: usInstruments.isLeveraged, isInverse: usInstruments.isInverse, isDerivativeProduct: usInstruments.isDerivativeProduct, manualProductAction: usInstruments.manualProductAction, productStatus: usInstruments.productStatus })
       .from(usInstruments).where(and(eq(usInstruments.enabled, true), inArray(usInstruments.market, [...US_EXCHANGES])))
       : [];
     const settings = await loadUsTurnoverFilterSettings();
-    const eligibleRows = rows.filter((row) => row.manualProductAction === "ALLOW" || (row.manualProductAction !== "BLOCK" && isEligibleUsCommonStock(row)));
+    const eligibleRows = rows.filter((row) => row.manualProductAction !== "BLOCK" && row.productStatus === "ACTIVE" && isEligibleUsCommonStock(row) && isEligibleUsCommonStock(classifyUsInstrumentProduct({ name: row.name, type: row.instrumentType })));
     const scopes = await applyCommonMarketCapFilter(eligibleRows.map((row, index) => ({ market: row.market, code: row.code, name: row.name, rank: index + 1, changeRate: null, rankingVolume: null, rankingTradeValue: null })), settings);
     const commonFilterEnabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
     return { scopes, universe: { ok: true, source: "DB_INTEGRATED_US_INSTRUMENTS", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instruments", commonFilter: { enabled: commonFilterEnabled, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: commonFilterEnabled ? "excluded" : "allowed" } } } };
