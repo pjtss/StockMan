@@ -6,21 +6,9 @@ export async function sendUsBollingerBandSignals(results: UsBollingerResult[]) {
   if (!qualified.length) return { ok: true, skipped: true, reason: "no_candidates", sent: 0 };
   const webhook = await loadFeatureDiscordWebhook("us-bollinger-band", ["US_BOLLINGER_BAND_DISCORD_WEBHOOK_URL"]);
   if (!webhook) return { ok: false, skipped: true, reason: "webhook_not_configured", sent: 0 };
-  const chunks: string[] = [];
-  const heading = "🚨 **해외주식 일봉 볼린저밴드 하단 이탈 알림**\n";
-  let current = heading;
-  for (const item of qualified) {
-    const line = `**${item.market} ${item.code}** ${item.name || ""} · 종가 ${item.close ?? "-"} · 하단 ${item.band?.lower ?? "-"} · 거래량 ${item.volume ?? "-"} · 시총 대비 거래대금 ${item.turnoverRatio ?? "-"}%\n`;
-    if (current.length + line.length > 1_850) { chunks.push(current.trimEnd()); current = heading; }
-    current += line;
-  }
-  if (current.trim() !== heading.trim()) chunks.push(current.trimEnd());
-  const responses = [];
-  for (const content of chunks) {
-    const description = content.replace(/^🚨 \*\*해외주식 일봉 볼린저밴드 하단 이탈 알림\*\*\n/, "");
-    const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN BOLLINGER", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 볼린저밴드 하단 이탈 알림", description, color: 0x7c3aed, footer: { text: "STOCKMAN · 종가와 하단선 비교" }, timestamp: new Date().toISOString() }] }) });
-    responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
-  }
+  const description = qualified.map((item) => `**${item.market} ${item.code}** ${item.name || ""} · 종가 ${item.close ?? "-"} · 하단 ${item.band?.lower ?? "-"} · 거래량 ${item.volume ?? "-"} · 시총 대비 거래대금 ${item.turnoverRatio ?? "-"}%`).join("\n").slice(0, 4_050);
+  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN BOLLINGER", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 볼린저밴드 하단 이탈 알림", description, color: 0x7c3aed, footer: { text: "STOCKMAN · 종가와 하단선 비교 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] }) });
+  const responses = [{ ok: response.ok, status: response.status, responseText: await response.text() }];
   const sent = responses.filter((response) => response.ok).length;
-  return { ok: sent === responses.length, sent: sent === responses.length ? qualified.length : 0, messagesSent: sent, messageCount: chunks.length, failures: responses.filter((response) => !response.ok) };
+  return { ok: sent === responses.length, sent: sent === responses.length ? qualified.length : 0, messagesSent: sent, messageCount: 1, failures: responses.filter((response) => !response.ok) };
 }

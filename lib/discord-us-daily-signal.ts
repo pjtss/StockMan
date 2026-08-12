@@ -4,6 +4,17 @@ import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 type Signal = { market: string; code: string; name?: string; [key: string]: unknown };
 const DISCORD_CONTENT_LIMIT = 2_000;
 const DISCORD_CONTENT_SAFE_LIMIT = 1_900;
+const DISCORD_EMBED_FIELD_LIMIT = 1_024;
+
+function fitEmbedField(lines: string[], total: number) {
+  let value = "";
+  for (const candidate of lines) {
+    if (value && value.length + candidate.length + 1 > DISCORD_EMBED_FIELD_LIMIT - 28) break;
+    value += `${value ? "\n" : ""}${candidate}`;
+  }
+  const omitted = total - value.split("\n").filter(Boolean).length;
+  return omitted > 0 ? `${value}\n… 외 ${omitted}건` : value;
+}
 
 function line(signal: Signal, metric: string) {
   const value = signal[metric];
@@ -46,21 +57,23 @@ export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?:
     input.obv?.length ? `**해외주식 일봉 OBV Signal 상승 후보**\n${input.obv.slice(0, 20).map((item) => `${line(item, "change")} · OBV ${item.obv ?? "-"} · Signal ${item.obvSignal ?? "-"} · 상회 ${item.aboveSignalDays ?? 0}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`).join("\n")}` : "",
   ].filter(Boolean);
   if (!sections.length) return { ok: true, sent: 0, skipped: true, reason: "no_candidates" };
-  const chunks = buildUsDailyIndicatorDiscordChunks(sections);
+  const fieldData = [
+    { name: "📉 해외주식 일봉 MFI 과매도", items: input.mfi ?? [], lines: (input.mfi ?? []).slice(0, 20).map((item) => line(item, "mfi")) },
+    { name: "📈 해외주식 일봉 DMI 상승", items: input.dmi ?? [], lines: (input.dmi ?? []).slice(0, 20).map((item) => `${line(item, "plusDi")} · -DI ${item.minusDi ?? "-"} · ADX ${item.adx ?? "-"}`) },
+    { name: "📊 해외주식 일봉 MACD 상승", items: input.macd ?? [], lines: (input.macd ?? []).slice(0, 20).map((item) => `${line(item, "histogram")} · MACD ${item.macd ?? "-"} · Signal ${item.signal ?? "-"}`) },
+    { name: "🔊 해외주식 일봉 OBV Signal 상승", items: input.obv ?? [], lines: (input.obv ?? []).slice(0, 20).map((item) => `${line(item, "change")} · OBV ${item.obv ?? "-"} · Signal ${item.obvSignal ?? "-"} · 상회 ${item.aboveSignalDays ?? 0}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`) },
+  ].filter((section) => section.items.length > 0);
   const count = (input.mfi?.length || 0) + (input.dmi?.length || 0) + (input.macd?.length || 0) + (input.obv?.length || 0);
   const responses = [];
-  for (const content of chunks) {
-    const description = content.replace(/^🚨 \*\*해외주식 일봉 지표 알림\*\*\n/, "");
-    const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", description, color: 0x2563eb, footer: { text: "STOCKMAN · DB 저장 일봉 기준" }, timestamp: new Date().toISOString() }] }) });
-    responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
-  }
+  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", color: 0x2563eb, fields: fieldData.map((section) => ({ name: section.name, value: fitEmbedField(section.lines, section.items.length), inline: false })), footer: { text: "STOCKMAN · DB 저장 일봉 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] }) });
+  responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
   const successful = responses.filter((response) => response.ok).length;
   return {
     ok: successful === responses.length,
     status: responses.find((response) => !response.ok)?.status ?? 200,
     sent: successful === responses.length ? count : 0,
     messagesSent: successful,
-    messageCount: chunks.length,
+    messageCount: 1,
     failures: responses.filter((response) => !response.ok).map(({ status, responseText }) => ({ status, responseText })),
   };
 }
