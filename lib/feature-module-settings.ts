@@ -30,6 +30,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-vwap": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { vwapPolicy: { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true } } },
   "us-bollinger-band": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 } } },
+  "us-minute-bollinger-band": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 120, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { minuteBollingerPolicy: { topN: 30, period: 20, stdDevMultiplier: 2, minChangeRate: 0 } } },
   "kr-bollinger-band": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 } } },
   "kr-daily-cache": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 43_200, activeDays: [1, 2, 3, 4, 5] },
   "us-free-float": { enabled: true, startTime: "09:30", endTime: "10:00", cooldownSeconds: 60, intervalSeconds: 86_400, activeDays: [1, 2, 3, 4, 5] },
@@ -105,6 +106,13 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   if (key === "us-news-radar") {
     const period = settings.featureSettings?.newsLookup?.defaultPeriod;
     if (period !== undefined && !["today", "3d", "7d", "1m"].includes(period)) throw new Error("INVALID_NEWS_DEFAULT_PERIOD");
+  }
+  if (key === "us-minute-bollinger-band") {
+    const policy = settings.featureSettings?.minuteBollingerPolicy;
+    if (policy?.topN !== undefined && (!Number.isInteger(Number(policy.topN)) || Number(policy.topN) < 1 || Number(policy.topN) > 100)) throw new Error("INVALID_MINUTE_BOLLINGER_TOP_N");
+    if (policy?.period !== undefined && (!Number.isInteger(Number(policy.period)) || Number(policy.period) < 2 || Number(policy.period) > 120)) throw new Error("INVALID_MINUTE_BOLLINGER_PERIOD");
+    if (policy?.stdDevMultiplier !== undefined && (!Number.isFinite(Number(policy.stdDevMultiplier)) || Number(policy.stdDevMultiplier) <= 0)) throw new Error("INVALID_MINUTE_BOLLINGER_MULTIPLIER");
+    if (policy?.minChangeRate !== undefined && !Number.isFinite(Number(policy.minChangeRate))) throw new Error("INVALID_MINUTE_BOLLINGER_RATE");
   }
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();

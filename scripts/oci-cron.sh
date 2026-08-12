@@ -97,6 +97,8 @@ run_cron_endpoint "us-daily-indicators" 180 "/api/cron/us-daily-indicators"
 
 run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
 
+run_cron_endpoint "us-minute-bollinger-band" 180 "/api/cron/us-minute-bollinger-band"
+
 run_cron_endpoint "kr-bollinger-band" 180 "/api/cron/kr-bollinger-band"
 
 run_cron_endpoint "kr-daily-cache" 300 "/api/cron/kr-daily-cache"

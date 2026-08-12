@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { requireAdminSession } from "@/lib/admin-auth";
+import { scanUsMinuteBollingerBands } from "@/lib/us-minute-bollinger-band";
+export async function GET(request: Request) { if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 }); const p = new URL(request.url).searchParams; try { const result = await scanUsMinuteBollingerBands({ policy: { topN: p.has("topN") ? Number(p.get("topN")) : undefined, period: p.has("period") ? Number(p.get("period")) : undefined, stdDevMultiplier: p.has("multiplier") ? Number(p.get("multiplier")) : undefined, minChangeRate: p.has("minRate") ? Number(p.get("minRate")) : undefined } }); return NextResponse.json({ ...result, mode: "ADMIN_MANUAL_TEST" }); } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); } }
