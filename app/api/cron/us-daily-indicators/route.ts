@@ -19,13 +19,14 @@ export async function POST(request: Request) {
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings, new Date())) { await recordSkippedAutomationRun("us-daily-indicators", moduleSettings.enabled ? "outside_schedule" : "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule" }); }
   const envInterval = Number.parseInt(process.env.US_DAILY_INDICATORS_INTERVAL_SECONDS || "600", 10) || 600;
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? envInterval);
+  const effectiveIntervalSeconds = Math.max(intervalSeconds, Math.max(0, moduleSettings.cooldownSeconds ?? 0));
   const latestRun = await loadLatestExecutedAutomationRun("us-daily-indicators").catch(() => null);
   const latestStartedAt = latestRun?.started_at ? new Date(latestRun.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
-  if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
+  if (elapsedSeconds != null && elapsedSeconds < effectiveIntervalSeconds) {
     const reason = latestRun?.status === "RUNNING" ? "already_running" : "outside_interval";
-    await recordSkippedAutomationRun("us-daily-indicators", reason, { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
-    return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+    await recordSkippedAutomationRun("us-daily-indicators", reason, { intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+    return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
   }
   try {
     const result = await withAutomationRun("us-daily-indicators", async () => {
@@ -48,6 +49,6 @@ export async function POST(request: Request) {
       discord,
     };
     });
-    return NextResponse.json({ intervalSeconds, ...result });
+    return NextResponse.json({ intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, ...result });
   } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }
