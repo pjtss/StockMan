@@ -2,7 +2,6 @@ import { getPool } from "./db";
 
 const TOKEN_ENDPOINT = "https://openapi.koreainvestment.com:9443/oauth2/tokenP";
 const TOKEN_LOCK_KEY = "kis-access-token";
-const REFRESH_WINDOW_MS = 60 * 60 * 1000;
 const DEFAULT_TOKEN_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
 type StoredKisToken = {
@@ -25,22 +24,13 @@ function toDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function getKstDateKey(value: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(value);
-}
-
 function canReuseToken(token: StoredKisToken, now: Date) {
   const expiresAt = token.expiresAt.getTime();
-  if (expiresAt <= now.getTime()) return false;
-  if (expiresAt > now.getTime() + REFRESH_WINDOW_MS) return true;
-
-  // KIS is a one-issuance-per-day service. Keep today's token until expiry.
-  return getKstDateKey(token.issuedAt) === getKstDateKey(now);
+  // Never rotate a token merely because it is close to expiry. KIS limits
+  // issuance frequency, so an unexpired shared token must be reused until the
+  // official expiry timestamp returned by KIS. Auth failures are handled by
+  // the explicit refresh path below.
+  return expiresAt > now.getTime();
 }
 
 async function readStoredToken(query: (sql: string, values?: unknown[]) => Promise<any>) {
@@ -193,6 +183,10 @@ export async function getAccessToken(): Promise<string | null> {
 
 export async function refreshAccessToken(): Promise<string | null> {
   cachedToken = null;
+  // This path is reserved for an explicit KIS AUTH/401 failure. Remove the
+  // shared DB token so loadOrIssueToken cannot immediately reuse the invalid
+  // credential from another process.
+  await clearTokenCache();
   return getAccessToken();
 }
 

@@ -111,7 +111,7 @@ describe("KIS token lifecycle", () => {
     database.setRow({
       access_token: "same-day-token",
       issued_at: new Date("2026-07-11T00:00:00.000Z"),
-      expires_at: new Date("2026-07-11T03:30:00.000Z"),
+      expires_at: new Date("2026-07-11T03:01:00.000Z"),
     });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -122,11 +122,25 @@ describe("KIS token lifecycle", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("coalesces concurrent refreshes into one issuance and persists the official expiry", async () => {
+  it("reuses a previous-day token while the official expiry is still in the future", async () => {
+    database.setRow({
+      access_token: "previous-day-token",
+      issued_at: new Date("2026-07-10T03:00:00.000Z"),
+      expires_at: new Date("2026-07-11T03:30:00.000Z"),
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getAccessToken } = await import("./kis-token");
+    expect(await getAccessToken()).toBe("previous-day-token");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("issues once after the official expiry and persists the official expiry", async () => {
     database.setRow({
       access_token: "expiring-token",
       issued_at: new Date("2026-07-10T02:30:00.000Z"),
-      expires_at: new Date("2026-07-11T03:30:00.000Z"),
+      expires_at: new Date("2026-07-11T02:59:00.000Z"),
     });
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -149,7 +163,7 @@ describe("KIS token lifecycle", () => {
     database.setRow({
       access_token: "old-token",
       issued_at: new Date("2026-07-10T02:30:00.000Z"),
-      expires_at: new Date("2026-07-11T03:30:00.000Z"),
+      expires_at: new Date("2026-07-11T02:59:00.000Z"),
     });
     database.setLockedRow({
       access_token: "other-instance-token",
