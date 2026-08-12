@@ -16,6 +16,8 @@ type TokenResponse = {
   access_token_token_expired?: unknown;
 };
 
+type TokenIssueReason = "expired" | "explicit_auth_refresh";
+
 let cachedToken: StoredKisToken | null = null;
 let tokenRequestPromise: Promise<string | null> | null = null;
 
@@ -107,7 +109,7 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
   };
 }
 
-async function loadOrIssueToken() {
+async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
   let pool: ReturnType<typeof getPool>;
   try {
     pool = getPool();
@@ -150,6 +152,13 @@ async function loadOrIssueToken() {
       `,
       [issued.accessToken, issued.issuedAt, issued.expiresAt],
     );
+    await client.query(
+      `
+        INSERT INTO kis_token_issuance_history (issued_at, expires_at, reason)
+        VALUES ($1, $2, $3)
+      `,
+      [issued.issuedAt, issued.expiresAt, reason],
+    );
     await client.query("COMMIT");
 
     cachedToken = issued;
@@ -174,7 +183,7 @@ export async function getAccessToken(): Promise<string | null> {
   }
 
   if (!tokenRequestPromise) {
-    tokenRequestPromise = loadOrIssueToken().finally(() => {
+    tokenRequestPromise = loadOrIssueToken("expired").finally(() => {
       tokenRequestPromise = null;
     });
   }
@@ -187,7 +196,12 @@ export async function refreshAccessToken(): Promise<string | null> {
   // shared DB token so loadOrIssueToken cannot immediately reuse the invalid
   // credential from another process.
   await clearTokenCache();
-  return getAccessToken();
+  if (!tokenRequestPromise) {
+    tokenRequestPromise = loadOrIssueToken("explicit_auth_refresh").finally(() => {
+      tokenRequestPromise = null;
+    });
+  }
+  return tokenRequestPromise;
 }
 
 export async function clearTokenCache() {
