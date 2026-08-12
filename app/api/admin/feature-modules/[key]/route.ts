@@ -30,6 +30,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
         marketRss: incomingFeatureSettings.marketRss === undefined ? current.featureSettings?.marketRss : { ...current.featureSettings?.marketRss, ...incomingFeatureSettings.marketRss },
         secEdgar: incomingFeatureSettings.secEdgar === undefined ? current.featureSettings?.secEdgar : { ...current.featureSettings?.secEdgar, ...incomingFeatureSettings.secEdgar },
         vwapPolicy: incomingFeatureSettings.vwapPolicy === undefined ? current.featureSettings?.vwapPolicy : { ...current.featureSettings?.vwapPolicy, ...incomingFeatureSettings.vwapPolicy },
+        newsLookup: incomingFeatureSettings.newsLookup === undefined ? current.featureSettings?.newsLookup : { ...current.featureSettings?.newsLookup, ...incomingFeatureSettings.newsLookup },
       };
     const settings = await saveFeatureModuleSettings(key as FeatureModuleKey, {
       enabled: has("enabled") ? Boolean(body.enabled) : current.enabled,

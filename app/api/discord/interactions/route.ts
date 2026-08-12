@@ -14,6 +14,8 @@ import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { runUsDailyFilterRefresh } from "@/lib/us-daily-filter-refresh";
 import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
+import { fetchTickerNews, type KisNewsPeriod } from "@/lib/kis-news-radar";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +64,12 @@ function formatVwapResult(result: Awaited<ReturnType<typeof scanUsVwap>>) {
   return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, summary, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `현재가 ${item.currentPrice?.toFixed(4) ?? "-"} · VWAP ${item.vwap?.toFixed(4) ?? "-"} · 상회율 ${item.vwap && item.currentPrice != null ? `${(((item.currentPrice / item.vwap) - 1) * 100).toFixed(2)}%` : "-"}`, `거래대금 ${item.totalTradeValue.toLocaleString()} · 거래량 ${item.totalVolume.toLocaleString()} · 포인트 ${item.pointCount}개`, `시총 ${item.marketCap ?? "-"} · 시총 대비 거래대금 ${item.turnoverRatio == null ? "-" : `${item.turnoverRatio.toFixed(2)}%`} · 등락률 ${item.changeRate == null ? "-" : `${item.changeRate.toFixed(2)}%`}`, `데이터 ${item.complete ? "완료" : "미완료"}`].join("\n")).join("\n\n")].join("\n");
 }
 
+function formatNewsResult(result: Awaited<ReturnType<typeof fetchTickerNews>>) {
+  if (!result.items.length) return `📰 **${result.ticker} 뉴스**\n조회 기간 ${result.fromDate} ~ ${result.toDate}\n해당 기간에 조회된 뉴스가 없습니다.`;
+  const lines = result.items.slice(0, 40).map((item) => `• ${item.date} ${item.time} | ${item.title}${item.source ? ` (${item.source})` : ""}`);
+  return [`📰 **${result.ticker} 뉴스**`, `조회 기간 ${result.fromDate} ~ ${result.toDate} · ${result.items.length}건`, "", ...lines].join("\n").slice(0, 1900);
+}
+
 async function notifyDailyWebhook(task: string, send: () => Promise<unknown>) {
   try {
     await send();
@@ -77,7 +85,7 @@ export async function POST(request: Request) {
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "daily-filter-refresh", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap", "sync-top100"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "refresh-daily", "daily-filter-refresh", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap", "sync-top100"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (interaction.data.name === "turnover-list") {
@@ -126,6 +134,11 @@ export async function POST(request: Request) {
     void upsertUsTopRisingUniverse().then((result) => updateOriginalResponse(applicationId, interaction.token, `✅ TOP100 통합 티커 갱신 완료\n거래소 ${result.exchanges.join(", ")} · 현재 통합 종목 ${result.activeInstrumentCount}개\n${result.results.map((row) => `${row.market}: 원본 ${row.sourceCount} · UPSERT ${row.upsertedCount} · 제외 ${row.excludedCount}`).join("\n")}`)).catch(() => updateOriginalResponse(applicationId, interaction.token, "TOP100 통합 티커 갱신에 실패했습니다."));
   } else if (interaction.data.name === "daily-filter-refresh") {
     void runUsDailyFilterRefresh().then((result) => updateOriginalResponse(applicationId, interaction.token, `✅ 통합 일봉 필터 재평가 및 Webhook 전송 완료\n대상: OBV ${result.instruments.obv} · MFI ${result.instruments.mfi} · DMI ${result.instruments.dmi} · MACD ${result.instruments.macd} · 돌파 ${result.instruments.breakout}\n후보: OBV ${result.counts.obv} · MFI ${result.counts.mfi} · DMI ${result.counts.dmi} · MACD ${result.counts.macd} · 돌파 ${result.counts.breakout}`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `통합 일봉 필터 갱신 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+  } else if (interaction.data.name === "news") {
+    void loadFeatureModuleSettings("us-news-radar").then((settings) => {
+      const period = settings.featureSettings?.newsLookup?.defaultPeriod || "today";
+      return fetchTickerNews(ticker, { period: period as KisNewsPeriod });
+    }).then((result) => updateOriginalResponse(applicationId, interaction.token, formatNewsResult(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `뉴스 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else {
     void getTickerOverview(ticker).then((overview) => updateOriginalResponse(applicationId, interaction.token, formatTickerOverview(overview))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
   }

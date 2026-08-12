@@ -35,7 +35,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-free-float": { enabled: true, startTime: "09:30", endTime: "10:00", cooldownSeconds: 60, intervalSeconds: 86_400, activeDays: [1, 2, 3, 4, 5] },
   "us-product-classification": { enabled: true, startTime: "09:00", endTime: "10:00", cooldownSeconds: 60, intervalSeconds: 86_400, activeDays: [1, 2, 3, 4, 5] },
   "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { newsLookup: { defaultPeriod: "today" } } },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5 } } },
   "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
@@ -101,6 +101,10 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     for (const [name, value, min, max] of [["period", policy?.period, 2, 200], ["multiplier", policy?.stdDevMultiplier, 0.1, 10], ["min_price", policy?.minPrice, 0, undefined], ["min_volume", policy?.minVolume, 0, undefined], ["min_turnover_ratio", policy?.minTurnoverRatio, 0, undefined]] as const) {
       if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < min || (max !== undefined && Number(value) > max))) throw new Error(`INVALID_KR_BOLLINGER_${name.toUpperCase()}`);
     }
+  }
+  if (key === "us-news-radar") {
+    const period = settings.featureSettings?.newsLookup?.defaultPeriod;
+    if (period !== undefined && !["today", "3d", "7d", "1m"].includes(period)) throw new Error("INVALID_NEWS_DEFAULT_PERIOD");
   }
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();

@@ -12,6 +12,7 @@ export type FeatureSpecificSettings = {
   vwapPolicy?: { minAbovePercent: number; minVolume: number; minTradeValue: number; minPointCount: number; minTurnoverRatio: number; requireComplete: boolean };
   bollingerPolicy?: { period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number };
   krBollingerPolicy?: { period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number };
+  newsLookup?: { defaultPeriod: "today" | "3d" | "7d" | "1m" };
 };
 
 export type FeatureModuleDefinition = {
