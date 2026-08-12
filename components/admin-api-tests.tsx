@@ -251,6 +251,17 @@ export function AdminApiTests() {
       }
       setResult({ ...(typeof data === "object" && data !== null ? data : {}), httpStatus: response.status, requestTrace });
       setActive(test.key);
+      if (test.key === "kr_daily_cache" && typeof data?.jobId === "string") {
+        const statusEndpoint = data.statusEndpoint as string;
+        for (let attempt = 0; attempt < 180; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const statusResponse = await fetch(statusEndpoint, { cache: "no-store" });
+          const statusData = await statusResponse.json().catch(() => ({}));
+          const statusTrace = readRequestTrace(statusResponse);
+          setResult({ ...(typeof statusData === "object" && statusData !== null ? statusData : {}), httpStatus: statusResponse.status, requestTrace: statusTrace });
+          if (statusData?.status === "COMPLETED" || statusData?.status === "FAILED") break;
+        }
+      }
     } catch (testError) {
       const message = testError instanceof Error ? testError.message : String(testError);
       const errorResult = { ok: false, error: message, endpoint: test.endpoint, query: test.query, checkedAt: new Date().toISOString() };

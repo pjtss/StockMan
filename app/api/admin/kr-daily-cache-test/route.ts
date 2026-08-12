@@ -1,6 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { loadStoredKrInstrumentScopes, syncKrInstrumentUniverseFromKis } from "@/lib/kr-instruments";
-import { refreshKrDailyCandles, refreshKrMarketSnapshot } from "@/lib/kr-daily-price-cache";
-export async function POST(){try{await requireAdminSession();const universeSync=await syncKrInstrumentUniverseFromKis();const {scopes}=await loadStoredKrInstrumentScopes();const results=[];for(const item of scopes){const daily=await refreshKrDailyCandles(item.code);const quote=await refreshKrMarketSnapshot(item.code);results.push({market:item.market,code:item.code,daily:daily?.diagnostics??null,quote:quote?{ok:quote.ok,status:quote.status,price:quote.price,volume:quote.volume,tradingValue:quote.tradingValue,marketCap:quote.marketCap,turnoverRatio:quote.turnoverRatio,error:quote.error,rawText:quote.rawText}:null});}const isSuccess=(r:any)=>Number(r.daily?.parsedCandleCount??0)>0&&r.quote?.ok===true;return NextResponse.json({ok:true,mode:"ADMIN_MANUAL_REFRESH",universeSync,instrumentCount:scopes.length,successCount:results.filter(isSuccess).length,failureCount:results.filter((r)=>!isSuccess(r)).length,results});}catch(e){return NextResponse.json({ok:false,error:e instanceof Error?e.message:String(e)},{status:500});}}
-export const GET = POST;
+import { getKrDailyCacheJob, startKrDailyCacheJob } from "@/lib/kr-daily-cache-job";
+
+export const dynamic = "force-dynamic";
+
+export async function POST() {
+  if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const job = startKrDailyCacheJob();
+  return NextResponse.json({ ok: true, mode: "ADMIN_MANUAL_REFRESH", jobId: job.jobId, status: job.status, statusEndpoint: `/api/admin/kr-daily-cache-test?jobId=${job.jobId}` }, { status: 202 });
+}
+
+export async function GET(request: Request) {
+  if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const jobId = new URL(request.url).searchParams.get("jobId");
+  if (!jobId) return NextResponse.json({ ok: false, error: "jobId is required" }, { status: 400 });
+  const job = getKrDailyCacheJob(jobId);
+  if (!job) return NextResponse.json({ ok: false, error: "job not found", jobId }, { status: 404 });
+  return NextResponse.json({ ok: true, ...job, progress: job.instrumentCount ? Number((job.processedCount / job.instrumentCount * 100).toFixed(1)) : 0 });
+}
