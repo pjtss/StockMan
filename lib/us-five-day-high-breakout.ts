@@ -50,7 +50,8 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     }
     const previous = selectPreviousFiveTradingDays(daily.candles, asOfDate);
     if (!daily.ok || previous.length < 5) {
-      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000), diagnostics: daily.diagnostics }, price: { ok: false, status: 0 }, error: !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient prior candles (${previous.length}/5)` };
+      const error = !daily.ok ? (daily.candles.length === 0 ? `DB daily candles unavailable (${daily.candles.length})` : `insufficient prior candles (${previous.length}/5)`) : `insufficient prior candles (${previous.length}/5)`;
+      lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000), diagnostics: daily.diagnostics }, price: { ok: false, status: 0 }, error };
       continue;
     }
     const cutoff = dateKey(asOfDate || currentUsMarketDate());

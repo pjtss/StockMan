@@ -21,7 +21,7 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
       const prefetched = cachedCandles.get(`${item.market}:${item.code}`) ?? [];
       const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : { ok: false, status: 0, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: prefetched?.length ?? 0 } };
       const candles = daily?.candles ?? [];
-      if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, obvSignal: null, signalGap: null, aboveSignalDays: 0, signalAbove: false, signalCrossedRecently: false, rising: false, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
+      if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, obvSignal: null, signalGap: null, aboveSignalDays: 0, signalAbove: false, signalCrossedRecently: false, rising: false, qualifies: false, error: !daily ? "DB daily candles unavailable (0)" : !daily.ok ? `DB daily candles unavailable (${candles.length})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
       const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
       const recent = ordered.slice(-lookback);
       const obvSeries = calculateUsObvSeries(ordered);
@@ -57,6 +57,7 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
         lastClose: ordered.at(-1)?.close ?? null,
         date: ordered.at(-1)?.date ?? null,
         rising,
+        qualifies: rising,
         dailyDiagnostics: daily.diagnostics,
         rawText: daily.response.rawText || undefined,
       });
@@ -64,5 +65,5 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 1, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.change ?? -Infinity) - (a.change ?? -Infinity));
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, lookback, signalPeriod, signalAboveDays, signalCrossLookback, qualification: "recent OBV > previous OBV AND OBV is above EMA signal for the configured consecutive days AND a recent golden cross occurred", instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.rising), results };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, lookback, signalPeriod, signalAboveDays, signalCrossLookback, qualification: "recent OBV > previous OBV AND OBV is above EMA signal for the configured consecutive days AND a recent golden cross occurred", instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.qualifies), qualifiedCount: results.filter((x) => x.qualifies).length, results };
 }

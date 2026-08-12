@@ -23,5 +23,7 @@ export function latestMacd(candles: MacdCandle[], fast = 12, slow = 26, signalPe
   if (!points.length) return null;
   const current = points.at(-1)!;
   const previous = points.at(-2);
-  return { ...current, goldenCross: Boolean(previous && previous.macd <= previous.signal && current.macd > current.signal), deathCross: Boolean(previous && previous.macd >= previous.signal && current.macd < current.signal), bullish: current.macd > current.signal };
+  const goldenCross = Boolean(previous && previous.macd <= previous.signal && current.macd > current.signal);
+  const histogramIncreasing = Boolean(previous && current.histogram > previous.histogram);
+  return { ...current, goldenCross, deathCross: Boolean(previous && previous.macd >= previous.signal && current.macd < current.signal), histogramIncreasing, bullish: current.macd > current.signal };
 }

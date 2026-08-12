@@ -20,7 +20,8 @@ export async function scanStoredUsMacd(options: { fast?: number; slow?: number; 
     try {
       const daily = await getDaily(item);
       const macd = daily?.ok ? latestMacd(daily.candles, fast, slow, signal) : null;
-      results.push({ market: item.market, code: item.code, name: item.name, ...macd, candleCount: daily?.candles.length ?? 0, dailyDiagnostics: daily?.diagnostics ?? null, rawText: (daily as any)?.response?.rawText || undefined, error: macd ? undefined : !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "insufficient parsed candles for MACD" });
+      const qualifies = Boolean(macd && macd.macd > macd.signal && macd.histogram > 0 && (macd.goldenCross || macd.histogramIncreasing));
+      results.push({ market: item.market, code: item.code, name: item.name, ...macd, bullish: qualifies, qualifies, qualificationRule: "MACD > Signal, histogram > 0, and golden cross or histogram increasing", candleCount: daily?.candles.length ?? 0, dailyDiagnostics: daily?.diagnostics ?? null, rawText: (daily as any)?.response?.rawText || undefined, error: macd ? undefined : !daily ? "DB daily candles unavailable (0)" : !daily.ok ? `DB daily candles unavailable (${daily.candles.length})` : "insufficient parsed candles for MACD" });
     } catch (error) { results.push({ market: item.market, code: item.code, name: item.name, macd: null, signal: null, histogram: null, goldenCross: false, deathCross: false, bullish: false, candleCount: 0, error: error instanceof Error ? error.message : String(error) }); }
   } }
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));

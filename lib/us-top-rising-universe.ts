@@ -33,7 +33,7 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
 }
 
 const DEFAULT_SETTINGS: UsTurnoverFilterSettings = { maxPrice: 0, maxRate: 0, maxOpenToHighRate: 0, minMarketCap: 0, maxMarketCap: 0, globalMinMarketCap: 0, globalMaxMarketCap: 0, minTurnoverRatio: 0, maxTurnoverRatio: 0, tradingValueIncreaseAlert: 0, minIntensity: 0, minTradingValueRvol: 0, minTradingValueIncreaseRate: 0, minPersistenceWindows: 0 };
-const STORED_SCOPE_CACHE_TTL_MS = 10_000;
+const STORED_SCOPE_CACHE_TTL_MS = 5 * 60_000;
 export type StoredUsInstrumentScopes = {
   scopes: UsTopRisingScope[];
   universe: {
@@ -57,7 +57,10 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
       .from(usInstruments).where(and(eq(usInstruments.enabled, true), inArray(usInstruments.market, [...US_EXCHANGES])))
       : [];
     const settings = await loadUsTurnoverFilterSettings();
-    const eligibleRows = rows.filter((row) => row.manualProductAction !== "BLOCK" && row.productStatus === "ACTIVE" && isEligibleUsCommonStock(row) && isEligibleUsCommonStock(classifyUsInstrumentProduct({ name: row.name, type: row.instrumentType })));
+    const eligibleRows = rows.filter((row) => {
+      const symbolProduct = /(?:[-.]?(?:W|WT|WS|UN|U))$/i.test(row.code) || /(?:warrant|right|unit|preferred|option)/i.test(String(row.name ?? ""));
+      return row.manualProductAction !== "BLOCK" && row.productStatus === "ACTIVE" && !symbolProduct && isEligibleUsCommonStock(row) && isEligibleUsCommonStock(classifyUsInstrumentProduct({ name: row.name, type: row.instrumentType }));
+    });
     const scopes = await applyCommonMarketCapFilter(eligibleRows.map((row, index) => ({ market: row.market, code: row.code, name: row.name, rank: index + 1, changeRate: null, rankingVolume: null, rankingTradeValue: null })), settings);
     const commonFilterEnabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
     return { scopes, universe: { ok: true, source: "DB_INTEGRATED_US_INSTRUMENTS", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instruments", commonFilter: { enabled: commonFilterEnabled, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: commonFilterEnabled ? "excluded" : "allowed" } } } };
