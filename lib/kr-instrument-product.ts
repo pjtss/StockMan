@@ -8,10 +8,14 @@ export type KrInstrumentProductClassification = {
   reason: string;
 };
 
-const ETF = /(?:\bETF\b|\bETN\b|\bETP\b|상장지수|인덱스|펀드|수익증권|(?:^|\s)(?:KODEX|TIGER|PLUS|SOL|ACE|HANARO|KBSTAR|KOSEF|KIWOOM|TREX)\b)/i;
+// KIS domestic ranking responses frequently omit a product type. Keep this
+// name fallback broad enough to reject known Korean ETF brands and fund-like
+// products before they enter the common-stock universe.
+const ETF = /(?:\bETF\b|\bETN\b|\bETP\b|상장지수|인덱스|펀드|수익증권|액티브|TDF|(?:^|\s)(?:KODEX|TIGER|PLUS|SOL|ACE|HANARO|KBSTAR|KOSEF|KIWOOM|TREX|RISE|ARIRANG|TIMEFOLIO|WON|UNICORN|마이티|파워|FOCUS|히어로즈|BNK|KTOP)\b)/i;
 const LEVERAGED = /(?:레버리지|leverag|\b(?:2|3|4|5)\s*x\b|\b(?:2|3|4|5)x\b|울트라|ultra|bull|bullish)/i;
 const INVERSE = /(?:인버스|inverse|\bshort\b|bear|하락배율)/i;
-const DERIVATIVE = /(?:ETN|ETP|ELW|warrant|선물|옵션|option|권리주|신주인수권|우선주|통안채|국고채|회사채|채권|SOFR|MSCI|S&P|KRX)/i;
+const DERIVATIVE = /(?:ETN|ETP|ELW|warrant|선물|옵션|option|권리주|신주인수권|우선주|스팩|SPAC|통안채|국고채|회사채|채권|SOFR|MSCI|S&P|KRX|코스피\s*\d+|코스닥\s*\d+)/i;
+const PREFERRED_SHARE = /(?:우선주|\d?우B?|우)$/i;
 
 export function classifyKrInstrumentProduct(input: { name?: unknown; productType?: unknown }): KrInstrumentProductClassification {
   const name = String(input.name ?? "").trim();
@@ -20,7 +24,7 @@ export function classifyKrInstrumentProduct(input: { name?: unknown; productType
   const isEtf = ETF.test(text);
   const isLeveraged = LEVERAGED.test(text);
   const isInverse = INVERSE.test(text);
-  const isDerivativeProduct = DERIVATIVE.test(text) || isEtf;
+  const isDerivativeProduct = DERIVATIVE.test(text) || PREFERRED_SHARE.test(name) || isEtf;
   let instrumentType: KrInstrumentProductClassification["instrumentType"] = "COMMON_STOCK";
   if (isLeveraged) instrumentType = "LEVERAGED_PRODUCT";
   else if (isInverse) instrumentType = "INVERSE_PRODUCT";
