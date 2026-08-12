@@ -18,6 +18,7 @@ type PageKey =
   | "us-ams-scout"
   | "us-turnover-trend"
   | "us-turnover-ratio"
+  | "us-news"
   | "top-rising"
   | "trading-intensity"
   | "admin"
@@ -47,6 +48,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link className={current === "us-turnover-ratio" ? styles.navActive : styles.navLink} href="/scanners/us/turnover-ratio" prefetch={false}>
           시총 대비 거래대금
+        </Link>
+        <Link className={current === "us-news" ? styles.navActive : styles.navLink} href="/scanners/us/news" prefetch={false}>
+          미국 뉴스 조회
         </Link>
         <Link className={styles.navLink} href="/short-borrow" prefetch={false}>
           공매도 대차

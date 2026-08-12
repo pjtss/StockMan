@@ -30,6 +30,16 @@ export type KisBreakingNews = {
 };
 
 export type KisNewsTitle = { newsKey: string; date: string; time: string; title: string; source: string; ticker: string; name: string };
+export type KisNewsPeriod = "today" | "3d" | "7d" | "1m";
+export type KisTickerNewsResult = {
+  ticker: string;
+  period: KisNewsPeriod;
+  exchange: string;
+  fromDate: string;
+  toDate: string;
+  items: KisNewsTitle[];
+  diagnostics: { requestedDates: number; successfulDates: number; emptyDates: number; failedDates: Array<{ date: string; error: string }> };
+};
 const US_TICKER_PATTERN = /^[A-Z][A-Z0-9.-]{0,14}$/;
 
 function isUsTicker(ticker: string) {
@@ -96,6 +106,52 @@ export async function fetchNewsTitles(ticker: string, options: { date?: string; 
     INFO_GB: "", CLASS_CD: "", NATION_CD: "US", EXCHANGE_CD: options.exchange || "", SYMB: ticker.toUpperCase(), DATA_DT: options.date || "", DATA_TM: options.time || "", CTS: "",
   }, "HHPSTH60100C1");
   return (body.outblock1 || []).map((item: Record<string, unknown>) => ({ newsKey: String(item.news_key || ""), date: String(item.data_dt || ""), time: String(item.data_tm || ""), title: String(item.title || ""), source: String(item.source || ""), ticker: String(item.symb || ticker).toUpperCase(), name: String(item.symb_name || "") })).filter((item: KisNewsTitle) => item.newsKey && item.title);
+}
+
+function nyDateParts(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  return { year: Number(parts.find((part) => part.type === "year")?.value), month: Number(parts.find((part) => part.type === "month")?.value), day: Number(parts.find((part) => part.type === "day")?.value) };
+}
+
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10).replaceAll("-", "");
+}
+
+/**
+ * KIS news-title은 날짜 범위 파라미터가 없으므로 시장일별로 조회하고 결과를 합친다.
+ * 기간의 기준일은 서버 시간대가 아니라 미국 동부 시장일이다.
+ */
+export async function fetchTickerNews(ticker: string, options: { period?: KisNewsPeriod; exchange?: string; now?: Date } = {}): Promise<KisTickerNewsResult> {
+  const normalizedTicker = ticker.trim().toUpperCase();
+  if (!isUsTicker(normalizedTicker)) throw new Error("INVALID_US_TICKER");
+  const period = options.period || "today";
+  const days = period === "today" ? 1 : period === "3d" ? 3 : period === "7d" ? 7 : period === "1m" ? 30 : 0;
+  if (!days) throw new Error("INVALID_NEWS_PERIOD");
+  const base = nyDateParts(options.now);
+  const dates = Array.from({ length: days }, (_, index) => {
+    const date = new Date(Date.UTC(base.year, base.month - 1, base.day - index));
+    return formatDate(date);
+  });
+  const diagnostics = { requestedDates: dates.length, successfulDates: 0, emptyDates: 0, failedDates: [] as Array<{ date: string; error: string }> };
+  const collected: KisNewsTitle[] = [];
+  // The shared KIS throttle limits bursts while allowing the 30-day view to finish promptly.
+  const results = await Promise.all(dates.map(async (date) => {
+    try {
+      const items = await fetchNewsTitles(normalizedTicker, { date, exchange: options.exchange });
+      return { date, items };
+    } catch (error) {
+      return { date, items: [] as KisNewsTitle[], error: error instanceof Error ? error.message : String(error) };
+    }
+  }));
+  for (const result of results) {
+    if (result.error) diagnostics.failedDates.push({ date: result.date, error: result.error });
+    else if (result.items.length === 0) diagnostics.emptyDates += 1;
+    else { diagnostics.successfulDates += 1; collected.push(...result.items); }
+  }
+  const unique = new Map<string, KisNewsTitle>();
+  for (const item of collected) unique.set(item.newsKey, item);
+  const items = [...unique.values()].sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
+  return { ticker: normalizedTicker, period, exchange: options.exchange || "", fromDate: dates[dates.length - 1], toDate: dates[0], items, diagnostics };
 }
 
 export async function detectNewsCandidates(options: { date?: string; time?: string } = {}) {
