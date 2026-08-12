@@ -38,7 +38,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = "debug_suite" | "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -48,6 +48,13 @@ type ApiTestDefinition = {
 };
 
 const TESTS: ApiTestDefinition[] = [
+  {
+    key: "debug_suite",
+    label: "전체 기능 디버깅 스위트",
+    description: "환경·DB 스키마·KIS 토큰·자동화·RSS·SEC 저장 상태를 한 번에 점검",
+    endpoint: "/api/admin/debug-suite",
+    query: "",
+  },
   {
     key: "us_updown",
     label: "미국 상승률 TOP N",
