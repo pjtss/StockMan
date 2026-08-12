@@ -7,8 +7,8 @@ export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutR
   const webhook = await loadFeatureDiscordWebhook("us-daily-indicators", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "US_DAILY_BREAKOUT_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   if (!items.length) return { ok: true, sent: 0 };
-  const content = items.map((item) => [
-    `🚨 **${item.market} ${item.code} 5일 고가 돌파**`,
+  const blocks = items.map((item) => [
+    `**${item.market} ${item.code}**`,
     `당일 시가: ${item.currentPrice}`, `직전 5거래일 최고가: ${item.previousFiveDayHigh}`,
     `등락률: ${item.rate ?? "확인 불가"}%`,
     `거래량: ${formatKoreanCompact(item.volume, "주")}`,
@@ -17,7 +17,22 @@ export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutR
     `시총 대비 거래대금: ${item.turnoverRatio == null ? "확인 불가" : `${item.turnoverRatio.toFixed(2)}%`}`,
     `유통주: ${formatKoreanCompact(item.freeFloatShares, "주")} · 유통비율: ${item.freeFloatPercent == null ? "확인 불가" : `${item.freeFloatPercent}%`}`,
     `기준일: ${item.previousFiveTradingDays.join(", ")}`,
-  ].join("\n")).join("\n\n");
-  const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DAILY BREAKOUT", content }) });
-  return { ok: response.ok, status: response.status, sent: response.ok ? items.length : 0 };
+  ].join("\n"));
+  const descriptions: string[] = [];
+  let description = "";
+  for (const block of blocks) {
+    if (description && description.length + block.length + 2 > 5_500) {
+      descriptions.push(description);
+      description = "";
+    }
+    description += `${description ? "\n\n" : ""}${block}`;
+  }
+  if (description) descriptions.push(description);
+  const responses = [];
+  for (const body of descriptions) {
+    const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DAILY BREAKOUT", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 5거래일 고가 돌파 알림", description: body, color: 0xdc2626, footer: { text: "STOCKMAN · 당일 시가 기준" }, timestamp: new Date().toISOString() }] }) });
+    responses.push({ ok: response.ok, status: response.status });
+  }
+  const successful = responses.filter((response) => response.ok).length;
+  return { ok: successful === responses.length, status: responses.find((response) => !response.ok)?.status ?? 200, sent: successful === responses.length ? items.length : 0, messagesSent: successful };
 }

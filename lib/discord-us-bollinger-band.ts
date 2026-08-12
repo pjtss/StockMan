@@ -7,16 +7,18 @@ export async function sendUsBollingerBandSignals(results: UsBollingerResult[]) {
   const webhook = await loadFeatureDiscordWebhook("us-bollinger-band", ["US_BOLLINGER_BAND_DISCORD_WEBHOOK_URL"]);
   if (!webhook) return { ok: false, skipped: true, reason: "webhook_not_configured", sent: 0 };
   const chunks: string[] = [];
-  let current = "🚨 **일봉 볼린저밴드 하단 이탈 후보**\n";
+  const heading = "🚨 **해외주식 일봉 볼린저밴드 하단 이탈 알림**\n";
+  let current = heading;
   for (const item of qualified) {
     const line = `**${item.market} ${item.code}** ${item.name || ""} · 종가 ${item.close ?? "-"} · 하단 ${item.band?.lower ?? "-"} · 거래량 ${item.volume ?? "-"} · 시총 대비 거래대금 ${item.turnoverRatio ?? "-"}%\n`;
-    if (current.length + line.length > 1_850) { chunks.push(current.trimEnd()); current = "🚨 **일봉 볼린저밴드 하단 이탈 후보**\n"; }
+    if (current.length + line.length > 1_850) { chunks.push(current.trimEnd()); current = heading; }
     current += line;
   }
-  if (current.trim() !== "🚨 **일봉 볼린저밴드 하단 이탈 후보**") chunks.push(current.trimEnd());
+  if (current.trim() !== heading.trim()) chunks.push(current.trimEnd());
   const responses = [];
   for (const content of chunks) {
-    const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN BOLLINGER", allowed_mentions: { parse: [] }, content }) });
+    const description = content.replace(/^🚨 \*\*해외주식 일봉 볼린저밴드 하단 이탈 알림\*\*\n/, "");
+    const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN BOLLINGER", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 볼린저밴드 하단 이탈 알림", description, color: 0x7c3aed, footer: { text: "STOCKMAN · 종가와 하단선 비교" }, timestamp: new Date().toISOString() }] }) });
     responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
   }
   const sent = responses.filter((response) => response.ok).length;

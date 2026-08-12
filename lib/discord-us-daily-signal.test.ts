@@ -10,6 +10,7 @@ describe("buildUsDailyIndicatorDiscordChunks", () => {
     const chunks = buildUsDailyIndicatorDiscordChunks(sections);
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every((chunk) => chunk.length <= 2_000)).toBe(true);
+    expect(chunks.join("\n")).toContain("해외주식 일봉 지표 알림");
     expect(chunks.join("\n")).toContain("MFI 과매도 후보");
     expect(chunks.join("\n")).toContain("DMI 상승 후보");
   });
