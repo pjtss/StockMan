@@ -95,6 +95,7 @@ describe("discord-sec", () => {
     expect(sent.ok).toBe(true);
     expect(url.searchParams.get("wait")).toBe("true");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
-    expect(body.embeds[0].title).toContain("Broadcom Inc.");
+    expect(body.content).toContain("Broadcom Inc.");
+    expect(body.embeds).toBeUndefined();
   });
 });

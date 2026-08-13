@@ -239,7 +239,7 @@ export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify(buildSecDiscordWebhookPayload(result)),
+    body: JSON.stringify(toTextWebhookPayload(buildSecDiscordWebhookPayload(result) as unknown as Record<string, unknown>)),
   });
   const responseText = await response.text();
 
@@ -250,3 +250,4 @@ export async function sendSecResultToDiscord(result: SecDiscordResult): Promise<
   };
 }
 import { loadFeatureDiscordWebhook } from "./discord-config";
+import { toTextWebhookPayload } from "./discord-text";

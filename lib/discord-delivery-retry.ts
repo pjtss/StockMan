@@ -4,6 +4,7 @@ import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib
 import { getDb } from "@/lib/db";
 import { marketRssArticles } from "@/lib/schema";
 import { parseMarketRssDeliveryArticleId } from "@/lib/discord-delivery-policy";
+import { toTextWebhookPayload } from "@/lib/discord-text";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -35,7 +36,7 @@ export async function retryDiscordDeliveries(limit = 50) {
     const webhook = await webhookFor(delivery.channelKey);
     try {
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
-      const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(delivery.payload) });
+      const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(delivery.payload as Record<string, unknown>)) });
       if (!response.ok) throw new Error(`discord_http_${response.status}`);
       await markDiscordDeliverySent(delivery.id);
       const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;

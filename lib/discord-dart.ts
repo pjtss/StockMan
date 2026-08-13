@@ -1,5 +1,6 @@
 import type { AlertItem } from "./types";
 import { loadFeatureDiscordWebhook } from "./discord-config";
+import { toTextWebhookPayload } from "./discord-text";
 
 type DiscordWebhookPayload = {
   content: string;
@@ -73,7 +74,7 @@ export async function sendDartAlertToDiscord(alert: AlertItem): Promise<DartDisc
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(buildDartDiscordWebhookPayload(alert)),
+    body: JSON.stringify(toTextWebhookPayload(buildDartDiscordWebhookPayload(alert) as unknown as Record<string, unknown>)),
   });
   const responseText = await response.text();
 

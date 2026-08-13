@@ -1,4 +1,5 @@
 import { formatKoreanCompact } from "@/lib/korean-number-format";
+import { toTextWebhookPayload } from "@/lib/discord-text";
 
 export type UsVwapDiscordItem = {
   market: string;
@@ -68,7 +69,7 @@ export async function sendUsVwapToDiscord(items: UsVwapDiscordItem[], webhookUrl
       response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(buildUsVwapDiscordPayload(chunk)),
+        body: JSON.stringify(toTextWebhookPayload(buildUsVwapDiscordPayload(chunk) as unknown as Record<string, unknown>)),
       });
       if (SUCCESS_STATUSES.has(response.status) || response.status < 400 || attempt === 2) break;
       await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));

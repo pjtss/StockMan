@@ -1,5 +1,6 @@
 import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { toTextWebhookPayload } from "@/lib/discord-text";
 
 type Signal = { market: string; code: string; name?: string; [key: string]: unknown };
 const DISCORD_CONTENT_LIMIT = 2_000;
@@ -65,7 +66,7 @@ export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?:
   ].filter((section) => section.items.length > 0);
   const count = (input.mfi?.length || 0) + (input.dmi?.length || 0) + (input.macd?.length || 0) + (input.obv?.length || 0);
   const responses = [];
-  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", color: 0x2563eb, fields: fieldData.map((section) => ({ name: section.name, value: fitEmbedField(section.lines, section.items.length), inline: false })), footer: { text: "STOCKMAN · DB 저장 일봉 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] }) });
+  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", color: 0x2563eb, fields: fieldData.map((section) => ({ name: section.name, value: fitEmbedField(section.lines, section.items.length), inline: false })), footer: { text: "STOCKMAN · DB 저장 일봉 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] })) });
   responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
   const successful = responses.filter((response) => response.ok).length;
   return {

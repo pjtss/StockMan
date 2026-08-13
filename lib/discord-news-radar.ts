@@ -1,6 +1,7 @@
 import type { AlertItem } from "./types";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { toTextWebhookPayload } from "@/lib/discord-text";
 
 export type NewsRadarDiscordContext = {
   rate: number | null;
@@ -59,7 +60,7 @@ export async function sendNewsRadarAlertToDiscord(alert: AlertItem, context: New
   url.searchParams.set("wait", "true");
   let response: Response | null = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    response = await fetch(url.toString(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildNewsRadarDiscordPayload(alert, context)) });
+    response = await fetch(url.toString(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(buildNewsRadarDiscordPayload(alert, context) as unknown as Record<string, unknown>)) });
     if (response.status === 200 || response.status === 204 || response.status < 400 || attempt === 2) break;
     await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
   }

@@ -1,6 +1,7 @@
 import type { UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
 import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
+import { toTextWebhookPayload } from "@/lib/discord-text";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 
 export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutResult[]) {
@@ -19,7 +20,7 @@ export async function sendUsDailyBreakoutToDiscord(items: UsFiveDayHighBreakoutR
     `기준일: ${item.previousFiveTradingDays.join(", ")}`,
   ].join("\n"));
   const description = blocks.join("\n\n").slice(0, 4_050);
-  const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DAILY BREAKOUT", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 5거래일 고가 돌파 알림", description, color: 0xdc2626, footer: { text: "STOCKMAN · 당일 시가 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] }) });
+  const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload({ username: "STOCKMAN DAILY BREAKOUT", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 5거래일 고가 돌파 알림", description, color: 0xdc2626, footer: { text: "STOCKMAN · 당일 시가 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] })) });
   const responses = [{ ok: response.ok, status: response.status }];
   const successful = responses.filter((response) => response.ok).length;
   return { ok: successful === responses.length, status: responses.find((response) => !response.ok)?.status ?? 200, sent: successful === responses.length ? items.length : 0, messagesSent: successful };

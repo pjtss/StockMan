@@ -2,6 +2,7 @@ import type { UsTurnoverRatioItem } from "@/lib/us-turnover-ratio";
 import type { UsTurnoverRatioItemWithTrend } from "@/lib/us-turnover-ratio-trend";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
 import { scoreCandidate } from "@/lib/candidate-score";
+import { toTextWebhookPayload } from "@/lib/discord-text";
 
 const SUCCESS_STATUSES = new Set([200, 204]);
 
@@ -53,7 +54,7 @@ export async function sendUsTurnoverRatioToDiscord(items: UsTurnoverRatioItem[],
   for (const chunk of chunks) {
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildUsTurnoverRatioDiscordPayload(chunk)) });
+      response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(buildUsTurnoverRatioDiscordPayload(chunk) as unknown as Record<string, unknown>)) });
       if (SUCCESS_STATUSES.has(response.status) || response.status < 400 || attempt === 2) break;
       await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
     }
