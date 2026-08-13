@@ -28,11 +28,12 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
     const obv = calculateUsObvSeries(candles); const obvSignal = analyzeUsObvSignal(candles, { signalPeriod: 9, consecutiveDays: 3, crossoverLookback: 5 });
     const band = calculateBollingerBands(candles, 20, 2).at(-1);
     const scoreParts = {
-      priceTrend: Number(ma20 != null && ma60 != null && recent.close > ma20 && ma20 > ma60) * 20,
-      obv: Number(obvSignal.aboveSignal && obvSignal.signalGapIncreasing && (obv.at(-1)?.obv || 0) > (obv.at(-2)?.obv || 0)) * 20,
-      macd: Number(Boolean(macd && macd.macd > macd.signal && macd.histogram > 0 && macd.histogramIncreasing)) * 20,
+      priceTrend: Number(ma20 != null && ma60 != null && recent.close > ma20 && ma20 > ma60) * 15,
+      obv: Number(obvSignal.aboveSignal && obvSignal.signalGapIncreasing && (obv.at(-1)?.obv || 0) > (obv.at(-2)?.obv || 0)) * 15,
+      macd: Number(Boolean(macd && macd.macd > macd.signal && macd.histogram > 0 && macd.histogramIncreasing)) * 15,
       mfi: Number(Boolean(mfi && mfi.value >= policy.minMfi && mfi.value <= policy.maxMfi && (latestMfi(candles.slice(0, -1), 14)?.value ?? 0) < mfi.value)) * 15,
       bollinger: Number(Boolean(band && recent.close > band.middle && recent.close >= band.middle)) * 15,
+      dmi: Number(Boolean(dmi && dmi.plusDi > dmi.minusDi && dmi.adx >= 20)) * 15,
       volume: Number(rvol != null && rvol >= policy.minRvol) * 10,
     };
     const score = Object.values(scoreParts).reduce((a, b) => a + b, 0);
