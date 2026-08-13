@@ -50,7 +50,7 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
       volume: Number(rvol != null && rvol >= policy.minRvol) * 10,
     };
     const score = Object.values(scoreParts).reduce((a, b) => a + b, 0);
-    const qualifies = score >= policy.minScore && (!policy.requirePriceTrend || scoreParts.priceTrend > 0) && (rvol == null || rvol >= policy.minRvol);
+    const qualifies = score >= policy.minScore && (!policy.requirePriceTrend || scoreParts.priceTrend > 0) && rvol != null && rvol >= policy.minRvol;
     results.push({ market: item.market, code: item.code, name: item.name, date: recent.date, close: recent.close, volume: recent.volume, ma20, ma60, rvol, mfi: mfi?.value ?? null, dmi, macd, obv: obv.at(-1)?.obv ?? null, obvSignal: obvSignal.latestSignal, bollinger: band, score, scoreParts, qualifies, status: qualifies ? "QUALIFIED" : "NOT_QUALIFIED", candleCount: candles.length });
   }
   results.sort((a, b) => Number(b.score) - Number(a.score));
