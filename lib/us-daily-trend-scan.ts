@@ -16,7 +16,16 @@ function average(values: number[]) { return values.length ? values.reduce((a, b)
 export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; context?: UsDailyScanContext } = {}) {
   const settings = await loadFeatureModuleSettings("us-daily-indicators");
   const evaluation = settings.featureSettings?.evaluation as Record<string, unknown> | undefined;
-  const configured = { minScore: Number(evaluation?.trendMinScore ?? defaults.minScore), minRvol: Number(evaluation?.trendMinRvol ?? defaults.minRvol), minMfi: Number(evaluation?.trendMinMfi ?? defaults.minMfi), maxMfi: Number(evaluation?.trendMaxMfi ?? defaults.maxMfi), requirePriceTrend: evaluation?.trendRequirePriceTrend === undefined ? defaults.requirePriceTrend : Boolean(evaluation.trendRequirePriceTrend) };
+  const configured = {
+    minScore: Number(evaluation?.trendMinScore ?? defaults.minScore),
+    minRvol: Number(evaluation?.trendMinRvol ?? defaults.minRvol),
+    minMfi: Number(evaluation?.trendMinMfi ?? defaults.minMfi),
+    maxMfi: Number(evaluation?.trendMaxMfi ?? defaults.maxMfi),
+    requirePriceTrend: evaluation?.trendRequirePriceTrend === undefined ? defaults.requirePriceTrend : Boolean(evaluation.trendRequirePriceTrend),
+    obvSignalPeriod: Number(evaluation?.obvSignalPeriod ?? 9),
+    obvSignalAboveDays: Number(evaluation?.obvSignalAboveDays ?? 3),
+    obvSignalCrossLookback: Number(evaluation?.obvSignalCrossLookback ?? 5),
+  };
   const policy = { ...configured, ...(options.policy || {}) };
   const context = options.context || await createUsDailyScanContext({ candleLimit: 100 });
   const results: Array<Record<string, unknown>> = [];
@@ -29,7 +38,7 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
     const volumeAverage = average(candles.slice(-21, -1).map((c) => c.volume));
     const rvol = volumeAverage && volumeAverage > 0 ? recent.volume / volumeAverage : null;
     const mfi = latestMfi(candles, 14); const dmi = latestDmi(candles, 14); const macd = latestMacd(candles);
-    const obv = calculateUsObvSeries(candles); const obvSignal = analyzeUsObvSignal(candles, { signalPeriod: 9, consecutiveDays: 3, crossoverLookback: 5 });
+    const obv = calculateUsObvSeries(candles); const obvSignal = analyzeUsObvSignal(candles, { signalPeriod: configured.obvSignalPeriod, consecutiveDays: configured.obvSignalAboveDays, crossoverLookback: configured.obvSignalCrossLookback });
     const band = calculateBollingerBands(candles, 20, 2).at(-1);
     const scoreParts = {
       priceTrend: Number(ma20 != null && ma60 != null && recent.close > ma20 && ma20 > ma60) * 15,
