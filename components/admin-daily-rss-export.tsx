@@ -3,6 +3,7 @@
 import { Clipboard, ExternalLink, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./admin-daily-rss-export.module.css";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
 type CopyItem = { title: string; link: string; grade: string };
 type AnalysisItem = Record<string, unknown>;
@@ -58,33 +59,7 @@ export function AdminDailyRssExport() {
 
   async function copyText(value: string) {
     try {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(value);
-        } catch {
-          const textarea = document.createElement("textarea");
-          textarea.value = value;
-          textarea.setAttribute("readonly", "");
-          textarea.style.position = "fixed";
-          textarea.style.opacity = "0";
-          document.body.appendChild(textarea);
-          textarea.select();
-          const copiedWithFallback = document.execCommand("copy");
-          textarea.remove();
-          if (!copiedWithFallback) throw new Error("document.execCommand copy failed");
-        }
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = value;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        const copiedWithFallback = document.execCommand("copy");
-        textarea.remove();
-        if (!copiedWithFallback) throw new Error("document.execCommand copy failed");
-      }
+      await copyToClipboard(value);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch (copyError) {

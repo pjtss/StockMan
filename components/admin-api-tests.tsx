@@ -5,6 +5,7 @@ import { Copy, Play } from "lucide-react";
 import { AdminModal } from "@/components/admin-modal";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/page.module.css";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
 type Result = {
   ok?: boolean;
@@ -451,9 +452,13 @@ export function AdminApiTests() {
             <button
               className={styles.toggleButton}
               onClick={async () => {
-                await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1600);
+                try {
+                  await copyToClipboard(JSON.stringify(result, null, 2));
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1600);
+                } catch (copyError) {
+                  setError(copyError instanceof Error ? `복사 실패: ${copyError.message}` : "복사 실패");
+                }
               }}
             >
               <Copy size={16} />
@@ -469,7 +474,7 @@ export function AdminApiTests() {
         return <AdminModal title={`${activeTest.label} · KIS 원본 응답`} description="가공하지 않은 API 원문입니다. 필요한 경우 아래 버튼으로 복사할 수 있습니다." onClose={() => setRawOpen(false)} wide>
           <div className={styles.resultHeader}><span>원본 블록</span><strong>{rawResponses.length}개</strong></div>
           <div className={styles.cardActions}>
-            <button className={styles.toggleButton} onClick={async () => { await navigator.clipboard.writeText(rawText); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>
+            <button className={styles.toggleButton} onClick={async () => { try { await copyToClipboard(rawText); setCopied(true); window.setTimeout(() => setCopied(false), 1600); } catch { setCopied(false); } }}>
               <Copy size={16} />
               {copied ? "원본 복사 완료" : "KIS 원본 응답 복사"}
             </button>

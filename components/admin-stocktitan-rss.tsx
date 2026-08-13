@@ -12,6 +12,7 @@ import {
   type MarketRssSource,
 } from "@/lib/market-rss-sources";
 import styles from "./admin-stocktitan-rss.module.css";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
 type GradeFilter = "all" | MarketRssGrade;
 
@@ -93,9 +94,13 @@ export function AdminStockTitanRss() {
   }, []);
 
   async function copy(label: string, value: unknown) {
-    await navigator.clipboard.writeText(typeof value === "string" ? value : json(value));
-    setCopied(label);
-    window.setTimeout(() => setCopied(""), 1400);
+    try {
+      await copyToClipboard(typeof value === "string" ? value : json(value));
+      setCopied(label);
+      window.setTimeout(() => setCopied(""), 1400);
+    } catch (copyError) {
+      setError(copyError instanceof Error ? `복사 실패: ${copyError.message}` : "복사 실패");
+    }
   }
 
   const gradeLabel = (value: MarketRssGrade) => MARKET_RSS_GRADE_LABELS[value];

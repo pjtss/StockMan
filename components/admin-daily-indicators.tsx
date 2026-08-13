@@ -4,6 +4,7 @@ import { Copy, Play } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/daily-indicators/daily-indicators.module.css";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
 type ModuleResult = { ok: boolean; data?: any; error?: string };
 type AggregateResult = {
@@ -81,36 +82,7 @@ export function AdminDailyIndicators() {
     const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
     if (!text) return;
     try {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-        } catch {
-          // Some mobile browsers or embedded contexts expose the Clipboard API
-          // but reject it when permission is unavailable. Fall through to the
-          // selection-based compatibility path below.
-          const textarea = document.createElement("textarea");
-          textarea.value = text;
-          textarea.setAttribute("readonly", "");
-          textarea.style.position = "fixed";
-          textarea.style.opacity = "0";
-          document.body.appendChild(textarea);
-          textarea.select();
-          const copied = document.execCommand("copy");
-          textarea.remove();
-          if (!copied) throw new Error("document.execCommand copy failed");
-        }
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        const copied = document.execCommand("copy");
-        textarea.remove();
-        if (!copied) throw new Error("document.execCommand copy failed");
-      }
+      await copyToClipboard(text);
       setError(null);
       setCopiedTarget(target);
       window.setTimeout(() => setCopiedTarget((current) => (current === target ? null : current)), 1600);
