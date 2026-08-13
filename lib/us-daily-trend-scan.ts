@@ -50,8 +50,13 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
       volume: Number(rvol != null && rvol >= policy.minRvol) * 10,
     };
     const score = Object.values(scoreParts).reduce((a, b) => a + b, 0);
-    const qualifies = score >= policy.minScore && (!policy.requirePriceTrend || scoreParts.priceTrend > 0) && rvol != null && rvol >= policy.minRvol;
-    results.push({ market: item.market, code: item.code, name: item.name, date: recent.date, close: recent.close, volume: recent.volume, ma20, ma60, rvol, mfi: mfi?.value ?? null, dmi, macd, obv: obv.at(-1)?.obv ?? null, obvSignal: obvSignal.latestSignal, bollinger: band, score, scoreParts, qualifies, status: qualifies ? "QUALIFIED" : "NOT_QUALIFIED", candleCount: candles.length });
+    const rejectionReasons = [
+      ...(score < policy.minScore ? [`score_below_minimum:${score}/${policy.minScore}`] : []),
+      ...(policy.requirePriceTrend && scoreParts.priceTrend === 0 ? ["price_trend_not_confirmed"] : []),
+      ...(rvol == null ? ["rvol_unavailable"] : rvol < policy.minRvol ? [`rvol_below_minimum:${Number(rvol.toFixed(2))}/${policy.minRvol}`] : []),
+    ];
+    const qualifies = rejectionReasons.length === 0;
+    results.push({ market: item.market, code: item.code, name: item.name, date: recent.date, close: recent.close, volume: recent.volume, ma20, ma60, rvol, mfi: mfi?.value ?? null, dmi, macd, obv: obv.at(-1)?.obv ?? null, obvSignal: obvSignal.latestSignal, bollinger: band, score, scoreParts, rejectionReasons, qualifies, status: qualifies ? "QUALIFIED" : "NOT_QUALIFIED", candleCount: candles.length });
   }
   results.sort((a, b) => Number(b.score) - Number(a.score));
   return { ok: Boolean((context.universe.universe as any).ok), checkedAt: new Date().toISOString(), policy, dataPolicy: { source: "us_daily_price_candles", indicators: ["OBV", "MACD", "MFI", "Bollinger", "DMI", "Volume"], qualification: "score >= minScore, price trend and RVOL filters" }, instrumentCount: results.length, successCount: results.filter((x) => x.status !== "FAILED").length, failureCount: results.filter((x) => x.status === "FAILED").length, qualified: results.filter((x) => x.qualifies), results };
