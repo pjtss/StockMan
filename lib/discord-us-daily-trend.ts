@@ -11,7 +11,7 @@ export async function sendUsDailyTrendToDiscord(items: Array<Record<string, unkn
   for (const item of qualified.slice(0, 30)) {
     const parts = (item.scoreParts || {}) as Record<string, unknown>;
     const points = (key: string) => Number(parts[key] ?? 0);
-    const line = `${item.market} ${item.code}${item.name ? ` | ${item.name}` : ""} · ${item.score}점 · 종가 ${item.close} · MFI ${item.mfi ?? "-"} · RVOL ${item.rvol == null ? "-" : Number(item.rvol).toFixed(2)}x\n  추세 ${points("priceTrend")} · OBV ${points("obv")} · MACD ${points("macd")} · MFI ${points("mfi")} · BB ${points("bollinger")} · DMI ${points("dmi")} · 거래량 ${points("volume")}`;
+    const line = `${item.market} ${item.code}${item.name ? ` | ${item.name}` : ""} · ${item.score}점 · 시가 ${item.open ?? "-"} · 이전5일고가 ${item.previousFiveDayHigh ?? "-"} · 종가 ${item.close} · MFI ${item.mfi ?? "-"} · RVOL ${item.rvol == null ? "-" : Number(item.rvol).toFixed(2)}x\n  일봉 돌파 ${item.dailyBreakout ? "YES" : "NO"} · 추세 ${points("priceTrend")} · OBV ${points("obv")} · MACD ${points("macd")} · MFI ${points("mfi")} · BB ${points("bollinger")} · DMI ${points("dmi")} · 거래량 ${points("volume")}`;
     const candidate = [...header, ...lines, line].join("\n");
     if (candidate.length > 1900) break;
     lines.push(line);

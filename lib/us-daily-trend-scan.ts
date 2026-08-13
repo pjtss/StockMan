@@ -7,9 +7,9 @@ import { latestMfi } from "@/lib/us-mfi";
 import { analyzeUsObvSignal, calculateUsObvSeries } from "@/lib/us-obv-signal";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 
-export type UsDailyTrendPolicy = { minScore?: number; minRvol?: number; minMfi?: number; maxMfi?: number; requirePriceTrend?: boolean };
+export type UsDailyTrendPolicy = { minScore?: number; minRvol?: number; minMfi?: number; maxMfi?: number; requirePriceTrend?: boolean; requireDailyBreakout?: boolean };
 
-const defaults = { minScore: 70, minRvol: 1.5, minMfi: 50, maxMfi: 85, requirePriceTrend: true };
+const defaults = { minScore: 70, minRvol: 1.5, minMfi: 50, maxMfi: 85, requirePriceTrend: true, requireDailyBreakout: true };
 
 function average(values: number[]) { return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null; }
 
@@ -22,6 +22,7 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
     minMfi: Number(evaluation?.trendMinMfi ?? defaults.minMfi),
     maxMfi: Number(evaluation?.trendMaxMfi ?? defaults.maxMfi),
     requirePriceTrend: evaluation?.trendRequirePriceTrend === undefined ? defaults.requirePriceTrend : Boolean(evaluation.trendRequirePriceTrend),
+    requireDailyBreakout: evaluation?.trendRequireDailyBreakout === undefined ? defaults.requireDailyBreakout : Boolean(evaluation.trendRequireDailyBreakout),
     obvSignalPeriod: Number(evaluation?.obvSignalPeriod ?? 9),
     obvSignalAboveDays: Number(evaluation?.obvSignalAboveDays ?? 3),
     obvSignalCrossLookback: Number(evaluation?.obvSignalCrossLookback ?? 5),
@@ -34,6 +35,9 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
     const recent = candles.at(-1);
     if (!recent || candles.length < 60) { results.push({ market: item.market, code: item.code, name: item.name, qualifies: false, score: 0, status: "FAILED", candleCount: candles.length, error: `insufficient daily candles (${candles.length}/60)` }); continue; }
     const closes = candles.map((c) => c.close);
+    const priorFive = candles.slice(0, -1).slice(-5);
+    const previousFiveDayHigh = priorFive.length === 5 ? Math.max(...priorFive.map((candle) => candle.high)) : null;
+    const dailyBreakout = previousFiveDayHigh != null && recent.open > previousFiveDayHigh;
     const ma20 = average(closes.slice(-20)); const ma60 = average(closes.slice(-60));
     const volumeAverage = average(candles.slice(-21, -1).map((c) => c.volume));
     const rvol = volumeAverage && volumeAverage > 0 ? recent.volume / volumeAverage : null;
@@ -53,11 +57,12 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
     const rejectionReasons = [
       ...(score < policy.minScore ? [`score_below_minimum:${score}/${policy.minScore}`] : []),
       ...(policy.requirePriceTrend && scoreParts.priceTrend === 0 ? ["price_trend_not_confirmed"] : []),
+      ...(policy.requireDailyBreakout && !dailyBreakout ? [previousFiveDayHigh == null ? "insufficient_prior_candles_for_breakout" : `daily_open_not_above_previous_five_day_high:${recent.open}/${previousFiveDayHigh}`] : []),
       ...(rvol == null ? ["rvol_unavailable"] : rvol < policy.minRvol ? [`rvol_below_minimum:${Number(rvol.toFixed(2))}/${policy.minRvol}`] : []),
     ];
     const qualifies = rejectionReasons.length === 0;
-    results.push({ market: item.market, code: item.code, name: item.name, date: recent.date, close: recent.close, volume: recent.volume, ma20, ma60, rvol, mfi: mfi?.value ?? null, dmi, macd, obv: obv.at(-1)?.obv ?? null, obvSignal: obvSignal.latestSignal, bollinger: band, score, scoreParts, rejectionReasons, qualifies, status: qualifies ? "QUALIFIED" : "NOT_QUALIFIED", candleCount: candles.length });
+    results.push({ market: item.market, code: item.code, name: item.name, date: recent.date, open: recent.open, close: recent.close, volume: recent.volume, previousFiveDayHigh, dailyBreakout, ma20, ma60, rvol, mfi: mfi?.value ?? null, dmi, macd, obv: obv.at(-1)?.obv ?? null, obvSignal: obvSignal.latestSignal, bollinger: band, score, scoreParts, rejectionReasons, qualifies, status: qualifies ? "QUALIFIED" : "NOT_QUALIFIED", candleCount: candles.length });
   }
   results.sort((a, b) => Number(b.score) - Number(a.score));
-  return { ok: Boolean((context.universe.universe as any).ok), checkedAt: new Date().toISOString(), policy, dataPolicy: { source: "us_daily_price_candles", candleLimit: context.candleLimit, currentDayIncluded: true, indicators: ["OBV", "MACD", "MFI", "Bollinger", "DMI", "Volume"], qualification: "score >= minScore, price trend and RVOL filters" }, instrumentCount: results.length, successCount: results.filter((x) => x.status !== "FAILED").length, failureCount: results.filter((x) => x.status === "FAILED").length, qualified: results.filter((x) => x.qualifies), results };
+  return { ok: Boolean((context.universe.universe as any).ok), checkedAt: new Date().toISOString(), policy, dataPolicy: { source: "us_daily_price_candles", candleLimit: context.candleLimit, currentDayIncluded: true, breakout: "today open > previous five trading-day high", indicators: ["OBV", "MACD", "MFI", "Bollinger", "DMI", "Volume"], qualification: "score >= minScore, price trend, RVOL, and daily breakout filters" }, instrumentCount: results.length, successCount: results.filter((x) => x.status !== "FAILED").length, failureCount: results.filter((x) => x.status === "FAILED").length, qualified: results.filter((x) => x.qualifies), results };
 }
