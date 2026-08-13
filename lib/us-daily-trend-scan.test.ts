@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("./feature-module-settings", () => ({ loadFeatureModuleSettings: vi.fn().mockResolvedValue({ featureSettings: { evaluation: {} } }) }));
 import { scanUsDailyTrend } from "./us-daily-trend-scan";
 
 describe("us daily trend scan", () => {
