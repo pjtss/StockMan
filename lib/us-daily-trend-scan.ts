@@ -5,6 +5,7 @@ import { latestDmi } from "@/lib/us-dmi";
 import { latestMacd } from "@/lib/us-macd";
 import { latestMfi } from "@/lib/us-mfi";
 import { analyzeUsObvSignal, calculateUsObvSeries } from "@/lib/us-obv-signal";
+import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 
 export type UsDailyTrendPolicy = { minScore?: number; minRvol?: number; minMfi?: number; maxMfi?: number; requirePriceTrend?: boolean };
 
@@ -13,7 +14,10 @@ const defaults = { minScore: 70, minRvol: 1.5, minMfi: 50, maxMfi: 85, requirePr
 function average(values: number[]) { return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null; }
 
 export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; context?: UsDailyScanContext } = {}) {
-  const policy = { ...defaults, ...(options.policy || {}) };
+  const settings = await loadFeatureModuleSettings("us-daily-indicators");
+  const evaluation = settings.featureSettings?.evaluation as Record<string, unknown> | undefined;
+  const configured = { minScore: Number(evaluation?.trendMinScore ?? defaults.minScore), minRvol: Number(evaluation?.trendMinRvol ?? defaults.minRvol), minMfi: Number(evaluation?.trendMinMfi ?? defaults.minMfi), maxMfi: Number(evaluation?.trendMaxMfi ?? defaults.maxMfi), requirePriceTrend: evaluation?.trendRequirePriceTrend === undefined ? defaults.requirePriceTrend : Boolean(evaluation.trendRequirePriceTrend) };
+  const policy = { ...configured, ...(options.policy || {}) };
   const context = options.context || await createUsDailyScanContext({ candleLimit: 100 });
   const results: Array<Record<string, unknown>> = [];
   for (const item of context.universe.scopes) {

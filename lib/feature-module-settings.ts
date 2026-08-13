@@ -83,6 +83,16 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     validateInteger("obv_signal_period", evaluation?.obvSignalPeriod, 2, 100);
     validateInteger("obv_signal_above_days", evaluation?.obvSignalAboveDays, 1, 20);
     validateInteger("obv_signal_cross_lookback", evaluation?.obvSignalCrossLookback, 1, 30);
+    const validateTrend = (name: string, value: unknown, min: number, max?: number) => {
+      if (value === undefined) return;
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < min || (max !== undefined && parsed > max)) throw new Error(`INVALID_${name.toUpperCase()}`);
+    };
+    validateTrend("trend_min_score", evaluation?.trendMinScore, 0, 100);
+    validateTrend("trend_min_rvol", evaluation?.trendMinRvol, 0);
+    validateTrend("trend_min_mfi", evaluation?.trendMinMfi, 0, 100);
+    validateTrend("trend_max_mfi", evaluation?.trendMaxMfi, 0, 100);
+    if (evaluation?.trendRequirePriceTrend !== undefined && typeof evaluation.trendRequirePriceTrend !== "boolean") throw new Error("INVALID_TREND_PRICE_POLICY");
   }
   if (key === "us-bollinger-band") {
     const policy = settings.featureSettings?.bollingerPolicy;
