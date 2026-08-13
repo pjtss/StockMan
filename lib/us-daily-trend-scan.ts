@@ -38,9 +38,30 @@ export async function scanUsDailyTrend(options: { policy?: UsDailyTrendPolicy; c
     const priorFive = candles.slice(0, -1).slice(-5);
     const previousFiveDayHigh = priorFive.length === 5 ? Math.max(...priorFive.map((candle) => candle.high)) : null;
     const dailyBreakout = previousFiveDayHigh != null && recent.open > previousFiveDayHigh;
-    const ma20 = average(closes.slice(-20)); const ma60 = average(closes.slice(-60));
     const volumeAverage = average(candles.slice(-21, -1).map((c) => c.volume));
     const rvol = volumeAverage && volumeAverage > 0 ? recent.volume / volumeAverage : null;
+    if (policy.requireDailyBreakout && !dailyBreakout) {
+      results.push({
+        market: item.market,
+        code: item.code,
+        name: item.name,
+        date: recent.date,
+        open: recent.open,
+        close: recent.close,
+        volume: recent.volume,
+        rvol,
+        previousFiveDayHigh,
+        dailyBreakout,
+        qualifies: false,
+        status: "BREAKOUT_FILTERED",
+        candleCount: candles.length,
+        score: 0,
+        scoreParts: {},
+        rejectionReasons: [previousFiveDayHigh == null ? "insufficient_prior_candles_for_breakout" : `daily_open_not_above_previous_five_day_high:${recent.open}/${previousFiveDayHigh}`, ...(rvol == null ? ["rvol_unavailable"] : [])],
+      });
+      continue;
+    }
+    const ma20 = average(closes.slice(-20)); const ma60 = average(closes.slice(-60));
     const mfi = latestMfi(candles, 14); const dmi = latestDmi(candles, 14); const macd = latestMacd(candles);
     const obv = calculateUsObvSeries(candles); const obvSignal = analyzeUsObvSignal(candles, { signalPeriod: configured.obvSignalPeriod, consecutiveDays: configured.obvSignalAboveDays, crossoverLookback: configured.obvSignalCrossLookback });
     const band = calculateBollingerBands(candles, 20, 2).at(-1);
