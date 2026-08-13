@@ -10,6 +10,8 @@ import { isWithinSchedule } from "@/lib/schedule-time";
 import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
+import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
 
 export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -31,15 +33,17 @@ export async function POST(request: Request) {
   try {
     const result = await withAutomationRun("us-daily-indicators", async () => {
     const context = await createUsDailyScanContext({ candleLimit: 100 });
-    const [mfi, dmi, macd, obv] = await Promise.all([scanStoredUsMfiOversold({ context }), scanStoredUsDmi({ context }), scanStoredUsMacd({ context }), scanStoredUsDailyObv({ context })]);
+    const [mfi, dmi, macd, obv, trend] = await Promise.all([scanStoredUsMfiOversold({ context }), scanStoredUsDmi({ context }), scanStoredUsMacd({ context }), scanStoredUsDailyObv({ context }), scanUsDailyTrend({ context })]);
     const [mfiFiltered, dmiFiltered, macdFiltered, obvFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified, obv.qualified].map((items) => filterUsDailyCandidates(items as any)));
     const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any, obv: obvFiltered.filtered as any });
+    const trendDiscord = await sendUsDailyTrendToDiscord(trend.results);
     return {
       ok: discord.ok,
       mfi,
       dmi,
       macd,
       obv,
+      trend,
       commonFilter: {
         excluded: { mfi: mfiFiltered.excludedCount, dmi: dmiFiltered.excludedCount, macd: macdFiltered.excludedCount, obv: obvFiltered.excludedCount },
         failureReasons: { mfi: mfiFiltered.failureReasons, dmi: dmiFiltered.failureReasons, macd: macdFiltered.failureReasons, obv: obvFiltered.failureReasons },
@@ -47,6 +51,7 @@ export async function POST(request: Request) {
         settings: mfiFiltered.settings,
       },
       discord,
+      trendDiscord,
     };
     });
     return NextResponse.json({ intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, ...result });
