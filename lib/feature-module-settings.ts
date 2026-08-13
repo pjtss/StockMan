@@ -92,6 +92,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     validateTrend("trend_min_rvol", evaluation?.trendMinRvol, 0);
     validateTrend("trend_min_mfi", evaluation?.trendMinMfi, 0, 100);
     validateTrend("trend_max_mfi", evaluation?.trendMaxMfi, 0, 100);
+    if (evaluation?.trendMinMfi !== undefined && evaluation?.trendMaxMfi !== undefined && Number(evaluation.trendMinMfi) > Number(evaluation.trendMaxMfi)) throw new Error("INVALID_TREND_MFI_RANGE");
     if (evaluation?.trendRequirePriceTrend !== undefined && typeof evaluation.trendRequirePriceTrend !== "boolean") throw new Error("INVALID_TREND_PRICE_POLICY");
   }
   if (key === "us-bollinger-band") {
