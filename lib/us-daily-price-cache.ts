@@ -1,5 +1,5 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { getDb, getPool } from "@/lib/db";
 import { usDailyPriceCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily-price";
@@ -31,19 +31,30 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
     const fetchLimit = Math.max(limit, BULK_CACHE_CANDLE_LIMIT);
     request = (async () => {
       const grouped = new Map<string, UsDailyCandle[]>();
-      // A single OR predicate for the full US universe can force a sequential
-      // scan and exceed the reverse-proxy timeout for weekly candles. Keep the
-      // composite (market, code, timeframe, date) index usable in small batches.
-      for (let offset = 0; offset < missing.length; offset += 50) {
-        const batch = missing.slice(offset, offset + 50);
-        const filters = batch.map((item) => and(eq(usDailyPriceCandles.market, item.market), eq(usDailyPriceCandles.code, item.code), eq(usDailyPriceCandles.timeframe, timeframe)));
-        const rows = await db.select().from(usDailyPriceCandles).where(or(...filters)).orderBy(desc(usDailyPriceCandles.candleDate));
-        for (const row of rows) {
-          const key = `${row.market}:${row.code}`;
-          const candles = grouped.get(key) ?? [];
-          if (candles.length < fetchLimit) candles.push({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } });
-          grouped.set(key, candles);
-        }
+      // Join against a VALUES list so PostgreSQL can use the composite
+      // (market, code, timeframe, date) index. A giant OR expression regresses
+      // to a sequential scan for the 400+ ticker weekly universe.
+      const params: unknown[] = [];
+      const values = missing.map((item, index) => {
+        const marketParam = index * 2 + 1;
+        const codeParam = marketParam + 1;
+        params.push(item.market, item.code);
+        return `($${marketParam}, $${codeParam})`;
+      }).join(", ");
+      params.push(timeframe);
+      const timeframeParam = params.length;
+      const query = `SELECT c.market, c.code, c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.source
+        FROM us_daily_price_candles c
+        JOIN (VALUES ${values}) AS v(market, code)
+          ON c.market = v.market AND c.code = v.code
+        WHERE c.timeframe = $${timeframeParam}
+        ORDER BY c.candle_date DESC`;
+      const rows = (await getPool().query(query, params)).rows;
+      for (const row of rows) {
+        const key = `${row.market}:${row.code}`;
+        const candles = grouped.get(key) ?? [];
+        if (candles.length < fetchLimit) candles.push({ date: row.candle_date, open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume), raw: { source: row.source, cached: true } });
+        grouped.set(key, candles);
       }
       return grouped;
     })();
