@@ -41,6 +41,7 @@ docker run --rm --network host \
   -user="$FLYWAY_USER" \
   -password="$FLYWAY_PASSWORD" \
   -locations="filesystem:/flyway/sql" \
+  -connectRetries=3 \
   migrate
 rm -f "$RELEASE"
 rm -rf "$DEPLOY_PATH.previous"
