@@ -427,6 +427,14 @@ export function AdminApiTests() {
               <strong>{String((result.requestTrace as { requestId?: string | null }).requestId || "자동 생성됨")} · {String((result.requestTrace as { serverTiming?: string | null }).serverTiming || "타이밍 없음")}</strong>
             </div>
           )}
+          {Boolean(result.progress && typeof result.progress === "object") && (() => {
+            const progress = result.progress as { processedCount?: number; totalCount?: number; successCount?: number; failureCount?: number; savedCandleCount?: number; etaMs?: number | null; lastCode?: string };
+            const processed = Number(progress.processedCount ?? 0);
+            const total = Number(progress.totalCount ?? 0);
+            const percent = total > 0 ? Math.round(processed / total * 100) : 0;
+            const eta = progress.etaMs == null ? "계산 중" : `${Math.max(0, Math.round(progress.etaMs / 1000))}초`;
+            return <div className={styles.resultHeader}><span>작업 진행률</span><strong>{processed}/{total} ({percent}%) · 성공 {progress.successCount ?? 0} · 실패 {progress.failureCount ?? 0} · 저장 {progress.savedCandleCount ?? 0}봉 · ETA {eta}{progress.lastCode ? ` · 최근 ${progress.lastCode}` : ""}</strong></div>;
+          })()}
           {Boolean(activeTest.key === "us_turnover_ratio" && result.debug && typeof result.debug === "object") && (
             <div className={styles.resultHeader}>
               <span>필터링 흐름</span>
@@ -439,6 +447,10 @@ export function AdminApiTests() {
               <strong>{(result.stages as Array<{ name: string; count: number }>).map((stage) => `${stage.name}: ${stage.count}`).join(" → ")}</strong>
             </div>
           )}
+          {Boolean(result.statistics && typeof result.statistics === "object") && (() => {
+            const stats = result.statistics as { qualifiedTouch?: number; qualifiedBelow?: number; filtered?: number; insufficientHistory?: number; failed?: number };
+            return <div className={styles.resultHeader}><span>탐지 통계</span><strong>터치 {stats.qualifiedTouch ?? 0} · 하단 이탈 {stats.qualifiedBelow ?? 0} · 필터 제외 {stats.filtered ?? 0} · 이력 부족 {stats.insufficientHistory ?? 0} · 실패 {stats.failed ?? 0}</strong></div>;
+          })()}
           {Boolean(activeTest.key === "us_trade_trend" && result.analysis && typeof result.analysis === "object") && (() => {
             const analysis = result.analysis as { metrics?: { sampleCount?: number; latestIntensity?: number | null; recentAverageIntensity?: number | null; previousAverageIntensity?: number | null; intensityChange?: number | null; priceChange?: number | null; volumeChangeRate?: number | null }; score?: { score?: number; level?: string } };
             const metrics = analysis.metrics || {};
