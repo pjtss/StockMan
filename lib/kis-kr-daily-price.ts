@@ -7,9 +7,16 @@ import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 export type KrDailyPriceResponse = { ok: boolean; status: number; request: { url: string; headers: Record<string,string> }; response: { rawText: string; parsed: unknown }; candles: Array<OHLCVCandle & { raw: unknown }>; diagnostics: Record<string, unknown> };
 function num(value: unknown) { const n = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; }
 export async function fetchKrDailyPrice(request: { code: string; startDate?: string; endDate?: string; timeframe?: "D" | "W" | "M" }): Promise<KrDailyPriceResponse | null> {
-  const code = request.code.trim(); const end = request.endDate?.replace(/-/g, "") ?? new Date().toISOString().slice(0,10).replace(/-/g, ""); const start = request.startDate?.replace(/-/g, "") ?? new Date(Date.now() - 180 * 86400000).toISOString().slice(0,10).replace(/-/g, "");
+  const code = request.code.trim();
+  const timeframe = request.timeframe ?? "D";
+  const end = request.endDate?.replace(/-/g, "") ?? new Date().toISOString().slice(0,10).replace(/-/g, "");
+  // KIS applies the date range to the selected period. 180 calendar days is
+  // enough for daily candles but only yields roughly six monthly candles.
+  // Request a horizon that can supply the default 20-period Bollinger window.
+  const horizonDays = timeframe === "M" ? 3650 : timeframe === "W" ? 1825 : 400;
+  const start = request.startDate?.replace(/-/g, "") ?? new Date(Date.now() - horizonDays * 86400000).toISOString().slice(0,10).replace(/-/g, "");
   const url = new URL("https://openapi.koreainvestment.com:9443/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice");
-  for (const [key,value] of Object.entries({ FID_COND_MRKT_DIV_CODE:"J", FID_INPUT_ISCD:code, FID_INPUT_DATE_1:start, FID_INPUT_DATE_2:end, FID_PERIOD_DIV_CODE:request.timeframe ?? "D", FID_ORG_ADJ_PRC:"0" })) url.searchParams.set(key,value);
+  for (const [key,value] of Object.entries({ FID_COND_MRKT_DIV_CODE:"J", FID_INPUT_ISCD:code, FID_INPUT_DATE_1:start, FID_INPUT_DATE_2:end, FID_PERIOD_DIV_CODE:timeframe, FID_ORG_ADJ_PRC:"0" })) url.searchParams.set(key,value);
   const token = await getAccessToken(); if (!token) return null;
   const response = await withKisRequestThrottle(() => fetch(url, { headers: { "content-type":"application/json", Authorization: buildKisAuthorization(token), appkey:KIS_APPKEY ?? "", appsecret:KIS_APPSECRET ?? "", tr_id:"FHKST03010100", custtype:"P" } }));
   const rawText = await response.text(); let parsed: any = null; try { parsed = JSON.parse(rawText); } catch {}

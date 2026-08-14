@@ -47,7 +47,9 @@ async function run(job: Job) {
         } finally { job.processedCount += 1; }
       }
     };
-    await Promise.all(Array.from({ length: Math.min(4, Math.max(1, scopes.length)) }, worker));
+    // Each worker performs daily, weekly, monthly and quote requests. Keep
+    // the fan-out below KIS per-second limits instead of creating bursts.
+    await Promise.all(Array.from({ length: Math.min(2, Math.max(1, scopes.length)) }, worker));
     job.status = "COMPLETED";
   } catch (error) {
     job.status = "FAILED";
