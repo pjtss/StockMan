@@ -4,7 +4,8 @@ import type { KisOutput } from "./kis-types";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 
-async function requestRanking(path: string, trId: string, params: Record<string, string>, token: string): Promise<KisOutput[]> {
+export type DomesticRankingRows = KisOutput[] & { diagnostics?: { status: number; rtCd: string | null; msgCd: string | null; msg1: string | null; recordCount: number; rawTextPreview: string } };
+async function requestRanking(path: string, trId: string, params: Record<string, string>, token: string): Promise<DomesticRankingRows> {
   const url = `${BASE_URL}${path}?${new URLSearchParams(params).toString()}`;
   const response = await fetch(url, {
     method: "GET",
@@ -17,9 +18,12 @@ async function requestRanking(path: string, trId: string, params: Record<string,
     },
   });
   if (!response.ok) throw new Error(`KIS API returned HTTP ${response.status}`);
-  const data = await response.json();
+  const rawText = await response.text();
+  const data = JSON.parse(rawText);
   if (data.rt_cd !== "0") throw new Error(`KIS API Error [${data.rt_cd}]: ${data.msg1}`);
-  return data.output || [];
+  const rows = (data.output || []) as DomesticRankingRows;
+  rows.diagnostics = { status: response.status, rtCd: data.rt_cd ?? null, msgCd: data.msg_cd ?? null, msg1: data.msg1 ?? null, recordCount: rows.length, rawTextPreview: rawText.slice(0, 2000) };
+  return rows;
 }
 
 export function fetchDomesticVolumePower(token: string) {

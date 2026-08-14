@@ -29,7 +29,7 @@ export async function loadStoredKrInstrumentScopes() {
 export async function syncKrInstrumentUniverseFromKis() {
   const token = await getAccessToken(); if (!token) throw new Error("KIS_TOKEN_UNAVAILABLE");
   const sources = await Promise.allSettled([fetchDomesticTradeValue(token), fetchDomesticFluctuation(token), fetchDomesticVolumePower(token)]);
-  const details = sources.map((item, index) => ({ source: ["TRADE_VALUE_TOP100", "FLUCTUATION", "VOLUME_POWER"][index], ok: item.status === "fulfilled", count: item.status === "fulfilled" ? item.value.length : 0, error: item.status === "rejected" ? String(item.reason) : undefined }));
+  const details = sources.map((item, index) => ({ source: ["TRADE_VALUE_TOP100", "FLUCTUATION", "VOLUME_POWER"][index], ok: item.status === "fulfilled", count: item.status === "fulfilled" ? item.value.length : 0, diagnostics: item.status === "fulfilled" ? item.value.diagnostics : undefined, error: item.status === "rejected" ? String(item.reason) : undefined }));
   let saved = 0;
   let excluded = 0;
   for (const source of sources) if (source.status === "fulfilled") for (const row of source.value as any[]) {
