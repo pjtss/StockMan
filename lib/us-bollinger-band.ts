@@ -74,6 +74,7 @@ export async function loadUsBollingerPolicy(): Promise<UsBollingerPolicy> {
   const settings = await loadFeatureModuleSettings("us-bollinger-band");
   const policy = settings.featureSettings?.bollingerPolicy as Partial<UsBollingerPolicy> | undefined;
   return {
+    timeframe: policy?.timeframe === "W" || policy?.timeframe === "M" ? policy.timeframe : "D",
     period: Math.max(2, Math.floor(Number(policy?.period ?? DEFAULT_BOLLINGER_PERIOD))),
     stdDevMultiplier: Math.max(0.1, Number(policy?.stdDevMultiplier ?? DEFAULT_BOLLINGER_MULTIPLIER)),
     minPrice: Math.max(0, Number(policy?.minPrice ?? 0)),
@@ -105,6 +106,7 @@ async function loadTurnoverMetrics(items: Array<{ market: string; code: string }
 export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsBollingerPolicy>; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const configured = options.policy ? { ...(await loadUsBollingerPolicy()), ...options.policy } : await loadUsBollingerPolicy();
   const policy: UsBollingerPolicy = {
+    timeframe: configured.timeframe === "W" || configured.timeframe === "M" ? configured.timeframe : "D",
     period: Math.max(2, Math.floor(Number(configured.period))),
     stdDevMultiplier: Math.max(0.1, Number(configured.stdDevMultiplier)),
     minPrice: Math.max(0, Number(configured.minPrice)),

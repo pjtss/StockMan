@@ -40,6 +40,7 @@ export type KrBollingerResult = {
   error?: string;
 };
 const defaults: KrBollingerPolicy = {
+  timeframe: "D",
   period: 20,
   stdDevMultiplier: 2,
   minPrice: 0,
@@ -52,6 +53,7 @@ export async function loadKrBollingerPolicy() {
     {}) as Partial<KrBollingerPolicy>;
   return {
     ...defaults,
+    timeframe: p.timeframe === "W" || p.timeframe === "M" ? p.timeframe : "D",
     period: Math.max(2, Math.floor(Number(p.period ?? defaults.period))),
     stdDevMultiplier: Math.max(0.1, Number(p.stdDevMultiplier ?? 2)),
     minPrice: Math.max(0, Number(p.minPrice ?? 0)),
@@ -104,6 +106,9 @@ export async function scanStoredKrBollingerBands(
   const loaded = await loadKrBollingerPolicy();
   const overrides = options.policy ?? {};
   const policy = {
+    timeframe: overrides.timeframe === "W" || overrides.timeframe === "M"
+      ? overrides.timeframe
+      : loaded.timeframe,
     period: Math.max(2, Math.floor(Number(overrides.period ?? loaded.period))),
     stdDevMultiplier: Math.max(
       0.1,
