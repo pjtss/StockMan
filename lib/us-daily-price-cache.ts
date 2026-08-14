@@ -30,14 +30,20 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
   if (!request) {
     const fetchLimit = Math.max(limit, BULK_CACHE_CANDLE_LIMIT);
     request = (async () => {
-      const filters = missing.map((item) => and(eq(usDailyPriceCandles.market, item.market), eq(usDailyPriceCandles.code, item.code), eq(usDailyPriceCandles.timeframe, timeframe)));
-      const rows = await db.select().from(usDailyPriceCandles).where(or(...filters)).orderBy(desc(usDailyPriceCandles.candleDate));
       const grouped = new Map<string, UsDailyCandle[]>();
-      for (const row of rows) {
-        const key = `${row.market}:${row.code}`;
-        const candles = grouped.get(key) ?? [];
-        if (candles.length < fetchLimit) candles.push({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } });
-        grouped.set(key, candles);
+      // A single OR predicate for the full US universe can force a sequential
+      // scan and exceed the reverse-proxy timeout for weekly candles. Keep the
+      // composite (market, code, timeframe, date) index usable in small batches.
+      for (let offset = 0; offset < missing.length; offset += 50) {
+        const batch = missing.slice(offset, offset + 50);
+        const filters = batch.map((item) => and(eq(usDailyPriceCandles.market, item.market), eq(usDailyPriceCandles.code, item.code), eq(usDailyPriceCandles.timeframe, timeframe)));
+        const rows = await db.select().from(usDailyPriceCandles).where(or(...filters)).orderBy(desc(usDailyPriceCandles.candleDate));
+        for (const row of rows) {
+          const key = `${row.market}:${row.code}`;
+          const candles = grouped.get(key) ?? [];
+          if (candles.length < fetchLimit) candles.push({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } });
+          grouped.set(key, candles);
+        }
       }
       return grouped;
     })();
