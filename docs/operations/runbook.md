@@ -12,6 +12,7 @@
 - 전체 실행 통계: `GET /api/debug/automation-runs?includeSummary=true`
 - 특정 기능: `GET /api/debug/automation-runs?module=<module>&limit=20`
 - 원본 관리자 테스트: `/admin/api-tests`
+- 장시간 일봉 볼린저 테스트는 POST로 비동기 job을 시작하고 `statusEndpoint`를 polling합니다. 동기 GET은 호환용으로 유지됩니다.
 - 스키마 상태: `/api/health`의 `database` 블록
 
 실패를 판단할 때 HTTP 상태만 보지 말고 JSON의 `ok`, `skipped`, `errorCode`, `stage`, `table`을 함께 확인합니다.

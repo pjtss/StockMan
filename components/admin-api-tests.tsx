@@ -261,7 +261,7 @@ export function AdminApiTests() {
               : test.key === "market_rss"
                 ? `mode=${marketRssMode}&translate=true`
               : test.query;
-      const asyncCacheTest = test.key === "kr_daily_cache" || test.key === "us_daily_cache";
+      const asyncCacheTest = test.key === "kr_daily_cache" || test.key === "us_daily_cache" || test.key === "us_bollinger_band" || test.key === "kr_bollinger_band";
       const response = await fetch(`${test.endpoint}${asyncCacheTest ? "" : query ? `?${query}` : ""}`, { method: asyncCacheTest ? "POST" : "GET", cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       const requestTrace = readRequestTrace(response);
@@ -275,7 +275,7 @@ export function AdminApiTests() {
       }
       setResult({ ...(typeof data === "object" && data !== null ? data : {}), httpStatus: response.status, requestTrace });
       setActive(test.key);
-      if ((test.key === "kr_daily_cache" || test.key === "us_daily_cache") && typeof data?.jobId === "string") {
+      if ((test.key === "kr_daily_cache" || test.key === "us_daily_cache" || test.key === "us_bollinger_band" || test.key === "kr_bollinger_band") && typeof data?.jobId === "string") {
         const statusEndpoint = data.statusEndpoint as string;
         for (let attempt = 0; attempt < 180; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
