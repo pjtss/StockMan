@@ -1,4 +1,4 @@
-import { loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
+import { isGlobalMarketCapAllowed, isTurnoverRatioAllowed, loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { getPool } from "@/lib/db";
 
 export async function filterUsDailyCandidates<T extends Record<string, any>>(items: T[]) {
@@ -41,12 +41,8 @@ export async function filterUsDailyCandidates<T extends Record<string, any>>(ite
     if (Number.isFinite(price) && price > settings.maxPrice) return reject("max_price");
     if (settings.maxRate > 0 && !Number.isFinite(rate)) return reject("missing_rate");
     if (Number.isFinite(rate) && rate > settings.maxRate) return reject("max_rate");
-    const commonMinMarketCap = settings.globalMinMarketCap > 0 ? settings.globalMinMarketCap : 0;
-    const commonMaxMarketCap = settings.globalMaxMarketCap > 0 ? settings.globalMaxMarketCap : 0;
-    if ((commonMinMarketCap > 0 || commonMaxMarketCap > 0) && !Number.isFinite(marketCap)) return reject("missing_market_cap");
-    if (Number.isFinite(marketCap) && ((commonMinMarketCap > 0 && marketCap < commonMinMarketCap) || (commonMaxMarketCap > 0 && marketCap > commonMaxMarketCap))) return reject("common_market_cap_range");
-    if (settings.minTurnoverRatio > 0 && !Number.isFinite(turnover)) return reject("missing_turnover_ratio");
-    if (Number.isFinite(turnover) && (turnover < settings.minTurnoverRatio || turnover > settings.maxTurnoverRatio)) return reject("turnover_ratio_range");
+    if (!isGlobalMarketCapAllowed(marketCap, settings)) return reject(Number.isFinite(marketCap) ? "common_market_cap_range" : "missing_market_cap");
+    if (!isTurnoverRatioAllowed(turnover, settings)) return reject(Number.isFinite(turnover) ? "turnover_ratio_range" : "missing_turnover_ratio");
     return true;
   });
   return { filtered, settings, excludedCount: items.length - filtered.length, failureReasons, matchedMetricCount };

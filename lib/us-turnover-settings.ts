@@ -1,5 +1,14 @@
 import { getPool } from "./db";
 export type UsTurnoverFilterSettings = { maxPrice:number; maxRate:number; maxOpenToHighRate:number; minMarketCap:number; maxMarketCap:number; globalMinMarketCap:number; globalMaxMarketCap:number; minTurnoverRatio:number; maxTurnoverRatio:number; tradingValueIncreaseAlert:number; minIntensity:number; minTradingValueRvol:number; minTradingValueIncreaseRate:number; minPersistenceWindows:number };
 export const DEFAULT_US_TURNOVER_FILTER_SETTINGS: UsTurnoverFilterSettings = { maxPrice:10, maxRate:30, maxOpenToHighRate:30, minMarketCap:1_000_000, maxMarketCap:100_000_000, globalMinMarketCap:0, globalMaxMarketCap:0, minTurnoverRatio:1, maxTurnoverRatio:10, tradingValueIncreaseAlert:20_000, minIntensity:100, minTradingValueRvol:2, minTradingValueIncreaseRate:0.1, minPersistenceWindows:1 };
+export function isGlobalMarketCapAllowed(value: number | null | undefined, settings: UsTurnoverFilterSettings) {
+  if (settings.globalMinMarketCap <= 0 && settings.globalMaxMarketCap <= 0) return true;
+  if (value == null || !Number.isFinite(value)) return false;
+  return (settings.globalMinMarketCap <= 0 || value >= settings.globalMinMarketCap) && (settings.globalMaxMarketCap <= 0 || value <= settings.globalMaxMarketCap);
+}
+export function isTurnoverRatioAllowed(value: number | null | undefined, settings: UsTurnoverFilterSettings) {
+  if (value == null || !Number.isFinite(value)) return false;
+  return value >= settings.minTurnoverRatio && (settings.maxTurnoverRatio <= 0 || value <= settings.maxTurnoverRatio);
+}
 export async function loadUsTurnoverFilterSettings(){ try { const r=await getPool().query<{settings:Partial<UsTurnoverFilterSettings> }>("SELECT settings FROM us_turnover_filter_settings WHERE key='default' LIMIT 1"); return {...DEFAULT_US_TURNOVER_FILTER_SETTINGS,...(r.rows[0]?.settings??{})}; } catch { return {...DEFAULT_US_TURNOVER_FILTER_SETTINGS}; } }
 export async function saveUsTurnoverFilterSettings(settings:UsTurnoverFilterSettings){ await getPool().query("INSERT INTO us_turnover_filter_settings (key,settings,updated_at) VALUES ('default',$1::jsonb,NOW()) ON CONFLICT (key) DO UPDATE SET settings=EXCLUDED.settings,updated_at=NOW()",[JSON.stringify(settings)]); return settings; }
