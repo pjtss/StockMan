@@ -18,16 +18,17 @@ async function executeWarm(options: { concurrency?: number } = {}) {
       const item = instruments[cursor++];
       if (!item) return;
       try {
-        const daily = await fetchUsDailyPrice({ code: item.code, market: item.market });
-        if (!daily?.ok || daily.candles.length === 0) {
-          failures.push({ market: item.market, code: item.code, error: !daily ? "KIS access token unavailable" : !daily.ok ? `KIS daily API failed (${daily.status})` : "KIS returned no daily candles" });
-          continue;
+        let itemSuccess = true;
+        for (const timeframe of ["D", "W", "M"] as const) {
+          const daily = await fetchUsDailyPrice({ code: item.code, market: item.market, timeframe });
+          if (!daily?.ok || daily.candles.length === 0) {
+            itemSuccess = false;
+            failures.push({ market: item.market, code: item.code, error: `${timeframe}: ${!daily ? "KIS access token unavailable" : !daily.ok ? `KIS API failed (${daily.status})` : "KIS returned no candles"}` });
+            continue;
+          }
+          candleCount += await saveUsDailyCandles(item.market, item.code, daily.candles, timeframe);
         }
-        // KIS can return a completed candle for the current market date. Store every
-        // valid candle; the composite key upsert keeps the latest observation for
-        // the same date while preserving earlier candles.
-        candleCount += await saveUsDailyCandles(item.market, item.code, daily.candles);
-        successCount += 1;
+        if (itemSuccess) successCount += 1;
       } catch (error) { failures.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) }); }
     }
   }

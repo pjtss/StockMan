@@ -7,6 +7,7 @@ export const DEFAULT_BOLLINGER_PERIOD = 20;
 export const DEFAULT_BOLLINGER_MULTIPLIER = 2;
 
 export type UsBollingerPolicy = {
+  timeframe?: "D" | "W" | "M";
   period: number;
   stdDevMultiplier: number;
   minPrice: number;
@@ -110,7 +111,8 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     minVolume: Math.max(0, Number(configured.minVolume)),
     minTurnoverRatio: Math.max(0, Number(configured.minTurnoverRatio)),
   };
-  const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(100, policy.period + 1) });
+  const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(100, policy.period + 1), timeframe });
   const instruments = context.universe.scopes;
   const metrics = await loadTurnoverMetrics(instruments);
   const results: UsBollingerResult[] = [];
@@ -151,7 +153,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_daily_price_candles", completedDailyCandleOnly: false, exclusionRule: "당일 봉 포함, 최신 저장 일봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 일봉 종가 <= 하단선" },
+    dataPolicy: { source: "us_daily_price_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 봉 종가 <= 하단선" },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED").length,
     failureCount: results.filter((result) => result.status === "FAILED").length,

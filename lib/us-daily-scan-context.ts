@@ -6,6 +6,7 @@ export type UsDailyScanContext = {
   universe: StoredUsInstrumentScopes;
   candles: Map<string, UsDailyCandle[]>;
   candleLimit: number;
+  timeframe: "D" | "W" | "M";
   timings: {
     universeMs: number;
     candlesMs: number;
@@ -18,19 +19,21 @@ export type UsDailyScanContext = {
  * multi-indicator run. Individual scanners can still be called without a
  * context; they create their own context-compatible cache path in that case.
  */
-export async function createUsDailyScanContext(options: { candleLimit?: number } = {}): Promise<UsDailyScanContext> {
+export async function createUsDailyScanContext(options: { candleLimit?: number; timeframe?: "D" | "W" | "M" } = {}): Promise<UsDailyScanContext> {
   const startedAt = performance.now();
   const universeStartedAt = performance.now();
   const universe = await loadStoredUsInstrumentScopes();
   const universeMs = Math.round(performance.now() - universeStartedAt);
   const candleLimit = Math.max(35, Math.floor(options.candleLimit ?? 100));
+  const timeframe = options.timeframe ?? "D";
   const candlesStartedAt = performance.now();
-  const candles = await loadCachedUsDailyCandlesBulk(universe.scopes, candleLimit).catch(() => new Map<string, UsDailyCandle[]>());
+  const candles = await loadCachedUsDailyCandlesBulk(universe.scopes, candleLimit, timeframe).catch(() => new Map<string, UsDailyCandle[]>());
   const candlesMs = Math.round(performance.now() - candlesStartedAt);
   return {
     universe,
     candles,
     candleLimit,
+    timeframe,
     timings: { universeMs, candlesMs, totalMs: Math.round(performance.now() - startedAt) },
   };
 }

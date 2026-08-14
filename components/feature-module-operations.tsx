@@ -21,8 +21,8 @@ type ModuleSettings = {
     marketRss?: { enabledSources?: string[] };
     secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
     vwapPolicy?: Record<string, number | boolean>;
-    bollingerPolicy?: { period?: number; stdDevMultiplier?: number; minPrice?: number; minVolume?: number; minTurnoverRatio?: number };
-    krBollingerPolicy?: { period?: number; stdDevMultiplier?: number; minPrice?: number; minVolume?: number; minTurnoverRatio?: number };
+    bollingerPolicy?: { timeframe?: "D" | "W" | "M"; period?: number; stdDevMultiplier?: number; minPrice?: number; minVolume?: number; minTurnoverRatio?: number };
+    krBollingerPolicy?: { timeframe?: "D" | "W" | "M"; period?: number; stdDevMultiplier?: number; minPrice?: number; minVolume?: number; minTurnoverRatio?: number };
     newsLookup?: { defaultPeriod?: "today" | "3d" | "7d" | "1m" };
     minuteBollingerPolicy?: { topN?: number; period?: number; stdDevMultiplier?: number; minChangeRate?: number };
   };
@@ -42,8 +42,8 @@ const DEFAULT_SETTINGS: ModuleSettings = {
     discordFormat: { webhookUrl: "" },
     evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5, trendMinScore: 70, trendMinRvol: 1.5, trendMinMfi: 50, trendMaxMfi: 85, trendRequirePriceTrend: true, trendRequireDailyBreakout: true },
     vwapPolicy: { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true },
-    bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
-    krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
+    bollingerPolicy: { timeframe: "D", period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
+    krBollingerPolicy: { timeframe: "D", period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
     marketRss: { enabledSources: [...MARKET_RSS_SOURCES] },
     secEdgar: { ciks: [], syncXbrl: false, discordBatch: 10 },
     newsLookup: { defaultPeriod: "today" },
@@ -91,8 +91,8 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   const newsLookup = settings.featureSettings?.newsLookup || { defaultPeriod: "today" as const };
   const minuteBollingerPolicy = settings.featureSettings?.minuteBollingerPolicy || { topN: 30, period: 20, stdDevMultiplier: 2, minChangeRate: 0 };
   const updatePolicy = (key: string, value: number | boolean) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, vwapPolicy: { ...policy, [key]: value } } });
-  const updateBollingerPolicy = (key: "period" | "stdDevMultiplier" | "minPrice" | "minVolume" | "minTurnoverRatio", value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, bollingerPolicy: { ...bollingerPolicy, [key]: value } } });
-  const updateKrBollingerPolicy = (key: "period" | "stdDevMultiplier" | "minPrice" | "minVolume" | "minTurnoverRatio", value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, krBollingerPolicy: { ...krBollingerPolicy, [key]: value } } });
+  const updateBollingerPolicy = (key: "timeframe" | "period" | "stdDevMultiplier" | "minPrice" | "minVolume" | "minTurnoverRatio", value: number | "D" | "W" | "M") => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, bollingerPolicy: { ...bollingerPolicy, [key]: value } } });
+  const updateKrBollingerPolicy = (key: "timeframe" | "period" | "stdDevMultiplier" | "minPrice" | "minVolume" | "minTurnoverRatio", value: number | "D" | "W" | "M") => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, krBollingerPolicy: { ...krBollingerPolicy, [key]: value } } });
   const updateWebhook = (value: string) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, discordFormat: { ...settings.featureSettings?.discordFormat, webhookUrl: value } } });
   const updateDebugWebhook = (value: string) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, discordFormat: { ...settings.featureSettings?.discordFormat, debugWebhookUrl: value } } });
   const updateMfiThreshold = (value: number) => setSettings({ ...settings, featureSettings: { ...settings.featureSettings, evaluation: { ...settings.featureSettings?.evaluation, mfiThreshold: value } } });

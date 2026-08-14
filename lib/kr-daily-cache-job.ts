@@ -36,10 +36,10 @@ async function run(job: Job) {
         const item = scopes[cursor++];
         if (!item) return;
         try {
-          const [daily, quote] = await Promise.all([refreshKrDailyCandles(item.code), refreshKrMarketSnapshot(item.code)]);
-          const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, quote: quote ? { ok: quote.ok, status: quote.status, price: quote.price, volume: quote.volume, tradingValue: quote.tradingValue, marketCap: quote.marketCap, turnoverRatio: quote.turnoverRatio, error: quote.error, rawText: quote.rawText } : null };
+          const [daily, weekly, monthly, quote] = await Promise.all([refreshKrDailyCandles(item.code, "D"), refreshKrDailyCandles(item.code, "W"), refreshKrDailyCandles(item.code, "M"), refreshKrMarketSnapshot(item.code)]);
+          const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null, quote: quote ? { ok: quote.ok, status: quote.status, price: quote.price, volume: quote.volume, tradingValue: quote.tradingValue, marketCap: quote.marketCap, turnoverRatio: quote.turnoverRatio, error: quote.error, rawText: quote.rawText } : null };
           job.results.push(result);
-          const success = Number(result.daily?.parsedCandleCount ?? 0) > 0 && result.quote?.ok === true;
+          const success = Number(result.daily?.parsedCandleCount ?? 0) > 0 && Number(result.weekly?.parsedCandleCount ?? 0) > 0 && Number(result.monthly?.parsedCandleCount ?? 0) > 0 && result.quote?.ok === true;
           if (success) job.successCount += 1; else job.failureCount += 1;
         } catch (error) {
           job.failureCount += 1;

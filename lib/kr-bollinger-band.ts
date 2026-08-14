@@ -7,6 +7,7 @@ import {
 import type { OHLCVCandle } from "@/lib/kis-chart";
 
 export type KrBollingerPolicy = {
+  timeframe?: "D" | "W" | "M";
   period: number;
   stdDevMultiplier: number;
   minPrice: number;
@@ -116,9 +117,11 @@ export async function scanStoredKrBollingerBands(
     ),
   } as KrBollingerPolicy;
   const universe = await loadStoredKrInstrumentScopes();
+  const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
   const candles = await loadCachedKrDailyCandlesBulk(
     universe.scopes,
     Math.max(100, policy.period + 1),
+    timeframe,
   );
   const metrics = await loadKrMarketMetrics(universe.scopes);
   const results: KrBollingerResult[] = [];
@@ -205,6 +208,7 @@ export async function scanStoredKrBollingerBands(
     policy,
     dataPolicy: {
       source: "kr_daily_price_candles",
+      timeframe,
       bandCalculation: "종가 기반",
       touchRule: "최근 저장 일봉 종가 <= 하단선",
       currentDayExcluded: false,

@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const number = (key: string) => { const value = Number(params.get(key)); return Number.isFinite(value) ? value : undefined; };
   const policy: Partial<UsBollingerPolicy> = {
+    timeframe: params.get("timeframe") === "W" || params.get("timeframe") === "M" ? params.get("timeframe") as "W" | "M" : "D",
     period: number("period"),
     stdDevMultiplier: number("stdDevMultiplier"),
     minPrice: number("minPrice"),
