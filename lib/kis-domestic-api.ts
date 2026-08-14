@@ -48,11 +48,11 @@ export function fetchDomesticFluctuation(token: string) {
 
 /** KIS 국내주식 거래대금순위. 결과는 거래대금 내림차순으로 반환된다. */
 export function fetchDomesticTradeValue(token: string) {
-  return requestRanking("/uapi/domestic-stock/v1/ranking/trade-value", "FHPST01710000", {
+  return requestRanking("/uapi/domestic-stock/v1/quotations/volume-rank", "FHPST01710000", {
     FID_COND_MRKT_DIV_CODE: "J", FID_COND_SCR_DIV_CODE: "20171", FID_INPUT_ISCD: "0000",
-    FID_DIV_CLS_CODE: "0", FID_RANK_SORT_CLS_CODE: "0", FID_INPUT_CNT_1: "0",
-    FID_TRGT_CLS_CODE: "111111111",
-    FID_INPUT_PRICE_1: "0", FID_INPUT_PRICE_2: "0", FID_VOL_CNT: "0",
-    FID_BLNG_CLS_CODE: "0", FID_TRGT_EXLS_CLS_CODE: "000000000",
-  }, token);
+    FID_DIV_CLS_CODE: "0", FID_BLNG_CLS_CODE: "0", FID_TRGT_CLS_CODE: "111111111",
+    FID_TRGT_EXLS_CLS_CODE: "000000000", FID_INPUT_PRICE_1: "0", FID_INPUT_PRICE_2: "0",
+    FID_VOL_CNT: "0", FID_INPUT_CNT_1: "0", FID_INPUT_CNT_2: "0",
+    FID_STOC_PRE_KYWD_CLS_CODE: "00", FID_SUB_AND_DO_CLS_CODE: "N",
+  }, token).then((rows) => rows.sort((a, b) => Number((b as any).acml_tr_pbmn ?? (b as any).acml_tr_pbmn_amt ?? 0) - Number((a as any).acml_tr_pbmn ?? (a as any).acml_tr_pbmn_amt ?? 0)));
 }
