@@ -78,7 +78,7 @@ export function buildUsDailyPriceUrl(request: UsDailyPriceRequest, config: Recor
     KEYB: ascii(config.KEYB),
     EXCD: market,
     SYMB: code,
-    GUBN: request.timeframe ?? "D",
+    GUBN: request.timeframe === "W" ? "1" : request.timeframe === "M" ? "2" : "0",
     BYMD: endDate,
     MODP: request.adjusted === false ? "0" : "1",
   });
