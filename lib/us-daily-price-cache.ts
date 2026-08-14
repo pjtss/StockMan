@@ -41,13 +41,18 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
         params.push(item.market, item.code);
         return `($${marketParam}, $${codeParam})`;
       }).join(", ");
-      params.push(timeframe);
-      const timeframeParam = params.length;
+      params.push(timeframe, fetchLimit);
+      const timeframeParam = params.length - 1;
+      const limitParam = params.length;
       const query = `SELECT c.market, c.code, c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.source
-        FROM us_daily_price_candles c
-        JOIN (VALUES ${values}) AS v(market, code)
-          ON c.market = v.market AND c.code = v.code
-        WHERE c.timeframe = $${timeframeParam}
+        FROM (
+          SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.market, c.code ORDER BY c.candle_date DESC) AS row_number
+          FROM us_daily_price_candles c
+          JOIN (VALUES ${values}) AS v(market, code)
+            ON c.market = v.market AND c.code = v.code
+          WHERE c.timeframe = $${timeframeParam}
+        ) c
+        WHERE c.row_number <= $${limitParam}
         ORDER BY c.candle_date DESC`;
       const rows = (await getPool().query(query, params)).rows;
       for (const row of rows) {

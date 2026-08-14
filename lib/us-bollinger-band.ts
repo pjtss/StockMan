@@ -114,7 +114,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     minTurnoverRatio: Math.max(0, Number(configured.minTurnoverRatio)),
   };
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
-  const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(100, policy.period + 1), timeframe });
+  const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(35, policy.period + 1), timeframe });
   const instruments = context.universe.scopes;
   const metrics = await loadTurnoverMetrics(instruments);
   const results: UsBollingerResult[] = [];
