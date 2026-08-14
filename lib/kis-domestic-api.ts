@@ -47,7 +47,7 @@ export function fetchDomesticFluctuation(token: string) {
 }
 
 /** KIS 국내주식 거래대금순위. 결과는 거래대금 내림차순으로 반환된다. */
-export function fetchDomesticTradeValue(token: string) {
+export function fetchDomesticTradeValueRanking(token: string) {
   return requestRanking("/uapi/domestic-stock/v1/quotations/volume-rank", "FHPST01710000", {
     FID_COND_MRKT_DIV_CODE: "J", FID_COND_SCR_DIV_CODE: "20171", FID_INPUT_ISCD: "0000",
     FID_DIV_CLS_CODE: "0", FID_BLNG_CLS_CODE: "0", FID_TRGT_CLS_CODE: "111111111",
