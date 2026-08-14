@@ -98,6 +98,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   }
   if (key === "us-bollinger-band") {
     const policy = settings.featureSettings?.bollingerPolicy;
+    if (policy?.timeframe !== undefined && !["D", "W", "M"].includes(String(policy.timeframe))) throw new Error("INVALID_BOLLINGER_TIMEFRAME");
     const validateNumber = (name: string, value: unknown, min: number, max?: number) => {
       if (value === undefined) return;
       const parsed = Number(value);
@@ -111,6 +112,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   }
   if (key === "kr-bollinger-band") {
     const policy = settings.featureSettings?.krBollingerPolicy;
+    if (policy?.timeframe !== undefined && !["D", "W", "M"].includes(String(policy.timeframe))) throw new Error("INVALID_KR_BOLLINGER_TIMEFRAME");
     for (const [name, value, min, max] of [["period", policy?.period, 2, 200], ["multiplier", policy?.stdDevMultiplier, 0.1, 10], ["min_price", policy?.minPrice, 0, undefined], ["min_volume", policy?.minVolume, 0, undefined], ["min_turnover_ratio", policy?.minTurnoverRatio, 0, undefined]] as const) {
       if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < min || (max !== undefined && Number(value) > max))) throw new Error(`INVALID_KR_BOLLINGER_${name.toUpperCase()}`);
     }
