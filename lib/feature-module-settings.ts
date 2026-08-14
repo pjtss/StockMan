@@ -97,7 +97,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     if (evaluation?.trendRequireDailyBreakout !== undefined && typeof evaluation.trendRequireDailyBreakout !== "boolean") throw new Error("INVALID_TREND_BREAKOUT_POLICY");
   }
   if (key === "us-bollinger-band") {
-    const policy = settings.featureSettings?.bollingerPolicy;
+    const policy = settings.featureSettings?.bollingerPolicy as any;
     if (policy?.timeframe !== undefined && !["D", "W", "M"].includes(String(policy.timeframe))) throw new Error("INVALID_BOLLINGER_TIMEFRAME");
     const validateNumber = (name: string, value: unknown, min: number, max?: number) => {
       if (value === undefined) return;
@@ -111,7 +111,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     validateNumber("bollinger_min_turnover_ratio", policy?.minTurnoverRatio, 0);
   }
   if (key === "kr-bollinger-band") {
-    const policy = settings.featureSettings?.krBollingerPolicy;
+    const policy = settings.featureSettings?.krBollingerPolicy as any;
     if (policy?.timeframe !== undefined && !["D", "W", "M"].includes(String(policy.timeframe))) throw new Error("INVALID_KR_BOLLINGER_TIMEFRAME");
     for (const [name, value, min, max] of [["period", policy?.period, 2, 200], ["multiplier", policy?.stdDevMultiplier, 0.1, 10], ["min_price", policy?.minPrice, 0, undefined], ["min_volume", policy?.minVolume, 0, undefined], ["min_turnover_ratio", policy?.minTurnoverRatio, 0, undefined]] as const) {
       if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < min || (max !== undefined && Number(value) > max))) throw new Error(`INVALID_KR_BOLLINGER_${name.toUpperCase()}`);
