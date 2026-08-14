@@ -8,6 +8,7 @@ export type UsDailyPriceRequest = {
   market: string;
   endDate?: string;
   adjusted?: boolean;
+  timeframe?: "D" | "W" | "M";
 };
 
 export type UsDailyCandle = {
@@ -77,7 +78,7 @@ export function buildUsDailyPriceUrl(request: UsDailyPriceRequest, config: Recor
     KEYB: ascii(config.KEYB),
     EXCD: market,
     SYMB: code,
-    GUBN: "0",
+    GUBN: request.timeframe ?? "D",
     BYMD: endDate,
     MODP: request.adjusted === false ? "0" : "1",
   });

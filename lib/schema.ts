@@ -326,6 +326,7 @@ export const usDailyPriceCandles = pgTable("us_daily_price_candles", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   market: text("market").notNull(),
   code: text("code").notNull(),
+  timeframe: text("timeframe").notNull().default("D"),
   candleDate: text("candle_date").notNull(),
   open: doublePrecision("open").notNull(),
   high: doublePrecision("high").notNull(),
@@ -334,7 +335,7 @@ export const usDailyPriceCandles = pgTable("us_daily_price_candles", {
   volume: doublePrecision("volume").notNull().default(0),
   source: text("source").notNull().default("KIS"),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("us_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.candleDate), index("us_daily_price_candles_lookup_idx").on(table.market, table.code, table.candleDate)]);
+}, (table) => [uniqueIndex("us_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("us_daily_price_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate)]);
 
 export const krInstruments = pgTable("kr_instruments", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -353,6 +354,7 @@ export const krDailyPriceCandles = pgTable("kr_daily_price_candles", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   market: text("market").notNull().default("KRX"),
   code: text("code").notNull(),
+  timeframe: text("timeframe").notNull().default("D"),
   candleDate: text("candle_date").notNull(),
   open: doublePrecision("open").notNull(),
   high: doublePrecision("high").notNull(),
@@ -361,7 +363,7 @@ export const krDailyPriceCandles = pgTable("kr_daily_price_candles", {
   volume: doublePrecision("volume").notNull(),
   source: text("source").notNull().default("KIS"),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("kr_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.candleDate), index("kr_daily_price_candles_lookup_idx").on(table.market, table.code, table.candleDate)]);
+}, (table) => [uniqueIndex("kr_daily_price_candles_market_code_date_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_daily_price_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate)]);
 
 export const krMarketSnapshots = pgTable("kr_market_snapshots", {
   id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull().default("KRX"), code: text("code").notNull(), price: doublePrecision("price"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), turnoverRatio: doublePrecision("turnover_ratio"), changeRate: doublePrecision("change_rate"), rawPayload: text("raw_payload"), observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),

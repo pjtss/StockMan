@@ -9,7 +9,7 @@ const MEMORY_TTL_MS = 60_000;
 const BULK_CACHE_CANDLE_LIMIT = 100;
 const bulkInflight = new Map<string, Promise<Map<string, UsDailyCandle[]>>>();
 
-export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 10) {
+export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 10, timeframe = "D") {
   const normalized = Array.from(new Map(items.map((item) => {
     const value = { market: item.market.trim().toUpperCase(), code: item.code.trim().toUpperCase() };
     return [`${value.market}:${value.code}`, value] as const;
@@ -18,7 +18,7 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
   const missing: typeof normalized = [];
   for (const item of normalized) {
     const key = `${item.market}:${item.code}`;
-    const memory = memoryCache.get(key);
+    const memory = timeframe === "D" ? memoryCache.get(key) : undefined;
     if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) result.set(key, memory.candles.slice(0, limit));
     else missing.push(item);
   }
@@ -30,7 +30,7 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
   if (!request) {
     const fetchLimit = Math.max(limit, BULK_CACHE_CANDLE_LIMIT);
     request = (async () => {
-      const filters = missing.map((item) => and(eq(usDailyPriceCandles.market, item.market), eq(usDailyPriceCandles.code, item.code)));
+      const filters = missing.map((item) => and(eq(usDailyPriceCandles.market, item.market), eq(usDailyPriceCandles.code, item.code), eq(usDailyPriceCandles.timeframe, timeframe)));
       const rows = await db.select().from(usDailyPriceCandles).where(or(...filters)).orderBy(desc(usDailyPriceCandles.candleDate));
       const grouped = new Map<string, UsDailyCandle[]>();
       for (const row of rows) {
@@ -58,22 +58,22 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
   return result;
 }
 
-export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10): Promise<UsDailyCandle[]> {
+export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10, timeframe = "D"): Promise<UsDailyCandle[]> {
   const cacheKey = `${market}:${code}`;
-  const memory = memoryCache.get(cacheKey);
+  const memory = timeframe === "D" ? memoryCache.get(cacheKey) : undefined;
   if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) return memory.candles.slice(0, limit);
   const db = getDb();
   if (!db) return [];
-  const rows = await db.select().from(usDailyPriceCandles).where(and(eq(usDailyPriceCandles.market, market), eq(usDailyPriceCandles.code, code))).orderBy(desc(usDailyPriceCandles.candleDate)).limit(limit);
+  const rows = await db.select().from(usDailyPriceCandles).where(and(eq(usDailyPriceCandles.market, market), eq(usDailyPriceCandles.code, code), eq(usDailyPriceCandles.timeframe, timeframe))).orderBy(desc(usDailyPriceCandles.candleDate)).limit(limit);
   const candles = rows.map((row) => ({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } }));
   memoryCache.set(cacheKey, { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
   return candles.slice(0, limit);
 }
 
-export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[]) {
+export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[], timeframe = "D") {
   const db = getDb();
   if (!db || candles.length === 0) return 0;
-  await db.insert(usDailyPriceCandles).values(candles.map((candle) => ({ market, code, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usDailyPriceCandles.market, usDailyPriceCandles.code, usDailyPriceCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
+  await db.insert(usDailyPriceCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usDailyPriceCandles.market, usDailyPriceCandles.code, usDailyPriceCandles.timeframe, usDailyPriceCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
   memoryCache.delete(`${market}:${code}`);
   return candles.length;
 }
