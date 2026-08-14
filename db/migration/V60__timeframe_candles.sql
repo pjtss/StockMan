@@ -1,3 +1,4 @@
+-- Timeframe-aware cache migration (D=day, W=week, M=month).
 ALTER TABLE us_daily_price_candles ADD COLUMN IF NOT EXISTS timeframe TEXT NOT NULL DEFAULT 'D';
 ALTER TABLE kr_daily_price_candles ADD COLUMN IF NOT EXISTS timeframe TEXT NOT NULL DEFAULT 'D';
 ALTER TABLE us_daily_price_candles DROP CONSTRAINT IF EXISTS us_daily_price_candles_market_code_date_unique;
