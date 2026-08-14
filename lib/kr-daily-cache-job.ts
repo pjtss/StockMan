@@ -15,6 +15,7 @@ type Job = {
   results: any[];
   error?: string;
   universeSync?: unknown;
+  progress?: { elapsedMs: number; etaMs: number | null; lastCode?: string };
 };
 
 const jobs = new Map<string, Job>();
@@ -26,6 +27,7 @@ function trimJobs() {
 
 async function run(job: Job) {
   job.status = "PROCESSING";
+  const progressStartedAt = Date.now();
   try {
     job.universeSync = await syncKrInstrumentUniverseFromKis();
     const { scopes } = await loadStoredKrInstrumentScopes();
@@ -44,7 +46,11 @@ async function run(job: Job) {
         } catch (error) {
           job.failureCount += 1;
           job.results.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) });
-        } finally { job.processedCount += 1; }
+        } finally {
+          job.processedCount += 1;
+          const elapsedMs = Date.now() - progressStartedAt;
+          job.progress = { elapsedMs, etaMs: job.processedCount ? Math.round(elapsedMs / job.processedCount * (job.instrumentCount - job.processedCount)) : null, lastCode: item.code };
+        }
       }
     };
     // Each worker performs daily, weekly, monthly and quote requests. Keep

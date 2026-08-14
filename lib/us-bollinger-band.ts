@@ -5,6 +5,8 @@ import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-dail
 
 export const DEFAULT_BOLLINGER_PERIOD = 20;
 export const DEFAULT_BOLLINGER_MULTIPLIER = 2;
+const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
+const resultCache = new Map<string, { expiresAt: number; value: any }>();
 
 export type UsBollingerPolicy = {
   timeframe?: "D" | "W" | "M";
@@ -23,13 +25,15 @@ export type BollingerPoint = {
   upper: number;
   lower: number;
   distanceToLowerPercent: number;
+  widthPercent: number;
+  widthExpanding: boolean;
 };
 
 export type UsBollingerResult = {
   market: string;
   code: string;
   name: string;
-  status: "QUALIFIED" | "NOT_TOUCHING" | "FILTERED" | "FAILED";
+  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
@@ -40,6 +44,8 @@ export type UsBollingerResult = {
   band: BollingerPoint | null;
   filter: { minPrice: boolean; minVolume: boolean; minTurnoverRatio: boolean };
   error?: string;
+  touchState: "TOUCH" | "BELOW" | "NONE";
+  reasonCode?: string;
 };
 
 export function calculateBollingerBands(candles: UsDailyCandle[], period = DEFAULT_BOLLINGER_PERIOD, stdDevMultiplier = DEFAULT_BOLLINGER_MULTIPLIER): BollingerPoint[] {
@@ -57,6 +63,8 @@ export function calculateBollingerBands(candles: UsDailyCandle[], period = DEFAU
     const lower = middle - stdDevMultiplier * deviation;
     const upper = middle + stdDevMultiplier * deviation;
     const close = rows[index].close;
+    const widthPercent = middle === 0 ? 0 : Number(((upper - lower) / Math.abs(middle) * 100).toFixed(4));
+    const previous = points.at(-1);
     points.push({
       date: rows[index].date,
       close,
@@ -65,6 +73,8 @@ export function calculateBollingerBands(candles: UsDailyCandle[], period = DEFAU
       upper: Number(upper.toFixed(6)),
       lower: Number(lower.toFixed(6)),
       distanceToLowerPercent: lower === 0 ? 0 : Number(((close - lower) / Math.abs(lower) * 100).toFixed(4)),
+      widthPercent,
+      widthExpanding: previous ? widthPercent > previous.widthPercent : false,
     });
   }
   return points;
@@ -114,6 +124,11 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     minTurnoverRatio: Math.max(0, Number(configured.minTurnoverRatio)),
   };
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
+  const cacheKey = JSON.stringify(policy);
+  if (!options.context && RESULT_CACHE_TTL_MS > 0) {
+    const cached = resultCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return { ...cached.value, cacheHit: true };
+  }
   const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(35, policy.period + 1), timeframe });
   const instruments = context.universe.scopes;
   const metrics = await loadTurnoverMetrics(instruments);
@@ -138,17 +153,18 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const volumePass = volume !== null && (policy.minVolume <= 0 || volume >= policy.minVolume);
         const turnoverPass = policy.minTurnoverRatio <= 0 || (metric?.turnoverRatio != null && metric.turnoverRatio >= policy.minTurnoverRatio);
         const passesFilters = pricePass && volumePass && turnoverPass;
-        const qualifies = Boolean(latest && passesFilters && latest.close <= latest.lower);
-        const status = !latest ? "FAILED" : !passesFilters ? "FILTERED" : qualifies ? "QUALIFIED" : "NOT_TOUCHING";
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, filter: { minPrice: pricePass, minVolume: volumePass, minTurnoverRatio: turnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
+        const touchState = !latest ? "NONE" : latest.close < latest.lower ? "BELOW" : latest.close <= latest.lower ? "TOUCH" : "NONE";
+        const qualifies = Boolean(latest && passesFilters && touchState !== "NONE");
+        const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters ? "FILTERED" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, filter: { minPrice: pricePass, minVolume: volumePass, minTurnoverRatio: turnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
       } catch (error) {
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status: "FAILED", qualifies: false, candleCount: 0, latestCandleDate: null, close: null, volume: null, marketCap: null, turnoverRatio: null, band: null, filter: { minPrice: false, minVolume: false, minTurnoverRatio: false }, error: error instanceof Error ? error.message : String(error) });
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status: "FAILED", qualifies: false, touchState: "NONE", candleCount: 0, latestCandleDate: null, close: null, volume: null, marketCap: null, turnoverRatio: null, band: null, filter: { minPrice: false, minVolume: false, minTurnoverRatio: false }, error: error instanceof Error ? error.message : String(error) });
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => Number(b.qualifies) - Number(a.qualifies) || a.market.localeCompare(b.market) || a.code.localeCompare(b.code));
-  return {
+  const output = {
     ok: Boolean((context.universe.universe as any).ok),
     checkedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
@@ -157,10 +173,14 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     policy,
     dataPolicy: { source: "us_daily_price_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 봉 종가 <= 하단선" },
     instrumentCount: instruments.length,
-    successCount: results.filter((result) => result.status !== "FAILED").length,
-    failureCount: results.filter((result) => result.status === "FAILED").length,
+    successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
+    failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,
+    statistics: { qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length, qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length, filtered: results.filter((r) => r.status === "FILTERED").length, insufficientHistory: results.filter((r) => r.status === "INSUFFICIENT_HISTORY").length, failed: results.filter((r) => r.status === "FAILED").length },
     filterExcludedCount: results.filter((result) => result.status === "FILTERED").length,
     qualified: results.filter((result) => result.qualifies),
     results,
+    cacheHit: false,
   };
+  if (!options.context && RESULT_CACHE_TTL_MS > 0) resultCache.set(cacheKey, { expiresAt: Date.now() + RESULT_CACHE_TTL_MS, value: output });
+  return output;
 }

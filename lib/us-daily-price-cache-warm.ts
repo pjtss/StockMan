@@ -4,7 +4,8 @@ import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
 
-async function executeWarm(options: { concurrency?: number } = {}) {
+export type WarmProgress = { processedCount: number; totalCount: number; successCount: number; failureCount: number; savedCandleCount: number; lastCode?: string; elapsedMs: number; etaMs: number | null };
+async function executeWarm(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {
   const startedAt = new Date().toISOString();
   const universe = await loadStoredUsInstrumentScopes();
   const instruments = universe.scopes;
@@ -12,6 +13,8 @@ async function executeWarm(options: { concurrency?: number } = {}) {
   let cursor = 0;
   let successCount = 0;
   let candleCount = 0;
+  let processedCount = 0;
+  const progressStarted = Date.now();
   const failures: Array<{ market: string; code: string; error: string }> = [];
   async function worker() {
     while (true) {
@@ -30,13 +33,16 @@ async function executeWarm(options: { concurrency?: number } = {}) {
         }
         if (itemSuccess) successCount += 1;
       } catch (error) { failures.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) }); }
+      processedCount += 1;
+      const elapsedMs = Date.now() - progressStarted;
+      options.onProgress?.({ processedCount, totalCount: instruments.length, successCount, failureCount: failures.length, savedCandleCount: candleCount, lastCode: item.code, elapsedMs, etaMs: processedCount ? Math.round(elapsedMs / processedCount * (instruments.length - processedCount)) : null });
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
   return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, startedAt, completedAt: new Date().toISOString(), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
 }
 
-export function warmUsDailyPriceCache(options: { concurrency?: number } = {}) {
+export function warmUsDailyPriceCache(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {
   if (!activeWarm) activeWarm = executeWarm(options).finally(() => { activeWarm = null; });
   return activeWarm;
 }

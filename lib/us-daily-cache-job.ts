@@ -9,6 +9,7 @@ type Job = {
   completedAt?: string;
   result?: Awaited<ReturnType<typeof warmUsDailyPriceCache>>;
   error?: string;
+  progress?: { processedCount: number; totalCount: number; successCount: number; failureCount: number; savedCandleCount: number; lastCode?: string; elapsedMs: number; etaMs: number | null };
 };
 
 const jobs = new Map<string, Job>();
@@ -21,7 +22,7 @@ function trimJobs() {
 async function run(job: Job) {
   job.status = "PROCESSING";
   try {
-    job.result = await warmUsDailyPriceCache();
+    job.result = await warmUsDailyPriceCache({ onProgress: (progress) => { job.progress = progress; } });
     job.status = "COMPLETED";
   } catch (error) {
     job.status = "FAILED";

@@ -5,6 +5,8 @@ import {
   loadKrMarketMetrics,
 } from "@/lib/kr-daily-price-cache";
 import type { OHLCVCandle } from "@/lib/kis-chart";
+const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
+const resultCache = new Map<string, { expiresAt: number; value: any }>();
 
 export type KrBollingerPolicy = {
   timeframe?: "D" | "W" | "M";
@@ -18,7 +20,7 @@ export type KrBollingerResult = {
   market: string;
   code: string;
   name: string;
-  status: "QUALIFIED" | "NOT_TOUCHING" | "FILTERED" | "FAILED";
+  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
@@ -38,6 +40,8 @@ export type KrBollingerResult = {
   } | null;
   filter: { minPrice: boolean; minVolume: boolean; minTurnoverRatio: boolean };
   error?: string;
+  touchState: "TOUCH" | "BELOW" | "NONE";
+  reasonCode?: string;
 };
 const defaults: KrBollingerPolicy = {
   timeframe: "D",
@@ -83,12 +87,15 @@ export function calculateKrBollingerBands(
       w.reduce((a, b) => a + (b - middle) ** 2, 0) / period,
     );
     const lower = middle - multiplier * dev;
+    const upper = middle + multiplier * dev;
+    const widthPercent = middle === 0 ? 0 : Number((((upper - lower) / Math.abs(middle)) * 100).toFixed(4));
+    const previous = points.at(-1);
     points.push({
       date: rows[i].date,
       close: rows[i].close,
       low: rows[i].low,
       middle: Number(middle.toFixed(6)),
-      upper: Number((middle + multiplier * dev).toFixed(6)),
+      upper: Number(upper.toFixed(6)),
       lower: Number(lower.toFixed(6)),
       distanceToLowerPercent:
         lower === 0
@@ -97,6 +104,8 @@ export function calculateKrBollingerBands(
               (((rows[i].close - lower) / Math.abs(lower)) * 100).toFixed(4),
             ),
     });
+    points[points.length - 1].widthPercent = widthPercent;
+    points[points.length - 1].widthExpanding = previous ? widthPercent > previous.widthPercent : false;
   }
   return points;
 }
@@ -123,6 +132,11 @@ export async function scanStoredKrBollingerBands(
   } as KrBollingerPolicy;
   const universe = await loadStoredKrInstrumentScopes();
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
+  const cacheKey = JSON.stringify(policy);
+  if (RESULT_CACHE_TTL_MS > 0) {
+    const cached = resultCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return { ...cached.value, cacheHit: true };
+  }
   const candles = await loadCachedKrDailyCandlesBulk(
     universe.scopes,
     Math.max(100, policy.period + 1),
@@ -155,19 +169,22 @@ export async function scanStoredKrBollingerBands(
         (metric?.turnoverRatio != null &&
           metric.turnoverRatio >= policy.minTurnoverRatio);
       const passes = pricePass && volumePass && turnoverPass;
-      const qualifies = Boolean(band && passes && band.close <= band.lower);
+      const touchState = !band ? "NONE" : band.close < band.lower ? "BELOW" : band.close <= band.lower ? "TOUCH" : "NONE";
+      const qualifies = Boolean(band && passes && touchState !== "NONE");
       results.push({
         market: item.market,
         code: item.code,
         name: item.name,
         status: !band
-          ? "FAILED"
+          ? "INSUFFICIENT_HISTORY"
           : !passes
             ? "FILTERED"
             : qualifies
-              ? "QUALIFIED"
+              ? touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
               : "NOT_TOUCHING",
         qualifies,
+        touchState,
+        reasonCode: !band ? "INSUFFICIENT_HISTORY" : undefined,
         candleCount: series.length,
         latestCandleDate: band?.date ?? null,
         close: band?.close ?? null,
@@ -192,6 +209,7 @@ export async function scanStoredKrBollingerBands(
         name: item.name,
         status: "FAILED",
         qualifies: false,
+        touchState: "NONE",
         candleCount: 0,
         latestCandleDate: null,
         close: null,
@@ -205,7 +223,7 @@ export async function scanStoredKrBollingerBands(
       });
     }
   }
-  return {
+  const output = {
     ok: true,
     checkedAt: new Date().toISOString(),
     universeAvailable: true,
@@ -215,14 +233,24 @@ export async function scanStoredKrBollingerBands(
       source: "kr_daily_price_candles",
       timeframe,
       bandCalculation: "종가 기반",
-      touchRule: "최근 저장 일봉 종가 <= 하단선",
+      touchRule: "최근 저장 봉 종가 = TOUCH, 하단선 미만 = BELOW",
       currentDayExcluded: false,
     },
     instrumentCount: universe.scopes.length,
-    successCount: results.filter((r) => r.status !== "FAILED").length,
-    failureCount: results.filter((r) => r.status === "FAILED").length,
+    successCount: results.filter((r) => r.status !== "FAILED" && r.status !== "INSUFFICIENT_HISTORY").length,
+    failureCount: results.filter((r) => r.status === "FAILED" || r.status === "INSUFFICIENT_HISTORY").length,
+    statistics: {
+      qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length,
+      qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length,
+      filtered: results.filter((r) => r.status === "FILTERED").length,
+      insufficientHistory: results.filter((r) => r.status === "INSUFFICIENT_HISTORY").length,
+      failed: results.filter((r) => r.status === "FAILED").length,
+    },
     filterExcludedCount: results.filter((r) => r.status === "FILTERED").length,
     qualified: results.filter((r) => r.qualifies),
     results,
+    cacheHit: false,
   };
+  if (RESULT_CACHE_TTL_MS > 0) resultCache.set(cacheKey, { expiresAt: Date.now() + RESULT_CACHE_TTL_MS, value: output });
+  return output;
 }
