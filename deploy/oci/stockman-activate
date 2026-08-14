@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
+stage="initialise"
+on_error() {
+  local code=$?
+  echo "stockman-activate failed: stage=${stage} exit=${code}" >&2
+  if [ "$stage" = "service-restart" ]; then
+    systemctl --no-pager --full status stockman.service stockman-cron.timer >&2 || true
+    journalctl --no-pager -u stockman.service -n 40 >&2 || true
+  fi
+  exit "$code"
+}
+trap on_error ERR
 
 DEPLOY_PATH="${1:?deployment path is required}"
 RELEASE="${2:?release archive is required}"
@@ -7,6 +18,7 @@ TEMP_PATH="${DEPLOY_PATH}.incoming"
 
 rm -rf "$TEMP_PATH"
 mkdir -p "$TEMP_PATH"
+stage="extract-release"
 tar -xzf "$RELEASE" -C "$TEMP_PATH"
 chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
 if ! command -v docker >/dev/null 2>&1; then
@@ -34,6 +46,7 @@ fi
 FLYWAY_USER="${DB_AUTH%%:*}"
 FLYWAY_PASSWORD="${DB_AUTH#*:}"
 FLYWAY_JDBC_URL="jdbc:postgresql://${DB_HOST_AND_NAME}"
+stage="flyway-migrate"
 docker run --rm --network host \
   -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
   "$FLYWAY_IMAGE" \
@@ -44,10 +57,12 @@ docker run --rm --network host \
   -connectRetries=3 \
   migrate
 rm -f "$RELEASE"
+stage="activate-files"
 rm -rf "$DEPLOY_PATH.previous"
 if [ -d "$DEPLOY_PATH" ]; then mv "$DEPLOY_PATH" "$DEPLOY_PATH.previous"; fi
 mv "$TEMP_PATH" "$DEPLOY_PATH"
 chown -R stockman:stockman "$DEPLOY_PATH"
+stage="service-restart"
 systemctl restart stockman.service
 systemctl restart stockman-cron.timer
 systemctl is-active --quiet stockman.service
@@ -57,6 +72,7 @@ systemctl is-active --quiet stockman-cron.timer
 # Missing Discord credentials should not block a normal web deployment, but when
 # configured the registration is a required, idempotent PUT operation.
 if [ -n "${DISCORD_APPLICATION_ID:-}" ] && [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
+  stage="discord-command-sync"
   if ! runuser -u stockman -- env \
     DISCORD_APPLICATION_ID="$DISCORD_APPLICATION_ID" \
     DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
