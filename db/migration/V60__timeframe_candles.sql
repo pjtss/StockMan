@@ -39,5 +39,22 @@ DROP INDEX IF EXISTS us_daily_price_candles_market_code_date_unique;
 DROP INDEX IF EXISTS us_daily_price_candles_market_code_candle_date_key;
 DROP INDEX IF EXISTS kr_daily_price_candles_market_code_date_unique;
 DROP INDEX IF EXISTS kr_daily_price_candles_market_code_candle_date_key;
+-- A few early cache writers did not use an idempotent conflict target. Keep
+-- the newest fetched row if such legacy duplicates are present before adding
+-- the timeframe-aware unique indexes.
+DELETE FROM us_daily_price_candles older
+USING us_daily_price_candles newer
+WHERE older.market = newer.market
+  AND older.code = newer.code
+  AND older.timeframe = newer.timeframe
+  AND older.candle_date = newer.candle_date
+  AND (older.fetched_at, older.id) < (newer.fetched_at, newer.id);
+DELETE FROM kr_daily_price_candles older
+USING kr_daily_price_candles newer
+WHERE older.market = newer.market
+  AND older.code = newer.code
+  AND older.timeframe = newer.timeframe
+  AND older.candle_date = newer.candle_date
+  AND (older.fetched_at, older.id) < (newer.fetched_at, newer.id);
 CREATE UNIQUE INDEX IF NOT EXISTS us_daily_price_candles_market_code_timeframe_date_unique ON us_daily_price_candles (market, code, timeframe, candle_date);
 CREATE UNIQUE INDEX IF NOT EXISTS kr_daily_price_candles_market_code_timeframe_date_unique ON kr_daily_price_candles (market, code, timeframe, candle_date);
