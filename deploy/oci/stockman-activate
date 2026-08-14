@@ -57,11 +57,13 @@ systemctl is-active --quiet stockman-cron.timer
 # Missing Discord credentials should not block a normal web deployment, but when
 # configured the registration is a required, idempotent PUT operation.
 if [ -n "${DISCORD_APPLICATION_ID:-}" ] && [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
-  runuser -u stockman -- env \
+  if ! runuser -u stockman -- env \
     DISCORD_APPLICATION_ID="$DISCORD_APPLICATION_ID" \
     DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
     DISCORD_GUILD_ID="${DISCORD_GUILD_ID:-}" \
-    node "$DEPLOY_PATH/scripts/register-discord-commands.mjs"
+    node "$DEPLOY_PATH/scripts/register-discord-commands.mjs"; then
+    echo "WARNING: Discord command registration failed; release remains active" >&2
+  fi
 else
   echo "Discord command registration skipped: DISCORD_APPLICATION_ID or DISCORD_BOT_TOKEN is not configured" >&2
 fi
