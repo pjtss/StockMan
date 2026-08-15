@@ -2,6 +2,7 @@ import { fetchFinraComposite } from "@/lib/finra-short-composite";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { getUsFreeFloat } from "@/lib/us-free-float";
 import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
+import { resolveSecTickerCandidates, selectPreferredSecCompanyTicker } from "@/lib/sec-company-ticker";
 
 const n = (v: unknown) => { const x = Number(String(v ?? "").replace(/,/g, "").replace(/%/g, "")); return Number.isFinite(x) ? x : null; };
 export function calculateSqueezeScore(input: { siFloat: number | null; pnl: number | null; daysToCover: number | null; shortVolumeRatio?: number | null }) {
@@ -18,9 +19,16 @@ export async function analyzeUsShortSqueeze(rawTicker: string) {
   const scopes = await Promise.race([
     loadStoredUsInstrumentScopes(),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error("UNIVERSE_TIMEOUT")), 5_000)),
-  ]).catch((error) => { throw error; });
-  const instrument = scopes.scopes.find((x) => x.code.toUpperCase() === ticker);
-  if (!instrument) return { ok: false, ticker, error: "TICKER_NOT_IN_ACTIVE_US_UNIVERSE" };
+  ]).catch(() => null);
+  let instrument = scopes?.scopes.find((x) => x.code.toUpperCase() === ticker);
+  if (!instrument) {
+    const secTicker = selectPreferredSecCompanyTicker(await resolveSecTickerCandidates(ticker));
+    if (!secTicker) return { ok: false, ticker, error: scopes ? "TICKER_NOT_IN_ACTIVE_US_UNIVERSE" : "UNIVERSE_TIMEOUT" };
+    const exchange = secTicker.exchange.toUpperCase();
+    const market = exchange === "NASDAQ" ? "NAS" : exchange === "NYSE AMERICAN" ? "AMS" : exchange === "NYSE" ? "NYS" : "";
+    if (!market) return { ok: false, ticker, error: "UNSUPPORTED_SEC_EXCHANGE" };
+    instrument = { market, code: ticker, name: secTicker.name, rank: undefined, changeRate: null, rankingVolume: null, rankingTradeValue: null };
+  }
   const bounded = <T>(promise: Promise<T>, fallback: T, timeoutMs = 9_000) => Promise.race([promise.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs))]);
   const emptyShort = { metric: { ticker, shortInterest: null, shortVolume: null, totalVolume: null, shortVolumeRatio: null, daysToCover: null, asOf: null, source: "FINRA", status: "UNAVAILABLE" }, shortInterestStatus: "TIMEOUT", thresholdStatus: "TIMEOUT" } as unknown as Awaited<ReturnType<typeof fetchFinraComposite>>;
   const emptyFloat = { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", dataType: "FREE_FLOAT", status: 0, error: "FLOAT_PROVIDER_TIMEOUT" } as Awaited<ReturnType<typeof getUsFreeFloat>>;
