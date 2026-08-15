@@ -1,5 +1,6 @@
 import { fetchFmpFreeFloat, type FreeFloatResult } from "@/lib/fmp-free-float";
 import { fetchSecOutstandingShares } from "@/lib/sec-outstanding-shares";
+import { fetchSecFreeFloat } from "@/lib/sec-free-float";
 import { loadFreshFreeFloat, saveFreeFloat } from "@/lib/free-float-repository";
 
 export type UsFreeFloatOverview = FreeFloatResult & { cached: boolean; fetchedAt: Date | null };
@@ -25,8 +26,9 @@ export async function getUsFreeFloat(rawTicker: string, market?: string): Promis
   if (result.ok && !isStale(result.asOf)) {
     try { const saved = await saveFreeFloat(result); return { ...result, cached: false, fetchedAt: saved?.fetchedAt ?? new Date() }; } catch { /* return live result even if cache is unavailable */ }
   }
-  const sec = await fetchSecOutstandingShares(ticker, market).catch(() => null);
-  return { ...(sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error }), fallbackReason, cached: false, fetchedAt: null };
+  const secFloat = await fetchSecFreeFloat(ticker, market).catch(() => null);
+  const sec = secFloat?.ok ? null : await fetchSecOutstandingShares(ticker, market).catch(() => null);
+  return { ...(secFloat?.ok ? secFloat : sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error }), fallbackReason, cached: false, fetchedAt: null };
 }
 
 /** Forces a live provider refresh. A failed refresh never replaces a valid DB snapshot. */
@@ -37,6 +39,7 @@ export async function refreshUsFreeFloat(rawTicker: string, market?: string): Pr
   if (result.ok && !isStale(result.asOf)) {
     try { const saved = await saveFreeFloat(result); return { ...result, cached: false, fetchedAt: saved?.fetchedAt ?? new Date() }; } catch { return { ...result, cached: false, fetchedAt: new Date() }; }
   }
-  const sec = await fetchSecOutstandingShares(ticker, market).catch(() => null);
-  return { ...(sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error }), fallbackReason, cached: false, fetchedAt: null };
+  const secFloat = await fetchSecFreeFloat(ticker, market).catch(() => null);
+  const sec = secFloat?.ok ? null : await fetchSecOutstandingShares(ticker, market).catch(() => null);
+  return { ...(secFloat?.ok ? secFloat : sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error }), fallbackReason, cached: false, fetchedAt: null };
 }
