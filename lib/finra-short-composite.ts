@@ -1,6 +1,7 @@
 import type { ShortInterestMetric } from "@/lib/short-interest-types";
 import { fetchFreeShortInterest } from "@/lib/short-interest-service";
 import { saveShortInterest } from "@/lib/short-interest-repository";
+import { fetchNasdaqShortInterest } from "@/lib/nasdaq-short-interest";
 
 const BASE = "https://api.finra.org/data/group/otcMarket/name";
 const num = (v: unknown) => { if (v == null || String(v).trim() === "") return null; const n = Number(String(v).replace(/,/g, "").replace(/%/g, "")); return Number.isFinite(n) ? n : null; };
@@ -13,7 +14,7 @@ async function query(endpoint: string, fields: string[], ticker: string, symbolF
   return rows(await response.json());
 }
 
-export type FinraComposite = { metric: ShortInterestMetric; shortInterestStatus: string; thresholdStatus: string };
+export type FinraComposite = { metric: ShortInterestMetric; shortInterestStatus: string; thresholdStatus: string; fallback?: { source: string; ok: boolean; raw?: unknown; error?: string } };
 
 export async function fetchFinraComposite(rawTicker: string): Promise<FinraComposite> {
   const ticker = rawTicker.trim().toUpperCase();
@@ -42,11 +43,25 @@ export async function fetchFinraComposite(rawTicker: string): Promise<FinraCompo
       }
     }
   } catch (error) { shortInterestStatus = error instanceof Error ? error.message : "API_ERROR"; }
+  let fallback: FinraComposite["fallback"];
+  if (metric.shortInterest == null || shortInterestStatus === "STALE" || shortInterestStatus === "NOT_PUBLISHED") {
+    const nasdaq = await fetchNasdaqShortInterest(ticker);
+    fallback = { source: "NASDAQ", ok: nasdaq.ok, raw: nasdaq.raw, error: nasdaq.error };
+    if (nasdaq.ok && nasdaq.shortInterest != null) {
+      metric.shortInterest = nasdaq.shortInterest;
+      metric.averageDailyVolume = nasdaq.averageDailyVolume;
+      metric.daysToCover = nasdaq.daysToCover;
+      metric.shortInterestAsOf = nasdaq.asOf;
+      metric.source = "NASDAQ";
+      metric.status = "OK";
+      shortInterestStatus = "NASDAQ_FALLBACK";
+    }
+  }
   try {
     if (thresholdResult.status === "rejected") throw thresholdResult.reason;
     const data = thresholdResult.value;
     const row = data[0]; metric.thresholdListed = Boolean(row); metric.thresholdAsOf = row ? String(row.tradeDate ?? "") || null : null; thresholdStatus = row ? "LISTED" : "NOT_FOUND";
   } catch (error) { thresholdStatus = error instanceof Error ? error.message : "API_ERROR"; }
   try { await saveShortInterest(metric); } catch { /* API result remains usable when migration is pending. */ }
-  return { metric, shortInterestStatus, thresholdStatus };
+  return { metric, shortInterestStatus, thresholdStatus, fallback };
 }
