@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usFreeFloatSnapshots, usNewsTickerExchangeCache } from "@/lib/schema";
 import { ensureUsInstrument } from "@/lib/us-instruments";
@@ -9,6 +9,22 @@ export async function loadFreshFreeFloat(ticker: string, now = new Date()) {
   const since = new Date(now); since.setUTCHours(0, 0, 0, 0);
   const rows = await db.select().from(usFreeFloatSnapshots).where(and(eq(usFreeFloatSnapshots.ticker, ticker.toUpperCase()), gte(usFreeFloatSnapshots.fetchedAt, since))).limit(1);
   return rows[0] ?? null;
+}
+
+/** Returns the most recently stored snapshot so the caller can apply an
+ * explicit freshness policy based on the provider's as-of date. */
+export async function loadLatestFreeFloat(ticker: string) {
+  const db = getDb();
+  const rows = await db.select().from(usFreeFloatSnapshots)
+    .where(eq(usFreeFloatSnapshots.ticker, ticker.toUpperCase()))
+    .orderBy(desc(usFreeFloatSnapshots.fetchedAt)).limit(1);
+  return rows[0] ?? null;
+}
+
+/** Stale snapshots are deliberately removed before a refresh is attempted. */
+export async function deleteFreeFloat(ticker: string) {
+  const db = getDb();
+  await db.delete(usFreeFloatSnapshots).where(eq(usFreeFloatSnapshots.ticker, ticker.toUpperCase()));
 }
 
 export async function saveFreeFloat(result: FreeFloatResult, fetchedAt = new Date()) {
