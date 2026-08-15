@@ -9,10 +9,17 @@ type Facts = { facts?: { "us-gaap"?: Record<string, { units?: Record<string, Arr
  * This is deliberately not labelled free float: SEC XBRL does not guarantee
  * a standardized float field for every issuer.
  */
-export async function fetchSecOutstandingShares(rawTicker: string): Promise<FreeFloatResult> {
+function normalizeMarket(value: string | undefined) {
+  const upper = value?.trim().toUpperCase();
+  return upper === "NAS" ? "NASDAQ" : upper === "NYS" ? "NYSE" : upper === "AMS" ? "NYSE AMERICAN" : upper;
+}
+
+export async function fetchSecOutstandingShares(rawTicker: string, preferredMarket?: string): Promise<FreeFloatResult> {
   const ticker = rawTicker.trim().toUpperCase();
   const candidates = await resolveSecTickerCandidates(ticker);
-  const mapping = selectPreferredSecCompanyTicker(candidates);
+  const normalizedMarket = normalizeMarket(preferredMarket);
+  const marketCandidates = normalizedMarket ? candidates.filter((candidate) => normalizeMarket(candidate.exchange) === normalizedMarket) : candidates;
+  const mapping = selectPreferredSecCompanyTicker(marketCandidates.length ? marketCandidates : candidates);
   if (!mapping) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: 404, error: "SEC ticker mapping not found" };
   const response = await fetchSecJson<Facts>(companyFactsUrl(mapping.cik));
   if (!response.ok) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: response.status, error: response.error };

@@ -17,7 +17,7 @@ export async function analyzeUsShortSqueeze(rawTicker: string) {
   const scopes = await loadStoredUsInstrumentScopes();
   const instrument = scopes.scopes.find((x) => x.code.toUpperCase() === ticker);
   if (!instrument) return { ok: false, ticker, error: "TICKER_NOT_IN_ACTIVE_US_UNIVERSE" };
-  const [short, float, price] = await Promise.all([fetchFinraComposite(ticker), getUsFreeFloat(ticker), fetchKisUsPriceDetail({ code: ticker, market: instrument.market })]);
+  const [short, float, price] = await Promise.all([fetchFinraComposite(ticker), getUsFreeFloat(ticker, instrument.market), fetchKisUsPriceDetail({ code: ticker, market: instrument.market })]);
   const output = getKisUsPriceDetailOutput(price?.parsed);
   const currentPrice = n(output.last ?? output.t_xprc ?? output.price);
   const si = short.metric.shortInterest;
