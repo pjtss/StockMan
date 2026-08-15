@@ -75,3 +75,10 @@ export async function resolveSecTicker(ticker: string) {
   const value = ticker.trim().toUpperCase();
   return rows.find((row) => row.ticker === value) || null;
 }
+
+/** Returns every SEC mapping row for a ticker so callers can disambiguate classes/exchanges. */
+export async function resolveSecTickerCandidates(ticker: string) {
+  const rows = await loadRows();
+  const value = ticker.trim().toUpperCase();
+  return rows.filter((row) => row.ticker === value);
+}

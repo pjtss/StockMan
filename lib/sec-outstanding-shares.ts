@@ -1,5 +1,5 @@
 import { companyFactsUrl, fetchSecJson } from "@/lib/sec-edgar-client";
-import { resolveSecTicker } from "@/lib/sec-company-ticker";
+import { resolveSecTickerCandidates, selectPreferredSecCompanyTicker } from "@/lib/sec-company-ticker";
 import type { FreeFloatResult } from "@/lib/fmp-free-float";
 
 type Facts = { facts?: { "us-gaap"?: Record<string, { units?: Record<string, Array<Record<string, unknown>>> }> } };
@@ -11,7 +11,8 @@ type Facts = { facts?: { "us-gaap"?: Record<string, { units?: Record<string, Arr
  */
 export async function fetchSecOutstandingShares(rawTicker: string): Promise<FreeFloatResult> {
   const ticker = rawTicker.trim().toUpperCase();
-  const mapping = await resolveSecTicker(ticker);
+  const candidates = await resolveSecTickerCandidates(ticker);
+  const mapping = selectPreferredSecCompanyTicker(candidates);
   if (!mapping) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: 404, error: "SEC ticker mapping not found" };
   const response = await fetchSecJson<Facts>(companyFactsUrl(mapping.cik));
   if (!response.ok) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: response.status, error: response.error };
