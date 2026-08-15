@@ -15,7 +15,10 @@ export function calculateSqueezeScore(input: { siFloat: number | null; pnl: numb
 export async function analyzeUsShortSqueeze(rawTicker: string) {
   const ticker = rawTicker.trim().toUpperCase();
   if (!/^[A-Z][A-Z0-9.-]{0,9}$/.test(ticker)) throw new Error("INVALID_TICKER");
-  const scopes = await loadStoredUsInstrumentScopes();
+  const scopes = await Promise.race([
+    loadStoredUsInstrumentScopes(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("UNIVERSE_TIMEOUT")), 5_000)),
+  ]).catch((error) => { throw error; });
   const instrument = scopes.scopes.find((x) => x.code.toUpperCase() === ticker);
   if (!instrument) return { ok: false, ticker, error: "TICKER_NOT_IN_ACTIVE_US_UNIVERSE" };
   const bounded = <T>(promise: Promise<T>, fallback: T, timeoutMs = 9_000) => Promise.race([promise.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs))]);
