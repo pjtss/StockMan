@@ -12,6 +12,7 @@ import { withAutomationRun } from "@/lib/automation-run";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
+import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { scanStoredUsDailyAdl } from "@/lib/us-adl";
 
 export async function POST(request: Request) {
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
   const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const moduleSettings = await loadFeatureModuleSettings("us-daily-indicators");
+  if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings, new Date())) { await recordSkippedAutomationRun("us-daily-indicators", moduleSettings.enabled ? "outside_schedule" : "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule" }); }
   const envInterval = Number.parseInt(process.env.US_DAILY_INDICATORS_INTERVAL_SECONDS || "600", 10) || 600;
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? envInterval);

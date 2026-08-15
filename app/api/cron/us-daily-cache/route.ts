@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
+  if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   const secret = process.env.CRON_SECRET?.trim();
   const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -17,7 +17,7 @@ type ModuleSettings = {
   activeDays: number[];
   featureSettings?: {
     discordFormat?: { webhookUrl?: string; debugWebhookUrl?: string };
-    evaluation?: { mfiThreshold?: number; obvSignalPeriod?: number; obvSignalAboveDays?: number; obvSignalCrossLookback?: number; trendMinScore?: number; trendMinRvol?: number; trendMinMfi?: number; trendMaxMfi?: number; trendRequirePriceTrend?: boolean; trendRequireDailyBreakout?: boolean };
+    evaluation?: { mfiThreshold?: number; obvSignalPeriod?: number; obvSignalAboveDays?: number; obvSignalCrossLookback?: number; trendMinScore?: number; trendMinRvol?: number; trendMinMfi?: number; trendMaxMfi?: number; trendRequirePriceTrend?: boolean; trendRequireDailyBreakout?: boolean; dailyAutomationEnabled?: boolean };
     marketRss?: { enabledSources?: string[] };
     secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
     vwapPolicy?: Record<string, number | boolean>;
@@ -40,7 +40,7 @@ const DEFAULT_SETTINGS: ModuleSettings = {
   activeDays: [1, 2, 3, 4, 5],
   featureSettings: {
     discordFormat: { webhookUrl: "" },
-    evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5, trendMinScore: 70, trendMinRvol: 1.5, trendMinMfi: 50, trendMaxMfi: 85, trendRequirePriceTrend: true, trendRequireDailyBreakout: true },
+    evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5, trendMinScore: 70, trendMinRvol: 1.5, trendMinMfi: 50, trendMaxMfi: 85, trendRequirePriceTrend: true, trendRequireDailyBreakout: true, dailyAutomationEnabled: true },
     vwapPolicy: { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true },
     bollingerPolicy: { timeframe: "D", period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
     krBollingerPolicy: { timeframe: "D", period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0 },
@@ -86,6 +86,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
   const trendMaxMfi = settings.featureSettings?.evaluation?.trendMaxMfi ?? 85;
   const trendRequirePriceTrend = settings.featureSettings?.evaluation?.trendRequirePriceTrend ?? true;
   const trendRequireDailyBreakout = settings.featureSettings?.evaluation?.trendRequireDailyBreakout ?? true;
+  const dailyAutomationEnabled = settings.featureSettings?.evaluation?.dailyAutomationEnabled !== false;
   const enabledRssSources = settings.featureSettings?.marketRss?.enabledSources || [...MARKET_RSS_SOURCES];
   const secEdgar = settings.featureSettings?.secEdgar || { ciks: [], syncXbrl: false, discordBatch: 10 };
   const newsLookup = settings.featureSettings?.newsLookup || { defaultPeriod: "today" as const };

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { scanStoredUsBollingerBands } from "@/lib/us-bollinger-band";
 import { sendUsBollingerBandSignals } from "@/lib/discord-us-bollinger-band";
@@ -11,6 +12,7 @@ export async function POST(request: Request) {
   const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("us-bollinger-band");
+  if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   if (!settings.enabled) { await recordSkippedAutomationRun("us-bollinger-band", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
   if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("us-bollinger-band", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
   const intervalSeconds = Math.max(60, settings.intervalSeconds ?? 600);
