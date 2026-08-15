@@ -16,8 +16,13 @@ export async function fetchSecOutstandingShares(rawTicker: string): Promise<Free
   if (!mapping) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: 404, error: "SEC ticker mapping not found" };
   const response = await fetchSecJson<Facts>(companyFactsUrl(mapping.cik));
   if (!response.ok) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: response.status, error: response.error };
-  const concept = response.data.facts?.["us-gaap"]?.EntityCommonStockSharesOutstanding;
-  const rows = Object.values(concept?.units || {}).flat().filter((row) => Number.isFinite(Number(row.val)) && row.end).sort((a, b) => String(b.end).localeCompare(String(a.end)));
+  const usGaap = response.data.facts?.["us-gaap"] || {};
+  const concepts = ["EntityCommonStockSharesOutstanding", "CommonStockSharesOutstanding"]
+    .map((tag) => usGaap[tag])
+    .filter(Boolean);
+  const rows = concepts.flatMap((concept) => Object.values(concept?.units || {}).flat())
+    .filter((row) => Number.isFinite(Number(row.val)) && row.end)
+    .sort((a, b) => String(b.end).localeCompare(String(a.end)));
   const latest = rows[0];
   const outstandingShares = latest ? Number(latest.val) : null;
   if (outstandingShares == null) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: 200, error: "SEC outstanding shares fact not found" };
