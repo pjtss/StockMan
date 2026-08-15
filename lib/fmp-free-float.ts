@@ -5,7 +5,7 @@ export type FreeFloatResult = {
   outstandingShares: number | null;
   freeFloatPercent: number | null;
   asOf: string | null;
-  source: "FMP";
+  source: "FMP" | "SEC";
   status: number | null;
   error?: string;
 };
