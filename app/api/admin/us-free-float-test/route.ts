@@ -7,5 +7,5 @@ export async function GET(request: Request) {
   const ticker = new URL(request.url).searchParams.get("ticker")?.trim().toUpperCase() || "";
   if (!ticker) return NextResponse.json({ error: "티커를 입력하세요." }, { status: 400 });
   const result = await getUsFreeFloat(ticker);
-  return NextResponse.json({ ok: result.ok, request: { method: "GET", endpoint: "/stable/shares-float", ticker }, result });
+  return NextResponse.json({ ok: result.ok, request: { method: "GET", endpoint: result.source === "SEC" ? "SEC Company Facts" : "/stable/shares-float", ticker }, result, diagnostics: { source: result.source, dataType: result.dataType ?? (result.source === "SEC" ? "OUTSTANDING_SHARES" : "FREE_FLOAT"), asOf: result.asOf, cached: result.cached, freeFloatAvailable: result.floatShares != null } });
 }

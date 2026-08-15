@@ -20,5 +20,5 @@ export async function fetchSecOutstandingShares(rawTicker: string): Promise<Free
   const latest = rows[0];
   const outstandingShares = latest ? Number(latest.val) : null;
   if (outstandingShares == null) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", status: 200, error: "SEC outstanding shares fact not found" };
-  return { ok: true, ticker, floatShares: null, outstandingShares, freeFloatPercent: null, asOf: String(latest.end), source: "SEC", status: response.status };
+  return { ok: true, ticker, floatShares: null, outstandingShares, freeFloatPercent: null, asOf: String(latest.end), source: "SEC", dataType: "OUTSTANDING_SHARES", status: response.status };
 }
