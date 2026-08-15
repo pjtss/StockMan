@@ -7,6 +7,7 @@ export type FreeFloatResult = {
   asOf: string | null;
   source: "FMP" | "SEC";
   dataType?: "FREE_FLOAT" | "OUTSTANDING_SHARES";
+  fallbackReason?: "FMP_UNAVAILABLE" | "FMP_STALE_OVER_30_DAYS";
   status: number | null;
   error?: string;
 };
