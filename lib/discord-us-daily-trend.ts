@@ -6,12 +6,12 @@ export async function sendUsDailyTrendToDiscord(items: Array<Record<string, unkn
   if (!webhook) return { ok: false, skipped: true, sent: 0, reason: "webhook_not_configured" };
   const qualified = items.filter((item) => item.qualifies);
   if (!qualified.length) return { ok: true, skipped: true, sent: 0, reason: "no_candidates" };
-  const header = ["🚀 미국 일봉 급등 추세 통합 탐지", "OBV · MACD · MFI · 볼린저밴드 · DMI · 가격추세 · 거래량"];
+  const header = ["🚀 미국 일봉 상승 추세 통합 탐지", "OBV + ADL Signal 상승 조건"];
   const lines: string[] = [];
   for (const item of qualified.slice(0, 30)) {
     const parts = (item.scoreParts || {}) as Record<string, unknown>;
     const points = (key: string) => Number(parts[key] ?? 0);
-    const line = `${item.market} ${item.code}${item.name ? ` | ${item.name}` : ""} · ${item.score}점 · 시가 ${item.open ?? "-"} · 이전5일고가 ${item.previousFiveDayHigh ?? "-"} · 종가 ${item.close} · MFI ${item.mfi ?? "-"} · RVOL ${item.rvol == null ? "-" : Number(item.rvol).toFixed(2)}x\n  일봉 돌파 ${item.dailyBreakout ? "YES" : "NO"} · 추세 ${points("priceTrend")} · OBV ${points("obv")} · MACD ${points("macd")} · MFI ${points("mfi")} · BB ${points("bollinger")} · DMI ${points("dmi")} · 거래량 ${points("volume")}`;
+    const line = `${item.market} ${item.code}${item.name ? ` | ${item.name}` : ""} · ${item.score}점 · 종가 ${item.close ?? "-"}\n  OBV ${points("obv")} · OBV ${item.obv ?? "-"} · Signal ${item.obvSignal ?? "-"}\n  ADL ${points("adl")} · ADL ${item.adl ?? "-"} · Signal ${item.adlSignal ?? "-"}`;
     const candidate = [...header, ...lines, line].join("\n");
     if (candidate.length > 1900) break;
     lines.push(line);
