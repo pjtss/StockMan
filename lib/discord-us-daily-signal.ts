@@ -48,7 +48,7 @@ export function buildUsDailyIndicatorDiscordChunks(sections: string[]) {
   return chunks;
 }
 
-export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?: Signal[]; macd?: Signal[]; obv?: Signal[] }) {
+export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?: Signal[]; macd?: Signal[]; obv?: Signal[]; adl?: Signal[] }) {
   const webhook = await loadFeatureDiscordWebhook("us-daily-indicators", ["US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL"]);
   if (!webhook) throw new Error("US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL is not configured");
   const sections = [
@@ -56,6 +56,7 @@ export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?:
     input.dmi?.length ? `**해외주식 일봉 DMI 상승 후보**\n${input.dmi.slice(0, 20).map((item) => `${line(item, "plusDi")} · -DI ${item.minusDi ?? "-"} · ADX ${item.adx ?? "-"}`).join("\n")}` : "",
     input.macd?.length ? `**해외주식 일봉 MACD 상승 후보**\n${input.macd.slice(0, 20).map((item) => `${line(item, "histogram")} · MACD ${item.macd ?? "-"} · Signal ${item.signal ?? "-"}`).join("\n")}` : "",
     input.obv?.length ? `**해외주식 일봉 OBV Signal 상승 후보**\n${input.obv.slice(0, 20).map((item) => `${line(item, "change")} · OBV ${item.obv ?? "-"} · Signal ${item.obvSignal ?? "-"} · 상회 ${item.aboveSignalDays ?? 0}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`).join("\n")}` : "",
+    input.adl?.length ? `**해외주식 일봉 ADL 상승 후보**\n${input.adl.slice(0, 20).map((item) => `${line(item, "delta")} · ADL ${item.adl ?? "-"} · 이전 ${item.previousAdl ?? "-"}`).join("\n")}` : "",
   ].filter(Boolean);
   if (!sections.length) return { ok: true, sent: 0, skipped: true, reason: "no_candidates" };
   const fieldData = [
@@ -63,8 +64,9 @@ export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?:
     { name: "📈 해외주식 일봉 DMI 상승", items: input.dmi ?? [], lines: (input.dmi ?? []).slice(0, 20).map((item) => `${line(item, "plusDi")} · -DI ${item.minusDi ?? "-"} · ADX ${item.adx ?? "-"}`) },
     { name: "📊 해외주식 일봉 MACD 상승", items: input.macd ?? [], lines: (input.macd ?? []).slice(0, 20).map((item) => `${line(item, "histogram")} · MACD ${item.macd ?? "-"} · Signal ${item.signal ?? "-"}`) },
     { name: "🔊 해외주식 일봉 OBV Signal 상승", items: input.obv ?? [], lines: (input.obv ?? []).slice(0, 20).map((item) => `${line(item, "change")} · OBV ${item.obv ?? "-"} · Signal ${item.obvSignal ?? "-"} · 상회 ${item.aboveSignalDays ?? 0}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`) },
+    { name: "📈 해외주식 일봉 ADL 상승", items: input.adl ?? [], lines: (input.adl ?? []).slice(0, 20).map((item) => `${line(item, "delta")} · ADL ${item.adl ?? "-"} · 이전 ${item.previousAdl ?? "-"}`) },
   ].filter((section) => section.items.length > 0);
-  const count = (input.mfi?.length || 0) + (input.dmi?.length || 0) + (input.macd?.length || 0) + (input.obv?.length || 0);
+  const count = (input.mfi?.length || 0) + (input.dmi?.length || 0) + (input.macd?.length || 0) + (input.obv?.length || 0) + (input.adl?.length || 0);
   const responses = [];
   const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", color: 0x2563eb, fields: fieldData.map((section) => ({ name: section.name, value: fitEmbedField(section.lines, section.items.length), inline: false })), footer: { text: "STOCKMAN · DB 저장 일봉 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] })) });
   responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
