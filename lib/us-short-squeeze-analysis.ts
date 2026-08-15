@@ -18,7 +18,14 @@ export async function analyzeUsShortSqueeze(rawTicker: string) {
   const scopes = await loadStoredUsInstrumentScopes();
   const instrument = scopes.scopes.find((x) => x.code.toUpperCase() === ticker);
   if (!instrument) return { ok: false, ticker, error: "TICKER_NOT_IN_ACTIVE_US_UNIVERSE" };
-  const [short, float, price] = await Promise.all([fetchFinraComposite(ticker), getUsFreeFloat(ticker, instrument.market), fetchKisUsPriceDetail({ code: ticker, market: instrument.market })]);
+  const bounded = <T>(promise: Promise<T>, fallback: T, timeoutMs = 9_000) => Promise.race([promise.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs))]);
+  const emptyShort = { metric: { ticker, shortInterest: null, shortVolume: null, totalVolume: null, shortVolumeRatio: null, daysToCover: null, asOf: null, source: "FINRA", status: "UNAVAILABLE" }, shortInterestStatus: "TIMEOUT", thresholdStatus: "TIMEOUT" } as unknown as Awaited<ReturnType<typeof fetchFinraComposite>>;
+  const emptyFloat = { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", dataType: "FREE_FLOAT", status: 0, error: "FLOAT_PROVIDER_TIMEOUT" } as Awaited<ReturnType<typeof getUsFreeFloat>>;
+  const [short, float, price] = await Promise.all([
+    bounded(fetchFinraComposite(ticker), emptyShort),
+    bounded(getUsFreeFloat(ticker, instrument.market), emptyFloat),
+    bounded(fetchKisUsPriceDetail({ code: ticker, market: instrument.market }), null),
+  ]);
   const output = getKisUsPriceDetailOutput(price?.parsed);
   const currentPrice = n(output.last ?? output.t_xprc ?? output.price);
   const si = short.metric.shortInterest;
