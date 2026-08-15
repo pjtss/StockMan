@@ -8,7 +8,7 @@ export function normalizeFinraShortVolume(ticker: string, row: Record<string, un
   const totalVolume = num(row?.totalParQuantity ?? row?.totalVolume ?? row?.total_volume);
   const asOf = String(row?.tradeReportDate ?? row?.tradeDate ?? row?.trade_date ?? "").trim() || null;
   const status = shortVolume == null || totalVolume == null ? "NULL_FIELD" : shortVolume === 0 ? "ZERO_SHORT_VOLUME" : "OK";
-  return { ticker: ticker.toUpperCase(), shortVolume, totalVolume, shortVolumeRatio: shortVolume != null && totalVolume ? shortVolume / totalVolume * 100 : null, shortInterest: null, daysToCover: null, asOf, shortVolumeAsOf: asOf, shortInterestAsOf: null, source: "FINRA", status, reason: status === "NULL_FIELD" ? "FINRA 응답 필수 수량 필드 누락" : undefined };
+  return { ticker: ticker.toUpperCase(), shortVolume, totalVolume, shortVolumeRatio: shortVolume != null && totalVolume ? shortVolume / totalVolume : null, shortInterest: null, daysToCover: null, asOf, shortVolumeAsOf: asOf, shortInterestAsOf: null, source: "FINRA", status, reason: status === "NULL_FIELD" ? "FINRA 응답 필수 수량 필드 누락" : undefined };
 }
 
 export function unavailableShortInterest(ticker: string, source: ShortInterestMetric["source"], status: ShortInterestMetric["status"] = "API_ERROR", reason = "공급자 응답 없음"): ShortInterestMetric {
