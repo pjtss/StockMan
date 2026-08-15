@@ -25,7 +25,7 @@ export async function fetchFmpFreeFloat(rawTicker: string): Promise<FreeFloatRes
   if (!apiKey) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "FMP", status: null, error: "FMP_API_KEY is not configured" };
   try {
     const url = `https://financialmodelingprep.com/stable/shares-float?symbol=${encodeURIComponent(ticker)}&apikey=${encodeURIComponent(apiKey)}`;
-    const response = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
+    const response = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(8000) });
     const raw = await response.json().catch(() => null) as any;
     const row = Array.isArray(raw) ? raw[0] : raw?.data?.[0] ?? raw;
     const floatShares = numberValue(row?.floatShares ?? row?.float_shares ?? row?.freeFloat);

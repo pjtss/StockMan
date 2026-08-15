@@ -5,7 +5,7 @@ export async function fetchNasdaqShortInterest(rawTicker: string): Promise<Nasda
   const ticker = rawTicker.trim().toUpperCase();
   const url = `https://api.nasdaq.com/api/quote/${encodeURIComponent(ticker)}/short-interest?assetclass=stocks`;
   try {
-    const response = await fetch(url, { headers: { accept: "application/json, text/plain, */*", "user-agent": "Mozilla/5.0 Stockman/1.0" }, cache: "no-store" });
+    const response = await fetch(url, { headers: { accept: "application/json, text/plain, */*", "user-agent": "Mozilla/5.0 Stockman/1.0" }, cache: "no-store", signal: AbortSignal.timeout(8000) });
     const raw = await response.json().catch(() => null);
     const rows = (raw as any)?.data?.rows ?? (raw as any)?.data?.table?.rows ?? [];
     const row = Array.isArray(rows) ? rows[0] : null;

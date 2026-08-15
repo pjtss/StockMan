@@ -15,7 +15,7 @@ export async function fetchFreeShortInterest(rawTicker: string): Promise<ShortIn
   try {
     const headers: Record<string, string> = { accept: "application/json", "content-type": "application/json" };
     if (process.env.FINRA_API_TOKEN?.trim()) headers.Authorization = `Bearer ${process.env.FINRA_API_TOKEN.trim()}`;
-    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ limit: 20, fields: ["tradeReportDate", "securitiesInformationProcessorSymbolIdentifier", "shortParQuantity", "shortExemptParQuantity", "totalParQuantity"], compareFilters: [{ compareType: "equal", fieldName: "securitiesInformationProcessorSymbolIdentifier", fieldValue: ticker }] }), cache: "no-store" });
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ limit: 20, fields: ["tradeReportDate", "securitiesInformationProcessorSymbolIdentifier", "shortParQuantity", "shortExemptParQuantity", "totalParQuantity"], compareFilters: [{ compareType: "equal", fieldName: "securitiesInformationProcessorSymbolIdentifier", fieldValue: ticker }] }), cache: "no-store", signal: AbortSignal.timeout(8000) });
     if (!response.ok) return unavailableShortInterest(ticker, "FINRA", "API_ERROR", `FINRA HTTP ${response.status}`);
     const raw = await response.json() as any;
     const rows = Array.isArray(raw) ? raw : raw?.data || raw?.results || [];

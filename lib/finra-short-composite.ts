@@ -9,7 +9,7 @@ const rows = (value: any): Record<string, unknown>[] => Array.isArray(value) ? v
 const tokenHeaders = () => { const h: Record<string, string> = { accept: "application/json", "content-type": "application/json" }; if (process.env.FINRA_API_TOKEN?.trim()) h.Authorization = `Bearer ${process.env.FINRA_API_TOKEN.trim()}`; return h; };
 async function query(endpoint: string, fields: string[], ticker: string, symbolField: string) {
   const url = process.env[endpoint] || `${BASE}/${endpoint === "FINRA_SHORT_INTEREST_URL" ? "consolidatedShortInterest" : "thresholdList"}`;
-  const response = await fetch(url, { method: "POST", headers: tokenHeaders(), body: JSON.stringify({ limit: 100, fields, compareFilters: [{ compareType: "equal", fieldName: symbolField, fieldValue: ticker }] }), cache: "no-store" });
+  const response = await fetch(url, { method: "POST", headers: tokenHeaders(), body: JSON.stringify({ limit: 100, fields, compareFilters: [{ compareType: "equal", fieldName: symbolField, fieldValue: ticker }] }), cache: "no-store", signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error(`FINRA ${endpoint} HTTP ${response.status}`);
   return rows(await response.json());
 }

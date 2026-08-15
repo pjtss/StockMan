@@ -45,14 +45,16 @@ export async function fetchSecFreeFloat(rawTicker: string, preferredMarket?: str
   const dates = recent.filingDate || [];
   const accessions = recent.accessionNumber || [];
   const documents = recent.primaryDocument || [];
-  for (let index = 0; index < forms.length && index < 40; index += 1) {
+  let inspected = 0;
+  for (let index = 0; index < forms.length && inspected < 6; index += 1) {
     if (!(forms[index] === "10-K" || forms[index] === "10-Q" || forms[index] === "S-1" || forms[index] === "S-1/A")) continue;
     const accession = String(accessions[index] || "");
     const document = String(documents[index] || "");
     if (!accession || !document) continue;
+    inspected += 1;
     const url = documentUrl(mapping.cik, accession, document);
     try {
-      const response = await fetch(url, { headers: createSecRequestHeaders("text/html"), cache: "no-store", signal: AbortSignal.timeout(12000) });
+      const response = await fetch(url, { headers: createSecRequestHeaders("text/html"), cache: "no-store", signal: AbortSignal.timeout(5000) });
       if (!response.ok) continue;
       const shares = extractExplicitFloat(await response.text());
       if (shares == null) continue;
