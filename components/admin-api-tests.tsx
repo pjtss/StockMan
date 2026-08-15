@@ -39,7 +39,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "debug_suite" | "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_adl" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_trend" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = "debug_suite" | "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_short_squeeze" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_adl" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_trend" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -155,6 +155,13 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/short-interest-test",
     query: "ticker=AAPL",
   },
+  {
+    key: "us_short_squeeze",
+    label: "미국 숏스퀴즈 평가",
+    description: "티커별 FINRA·KIS·유통주 기반 공매도 압박 평가",
+    endpoint: "/api/admin/us-short-squeeze-test",
+    query: "ticker=AAPL",
+  },
   { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   { key: "us_daily_obv", label: "미국 일봉 OBV", description: "TOP100 종목의 DB 저장 일봉만으로 최근 5거래일 대비 OBV 상승 탐지", endpoint: "/api/admin/us-daily-obv-test", query: "" },
   { key: "us_adl", label: "미국 일봉 ADL", description: "KIS OHLCV로 계산한 Accumulation/Distribution Line 상승 탐지", endpoint: "/api/admin/us-adl-test", query: "" },
@@ -256,6 +263,8 @@ export function AdminApiTests() {
                 : test.key === "us_free_float"
                   ? `ticker=${encodeURIComponent(freeFloatTicker)}`
                 : test.key === "short_interest"
+                  ? `ticker=${encodeURIComponent(shortInterestTicker)}`
+                : test.key === "us_short_squeeze"
                   ? `ticker=${encodeURIComponent(shortInterestTicker)}`
                 : test.key === "us_mfi"
                   ? `period=${encodeURIComponent(mfiPeriod)}&threshold=${encodeURIComponent(mfiThreshold)}`
@@ -370,7 +379,10 @@ export function AdminApiTests() {
               {test.key === "us_free_float" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={freeFloatTicker} onChange={(event) => setFreeFloatTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
-          {test.key === "short_interest" && (
+              {test.key === "short_interest" && (
+                <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={shortInterestTicker} onChange={(event) => setShortInterestTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
+              )}
+              {test.key === "us_short_squeeze" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={shortInterestTicker} onChange={(event) => setShortInterestTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
               {test.key === "us_mfi" && (
