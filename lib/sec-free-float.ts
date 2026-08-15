@@ -32,12 +32,22 @@ function extractExplicitFloat(text: string) {
 /** Extracts free float only when a SEC filing explicitly states share count. */
 export async function fetchSecFreeFloat(rawTicker: string, preferredMarket?: string): Promise<FreeFloatResult> {
   const ticker = rawTicker.trim().toUpperCase();
-  const candidates = await resolveSecTickerCandidates(ticker);
+  // This is a fallback provider used on a synchronous API path. Keep the
+  // entire SEC filing inspection bounded so a slow SEC archive cannot hold
+  // the user request open for tens of seconds.
+  const deadline = Date.now() + 10_000;
+  const candidates = await Promise.race([
+    resolveSecTickerCandidates(ticker),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("SEC ticker mapping timeout")), 4_000)),
+  ]).catch(() => [] as Awaited<ReturnType<typeof resolveSecTickerCandidates>>);
   const market = preferredMarket?.toUpperCase() === "NAS" ? "NASDAQ" : preferredMarket?.toUpperCase() === "NYS" ? "NYSE" : preferredMarket?.toUpperCase() === "AMS" ? "NYSE AMERICAN" : undefined;
   const marketCandidates = market ? candidates.filter((row) => row.exchange.toUpperCase() === market) : candidates;
   const mapping = selectPreferredSecCompanyTicker(marketCandidates.length ? marketCandidates : candidates);
   if (!mapping) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", dataType: "FREE_FLOAT", status: 404, error: "SEC common-share mapping not found" };
-  const submission = await fetchSecJson<Submissions>(submissionsUrl(mapping.cik));
+  const submission = await Promise.race([
+    fetchSecJson<Submissions>(submissionsUrl(mapping.cik)),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("SEC submissions timeout")), 4_000)),
+  ]).catch(() => ({ ok: false as const, status: 0, error: "SEC submissions timeout", rawText: "", fetchedAt: new Date().toISOString(), url: submissionsUrl(mapping.cik) }));
   if (!submission.ok) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", dataType: "FREE_FLOAT", status: submission.status, error: submission.error };
   const recent = submission.data.filings?.recent;
   if (!recent) return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "SEC", dataType: "FREE_FLOAT", status: 200, error: "SEC recent filings unavailable" };
@@ -46,7 +56,7 @@ export async function fetchSecFreeFloat(rawTicker: string, preferredMarket?: str
   const accessions = recent.accessionNumber || [];
   const documents = recent.primaryDocument || [];
   let inspected = 0;
-  for (let index = 0; index < forms.length && inspected < 6; index += 1) {
+  for (let index = 0; index < forms.length && inspected < 2 && Date.now() < deadline; index += 1) {
     if (!(forms[index] === "10-K" || forms[index] === "10-Q" || forms[index] === "S-1" || forms[index] === "S-1/A")) continue;
     const accession = String(accessions[index] || "");
     const document = String(documents[index] || "");
@@ -54,7 +64,7 @@ export async function fetchSecFreeFloat(rawTicker: string, preferredMarket?: str
     inspected += 1;
     const url = documentUrl(mapping.cik, accession, document);
     try {
-      const response = await fetch(url, { headers: createSecRequestHeaders("text/html"), cache: "no-store", signal: AbortSignal.timeout(5000) });
+      const response = await fetch(url, { headers: createSecRequestHeaders("text/html"), cache: "no-store", signal: AbortSignal.timeout(Math.max(500, Math.min(3_000, deadline - Date.now()))) });
       if (!response.ok) continue;
       const shares = extractExplicitFloat(await response.text());
       if (shares == null) continue;

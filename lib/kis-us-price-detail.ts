@@ -58,7 +58,7 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   });
 
   async function fetchOnce(token: string) {
-    const response = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers: headers(token) }));
+    const response = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers: headers(token), signal: AbortSignal.timeout(8_000) }));
     const rawText = await response.text();
     return { response, parsed: parseJson(rawText) };
   }
