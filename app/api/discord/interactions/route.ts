@@ -18,6 +18,7 @@ import { fetchTickerNews, type KisNewsPeriod } from "@/lib/kis-news-radar";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
+import { analyzeUsShortSqueeze } from "@/lib/us-short-squeeze-analysis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "daily-filter-refresh", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap", "sync-top100"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "short-squeeze", "refresh-daily", "daily-filter-refresh", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap", "sync-top100"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (interaction.data.name === "turnover-list") {
@@ -137,6 +138,8 @@ export async function POST(request: Request) {
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-trend") {
     void scanUsDailyTrend().then(async (result) => { const webhookStatus = await notifyDailyWebhook("일봉 급등 추세 통합", () => sendUsDailyTrendToDiscord(result.results)); return updateOriginalResponse(applicationId, interaction.token, `${formatDailyTrendResult(result)}\n\n${webhookStatus.trim()}`); }).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 급등 추세 종목을 조회하는 중 오류가 발생했습니다."));
+  } else if (interaction.data.name === "short-squeeze") {
+    void analyzeUsShortSqueeze(ticker).then((result) => updateOriginalResponse(applicationId, interaction.token, result.ok ? [`🩳 **${result.ticker} 숏스퀴즈 평가**`, `상태 ${result.squeezeState} · 등급 ${result.squeezeGrade} · 점수 ${result.squeezeScore}/${result.maxAvailableScore}`, `신뢰도 ${result.dataConfidence} · 커버리지 ${result.scoreCoveragePercent.toFixed(1)}%`, `현재가 ${result.currentPrice ?? "-"} · SI/Float ${result.shortInterestFloatPercent == null ? "-" : `${result.shortInterestFloatPercent.toFixed(2)}%`}`, `Days To Cover ${result.daysToCover == null ? "-" : result.daysToCover.toFixed(2)}`, "※ 공개 데이터 기반 추정이며 실제 강제청산 가격이 아닙니다."].join("\n") : `공매도 평가 실패: ${result.error}`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `공매도 평가 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (interaction.data.name === "vwap") {
     void scanUsVwap().then((result) => updateOriginalResponse(applicationId, interaction.token, formatVwapResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "당일 VWAP 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "sync-top100") {
