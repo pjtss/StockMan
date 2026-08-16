@@ -17,7 +17,14 @@ export async function getUsFreeFloat(rawTicker: string, market?: string): Promis
   const ticker = rawTicker.trim().toUpperCase();
   try {
     const cached = await loadLatestFreeFloat(ticker);
-    if (cached && !isStale(cached.asOf ?? cached.fetchedAt?.toISOString())) return { ok: true, ticker, floatShares: cached.floatShares, outstandingShares: cached.outstandingShares, freeFloatPercent: cached.freeFloatPercent, asOf: cached.asOf, source: cached.source as "FMP" | "SEC", status: 200, dataType: cached.source === "SEC" && cached.outstandingShares != null ? "OUTSTANDING_SHARES" : "FREE_FLOAT", cached: true, fetchedAt: cached.fetchedAt };
+    if (cached && !isStale(cached.asOf ?? cached.fetchedAt?.toISOString())) {
+      const correctedPercent = cached.freeFloatPercent != null && cached.freeFloatPercent > 0 && cached.freeFloatPercent <= 100
+        ? cached.freeFloatPercent
+        : (cached.floatShares != null && cached.outstandingShares ? cached.floatShares / cached.outstandingShares * 100 : null);
+      const corrected = { ok: true as const, ticker, floatShares: cached.floatShares, outstandingShares: cached.outstandingShares, freeFloatPercent: correctedPercent, asOf: cached.asOf, source: cached.source as "FMP" | "SEC", dataType: cached.source === "SEC" && cached.outstandingShares != null ? "OUTSTANDING_SHARES" as const : "FREE_FLOAT" as const, status: 200, cached: true, fetchedAt: cached.fetchedAt };
+      if (correctedPercent !== cached.freeFloatPercent) { try { await saveFreeFloat(corrected); } catch { /* corrected response remains usable */ } }
+      return corrected;
+    }
     if (cached) await deleteFreeFloat(ticker);
   } catch {
     // A missing migration must not prevent the base ticker query from working.
