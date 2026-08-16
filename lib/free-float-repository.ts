@@ -1,6 +1,6 @@
 import { and, desc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usFreeFloatSnapshots, usFreeFloatDiagnostics, usNewsTickerExchangeCache } from "@/lib/schema";
+import { usFreeFloatSnapshots, usFreeFloatDiagnostics, usFreeFloatRefreshHistory, usNewsTickerExchangeCache } from "@/lib/schema";
 import { ensureUsInstrument } from "@/lib/us-instruments";
 import type { FreeFloatResult } from "@/lib/fmp-free-float";
 
@@ -58,5 +58,19 @@ export async function saveFreeFloatDiagnostic(input: {
     fmpStatus: input.fmp?.status ?? null, fmpError: input.fmp?.error ?? null, fmpResponse: clip(input.fmp?.providerResponse),
     secStatus: input.sec?.status ?? null, secError: input.sec?.error ?? null, secResponse: clip(input.sec?.providerResponse), attemptedAt: new Date(),
   } }).returning();
+  return row ?? null;
+}
+
+export async function saveFreeFloatRefreshHistory(input: {
+  ticker: string; market?: string | null; startedAt: Date; finishedAt: Date;
+  status: string; source?: string | null; failureReason?: string | null;
+  fmpStatus?: number | null; secStatus?: number | null; saved: boolean;
+}) {
+  const [row] = await getDb().insert(usFreeFloatRefreshHistory).values({
+    ticker: input.ticker.toUpperCase(), market: input.market ?? null,
+    startedAt: input.startedAt, finishedAt: input.finishedAt, status: input.status,
+    source: input.source ?? null, failureReason: input.failureReason ?? null,
+    fmpStatus: input.fmpStatus ?? null, secStatus: input.secStatus ?? null, saved: input.saved,
+  }).returning();
   return row ?? null;
 }

@@ -312,6 +312,20 @@ export const usFreeFloatDiagnostics = pgTable("us_free_float_diagnostics", {
   attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const usFreeFloatRefreshHistory = pgTable("us_free_float_refresh_history", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  ticker: text("ticker").notNull(),
+  market: text("market"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }).notNull(),
+  status: text("status").notNull(),
+  source: text("source"),
+  failureReason: text("failure_reason"),
+  fmpStatus: integer("fmp_status"),
+  secStatus: integer("sec_status"),
+  saved: boolean("saved").notNull().default(false),
+});
+
 export const usInstruments = pgTable("us_instruments", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   market: text("market").notNull(),
