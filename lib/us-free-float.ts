@@ -44,7 +44,7 @@ export async function getUsFreeFloat(rawTicker: string, market?: string): Promis
       return { ...selected, fallbackReason, cached: false, fetchedAt: saved?.fetchedAt ?? null };
     } catch { /* the live fallback remains usable */ }
   }
-  return { ...selected, fallbackReason, cached: false, fetchedAt: null };
+  return { ...selected, fmpStatus: result.status, secStatus: secFloat?.status ?? sec?.status ?? null, fallbackReason, cached: false, fetchedAt: null };
 }
 
 /** Forces a live provider refresh. A failed refresh never replaces a valid DB snapshot. */
@@ -67,5 +67,5 @@ export async function refreshUsFreeFloat(rawTicker: string, market?: string): Pr
       return { ...selected, fallbackReason, cached: false, fetchedAt: saved?.fetchedAt ?? null };
     } catch { /* return live fallback */ }
   }
-  return { ...selected, fallbackReason, cached: false, fetchedAt: null };
+  return { ...selected, fmpStatus: result.status, secStatus: secFloat?.status ?? sec?.status ?? null, fallbackReason, cached: false, fetchedAt: null };
 }
