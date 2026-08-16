@@ -3,7 +3,7 @@ import { fetchSecOutstandingShares } from "@/lib/sec-outstanding-shares";
 import { fetchSecFreeFloat } from "@/lib/sec-free-float";
 import { deleteFreeFloat, loadLatestFreeFloat, saveFreeFloat, saveFreeFloatDiagnostic } from "@/lib/free-float-repository";
 
-export type UsFreeFloatOverview = FreeFloatResult & { cached: boolean; fetchedAt: Date | null };
+export type UsFreeFloatOverview = FreeFloatResult & { cached: boolean; fetchedAt: Date | null; fmpStatus?: number | null; secStatus?: number | null };
 
 const STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 function isStale(asOf: string | null | undefined, now = Date.now()) {
