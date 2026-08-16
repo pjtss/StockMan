@@ -21,5 +21,15 @@ export async function refreshAllUsFreeFloat(options: { concurrency?: number; off
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, batch.length)) }, worker));
-  return { ok: true, source: "FMP", instrumentCount: rows.length, batch: { offset, limit, count: batch.length, nextOffset: offset + batch.length < rows.length ? offset + batch.length : null, hasNext: offset + batch.length < rows.length }, successCount: results.filter((result) => result.ok === true).length, failureCount: results.filter((result) => result.ok !== true).length, results };
+  return {
+    ok: true,
+    source: "FMP",
+    instrumentCount: rows.length,
+    batch: { offset, limit, count: batch.length, nextOffset: offset + batch.length < rows.length ? offset + batch.length : null, hasNext: offset + batch.length < rows.length },
+    successCount: results.filter((result) => result.ok === true).length,
+    failureCount: results.filter((result) => result.ok !== true).length,
+    savedCount: results.filter((result) => result.ok === true && result.fetchedAt != null).length,
+    saveFailureCount: results.filter((result) => result.ok === true && result.fetchedAt == null).length,
+    results,
+  };
 }

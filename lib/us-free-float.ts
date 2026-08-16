@@ -37,7 +37,12 @@ export async function getUsFreeFloat(rawTicker: string, market?: string): Promis
   const secFloat = await fetchSecFreeFloat(ticker, market).catch(() => null);
   const sec = secFloat?.ok ? null : await fetchSecOutstandingShares(ticker, market).catch(() => null);
   const selected = secFloat?.ok ? secFloat : sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error };
-  if (selected.ok) { try { await saveFreeFloat(selected); } catch { /* the live fallback remains usable */ } }
+  if (selected.ok) {
+    try {
+      const saved = await saveFreeFloat(selected);
+      return { ...selected, fallbackReason, cached: false, fetchedAt: saved?.fetchedAt ?? null };
+    } catch { /* the live fallback remains usable */ }
+  }
   return { ...selected, fallbackReason, cached: false, fetchedAt: null };
 }
 
@@ -54,6 +59,11 @@ export async function refreshUsFreeFloat(rawTicker: string, market?: string): Pr
   const secFloat = await fetchSecFreeFloat(ticker, market).catch(() => null);
   const sec = secFloat?.ok ? null : await fetchSecOutstandingShares(ticker, market).catch(() => null);
   const selected = secFloat?.ok ? secFloat : sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error };
-  if (selected.ok) { try { await saveFreeFloat(selected); } catch { /* return live fallback */ } }
+  if (selected.ok) {
+    try {
+      const saved = await saveFreeFloat(selected);
+      return { ...selected, fallbackReason, cached: false, fetchedAt: saved?.fetchedAt ?? null };
+    } catch { /* return live fallback */ }
+  }
   return { ...selected, fallbackReason, cached: false, fetchedAt: null };
 }

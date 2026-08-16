@@ -290,7 +290,7 @@ export const usTradeIntensityTicks = pgTable(
 
 export const usFreeFloatSnapshots = pgTable("us_free_float_snapshots", {
   ticker: text("ticker").primaryKey(),
-  floatShares: doublePrecision("float_shares").notNull(),
+  floatShares: doublePrecision("float_shares"),
   outstandingShares: doublePrecision("outstanding_shares"),
   freeFloatPercent: doublePrecision("free_float_percent"),
   asOf: text("as_of"),

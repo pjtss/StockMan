@@ -28,7 +28,10 @@ export async function deleteFreeFloat(ticker: string) {
 }
 
 export async function saveFreeFloat(result: FreeFloatResult, fetchedAt = new Date()) {
-  if (!result.ok || result.floatShares == null) return null;
+  // SEC fallback may provide only outstanding shares. Persist that verified
+  // snapshot as well; rejecting it made the refresh API report success while
+  // silently leaving no DB row behind.
+  if (!result.ok || (result.floatShares == null && result.outstandingShares == null)) return null;
   const db = getDb();
   const [marketRow] = await db.select({ market: usNewsTickerExchangeCache.market }).from(usNewsTickerExchangeCache).where(eq(usNewsTickerExchangeCache.ticker, result.ticker.toUpperCase())).limit(1);
   const instrumentId = marketRow?.market ? await ensureUsInstrument({ market: marketRow.market, code: result.ticker }) : null;
