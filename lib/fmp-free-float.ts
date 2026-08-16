@@ -30,7 +30,12 @@ export async function fetchFmpFreeFloat(rawTicker: string): Promise<FreeFloatRes
     const row = Array.isArray(raw) ? raw[0] : raw?.data?.[0] ?? raw;
     const floatShares = numberValue(row?.floatShares ?? row?.float_shares ?? row?.freeFloat);
     const outstandingShares = numberValue(row?.outstandingShares ?? row?.outstanding_shares ?? row?.sharesOutstanding);
-    const freeFloatPercent = numberValue(row?.freeFloatPercent ?? row?.free_float_percent ?? row?.freeFloatPercentage) ?? (floatShares != null && outstandingShares ? floatShares / outstandingShares * 100 : null);
+    const reportedPercent = numberValue(row?.freeFloatPercent ?? row?.free_float_percent ?? row?.freeFloatPercentage);
+    // Some FMP responses contain a placeholder zero even when both share
+    // counts are present. Never persist that as a meaningful float ratio.
+    const freeFloatPercent = reportedPercent != null && reportedPercent > 0 && reportedPercent <= 100
+      ? reportedPercent
+      : (floatShares != null && outstandingShares ? floatShares / outstandingShares * 100 : null);
     const asOf = String(row?.date ?? row?.asOf ?? row?.as_of ?? "").trim() || null;
     return { ok: response.ok && floatShares != null, ticker, floatShares, outstandingShares, freeFloatPercent, asOf, source: "FMP", dataType: "FREE_FLOAT", status: response.status, ...(response.ok ? {} : { error: `FMP HTTP ${response.status}` }) };
   } catch (error) {
