@@ -5,7 +5,9 @@ import { getPool } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const cronSecret = request.headers.get("x-cron-secret") || "";
+  const cronAuthorized = Boolean(process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET);
+  if (!cronAuthorized && !(await requireAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   const params = new URL(request.url).searchParams;
   const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
   const limit = Math.max(1, Math.min(100, Number(params.get("limit") ?? 100) || 100));
