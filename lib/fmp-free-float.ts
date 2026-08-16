@@ -11,6 +11,7 @@ export type FreeFloatResult = {
   sourceUrl?: string;
   status: number | null;
   error?: string;
+  providerResponse?: unknown;
 };
 
 const numberValue = (value: unknown) => {
@@ -37,7 +38,7 @@ export async function fetchFmpFreeFloat(rawTicker: string): Promise<FreeFloatRes
       ? reportedPercent
       : (floatShares != null && outstandingShares ? floatShares / outstandingShares * 100 : null);
     const asOf = String(row?.date ?? row?.asOf ?? row?.as_of ?? "").trim() || null;
-    return { ok: response.ok && floatShares != null, ticker, floatShares, outstandingShares, freeFloatPercent, asOf, source: "FMP", dataType: "FREE_FLOAT", status: response.status, ...(response.ok ? {} : { error: `FMP HTTP ${response.status}` }) };
+    return { ok: response.ok && floatShares != null, ticker, floatShares, outstandingShares, freeFloatPercent, asOf, source: "FMP", dataType: "FREE_FLOAT", status: response.status, providerResponse: raw, ...(response.ok ? {} : { error: `FMP HTTP ${response.status}` }) };
   } catch (error) {
     return { ok: false, ticker, floatShares: null, outstandingShares: null, freeFloatPercent: null, asOf: null, source: "FMP", status: null, error: error instanceof Error ? error.message : String(error) };
   }

@@ -1,7 +1,7 @@
 import { fetchFmpFreeFloat, type FreeFloatResult } from "@/lib/fmp-free-float";
 import { fetchSecOutstandingShares } from "@/lib/sec-outstanding-shares";
 import { fetchSecFreeFloat } from "@/lib/sec-free-float";
-import { deleteFreeFloat, loadLatestFreeFloat, saveFreeFloat } from "@/lib/free-float-repository";
+import { deleteFreeFloat, loadLatestFreeFloat, saveFreeFloat, saveFreeFloatDiagnostic } from "@/lib/free-float-repository";
 
 export type UsFreeFloatOverview = FreeFloatResult & { cached: boolean; fetchedAt: Date | null };
 
@@ -37,6 +37,7 @@ export async function getUsFreeFloat(rawTicker: string, market?: string): Promis
   const secFloat = await fetchSecFreeFloat(ticker, market).catch(() => null);
   const sec = secFloat?.ok ? null : await fetchSecOutstandingShares(ticker, market).catch(() => null);
   const selected = secFloat?.ok ? secFloat : sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error };
+  if (!selected.ok) { try { await saveFreeFloatDiagnostic({ ticker, market, failureReason: selected.error ?? "FREE_FLOAT_UNAVAILABLE", fmp: result, sec: secFloat?.ok ? secFloat : sec }); } catch { /* diagnostics must not block the response */ } }
   if (selected.ok) {
     try {
       const saved = await saveFreeFloat(selected);
@@ -59,6 +60,7 @@ export async function refreshUsFreeFloat(rawTicker: string, market?: string): Pr
   const secFloat = await fetchSecFreeFloat(ticker, market).catch(() => null);
   const sec = secFloat?.ok ? null : await fetchSecOutstandingShares(ticker, market).catch(() => null);
   const selected = secFloat?.ok ? secFloat : sec?.ok ? sec : { ...result, ok: false, error: result.ok ? "FMP free-float data is older than 30 days and SEC fallback was unavailable" : result.error };
+  if (!selected.ok) { try { await saveFreeFloatDiagnostic({ ticker, market, failureReason: selected.error ?? "FREE_FLOAT_UNAVAILABLE", fmp: result, sec: secFloat?.ok ? secFloat : sec }); } catch { /* diagnostics must not block the response */ } }
   if (selected.ok) {
     try {
       const saved = await saveFreeFloat(selected);

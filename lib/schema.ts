@@ -299,6 +299,19 @@ export const usFreeFloatSnapshots = pgTable("us_free_float_snapshots", {
   instrumentId: bigint("instrument_id", { mode: "number" }),
 });
 
+export const usFreeFloatDiagnostics = pgTable("us_free_float_diagnostics", {
+  ticker: text("ticker").primaryKey(),
+  market: text("market"),
+  failureReason: text("failure_reason"),
+  fmpStatus: integer("fmp_status"),
+  fmpError: text("fmp_error"),
+  fmpResponse: jsonb("fmp_response"),
+  secStatus: integer("sec_status"),
+  secError: text("sec_error"),
+  secResponse: jsonb("sec_response"),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const usInstruments = pgTable("us_instruments", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   market: text("market").notNull(),

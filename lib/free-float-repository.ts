@@ -1,6 +1,6 @@
 import { and, desc, eq, gte } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usFreeFloatSnapshots, usNewsTickerExchangeCache } from "@/lib/schema";
+import { usFreeFloatSnapshots, usFreeFloatDiagnostics, usNewsTickerExchangeCache } from "@/lib/schema";
 import { ensureUsInstrument } from "@/lib/us-instruments";
 import type { FreeFloatResult } from "@/lib/fmp-free-float";
 
@@ -36,5 +36,27 @@ export async function saveFreeFloat(result: FreeFloatResult, fetchedAt = new Dat
   const [marketRow] = await db.select({ market: usNewsTickerExchangeCache.market }).from(usNewsTickerExchangeCache).where(eq(usNewsTickerExchangeCache.ticker, result.ticker.toUpperCase())).limit(1);
   const instrumentId = marketRow?.market ? await ensureUsInstrument({ market: marketRow.market, code: result.ticker }) : null;
   const [row] = await db.insert(usFreeFloatSnapshots).values({ ticker: result.ticker, instrumentId, floatShares: result.floatShares, outstandingShares: result.outstandingShares, freeFloatPercent: result.freeFloatPercent, asOf: result.asOf, source: result.source, fetchedAt }).onConflictDoUpdate({ target: usFreeFloatSnapshots.ticker, set: { instrumentId, floatShares: result.floatShares, outstandingShares: result.outstandingShares, freeFloatPercent: result.freeFloatPercent, asOf: result.asOf, source: result.source, fetchedAt } }).returning();
+  return row ?? null;
+}
+
+export async function saveFreeFloatDiagnostic(input: {
+  ticker: string; market?: string | null; failureReason: string;
+  fmp?: FreeFloatResult | null; sec?: FreeFloatResult | null;
+}) {
+  const clip = (value: unknown) => {
+    if (value == null) return null;
+    const text = JSON.stringify(value);
+    return text.length > 20000 ? { truncated: true, preview: text.slice(0, 20000) } : value;
+  };
+  const [row] = await getDb().insert(usFreeFloatDiagnostics).values({
+    ticker: input.ticker.toUpperCase(), market: input.market ?? null, failureReason: input.failureReason,
+    fmpStatus: input.fmp?.status ?? null, fmpError: input.fmp?.error ?? null, fmpResponse: clip(input.fmp?.providerResponse),
+    secStatus: input.sec?.status ?? null, secError: input.sec?.error ?? null, secResponse: clip(input.sec?.providerResponse),
+    attemptedAt: new Date(),
+  }).onConflictDoUpdate({ target: usFreeFloatDiagnostics.ticker, set: {
+    market: input.market ?? null, failureReason: input.failureReason,
+    fmpStatus: input.fmp?.status ?? null, fmpError: input.fmp?.error ?? null, fmpResponse: clip(input.fmp?.providerResponse),
+    secStatus: input.sec?.status ?? null, secError: input.sec?.error ?? null, secResponse: clip(input.sec?.providerResponse), attemptedAt: new Date(),
+  } }).returning();
   return row ?? null;
 }

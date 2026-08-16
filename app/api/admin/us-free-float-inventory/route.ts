@@ -16,7 +16,9 @@ export async function GET(request: Request) {
     const result = await pool.query({
       text: `SELECT i.market, i.code, i.name,
                     s.source, s.as_of, s.fetched_at, s.float_shares,
-                    s.outstanding_shares, s.free_float_percent
+                    s.outstanding_shares, s.free_float_percent,
+                    d.failure_reason, d.fmp_status, d.fmp_error,
+                    d.sec_status, d.sec_error, d.attempted_at
              FROM us_instruments i
              LEFT JOIN LATERAL (
                SELECT source, as_of, fetched_at, float_shares,
@@ -26,6 +28,7 @@ export async function GET(request: Request) {
                ORDER BY fetched_at DESC
                LIMIT 1
              ) s ON TRUE
+             LEFT JOIN us_free_float_diagnostics d ON d.ticker = i.code
              WHERE i.enabled = TRUE
              ORDER BY i.market, i.code
              OFFSET $1 LIMIT $2`,

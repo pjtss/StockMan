@@ -16,7 +16,7 @@ export async function refreshAllUsFreeFloat(options: { concurrency?: number; off
     while (true) {
       const row = batch[cursor++];
       if (!row) return;
-      const result = await refreshUsFreeFloat(row.code).catch((error) => ({ ok: false, ticker: row.code, error: error instanceof Error ? error.message : String(error) }));
+      const result = await refreshUsFreeFloat(row.code, row.market).catch((error) => ({ ok: false, ticker: row.code, error: error instanceof Error ? error.message : String(error) }));
       results.push({ ...result, market: row.market, ticker: row.code });
     }
   }
