@@ -15,7 +15,18 @@ export function AdminInstrumentUniverseImport() {
     setBusy(true); setResult(null);
     try {
       const response = await fetch("/api/admin/instrument-universe-import", { method: "POST", body: form });
-      setResult(await response.json());
+      const responseText = await response.text();
+      let payload: unknown;
+      try {
+        payload = JSON.parse(responseText);
+      } catch {
+        payload = {
+          ok: false,
+          error: `서버가 JSON이 아닌 응답을 반환했습니다. (HTTP ${response.status})`,
+          responsePreview: responseText.slice(0, 500),
+        };
+      }
+      setResult(payload);
     } catch (error) { setResult({ ok: false, error: error instanceof Error ? error.message : String(error) }); }
     finally { setBusy(false); }
   }
