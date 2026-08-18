@@ -18,7 +18,7 @@ export async function GET() {
       db.execute(sql`SELECT market, COUNT(*)::int AS count FROM kr_instrument_universe GROUP BY market ORDER BY market`),
       db.execute(sql`SELECT market, COUNT(*)::int AS count FROM us_instrument_universe GROUP BY market ORDER BY market`),
     ]);
-    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, tables: { kr: kr[0], us: us[0] }, marketCounts: { kr: krMarkets, us: usMarkets }, recentSyncRuns: runs });
+    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, tables: { kr: kr.rows[0], us: us.rows[0] }, marketCounts: { kr: krMarkets.rows, us: usMarkets.rows }, recentSyncRuns: runs });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
   }
