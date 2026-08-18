@@ -64,7 +64,9 @@ export function formatTickerOverview(overview: TickerOverview | null) {
     `거래량 ${number(quote.volume)} · 거래대금 ${number(quote.tradingValue)} · 시가총액 ${number(quote.marketCap)}`,
   ];
   const float = overview.freeFloat;
-  lines.push("", "**유통주**", float.ok ? `유통주식수 ${number(float.floatShares)} · 유통비율 ${number(float.freeFloatPercent, "%")}` : "유통주 데이터 없음");
+  lines.push("", "**주식수**", float.ok
+    ? `발행주식수 ${number(float.outstandingShares)} · 유통주식수 ${number(float.floatShares)} · 유통비율 ${number(float.freeFloatPercent, "%")}`
+    : "발행·유통주 데이터 없음");
   if (float.ok) lines.push(`유통 시가총액 ${number(quote.price == null ? null : quote.price * (float.floatShares ?? 0))}`, `기준일 ${float.asOf ?? "-"} · 출처 ${float.source}${float.cached ? " · DB 캐시" : ""}`);
   const short = overview.shortInterest;
   lines.push("", "**공매도**", short.metric.status === "OK" || short.metric.status === "ZERO_SHORT_VOLUME" ? `일별 공매도 비율 ${number(short.metric.shortVolumeRatio, "%")} · 공매도 거래량 ${number(short.metric.shortVolume)} · 판정 **${short.score.level}**` : `공매도 데이터 ${short.metric.status} · ${short.metric.reason || "원인 확인 필요"}`);
