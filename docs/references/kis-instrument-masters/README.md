@@ -68,4 +68,5 @@ AMSMST.COD      → market = AMS
 ## 공식 출처
 
 - [KIS Developers](https://apiportal.koreainvestment.com/) → 종목 정보 파일 → 헤더정보/종목 다운로드
+- [헤더 구조체 필드 정의](./header-definitions.md)
 - 전체 유니버스 동기화 설계: [`../../../architecture/instrument-universe-sync.md`](../../../architecture/instrument-universe-sync.md)
