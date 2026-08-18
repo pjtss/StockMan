@@ -72,8 +72,11 @@ export async function getHealthSnapshot() {
       for (const moduleKey of cacheModules) {
         const settings = await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null);
         const row = latestByModule.get(moduleKey);
-        const startedAtMs = row?.started_at ? new Date(row.started_at).getTime() : null;
-        const ageSeconds = startedAtMs == null ? null : Math.max(0, Math.round((Date.now() - startedAtMs) / 1000));
+        // A completed run's freshness is measured from completion, not start.
+        // Long-running cache jobs must not look stale while they are still finishing.
+        const activityAt = row?.finished_at ?? row?.started_at ?? null;
+        const activityAtMs = activityAt ? new Date(activityAt).getTime() : null;
+        const ageSeconds = activityAtMs == null ? null : Math.max(0, Math.round((Date.now() - activityAtMs) / 1000));
         const intervalSeconds = settings?.intervalSeconds ?? null;
         const stale = Boolean(settings?.enabled && ageSeconds != null && intervalSeconds != null && ageSeconds > intervalSeconds * 2);
         const startedAt = row?.started_at?.toISOString() ?? null;
