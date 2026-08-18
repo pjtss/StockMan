@@ -1,6 +1,7 @@
 # Development
 
 ## 2026-08-18
+- **[자동화 추적 연결 점검]** OCI cron 23개 라우트를 실행 이력 계층과 대조했고, 모든 예약 라우트가 `withAutomationRun` 또는 명시적 skip 기록을 사용하도록 확인했다.
 - **[Health 화면 캐시 상태 연결]** `/health-check`에 캐시 자동화별 상태, 마지막 성공 시각, 경과 시간, stale 사유를 표시해 `/api/health`의 진단 정보를 운영 화면에서도 확인할 수 있게 했다.
 - **[Health 캐시 실패 진단]** 캐시 자동화별 마지막 성공 시각(`lastSuccessAt`)과 stale 사유(`never_run`, `last_run_failed`, `interval_exceeded`, `disabled`)를 `/api/health`에 추가해 최근 실패를 정상 실행으로 오인하지 않도록 했다.
 - **[Health 캐시 신선도 기준 보정]** 완료된 캐시 작업은 시작 시각이 아니라 완료 시각을 기준으로 stale 여부를 계산하도록 수정했다. 장시간 작업 중인 캐시가 실행 도중 오래된 것으로 잘못 표시되지 않는다.
