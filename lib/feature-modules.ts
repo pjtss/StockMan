@@ -1,4 +1,4 @@
-export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "market-rss" | "us-scanners" | "domestic-trade-intensity" | "us-turnover-trend" | "us-turnover-ratio" | "us-vwap" | "us-bollinger-band" | "us-bollinger-middle-lower" | "us-minute-bollinger-band" | "kr-bollinger-band" | "kr-daily-cache" | "us-free-float" | "us-product-classification" | "us-short-borrow" | "us-news-radar" | "us-breaking-news-forwarder" | "us-daily-indicators" | "us-obv" | "us-daily-cache" | "us-daily-open-cache" | "us-daily-breakout" | "us-trade-intensity" | "short-borrow" | "discord-delivery-retry";
+export type FeatureModuleKey = "dart-realtime" | "sec-realtime" | "market-rss" | "us-scanners" | "domestic-trade-intensity" | "us-turnover-trend" | "us-turnover-ratio" | "us-vwap" | "us-bollinger-band" | "us-bollinger-middle-lower" | "us-minute-bollinger-band" | "kr-bollinger-band" | "kr-bollinger-middle-lower" | "kr-daily-cache" | "us-free-float" | "us-product-classification" | "us-short-borrow" | "us-news-radar" | "us-breaking-news-forwarder" | "us-daily-indicators" | "us-obv" | "us-daily-cache" | "us-daily-open-cache" | "us-daily-breakout" | "us-trade-intensity" | "short-borrow" | "discord-delivery-retry";
 
 /** Feature-specific settings never share the common ON/OFF/schedule contract. */
 export type FeatureSpecificSettings = {
@@ -12,7 +12,7 @@ export type FeatureSpecificSettings = {
   secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
   vwapPolicy?: { minAbovePercent: number; minVolume: number; minTradeValue: number; minPointCount: number; minTurnoverRatio: number; requireComplete: boolean };
   bollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER" };
-  krBollingerPolicy?: { period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number };
+  krBollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER" };
   newsLookup?: { defaultPeriod: "today" | "3d" | "7d" | "1m" };
   minuteBollingerPolicy?: { topN: number; period: number; stdDevMultiplier: number; minChangeRate: number };
 };
@@ -39,6 +39,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "us-bollinger-middle-lower", label: "일봉 볼린저밴드 중단선~하단선", description: "해외 통합 티커의 최신 저장 일봉 종가가 중단선과 하단선 사이인 종목 탐지", settingsPath: "/admin/modules/us-bollinger-middle-lower", scheduler: "OCI_CRON" },
   { key: "us-minute-bollinger-band", label: "1분봉 볼린저밴드 하단", description: "상승률 TOP 종목의 KIS 1분봉 종가가 볼린저밴드 하단 이하인 종목 탐지", settingsPath: "/admin/modules/us-minute-bollinger-band", scheduler: "OCI_CRON" },
   { key: "kr-bollinger-band", label: "국내 일봉 볼린저밴드 하단 이탈", description: "국내 통합 티커의 일봉 종가가 볼린저밴드 하단 이하인 종목 탐지", settingsPath: "/admin/modules/kr-bollinger-band", scheduler: "OCI_CRON" },
+  { key: "kr-bollinger-middle-lower", label: "국내 일봉 볼린저밴드 중단선~하단선", description: "국내 통합 티커의 최신 저장 일봉 종가가 중단선과 하단선 사이인 종목 탐지", settingsPath: "/admin/modules/kr-bollinger-middle-lower", scheduler: "OCI_CRON" },
   { key: "kr-daily-cache", label: "국내 일봉 캐시 갱신", description: "KIS 국내 통합 티커·일봉·시세 지표 DB 갱신", settingsPath: "/admin/modules/kr-daily-cache", scheduler: "OCI_CRON" },
   { key: "us-free-float", label: "해외 유통주 갱신", description: "해외 통합 티커의 유통주식수와 유통비율을 일일 갱신", settingsPath: "/admin/modules/us-free-float", scheduler: "OCI_CRON" },
   { key: "us-product-classification", label: "해외 상품 유형 검증", description: "KIS 상품 유형으로 ETF·레버리지·파생상품을 비활성화", settingsPath: "/admin/modules/us-product-classification", scheduler: "OCI_CRON" },

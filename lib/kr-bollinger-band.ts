@@ -15,12 +15,13 @@ export type KrBollingerPolicy = {
   minPrice: number;
   minVolume: number;
   minTurnoverRatio: number;
+  zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER";
 };
 export type KrBollingerResult = {
   market: string;
   code: string;
   name: string;
-  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
+  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "QUALIFIED_MIDDLE_TO_LOWER" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
@@ -50,9 +51,10 @@ const defaults: KrBollingerPolicy = {
   minPrice: 0,
   minVolume: 0,
   minTurnoverRatio: 0,
+  zone: "LOWER_OR_BELOW",
 };
-export async function loadKrBollingerPolicy() {
-  const s = await loadFeatureModuleSettings("kr-bollinger-band");
+export async function loadKrBollingerPolicy(moduleKey: "kr-bollinger-band" | "kr-bollinger-middle-lower" = "kr-bollinger-band") {
+  const s = await loadFeatureModuleSettings(moduleKey);
   const p = (s.featureSettings?.krBollingerPolicy ??
     {}) as Partial<KrBollingerPolicy>;
   return {
@@ -63,6 +65,7 @@ export async function loadKrBollingerPolicy() {
     minPrice: Math.max(0, Number(p.minPrice ?? 0)),
     minVolume: Math.max(0, Number(p.minVolume ?? 0)),
     minTurnoverRatio: Math.max(0, Number(p.minTurnoverRatio ?? 0)),
+    zone: p.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
   };
 }
 export function calculateKrBollingerBands(
@@ -110,9 +113,10 @@ export function calculateKrBollingerBands(
   return points;
 }
 export async function scanStoredKrBollingerBands(
-  options: { policy?: Partial<KrBollingerPolicy> } = {},
+  options: { policy?: Partial<KrBollingerPolicy>; moduleKey?: "kr-bollinger-band" | "kr-bollinger-middle-lower" } = {},
 ) {
-  const loaded = await loadKrBollingerPolicy();
+  const moduleKey = options.moduleKey ?? "kr-bollinger-band";
+  const loaded = await loadKrBollingerPolicy(moduleKey);
   const overrides = options.policy ?? {};
   const policy = {
     timeframe: overrides.timeframe === "W" || overrides.timeframe === "M"
@@ -129,6 +133,7 @@ export async function scanStoredKrBollingerBands(
       0,
       Number(overrides.minTurnoverRatio ?? loaded.minTurnoverRatio),
     ),
+    zone: overrides.zone === "MIDDLE_TO_LOWER" || loaded.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
   } as KrBollingerPolicy;
   const universe = await loadStoredKrInstrumentScopes();
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
@@ -170,7 +175,8 @@ export async function scanStoredKrBollingerBands(
           metric.turnoverRatio >= policy.minTurnoverRatio);
       const passes = pricePass && volumePass && turnoverPass;
       const touchState = !band ? "NONE" : band.close < band.lower ? "BELOW" : band.close <= band.lower ? "TOUCH" : "NONE";
-      const qualifies = Boolean(band && passes && touchState !== "NONE");
+      const inMiddleToLower = Boolean(band && band.close >= band.lower && band.close <= band.middle);
+      const qualifies = Boolean(band && passes && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
       results.push({
         market: item.market,
         code: item.code,
@@ -180,7 +186,7 @@ export async function scanStoredKrBollingerBands(
           : !passes
             ? "FILTERED"
             : qualifies
-              ? touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
+              ? policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
               : "NOT_TOUCHING",
         qualifies,
         touchState,
@@ -232,8 +238,9 @@ export async function scanStoredKrBollingerBands(
     dataPolicy: {
       source: "kr_daily_price_candles",
       timeframe,
+      zone: policy.zone,
       bandCalculation: "종가 기반",
-      touchRule: "최근 저장 봉 종가 = TOUCH, 하단선 미만 = BELOW",
+      touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : "최근 저장 봉 종가 = TOUCH, 하단선 미만 = BELOW",
       currentDayExcluded: false,
     },
     instrumentCount: universe.scopes.length,
@@ -242,6 +249,7 @@ export async function scanStoredKrBollingerBands(
     statistics: {
       qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length,
       qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length,
+      qualifiedMiddleToLower: results.filter((r) => r.status === "QUALIFIED_MIDDLE_TO_LOWER").length,
       filtered: results.filter((r) => r.status === "FILTERED").length,
       insufficientHistory: results.filter((r) => r.status === "INSUFFICIENT_HISTORY").length,
       failed: results.filter((r) => r.status === "FAILED").length,

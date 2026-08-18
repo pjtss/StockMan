@@ -20,7 +20,7 @@ StockMan은 이미 수집·캐시·탐지·알림·관리자 디버깅까지 갖
 | 시장/공시 수집 | SEC EDGAR, DART, Market RSS | 공식 피드·원문 | 저장·분류·Discord |
 | 시장 캐시 | 국내/해외 일봉, 당일 시가, 유통주, 상품분류 | KIS 및 fallback 출처 | PostgreSQL 캐시 |
 | 일봉 신호 | OBV, ADL, MACD, DMI, MFI, 돌파 | 저장된 일봉 | 후보·통합 점수 |
-| 밴드/가격 | 국내·해외 일봉/1분봉 볼린저, VWAP | 저장 캔들·당일 시세 | 조건 충족 종목 |
+| 밴드/가격 | 국내·해외 일·주·월봉 볼린저(하단 터치·이탈 / 중단선~하단선), 해외 1분봉 볼린저, VWAP | 저장 캔들·당일 시세 | 조건 충족 종목 |
 | 수급/거래 | 거래대금, turnover, 체결강도, short borrow | KIS·FINRA·Alpaca 등 | 후보·점수·알림 |
 | 운영 도구 | 관리자 테스트, health, observability | 실행 이력·원본 응답 | 진단·설정 |
 
