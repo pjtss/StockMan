@@ -68,6 +68,14 @@ systemctl restart stockman-cron.timer
 systemctl is-active --quiet stockman.service
 systemctl is-active --quiet stockman-cron.timer
 
+# Keep the reverse proxy upload limit in sync with the application release.
+if command -v nginx >/dev/null 2>&1 && [ -f "$DEPLOY_PATH/deploy/oci/nginx-stockman.conf" ]; then
+  stage="nginx-reload"
+  install -m 0644 "$DEPLOY_PATH/deploy/oci/nginx-stockman.conf" /etc/nginx/conf.d/stockman.conf
+  nginx -t
+  systemctl reload nginx
+fi
+
 # Keep Discord application commands synchronized with every deployed release.
 # Missing Discord credentials should not block a normal web deployment, but when
 # configured the registration is a required, idempotent PUT operation.

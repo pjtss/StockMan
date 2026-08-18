@@ -46,6 +46,8 @@ jobs:
           mkdir -p .next/standalone/scripts
           cp scripts/oci-cron.sh .next/standalone/scripts/oci-cron.sh
           cp scripts/register-discord-commands.mjs .next/standalone/scripts/register-discord-commands.mjs
+          mkdir -p .next/standalone/deploy/oci
+          cp deploy/oci/nginx-stockman.conf .next/standalone/deploy/oci/nginx-stockman.conf
           mkdir -p .next/standalone/db/migration
           cp db/migration/*.sql .next/standalone/db/migration/
           node -e "const fs=require('fs'); const p=require('./package.json'); fs.writeFileSync('.next/standalone/build-info.json', JSON.stringify({version:p.version,commit:process.env.STOCKMAN_BUILD_VERSION||'unknown',builtAt:process.env.STOCKMAN_BUILD_TIME||new Date().toISOString()}));"
