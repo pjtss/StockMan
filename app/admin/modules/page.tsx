@@ -19,6 +19,7 @@ const schedulerClass = { OCI_CRON: "ociCron", OPTIONAL_CRON: "optionalCron", NOT
 
 export default function AdminModulesPage() {
   return <AdminPageShell eyebrow="FEATURE MODULES" title="기능별 운영 관리" description="기능군을 접거나 펼쳐 필요한 설정만 확인하세요. 모든 기능은 독립적으로 ON/OFF·스케줄·테스트할 수 있습니다.">
+    <p><Link href="/admin/modules/instrument-universe">전체 종목 마스터 업로드 →</Link></p>
     <div className={styles.groups}>{groups.map((group, index) => <details className={styles.group} key={group.key} open={index === 0}>
       <summary className={styles.groupHeader}><div><span className={styles.groupEyebrow}>MODULE GROUP</span><h2>{group.title}</h2><p>{group.description}</p></div><span className={styles.count}>{group.keys.length}개</span></summary>
       <div className={styles.grid}>{group.keys.map((key) => { const module = moduleMap.get(key); if (!module) return null; return <Link className={styles.card} href={module.settingsPath} key={module.key}><div className={styles.cardMeta}><span>{module.key}</span><em className={styles[schedulerClass[module.scheduler]]}>{schedulerLabel[module.scheduler]}</em></div><strong>{module.label}</strong><p>{module.description}</p><b>관리하기 →</b></Link>; })}</div>
