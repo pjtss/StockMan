@@ -88,6 +88,8 @@ sudo systemctl enable --now nginx
 sudo systemctl reload nginx
 ```
 
+`nginx-stockman.conf`에는 종목 마스터 파일 업로드를 위해 `client_max_body_size 20m`이 설정되어 있습니다. 기존 운영 서버에 이미 설정 파일이 설치되어 있다면 파일을 다시 복사한 뒤 `nginx -t`와 `systemctl reload nginx`를 실행해야 합니다.
+
 HTTPS는 OCI 인스턴스 앞에 도메인과 인증서를 연결한 뒤 Certbot 또는 OCI Load Balancer에서 처리합니다.
 
 ## 5. 확인
