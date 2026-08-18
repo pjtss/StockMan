@@ -1,5 +1,6 @@
 import { formatKoreanCompact } from "@/lib/korean-number-format";
 import { toTextWebhookPayload } from "@/lib/discord-text";
+import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
 
 export type UsVwapDiscordItem = {
   market: string;
@@ -20,8 +21,8 @@ export type UsVwapDiscordItem = {
 
 const SUCCESS_STATUSES = new Set([200, 204]);
 
-function number(value: number | null | undefined, digits = 2) {
-  return value == null || !Number.isFinite(value) ? "-" : value.toFixed(digits);
+function number(value: number | null | undefined) {
+  return formatDisplayNumber(value);
 }
 
 function amount(value: number | null | undefined) {
@@ -30,7 +31,7 @@ function amount(value: number | null | undefined) {
 
 function signed(value: number | null | undefined, suffix = "") {
   if (value == null || !Number.isFinite(value)) return "-";
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}${suffix}`;
+  return `${value >= 0 ? "+" : ""}${formatDisplayNumber(value)}${suffix}`;
 }
 
 export function buildUsVwapDiscordPayload(items: UsVwapDiscordItem[]) {
@@ -42,13 +43,13 @@ export function buildUsVwapDiscordPayload(items: UsVwapDiscordItem[]) {
       description: "당일 전체 세션 기준 현재가가 VWAP 위에 있습니다.",
       color: 0x2dd4bf,
       fields: [
-        { name: "현재가", value: number(item.currentPrice, 4), inline: true },
-        { name: "당일 VWAP", value: number(item.vwap, 4), inline: true },
+        { name: "현재가", value: number(item.currentPrice), inline: true },
+        { name: "당일 VWAP", value: number(item.vwap), inline: true },
         { name: "VWAP 상회율", value: signed(item.aboveVwapPercent, "%"), inline: true },
         { name: "당일 거래대금", value: amount(item.totalTradeValue), inline: true },
-        { name: "거래량", value: Number.isFinite(item.totalVolume) ? item.totalVolume.toLocaleString("en-US") : "-", inline: true },
+        { name: "거래량", value: formatDisplayNumber(item.totalVolume), inline: true },
         { name: "시가총액", value: amount(item.marketCap), inline: true },
-        { name: "시총 대비 거래대금", value: item.turnoverRatio == null ? "-" : `${item.turnoverRatio.toFixed(2)}%`, inline: true },
+        { name: "시총 대비 거래대금", value: formatDisplayPercent(item.turnoverRatio), inline: true },
         { name: "등락률", value: signed(item.changeRate, "%"), inline: true },
         { name: "데이터", value: `${item.pointCount}개 포인트 · ${item.complete ? "완료" : "미완료"}`, inline: true },
       ],

@@ -19,6 +19,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
 import { analyzeUsShortSqueeze } from "@/lib/us-short-squeeze-analysis";
+import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ function formatDmiResult(result: Awaited<ReturnType<typeof scanStoredUsDmi>>) {
 }
 function formatMacdResult(result: Awaited<ReturnType<typeof scanStoredUsMacd>>) {
   if (!result.qualified.length) return [`일봉 MACD 상승 모멘텀 종목이 없습니다.`, `기준 ${result.fast}/${result.slow}/${result.signal} · 분석 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
-  return [`📊 **일봉 MACD 상승 후보**`, `기준: ${result.fast}/${result.slow}/${result.signal} · MACD > Signal`, `분석 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `MACD ${item.macd.toFixed(4)} · Signal ${item.signal.toFixed(4)} · Histogram ${item.histogram.toFixed(4)}`, item.goldenCross ? "🟢 골든크로스" : "상승 모멘텀 유지"].join("\n"))].join("\n\n");
+  return [`📊 **일봉 MACD 상승 후보**`, `기준: ${result.fast}/${result.slow}/${result.signal} · MACD > Signal`, `분석 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `MACD ${formatDisplayNumber(item.macd)} · Signal ${formatDisplayNumber(item.signal)} · Histogram ${formatDisplayNumber(item.histogram)}`, item.goldenCross ? "🟢 골든크로스" : "상승 모멘텀 유지"].join("\n"))].join("\n\n");
 }
 function formatDailyObvResult(result: Awaited<ReturnType<typeof scanStoredUsDailyObv>>) {
   if (!result.qualified.length) return [`일봉 OBV 상승 종목이 없습니다.`, `기준: 최근 ${result.lookback}거래일 · 분석 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
@@ -64,7 +65,7 @@ function formatDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPri
 function formatVwapResult(result: Awaited<ReturnType<typeof scanUsVwap>>) {
   const summary = `통합 종목 ${result.instrumentCount}개 · DB 캐시 ${result.cacheHitCount}개 · KIS 조회 ${result.kisRequestCount}개 · 실패 ${result.failureCount}개`;
   if (!result.qualified.length) return [`당일 VWAP 상회 종목이 없습니다.`, summary].join("\n");
-  return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, summary, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `현재가 ${item.currentPrice?.toFixed(4) ?? "-"} · VWAP ${item.vwap?.toFixed(4) ?? "-"} · 상회율 ${item.vwap && item.currentPrice != null ? `${(((item.currentPrice / item.vwap) - 1) * 100).toFixed(2)}%` : "-"}`, `거래대금 ${item.totalTradeValue.toLocaleString()} · 거래량 ${item.totalVolume.toLocaleString()} · 포인트 ${item.pointCount}개`, `시총 ${item.marketCap ?? "-"} · 시총 대비 거래대금 ${item.turnoverRatio == null ? "-" : `${item.turnoverRatio.toFixed(2)}%`} · 등락률 ${item.changeRate == null ? "-" : `${item.changeRate.toFixed(2)}%`}`, `데이터 ${item.complete ? "완료" : "미완료"}`].join("\n")).join("\n\n")].join("\n");
+  return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, summary, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `현재가 ${formatDisplayNumber(item.currentPrice)} · VWAP ${formatDisplayNumber(item.vwap)} · 상회율 ${item.vwap && item.currentPrice != null ? formatDisplayPercent(((item.currentPrice / item.vwap) - 1) * 100) : "-"}`, `거래대금 ${formatDisplayNumber(item.totalTradeValue)} · 거래량 ${formatDisplayNumber(item.totalVolume)} · 포인트 ${item.pointCount}개`, `시총 ${formatDisplayNumber(item.marketCap)} · 시총 대비 거래대금 ${formatDisplayPercent(item.turnoverRatio)} · 등락률 ${formatDisplayPercent(item.changeRate)}`, `데이터 ${item.complete ? "완료" : "미완료"}`].join("\n")).join("\n\n")].join("\n");
 }
 
 function formatDailyTrendResult(result: Awaited<ReturnType<typeof scanUsDailyTrend>>) {

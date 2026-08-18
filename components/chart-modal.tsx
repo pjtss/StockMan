@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./chart-modal.module.css";
 import type { ChartData } from "@/lib/kis-chart";
+import { formatDisplayNumber } from "@/lib/display-number";
 
 interface ChartModalProps {
   code: string;
@@ -175,7 +176,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
             </div>
             {data && (
               <div className={styles.priceBlock}>
-                <span className={styles.price}>{data.latestPrice.toLocaleString()}원</span>
+                <span className={styles.price}>{formatDisplayNumber(data.latestPrice)}원</span>
                 <span className={isUp ? styles.changeUp : styles.changeDown}>
                   {data.latestChange} ({data.latestChangeRate})
                 </span>
@@ -229,13 +230,13 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
                     (indicators?.macd ?? 0) >= 0 ? styles.macdPositive : styles.macdNegative
                   }`}>
                     {indicators?.macd !== null && indicators?.macd !== undefined
-                      ? indicators.macd.toLocaleString()
+                      ? formatDisplayNumber(indicators.macd)
                       : "N/A"}
                   </span>
                   <span className={styles.indicatorSub}>
-                    시그널: {indicators?.macdSignal?.toLocaleString() ?? "N/A"} &nbsp;|&nbsp;
+                    시그널: {indicators?.macdSignal == null ? "N/A" : formatDisplayNumber(indicators.macdSignal)} &nbsp;|&nbsp;
                     히스토: <span className={(indicators?.macdHist ?? 0) >= 0 ? styles.macdPositive : styles.macdNegative}>
-                      {indicators?.macdHist?.toLocaleString() ?? "N/A"}
+                      {indicators?.macdHist == null ? "N/A" : formatDisplayNumber(indicators.macdHist)}
                     </span>
                   </span>
                 </div>
@@ -244,11 +245,11 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
                 <div className={styles.indicatorCard}>
                   <span className={styles.indicatorLabel}>볼린저 밴드</span>
                   <span className={styles.indicatorValue} style={{ fontSize: "14px" }}>
-                    {indicators?.bbUpper?.toLocaleString() ?? "N/A"}
+                    {indicators?.bbUpper == null ? "N/A" : formatDisplayNumber(indicators.bbUpper)}
                   </span>
                   <span className={styles.indicatorSub}>
-                    중: {indicators?.bbMiddle?.toLocaleString() ?? "-"} &nbsp;|&nbsp;
-                    하: {indicators?.bbLower?.toLocaleString() ?? "-"}
+                    중: {indicators?.bbMiddle == null ? "-" : formatDisplayNumber(indicators.bbMiddle)} &nbsp;|&nbsp;
+                    하: {indicators?.bbLower == null ? "-" : formatDisplayNumber(indicators.bbLower)}
                     <br />
                     <span className={bbInfo.cls}>{bbInfo.text}</span>
                   </span>

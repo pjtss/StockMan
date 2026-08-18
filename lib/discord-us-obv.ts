@@ -1,12 +1,13 @@
 import type { UsMinuteTurnoverPoint } from "@/lib/kis-us-minute-turnover";
 import { getUsDailyIndicatorsWebhook } from "@/lib/discord-us-daily-indicators";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
+import { formatDisplayNumber } from "@/lib/display-number";
 
 export function buildUsObvDiscordPayload(items: Array<Record<string, unknown>>) {
   return {
     username: "STOCKMAN US OBV",
     allowed_mentions: { parse: [] as string[] },
-    content: items.length ? `🚨 **OBV 상승 후보 ${items.length}종목**\n${items.map((item) => `**${item["market"]} ${item["code"]}** ${item["name"] || ""} · OBV ${Number(item["obv"] || 0).toLocaleString("en-US")} · 최근 30분 ${Number(item["recentObv"] || 0).toLocaleString("en-US")} · 1분봉 ${item["pointCount"]}개`).join("\n")}` : "OBV 상승 후보가 없습니다.",
+    content: items.length ? `🚨 **OBV 상승 후보 ${items.length}종목**\n${items.map((item) => `**${item["market"]} ${item["code"]}** ${item["name"] || ""} · OBV ${formatDisplayNumber(Number(item["obv"] || 0))} · 최근 30분 ${formatDisplayNumber(Number(item["recentObv"] || 0))} · 1분봉 ${item["pointCount"]}개`).join("\n")}` : "OBV 상승 후보가 없습니다.",
   };
 }
 
