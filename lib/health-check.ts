@@ -68,7 +68,9 @@ export async function getHealthSnapshot() {
       automationCoverage = getAutomationCoverage(expected, Object.keys(automation));
       const cacheModules = ["us-daily-cache", "us-daily-open-cache", "kr-daily-cache", "us-free-float", "us-product-classification"];
       const latest = await getPool().query<{ module_key: string; status: string; started_at: Date; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message, summary FROM automation_runs WHERE module_key = ANY($1) AND status <> 'SKIPPED' ORDER BY module_key, started_at DESC", [cacheModules]);
+      const latestSuccess = await getPool().query<{ module_key: string; finished_at: Date | null }>("SELECT DISTINCT ON (module_key) module_key, finished_at FROM automation_runs WHERE module_key = ANY($1) AND status = 'SUCCESS' ORDER BY module_key, started_at DESC", [cacheModules]);
       const latestByModule = new Map(latest.rows.map((row) => [row.module_key, row]));
+      const successByModule = new Map(latestSuccess.rows.map((row) => [row.module_key, row]));
       for (const moduleKey of cacheModules) {
         const settings = await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null);
         const row = latestByModule.get(moduleKey);
@@ -78,11 +80,21 @@ export async function getHealthSnapshot() {
         const activityAtMs = activityAt ? new Date(activityAt).getTime() : null;
         const ageSeconds = activityAtMs == null ? null : Math.max(0, Math.round((Date.now() - activityAtMs) / 1000));
         const intervalSeconds = settings?.intervalSeconds ?? null;
-        const stale = Boolean(settings?.enabled && ageSeconds != null && intervalSeconds != null && ageSeconds > intervalSeconds * 2);
+        const lastSuccessAt = successByModule.get(moduleKey)?.finished_at?.toISOString() ?? null;
+        const staleReason = !settings?.enabled
+          ? "disabled"
+          : !row
+            ? "never_run"
+            : row.status === "FAILED"
+              ? "last_run_failed"
+              : ageSeconds != null && intervalSeconds != null && ageSeconds > intervalSeconds * 2
+                ? "interval_exceeded"
+                : null;
+        const stale = Boolean(staleReason && staleReason !== "disabled");
         const startedAt = row?.started_at?.toISOString() ?? null;
         const finishedAt = row?.finished_at?.toISOString() ?? null;
         const durationMs = startedAt && finishedAt ? Math.max(0, new Date(finishedAt).getTime() - new Date(startedAt).getTime()) : null;
-        cacheAutomation[moduleKey] = { enabled: settings?.enabled ?? null, intervalSeconds, status: row?.status ?? "NEVER_RUN", startedAt, finishedAt, durationMs, durationSeconds: durationMs == null ? null : Number((durationMs / 1000).toFixed(2)), ageSeconds, stale, error: row?.error_message ?? null, metrics: summarizeAutomationMetrics(row?.summary) };
+        cacheAutomation[moduleKey] = { enabled: settings?.enabled ?? null, intervalSeconds, status: row?.status ?? "NEVER_RUN", startedAt, finishedAt, lastSuccessAt, durationMs, durationSeconds: durationMs == null ? null : Number((durationMs / 1000).toFixed(2)), ageSeconds, stale, staleReason, error: row?.error_message ?? null, metrics: summarizeAutomationMetrics(row?.summary) };
       }
     } catch (error) { console.warn("[Health] automation status unavailable:", error instanceof Error ? error.message : error); }
   }
