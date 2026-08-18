@@ -237,6 +237,27 @@ instrument_sync_runs
 
 전환 완료 전에는 기존 테이블을 삭제·이름 변경·대량 갱신하지 않는다. 신규 테이블의 시장별 건수, 상품분류 정확도, 캐시 성공률, 탐지 결과를 검증한 뒤 기능 단위로 소비자를 전환한다.
 
+## 13. 현재 구현 범위
+
+현재 단계에서는 신규 테이블 생성과 마스터 파일 적재만 제공한다.
+
+```text
+POST /api/admin/instrument-universe-import
+body: { "sourceDirectory": "..." }
+```
+
+`sourceDirectory`에는 다음 5개 파일이 있어야 한다.
+
+```text
+kospi_code.mst
+kosdaq_code.mst
+NASMST.COD
+NYSMST.COD
+AMSMST.COD
+```
+
+이 단계에서는 기존 일봉·주봉·월봉·탐지 API와 신규 유니버스를 연결하지 않는다. 적재 결과는 `instrument_universe_sync_runs`에 기록하고, 신규 테이블의 원본·분류·건수 검증에만 사용한다.
+
 ## 12. 공식 참고
 
 - [KIS Developers](https://apiportal.koreainvestment.com/)

@@ -1,0 +1,75 @@
+CREATE TABLE IF NOT EXISTS kr_instrument_universe (
+  id BIGSERIAL PRIMARY KEY,
+  market TEXT NOT NULL,
+  code TEXT NOT NULL,
+  standard_code TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT '',
+  instrument_type TEXT NOT NULL DEFAULT 'UNKNOWN',
+  security_group_code TEXT NOT NULL DEFAULT '',
+  market_cap_scale TEXT NOT NULL DEFAULT '',
+  industry_large_code TEXT NOT NULL DEFAULT '',
+  industry_medium_code TEXT NOT NULL DEFAULT '',
+  industry_small_code TEXT NOT NULL DEFAULT '',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  is_etp BOOLEAN NOT NULL DEFAULT FALSE,
+  is_warrant BOOLEAN NOT NULL DEFAULT FALSE,
+  is_preferred BOOLEAN NOT NULL DEFAULT FALSE,
+  is_suspended BOOLEAN NOT NULL DEFAULT FALSE,
+  source_file TEXT NOT NULL,
+  raw_payload TEXT NOT NULL DEFAULT '',
+  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  missing_runs INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT kr_instrument_universe_market_code_unique UNIQUE (market, code)
+);
+CREATE INDEX IF NOT EXISTS kr_instrument_universe_enabled_idx ON kr_instrument_universe (enabled, market, code);
+
+CREATE TABLE IF NOT EXISTS us_instrument_universe (
+  id BIGSERIAL PRIMARY KEY,
+  market TEXT NOT NULL,
+  code TEXT NOT NULL,
+  realtime_symbol TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT '',
+  english_name TEXT NOT NULL DEFAULT '',
+  instrument_type TEXT NOT NULL DEFAULT 'UNKNOWN',
+  security_type TEXT NOT NULL DEFAULT '',
+  etp_type TEXT NOT NULL DEFAULT '',
+  currency TEXT NOT NULL DEFAULT '',
+  country_code TEXT NOT NULL DEFAULT '',
+  industry_code TEXT NOT NULL DEFAULT '',
+  is_etf BOOLEAN NOT NULL DEFAULT FALSE,
+  is_leveraged BOOLEAN NOT NULL DEFAULT FALSE,
+  is_inverse BOOLEAN NOT NULL DEFAULT FALSE,
+  is_warrant BOOLEAN NOT NULL DEFAULT FALSE,
+  is_derivative BOOLEAN NOT NULL DEFAULT FALSE,
+  is_dr BOOLEAN NOT NULL DEFAULT FALSE,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  source_file TEXT NOT NULL,
+  raw_payload TEXT NOT NULL DEFAULT '',
+  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  missing_runs INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT us_instrument_universe_market_code_unique UNIQUE (market, code)
+);
+CREATE INDEX IF NOT EXISTS us_instrument_universe_enabled_idx ON us_instrument_universe (enabled, market, code);
+
+CREATE TABLE IF NOT EXISTS instrument_universe_sync_runs (
+  id BIGSERIAL PRIMARY KEY,
+  scope TEXT NOT NULL,
+  source_directory TEXT NOT NULL,
+  status TEXT NOT NULL,
+  source_count INTEGER NOT NULL DEFAULT 0,
+  inserted_count INTEGER NOT NULL DEFAULT 0,
+  updated_count INTEGER NOT NULL DEFAULT 0,
+  deactivated_count INTEGER NOT NULL DEFAULT 0,
+  excluded_count INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  error_summary TEXT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS instrument_universe_sync_runs_scope_idx ON instrument_universe_sync_runs (scope, started_at DESC);
