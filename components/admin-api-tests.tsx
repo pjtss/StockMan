@@ -39,7 +39,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "debug_suite" | "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_short_squeeze" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_adl" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_trend" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = "debug_suite" | "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_short_squeeze" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "us_bollinger_middle_lower" | "kr_bollinger_band" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_adl" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_trend" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -107,6 +107,7 @@ const TESTS: ApiTestDefinition[] = [
   },
   { key: "us_vwap", label: "미국 당일 VWAP 상회", description: "AMS·NAS·NYS 관심종목의 당일 전체 세션 VWAP 비교", endpoint: "/api/admin/us-vwap-test", query: "" },
   { key: "us_bollinger_band", label: "미국 일봉 볼린저밴드 하단 이탈", description: "통합 티커 전체의 DB 완료 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/us-bollinger-band-test", query: "" },
+  { key: "us_bollinger_middle_lower", label: "미국 일봉 볼린저밴드 중단선~하단선", description: "통합 티커 전체의 DB 일봉 종가가 중단선과 하단선 사이인지 진단", endpoint: "/api/admin/us-bollinger-middle-lower-test", query: "" },
   { key: "kr_bollinger_band", label: "국내 일봉 볼린저밴드 하단 이탈", description: "국내 통합 티커 전체의 DB 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/kr-bollinger-band-test", query: "" },
   { key: "kr_instruments_sync", label: "국내 통합 티커 KIS 동기화", description: "KIS 국내 랭킹에서 국내 전용 통합 티커 테이블 UPSERT", endpoint: "/api/admin/kr-instruments-sync-test", query: "" },
   { key: "kr_daily_cache", label: "국내 일봉·시세 DB 갱신", description: "국내 통합 티커의 KIS 일봉과 시총·거래대금 원본 응답 저장", endpoint: "/api/admin/kr-daily-cache-test", query: "" },

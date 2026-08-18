@@ -16,6 +16,7 @@ export type UsBollingerPolicy = {
   minPrice: number;
   minVolume: number;
   minTurnoverRatio: number;
+  zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER";
 };
 
 export type BollingerPoint = {
@@ -34,7 +35,7 @@ export type UsBollingerResult = {
   market: string;
   code: string;
   name: string;
-  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
+  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "QUALIFIED_MIDDLE_TO_LOWER" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
@@ -81,8 +82,8 @@ export function calculateBollingerBands(candles: UsDailyCandle[], period = DEFAU
   return points;
 }
 
-export async function loadUsBollingerPolicy(): Promise<UsBollingerPolicy> {
-  const settings = await loadFeatureModuleSettings("us-bollinger-band");
+export async function loadUsBollingerPolicy(moduleKey: "us-bollinger-band" | "us-bollinger-middle-lower" = "us-bollinger-band"): Promise<UsBollingerPolicy> {
+  const settings = await loadFeatureModuleSettings(moduleKey);
   const policy = settings.featureSettings?.bollingerPolicy as Partial<UsBollingerPolicy> | undefined;
   return {
     timeframe: policy?.timeframe === "W" || policy?.timeframe === "M" ? policy.timeframe : "D",
@@ -91,6 +92,7 @@ export async function loadUsBollingerPolicy(): Promise<UsBollingerPolicy> {
     minPrice: Math.max(0, Number(policy?.minPrice ?? 0)),
     minVolume: Math.max(0, Number(policy?.minVolume ?? 0)),
     minTurnoverRatio: Math.max(0, Number(policy?.minTurnoverRatio ?? 0)),
+    zone: policy?.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
   };
 }
 
@@ -114,8 +116,9 @@ async function loadTurnoverMetrics(items: Array<{ market: string; code: string }
   return metrics;
 }
 
-export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsBollingerPolicy>; concurrency?: number; context?: UsDailyScanContext } = {}) {
-  const configured = options.policy ? { ...(await loadUsBollingerPolicy()), ...options.policy } : await loadUsBollingerPolicy();
+export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsBollingerPolicy>; concurrency?: number; context?: UsDailyScanContext; moduleKey?: "us-bollinger-band" | "us-bollinger-middle-lower" } = {}) {
+  const moduleKey = options.moduleKey ?? "us-bollinger-band";
+  const configured = options.policy ? { ...(await loadUsBollingerPolicy(moduleKey)), ...options.policy } : await loadUsBollingerPolicy(moduleKey);
   const policy: UsBollingerPolicy = {
     timeframe: configured.timeframe === "W" || configured.timeframe === "M" ? configured.timeframe : "D",
     period: Math.max(2, Math.floor(Number(configured.period))),
@@ -123,6 +126,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     minPrice: Math.max(0, Number(configured.minPrice)),
     minVolume: Math.max(0, Number(configured.minVolume)),
     minTurnoverRatio: Math.max(0, Number(configured.minTurnoverRatio)),
+    zone: configured.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
   };
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
   const commonSettings = await loadUsTurnoverFilterSettings();
@@ -158,8 +162,9 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const commonTurnoverPass = isTurnoverRatioAllowed(metric?.turnoverRatio, commonSettings);
         const passesFilters = pricePass && volumePass && turnoverPass && commonMarketCapPass && commonTurnoverPass;
         const touchState = !latest ? "NONE" : latest.close < latest.lower ? "BELOW" : latest.close <= latest.lower ? "TOUCH" : "NONE";
-        const qualifies = Boolean(latest && passesFilters && touchState !== "NONE");
-        const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters ? "FILTERED" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
+        const inMiddleToLower = Boolean(latest && latest.close >= latest.lower && latest.close <= latest.middle);
+        const qualifies = Boolean(latest && passesFilters && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
+        const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters ? "FILTERED" : qualifies && policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : !commonMarketCapPass ? "COMMON_MARKET_CAP_FILTER" : !commonTurnoverPass ? "COMMON_TURNOVER_RATIO_FILTER" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, filter: { minPrice: pricePass, minVolume: volumePass, minTurnoverRatio: turnoverPass, commonMarketCap: commonMarketCapPass, commonTurnoverRatio: commonTurnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
       } catch (error) {
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status: "FAILED", qualifies: false, touchState: "NONE", candleCount: 0, latestCandleDate: null, close: null, volume: null, marketCap: null, turnoverRatio: null, band: null, filter: { minPrice: false, minVolume: false, minTurnoverRatio: false, commonMarketCap: false, commonTurnoverRatio: false }, error: error instanceof Error ? error.message : String(error) });
@@ -175,11 +180,11 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_daily_price_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", touchRule: "최근 봉 종가 <= 하단선", commonFilter: { source: "us_turnover_filter_settings", globalMinMarketCap: commonSettings.globalMinMarketCap, globalMaxMarketCap: commonSettings.globalMaxMarketCap, minTurnoverRatio: commonSettings.minTurnoverRatio, maxTurnoverRatio: commonSettings.maxTurnoverRatio } },
+    dataPolicy: { source: "us_daily_price_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", commonFilter: { source: "us_turnover_filter_settings", globalMinMarketCap: commonSettings.globalMinMarketCap, globalMaxMarketCap: commonSettings.globalMaxMarketCap, minTurnoverRatio: commonSettings.minTurnoverRatio, maxTurnoverRatio: commonSettings.maxTurnoverRatio } },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
     failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,
-    statistics: { qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length, qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length, filtered: results.filter((r) => r.status === "FILTERED").length, insufficientHistory: results.filter((r) => r.status === "INSUFFICIENT_HISTORY").length, failed: results.filter((r) => r.status === "FAILED").length },
+    statistics: { qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length, qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length, qualifiedMiddleToLower: results.filter((r) => r.status === "QUALIFIED_MIDDLE_TO_LOWER").length, filtered: results.filter((r) => r.status === "FILTERED").length, insufficientHistory: results.filter((r) => r.status === "INSUFFICIENT_HISTORY").length, failed: results.filter((r) => r.status === "FAILED").length },
     filterExcludedCount: results.filter((result) => result.status === "FILTERED").length,
     qualified: results.filter((result) => result.qualifies),
     results,
