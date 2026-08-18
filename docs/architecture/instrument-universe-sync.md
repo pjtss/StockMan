@@ -243,8 +243,17 @@ instrument_sync_runs
 
 ```text
 POST /api/admin/instrument-universe-import
-body: { "sourceDirectory": "..." }
+Content-Type: multipart/form-data
+
+fields:
+  kospi_code.mst
+  kosdaq_code.mst
+  NASMST.COD
+  NYSMST.COD
+  AMSMST.COD
 ```
+
+운영 관리자에서는 5개 파일을 직접 업로드한다. 서버는 임시 디렉터리에 저장한 뒤 파싱·검증·bulk upsert를 실행한다. 서버 디렉터리를 지정하는 JSON 방식은 내부 자동화와 로컬 테스트용 fallback으로만 유지한다.
 
 `sourceDirectory`에는 다음 5개 파일이 있어야 한다.
 
