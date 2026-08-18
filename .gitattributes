@@ -1,0 +1,3 @@
+# KIS instrument master files are source data; preserve their original bytes.
+docs/references/kis-instrument-masters/**/*.mst -text
+docs/references/kis-instrument-masters/**/*.COD -text
