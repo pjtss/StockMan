@@ -47,7 +47,7 @@ export async function getHealthSnapshot() {
   if (database.connected && database.checkedTables.includes("automation_runs")) {
     try {
       const result = await getPool().query<{ module_key: string; status: string; started_at: Date; finished_at: Date | null; error_message: string | null }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message FROM automation_runs ORDER BY module_key, started_at DESC");
-      automation = Object.fromEntries(result.rows.map((row) => [row.module_key, { status: row.status, startedAt: row.started_at?.toISOString() ?? null, finishedAt: row.finished_at?.toISOString() ?? null, error: row.error_message }]));
+      automation = Object.fromEntries(result.rows.map((row) => { const startedAt = row.started_at?.toISOString() ?? null; const finishedAt = row.finished_at?.toISOString() ?? null; const durationMs = startedAt && finishedAt ? Math.max(0, new Date(finishedAt).getTime() - new Date(startedAt).getTime()) : null; return [row.module_key, { status: row.status, startedAt, finishedAt, durationMs, durationSeconds: durationMs == null ? null : Number((durationMs / 1000).toFixed(2)), error: row.error_message }]; }));
       const cacheModules = ["us-daily-cache", "us-daily-open-cache", "kr-daily-cache", "us-free-float", "us-product-classification"];
       const latest = await getPool().query<{ module_key: string; status: string; started_at: Date; finished_at: Date | null; error_message: string | null }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message FROM automation_runs WHERE module_key = ANY($1) AND status <> 'SKIPPED' ORDER BY module_key, started_at DESC", [cacheModules]);
       const latestByModule = new Map(latest.rows.map((row) => [row.module_key, row]));
@@ -58,7 +58,10 @@ export async function getHealthSnapshot() {
         const ageSeconds = startedAtMs == null ? null : Math.max(0, Math.round((Date.now() - startedAtMs) / 1000));
         const intervalSeconds = settings?.intervalSeconds ?? null;
         const stale = Boolean(settings?.enabled && ageSeconds != null && intervalSeconds != null && ageSeconds > intervalSeconds * 2);
-        cacheAutomation[moduleKey] = { enabled: settings?.enabled ?? null, intervalSeconds, status: row?.status ?? "NEVER_RUN", startedAt: row?.started_at?.toISOString() ?? null, finishedAt: row?.finished_at?.toISOString() ?? null, ageSeconds, stale, error: row?.error_message ?? null };
+        const startedAt = row?.started_at?.toISOString() ?? null;
+        const finishedAt = row?.finished_at?.toISOString() ?? null;
+        const durationMs = startedAt && finishedAt ? Math.max(0, new Date(finishedAt).getTime() - new Date(startedAt).getTime()) : null;
+        cacheAutomation[moduleKey] = { enabled: settings?.enabled ?? null, intervalSeconds, status: row?.status ?? "NEVER_RUN", startedAt, finishedAt, durationMs, durationSeconds: durationMs == null ? null : Number((durationMs / 1000).toFixed(2)), ageSeconds, stale, error: row?.error_message ?? null };
       }
     } catch (error) { console.warn("[Health] automation status unavailable:", error instanceof Error ? error.message : error); }
   }
