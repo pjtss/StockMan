@@ -27,6 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run quality gates
+        run: |
+          npm test -- --run
+          npm run typecheck
+          npm run docs:check
+          npm run cron:check
+          bash -n scripts/oci-cron.sh
+
       - name: Build Next.js standalone
         env:
           STOCKMAN_BUILD_VERSION: ${{ github.sha }}

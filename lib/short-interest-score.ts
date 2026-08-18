@@ -8,8 +8,9 @@ export function scoreShortInterest(metric: ShortInterestMetric): ShortInterestSc
   let score = 0;
   const reasons: string[] = [];
   if (metric.shortVolumeRatio != null) {
-    if (metric.shortVolumeRatio >= 50) { score += 2; reasons.push("일별 공매도 거래량 비율 50% 이상"); }
-    else if (metric.shortVolumeRatio >= 30) { score += 1; reasons.push("일별 공매도 거래량 비율 30% 이상"); }
+    // Contract: ratios are stored as fractions (0.25 = 25%).
+    if (metric.shortVolumeRatio >= 0.5) { score += 2; reasons.push("일별 공매도 거래량 비율 50% 이상"); }
+    else if (metric.shortVolumeRatio >= 0.3) { score += 1; reasons.push("일별 공매도 거래량 비율 30% 이상"); }
   }
   if (metric.daysToCover != null) {
     if (metric.daysToCover >= 5) { score += 2; reasons.push("Days to Cover 5일 이상"); }

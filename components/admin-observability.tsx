@@ -17,6 +17,8 @@ type Run = {
   errorMessage?: string | null;
 };
 
+type CompletionNotification = { sent?: boolean; skipped?: boolean; reason?: string; error?: string };
+
 type Module = {
   key: string;
   label: string;
@@ -48,6 +50,18 @@ function summarize(run: Run | undefined) {
   if (run.errorMessage) return run.errorMessage;
   const entries = Object.entries(run.summary || {}).slice(0, 3);
   return entries.length ? entries.map(([key, value]) => `${key}: ${String(value)}`).join(" · ") : "요약 정보 없음";
+}
+
+function completionStatus(run: Run | undefined) {
+  const value = run?.summary?.notifications;
+  const completion = value && typeof value === "object" && "completion" in value
+    ? (value as { completion?: CompletionNotification }).completion
+    : undefined;
+  if (!completion) return null;
+  if (completion.sent) return "Discord 완료 알림 전송됨";
+  if (completion.reason === "delivery_failed") return `Discord 완료 알림 실패${completion.error ? `: ${completion.error}` : ""}`;
+  if (completion.skipped) return `Discord 완료 알림 건너뜀${completion.reason ? ` (${completion.reason})` : ""}`;
+  return "Discord 완료 알림 미전송";
 }
 
 export function AdminObservability() {
@@ -124,6 +138,7 @@ export function AdminObservability() {
                   <div><dt>실행 건수</dt><dd>{module.runCount ?? module.runs.length}건</dd></div>
                 </dl>
                 <p className={styles.preview}>{latest ? summarize(latest) : notScheduled ? "이 모듈은 자동 예약 대상이 아닙니다." : "아직 실행 이력이 없습니다."}</p>
+                {completionStatus(latest) && <p className={styles.moduleMeta}>{completionStatus(latest)}</p>}
                 <button className={styles.detailButton} onClick={() => setSelected(module)}>
                   <Eye size={15} /> 상세 결과 보기
                 </button>

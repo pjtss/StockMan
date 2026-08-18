@@ -3,3 +3,21 @@ node_modules
 npm-debug.log*
 .env.local
 .env*.local
+.env.template
+
+# Local build and TypeScript caches
+tsconfig.tsbuildinfo
+
+# Local server/debug output
+*.log
+*.log.*
+*-debug.json
+ops-refresh-debug.json
+
+# One-off data exports and rerun artifacts
+float-rerun-*.json
+free-float-inventory-*.csv
+
+# Local IDE metadata
+.idea/
+.vscode/

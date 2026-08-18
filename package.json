@@ -9,7 +9,10 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "docs:check": "node scripts/check-docs.mjs"
+    "docs:check": "node scripts/check-docs.mjs",
+    "cron:check": "node scripts/check-oci-cron.mjs",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run cron:check && npm run build"
   },
   "dependencies": {
     "@netlify/functions": "^5.2.0",

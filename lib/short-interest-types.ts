@@ -2,6 +2,7 @@ export type ShortInterestMetric = {
   ticker: string;
   shortVolume: number | null;
   totalVolume: number | null;
+  /** Fractional ratio: 0.25 means 25%. Presentation layers multiply by 100. */
   shortVolumeRatio: number | null;
   shortInterest: number | null;
   daysToCover: number | null;

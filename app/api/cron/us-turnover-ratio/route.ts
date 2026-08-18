@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ensureSchema } from "@/lib/db";
 import { runUsTurnoverRatioAutomation } from "@/lib/us-turnover-ratio-automation";
 import { withAutomationLock } from "@/lib/automation-lock";
+import { withAutomationRun } from "@/lib/automation-run";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ async function handleUsTurnoverRatio(request: Request) {
 
   try {
     await ensureSchema();
-    const data = await withAutomationLock("us-turnover-ratio", runUsTurnoverRatioAutomation);
+    const data = await withAutomationRun("us-turnover-ratio", () => withAutomationLock("us-turnover-ratio", runUsTurnoverRatioAutomation));
     return NextResponse.json({ ok: true, data: data ?? { skipped: true, reason: "already_running", sent: 0 } });
   } catch (error) {
     console.error("[OCI Cron] US turnover ratio failed:", error);

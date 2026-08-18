@@ -7,6 +7,7 @@ export type FeatureSpecificSettings = {
   shortBorrowPolicy?: Record<string, unknown>;
   evaluation?: Record<string, string | number | boolean>;
   discordFormat?: Record<string, string | number | boolean>;
+  automationCompletion?: { enabled?: boolean; webhookUrl?: string };
   marketRss?: { enabledSources?: string[] };
   secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
   vwapPolicy?: { minAbovePercent: number; minVolume: number; minTradeValue: number; minPointCount: number; minTurnoverRatio: number; requireComplete: boolean };

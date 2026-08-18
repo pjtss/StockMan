@@ -1,5 +1,28 @@
 # Development
 
+## 2026-08-18
+- **[자동 수집 완료 알림 범위 확장]** 국내·해외 일봉 캐시뿐 아니라 해외 유통주 갱신과 상품분류 갱신도 동일한 완료 요약 계약과 관리자 설정을 사용하도록 통합했다. 수집 작업별 성공·실패·건수·소요 시간을 한 채널에서 확인할 수 있으며, 개별 모듈 설정이 환경변수 fallback보다 우선한다.
+- **[완료 알림 관측성 보강]** 자동화 실행 이력의 `summary.notifications.completion`에 완료 Webhook의 전송·건너뜀·실패 결과를 함께 기록한다. 데이터 수집은 성공했지만 Discord 전송만 실패한 경우를 실행 실패와 구분할 수 있다.
+- **[관리자 관측성 UI]** `/admin/observability` 기능 카드에 최근 완료 Webhook 상태를 간단히 표시하고, 상세 모달에서는 기존 원본 JSON으로 전송 실패 원인까지 확인할 수 있게 했다.
+- **[Webhook 장애 격리]** 자동 수집 완료 Webhook 요청에 10초 제한시간을 적용해 Discord 지연·장애가 DB 캐시 작업과 자동화 종료를 붙잡지 않도록 했다. 전송 실패는 실행 이력의 알림 상태로 기록된다.
+- **[완료 알림 회귀 테스트]** 지원 모듈 판정, 모듈별 Webhook 우선순위, 환경변수 fallback, 요약 payload를 자동 테스트해 완료 알림 계약의 변경을 검증한다.
+- **[실행 이력 저장량 최적화]** `automation_runs.summary`에는 전체 스캐너 배열을 저장하지 않고 배열 건수·최대 3개 샘플·문자열 상한·깊이 제한을 적용한다. API 응답 원본은 변경하지 않으면서 DB 증가와 관측성 조회 비용을 줄인다.
+- **[작업 트리 위생]** 로컬 로그·빌드 캐시·일회성 재검증 산출물·IDE 메타데이터를 `.gitignore`에 명시해 운영 코드와 디버깅 산출물이 섞이지 않도록 했다. 기존 파일은 삭제하지 않는다.
+- **[표준 품질 게이트]** `npm run verify`를 추가해 전체 테스트·TypeScript·문서/마이그레이션 검사·프로덕션 빌드를 동일한 순서로 실행하도록 표준화했다.
+- **[문서 진입점 검증]** 문서 검사 목록에 프로젝트 아키텍처 기준 문서를 포함해 구조 문서가 삭제·누락된 상태로 배포되지 않도록 했다.
+- **[기획 기준선]** 기능별 데이터 출처·자동화·알림·관리자 책임과 P0/P1/P2 개선 우선순위를 `docs/architecture/feature-inventory.md`에 고정했다.
+- **[Health 결과 지표]** `/api/health`의 자동화·캐시 상태에 마지막 실행의 처리·성공·실패·저장 캔들·전송 건수 요약을 추가해 상태뿐 아니라 갱신 품질도 바로 확인할 수 있게 했다.
+- **[Health 화면 지표]** `/health-check`의 최근 자동화 목록에도 위 결과 지표를 표시해 API를 직접 열지 않고도 갱신 품질을 확인할 수 있게 했다.
+- **[OCI 배포 품질 게이트]** GitHub Actions OCI 배포 전에 전체 테스트·TypeScript·문서/마이그레이션 검사를 실행하도록 추가했다. 검증 실패 시 standalone 산출물 생성과 서버 활성화를 진행하지 않는다.
+- **[OCI cron 문법 검증]** 동일한 배포 게이트에서 `bash -n scripts/oci-cron.sh`를 실행해 예약 실행 스크립트의 문법 오류를 사전에 차단한다.
+- **[OCI cron 교차 플랫폼 검증]** `npm run cron:check`로 endpoint·timeout·라벨 중복을 Node에서 검사하고, Ubuntu에서는 추가로 Bash 문법 검사를 수행한다.
+- **[자동화 실행 이력 커버리지]** OCI cron에 등록되어 있던 `us-turnover-ratio`와 DART `sync-filings` 경로도 공통 `withAutomationRun`으로 감싸 실행·실패·소요 시간을 관리자 관측성에 남기도록 보강했다.
+- **[공매도 데이터 계약 통일]** FINRA `shortVolumeRatio`를 저장·점수 계산 모두 소수 비율로 통일했다(`0.25 = 25%`). Discord/UI에서만 퍼센트로 변환하며, 회귀 테스트를 추가했다.
+- **[운영 데이터 무결성]** DART 과거 공시 조회에서 DB가 비었을 때 반환하던 가짜 공시를 제거하고, 빈 배열과 구조화된 `x-debug-status=empty`를 반환하도록 변경했다.
+- **[구조 문서화]** 전체 수집·캐시·필터·신호·전달 계층과 데이터 계약을 `docs/architecture/project-architecture.md`에 기록했다.
+- **[운영 관측성]** `/api/health`와 `/health-check`에 OCI cron 등록 기능과 실제 실행 이력의 커버리지를 추가해 미실행 자동화를 식별할 수 있게 했다. 완료 알림 Webhook 환경변수 상태도 health 환경 점검에 포함했다.
+- **[일봉 통합 판정]** 기존 OBV·ADL·MACD·DMI·MFI·돌파 결과를 변경하지 않고 티커 기준 통합 점수와 A/B/C 등급을 `runUsDailyFilterRefresh` 결과에 추가했다. 점수는 돌파 25, OBV 20, ADL 20, MACD 15, DMI 10, MFI 10이며 매수 추천이 아닌 신호 동시 충족 요약이다.
+
 ## 2026-08-08
 - **[SEC/RSS 파이프라인 통합]** SEC EDGAR RSS 중복 자동화를 제거하고 역할을 분리했다.
   - `market-rss`가 GlobeNewswire·NASDAQ·NASDAQ Trader·SEC EDGAR·StockTitan RSS를 수집·정규화·분류·번역·Discord 전송하는 유일한 RSS 자동화 경로가 된다.
