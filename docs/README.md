@@ -24,6 +24,7 @@
 - 볼린저밴드 탐지 계약: [`bollinger-band-operations.md`](./bollinger-band-operations.md)
 - 관리자 모듈 그룹: [`admin-module-groups.md`](./admin-module-groups.md)
 - 외부 공식 문서 인덱스: [`references/README.md`](./references/README.md)
+- KIS 종목 마스터 원본 보관소: [`references/kis-instrument-masters/README.md`](./references/kis-instrument-masters/README.md)
 
 ## 문서 원칙
 
