@@ -39,6 +39,17 @@ describe("automation completion Discord notification", () => {
     expect(String(init.body)).toContain("소요 시간: 1.50초");
   });
 
+  it("retries transient Discord failures and reports the attempt count", async () => {
+    mocks.loadFeatureModuleSettings.mockResolvedValue({ featureSettings: { automationCompletion: { enabled: true, webhookUrl: "https://discord.example/webhook" } } });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(notifyAutomationCompletion("us-daily-cache", "SUCCESS", {})).resolves.toMatchObject({ sent: true, attempts: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("uses the environment fallback when the module webhook is empty", async () => {
     vi.stubEnv("AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL", "https://discord.example/fallback");
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));

@@ -27,18 +27,31 @@ function resultSummary(summary: Record<string, unknown>) {
 }
 
 async function postCompletionWebhook(url: string, body: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    return await fetch(`${url}${url.includes("?") ? "&" : "?"}wait=true`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
+  const maxAttempts = 3;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}wait=true`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        signal: controller.signal,
+      });
+      if (response.ok || (response.status >= 400 && response.status < 500 && response.status !== 429) || attempt === maxAttempts) {
+        return { response, attempts: attempt };
+      }
+      lastError = new Error(`Discord HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
   }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, status: "SUCCESS" | "FAILED", summary: Record<string, unknown>, errorMessage?: string) {
@@ -76,7 +89,7 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
     errorMessage ? `오류: ${errorMessage}` : null,
     `완료 시각: ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
   ].filter(Boolean).join("\n");
-  const response = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content: lines.slice(0, 1900), allowed_mentions: { parse: [] } }));
-  if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
-  return { sent: true, skipped: false, configured: true };
+  const delivered = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content: lines.slice(0, 1900), allowed_mentions: { parse: [] } }));
+  if (!delivered.response.ok) throw new Error(`Discord HTTP ${delivered.response.status}`);
+  return { sent: true, skipped: false, configured: true, attempts: delivered.attempts };
 }
