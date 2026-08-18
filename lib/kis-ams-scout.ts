@@ -2,6 +2,7 @@ import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
+import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
 
 export type AmsScoutCandidate = {
   symb: string;
@@ -180,9 +181,9 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
 
     const reason = [
       `거래대금순위 ${row.rank}`,
-      `당일 거래대금 ${tradeAmount.toLocaleString()}`,
-      `시총 대비 ${marketCap !== null && marketCap > 0 ? marketCapRatio.toFixed(4) : "N/A"}`,
-      `최근 5분 거래대금 ${minute5.toLocaleString()}`,
+      `당일 거래대금 ${formatDisplayNumber(tradeAmount)}`,
+      `시총 대비 ${marketCap !== null && marketCap > 0 ? formatDisplayPercent(marketCapRatio) : "N/A"}`,
+      `최근 5분 거래대금 ${formatDisplayNumber(minute5)}`,
     ];
 
     const score = Math.round(

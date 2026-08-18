@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Clipboard, Eye, RefreshCw } from "lucide-react";
 import { AdminModal } from "@/components/admin-modal";
+import { formatDisplayCurrency } from "@/lib/display-number";
 import {
   MARKET_RSS_GRADE_LABELS,
   type MarketRssGrade,
@@ -154,7 +155,7 @@ export function AdminStockTitanRss() {
               <p className={styles.original}>{article.title}</p>
               <div className={styles.meta}>
                 <span>{article.detectedTicker ? `티커 ${article.detectedTicker}` : "티커 미추출"}</span>
-                <span>{article.eventDirection || "NEUTRAL"}{article.financingAmountUsd ? ` · $${article.financingAmountUsd.toLocaleString()}` : ""}</span>
+                <span>{article.eventDirection || "NEUTRAL"}{article.financingAmountUsd ? ` · ${formatDisplayCurrency(article.financingAmountUsd)}` : ""}</span>
                 <span>번역 {article.translationStatus}</span>
                 <span>전송 {article.notificationStatus}</span>
               </div>

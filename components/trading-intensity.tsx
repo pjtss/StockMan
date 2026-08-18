@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { StockIntensity } from "@/lib/kis";
 import styles from "./trading-intensity.module.css";
 import { ChartModal } from "./chart-modal";
+import { formatDisplayPercent } from "@/lib/display-number";
 
 export function TradingIntensity() {
   const [items, setItems] = useState<StockIntensity[]>([]);
@@ -57,7 +58,7 @@ export function TradingIntensity() {
               <span className={styles.rank}>{item.rank}</span>
               <div className={styles.info}>
                 <span className={styles.name}>{item.company}</span>
-                <span className={styles.intensity}>{item.intensity.toFixed(1)}%</span>
+                <span className={styles.intensity}>{formatDisplayPercent(item.intensity)}</span>
               </div>
               <div className={styles.priceInfo}>
                 <span className={styles.price}>{item.price}</span>

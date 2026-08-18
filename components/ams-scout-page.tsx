@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageNavigation } from "@/components/page-navigation";
 import styles from "@/components/us-turnover-trend.module.css";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
+import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
 
 type Candidate = {
   symb: string;
@@ -96,13 +97,13 @@ export function AmsScoutPage() {
                 </div>
 
                 <div className={styles.panel} style={{ padding: 14 }}>
-                  <div className={styles.meta}>현재가 {item.price.toLocaleString()} | 등락률 {item.changeRate.toFixed(2)}%</div>
+                  <div className={styles.meta}>현재가 {formatDisplayNumber(item.price)} | 등락률 {formatDisplayPercent(item.changeRate)}</div>
                   <div className={styles.meta}>
                     당일 거래대금 {formatMoney(item.tradeAmount)} | 시총{" "}
                     {item.marketCap ? formatMoney(item.marketCap) : "조회 실패"}
                   </div>
                   <div className={styles.meta}>최근 1분 {formatMoney(item.minuteTradeAmount)} · 3분 {formatMoney(item.minuteTradeAmount3m)} · 5분 {formatMoney(item.minuteTradeAmount5m)}</div>
-                  <div className={styles.meta}>전일 거래량 {item.prevVolume.toLocaleString()} | 전일 거래대금 {formatMoney(item.prevTradeAmount)}</div>
+                  <div className={styles.meta}>전일 거래량 {formatDisplayNumber(item.prevVolume)} | 전일 거래대금 {formatMoney(item.prevTradeAmount)}</div>
                 </div>
 
                 <div className={styles.panel} style={{ padding: 14 }}>

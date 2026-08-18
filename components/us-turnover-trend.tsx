@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PageNavigation } from "@/components/page-navigation";
 import styles from "./us-turnover-trend.module.css";
 import { formatKoreanCompact } from "@/lib/korean-number-format";
+import { formatDisplayNumber } from "@/lib/display-number";
 
 type TrendPoint = {
   index: number;
@@ -229,7 +230,7 @@ export function UsTurnoverTrend() {
                   className={styles.chart}
                 />
                 <div className={styles.raw}>
-                  {latest ? `현재가 ${latest.price.toLocaleString()} | 마지막 시점 ${latest.time || "N/A"}` : "데이터 없음"}
+                  {latest ? `현재가 ${formatDisplayNumber(latest.price)} | 마지막 시점 ${latest.time || "N/A"}` : "데이터 없음"}
                 </div>
               </section>
             );

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { getSectorSentiment } from "@/lib/sectors";
 import styles from "./sector-map.module.css";
+import { formatDisplayPercent } from "@/lib/display-number";
 
 interface SectorMapProps {
   items: any[];
@@ -42,7 +43,7 @@ export function SectorMap({ items }: SectorMapProps) {
                 <span className={styles.name}>{sector.name}</span>
                 {isHighStrength && <span className={styles.hotBadge}>🔥 HOT</span>}
               </div>
-              <span className={styles.count}>{sector.count}건 (호재율 {sector.strength.toFixed(0)}%)</span>
+              <span className={styles.count}>{sector.count}건 (호재율 {formatDisplayPercent(sector.strength)})</span>
               <div className={styles.barWrap}>
                  <div 
                    className={styles.bar} 
