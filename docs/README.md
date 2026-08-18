@@ -18,6 +18,7 @@
 
 - 코드 구조: [`architecture/code-structure.md`](./architecture/code-structure.md)
 - 전체 제품·데이터·자동화 구조: [`architecture/project-architecture.md`](./architecture/project-architecture.md)
+- 국내·해외 전체 종목 통합 유니버스 동기화 설계: [`architecture/instrument-universe-sync.md`](./architecture/instrument-universe-sync.md)
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
 - 볼린저밴드 탐지 계약: [`bollinger-band-operations.md`](./bollinger-band-operations.md)
