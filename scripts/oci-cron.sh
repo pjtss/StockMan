@@ -72,7 +72,6 @@ run_cron_endpoint "us-daily-open-cache" 300 "/api/cron/us-daily-open-cache"
 
 run_cron_endpoint "us-daily-breakout" 120 "/api/cron/us-daily-breakout"
 
-run_cron_endpoint "us-daily-indicators" 180 "/api/cron/us-daily-indicators"
 
 run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
 run_cron_endpoint "us-bollinger-middle-lower" 180 "/api/cron/us-bollinger-middle-lower"

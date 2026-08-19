@@ -39,7 +39,6 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "kr-bollinger-middle-lower", label: "국내 일봉 볼린저밴드 중단선~하단선", description: "국내 유니버스의 최신 저장 일봉 종가가 중단선과 하단선 사이인 종목 탐지", settingsPath: "/admin/modules/kr-bollinger-middle-lower", scheduler: "OCI_CRON" },
   { key: "kr-daily-cache", label: "국내 일봉 캐시 갱신", description: "KIS 국내 유니버스·일봉·시세 지표 DB 갱신", settingsPath: "/admin/modules/kr-daily-cache", scheduler: "OCI_CRON" },
   { key: "us-breaking-news-forwarder", label: "해외 속보 Discord 전달", description: "KIS 해외 속보 원문을 별도 Discord 채널로 전달", settingsPath: "/admin/modules/us-breaking-news-forwarder", scheduler: "OCI_CRON" },
-  { key: "us-daily-indicators", label: "일봉 지표 알림", description: "MFI·DMI·MACD·OBV 일봉 후보 통합 알림", settingsPath: "/admin/modules/us-daily-indicators", scheduler: "OCI_CRON" },
   { key: "us-daily-cache", label: "일봉 캐시 갱신", description: "미국 일봉 데이터 DB 갱신", settingsPath: "/admin/modules/us-daily-cache", scheduler: "OCI_CRON" },
   { key: "us-daily-open-cache", label: "당일 시가 갱신", description: "미국 현재 세션 시가를 DB에 1시간마다 갱신", settingsPath: "/admin/modules/us-daily-open-cache", scheduler: "OCI_CRON" },
   { key: "us-daily-breakout", label: "일봉 돌파 자동화", description: "최근 고가 돌파 후보 탐지·알림", settingsPath: "/admin/modules/us-daily-breakout", scheduler: "OCI_CRON" },
