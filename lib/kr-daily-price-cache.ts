@@ -16,7 +16,7 @@ export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string
   for (const row of rows) {
     const key = `${row.market}:${row.code}`;
     const candles = result.get(key) ?? [];
-    if (candles.length < limit) candles.push({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume });
+    if (candles.length < limit) candles.push({ date: row.candleDate, open: row.open ?? 0, high: row.high ?? 0, low: row.low ?? 0, close: row.close ?? 0, volume: row.volume ?? 0 });
     result.set(key, candles);
   }
   return result;

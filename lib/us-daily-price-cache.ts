@@ -87,7 +87,7 @@ export async function loadCachedUsDailyCandles(market: string, code: string, lim
   const db = getDb();
   if (!db) return [];
   const rows = await db.select().from(usInstrumentUniverseCandles).where(and(eq(usInstrumentUniverseCandles.market, market), eq(usInstrumentUniverseCandles.code, code), eq(usInstrumentUniverseCandles.timeframe, timeframe))).orderBy(desc(usInstrumentUniverseCandles.candleDate)).limit(limit);
-  const candles = rows.map((row) => ({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } }));
+    const candles = rows.map((row) => ({ date: row.candleDate, open: row.open ?? 0, high: row.high ?? 0, low: row.low ?? 0, close: row.close ?? 0, volume: row.volume ?? 0, raw: { source: row.source, cached: true } }));
   memoryCache.set(cacheKey, { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
   return candles.slice(0, limit);
 }
