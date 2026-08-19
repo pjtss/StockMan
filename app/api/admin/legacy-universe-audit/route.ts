@@ -13,6 +13,11 @@ const LEGACY_TABLES = [
   "us_news_ticker_exchange_cache", "us_news_radar_events", "us_short_metrics",
   "us_short_interest_snapshots", "short_borrow_snapshots",
 ] as const;
+const ACTIVE_TABLES = [
+  "kr_instrument_universe", "us_instrument_universe",
+  "kr_instrument_universe_candles", "us_instrument_universe_candles",
+  "instrument_universe_sync_runs", "instrument_candle_cache_failures",
+] as const;
 
 export async function GET() {
   const startedAt = Date.now();
@@ -24,7 +29,21 @@ export async function GET() {
     const fkRows = await db.execute(sql`SELECT tc.table_name, kcu.column_name, ccu.table_name AS referenced_table, ccu.column_name AS referenced_column, tc.constraint_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND ccu.table_schema = 'public' AND ccu.table_name = ANY(${tableNames}) ORDER BY tc.table_name, tc.constraint_name`);
     const references = fkRows.rows;
     const existingTables = tableRows.rows.filter((row) => row.exists === true || row.exists === "t");
-    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, legacyTables: tableRows.rows, foreignKeys: references, safeToDrop: existingTables.length === 0 && references.length === 0, criteria: { legacyTables: [...LEGACY_TABLES], requiresZeroExistingTables: true, requiresZeroForeignKeys: true, note: "V70 DROP CASCADE 적용 후 레거시 테이블과 외래키가 모두 0인지 확인합니다." } });
+    const activeNames = ACTIVE_TABLES as readonly string[];
+    const activeRows = await db.execute(sql`SELECT t.table_name, EXISTS (SELECT 1 FROM information_schema.tables x WHERE x.table_schema = 'public' AND x.table_name = t.table_name) AS exists, CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables x WHERE x.table_schema = 'public' AND x.table_name = t.table_name) THEN (SELECT c.reltuples::bigint FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname = t.table_name) ELSE 0 END AS estimated_rows FROM unnest(${activeNames}::text[]) AS t(table_name)`);
+    const flywayRows = await db.execute(sql`SELECT version, description, installed_on FROM flyway_schema_history WHERE success = true ORDER BY installed_rank DESC LIMIT 1`);
+    const candleCounts = await db.execute(sql`SELECT 'US' AS scope, timeframe, COUNT(*)::bigint AS rows, COUNT(DISTINCT market || ':' || code)::bigint AS instruments FROM us_instrument_universe_candles GROUP BY timeframe UNION ALL SELECT 'KR' AS scope, timeframe, COUNT(*)::bigint AS rows, COUNT(DISTINCT market || ':' || code)::bigint AS instruments FROM kr_instrument_universe_candles GROUP BY timeframe ORDER BY scope, timeframe`);
+    const syncRuns = await db.execute(sql`SELECT id, scope, status, source_count, inserted_count, updated_count, deactivated_count, excluded_count, error_count, started_at, completed_at FROM instrument_universe_sync_runs ORDER BY started_at DESC LIMIT 10`);
+    const featureSettings = await db.execute(sql`SELECT module_key, settings, updated_at FROM feature_module_settings ORDER BY module_key`);
+    const activeExisting = activeRows.rows.filter((row) => row.exists === true || row.exists === "t");
+    const checks = {
+      legacyTablesRemoved: existingTables.length === 0,
+      noLegacyForeignKeys: references.length === 0,
+      activeTablesPresent: activeExisting.length === ACTIVE_TABLES.length,
+      flywayAvailable: flywayRows.rows.length > 0,
+      v70Applied: flywayRows.rows.some((row) => String(row.version) === "70"),
+    };
+    return NextResponse.json({ ok: Object.values(checks).every(Boolean), oneTime: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, checks, flyway: flywayRows.rows[0] ?? null, legacyTables: tableRows.rows, foreignKeys: references, activeTables: activeRows.rows, candleCounts: candleCounts.rows, latestSyncRuns: syncRuns.rows, featureSettings: featureSettings.rows, safeToDrop: checks.legacyTablesRemoved && checks.noLegacyForeignKeys, criteria: { legacyTables: [...LEGACY_TABLES], activeTables: [...ACTIVE_TABLES], requiredTimeframes: ["D", "W", "M"], requiresZeroExistingTables: true, requiresZeroForeignKeys: true, requiredFlywayVersion: "70" } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
   }
