@@ -74,6 +74,8 @@ const TESTS: ApiTestDefinition[] = [
   { key: "us_bollinger_middle_lower", label: "미국 일봉 볼린저밴드 중단선~하단선", description: "해외 유니버스 전체의 DB 일봉 종가가 중단선과 하단선 사이인지 진단", endpoint: "/api/admin/us-bollinger-middle-lower-test", query: "" },
   { key: "kr_bollinger_band", label: "국내 일봉 볼린저밴드 하단 이탈", description: "국내 유니버스 전체의 DB 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/kr-bollinger-band-test", query: "" },
   { key: "kr_bollinger_middle_lower", label: "국내 일봉 볼린저밴드 중단선~하단선", description: "국내 유니버스 전체의 DB 일봉 종가가 중단선과 하단선 사이인지 진단", endpoint: "/api/admin/kr-bollinger-middle-lower-test", query: "" },
+  { key: "kr_daily_ma9", label: "국내 일봉 9일선 위 종목", description: "국내 공식 보통주 유니버스의 최신 저장 일봉 종가가 9일 단순이동평균보다 높은지 진단", endpoint: "/api/admin/kr-daily-ma9-test", query: "" },
+  { key: "us_daily_ma9", label: "해외 일봉 9일선 위 종목", description: "해외 공식 보통주 유니버스의 최신 저장 일봉 종가가 9일 단순이동평균보다 높은지 진단", endpoint: "/api/admin/us-daily-ma9-test", query: "" },
   { key: "kr_daily_cache", label: "국내 일봉·시세 DB 갱신", description: "국내 유니버스의 KIS 일봉과 시총·거래대금 원본 응답 저장", endpoint: "/api/admin/kr-daily-cache-test", query: "" },
   {
     key: "us_trade_trend",
