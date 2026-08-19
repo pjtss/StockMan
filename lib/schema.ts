@@ -591,6 +591,15 @@ export const discordDeliveryQueue = pgTable("discord_delivery_queue", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const instrumentCandleCacheFailures = pgTable("instrument_candle_cache_failures", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code").notNull(),
+  timeframe: text("timeframe").notNull(),
+  error: text("error").notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("instrument_candle_cache_failures_lookup_idx").on(table.market, table.code, table.timeframe, table.observedAt), index("instrument_candle_cache_failures_recent_idx").on(table.observedAt)]);
+
 export const secCompanies = pgTable("sec_companies", {
   cik: text("cik").primaryKey(), name: text("name").notNull(), tickers: text("tickers").array().notNull().default(sql`'{}'::text[]`), exchanges: text("exchanges").array().notNull().default(sql`'{}'::text[]`), sic: text("sic"), sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

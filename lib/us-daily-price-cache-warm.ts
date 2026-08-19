@@ -3,6 +3,7 @@ import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
 
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
 
@@ -35,13 +36,19 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
           const daily = await fetchUsDailyPrice({ code: item.code, market: item.market, timeframe });
           if (!daily?.ok || daily.candles.length === 0) {
             itemSuccess = false;
-            failures.push({ market: item.market, code: item.code, error: `${timeframe}: ${!daily ? "KIS access token unavailable" : !daily.ok ? `KIS API failed (${daily.status})` : "KIS returned no candles"}` });
+            const error = `${timeframe}: ${!daily ? "KIS access token unavailable" : !daily.ok ? `KIS API failed (${daily.status})` : "KIS returned no candles"}`;
+            failures.push({ market: item.market, code: item.code, error });
+            await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error });
             continue;
           }
           candleCount += await saveUsDailyCandles(item.market, item.code, daily.candles, timeframe);
         }
         if (itemSuccess) successCount += 1;
-      } catch (error) { failures.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) }); }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push({ market: item.market, code: item.code, error: message });
+        for (const timeframe of dueTimeframes) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
+      }
       processedCount += 1;
       const elapsedMs = Date.now() - progressStarted;
       options.onProgress?.({ processedCount, totalCount: instruments.length, successCount, failureCount: failures.length, savedCandleCount: candleCount, lastCode: item.code, elapsedMs, etaMs: processedCount ? Math.round(elapsedMs / processedCount * (instruments.length - processedCount)) : null });

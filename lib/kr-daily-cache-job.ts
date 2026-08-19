@@ -3,6 +3,7 @@ import { loadStoredKrInstrumentScopes, syncKrInstrumentUniverseFromKis } from "@
 import { refreshKrDailyCandles, refreshKrMarketSnapshot } from "@/lib/kr-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -53,10 +54,20 @@ async function run(job: Job) {
           const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null, quote: quote ? { ok: quote.ok, status: quote.status, price: quote.price, volume: quote.volume, tradingValue: quote.tradingValue, marketCap: quote.marketCap, turnoverRatio: quote.turnoverRatio, error: quote.error, rawText: quote.rawText } : null };
           job.results.push(result);
           const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0) && result.quote?.ok === true;
-          if (success) job.successCount += 1; else job.failureCount += 1;
+          if (success) job.successCount += 1;
+          else {
+            job.failureCount += 1;
+            for (const timeframe of dueTimeframes) {
+              const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly;
+              if (Number(diagnostic?.parsedCandleCount ?? 0) <= 0) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: `${timeframe}: ${diagnostic?.msg1 ?? "KIS returned no candles"}` });
+            }
+            if (result.quote?.ok !== true) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe: "D", error: `quote: ${result.quote?.error ?? "KIS quote failed"}` });
+          }
         } catch (error) {
           job.failureCount += 1;
-          job.results.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) });
+          const message = error instanceof Error ? error.message : String(error);
+          job.results.push({ market: item.market, code: item.code, error: message });
+          for (const timeframe of dueTimeframes) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
         } finally {
           job.processedCount += 1;
           const elapsedMs = Date.now() - progressStartedAt;
