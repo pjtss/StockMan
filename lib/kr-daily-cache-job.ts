@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { loadStoredKrInstrumentScopes, syncKrInstrumentUniverseFromKis } from "@/lib/kr-instruments";
 import { refreshKrDailyCandles, refreshKrMarketSnapshot } from "@/lib/kr-daily-price-cache";
+import { sql } from "drizzle-orm";
+import { getDb } from "@/lib/db";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -15,6 +17,7 @@ type Job = {
   results: any[];
   error?: string;
   universeSync?: unknown;
+  dueTimeframes?: Array<"D" | "W" | "M">;
   progress?: { elapsedMs: number; etaMs: number | null; lastCode?: string };
 };
 
@@ -32,16 +35,22 @@ async function run(job: Job) {
     job.universeSync = await syncKrInstrumentUniverseFromKis();
     const { scopes } = await loadStoredKrInstrumentScopes();
     job.instrumentCount = scopes.length;
+    const nowMs = Date.now();
+    const freshness = { D: 12 * 60 * 60 * 1000, W: 3 * 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
+    const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM kr_daily_price_candles GROUP BY timeframe`);
+    const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
+    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
+    job.dueTimeframes = dueTimeframes;
     let cursor = 0;
     const worker = async () => {
       while (true) {
         const item = scopes[cursor++];
         if (!item) return;
         try {
-          const [daily, weekly, monthly, quote] = await Promise.all([refreshKrDailyCandles(item.code, "D"), refreshKrDailyCandles(item.code, "W"), refreshKrDailyCandles(item.code, "M"), refreshKrMarketSnapshot(item.code)]);
+          const [daily, weekly, monthly, quote] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D") : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W") : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M") : null, refreshKrMarketSnapshot(item.code)]);
           const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null, quote: quote ? { ok: quote.ok, status: quote.status, price: quote.price, volume: quote.volume, tradingValue: quote.tradingValue, marketCap: quote.marketCap, turnoverRatio: quote.turnoverRatio, error: quote.error, rawText: quote.rawText } : null };
           job.results.push(result);
-          const success = Number(result.daily?.parsedCandleCount ?? 0) > 0 && Number(result.weekly?.parsedCandleCount ?? 0) > 0 && Number(result.monthly?.parsedCandleCount ?? 0) > 0 && result.quote?.ok === true;
+          const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0) && result.quote?.ok === true;
           if (success) job.successCount += 1; else job.failureCount += 1;
         } catch (error) {
           job.failureCount += 1;
