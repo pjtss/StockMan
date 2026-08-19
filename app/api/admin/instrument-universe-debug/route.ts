@@ -14,11 +14,12 @@ export async function GET() {
       db.execute(sql`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE enabled)::int AS enabled, COUNT(*) FILTER (WHERE NOT enabled)::int AS disabled, COUNT(DISTINCT market)::int AS markets, COUNT(*) - COUNT(DISTINCT market || ':' || code)::int AS duplicate_keys FROM us_instrument_universe`),
       db.select().from(instrumentUniverseSyncRuns).orderBy(sql`${instrumentUniverseSyncRuns.startedAt} DESC`).limit(5),
     ]);
-    const [krMarkets, usMarkets] = await Promise.all([
+    const [krMarkets, usMarkets, krOfficial] = await Promise.all([
       db.execute(sql`SELECT market, COUNT(*)::int AS count FROM kr_instrument_universe GROUP BY market ORDER BY market`),
       db.execute(sql`SELECT market, COUNT(*)::int AS count FROM us_instrument_universe GROUP BY market ORDER BY market`),
+      db.execute(sql`SELECT security_group_code AS "securityGroupCode", etp_product_class_code AS "etpProductClassCode", preferred_class_code AS "preferredClassCode", trading_halt_code AS "tradingHaltCode", liquidation_code AS "liquidationCode", managed_issue_code AS "managedIssueCode", COUNT(*)::int AS count FROM kr_instrument_universe GROUP BY security_group_code, etp_product_class_code, preferred_class_code, trading_halt_code, liquidation_code, managed_issue_code ORDER BY count DESC, security_group_code LIMIT 500`),
     ]);
-    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, tables: { kr: kr.rows[0], us: us.rows[0] }, marketCounts: { kr: krMarkets.rows, us: usMarkets.rows }, recentSyncRuns: runs });
+    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, tables: { kr: kr.rows[0], us: us.rows[0] }, marketCounts: { kr: krMarkets.rows, us: usMarkets.rows }, officialKrClassification: krOfficial.rows, recentSyncRuns: runs });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
   }
