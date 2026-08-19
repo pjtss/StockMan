@@ -22,7 +22,6 @@ describe('PageNavigation Component', () => {
     expect(screen.getByText('홈')).toBeDefined();
     expect(screen.getByText('DART')).toBeDefined();
 
-    expect(screen.getByText('미국 상승률 TOP N')).toBeDefined();
   });
 
   it('highlights the active link', () => {

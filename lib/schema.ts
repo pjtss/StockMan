@@ -141,56 +141,6 @@ export const kisApiConfigs = pgTable(
   }
 );
 
-// 9. 미국 상승률 TOP N 설정
-export const usTopRisingConfig = pgTable(
-  "us_top_rising_config",
-  {
-    key: text("key").primaryKey(),
-    topN: integer("top_n").notNull().default(10),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  }
-);
-
-// 13. 상승률 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
-export const topRisingStocks = pgTable(
-  "top_rising_stocks",
-  {
-    code: text("code").primaryKey(),
-    company: text("company").notNull(),
-    changeRate: text("change_rate").notNull(),
-    price: text("price").notNull(),
-    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
-    instrumentId: bigint("instrument_id", { mode: "number" }),
-  }
-);
-
-// 14. 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
-export const topIntensityStocks = pgTable(
-  "top_intensity_stocks",
-  {
-    code: text("code").primaryKey(),
-    company: text("company").notNull(),
-    intensity: integer("intensity").notNull(),
-    price: text("price").notNull(),
-    changeRate: text("change_rate").notNull(),
-    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
-    instrumentId: bigint("instrument_id", { mode: "number" }),
-  }
-);
-// 15. 미국 주식 체결강도 상위 TOP 10 실시간 데이터 엔티티 (비교 및 갱신용)
-export const usIntensityStocks = pgTable(
-  "us_intensity_stocks",
-  {
-    code: text("code").primaryKey(),
-    company: text("company").notNull(),
-    intensity: integer("intensity").notNull(),
-    price: text("price").notNull(),
-    changeRate: text("change_rate").notNull(),
-    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
-    instrumentId: bigint("instrument_id", { mode: "number" }),
-  }
-);
-
 /** Canonical instrument membership for the turnover-trend watchlist. */
 export const usTurnoverWatchlist = pgTable("us_turnover_watchlist", {
   instrumentId: bigint("instrument_id", { mode: "number" }).primaryKey(),

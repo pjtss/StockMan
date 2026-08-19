@@ -20,13 +20,6 @@ describe('KIS API Module', () => {
       delete process.env.KIS_APPSECRET;
     });
 
-    it('returns mock trading intensity data', async () => {
-      const { fetchTradingIntensity } = await import('./kis');
-      const data = await fetchTradingIntensity();
-      expect(data).toHaveLength(10);
-      expect(data[0].company).toBe('가짜 종목 A');
-      expect(data[0].intensity).toBe(180);
-    });
 
     it('returns mock volume spike data', async () => {
       const { fetchVolumeSpike } = await import('./kis');
@@ -67,36 +60,6 @@ describe('KIS API Module', () => {
       expect(data).toHaveLength(10);
       expect(data[0].company).toBe('강호가 종목 1');
       expect(data[0].bidAskRatio).toBe(250);
-    });
-  });
-  describe('When credentials are set', () => {
-    it('handles successful access token lookup and returns full data', async () => {
-      process.env.KIS_APPKEY = 'test-key';
-      process.env.KIS_APPSECRET = 'test-secret';
-      
-      const { fetchTradingIntensity } = await import('./kis');
-
-      vi.mocked(fetch).mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ access_token: 'test-token' }),
-      } as any);
-
-      const intensity = await fetchTradingIntensity();
-      expect(intensity).toHaveLength(10);
-      expect(intensity[0].company).toBe('가짜 종목 A');
-    });
-
-    it('handles access token fetch failure and falls back to mock', async () => {
-      process.env.KIS_APPKEY = 'test-key';
-      process.env.KIS_APPSECRET = 'test-secret';
-      
-      const { fetchTradingIntensity } = await import('./kis');
-
-      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
-
-      const intensity = await fetchTradingIntensity();
-      expect(intensity).toHaveLength(10);
-      expect(intensity[0].company).toBe('가짜 종목 A');
     });
   });
 });
