@@ -7,7 +7,7 @@ describe("daily 9-day moving average detector", () => {
     const result = evaluateDailyMa9(candles, { market: "NAS", code: "TEST", name: "Test" });
     expect(result.status).toBe("ABOVE_MA9");
     expect(result.qualifies).toBe(true);
-    expect(result.ma9).toBeCloseTo(101.111111, 5);
+    expect(result.ema9).toBeCloseTo(102, 5);
   });
   it("does not qualify with fewer than nine valid candles", () => {
     const result = evaluateDailyMa9([{ date: "20260801", close: 100 }], { market: "KRX", code: "000001" });
