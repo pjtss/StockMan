@@ -19,6 +19,12 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM us_instrument_universe_candles GROUP BY timeframe`);
   const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
   const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
+  // A global MAX(fetched_at) cannot prove that every ticker has enough
+  // history. Backfill only symbols whose daily cache is below the scanner's
+  // minimum history, even when the normal daily timeframe is not due yet.
+  const underfilledDaily = new Set<string>();
+  const underfilled = await getDb().execute(sql`SELECT market, code FROM us_instrument_universe_candles WHERE timeframe = 'D' GROUP BY market, code HAVING COUNT(*) < 35`);
+  for (const row of underfilled.rows as Array<{ market: string; code: string }>) underfilledDaily.add(`${String(row.market).toUpperCase()}:${String(row.code).toUpperCase()}`);
   const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
   let cursor = 0;
   let successCount = 0;
@@ -32,7 +38,10 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
       if (!item) return;
       try {
         let itemSuccess = true;
-        for (const timeframe of dueTimeframes) {
+        for (const timeframe of (Object.keys(freshness) as Array<keyof typeof freshness>)) {
+          const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
+          const shouldFetch = dueTimeframes.includes(timeframe) || (timeframe === "D" && underfilledDaily.has(key));
+          if (!shouldFetch) continue;
           const daily = await fetchUsDailyPrice({ code: item.code, market: item.market, timeframe });
           if (!daily?.ok || daily.candles.length === 0) {
             itemSuccess = false;
@@ -57,7 +66,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
   const completedAt = new Date().toISOString();
   const durationMs = Date.parse(completedAt) - Date.parse(startedAt);
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures };
 }
 
 export function warmUsDailyPriceCache(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {
