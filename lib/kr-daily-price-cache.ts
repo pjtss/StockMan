@@ -27,8 +27,8 @@ export async function saveKrDailyCandles(market: string, code: string, candles: 
   return candles.length;
 }
 
-export async function refreshKrDailyCandles(code: string, timeframe: CandleTimeframe = "D") {
+export async function refreshKrDailyCandles(code: string, timeframe: CandleTimeframe = "D", market = "KOSPI") {
   const response = await fetchKrDailyPrice({ code, timeframe });
-  if (response?.ok && response.candles.length) await saveKrDailyCandles("KRX", code, response.candles, timeframe);
+  if (response?.ok && response.candles.length) await saveKrDailyCandles(market, code, response.candles, timeframe);
   return response;
 }

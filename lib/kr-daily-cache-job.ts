@@ -48,7 +48,7 @@ async function run(job: Job) {
         const item = scopes[cursor++];
         if (!item) return;
         try {
-          const [daily, weekly, monthly] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D") : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W") : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M") : null]);
+          const [daily, weekly, monthly] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D", item.market) : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W", item.market) : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M", item.market) : null]);
           const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null };
           job.results.push(result);
           const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0);
