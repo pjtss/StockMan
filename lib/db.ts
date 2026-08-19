@@ -38,7 +38,7 @@ export function getDb() {
 
 /**
  * Flyway가 모든 스키마 변경을 소유한다. 애플리케이션은 연결 가능 여부만
- * 확인하며, 런타임에 레거시 테이블을 재생성하거나 DDL을 실행하지 않는다.
+ * 확인하며, 런타임에 테이블을 재생성하거나 DDL을 실행하지 않는다.
  */
 export async function ensureSchema() {
   const client = await getPool().connect();
