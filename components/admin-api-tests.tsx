@@ -39,7 +39,7 @@ function collectRawResponses(value: unknown, path = "$", depth = 0, output: RawR
   return output;
 }
 
-type TestKey = "debug_suite" | "us_updown" | "us_price_detail" | "us_trade_trend" | "us_trade_collect" | "discord_ticker" | "kis_token" | "us_free_float" | "us_free_float_refresh" | "us_product_classification" | "short_interest" | "us_short_squeeze" | "us_turnover" | "us_intensity" | "us_top_rising" | "us_turnover_ratio" | "us_turnover_watchlist" | "us_vwap" | "us_bollinger_band" | "us_bollinger_middle_lower" | "kr_bollinger_band" | "kr_bollinger_middle_lower" | "kr_instruments_sync" | "kr_daily_cache" | "us_top100_upsert" | "us_obv" | "us_daily_obv" | "us_adl" | "us_mfi" | "us_macd" | "us_dmi" | "us_daily_breakout" | "us_daily_trend" | "us_daily_cache" | "us_daily_open_cache" | "us_news_radar" | "us_news_ticker" | "us_news_radar_events" | "market_rss" | "market_rss_signal" | "sec_raw" | "sec_edgar";
+type TestKey = string;
 type ApiTestDefinition = {
   key: TestKey;
   label: string;
@@ -84,35 +84,11 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/stock/us/intensity",
     query: "",
   },
-  {
-    key: "us_top_rising",
-    label: "미국 상승률 스캐너",
-    description: "상승률 TOP N 스캐너 가공 응답",
-    endpoint: "/api/stock/top-rising",
-    query: "",
-  },
-  {
-    key: "us_turnover_ratio",
-    label: "시총 대비 거래대금 스캐너",
-    description: "미국 상승률 TOP 100 중 시총 대비 거래대금 1~10% 필터 응답",
-    endpoint: "/api/admin/us-turnover-ratio-test",
-    query: "",
-  },
-  {
-    key: "us_turnover_watchlist",
-    label: "관심종목 시총 대비 거래대금",
-    description: "등록된 관심종목만 상세 시세 조회·필터 판정·단계별 디버깅",
-    endpoint: "/api/admin/us-turnover-watchlist-test",
-    query: "send=false",
-  },
-  { key: "us_vwap", label: "미국 당일 VWAP 상회", description: "AMS·NAS·NYS 관심종목의 당일 전체 세션 VWAP 비교", endpoint: "/api/admin/us-vwap-test", query: "" },
   { key: "us_bollinger_band", label: "미국 일봉 볼린저밴드 하단 이탈", description: "통합 티커 전체의 DB 완료 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/us-bollinger-band-test", query: "" },
   { key: "us_bollinger_middle_lower", label: "미국 일봉 볼린저밴드 중단선~하단선", description: "통합 티커 전체의 DB 일봉 종가가 중단선과 하단선 사이인지 진단", endpoint: "/api/admin/us-bollinger-middle-lower-test", query: "" },
   { key: "kr_bollinger_band", label: "국내 일봉 볼린저밴드 하단 이탈", description: "국내 통합 티커 전체의 DB 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/kr-bollinger-band-test", query: "" },
   { key: "kr_bollinger_middle_lower", label: "국내 일봉 볼린저밴드 중단선~하단선", description: "국내 통합 티커 전체의 DB 일봉 종가가 중단선과 하단선 사이인지 진단", endpoint: "/api/admin/kr-bollinger-middle-lower-test", query: "" },
-  { key: "kr_instruments_sync", label: "국내 통합 티커 KIS 동기화", description: "KIS 국내 랭킹에서 국내 전용 통합 티커 테이블 UPSERT", endpoint: "/api/admin/kr-instruments-sync-test", query: "" },
   { key: "kr_daily_cache", label: "국내 일봉·시세 DB 갱신", description: "국내 통합 티커의 KIS 일봉과 시총·거래대금 원본 응답 저장", endpoint: "/api/admin/kr-daily-cache-test", query: "" },
-  { key: "us_top100_upsert", label: "미국 TOP100 통합 티커 UPSERT", description: "NAS·AMS·NYS TOP100에서 ETF·레버리지 제외 후 통합 테이블 반영", endpoint: "/api/admin/us-top-rising-upsert-test", query: "" },
   {
     key: "us_trade_trend",
     label: "미국 단일종목 체결강도",
@@ -121,50 +97,12 @@ const TESTS: ApiTestDefinition[] = [
     query: "code=AAPL&market=NAS&day=1",
   },
   {
-    key: "us_trade_collect",
-    label: "미국 체결강도 수집·저장",
-    description: "최근 체결추이를 DB에 중복 제거 저장(Discord 미전송)",
-    endpoint: "/api/admin/us-trade-intensity-collect-test",
-    query: "symbols=AAPL,TSLA&market=NAS&maxSymbols=2&delayMs=350",
-  },
-  {
-    key: "discord_ticker",
-    label: "Discord /ticker 종합 조회",
-    description: "현재가·유동성·최근 체결강도 종합 응답",
-    endpoint: "/api/admin/discord-ticker-overview-test",
-    query: "code=AAPL",
-  },
-  {
     key: "kis_token",
     label: "KIS Access Token 상태",
     description: "DB 토큰의 발급 시각·공식 만료 시각·잔여 시간 확인(토큰 값은 노출하지 않음)",
     endpoint: "/api/admin/kis-token-debug",
     query: "",
   },
-  {
-    key: "us_free_float",
-    label: "미국 유통주 조회",
-    description: "FMP 무료 Free Float API 및 일일 DB 캐시",
-    endpoint: "/api/admin/us-free-float-test",
-    query: "ticker=AAPL",
-  },
-  { key: "us_free_float_refresh", label: "미국 유통주 전체 갱신", description: "통합 티커 전체를 대상으로 FMP 유통주 강제 갱신", endpoint: "/api/admin/us-free-float-refresh-test", query: "" },
-  { key: "us_product_classification", label: "미국 ETF·레버리지 비활성화", description: "KIS 상품 유형을 확인하고 제외 상품을 INACTIVE_EXCLUDED 처리", endpoint: "/api/admin/us-product-classification-refresh-test", query: "" },
-  {
-    key: "short_interest",
-    label: "미국 단일종목 공매도",
-    description: "FINRA 무료 일별 공매도 거래량 조회",
-    endpoint: "/api/admin/short-interest-test",
-    query: "ticker=AAPL",
-  },
-  {
-    key: "us_short_squeeze",
-    label: "미국 숏스퀴즈 평가",
-    description: "티커별 FINRA·KIS·유통주 기반 공매도 압박 평가",
-    endpoint: "/api/admin/us-short-squeeze-test",
-    query: "ticker=AAPL",
-  },
-  { key: "us_obv", label: "미국 당일 1분봉 OBV", description: "AMS·NAS·NYS 후보의 당일 1분봉 OBV 계산", endpoint: "/api/admin/us-obv-test", query: "" },
   { key: "us_daily_obv", label: "미국 일봉 OBV", description: "TOP100 종목의 DB 저장 일봉만으로 최근 5거래일 대비 OBV 상승 탐지", endpoint: "/api/admin/us-daily-obv-test", query: "" },
   { key: "us_adl", label: "미국 일봉 ADL", description: "KIS OHLCV로 계산한 Accumulation/Distribution Line 상승 탐지", endpoint: "/api/admin/us-adl-test", query: "" },
   { key: "us_mfi", label: "미국 MFI 과매도", description: "TOP100 종목의 DB 저장 일봉만으로 MFI 과매도 스캔", endpoint: "/api/admin/us-mfi-test", query: "period=14&threshold=30" },
@@ -221,13 +159,7 @@ const TESTS: ApiTestDefinition[] = [
 
 // Legacy integrated-universe endpoints were removed with V70. Keep their historical
 // definitions out of the admin runner so the dashboard cannot invoke deleted APIs.
-const RETIRED_TEST_KEYS = new Set<TestKey>([
-  "us_turnover_ratio", "us_turnover_watchlist", "us_vwap", "kr_instruments_sync",
-  "us_top100_upsert", "us_trade_collect", "discord_ticker", "us_free_float",
-  "us_free_float_refresh", "us_product_classification", "short_interest",
-  "us_short_squeeze", "us_obv", "us_news_radar", "us_news_ticker", "us_news_radar_events",
-]);
-const ACTIVE_TESTS = TESTS.filter((test) => !RETIRED_TEST_KEYS.has(test.key));
+const ACTIVE_TESTS = TESTS;
 
 export function AdminApiTests() {
   const [error, setError] = useState<string | null>(null);

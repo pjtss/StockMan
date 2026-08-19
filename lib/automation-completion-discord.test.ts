@@ -50,14 +50,4 @@ describe("automation completion Discord notification", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("uses the environment fallback when the module webhook is empty", async () => {
-    vi.stubEnv("AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL", "https://discord.example/fallback");
-    const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await notifyAutomationCompletion("us-free-float", "FAILED", { diagnostics: { message: "source unavailable" } }, "source unavailable");
-
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://discord.example/fallback?wait=true");
-    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)).toContain("source unavailable");
-  });
 });

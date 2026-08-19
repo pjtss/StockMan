@@ -26,7 +26,7 @@ public/               정적 자산
 | 탐지 | `us-*scan.ts`, `*-bollinger-band.ts`, `us-daily-trend-scan.ts` | DB 캐시 기반 지표 계산과 필터 |
 | 알림 | `discord-*.ts`, `discord-text.ts`, `discord-delivery-*` | Discord DTO, 웹훅 전송, 재시도·중복 방지 |
 | RSS·공시 | `market-rss*.ts`, `sec-*.ts`, `dart-*.ts` | 수집·정규화·분류·분석·전송 |
-| 상품·유니버스 | `us-instruments.ts`, `kr-instruments.ts`, `us-product-classification.ts` | 종목 수집, 상품 분류, 탐지 대상 결정 |
+| 상품·유니버스 | `us-top-rising-universe.ts`, `kr-instruments.ts`, `instrument-universe-import.ts` | 신규 통합 유니버스 조회·필터·동기화 |
 
 ## 의존성 규칙
 

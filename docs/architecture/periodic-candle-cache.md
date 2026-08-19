@@ -48,9 +48,9 @@ KIS 응답을 timeframe별 캐시 테이블에 upsert
 - 주봉·월봉 timeframe별 독립 간격 판정: 구현 완료 (`fetched_at` 기준)
 - 하루 1회 캐시 결과 Discord 요약: 구현 완료 (DB dedupe)
 
-## 레거시 제거 조건
+## 레거시 제거 상태
 
-기존 `us_daily_price_candles`, `kr_daily_price_candles`, `us_instruments`, `kr_instruments`는 신규 탐지 기능이 신규 테이블만 읽는지와 신규 캐시 성공률을 운영에서 확인한 뒤 별도 삭제 마이그레이션으로 제거한다. 검증 전에는 삭제하지 않는다.
+기존 `us_daily_price_candles`, `kr_daily_price_candles`, `us_instruments`, `kr_instruments`는 V70에서 삭제 완료했다. 신규 탐지와 캐시는 `*_instrument_universe` 및 `*_instrument_universe_candles`만 사용한다.
 
 ## 검증 API
 

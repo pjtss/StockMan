@@ -43,7 +43,7 @@ curl -sS -H "x-cron-secret: $CRON_SECRET" \
   "coverage": {
     "configuredModuleCount": 18,
     "observedModuleCount": 16,
-    "noRunModuleKeys": ["us-short-borrow", "us-vwap"]
+    "noRunModuleKeys": []
   },
   "modules": [],
   "recentRuns": [],

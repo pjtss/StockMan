@@ -6,8 +6,6 @@ const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-daily-cache",
   "us-daily-cache",
   "us-daily-open-cache",
-  "us-free-float",
-  "us-product-classification",
 ]);
 
 function asNumber(value: unknown) {
@@ -94,9 +92,7 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
       ? "해외 일봉 캐시"
       : moduleKey === "us-daily-open-cache"
         ? "해외 일봉 시가 캐시"
-        : moduleKey === "us-free-float"
-          ? "해외 유통주 갱신"
-          : "해외 상품분류 갱신";
+        : "해외 일봉 시가 캐시";
   const lines = [
     `${status === "SUCCESS" ? "✅" : "❌"} ${label} 자동화 완료`,
     `상태: ${status === "SUCCESS" ? "성공" : "실패"}`,

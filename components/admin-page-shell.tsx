@@ -25,7 +25,6 @@ const NAV_ICONS = {
   "daily-rss": Newspaper,
   modules: Settings2,
   blacklist: ListFilter,
-  "product-classification": ListFilter,
   "sec-test": ChartNoAxesCombined,
   observability: Activity,
   "stocktitan-rss": Newspaper,
