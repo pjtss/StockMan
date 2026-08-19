@@ -6,7 +6,7 @@ export async function sendKrBollingerBandSignals(results:KrBollingerResult[], zo
   const webhook=await loadFeatureDiscordWebhook(moduleKey,["KR_BOLLINGER_BAND_DISCORD_WEBHOOK_URL"]);
   if(!webhook)return {sent:0,skipped:true,reason:"webhook_not_configured"};
   const header=`국내주식 볼린저밴드 ${zoneLabel}\n\n`;
-  const rows=qualified.map(r=>`🚨 KRX ${r.code} | ${r.name}\n종가 ${r.close} / 중단 ${r.band?.middle} / 하단 ${r.band?.lower} | 거래량 ${r.volume}`);
+  const rows=qualified.map(r=>`KRX | ${r.name || r.code}`);
   const chunks:string[]=[]; let current=header;
   for(const row of rows){const next=current===header?`${current}${row}`:`${current}\n\n${row}`;if(next.length>1900&&current!==header){chunks.push(current);current=`${header}${row}`;}else current=next;}
   if(current!==header)chunks.push(current);
