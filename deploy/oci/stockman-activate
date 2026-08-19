@@ -69,6 +69,9 @@ systemctl daemon-reload
 systemctl restart stockman.service
 systemctl enable stockman-cron.timer
 systemctl restart stockman-cron.timer
+# Run one scheduler pass immediately after activation so a fresh deployment
+# never leaves the cache health view stale until the next calendar boundary.
+systemctl start --no-block stockman-cron.service
 systemctl is-active --quiet stockman.service
 systemctl is-active --quiet stockman-cron.timer
 
