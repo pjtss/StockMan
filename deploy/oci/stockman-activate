@@ -63,6 +63,8 @@ if [ -d "$DEPLOY_PATH" ]; then mv "$DEPLOY_PATH" "$DEPLOY_PATH.previous"; fi
 mv "$TEMP_PATH" "$DEPLOY_PATH"
 chown -R stockman:stockman "$DEPLOY_PATH"
 stage="service-restart"
+install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.service" /etc/systemd/system/stockman-cron.service
+install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.timer" /etc/systemd/system/stockman-cron.timer
 systemctl daemon-reload
 systemctl restart stockman.service
 systemctl enable --now stockman-cron.timer
