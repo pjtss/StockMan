@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision, numeric } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART 및 SEC 공시 이력 엔티티
@@ -504,11 +504,11 @@ export const featureModuleSettings = pgTable("feature_module_settings", {
 });
 
 export const usInstrumentUniverseCandles = pgTable("us_instrument_universe_candles", {
-  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), open: numeric("open"), high: numeric("high"), low: numeric("low"), close: numeric("close"), volume: numeric("volume"), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), close: doublePrecision("close"), volume: doublePrecision("volume"), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("us_instrument_universe_candles_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("us_instrument_universe_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate)]);
 
 export const krInstrumentUniverseCandles = pgTable("kr_instrument_universe_candles", {
-  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), open: numeric("open"), high: numeric("high"), low: numeric("low"), close: numeric("close"), volume: numeric("volume"), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), close: doublePrecision("close"), volume: doublePrecision("volume"), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("kr_instrument_universe_candles_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_instrument_universe_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate)]);
 
 export const krInstrumentUniverse = pgTable("kr_instrument_universe", {
