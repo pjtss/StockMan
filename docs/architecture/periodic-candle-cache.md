@@ -50,7 +50,7 @@ KIS 응답을 timeframe별 캐시 테이블에 upsert
 
 ## 레거시 제거 상태
 
-기존 `us_daily_price_candles`, `kr_daily_price_candles`, `us_instruments`, `kr_instruments`는 V70에서 삭제 완료했다. 신규 탐지와 캐시는 `*_instrument_universe` 및 `*_instrument_universe_candles`만 사용한다.
+현재 탐지와 캐시는 `*_instrument_universe` 및 `*_instrument_universe_candles`만 사용한다.
 
 ## 검증 API
 
