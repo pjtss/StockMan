@@ -22,7 +22,7 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
   if (!enabled || scopes.length === 0) return scopes;
   const caps = new Map<string, number | null>();
   try {
-    // Legacy turnover snapshots were removed. Only values already present in
+    // Only values already present in
     // the persisted universe can satisfy an optional market-cap constraint.
   } catch { return []; }
   return scopes.filter((scope) => {

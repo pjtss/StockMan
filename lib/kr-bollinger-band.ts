@@ -146,7 +146,7 @@ export async function scanStoredKrBollingerBands(
     Math.max(100, policy.period + 1),
     timeframe,
   );
-  // Legacy quote/turnover snapshots were removed. Candle-only filters remain
+  // Candle-only filters remain authoritative for this scanner.
   // reusable; a positive turnover threshold intentionally yields FILTERED
   // until a replacement quote cache is configured.
   const metrics = new Map<string, { marketCap: number | null; turnoverRatio: number | null }>();

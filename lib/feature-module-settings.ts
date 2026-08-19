@@ -9,7 +9,7 @@ export type CommonModuleSettings = {
   startTime: string;
   endTime: string;
   scheduleMode?: "daily-window" | "weekly-range";
-  /** Optional weekly-range schedule. Omitted values keep the legacy activeDays behavior. */
+  /** Optional weekly-range schedule. */
   startDay?: number;
   endDay?: number;
   cooldownSeconds: number;

@@ -11,11 +11,11 @@ import { filterRecentSecItems } from "./sec-filters";
 import type { SecItem } from "./types";
 
 /**
- * Legacy direct SEC RSS application service.
+ * SEC RSS application service.
  *
  * Scheduled execution is intentionally disabled: SEC EDGAR RSS is now owned by
  * the market-rss pipeline. This module remains available for compatibility and
- * isolated tests until the legacy public SEC feed surface is retired.
+ * isolated tests for the public SEC feed surface.
  */
 
 const AUTOMATION_LOOKBACK_MINUTES = 10;

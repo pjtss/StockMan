@@ -116,7 +116,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
   }
   const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(35, policy.period + 1), timeframe });
   const instruments = context.universe.scopes;
-  // Legacy turnover snapshots are intentionally not consulted. Optional
+  // Only current candle and market metrics are consulted. Optional
   // market-cap/turnover filters can only use fields supplied by the caller.
   const metrics = new Map<string, { marketCap: number | null; turnoverRatio: number | null }>();
   const results: UsBollingerResult[] = [];

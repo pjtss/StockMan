@@ -6,7 +6,7 @@ let activeScan: Promise<Awaited<ReturnType<typeof executeScan>>> | null = null;
 async function executeScan(options: { limit?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const startedAt = Date.now();
   // Automatic detection uses the canonical instrument registry, not the
-  // legacy/manual breakout watchlist. Only enabled US exchanges are included.
+  // Only enabled US exchanges are included.
   const context = options.context ?? await createUsDailyScanContext({ candleLimit: 100 });
   const universe = context.universe;
   const watchlist = universe.scopes;

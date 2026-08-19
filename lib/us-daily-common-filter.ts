@@ -9,7 +9,7 @@ export async function filterUsDailyCandidates<T extends Record<string, any>>(ite
     price: number | null;
     changeRate: number | null;
   }>();
-  // Daily scanners are DB-candle based. Legacy live turnover snapshots are
+  // Daily scanners are DB-candle based. Live snapshots are
   // not queried; callers may provide quote fields directly when needed.
   const matchedMetricCount = items.filter((item) => metrics.has(`${String(item.market || "").toUpperCase()}:${String(item.code || "").toUpperCase()}`)).length;
   const failureReasons: Record<string, number> = {};
