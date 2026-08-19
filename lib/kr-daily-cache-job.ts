@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { loadStoredKrInstrumentScopes, syncKrInstrumentUniverseFromKis } from "@/lib/kr-instruments";
+import { loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
 import { refreshKrDailyCandles, refreshKrMarketSnapshot } from "@/lib/kr-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -17,7 +17,6 @@ type Job = {
   failureCount: number;
   results: any[];
   error?: string;
-  universeSync?: unknown;
   dueTimeframes?: Array<"D" | "W" | "M">;
   progress?: { elapsedMs: number; etaMs: number | null; lastCode?: string };
 };
@@ -33,7 +32,6 @@ async function run(job: Job) {
   job.status = "PROCESSING";
   const progressStartedAt = Date.now();
   try {
-    job.universeSync = await syncKrInstrumentUniverseFromKis();
     const { scopes } = await loadStoredKrInstrumentScopes();
     job.instrumentCount = scopes.length;
     const nowMs = Date.now();
@@ -88,10 +86,23 @@ async function run(job: Job) {
 }
 
 export function startKrDailyCacheJob() {
-  const job: Job = { jobId: crypto.randomUUID(), status: "QUEUED", startedAt: new Date().toISOString(), instrumentCount: 0, processedCount: 0, successCount: 0, failureCount: 0, results: [] };
+  const job = createJob();
   jobs.set(job.jobId, job);
   trimJobs();
   void run(job);
+  return job;
+}
+
+function createJob(): Job {
+  return { jobId: crypto.randomUUID(), status: "QUEUED", startedAt: new Date().toISOString(), instrumentCount: 0, processedCount: 0, successCount: 0, failureCount: 0, results: [] };
+}
+
+/** Synchronous application-service entry point used by OCI cron. */
+export async function runKrDailyCacheNow() {
+  const job = createJob();
+  jobs.set(job.jobId, job);
+  trimJobs();
+  await run(job);
   return job;
 }
 
