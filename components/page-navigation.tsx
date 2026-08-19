@@ -14,10 +14,8 @@ type PageKey =
   | "notifications"
   | "scanners-us"
   | "us-intensity"
-  | "us-top-rising"
   | "us-ams-scout"
   | "us-news"
-  | "top-rising"
   | "trading-intensity"
   | "admin"
 
@@ -37,13 +35,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
           DART
         </Link>
 
-        <Link
-          className={current === "us-top-rising" ? styles.navActive : styles.navLink}
-          href="/scanners/us/top-rising"
-          prefetch={false}
-        >
-          미국 상승률 TOP N
-        </Link>
         <Link className={current === "us-news" ? styles.navActive : styles.navLink} href="/scanners/us/news" prefetch={false}>
           미국 뉴스 조회
         </Link>
