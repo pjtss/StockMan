@@ -75,7 +75,21 @@ async function handle(request: Request) {
   const requestId = crypto.randomUUID();
   if (!(await authorized(request))) return NextResponse.json({ ok: false, error: "Unauthorized", requestId }, { status: 401, headers: { "x-request-id": requestId } });
   const url = new URL(request.url);
-  const requested = (url.searchParams.get("checks") || "").split(",").map((value) => value.trim()).filter((value): value is CheckName => (ALL_CHECKS as readonly string[]).includes(value));
+  const target = url.searchParams.get("target")?.trim();
+  const rawChecks = url.searchParams.get("checks") || (target && target !== "all" ? target : "");
+  const requestedValues = rawChecks.split(",").map((value) => value.trim()).filter(Boolean);
+  const invalid = requestedValues.filter((value) => !(ALL_CHECKS as readonly string[]).includes(value as CheckName));
+  if (invalid.length) {
+    return NextResponse.json({
+      requestId,
+      mode: "ADMIN_DEBUG_SUITE",
+      ok: false,
+      error: "INVALID_DEBUG_TARGET",
+      invalidTargets: invalid,
+      allowedTargets: ["all", ...ALL_CHECKS],
+    }, { status: 400, headers: { "x-request-id": requestId } });
+  }
+  const requested = requestedValues.filter((value): value is CheckName => (ALL_CHECKS as readonly string[]).includes(value as CheckName));
   const checks = requested.length ? requested : [...ALL_CHECKS];
   try {
     return NextResponse.json({ requestId, mode: "ADMIN_DEBUG_SUITE", ...(await runSuite(checks)) }, { headers: { "x-request-id": requestId } });
