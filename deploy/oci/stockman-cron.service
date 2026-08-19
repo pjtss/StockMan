@@ -9,3 +9,5 @@ User=stockman
 WorkingDirectory=/opt/stockman/current
 EnvironmentFile=/etc/stockman/stockman.env
 ExecStart=/opt/stockman/current/scripts/oci-cron.sh
+TimeoutStartSec=30min
+TimeoutStopSec=30s
