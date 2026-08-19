@@ -12,7 +12,7 @@ const response = await fetch(endpoint, { method: "PUT", headers: { authorization
   { name: "dmi", description: "저장된 미국 종목의 일봉 DMI를 조회합니다.", type: 1 },
   { name: "macd", description: "저장된 미국 종목의 일봉 MACD를 조회합니다.", type: 1 },
   { name: "daily-trend", description: "OBV·MACD·MFI·볼린저·DMI·거래량 기반 급등 추세를 조회합니다.", type: 1 },
-  { name: "sync-top100", description: "NAS·AMS·NYS 상승률 TOP100을 통합 티커 테이블에 갱신합니다.", type: 1 },
+  { name: "sync-top100", description: "NAS·AMS·NYS 상승률 TOP100을 해외 유니버스에 갱신합니다.", type: 1 },
   { name: "refresh-daily", description: "통합 종목 전체의 일봉 데이터를 DB에 갱신합니다.", type: 1 },
   { name: "daily-filter-refresh", description: "DB의 최신 일봉 데이터로 전체 일봉 필터를 재평가하고 Webhook으로 전송합니다.", type: 1 },
 ]) });
