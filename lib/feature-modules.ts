@@ -27,6 +27,7 @@ export type FeatureModuleDefinition = {
 };
 
 export const FEATURE_MODULES: FeatureModuleDefinition[] = [
+  { key: "instrument-fundamentals", label: "종목 기본정보 갱신", description: "국내·해외 유니버스의 현재가·거래량·거래대금·시가총액 기본정보를 하루 1회 저장", settingsPath: "/admin/modules/instrument-fundamentals", scheduler: "OCI_CRON" },
   { key: "dart-realtime", label: "DART 공시 자동화", description: "OpenDART 수집·평가·알림", settingsPath: "/admin/modules/dart-realtime", scheduler: "OCI_CRON" },
   { key: "sec-realtime", label: "SEC Submissions 자동화", description: "CIK 기반 SEC Submissions·Form/Item·XBRL 수집·알림", settingsPath: "/admin/modules/sec-realtime", scheduler: "OCI_CRON" },
   { key: "market-rss", label: "시장 RSS 통합", description: "SEC EDGAR·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss", scheduler: "OCI_CRON" },

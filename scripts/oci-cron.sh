@@ -63,6 +63,7 @@ run_cron_endpoint "sync-filings" 50 "/api/cron/sync-filings"
 run_cron_endpoint "sec-edgar" 180 "/api/cron/sec-edgar"
 
 run_cron_endpoint "us-breaking-news-forwarder" 50 "/api/cron/us-breaking-news-forwarder"
+run_cron_endpoint "instrument-fundamentals" 300 "/api/cron/instrument-fundamentals"
 
 run_cron_endpoint "market-rss" 180 "/api/cron/market-rss"
 
