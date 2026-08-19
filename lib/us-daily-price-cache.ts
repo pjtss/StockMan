@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, getPool } from "@/lib/db";
-import { usDailyPriceCandles } from "@/lib/schema";
+import { usDailyPriceCandles, usInstrumentUniverseCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily-price";
 
@@ -47,7 +47,7 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
       const query = `SELECT c.market, c.code, c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.source
         FROM (
           SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.market, c.code ORDER BY c.candle_date DESC) AS row_number
-          FROM us_daily_price_candles c
+          FROM us_instrument_universe_candles c
           JOIN (VALUES ${values}) AS v(market, code)
             ON c.market = v.market AND c.code = v.code
           WHERE c.timeframe = $${timeframeParam}
@@ -86,7 +86,7 @@ export async function loadCachedUsDailyCandles(market: string, code: string, lim
   if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) return memory.candles.slice(0, limit);
   const db = getDb();
   if (!db) return [];
-  const rows = await db.select().from(usDailyPriceCandles).where(and(eq(usDailyPriceCandles.market, market), eq(usDailyPriceCandles.code, code), eq(usDailyPriceCandles.timeframe, timeframe))).orderBy(desc(usDailyPriceCandles.candleDate)).limit(limit);
+  const rows = await db.select().from(usInstrumentUniverseCandles).where(and(eq(usInstrumentUniverseCandles.market, market), eq(usInstrumentUniverseCandles.code, code), eq(usInstrumentUniverseCandles.timeframe, timeframe))).orderBy(desc(usInstrumentUniverseCandles.candleDate)).limit(limit);
   const candles = rows.map((row) => ({ date: row.candleDate, open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume, raw: { source: row.source, cached: true } }));
   memoryCache.set(cacheKey, { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
   return candles.slice(0, limit);
@@ -95,7 +95,7 @@ export async function loadCachedUsDailyCandles(market: string, code: string, lim
 export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[], timeframe = "D") {
   const db = getDb();
   if (!db || candles.length === 0) return 0;
-  await db.insert(usDailyPriceCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usDailyPriceCandles.market, usDailyPriceCandles.code, usDailyPriceCandles.timeframe, usDailyPriceCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
+  await db.insert(usInstrumentUniverseCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usInstrumentUniverseCandles.market, usInstrumentUniverseCandles.code, usInstrumentUniverseCandles.timeframe, usInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
   memoryCache.delete(`${market}:${code}`);
   return candles.length;
 }

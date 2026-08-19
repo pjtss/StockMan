@@ -1,6 +1,6 @@
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { krDailyPriceCandles, krMarketSnapshots } from "@/lib/schema";
+import { krDailyPriceCandles, krInstrumentUniverseCandles, krMarketSnapshots } from "@/lib/schema";
 import type { OHLCVCandle } from "@/lib/kis-chart";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 import { fetchKrPriceDetail } from "@/lib/kis-kr-price-detail";
@@ -11,8 +11,8 @@ export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string
   const db = getDb();
   const result = new Map<string, OHLCVCandle[]>();
   if (!items.length) return result;
-  const filters = items.map((item) => and(eq(krDailyPriceCandles.market, item.market), eq(krDailyPriceCandles.code, item.code), eq(krDailyPriceCandles.timeframe, timeframe)));
-  const rows = await db.select().from(krDailyPriceCandles).where(or(...filters)).orderBy(desc(krDailyPriceCandles.candleDate));
+  const filters = items.map((item) => and(eq(krInstrumentUniverseCandles.market, item.market), eq(krInstrumentUniverseCandles.code, item.code), eq(krInstrumentUniverseCandles.timeframe, timeframe)));
+  const rows = await db.select().from(krInstrumentUniverseCandles).where(or(...filters)).orderBy(desc(krInstrumentUniverseCandles.candleDate));
   for (const row of rows) {
     const key = `${row.market}:${row.code}`;
     const candles = result.get(key) ?? [];
@@ -24,7 +24,7 @@ export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string
 
 export async function saveKrDailyCandles(market: string, code: string, candles: OHLCVCandle[], timeframe: CandleTimeframe = "D") {
   if (!candles.length) return 0;
-  await getDb().insert(krDailyPriceCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [krDailyPriceCandles.market, krDailyPriceCandles.code, krDailyPriceCandles.timeframe, krDailyPriceCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, fetchedAt: new Date() } });
+  await getDb().insert(krInstrumentUniverseCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [krInstrumentUniverseCandles.market, krInstrumentUniverseCandles.code, krInstrumentUniverseCandles.timeframe, krInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, fetchedAt: new Date() } });
   return candles.length;
 }
 
