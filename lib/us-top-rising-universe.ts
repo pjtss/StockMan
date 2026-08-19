@@ -56,11 +56,10 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
       .from(usInstrumentUniverse).where(and(eq(usInstrumentUniverse.enabled, true), inArray(usInstrumentUniverse.market, [...US_EXCHANGES])))
       : [];
     const settings = await loadUsTurnoverFilterSettings();
-    const eligibleRows = rows.filter((row) => {
-      const symbolProduct = /(?:[-.]?(?:W|WT|WS|UN|U))$/i.test(row.code) || /(?:warrant|right|unit|preferred|option)/i.test(`${row.name} ${row.englishName}`);
-      const persistedProductExcluded = row.isEtf || row.isLeveraged || row.isInverse || row.isWarrant || row.isDerivative;
-      return !persistedProductExcluded && !symbolProduct && (row.instrumentType === "COMMON_STOCK" || row.instrumentType === "DR") && isEligibleUsCommonStock(classifyUsInstrumentProduct({ name: row.name, englishName: row.englishName, type: row.instrumentType }));
-    });
+    // Cache membership is deliberately independent from market-cap, turnover,
+    // price and volume policies. Only the official persisted product type is
+    // authoritative here; live scanners may apply their own ranking filters.
+    const eligibleRows = rows.filter((row) => row.instrumentType === "COMMON_STOCK");
     // The persisted KIS master contains product metadata but not a numeric
     // market-cap value. Applying a numeric cap filter here would therefore
     // treat every row as unknown and silently reduce the cache universe to 0.
@@ -68,7 +67,7 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
     // provide a marketCap value; the stored master is filtered by product type.
     const scopes = eligibleRows.map((row, index) => ({ market: row.market, code: row.code, name: row.name, rank: index + 1, changeRate: null, rankingVolume: null, rankingTradeValue: null }));
     const commonFilterEnabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
-    return { scopes, universe: { ok: true, source: "DB_INTEGRATED_US_INSTRUMENT_UNIVERSE", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instrument_universe", commonFilter: { enabled: commonFilterEnabled, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "allowed_for_master_without_numeric_market_cap" } } } };
+    return { scopes, universe: { ok: true, source: "DB_INTEGRATED_US_INSTRUMENT_UNIVERSE", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instrument_universe", instrumentType: "COMMON_STOCK", numericFilters: "NONE", ignoredTurnoverSettings: commonFilterEnabled ? { minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap } : null } } };
   })();
   try {
     const value = await storedScopeInflight;

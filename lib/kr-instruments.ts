@@ -15,6 +15,8 @@ export async function loadStoredKrInstrumentScopes() {
   // Eligibility is derived exclusively from the official KIS master fields
   // persisted on the universe row. Do not reinterpret the security type from
   // a display name: names are presentation data and are not authoritative.
-  const eligible = rows.filter((row) => !row.isEtp && !row.isWarrant && !row.isSuspended && (row.instrumentType === "COMMON_STOCK" || row.instrumentType === "DR"));
-  return { scopes: eligible.map(({ instrumentType: _instrumentType, isEtp: _isEtp, isWarrant: _isWarrant, isPreferred: _isPreferred, isSuspended: _isSuspended, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENT_UNIVERSE", count: eligible.length, excludedInDb: rows.length - eligible.length } };
+  // Cache every official common-stock row. Market-cap, turnover, price,
+  // volume and suspension state are detection policies, not cache membership.
+  const eligible = rows.filter((row) => row.instrumentType === "COMMON_STOCK");
+  return { scopes: eligible.map(({ instrumentType: _instrumentType, isEtp: _isEtp, isWarrant: _isWarrant, isPreferred: _isPreferred, isSuspended: _isSuspended, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENT_UNIVERSE", count: eligible.length, excludedInDb: rows.length - eligible.length, criteria: { instrumentType: "COMMON_STOCK", numericFilters: "NONE" } } };
 }
