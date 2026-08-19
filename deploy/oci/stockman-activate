@@ -67,7 +67,8 @@ install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.service" /etc/systemd/sys
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.timer" /etc/systemd/system/stockman-cron.timer
 systemctl daemon-reload
 systemctl restart stockman.service
-systemctl enable --now stockman-cron.timer
+systemctl enable stockman-cron.timer
+systemctl restart stockman-cron.timer
 systemctl is-active --quiet stockman.service
 systemctl is-active --quiet stockman-cron.timer
 
