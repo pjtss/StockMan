@@ -1,5 +1,6 @@
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { getPool } from "@/lib/db";
 
 const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-daily-cache",
@@ -70,6 +71,21 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
     configured = Boolean(webhook);
   }
   if (!webhook) return { sent: false, skipped: true, reason: "webhook_not_configured", configured };
+  const deliveryDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+  let dedupeAvailable = true;
+  try {
+    const claimed = await getPool().query(
+      `INSERT INTO automation_notification_deliveries (module_key, delivery_date, status, attempts, updated_at)
+       VALUES ($1, $2::date, 'PENDING', 1, NOW())
+       ON CONFLICT (module_key, delivery_date) DO NOTHING
+       RETURNING module_key`,
+      [moduleKey, deliveryDate],
+    );
+    if (claimed.rowCount === 0) return { sent: false, skipped: true, reason: "daily_already_sent", configured: true, deliveryDate };
+  } catch (error) {
+    dedupeAvailable = false;
+    console.warn(`[Automation] daily notification dedupe unavailable for ${moduleKey}:`, error instanceof Error ? error.message : error);
+  }
 
   const durationMs = asNumber((summary.observability as Record<string, unknown> | undefined)?.durationMs);
   const label = moduleKey === "kr-daily-cache"
@@ -89,7 +105,13 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
     errorMessage ? `오류: ${errorMessage}` : null,
     `완료 시각: ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
   ].filter(Boolean).join("\n");
-  const delivered = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content: lines.slice(0, 1900), allowed_mentions: { parse: [] } }));
-  if (!delivered.response.ok) throw new Error(`Discord HTTP ${delivered.response.status}`);
-  return { sent: true, skipped: false, configured: true, attempts: delivered.attempts };
+  try {
+    const delivered = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content: lines.slice(0, 1900), allowed_mentions: { parse: [] } }));
+    if (!delivered.response.ok) throw new Error(`Discord HTTP ${delivered.response.status}`);
+    if (dedupeAvailable) await getPool().query(`UPDATE automation_notification_deliveries SET status = 'SENT', sent_at = NOW(), updated_at = NOW() WHERE module_key = $1 AND delivery_date = $2::date`, [moduleKey, deliveryDate]);
+    return { sent: true, skipped: false, configured: true, attempts: delivered.attempts, deliveryDate };
+  } catch (error) {
+    if (dedupeAvailable) await getPool().query(`UPDATE automation_notification_deliveries SET status = 'FAILED', last_error = $3, updated_at = NOW() WHERE module_key = $1 AND delivery_date = $2::date`, [moduleKey, deliveryDate, error instanceof Error ? error.message : String(error)]).catch(() => undefined);
+    throw error;
+  }
 }

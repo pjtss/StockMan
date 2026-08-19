@@ -565,6 +565,10 @@ export const automationRuns = pgTable("automation_runs", {
   errorMessage: text("error_message"),
 });
 
+export const automationNotificationDeliveries = pgTable("automation_notification_deliveries", {
+  moduleKey: text("module_key").notNull(), deliveryDate: text("delivery_date").notNull(), status: text("status").notNull().default("PENDING"), attempts: integer("attempts").notNull().default(0), sentAt: timestamp("sent_at", { withTimezone: true }), lastError: text("last_error"), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("automation_notification_deliveries_pk").on(table.moduleKey, table.deliveryDate)]);
+
 export const discordDeliveryQueue = pgTable("discord_delivery_queue", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   externalId: text("external_id").notNull().unique(),
