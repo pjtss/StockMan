@@ -70,20 +70,6 @@ const TESTS: ApiTestDefinition[] = [
     endpoint: "/api/admin/kis-us-price-detail-test",
     query: "code=TOPS&market=AMS",
   },
-  {
-    key: "us_turnover",
-    label: "해외 거래대금 추이",
-    description: "해외주식 분봉 기반 거래대금 응답",
-    endpoint: "/api/stock/us/turnover-trend",
-    query: "code=AAPL&market=NAS",
-  },
-  {
-    key: "us_intensity",
-    label: "미국 체결강도",
-    description: "미국 체결강도 랭킹 응답",
-    endpoint: "/api/stock/us/intensity",
-    query: "",
-  },
   { key: "us_bollinger_band", label: "미국 일봉 볼린저밴드 하단 이탈", description: "통합 티커 전체의 DB 완료 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/us-bollinger-band-test", query: "" },
   { key: "us_bollinger_middle_lower", label: "미국 일봉 볼린저밴드 중단선~하단선", description: "통합 티커 전체의 DB 일봉 종가가 중단선과 하단선 사이인지 진단", endpoint: "/api/admin/us-bollinger-middle-lower-test", query: "" },
   { key: "kr_bollinger_band", label: "국내 일봉 볼린저밴드 하단 이탈", description: "국내 통합 티커 전체의 DB 일봉 종가와 하단선 비교·필터 진단", endpoint: "/api/admin/kr-bollinger-band-test", query: "" },
@@ -157,8 +143,6 @@ const TESTS: ApiTestDefinition[] = [
   { key: "sec_edgar", label: "SEC EDGAR 수집·분류·XBRL", description: "티커·CIK 매핑, Submissions 저장, Form/Item 분류, 선택적 Company Facts 저장", endpoint: "/api/admin/sec-edgar-test", query: "ticker=AAPL&facts=true" },
 ];
 
-// Legacy integrated-universe endpoints were removed with V70. Keep their historical
-// definitions out of the admin runner so the dashboard cannot invoke deleted APIs.
 const ACTIVE_TESTS = TESTS;
 
 export function AdminApiTests() {
@@ -177,9 +161,6 @@ export function AdminApiTests() {
   const [tradeWatchScore, setTradeWatchScore] = useState("60");
   const [tradeCollectSymbols, setTradeCollectSymbols] = useState("AAPL,TSLA");
   const [tickerOverviewCode, setTickerOverviewCode] = useState("AAPL");
-  const [freeFloatTicker, setFreeFloatTicker] = useState("AAPL");
-  const [freeFloatMarket, setFreeFloatMarket] = useState("NAS");
-  const [shortInterestTicker, setShortInterestTicker] = useState("AAPL");
   const [secEdgarTicker, setSecEdgarTicker] = useState("AAPL");
   const [mfiPeriod, setMfiPeriod] = useState("14");
   const [mfiThreshold, setMfiThreshold] = useState("30");
@@ -205,12 +186,6 @@ export function AdminApiTests() {
                 ? `symbols=${encodeURIComponent(tradeCollectSymbols)}&maxSymbols=10&delayMs=350`
                 : test.key === "discord_ticker"
                   ? `code=${encodeURIComponent(tickerOverviewCode)}`
-                : test.key === "us_free_float"
-                  ? `ticker=${encodeURIComponent(freeFloatTicker)}&market=${encodeURIComponent(freeFloatMarket)}`
-                : test.key === "short_interest"
-                  ? `ticker=${encodeURIComponent(shortInterestTicker)}`
-                : test.key === "us_short_squeeze"
-                  ? `ticker=${encodeURIComponent(shortInterestTicker)}`
                 : test.key === "us_mfi"
                   ? `period=${encodeURIComponent(mfiPeriod)}&threshold=${encodeURIComponent(mfiThreshold)}`
               : test.key === "market_rss"
@@ -321,18 +296,6 @@ export function AdminApiTests() {
               {test.key === "discord_ticker" && (
                 <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={tickerOverviewCode} onChange={(event) => setTickerOverviewCode(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
               )}
-              {test.key === "us_free_float" && (
-                <div className={styles.fieldGrid}>
-                  <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={freeFloatTicker} onChange={(event) => setFreeFloatTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
-                  <label className={styles.inlineField}><span className={styles.fieldLabel}>거래소</span><select className={styles.textInput} value={freeFloatMarket} onChange={(event) => setFreeFloatMarket(event.target.value)}><option value="NAS">NAS</option><option value="NYS">NYS</option><option value="AMS">AMS</option></select></label>
-                </div>
-              )}
-              {test.key === "short_interest" && (
-                <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={shortInterestTicker} onChange={(event) => setShortInterestTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
-              )}
-              {test.key === "us_short_squeeze" && (
-                <label className={styles.inlineField}><span className={styles.fieldLabel}>티커</span><input className={styles.textInput} value={shortInterestTicker} onChange={(event) => setShortInterestTicker(event.target.value.toUpperCase())} placeholder="AAPL" /></label>
-              )}
               {test.key === "us_mfi" && (
                 <div className={styles.fieldGrid}>
                   <label className={styles.inlineField}><span className={styles.fieldLabel}>기간</span><input type="number" min="2" className={styles.textInput} value={mfiPeriod} onChange={(event) => setMfiPeriod(event.target.value)} /></label>
@@ -354,7 +317,7 @@ export function AdminApiTests() {
                 <button
                   className={styles.toggleButton}
                   onClick={() => void runTest(test)}
-                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim()) || (test.key === "us_free_float" && !freeFloatTicker.trim()) || (test.key === "short_interest" && !shortInterestTicker.trim()) || (test.key === "us_mfi" && (!mfiPeriod.trim() || !mfiThreshold.trim()))}
+                  disabled={running !== null || (test.key === "sec_raw" && !secUrl.trim()) || (test.key === "us_price_detail" && !priceDetailCode.trim()) || (test.key === "us_trade_trend" && !tradeTrendCode.trim()) || (test.key === "us_trade_collect" && !tradeCollectSymbols.trim()) || (test.key === "discord_ticker" && !tickerOverviewCode.trim()) || (test.key === "us_mfi" && (!mfiPeriod.trim() || !mfiThreshold.trim()))}
                 >
                   <Play size={16} />
                   {isRunning ? "호출 중" : "실행"}
@@ -417,16 +380,6 @@ export function AdminApiTests() {
             const metrics = analysis.metrics || {};
             const score = analysis.score || {};
             return <div className={styles.resultHeader}><span>체결강도 분석</span><strong>{score.level ?? "-"} {score.score ?? 0}점 · {metrics.sampleCount ?? 0}건 · 최근 평균 {metrics.recentAverageIntensity ?? "-"} · 직전 평균 {metrics.previousAverageIntensity ?? "-"} · 변화 {metrics.intensityChange ?? "-"}</strong></div>;
-          })()}
-          {activeTest.key === "us_short_squeeze" && (
-            <div className={styles.resultHeader}>
-              <span>숏스퀴즈 요약</span>
-              <strong>{String(result.squeezeState ?? "-")} · {String(result.squeezeGrade ?? "-")} · {String(result.squeezeScore ?? 0)}/{String(result.maxAvailableScore ?? 0)}점 · 잔고 {String(result.shortInterestSource ?? "-")} · 유통주 {String(result.floatSource ?? "-")} {result.floatDataType ? `(${String(result.floatDataType)})` : ""}</strong>
-            </div>
-          )}
-          {Boolean(activeTest.key === "us_free_float" && result.diagnostics && typeof result.diagnostics === "object") && (() => {
-            const diagnostics = result.diagnostics as { source?: string; dataType?: string; asOf?: string | null; cached?: boolean; freeFloatAvailable?: boolean; fallbackReason?: string | null };
-            return <div className={styles.resultHeader}><span>유통주 출처</span><strong>{diagnostics.source ?? "-"} · {diagnostics.dataType ?? "-"} · 기준일 {diagnostics.asOf ?? "-"} · 캐시 {diagnostics.cached ? "사용" : "미사용"} · fallback {diagnostics.fallbackReason ?? "없음"}</strong></div>;
           })()}
           <div className={styles.cardActions}>
             {collectRawResponses(result).length > 0 && (

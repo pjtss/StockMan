@@ -4,9 +4,6 @@ import styles from "./page.module.css";
 
 const destinations = [
   { href: "/dart", label: "DART 공시 분석", description: "실시간 국내 공시와 상세 분석" },
-  { href: "/scanners/trading-intensity", label: "국내 체결강도 TOP 10", description: "국내 시장 체결강도 상위 종목" },
-  { href: "/scanners/us/intensity", label: "미국 체결강도 TOP 10", description: "미국 시장 체결강도 상위 종목" },
-  { href: "/scanners/us/turnover-ratio", label: "미국 거래대금 비율", description: "시총 대비 거래대금 조건 종목" },
 ];
 
 export default function HomePage() {

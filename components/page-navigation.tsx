@@ -16,7 +16,6 @@ type PageKey =
   | "us-intensity"
   | "us-ams-scout"
   | "us-news"
-  | "trading-intensity"
   | "admin"
 
 export function PageNavigation({ current }: { current: PageKey }) {
