@@ -7,6 +7,7 @@ import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/l
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 
 export async function POST(request: Request) {
+  try {
   const secret = process.env.CRON_SECRET?.trim();
   const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!secret || supplied !== secret) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -25,4 +26,5 @@ export async function POST(request: Request) {
   }
   const result = await withAutomationRun("kr-daily-cache", runKrDailyCacheNow);
   return NextResponse.json({ ok: true, intervalSeconds, ...result });
+  } catch (error) { return NextResponse.json({ ok: false, stage: "kr-daily-cache-cron", error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
 }
