@@ -18,6 +18,7 @@ const ACTIVE_TABLES = [
   "kr_instrument_universe_candles", "us_instrument_universe_candles",
   "instrument_universe_sync_runs", "instrument_candle_cache_failures",
 ] as const;
+const RETIRED_MODULES = ["us-turnover-ratio", "us-turnover-trend", "us-vwap", "us-short-borrow"] as const;
 
 export async function GET() {
   const startedAt = Date.now();
@@ -40,6 +41,7 @@ export async function GET() {
     const candleCounts = await db.execute(sql`SELECT 'US' AS scope, timeframe, COUNT(*)::bigint AS rows, COUNT(DISTINCT market || ':' || code)::bigint AS instruments FROM us_instrument_universe_candles GROUP BY timeframe UNION ALL SELECT 'KR' AS scope, timeframe, COUNT(*)::bigint AS rows, COUNT(DISTINCT market || ':' || code)::bigint AS instruments FROM kr_instrument_universe_candles GROUP BY timeframe ORDER BY scope, timeframe`);
     const syncRuns = await db.execute(sql`SELECT id, scope, status, source_count, inserted_count, updated_count, deactivated_count, excluded_count, error_count, started_at, completed_at FROM instrument_universe_sync_runs ORDER BY started_at DESC LIMIT 10`);
     const featureSettings = await db.execute(sql`SELECT module_key, settings, updated_at FROM feature_module_settings ORDER BY module_key`);
+    const retiredSettings = featureSettings.rows.filter((row) => RETIRED_MODULES.includes(String(row.module_key) as (typeof RETIRED_MODULES)[number]));
     const activeExisting = activeRows.rows.filter((row) => row.exists === true || row.exists === "t");
     const checks = {
       legacyTablesRemoved: existingTables.length === 0,
@@ -47,8 +49,9 @@ export async function GET() {
       activeTablesPresent: activeExisting.length === ACTIVE_TABLES.length,
       flywayAvailable: flywayRows.rows.length > 0,
       v70Applied: flywayRows.rows.some((row) => String(row.version) === "70"),
+      noRetiredFeatureSettings: retiredSettings.length === 0,
     };
-    return NextResponse.json({ ok: Object.values(checks).every(Boolean), oneTime: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, checks, flyway: flywayRows.rows[0] ?? null, legacyTables: tableRows.rows, foreignKeys: references, activeTables: activeRows.rows, candleCounts: candleCounts.rows, latestSyncRuns: syncRuns.rows, featureSettings: featureSettings.rows, safeToDrop: checks.legacyTablesRemoved && checks.noLegacyForeignKeys, criteria: { legacyTables: [...LEGACY_TABLES], activeTables: [...ACTIVE_TABLES], requiredTimeframes: ["D", "W", "M"], requiresZeroExistingTables: true, requiresZeroForeignKeys: true, requiredFlywayVersion: "70" } });
+    return NextResponse.json({ ok: Object.values(checks).every(Boolean), oneTime: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, checks, flyway: flywayRows.rows[0] ?? null, legacyTables: tableRows.rows, foreignKeys: references, activeTables: activeRows.rows, candleCounts: candleCounts.rows, latestSyncRuns: syncRuns.rows, featureSettings: featureSettings.rows, retiredFeatureSettings: retiredSettings, safeToDrop: checks.legacyTablesRemoved && checks.noLegacyForeignKeys, criteria: { legacyTables: [...LEGACY_TABLES], activeTables: [...ACTIVE_TABLES], retiredModules: [...RETIRED_MODULES], requiredTimeframes: ["D", "W", "M"], requiresZeroExistingTables: true, requiresZeroForeignKeys: true, requiredFlywayVersion: "70" } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
   }
