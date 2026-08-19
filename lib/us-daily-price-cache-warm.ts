@@ -23,7 +23,13 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   // history. Backfill only symbols whose daily cache is below the scanner's
   // minimum history, even when the normal daily timeframe is not due yet.
   const underfilledDaily = new Set<string>();
-  const underfilled = await getDb().execute(sql`SELECT market, code FROM us_instrument_universe_candles WHERE timeframe = 'D' GROUP BY market, code HAVING COUNT(*) < 35`);
+  const underfilled = await getDb().execute(sql`SELECT u.market, u.code
+    FROM us_instrument_universe u
+    LEFT JOIN us_instrument_universe_candles c
+      ON c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
+    WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
+    GROUP BY u.market, u.code
+    HAVING COUNT(c.candle_date) < 35`);
   for (const row of underfilled.rows as Array<{ market: string; code: string }>) underfilledDaily.add(`${String(row.market).toUpperCase()}:${String(row.code).toUpperCase()}`);
   const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
   let cursor = 0;
