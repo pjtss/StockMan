@@ -40,7 +40,7 @@ export function AdminInstrumentUniverseImport() {
       <input type="file" multiple accept=".mst,.COD,.cod" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} />
       <ul>{requiredFiles.map((name) => <li key={name}>{names.has(name) ? "✅" : "⬜"} {name}</li>)}</ul>
       <button type="button" onClick={() => void submit()} disabled={!complete || busy} style={{ padding: "10px 16px", borderRadius: 8, cursor: complete && !busy ? "pointer" : "not-allowed" }}>
-        {busy ? "적재 중..." : "신규 테이블에 적재"}
+        {busy ? "적재 중..." : "유니버스에 적재"}
       </button>
     </div>
     {result !== null && <pre style={{ margin: 0, padding: 16, overflow: "auto", maxHeight: 500, borderRadius: 12, background: "#0f172a", color: "#e2e8f0" }}>{JSON.stringify(result, null, 2)}</pre>}
