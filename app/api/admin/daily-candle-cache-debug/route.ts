@@ -20,7 +20,7 @@ export async function GET() {
       loadRecentAutomationRuns("us-daily-cache", 5),
       loadRecentAutomationRuns("kr-daily-cache", 5),
     ]);
-    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, policy: { D: 43200, W: 259200, M: 604800, unit: "seconds", source: "DB fetched_at" }, cache: { us, kr }, automation: { us: usRuns, kr: krRuns } });
+    return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, policy: { D: 21600, W: 259200, M: 604800, unit: "seconds", source: "DB fetched_at" }, cache: { us, kr }, automation: { us: usRuns, kr: krRuns } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
   }

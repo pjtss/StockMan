@@ -236,7 +236,7 @@ export async function scanStoredKrBollingerBands(
     universe: universe.universe,
     policy,
     dataPolicy: {
-      source: "kr_daily_price_candles",
+      source: "kr_instrument_universe_candles",
       timeframe,
       zone: policy.zone,
       bandCalculation: "종가 기반",

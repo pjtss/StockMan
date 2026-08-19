@@ -70,7 +70,7 @@ async function executeUnified(breakoutLimit: number | undefined, mode: "summary"
     timings,
     cache: { universeCount: context.universe.scopes.length, candleRows, candleMissingCount, candleLimit: context.candleLimit },
     dataPolicy: {
-      source: "us_daily_price_candles",
+      source: "us_instrument_universe_candles",
       storage: "PostgreSQL DB cache",
       kstToday: currentKstDate(),
       usMarketDate: currentUsMarketDate(),

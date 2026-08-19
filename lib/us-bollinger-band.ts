@@ -180,7 +180,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_daily_price_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", commonFilter: { source: "us_turnover_filter_settings", globalMinMarketCap: commonSettings.globalMinMarketCap, globalMaxMarketCap: commonSettings.globalMaxMarketCap, minTurnoverRatio: commonSettings.minTurnoverRatio, maxTurnoverRatio: commonSettings.maxTurnoverRatio } },
+    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", commonFilter: { source: "us_turnover_filter_settings", globalMinMarketCap: commonSettings.globalMinMarketCap, globalMaxMarketCap: commonSettings.globalMaxMarketCap, minTurnoverRatio: commonSettings.minTurnoverRatio, maxTurnoverRatio: commonSettings.maxTurnoverRatio } },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
     failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,

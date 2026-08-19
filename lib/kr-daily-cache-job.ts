@@ -36,7 +36,9 @@ async function run(job: Job) {
     const { scopes } = await loadStoredKrInstrumentScopes();
     job.instrumentCount = scopes.length;
     const nowMs = Date.now();
-    const freshness = { D: 12 * 60 * 60 * 1000, W: 3 * 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
+    // The current-day candle is partial during market hours, so refresh it
+    // frequently while keeping weekly/monthly traffic bounded.
+    const freshness = { D: 6 * 60 * 60 * 1000, W: 3 * 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
     const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM kr_instrument_universe_candles GROUP BY timeframe`);
     const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
     const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
