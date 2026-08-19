@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { featureModuleSettings } from "@/lib/schema";
 import { getFeatureModule, type FeatureModuleKey, type FeatureSpecificSettings } from "@/lib/feature-modules";
-import type { ShortBorrowScorePolicy } from "@/lib/short-borrow-policy";
 import { MARKET_RSS_SOURCES } from "@/lib/market-rss-sources";
 
 export type CommonModuleSettings = {
@@ -17,7 +16,7 @@ export type CommonModuleSettings = {
   intervalSeconds?: number;
   activeDays: number[];
   updatedAt?: string;
-  featureSettings?: FeatureSpecificSettings & { shortBorrowPolicy?: Partial<ShortBorrowScorePolicy> };
+  featureSettings?: FeatureSpecificSettings;
 };
 
 const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
@@ -26,27 +25,19 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "market-rss": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0], featureSettings: { marketRss: { enabledSources: [...MARKET_RSS_SOURCES] } } },
   "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, intervalSeconds: 30, activeDays: [1, 2, 3, 4, 5] },
   "domestic-trade-intensity": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-turnover-trend": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-turnover-ratio": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-vwap": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { vwapPolicy: { minAbovePercent: 0, minVolume: 0, minTradeValue: 0, minPointCount: 1, minTurnoverRatio: 0, requireComplete: true } } },
   "us-bollinger-band": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
   "us-bollinger-middle-lower": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER" } } },
   "us-minute-bollinger-band": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 120, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { minuteBollingerPolicy: { topN: 30, period: 20, stdDevMultiplier: 2, minChangeRate: 0 } } },
   "kr-bollinger-band": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
   "kr-bollinger-middle-lower": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER" } } },
   "kr-daily-cache": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 21_600, activeDays: [1, 2, 3, 4, 5] },
-  "us-free-float": { enabled: true, startTime: "09:30", endTime: "10:00", cooldownSeconds: 60, intervalSeconds: 86_400, activeDays: [1, 2, 3, 4, 5] },
-  "us-product-classification": { enabled: true, startTime: "09:00", endTime: "10:00", cooldownSeconds: 60, intervalSeconds: 86_400, activeDays: [1, 2, 3, 4, 5] },
-  "us-short-borrow": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { newsLookup: { defaultPeriod: "today" } } },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { newsLookup: { defaultPeriod: "today" } } },
   "us-daily-indicators": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { evaluation: { mfiThreshold: 30, obvSignalPeriod: 9, obvSignalAboveDays: 3, obvSignalCrossLookback: 5, trendMinScore: 70, trendMinRvol: 1.5, trendMinMfi: 50, trendMaxMfi: 85, trendRequirePriceTrend: true, trendRequireDailyBreakout: true } } },
-  "us-obv": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
+  "us-obv": { enabled: false, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
   "us-daily-cache": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 21_600, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-open-cache": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 3_600, activeDays: [1, 2, 3, 4, 5] },
   "us-daily-breakout": { enabled: true, startTime: "09:01", endTime: "09:02", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
-  "us-trade-intensity": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6] },
-  "short-borrow": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "discord-delivery-retry": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0] },
 };
 

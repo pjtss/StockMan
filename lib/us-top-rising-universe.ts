@@ -1,7 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usInstrumentUniverse, usInstruments } from "@/lib/schema";
-import { ensureUsInstrument } from "@/lib/us-instruments";
+import { usInstrumentUniverse } from "@/lib/schema";
 import { classifyUsInstrumentProduct, isEligibleUsCommonStock } from "@/lib/us-instrument-product";
 import { fetchKisUsTopRisingApi } from "@/lib/kis-us-api";
 import { getPool } from "@/lib/db";
@@ -23,8 +22,8 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
   if (!enabled || scopes.length === 0) return scopes;
   const caps = new Map<string, number | null>();
   try {
-    const result = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT DISTINCT ON (market, code) market, code, market_cap FROM us_turnover_ratio_snapshots WHERE market = ANY($1::text[]) ORDER BY market, code, observed_at DESC", [[...US_EXCHANGES]]);
-    for (const row of result.rows) caps.set(`${row.market}:${row.code}`, row.market_cap == null ? null : Number(row.market_cap));
+    // Legacy turnover snapshots were removed. Only values already present in
+    // the persisted universe can satisfy an optional market-cap constraint.
   } catch { return []; }
   return scopes.filter((scope) => {
     const marketCap = scope.marketCap ?? caps.get(`${scope.market}:${scope.code}`) ?? null;
@@ -107,25 +106,4 @@ export async function loadUsTopRisingScopes() {
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
   return { scopes: filteredScopes, universe: { ok: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topN: 100, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" } } } };
-}
-
-export async function upsertUsTopRisingUniverse() {
-  const db = getDb(); const results: any[] = []; const seen = new Set<string>();
-  for (const market of US_EXCHANGES) {
-    const response = await fetchKisUsTopRisingApi({ excd: market });
-    const sourceRows = rows(response?.response?.parsed); let upserted = 0; let excluded = 0;
-    for (const row of sourceRows) {
-      const ticker = code(row); const name = String(row.name ?? row.company ?? row.enName ?? "").trim();
-      if (!ticker) continue;
-      const product = classifyUsInstrumentProduct({ name, englishName: row.ename, type: row.etyp_nm });
-      const isExcluded = !isEligibleUsCommonStock(product);
-      if (isExcluded) { excluded += 1; }
-      if (isExcluded) continue;
-      if (seen.has(`${market}:${ticker}`)) continue; seen.add(`${market}:${ticker}`);
-      if (await ensureUsInstrument({ market, code: ticker, name, englishName: String(row.ename ?? ""), productType: String(row.etyp_nm ?? "") })) upserted += 1;
-    }
-    results.push({ market, httpStatus: response?.status ?? 0, sourceCount: sourceRows.length, upsertedCount: upserted, excludedCount: excluded, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "" });
-  }
-  const activeCount = db ? (await db.select({ id: usInstruments.id }).from(usInstruments).where(and(eq(usInstruments.enabled, true), inArray(usInstruments.market, [...US_EXCHANGES])))).length : 0;
-  return { ok: results.every((row) => row.httpStatus >= 200 && row.httpStatus < 300), checkedAt: new Date().toISOString(), exchanges: [...US_EXCHANGES], results, activeInstrumentCount: activeCount };
 }

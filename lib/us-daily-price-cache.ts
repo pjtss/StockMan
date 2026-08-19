@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, getPool } from "@/lib/db";
-import { usDailyPriceCandles, usInstrumentUniverseCandles } from "@/lib/schema";
+import { usInstrumentUniverseCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily-price";
 

@@ -2,7 +2,6 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
 import {
   loadCachedKrDailyCandlesBulk,
-  loadKrMarketMetrics,
 } from "@/lib/kr-daily-price-cache";
 import type { OHLCVCandle } from "@/lib/kis-chart";
 const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
@@ -147,7 +146,10 @@ export async function scanStoredKrBollingerBands(
     Math.max(100, policy.period + 1),
     timeframe,
   );
-  const metrics = await loadKrMarketMetrics(universe.scopes);
+  // Legacy quote/turnover snapshots were removed. Candle-only filters remain
+  // reusable; a positive turnover threshold intentionally yields FILTERED
+  // until a replacement quote cache is configured.
+  const metrics = new Map<string, { marketCap: number | null; turnoverRatio: number | null }>();
   const results: KrBollingerResult[] = [];
   for (const item of universe.scopes) {
     const key = `${item.market}:${item.code}`;

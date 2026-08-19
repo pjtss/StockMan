@@ -1,11 +1,7 @@
 import { getAccessToken } from "@/lib/kis";
 import { buildKisAuthorization } from "@/lib/kis-authorization";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
-import { getDb } from "@/lib/db";
-import { usNewsTickerExchangeCache } from "@/lib/schema";
-import { and, eq, gte } from "drizzle-orm";
 import { scoreNewsTitle } from "@/lib/news-title-filter";
-import { ensureUsInstrument } from "@/lib/us-instruments";
 import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
@@ -53,25 +49,11 @@ function responseTicker(output: Record<string, unknown>) {
 }
 
 async function cachedMarket(ticker: string) {
-  try {
-    const db = getDb();
-    if (!db) return null;
-    const validSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const rows = await db.select().from(usNewsTickerExchangeCache)
-      .where(and(eq(usNewsTickerExchangeCache.ticker, ticker), gte(usNewsTickerExchangeCache.validatedAt, validSince)))
-      .limit(1);
-    return rows[0]?.market ?? null;
-  } catch { return null; }
+  return null;
 }
 
 async function cacheMarket(ticker: string, market: string) {
-  try {
-    const db = getDb();
-    if (!db) return;
-    const instrument = await ensureUsInstrument({ market, code: ticker });
-    await db.insert(usNewsTickerExchangeCache).values({ ticker, market, instrumentId: instrument ?? undefined, validatedAt: new Date() })
-      .onConflictDoUpdate({ target: usNewsTickerExchangeCache.ticker, set: { market, instrumentId: instrument ?? undefined, validatedAt: new Date() } });
-  } catch { /* cache is an optimization; KIS validation remains authoritative */ }
+  void ticker; void market;
 }
 
 async function kisGet(path: string, params: Record<string, string>, trId: string) {

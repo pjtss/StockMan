@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
-import { refreshKrDailyCandles, refreshKrMarketSnapshot } from "@/lib/kr-daily-price-cache";
+import { refreshKrDailyCandles } from "@/lib/kr-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
@@ -48,10 +48,10 @@ async function run(job: Job) {
         const item = scopes[cursor++];
         if (!item) return;
         try {
-          const [daily, weekly, monthly, quote] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D") : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W") : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M") : null, refreshKrMarketSnapshot(item.code)]);
-          const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null, quote: quote ? { ok: quote.ok, status: quote.status, price: quote.price, volume: quote.volume, tradingValue: quote.tradingValue, marketCap: quote.marketCap, turnoverRatio: quote.turnoverRatio, error: quote.error, rawText: quote.rawText } : null };
+          const [daily, weekly, monthly] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D") : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W") : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M") : null]);
+          const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null };
           job.results.push(result);
-          const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0) && result.quote?.ok === true;
+          const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0);
           if (success) job.successCount += 1;
           else {
             job.failureCount += 1;
@@ -59,7 +59,6 @@ async function run(job: Job) {
               const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly;
               if (Number(diagnostic?.parsedCandleCount ?? 0) <= 0) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: `${timeframe}: ${diagnostic?.msg1 ?? "KIS returned no candles"}` });
             }
-            if (result.quote?.ok !== true) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe: "D", error: `quote: ${result.quote?.error ?? "KIS quote failed"}` });
           }
         } catch (error) {
           job.failureCount += 1;

@@ -1,5 +1,4 @@
 import { findUsFiveDayHighBreakout, type UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
-import { getUsFreeFloat } from "@/lib/us-free-float";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 
 let activeScan: Promise<Awaited<ReturnType<typeof executeScan>>> | null = null;
@@ -26,14 +25,7 @@ async function executeScan(options: { limit?: number; concurrency?: number; cont
       const item = scanList[index];
       if (!item) return;
       const result = await findUsFiveDayHighBreakout({ code: item.code, market: item.market, cachedCandles: cachedCandles.get(`${item.market}:${item.code}`) });
-      // Free-float is only needed for an actual breakout notification. Avoid an
-      // FMP request for every non-breakout instrument in the full-table scan.
-      if (!result.qualifies) {
-        results[index] = { ...result, freeFloatShares: null, freeFloatPercent: null };
-        continue;
-      }
-      const float = await getUsFreeFloat(item.code).catch(() => null);
-      results[index] = { ...result, freeFloatShares: float?.ok ? float.floatShares : null, freeFloatPercent: float?.ok ? float.freeFloatPercent : null };
+      results[index] = { ...result, freeFloatShares: null, freeFloatPercent: null };
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, scanList.length)) }, worker));

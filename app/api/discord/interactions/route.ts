@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyDiscordSignature } from "@/lib/discord-interaction-security";
-import { formatTickerOverview, getTickerOverview } from "@/lib/discord-ticker-overview";
 import { runUsDailyBreakoutScan } from "@/lib/us-daily-breakout-automation";
 import { scanStoredUsMfiOversold } from "@/lib/us-mfi-oversold";
 import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
-import { scanUsVwap } from "@/lib/us-vwap";
-import { upsertUsTopRisingUniverse } from "@/lib/us-top-rising-universe";
-import { addUsTurnoverSymbol, clearUsTurnoverSymbols, loadUsTurnoverSymbols, removeUsTurnoverSymbol } from "@/lib/us-turnover-symbols";
 import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { runUsDailyFilterRefresh } from "@/lib/us-daily-filter-refresh";
@@ -18,7 +14,6 @@ import { fetchTickerNews, type KisNewsPeriod } from "@/lib/kis-news-radar";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
-import { analyzeUsShortSqueeze } from "@/lib/us-short-squeeze-analysis";
 import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
 
 export const runtime = "nodejs";
@@ -62,12 +57,6 @@ function formatDailyObvResult(result: Awaited<ReturnType<typeof scanStoredUsDail
 function formatDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPriceCache>>) {
   return [`✅ **전체 일봉 데이터 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 일봉 데이터가 DB에 저장되었습니다."].join("\n");
 }
-function formatVwapResult(result: Awaited<ReturnType<typeof scanUsVwap>>) {
-  const summary = `통합 종목 ${result.instrumentCount}개 · DB 캐시 ${result.cacheHitCount}개 · KIS 조회 ${result.kisRequestCount}개 · 실패 ${result.failureCount}개`;
-  if (!result.qualified.length) return [`당일 VWAP 상회 종목이 없습니다.`, summary].join("\n");
-  return [`📈 **당일 VWAP 상회 종목**`, `세션 ${result.sessionDate} · AMS/NAS/NYS · 전체 세션 데이터`, summary, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `현재가 ${formatDisplayNumber(item.currentPrice)} · VWAP ${formatDisplayNumber(item.vwap)} · 상회율 ${item.vwap && item.currentPrice != null ? formatDisplayPercent(((item.currentPrice / item.vwap) - 1) * 100) : "-"}`, `거래대금 ${formatDisplayNumber(item.totalTradeValue)} · 거래량 ${formatDisplayNumber(item.totalVolume)} · 포인트 ${item.pointCount}개`, `시총 ${formatDisplayNumber(item.marketCap)} · 시총 대비 거래대금 ${formatDisplayPercent(item.turnoverRatio)} · 등락률 ${formatDisplayPercent(item.changeRate)}`, `데이터 ${item.complete ? "완료" : "미완료"}`].join("\n")).join("\n\n")].join("\n");
-}
-
 function formatDailyTrendResult(result: Awaited<ReturnType<typeof scanUsDailyTrend>>) {
   if (!result.qualified.length) return [`일봉 급등 추세 후보가 없습니다.`, `기준 점수 ${result.policy.minScore}점 · RVOL ${result.policy.minRvol}x · 분석 ${result.instrumentCount}개`].join("\n");
   return [`🚀 **일봉 급등 추세 통합 후보**`, `기준 점수 ${result.policy.minScore}점 이상 · RVOL ${result.policy.minRvol}x 이상`, `OBV · MACD · MFI · 볼린저밴드 · DMI · 거래량`, `조건 충족 ${result.qualified.length}개`, "", ...result.qualified.slice(0, 20).map((item: any) => `${item.market} ${item.code}${item.name ? ` | ${item.name}` : ""} · 점수 ${item.score}점 · MFI ${item.mfi ?? "-"} · RVOL ${item.rvol == null ? "-" : Number(item.rvol).toFixed(2)}x`)].join("\n");
@@ -94,18 +83,10 @@ export async function POST(request: Request) {
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
   const interaction = JSON.parse(body);
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
-  if (interaction.type !== 2 || !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "short-squeeze", "refresh-daily", "daily-filter-refresh", "turnover-list", "turnover-add", "turnover-remove", "turnover-clear", "vwap", "sync-top100"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || !["news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "daily-filter-refresh"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
-  if (interaction.data.name === "turnover-list") {
-    void loadUsTurnoverSymbols().then((symbols) => updateOriginalResponse(applicationId, interaction.token, symbols.length ? `📋 **시총 대비 거래대금 탐지 목록 (${symbols.length}개)**\n${symbols.map((symbol) => `- ${symbol}`).join("\n")}` : "현재 등록된 시총 대비 거래대금 탐지 종목이 없습니다.")).catch(() => updateOriginalResponse(applicationId, interaction.token, "탐지 목록을 조회하지 못했습니다."));
-  } else if (interaction.data.name === "turnover-add") {
-    void addUsTurnoverSymbol(ticker).then((symbol) => updateOriginalResponse(applicationId, interaction.token, `✅ **${symbol}**을(를) 시총 대비 거래대금 탐지 목록에 추가했습니다.`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `종목 추가 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
-  } else if (interaction.data.name === "turnover-remove") {
-    void removeUsTurnoverSymbol(ticker).then((symbol) => updateOriginalResponse(applicationId, interaction.token, `✅ **${symbol}**을(를) 시총 대비 거래대금 탐지 목록에서 삭제했습니다.`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `종목 삭제 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
-  } else if (interaction.data.name === "turnover-clear") {
-    void clearUsTurnoverSymbols().then(() => updateOriginalResponse(applicationId, interaction.token, "✅ 시총 대비 거래대금 탐지 종목을 모두 삭제했습니다.")).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 삭제에 실패했습니다."));
-  } else if (interaction.data.name === "refresh-daily") {
+  if (interaction.data.name === "refresh-daily") {
     void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-breakout") {
     void runUsDailyBreakoutScan().then(async (result) => {
@@ -139,21 +120,10 @@ export async function POST(request: Request) {
     }).catch(() => updateOriginalResponse(applicationId, interaction.token, "MACD 종목을 조회하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-trend") {
     void scanUsDailyTrend().then(async (result) => { const webhookStatus = await notifyDailyWebhook("일봉 급등 추세 통합", () => sendUsDailyTrendToDiscord(result.results)); return updateOriginalResponse(applicationId, interaction.token, `${formatDailyTrendResult(result)}\n\n${webhookStatus.trim()}`); }).catch(() => updateOriginalResponse(applicationId, interaction.token, "일봉 급등 추세 종목을 조회하는 중 오류가 발생했습니다."));
-  } else if (interaction.data.name === "short-squeeze") {
-      void analyzeUsShortSqueeze(ticker).then((result) => updateOriginalResponse(applicationId, interaction.token, result.ok ? [`🩳 **${result.ticker} 숏스퀴즈 평가**`, `상태 ${result.squeezeState} · 등급 ${result.squeezeGrade} · 점수 ${result.squeezeScore}/${result.maxAvailableScore}`, `신뢰도 ${result.dataConfidence} · 커버리지 ${formatDisplayPercent(result.scoreCoveragePercent)}`, `현재가 ${formatDisplayNumber(result.currentPrice)} · SI/Float ${formatDisplayPercent(result.shortInterestFloatPercent)}`, `Days To Cover ${"daysToCover" in result && typeof result.daysToCover === "number" ? formatDisplayNumber(result.daysToCover) : "-"} · Short Volume Ratio ${result.shortVolumeRatio == null ? "-" : formatDisplayPercent(result.shortVolumeRatio * 100)}`, `공매도 잔고 출처 ${result.shortInterestSource ?? "-"} · 유통주 출처 ${result.floatSource ?? "-"} (${result.floatDataType ?? "-"})`, `기준일 공매도 ${result.shortInterestAsOf ?? "-"} · 유통주 ${result.floatAsOf ?? "-"}`, "※ 공개 데이터 기반 추정이며 실제 강제청산 가격·숏 원가는 제공되지 않습니다."].join("\n") : `공매도 평가 실패: ${result.error}`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `공매도 평가 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
-  } else if (interaction.data.name === "vwap") {
-    void scanUsVwap().then((result) => updateOriginalResponse(applicationId, interaction.token, formatVwapResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "당일 VWAP 종목을 조회하는 중 오류가 발생했습니다."));
-  } else if (interaction.data.name === "sync-top100") {
-    void upsertUsTopRisingUniverse().then((result) => updateOriginalResponse(applicationId, interaction.token, `✅ TOP100 통합 티커 갱신 완료\n거래소 ${result.exchanges.join(", ")} · 현재 통합 종목 ${result.activeInstrumentCount}개\n${result.results.map((row) => `${row.market}: 원본 ${row.sourceCount} · UPSERT ${row.upsertedCount} · 제외 ${row.excludedCount}`).join("\n")}`)).catch(() => updateOriginalResponse(applicationId, interaction.token, "TOP100 통합 티커 갱신에 실패했습니다."));
   } else if (interaction.data.name === "daily-filter-refresh") {
     void runUsDailyFilterRefresh().then((result) => updateOriginalResponse(applicationId, interaction.token, `✅ 통합 일봉 필터 재평가 및 Webhook 전송 완료\n대상: OBV ${result.instruments.obv} · MFI ${result.instruments.mfi} · DMI ${result.instruments.dmi} · MACD ${result.instruments.macd} · 돌파 ${result.instruments.breakout}\n후보: OBV ${result.counts.obv} · MFI ${result.counts.mfi} · DMI ${result.counts.dmi} · MACD ${result.counts.macd} · 돌파 ${result.counts.breakout}`)).catch((error) => updateOriginalResponse(applicationId, interaction.token, `통합 일봉 필터 갱신 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (interaction.data.name === "news") {
-    void loadFeatureModuleSettings("us-news-radar").then((settings) => {
-      const period = settings.featureSettings?.newsLookup?.defaultPeriod || "today";
-      return fetchTickerNews(ticker, { period: period as KisNewsPeriod });
-    }).then((result) => updateOriginalResponse(applicationId, interaction.token, formatNewsResult(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `뉴스 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
-  } else {
-    void getTickerOverview(ticker).then((overview) => updateOriginalResponse(applicationId, interaction.token, formatTickerOverview(overview))).catch(() => updateOriginalResponse(applicationId, interaction.token, "티커 정보를 조회하는 중 오류가 발생했습니다."));
+    void fetchTickerNews(ticker, { period: "today" as KisNewsPeriod }).then((result) => updateOriginalResponse(applicationId, interaction.token, formatNewsResult(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `뉴스 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   }
   return NextResponse.json({ type: 5, data: { flags: 64 } });
 }

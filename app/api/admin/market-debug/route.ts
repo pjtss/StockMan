@@ -3,7 +3,6 @@ import { requireAdminSession } from "@/lib/admin-auth";
 import { getPool } from "@/lib/db";
 import { responseTimeMs, resolveRequestId, withRequestTrace } from "@/lib/request-trace";
 import { scanStoredKrBollingerBands } from "@/lib/kr-bollinger-band";
-import { syncKrInstrumentUniverseFromKis } from "@/lib/kr-instruments";
 import { scanStoredUsBollingerBands } from "@/lib/us-bollinger-band";
 import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
@@ -19,7 +18,7 @@ async function safeQuery<T extends import("pg").QueryResultRow>(sql: string, val
 }
 
 async function inventory() {
-  const tables = ["kr_instruments", "kr_daily_price_candles", "kr_market_snapshots", "us_instruments", "us_daily_price_candles", "us_turnover_ratio_snapshots"];
+  const tables = ["kr_instrument_universe", "kr_instrument_universe_candles", "us_instrument_universe", "us_instrument_universe_candles"];
   const tableResult = await safeQuery<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1::text[]) ORDER BY table_name", [tables]);
   const present = new Set(tableResult.rows.map((row) => row.table_name));
   const counts: Record<string, unknown> = {};
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
   const run = ["1", "true", "yes"].includes((url.searchParams.get("run") ?? "").toLowerCase());
   const body: Record<string, unknown> = { ok: true, mode: run ? "ADMIN_DEBUG_RUN" : "ADMIN_DEBUG_SNAPSHOT", checkedAt: new Date().toISOString(), requestId, responseTimeMs: responseTimeMs(startedAt), requestedMarket: market, environment: { kisConfigured: Boolean(process.env.KIS_APPKEY && process.env.KIS_APPSECRET), databaseConfigured: Boolean(process.env.DATABASE_URL), cronSecretConfigured: Boolean(process.env.CRON_SECRET) }, inventory: await inventory() };
   if (run && (market === "KR" || market === "ALL")) {
-    try { body.kr = { sync: await syncKrInstrumentUniverseFromKis(), scan: await scanStoredKrBollingerBands() }; }
+    try { body.kr = { scan: await scanStoredKrBollingerBands() }; }
     catch (error) { body.kr = { ok: false, error: error instanceof Error ? error.message : String(error) }; }
   }
   if (run && (market === "US" || market === "ALL")) {
