@@ -8,18 +8,23 @@ import { instrumentUniverseSyncRuns, krInstrumentUniverse, usInstrumentUniverse 
 type KrRow = { market: "KOSPI" | "KOSDAQ"; code: string; standardCode: string; name: string; securityGroupCode: string; marketCapScale: string; industryLargeCode: string; industryMediumCode: string; industrySmallCode: string; etpProductClassCode: string; preferredClassCode: string; tradingHaltCode: string; liquidationCode: string; managedIssueCode: string; sourceFile: string; rawPayload: string };
 type UsRow = { market: "NAS" | "NYS" | "AMS"; code: string; realtimeSymbol: string; name: string; englishName: string; securityType: string; etpType: string; currency: string; countryCode: string; industryCode: string; isEtf: boolean; isWarrant: boolean; isDerivative: boolean; isDr: boolean; sourceFile: string; rawPayload: string };
 
-function decode(bytes: Buffer) { return new TextDecoder("euc-kr").decode(bytes); }
+const KIS_DECODER = new TextDecoder("euc-kr");
+function decode(bytes: Buffer) { return KIS_DECODER.decode(bytes); }
 function clean(value: string | undefined) { return (value ?? "").replace(/\0/g, "").trim(); }
 function bool(value: string) { return value.toUpperCase() === "Y"; }
 
 export function parseDomestic(buffer: Buffer, market: "KOSPI" | "KOSDAQ", sourceFile: string): KrRow[] {
-  return decode(buffer).split(/\r?\n/).map((raw) => raw.replace(/\r$/, "")).filter(Boolean).map((raw) => {
+  // The domestic master is a byte-offset fixed-width file.  Applying the
+  // offsets after decoding CP949 is incorrect because Korean characters are
+  // two bytes but one JavaScript character; that shifted the security-group
+  // field (for example BC/EF) and let ETPs through as COMMON_STOCK.
+  return buffer.toString("binary").split("\n").map((line) => Buffer.from(line.replace(/\r$/, ""), "binary")).filter((line) => line.length > 0).map((line) => {
     const kospi = market === "KOSPI";
-    const one = (offset: number) => clean(raw.slice(offset, offset + 1));
-    const two = (offset: number) => clean(raw.slice(offset, offset + 2));
+    const field = (offset: number, length: number) => clean(decode(line.subarray(offset, offset + length)));
+    const one = (offset: number) => field(offset, 1);
     // Offsets follow KIS Developers' official 종목마스터정보(코스피/코스닥).h.
-    const common = { market, code: clean(raw.slice(0, 6)), standardCode: clean(raw.slice(9, 21)), name: clean(raw.slice(21, 61)), securityGroupCode: clean(raw.slice(61, 63)), marketCapScale: one(63), industryLargeCode: clean(raw.slice(64, 67)), industryMediumCode: clean(raw.slice(67, 70)), industrySmallCode: clean(raw.slice(70, 73)), sourceFile, rawPayload: raw };
-    const etp = one(kospi ? 80 : 76);
+    const common = { market, code: field(0, 6), standardCode: field(9, 12), name: field(21, 40), securityGroupCode: field(61, 2), marketCapScale: one(63), industryLargeCode: field(64, 4), industryMediumCode: field(68, 4), industrySmallCode: field(72, 4), sourceFile, rawPayload: decode(line) };
+    const etp = one(kospi ? 84 : 80);
     const halt = one(kospi ? 118 : 113);
     const liquidation = one(kospi ? 119 : 114);
     const managed = one(kospi ? 120 : 115);
