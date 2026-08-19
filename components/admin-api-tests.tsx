@@ -219,6 +219,16 @@ const TESTS: ApiTestDefinition[] = [
   { key: "sec_edgar", label: "SEC EDGAR 수집·분류·XBRL", description: "티커·CIK 매핑, Submissions 저장, Form/Item 분류, 선택적 Company Facts 저장", endpoint: "/api/admin/sec-edgar-test", query: "ticker=AAPL&facts=true" },
 ];
 
+// Legacy integrated-universe endpoints were removed with V70. Keep their historical
+// definitions out of the admin runner so the dashboard cannot invoke deleted APIs.
+const RETIRED_TEST_KEYS = new Set<TestKey>([
+  "us_turnover_ratio", "us_turnover_watchlist", "us_vwap", "kr_instruments_sync",
+  "us_top100_upsert", "us_trade_collect", "discord_ticker", "us_free_float",
+  "us_free_float_refresh", "us_product_classification", "short_interest",
+  "us_short_squeeze", "us_obv", "us_news_radar", "us_news_ticker", "us_news_radar_events",
+]);
+const ACTIVE_TESTS = TESTS.filter((test) => !RETIRED_TEST_KEYS.has(test.key));
+
 export function AdminApiTests() {
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<TestKey | null>(null);
@@ -310,7 +320,7 @@ export function AdminApiTests() {
     }
   }
 
-  const activeTest = TESTS.find((test) => test.key === active);
+  const activeTest = ACTIVE_TESTS.find((test) => test.key === active);
 
   return (
     <AdminPageShell
@@ -321,7 +331,7 @@ export function AdminApiTests() {
       {error && <div className={`${styles.alert} ${styles.error}`}>{error}</div>}
 
       <section className={styles.statusGrid} aria-label="API 테스트 목록">
-        {TESTS.map((test) => {
+        {ACTIVE_TESTS.map((test) => {
           const isRunning = running === test.key;
           return (
             <article key={test.key} className={styles.card}>

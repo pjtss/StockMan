@@ -1,4 +1,3 @@
-import { getPool } from "@/lib/db";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
@@ -96,26 +95,6 @@ export async function loadUsBollingerPolicy(moduleKey: "us-bollinger-band" | "us
   };
 }
 
-async function loadTurnoverMetrics(items: Array<{ market: string; code: string }>) {
-  const metrics = new Map<string, { marketCap: number | null; turnoverRatio: number | null }>();
-  if (!items.length) return metrics;
-  try {
-    const result = await getPool().query<{ market: string; code: string; market_cap: number | null; turnover_ratio: number | null }>(
-      `SELECT DISTINCT ON (market, code) market, code, market_cap, turnover_ratio
-       FROM us_turnover_ratio_snapshots
-       WHERE observed_at >= NOW() - INTERVAL '24 hours'
-         AND (market, code) IN (${items.map((_, index) => `($${index * 2 + 1}, $${index * 2 + 2})`).join(",")})
-       ORDER BY market, code, observed_at DESC`,
-      items.flatMap((item) => [item.market.toUpperCase(), item.code.toUpperCase()]),
-    );
-    for (const row of result.rows) metrics.set(`${row.market.toUpperCase()}:${row.code.toUpperCase()}`, { marketCap: row.market_cap == null ? null : Number(row.market_cap), turnoverRatio: row.turnover_ratio == null ? null : Number(row.turnover_ratio) });
-  } catch {
-    // A missing turnover snapshot should be reported as a filter failure, not
-    // cause the entire DB-backed diagnostic to abort.
-  }
-  return metrics;
-}
-
 export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsBollingerPolicy>; concurrency?: number; context?: UsDailyScanContext; moduleKey?: "us-bollinger-band" | "us-bollinger-middle-lower" } = {}) {
   const moduleKey = options.moduleKey ?? "us-bollinger-band";
   const configured = options.policy ? { ...(await loadUsBollingerPolicy(moduleKey)), ...options.policy } : await loadUsBollingerPolicy(moduleKey);
@@ -137,7 +116,9 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
   }
   const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(35, policy.period + 1), timeframe });
   const instruments = context.universe.scopes;
-  const metrics = await loadTurnoverMetrics(instruments);
+  // Legacy turnover snapshots are intentionally not consulted. Optional
+  // market-cap/turnover filters can only use fields supplied by the caller.
+  const metrics = new Map<string, { marketCap: number | null; turnoverRatio: number | null }>();
   const results: UsBollingerResult[] = [];
   const startedAt = Date.now();
   let cursor = 0;

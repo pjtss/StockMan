@@ -1,9 +1,7 @@
 import { isGlobalMarketCapAllowed, isTurnoverRatioAllowed, loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
-import { getPool } from "@/lib/db";
 
 export async function filterUsDailyCandidates<T extends Record<string, any>>(items: T[]) {
   const settings = await loadUsTurnoverFilterSettings();
-  const pool = getPool();
   const metrics = new Map<string, {
     marketCap: number | null;
     turnoverRatio: number | null;
@@ -11,18 +9,8 @@ export async function filterUsDailyCandidates<T extends Record<string, any>>(ite
     price: number | null;
     changeRate: number | null;
   }>();
-  if (pool && items.length) {
-    const keys = items.map((item) => `${String(item.market || "").toUpperCase()}:${String(item.code || "").toUpperCase()}`);
-    const result = await pool.query(`SELECT DISTINCT ON (market, code) market, code, market_cap, turnover_ratio, trading_value, price, change_rate FROM us_turnover_ratio_snapshots WHERE observed_at >= NOW() - INTERVAL '24 hours' AND (market, code) IN (${items.map((_, index) => `($${index * 2 + 1}, $${index * 2 + 2})`).join(",")}) ORDER BY market, code, observed_at DESC`, items.flatMap((item) => [String(item.market || "").toUpperCase(), String(item.code || "").toUpperCase()]));
-    for (const row of result.rows) metrics.set(`${String(row.market).toUpperCase()}:${String(row.code).toUpperCase()}`, {
-      marketCap: row.market_cap == null ? null : Number(row.market_cap),
-      turnoverRatio: row.turnover_ratio == null ? null : Number(row.turnover_ratio),
-      tradingValue: row.trading_value == null ? null : Number(row.trading_value),
-      price: row.price == null ? null : Number(row.price),
-      changeRate: row.change_rate == null ? null : Number(row.change_rate),
-    });
-    void keys;
-  }
+  // Daily scanners are DB-candle based. Legacy live turnover snapshots are
+  // not queried; callers may provide quote fields directly when needed.
   const matchedMetricCount = items.filter((item) => metrics.has(`${String(item.market || "").toUpperCase()}:${String(item.code || "").toUpperCase()}`)).length;
   const failureReasons: Record<string, number> = {};
   const filtered = items.filter((item) => {

@@ -54,20 +54,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/admin/daily-indicators",
   },
   {
-    id: "blacklist",
-    group: "종목",
-    label: "수동 제외 종목",
-    description: "AMS 스캐너 제외 티커 관리",
-    href: "/admin/us-turnover-blacklist",
-  },
-  {
-    id: "product-classification",
-    group: "종목",
-    label: "상품 분류",
-    description: "ETF·레버리지·인버스 상품 자동 분류와 예외 관리",
-    href: "/admin/us-instrument-products",
-  },
-  {
     id: "sec-test",
     group: "API",
     label: "SEC 분석 테스트",

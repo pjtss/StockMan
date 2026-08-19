@@ -7,7 +7,6 @@ const destinations = [
   { href: "/scanners/trading-intensity", label: "국내 체결강도 TOP 10", description: "국내 시장 체결강도 상위 종목" },
   { href: "/scanners/us/intensity", label: "미국 체결강도 TOP 10", description: "미국 시장 체결강도 상위 종목" },
   { href: "/scanners/us/turnover-ratio", label: "미국 거래대금 비율", description: "시총 대비 거래대금 조건 종목" },
-  { href: "/short-borrow", label: "공매도 대차 압박", description: "Alpaca 계정 기준 대차·Locate 상태" },
 ];
 
 export default function HomePage() {
