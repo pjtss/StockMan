@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { krInstruments } from "@/lib/schema";
+import { krInstrumentUniverse, krInstruments } from "@/lib/schema";
 import { fetchDomesticFluctuation, fetchDomesticVolumePower, fetchDomesticTradeValueRanking } from "@/lib/kis-domestic-api";
 import { getAccessToken } from "@/lib/kis";
 import { classifyKrInstrumentProduct, isEligibleKrCommonStock } from "@/lib/kr-instrument-product";
@@ -22,9 +22,9 @@ export async function ensureKrInstrument(input: { code: string; name?: string; p
   return { market: (input.market ?? KR_MARKET).toUpperCase(), code, saved: true, excluded: false };
 }
 export async function loadStoredKrInstrumentScopes() {
-  const rows = await getDb().select({ market: krInstruments.market, code: krInstruments.code, name: krInstruments.name, productStatus: krInstruments.productStatus }).from(krInstruments).where(and(eq(krInstruments.enabled, true), eq(krInstruments.productStatus, "ACTIVE"))).orderBy(asc(krInstruments.code));
-  const eligible = rows.filter((row) => isEligibleKrCommonStock(classifyKrInstrumentProduct({ name: row.name })));
-  return { scopes: eligible.map(({ productStatus: _productStatus, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENTS", count: eligible.length, excludedInDb: rows.length - eligible.length } };
+  const rows = await getDb().select({ market: krInstrumentUniverse.market, code: krInstrumentUniverse.code, name: krInstrumentUniverse.name, instrumentType: krInstrumentUniverse.instrumentType, isEtp: krInstrumentUniverse.isEtp, isWarrant: krInstrumentUniverse.isWarrant, isPreferred: krInstrumentUniverse.isPreferred, isSuspended: krInstrumentUniverse.isSuspended }).from(krInstrumentUniverse).where(and(eq(krInstrumentUniverse.enabled, true), eq(krInstrumentUniverse.market, KR_MARKET))).orderBy(asc(krInstrumentUniverse.code));
+  const eligible = rows.filter((row) => !row.isEtp && !row.isWarrant && !row.isSuspended && (row.instrumentType === "COMMON_STOCK" || row.instrumentType === "DR") && isEligibleKrCommonStock(classifyKrInstrumentProduct({ name: row.name })));
+  return { scopes: eligible.map(({ instrumentType: _instrumentType, isEtp: _isEtp, isWarrant: _isWarrant, isPreferred: _isPreferred, isSuspended: _isSuspended, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENT_UNIVERSE", count: eligible.length, excludedInDb: rows.length - eligible.length } };
 }
 export async function syncKrInstrumentUniverseFromKis() {
   const token = await getAccessToken(); if (!token) throw new Error("KIS_TOKEN_UNAVAILABLE");
