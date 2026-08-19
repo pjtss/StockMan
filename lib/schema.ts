@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision, numeric } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART 및 SEC 공시 이력 엔티티
