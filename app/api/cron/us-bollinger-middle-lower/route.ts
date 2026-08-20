@@ -6,6 +6,7 @@ import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { scanStoredUsBollingerBands } from "@/lib/us-bollinger-band";
 import { sendUsBollingerBandSignals } from "@/lib/discord-us-bollinger-band";
+import { persistDailyBollingerResults } from "@/lib/daily-bollinger-cache";
 
 export async function POST(request: Request) {
   const debugRun = new URL(request.url).searchParams.get("debug") === "true" || request.headers.get("x-debug-run") === "true";
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
   const result = await withAutomationRun("us-bollinger-middle-lower", async () => {
     const scan = await scanStoredUsBollingerBands({ moduleKey: "us-bollinger-middle-lower" });
     const discord = await sendUsBollingerBandSignals(scan.results, "중단선~하단선");
-    return { ...scan, discord };
+    const cache = await persistDailyBollingerResults("US", "MIDDLE_TO_LOWER", scan);
+    return { ...scan, discord, cache };
   });
   return NextResponse.json({ ok: true, debugRun, intervalSeconds, cooldownSeconds: settings.cooldownSeconds, effectiveIntervalSeconds, ...result });
 }

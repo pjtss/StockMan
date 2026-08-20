@@ -6,6 +6,7 @@ import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { scanStoredUsBollingerBands } from "@/lib/us-bollinger-band";
 import { sendUsBollingerBandSignals } from "@/lib/discord-us-bollinger-band";
+import { persistDailyBollingerResults } from "@/lib/daily-bollinger-cache";
 
 export async function POST(request: Request) {
   const debugRun = new URL(request.url).searchParams.get("debug") === "true" || request.headers.get("x-debug-run") === "true";
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     const result = await withAutomationRun("us-bollinger-band", async () => {
       const scan = await scanStoredUsBollingerBands();
       const discord = await sendUsBollingerBandSignals(scan.results);
-      return { ...scan, discord };
+      const cache = await persistDailyBollingerResults("US", scan.policy.zone ?? "LOWER_OR_BELOW", scan);
+      return { ...scan, discord, cache };
     });
     return NextResponse.json({ debugRun, intervalSeconds, cooldownSeconds: settings.cooldownSeconds, effectiveIntervalSeconds, ...result });
   } catch (error) {
