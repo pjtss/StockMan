@@ -5,6 +5,8 @@ describe("Discord daily detection cache commands", () => {
   it("maps the four requested commands to cache keys", () => {
     expect(getDailyCacheCommand("kr-bollinger-cache")?.key).toBe("daily-bollinger:KR:D:LOWER_OR_BELOW");
     expect(getDailyCacheCommand("us-bollinger-cache")?.key).toBe("daily-bollinger:US:D:LOWER_OR_BELOW");
+    expect(getDailyCacheCommand("kr-bollinger-middle-lower-cache")?.key).toBe("daily-bollinger:KR:D:MIDDLE_TO_LOWER");
+    expect(getDailyCacheCommand("us-bollinger-middle-lower-cache")?.key).toBe("daily-bollinger:US:D:MIDDLE_TO_LOWER");
     expect(getDailyCacheCommand("kr-golden-cross-cache")?.key).toBe("daily-golden-cross:KR:D");
     expect(getDailyCacheCommand("us-golden-cross-cache")?.key).toBe("daily-golden-cross:US:D");
   });

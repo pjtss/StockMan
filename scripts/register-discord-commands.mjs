@@ -17,6 +17,8 @@ const response = await fetch(endpoint, { method: "PUT", headers: { authorization
   { name: "daily-filter-refresh", description: "DB의 최신 일봉 데이터로 전체 일봉 필터를 재평가하고 Webhook으로 전송합니다.", type: 1 },
   { name: "kr-bollinger-cache", description: "국내 일봉 볼린저밴드 하단 이하 캐시를 조회합니다.", type: 1 },
   { name: "us-bollinger-cache", description: "해외 일봉 볼린저밴드 하단 이하 캐시를 조회합니다.", type: 1 },
+  { name: "kr-bollinger-middle-lower-cache", description: "국내 일봉 볼린저밴드 중단선~하단선 캐시를 조회합니다.", type: 1 },
+  { name: "us-bollinger-middle-lower-cache", description: "해외 일봉 볼린저밴드 중단선~하단선 캐시를 조회합니다.", type: 1 },
   { name: "kr-golden-cross-cache", description: "국내 일봉 골든크로스 캐시를 조회합니다.", type: 1 },
   { name: "us-golden-cross-cache", description: "해외 일봉 골든크로스 캐시를 조회합니다.", type: 1 },
 ]) });

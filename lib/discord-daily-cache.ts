@@ -1,6 +1,6 @@
 import { readKisCache } from "@/lib/kis-cache";
 
-export type DailyCacheCommand = "kr-bollinger-cache" | "us-bollinger-cache" | "kr-golden-cross-cache" | "us-golden-cross-cache";
+export type DailyCacheCommand = "kr-bollinger-cache" | "us-bollinger-cache" | "kr-bollinger-middle-lower-cache" | "us-bollinger-middle-lower-cache" | "kr-golden-cross-cache" | "us-golden-cross-cache";
 
 type CacheRecord = {
   market?: string;
@@ -26,6 +26,8 @@ type CachePayload = {
 const COMMANDS: Record<DailyCacheCommand, { key: string; title: string }> = {
   "kr-bollinger-cache": { key: "daily-bollinger:KR:D:LOWER_OR_BELOW", title: "국내 일봉 볼린저밴드 하단 이하" },
   "us-bollinger-cache": { key: "daily-bollinger:US:D:LOWER_OR_BELOW", title: "해외 일봉 볼린저밴드 하단 이하" },
+  "kr-bollinger-middle-lower-cache": { key: "daily-bollinger:KR:D:MIDDLE_TO_LOWER", title: "국내 일봉 볼린저밴드 중단선~하단선" },
+  "us-bollinger-middle-lower-cache": { key: "daily-bollinger:US:D:MIDDLE_TO_LOWER", title: "해외 일봉 볼린저밴드 중단선~하단선" },
   "kr-golden-cross-cache": { key: "daily-golden-cross:KR:D", title: "국내 일봉 골든크로스" },
   "us-golden-cross-cache": { key: "daily-golden-cross:US:D", title: "해외 일봉 골든크로스" },
 };
@@ -67,4 +69,3 @@ export function formatDailyCacheCommand(result: Awaited<ReturnType<typeof loadDa
   if (included === 0 && lines.length === 0) content += "\n조건 충족 종목이 없습니다.";
   return content;
 }
-
