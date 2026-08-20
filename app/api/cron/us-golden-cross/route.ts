@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
-import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { loadLatestExecutedAutomationRun, loadRunningAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { createUsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { calculateGoldenCross, persistGoldenCrossResults, type GoldenCrossResult } from "@/lib/daily-golden-cross";
 
@@ -12,6 +12,8 @@ export async function POST(request: Request) {
   if (!secret || supplied !== secret) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("us-golden-cross");
   const debugRun = new URL(request.url).searchParams.get("debug") === "true" || request.headers.get("x-debug-run") === "true";
+  const running = await loadRunningAutomationRun("us-golden-cross").catch(() => null);
+  if (running) { await recordSkippedAutomationRun("us-golden-cross", "already_running", { runningRunId: running.id, runningStartedAt: running.started_at }); return NextResponse.json({ ok: true, skipped: true, reason: "already_running", runningRunId: running.id }); }
   if (!debugRun && !settings.enabled) { await recordSkippedAutomationRun("us-golden-cross", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
   if (!debugRun && !isWithinSchedule(settings)) { await recordSkippedAutomationRun("us-golden-cross", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
   const intervalSeconds = Math.max(3600, settings.intervalSeconds ?? 86400);

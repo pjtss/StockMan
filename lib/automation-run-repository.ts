@@ -101,3 +101,21 @@ export async function loadLatestExecutedAutomationRun(moduleKey: FeatureModuleKe
   );
   return rows.rows[0] || null;
 }
+
+/** Return an active worker so expensive scans cannot overlap. */
+export async function loadRunningAutomationRun(moduleKey: FeatureModuleKey) {
+  const rows = await getPool().query<{
+    id: number;
+    started_at: string;
+  }>(
+    `SELECT id, started_at
+       FROM automation_runs
+      WHERE module_key = $1
+        AND status = 'RUNNING'
+        AND started_at >= NOW() - (900 * INTERVAL '1 second')
+      ORDER BY started_at DESC
+      LIMIT 1`,
+    [moduleKey],
+  );
+  return rows.rows[0] || null;
+}
