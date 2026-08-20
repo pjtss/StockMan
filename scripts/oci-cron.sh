@@ -68,6 +68,8 @@ run_cron_endpoint "instrument-fundamentals" 300 "/api/cron/instrument-fundamenta
 run_cron_endpoint "market-rss" 180 "/api/cron/market-rss"
 
 run_cron_endpoint "us-daily-cache" 300 "/api/cron/us-daily-cache"
+run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
+run_cron_endpoint "us-bollinger-middle-lower" 180 "/api/cron/us-bollinger-middle-lower"
 run_cron_endpoint "us-golden-cross" 180 "/api/cron/us-golden-cross"
 
 run_cron_endpoint "us-daily-open-cache" 300 "/api/cron/us-daily-open-cache"
@@ -75,15 +77,11 @@ run_cron_endpoint "us-daily-open-cache" 300 "/api/cron/us-daily-open-cache"
 run_cron_endpoint "us-daily-breakout" 120 "/api/cron/us-daily-breakout"
 
 
-run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
-run_cron_endpoint "us-bollinger-middle-lower" 180 "/api/cron/us-bollinger-middle-lower"
-
 run_cron_endpoint "us-minute-bollinger-band" 180 "/api/cron/us-minute-bollinger-band"
 
+run_cron_endpoint "kr-daily-cache" 300 "/api/cron/kr-daily-cache"
 run_cron_endpoint "kr-bollinger-band" 180 "/api/cron/kr-bollinger-band"
 run_cron_endpoint "kr-bollinger-middle-lower" 180 "/api/cron/kr-bollinger-middle-lower"
-
-run_cron_endpoint "kr-daily-cache" 300 "/api/cron/kr-daily-cache"
 run_cron_endpoint "kr-golden-cross" 180 "/api/cron/kr-golden-cross"
 
 ELAPSED_MS=$(( $(date +%s%3N) - START_MS ))

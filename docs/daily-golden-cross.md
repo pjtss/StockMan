@@ -17,3 +17,12 @@
 - 해외: `daily-golden-cross:US:D`
 
 일봉 캐시 갱신 API가 먼저 실행되고 같은 cron 패스에서 골든크로스 API가 뒤따른다. 따라서 탐지 결과는 최신 일봉 캐시를 기반으로 다시 계산된다. `qualified`에는 적격 종목, `scannedCount`에는 계산 대상 수, `updatedAt`에는 저장 시각을 기록한다.
+
+볼린저밴드도 동일한 방식으로 탐지 결과를 별도 저장한다.
+
+- `daily-bollinger:KR:D:LOWER_OR_BELOW`
+- `daily-bollinger:KR:D:MIDDLE_TO_LOWER`
+- `daily-bollinger:US:D:LOWER_OR_BELOW`
+- `daily-bollinger:US:D:MIDDLE_TO_LOWER`
+
+OCI cron은 각 시장별로 `일봉 캐시 → 볼린저밴드 결과 캐시 → 골든크로스 결과 캐시` 순서로 호출한다. 캐시 확인용 일회성 API는 `GET /api/debug/daily-golden-cross-cache`이며 `CRON_SECRET` 인증이 필요하다.
