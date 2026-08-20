@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseDomestic, parseOverseas } from "@/lib/instrument-universe-import";
+import { classifyKr, parseDomestic, parseOverseas } from "@/lib/instrument-universe-import";
 
 const masterDir = path.join(process.cwd(), "docs", "references", "kis-instrument-masters", "2026-08-18");
 
@@ -19,6 +19,9 @@ describe("KIS instrument master parsers", () => {
     const fund = kospi.find((row) => row.securityGroupCode === "BC");
     expect(fund).toBeDefined();
     expect(fund?.name).not.toContain("BC");
+    expect(kospi.some((row) => /스팩|SPAC|우선주|우\(전환\)/i.test(row.name))).toBe(true);
+    const spac = rows.find((row) => /스팩|SPAC/i.test(row.name));
+    expect(spac && classifyKr(spac).instrumentType).toBe("EXCLUDED_PRODUCT");
   });
   it("parses overseas tab masters and preserves market mapping", async () => {
     const buffer = await readFile(path.join(masterDir, "NASMST.COD"));

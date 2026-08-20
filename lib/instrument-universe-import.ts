@@ -41,11 +41,18 @@ export function parseOverseas(buffer: Buffer, market: "NAS" | "NYS" | "AMS", sou
   }).filter((row) => row.code.length > 0);
 }
 
-function classifyKr(row: KrRow) {
+export function classifyKr(row: KrRow) {
   const isEtp = ["EF", "FE"].includes(row.securityGroupCode) || ["1", "2", "3", "4", "5"].includes(row.etpProductClassCode);
   const isWarrant = ["EW", "SW", "SR"].includes(row.securityGroupCode);
-  const isPreferred = ["1", "2"].includes(row.preferredClassCode);
-  const excluded = isEtp || isWarrant || ["BC", "MF", "RT", "SC", "IF"].includes(row.securityGroupCode) || isPreferred;
+  // KIS exposes SPACs and some preferred/convertible shares as ST (stock) in
+  // the security-group field. Their official master name is the remaining
+  // authoritative product descriptor, so exclude these names from the
+  // COMMON_STOCK universe rather than allowing them into daily scanners.
+  const preferredName = /(?:우선주|우(?:\(|$)|\d우B(?:\(|$))/i.test(row.name);
+  const spacName = /(?:스팩|SPAC)/i.test(row.name);
+  const convertibleName = /(?:전환|신주인수권|권리주)/i.test(row.name);
+  const isPreferred = ["1", "2"].includes(row.preferredClassCode) || preferredName;
+  const excluded = isEtp || isWarrant || spacName || convertibleName || ["BC", "MF", "RT", "SC", "IF"].includes(row.securityGroupCode) || isPreferred;
   return { instrumentType: excluded ? "EXCLUDED_PRODUCT" : row.securityGroupCode === "DR" ? "DR" : "COMMON_STOCK", isEtp, isWarrant, isPreferred, isSuspended: ["Y", "1"].includes(row.tradingHaltCode) || ["Y", "1"].includes(row.liquidationCode) || ["Y", "1"].includes(row.managedIssueCode) };
 }
 
