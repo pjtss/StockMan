@@ -12,8 +12,8 @@ export type FeatureSpecificSettings = {
   automationCompletion?: { enabled?: boolean; webhookUrl?: string };
   marketRss?: { enabledSources?: string[] };
   secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
-  bollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER" };
-  krBollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER" };
+  bollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER"; requireObvAdlSignal?: boolean; obvSignalPeriod?: number; adlSignalPeriod?: number };
+  krBollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER"; requireObvAdlSignal?: boolean; obvSignalPeriod?: number; adlSignalPeriod?: number };
   newsLookup?: { defaultPeriod: "today" | "3d" | "7d" | "1m" };
   minuteBollingerPolicy?: { topN: number; period: number; stdDevMultiplier: number; minChangeRate: number };
 };

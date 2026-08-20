@@ -29,11 +29,11 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "domestic-trade-intensity": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-bollinger-band": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
   "us-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
-  "us-bollinger-middle-lower": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER" } } },
+  "us-bollinger-middle-lower": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER", requireObvAdlSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "us-minute-bollinger-band": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 120, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { minuteBollingerPolicy: { topN: 30, period: 20, stdDevMultiplier: 2, minChangeRate: 0 } } },
   "kr-bollinger-band": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
   "kr-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
-  "kr-bollinger-middle-lower": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER" } } },
+  "kr-bollinger-middle-lower": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER", requireObvAdlSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "kr-daily-cache": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 21_600, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-news-radar": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { newsLookup: { defaultPeriod: "today" } } },
@@ -114,6 +114,8 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     validateNumber("bollinger_min_price", policy?.minPrice, 0);
     validateNumber("bollinger_min_volume", policy?.minVolume, 0);
     validateNumber("bollinger_min_turnover_ratio", policy?.minTurnoverRatio, 0);
+    for (const name of ["obvSignalPeriod", "adlSignalPeriod"]) { if (policy?.[name] !== undefined && (!Number.isInteger(Number(policy[name])) || Number(policy[name]) < 2 || Number(policy[name]) > 100)) throw new Error(`INVALID_BOLLINGER_${name.toUpperCase()}`); }
+    if (policy?.requireObvAdlSignal !== undefined && typeof policy.requireObvAdlSignal !== "boolean") throw new Error("INVALID_BOLLINGER_OBV_ADL_POLICY");
     if (policy?.zone !== undefined && !["LOWER_OR_BELOW", "MIDDLE_TO_LOWER"].includes(String(policy.zone))) throw new Error("INVALID_BOLLINGER_ZONE");
   }
   if (key === "kr-bollinger-band" || key === "kr-bollinger-middle-lower") {
@@ -123,6 +125,8 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
       if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < min || (max !== undefined && Number(value) > max))) throw new Error(`INVALID_KR_BOLLINGER_${name.toUpperCase()}`);
     }
     if (policy?.zone !== undefined && !["LOWER_OR_BELOW", "MIDDLE_TO_LOWER"].includes(String(policy.zone))) throw new Error("INVALID_KR_BOLLINGER_ZONE");
+    for (const name of ["obvSignalPeriod", "adlSignalPeriod"]) { if (policy?.[name] !== undefined && (!Number.isInteger(Number(policy[name])) || Number(policy[name]) < 2 || Number(policy[name]) > 100)) throw new Error(`INVALID_KR_BOLLINGER_${name.toUpperCase()}`); }
+    if (policy?.requireObvAdlSignal !== undefined && typeof policy.requireObvAdlSignal !== "boolean") throw new Error("INVALID_KR_BOLLINGER_OBV_ADL_POLICY");
   }
   if (key === "us-news-radar") {
     const period = settings.featureSettings?.newsLookup?.defaultPeriod;

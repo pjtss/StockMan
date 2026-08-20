@@ -4,6 +4,7 @@ import {
   loadCachedKrDailyCandlesBulk,
 } from "@/lib/kr-daily-price-cache";
 import type { OHLCVCandle } from "@/lib/kis-chart";
+import { calculateObvAdlSignal } from "@/lib/daily-obv-adl-filter";
 const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
 const resultCache = new Map<string, { expiresAt: number; value: any }>();
 
@@ -15,6 +16,9 @@ export type KrBollingerPolicy = {
   minVolume: number;
   minTurnoverRatio: number;
   zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER";
+  requireObvAdlSignal?: boolean;
+  obvSignalPeriod?: number;
+  adlSignalPeriod?: number;
 };
 export type KrBollingerResult = {
   market: string;
@@ -42,6 +46,8 @@ export type KrBollingerResult = {
   error?: string;
   touchState: "TOUCH" | "BELOW" | "NONE";
   reasonCode?: string;
+  obvAboveSignal?: boolean;
+  adlAboveSignal?: boolean;
 };
 const defaults: KrBollingerPolicy = {
   timeframe: "D",
@@ -65,6 +71,9 @@ export async function loadKrBollingerPolicy(moduleKey: "kr-bollinger-band" | "kr
     minVolume: Math.max(0, Number(p.minVolume ?? 0)),
     minTurnoverRatio: Math.max(0, Number(p.minTurnoverRatio ?? 0)),
     zone: p.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
+    requireObvAdlSignal: p.requireObvAdlSignal !== false,
+    obvSignalPeriod: Math.max(2, Math.floor(Number(p.obvSignalPeriod ?? 9))),
+    adlSignalPeriod: Math.max(2, Math.floor(Number(p.adlSignalPeriod ?? 9))),
   };
 }
 export function calculateKrBollingerBands(
@@ -133,6 +142,9 @@ export async function scanStoredKrBollingerBands(
       Number(overrides.minTurnoverRatio ?? loaded.minTurnoverRatio),
     ),
     zone: overrides.zone === "MIDDLE_TO_LOWER" || loaded.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
+    requireObvAdlSignal: overrides.requireObvAdlSignal ?? loaded.requireObvAdlSignal,
+    obvSignalPeriod: Math.max(2, Math.floor(Number(overrides.obvSignalPeriod ?? loaded.obvSignalPeriod ?? 9))),
+    adlSignalPeriod: Math.max(2, Math.floor(Number(overrides.adlSignalPeriod ?? loaded.adlSignalPeriod ?? 9))),
   } as KrBollingerPolicy;
   const universe = await loadStoredKrInstrumentScopes();
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
@@ -178,7 +190,9 @@ export async function scanStoredKrBollingerBands(
       const passes = pricePass && volumePass && turnoverPass;
       const touchState = !band ? "NONE" : band.close < band.lower ? "BELOW" : band.close <= band.lower ? "TOUCH" : "NONE";
       const inMiddleToLower = Boolean(band && band.close >= band.lower && band.close <= band.middle);
-      const qualifies = Boolean(band && passes && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
+      const signal = calculateObvAdlSignal(series, policy.obvSignalPeriod, policy.adlSignalPeriod);
+      const signalPass = policy.zone !== "MIDDLE_TO_LOWER" || !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
+      const qualifies = Boolean(band && passes && signalPass && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
       results.push({
         market: item.market,
         code: item.code,
@@ -192,7 +206,7 @@ export async function scanStoredKrBollingerBands(
               : "NOT_TOUCHING",
         qualifies,
         touchState,
-        reasonCode: !band ? "INSUFFICIENT_HISTORY" : undefined,
+        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : undefined,
         candleCount: series.length,
         latestCandleDate: band?.date ?? null,
         close: band?.close ?? null,
@@ -201,6 +215,8 @@ export async function scanStoredKrBollingerBands(
         marketCap: metric?.marketCap ?? null,
         turnoverRatio: metric?.turnoverRatio ?? null,
         band,
+        obvAboveSignal: signal.obvAboveSignal,
+        adlAboveSignal: signal.adlAboveSignal,
         filter: {
           minPrice: pricePass,
           minVolume: volumePass,
