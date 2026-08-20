@@ -12,6 +12,10 @@ const EXCLUDED = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+
 // and product-name hints prevent the live VWAP universe from treating an ETF
 // as a common stock when provider metadata is incomplete.
 const ETF_NAME_HINT = /\b(?:ISHARES|VISTASHARES|ROUNDHILL|KRANESHARES|KFA|SPDR|VANECK|PROSHARES|DIREXION|GLOBAL\s+X|INVESCO|GRANITESHARES|AMPLIFY|JANUS\s+HENDERSON)\b/i;
+// KIS's overseas master marks many preferred shares, notes and units as
+// security type 2 (stock). The official master name remains the authoritative
+// product descriptor for these cases, so exclude them from common-stock scans.
+export const EXCLUDED_US_OFFICIAL_NAME = /(?:preferred|\bpfd\b|\b(?:senior\s+)?notes?\b|\bnts\b|\bbonds?\b|\bunits?\b|\bwarrants?\b|\bright\b|\bdebentures?\b|우선주|채권|워런트)/i;
 function rows(parsed: any) { const output = parsed?.output ?? parsed?.output2 ?? parsed?.output1; return Array.isArray(output) ? output.slice(0, 100) : []; }
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
@@ -59,7 +63,7 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
     // Cache membership is deliberately independent from market-cap, turnover,
     // price and volume policies. Only the official persisted product type is
     // authoritative here; live scanners may apply their own ranking filters.
-    const eligibleRows = rows.filter((row) => row.instrumentType === "COMMON_STOCK");
+    const eligibleRows = rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !EXCLUDED_US_OFFICIAL_NAME.test(`${row.name ?? ""} ${row.englishName ?? ""}`));
     // The persisted KIS master contains product metadata but not a numeric
     // market-cap value. Applying a numeric cap filter here would therefore
     // treat every row as unknown and silently reduce the cache universe to 0.

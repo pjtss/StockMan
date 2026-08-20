@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readKisCache } from "@/lib/kis-cache";
+import { EXCLUDED_US_OFFICIAL_NAME } from "@/lib/us-top-rising-universe";
 
 type CachedGoldenCross = {
   scope?: string;
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     const key = kind === "golden-cross" ? `daily-golden-cross:${scope}:D` : `daily-bollinger:${scope}:${suffix}`;
     const data = await readKisCache<CachedGoldenCross>(key);
     const qualified = data?.qualified ?? [];
-    const excluded = scope === "KR" ? qualified.filter((item) => excludedKrName.test(item.name ?? "")) : [];
+    const excluded = scope === "KR" ? qualified.filter((item) => excludedKrName.test(item.name ?? "")) : qualified.filter((item) => EXCLUDED_US_OFFICIAL_NAME.test(item.name ?? ""));
     return {
       kind,
       scope,
