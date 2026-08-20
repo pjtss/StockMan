@@ -28,11 +28,11 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, intervalSeconds: 30, activeDays: [1, 2, 3, 4, 5] },
   "domestic-trade-intensity": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
   "us-bollinger-band": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
-  "us-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6] },
+  "us-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "us-bollinger-middle-lower": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER" } } },
   "us-minute-bollinger-band": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 120, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { minuteBollingerPolicy: { topN: 30, period: 20, stdDevMultiplier: 2, minChangeRate: 0 } } },
   "kr-bollinger-band": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
-  "kr-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6] },
+  "kr-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "kr-bollinger-middle-lower": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER" } } },
   "kr-daily-cache": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 21_600, activeDays: [1, 2, 3, 4, 5] },
   "us-breaking-news-forwarder": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
@@ -92,6 +92,14 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     if (evaluation?.trendMinMfi !== undefined && evaluation?.trendMaxMfi !== undefined && Number(evaluation.trendMinMfi) > Number(evaluation.trendMaxMfi)) throw new Error("INVALID_TREND_MFI_RANGE");
     if (evaluation?.trendRequirePriceTrend !== undefined && typeof evaluation.trendRequirePriceTrend !== "boolean") throw new Error("INVALID_TREND_PRICE_POLICY");
     if (evaluation?.trendRequireDailyBreakout !== undefined && typeof evaluation.trendRequireDailyBreakout !== "boolean") throw new Error("INVALID_TREND_BREAKOUT_POLICY");
+  }
+  if (key === "us-golden-cross" || key === "kr-golden-cross") {
+    const policy = settings.featureSettings?.goldenCrossPolicy as any;
+    const validate = (name: string, value: unknown, min: number, max?: number) => { if (value === undefined) return; const parsed = Number(value); if (!Number.isInteger(parsed) || parsed < min || (max !== undefined && parsed > max)) throw new Error(`INVALID_GOLDEN_CROSS_${name.toUpperCase()}`); };
+    validate("short_period", policy?.shortPeriod, 2, 100); validate("long_period", policy?.longPeriod, 3, 200); validate("recent_cross_lookback", policy?.recentCrossLookback, 1, 30); validate("obv_signal_period", policy?.obvSignalPeriod, 2, 100); validate("adl_signal_period", policy?.adlSignalPeriod, 2, 100);
+    if (policy?.approachingProximityPercent !== undefined && (!Number.isFinite(Number(policy.approachingProximityPercent)) || Number(policy.approachingProximityPercent) < 0 || Number(policy.approachingProximityPercent) > 20)) throw new Error("INVALID_GOLDEN_CROSS_PROXIMITY");
+    for (const keyName of ["requireObvAboveSignal", "requireAdlAboveSignal"]) if (policy?.[keyName] !== undefined && typeof policy[keyName] !== "boolean") throw new Error(`INVALID_GOLDEN_CROSS_${keyName.toUpperCase()}`);
+    if (policy?.shortPeriod !== undefined && policy?.longPeriod !== undefined && Number(policy.shortPeriod) >= Number(policy.longPeriod)) throw new Error("INVALID_GOLDEN_CROSS_PERIOD_ORDER");
   }
   if (key === "us-bollinger-band" || key === "us-bollinger-middle-lower") {
     const policy = settings.featureSettings?.bollingerPolicy as any;

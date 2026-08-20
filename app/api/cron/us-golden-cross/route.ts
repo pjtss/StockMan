@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   if (!debugRun && elapsedSeconds != null && elapsedSeconds < intervalSeconds) { await recordSkippedAutomationRun("us-golden-cross", "outside_interval", { intervalSeconds, elapsedSeconds }); return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds }); }
   const result = await withAutomationRun("us-golden-cross", async () => {
     const context = await createUsDailyScanContext({ candleLimit: 30, timeframe: "D" });
-    const results: GoldenCrossResult[] = context.universe.scopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, timeframe: "D", ...calculateGoldenCross(context.candles.get(`${scope.market}:${scope.code}`) ?? []) }));
+    const policy = (settings.featureSettings?.goldenCrossPolicy ?? {}) as any;
+    const results: GoldenCrossResult[] = context.universe.scopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, timeframe: "D", ...calculateGoldenCross(context.candles.get(`${scope.market}:${scope.code}`) ?? [], policy) }));
     const cache = await persistGoldenCrossResults("US", results);
     return { ok: true, instrumentCount: results.length, successCount: results.filter((row) => row.reason !== "INSUFFICIENT_HISTORY").length, failureCount: results.filter((row) => row.reason === "INSUFFICIENT_HISTORY").length, qualified: results.filter((row) => row.qualifies), cache };
   });

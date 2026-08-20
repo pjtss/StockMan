@@ -21,6 +21,7 @@ type CachePayload = {
   failureCount?: number;
   qualifiedCount?: number;
   qualified?: CacheRecord[];
+  policy?: { ema?: string; recentCrossLookback?: number; requiredSignals?: string[] };
 };
 
 const COMMANDS: Record<DailyCacheCommand, { key: string; title: string }> = {
@@ -59,13 +60,14 @@ export function splitDailyCacheCommand(result: Awaited<ReturnType<typeof loadDai
   const items = Array.isArray(payload.qualified) ? payload.qualified : [];
   const header = `📊 **${result.title} 캐시**`;
   const meta = `갱신 ${payload.updatedAt ?? "-"} · 대상 ${payload.scannedCount ?? 0}개 · 조건 충족 ${payload.qualifiedCount ?? items.length}개`;
+  const policyLine = result.title.includes("골든크로스") ? `기준 EMA ${payload.policy?.ema ?? "9/20"} · 직전/당일/최근 ${payload.policy?.recentCrossLookback ?? 5}봉 · ${payload.policy?.requiredSignals?.join(" AND ") ?? "OBV > Signal AND ADL > Signal"}` : "";
   const limit = 1900;
   const chunks: string[] = [];
-  let content = `${header}\n${meta}`;
+  let content = `${header}\n${meta}${policyLine ? `\n${policyLine}` : ""}`;
   for (const line of items.map(displayName)) {
     if ((content + "\n" + line).length > limit) {
       chunks.push(content);
-      content = `${header} (계속)\n${line}`;
+      content = `${header} (계속)\n${policyLine ? `${policyLine}\n` : ""}${line}`;
     } else {
       content += `\n${line}`;
     }

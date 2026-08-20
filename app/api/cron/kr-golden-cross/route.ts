@@ -24,7 +24,8 @@ export async function POST(request: Request) {
   const result = await withAutomationRun("kr-golden-cross", async () => {
     const universe = await loadStoredKrInstrumentScopes();
     const candles = await loadCachedKrDailyCandlesBulk(universe.scopes, 30, "D");
-    const results: GoldenCrossResult[] = universe.scopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, timeframe: "D", ...calculateGoldenCross(candles.get(`${scope.market}:${scope.code}`) ?? []) }));
+    const policy = (settings.featureSettings?.goldenCrossPolicy ?? {}) as any;
+    const results: GoldenCrossResult[] = universe.scopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, timeframe: "D", ...calculateGoldenCross(candles.get(`${scope.market}:${scope.code}`) ?? [], policy) }));
     const cache = await persistGoldenCrossResults("KR", results);
     return { ok: true, instrumentCount: results.length, successCount: results.filter((row) => row.reason !== "INSUFFICIENT_HISTORY").length, failureCount: results.filter((row) => row.reason === "INSUFFICIENT_HISTORY").length, qualified: results.filter((row) => row.qualifies), cache };
   });

@@ -7,6 +7,7 @@ export type FeatureSpecificSettings = {
   kisRequest?: Record<string, string | number | boolean>;
   turnoverFilter?: Record<string, string | number | boolean>;
   evaluation?: Record<string, string | number | boolean>;
+  goldenCrossPolicy?: Record<string, string | number | boolean>;
   discordFormat?: Record<string, string | number | boolean>;
   automationCompletion?: { enabled?: boolean; webhookUrl?: string };
   marketRss?: { enabledSources?: string[] };
