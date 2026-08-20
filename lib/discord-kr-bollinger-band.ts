@@ -8,7 +8,7 @@ export async function sendKrBollingerBandSignals(results:KrBollingerResult[], zo
   const header=`국내주식 볼린저밴드 ${zoneLabel}\n\n`;
   const rows=qualified.map(r=>`KRX | ${r.name || r.code}`);
   const chunks:string[]=[]; let current=header;
-  for(const row of rows){const next=current===header?`${current}${row}`:`${current}\n\n${row}`;if(next.length>1900&&current!==header){chunks.push(current);current=`${header}${row}`;}else current=next;}
+  for(const row of rows){const next=current===header?`${current}${row}`:`${current}\n${row}`;if(next.length>1900&&current!==header){chunks.push(current);current=`${header}${row}`;}else current=next;}
   if(current!==header)chunks.push(current);
   const responses=[];
   for(const content of chunks){const response=await fetch(webhook,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({content})});responses.push({ok:response.ok,status:response.status,responseText:await response.text()});}
