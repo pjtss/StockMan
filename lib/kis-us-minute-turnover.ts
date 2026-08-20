@@ -12,6 +12,9 @@ export type UsMinuteTurnoverPoint = {
   time: string;
   price: number;
   amount: number;
+  volume?: number;
+  high?: number;
+  low?: number;
   bid?: number;
   ask?: number;
   raw: unknown;
@@ -93,6 +96,9 @@ function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??
         row.amount ?? row.tvol ?? row.cum_amount ?? row.cumTradeAmount ?? row.cntg_pbmn ?? row.value ?? row.eamt ?? row.evol
       ),
+      volume: parseNumber(row.evol ?? row.tvol ?? row.volume ?? row.acml_vol ?? row.acml_volume) || undefined,
+      high: parseNumber(row.high ?? row.hprc ?? row.high_price ?? row.hts_high) || undefined,
+      low: parseNumber(row.low ?? row.lprc ?? row.low_price ?? row.hts_low) || undefined,
       bid: parseNumber(row.pbid ?? row.bid) || undefined,
       ask: parseNumber(row.pask ?? row.ask) || undefined,
       raw: row,

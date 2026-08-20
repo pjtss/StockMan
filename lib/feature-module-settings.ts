@@ -31,6 +31,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "us-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "us-bollinger-middle-lower": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER", requireObvAdlSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "us-minute-bollinger-band": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 120, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { minuteBollingerPolicy: { topN: 30, period: 20, stdDevMultiplier: 2, minChangeRate: 0 } } },
+  "us-minute-obv-adl": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 120, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { minuteObvAdlPolicy: { topN: 100, obvSignalPeriod: 9, adlSignalPeriod: 9, requireRisingSignals: true, minChangeRate: 0 } } },
   "kr-bollinger-band": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW" } } },
   "kr-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "kr-bollinger-middle-lower": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { krBollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER", requireObvAdlSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
@@ -138,6 +139,13 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     if (policy?.period !== undefined && (!Number.isInteger(Number(policy.period)) || Number(policy.period) < 2 || Number(policy.period) > 120)) throw new Error("INVALID_MINUTE_BOLLINGER_PERIOD");
     if (policy?.stdDevMultiplier !== undefined && (!Number.isFinite(Number(policy.stdDevMultiplier)) || Number(policy.stdDevMultiplier) <= 0)) throw new Error("INVALID_MINUTE_BOLLINGER_MULTIPLIER");
     if (policy?.minChangeRate !== undefined && !Number.isFinite(Number(policy.minChangeRate))) throw new Error("INVALID_MINUTE_BOLLINGER_RATE");
+  }
+  if (key === "us-minute-obv-adl") {
+    const policy = settings.featureSettings?.minuteObvAdlPolicy as any;
+    if (policy?.topN !== undefined && (!Number.isInteger(Number(policy.topN)) || Number(policy.topN) < 1 || Number(policy.topN) > 100)) throw new Error("INVALID_MINUTE_OBV_ADL_TOP_N");
+    for (const name of ["obvSignalPeriod", "adlSignalPeriod"]) if (policy?.[name] !== undefined && (!Number.isInteger(Number(policy[name])) || Number(policy[name]) < 2 || Number(policy[name]) > 100)) throw new Error(`INVALID_MINUTE_OBV_ADL_${name.toUpperCase()}`);
+    if (policy?.requireRisingSignals !== undefined && typeof policy.requireRisingSignals !== "boolean") throw new Error("INVALID_MINUTE_OBV_ADL_RISING");
+    if (policy?.minChangeRate !== undefined && !Number.isFinite(Number(policy.minChangeRate))) throw new Error("INVALID_MINUTE_OBV_ADL_RATE");
   }
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
