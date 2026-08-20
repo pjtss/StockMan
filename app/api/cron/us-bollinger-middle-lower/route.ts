@@ -29,8 +29,8 @@ export async function POST(request: Request) {
   }
   const result = await withAutomationRun("us-bollinger-middle-lower", async () => {
     const scan = await scanStoredUsBollingerBands({ moduleKey: "us-bollinger-middle-lower" });
-    const discord = await sendUsBollingerBandSignals(scan.results, "중단선~하단선");
     const cache = await persistDailyBollingerResults("US", "MIDDLE_TO_LOWER", scan);
+    const discord = await sendUsBollingerBandSignals(scan.results, "중단선~하단선");
     return { ...scan, discord, cache };
   });
   return NextResponse.json({ ok: true, debugRun, intervalSeconds, cooldownSeconds: settings.cooldownSeconds, effectiveIntervalSeconds, ...result });

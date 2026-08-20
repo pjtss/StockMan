@@ -30,8 +30,8 @@ export async function POST(request: Request) {
   try {
     const result = await withAutomationRun("us-bollinger-band", async () => {
       const scan = await scanStoredUsBollingerBands();
-      const discord = await sendUsBollingerBandSignals(scan.results);
       const cache = await persistDailyBollingerResults("US", scan.policy.zone ?? "LOWER_OR_BELOW", scan);
+      const discord = await sendUsBollingerBandSignals(scan.results);
       return { ...scan, discord, cache };
     });
     return NextResponse.json({ debugRun, intervalSeconds, cooldownSeconds: settings.cooldownSeconds, effectiveIntervalSeconds, ...result });

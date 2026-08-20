@@ -28,8 +28,8 @@ export async function POST(request: Request) {
   }
   const result = await withAutomationRun("kr-bollinger-band", async () => {
     const scan = await scanStoredKrBollingerBands();
-    const discord = await sendKrBollingerBandSignals(scan.results);
     const cache = await persistDailyBollingerResults("KR", scan.policy.zone ?? "LOWER_OR_BELOW", scan);
+    const discord = await sendKrBollingerBandSignals(scan.results);
     return { ...scan, discord, cache };
   });
   return NextResponse.json({ ok: true, debugRun, intervalSeconds, data: result });
