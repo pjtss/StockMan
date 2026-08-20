@@ -199,7 +199,7 @@ export async function scanStoredKrBollingerBands(
         name: item.name,
         status: !band
           ? "INSUFFICIENT_HISTORY"
-          : !passes
+          : !passes || !signalPass
             ? "FILTERED"
             : qualifies
               ? policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
