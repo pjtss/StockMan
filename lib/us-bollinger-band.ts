@@ -1,7 +1,6 @@
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
-import { isGlobalMarketCapAllowed, isTurnoverRatioAllowed, loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 
 export const DEFAULT_BOLLINGER_PERIOD = 20;
 export const DEFAULT_BOLLINGER_MULTIPLIER = 2;
@@ -108,7 +107,6 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     zone: configured.zone === "MIDDLE_TO_LOWER" ? "MIDDLE_TO_LOWER" : "LOWER_OR_BELOW",
   };
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
-  const commonSettings = await loadUsTurnoverFilterSettings();
   const cacheKey = JSON.stringify(policy);
   if (!options.context && RESULT_CACHE_TTL_MS > 0) {
     const cached = resultCache.get(cacheKey);
@@ -139,14 +137,16 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const pricePass = close !== null && (policy.minPrice <= 0 || close >= policy.minPrice);
         const volumePass = volume !== null && (policy.minVolume <= 0 || volume >= policy.minVolume);
         const turnoverPass = policy.minTurnoverRatio <= 0 || (metric?.turnoverRatio != null && metric.turnoverRatio >= policy.minTurnoverRatio);
-        const commonMarketCapPass = isGlobalMarketCapAllowed(metric?.marketCap, commonSettings);
-        const commonTurnoverPass = isTurnoverRatioAllowed(metric?.turnoverRatio, commonSettings);
-        const passesFilters = pricePass && volumePass && turnoverPass && commonMarketCapPass && commonTurnoverPass;
+        // Bollinger scans cover every COMMON_STOCK. Do not apply turnover
+        // scanner market-cap/turnover thresholds (KIS metrics may be null).
+        const commonMarketCapPass = true;
+        const commonTurnoverPass = true;
+        const passesFilters = pricePass && volumePass && turnoverPass;
         const touchState = !latest ? "NONE" : latest.close < latest.lower ? "BELOW" : latest.close <= latest.lower ? "TOUCH" : "NONE";
         const inMiddleToLower = Boolean(latest && latest.close >= latest.lower && latest.close <= latest.middle);
         const qualifies = Boolean(latest && passesFilters && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
         const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters ? "FILTERED" : qualifies && policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : !commonMarketCapPass ? "COMMON_MARKET_CAP_FILTER" : !commonTurnoverPass ? "COMMON_TURNOVER_RATIO_FILTER" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, filter: { minPrice: pricePass, minVolume: volumePass, minTurnoverRatio: turnoverPass, commonMarketCap: commonMarketCapPass, commonTurnoverRatio: commonTurnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, filter: { minPrice: pricePass, minVolume: volumePass, commonMarketCap: commonMarketCapPass, minTurnoverRatio: turnoverPass, commonTurnoverRatio: commonTurnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
       } catch (error) {
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status: "FAILED", qualifies: false, touchState: "NONE", candleCount: 0, latestCandleDate: null, close: null, volume: null, marketCap: null, turnoverRatio: null, band: null, filter: { minPrice: false, minVolume: false, minTurnoverRatio: false, commonMarketCap: false, commonTurnoverRatio: false }, error: error instanceof Error ? error.message : String(error) });
       }
@@ -161,7 +161,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", commonFilter: { source: "us_turnover_filter_settings", globalMinMarketCap: commonSettings.globalMinMarketCap, globalMaxMarketCap: commonSettings.globalMaxMarketCap, minTurnoverRatio: commonSettings.minTurnoverRatio, maxTurnoverRatio: commonSettings.maxTurnoverRatio } },
+    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
     failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,
