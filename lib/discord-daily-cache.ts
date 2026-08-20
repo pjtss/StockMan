@@ -50,22 +50,27 @@ function displayName(item: CacheRecord) {
 }
 
 export function formatDailyCacheCommand(result: Awaited<ReturnType<typeof loadDailyCacheCommand>>) {
-  if (!result.payload) return `📭 **${result.title} 캐시 없음**\n아직 갱신된 캐시가 없습니다. 일봉 캐시와 탐지 작업을 먼저 실행해 주세요.`;
+  return splitDailyCacheCommand(result).join("\n");
+}
+
+export function splitDailyCacheCommand(result: Awaited<ReturnType<typeof loadDailyCacheCommand>>) {
+  if (!result.payload) return [`📭 **${result.title} 캐시 없음**\n아직 갱신된 캐시가 없습니다. 일봉 캐시와 탐지 작업을 먼저 실행해 주세요.`];
   const payload = result.payload;
   const items = Array.isArray(payload.qualified) ? payload.qualified : [];
   const header = `📊 **${result.title} 캐시**`;
   const meta = `갱신 ${payload.updatedAt ?? "-"} · 대상 ${payload.scannedCount ?? 0}개 · 조건 충족 ${payload.qualifiedCount ?? items.length}개`;
-  const limit = 1800;
-  const lines = items.map(displayName);
+  const limit = 1900;
+  const chunks: string[] = [];
   let content = `${header}\n${meta}`;
-  let included = 0;
-  for (const line of lines) {
-    const next = `${content}\n${line}`;
-    if (next.length > limit) break;
-    content = next;
-    included += 1;
+  for (const line of items.map(displayName)) {
+    if ((content + "\n" + line).length > limit) {
+      chunks.push(content);
+      content = `${header} (계속)\n${line}`;
+    } else {
+      content += `\n${line}`;
+    }
   }
-  if (included < lines.length) content += `\n외 ${lines.length - included}개는 Discord 길이 제한으로 생략되었습니다.`;
-  if (included === 0 && lines.length === 0) content += "\n조건 충족 종목이 없습니다.";
-  return content;
+  if (items.length === 0) content += "\n조건 충족 종목이 없습니다.";
+  chunks.push(content);
+  return chunks;
 }

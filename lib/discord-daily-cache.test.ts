@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDailyCacheCommand, getDailyCacheCommand } from "./discord-daily-cache";
+import { getDailyCacheCommand, splitDailyCacheCommand } from "./discord-daily-cache";
 
 describe("Discord daily detection cache commands", () => {
   it("maps the four requested commands to cache keys", () => {
@@ -13,9 +13,9 @@ describe("Discord daily detection cache commands", () => {
 
   it("keeps the response compact and reports omitted records", () => {
     const definition = getDailyCacheCommand("kr-bollinger-cache")!;
-    const result = formatDailyCacheCommand({ ...definition, cacheKey: definition.key, payload: { updatedAt: "2026-08-20T00:00:00Z", scannedCount: 300, qualifiedCount: 300, qualified: Array.from({ length: 300 }, (_, i) => ({ market: "KRX", code: String(i).padStart(6, "0"), name: "종목" })) } });
-    expect(result.length).toBeLessThanOrEqual(1900);
-    expect(result).toContain("외 ");
-    expect(result).not.toContain("\n\n");
+    const chunks = splitDailyCacheCommand({ ...definition, cacheKey: definition.key, payload: { updatedAt: "2026-08-20T00:00:00Z", scannedCount: 300, qualifiedCount: 300, qualified: Array.from({ length: 300 }, (_, i) => ({ market: "KRX", code: String(i).padStart(6, "0"), name: "종목" })) } });
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.length <= 1900)).toBe(true);
+    expect(chunks.join("\n")).toContain("KRX 000299");
   });
 });

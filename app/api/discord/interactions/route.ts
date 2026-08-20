@@ -15,7 +15,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
 import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
-import { formatDailyCacheCommand, getDailyCacheCommand, loadDailyCacheCommand, type DailyCacheCommand } from "@/lib/discord-daily-cache";
+import { getDailyCacheCommand, loadDailyCacheCommand, splitDailyCacheCommand, type DailyCacheCommand } from "@/lib/discord-daily-cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +26,13 @@ function optionValue(data: any, name: string) {
 
 async function updateOriginalResponse(applicationId: string, token: string, content: string) {
   await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }) });
+}
+
+async function sendDailyCacheResponses(applicationId: string, token: string, chunks: string[]) {
+  await updateOriginalResponse(applicationId, token, chunks[0] ?? "캐시 결과가 없습니다.");
+  for (const content of chunks.slice(1)) {
+    await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }) });
+  }
 }
 
 function formatBreakoutResult(result: Awaited<ReturnType<typeof runUsDailyBreakoutScan>>) {
@@ -90,7 +97,7 @@ export async function POST(request: Request) {
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (cacheCommand) {
-    void loadDailyCacheCommand(interaction.data.name as DailyCacheCommand).then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheCommand(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `캐시 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+    void loadDailyCacheCommand(interaction.data.name as DailyCacheCommand).then((result) => sendDailyCacheResponses(applicationId, interaction.token, splitDailyCacheCommand(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `캐시 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (interaction.data.name === "refresh-daily") {
     void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
   } else if (interaction.data.name === "daily-breakout") {
