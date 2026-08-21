@@ -13,7 +13,7 @@ describe("Discord daily detection cache commands", () => {
 
   it("keeps the response compact and reports omitted records", () => {
     const definition = getDailyCacheCommand("kr-bollinger-cache")!;
-    const chunks = splitDailyCacheCommand({ ...definition, cacheKey: definition.key, payload: { updatedAt: "2026-08-20T00:00:00Z", scannedCount: 300, qualifiedCount: 300, qualified: Array.from({ length: 300 }, (_, i) => ({ market: "KRX", code: String(i).padStart(6, "0"), name: "종목" })) } });
+    const chunks = splitDailyCacheCommand({ ...definition, cacheKey: definition.key, payload: { updatedAt: "2026-08-20T00:00:00Z", scannedCount: 300, qualifiedCount: 300, qualified: Array.from({ length: 300 }, (_, i) => ({ market: "KRX", code: String(i).padStart(6, "0"), name: "종목", obvAboveSignal: true, adlAboveSignal: true })) } });
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every((chunk) => chunk.length <= 1900)).toBe(true);
     expect(chunks.join("\n")).toContain("KRX 000299");

@@ -63,7 +63,7 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
     // Cache membership is deliberately independent from market-cap, turnover,
     // price and volume policies. Only the official persisted product type is
     // authoritative here; live scanners may apply their own ranking filters.
-    const eligibleRows = rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !EXCLUDED_US_OFFICIAL_NAME.test(`${row.name ?? ""} ${row.englishName ?? ""}`));
+    const eligibleRows = rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !row.isEtf && !row.isWarrant && !row.isDerivative && !row.isDr && !row.isLeveraged && !row.isInverse && !EXCLUDED_US_OFFICIAL_NAME.test(`${row.name ?? ""} ${row.englishName ?? ""}`));
     // The persisted KIS master contains product metadata but not a numeric
     // market-cap value. Applying a numeric cap filter here would therefore
     // treat every row as unknown and silently reduce the cache universe to 0.
