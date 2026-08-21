@@ -157,7 +157,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const touchState = !latest ? "NONE" : latest.close < latest.lower ? "BELOW" : latest.close <= latest.lower ? "TOUCH" : "NONE";
         const inMiddleToLower = Boolean(latest && latest.close >= latest.lower && latest.close <= latest.middle);
         const signal = calculateObvAdlSignal(candles, policy.obvSignalPeriod, policy.adlSignalPeriod);
-        const signalPass = policy.zone !== "MIDDLE_TO_LOWER" || !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
+        const signalPass = !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
         const qualifies = Boolean(latest && passesFilters && signalPass && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
         const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters || !signalPass ? "FILTERED" : qualifies && policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, obvAboveSignal: signal.obvAboveSignal, adlAboveSignal: signal.adlAboveSignal, filter: { minPrice: pricePass, minVolume: volumePass, commonMarketCap: commonMarketCapPass, minTurnoverRatio: turnoverPass, commonTurnoverRatio: commonTurnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
@@ -175,7 +175,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하 AND OBV·ADL > Signal" : "최근 봉 종가 <= 하단선", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
+    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", indicatorFilter: policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
     failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,
