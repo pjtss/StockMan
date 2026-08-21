@@ -1,8 +1,6 @@
-import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 export async function isDailyCandleAutomationEnabled() {
-  const settings = await loadFeatureModuleSettings("us-daily-indicators");
-  // Indicator execution and candle-cache refresh are independent controls.
-  // Disabling the indicator module must not stop cache/open-price/Bollinger
-  // jobs. Only an explicit global opt-out disables the daily automation set.
-  return (settings.featureSettings?.evaluation as Record<string, unknown> | undefined)?.dailyAutomationEnabled !== false;
+  // Daily candle caches and their dependent scans are controlled by their own
+  // feature-module settings. The legacy indicator toggle must not disable
+  // cache refreshes (or leave the cache stale while indicators are off).
+  return true;
 }
