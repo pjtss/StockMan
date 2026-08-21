@@ -2,6 +2,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { calculateObvAdlSignal } from "@/lib/daily-obv-adl-filter";
+import { detectBollingerRebound } from "@/lib/bollinger-rebound";
 
 export const DEFAULT_BOLLINGER_PERIOD = 20;
 export const DEFAULT_BOLLINGER_MULTIPLIER = 2;
@@ -19,6 +20,9 @@ export type UsBollingerPolicy = {
   requireObvAdlSignal?: boolean;
   obvSignalPeriod?: number;
   adlSignalPeriod?: number;
+  reboundAfterBreakout?: boolean;
+  reboundLookback?: number;
+  reboundTolerancePercent?: number;
 };
 
 export type BollingerPoint = {
@@ -37,7 +41,7 @@ export type UsBollingerResult = {
   market: string;
   code: string;
   name: string;
-  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "QUALIFIED_MIDDLE_TO_LOWER" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
+  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "QUALIFIED_RETOUCH" | "QUALIFIED_MIDDLE_TO_LOWER" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
@@ -52,6 +56,9 @@ export type UsBollingerResult = {
   reasonCode?: string;
   obvAboveSignal?: boolean;
   adlAboveSignal?: boolean;
+  reboundState?: "RETOUCH_AFTER_BREAKOUT" | "BREAKOUT_BELOW" | "NO_REBOUND";
+  breakoutDate?: string | null;
+  retestDistancePercent?: number | null;
 };
 
 export function calculateBollingerBands(candles: UsDailyCandle[], period = DEFAULT_BOLLINGER_PERIOD, stdDevMultiplier = DEFAULT_BOLLINGER_MULTIPLIER): BollingerPoint[] {
@@ -100,6 +107,9 @@ export async function loadUsBollingerPolicy(moduleKey: "us-bollinger-band" | "us
     requireObvAdlSignal: policy?.requireObvAdlSignal !== false,
     obvSignalPeriod: Math.max(2, Math.floor(Number(policy?.obvSignalPeriod ?? 9))),
     adlSignalPeriod: Math.max(2, Math.floor(Number(policy?.adlSignalPeriod ?? 9))),
+    reboundAfterBreakout: policy?.reboundAfterBreakout !== false,
+    reboundLookback: Math.max(1, Math.floor(Number(policy?.reboundLookback ?? 3))),
+    reboundTolerancePercent: Math.max(0, Number(policy?.reboundTolerancePercent ?? 0.5)),
   };
 }
 
@@ -117,6 +127,9 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     requireObvAdlSignal: configured.requireObvAdlSignal !== false,
     obvSignalPeriod: Math.max(2, Math.floor(Number(configured.obvSignalPeriod ?? 9))),
     adlSignalPeriod: Math.max(2, Math.floor(Number(configured.adlSignalPeriod ?? 9))),
+    reboundAfterBreakout: configured.reboundAfterBreakout !== false,
+    reboundLookback: Math.max(1, Math.floor(Number(configured.reboundLookback ?? 3))),
+    reboundTolerancePercent: Math.max(0, Number(configured.reboundTolerancePercent ?? 0.5)),
   };
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
   const cacheKey = JSON.stringify(policy);
@@ -158,9 +171,12 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const inMiddleToLower = Boolean(latest && latest.close >= latest.lower && latest.close <= latest.middle);
         const signal = calculateObvAdlSignal(candles, policy.obvSignalPeriod, policy.adlSignalPeriod);
         const signalPass = !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
-        const qualifies = Boolean(latest && passesFilters && signalPass && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
-        const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters || !signalPass ? "FILTERED" : qualifies && policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
-        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, obvAboveSignal: signal.obvAboveSignal, adlAboveSignal: signal.adlAboveSignal, filter: { minPrice: pricePass, minVolume: volumePass, commonMarketCap: commonMarketCapPass, minTurnoverRatio: turnoverPass, commonTurnoverRatio: commonTurnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
+        const rebound = detectBollingerRebound(points, { enabled: policy.reboundAfterBreakout !== false, lookback: policy.reboundLookback ?? 3, tolerancePercent: policy.reboundTolerancePercent ?? 0.5 });
+        const priceCondition = policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : policy.reboundAfterBreakout !== false ? rebound.qualifies : touchState !== "NONE";
+        const qualifies = Boolean(latest && passesFilters && signalPass && priceCondition);
+        const status = !latest ? "INSUFFICIENT_HISTORY" : !passesFilters || !signalPass ? "FILTERED" : qualifies && policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : qualifies && policy.reboundAfterBreakout !== false ? "QUALIFIED_RETOUCH" : touchState === "BELOW" ? "QUALIFIED_BELOW" : touchState === "TOUCH" ? "QUALIFIED_TOUCH" : "NOT_TOUCHING";
+        const breakoutDate = rebound.breakoutIndex == null ? null : points[rebound.breakoutIndex]?.date ?? null;
+        results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status, qualifies, touchState, reasonCode: !latest ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : policy.zone !== "MIDDLE_TO_LOWER" && policy.reboundAfterBreakout !== false && !rebound.qualifies ? "NO_PRIOR_BREAKOUT_RETOUCH" : undefined, candleCount: candles.length, latestCandleDate: latest?.date ?? null, close, volume, marketCap: metric?.marketCap ?? null, turnoverRatio: metric?.turnoverRatio ?? null, band: latest ?? null, obvAboveSignal: signal.obvAboveSignal, adlAboveSignal: signal.adlAboveSignal, reboundState: rebound.state, breakoutDate, retestDistancePercent: rebound.retestDistancePercent, filter: { minPrice: pricePass, minVolume: volumePass, commonMarketCap: commonMarketCapPass, minTurnoverRatio: turnoverPass, commonTurnoverRatio: commonTurnoverPass }, error: !latest ? `insufficient valid candles (${candles.length}/${policy.period})` : undefined });
       } catch (error) {
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", status: "FAILED", qualifies: false, touchState: "NONE", candleCount: 0, latestCandleDate: null, close: null, volume: null, marketCap: null, turnoverRatio: null, band: null, filter: { minPrice: false, minVolume: false, minTurnoverRatio: false, commonMarketCap: false, commonTurnoverRatio: false }, error: error instanceof Error ? error.message : String(error) });
       }
@@ -175,7 +191,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 종가 <= 하단선", indicatorFilter: policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
+    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : policy.reboundAfterBreakout !== false ? "최근 3봉(설정 가능) 내 하단 이탈 후 현재 하단선 재터치" : "최근 봉 종가 <= 하단선", indicatorFilter: policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
     failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,

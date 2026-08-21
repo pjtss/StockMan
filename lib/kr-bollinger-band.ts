@@ -5,6 +5,7 @@ import {
 } from "@/lib/kr-daily-price-cache";
 import type { OHLCVCandle } from "@/lib/kis-chart";
 import { calculateObvAdlSignal } from "@/lib/daily-obv-adl-filter";
+import { detectBollingerRebound } from "@/lib/bollinger-rebound";
 const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
 const resultCache = new Map<string, { expiresAt: number; value: any }>();
 
@@ -19,12 +20,15 @@ export type KrBollingerPolicy = {
   requireObvAdlSignal?: boolean;
   obvSignalPeriod?: number;
   adlSignalPeriod?: number;
+  reboundAfterBreakout?: boolean;
+  reboundLookback?: number;
+  reboundTolerancePercent?: number;
 };
 export type KrBollingerResult = {
   market: string;
   code: string;
   name: string;
-  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "QUALIFIED_MIDDLE_TO_LOWER" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
+  status: "QUALIFIED_TOUCH" | "QUALIFIED_BELOW" | "QUALIFIED_RETOUCH" | "QUALIFIED_MIDDLE_TO_LOWER" | "NOT_TOUCHING" | "FILTERED" | "INSUFFICIENT_HISTORY" | "FAILED";
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
@@ -48,6 +52,9 @@ export type KrBollingerResult = {
   reasonCode?: string;
   obvAboveSignal?: boolean;
   adlAboveSignal?: boolean;
+  reboundState?: "RETOUCH_AFTER_BREAKOUT" | "BREAKOUT_BELOW" | "NO_REBOUND";
+  breakoutDate?: string | null;
+  retestDistancePercent?: number | null;
 };
 const defaults: KrBollingerPolicy = {
   timeframe: "D",
@@ -74,6 +81,9 @@ export async function loadKrBollingerPolicy(moduleKey: "kr-bollinger-band" | "kr
     requireObvAdlSignal: p.requireObvAdlSignal !== false,
     obvSignalPeriod: Math.max(2, Math.floor(Number(p.obvSignalPeriod ?? 9))),
     adlSignalPeriod: Math.max(2, Math.floor(Number(p.adlSignalPeriod ?? 9))),
+    reboundAfterBreakout: p.reboundAfterBreakout !== false,
+    reboundLookback: Math.max(1, Math.floor(Number(p.reboundLookback ?? 3))),
+    reboundTolerancePercent: Math.max(0, Number(p.reboundTolerancePercent ?? 0.5)),
   };
 }
 export function calculateKrBollingerBands(
@@ -145,6 +155,9 @@ export async function scanStoredKrBollingerBands(
     requireObvAdlSignal: overrides.requireObvAdlSignal ?? loaded.requireObvAdlSignal,
     obvSignalPeriod: Math.max(2, Math.floor(Number(overrides.obvSignalPeriod ?? loaded.obvSignalPeriod ?? 9))),
     adlSignalPeriod: Math.max(2, Math.floor(Number(overrides.adlSignalPeriod ?? loaded.adlSignalPeriod ?? 9))),
+    reboundAfterBreakout: overrides.reboundAfterBreakout ?? loaded.reboundAfterBreakout,
+    reboundLookback: Math.max(1, Math.floor(Number(overrides.reboundLookback ?? loaded.reboundLookback ?? 3))),
+    reboundTolerancePercent: Math.max(0, Number(overrides.reboundTolerancePercent ?? loaded.reboundTolerancePercent ?? 0.5)),
   } as KrBollingerPolicy;
   const universe = await loadStoredKrInstrumentScopes();
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
@@ -192,7 +205,9 @@ export async function scanStoredKrBollingerBands(
       const inMiddleToLower = Boolean(band && band.close >= band.lower && band.close <= band.middle);
       const signal = calculateObvAdlSignal(series, policy.obvSignalPeriod, policy.adlSignalPeriod);
       const signalPass = !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
-      const qualifies = Boolean(band && passes && signalPass && (policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : touchState !== "NONE"));
+      const rebound = detectBollingerRebound(points, { enabled: policy.reboundAfterBreakout !== false, lookback: policy.reboundLookback ?? 3, tolerancePercent: policy.reboundTolerancePercent ?? 0.5 });
+      const priceCondition = policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : policy.reboundAfterBreakout !== false ? rebound.qualifies : touchState !== "NONE";
+      const qualifies = Boolean(band && passes && signalPass && priceCondition);
       results.push({
         market: item.market,
         code: item.code,
@@ -202,11 +217,11 @@ export async function scanStoredKrBollingerBands(
           : !passes || !signalPass
             ? "FILTERED"
             : qualifies
-              ? policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
+              ? policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : policy.reboundAfterBreakout !== false ? "QUALIFIED_RETOUCH" : touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
               : "NOT_TOUCHING",
         qualifies,
         touchState,
-        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : undefined,
+        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : policy.zone !== "MIDDLE_TO_LOWER" && policy.reboundAfterBreakout !== false && !rebound.qualifies ? "NO_PRIOR_BREAKOUT_RETOUCH" : undefined,
         candleCount: series.length,
         latestCandleDate: band?.date ?? null,
         close: band?.close ?? null,
@@ -217,6 +232,9 @@ export async function scanStoredKrBollingerBands(
         band,
         obvAboveSignal: signal.obvAboveSignal,
         adlAboveSignal: signal.adlAboveSignal,
+        reboundState: rebound.state,
+        breakoutDate: rebound.breakoutIndex == null ? null : points[rebound.breakoutIndex]?.date ?? null,
+        retestDistancePercent: rebound.retestDistancePercent,
         filter: {
           minPrice: pricePass,
           minVolume: volumePass,
@@ -258,8 +276,9 @@ export async function scanStoredKrBollingerBands(
       timeframe,
       zone: policy.zone,
       bandCalculation: "종가 기반",
-      touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : "최근 저장 봉 종가 = TOUCH, 하단선 미만 = BELOW",
+      touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : policy.reboundAfterBreakout ? "최근 저장 봉 하단 이탈 후 현재 하단선 재터치" : "최근 저장 봉 종가 = TOUCH, 하단선 미만 = BELOW",
       indicatorFilter: policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화",
+      reboundPolicy: policy.reboundAfterBreakout ? { enabled: true, lookback: policy.reboundLookback, tolerancePercent: policy.reboundTolerancePercent } : { enabled: false },
       currentDayExcluded: false,
     },
     instrumentCount: universe.scopes.length,
