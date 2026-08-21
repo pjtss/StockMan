@@ -16,8 +16,12 @@ async function domestic(ticker:string):Promise<TickerInfo|null>{const q=await fe
 export async function getTickerInfo(raw:string):Promise<TickerInfo|null>{const t=raw.trim().toUpperCase();if(/^\d{6}$/.test(t))return domestic(t);if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(t))return null;for(const market of ["NAS","NYS","AMS"]){const q=await fetchKisUsPriceDetail({code:t,market}),o=getKisUsPriceDetailOutput(q?.parsed);if(!q?.ok)continue;const c=await loadCachedUsDailyCandlesBulk([{market,code:t}],100,"D").catch(()=>new Map());return{ticker:t,market,name:String(o.name??o.enname??t),price:n(o.last??o.t_prpr),rate:n(o.t_xrat??o.t_rate),tradingValue:n(o.tamt??o.tamnt),marketCap:n(o.tomv),open:n(o.t_open??o.open),high:n(o.t_high??o.high),low:n(o.t_low??o.low),previousClose:n(o.t_prev??o.prev),volume:n(o.tvol??o.pvol??o.vol),bid:n(o.pbid),ask:n(o.pask),dailyIndicators:calculateDailyTickerIndicators(c.get(`${market}:${t}`)??[])};}return null;}
 export function formatTickerInfo(i: TickerInfo | null) {
   if (!i) return "해당 국내·해외 종목을 찾을 수 없습니다.";
+  const truncate2 = (x: number) => {
+    const sign = x < 0 ? -1 : 1;
+    return sign * Math.floor(Math.abs(x) * 100) / 100;
+  };
   const v = (x: number | null, suffix = "") =>
-    x == null ? "-" : `${x.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
+    x == null ? "-" : `${truncate2(x).toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(truncate2(x)) ? 0 : 2, maximumFractionDigits: 2 })}${suffix}`;
   const a = (x: number | null, suffix = "") =>
     x == null ? "-" : `${formatKoreanFloorCompact(x)}${suffix}`;
   const d = i.dailyIndicators;
