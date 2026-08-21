@@ -6,7 +6,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 
 async function cacheStats(table: "us_instrument_universe_candles" | "kr_instrument_universe_candles") {
   const db = getDb();
-  const rows = await db.execute(sql.raw(`SELECT timeframe, COUNT(*)::int AS candle_count, COUNT(DISTINCT market || ':' || code)::int AS instrument_count, MAX(fetched_at) AS latest_fetched_at FROM ${table} GROUP BY timeframe ORDER BY timeframe`));
+  const rows = await db.execute(sql.raw(`SELECT timeframe, COUNT(*)::int AS candle_count, COUNT(DISTINCT market || ':' || code)::int AS instrument_count, MAX(candle_date) AS latest_candle_date, MIN(candle_date) AS earliest_candle_date, MAX(fetched_at) AS latest_fetched_at FROM ${table} GROUP BY timeframe ORDER BY timeframe`));
   return rows.rows;
 }
 
