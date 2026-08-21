@@ -53,7 +53,10 @@ export function classifyKr(row: KrRow) {
   const convertibleName = /(?:전환|신주인수권|권리주)/i.test(row.name);
   const isPreferred = ["1", "2"].includes(row.preferredClassCode) || preferredName;
   const excluded = isEtp || isWarrant || spacName || convertibleName || ["BC", "MF", "RT", "SC", "IF"].includes(row.securityGroupCode) || isPreferred;
-  return { instrumentType: excluded ? "EXCLUDED_PRODUCT" : row.securityGroupCode === "DR" ? "DR" : "COMMON_STOCK", isEtp, isWarrant, isPreferred, isSuspended: ["Y", "1"].includes(row.tradingHaltCode) || ["Y", "1"].includes(row.liquidationCode) || ["Y", "1"].includes(row.managedIssueCode) };
+  // `managedIssueCode` is the official 관리종목 flag, not a trading halt.
+  // It must remain available for diagnostics but must not exclude a stock
+  // from daily candles. Only the official 거래정지/청산 flags suspend data.
+  return { instrumentType: excluded ? "EXCLUDED_PRODUCT" : row.securityGroupCode === "DR" ? "DR" : "COMMON_STOCK", isEtp, isWarrant, isPreferred, isSuspended: ["Y", "1"].includes(row.tradingHaltCode) || ["Y", "1"].includes(row.liquidationCode) };
 }
 
 export async function importInstrumentMasters(sourceDirectory: string) {
