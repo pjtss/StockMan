@@ -29,7 +29,7 @@ export function formatTickerInfo(i: TickerInfo | null) {
   return [
     `**${i.ticker}** (${i.market})`,
     `종목명: ${i.name}`,
-    `현재가: ${a(i.price)}`,
+    `현재가: ${i.price == null ? "-" : i.price.toLocaleString("en-US")}`,
     `등락률: ${v(i.rate, "%")}`,
     `거래대금: ${a(i.tradingValue)}`,
     `시가총액: ${a(i.marketCap)}`,
