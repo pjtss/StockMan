@@ -18,7 +18,7 @@ function compact(value: unknown): string {
 }
 
 function resultSummary(summary: Record<string, unknown>) {
-  const preferred = ["instrumentCount", "successCount", "failureCount", "savedCandleCount", "processedCount", "sent", "skipped"];
+  const preferred = ["instrumentCount", "successCount", "failureCount", "savedCandleCount", "processedCount", "sent", "skipped", "reason", "intervalSeconds", "elapsedSeconds", "latestRunStatus"];
   const selected = Object.fromEntries(preferred.filter((key) => key in summary).map((key) => [key, summary[key]]));
   if (Object.keys(selected).length) return compact(selected);
   return compact(summary.counts ?? summary.result ?? { ok: true });
