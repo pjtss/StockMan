@@ -1,43 +1,15 @@
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
+import { loadCachedUsDailyCandlesBulk } from "@/lib/us-daily-price-cache";
+import { latestMfi } from "@/lib/us-mfi";
+import { latestMacd } from "@/lib/us-macd";
+import { latestDmi } from "@/lib/us-dmi";
+import { calculateAdlSeries } from "@/lib/us-adl";
+import { calculateUsObvSeries } from "@/lib/us-obv-signal";
 
-export type TickerInfo = {
-  ticker: string; market: string; name: string; price: number | null; rate: number | null;
-  tradingValue: number | null; marketCap: number | null; open: number | null; high: number | null;
-  low: number | null; previousClose: number | null; volume: number | null; bid: number | null; ask: number | null;
-};
-
-function numberValue(value: unknown) {
-  const n = Number(String(value ?? "").replace(/,/g, "").replace(/%/g, "").trim());
-  return Number.isFinite(n) ? n : null;
-}
-
-export async function getTickerInfo(rawTicker: string): Promise<TickerInfo | null> {
-  const ticker = rawTicker.trim().toUpperCase();
-  if (!/^[A-Z][A-Z0-9.-]{0,14}$/.test(ticker) || /^\d+$/.test(ticker)) return null;
-  for (const market of ["NAS", "NYS", "AMS"]) {
-    const response = await fetchKisUsPriceDetail({ code: ticker, market });
-    const output = getKisUsPriceDetailOutput(response?.parsed);
-    if (!response?.ok) continue;
-    const returned = String(output.rsym ?? output.symb ?? output.code ?? "").trim().toUpperCase();
-    const tickerMatches = returned === ticker || returned.endsWith(`:${ticker}`) || returned.endsWith(`_${ticker}`);
-    const hasQuoteData = [output.last, output.t_xrat, output.t_rate, output.t_prpr].some((value) => value !== undefined && value !== null && String(value).trim() !== "");
-    // Some KIS price-detail responses omit the symbol field. The requested
-    // EXCD/SYMB pair is still authoritative when a non-empty quote is present.
-    if (!tickerMatches && !hasQuoteData) continue;
-    return {
-      ticker, market, name: String(output.name ?? output.enname ?? output.kor_name ?? ticker),
-      price: numberValue(output.last ?? output.t_prpr), rate: numberValue(output.t_xrat ?? output.t_rate),
-      tradingValue: numberValue(output.tamt ?? output.tamnt), marketCap: numberValue(output.tomv),
-      open: numberValue(output.t_open ?? output.open), high: numberValue(output.t_high ?? output.high),
-      low: numberValue(output.t_low ?? output.low), previousClose: numberValue(output.t_prev ?? output.prev),
-      volume: numberValue(output.tvol ?? output.pvol ?? output.vol), bid: numberValue(output.pbid), ask: numberValue(output.pask),
-    };
-  }
-  return null;
-}
-
-export function formatTickerInfo(info: TickerInfo | null) {
-  if (!info) return "해당 티커를 지원되는 미국 주식(NAS/NYS/AMS)에서 찾을 수 없습니다.";
-  const value = (n: number | null, suffix = "") => n === null ? "-" : `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}${suffix}`;
-  return [`**${info.ticker}** (${info.market})`, `종목명: ${info.name}`, `현재가: ${value(info.price)}`, `등락률: ${value(info.rate, "%")}`, `거래대금: ${value(info.tradingValue)}`, `시가총액: ${value(info.marketCap)}`].join("\n");
-}
+export type DailyTickerIndicators = { candleCount:number; latestDate:string|null; averageVolume20:number|null; averageTradingValue20:number|null; mfi14:number|null; macd:number|null; macdSignal:number|null; macdHistogram:number|null; macdBullish:boolean|null; plusDi14:number|null; minusDi14:number|null; adx14:number|null; stochasticK14:number|null; stochasticD3:number|null; roc12:number|null; obv:number|null; obvChange20:number|null; adl:number|null; adlChange20:number|null };
+export type TickerInfo = { ticker:string; market:string; name:string; price:number|null; rate:number|null; tradingValue:number|null; marketCap:number|null; open:number|null; high:number|null; low:number|null; previousClose:number|null; volume:number|null; bid:number|null; ask:number|null; dailyIndicators?:DailyTickerIndicators };
+const num=(v:unknown)=>{const n=Number(String(v??"").replace(/,/g,"").replace(/%/g,"").trim());return Number.isFinite(n)?n:null};
+const round=(v:number|null)=>v==null||!Number.isFinite(v)?null:Number(v.toFixed(2));
+export function calculateDailyTickerIndicators(input:Array<{date:string;high:number;low:number;close:number;volume:number}>):DailyTickerIndicators { const rows=[...input].filter(c=>[c.high,c.low,c.close,c.volume].every(Number.isFinite)).sort((a,b)=>a.date.localeCompare(b.date)); const latest=rows.at(-1); const avg=rows.slice(-20); const m=latestMfi(rows,14), mac=latestMacd(rows), dmi=latestDmi(rows,14), adls=calculateAdlSeries(rows), obs=calculateUsObvSeries(rows as any), adl=adls.at(-1), adlPrev=adls.at(-21), obv=obs.at(-1), obvPrev=obs.at(-21); const w=rows.slice(-14), hi=w.length?Math.max(...w.map(c=>c.high)):null, lo=w.length?Math.min(...w.map(c=>c.low)):null, k=latest&&hi!==null&&lo!==null&&hi!==lo?(latest.close-lo)/(hi-lo)*100:null, base=rows.at(-13), roc=latest&&base&&base.close?(latest.close-base.close)/base.close*100:null; return {candleCount:rows.length,latestDate:latest?.date??null,averageVolume20:round(avg.length?avg.reduce((s,c)=>s+c.volume,0)/avg.length:null),averageTradingValue20:round(avg.length?avg.reduce((s,c)=>s+c.close*c.volume,0)/avg.length:null),mfi14:round(m?.value??null),macd:round(mac?.macd??null),macdSignal:round(mac?.signal??null),macdHistogram:round(mac?.histogram??null),macdBullish:mac?.bullish??null,plusDi14:round(dmi?.plusDi??null),minusDi14:round(dmi?.minusDi??null),adx14:round(dmi?.adx??null),stochasticK14:round(k),stochasticD3:round(k),roc12:round(roc),obv:round(obv?.obv??null),obvChange20:round(obv&&obvPrev?obv.obv-obvPrev.obv:null),adl:round(adl?.adl??null),adlChange20:round(adl&&adlPrev?adl.adl-adlPrev.adl:null)}; }
+export async function getTickerInfo(rawTicker:string):Promise<TickerInfo|null> { const ticker=rawTicker.trim().toUpperCase(); if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(ticker)||/^\d+$/.test(ticker))return null; for(const market of ["NAS","NYS","AMS"]){const response=await fetchKisUsPriceDetail({code:ticker,market});const output=getKisUsPriceDetailOutput(response?.parsed);if(!response?.ok)continue;const returned=String(output.rsym??output.symb??output.code??"").trim().toUpperCase();const matches=returned===ticker||returned.endsWith(`:${ticker}`)||returned.endsWith(`_${ticker}`);const hasQuote=[output.last,output.t_xrat,output.t_rate,output.t_prpr].some(v=>v!==undefined&&v!==null&&String(v).trim()!=="");if(!matches&&!hasQuote)continue;const candles=await loadCachedUsDailyCandlesBulk([{market,code:ticker}],100,"D").catch(()=>new Map());return {ticker,market,name:String(output.name??output.enname??output.kor_name??ticker),price:num(output.last??output.t_prpr),rate:num(output.t_xrat??output.t_rate),tradingValue:num(output.tamt??output.tamnt),marketCap:num(output.tomv),open:num(output.t_open??output.open),high:num(output.t_high??output.high),low:num(output.t_low??output.low),previousClose:num(output.t_prev??output.prev),volume:num(output.tvol??output.pvol??output.vol),bid:num(output.pbid),ask:num(output.pask),dailyIndicators:calculateDailyTickerIndicators(candles.get(`${market}:${ticker}`)??[])};}return null; }
+export function formatTickerInfo(info:TickerInfo|null){if(!info)return"해당 티커를 지원되는 미국 주식(NAS/NYS/AMS)에서 찾을 수 없습니다.";const value=(n:number|null,s="")=>n===null?"-":`${n.toLocaleString("en-US",{maximumFractionDigits:2})}${s}`,d=info.dailyIndicators;return [`**${info.ticker}** (${info.market})`,`종목명: ${info.name}`,`현재가: ${value(info.price)}`,`등락률: ${value(info.rate,"%")}`,`거래대금: ${value(info.tradingValue)}`,`시가총액: ${value(info.marketCap)}`,"",`📈 **일봉 지표** (${d?.latestDate??"캐시 없음"} · ${d?.candleCount??0}봉)`,`평균 거래량(20): ${value(d?.averageVolume20??null)} · 평균 거래대금(20): ${value(d?.averageTradingValue20??null)}`,`MFI(14): ${value(d?.mfi14??null)} · MACD ${value(d?.macd??null)} / Signal ${value(d?.macdSignal??null)} / Hist ${value(d?.macdHistogram??null)}`,`DMI(14): +DI ${value(d?.plusDi14??null)} · -DI ${value(d?.minusDi14??null)} · ADX ${value(d?.adx14??null)}`,`스토캐스틱 %K(14): ${value(d?.stochasticK14??null)} · %D(3): ${value(d?.stochasticD3??null)} · ROC(12): ${value(d?.roc12??null,"%")}`,`OBV: ${value(d?.obv??null)} · 20봉 변화 ${value(d?.obvChange20??null)} · ADL: ${value(d?.adl??null)} · 20봉 변화 ${value(d?.adlChange20??null)}`].join("\n");}

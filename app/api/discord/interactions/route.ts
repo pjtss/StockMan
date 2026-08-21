@@ -16,6 +16,7 @@ import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
 import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
 import { getDailyCacheCommand, loadDailyCacheCommand, splitDailyCacheCommand, type DailyCacheCommand } from "@/lib/discord-daily-cache";
+import { getTickerInfo, formatTickerInfo } from "@/lib/discord-ticker-command";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,10 +94,12 @@ export async function POST(request: Request) {
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
   if (["daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "daily-filter-refresh"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "일봉 OBV·MFI·MACD·DMI·ADL 기능은 현재 비활성화되어 있습니다.", flags: 64 } });
   const cacheCommand = getDailyCacheCommand(interaction.data?.name);
-  if (interaction.type !== 2 || (!cacheCommand && !["news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "daily-filter-refresh"].includes(interaction.data?.name))) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || (!cacheCommand && !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "daily-filter-refresh"].includes(interaction.data?.name))) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
-  if (cacheCommand) {
+  if (interaction.data.name === "ticker") {
+    void getTickerInfo(ticker).then((result) => updateOriginalResponse(applicationId, interaction.token, formatTickerInfo(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `티커 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+  } else if (cacheCommand) {
     void loadDailyCacheCommand(interaction.data.name as DailyCacheCommand).then((result) => sendDailyCacheResponses(applicationId, interaction.token, splitDailyCacheCommand(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `캐시 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (interaction.data.name === "refresh-daily") {
     void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
