@@ -5,7 +5,7 @@ import {
 } from "@/lib/kr-daily-price-cache";
 import type { OHLCVCandle } from "@/lib/kis-chart";
 import { calculateObvAdlSignal } from "@/lib/daily-obv-adl-filter";
-import { detectBollingerRebound } from "@/lib/bollinger-rebound";
+import { findRecentLowerBandTouch } from "@/lib/bollinger-lower-touch";
 const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
 const resultCache = new Map<string, { expiresAt: number; value: any }>();
 
@@ -205,8 +205,8 @@ export async function scanStoredKrBollingerBands(
       const inMiddleToLower = Boolean(band && band.close >= band.lower && band.close <= band.middle);
       const signal = calculateObvAdlSignal(series, policy.obvSignalPeriod, policy.adlSignalPeriod);
       const signalPass = !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
-      const rebound = detectBollingerRebound(points, { enabled: policy.reboundAfterBreakout !== false, lookback: policy.reboundLookback ?? 3, tolerancePercent: policy.reboundTolerancePercent ?? 0.5 });
-      const priceCondition = policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : policy.reboundAfterBreakout !== false ? rebound.qualifies : touchState !== "NONE";
+      const recentTouch = findRecentLowerBandTouch(points);
+      const priceCondition = policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : recentTouch.qualifies;
       const qualifies = Boolean(band && passes && signalPass && priceCondition);
       results.push({
         market: item.market,
@@ -217,11 +217,11 @@ export async function scanStoredKrBollingerBands(
           : !passes || !signalPass
             ? "FILTERED"
             : qualifies
-              ? policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : policy.reboundAfterBreakout !== false ? "QUALIFIED_RETOUCH" : touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH"
+              ? policy.zone === "MIDDLE_TO_LOWER" ? "QUALIFIED_MIDDLE_TO_LOWER" : recentTouch.isCurrent ? (touchState === "BELOW" ? "QUALIFIED_BELOW" : "QUALIFIED_TOUCH") : "QUALIFIED_RETOUCH"
               : "NOT_TOUCHING",
         qualifies,
         touchState,
-        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : policy.zone !== "MIDDLE_TO_LOWER" && policy.reboundAfterBreakout !== false && !rebound.qualifies ? "NO_PRIOR_BREAKOUT_RETOUCH" : undefined,
+        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : policy.zone !== "MIDDLE_TO_LOWER" && !recentTouch.qualifies ? "NO_RECENT_LOWER_TOUCH" : undefined,
         candleCount: series.length,
         latestCandleDate: band?.date ?? null,
         close: band?.close ?? null,
@@ -232,9 +232,9 @@ export async function scanStoredKrBollingerBands(
         band,
         obvAboveSignal: signal.obvAboveSignal,
         adlAboveSignal: signal.adlAboveSignal,
-        reboundState: rebound.state,
-        breakoutDate: rebound.breakoutIndex == null ? null : points[rebound.breakoutIndex]?.date ?? null,
-        retestDistancePercent: rebound.retestDistancePercent,
+        reboundState: undefined,
+        breakoutDate: null,
+        retestDistancePercent: null,
         filter: {
           minPrice: pricePass,
           minVolume: volumePass,
@@ -276,9 +276,8 @@ export async function scanStoredKrBollingerBands(
       timeframe,
       zone: policy.zone,
       bandCalculation: "종가 기반",
-      touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : policy.reboundAfterBreakout ? "최근 저장 봉 하단 이탈 후 현재 하단선 재터치" : "최근 저장 봉 종가 = TOUCH, 하단선 미만 = BELOW",
+      touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 또는 직전 거래일 종가가 해당 봉의 하단선 이하",
       indicatorFilter: policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화",
-      reboundPolicy: policy.reboundAfterBreakout ? { enabled: true, lookback: policy.reboundLookback, tolerancePercent: policy.reboundTolerancePercent } : { enabled: false },
       currentDayExcluded: false,
     },
     instrumentCount: universe.scopes.length,
