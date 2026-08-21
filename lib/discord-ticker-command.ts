@@ -7,6 +7,7 @@ import { latestMacd } from "@/lib/us-macd";
 import { latestDmi } from "@/lib/us-dmi";
 import { calculateAdlSeries } from "@/lib/us-adl";
 import { calculateUsObvSeries } from "@/lib/us-obv-signal";
+import { formatKoreanFloorCompact } from "@/lib/korean-number-format";
 export type DailyTickerIndicators={candleCount:number;latestDate:string|null;averageVolume20:number|null;averageTradingValue20:number|null;mfi14:number|null;macd:number|null;macdSignal:number|null;macdHistogram:number|null;plusDi14:number|null;minusDi14:number|null;adx14:number|null;stochasticK14:number|null;roc12:number|null;obv:number|null;obvChange20:number|null;adl:number|null;adlChange20:number|null};
 export type TickerInfo={ticker:string;market:string;name:string;price:number|null;rate:number|null;tradingValue:number|null;marketCap:number|null;open:number|null;high:number|null;low:number|null;previousClose:number|null;volume:number|null;bid:number|null;ask:number|null;dailyIndicators?:DailyTickerIndicators};
 const n=(v:unknown)=>{const x=Number(String(v??"").replace(/,/g,"").replace(/%/g,""));return Number.isFinite(x)?x:null}; const r=(v:number|null)=>v==null?null:Number(v.toFixed(2));

@@ -23,3 +23,13 @@ export function formatKoreanCompact(value: number | null | undefined, suffix = "
   const scaled = amount / unit.divisor;
   return `${sign}${scaled.toLocaleString("en-US", { maximumFractionDigits: 2 })}${unit.label}${suffix}`;
 }
+
+/** Largest Korean unit with lower digits discarded (e.g. 1,546,738 -> 154만). */
+export function formatKoreanFloorCompact(value: number | null | undefined, suffix = "") {
+  if (value == null || !Number.isFinite(value)) return "-";
+  const sign = value < 0 ? "-" : "";
+  const amount = Math.floor(Math.abs(value));
+  const units = [{ divisor: 1_000_000_000_000, label: "조" }, { divisor: 100_000_000, label: "억" }, { divisor: 10_000, label: "만" }, { divisor: 1_000, label: "천" }];
+  const unit = units.find((item) => amount >= item.divisor);
+  return unit ? `${sign}${Math.floor(amount / unit.divisor)}${unit.label}${suffix}` : `${sign}${amount.toLocaleString("en-US")}${suffix}`;
+}
