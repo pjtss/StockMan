@@ -3,6 +3,7 @@ import { getDb, getPool } from "@/lib/db";
 import { automationRuns } from "@/lib/schema";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { readRequestTrace } from "@/lib/request-trace";
+import { notifyAutomationCompletion } from "@/lib/automation-completion-discord";
 
 const STALE_RUN_AFTER_SECONDS = 15 * 60;
 const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
@@ -58,6 +59,11 @@ export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, re
         )`,
       [moduleKey, reason, summary, SKIP_OBSERVATION_WINDOW_SECONDS],
     );
+    await notifyAutomationCompletion(moduleKey, "SKIPPED", {
+      skipped: true,
+      reason,
+      ...details,
+    }).catch((error) => console.warn(`[Automation] skipped notification failed for ${moduleKey}:`, error instanceof Error ? error.message : error));
   } catch (error) {
     console.warn(`[Automation] unable to record skipped run for ${moduleKey}:`, error instanceof Error ? error.message : error);
   }

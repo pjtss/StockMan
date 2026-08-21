@@ -1,6 +1,5 @@
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
-import { getPool } from "@/lib/db";
 
 const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-daily-cache",
@@ -53,7 +52,7 @@ async function postCompletionWebhook(url: string, body: string) {
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, status: "SUCCESS" | "FAILED", summary: Record<string, unknown>, errorMessage?: string) {
+export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, status: "SUCCESS" | "FAILED" | "SKIPPED", summary: Record<string, unknown>, errorMessage?: string) {
   if (!COMPLETION_MODULES.has(moduleKey)) return { sent: false, skipped: true, reason: "module_not_supported" };
   let configured = false;
   let webhook = "";
@@ -70,20 +69,10 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
   }
   if (!webhook) return { sent: false, skipped: true, reason: "webhook_not_configured", configured };
   const deliveryDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
-  let dedupeAvailable = true;
-  try {
-    const claimed = await getPool().query(
-      `INSERT INTO automation_notification_deliveries (module_key, delivery_date, status, attempts, updated_at)
-       VALUES ($1, $2::date, 'PENDING', 1, NOW())
-       ON CONFLICT (module_key, delivery_date) DO NOTHING
-       RETURNING module_key`,
-      [moduleKey, deliveryDate],
-    );
-    if (claimed.rowCount === 0) return { sent: false, skipped: true, reason: "daily_already_sent", configured: true, deliveryDate };
-  } catch (error) {
-    dedupeAvailable = false;
-    console.warn(`[Automation] daily notification dedupe unavailable for ${moduleKey}:`, error instanceof Error ? error.message : error);
-  }
+  // Completion notifications are intentionally sent for every automation
+  // execution. The cache interval is configurable (often hourly), so a
+  // daily delivery dedupe would hide successful and skipped runs from the
+  // operator.
 
   const durationMs = asNumber((summary.observability as Record<string, unknown> | undefined)?.durationMs);
   const label = moduleKey === "kr-daily-cache"
@@ -94,8 +83,8 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
         ? "해외 일봉 시가 캐시"
         : "해외 일봉 시가 캐시";
   const lines = [
-    `${status === "SUCCESS" ? "✅" : "❌"} ${label} 자동화 완료`,
-    `상태: ${status === "SUCCESS" ? "성공" : "실패"}`,
+    `${status === "SUCCESS" ? "✅" : status === "SKIPPED" ? "⏭️" : "❌"} ${label} 자동화 완료`,
+    `상태: ${status === "SUCCESS" ? "성공" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
     durationMs == null ? null : `소요 시간: ${(durationMs / 1000).toFixed(2)}초`,
     `결과: ${resultSummary(summary)}`,
     errorMessage ? `오류: ${errorMessage}` : null,
@@ -104,10 +93,8 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
   try {
     const delivered = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content: lines.slice(0, 1900), allowed_mentions: { parse: [] } }));
     if (!delivered.response.ok) throw new Error(`Discord HTTP ${delivered.response.status}`);
-    if (dedupeAvailable) await getPool().query(`UPDATE automation_notification_deliveries SET status = 'SENT', sent_at = NOW(), updated_at = NOW() WHERE module_key = $1 AND delivery_date = $2::date`, [moduleKey, deliveryDate]);
     return { sent: true, skipped: false, configured: true, attempts: delivered.attempts, deliveryDate };
   } catch (error) {
-    if (dedupeAvailable) await getPool().query(`UPDATE automation_notification_deliveries SET status = 'FAILED', last_error = $3, updated_at = NOW() WHERE module_key = $1 AND delivery_date = $2::date`, [moduleKey, deliveryDate, error instanceof Error ? error.message : String(error)]).catch(() => undefined);
     throw error;
   }
 }
