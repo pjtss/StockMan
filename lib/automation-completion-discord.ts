@@ -69,10 +69,9 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
   }
   if (!webhook) return { sent: false, skipped: true, reason: "webhook_not_configured", configured };
   const deliveryDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
-  // Completion notifications are intentionally sent for every automation
-  // execution. The cache interval is configurable (often hourly), so a
-  // daily delivery dedupe would hide successful and skipped runs from the
-  // operator.
+  // Completion notifications are sent only after an actual worker execution.
+  // Schedule/interval observations are persisted as SKIPPED runs but are not
+  // delivered to Discord to avoid cron-driven notification spam.
 
   const durationMs = asNumber((summary.observability as Record<string, unknown> | undefined)?.durationMs);
   const label = moduleKey === "kr-daily-cache"
