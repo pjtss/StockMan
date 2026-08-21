@@ -20,6 +20,10 @@ export async function loadStoredKrInstrumentScopes() {
   // a display name: names are presentation data and are not authoritative.
   // Cache every official common-stock row. Market-cap, turnover, price,
   // volume and suspension state are detection policies, not cache membership.
-  const eligible = rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !isExcludedKrOfficialName(row.name));
-  return { scopes: eligible.map(({ instrumentType: _instrumentType, isEtp: _isEtp, isWarrant: _isWarrant, isPreferred: _isPreferred, isSuspended: _isSuspended, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENT_UNIVERSE", markets: [...KR_MARKETS], count: eligible.length, excludedInDb: rows.length - eligible.length, criteria: { instrumentType: "COMMON_STOCK", numericFilters: "NONE" } } };
+  const eligible = rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !isExcludedKrOfficialName(row.name) && !row.isSuspended);
+  const excludedByReason = {
+    product: rows.filter((row) => row.instrumentType !== "COMMON_STOCK" || isExcludedKrOfficialName(row.name)).length,
+    suspended: rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !isExcludedKrOfficialName(row.name) && row.isSuspended).length,
+  };
+  return { scopes: eligible.map(({ instrumentType: _instrumentType, isEtp: _isEtp, isWarrant: _isWarrant, isPreferred: _isPreferred, isSuspended: _isSuspended, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENT_UNIVERSE", markets: [...KR_MARKETS], count: eligible.length, excludedInDb: rows.length - eligible.length, excludedByReason, criteria: { instrumentType: "COMMON_STOCK", officialStatus: "trht_yn/sltr_yn/mang_issu_yn 모두 비활성", numericFilters: "NONE" } } };
 }

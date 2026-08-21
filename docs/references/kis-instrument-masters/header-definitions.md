@@ -157,6 +157,12 @@ KOSPI의 `kospi_issu_yn`, KOSDAQ의 `ksq150_nmix_yn`처럼 시장에만 의미�
 5. 상품 분류는 `scrt_grp_cls_code`, `etp_prod_cls_code`, 해외 `stis`·`etyp`을 함께 평가한다.
 6. 헤더에 정의된 삭제 필드는 새 계산에 사용하지 않고 원본 호환 필드로만 보존한다.
 
+## 5. 탐지 유니버스 상태 필터
+
+원본 종목·캔들 캐시는 상태 종목도 보존한다. 다만 탐지·알림 유니버스는 국내 `trht_yn`, `sltr_yn`, `mang_issu_yn` 중 하나라도 활성인 종목을 제외한다. 이 제외는 상품 분류(`COMMON_STOCK`)와 별도의 상태 필터이며, 진단 응답에는 `excludedByReason.suspended`로 집계한다.
+
+해외 `mastcode`에는 동일한 거래정지·정리매매·관리종목 필드가 없으므로, 해외 상태를 마스터만으로 추정하지 않는다. 해외는 `stis`·`etyp` 상품 분류만 확정하고, 거래 상태는 별도 공식 시세 상태 필드가 확인될 때까지 `UNKNOWN_STATUS`로 관리한다.
+
 ## 4. 연결 문서
 
 - [KIS 종목 마스터 원본 보관소](./README.md)
