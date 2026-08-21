@@ -160,7 +160,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const close = latest?.close ?? null;
         const volume = latestCandle?.volume ?? null;
         const pricePass = close !== null && (policy.minPrice <= 0 || close >= policy.minPrice);
-        const volumePass = volume !== null && (policy.minVolume <= 0 || volume >= policy.minVolume);
+        const volumePass = true;
         const turnoverPass = policy.minTurnoverRatio <= 0 || (metric?.turnoverRatio != null && metric.turnoverRatio >= policy.minTurnoverRatio);
         // Bollinger scans cover every COMMON_STOCK. Do not apply turnover
         // scanner market-cap/turnover thresholds (KIS metrics may be null).

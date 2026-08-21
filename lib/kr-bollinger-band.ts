@@ -193,9 +193,7 @@ export async function scanStoredKrBollingerBands(
       const pricePass =
         band !== null &&
         (policy.minPrice <= 0 || band.close >= policy.minPrice);
-      const volumePass =
-        latest !== null &&
-        (policy.minVolume <= 0 || latest.volume >= policy.minVolume);
+      const volumePass = true;
       const turnoverPass =
         policy.minTurnoverRatio <= 0 ||
         (metric?.turnoverRatio != null &&
