@@ -204,7 +204,7 @@ export async function scanStoredKrBollingerBands(
       const touchState = !band ? "NONE" : band.close < band.lower ? "BELOW" : band.close <= band.lower ? "TOUCH" : "NONE";
       const inMiddleToLower = Boolean(band && band.close >= band.lower && band.close <= band.middle);
       const signal = calculateObvAdlSignal(series, policy.obvSignalPeriod, policy.adlSignalPeriod);
-      const signalPass = policy.zone === "MIDDLE_TO_LOWER" || !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
+      const signalPass = true;
       const recentTouch = findRecentLowerBandTouch(points);
       const priceCondition = policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : recentTouch.qualifies;
       const qualifies = Boolean(band && passes && signalPass && priceCondition);
@@ -277,7 +277,7 @@ export async function scanStoredKrBollingerBands(
       zone: policy.zone,
       bandCalculation: "종가 기반",
       touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 또는 직전 거래일 종가가 해당 봉의 하단선 이하",
-      indicatorFilter: policy.zone === "MIDDLE_TO_LOWER" ? "비활성화(중단선~하단선 전용)" : policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화",
+      indicatorFilter: "비활성화",
       currentDayExcluded: false,
     },
     instrumentCount: universe.scopes.length,
