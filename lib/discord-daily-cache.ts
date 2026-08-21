@@ -72,7 +72,10 @@ export function splitDailyCacheCommand(result: Awaited<ReturnType<typeof loadDai
     ? rawItems.filter((item) => item.obvAboveSignal === true && item.adlAboveSignal === true && item.instrumentType !== "ETF" && item.instrumentType !== "DERIVATIVE" && item.instrumentType !== "DR" && !item.isEtf && !item.isWarrant && !item.isDerivative && !item.isDr)
     : rawItems;
   const header = `📊 **${result.title} 캐시**`;
-  const meta = `갱신 ${payload.updatedAt ?? "-"} · 대상 ${payload.scannedCount ?? 0}개 · 조건 충족 ${payload.qualifiedCount ?? items.length}개`;
+  // Report the rows that will actually be emitted. Legacy rows without the
+  // mandatory OBV/ADL fields are intentionally removed above and must not be
+  // counted as qualified in the Discord summary.
+  const meta = `갱신 ${payload.updatedAt ?? "-"} · 대상 ${payload.scannedCount ?? 0}개 · 조건 충족 ${items.length}개`;
   const policyLine = result.title.includes("골든크로스") ? `기준 EMA ${payload.policy?.ema ?? "9/20"} · 직전/당일/최근 ${payload.policy?.recentCrossLookback ?? 5}봉 · ${payload.policy?.requiredSignals?.join(" AND ") ?? "OBV > Signal AND ADL > Signal"}` : "";
   const limit = 1900;
   const chunks: string[] = [];
