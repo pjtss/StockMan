@@ -31,6 +31,7 @@ export type UsDailyPriceResponse = {
 };
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
+const REQUEST_TIMEOUT_MS = 30_000;
 
 function ascii(value: unknown, fallback = "") {
   const text = String(value ?? fallback);
@@ -103,7 +104,15 @@ export async function fetchUsDailyPrice(request: UsDailyPriceRequest): Promise<U
     tr_cont: "",
   });
   async function once(token: string) {
-    const response = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers: headers(token) }));
+    const response = await withKisRequestThrottle(async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      try {
+        return await fetch(url, { method: "GET", headers: headers(token), signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
     const rawText = await response.text();
     return { response, rawText, parsed: json(rawText) };
   }
