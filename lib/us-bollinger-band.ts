@@ -170,7 +170,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
         const touchState = !latest ? "NONE" : latest.close < latest.lower ? "BELOW" : latest.close <= latest.lower ? "TOUCH" : "NONE";
         const inMiddleToLower = Boolean(latest && latest.close >= latest.lower && latest.close <= latest.middle);
         const signal = calculateObvAdlSignal(candles, policy.obvSignalPeriod, policy.adlSignalPeriod);
-        const signalPass = !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
+        const signalPass = policy.zone === "MIDDLE_TO_LOWER" || !policy.requireObvAdlSignal || (signal.ready && signal.obvAboveSignal && signal.adlAboveSignal);
         const recentTouch = findRecentLowerBandTouch(points);
         const priceCondition = policy.zone === "MIDDLE_TO_LOWER" ? inMiddleToLower : recentTouch.qualifies;
         const qualifies = Boolean(latest && passesFilters && signalPass && priceCondition);
@@ -190,7 +190,7 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     universeAvailable: Boolean((context.universe.universe as any).ok),
     universe: context.universe.universe,
     policy,
-    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 또는 직전 거래일 종가가 해당 봉의 하단선 이하", indicatorFilter: policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
+    dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 또는 직전 거래일 종가가 해당 봉의 하단선 이하", indicatorFilter: policy.zone === "MIDDLE_TO_LOWER" ? "비활성화(중단선~하단선 전용)" : policy.requireObvAdlSignal ? "OBV·ADL 각각 Signal 이상(AND)" : "비활성화", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
     instrumentCount: instruments.length,
     successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
     failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,
