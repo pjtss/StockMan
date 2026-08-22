@@ -1,5 +1,6 @@
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
+import { loadFeatureDiscordDebugWebhook } from "@/lib/discord-config";
 
 const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-daily-cache",
@@ -60,7 +61,10 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
     const settings = await loadFeatureModuleSettings(moduleKey);
     const completion = settings.featureSettings?.automationCompletion as { enabled?: boolean; webhookUrl?: string } | undefined;
     if (completion?.enabled === false) return { sent: false, skipped: true, reason: "disabled" };
-    webhook = completion?.webhookUrl?.trim() || process.env.AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL?.trim() || "";
+    // Cache execution results are operational diagnostics: prefer the
+    // module's existing debug channel, while retaining the completion webhook
+    // as a fallback for installations that have not configured one.
+    webhook = await loadFeatureDiscordDebugWebhook(moduleKey) || completion?.webhookUrl?.trim() || process.env.AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL?.trim() || "";
     configured = Boolean(webhook);
   } catch (error) {
     console.warn(`[Automation] completion settings unavailable for ${moduleKey}:`, error instanceof Error ? error.message : error);

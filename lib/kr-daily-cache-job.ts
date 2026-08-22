@@ -4,6 +4,7 @@ import { refreshKrDailyCandles } from "@/lib/kr-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
+import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -41,6 +42,9 @@ async function run(job: Job) {
     const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM kr_instrument_universe_candles GROUP BY timeframe`);
     const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
     const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
+    const retryRows = await loadDueCandleCacheRetries();
+    const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
+    for (const row of retryRows) if (!dueTimeframes.includes(row.timeframe)) dueTimeframes.push(row.timeframe);
     job.dueTimeframes = dueTimeframes;
     let cursor = 0;
     const worker = async () => {
@@ -51,7 +55,9 @@ async function run(job: Job) {
           const [daily, weekly, monthly] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D", item.market) : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W", item.market) : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M", item.market) : null]);
           const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null };
           job.results.push(result);
+          const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
           const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0);
+          for (const timeframe of dueTimeframes) { const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly; if (Number(diagnostic?.parsedCandleCount ?? 0) > 0 && (retryKeys.has(`${key}:${timeframe}`) || retryRows.length > 0)) await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe }); }
           if (success) job.successCount += 1;
           else {
             job.failureCount += 1;

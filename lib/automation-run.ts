@@ -38,7 +38,12 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
     const summary: Record<string, unknown> = compactAutomationSummary(result && typeof result === "object" ? { ...(result as Record<string, unknown>) } : { result }) as Record<string, unknown>;
     summary.observability = { ...(summary.observability && typeof summary.observability === "object" ? summary.observability as Record<string, unknown> : {}), ...(trace || {}), durationMs: Date.now() - startedAt };
     try {
-      summary.notifications = { completion: await notifyAutomationCompletion(moduleKey, "SUCCESS", summary) };
+      // A worker can finish its loop while individual instruments failed.
+      // Keep the run technically completed for scheduling, but surface the
+      // partial failure as a failure notification so the debug channel cannot
+      // silently report a green run with missing candles.
+      const notificationStatus = Number(summary.failureCount ?? 0) > 0 ? "FAILED" : "SUCCESS";
+      summary.notifications = { completion: await notifyAutomationCompletion(moduleKey, notificationStatus, summary, notificationStatus === "FAILED" ? `${summary.failureCount}개 종목 처리 실패` : undefined) };
     } catch (error) {
       summary.notifications = { completion: { sent: false, skipped: false, reason: "delivery_failed", error: error instanceof Error ? error.message : String(error) } };
       console.warn(`[Automation] completion notification failed for ${moduleKey}:`, error instanceof Error ? error.message : error);

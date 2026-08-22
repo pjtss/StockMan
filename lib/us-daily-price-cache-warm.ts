@@ -4,6 +4,7 @@ import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
+import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
 
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
 
@@ -18,7 +19,9 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const freshness = { D: 6 * 60 * 60 * 1000, W: 3 * 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
   const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM us_instrument_universe_candles GROUP BY timeframe`);
   const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
-  const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
+  const retryRows = await loadDueCandleCacheRetries();
+  const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
+  const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe] || retryRows.some((row) => row.timeframe === timeframe));
   // A global MAX(fetched_at) cannot prove that every ticker has enough
   // history. Backfill only symbols whose daily cache is below the scanner's
   // minimum history, even when the normal daily timeframe is not due yet.
@@ -46,7 +49,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
         let itemSuccess = true;
         for (const timeframe of (Object.keys(freshness) as Array<keyof typeof freshness>)) {
           const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
-          const shouldFetch = dueTimeframes.includes(timeframe) || (timeframe === "D" && underfilledDaily.has(key));
+          const shouldFetch = retryKeys.has(`${key}:${timeframe}`) || dueTimeframes.includes(timeframe) || (timeframe === "D" && underfilledDaily.has(key));
           if (!shouldFetch) continue;
           const daily = await fetchUsDailyPrice({ code: item.code, market: item.market, timeframe });
           if (!daily?.ok || daily.candles.length === 0) {
@@ -57,6 +60,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
             continue;
           }
           candleCount += await saveUsDailyCandles(item.market, item.code, daily.candles, timeframe);
+          await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe });
         }
         if (itemSuccess) successCount += 1;
       } catch (error) {
