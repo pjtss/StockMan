@@ -4,7 +4,10 @@ import { automationRuns } from "@/lib/schema";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { readRequestTrace } from "@/lib/request-trace";
 
-const STALE_RUN_AFTER_SECONDS = 15 * 60;
+// Daily candle jobs legitimately run longer than 15 minutes on the full
+// universe. Keep stale recovery above the cron request ceiling so an active
+// worker is never falsely finalized while it is still processing.
+const STALE_RUN_AFTER_SECONDS = 2 * 60 * 60;
 const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
 
 /** Mark abandoned workers before creating a new run. */
@@ -112,10 +115,10 @@ export async function loadRunningAutomationRun(moduleKey: FeatureModuleKey) {
        FROM automation_runs
       WHERE module_key = $1
         AND status = 'RUNNING'
-        AND started_at >= NOW() - (900 * INTERVAL '1 second')
+        AND started_at >= NOW() - ($2 * INTERVAL '1 second')
       ORDER BY started_at DESC
       LIMIT 1`,
-    [moduleKey],
+    [moduleKey, STALE_RUN_AFTER_SECONDS],
   );
   return rows.rows[0] || null;
 }
