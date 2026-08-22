@@ -12,7 +12,8 @@ export async function refreshDailyBollingerCaches(market: "KR" | "US") {
       const scanned = await scan({ policy: { zone } } as any);
       results[zone] = await persistDailyBollingerResults(market, zone, scanned);
     } catch (error) {
-      results[zone] = { ok: false, error: error instanceof Error ? error.message : String(error) };
+      const message = error instanceof Error ? error.message : String(error);
+      results[zone] = { ok: false, error: message, retryQueued: true };
     }
   }
   return results;

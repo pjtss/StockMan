@@ -6,6 +6,10 @@ const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-daily-cache",
   "us-daily-cache",
   "us-daily-open-cache",
+  "kr-bollinger-band",
+  "kr-bollinger-middle-lower",
+  "us-bollinger-band",
+  "us-bollinger-middle-lower",
 ]);
 
 function asNumber(value: unknown) {

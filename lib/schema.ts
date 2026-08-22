@@ -312,6 +312,10 @@ export const secFilingEvents = pgTable("sec_filing_events", {
   accession: text("accession").primaryKey(), cik: text("cik").notNull(), category: text("category").notNull(), direction: text("direction").notNull(), score: integer("score").notNull(), matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`), bodyExcerpt: text("body_excerpt").notNull().default(""), financingAmountUsd: doublePrecision("financing_amount_usd"), dilutionRisk: text("dilution_risk"), insiderAction: text("insider_action"), discordStatus: text("discord_status").notNull().default("PENDING"), discordSentAt: timestamp("discord_sent_at", { withTimezone: true }), lastError: text("last_error"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const dailyBollingerCacheRetries = pgTable("daily_bollinger_cache_retries", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), scope: text("scope").notNull(), zone: text("zone").notNull(), status: text("status").notNull().default("PENDING"), attempts: integer("attempts").notNull().default(0), nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(), lastError: text("last_error"), lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }), succeededAt: timestamp("succeeded_at", { withTimezone: true }), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("daily_bollinger_cache_retries_key").on(table.scope, table.zone), index("daily_bollinger_cache_retries_due_idx").on(table.status, table.nextAttemptAt)]);
+
 /** Full SEC index/primary document captured for later AI analysis. */
 export const secFilingDocuments = pgTable("sec_filing_documents", {
   accession: text("accession").primaryKey(),
