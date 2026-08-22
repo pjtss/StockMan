@@ -18,4 +18,16 @@ describe("Discord daily detection cache commands", () => {
     expect(chunks.every((chunk) => chunk.length <= 1900)).toBe(true);
     expect(chunks.join("\n")).toContain("KRX 000299");
   });
+
+  it("does not reapply the removed OBV/ADL filter to Bollinger cache rows", () => {
+    const definition = getDailyCacheCommand("us-bollinger-cache")!;
+    const chunks = splitDailyCacheCommand({ ...definition, cacheKey: definition.key, payload: { updatedAt: "2026-08-20T00:00:00Z", scannedCount: 2, qualifiedCount: 2, qualified: [
+      { market: "NAS", code: "AAA", name: "첫 종목" },
+      { market: "NYS", code: "BBB", name: "둘째 종목", obvAboveSignal: false, adlAboveSignal: false },
+    ] } });
+    const text = chunks.join("\n");
+    expect(text).toContain("조건 충족 2개");
+    expect(text).toContain("NAS AAA");
+    expect(text).toContain("NYS BBB");
+  });
 });
