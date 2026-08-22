@@ -6,6 +6,11 @@ describe("US market date handling", () => {
     expect(currentUsMarketDate(new Date("2026-08-11T01:00:00.000Z"))).toBe("20260810");
   });
 
+  it("uses Friday during the US weekend", () => {
+    expect(currentUsMarketDate(new Date("2026-08-22T16:00:00.000Z"))).toBe("20260821");
+    expect(currentUsMarketDate(new Date("2026-08-23T16:00:00.000Z"))).toBe("20260821");
+  });
+
   it("removes the partial current-session candle from historical scans", () => {
     const rows = [
       { date: "20260811", open: 2, high: 2, low: 2, close: 2, volume: 10, raw: null },
