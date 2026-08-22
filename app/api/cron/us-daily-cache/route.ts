@@ -15,15 +15,15 @@ export async function POST(request: Request) {
   const moduleSettings = await loadFeatureModuleSettings("us-daily-cache");
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings)) {
     await recordSkippedAutomationRun("us-daily-cache", moduleSettings.enabled ? "outside_schedule" : "disabled");
-    return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 3_600, schedule: "DB schedule, one-hour minimum" });
+    return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 86_400, schedule: "DB schedule, daily" });
   }
-  const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 3_600);
+  const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 86_400);
   const latest = await loadLatestExecutedAutomationRun("us-daily-cache").catch(() => null);
   const latestStartedAt = latest?.started_at ? new Date(latest.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
   if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
     await recordSkippedAutomationRun("us-daily-cache", "outside_interval", { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds) });
-    return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), schedule: "DB schedule, six-hour minimum" });
+    return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), schedule: "DB schedule, daily" });
   }
   return NextResponse.json({ ok: true, ...(await withAutomationRun("us-daily-cache", warmUsDailyPriceCache)) });
   } catch (error) { return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
