@@ -70,7 +70,7 @@ run_cron_endpoint "market-rss" 180 "/api/cron/market-rss"
 # Full-universe daily candle refresh can take longer than five minutes.
 # Keep the request alive so the DB automation run can finalize SUCCESS/FAILED
 # and its per-instrument retry queue is committed instead of being orphaned.
-run_cron_endpoint "us-daily-cache" 1800 "/api/cron/us-daily-cache"
+run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
 run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
 run_cron_endpoint "us-bollinger-middle-lower" 180 "/api/cron/us-bollinger-middle-lower"
 run_cron_endpoint "us-golden-cross" 180 "/api/cron/us-golden-cross"
@@ -83,7 +83,7 @@ run_cron_endpoint "us-daily-breakout" 120 "/api/cron/us-daily-breakout"
 run_cron_endpoint "us-minute-bollinger-band" 180 "/api/cron/us-minute-bollinger-band"
 run_cron_endpoint "us-minute-obv-adl" 180 "/api/cron/us-minute-obv-adl"
 
-run_cron_endpoint "kr-daily-cache" 1800 "/api/cron/kr-daily-cache"
+run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
 run_cron_endpoint "kr-bollinger-band" 180 "/api/cron/kr-bollinger-band"
 run_cron_endpoint "kr-bollinger-middle-lower" 180 "/api/cron/kr-bollinger-middle-lower"
 run_cron_endpoint "kr-golden-cross" 180 "/api/cron/kr-golden-cross"
