@@ -7,6 +7,7 @@ import { isWithinSchedule } from "@/lib/schedule-time";
 import { scanStoredUsBollingerBands } from "@/lib/us-bollinger-band";
 import { sendUsBollingerBandSignals } from "@/lib/discord-us-bollinger-band";
 import { persistDailyBollingerResults } from "@/lib/daily-bollinger-cache";
+import { withDailyBollingerRetry } from "@/lib/daily-bollinger-retry";
 
 export async function POST(request: Request) {
   const debugRun = new URL(request.url).searchParams.get("debug") === "true" || request.headers.get("x-debug-run") === "true";
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, cooldownSeconds: settings.cooldownSeconds, effectiveIntervalSeconds, elapsedSeconds: Math.round(elapsedSeconds) });
   }
   const result = await withAutomationRun("us-bollinger-middle-lower", async () => {
-    const scan = await scanStoredUsBollingerBands({ moduleKey: "us-bollinger-middle-lower" });
+    const scan = await withDailyBollingerRetry({ scope: "US", zone: "MIDDLE_TO_LOWER" }, () => scanStoredUsBollingerBands({ moduleKey: "us-bollinger-middle-lower" }));
     const cache = await persistDailyBollingerResults("US", "MIDDLE_TO_LOWER", scan);
     const discord = await sendUsBollingerBandSignals(scan.results, "중단선~하단선");
     return { ...scan, discord, cache };

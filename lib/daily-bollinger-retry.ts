@@ -7,3 +7,10 @@ export async function enqueueDailyBollingerRetry(input: Input) {
 export async function markDailyBollingerRetrySuccess(input: Omit<Input, "error">) {
   try { await getPool().query(`UPDATE daily_bollinger_cache_retries SET status='SUCCESS',succeeded_at=NOW(),updated_at=NOW() WHERE scope=$1 AND zone=$2`, [input.scope, input.zone]); } catch { /* observability only */ }
 }
+export async function withDailyBollingerRetry<T>(input: Omit<Input, "error">, operation: () => Promise<T>): Promise<T> {
+  try { return await operation(); }
+  catch (error) {
+    await enqueueDailyBollingerRetry({ ...input, error: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}

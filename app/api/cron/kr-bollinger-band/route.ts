@@ -7,6 +7,7 @@ import { withAutomationRun } from "@/lib/automation-run";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { persistDailyBollingerResults } from "@/lib/daily-bollinger-cache";
+import { withDailyBollingerRetry } from "@/lib/daily-bollinger-retry";
 
 export async function POST(request: Request) {
   const debugRun = new URL(request.url).searchParams.get("debug") === "true" || request.headers.get("x-debug-run") === "true";
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
   }
   const result = await withAutomationRun("kr-bollinger-band", async () => {
-    const scan = await scanStoredKrBollingerBands();
+    const scan = await withDailyBollingerRetry({ scope: "KR", zone: "LOWER_OR_BELOW" }, () => scanStoredKrBollingerBands());
     const cache = await persistDailyBollingerResults("KR", scan.policy.zone ?? "LOWER_OR_BELOW", scan);
     const discord = await sendKrBollingerBandSignals(scan.results);
     return { ...scan, discord, cache };
