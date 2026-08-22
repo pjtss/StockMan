@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   if (!settings.enabled) { await recordSkippedAutomationRun("kr-daily-cache", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
   if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("kr-daily-cache", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
-  const intervalSeconds = Math.max(60, settings.intervalSeconds ?? 21_600);
+  const intervalSeconds = Math.max(60, settings.intervalSeconds ?? 3_600);
   const latestRun = await loadLatestExecutedAutomationRun("kr-daily-cache").catch(() => null);
   const latestStartedAt = latestRun?.started_at ? new Date(latestRun.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);

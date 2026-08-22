@@ -15,9 +15,9 @@ export async function POST(request: Request) {
   const moduleSettings = await loadFeatureModuleSettings("us-daily-cache");
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings)) {
     await recordSkippedAutomationRun("us-daily-cache", moduleSettings.enabled ? "outside_schedule" : "disabled");
-    return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 21_600, schedule: "DB schedule, six-hour minimum" });
+    return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 3_600, schedule: "DB schedule, one-hour minimum" });
   }
-  const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 21_600);
+  const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 3_600);
   const latest = await loadLatestExecutedAutomationRun("us-daily-cache").catch(() => null);
   const latestStartedAt = latest?.started_at ? new Date(latest.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
