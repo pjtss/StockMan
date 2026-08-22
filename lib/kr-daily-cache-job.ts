@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
 import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
+import { refreshDailyBollingerCaches } from "@/lib/daily-cache-followup";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -82,6 +83,7 @@ async function run(job: Job) {
     // the fan-out below KIS per-second limits instead of creating bursts.
     await Promise.all(Array.from({ length: Math.min(2, Math.max(1, scopes.length)) }, worker));
     job.status = "COMPLETED";
+    (job as any).bollingerCache = job.failureCount === 0 ? await refreshDailyBollingerCaches("KR") : { skipped: true, reason: "daily_candle_failures", failureCount: job.failureCount };
   } catch (error) {
     job.status = "FAILED";
     job.error = error instanceof Error ? error.message : String(error);
