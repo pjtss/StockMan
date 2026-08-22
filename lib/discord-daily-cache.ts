@@ -65,11 +65,12 @@ export function splitDailyCacheCommand(result: Awaited<ReturnType<typeof loadDai
   if (!result.payload) return [`📭 **${result.title} 캐시 없음**\n아직 갱신된 캐시가 없습니다. 일봉 캐시와 탐지 작업을 먼저 실행해 주세요.`];
   const payload = result.payload;
   const rawItems = Array.isArray(payload.qualified) ? payload.qualified : [];
-  // Read-side guard: never emit legacy/stale cache rows that were produced
-  // before the mandatory OBV+ADL policy or product exclusion was enabled.
+  // Read-side guard: product-type exclusion remains defensive, but BB caches
+  // no longer require OBV/ADL fields. Those filters were removed from the
+  // official BB policy and must not be reintroduced while formatting alerts.
   const isBollinger = result.title.includes("볼린저밴드");
   const items = isBollinger
-    ? rawItems.filter((item) => item.obvAboveSignal === true && item.adlAboveSignal === true && item.instrumentType !== "ETF" && item.instrumentType !== "DERIVATIVE" && item.instrumentType !== "DR" && !item.isEtf && !item.isWarrant && !item.isDerivative && !item.isDr)
+    ? rawItems.filter((item) => item.instrumentType !== "ETF" && item.instrumentType !== "DERIVATIVE" && item.instrumentType !== "DR" && !item.isEtf && !item.isWarrant && !item.isDerivative && !item.isDr)
     : rawItems;
   const header = `📊 **${result.title} 캐시**`;
   // Report the rows that will actually be emitted. Legacy rows without the
