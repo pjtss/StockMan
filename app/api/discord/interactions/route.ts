@@ -110,8 +110,10 @@ export async function POST(request: Request) {
   } else if (["refresh-daily", "refresh-us-daily", "refresh-kr-daily"].includes(interaction.data.name)) {
     const isKr = interaction.data.name === "refresh-kr-daily";
     const moduleKey = isKr ? "kr-daily-cache" : "us-daily-cache";
-    const task = isKr ? runKrDailyCacheNow : warmUsDailyPriceCache;
-    void withAutomationRun(moduleKey, task).then((result: any) => updateOriginalResponse(applicationId, interaction.token, isKr ? formatKrDailyCacheResult(result) : formatUsDailyCacheResult(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `${isKr ? "국내" : "해외"} 일봉 캐시 갱신 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+    const runRefresh = isKr
+      ? withAutomationRun("kr-daily-cache", runKrDailyCacheNow).then((result) => updateOriginalResponse(applicationId, interaction.token, formatKrDailyCacheResult(result)))
+      : withAutomationRun("us-daily-cache", warmUsDailyPriceCache).then((result) => updateOriginalResponse(applicationId, interaction.token, formatUsDailyCacheResult(result)));
+    void runRefresh.catch((error) => updateOriginalResponse(applicationId, interaction.token, `${isKr ? "국내" : "해외"} 일봉 캐시 갱신 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (interaction.data.name === "daily-breakout") {
     void runUsDailyBreakoutScan().then(async (result) => {
       const filtered = await filterUsDailyCandidates(result.qualified as any);
