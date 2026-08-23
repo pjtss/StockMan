@@ -6,6 +6,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
 import { loadCachedKrDailyCandlesBulk } from "@/lib/kr-daily-price-cache";
 import { createUsDailyScanContext } from "@/lib/us-daily-scan-context";
+import { enqueueDailyFollowupRetry, markDailyFollowupRetrySuccess } from "@/lib/daily-followup-retry";
 
 /** Refresh both daily Bollinger cache zones after candle storage. Discord
  * delivery remains owned by the Bollinger cron modules to avoid duplicates. */
@@ -18,9 +19,11 @@ export async function refreshDailyBollingerCaches(market: "KR" | "US") {
       results[zone] = await persistDailyBollingerResults(market, zone, scanned);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      await enqueueDailyFollowupRetry(market, "BOLLINGER", message);
       results[zone] = { ok: false, error: message, retryQueued: true };
     }
   }
+  if (Object.values(results).every((result: any) => result?.ok !== false)) await markDailyFollowupRetrySuccess(market, "BOLLINGER");
   return results;
 }
 
@@ -39,8 +42,11 @@ export async function refreshDailyGoldenCrossCache(market: "KR" | "US") {
       results = context.universe.scopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, timeframe: "D", ...calculateGoldenCross(context.candles.get(`${scope.market}:${scope.code}`) ?? [], policy) }));
     }
     const cache = await persistGoldenCrossResults(market, results);
+    await markDailyFollowupRetrySuccess(market, "GOLDEN_CROSS");
     return { ok: true, instrumentCount: results.length, successCount: results.filter((row) => row.reason !== "INSUFFICIENT_HISTORY").length, failureCount: results.filter((row) => row.reason === "INSUFFICIENT_HISTORY").length, cache };
   } catch (error) {
-    return { ok: false, retryQueued: true, error: error instanceof Error ? error.message : String(error) };
+    const message = error instanceof Error ? error.message : String(error);
+    await enqueueDailyFollowupRetry(market, "GOLDEN_CROSS", message);
+    return { ok: false, retryQueued: true, error: message };
   }
 }
