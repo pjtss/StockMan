@@ -6,6 +6,8 @@ import { scanStoredUsDmi } from "@/lib/us-dmi-scan";
 import { scanStoredUsMacd } from "@/lib/us-macd-scan";
 import { scanStoredUsDailyObv } from "@/lib/us-daily-obv";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
+import { runKrDailyCacheNow } from "@/lib/kr-daily-cache-job";
+import { withAutomationRun } from "@/lib/automation-run";
 import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
 import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { runUsDailyFilterRefresh } from "@/lib/us-daily-filter-refresh";
@@ -63,8 +65,12 @@ function formatDailyObvResult(result: Awaited<ReturnType<typeof scanStoredUsDail
   if (!result.qualified.length) return [`일봉 OBV 상승 종목이 없습니다.`, `기준: 최근 ${result.lookback}거래일 · 분석 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`].join("\n");
   return [`📊 **일봉 OBV 상승 후보**`, `기준: 최근 ${result.lookback}거래일 비교 · Signal EMA ${result.signalPeriod} · ${result.signalAboveDays}일 연속 상회 · 최근 ${result.signalCrossLookback}일 골든크로스`, `분석 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `OBV ${item.obv} · Signal ${item.obvSignal} · 괴리 ${item.signalGap}`, `OBV 변화 ${item.change} · Signal 상회 ${item.aboveSignalDays}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`, `종가 ${item.lastClose} · 기준일 ${item.date}`].join("\n"))].join("\n\n");
 }
-function formatDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPriceCache>>) {
-  return [`✅ **전체 일봉 데이터 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 일봉 데이터가 DB에 저장되었습니다."].join("\n");
+function formatUsDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPriceCache>>) {
+  return [`✅ **해외 일봉 캐시 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 해외 일봉 데이터가 DB에 저장되었습니다."].join("\n");
+}
+function formatKrDailyCacheResult(result: Awaited<ReturnType<typeof runKrDailyCacheNow>>) {
+  const failed = result.results.filter((item: any) => item.error).slice(0, 5);
+  return [`✅ **국내 일봉 캐시 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `처리 ${result.processedCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, failed.length ? `실패 원인 예시: ${failed.map((item: any) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 국내 일봉 데이터가 DB에 저장되었습니다."].join("\n");
 }
 function formatDailyTrendResult(result: Awaited<ReturnType<typeof scanUsDailyTrend>>) {
   if (!result.qualified.length) return [`일봉 급등 추세 후보가 없습니다.`, `기준 점수 ${result.policy.minScore}점 · RVOL ${result.policy.minRvol}x · 분석 ${result.instrumentCount}개`].join("\n");
@@ -94,15 +100,18 @@ export async function POST(request: Request) {
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
   if (["daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "daily-filter-refresh"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "일봉 OBV·MFI·MACD·DMI·ADL 기능은 현재 비활성화되어 있습니다.", flags: 64 } });
   const cacheCommand = getDailyCacheCommand(interaction.data?.name);
-  if (interaction.type !== 2 || (!cacheCommand && !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "daily-filter-refresh"].includes(interaction.data?.name))) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || (!cacheCommand && !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "refresh-us-daily", "refresh-kr-daily", "daily-filter-refresh"].includes(interaction.data?.name))) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
   if (interaction.data.name === "ticker") {
     void getTickerInfo(ticker).then((result) => updateOriginalResponse(applicationId, interaction.token, formatTickerInfo(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `티커 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (cacheCommand) {
     void loadDailyCacheCommand(interaction.data.name as DailyCacheCommand).then((result) => sendDailyCacheResponses(applicationId, interaction.token, splitDailyCacheCommand(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `캐시 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
-  } else if (interaction.data.name === "refresh-daily") {
-    void warmUsDailyPriceCache().then((result) => updateOriginalResponse(applicationId, interaction.token, formatDailyCacheResult(result))).catch(() => updateOriginalResponse(applicationId, interaction.token, "전체 일봉 데이터를 갱신하는 중 오류가 발생했습니다."));
+  } else if (["refresh-daily", "refresh-us-daily", "refresh-kr-daily"].includes(interaction.data.name)) {
+    const isKr = interaction.data.name === "refresh-kr-daily";
+    const moduleKey = isKr ? "kr-daily-cache" : "us-daily-cache";
+    const task = isKr ? runKrDailyCacheNow : warmUsDailyPriceCache;
+    void withAutomationRun(moduleKey, task).then((result: any) => updateOriginalResponse(applicationId, interaction.token, isKr ? formatKrDailyCacheResult(result) : formatUsDailyCacheResult(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `${isKr ? "국내" : "해외"} 일봉 캐시 갱신 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (interaction.data.name === "daily-breakout") {
     void runUsDailyBreakoutScan().then(async (result) => {
       const filtered = await filterUsDailyCandidates(result.qualified as any);
