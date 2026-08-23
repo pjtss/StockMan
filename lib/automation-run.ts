@@ -42,7 +42,13 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
       // Keep the run technically completed for scheduling, but surface the
       // partial failure as a failure notification so the debug channel cannot
       // silently report a green run with missing candles.
-      const notificationStatus = Number(summary.failureCount ?? 0) > 0 ? "FAILED" : "SUCCESS";
+      const failureCount = Number(summary.failureCount ?? 0);
+      const instrumentCount = Number(summary.instrumentCount ?? 0);
+      const notificationStatus = failureCount === 0
+        ? "SUCCESS"
+        : instrumentCount > 0 && failureCount >= instrumentCount
+          ? "FAILED"
+          : "PARTIAL";
       summary.notifications = { completion: await notifyAutomationCompletion(moduleKey, notificationStatus, summary, notificationStatus === "FAILED" ? `${summary.failureCount}개 종목 처리 실패` : undefined) };
     } catch (error) {
       summary.notifications = { completion: { sent: false, skipped: false, reason: "delivery_failed", error: error instanceof Error ? error.message : String(error) } };

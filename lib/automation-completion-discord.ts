@@ -79,7 +79,7 @@ async function postCompletionWebhook(url: string, body: string) {
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, status: "SUCCESS" | "FAILED" | "SKIPPED", summary: Record<string, unknown>, errorMessage?: string) {
+export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, status: "SUCCESS" | "PARTIAL" | "FAILED" | "SKIPPED", summary: Record<string, unknown>, errorMessage?: string) {
   if (!COMPLETION_MODULES.has(moduleKey)) return { sent: false, skipped: true, reason: "module_not_supported" };
   let configured = false;
   let webhook = "";
@@ -112,8 +112,8 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
         ? "해외 일봉 시가 캐시"
         : "해외 일봉 시가 캐시";
   const lines = [
-    `${status === "SUCCESS" ? "✅" : status === "SKIPPED" ? "⏭️" : "❌"} ${label} 자동화 완료`,
-    `상태: ${status === "SUCCESS" ? "성공" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
+    `${status === "SUCCESS" ? "✅" : status === "PARTIAL" ? "⚠️" : status === "SKIPPED" ? "⏭️" : "❌"} ${label} 자동화 완료`,
+    `상태: ${status === "SUCCESS" ? "성공" : status === "PARTIAL" ? "부분 완료(일부 종목 데이터 미수신)" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
     durationMs == null ? null : `소요 시간: ${(durationMs / 1000).toFixed(2)}초`,
     `결과: ${resultSummary(summary)}`,
     ...followupSummary(summary),
