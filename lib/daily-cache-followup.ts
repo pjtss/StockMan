@@ -7,10 +7,14 @@ import { loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
 import { loadCachedKrDailyCandlesBulk } from "@/lib/kr-daily-price-cache";
 import { createUsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { enqueueDailyFollowupRetry, markDailyFollowupRetrySuccess } from "@/lib/daily-followup-retry";
+import { isWithinSchedule } from "@/lib/schedule-time";
 
 /** Refresh both daily Bollinger cache zones after candle storage. Discord
  * delivery remains owned by the Bollinger cron modules to avoid duplicates. */
 export async function refreshDailyBollingerCaches(market: "KR" | "US") {
+  const settings = await loadFeatureModuleSettings(market === "KR" ? "kr-bollinger-band" : "us-bollinger-band");
+  if (!settings.enabled) return { skipped: true, reason: "disabled" };
+  if (!isWithinSchedule(settings)) return { skipped: true, reason: "outside_schedule" };
   const scan = market === "KR" ? scanStoredKrBollingerBands : scanStoredUsBollingerBands;
   const results: Record<string, unknown> = {};
   for (const zone of ["LOWER_OR_BELOW", "MIDDLE_TO_LOWER"] as const) {
@@ -31,6 +35,8 @@ export async function refreshDailyBollingerCaches(market: "KR" | "US") {
 export async function refreshDailyGoldenCrossCache(market: "KR" | "US") {
   try {
     const settings = await loadFeatureModuleSettings(market === "KR" ? "kr-golden-cross" : "us-golden-cross");
+    if (!settings.enabled) return { skipped: true, reason: "disabled" };
+    if (!isWithinSchedule(settings)) return { skipped: true, reason: "outside_schedule" };
     const policy = (settings.featureSettings?.goldenCrossPolicy ?? {}) as any;
     let results: GoldenCrossResult[];
     if (market === "KR") {
