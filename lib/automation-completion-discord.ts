@@ -29,6 +29,28 @@ function resultSummary(summary: Record<string, unknown>) {
   return compact(summary.counts ?? summary.result ?? { ok: true });
 }
 
+function followupSummary(summary: Record<string, unknown>) {
+  const lines: string[] = [];
+  const bollinger = summary.bollingerCache as Record<string, unknown> | undefined;
+  if (bollinger) {
+    if (bollinger.skipped === true) lines.push(`볼린저밴드: 건너뜀(${compact(bollinger.reason)})`);
+    else {
+      const lower = bollinger.LOWER_OR_BELOW as Record<string, unknown> | undefined;
+      const middle = bollinger.MIDDLE_TO_LOWER as Record<string, unknown> | undefined;
+      lines.push(`볼린저밴드: 하단 이하 ${compact(lower?.qualifiedCount ?? "-")}개 · 중단~하단 ${compact(middle?.qualifiedCount ?? "-")}개`);
+    }
+  }
+  const golden = summary.goldenCrossCache as Record<string, unknown> | undefined;
+  if (golden) {
+    if (golden.skipped === true) lines.push(`골든크로스: 건너뜀(${compact(golden.reason)})`);
+    else {
+      const cache = golden.cache as Record<string, unknown> | undefined;
+      lines.push(`골든크로스: 조건 충족 ${compact(cache?.qualifiedCount ?? golden.qualifiedCount ?? "-")}개 · ${golden.ok === false ? "실패" : "갱신 완료"}`);
+    }
+  }
+  return lines;
+}
+
 async function postCompletionWebhook(url: string, body: string) {
   const maxAttempts = 3;
   let lastError: unknown;
@@ -94,6 +116,7 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
     `상태: ${status === "SUCCESS" ? "성공" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
     durationMs == null ? null : `소요 시간: ${(durationMs / 1000).toFixed(2)}초`,
     `결과: ${resultSummary(summary)}`,
+    ...followupSummary(summary),
     errorMessage ? `오류: ${errorMessage}` : null,
     `완료 시각: ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
   ].filter(Boolean).join("\n");
