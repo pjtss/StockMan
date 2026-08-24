@@ -1,0 +1,18 @@
+import Link from "next/link";
+import { PageNavigation } from "@/components/page-navigation";
+import { MultiTimeframeReboundCopy } from "@/components/multi-timeframe-rebound-copy";
+import { scanMultiTimeframeBbRebound } from "@/lib/multi-timeframe-bb-rebound";
+import { recommendMultiTimeframe } from "@/lib/multi-timeframe-recommendations";
+import { scanMultiTimeframeBbPullback } from "@/lib/multi-timeframe-bb-pullback";
+import styles from "../page.module.css";
+
+export const dynamic = "force-dynamic";
+
+export default async function MultiTimeframeReboundPage({ searchParams }: { searchParams: Promise<{ market?: string; limit?: string }> }) {
+  const params = await searchParams;
+  const market = params.market?.toUpperCase() === "KR" ? "KR" : "US";
+  const limit = Math.max(1, Math.min(100, Number(params.limit ?? 30) || 30));
+  const [result, recommendations, pullback, allMiddle] = await Promise.all([scanMultiTimeframeBbRebound(market, limit), recommendMultiTimeframe(market, "all", limit), scanMultiTimeframeBbPullback(market, "pullback"), scanMultiTimeframeBbPullback(market, "all-middle-above")]).catch((error) => [{ ok: false, error: error instanceof Error ? error.message : String(error), instrumentCount: 0, qualifiedCount: 0, results: [], policy: null }, { qualifiedCount: 0, results: [] }, { qualifiedCount: 0, qualified: [] }, { qualifiedCount: 0, qualified: [] }]) as any;
+  const copyText = result.results.map((item: any) => `${item.market} ${item.code} | ${item.name}\n종가 ${item.latest.close} | 반등일 ${item.latest.date} | RVOL ${Number(item.rvol.current).toFixed(2)}x\n일봉 BB 하단 회복 | 주봉 중단 ${Number(item.weekly.middle).toFixed(2)} | 월봉 중단 ${Number(item.monthly.middle).toFixed(2)}\nOBV Signal 상승 | ADL Signal 상승`).join("\n\n");
+  return <><PageNavigation current="multi-timeframe-rebound" /><main className={styles.page}><section className={styles.hero}><div className={styles.kicker}>MULTI-TIMEFRAME ANALYSIS</div><h1 className={styles.title}>일·주·월봉 통합 탐지</h1><p>반등 후보와 최근 통합 추천·볼린저밴드 탐지 결과를 한 화면에서 확인합니다.</p></section><div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:24}}><Link href="/scanners/multi-timeframe-rebound?market=KR&limit=30">국내</Link><Link href="/scanners/multi-timeframe-rebound?market=US&limit=30">해외</Link><MultiTimeframeReboundCopy text={copyText} /></div><section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:24}}>{[["반등 후보",result.qualifiedCount],["통합 추천",recommendations.qualifiedCount],["BB 풀백",pullback.qualifiedCount],["전 봉 중단선 이상",allMiddle.qualifiedCount]].map(([label,count])=><div key={String(label)}> {label}<br/><strong>{Number(count).toLocaleString()}</strong></div>)}</section><section>{result.results.map((item: any) => <article key={`${item.market}:${item.code}`} style={{border:"1px solid var(--border-color,#334155)",borderRadius:12,padding:16,marginBottom:12}}><strong>{item.market} {item.code} | {item.name}</strong><div>종가 {item.latest.close} · 반등일 {item.latest.date} · RVOL {Number(item.rvol.current).toFixed(2)}x</div><div>일봉 BB 하단 회복 · 주봉 중단 {Number(item.weekly.middle).toFixed(2)} · 월봉 중단 {Number(item.monthly.middle).toFixed(2)}</div><div>OBV Signal 상승 · ADL Signal 상승</div></article>)}</section>{result.qualifiedCount === 0 && <p style={{textAlign:"center",opacity:.75}}>현재 반등 조건을 모두 충족하는 종목이 없습니다.</p>}<section style={{marginTop:32}}><h2>다른 일·주·월봉 결과</h2><p>통합 추천 상위: {recommendations.results?.slice(0,5).map((x:any)=>`${x.market} ${x.code}`).join(" · ") || "없음"}</p><p>BB 풀백 상위: {pullback.qualified?.slice(0,5).map((x:any)=>`${x.market} ${x.code}`).join(" · ") || "없음"}</p><p>모든 봉 중단선 이상: {allMiddle.qualified?.slice(0,5).map((x:any)=>`${x.market} ${x.code}`).join(" · ") || "없음"}</p></section></main></>;
+}

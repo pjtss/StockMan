@@ -16,6 +16,7 @@ type PageKey =
   | "us-intensity"
   | "us-ams-scout"
   | "us-news"
+  | "multi-timeframe-rebound"
   | "admin"
 
 export function PageNavigation({ current }: { current: PageKey }) {
