@@ -1,7 +1,8 @@
 /** 공식 KIS 종목 마스터 기준 공통 거래 대상 판정 모듈. */
 export function isEligibleKrCommonStock(row: { instrumentType?: unknown; tradingHaltCode?: unknown; liquidationCode?: unknown; managedIssueCode?: unknown; isSuspended?: unknown }) {
   const flag = (value: unknown) => value === true || ["Y", "1"].includes(String(value ?? ""));
-  return row.instrumentType === "COMMON_STOCK" && !flag(row.isSuspended) && !flag(row.tradingHaltCode) && !flag(row.liquidationCode) && !flag(row.managedIssueCode);
+  const managed = String(row.managedIssueCode ?? "").toUpperCase();
+  return row.instrumentType === "COMMON_STOCK" && !flag(row.isSuspended) && !flag(row.tradingHaltCode) && !flag(row.liquidationCode) && managed !== "Y";
 }
 
 export function isEligibleUsCommonStock(row: { instrumentType?: unknown; isEtf?: unknown; isWarrant?: unknown; isDerivative?: unknown; isDr?: unknown; isLeveraged?: unknown; isInverse?: unknown; enabled?: unknown }) {
@@ -10,7 +11,7 @@ export function isEligibleUsCommonStock(row: { instrumentType?: unknown; isEtf?:
 }
 
 export function commonStockEligibilitySql(market: "KR" | "US") {
-  if (market === "KR") return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1') AND COALESCE(managed_issue_code, '') NOT IN ('Y','1')";
+  if (market === "KR") return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1') AND COALESCE(managed_issue_code, '') <> 'Y'";
   return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false";
 }
 

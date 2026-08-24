@@ -25,7 +25,7 @@ export async function loadStoredKrInstrumentScopes() {
   const excludedByReason = {
     product: rows.filter((row) => row.instrumentType !== "COMMON_STOCK").length,
     suspended: rows.filter((row) => row.instrumentType === "COMMON_STOCK" && (["Y", "1"].includes(String(row.tradingHaltCode ?? "")) || ["Y", "1"].includes(String(row.liquidationCode ?? "")) || ["Y", "1"].includes(String(row.isSuspended ?? "")))).length,
-    managed: rows.filter((row) => row.instrumentType === "COMMON_STOCK" && ["Y", "1"].includes(String(row.managedIssueCode ?? ""))).length,
+    managed: rows.filter((row) => row.instrumentType === "COMMON_STOCK" && String(row.managedIssueCode ?? "").toUpperCase() === "Y").length,
   };
   return { scopes: eligible.map(({ instrumentType: _instrumentType, isEtp: _isEtp, isWarrant: _isWarrant, isPreferred: _isPreferred, tradingHaltCode: _tradingHaltCode, liquidationCode: _liquidationCode, managedIssueCode: _managedIssueCode, isSuspended: _isSuspended, ...row }) => row), universe: { ok: true, source: "DB_INTEGRATED_KR_INSTRUMENT_UNIVERSE", markets: [...KR_MARKETS], count: eligible.length, excludedInDb: rows.length - eligible.length, excludedByReason, criteria: { instrumentType: "COMMON_STOCK", officialStatus: "tradingHaltCode/liquidationCode/managedIssueCode/isSuspended", numericFilters: "NONE" } } };
 }
