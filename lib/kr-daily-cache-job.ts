@@ -84,7 +84,10 @@ async function run(job: Job) {
     // the fan-out below KIS per-second limits instead of creating bursts.
     await Promise.all(Array.from({ length: Math.min(2, Math.max(1, scopes.length)) }, worker));
     job.status = "COMPLETED";
-    if (job.failureCount === 0) {
+    // Partial KIS failures must not block follow-up caches for instruments
+    // whose candles were saved successfully. The scanners read the DB cache
+    // and naturally omit the failed instruments.
+    if (job.successCount > 0) {
       (job as any).bollingerCache = await refreshDailyBollingerCaches("KR");
       (job as any).goldenCrossCache = await refreshDailyGoldenCrossCache("KR");
     } else {

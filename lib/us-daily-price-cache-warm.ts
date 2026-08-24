@@ -78,8 +78,12 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
   const completedAt = new Date().toISOString();
   const durationMs = Date.parse(completedAt) - Date.parse(startedAt);
-  const bollingerCache = failures.length === 0 ? await refreshDailyBollingerCaches("US") : { skipped: true, reason: "daily_candle_failures", failureCount: failures.length };
-  const goldenCrossCache = failures.length === 0 ? await refreshDailyGoldenCrossCache("US") : { skipped: true, reason: "daily_candle_failures", failureCount: failures.length };
+  // Partial KIS failures must not block follow-up caches for instruments
+  // whose candles were saved successfully. The scanners read the DB cache
+  // and naturally omit the failed instruments.
+  const followupBlocked = successCount === 0;
+  const bollingerCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyBollingerCaches("US");
+  const goldenCrossCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyGoldenCrossCache("US");
   return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures, bollingerCache, goldenCrossCache };
 }
 
