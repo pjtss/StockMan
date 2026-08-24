@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { krInstrumentUniverse } from "@/lib/schema";
+import { isEligibleKrCommonStock } from "@/lib/instrument-eligibility";
 
 export const KR_MARKETS = ["KOSPI", "KOSDAQ"] as const;
 export type KrInstrumentScope = { market: string; code: string; name: string };
@@ -20,7 +21,7 @@ export async function loadStoredKrInstrumentScopes() {
   // a display name: names are presentation data and are not authoritative.
   // Cache every official common-stock row. Market-cap, turnover, price,
   // volume and suspension state are detection policies, not cache membership.
-  const eligible = rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !isExcludedKrOfficialName(row.name) && !["Y", "1"].includes(String(row.tradingHaltCode ?? "")) && !["Y", "1"].includes(String(row.liquidationCode ?? "")));
+  const eligible = rows.filter((row) => isEligibleKrCommonStock(row) && !isExcludedKrOfficialName(row.name));
   const excludedByReason = {
     product: rows.filter((row) => row.instrumentType !== "COMMON_STOCK" || isExcludedKrOfficialName(row.name)).length,
     suspended: rows.filter((row) => row.instrumentType === "COMMON_STOCK" && !isExcludedKrOfficialName(row.name) && (["Y", "1"].includes(String(row.tradingHaltCode ?? "")) || ["Y", "1"].includes(String(row.liquidationCode ?? "")))).length,
