@@ -18,9 +18,10 @@ export function getPool(): Pool {
       console.info("[DB] Connecting to: <unparsed DATABASE_URL>");
     }
 
+    const isLocalDatabase = ["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname);
     pool = new Pool({
       connectionString: databaseUrl,
-      ssl: { rejectUnauthorized: false },
+      ...(isLocalDatabase ? {} : { ssl: { rejectUnauthorized: false } }),
     });
   }
 

@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     if (!sourceDirectory) return NextResponse.json({ ok: false, error: "파일을 multipart로 업로드하거나 sourceDirectory를 지정해야 합니다." }, { status: 400 });
     return NextResponse.json({ ...(await importInstrumentMasters(sourceDirectory)), uploadMode: false });
   } catch (error) {
+    console.error("[instrument-universe-import] failed", error);
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
