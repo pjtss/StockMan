@@ -101,16 +101,17 @@ export async function POST(request: Request) {
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
   if (["daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "daily-filter-refresh"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "일봉 OBV·MFI·MACD·DMI·ADL 기능은 현재 비활성화되어 있습니다.", flags: 64 } });
   const cacheCommand = getDailyCacheCommand(interaction.data?.name);
-  if (interaction.type !== 2 || (!cacheCommand && !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "refresh-us-daily", "refresh-kr-daily", "daily-filter-refresh", "bb-pullback-export"].includes(interaction.data?.name))) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
+  if (interaction.type !== 2 || (!cacheCommand && !["ticker", "news", "daily-breakout", "daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "refresh-daily", "refresh-us-daily", "refresh-kr-daily", "daily-filter-refresh", "bb-pullback-export", "bb-all-middle-above"].includes(interaction.data?.name))) return NextResponse.json({ type: 4, data: { content: "지원하지 않는 명령어입니다.", flags: 64 } });
   const ticker = String(optionValue(interaction.data, "symbol") || "").trim();
   const applicationId = process.env.DISCORD_APPLICATION_ID || interaction.application_id;
-  if (interaction.data.name === "bb-pullback-export") {
+  if (["bb-pullback-export", "bb-all-middle-above"].includes(interaction.data.name)) {
     const market = String(optionValue(interaction.data, "market") || "ALL").toUpperCase() as "KR" | "US" | "ALL";
     const expiresAt = Date.now() + 15 * 60 * 1000;
     const token = createBbExportToken(market, expiresAt);
     const base = process.env.NEXT_PUBLIC_APP_URL || `https://${request.headers.get("host") || "stockman.r-e.kr"}`;
-    const link = `${base}/api/scan/multi-timeframe-bb-pullback/html?market=${market}&token=${token}`;
-    void updateOriginalResponse(applicationId, interaction.token, `📥 다중 시간봉 볼린저밴드 HTML 결과\n\n${link}\n\n링크는 15분 후 만료됩니다.`);
+    const mode = interaction.data.name === "bb-all-middle-above" ? "all-middle-above" : "pullback";
+    const link = `${base}/api/scan/multi-timeframe-bb-pullback/html?market=${market}&mode=${mode}&token=${token}`;
+    void updateOriginalResponse(applicationId, interaction.token, `${mode === "all-middle-above" ? "📈 일·주·월봉 BB 중단선 이상" : "📥 다중 시간봉 볼린저밴드"} HTML 결과\n\n${link}\n\n링크는 15분 후 만료됩니다.`);
   } else if (interaction.data.name === "ticker") {
     void getTickerInfo(ticker).then((result) => updateOriginalResponse(applicationId, interaction.token, formatTickerInfo(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `티커 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (cacheCommand) {
