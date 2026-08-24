@@ -1,0 +1,21 @@
+import { sql } from "drizzle-orm";
+import { getDb } from "@/lib/db";
+import { commonStockEligibilitySql } from "@/lib/instrument-eligibility";
+
+type Mode = "scalp" | "swing" | "all";
+type Candle = { date: string; close: number; volume: number };
+const ema = (values: number[], period: number) => { if (!values.length) return null; const k = 2 / (period + 1); let out = values[0]; for (const value of values.slice(1)) out = value * k + out * (1 - k); return out; };
+const bb = (values: number[]) => { if (values.length < 20) return null; const w = values.slice(-20); const mid = w.reduce((a, b) => a + b, 0) / w.length; const sd = Math.sqrt(w.reduce((a, b) => a + (b - mid) ** 2, 0) / w.length); return { mid, lower: mid - 2 * sd, upper: mid + 2 * sd }; };
+const avg = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+
+export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = "all", limit = 30) {
+  const universe = market === "KR" ? "kr_instrument_universe" : "us_instrument_universe";
+  const candlesTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
+  const db = getDb();
+  const scopes = await db.execute(sql.raw(`SELECT market, code, name FROM ${universe} WHERE ${commonStockEligibilitySql(market)}`));
+  const candles = await db.execute(sql.raw(`SELECT market, code, timeframe, candle_date AS date, close, volume FROM ${candlesTable} WHERE timeframe IN ('D','W','M') AND close IS NOT NULL ORDER BY market, code, timeframe, candle_date`));
+  const grouped = new Map<string, { D: Candle[]; W: Candle[]; M: Candle[] }>();
+  for (const row of candles.rows as any[]) { const key = `${row.market}:${row.code}`; const item = grouped.get(key) ?? { D: [], W: [], M: [] }; item[row.timeframe as "D" | "W" | "M"].push({ date: String(row.date), close: Number(row.close), volume: Number(row.volume ?? 0) }); grouped.set(key, item); }
+  const results = (scopes.rows as any[]).map((scope) => { const g = grouped.get(`${scope.market}:${scope.code}`); if (!g || g.D.length < 20 || g.W.length < 20 || g.M.length < 20) return null; const d = g.D, w = g.W, m = g.M; const dc = d.at(-1)!, wc = w.at(-1)!, mc = m.at(-1)!; const dbb = bb(d.map(x => x.close))!, wbb = bb(w.map(x => x.close))!, mbb = bb(m.map(x => x.close))!; const dE9 = ema(d.map(x => x.close), 9)!, dE20 = ema(d.map(x => x.close), 20)!; const wE9 = ema(w.map(x => x.close), 9)!, wE20 = ema(w.map(x => x.close), 20)!; const dVol = avg(d.slice(-20).map(x => x.volume)) ?? 0; const volRatio = dVol > 0 ? dc.volume / dVol : 0; const trend = (dc.close > dE9 ? 10 : 0) + (dE9 > dE20 ? 10 : 0) + (wc.close > wE9 && wE9 > wE20 ? 15 : 0) + (mc.close >= mbb.mid ? 10 : 0); const momentum = dc.close >= dbb.mid && dc.close <= dbb.upper ? 10 : dc.close > dbb.upper ? 5 : 0; const liquidity = volRatio >= 1.5 ? 15 : volRatio >= 1 ? 8 : 0; const pullback = dc.close <= dbb.mid && dc.close >= dbb.lower ? 10 : 0; const score = mode === "scalp" ? trend + momentum + liquidity : mode === "swing" ? trend + pullback + (mc.close >= mbb.mid ? 10 : 0) : trend + momentum + liquidity + pullback; if (mode === "scalp" && liquidity === 0) return null; if (mode === "swing" && !(wc.close >= wbb.mid && mc.close >= mbb.mid)) return null; return { market: scope.market, code: scope.code, name: scope.name, score, latest: { date: dc.date, close: dc.close, volume: dc.volume }, averages: { volume20: dVol, volumeRatio: volRatio }, trend: { dailyEma9: dE9, dailyEma20: dE20, weeklyEma9: wE9, weeklyEma20: wE20 }, bollinger: { daily: dbb, weekly: wbb, monthly: mbb }, reasons: [trend >= 25 ? "다중 시간봉 상승 추세" : null, liquidity >= 8 ? "일봉 거래량 증가" : null, momentum > 0 ? "일봉 BB 상단 접근" : null, pullback > 0 ? "일봉 눌림목" : null].filter(Boolean) }; }).filter(Boolean).sort((a: any, b: any) => b.score - a.score).slice(0, Math.max(1, Math.min(limit, 100)));
+  return { ok: true, market, mode, instrumentCount: scopes.rows.length, qualifiedCount: results.length, results, policy: { source: "*_instrument_universe_candles", timeframes: ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" } };
+}
