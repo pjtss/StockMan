@@ -5,6 +5,7 @@ describe("instrument eligibility", () => {
   it("rejects official domestic suspended and liquidation flags", () => {
     expect(isEligibleKrCommonStock({ instrumentType: "COMMON_STOCK", tradingHaltCode: "Y" })).toBe(false);
     expect(isEligibleKrCommonStock({ instrumentType: "COMMON_STOCK", liquidationCode: "1" })).toBe(false);
+    expect(isEligibleKrCommonStock({ instrumentType: "COMMON_STOCK", managedIssueCode: "1" })).toBe(false);
     expect(isEligibleKrCommonStock({ instrumentType: "COMMON_STOCK" })).toBe(true);
   });
   it("rejects overseas products using persisted official classification flags", () => {
