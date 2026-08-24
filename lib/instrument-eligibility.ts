@@ -4,6 +4,16 @@ export function isEligibleKrCommonStock(row: { instrumentType?: unknown; trading
   return row.instrumentType === "COMMON_STOCK" && !flag(row.isSuspended) && !flag(row.tradingHaltCode) && !flag(row.liquidationCode);
 }
 
+export function isEligibleUsCommonStock(row: { instrumentType?: unknown; isEtf?: unknown; isWarrant?: unknown; isDerivative?: unknown; isDr?: unknown; isLeveraged?: unknown; isInverse?: unknown; enabled?: unknown }) {
+  const flag = (value: unknown) => value === true;
+  return row.instrumentType === "COMMON_STOCK" && row.enabled !== false && !flag(row.isEtf) && !flag(row.isWarrant) && !flag(row.isDerivative) && !flag(row.isDr) && !flag(row.isLeveraged) && !flag(row.isInverse);
+}
+
+export function commonStockEligibilitySql(market: "KR" | "US") {
+  if (market === "KR") return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1')";
+  return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false";
+}
+
 export const eligibilityPolicy = {
   kr: "COMMON_STOCK + 공식 거래정지·청산·is_suspended 제외",
   us: "COMMON_STOCK + 상품 유형 제외; 공식 거래정지 필드 미제공",
