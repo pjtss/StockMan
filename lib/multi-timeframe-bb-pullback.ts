@@ -5,7 +5,8 @@ type Candle = { date: string; high: number; low: number; close: number };
 type Scope = { market: string; code: string; name: string };
 const bb = (rows: Candle[]) => { if (rows.length < 20) return null; const w = rows.slice(-20).map((x) => x.close); const middle = w.reduce((s, v) => s + v, 0) / 20; const sd = Math.sqrt(w.reduce((s, v) => s + (v - middle) ** 2, 0) / 20); return { middle, lower: middle - 2 * sd, upper: middle + 2 * sd }; };
 const previousBb = (rows: Candle[]) => bb(rows.slice(0, -1));
-const completed = (rows: Candle[], tf: string) => { const now = new Date(); const day = now.toISOString().slice(0, 10).replaceAll("-", ""); const month = day.slice(0, 6); const ws = new Date(now); ws.setUTCDate(now.getUTCDate() - ((now.getUTCDay() + 6) % 7)); const week = ws.toISOString().slice(0, 10).replaceAll("-", ""); return rows.filter((r) => tf === "D" ? r.date < day : tf === "M" ? r.date.slice(0, 6) < month : r.date < week); };
+// 최신 저장 캔들(진행 중인 일·주·월봉 포함)을 판정에 사용한다.
+const completed = (rows: Candle[], _tf: string) => rows;
 
 export async function scanMultiTimeframeBbPullback(market: "KR" | "US") {
   const u = market === "US" ? "us_instrument_universe" : "kr_instrument_universe"; const c = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
