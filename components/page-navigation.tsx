@@ -45,6 +45,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         >
           AMS 급등주 탐색
         </Link>
+        <Link className={current === "multi-timeframe-rebound" ? styles.navActive : styles.navLink} href="/scanners/multi-timeframe-rebound" prefetch={false}>
+          일·주·월봉 탐지
+        </Link>
         <Link
           className={current === "notifications" ? styles.navActive : styles.navLink}
           href="/notifications"
