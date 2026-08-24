@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stockman-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stockman
+      POSTGRES_USER: stockman
+      POSTGRES_PASSWORD: stockman-local-only
+    ports:
+      - "5433:5432"
+    volumes:
+      - stockman-postgres-local-data:/var/lib/postgresql/data
+
+volumes:
+  stockman-postgres-local-data:
