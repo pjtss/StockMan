@@ -23,7 +23,7 @@ export function commonStockEligibilitySql(market: "KR" | "US") {
  * The fallback only uses columns introduced with the universe tables and is
  * explicitly reported to callers so it cannot be mistaken for a full filter.
  */
-export async function queryEligibleUniverse(db: { execute: (query: unknown) => Promise<any> }, market: "KR" | "US") {
+export async function queryEligibleUniverse(db: { execute: (query: any) => Promise<any> }, market: "KR" | "US") {
   const table = market === "KR" ? "kr_instrument_universe" : "us_instrument_universe";
   const full = `SELECT market, code, name FROM ${table} WHERE ${commonStockEligibilitySql(market)}`;
   try {
