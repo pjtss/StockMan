@@ -18,6 +18,12 @@ export type AutomationRunDimensions = {
   retryCount?: number;
 };
 
+function inferRunDimensions(moduleKey: string, dimensions: AutomationRunDimensions) {
+  const market = dimensions.market ?? (moduleKey.startsWith("kr-") ? "KR" : moduleKey.startsWith("us-") ? "US" : undefined);
+  const timeframe = dimensions.timeframe ?? (moduleKey.includes("minute") ? "1m" : moduleKey.includes("weekly") ? "W" : moduleKey.includes("monthly") ? "M" : moduleKey.includes("daily") || moduleKey.includes("bollinger") || moduleKey.includes("golden-cross") ? "D" : undefined);
+  return { jobType: dimensions.jobType ?? moduleKey, market, timeframe, triggerType: dimensions.triggerType ?? "AUTOMATION", retryCount: Math.max(0, Math.floor(dimensions.retryCount ?? 0)) };
+}
+
 /** Mark abandoned workers before creating a new run. */
 async function reconcileStaleRuns() {
   try {
@@ -46,15 +52,16 @@ async function reconcileStaleRuns() {
 export async function startAutomationRun(moduleKey: FeatureModuleKey, dimensions: AutomationRunDimensions = {}) {
   const db = getDb();
   await reconcileStaleRuns();
+  const normalized = inferRunDimensions(moduleKey, dimensions);
   const rows = await db.insert(automationRuns).values({
     moduleKey,
     status: "RUNNING",
     startedAt: new Date(),
-    jobType: dimensions.jobType ?? moduleKey,
-    market: dimensions.market ?? null,
-    timeframe: dimensions.timeframe ?? null,
-    triggerType: dimensions.triggerType ?? "AUTOMATION",
-    retryCount: Math.max(0, Math.floor(dimensions.retryCount ?? 0)),
+    jobType: normalized.jobType,
+    market: normalized.market ?? null,
+    timeframe: normalized.timeframe ?? null,
+    triggerType: normalized.triggerType,
+    retryCount: normalized.retryCount,
   }).returning({ id: automationRuns.id });
   return rows[0]?.id;
 }
