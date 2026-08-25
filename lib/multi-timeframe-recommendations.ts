@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { commonStockEligibilitySql } from "@/lib/instrument-eligibility";
+import { queryEligibleUniverse } from "@/lib/instrument-eligibility";
 
 type Mode = "scalp" | "swing" | "all";
 type Candle = { date: string; close: number; volume: number };
@@ -9,10 +9,10 @@ const bb = (values: number[]) => { if (values.length < 20) return null; const w 
 const avg = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 
 export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = "all", limit = 30) {
-  const universe = market === "KR" ? "kr_instrument_universe" : "us_instrument_universe";
   const candlesTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
   const db = getDb();
-  const scopes = await db.execute(sql.raw(`SELECT market, code, name FROM ${universe} WHERE ${commonStockEligibilitySql(market)}`));
+  const eligibility = await queryEligibleUniverse(db, market);
+  const scopes = { rows: eligibility.rows };
   const candles = await db.execute(sql.raw(`SELECT market, code, timeframe, candle_date AS date, close, volume FROM ${candlesTable} WHERE timeframe IN ('D','W','M') AND close IS NOT NULL ORDER BY market, code, timeframe, candle_date`));
   let fundamentals = new Map<string, any>();
   try {

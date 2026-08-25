@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { commonStockEligibilitySql, eligibilityPolicy } from "@/lib/instrument-eligibility";
+import { queryEligibleUniverse, eligibilityPolicy } from "@/lib/instrument-eligibility";
 
 type Candle = { date: string; high: number; low: number; close: number };
 type Scope = { market: string; code: string; name: string };
@@ -12,7 +12,8 @@ export type MultiTimeframeBbMode = "pullback" | "all-middle-above";
 
 export async function scanMultiTimeframeBbPullback(market: "KR" | "US", mode: MultiTimeframeBbMode = "pullback") {
   const u = market === "US" ? "us_instrument_universe" : "kr_instrument_universe"; const c = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
-  const scopes = await getDb().execute(sql.raw(`SELECT market,code,name FROM ${u} WHERE ${commonStockEligibilitySql(market)} ORDER BY market,code`));
+  const eligibility = await queryEligibleUniverse(getDb(), market);
+  const scopes = { rows: eligibility.rows };
   const candles = await getDb().execute(sql.raw(`SELECT market,code,timeframe,candle_date AS date,high,low,close FROM ${c} WHERE timeframe IN ('D','W','M') ORDER BY market,code,timeframe,candle_date`));
   const map = new Map<string, { D: Candle[]; W: Candle[]; M: Candle[] }>(); for (const r of candles.rows as any[]) { const k = `${r.market}:${r.code}`; const g = map.get(k) ?? { D: [], W: [], M: [] }; g[r.timeframe as "D" | "W" | "M"].push({ date: String(r.date), high: Number(r.high), low: Number(r.low), close: Number(r.close) }); map.set(k, g); }
   const qualified = (scopes.rows as Scope[]).map((s) => { const g = map.get(`${s.market}:${s.code}`); if (!g) return null; const d = completed(g.D, "D"), w = completed(g.W, "W"), m = completed(g.M, "M"); const db = bb(d), wb = bb(w), mb = bb(m), last = d.at(-1), previous = d.at(-2), wLast = w.at(-1), mLast = m.at(-1); if (!last || !wLast || !mLast || !db || !wb || !mb) return null; const weeklyMiddleToUpper = wLast.close >= wb.middle && wLast.close <= wb.upper; const monthlyMiddleToUpper = mLast.close >= mb.middle && mLast.close <= mb.upper; const dailyAtOrBelowMiddle = last.close <= db.middle; const previousDb = previous ? bb(d.slice(0, -1)) : null; const dailyLowerTouch = last.close <= db.lower || Boolean(previous && previousDb && previous.close <= previousDb.lower); const matches = mode === "all-middle-above" ? last.close >= db.middle && wLast.close >= wb.middle && mLast.close >= mb.middle : weeklyMiddleToUpper && monthlyMiddleToUpper && dailyAtOrBelowMiddle && dailyLowerTouch; if (!matches) return null; return { market: s.market, code: s.code, name: s.name, daily: { date: last.date, close: last.close, bbMiddle: db.middle, bbLower: db.lower, atOrAboveMiddle: last.close >= db.middle, lowerTouch: last.close <= db.lower, lowerTouchDate: last.close <= db.lower ? last.date : previous?.date ?? null }, weekly: { date: wLast.date, close: wLast.close, bbMiddle: wb.middle, bbUpper: wb.upper, middleToUpper: weeklyMiddleToUpper }, monthly: { date: mLast.date, close: mLast.close, bbMiddle: mb.middle, bbUpper: mb.upper, middleToUpper: monthlyMiddleToUpper } }; }).filter(Boolean);
