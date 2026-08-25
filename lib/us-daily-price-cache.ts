@@ -95,7 +95,7 @@ export async function loadCachedUsDailyCandles(market: string, code: string, lim
 export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[], timeframe = "D") {
   const db = getDb();
   if (!db || candles.length === 0) return 0;
-  await db.insert(usInstrumentUniverseCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usInstrumentUniverseCandles.market, usInstrumentUniverseCandles.code, usInstrumentUniverseCandles.timeframe, usInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
+  await db.insert(usInstrumentUniverseCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, candleTime: null, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, source: "KIS" }))).onConflictDoUpdate({ target: [usInstrumentUniverseCandles.market, usInstrumentUniverseCandles.code, usInstrumentUniverseCandles.timeframe, usInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, source: sql`excluded.source`, fetchedAt: new Date() } });
   memoryCache.delete(`${market}:${code}`);
   return candles.length;
 }

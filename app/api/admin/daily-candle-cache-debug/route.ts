@@ -17,7 +17,7 @@ function withKstTimestamp<T extends Record<string, any>>(row: T) {
 
 async function cacheStats(table: "us_instrument_universe_candles" | "kr_instrument_universe_candles") {
   const db = getDb();
-  const rows = await db.execute(sql.raw(`SELECT timeframe, COUNT(*)::int AS candle_count, COUNT(DISTINCT market || ':' || code)::int AS instrument_count, MAX(candle_date) AS latest_candle_date, MIN(candle_date) AS earliest_candle_date, MAX(fetched_at) AS latest_fetched_at FROM ${table} GROUP BY timeframe ORDER BY timeframe`));
+  const rows = await db.execute(sql.raw(`SELECT timeframe, COUNT(*)::int AS candle_count, COUNT(DISTINCT market || ':' || code)::int AS instrument_count, MAX(candle_date) AS latest_candle_date, MIN(candle_date) AS earliest_candle_date, MAX(candle_time) AS latest_candle_time, MAX(fetched_at) AS latest_fetched_at FROM ${table} GROUP BY timeframe ORDER BY timeframe`));
   return rows.rows;
 }
 
@@ -39,7 +39,7 @@ export async function GET() {
       db.execute(sql`SELECT scope, zone, status, attempts, next_attempt_at, last_attempt_at, succeeded_at, last_error FROM daily_bollinger_cache_retries WHERE status = 'PENDING' ORDER BY next_attempt_at LIMIT 100`).catch(() => ({ rows: [] } as any)),
     ]);
     const checkedAt = new Date().toISOString();
-    const addCacheKst = (rows: any[]) => rows.map((row) => ({ ...row, latest_fetched_at_kst: formatKst(row.latest_fetched_at) }));
+    const addCacheKst = (rows: any[]) => rows.map((row) => ({ ...row, latest_candle_time_kst: formatKst(row.latest_candle_time), latest_fetched_at_kst: formatKst(row.latest_fetched_at) }));
     return NextResponse.json({ ok: true, checkedAt, checkedAtKst: formatKst(checkedAt), timezone: "Asia/Seoul", durationMs: Date.now() - startedAt, policy: { D: 86400, W: 86400, M: 604800, unit: "seconds", source: "DB fetched_at" }, cache: { us: addCacheKst(us as any[]), kr: addCacheKst(kr as any[]) }, automation: { us: usRuns.map(withKstTimestamp), kr: krRuns.map(withKstTimestamp) }, failures: { last24h: Number((failureCountRows.rows[0] as any)?.count ?? 0), recent: failureRows.rows.map((row: any) => ({ ...row, observed_at_kst: formatKst(row.observed_at) })) }, retries: { byStatus: retryRows.rows, pending: retryDueRows.rows.map((row: any) => ({ ...row, next_attempt_at_kst: formatKst(row.next_attempt_at) })), pendingCount: retryDueRows.rows.length }, bollingerRetries: { byScopeZoneStatus: bbRetryRows.rows, pending: bbRetryPendingRows.rows.map((row: any) => ({ ...row, next_attempt_at_kst: formatKst(row.next_attempt_at), last_attempt_at_kst: formatKst(row.last_attempt_at), succeeded_at_kst: formatKst(row.succeeded_at) })), pendingCount: bbRetryPendingRows.rows.length } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
