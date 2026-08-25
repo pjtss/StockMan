@@ -10,6 +10,14 @@ import { readRequestTrace } from "@/lib/request-trace";
 const STALE_RUN_AFTER_SECONDS = 2 * 60 * 60;
 const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
 
+export type AutomationRunDimensions = {
+  jobType?: string;
+  market?: "KR" | "US" | string;
+  timeframe?: "D" | "W" | "M" | string;
+  triggerType?: "AUTOMATION" | "MANUAL" | "RETRY" | string;
+  retryCount?: number;
+};
+
 /** Mark abandoned workers before creating a new run. */
 async function reconcileStaleRuns() {
   try {
@@ -35,10 +43,19 @@ async function reconcileStaleRuns() {
   }
 }
 
-export async function startAutomationRun(moduleKey: FeatureModuleKey) {
+export async function startAutomationRun(moduleKey: FeatureModuleKey, dimensions: AutomationRunDimensions = {}) {
   const db = getDb();
   await reconcileStaleRuns();
-  const rows = await db.insert(automationRuns).values({ moduleKey, status: "RUNNING", startedAt: new Date() }).returning({ id: automationRuns.id });
+  const rows = await db.insert(automationRuns).values({
+    moduleKey,
+    status: "RUNNING",
+    startedAt: new Date(),
+    jobType: dimensions.jobType ?? moduleKey,
+    market: dimensions.market ?? null,
+    timeframe: dimensions.timeframe ?? null,
+    triggerType: dimensions.triggerType ?? "AUTOMATION",
+    retryCount: Math.max(0, Math.floor(dimensions.retryCount ?? 0)),
+  }).returning({ id: automationRuns.id });
   return rows[0]?.id;
 }
 
@@ -69,7 +86,10 @@ export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, re
 export async function finishAutomationRun(id: number | undefined, status: "SUCCESS" | "PARTIAL" | "FAILED" | "SKIPPED", summary: Record<string, unknown> = {}, errorMessage?: string) {
   if (!id) return;
   const db = getDb();
-  await db.update(automationRuns).set({ status, finishedAt: new Date(), summary, errorMessage: errorMessage || null }).where(eq(automationRuns.id, id));
+  const finishedAt = new Date();
+  const started = await db.select({ startedAt: automationRuns.startedAt }).from(automationRuns).where(eq(automationRuns.id, id)).limit(1);
+  const durationMs = started[0]?.startedAt ? Math.max(0, finishedAt.getTime() - started[0].startedAt.getTime()) : null;
+  await db.update(automationRuns).set({ status, finishedAt, durationMs, summary, errorMessage: errorMessage || null }).where(eq(automationRuns.id, id));
 }
 
 export async function loadRecentAutomationRuns(moduleKey: FeatureModuleKey, limit = 20) {

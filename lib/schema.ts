@@ -248,6 +248,12 @@ export const usBreakingNewsDiscordDeliveries = pgTable("us_breaking_news_discord
 export const automationRuns = pgTable("automation_runs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   moduleKey: text("module_key").notNull(),
+  jobType: text("job_type").notNull().default("FEATURE"),
+  market: text("market"),
+  timeframe: text("timeframe"),
+  triggerType: text("trigger_type").notNull().default("AUTOMATION"),
+  retryCount: integer("retry_count").notNull().default(0),
+  durationMs: integer("duration_ms"),
   status: text("status").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
