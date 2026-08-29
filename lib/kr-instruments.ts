@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { krInstrumentUniverse } from "@/lib/schema";
+import { krCommonStockUniverse } from "@/lib/schema";
 import { isEligibleKrCommonStock } from "@/lib/instrument-eligibility";
+import { syncDailyActivityStatus } from "@/lib/daily-activity-status";
 
 export const KR_MARKETS = ["KOSPI", "KOSDAQ"] as const;
 export type KrInstrumentScope = { market: string; code: string; name: string };
@@ -15,7 +16,8 @@ export function isExcludedKrOfficialName(name: string) {
   return /(?:스팩|SPAC|우선주|우(?:\(|$)|\d우B(?:\(|$)|전환|신주인수권|권리주)/i.test(String(name ?? ""));
 }
 export async function loadStoredKrInstrumentScopes() {
-  const rows = await getDb().select({ market: krInstrumentUniverse.market, code: krInstrumentUniverse.code, name: krInstrumentUniverse.name, instrumentType: krInstrumentUniverse.instrumentType, isEtp: krInstrumentUniverse.isEtp, isWarrant: krInstrumentUniverse.isWarrant, isPreferred: krInstrumentUniverse.isPreferred, tradingHaltCode: krInstrumentUniverse.tradingHaltCode, liquidationCode: krInstrumentUniverse.liquidationCode, managedIssueCode: krInstrumentUniverse.managedIssueCode, isSuspended: krInstrumentUniverse.isSuspended }).from(krInstrumentUniverse).where(and(eq(krInstrumentUniverse.enabled, true), inArray(krInstrumentUniverse.market, [...KR_MARKETS]))).orderBy(asc(krInstrumentUniverse.market), asc(krInstrumentUniverse.code));
+  await syncDailyActivityStatus();
+  const rows = await getDb().select({ market: krCommonStockUniverse.market, code: krCommonStockUniverse.code, name: krCommonStockUniverse.name, instrumentType: krCommonStockUniverse.instrumentType, isEtp: krCommonStockUniverse.isEtp, isWarrant: krCommonStockUniverse.isWarrant, isPreferred: krCommonStockUniverse.isPreferred, tradingHaltCode: krCommonStockUniverse.tradingHaltCode, liquidationCode: krCommonStockUniverse.liquidationCode, managedIssueCode: krCommonStockUniverse.managedIssueCode, isSuspended: krCommonStockUniverse.isSuspended }).from(krCommonStockUniverse).where(and(eq(krCommonStockUniverse.enabled, true), inArray(krCommonStockUniverse.market, [...KR_MARKETS]))).orderBy(asc(krCommonStockUniverse.market), asc(krCommonStockUniverse.code));
   // Eligibility is derived exclusively from the official KIS master fields
   // persisted on the universe row. Do not reinterpret the security type from
   // a display name: names are presentation data and are not authoritative.

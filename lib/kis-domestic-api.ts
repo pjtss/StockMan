@@ -1,25 +1,14 @@
-import { buildKisAuthorization } from "./kis-authorization";
-import { KIS_APPKEY, KIS_APPSECRET } from "./kis-runtime";
 import type { KisOutput } from "./kis-types";
+import { kisRequest } from "./kis-request-framework";
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
 
 export type DomesticRankingRows = KisOutput[] & { diagnostics?: { status: number; rtCd: string | null; msgCd: string | null; msg1: string | null; recordCount: number; rawTextPreview: string } };
 async function requestRanking(path: string, trId: string, params: Record<string, string>, token: string): Promise<DomesticRankingRows> {
   const url = `${BASE_URL}${path}?${new URLSearchParams(params).toString()}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "content-type": "application/json",
-      Authorization: buildKisAuthorization(token),
-      appkey: KIS_APPKEY || "",
-      appsecret: KIS_APPSECRET || "",
-      tr_id: trId,
-    },
-  });
+  const { response, rawText, parsed: data } = await kisRequest<any>({ url, token, trId });
   if (!response.ok) throw new Error(`KIS API returned HTTP ${response.status}`);
-  const rawText = await response.text();
-  const data = JSON.parse(rawText);
+  if (!data) throw new Error("KIS API returned invalid JSON");
   if (data.rt_cd !== "0") throw new Error(`KIS API Error [${data.rt_cd}]: ${data.msg1}`);
   const rows = (data.output || []) as DomesticRankingRows;
   rows.diagnostics = { status: response.status, rtCd: data.rt_cd ?? null, msgCd: data.msg_cd ?? null, msg1: data.msg1 ?? null, recordCount: rows.length, rawTextPreview: rawText.slice(0, 2000) };

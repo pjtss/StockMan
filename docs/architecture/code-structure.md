@@ -22,7 +22,7 @@ public/               정적 자산
 | 설정·자동화 | `feature-module-settings.ts`, `automation-run.ts`, `schedule-time.ts` | DB 설정, 실행 이력, KST 일정 판정 |
 | KIS 인증 | `kis-token.ts`, `kis-authorization.ts`, `kis-request-throttle.ts` | 토큰 수명주기, Authorization, 호출 직렬화·재시도 |
 | KIS 시세 | `kis-us*.ts`, `kis-kr*.ts`, `kis-chart.ts` | 해외·국내 원본 API 호출과 파싱 |
-| 캐시 | `us-daily-price-cache*.ts`, `kr-daily-price-cache.ts` | 일·주·월봉과 시세 DB 저장·조회 |
+| 캐시 | `us-daily-price-cache*.ts`, `kr-daily-price-cache.ts`, `*-minute-candle-cache.ts` | 일·주·월봉·분봉과 시세 DB 저장·조회 |
 | 탐지 | `us-*scan.ts`, `*-bollinger-band.ts`, `us-daily-trend-scan.ts` | DB 캐시 기반 지표 계산과 필터 |
 | 알림 | `discord-*.ts`, `discord-text.ts`, `discord-delivery-*` | Discord DTO, 웹훅 전송, 재시도·중복 방지 |
 | RSS·공시 | `market-rss*.ts`, `sec-*.ts`, `dart-*.ts` | 수집·정규화·분류·분석·전송 |
@@ -33,7 +33,9 @@ public/               정적 자산
 - `components/` → `app/api` 호출만 사용하고 `lib/db`를 직접 import하지 않습니다.
 - `app/api`는 외부 입력을 검증한 뒤 `lib/` 애플리케이션 서비스를 호출합니다.
 - KIS 호출은 `kis-token`과 `kis-request-throttle`을 우회하지 않습니다.
+- KIS 실전계좌 REST 호출은 TPS 18을 상한으로 관리하며, 공통 throttle 기본값은 100ms 간격(TPS 10)입니다. 토큰 발급 제한과 일반 API 호출 제한을 별도로 취급합니다.
 - 일봉 탐지는 KIS를 직접 호출하지 않고 캐시 저장소를 사용합니다.
+- 일·주·월봉 기반 종목 추출 응답은 사용 봉의 거래일시·갱신일시·종목 목록 메타데이터를 화면과 API에 함께 제공합니다.
 - Discord 전송은 기능 모듈에서 payload를 만들고 공통 delivery 정책을 거칩니다.
 - DB 스키마 변경은 기존 migration 수정이 아니라 새 `V번호__설명.sql`로 추가합니다.
 

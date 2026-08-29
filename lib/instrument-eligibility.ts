@@ -13,8 +13,8 @@ export function isEligibleUsCommonStock(row: { instrumentType?: unknown; isEtf?:
 }
 
 export function commonStockEligibilitySql(market: "KR" | "US") {
-  if (market === "KR") return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1') AND COALESCE(managed_issue_code, '') <> 'Y'";
-  return "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false";
+  if (market === "KR") return "enabled = true AND daily_active = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1') AND COALESCE(managed_issue_code, '') <> 'Y'";
+  return "enabled = true AND daily_active = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false";
 }
 
 /**
@@ -24,7 +24,7 @@ export function commonStockEligibilitySql(market: "KR" | "US") {
  * explicitly reported to callers so it cannot be mistaken for a full filter.
  */
 export async function queryEligibleUniverse(db: { execute: (query: any) => Promise<any> }, market: "KR" | "US") {
-  const table = market === "KR" ? "kr_instrument_universe" : "us_instrument_universe";
+  const table = market === "KR" ? "kr_common_stock_universe" : "us_common_stock_universe";
   const full = `SELECT market, code, name FROM ${table} WHERE ${commonStockEligibilitySql(market)}`;
   try {
     return { rows: (await db.execute(sql.raw(full))).rows as any[], compatibilityFallback: false };
@@ -34,8 +34,8 @@ export async function queryEligibleUniverse(db: { execute: (query: any) => Promi
     // Retrying the baseline query is safe: a real connection/query failure
     // will fail again and be returned to the caller.
     const base = market === "KR"
-      ? "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false"
-      : "enabled = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false";
+      ? "enabled = true AND daily_active = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false"
+      : "enabled = true AND daily_active = true AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false";
     try {
       return { rows: (await db.execute(sql.raw(`SELECT market, code, name FROM ${table} WHERE ${base}`))).rows as any[], compatibilityFallback: true };
     } catch (fallbackError) {

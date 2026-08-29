@@ -3,6 +3,7 @@ import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 import { calculateKisUsMarketCap } from "@/lib/kis-us-market-cap";
 import { formatDisplayNumber, formatDisplayPercent } from "@/lib/display-number";
+import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 export type AmsScoutCandidate = {
   symb: string;
@@ -60,7 +61,7 @@ function sum(values: number[]) {
 }
 
 async function fetchJson(url: string, headers: Record<string, string>) {
-  const res = await fetch(url, { method: "GET", headers });
+  const res = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers }));
   const rawText = await res.text();
   let parsed: any = null;
   try {

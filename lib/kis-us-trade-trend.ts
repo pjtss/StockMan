@@ -1,6 +1,7 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
+import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 export type KisUsTradeMarket = "NAS" | "AMS" | "NYS";
 export type KisUsTradeTrendRequest = { code: string; market?: KisUsTradeMarket; day?: "0" | "1" };
@@ -19,7 +20,7 @@ export async function fetchKisUsTradeTrend(input: KisUsTradeTrendRequest): Promi
   if (!code) return null;
   const config = await loadKisApiConfig("us_trade_trend");
   const headers = (token: string) => ({ "content-type": config.content_type, Authorization: buildKisAuthorization(token), appkey: process.env.KIS_APPKEY || "", appsecret: process.env.KIS_APPSECRET || "", tr_id: config.tr_id || "HHDFS76200300", custtype: config.custtype || "P", tr_cont: "" });
-  async function once(token: string, exchange: KisUsTradeMarket) { const params = new URLSearchParams({ AUTH: config.AUTH ?? "", EXCD: exchange, TDAY: day, SYMB: code, KEYB: config.KEYB ?? "" }); const response = await fetch(`https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-ccnl?${params}`, { headers: headers(token) }); const rawText = await response.text(); let raw: any = null; try { raw = JSON.parse(rawText); } catch {} return { response, raw, rawText }; }
+  async function once(token: string, exchange: KisUsTradeMarket) { const params = new URLSearchParams({ AUTH: config.AUTH ?? "", EXCD: exchange, TDAY: day, SYMB: code, KEYB: config.KEYB ?? "" }); const response = await withKisRequestThrottle(() => fetch(`https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-ccnl?${params}`, { headers: headers(token) })); const rawText = await response.text(); let raw: any = null; try { raw = JSON.parse(rawText); } catch {} return { response, raw, rawText }; }
   let token = await getAccessToken(); if (!token) return null;
   const exchanges: KisUsTradeMarket[] = market ? [market] : ["NAS", "AMS", "NYS"];
   let last: Awaited<ReturnType<typeof once>> | null = null;

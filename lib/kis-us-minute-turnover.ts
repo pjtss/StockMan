@@ -1,6 +1,7 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
+import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 export type UsMinuteTurnoverRequest = {
   code: string;
@@ -118,7 +119,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
 
   async function fetchOnce(token: string, next = "") {
     const { url } = buildRequest(code, market, config, next);
-    const response = await fetch(url, {
+    const response = await withKisRequestThrottle(() => fetch(url, {
       method: "GET",
       headers: {
         "content-type": contentType,
@@ -129,7 +130,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
         custtype,
         tr_cont: "",
       },
-    });
+    }));
     const rawText = await response.text();
     return { response, rawText, parsed: parseJson(rawText), url };
   }

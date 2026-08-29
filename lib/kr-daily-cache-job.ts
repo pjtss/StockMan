@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
 import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
 import { refreshDailyBollingerCaches, refreshDailyGoldenCrossCache } from "@/lib/daily-cache-followup";
+import { upsertWeeklyFromDaily } from "@/lib/daily-to-weekly-upsert";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -43,12 +44,14 @@ async function run(job: Job) {
     const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 24 * 60 * 60 * 1000 } as const;
     const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM kr_instrument_universe_candles GROUP BY timeframe`);
     const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
-    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
+    const missingDailyPayload = await getDb().execute(sql`SELECT COUNT(*) AS count FROM kr_instrument_universe_candles WHERE timeframe = 'D' AND COALESCE(raw_payload, '') = ''`);
+    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => timeframe === "D" && (Number((missingDailyPayload.rows[0] as any)?.count ?? 0) > 0 || !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]));
     const retryRows = await loadDueCandleCacheRetries();
     const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
     for (const row of retryRows) if (!dueTimeframes.includes(row.timeframe)) dueTimeframes.push(row.timeframe);
     job.dueTimeframes = dueTimeframes;
-    let cursor = 0;
+  let cursor = 0;
+    let dailySuccessCount = 0;
     const worker = async () => {
       while (true) {
         const item = scopes[cursor++];
@@ -56,6 +59,7 @@ async function run(job: Job) {
         try {
           const [daily, weekly, monthly] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D", item.market) : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W", item.market) : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M", item.market) : null]);
           const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null };
+          if (Number(result.daily?.parsedCandleCount ?? 0) > 0) dailySuccessCount += 1;
           job.results.push(result);
           const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
           const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0);
@@ -73,17 +77,20 @@ async function run(job: Job) {
           const message = error instanceof Error ? error.message : String(error);
           job.results.push({ market: item.market, code: item.code, error: message });
           for (const timeframe of dueTimeframes) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
-        } finally {
-          job.processedCount += 1;
-          const elapsedMs = Date.now() - progressStartedAt;
-          job.progress = { elapsedMs, etaMs: job.processedCount ? Math.round(elapsedMs / job.processedCount * (job.instrumentCount - job.processedCount)) : null, lastCode: item.code };
-        }
+      } finally {
+        job.processedCount += 1;
+        const elapsedMs = Date.now() - progressStartedAt;
+        job.progress = { elapsedMs, etaMs: job.processedCount ? Math.round(elapsedMs / job.processedCount * (job.instrumentCount - job.processedCount)) : null, lastCode: item.code };
+        if (job.processedCount === 1 || job.processedCount % 100 === 0) console.info(`[KR_DAILY_REFRESH] processed=${job.processedCount}/${job.instrumentCount} success=${job.successCount} failures=${job.failureCount} elapsedMs=${elapsedMs} etaMs=${job.progress.etaMs ?? "-"} last=${item.market}:${item.code}`);
+      }
       }
     };
     // Each worker performs daily, weekly, monthly and quote requests. Keep
     // the fan-out below KIS per-second limits instead of creating bursts.
     await Promise.all(Array.from({ length: Math.min(2, Math.max(1, scopes.length)) }, worker));
     job.status = "COMPLETED";
+    (job as any).dailySuccessCount = dailySuccessCount;
+    (job as any).weeklyDerived = await upsertWeeklyFromDaily("KR", { runDailyTotal: scopes.length, runDailySuccess: dailySuccessCount });
     // Partial KIS failures must not block follow-up caches for instruments
     // whose candles were saved successfully. The scanners read the DB cache
     // and naturally omit the failed instruments.

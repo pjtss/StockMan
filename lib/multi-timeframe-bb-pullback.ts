@@ -11,7 +11,7 @@ const completed = (rows: Candle[], _tf: string) => rows;
 export type MultiTimeframeBbMode = "pullback" | "all-middle-above";
 
 export async function scanMultiTimeframeBbPullback(market: "KR" | "US", mode: MultiTimeframeBbMode = "pullback") {
-  const u = market === "US" ? "us_instrument_universe" : "kr_instrument_universe"; const c = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
+  const u = market === "US" ? "us_instrument_universe" : "kr_common_stock_universe"; const c = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
   const eligibility = await queryEligibleUniverse(getDb(), market);
   const scopes = { rows: eligibility.rows };
   const candles = await getDb().execute(sql.raw(`SELECT market,code,timeframe,candle_date AS date,high,low,close FROM ${c} WHERE timeframe IN ('D','W','M') ORDER BY market,code,timeframe,candle_date`));

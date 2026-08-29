@@ -1,10 +1,11 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { usInstrumentUniverse } from "@/lib/schema";
 import { classifyUsInstrumentProduct, isEligibleUsCommonStock } from "@/lib/us-instrument-product";
 import { fetchKisUsTopRisingApi } from "@/lib/kis-us-api";
 import { getPool } from "@/lib/db";
 import { loadUsTurnoverFilterSettings, type UsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
+import { syncDailyActivityStatus } from "@/lib/daily-activity-status";
 
 export const US_EXCHANGES = ["NAS", "AMS", "NYS"] as const;
 const EXCLUDED = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i;
@@ -52,12 +53,13 @@ let storedScopeInflight: Promise<StoredUsInstrumentScopes> | null = null;
 
 /** Canonical persisted universe used by daily indicators. No live ranking API is called. */
 export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrumentScopes> {
+  await syncDailyActivityStatus();
   if (storedScopeCache && storedScopeCache.expiresAt > Date.now()) return storedScopeCache.value;
   if (storedScopeInflight) return storedScopeInflight;
   storedScopeInflight = (async () => {
     const db = getDb();
     const rows = db ? await db.select({ market: usInstrumentUniverse.market, code: usInstrumentUniverse.code, name: usInstrumentUniverse.name, englishName: usInstrumentUniverse.englishName, instrumentType: usInstrumentUniverse.instrumentType, isEtf: usInstrumentUniverse.isEtf, isLeveraged: usInstrumentUniverse.isLeveraged, isInverse: usInstrumentUniverse.isInverse, isWarrant: usInstrumentUniverse.isWarrant, isDerivative: usInstrumentUniverse.isDerivative, isDr: usInstrumentUniverse.isDr })
-      .from(usInstrumentUniverse).where(and(eq(usInstrumentUniverse.enabled, true), inArray(usInstrumentUniverse.market, [...US_EXCHANGES])))
+      .from(usInstrumentUniverse).where(and(eq(usInstrumentUniverse.enabled, true), sql`daily_active = true`, inArray(usInstrumentUniverse.market, [...US_EXCHANGES])))
       : [];
     const settings = await loadUsTurnoverFilterSettings();
     // Cache membership is deliberately independent from market-cap, turnover,

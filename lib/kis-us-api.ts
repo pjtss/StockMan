@@ -1,6 +1,6 @@
 import { loadKisApiConfig, type KisApiConfig } from "@/lib/kis-api-config";
 import { getAccessToken } from "@/lib/kis";
-import { buildKisAuthorization } from "@/lib/kis-authorization";
+import { kisRequest } from "@/lib/kis-request-framework";
 
 export type KisUsTopRisingApiRequest = {
   excd?: string;
@@ -75,20 +75,8 @@ export async function fetchKisUsTopRisingApi(request: KisUsTopRisingApiRequest =
     return null;
   }
 
-  const response = await fetch(prepared.url, {
-    method: "GET",
-    headers: {
-      "content-type": prepared.config.content_type || "application/json; charset=utf-8",
-      Authorization: buildKisAuthorization(prepared.token),
-      appkey: process.env.KIS_APPKEY || "",
-      appsecret: process.env.KIS_APPSECRET || "",
-      tr_id: prepared.config.tr_id || "HHDFS76290000",
-      custtype: prepared.config.custtype || "P",
-      tr_cont: "",
-    },
-  });
-
-  const rawText = await response.text();
+  const responseResult = await kisRequest<any>({ url: prepared.url, token: prepared.token, trId: prepared.config.tr_id || "HHDFS76290000", headers: { "content-type": prepared.config.content_type || "application/json; charset=utf-8", custtype: prepared.config.custtype || "P", tr_cont: "" } });
+  const { response, rawText } = responseResult;
   return {
     ok: response.ok,
     status: response.status,
@@ -105,9 +93,9 @@ export async function fetchKisUsTopRisingApi(request: KisUsTopRisingApiRequest =
         tr_cont: "",
       },
     },
-    response: {
+      response: {
       rawText,
-      parsed: parseResponse(rawText),
+      parsed: responseResult.parsed ?? parseResponse(rawText),
     },
   } satisfies KisUsTopRisingApiResponse;
 }

@@ -1,7 +1,12 @@
 /** Serializes KIS calls in this process and backs off on gateway rate limits. */
-// Keep the conservative default, but allow operations to tune latency without
-// rebuilding the application. Never set this below the KIS account/API limit.
-const MIN_INTERVAL_MS = Math.max(50, Number(process.env.KIS_MIN_REQUEST_INTERVAL_MS ?? 250) || 250);
+// Keep the default at the documented live-account ceiling (TPS 18), while
+// allowing operations to choose a more conservative fixed interval.
+// 1000 / 18 = 55.56ms, so 56ms prevents rounding above the limit.
+const BASE_INTERVAL_MS = Math.max(50, Number(process.env.KIS_MIN_REQUEST_INTERVAL_MS ?? 56) || 56);
+const MAX_ADAPTIVE_INTERVAL_MS = 250;
+const RATE_LIMIT_STEP_MS = 25;
+let adaptiveIntervalMs = BASE_INTERVAL_MS;
+let consecutiveSuccesses = 0;
 const RETRY_DELAYS_MS = [500, 1000, 2000];
 let tail: Promise<void> = Promise.resolve();
 let lastStartedAt = 0;
@@ -13,7 +18,7 @@ async function acquire() {
   let release!: () => void;
   tail = new Promise<void>((resolve) => { release = resolve; });
   await previous;
-  const wait = Math.max(0, MIN_INTERVAL_MS - (Date.now() - lastStartedAt));
+  const wait = Math.max(0, adaptiveIntervalMs - (Date.now() - lastStartedAt));
   if (wait) await sleep(wait);
   lastStartedAt = Date.now();
   return release;
@@ -37,6 +42,16 @@ export async function withKisRequestThrottle<T>(request: () => Promise<T>): Prom
     try {
       const result = await request();
       const failure = classifyKisFailure(result);
+      if (failure === "RATE_LIMITED") {
+        adaptiveIntervalMs = Math.min(MAX_ADAPTIVE_INTERVAL_MS, adaptiveIntervalMs + RATE_LIMIT_STEP_MS);
+        consecutiveSuccesses = 0;
+      } else if (!failure) {
+        consecutiveSuccesses += 1;
+        if (consecutiveSuccesses >= 25 && adaptiveIntervalMs > BASE_INTERVAL_MS) {
+          adaptiveIntervalMs = Math.max(BASE_INTERVAL_MS, adaptiveIntervalMs - 1);
+          consecutiveSuccesses = 0;
+        }
+      }
       if (!(failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP") || attempt >= RETRY_DELAYS_MS.length) return result;
       await sleep(RETRY_DELAYS_MS[attempt]);
       continue;

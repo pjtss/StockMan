@@ -65,6 +65,9 @@ OCI 배포에서는 위 검증 외에 Ubuntu에서 `bash -n scripts/oci-cron.sh`
 ## 문서
 
 - [프로젝트 구조 및 운영 기준](docs/architecture/project-architecture.md)
+- [코드 구조](docs/architecture/code-structure.md)
+- [DB·전체 테이블 구조](docs/architecture/database-schema.md)
+- [일·주·월봉 캐시 운영 설계](docs/architecture/periodic-candle-cache.md)
 - [운영 런북](docs/operations/runbook.md)
 - [개발 변경 이력](Development.md)
 - [환경변수 설명](Env.md)

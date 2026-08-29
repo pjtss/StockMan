@@ -17,6 +17,7 @@ type PageKey =
   | "us-ams-scout"
   | "us-news"
   | "multi-timeframe-rebound"
+  | "charts"
   | "admin"
 
 export function PageNavigation({ current }: { current: PageKey }) {
@@ -47,6 +48,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link className={current === "multi-timeframe-rebound" ? styles.navActive : styles.navLink} href="/scanners/multi-timeframe-rebound" prefetch={false}>
           일·주·월봉 탐지
+        </Link>
+        <Link className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
+          티커 차트
         </Link>
         <Link
           className={current === "notifications" ? styles.navActive : styles.navLink}

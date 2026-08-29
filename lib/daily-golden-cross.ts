@@ -1,6 +1,6 @@
 import { writeKisCache } from "@/lib/kis-cache";
 
-export type GoldenCandle = { date: string; close: number; high?: number; low?: number; volume?: number };
+export type GoldenCandle = { date: string; close: number; high?: number; low?: number; volume?: number; updatedAt?: string | null };
 export type GoldenScope = { market: string; code: string; name?: string };
 export type GoldenState = "APPROACHING" | "CROSSED_TODAY" | "RECENT_CROSS" | "ESTABLISHED" | "NONE";
 export type GoldenCrossPolicy = {
@@ -9,6 +9,7 @@ export type GoldenCrossPolicy = {
 };
 export type GoldenCrossResult = GoldenScope & {
   timeframe: "D"; qualifies: boolean; state: GoldenState; latestDate: string | null; previousDate: string | null;
+  latestUpdatedAt: string | null; previousUpdatedAt: string | null; dataQuality: "VALID" | "INSUFFICIENT_HISTORY" | "INVALID_INPUT";
   emaShort: number | null; emaLong: number | null; previousEmaShort: number | null; previousEmaLong: number | null;
   crossDate: string | null; obv: number | null; obvSignal: number | null; adl: number | null; adlSignal: number | null;
   obvAboveSignal: boolean; adlAboveSignal: boolean; candleCount: number;
@@ -23,8 +24,9 @@ function round(value: number | null) { return value == null || !Number.isFinite(
 export function calculateGoldenCross(candles: GoldenCandle[], input: GoldenCrossPolicy = {}): Omit<GoldenCrossResult, "market" | "code" | "name" | "timeframe"> {
   const policy = { ...defaults, ...input };
   const rows = candles.filter((row) => Number.isFinite(row.close) && row.close > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const invalidInput = candles.length > 0 && rows.length !== candles.length;
   const minimum = Math.max(policy.longPeriod + 1, policy.obvSignalPeriod + 1, policy.adlSignalPeriod + 1);
-  if (rows.length < minimum) return { qualifies: false, state: "NONE", latestDate: rows.at(-1)?.date ?? null, previousDate: rows.at(-2)?.date ?? null, emaShort: null, emaLong: null, previousEmaShort: null, previousEmaLong: null, crossDate: null, obv: null, obvSignal: null, adl: null, adlSignal: null, obvAboveSignal: false, adlAboveSignal: false, candleCount: rows.length, reason: "INSUFFICIENT_HISTORY" };
+  if (rows.length < minimum) return { qualifies: false, state: "NONE", latestDate: rows.at(-1)?.date ?? null, previousDate: rows.at(-2)?.date ?? null, latestUpdatedAt: rows.at(-1)?.updatedAt ?? null, previousUpdatedAt: rows.at(-2)?.updatedAt ?? null, dataQuality: invalidInput ? "INVALID_INPUT" : "INSUFFICIENT_HISTORY", emaShort: null, emaLong: null, previousEmaShort: null, previousEmaLong: null, crossDate: null, obv: null, obvSignal: null, adl: null, adlSignal: null, obvAboveSignal: false, adlAboveSignal: false, candleCount: rows.length, reason: "INSUFFICIENT_HISTORY" };
   const closes = rows.map((row) => row.close), short = ema(closes, policy.shortPeriod), long = ema(closes, policy.longPeriod), obv = obvSeries(rows), adl = adlSeries(rows), obvSignals = ema(obv, policy.obvSignalPeriod), adlSignals = ema(adl, policy.adlSignalPeriod);
   const last = rows.length - 1, previous = last - 1, latestShort = short[last], latestLong = long[last], crossedToday = short[previous] <= long[previous] && latestShort > latestLong;
   let crossIndex: number | null = null; for (let index = last; index > 0; index -= 1) if (short[index - 1] <= long[index - 1] && short[index] > long[index]) { crossIndex = index; break; }
@@ -34,7 +36,7 @@ export function calculateGoldenCross(candles: GoldenCandle[], input: GoldenCross
   const obvAboveSignal = obv[last] > obvSignals[last], adlAboveSignal = adl[last] > adlSignals[last], signalReady = (!policy.requireObvAboveSignal || obvAboveSignal) && (!policy.requireAdlAboveSignal || adlAboveSignal);
   const qualifies = ["APPROACHING", "CROSSED_TODAY", "RECENT_CROSS"].includes(state) && signalReady;
   const reason: GoldenCrossResult["reason"] = !["APPROACHING", "CROSSED_TODAY", "RECENT_CROSS"].includes(state) ? state === "ESTABLISHED" ? "ESTABLISHED" : "NOT_READY" : !obvAboveSignal && policy.requireObvAboveSignal ? "OBV_BELOW_SIGNAL" : !adlAboveSignal && policy.requireAdlAboveSignal ? "ADL_BELOW_SIGNAL" : state === "APPROACHING" || state === "CROSSED_TODAY" || state === "RECENT_CROSS" ? state : "NOT_READY";
-  return { qualifies, state, latestDate: rows[last].date, previousDate: rows[previous].date, emaShort: round(latestShort), emaLong: round(latestLong), previousEmaShort: round(short[previous]), previousEmaLong: round(long[previous]), crossDate: crossIndex == null ? null : rows[crossIndex].date, obv: round(obv[last]), obvSignal: round(obvSignals[last]), adl: round(adl[last]), adlSignal: round(adlSignals[last]), obvAboveSignal, adlAboveSignal, candleCount: rows.length, reason };
+  return { qualifies, state, latestDate: rows[last].date, previousDate: rows[previous].date, latestUpdatedAt: rows[last].updatedAt ?? null, previousUpdatedAt: rows[previous].updatedAt ?? null, dataQuality: invalidInput ? "INVALID_INPUT" : "VALID", emaShort: round(latestShort), emaLong: round(latestLong), previousEmaShort: round(short[previous]), previousEmaLong: round(long[previous]), crossDate: crossIndex == null ? null : rows[crossIndex].date, obv: round(obv[last]), obvSignal: round(obvSignals[last]), adl: round(adl[last]), adlSignal: round(adlSignals[last]), obvAboveSignal, adlAboveSignal, candleCount: rows.length, reason };
 }
 
 export async function persistGoldenCrossResults(scope: "KR" | "US", results: GoldenCrossResult[]) {

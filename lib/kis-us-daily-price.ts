@@ -1,7 +1,7 @@
 import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
-import { buildKisAuthorization, isKisTokenExpiredResponse } from "@/lib/kis-authorization";
-import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
+import { isKisTokenExpiredResponse } from "@/lib/kis-authorization";
+import { kisRequest } from "@/lib/kis-request-framework";
 
 export type UsDailyPriceRequest = {
   code: string;
@@ -18,6 +18,10 @@ export type UsDailyCandle = {
   low: number;
   close: number;
   volume: number;
+  tradingValue?: number | null;
+  priceSign?: string | null;
+  priceDiff?: number | null;
+  changeRate?: number | null;
   raw: unknown;
 };
 
@@ -56,6 +60,10 @@ function parseCandles(parsed: any): UsDailyCandle[] {
     low: number(row.xlow ?? row.low ?? row.stck_lwpr ?? row.lwpr),
     close: number(row.xclo ?? row.clos ?? row.xprc ?? row.last ?? row.close ?? row.stck_clpr ?? row.clpr),
     volume: number(row.xvol ?? row.tvol ?? row.acml_vol ?? row.volume),
+    tradingValue: row.tamt == null ? null : number(row.tamt),
+    priceSign: row.sign == null ? null : String(row.sign),
+    priceDiff: row.diff == null ? null : number(row.diff),
+    changeRate: row.rate == null ? null : number(row.rate),
     raw: row,
   })).filter((candle: UsDailyCandle) => candle.date && candle.close > 0);
 }
@@ -94,27 +102,8 @@ export async function fetchUsDailyPrice(request: UsDailyPriceRequest): Promise<U
   const url = buildUsDailyPriceUrl({ ...request, code, market }, config);
   const contentType = ascii(config.content_type, "application/json; charset=utf-8");
   const trId = ascii(config.tr_id, "HHDFS76240000") || "HHDFS76240000";
-  const headers = (token: string) => ({
-    "content-type": contentType,
-    authorization: buildKisAuthorization(token),
-    appkey: ascii(process.env.KIS_APPKEY),
-    appsecret: ascii(process.env.KIS_APPSECRET),
-    tr_id: trId,
-    custtype: ascii(config.custtype, "P") || "P",
-    tr_cont: "",
-  });
   async function once(token: string) {
-    const response = await withKisRequestThrottle(async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-      try {
-        return await fetch(url, { method: "GET", headers: headers(token), signal: controller.signal });
-      } finally {
-        clearTimeout(timeout);
-      }
-    });
-    const rawText = await response.text();
-    return { response, rawText, parsed: json(rawText) };
+    return kisRequest<any>({ url, token, trId, timeoutMs: REQUEST_TIMEOUT_MS, headers: { "content-type": contentType, custtype: ascii(config.custtype, "P") || "P", tr_cont: "" } });
   }
   let token = await getAccessToken();
   if (!token) return null;
@@ -128,7 +117,7 @@ export async function fetchUsDailyPrice(request: UsDailyPriceRequest): Promise<U
   return {
     ok: result.response.ok && result.parsed?.rt_cd === "0",
     status: result.response.status,
-    request: { method: "GET", url, headers: { ...headers("masked"), authorization: "Bearer <masked>", appkey: "<masked>", appsecret: "<masked>" } },
+    request: { method: "GET", url, headers: { authorization: "Bearer <masked>", appkey: "<masked>", appsecret: "<masked>", "content-type": contentType, tr_id: trId, custtype: ascii(config.custtype, "P") || "P", tr_cont: "" } },
     response: { rawText: result.rawText, parsed: result.parsed },
     candles,
     diagnostics: dailyDiagnostics(result.parsed, result.response.status, candles),

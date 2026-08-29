@@ -5,6 +5,7 @@ import { getAccessToken, getKisMode, refreshAccessToken } from "./kis";
 import { buildKisAuthorization, isKisTokenExpiredErrorMessage } from "./kis-authorization";
 import { loadKisApiConfig } from "./kis-api-config";
 import { buildKisUsRequestDebug, pushKisUsDebugLog } from "./kis-us-debug";
+import { withKisRequestThrottle } from "./kis-request-throttle";
 
 const KIS_APPKEY = process.env.KIS_APPKEY;
 const KIS_APPSECRET = process.env.KIS_APPSECRET;
@@ -73,7 +74,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
         tr_cont: "",
       })
     );
-    const response = await fetch(url, {
+    const response = await withKisRequestThrottle(() => fetch(url, {
       method: "GET",
       headers: {
         "content-type": "application/json; charset=utf-8",
@@ -84,7 +85,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
         custtype: config.custtype || "P",  // 해외주식 API 필수 헤더 (P: 개인, B: 법인)
         tr_cont: "",    // 연속조회 비사용
       },
-    });
+    }));
 
     if (!response.ok) {
       const errText = await response.text();
@@ -142,7 +143,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
               tr_cont: "",
             })
           );
-          const retryResponse = await fetch(url, {
+          const retryResponse = await withKisRequestThrottle(() => fetch(url, {
             method: "GET",
             headers: {
               "content-type": "application/json; charset=utf-8",
@@ -153,7 +154,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
               custtype: config.custtype || "P",
               tr_cont: "",
             },
-          });
+          }));
           if (retryResponse.ok) {
             const retryData = await retryResponse.json();
             pushKisUsDebugLog("KIS-US-RES-RETRY", { status: retryResponse.status, data: retryData });
@@ -269,7 +270,7 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
         tr_cont: "",
       })
     );
-    const response = await fetch(url, {
+    const response = await withKisRequestThrottle(() => fetch(url, {
       method: "GET",
       headers: {
         "content-type": "application/json; charset=utf-8",
@@ -280,7 +281,7 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
         custtype: config.custtype || "P",
         tr_cont: "",
       },
-    });
+    }));
 
     if (!response.ok) {
       const errText = await response.text();

@@ -9,8 +9,14 @@ export async function syncUsMinuteScanUniverse(scopes: UsTopRisingScope[], topN:
   try {
     await client.query("BEGIN");
     if (markets.length) await client.query(`DELETE FROM us_minute_scan_universe WHERE market = ANY($1::text[])`, [markets]);
-    for (const scope of selected) {
-      await client.query(`INSERT INTO us_minute_scan_universe (market, code, name, rank, change_rate, updated_at) VALUES ($1,$2,$3,$4,$5,NOW()) ON CONFLICT (market, code) DO UPDATE SET name=EXCLUDED.name, rank=EXCLUDED.rank, change_rate=EXCLUDED.change_rate, updated_at=NOW()`, [scope.market, scope.code, scope.name ?? null, scope.rank, scope.changeRate ?? null]);
+    if (selected.length) {
+      const values: unknown[] = [];
+      const placeholders = selected.map((scope, index) => {
+        const offset = index * 5;
+        values.push(scope.market, scope.code, scope.name ?? null, scope.rank, scope.changeRate ?? null);
+        return `($${offset + 1},$${offset + 2},$${offset + 3},$${offset + 4},$${offset + 5},NOW())`;
+      }).join(",");
+      await client.query(`INSERT INTO us_minute_scan_universe (market, code, name, rank, change_rate, updated_at) VALUES ${placeholders} ON CONFLICT (market, code) DO UPDATE SET name=EXCLUDED.name, rank=EXCLUDED.rank, change_rate=EXCLUDED.change_rate, updated_at=NOW()`, values);
     }
     await client.query("COMMIT");
     return { persisted: selected.length, markets };

@@ -5,10 +5,7 @@
  */
 
 import { getAccessToken } from "./kis";
-import { buildKisAuthorization } from "./kis-authorization";
-
-const KIS_APPKEY = process.env.KIS_APPKEY ?? "";
-const KIS_APPSECRET = process.env.KIS_APPSECRET ?? "";
+import { kisRequest } from "./kis-request-framework";
 
 const BASE_URL =
   process.env.KIS_MODE === "mock"
@@ -22,6 +19,8 @@ export interface OHLCVCandle {
   low: number;
   close: number;
   volume: number;
+  tradingValue?: number | null;
+  raw?: unknown;
 }
 
 export interface TechnicalIndicators {
@@ -42,14 +41,30 @@ export interface ChartData {
   latestPrice: number;
   latestChange: string;
   latestChangeRate: string;
+  fundamentals?: ChartFundamentals;
+  candleDataUpdatedAt?: string | null;
+}
+
+export interface ChartFundamentals {
+  marketCap: number | null;
+  latestTradingValue: number | null;
+  averageTradingValue20: number | null;
+  latestVolume: number | null;
+  averageVolume20: number | null;
+  rvol: number | null;
+  currency: string;
+  observedAt: string | null;
+  fetchedAt: string | null;
+  source: string | null;
+  status: "AVAILABLE" | "STALE" | "UNKNOWN";
 }
 
 /** KIS 일봉 API 호출 */
-async function fetchDailyOHLCV(code: string, token: string): Promise<OHLCVCandle[]> {
+async function fetchDailyOHLCV(code: string, token: string, timeframe: "D" | "W" | "M" = "D"): Promise<OHLCVCandle[]> {
   const today = new Date();
   const endDate = today.toISOString().slice(0, 10).replace(/-/g, "");
-  // 60일 전
-  const startDateObj = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000);
+  const lookbackDays = timeframe === "M" ? 365 * 5 : timeframe === "W" ? 365 * 2 : 60;
+  const startDateObj = new Date(today.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
   const startDate = startDateObj.toISOString().slice(0, 10).replace(/-/g, "");
 
   const url = new URL(`${BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice`);
@@ -57,23 +72,12 @@ async function fetchDailyOHLCV(code: string, token: string): Promise<OHLCVCandle
   url.searchParams.set("FID_INPUT_ISCD", code);
   url.searchParams.set("FID_INPUT_DATE_1", startDate);
   url.searchParams.set("FID_INPUT_DATE_2", endDate);
-  url.searchParams.set("FID_PERIOD_DIV_CODE", "D");
+  url.searchParams.set("FID_PERIOD_DIV_CODE", timeframe);
   url.searchParams.set("FID_ORG_ADJ_PRC", "0");
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: buildKisAuthorization(token),
-      appkey: KIS_APPKEY,
-      appsecret: KIS_APPSECRET,
-      tr_id: "FHKST03010100",
-      custtype: "P",
-    },
-  });
+  const { response: res, parsed: json } = await kisRequest<any>({ url: url.toString(), token, trId: "FHKST03010100" });
 
   if (!res.ok) throw new Error(`KIS chart API HTTP ${res.status}`);
-  const json = await res.json();
-
   if (json.rt_cd !== "0") {
     throw new Error(`KIS chart API error: ${json.msg1}`);
   }
@@ -89,6 +93,7 @@ async function fetchDailyOHLCV(code: string, token: string): Promise<OHLCVCandle
       low: parseInt(r.stck_lwpr, 10) || 0,
       close: parseInt(r.stck_clpr, 10) || 0,
       volume: parseInt(r.acml_vol, 10) || 0,
+      tradingValue: Number(r.acml_tr_pbmn ?? 0) || null,
     }))
     .reverse();
 }
@@ -120,7 +125,7 @@ function calcEMA(data: number[], period: number): number[] {
   const k = 2 / (period + 1);
   const emas: number[] = [];
 
-  // 첫 EMA = 첫 period 일 SMA
+  // EMA의 초기 시드: 첫 period 구간 평균. 이후 값은 EMA 재귀식으로 계산한다.
   const seed = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
   emas.push(seed);
 
@@ -171,14 +176,14 @@ function calcBollingerBands(closes: number[], period = 20): { upper: number | nu
 }
 
 /** 메인 함수: 차트 데이터 + 기술적 지표 반환 */
-export async function fetchChartData(code: string): Promise<ChartData | null> {
+export async function fetchChartData(code: string, timeframe: "D" | "W" | "M" = "D"): Promise<ChartData | null> {
   const token = await getAccessToken();
   if (!token) {
     console.warn(`[CHART] No KIS token available for code ${code}`);
     return null;
   }
 
-  const candles = await fetchDailyOHLCV(code, token);
+  const candles = await fetchDailyOHLCV(code, token, timeframe);
   if (candles.length === 0) return null;
 
   const closes = candles.map((c) => c.close);
@@ -204,5 +209,6 @@ export async function fetchChartData(code: string): Promise<ChartData | null> {
     latestPrice: last.close,
     latestChange: changeStr,
     latestChangeRate: changeRateStr,
+    candleDataUpdatedAt: new Date().toISOString(),
   };
 }

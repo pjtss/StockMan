@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./chart-modal.module.css";
-import type { ChartData } from "@/lib/kis-chart";
-import { formatDisplayNumber } from "@/lib/display-number";
+import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart";
+import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 
 interface ChartModalProps {
   code: string;
@@ -28,10 +28,71 @@ function bbLabel(close: number, upper: number | null, lower: number | null): { t
   return { text: "밴드 내", cls: styles.bbNormal };
 }
 
+type IndicatorLine = { label: string; color: string; values: Array<number | null> };
+
+function rollingAverage(values: number[], period: number, index: number) {
+  if (index < period - 1) return null;
+  return values.slice(index - period + 1, index + 1).reduce((sum, value) => sum + value, 0) / period;
+}
+
+function indicatorLines(candles: OHLCVCandle[]): IndicatorLine[] {
+  const closes = candles.map((c) => c.close);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
+  const volumes = candles.map((c) => c.volume);
+  const rsi: Array<number | null> = [], mfi: Array<number | null> = [], macd: Array<number | null> = [], macdSignal: Array<number | null> = [];
+  const dmiPlus: Array<number | null> = [], dmiMinus: Array<number | null> = [], stochastic: Array<number | null> = [];
+  const obv: number[] = [], adl: number[] = [];
+  let obvValue = 0, adlValue = 0;
+  const ema = (values: number[], period: number) => { const result: number[] = []; const k = 2 / (period + 1); values.forEach((value, i) => { result.push(i === 0 ? value : value * k + result[i - 1] * (1 - k)); }); return result; };
+  const ema12 = ema(closes, 12), ema26 = ema(closes, 26), macdRaw = closes.map((_, i) => ema12[i] - ema26[i]), signalRaw = ema(macdRaw, 9);
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) obvValue = volumes[i]; else obvValue += closes[i] > closes[i - 1] ? volumes[i] : closes[i] < closes[i - 1] ? -volumes[i] : 0;
+    const range = highs[i] - lows[i]; adlValue += range > 0 ? (((closes[i] - lows[i]) - (highs[i] - closes[i])) / range) * volumes[i] : 0;
+    obv.push(obvValue); adl.push(adlValue);
+    const rsiWindow = closes.slice(Math.max(1, i - 13), i + 1).map((value, j, array) => j === 0 ? 0 : value - array[j - 1]);
+    const gains = rsiWindow.filter((v) => v > 0), losses = rsiWindow.filter((v) => v < 0).map((v) => -v);
+    const avgGain = gains.length ? gains.reduce((a, b) => a + b, 0) / 14 : 0, avgLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / 14 : 0;
+    rsi.push(i < 14 ? null : avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
+    const typical = candles.slice(Math.max(0, i - 13), i + 1).map((c) => (c.high + c.low + c.close) / 3), money = candles.slice(Math.max(0, i - 13), i + 1).map((c) => ((c.high + c.low + c.close) / 3) * c.volume);
+    const positive = money.filter((_, j) => j === 0 || typical[j] >= typical[j - 1]).reduce((a, b) => a + b, 0), negative = money.filter((_, j) => j > 0 && typical[j] < typical[j - 1]).reduce((a, b) => a + b, 0);
+    mfi.push(i < 14 ? null : negative === 0 ? 100 : 100 - 100 / (1 + positive / negative));
+    macd.push(macdRaw[i]); macdSignal.push(signalRaw[i]);
+    const tr = i === 0 ? highs[i] - lows[i] : Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    const up = i === 0 ? 0 : Math.max(highs[i] - highs[i - 1], 0), down = i === 0 ? 0 : Math.max(lows[i - 1] - lows[i], 0);
+    const atr = candles.slice(Math.max(0, i - 13), i + 1).reduce((sum, _, j) => sum + (j === 0 ? tr : Math.max(highs[Math.max(0, i - 13) + j] - lows[Math.max(0, i - 13) + j], 0)), 0) / 14;
+    dmiPlus.push(i < 14 ? null : atr ? (up / atr) * 100 : 0); dmiMinus.push(i < 14 ? null : atr ? (down / atr) * 100 : 0);
+    const low14 = Math.min(...lows.slice(Math.max(0, i - 13), i + 1)), high14 = Math.max(...highs.slice(Math.max(0, i - 13), i + 1));
+    stochastic.push(i < 13 || high14 === low14 ? null : ((closes[i] - low14) / (high14 - low14)) * 100);
+  }
+  return [{ label: "RSI (14)", color: "#f59e0b", values: rsi }, { label: "MFI (14)", color: "#a78bfa", values: mfi }, { label: "MACD", color: "#38bdf8", values: macd }, { label: "MACD Signal", color: "#f97316", values: macdSignal }, { label: "+DI", color: "#22c55e", values: dmiPlus }, { label: "-DI", color: "#ef4444", values: dmiMinus }, { label: "Stochastic", color: "#e879f9", values: stochastic }, { label: "OBV", color: "#14b8a6", values: obv }, { label: "ADL", color: "#60a5fa", values: adl }];
+}
+
+function IndicatorCharts({ candles }: { candles: OHLCVCandle[] }) {
+  const lines = indicatorLines(candles);
+  const groups = [[lines[0], lines[1]], [lines[2], lines[3]], [lines[4], lines[5]], [lines[6]], [lines[7]], [lines[8]]];
+  return <div className={styles.indicatorCharts}>{groups.map((group, groupIndex) => { const all = group.flatMap((line) => line.values).filter((v): v is number => v !== null && Number.isFinite(v)); const min = Math.min(...all), max = Math.max(...all), span = max - min || 1; return <div className={styles.indicatorPlot} key={groupIndex}><div className={styles.plotLegend}>{group.map((line) => <span key={line.label} style={{ color: line.color }}>● {line.label}</span>)}</div><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-label={group.map((line) => line.label).join(", ")}><line x1="0" y1="14" x2="100" y2="14" stroke="rgba(148,163,184,.12)" />{group.map((line) => { const points = line.values.map((value, i) => value === null ? null : `${(i / Math.max(1, line.values.length - 1)) * 100},${28 - ((value - min) / span) * 24 - 2}`).filter(Boolean).join(" "); return <polyline key={line.label} points={points} fill="none" stroke={line.color} strokeWidth="0.8" vectorEffect="non-scaling-stroke" />; })}</svg></div>; })}</div>;
+}
+
+function FundamentalsPanel({ data, fundamentals, timeframe, isUsChart }: { data?: ChartData; fundamentals?: ChartFundamentals; timeframe: "D" | "W" | "M"; isUsChart: boolean }) {
+  const f = fundamentals ?? data?.fundamentals;
+  const timeframeLabel = timeframe === "D" ? "일봉" : timeframe === "W" ? "주봉" : "월봉";
+  const candleDate = data?.candles.at(-1)?.date;
+  const normalizedCandleDate = candleDate && /^\d{8}$/.test(candleDate) ? `${candleDate.slice(0, 4)}-${candleDate.slice(4, 6)}-${candleDate.slice(6, 8)}` : candleDate;
+  const sourceLabel = f?.source === "KIS_DOMESTIC_PRICE" ? "KIS 국내 시세" : f?.source === "KIS_US_PRICE" ? "KIS 해외 시세" : f?.source ?? "미확인";
+  const statusLabel = f?.status === "AVAILABLE" ? "정상" : f?.status === "STALE" ? "지연" : "미확인";
+  const amount = (number: number | null | undefined) => formatDisplayAmount(number, isUsChart ? "USD" : "KRW");
+  const items = [["시가총액", amount(f?.marketCap)], ["최근 거래대금", amount(f?.latestTradingValue)], ["20봉 평균 거래대금", amount(f?.averageTradingValue20)], ["최근 거래량", formatDisplayVolume(f?.latestVolume)], ["20봉 평균 거래량", formatDisplayVolume(f?.averageVolume20)], ["RVOL", f?.rvol == null || !Number.isFinite(f.rvol) ? "미확인" : `${formatDisplayNumber(f.rvol)}배`]];
+  return <div><div className={styles.indicators}>{items.map(([label, current]) => <div className={styles.indicatorCard} key={label}><span className={styles.indicatorLabel}>{label}</span><span className={styles.indicatorValue}>{current}</span><span className={styles.indicatorSub}>{timeframeLabel} 완료봉 기준</span></div>)}</div><div className={styles.indicatorSub} style={{ marginTop: 16, lineHeight: 1.7 }}>기본정보 기준시각: {formatDisplayDateTime(f?.observedAt)}<br/>기본정보 갱신시각: {formatDisplayDateTime(f?.fetchedAt)}<br/>봉 데이터 기준일: {formatDisplayDate(normalizedCandleDate)}<br/>봉 데이터 갱신시각: {formatDisplayDateTime(data?.candleDataUpdatedAt)}<br/>출처: {sourceLabel} · 상태: {statusLabel}</div></div>;
+}
+
 export function ChartModal({ code, company, onClose }: ChartModalProps) {
+  const [timeframe, setTimeframe] = useState<"D" | "W" | "M">("D");
+  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals">("chart");
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fallbackFundamentals, setFallbackFundamentals] = useState<ChartFundamentals | undefined>();
   const chartRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -48,15 +109,17 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}`)
+    setFallbackFundamentals(undefined);
+    const market = code.startsWith("US:") ? "US" : "KR";
+    fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`)
       .then((r) => {
-        if (!r.ok) return r.json().then((e) => Promise.reject(new Error(e.error ?? `HTTP ${r.status}`)));
+        if (!r.ok) return r.json().then((e) => { if (e.fundamentals) setFallbackFundamentals(e.fundamentals); return Promise.reject(new Error(e.error ?? `HTTP ${r.status}`)); });
         return r.json();
       })
       .then((json: ChartData) => setData(json))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [code, company]);
+  }, [code, company, timeframe]);
 
   // TradingView Lightweight Charts 렌더링
   useEffect(() => {
@@ -67,7 +130,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
 
     let cancelled = false;
 
-    import("lightweight-charts").then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle }) => {
+    import("lightweight-charts").then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle, HistogramSeries }) => {
       if (cancelled || !chartRef.current) return;
 
       const chart = createChart(chartRef.current, {
@@ -102,7 +165,8 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
         wickDownColor: "#4d94ff",
       });
 
-      const candleData = data.candles.map((c) => ({
+      const candles = [...data.candles].sort((a, b) => a.date.localeCompare(b.date));
+      const candleData = candles.map((c) => ({
         time: `${c.date.slice(0, 4)}-${c.date.slice(4, 6)}-${c.date.slice(6, 8)}` as any,
         open: c.open,
         high: c.high,
@@ -111,19 +175,52 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
       }));
       candleSeries.setData(candleData);
 
-      // 볼린저 밴드 (상단/하단 라인)
-      const { bbUpper, bbMiddle, bbLower } = data.indicators;
-      if (bbUpper && bbMiddle && bbLower && data.candles.length > 0) {
-        const lastDate = data.candles[data.candles.length - 1].date;
-        const t = `${lastDate.slice(0, 4)}-${lastDate.slice(4, 6)}-${lastDate.slice(6, 8)}` as any;
+      // 거래량 막대와 20개 봉 평균 거래량 선
+      const volumeSeries = chart.addSeries(HistogramSeries, {
+        priceScaleId: "volume",
+        priceFormat: { type: "volume" },
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+      volumeSeries.setData(candles.map((candle, index) => ({
+        time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+        value: candle.volume,
+        color: index > 0 && candle.close >= candles[index - 1].close ? "rgba(255,77,77,0.55)" : "rgba(77,148,255,0.55)",
+      })));
+      chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+      const volumeAverageSeries = chart.addSeries(LineSeries, {
+        priceScaleId: "volume",
+        color: "#facc15",
+        lineWidth: 1,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+      volumeAverageSeries.setData(candles.map((candle, index) => ({
+        time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+        value: candles.slice(Math.max(0, index - 19), index + 1).reduce((sum, item) => sum + item.volume, 0) / Math.min(20, index + 1),
+      })));
 
-        const bbUpperSeries = chart.addSeries(LineSeries, { color: "rgba(255,77,77,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-        const bbMiddleSeries = chart.addSeries(LineSeries, { color: "rgba(255,255,255,0.25)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false, lineStyle: LineStyle.Dotted });
+      // 볼린저 밴드: 각 일봉 시점의 최근 20개 종가로 전체 구간을 계산한다.
+      if (candles.length >= 20) {
+        const bands = candles.slice(19).map((candle, index) => {
+          const end = index + 20;
+          const closes = candles.slice(end - 20, end).map((item) => item.close);
+          const middle = closes.reduce((sum, value) => sum + value, 0) / 20;
+          const variance = closes.reduce((sum, value) => sum + (value - middle) ** 2, 0) / 20;
+          const deviation = Math.sqrt(variance);
+          return {
+            time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+            upper: middle + 2 * deviation,
+            middle,
+            lower: middle - 2 * deviation,
+          };
+        });
+        const bbUpperSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.45)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
+        const bbMiddleSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.7)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false, lineStyle: LineStyle.Dotted });
         const bbLowerSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
-
-        bbUpperSeries.setData([{ time: t, value: bbUpper }]);
-        bbMiddleSeries.setData([{ time: t, value: bbMiddle }]);
-        bbLowerSeries.setData([{ time: t, value: bbLower }]);
+        bbUpperSeries.setData(bands.map((band) => ({ time: band.time, value: band.upper })));
+        bbMiddleSeries.setData(bands.map((band) => ({ time: band.time, value: band.middle })));
+        bbLowerSeries.setData(bands.map((band) => ({ time: band.time, value: band.lower })));
       }
 
       chart.timeScale().fitContent();
@@ -160,6 +257,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
   }, []);
 
   const indicators = data?.indicators;
+  const isUsChart = code.startsWith("US:");
   const rsiInfo = rsiLabel(indicators?.rsi14 ?? null);
   const bbInfo = bbLabel(data?.latestPrice ?? 0, indicators?.bbUpper ?? null, indicators?.bbLower ?? null);
   const isUp = data?.latestChangeRate?.startsWith("+") ?? false;
@@ -176,7 +274,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
             </div>
             {data && (
               <div className={styles.priceBlock}>
-                <span className={styles.price}>{formatDisplayNumber(data.latestPrice)}원</span>
+                <span className={styles.price}>{isUsChart ? "$" : ""}{formatDisplayNumber(data.latestPrice)}{isUsChart ? "" : "원"}</span>
                 <span className={isUp ? styles.changeUp : styles.changeDown}>
                   {data.latestChange} ({data.latestChangeRate})
                 </span>
@@ -186,8 +284,18 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
           <button className={styles.closeBtn} onClick={onClose} aria-label="닫기">✕</button>
         </div>
 
+        <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button></div>
+
         {/* 바디 */}
         <div className={styles.body}>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }} role="tablist" aria-label="차트 주기">
+            {([["D", "일봉"], ["W", "주봉"], ["M", "월봉"]] as const).map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setTimeframe(value)} aria-selected={timeframe === value}
+                style={{ padding: "8px 14px", borderRadius: "8px", background: timeframe === value ? "#00ffa3" : "rgba(148,163,184,.16)", color: timeframe === value ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
+                {label}
+              </button>
+            ))}
+          </div>
           {loading && (
             <div className={styles.chartWrap}>
               <div className={styles.chartLoading}>
@@ -205,58 +313,17 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
             </div>
           )}
 
-          {!loading && !error && data && (
-            <>
+          {error && activeTab === "fundamentals" && <FundamentalsPanel fundamentals={fallbackFundamentals} timeframe={timeframe} isUsChart={isUsChart} />}
+
+          {!loading && !error && data && activeTab === "chart" && (
+            <div id="chart-panel" role="tabpanel" aria-labelledby="chart-tab">
               {/* 캔들 차트 */}
               <div className={styles.chartWrap} ref={chartRef} />
+              <IndicatorCharts candles={data.candles} />
 
-              {/* 기술적 지표 카드 */}
-              <div className={styles.indicators}>
-                {/* RSI */}
-                <div className={styles.indicatorCard}>
-                  <span className={styles.indicatorLabel}>RSI (14)</span>
-                  <span className={`${styles.indicatorValue} ${rsiInfo.cls}`}>
-                    {indicators?.rsi14 !== null && indicators?.rsi14 !== undefined
-                      ? indicators.rsi14.toFixed(1)
-                      : "N/A"}
-                  </span>
-                  <span className={styles.indicatorSub}>{rsiInfo.text}</span>
-                </div>
-
-                {/* MACD */}
-                <div className={styles.indicatorCard}>
-                  <span className={styles.indicatorLabel}>MACD</span>
-                  <span className={`${styles.indicatorValue} ${
-                    (indicators?.macd ?? 0) >= 0 ? styles.macdPositive : styles.macdNegative
-                  }`}>
-                    {indicators?.macd !== null && indicators?.macd !== undefined
-                      ? formatDisplayNumber(indicators.macd)
-                      : "N/A"}
-                  </span>
-                  <span className={styles.indicatorSub}>
-                    시그널: {indicators?.macdSignal == null ? "N/A" : formatDisplayNumber(indicators.macdSignal)} &nbsp;|&nbsp;
-                    히스토: <span className={(indicators?.macdHist ?? 0) >= 0 ? styles.macdPositive : styles.macdNegative}>
-                      {indicators?.macdHist == null ? "N/A" : formatDisplayNumber(indicators.macdHist)}
-                    </span>
-                  </span>
-                </div>
-
-                {/* 볼린저 밴드 */}
-                <div className={styles.indicatorCard}>
-                  <span className={styles.indicatorLabel}>볼린저 밴드</span>
-                  <span className={styles.indicatorValue} style={{ fontSize: "14px" }}>
-                    {indicators?.bbUpper == null ? "N/A" : formatDisplayNumber(indicators.bbUpper)}
-                  </span>
-                  <span className={styles.indicatorSub}>
-                    중: {indicators?.bbMiddle == null ? "-" : formatDisplayNumber(indicators.bbMiddle)} &nbsp;|&nbsp;
-                    하: {indicators?.bbLower == null ? "-" : formatDisplayNumber(indicators.bbLower)}
-                    <br />
-                    <span className={bbInfo.cls}>{bbInfo.text}</span>
-                  </span>
-                </div>
-              </div>
-            </>
+            </div>
           )}
+          {!loading && data && activeTab === "fundamentals" && <div id="fundamentals-panel" role="tabpanel" aria-labelledby="fundamentals-tab"><FundamentalsPanel data={data} timeframe={timeframe} isUsChart={isUsChart} /></div>}
         </div>
       </div>
     </div>,
