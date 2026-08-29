@@ -4,11 +4,8 @@ import { useEffect, useState } from "react";
 import { GLOBAL_POLLING_INTERVAL, PAGE_SIZE } from "@/lib/constants";
 import { formatTime, getJudgmentStatus, paginateItems, sortByPublishedAtDesc } from "@/lib/utils";
 import type { DartItem, DartJudgment, SecItem, SecSentiment } from "@/lib/types";
-import { calculateMarketSentiment } from "@/lib/scoring";
 import { PageNavigation } from "./page-navigation";
 import { getWatchlist, toggleWatchlist } from "@/lib/watchlist";
-import { MarketSentiment } from "./market-sentiment";
-import { SectorMap } from "./sector-map";
 import { CompanyTimeline } from "./company-timeline";
 import { ContractBadge } from "./contract-badge";
 import styles from "./feed-page.module.css";
@@ -233,11 +230,6 @@ export function FeedPage(props: FeedPageProps) {
   const dartItems = paginateItems(rawDartItems, currentPage, PAGE_SIZE);
   const secItems = paginateItems(rawSecItems, currentPage, PAGE_SIZE);
 
-  // 모듈화된 함수 사용
-  const { score: sentimentScore, label: sentimentLabel } = calculateMarketSentiment(
-    props.type === "dart" ? rawDartItems : rawSecItems
-  );
-
   return (
     <main className={styles.page}>
       <PageNavigation current={props.type} />
@@ -248,10 +240,6 @@ export function FeedPage(props: FeedPageProps) {
           <div className={styles.heroMain}>
           <p className={styles.heroDescription}>{props.description}</p>
           <h1 className={styles.heroTitle}>{props.title}</h1>
-          <div className={styles.sentimentWrap}>
-            <MarketSentiment score={sentimentScore} label={sentimentLabel} />
-            <SectorMap items={props.type === "dart" ? rawDartItems : rawSecItems} />
-          </div>
           </div>
         </div>
         <div className={styles.statusCard}>
