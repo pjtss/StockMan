@@ -1,5 +1,13 @@
 CREATE TABLE IF NOT EXISTS kr_common_stock_universe (LIKE kr_instrument_universe INCLUDING DEFAULTS INCLUDING GENERATED INCLUDING IDENTITY INCLUDING STORAGE);
 CREATE TABLE IF NOT EXISTS kr_special_instrument_universe (LIKE kr_instrument_universe INCLUDING DEFAULTS INCLUDING GENERATED INCLUDING IDENTITY INCLUDING STORAGE);
+-- LIKE ... INCLUDING DEFAULTS copies the legacy sequence reference. Detach it
+-- before dropping the source table, then give each split table its own sequence.
+CREATE SEQUENCE IF NOT EXISTS kr_common_stock_universe_id_seq;
+CREATE SEQUENCE IF NOT EXISTS kr_special_instrument_universe_id_seq;
+ALTER TABLE kr_common_stock_universe ALTER COLUMN id SET DEFAULT nextval('kr_common_stock_universe_id_seq');
+ALTER TABLE kr_special_instrument_universe ALTER COLUMN id SET DEFAULT nextval('kr_special_instrument_universe_id_seq');
+SELECT setval('kr_common_stock_universe_id_seq', GREATEST(COALESCE((SELECT MAX(id) FROM kr_common_stock_universe), 0) + 1, 1), false);
+SELECT setval('kr_special_instrument_universe_id_seq', GREATEST(COALESCE((SELECT MAX(id) FROM kr_special_instrument_universe), 0) + 1, 1), false);
 ALTER TABLE kr_common_stock_universe ADD CONSTRAINT kr_common_stock_universe_market_code_unique UNIQUE (market, code);
 ALTER TABLE kr_special_instrument_universe ADD CONSTRAINT kr_special_instrument_universe_market_code_unique UNIQUE (market, code);
 
