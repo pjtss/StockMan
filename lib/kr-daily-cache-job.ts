@@ -41,11 +41,11 @@ async function run(job: Job) {
     // The current-day candle is partial during market hours, so refresh it
     // frequently while keeping weekly/monthly traffic bounded.
     // 일봉·주봉은 매일 1회, 월봉은 주 1회 갱신한다. 실패한 캔들은 retry queue가 우선한다.
-    const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 24 * 60 * 60 * 1000 } as const;
+    const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
     const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM kr_instrument_universe_candles GROUP BY timeframe`);
     const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
     const missingDailyPayload = await getDb().execute(sql`SELECT COUNT(*) AS count FROM kr_instrument_universe_candles WHERE timeframe = 'D' AND COALESCE(raw_payload, '') = ''`);
-    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => timeframe === "D" && (Number((missingDailyPayload.rows[0] as any)?.count ?? 0) > 0 || !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]));
+    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (timeframe === "D" && Number((missingDailyPayload.rows[0] as any)?.count ?? 0) > 0) || !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
     const retryRows = await loadDueCandleCacheRetries();
     const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
     for (const row of retryRows) if (!dueTimeframes.includes(row.timeframe)) dueTimeframes.push(row.timeframe);
