@@ -15,7 +15,6 @@ type PageKey =
   | "scanners-us"
   | "us-intensity"
   | "us-ams-scout"
-  | "us-news"
   | "multi-timeframe-rebound"
   | "charts"
   | "admin"
@@ -36,9 +35,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
           DART
         </Link>
 
-        <Link className={current === "us-news" ? styles.navActive : styles.navLink} href="/scanners/us/news" prefetch={false}>
-          미국 뉴스 조회
-        </Link>
         <Link
           className={current === "us-ams-scout" ? styles.navActive : styles.navLink}
           href="/scanners/us/ams-scout"
