@@ -14,7 +14,6 @@ type PageKey =
   | "notifications"
   | "scanners-us"
   | "us-intensity"
-  | "us-ams-scout"
   | "multi-timeframe-rebound"
   | "charts"
   | "admin"
@@ -35,13 +34,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
           DART
         </Link>
 
-        <Link
-          className={current === "us-ams-scout" ? styles.navActive : styles.navLink}
-          href="/scanners/us/ams-scout"
-          prefetch={false}
-        >
-          AMS 급등주 탐색
-        </Link>
         <Link className={current === "multi-timeframe-rebound" ? styles.navActive : styles.navLink} href="/scanners/multi-timeframe-rebound" prefetch={false}>
           일·주·월봉 탐지
         </Link>
