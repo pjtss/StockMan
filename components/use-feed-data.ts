@@ -20,7 +20,14 @@ export function useFeedData(type: FeedType) {
     async function load() {
       try {
         const response = await fetch(endpoint, { cache: "no-store" });
-        if (!response.ok) throw new Error("RSS 응답을 가져오는 데 실패했습니다.");
+        if (!response.ok) {
+          let message = "RSS 응답을 가져오는 데 실패했습니다.";
+          try {
+            const body = await response.json() as { error?: string };
+            if (body.error) message = body.error;
+          } catch { /* non-JSON error response */ }
+          throw new Error(message);
+        }
         if (type === "dart") {
           const data = (await response.json()) as FeedPayload<DartItem>;
           if (!cancelled) setDartData(data);
