@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import styles from "./page-navigation.module.css";
-import { ThemeToggle } from "./theme-toggle";
 
 type PageKey =
   | "home"
@@ -48,7 +47,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
           알림 설정
         </Link>
       </nav>
-      <ThemeToggle />
     </header>
   );
 }
