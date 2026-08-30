@@ -1,0 +1,3 @@
+import { NextResponse } from "next/server"; import { createComment } from "@/lib/inquiries"; import { getRequestIdentity } from "@/lib/request-identity";
+import { validateCommentInput } from "@/lib/inquiry-validation";
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){const body=await request.json().catch(()=>({}));const input=validateCommentInput(body.content);if(!input.ok)return NextResponse.json({error:input.error},{status:400});await createComment(Number((await params).id),input.content,getRequestIdentity(request));return NextResponse.json({ok:true},{status:201});}

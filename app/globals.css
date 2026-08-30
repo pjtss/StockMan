@@ -1,6 +1,7 @@
 /* ========== DARK THEME (default) ========== */
 :root,
 [data-theme="dark"] {
+  color-scheme: dark;
   --background: #050b12;
   --foreground: #e8eef5;
   --card: rgba(7, 12, 20, 0.94);
@@ -56,6 +57,7 @@
 
 /* ========== LIGHT THEME ========== */
 [data-theme="light"] {
+  color-scheme: light;
   --background: #f0f4f8;
   --foreground: #0f172a;
   --card: rgba(255, 255, 255, 0.85);
@@ -131,8 +133,12 @@ html, body {
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at 8% -10%, var(--body-gradient-1), transparent 32rem),
+    radial-gradient(circle at 92% 0%, var(--body-gradient-2), transparent 30rem),
+    var(--background);
   background-attachment: fixed;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* Custom Scrollbar */
@@ -157,6 +163,17 @@ a {
   transition: all 0.2s ease;
 }
 
+.inquiryBoard, .inquiryForm { max-width: 860px; margin: 24px auto; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); }
+.inquiryBoardHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.inquiryBoardHead a, .inquiryForm button { padding: 10px 16px; border-radius: 10px; background: var(--primary); color: var(--primary-foreground); font-weight: 800; }
+.inquiryForm { display: grid; gap: 18px; }
+.inquiryForm label { display: grid; gap: 8px; color: var(--text-secondary); font-weight: 700; }
+.inquiryForm input, .inquiryForm textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--input); color: var(--foreground); font: inherit; }
+.inquiryForm textarea { resize: vertical; }
+.inquiryForm p { color: var(--destructive); }
+.inquiryList { display: grid; gap: 8px; }.inquiryRow { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--glass); }.inquiryRow small, .inquiryRow span, .inquiryMeta { color: var(--text-muted); font-size: 12px; }.inquiryRow span { grid-column: 2; grid-row: 1 / span 2; align-self: center; }.inquiryContent { min-height: 180px; margin: 24px 0; padding: 20px 0; white-space: pre-wrap; line-height: 1.8; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }.inquiryInteraction { display: grid; gap: 12px; margin-bottom: 22px; }.inquiryInteraction button { width: fit-content; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--secondary); color: var(--foreground); font-weight: 700; }.inquiryInteraction textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--input); color: var(--foreground); font: inherit; }.inquiryComment { padding: 12px 0; border-bottom: 1px solid var(--border); }.inquiryComment p { margin-top: 5px; white-space: pre-wrap; }
+@media (max-width: 600px) { .inquiryRow { grid-template-columns: 1fr; }.inquiryRow span { grid-column: auto; grid-row: auto; }.inquiryBoard, .inquiryForm { padding: 18px; } }
+
 button {
   cursor: pointer;
   border: none;
@@ -175,6 +192,22 @@ button {
     transform: translateY(0);
   }
 }
+
+.fireworksOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.fireworksOverlay[data-active="true"] {
+  opacity: 1;
+}
+
+.dragonThreatOverlay { position: fixed; inset: 0; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 220ms ease; }
+.dragonThreatOverlay[data-active="true"] { opacity: 1; }
 
 @keyframes glow {
   0% { box-shadow: 0 0 5px rgba(0, 255, 163, 0.2); }
