@@ -14,9 +14,7 @@ type PageKey =
   | "notifications"
   | "scanners-us"
   | "us-intensity"
-  | "multi-timeframe-rebound"
   | "charts"
-  | "admin"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
@@ -34,9 +32,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
           DART
         </Link>
 
-        <Link className={current === "multi-timeframe-rebound" ? styles.navActive : styles.navLink} href="/scanners/multi-timeframe-rebound" prefetch={false}>
-          일·주·월봉 탐지
-        </Link>
         <Link className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
           티커 차트
         </Link>
@@ -46,9 +41,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
           prefetch={false}
         >
           알림 설정
-        </Link>
-        <Link className={current === "admin" ? styles.navActive : styles.navLink} href="/admin" prefetch={false}>
-          관리자
         </Link>
       </nav>
       <ThemeToggle />
