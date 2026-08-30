@@ -50,18 +50,19 @@ function indicatorLines(candles: OHLCVCandle[]): IndicatorLine[] {
     if (i === 0) obvValue = volumes[i]; else obvValue += closes[i] > closes[i - 1] ? volumes[i] : closes[i] < closes[i - 1] ? -volumes[i] : 0;
     const range = highs[i] - lows[i]; adlValue += range > 0 ? (((closes[i] - lows[i]) - (highs[i] - closes[i])) / range) * volumes[i] : 0;
     obv.push(obvValue); adl.push(adlValue);
-    const rsiWindow = closes.slice(Math.max(1, i - 13), i + 1).map((value, j, array) => j === 0 ? 0 : value - array[j - 1]);
-    const gains = rsiWindow.filter((v) => v > 0), losses = rsiWindow.filter((v) => v < 0).map((v) => -v);
-    const avgGain = gains.length ? gains.reduce((a, b) => a + b, 0) / 14 : 0, avgLoss = losses.length ? losses.reduce((a, b) => a + b, 0) / 14 : 0;
+    const rsiStart = Math.max(1, i - 13);
+    const rsiDiffs = closes.slice(rsiStart, i + 1).map((value, j) => value - closes[rsiStart + j - 1]);
+    const gains = rsiDiffs.map((v) => Math.max(v, 0)), losses = rsiDiffs.map((v) => Math.max(-v, 0));
+    const avgGain = gains.reduce((a, b) => a + b, 0) / 14, avgLoss = losses.reduce((a, b) => a + b, 0) / 14;
     rsi.push(i < 14 ? null : avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
-    const typical = candles.slice(Math.max(0, i - 13), i + 1).map((c) => (c.high + c.low + c.close) / 3), money = candles.slice(Math.max(0, i - 13), i + 1).map((c) => ((c.high + c.low + c.close) / 3) * c.volume);
-    const positive = money.filter((_, j) => j === 0 || typical[j] >= typical[j - 1]).reduce((a, b) => a + b, 0), negative = money.filter((_, j) => j > 0 && typical[j] < typical[j - 1]).reduce((a, b) => a + b, 0);
+    const typical = candles.slice(Math.max(0, i - 14), i + 1).map((c) => (c.high + c.low + c.close) / 3);
+    let positive = 0, negative = 0;
+    for (let j = 1; j < typical.length; j++) { const flow = typical[j] * candles[Math.max(0, i - 14) + j].volume; if (typical[j] > typical[j - 1]) positive += flow; else if (typical[j] < typical[j - 1]) negative += flow; }
     mfi.push(i < 14 ? null : negative === 0 ? 100 : 100 - 100 / (1 + positive / negative));
     macd.push(macdRaw[i]); macdSignal.push(signalRaw[i]);
-    const tr = i === 0 ? highs[i] - lows[i] : Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
-    const up = i === 0 ? 0 : Math.max(highs[i] - highs[i - 1], 0), down = i === 0 ? 0 : Math.max(lows[i - 1] - lows[i], 0);
-    const atr = candles.slice(Math.max(0, i - 13), i + 1).reduce((sum, _, j) => sum + (j === 0 ? tr : Math.max(highs[Math.max(0, i - 13) + j] - lows[Math.max(0, i - 13) + j], 0)), 0) / 14;
-    dmiPlus.push(i < 14 ? null : atr ? (up / atr) * 100 : 0); dmiMinus.push(i < 14 ? null : atr ? (down / atr) * 100 : 0);
+    const dmiStart = Math.max(1, i - 13); let trSum = 0, plusSum = 0, minusSum = 0;
+    for (let j = dmiStart; j <= i; j++) { const tr = Math.max(highs[j] - lows[j], Math.abs(highs[j] - closes[j - 1]), Math.abs(lows[j] - closes[j - 1])); const upMove = highs[j] - highs[j - 1], downMove = lows[j - 1] - lows[j]; trSum += tr; plusSum += upMove > downMove && upMove > 0 ? upMove : 0; minusSum += downMove > upMove && downMove > 0 ? downMove : 0; }
+    dmiPlus.push(i < 14 ? null : trSum ? (plusSum / trSum) * 100 : 0); dmiMinus.push(i < 14 ? null : trSum ? (minusSum / trSum) * 100 : 0);
     const low14 = Math.min(...lows.slice(Math.max(0, i - 13), i + 1)), high14 = Math.max(...highs.slice(Math.max(0, i - 13), i + 1));
     stochastic.push(i < 13 || high14 === low14 ? null : ((closes[i] - low14) / (high14 - low14)) * 100);
   }
@@ -123,7 +124,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
 
   // TradingView Lightweight Charts 렌더링
   useEffect(() => {
-    if (!data || !chartRef.current) return;
+    if (activeTab !== "chart" || !data || !chartRef.current) return;
 
     // cleanup previous instance
     if (cleanupRef.current) cleanupRef.current();
@@ -246,8 +247,9 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
 
     return () => {
       cancelled = true;
+      if (cleanupRef.current) cleanupRef.current();
     };
-  }, [data]);
+  }, [data, activeTab]);
 
   // cleanup on unmount
   useEffect(() => {

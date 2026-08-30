@@ -24,6 +24,8 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "instrument_fundamental_snapshots",
   "kis_tokens",
   "kis_token_issuance_history",
+  "debug_run_items",
+  "debug_kis_calls",
 ] as const;
 
 /** Tables removed by V70 and not allowed in the active architecture. */

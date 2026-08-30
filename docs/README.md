@@ -22,6 +22,8 @@
 - 국내·해외 전체 종목 통합 유니버스 동기화 설계: [`architecture/instrument-universe-sync.md`](./architecture/instrument-universe-sync.md)
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
+- 프로젝트 전체 디버깅 구조: [`DEBUGGING_ARCHITECTURE.md`](./DEBUGGING_ARCHITECTURE.md)
+- 일·주·월봉 캐시 갱신: [`CANDLE_REFRESH_DESIGN.md`](./CANDLE_REFRESH_DESIGN.md)
 - 볼린저밴드 탐지 계약: [`bollinger-band-operations.md`](./bollinger-band-operations.md)
 - 관리자 모듈 그룹: [`admin-module-groups.md`](./admin-module-groups.md)
 - 외부 공식 문서 인덱스: [`references/README.md`](./references/README.md)

@@ -27,6 +27,7 @@ export type AutomationDebugRun = {
   errorDiagnostics?: ErrorDiagnostics;
   summary?: unknown;
   errorMessage: string | null;
+  items?: Array<Record<string, unknown>>;
 };
 
 type AutomationDebugDbRow = {
@@ -202,6 +203,14 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
       ORDER BY started_at DESC`,
     recentParams,
   );
+  const recentRunIds = recentRows.rows.map((row) => Number(row.id)).filter(Number.isFinite);
+  let itemRows: { rows: Array<Record<string, unknown>> } = { rows: [] };
+  if (recentRunIds.length) {
+    try { itemRows = await pool.query(`SELECT run_id, market, code, timeframe, status, attempt_count, started_at, completed_at, duration_ms, error_category, error_code, error_message, metadata FROM debug_run_items WHERE run_id = ANY($1::bigint[]) ORDER BY completed_at DESC NULLS LAST`, [recentRunIds]); }
+    catch (error) { console.warn("[AutomationDebug] debug_run_items unavailable; continuing without item details:", error instanceof Error ? error.message : error); }
+  }
+  const itemsByRun = new Map<number, Array<Record<string, unknown>>>();
+  for (const row of itemRows.rows) { const key = Number(row.run_id); const items = itemsByRun.get(key) || []; items.push(row); itemsByRun.set(key, items); }
 
   const failureParams = [...statsParams, failureLimit];
   const failureRows = await pool.query<AutomationDebugDbRow>(
@@ -253,6 +262,7 @@ export async function loadAutomationDebugSnapshot(filter: AutomationDebugFilter 
   const runsByModule = new Map<string, AutomationDebugRun[]>();
   const recentRuns = recentRows.rows.map((row) => {
     const run = normalizeAutomationDebugRun(row, includeSummary, staleAfterSeconds);
+    run.items = itemsByRun.get(run.id) || [];
     const runs = runsByModule.get(run.moduleKey) || [];
     runs.push(run);
     runsByModule.set(run.moduleKey, runs);

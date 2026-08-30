@@ -14,6 +14,7 @@ type Run = {
   durationMs?: number | null;
   observability?: { requestId?: string | null; cronRunId?: string | null; durationMs?: number | null };
   summary?: Record<string, unknown>;
+  items?: Array<Record<string, unknown>>;
   errorMessage?: string | null;
 };
 
@@ -156,6 +157,7 @@ export function AdminObservability() {
                 <header className={styles.runHeader}><strong>{run.status}</strong><time>{formatDate(run.startedAt)}</time></header>
                 {(run.observability?.requestId || run.durationMs != null) && <p className={styles.runMeta}>requestId: {run.observability?.requestId || "-"} · duration: {run.durationMs ?? run.observability?.durationMs ?? "-"}ms</p>}
                 {run.errorMessage && <p className={styles.runError}>{run.errorMessage}</p>}
+                {(run.items?.length ?? 0) > 0 && <p className={styles.runMeta}>종목별 진단 {run.items?.length}건 · 실패 {run.items?.filter((item) => item.status === "FAILED").length ?? 0}건</p>}
                 <pre>{JSON.stringify(run.summary || {}, null, 2)}</pre>
               </article>
             ))}

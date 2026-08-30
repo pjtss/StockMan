@@ -292,6 +292,13 @@ export const automationRuns = pgTable("automation_runs", {
   errorMessage: text("error_message"),
 });
 
+export const debugRunItems = pgTable("debug_run_items", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  runId: bigint("run_id", { mode: "number" }).notNull(),
+  market: text("market"), code: text("code"), timeframe: text("timeframe"), status: text("status").notNull(),
+  attemptCount: integer("attempt_count").notNull().default(0), startedAt: timestamp("started_at", { withTimezone: true }), completedAt: timestamp("completed_at", { withTimezone: true }), durationMs: integer("duration_ms"), errorCategory: text("error_category"), errorCode: text("error_code"), errorMessage: text("error_message"), metadata: jsonb("metadata").notNull().default({}),
+}, (table) => [index("debug_run_items_run_idx").on(table.runId), index("debug_run_items_error_idx").on(table.status, table.completedAt)]);
+
 export const automationNotificationDeliveries = pgTable("automation_notification_deliveries", {
   moduleKey: text("module_key").notNull(), deliveryDate: text("delivery_date").notNull(), status: text("status").notNull().default("PENDING"), attempts: integer("attempts").notNull().default(0), sentAt: timestamp("sent_at", { withTimezone: true }), lastError: text("last_error"), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("automation_notification_deliveries_pk").on(table.moduleKey, table.deliveryDate)]);

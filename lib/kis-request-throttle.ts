@@ -1,3 +1,6 @@
+import { createDebugContext, type DebugContext } from "@/lib/debug-context";
+import { writeDebugLog } from "@/lib/debug-logger";
+
 /** Serializes KIS calls in this process and backs off on gateway rate limits. */
 // Keep the default at the documented live-account ceiling (TPS 18), while
 // allowing operations to choose a more conservative fixed interval.
@@ -36,8 +39,10 @@ export function classifyKisFailure(result: any): "RATE_LIMITED" | "TRANSIENT_HTT
   return null;
 }
 
-export async function withKisRequestThrottle<T>(request: () => Promise<T>): Promise<T> {
+export async function withKisRequestThrottle<T>(request: () => Promise<T>, context?: DebugContext): Promise<T> {
+  const trace = context ?? createDebugContext({ feature: "kis-api" });
   for (let attempt = 0; ; attempt += 1) {
+    const attemptStartedAt = Date.now();
     const release = await acquire();
     try {
       const result = await request();
@@ -53,10 +58,12 @@ export async function withKisRequestThrottle<T>(request: () => Promise<T>): Prom
         }
       }
       if (!(failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP") || attempt >= RETRY_DELAYS_MS.length) return result;
+      writeDebugLog("WARN", "kis_api_retry_scheduled", trace, { attempt: attempt + 1, failure, delayMs: RETRY_DELAYS_MS[attempt], durationMs: Date.now() - attemptStartedAt, retryable: true });
       await sleep(RETRY_DELAYS_MS[attempt]);
       continue;
     } catch (error) {
       if (attempt >= RETRY_DELAYS_MS.length) throw error;
+      writeDebugLog("WARN", "kis_api_retry_scheduled", trace, { attempt: attempt + 1, failure: "NETWORK", delayMs: RETRY_DELAYS_MS[attempt], durationMs: Date.now() - attemptStartedAt, retryable: true, error: error instanceof Error ? error.message : String(error) });
       await sleep(RETRY_DELAYS_MS[attempt]);
       continue;
     } finally {

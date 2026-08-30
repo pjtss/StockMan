@@ -7,6 +7,7 @@ import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
 import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
 import { refreshDailyBollingerCaches, refreshDailyGoldenCrossCache } from "@/lib/daily-cache-followup";
 import { upsertWeeklyFromDaily } from "@/lib/daily-to-weekly-upsert";
+import { measureCandleRefresh } from "@/lib/candle-refresh-observability";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -57,13 +58,14 @@ async function run(job: Job) {
         const item = scopes[cursor++];
         if (!item) return;
         try {
-          const [daily, weekly, monthly] = await Promise.all([dueTimeframes.includes("D") ? refreshKrDailyCandles(item.code, "D", item.market) : null, dueTimeframes.includes("W") ? refreshKrDailyCandles(item.code, "W", item.market) : null, dueTimeframes.includes("M") ? refreshKrDailyCandles(item.code, "M", item.market) : null]);
-          const result = { market: item.market, code: item.code, daily: daily?.diagnostics ?? null, weekly: weekly?.diagnostics ?? null, monthly: monthly?.diagnostics ?? null };
+          const [dailyMeasured, weeklyMeasured, monthlyMeasured] = await Promise.all([dueTimeframes.includes("D") ? measureCandleRefresh({market:item.market,timeframe:"D",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"D",item.market); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null, dueTimeframes.includes("W") ? measureCandleRefresh({market:item.market,timeframe:"W",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"W",item.market); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null, dueTimeframes.includes("M") ? measureCandleRefresh({market:item.market,timeframe:"M",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"M",item.market); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null]);
+          const daily=dailyMeasured?.value, weekly=weeklyMeasured?.value, monthly=monthlyMeasured?.value;
+          const result = { market: item.market, code: item.code, daily: (daily as any)?.diagnostics ?? null, weekly: (weekly as any)?.diagnostics ?? null, monthly: (monthly as any)?.diagnostics ?? null };
           if (Number(result.daily?.parsedCandleCount ?? 0) > 0) dailySuccessCount += 1;
           job.results.push(result);
           const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
           const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0);
-          for (const timeframe of dueTimeframes) { const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly; if (Number(diagnostic?.parsedCandleCount ?? 0) > 0 && (retryKeys.has(`${key}:${timeframe}`) || retryRows.length > 0)) await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe }); }
+          for (const timeframe of dueTimeframes) { const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly; if (Number(diagnostic?.parsedCandleCount ?? 0) > 0 && retryKeys.has(`${key}:${timeframe}`)) await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe }); }
           if (success) job.successCount += 1;
           else {
             job.failureCount += 1;
@@ -89,6 +91,11 @@ async function run(job: Job) {
     // the fan-out below KIS per-second limits instead of creating bursts.
     await Promise.all(Array.from({ length: Math.min(2, Math.max(1, scopes.length)) }, worker));
     job.status = "COMPLETED";
+    (job as any).debugItems = job.results.flatMap((item: any) => ([
+      item.daily ? { market: item.market, code: item.code, timeframe: "D", status: Number(item.daily.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.daily.msg1 ?? null, metadata: item.daily } : null,
+      item.weekly ? { market: item.market, code: item.code, timeframe: "W", status: Number(item.weekly.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.weekly.msg1 ?? null, metadata: item.weekly } : null,
+      item.monthly ? { market: item.market, code: item.code, timeframe: "M", status: Number(item.monthly.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.monthly.msg1 ?? null, metadata: item.monthly } : null,
+    ].filter(Boolean)));
     (job as any).dailySuccessCount = dailySuccessCount;
     (job as any).weeklyDerived = await upsertWeeklyFromDaily("KR", { runDailyTotal: scopes.length, runDailySuccess: dailySuccessCount });
     // Partial KIS failures must not block follow-up caches for instruments

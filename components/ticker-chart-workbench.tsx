@@ -4,11 +4,32 @@ import { useEffect, useMemo, useState } from "react";
 import { ChartModal } from "@/components/chart-modal";
 import styles from "./ticker-chart-workbench.module.css";
 
+function HelpMark({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return <span style={{ position: "relative", display: "inline-block" }} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <button type="button" aria-label={`도움말: ${text}`} aria-expanded={open} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} style={{ display: "inline-grid", placeItems: "center", width: 16, height: 16, marginLeft: 5, padding: 0, border: "1px solid #64748b", borderRadius: "50%", background: "rgba(51,65,85,.55)", color: "#e2e8f0", fontSize: 10, fontWeight: 800, lineHeight: 1, cursor: "help", verticalAlign: "1px" }}>?</button>
+    {open && <span role="tooltip" style={{ position: "absolute", zIndex: 30, left: "50%", bottom: "calc(100% + 9px)", width: 245, transform: "translateX(-50%)", padding: "10px 12px", border: "1px solid rgba(148,163,184,.35)", borderRadius: 10, background: "#111827", color: "#e5e7eb", fontSize: 12, fontWeight: 500, lineHeight: 1.5, textAlign: "left", boxShadow: "0 12px 28px rgba(2,6,23,.42)", pointerEvents: "none" }}>{text}<span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: -5, width: 9, height: 9, transform: "translateX(-50%) rotate(45deg)", background: "#111827", borderRight: "1px solid rgba(148,163,184,.35)", borderBottom: "1px solid rgba(148,163,184,.35)" }} /></span>}
+  </span>;
+}
+
 export function TickerChartWorkbench() {
   const [input, setInput] = useState("");
   const [market, setMarket] = useState<"KR" | "US">("KR");
   const [names, setNames] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedMarket, setSelectedMarket] = useState<"KR" | "US">("KR");
+  const [minCap, setMinCap] = useState("1000");
+  const [maxCap, setMaxCap] = useState("");
+  const [minRvol, setMinRvol] = useState("0");
+  const [maxRvol, setMaxRvol] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [bbPosition, setBbPosition] = useState<"LOWER_TOUCH" | "BELOW_MIDDLE" | "ANY">("LOWER_TOUCH");
+  const [lowerTouch, setLowerTouch] = useState(true);
+  const [scanTimeframe, setScanTimeframe] = useState<"D" | "W" | "M">("D");
+  const [scanRows, setScanRows] = useState<any[]>([]);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const tickers = useMemo(
     () => [...new Set(input.split(/[,,\n\s]+/).map((value) => value.trim().toUpperCase()).filter(Boolean))],
     [input]
@@ -21,6 +42,11 @@ export function TickerChartWorkbench() {
       .then((json: { names?: Record<string, string> }) => setNames(json.names ?? {}))
       .catch(() => setNames({}));
   }, [market, tickers]);
+
+  async function runScan() {
+    setScanLoading(true); setScanError(null);
+    try { const prefix=scanTimeframe; const filters:any[]=[]; if(Number(minCap)>0)filters.push({field:"marketCap",operator:">=",value:Number(minCap)*100000000}); if(Number(maxCap)>0)filters.push({field:"marketCap",operator:"<=",value:Number(maxCap)*100000000}); if(Number(minRvol)>0)filters.push({field:`${prefix}.rvol`,operator:">=",value:Number(minRvol)}); if(Number(maxRvol)>0)filters.push({field:`${prefix}.rvol`,operator:"<=",value:Number(maxRvol)}); if(Number(minPrice)>0)filters.push({field:`${prefix}.close`,operator:">=",value:Number(minPrice)}); if(Number(maxPrice)>0)filters.push({field:`${prefix}.close`,operator:"<=",value:Number(maxPrice)}); if(bbPosition==="LOWER_TOUCH")filters.push({field:`${prefix}.bb.lowerTouch`,operator:"=",value:true}); if(bbPosition==="BELOW_MIDDLE")filters.push({field:`${prefix}.close`,operator:"<=",value:`${prefix}.bb.middle`}); const response=await fetch("/api/screener/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({market,timeframe:scanTimeframe,instrumentType:"COMMON_STOCK",status:"ACTIVE",filters,ranking:[{field:`${prefix}.rvol`,direction:"DESC"}],limit:100})}); const json=await response.json(); if(!response.ok)throw new Error(json.error??"추출 실패"); setScanRows(json.results??[]); } catch(error){setScanError(error instanceof Error?error.message:"추출 실패");} finally{setScanLoading(false);}
+  }
 
   return (
     <>
@@ -39,7 +65,23 @@ export function TickerChartWorkbench() {
           <button type="button" className={market === "US" ? styles.modeActive : styles.mode} onClick={() => setMarket("US")}>해외</button>
         </div>
         <p className={styles.hint}>쉼표, 공백, 줄바꿈으로 여러 종목을 입력할 수 있습니다. {market === "KR" ? "국내 종목코드" : "해외 티커"}를 입력하세요.</p>
+        <div className={styles.scanBox}>
+          <strong>조건으로 종목 추출</strong>
+          <div className={styles.scanFields}>
+            <label><span>기준 봉<HelpMark text="지표와 가격을 계산할 캔들 주기입니다." /></span><select value={scanTimeframe} onChange={e=>setScanTimeframe(e.target.value as "D"|"W"|"M")}><option value="D">일봉</option><option value="W">주봉</option><option value="M">월봉</option></select></label>
+            <label><span>최소 시총(억원)<HelpMark text="시가총액이 이 값 이상인 종목만 조회합니다. 국내는 억원 단위입니다." /></span><input value={minCap} onChange={e=>setMinCap(e.target.value)} /></label>
+            <label><span>최대 시총(억원)<HelpMark text="시가총액이 이 값 이하인 종목만 조회합니다. 비워 두면 상한이 없습니다." /></span><input value={maxCap} onChange={e=>setMaxCap(e.target.value)} /></label>
+            <label><span>최소 RVOL<HelpMark text="선택한 기준 봉의 RVOL이 이 값 이상인 종목만 조회합니다." /></span><input value={minRvol} onChange={e=>setMinRvol(e.target.value)} /></label>
+            <label><span>최대 RVOL<HelpMark text="선택한 기준 봉의 RVOL이 이 값 이하인 종목만 조회합니다." /></span><input value={maxRvol} onChange={e=>setMaxRvol(e.target.value)} /></label>
+            <label><span>최저 종가<HelpMark text="선택한 기준 봉의 종가가 이 값 이상인 종목만 조회합니다." /></span><input value={minPrice} onChange={e=>setMinPrice(e.target.value)} /></label>
+            <label><span>최고 종가<HelpMark text="선택한 기준 봉의 종가가 이 값 이하인 종목만 조회합니다." /></span><input value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} /></label>
+            <label><span>BB 위치<HelpMark text="하단 터치/이탈은 저가가 BB 하단에 닿거나 밑으로 내려간 경우입니다. 중단선 이하는 종가가 BB 중단선 이하인 경우입니다." /></span><select value={bbPosition} onChange={e=>setBbPosition(e.target.value as "LOWER_TOUCH"|"BELOW_MIDDLE"|"ANY")}><option value="LOWER_TOUCH">하단 터치/이탈</option><option value="BELOW_MIDDLE">중단선 이하</option><option value="ANY">제한 없음</option></select></label>
+            <button type="button" onClick={runScan} disabled={scanLoading}>{scanLoading?"추출 중…":"종목 추출"}</button>
+          </div>
+          {scanError&&<p className={styles.error}>{scanError}</p>}
+        </div>
       </section>
+      {scanRows.length > 0 && <section className={styles.results}><div className={styles.resultHeader}><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div><div className={styles.grid}>{scanRows.map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · RVOL {row.metrics?.["D.rvol"]==null?"-":Number(row.metrics["D.rvol"]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div></section>}
 
       <section className={styles.results} aria-live="polite">
         <div className={styles.resultHeader}>
@@ -57,7 +99,7 @@ export function TickerChartWorkbench() {
           </div>
         )}
       </section>
-      {selected && <ChartModal code={market === "US" ? `US:${selected}` : selected} company={names[selected] || selected} onClose={() => setSelected(null)} />}
+      {selected && <ChartModal code={selectedMarket === "US" ? `US:${selected}` : selected} company={names[selected] || selected} onClose={() => setSelected(null)} />}
     </>
   );
 }

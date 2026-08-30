@@ -99,6 +99,15 @@ export async function finishAutomationRun(id: number | undefined, status: "SUCCE
   await db.update(automationRuns).set({ status, finishedAt, durationMs, summary, errorMessage: errorMessage || null }).where(eq(automationRuns.id, id));
 }
 
+export async function recordDebugRunItems(runId: number | undefined, items: unknown) {
+  if (!runId || !Array.isArray(items) || items.length === 0) return 0;
+  const rows = items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"));
+  if (!rows.length) return 0;
+  const values = rows.map((item) => [runId, item.market ?? null, item.code ?? null, item.timeframe ?? null, item.status ?? "COMPLETED", item.attemptCount ?? 0, item.startedAt ?? null, item.completedAt ?? null, item.durationMs ?? null, item.errorCategory ?? null, item.errorCode ?? null, item.errorMessage ?? null, JSON.stringify(item.metadata ?? {})]);
+  const result = await getPool().query(`INSERT INTO debug_run_items (run_id, market, code, timeframe, status, attempt_count, started_at, completed_at, duration_ms, error_category, error_code, error_message, metadata) SELECT * FROM UNNEST($1::bigint[], $2::text[], $3::text[], $4::text[], $5::text[], $6::int[], $7::timestamptz[], $8::timestamptz[], $9::int[], $10::text[], $11::text[], $12::text[], $13::jsonb[])`, [values.map(v=>v[0]),values.map(v=>v[1]),values.map(v=>v[2]),values.map(v=>v[3]),values.map(v=>v[4]),values.map(v=>v[5]),values.map(v=>v[6]),values.map(v=>v[7]),values.map(v=>v[8]),values.map(v=>v[9]),values.map(v=>v[10]),values.map(v=>v[11]),values.map(v=>v[12])]);
+  return result.rowCount ?? 0;
+}
+
 export async function loadRecentAutomationRuns(moduleKey: FeatureModuleKey, limit = 20) {
   const db = getDb();
   return db.select().from(automationRuns).where(eq(automationRuns.moduleKey, moduleKey)).orderBy(desc(automationRuns.startedAt)).limit(limit);
