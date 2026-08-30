@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
-const envLine = fs.readFileSync(".env.local", "utf8").split(/\r?\n/).find((value) => /^DATABASE_URL\s*=/.test(value));
+const envFile = fs.existsSync(".env.local") ? fs.readFileSync(".env.local", "utf8") : "";
+const envLine = envFile.split(/\r?\n/).find((value) => /^DATABASE_URL\s*=/.test(value));
 if (envLine) process.env.DATABASE_URL = envLine.replace(/^DATABASE_URL\s*=\s*/, "").replace(/^\"|\"$/g, "");
 const { getPool } = await import("./db");
 const { toggleLike } = await import("./inquiries");
