@@ -1,10 +1,15 @@
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   width: 100%;
-  margin-bottom: 32px;
-  gap: 20px;
+  margin-bottom: 28px;
+  gap: 24px;
+  padding: 10px 12px;
+  border: 1px solid var(--nav-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--nav-bg) 72%, transparent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }
 
 .brand {
@@ -12,6 +17,9 @@
   align-items: center;
   gap: 8px;
   user-select: none;
+  text-decoration: none;
+  justify-self: start;
+  min-width: 0;
 }
 
 .logoIcon {
@@ -56,6 +64,18 @@
   width: max-content;
   max-width: 100%;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  justify-self: center;
+}
+
+.header > :last-child {
+  justify-self: end;
+}
+
+.brand:focus-visible,
+.navLink:focus-visible,
+.navActive:focus-visible {
+  outline: 2px solid #00e79b;
+  outline-offset: 3px;
 }
 
 .navLink,
@@ -114,17 +134,19 @@
 /* Mobile Responsive Optimization */
 @media (max-width: 768px) {
   .header {
+    display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    padding: 12px 8px;
     width: 100%;
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .brand {
     justify-content: center;
+    align-self: center;
   }
 
   .nav {
@@ -136,6 +158,8 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     justify-content: flex-start;
+    align-self: stretch;
+    overscroll-behavior-x: contain;
     scrollbar-width: none; /* Firefox */
   }
 
@@ -148,5 +172,16 @@
     padding: 8px 14px;
     font-size: 12px;
     flex: 1 0 auto;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logoIcon,
+  .nav,
+  .navLink,
+  .navActive {
+    animation: none;
+    transition: none;
   }
 }

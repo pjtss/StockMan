@@ -6,6 +6,7 @@
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
+  border-radius: 999px;
 }
 
 .track {
@@ -53,4 +54,16 @@
 .toggle:hover .track {
   border-color: var(--neon-green);
   box-shadow: 0 0 8px rgba(0, 255, 163, 0.2);
+}
+
+.toggle:focus-visible .track {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track,
+  .thumb {
+    transition: none;
+  }
 }

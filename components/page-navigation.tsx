@@ -15,27 +15,29 @@ type PageKey =
   | "scanners-us"
   | "us-intensity"
   | "charts"
+  | "inquiries"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
     <header className={styles.header}>
-      <div className={styles.brand}>
+      <Link className={styles.brand} href="/" aria-label="STOCKMAN QUANT 홈" prefetch={false}>
         <span className={styles.logoIcon}>⚡</span>
         <span className={styles.brandName}>STOCKMAN</span>
         <span className={styles.brandSubtitle}>QUANT</span>
-      </div>
-      <nav className={styles.nav}>
-        <Link className={current === "home" ? styles.navActive : styles.navLink} href="/" prefetch={false}>
+      </Link>
+      <nav className={styles.nav} aria-label="주요 메뉴">
+        <Link aria-current={current === "home" ? "page" : undefined} className={current === "home" ? styles.navActive : styles.navLink} href="/" prefetch={false}>
           홈
         </Link>
-        <Link className={current === "dart" ? styles.navActive : styles.navLink} href="/dart" prefetch={false}>
+        <Link aria-current={current === "dart" ? "page" : undefined} className={current === "dart" ? styles.navActive : styles.navLink} href="/dart" prefetch={false}>
           DART
         </Link>
 
-        <Link className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
+        <Link aria-current={current === "charts" ? "page" : undefined} className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
           티커 차트
         </Link>
         <Link
+          aria-current={current === "notifications" ? "page" : undefined}
           className={current === "notifications" ? styles.navActive : styles.navLink}
           href="/notifications"
           prefetch={false}
