@@ -30,6 +30,8 @@ export function TickerChartWorkbench() {
   const [scanRows, setScanRows] = useState<any[]>([]);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const capUnit = market === "KR" ? "억원" : "달러";
+  const capMultiplier = market === "KR" ? 100000000 : 1;
   const tickers = useMemo(
     () => [...new Set(input.split(/[,,\n\s]+/).map((value) => value.trim().toUpperCase()).filter(Boolean))],
     [input]
@@ -43,9 +45,14 @@ export function TickerChartWorkbench() {
       .catch(() => setNames({}));
   }, [market, tickers]);
 
+  useEffect(() => {
+    setMinCap(market === "KR" ? "1000" : "100000000");
+    setMaxCap("");
+  }, [market]);
+
   async function runScan() {
     setScanLoading(true); setScanError(null);
-    try { const prefix=scanTimeframe; const filters:any[]=[]; if(Number(minCap)>0)filters.push({field:"marketCap",operator:">=",value:Number(minCap)*100000000}); if(Number(maxCap)>0)filters.push({field:"marketCap",operator:"<=",value:Number(maxCap)*100000000}); if(Number(minRvol)>0)filters.push({field:`${prefix}.rvol`,operator:">=",value:Number(minRvol)}); if(Number(maxRvol)>0)filters.push({field:`${prefix}.rvol`,operator:"<=",value:Number(maxRvol)}); if(Number(minPrice)>0)filters.push({field:`${prefix}.close`,operator:">=",value:Number(minPrice)}); if(Number(maxPrice)>0)filters.push({field:`${prefix}.close`,operator:"<=",value:Number(maxPrice)}); if(bbPosition==="LOWER_TOUCH")filters.push({field:`${prefix}.bb.lowerTouch`,operator:"=",value:true}); if(bbPosition==="BELOW_MIDDLE")filters.push({field:`${prefix}.close`,operator:"<=",value:`${prefix}.bb.middle`}); const response=await fetch("/api/screener/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({market,timeframe:scanTimeframe,instrumentType:"COMMON_STOCK",status:"ACTIVE",filters,ranking:[{field:`${prefix}.rvol`,direction:"DESC"}],limit:100})}); const json=await response.json(); if(!response.ok)throw new Error(json.error??"추출 실패"); setScanRows(json.results??[]); } catch(error){setScanError(error instanceof Error?error.message:"추출 실패");} finally{setScanLoading(false);}
+    try { const prefix=scanTimeframe; const filters:any[]=[]; if(Number(minCap)>0)filters.push({field:"marketCap",operator:">=",value:Number(minCap)*capMultiplier}); if(Number(maxCap)>0)filters.push({field:"marketCap",operator:"<=",value:Number(maxCap)*capMultiplier}); if(Number(minRvol)>0)filters.push({field:`${prefix}.rvol`,operator:">=",value:Number(minRvol)}); if(Number(maxRvol)>0)filters.push({field:`${prefix}.rvol`,operator:"<=",value:Number(maxRvol)}); if(Number(minPrice)>0)filters.push({field:`${prefix}.close`,operator:">=",value:Number(minPrice)}); if(Number(maxPrice)>0)filters.push({field:`${prefix}.close`,operator:"<=",value:Number(maxPrice)}); if(bbPosition==="LOWER_TOUCH")filters.push({field:`${prefix}.bb.lowerTouch`,operator:"=",value:true}); if(bbPosition==="BELOW_MIDDLE")filters.push({field:`${prefix}.close`,operator:"<=",value:`${prefix}.bb.middle`}); const response=await fetch("/api/screener/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({market,timeframe:scanTimeframe,instrumentType:"COMMON_STOCK",status:"ACTIVE",filters,ranking:[{field:`${prefix}.rvol`,direction:"DESC"}],limit:100})}); const json=await response.json(); if(!response.ok)throw new Error(json.error??"추출 실패"); setScanRows(json.results??[]); } catch(error){setScanError(error instanceof Error?error.message:"추출 실패");} finally{setScanLoading(false);}
   }
 
   return (
@@ -69,8 +76,8 @@ export function TickerChartWorkbench() {
           <strong>조건으로 종목 추출</strong>
           <div className={styles.scanFields}>
             <label><span>기준 봉<HelpMark text="지표와 가격을 계산할 캔들 주기입니다." /></span><select value={scanTimeframe} onChange={e=>setScanTimeframe(e.target.value as "D"|"W"|"M")}><option value="D">일봉</option><option value="W">주봉</option><option value="M">월봉</option></select></label>
-            <label><span>최소 시총(억원)<HelpMark text="시가총액이 이 값 이상인 종목만 조회합니다. 국내는 억원 단위입니다." /></span><input value={minCap} onChange={e=>setMinCap(e.target.value)} /></label>
-            <label><span>최대 시총(억원)<HelpMark text="시가총액이 이 값 이하인 종목만 조회합니다. 비워 두면 상한이 없습니다." /></span><input value={maxCap} onChange={e=>setMaxCap(e.target.value)} /></label>
+            <label><span>최소 시총({capUnit})<HelpMark text={`시가총액이 이 값 이상인 종목만 조회합니다. 현재 단위는 ${market === "KR" ? "억원" : "미국 달러"}입니다.`} /></span><input inputMode="decimal" value={minCap} onChange={e=>setMinCap(e.target.value)} /></label>
+            <label><span>최대 시총({capUnit})<HelpMark text={`시가총액이 이 값 이하인 종목만 조회합니다. 현재 단위는 ${market === "KR" ? "억원" : "미국 달러"}입니다. 비워 두면 상한이 없습니다.`} /></span><input inputMode="decimal" value={maxCap} onChange={e=>setMaxCap(e.target.value)} /></label>
             <label><span>최소 RVOL<HelpMark text="선택한 기준 봉의 RVOL이 이 값 이상인 종목만 조회합니다." /></span><input value={minRvol} onChange={e=>setMinRvol(e.target.value)} /></label>
             <label><span>최대 RVOL<HelpMark text="선택한 기준 봉의 RVOL이 이 값 이하인 종목만 조회합니다." /></span><input value={maxRvol} onChange={e=>setMaxRvol(e.target.value)} /></label>
             <label><span>최저 종가<HelpMark text="선택한 기준 봉의 종가가 이 값 이상인 종목만 조회합니다." /></span><input value={minPrice} onChange={e=>setMinPrice(e.target.value)} /></label>
