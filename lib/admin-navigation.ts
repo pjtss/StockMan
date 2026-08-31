@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "modules" | "api-config" | "api-tests" | "daily-indicators" | "daily-rss" | "blacklist" | "sec-test" | "observability" | "stocktitan-rss" | "user-activity";
+export type AdminNavId = "dashboard" | "modules" | "api-config" | "api-tests" | "daily-indicators" | "daily-rss" | "blacklist" | "sec-test" | "observability" | "stocktitan-rss" | "user-activity" | "database";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -32,6 +32,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   { id: "stocktitan-rss", group: "진단", label: "RSS 공시", description: "출처·호재 등급별 원문·번역·알림 디버깅", href: "/admin/stocktitan-rss" },
   { id: "user-activity", group: "진단", label: "유저 행동", description: "요청 경로·사용자 키·오류 흐름 확인", href: "/admin/user-activity" },
+  { id: "database", group: "진단", label: "DB 데이터 조회", description: "테이블·컬럼·최근 저장 데이터 확인", href: "/admin/database" },
   { id: "daily-rss", group: "진단", label: "일별 RSS·SEC 복사", description: "날짜별 제목·링크·호재 등급 추출 및 복사", href: "/admin/daily-rss" },
   {
     id: "api-config",
