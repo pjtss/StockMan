@@ -1,13 +1,17 @@
 import type { MarketRssItem } from "./market-rss";
-import { LibreTranslateClient } from "./libretranslate-client";
 import type { TranslationClient } from "./translation-types";
+import { CloudTranslationClient } from "./cloud-translation-client";
+import { LibreTranslateClient } from "./libretranslate-client";
 
-export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translationFallback: boolean; translationFallbackReason?: string };
-export async function translateMarketRssItem(item: MarketRssItem, client: TranslationClient = new LibreTranslateClient()): Promise<TranslatedMarketRssItem> {
-  const title = await client.translate(item.title);
-  const summary = item.summary.trim() ? await client.translate(item.summary) : { translatedText: "", fallback: false, fallbackReason: undefined };
-  const fallbackReason = [title.fallbackReason, summary.fallbackReason].filter(Boolean).join(",") || undefined;
-  return { ...item, translatedTitle: title.translatedText, translatedSummary: summary.translatedText, translationFallback: title.fallback || summary.fallback, translationFallbackReason: fallbackReason };
+export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationFallback: boolean; translationFallbackReason?: string };
+export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient): Promise<TranslatedMarketRssItem> {
+  const selectedClient = client ?? CloudTranslationClient.fromEnvironment();
+  if (!selectedClient) return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "cloud_translation_not_configured" };
+  const title = await selectedClient.translate(item.title);
+  const summary = item.summary.trim() ? await selectedClient.translate(item.summary) : { translatedText: "", fallback: false, fallbackReason: undefined };
+  const content = item.content?.trim() ? await selectedClient.translate(item.content) : null;
+  const fallbackReason = [title.fallbackReason, summary.fallbackReason, content?.fallbackReason].filter(Boolean).join(",") || undefined;
+  return { ...item, translatedTitle: title.translatedText, translatedSummary: summary.translatedText, ...(content ? { translatedContent: content.translatedText } : {}), translationFallback: title.fallback || summary.fallback || Boolean(content?.fallback), translationFallbackReason: fallbackReason };
 }
 
 export async function translateMarketRssItems(items: MarketRssItem[], client: TranslationClient = new LibreTranslateClient()) {

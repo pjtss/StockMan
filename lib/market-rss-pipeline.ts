@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
 import { translateMarketRssItem } from "./translate-market-rss-item";
-import { LibreTranslateClient } from "./libretranslate-client";
+import { CloudTranslationClient } from "./cloud-translation-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
@@ -11,6 +11,8 @@ import { loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
+import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
+import { loadTranslationCache, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -44,6 +46,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         externalId: item.id,
         title: item.title,
         summary: item.summary,
+        content: item.content ?? "",
         rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
         sourceSnapshotId,
         detectedTicker: classification.ticker || mappedTicker,
@@ -58,7 +61,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         notifyEligible,
         isBacklog,
       }).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
-        title: sql`excluded.title`, summary: sql`excluded.summary`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
+        title: sql`excluded.title`, summary: sql`excluded.summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         link: sql`CASE WHEN ${marketRssArticles.link} = '' THEN excluded.link ELSE ${marketRssArticles.link} END`,
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,
         category: sql`excluded.category`, priority: sql`excluded.priority`,
@@ -76,16 +79,27 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
 
 export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
+  const client = CloudTranslationClient.fromEnvironment();
+  if (!client) return { attempted: 0, translated: 0, cached: 0, fallback: 0, failed: 0, skipped: true, reason: "cloud_translation_not_configured" };
   const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.translationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
-  const client = new LibreTranslateClient();
+  const cachedClient: TranslationClient = { translate: async (text: string, source: TranslationLanguage = "en", target: TranslationLanguage = "ko"): Promise<TranslationResult> => {
+    const provider = "google-cloud-translation";
+    const cached = await loadTranslationCache(text, provider, target);
+    if (cached) return { translatedText: cached.translatedText, source, target, provider, fallback: false };
+    const reservation = await reserveTranslationCharacters(text.length);
+    if (!reservation.allowed) return { translatedText: text, source, target, provider, fallback: true, fallbackReason: "monthly_character_limit_reached" };
+    const result = await client.translate(text, source, target);
+    if (!result.fallback) await saveTranslationCache(text, result.translatedText, provider, source, target);
+    return result;
+  } };
   let translated = 0;
   let fallback = 0;
   let failed = 0;
   const fallbackReasons: Record<string, number> = {};
   for (const row of rows) {
     try {
-      const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, client);
-      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translationFallback: result.translationFallback, translationError: result.translationFallbackReason || null, translationAttempts: row.translationAttempts + 1, translationStatus: result.translationFallback ? "FALLBACK" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient);
+      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translatedContent: result.translatedContent ?? null, translationProvider: "google-cloud-translation", translationCharCount: result.title.length + result.summary.length + (result.content?.length ?? 0), translationSkippedReason: result.translationFallbackReason ?? null, translationTranslatedAt: result.translationFallback ? null : new Date(), translationFallback: result.translationFallback, translationError: result.translationFallbackReason || null, translationAttempts: row.translationAttempts + 1, translationStatus: result.translationFallback ? "SKIPPED" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       translated++;
       if (result.translationFallback) {
         fallback++;

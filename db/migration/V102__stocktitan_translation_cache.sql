@@ -1,0 +1,10 @@
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT '';
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translated_content TEXT;
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_provider TEXT;
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_source_language TEXT NOT NULL DEFAULT 'en';
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_target_language TEXT NOT NULL DEFAULT 'ko';
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_char_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_skipped_reason TEXT;
+ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_translated_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS market_rss_translation_cache (id BIGSERIAL PRIMARY KEY, source_hash TEXT NOT NULL, source_text TEXT NOT NULL, translated_text TEXT NOT NULL, source_language TEXT NOT NULL DEFAULT 'en', target_language TEXT NOT NULL DEFAULT 'ko', provider TEXT NOT NULL, character_count INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (source_hash, target_language, provider));
+CREATE TABLE IF NOT EXISTS translation_usage_monthly (usage_month TEXT PRIMARY KEY, reserved_characters BIGINT NOT NULL DEFAULT 0, translated_characters BIGINT NOT NULL DEFAULT 0, limit_alerted BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
