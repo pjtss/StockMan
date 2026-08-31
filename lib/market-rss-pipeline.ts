@@ -7,12 +7,12 @@ import { CloudTranslationClient } from "./cloud-translation-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
-import { loadFeatureDiscordWebhook } from "./discord-config";
+import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
-import { loadTranslationCache, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
+import { claimTranslationLimitAlert, loadTranslationCache, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -95,6 +95,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   let translated = 0;
   let fallback = 0;
   let failed = 0;
+  let limitReached = false;
   const fallbackReasons: Record<string, number> = {};
   for (const row of rows) {
     try {
@@ -105,13 +106,22 @@ export async function translatePendingMarketRssArticles(limit = 10) {
         fallback++;
         const reason = result.translationFallbackReason || "unknown";
         fallbackReasons[reason] = (fallbackReasons[reason] || 0) + 1;
+        if (reason === "monthly_character_limit_reached") limitReached = true;
       }
     } catch (error) {
       failed++;
       await db.update(marketRssArticles).set({ translationStatus: "FAILED", translationAttempts: row.translationAttempts + 1, translationError: error instanceof Error ? error.message : String(error), updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
     }
   }
-  return { attempted: rows.length, translated, fallback, failed, fallbackReasons };
+  let limitAlertSent = false;
+  if (limitReached && await claimTranslationLimitAlert()) {
+    const webhook = await loadFeatureDiscordDebugWebhook("market-rss", ["STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL"]);
+    if (webhook) {
+      const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `⚠️ Cloud Translation 번역 중지\n사유: 월간 공백 포함 문자 한도(${(300000).toLocaleString()}자) 도달\n대상: StockTitan RSS` }) }).catch(() => null);
+      limitAlertSent = Boolean(response?.ok);
+    }
+  }
+  return { attempted: rows.length, translated, fallback, failed, fallbackReasons, limitReached, limitAlertSent };
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {
