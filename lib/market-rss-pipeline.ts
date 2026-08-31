@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
@@ -33,9 +33,12 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       // SEC filings without a preferred common-share mapping (for example
       // trusts, units and warrants) cannot produce a useful stock alert.
       // Keep the filing for diagnostics, but suppress the notification.
-      const notifyEligible = classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker));
+      // StockTitan is an explicit publisher feed requested for full delivery:
+      // every item is notification-eligible, while other sources keep their
+      // classifier and SEC ticker safeguards.
+      const notifyEligible = item.source === "STOCKTITAN" || (classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker)));
       const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
-      const isBacklog = Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
+      const isBacklog = item.source === "STOCKTITAN" ? false : Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
       const rows = await db.insert(marketRssArticles).values({
         source: item.source,
         externalId: item.id,
@@ -103,8 +106,8 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   const db = getDb();
   const now = Date.now();
   const staleCutoff = new Date(now - articleAgeLimitMs());
-  await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "backlog_or_stale_article", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), or(eq(marketRssArticles.isBacklog, true), lt(marketRssArticles.publishedAt, staleCutoff))));
-  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false), or(isNull(marketRssArticles.publishedAt), gte(marketRssArticles.publishedAt, staleCutoff)))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.publishedAt)).limit(limit);
+  await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "backlog_or_stale_article", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), ne(marketRssArticles.source, "STOCKTITAN"), or(eq(marketRssArticles.isBacklog, true), lt(marketRssArticles.publishedAt, staleCutoff))));
+  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), or(eq(marketRssArticles.source, "STOCKTITAN"), eq(marketRssArticles.isBacklog, false)), or(eq(marketRssArticles.source, "STOCKTITAN"), or(isNull(marketRssArticles.publishedAt), gte(marketRssArticles.publishedAt, staleCutoff))))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.publishedAt)).limit(limit);
   const perMinuteLimit = Math.max(1, Number(process.env.RSS_DISCORD_PER_MINUTE || 5));
   const recent = await db.select({ count: sql<number>`count(*)` }).from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "SENT"), gte(marketRssArticles.notifiedAt, new Date(now - 60_000))));
   let remaining = Math.max(0, perMinuteLimit - Number(recent[0]?.count || 0));
