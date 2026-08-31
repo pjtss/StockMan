@@ -28,13 +28,14 @@ export function TickerChartWorkbench() {
   const [lowerTouch, setLowerTouch] = useState(true);
   const [scanTimeframe, setScanTimeframe] = useState<"D" | "W" | "M">("D");
   const [scanRows, setScanRows] = useState<any[]>([]);
+  const [scanSort, setScanSort] = useState<"marketCapDesc" | "marketCapAsc">("marketCapDesc");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const capUnit = market === "KR" ? "억원" : "달러";
   const capMultiplier = market === "KR" ? 100000000 : 1;
   const tickers = useMemo(
-    () => [...new Set(input.split(/[,,\n\s]+/).map((value) => value.trim().toUpperCase()).filter(Boolean))],
-    [input]
+    () => [...new Set(input.split(/[,,\n\s]+/).map((value) => { const normalized = value.trim().toUpperCase(); return market === "KR" && /^\d+$/.test(normalized) ? normalized.padStart(6, "0") : normalized; }).filter(Boolean))],
+    [input, market]
   );
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function TickerChartWorkbench() {
           {scanError&&<p className={styles.error}>{scanError}</p>}
         </div>
       </section>
-      {scanRows.length > 0 && <section className={styles.results}><div className={styles.resultHeader}><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div><div className={styles.grid}>{scanRows.map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · RVOL {row.metrics?.["D.rvol"]==null?"-":Number(row.metrics["D.rvol"]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div></section>}
+      {scanRows.length > 0 && <section className={styles.results}><div className={styles.resultHeader}><div><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div><label className={styles.sortControl}>정렬<select value={scanSort} onChange={e=>setScanSort(e.target.value as "marketCapDesc"|"marketCapAsc")}><option value="marketCapDesc">시총 큰 순</option><option value="marketCapAsc">시총 작은 순</option></select></label></div><div className={styles.grid}>{[...scanRows].sort((a,b)=>{const av=Number(a.marketCap??-1),bv=Number(b.marketCap??-1);return scanSort === "marketCapAsc" ? av-bv : bv-av;}).map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · 시총 {row.marketCap==null?"-":Number(row.marketCap).toLocaleString()} · RVOL {row.metrics?.["D.rvol"]==null?"-":Number(row.metrics["D.rvol"]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div></section>}
 
       <section className={styles.results} aria-live="polite">
         <div className={styles.resultHeader}>
@@ -100,7 +101,7 @@ export function TickerChartWorkbench() {
             {tickers.map((ticker) => (
               <article key={ticker} className={styles.card}>
                 <div><strong>{ticker}{names[ticker] ? ` · ${names[ticker]}` : ""}</strong><small>{market === "KR" ? "국내 종목코드" : "해외 티커"}</small></div>
-                <button type="button" onClick={() => setSelected(ticker)}>차트 보기</button>
+                <button type="button" onClick={() => { setSelectedMarket(market); setSelected(ticker); }}>차트 보기</button>
               </article>
             ))}
           </div>
