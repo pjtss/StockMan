@@ -227,8 +227,9 @@ export function FeedPage(props: FeedPageProps) {
   const totalPages = Math.ceil(count / PAGE_SIZE);
   const fetchedAt = props.type === "dart" ? dartData?.fetchedAt : secData?.fetchedAt;
 
-  const dartItems = paginateItems(rawDartItems, currentPage, PAGE_SIZE);
-  const secItems = paginateItems(rawSecItems, currentPage, PAGE_SIZE);
+  // Always sort the complete feed before pagination so every page is newest-first.
+  const dartItems = paginateItems(sortByPublishedAtDesc(rawDartItems), currentPage, PAGE_SIZE);
+  const secItems = paginateItems(sortByPublishedAtDesc(rawSecItems), currentPage, PAGE_SIZE);
 
   return (
     <main className={styles.page}>
