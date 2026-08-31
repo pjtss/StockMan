@@ -55,6 +55,7 @@ docker run --rm --network host \
   -password="$FLYWAY_PASSWORD" \
   -locations="filesystem:/flyway/sql" \
   -connectRetries=3 \
+  -outOfOrder=true \
   migrate
 rm -f "$RELEASE"
 stage="activate-files"
