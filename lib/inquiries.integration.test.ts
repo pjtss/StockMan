@@ -4,7 +4,7 @@ const envFile = fs.existsSync(".env.local") ? fs.readFileSync(".env.local", "utf
 const envLine = envFile.split(/\r?\n/).find((value) => /^DATABASE_URL\s*=/.test(value));
 if (envLine) process.env.DATABASE_URL = envLine.replace(/^DATABASE_URL\s*=\s*/, "").replace(/^\"|\"$/g, "");
 const { getPool } = await import("./db");
-const { toggleLike } = await import("./inquiries");
+const { addLike } = await import("./inquiries");
 
 describe.skipIf(!envLine)("inquiry PostgreSQL integration", () => {
   it("serializes concurrent likes for the same user", async () => {
@@ -12,10 +12,11 @@ describe.skipIf(!envLine)("inquiry PostgreSQL integration", () => {
     const created = await pool.query("INSERT INTO inquiries(title,content,author_key,ip_address) VALUES('integration','integration','integration','127.0.0.1') RETURNING id");
     const id = Number(created.rows[0].id);
     try {
-      const results = await Promise.all([toggleLike(id, "concurrent-user"), toggleLike(id, "concurrent-user")]);
+      const identity = { userKey: "concurrent-user", ip: "127.0.0.1", userAgent: "vitest" };
+      const results = await Promise.all([addLike(id, identity), addLike(id, identity)]);
       const row = await pool.query("SELECT like_count FROM inquiries WHERE id=$1", [id]);
       expect(results).toHaveLength(2);
-      expect(row.rows[0].like_count).toBe(0);
+      expect(row.rows[0].like_count).toBe(2);
     } finally { await pool.query("DELETE FROM inquiries WHERE id=$1", [id]); await pool.end(); }
   }, 30000);
 });
