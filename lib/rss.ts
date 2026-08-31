@@ -56,11 +56,17 @@ function stripCdata(value: string | undefined): string {
 }
 
 function normalizeText(value: unknown): string {
+  const clean = (input: string) => stripCdata(input)
+    .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/<br\s*\/?>(\s*)/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   if (typeof value === "string") {
-    return stripCdata(value);
+    return clean(value);
   }
   if (value && typeof value === "object" && "#text" in value) {
-    return stripCdata(String(value["#text"]));
+    return clean(String(value["#text"]));
   }
   return "";
 }
