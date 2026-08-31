@@ -28,6 +28,16 @@ export async function reserveTranslationCharacters(characterCount: number, month
   } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
 }
 
+export async function releaseTranslationCharacters(characterCount: number, month = new Date().toISOString().slice(0, 7)) {
+  if (characterCount <= 0) return;
+  await getPool().query("UPDATE translation_usage_monthly SET reserved_characters=GREATEST(0,reserved_characters-$1),updated_at=NOW() WHERE usage_month=$2", [characterCount, month]);
+}
+
+export async function recordTranslatedCharacters(characterCount: number, month = new Date().toISOString().slice(0, 7)) {
+  if (characterCount <= 0) return;
+  await getPool().query("UPDATE translation_usage_monthly SET translated_characters=translated_characters+$1,updated_at=NOW() WHERE usage_month=$2", [characterCount, month]);
+}
+
 export async function claimTranslationLimitAlert(month = new Date().toISOString().slice(0, 7)) {
   const result = await getPool().query("INSERT INTO translation_usage_monthly (usage_month,limit_alerted) VALUES ($1,TRUE) ON CONFLICT (usage_month) DO UPDATE SET limit_alerted=TRUE,updated_at=NOW() WHERE translation_usage_monthly.limit_alerted=FALSE RETURNING usage_month", [month]);
   return result.rowCount === 1;

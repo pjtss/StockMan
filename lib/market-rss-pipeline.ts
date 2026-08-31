@@ -12,7 +12,7 @@ import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
-import { claimTranslationLimitAlert, loadTranslationCache, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
+import { claimTranslationLimitAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -88,8 +88,15 @@ export async function translatePendingMarketRssArticles(limit = 10) {
     if (cached) return { translatedText: cached.translatedText, source, target, provider, fallback: false };
     const reservation = await reserveTranslationCharacters(text.length);
     if (!reservation.allowed) return { translatedText: text, source, target, provider, fallback: true, fallbackReason: "monthly_character_limit_reached" };
-    const result = await client.translate(text, source, target);
+    let result: TranslationResult;
+    try {
+      result = await client.translate(text, source, target);
+    } catch (error) {
+      await releaseTranslationCharacters(text.length);
+      throw error;
+    }
     if (!result.fallback) await saveTranslationCache(text, result.translatedText, provider, source, target);
+    if (!result.fallback) await recordTranslatedCharacters(text.length);
     return result;
   } };
   let translated = 0;
