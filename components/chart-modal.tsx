@@ -6,7 +6,7 @@ import styles from "./chart-modal.module.css";
 import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart";
 import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 
-type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; link: string; publishedAt: string | null; source: string };
+type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; summary?: string | null; translatedSummary?: string | null; link: string; publishedAt: string | null; source: string; translationStatus?: string | null };
 
 interface ChartModalProps {
   code: string;
@@ -90,10 +90,10 @@ function FundamentalsPanel({ data, fundamentals, timeframe, isUsChart }: { data?
 }
 
 function NewsPanel({ items, loading, error }: { items: StockTitanNewsItem[]; loading: boolean; error: string | null }) {
-  if (loading) return <div className={styles.chartLoading}>StockTitan 뉴스를 불러오는 중…</div>;
+  if (loading) return <div className={styles.chartLoading}>RSS·공시 뉴스를 불러오는 중…</div>;
   if (error) return <div className={styles.error}>{error}</div>;
-  if (!items.length) return <div className={styles.empty}>저장된 StockTitan 뉴스가 없습니다.</div>;
-  return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}</article>)}</div>;
+  if (!items.length) return <div className={styles.empty}>저장된 RSS·공시 뉴스가 없습니다.</div>;
+  return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.source} · {item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}{(item.translatedSummary || item.summary) && <p>{item.translatedSummary || item.summary}</p>}</article>)}</div>;
 }
 
 export function ChartModal({ code, company, onClose }: ChartModalProps) {
