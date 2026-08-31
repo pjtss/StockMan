@@ -1,4 +1,5 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
+import { getRequestLogSecret } from "@/lib/request-log-config";
 
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
@@ -19,7 +20,8 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("x-request-id", requestId);
   const logUrl = new URL("/api/internal/request-log", request.url);
-  event.waitUntil(fetch(logUrl, { method: "POST", headers: { "content-type": "application/json", "x-request-log-secret": process.env.REQUEST_LOG_SECRET || "", "x-request-id": requestId, "x-forwarded-for": request.headers.get("x-forwarded-for") || "", "user-agent": request.headers.get("user-agent") || "" }, body: JSON.stringify({ method: request.method, path: request.nextUrl.pathname }) }).catch(() => undefined));
+  const logSecret = getRequestLogSecret();
+  if (logSecret) event.waitUntil(fetch(logUrl, { method: "POST", headers: { "content-type": "application/json", "x-request-log-secret": logSecret, "x-request-id": requestId, "x-forwarded-for": request.headers.get("x-forwarded-for") || "", "user-agent": request.headers.get("user-agent") || "" }, body: JSON.stringify({ method: request.method, path: request.nextUrl.pathname }) }).catch(() => undefined));
   return response;
 }
 

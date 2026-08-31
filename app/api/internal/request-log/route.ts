@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getRequestIdentity } from "@/lib/request-identity";
+import { getRequestLogSecret } from "@/lib/request-log-config";
 
 export async function POST(request: Request) {
-  const expected = process.env.REQUEST_LOG_SECRET || "";
+  const expected = getRequestLogSecret();
   if (!expected || request.headers.get("x-request-log-secret") !== expected) return NextResponse.json({ ok: false }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const identity = getRequestIdentity(request);
