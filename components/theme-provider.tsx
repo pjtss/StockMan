@@ -24,8 +24,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem("stockman-theme") as Theme | null;
-    const preferred = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    const resolved = stored ?? preferred;
+    // Dark is the product default; an explicit user choice is preserved.
+    const resolved = stored === "light" || stored === "dark" ? stored : "dark";
     setTheme(resolved);
     document.documentElement.setAttribute("data-theme", resolved);
     setMounted(true);
