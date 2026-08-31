@@ -15,6 +15,7 @@ type PageKey =
   | "us-intensity"
   | "charts"
   | "inquiries"
+  | "notices"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
@@ -37,6 +38,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link aria-current={current === "inquiries" ? "page" : undefined} className={current === "inquiries" ? styles.navActive : styles.navLink} href="/inquiries" prefetch={false}>
           문의
+        </Link>
+        <Link aria-current={current === "notices" ? "page" : undefined} className={current === "notices" ? styles.navActive : styles.navLink} href="/notices" prefetch={false}>
+          공지사항
         </Link>
         <Link
           aria-current={current === "notifications" ? "page" : undefined}
