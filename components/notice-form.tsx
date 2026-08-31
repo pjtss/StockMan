@@ -10,10 +10,15 @@ export function NoticeForm() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    const response = await fetch("/api/notices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, content }) });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) { setError(body.error || "공지사항 등록에 실패했습니다."); return; }
-    router.push(`/notices/${body.id}`);
+    try {
+      const response = await fetch("/api/notices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, content }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) { setError(body.error || "공지사항 등록에 실패했습니다."); return; }
+      if (!body.id) { setError("공지사항 ID를 받지 못했습니다."); return; }
+      router.push(`/notices/${body.id}`);
+    } catch {
+      setError("서버와 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
   }
   return <form className="inquiryForm" onSubmit={submit}>
     <div className="inquiryFormIntro"><span>새 공지사항</span><p>관리자에게만 공개된 작성 화면입니다.</p></div>
