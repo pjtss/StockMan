@@ -6,6 +6,8 @@ import styles from "./chart-modal.module.css";
 import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart";
 import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 
+type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; link: string; publishedAt: string | null; source: string };
+
 interface ChartModalProps {
   code: string;
   company: string;
@@ -87,13 +89,23 @@ function FundamentalsPanel({ data, fundamentals, timeframe, isUsChart }: { data?
   return <div><div className={styles.indicators}>{items.map(([label, current]) => <div className={styles.indicatorCard} key={label}><span className={styles.indicatorLabel}>{label}</span><span className={styles.indicatorValue}>{current}</span><span className={styles.indicatorSub}>{timeframeLabel} 완료봉 기준</span></div>)}</div><div className={styles.indicatorSub} style={{ marginTop: 16, lineHeight: 1.7 }}>기본정보 기준시각: {formatDisplayDateTime(f?.observedAt)}<br/>기본정보 갱신시각: {formatDisplayDateTime(f?.fetchedAt)}<br/>봉 데이터 기준일: {formatDisplayDate(normalizedCandleDate)}<br/>봉 데이터 갱신시각: {formatDisplayDateTime(data?.candleDataUpdatedAt)}<br/>출처: {sourceLabel} · 상태: {statusLabel}</div></div>;
 }
 
+function NewsPanel({ items, loading, error }: { items: StockTitanNewsItem[]; loading: boolean; error: string | null }) {
+  if (loading) return <div className={styles.chartLoading}>StockTitan 뉴스를 불러오는 중…</div>;
+  if (error) return <div className={styles.error}>{error}</div>;
+  if (!items.length) return <div className={styles.empty}>저장된 StockTitan 뉴스가 없습니다.</div>;
+  return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}</article>)}</div>;
+}
+
 export function ChartModal({ code, company, onClose }: ChartModalProps) {
   const [timeframe, setTimeframe] = useState<"D" | "W" | "M">("D");
-  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals">("chart");
+  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "news">("chart");
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fallbackFundamentals, setFallbackFundamentals] = useState<ChartFundamentals | undefined>();
+  const [news, setNews] = useState<StockTitanNewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -121,6 +133,14 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [code, company, timeframe]);
+
+  useEffect(() => {
+    if (activeTab !== "news") return;
+    let cancelled = false;
+    setNewsLoading(true); setNewsError(null);
+    fetch(`/api/stock/news?ticker=${encodeURIComponent(code)}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: { items?: StockTitanNewsItem[] }) => { if (!cancelled) setNews(body.items ?? []); }).catch((error: Error) => { if (!cancelled) setNewsError(error.message); }).finally(() => { if (!cancelled) setNewsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, code]);
 
   // TradingView Lightweight Charts 렌더링
   useEffect(() => {
@@ -166,7 +186,16 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
         wickDownColor: "#4d94ff",
       });
 
-      const candles = [...data.candles].sort((a, b) => a.date.localeCompare(b.date));
+      // KIS 응답 순서가 시장/주기에 따라 달라질 수 있으므로 차트 입력 직전에
+      // 숫자 날짜 기준으로 오름차순 정렬하고, 같은 날짜의 중복 봉을 제거한다.
+      // Lightweight Charts는 setData()에 strictly ascending time을 요구한다.
+      const candles = Array.from(
+        new Map(
+          data.candles
+            .filter((c) => /^\d{8}$/.test(c.date) && Number.isFinite(c.close))
+            .map((c) => [c.date, c] as const),
+        ).values(),
+      ).sort((a, b) => Number(a.date) - Number(b.date));
       const candleData = candles.map((c) => ({
         time: `${c.date.slice(0, 4)}-${c.date.slice(4, 6)}-${c.date.slice(6, 8)}` as any,
         open: c.open,
@@ -286,7 +315,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
           <button className={styles.closeBtn} onClick={onClose} aria-label="닫기">✕</button>
         </div>
 
-        <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button></div>
+        <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button><button id="news-tab" className={`${styles.tab} ${activeTab === "news" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "news"} aria-controls="news-panel" onClick={() => setActiveTab("news")}>뉴스</button></div>
 
         {/* 바디 */}
         <div className={styles.body}>
@@ -326,6 +355,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
             </div>
           )}
           {!loading && data && activeTab === "fundamentals" && <div id="fundamentals-panel" role="tabpanel" aria-labelledby="fundamentals-tab"><FundamentalsPanel data={data} timeframe={timeframe} isUsChart={isUsChart} /></div>}
+          {activeTab === "news" && <div id="news-panel" role="tabpanel" aria-labelledby="news-tab"><NewsPanel items={news} loading={newsLoading} error={newsError} /></div>}
         </div>
       </div>
     </div>,

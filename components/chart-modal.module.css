@@ -242,6 +242,13 @@
   color: #475569;
 }
 
+.newsList { display: grid; gap: 10px; }
+.newsItem { display: grid; gap: 5px; padding: 14px 16px; border: 1px solid rgba(148,163,184,.16); border-radius: 10px; background: rgba(15,23,42,.42); }
+.newsItem time, .newsItem small { color: #94a3b8; font-size: 12px; }
+.newsItem a { color: #e2e8f0; font-weight: 700; line-height: 1.45; text-decoration: none; }
+.newsItem a:hover { text-decoration: underline; }
+.empty { padding: 32px 12px; color: #94a3b8; text-align: center; }
+
 .rsiOverbought { color: #ff4d4d; }
 .rsiOversold { color: #00ffa3; }
 .rsiNeutral { color: #e2e8f0; }
