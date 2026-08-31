@@ -11,6 +11,7 @@ import {
   LogOut,
   Settings2,
   Newspaper,
+  Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -28,6 +29,7 @@ const NAV_ICONS = {
   "sec-test": ChartNoAxesCombined,
   observability: Activity,
   "stocktitan-rss": Newspaper,
+  "user-activity": Users,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;
 
 type AdminPageShellProps = {
