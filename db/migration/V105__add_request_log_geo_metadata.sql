@@ -1,0 +1,9 @@
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_country_code TEXT;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_country_name TEXT;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_region TEXT;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_city TEXT;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_timezone TEXT;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_asn INTEGER;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_org TEXT;
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_source TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS geo_confidence TEXT NOT NULL DEFAULT 'unknown';
