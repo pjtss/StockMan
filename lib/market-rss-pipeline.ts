@@ -12,7 +12,7 @@ import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
-import { claimTranslationLimitAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
+import { claimTranslationLimitAlert, claimTranslationThresholdAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -87,7 +87,12 @@ export async function translatePendingMarketRssArticles(limit = 10) {
     const cached = await loadTranslationCache(text, provider, target);
     if (cached) return { translatedText: cached.translatedText, source, target, provider, fallback: false };
     const reservation = await reserveTranslationCharacters(text.length);
-    if (!reservation.allowed) return { translatedText: text, source, target, provider, fallback: true, fallbackReason: "monthly_character_limit_reached" };
+    if (!reservation.allowed) {
+      for (let threshold = 100000; threshold <= reservation.used; threshold += 100000) {
+        if (await claimTranslationThresholdAlert(threshold)) thresholdAlerts.add(threshold);
+      }
+      return { translatedText: text, source, target, provider, fallback: true, fallbackReason: "monthly_character_limit_reached" };
+    }
     let result: TranslationResult;
     try {
       result = await client.translate(text, source, target);
@@ -95,14 +100,20 @@ export async function translatePendingMarketRssArticles(limit = 10) {
       await releaseTranslationCharacters(text.length);
       throw error;
     }
-    if (!result.fallback) await saveTranslationCache(text, result.translatedText, provider, source, target);
-    if (!result.fallback) await recordTranslatedCharacters(text.length);
+    if (!result.fallback) {
+      await saveTranslationCache(text, result.translatedText, provider, source, target);
+      await recordTranslatedCharacters(text.length);
+      for (let threshold = 100000; threshold <= reservation.used; threshold += 100000) {
+        if (await claimTranslationThresholdAlert(threshold)) thresholdAlerts.add(threshold);
+      }
+    }
     return result;
   } };
   let translated = 0;
   let fallback = 0;
   let failed = 0;
   let limitReached = false;
+  const thresholdAlerts = new Set<number>();
   const fallbackReasons: Record<string, number> = {};
   for (const row of rows) {
     try {
@@ -128,7 +139,15 @@ export async function translatePendingMarketRssArticles(limit = 10) {
       limitAlertSent = Boolean(response?.ok);
     }
   }
-  return { attempted: rows.length, translated, fallback, failed, fallbackReasons, limitReached, limitAlertSent };
+  let thresholdAlertSent = 0;
+  const thresholdWebhook = thresholdAlerts.size ? await loadFeatureDiscordDebugWebhook("market-rss", ["STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL"]) : null;
+  if (thresholdWebhook) {
+    for (const threshold of [...thresholdAlerts].sort((a, b) => a - b)) {
+      const response = await fetch(`${thresholdWebhook}${thresholdWebhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `ℹ️ Cloud Translation 누적 사용량 알림\n누적 번역량: ${threshold.toLocaleString()}자 이상\n대상: StockTitan RSS` }) }).catch(() => null);
+      if (response?.ok) thresholdAlertSent++;
+    }
+  }
+  return { attempted: rows.length, translated, fallback, failed, fallbackReasons, limitReached, limitAlertSent, thresholdAlerts: [...thresholdAlerts].sort((a, b) => a - b), thresholdAlertSent };
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {

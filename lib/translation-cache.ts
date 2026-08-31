@@ -42,3 +42,8 @@ export async function claimTranslationLimitAlert(month = new Date().toISOString(
   const result = await getPool().query("INSERT INTO translation_usage_monthly (usage_month,limit_alerted) VALUES ($1,TRUE) ON CONFLICT (usage_month) DO UPDATE SET limit_alerted=TRUE,updated_at=NOW() WHERE translation_usage_monthly.limit_alerted=FALSE RETURNING usage_month", [month]);
   return result.rowCount === 1;
 }
+
+export async function claimTranslationThresholdAlert(threshold: number, month = new Date().toISOString().slice(0, 7)) {
+  const result = await getPool().query("INSERT INTO translation_usage_monthly (usage_month,alerted_thresholds) VALUES ($1,ARRAY[$2]::integer[]) ON CONFLICT (usage_month) DO UPDATE SET alerted_thresholds=array_append(translation_usage_monthly.alerted_thresholds,$2),updated_at=NOW() WHERE NOT ($2 = ANY(translation_usage_monthly.alerted_thresholds)) RETURNING usage_month", [month, threshold]);
+  return result.rowCount === 1;
+}
