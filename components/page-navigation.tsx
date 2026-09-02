@@ -23,7 +23,8 @@ type PageKey =
 
 export function PageNavigation({ current }: { current: PageKey }) {
   const [username, setUsername] = useState<string | null>(null);
-  useEffect(() => { fetch("/api/auth/me").then(response => response.ok ? response.json() : null).then(body => setUsername(body?.user?.username ?? null)).catch(() => setUsername(null)); }, []);
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => { fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" }).then(response => response.ok ? response.json() : null).then(body => setUsername(body?.user?.username ?? null)).catch(() => setUsername(null)).finally(() => setAuthChecked(true)); }, []);
   async function logout() { await fetch("/api/auth/logout", { method: "POST" }); setUsername(null); window.location.reload(); }
   return (
     <header className={styles.header}>
@@ -63,7 +64,7 @@ export function PageNavigation({ current }: { current: PageKey }) {
         >
           알림 설정
         </Link>
-        {username ? <button type="button" className={styles.navLink} onClick={logout} aria-label={`${username} 로그아웃`}>로그아웃</button> : <Link aria-current={current === "login" ? "page" : undefined} className={current === "login" ? styles.navActive : styles.navLink} href="/login" prefetch={false}>로그인</Link>}
+        {authChecked && (username ? <button type="button" className={styles.navLink} onClick={logout} aria-label={`${username} 로그아웃`}>로그아웃</button> : <Link aria-current={current === "login" ? "page" : undefined} className={current === "login" ? styles.navActive : styles.navLink} href="/login" prefetch={false}>로그인</Link>)}
       </nav>
     </header>
   );
