@@ -1,2 +1,3 @@
 import { UserAuthForm } from "@/components/user-auth-form";
-export default function RegisterPage(){return <main><UserAuthForm mode="register" /></main>}
+import { PageNavigation } from "@/components/page-navigation";
+export default function RegisterPage(){return <><PageNavigation current="register" /><main className="page-shell"><UserAuthForm mode="register" /></main></>}

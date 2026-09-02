@@ -17,6 +17,8 @@ type PageKey =
   | "inquiries"
   | "notices"
   | "market-news"
+  | "login"
+  | "register"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   return (
@@ -56,6 +58,12 @@ export function PageNavigation({ current }: { current: PageKey }) {
           prefetch={false}
         >
           알림 설정
+        </Link>
+        <Link aria-current={current === "login" ? "page" : undefined} className={current === "login" ? styles.navActive : styles.navLink} href="/login" prefetch={false}>
+          로그인
+        </Link>
+        <Link aria-current={current === "register" ? "page" : undefined} className={current === "register" ? styles.navActive : styles.navLink} href="/register" prefetch={false}>
+          회원가입
         </Link>
       </nav>
     </header>
