@@ -17,6 +17,7 @@ export function TickerChartWorkbench() {
   const [market, setMarket] = useState<"KR" | "US">("KR");
   const [names, setNames] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<"KR" | "US">("KR");
   const [minCap, setMinCap] = useState("1000");
   const [maxCap, setMaxCap] = useState("");
@@ -31,9 +32,11 @@ export function TickerChartWorkbench() {
   const [lowerTouch, setLowerTouch] = useState(true);
   const [scanTimeframe, setScanTimeframe] = useState<"D" | "W" | "M">("D");
   const [scanRows, setScanRows] = useState<any[]>([]);
+  const [scanCompleted, setScanCompleted] = useState(false);
   const [scanSort, setScanSort] = useState<"marketCapDesc" | "marketCapAsc">("marketCapDesc");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [accumulationLoading, setAccumulationLoading] = useState(false);
   const capUnit = market === "KR" ? "억원" : "달러";
   const capMultiplier = market === "KR" ? 100000000 : 1;
   const tickers = useMemo(
@@ -55,9 +58,17 @@ export function TickerChartWorkbench() {
   }, [market]);
 
   async function runScan() {
-    setScanLoading(true); setScanError(null);
-    try { const prefix=scanTimeframe; const filters:any[]=[]; if(Number(minCap)>0)filters.push({field:"marketCap",operator:">=",value:Number(minCap)*capMultiplier}); if(Number(maxCap)>0)filters.push({field:"marketCap",operator:"<=",value:Number(maxCap)*capMultiplier}); if(Number(minRvol)>0)filters.push({field:`${prefix}.rvol`,operator:">=",value:Number(minRvol)}); if(Number(maxRvol)>0)filters.push({field:`${prefix}.rvol`,operator:"<=",value:Number(maxRvol)}); if(Number(minPrice)>0)filters.push({field:`${prefix}.close`,operator:">=",value:Number(minPrice)}); if(Number(maxPrice)>0)filters.push({field:`${prefix}.close`,operator:"<=",value:Number(maxPrice)}); if(bbPosition==="LOWER_TOUCH")filters.push({field:`${prefix}.bb.lowerTouch`,operator:"=",value:true}); if(bbPosition==="BELOW_MIDDLE")filters.push({field:`${prefix}.close`,operator:"<=",value:`${prefix}.bb.middle`}); if(obvTrend!=="ANY")filters.push({field:`${prefix}.obv.signalTrend`,operator:"=",value:obvTrend}); if(adlTrend!=="ANY")filters.push({field:`${prefix}.adl.signalTrend`,operator:"=",value:adlTrend}); if(goldenCross!=="ANY")filters.push({field:`${prefix}.emaGoldenCross`,operator:"=",value:true}); const response=await fetch("/api/screener/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({market,timeframe:scanTimeframe,instrumentType:"COMMON_STOCK",status:"ACTIVE",filters,ranking:[{field:`${prefix}.rvol`,direction:"DESC"}],limit:100})}); const json=await response.json(); if(!response.ok)throw new Error(json.error??"추출 실패"); setScanRows(json.results??[]); } catch(error){setScanError(error instanceof Error?error.message:"추출 실패");} finally{setScanLoading(false);}
+    setScanLoading(true); setScanError(null); setScanCompleted(false);
+    try { const prefix=scanTimeframe; const filters:any[]=[]; if(Number(minCap)>0)filters.push({field:"marketCap",operator:">=",value:Number(minCap)*capMultiplier}); if(Number(maxCap)>0)filters.push({field:"marketCap",operator:"<=",value:Number(maxCap)*capMultiplier}); if(Number(minRvol)>0)filters.push({field:`${prefix}.rvol`,operator:">=",value:Number(minRvol)}); if(Number(maxRvol)>0)filters.push({field:`${prefix}.rvol`,operator:"<=",value:Number(maxRvol)}); if(Number(minPrice)>0)filters.push({field:`${prefix}.close`,operator:">=",value:Number(minPrice)}); if(Number(maxPrice)>0)filters.push({field:`${prefix}.close`,operator:"<=",value:Number(maxPrice)}); if(bbPosition==="LOWER_TOUCH")filters.push({field:`${prefix}.bb.lowerTouch`,operator:"=",value:true}); if(bbPosition==="BELOW_MIDDLE")filters.push({field:`${prefix}.close`,operator:"<=",value:`${prefix}.bb.middle`}); if(obvTrend!=="ANY")filters.push({field:`${prefix}.obv.signalTrend`,operator:"=",value:obvTrend}); if(adlTrend!=="ANY")filters.push({field:`${prefix}.adl.signalTrend`,operator:"=",value:adlTrend}); if(goldenCross!=="ANY")filters.push({field:`${prefix}.emaGoldenCross`,operator:"=",value:true}); const response=await fetch("/api/screener/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({market,timeframe:scanTimeframe,instrumentType:"COMMON_STOCK",status:"ACTIVE",filters,ranking:[{field:`${prefix}.rvol`,direction:"DESC"}],limit:100})}); const json=await response.json(); if(!response.ok)throw new Error(json.error??"추출 실패"); setScanRows(json.results??[]); setScanCompleted(true); } catch(error){setScanError(error instanceof Error?error.message:"추출 실패");} finally{setScanLoading(false);}
   }
+
+  async function runAccumulationScan() {
+    setAccumulationLoading(true); setScanError(null);
+    try { const response = await fetch("/api/scan/kr-accumulation?limit=100"); const json = await response.json(); if (!response.ok || !json.ok) throw new Error(json.error ?? "매집 의심 종목 추출 실패"); setScanRows(json.results ?? []); setMarket("KR"); }
+    catch (error) { setScanError(error instanceof Error ? error.message : "매집 의심 종목 추출 실패"); }
+    finally { setAccumulationLoading(false); }
+  }
+
 
   return (
     <>
@@ -79,6 +90,7 @@ export function TickerChartWorkbench() {
         <div className={styles.scanBox}>
           <strong>조건으로 종목 추출</strong>
           <div className={styles.scanFields}>
+            <button type="button" onClick={runAccumulationScan} disabled={accumulationLoading}>{accumulationLoading ? "매집 후보 추출 중…" : "매집 의심 종목 추출"}</button>
             <label><span>기준 봉<HelpMark text="지표와 가격을 계산할 캔들 주기입니다." /></span><select value={scanTimeframe} onChange={e=>setScanTimeframe(e.target.value as "D"|"W"|"M")}><option value="D">일봉</option><option value="W">주봉</option><option value="M">월봉</option></select></label>
             <label><span>최소 시총({capUnit})<HelpMark text={`시가총액이 이 값 이상인 종목만 조회합니다. 현재 단위는 ${market === "KR" ? "억원" : "미국 달러"}입니다.`} /></span><input inputMode="decimal" value={minCap} onChange={e=>setMinCap(e.target.value)} /></label>
             <label><span>최대 시총({capUnit})<HelpMark text={`시가총액이 이 값 이하인 종목만 조회합니다. 현재 단위는 ${market === "KR" ? "억원" : "미국 달러"}입니다. 비워 두면 상한이 없습니다.`} /></span><input inputMode="decimal" value={maxCap} onChange={e=>setMaxCap(e.target.value)} /></label>
@@ -94,7 +106,7 @@ export function TickerChartWorkbench() {
           {scanError&&<p className={styles.error}>{scanError}</p>}
         </div>
       </section>
-      {scanRows.length > 0 && <section className={styles.results}><div className={styles.resultHeader}><div><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div><label className={styles.sortControl}>정렬<select value={scanSort} onChange={e=>setScanSort(e.target.value as "marketCapDesc"|"marketCapAsc")}><option value="marketCapDesc">시총 큰 순</option><option value="marketCapAsc">시총 작은 순</option></select></label></div><div className={styles.grid}>{[...scanRows].sort((a,b)=>{const av=Number(a.marketCap??-1),bv=Number(b.marketCap??-1);return scanSort === "marketCapAsc" ? av-bv : bv-av;}).map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · 시총 {row.marketCap==null?"-":Number(row.marketCap).toLocaleString()} · RVOL {row.metrics?.["D.rvol"]==null?"-":Number(row.metrics["D.rvol"]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div></section>}
+      {scanCompleted && <section className={styles.results}><div className={styles.resultHeader}><div><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div>{scanRows.length > 0 && <label className={styles.sortControl}>정렬<select value={scanSort} onChange={e=>setScanSort(e.target.value as "marketCapDesc"|"marketCapAsc")}><option value="marketCapDesc">시총 큰 순</option><option value="marketCapAsc">시총 작은 순</option></select></label>}</div>{scanRows.length === 0 ? <p className={styles.empty}>현재 조건과 캐시 기준을 모두 만족하는 종목이 없습니다.</p> : <div className={styles.grid}>{[...scanRows].sort((a,b)=>{const av=Number(a.marketCap??-1),bv=Number(b.marketCap??-1);return scanSort === "marketCapAsc" ? av-bv : bv-av;}).map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · 시총 {row.marketCap==null?"-":Number(row.marketCap).toLocaleString()} · RVOL {row.metrics?.["D.rvol"]==null?"-":Number(row.metrics["D.rvol"]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedCompany(row.name || row.code);setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div>}</section>}
 
       <section className={styles.results} aria-live="polite">
         <div className={styles.resultHeader}>
@@ -106,13 +118,13 @@ export function TickerChartWorkbench() {
             {tickers.map((ticker) => (
               <article key={ticker} className={styles.card}>
                 <div><strong>{ticker}{names[ticker] ? ` · ${names[ticker]}` : ""}</strong><small>{market === "KR" ? "국내 종목코드" : "해외 티커"}</small></div>
-                <button type="button" onClick={() => { setSelectedMarket(market); setSelected(ticker); }}>차트 보기</button>
+                <button type="button" onClick={() => { setSelectedCompany(names[ticker] || ticker); setSelectedMarket(market); setSelected(ticker); }}>차트 보기</button>
               </article>
             ))}
           </div>
         )}
       </section>
-      {selected && <ChartModal code={selectedMarket === "US" ? `US:${selected}` : selected} company={names[selected] || selected} onClose={() => setSelected(null)} />}
+      {selected && <ChartModal code={selectedMarket === "US" ? `US:${selected}` : selected} company={selectedCompany || names[selected] || selected} onClose={() => { setSelected(null); setSelectedCompany(null); }} />}
     </>
   );
 }
