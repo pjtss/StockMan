@@ -38,6 +38,7 @@ function rollingAverage(values: number[], period: number, index: number) {
 }
 
 function emaSeries(values: number[], period: number): Array<number | null> {
+  values = values.map(Number);
   if (values.length < period) return values.map(() => null);
   const result: Array<number | null> = values.map(() => null);
   const multiplier = 2 / (period + 1);
@@ -211,10 +212,10 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
       ).sort((a, b) => Number(a.date) - Number(b.date));
       const candleData = candles.map((c) => ({
         time: `${c.date.slice(0, 4)}-${c.date.slice(4, 6)}-${c.date.slice(6, 8)}` as any,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
       }));
       candleSeries.setData(candleData);
 
@@ -225,7 +226,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
         const values = emaSeries(closeValues, period);
         const series = chart.addSeries(LineSeries, {
           color,
-          lineWidth: 1,
+          lineWidth: 2,
           lastValueVisible: false,
           priceLineVisible: false,
         });
@@ -244,7 +245,7 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
       });
       volumeSeries.setData(candles.map((candle, index) => ({
         time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
-        value: candle.volume,
+        value: Number(candle.volume),
         color: index > 0 && candle.close >= candles[index - 1].close ? "rgba(255,77,77,0.55)" : "rgba(77,148,255,0.55)",
       })));
       chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
