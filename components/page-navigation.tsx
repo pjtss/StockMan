@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import styles from "./page-navigation.module.css";
 
 type PageKey =
@@ -21,6 +22,9 @@ type PageKey =
   | "register"
 
 export function PageNavigation({ current }: { current: PageKey }) {
+  const [username, setUsername] = useState<string | null>(null);
+  useEffect(() => { fetch("/api/auth/me").then(response => response.ok ? response.json() : null).then(body => setUsername(body?.user?.username ?? null)).catch(() => setUsername(null)); }, []);
+  async function logout() { await fetch("/api/auth/logout", { method: "POST" }); setUsername(null); window.location.reload(); }
   return (
     <header className={styles.header}>
       <Link className={styles.brand} href="/" aria-label="STOCKMAN QUANT 홈" prefetch={false}>
@@ -59,12 +63,7 @@ export function PageNavigation({ current }: { current: PageKey }) {
         >
           알림 설정
         </Link>
-        <Link aria-current={current === "login" ? "page" : undefined} className={current === "login" ? styles.navActive : styles.navLink} href="/login" prefetch={false}>
-          로그인
-        </Link>
-        <Link aria-current={current === "register" ? "page" : undefined} className={current === "register" ? styles.navActive : styles.navLink} href="/register" prefetch={false}>
-          회원가입
-        </Link>
+        {username ? <button type="button" className={styles.navLink} onClick={logout} aria-label={`${username} 로그아웃`}>로그아웃</button> : <Link aria-current={current === "login" ? "page" : undefined} className={current === "login" ? styles.navActive : styles.navLink} href="/login" prefetch={false}>로그인</Link>}
       </nav>
     </header>
   );

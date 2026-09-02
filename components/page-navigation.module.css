@@ -92,7 +92,10 @@
   justify-content: center;
   text-decoration: none;
   white-space: nowrap;
+  font-family: inherit;
 }
+
+button.navLink { border: 0; background: transparent; }
 
 .navLink {
   color: var(--nav-link);
