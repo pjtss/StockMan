@@ -25,7 +25,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const timeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
   const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
   for (const timeframe of timeframes) {
-    const stale = await getDb().execute(sql`SELECT u.market, u.code FROM us_common_stock_universe u LEFT JOIN us_instrument_universe_candles c ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe} WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK' GROUP BY u.market, u.code HAVING MAX(c.fetched_at) IS NULL OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')`);
+    const stale = await getDb().execute(sql`SELECT u.market, u.code FROM us_common_stock_universe u LEFT JOIN us_instrument_universe_candles c ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe} WHERE u.instrument_type = 'COMMON_STOCK' GROUP BY u.market, u.code HAVING MAX(c.fetched_at) IS NULL OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')`);
     staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
   }
   const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryRows.some((row) => row.timeframe === timeframe));
@@ -37,7 +37,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
     FROM us_common_stock_universe u
     LEFT JOIN us_instrument_universe_candles c
       ON c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
-    WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
+    WHERE u.instrument_type = 'COMMON_STOCK'
     GROUP BY u.market, u.code
     HAVING COUNT(c.candle_date) < 35 OR COUNT(*) FILTER (WHERE COALESCE(c.raw_payload, '') = '') > 0`);
   for (const row of underfilled.rows as Array<{ market: string; code: string }>) underfilledDaily.add(`${String(row.market).toUpperCase()}:${String(row.code).toUpperCase()}`);
