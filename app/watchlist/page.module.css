@@ -40,6 +40,29 @@
   align-items: flex-start;
 }
 
+.watchLayout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start; }
+.addCard, .watchGroup { background: var(--card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 24px; backdrop-filter: blur(20px); }
+.addCard { position: sticky; top: 100px; }
+.watchMain { min-width: 0; display: grid; gap: 18px; }
+.watchGroup { min-width: 0; }
+.modes { display: flex; gap: 8px; margin-bottom: 14px; }
+.mode, .modeActive { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--glass-border); font-weight: 800; cursor: pointer; }
+.mode { background: rgba(255,255,255,.04); color: var(--text-secondary); }
+.modeActive { background: var(--neon-green, #00ffa3); color: #020617; border-color: transparent; }
+.watchInput { box-sizing: border-box; width: 100%; padding: 12px; margin-bottom: 10px; background: rgba(255,255,255,.06); border: 1px solid var(--glass-border); border-radius: 10px; color: var(--text-primary); outline: none; }
+.watchInput:focus { border-color: var(--neon-green, #00ffa3); }
+.addBtn { width: 100%; padding: 11px 12px; background: var(--neon-green, #00ffa3); color: #020617; border: 0; border-radius: 10px; font-weight: 800; cursor: pointer; }
+.statusMessage { margin: 12px 0 0; color: var(--neon-green, #00ffa3); font-size: 12px; }
+.count { color: var(--neon-green, #00ffa3); font-size: 12px; }
+.watchGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.watchCard { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: rgba(255,255,255,.035); border: 1px solid var(--glass-border); border-radius: 14px; min-width: 0; }
+.watchCard strong, .watchCard small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watchCard strong { color: var(--text-primary); }
+.watchCard small { margin-top: 5px; color: var(--text-secondary); font-size: 11px; }
+.watchActions { display: flex; gap: 6px; flex-shrink: 0; }
+.watchActions button { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(0,255,163,.35); background: rgba(0,255,163,.1); color: var(--text-primary); font-size: 11px; font-weight: 800; cursor: pointer; }
+.watchActions .removeBtn { border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.08); color: #fca5a5; }
+
 .sidebar {
   position: sticky;
   top: 100px;
@@ -405,4 +428,6 @@
   .sidebar {
     position: static;
   }
+  .watchLayout { grid-template-columns: 1fr; }
+  .addCard { position: static; }
 }

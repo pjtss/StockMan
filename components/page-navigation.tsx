@@ -37,6 +37,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         <Link aria-current={current === "charts" ? "page" : undefined} className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
           티커 차트
         </Link>
+        <Link aria-current={current === "watchlist" ? "page" : undefined} className={current === "watchlist" ? styles.navActive : styles.navLink} href="/watchlist" prefetch={false}>
+          관심종목
+        </Link>
         <Link aria-current={current === "inquiries" ? "page" : undefined} className={current === "inquiries" ? styles.navActive : styles.navLink} href="/inquiries" prefetch={false}>
           문의
         </Link>
