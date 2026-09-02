@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"; import { loginUser } from "@/lib/user-auth";
+export async function POST(request:Request){try{const b=await request.json();const user=await loginUser(String(b.username??"").trim(),String(b.password??""),request.headers.get("x-forwarded-for")?.split(",")[0].trim(),request.headers.get("user-agent"));const response=NextResponse.json({ok:true,user:user.user});response.cookies.set(user.cookie.name,user.cookie.value,user.cookie.options);return response;}catch{return NextResponse.json({ok:false,error:"INVALID_LOGIN"},{status:401});}}
