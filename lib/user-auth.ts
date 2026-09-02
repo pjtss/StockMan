@@ -8,8 +8,9 @@ const secure = () => process.env.NODE_ENV === "production" || process.env.AUTH_C
 const hashToken = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 const passwordHash = (password: string, salt = crypto.randomBytes(16).toString("hex")) => `${salt}:${crypto.scryptSync(password, salt, 64).toString("hex")}`;
 const passwordMatches = (password: string, stored: string) => { const [salt, value] = stored.split(":"); if (!salt || !value) return false; const actual = crypto.scryptSync(password, salt, 64); const expected = Buffer.from(value, "hex"); return actual.length === expected.length && crypto.timingSafeEqual(actual, expected); };
-export function validateUsername(value: string) { return /^[A-Za-z0-9_]{3,32}$/.test(value); }
-export function validatePassword(value: string) { return value.length >= 8 && value.length <= 128; }
+// Username/password are intentionally unrestricted by product policy.
+export function validateUsername(_value: string) { return true; }
+export function validatePassword(_value: string) { return true; }
 function cookie(value: string, maxAge: number) { return { name: COOKIE, value, options: { httpOnly: true, sameSite: "lax" as const, secure: secure(), path: "/", maxAge } }; }
 export function clearUserSessionCookie() { return cookie("", 0); }
 export async function logoutUser() { const token=(await cookies()).get(COOKIE)?.value; if(token) await getPool().query("UPDATE user_sessions SET revoked_at=NOW() WHERE session_hash=$1 AND revoked_at IS NULL",[hashToken(token)]); }

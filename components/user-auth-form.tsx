@@ -24,8 +24,8 @@ export function UserAuthForm({ mode }: { mode: "login" | "register" }) {
     <div className={styles.icon} aria-hidden="true">⚡</div><p className={styles.eyebrow}>STOCKMAN QUANT</p>
     <h1>{isLogin ? "다시 만나서 반가워요" : "StockMan 시작하기"}</h1>
     <p className={styles.description}>{isLogin ? "계정에 로그인하고 관심종목과 차트를 계속 확인하세요." : "간단한 계정으로 나만의 관심종목을 관리하세요."}</p>
-    <div className={styles.fields}><label className={styles.field} htmlFor="auth-username"><span>아이디</span><input id="auth-username" value={username} onChange={event => setUsername(event.target.value)} placeholder="영문, 숫자, 밑줄 3~32자" autoComplete="username" required /></label>
-      <label className={styles.field} htmlFor="auth-password"><span>비밀번호</span><input id="auth-password" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="8자 이상 입력" autoComplete={isLogin ? "current-password" : "new-password"} minLength={8} required /></label></div>
+    <div className={styles.fields}><label className={styles.field} htmlFor="auth-username"><span>아이디</span><input id="auth-username" value={username} onChange={event => setUsername(event.target.value)} placeholder="아이디를 입력하세요" autoComplete="username" /></label>
+      <label className={styles.field} htmlFor="auth-password"><span>비밀번호</span><input id="auth-password" type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="비밀번호를 입력하세요" autoComplete={isLogin ? "current-password" : "new-password"} /></label></div>
     {error && <p className={styles.error} role="alert">{error}</p>}{done && <p className={styles.success} role="status">가입이 완료되었습니다. 로그인해 주세요.</p>}
     <button className={styles.submit} type="submit" disabled={loading}>{loading ? "처리 중…" : isLogin ? "로그인" : "회원가입"}<span aria-hidden="true">→</span></button>
     <p className={styles.switch}>{isLogin ? "아직 계정이 없나요?" : "이미 계정이 있나요?"} <Link href={isLogin ? "/register" : "/login"}>{isLogin ? "회원가입" : "로그인"}</Link></p>

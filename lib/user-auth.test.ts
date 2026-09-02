@@ -2,19 +2,14 @@ import { describe, expect, it } from "vitest";
 import { clearUserSessionCookie, validatePassword, validateUsername } from "./user-auth";
 
 describe("user authentication policy", () => {
-  it("accepts only the documented username format", () => {
-    expect(validateUsername("abc" )).toBe(true);
-    expect(validateUsername("user_01")).toBe(true);
-    expect(validateUsername("ab")).toBe(false);
-    expect(validateUsername("user-name")).toBe(false);
-    expect(validateUsername("가나다")).toBe(false);
+  it("accepts usernames without format or length restrictions", () => {
+    expect(validateUsername("")).toBe(true);
+    expect(validateUsername("가나다 이름/기호".repeat(100))).toBe(true);
   });
 
-  it("enforces the 8 to 128 character password bounds", () => {
-    expect(validatePassword("1234567")).toBe(false);
-    expect(validatePassword("12345678")).toBe(true);
-    expect(validatePassword("x".repeat(128))).toBe(true);
-    expect(validatePassword("x".repeat(129))).toBe(false);
+  it("accepts passwords without length restrictions", () => {
+    expect(validatePassword("")).toBe(true);
+    expect(validatePassword("p".repeat(1000))).toBe(true);
   });
 
   it("clears the fixed-expiry session cookie without renewal", () => {
