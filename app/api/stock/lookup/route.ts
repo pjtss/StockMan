@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   const codes = [...new Set((searchParams.get("codes") ?? "").split(",").map((code) => code.trim().toUpperCase()).filter(Boolean))];
   if (!codes.length) return NextResponse.json({ names: {} });
   const table = market === "US" ? "us_common_stock_universe" : "kr_common_stock_universe";
-  const rows = (await getPool().query(`SELECT code, name FROM ${table} WHERE enabled = TRUE AND code = ANY($1)`, [codes])).rows;
+  // Chart lookup must resolve names for both active and inactive instruments;
+  // activity filtering belongs to screeners, not the chart display.
+  const rows = (await getPool().query(`SELECT code, name FROM ${table} WHERE code = ANY($1)`, [codes])).rows;
   return NextResponse.json({ names: Object.fromEntries(rows.map((row) => [row.code, row.name])) });
 }
