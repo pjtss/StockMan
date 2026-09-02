@@ -24,7 +24,7 @@ type PageKey =
 export function PageNavigation({ current }: { current: PageKey }) {
   const [username, setUsername] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  useEffect(() => { fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" }).then(response => response.ok ? response.json() : null).then(body => setUsername(body?.user?.username ?? null)).catch(() => setUsername(null)).finally(() => setAuthChecked(true)); }, []);
+  useEffect(() => { fetch(`/api/auth/me?ts=${Date.now()}`, { credentials: "same-origin", cache: "no-store" }).then(response => response.ok ? response.json() : null).then(body => setUsername(body?.authenticated ? body.user?.username ?? null : null)).catch(() => setUsername(null)).finally(() => setAuthChecked(true)); }, []);
   async function logout() { await fetch("/api/auth/logout", { method: "POST" }); setUsername(null); window.location.reload(); }
   return (
     <header className={styles.header}>
