@@ -31,6 +31,11 @@ export const OPERATIONAL_SCHEMA_TABLES = [
 /** Tables removed by V70 and not allowed in the active architecture. */
 export const RETIRED_SCHEMA_TABLES = ["kr_daily_price_candles", "us_daily_price_candles"] as const;
 
+export const REQUIRED_OPERATIONAL_COLUMNS = [
+  ["kr_common_stock_universe", "daily_active"],
+  ["us_common_stock_universe", "daily_active"],
+] as const;
+
 export type SchemaHealth = {
   connectionOk: boolean;
   schemaReady: boolean;
@@ -39,6 +44,7 @@ export type SchemaHealth = {
   missingTables: string[];
   operationalTables: string[];
   missingOperationalTables: string[];
+  missingOperationalColumns: string[];
   retiredTablesPresent: string[];
   latencyMs: number;
   error?: { errorCode: string; message: string; databaseCode?: string };
@@ -61,6 +67,14 @@ export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
     const checkedTables = tableResult.rows.map((row) => row.table_name);
     const missingTables = getMissingSchemaTables(checkedTables);
     const missingOperationalTables = getMissingSchemaTables(checkedTables, OPERATIONAL_SCHEMA_TABLES);
+    const columnResult = await pool.query<{ table_name: string; column_name: string }>(
+      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (($1, $2), ($3, $4))",
+      ["kr_common_stock_universe", "daily_active", "us_common_stock_universe", "daily_active"],
+    );
+    const availableColumns = new Set(columnResult.rows.map((row) => `${row.table_name}.${row.column_name}`));
+    const missingOperationalColumns = REQUIRED_OPERATIONAL_COLUMNS
+      .map(([table, column]) => `${table}.${column}`)
+      .filter((column) => !availableColumns.has(column));
     const retiredResult = await pool.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
       [RETIRED_SCHEMA_TABLES],
@@ -73,12 +87,13 @@ export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
     }
     return {
       connectionOk: true,
-      schemaReady: missingOperationalTables.length === 0 && retiredTablesPresent.length === 0 && Boolean(flywayVersion),
+      schemaReady: missingOperationalTables.length === 0 && missingOperationalColumns.length === 0 && retiredTablesPresent.length === 0 && Boolean(flywayVersion),
       flywayVersion,
       checkedTables,
       missingTables,
       operationalTables: checkedTables.filter((table) => (OPERATIONAL_SCHEMA_TABLES as readonly string[]).includes(table)),
       missingOperationalTables,
+      missingOperationalColumns,
       retiredTablesPresent,
       latencyMs: Date.now() - startedAt,
     };
@@ -92,6 +107,7 @@ export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
       missingTables: [...CORE_SCHEMA_TABLES],
       operationalTables: [],
       missingOperationalTables: [...OPERATIONAL_SCHEMA_TABLES],
+      missingOperationalColumns: REQUIRED_OPERATIONAL_COLUMNS.map(([table, column]) => `${table}.${column}`),
       retiredTablesPresent: [],
       latencyMs: Date.now() - startedAt,
       error: { errorCode: diagnostics.errorCode, message: diagnostics.message, databaseCode: diagnostics.databaseCode },
