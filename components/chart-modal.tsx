@@ -37,6 +37,19 @@ function rollingAverage(values: number[], period: number, index: number) {
   return values.slice(index - period + 1, index + 1).reduce((sum, value) => sum + value, 0) / period;
 }
 
+function emaSeries(values: number[], period: number): Array<number | null> {
+  if (values.length < period) return values.map(() => null);
+  const result: Array<number | null> = values.map(() => null);
+  const multiplier = 2 / (period + 1);
+  let previous = values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
+  result[period - 1] = previous;
+  for (let index = period; index < values.length; index += 1) {
+    previous = (values[index] - previous) * multiplier + previous;
+    result[index] = previous;
+  }
+  return result;
+}
+
 function indicatorLines(candles: OHLCVCandle[]): IndicatorLine[] {
   const closes = candles.map((c) => c.close);
   const highs = candles.map((c) => c.high);
@@ -205,6 +218,23 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
       }));
       candleSeries.setData(candleData);
 
+      // 일반 이동평균선은 프로젝트 규칙에 따라 EMA를 사용한다.
+      const emaColors = new Map([[9, "#facc15"], [20, "#fb923c"], [60, "#c084fc"]]);
+      const closeValues = candles.map((item) => item.close);
+      for (const [period, color] of emaColors) {
+        const values = emaSeries(closeValues, period);
+        const series = chart.addSeries(LineSeries, {
+          color,
+          lineWidth: 1,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        series.setData(candles.map((candle, index) => ({
+          time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+          value: values[index],
+        })).filter((point): point is { time: any; value: number } => point.value != null));
+      }
+
       // 거래량 막대와 20개 봉 평균 거래량 선
       const volumeSeries = chart.addSeries(HistogramSeries, {
         priceScaleId: "volume",
@@ -349,6 +379,11 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
           {!loading && !error && data && activeTab === "chart" && (
             <div id="chart-panel" role="tabpanel" aria-labelledby="chart-tab">
               {/* 캔들 차트 */}
+              <div className={styles.chartLegend} aria-label="지수이동평균선 범례">
+                <span style={{ color: "#facc15" }}>● EMA 9</span>
+                <span style={{ color: "#fb923c" }}>● EMA 20</span>
+                <span style={{ color: "#c084fc" }}>● EMA 60</span>
+              </div>
               <div className={styles.chartWrap} ref={chartRef} />
               <IndicatorCharts candles={data.candles} />
 

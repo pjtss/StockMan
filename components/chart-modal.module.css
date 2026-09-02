@@ -28,6 +28,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
   animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -160,6 +161,16 @@
   position: relative;
 }
 
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .indicatorCharts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -289,6 +300,26 @@
 @media (max-width: 600px) {
   .modal { max-height: 95vh; border-radius: 16px 16px 0 0; }
   .overlay { align-items: flex-end; padding: 0; }
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+    min-height: 72px;
+    padding: 16px 64px 12px 16px;
+    background: rgba(10, 14, 26, 0.98);
+  }
+  .titleBlock { min-width: 0; }
+  .company, .code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* iOS Safari can scroll the fixed modal itself while the chart canvas is
+     being interacted with. Keep the dismiss action viewport-visible. */
+  .closeBtn {
+    position: absolute;
+    top: 16px;
+    right: 12px;
+    z-index: 1060;
+    margin-left: 0;
+    background: rgba(10, 14, 26, 0.96);
+  }
   .body { padding: 16px; }
   .tabs { padding-left: 16px; padding-right: 16px; }
   .indicators { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
