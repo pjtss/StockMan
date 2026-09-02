@@ -6,7 +6,6 @@ import styles from "@/app/watchlist/page.module.css";
 
 type Market = "KR" | "US";
 type WatchItem = { market: Market; code: string; name?: string };
-const STORAGE_KEY = "stockman_chart_watchlist";
 
 function normalizeCode(value: string, market: Market) {
   const code = value.trim().toUpperCase();
@@ -22,13 +21,10 @@ export function WatchlistWorkbench() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
-      if (Array.isArray(saved)) setItems(saved.filter((item): item is WatchItem => Boolean(item?.market && item?.code)));
-    } catch { setItems([]); }
+    fetch("/api/watchlist").then(response => response.ok ? response.json() : Promise.reject(new Error("unauthorized")))
+      .then(body => setItems((body.items ?? []).map((item: WatchItem) => ({ market: item.market, code: item.code }))))
+      .catch(() => setMessage("관심종목을 사용하려면 로그인해 주세요."));
   }, []);
-
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }, [items]);
 
   const grouped = useMemo(() => ({ KR: items.filter(item => item.market === "KR"), US: items.filter(item => item.market === "US") }), [items]);
 
@@ -47,15 +43,17 @@ export function WatchlistWorkbench() {
     }).catch(() => undefined);
   }, [items]);
 
-  function addItems() {
+  async function addItems() {
     const codes = [...new Set(input.split(/[,,\n\s]+/).map(value => normalizeCode(value, market)).filter(Boolean))];
     if (!codes.length) { setMessage("티커를 입력하세요."); return; }
     const existing = new Set(items.map(item => `${item.market}:${item.code}`));
     const added = codes.filter(code => !existing.has(`${market}:${code}`)).map(code => ({ market, code }));
-    setItems(current => [...current, ...added]); setInput(""); setMessage(added.length ? `${added.length}개 종목을 등록했습니다.` : "이미 등록된 종목입니다.");
+    const saved: WatchItem[] = [];
+    for (const item of added) { const response = await fetch("/api/watchlist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(item) }); if (response.ok) saved.push(item); }
+    setItems(current => [...current, ...saved]); setInput(""); setMessage(saved.length ? `${saved.length}개 종목을 등록했습니다.` : added.length ? "등록할 수 없습니다. 로그인 상태를 확인해 주세요." : "이미 등록된 종목입니다.");
   }
 
-  function removeItem(item: WatchItem) { setItems(current => current.filter(value => !(value.market === item.market && value.code === item.code))); if (selected?.code === item.code && selected.market === item.market) setSelected(null); }
+  async function removeItem(item: WatchItem) { const response = await fetch("/api/watchlist", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(item) }); if (response.ok) setItems(current => current.filter(value => !(value.market === item.market && value.code === item.code))); if (selected?.code === item.code && selected.market === item.market) setSelected(null); }
   function renderGroup(label: string, group: WatchItem[]) {
     return <section className={styles.watchGroup}><div className={styles.feedHeader}><h2 className={styles.cardTitle}>{label} <span className={styles.count}>{group.length}</span></h2></div>{!group.length ? <p className={styles.emptyState}>등록된 종목이 없습니다.</p> : <div className={styles.watchGrid}>{group.map(item => <article className={styles.watchCard} key={`${item.market}:${item.code}`}><div><strong>{names[item.code] ?? item.name ?? "회사명 확인 중"}</strong><small>{item.code} · {item.market === "KR" ? "국내" : "해외"}</small></div><div className={styles.watchActions}><button type="button" onClick={() => setSelected({ ...item, name: names[item.code] ?? item.name })}>차트 보기</button><button type="button" className={styles.removeBtn} onClick={() => removeItem(item)} aria-label={`${item.code} 삭제`}>삭제</button></div></article>)}</div>}</section>;
   }
