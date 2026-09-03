@@ -8,10 +8,10 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const selectedClient = client ?? CloudTranslationClient.fromEnvironment();
   if (!selectedClient) return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "cloud_translation_not_configured" };
   const title = await selectedClient.translate(item.title);
-  const summary = item.summary.trim() ? await selectedClient.translate(item.summary) : { translatedText: "", fallback: false, fallbackReason: undefined };
-  const content = item.content?.trim() ? await selectedClient.translate(item.content) : null;
-  const fallbackReason = [title.fallbackReason, summary.fallbackReason, content?.fallbackReason].filter(Boolean).join(",") || undefined;
-  return { ...item, translatedTitle: title.translatedText, translatedSummary: summary.translatedText, ...(content ? { translatedContent: content.translatedText } : {}), translationFallback: title.fallback || summary.fallback || Boolean(content?.fallback), translationFallbackReason: fallbackReason };
+  // Cost policy: only the headline is sent to Google Translation. Keep the
+  // original summary/body available to callers without spending translation
+  // quota on fields that are not currently displayed as translated.
+  return { ...item, translatedTitle: title.translatedText, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason };
 }
 
 export async function translateMarketRssItems(items: MarketRssItem[], client: TranslationClient = new LibreTranslateClient()) {

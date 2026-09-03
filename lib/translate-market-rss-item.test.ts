@@ -7,15 +7,14 @@ const item = (id: string): MarketRssItem => ({ id, title: `Title ${id}`, summary
 const client = (translate: TranslationClient["translate"]): TranslationClient => ({ translate });
 
 describe("market RSS translation", () => {
-  it("translates both title and summary for debugging visibility", async () => {
+  it("translates the title only and preserves the original summary", async () => {
     const translate = vi.fn(async (text: string) => ({ translatedText: `번역:${text}`, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
     const result = await translateMarketRssItem(item("1"), client(translate));
 
-    expect(translate).toHaveBeenCalledTimes(2);
+    expect(translate).toHaveBeenCalledTimes(1);
     expect(translate).toHaveBeenCalledWith("Title 1");
-    expect(translate).toHaveBeenCalledWith("Long summary 1");
     expect(result.translatedTitle).toBe("번역:Title 1");
-    expect(result.translatedSummary).toBe("번역:Long summary 1");
+    expect(result.translatedSummary).toBe("Long summary 1");
   });
 
   it("processes a batch sequentially", async () => {
@@ -28,6 +27,6 @@ describe("market RSS translation", () => {
     });
     await translateMarketRssItems([item("1"), item("2")], client(translate));
 
-    expect(order).toEqual(["start:Title 1", "end:Title 1", "start:Long summary 1", "end:Long summary 1", "start:Title 2", "end:Title 2", "start:Long summary 2", "end:Long summary 2"]);
+    expect(order).toEqual(["start:Title 1", "end:Title 1", "start:Title 2", "end:Title 2"]);
   });
 });
