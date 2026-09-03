@@ -25,8 +25,9 @@ describe("market RSS translation", () => {
       order.push(`end:${text}`);
       return { translatedText: text, source: "en" as const, target: "ko" as const, provider: "test", fallback: false };
     });
-    await translateMarketRssItems([item("1"), item("2")], client(translate));
+    await translateMarketRssItems([item("1"), item("2"), item("3"), item("4"), item("5")], client(translate));
 
-    expect(order).toEqual(["start:Title 1", "end:Title 1", "start:Title 2", "end:Title 2"]);
+    expect(order).toEqual(["start:Title 1", "end:Title 1", "start:Title 2", "end:Title 2", "start:Title 3", "end:Title 3", "start:Title 4", "end:Title 4", "start:Title 5", "end:Title 5"]);
+    expect(translate).toHaveBeenCalledTimes(5);
   });
 });
