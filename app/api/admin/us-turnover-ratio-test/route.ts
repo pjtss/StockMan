@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { requireAdminSession } from "@/lib/admin-auth";
+import { calculateMarketCapTurnoverPercent, isTurnoverRatioAllowed, loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
+export async function GET(request: Request) { if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 }); const p = new URL(request.url).searchParams; const tradingValue = Number(p.get("tradingValue")); const marketCap = Number(p.get("marketCap")); const ratio = calculateMarketCapTurnoverPercent(tradingValue, marketCap); const settings = await loadUsTurnoverFilterSettings(); return NextResponse.json({ ok: true, formula: "tradingValue / marketCap * 100", tradingValue, marketCap, ratioPercent: ratio, minimumRatioPercent: settings.minTurnoverRatio, qualifies: ratio != null && isTurnoverRatioAllowed(ratio, settings) }); }

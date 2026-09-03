@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_US_TURNOVER_FILTER_SETTINGS, isGlobalMarketCapAllowed, isTurnoverRatioAllowed } from "./us-turnover-settings";
+import { calculateMarketCapTurnoverPercent, DEFAULT_US_TURNOVER_FILTER_SETTINGS, isGlobalMarketCapAllowed, isTurnoverRatioAllowed } from "./us-turnover-settings";
 
 describe("US turnover settings shared predicates", () => {
+  it("calculates market-cap-relative trading value as a percent", () => {
+    expect(calculateMarketCapTurnoverPercent(50, 1000)).toBe(5);
+    expect(calculateMarketCapTurnoverPercent(49.99, 1000)).toBeCloseTo(4.999);
+    expect(calculateMarketCapTurnoverPercent(1, 0)).toBeNull();
+  });
   it("applies the configured turnover-ratio range inclusively", () => {
     const settings = { ...DEFAULT_US_TURNOVER_FILTER_SETTINGS, minTurnoverRatio: 2, maxTurnoverRatio: 5 };
     expect(isTurnoverRatioAllowed(2, settings)).toBe(true);

@@ -1,4 +1,4 @@
-import { isGlobalMarketCapAllowed, isTurnoverRatioAllowed, loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
+import { calculateMarketCapTurnoverPercent, isGlobalMarketCapAllowed, isTurnoverRatioAllowed, loadUsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 
 export async function filterUsDailyCandidates<T extends Record<string, any>>(items: T[]) {
   const settings = await loadUsTurnoverFilterSettings();
@@ -22,7 +22,7 @@ export async function filterUsDailyCandidates<T extends Record<string, any>>(ite
     const price = Number(item.price ?? item.currentPrice ?? metric?.price);
     const rate = Number(item.rate ?? item.changeRate ?? metric?.changeRate);
     const rawMarketCap = item.marketCap ?? metric?.marketCap;
-    const rawTurnover = item.turnoverRatio ?? metric?.turnoverRatio;
+    const rawTurnover = item.turnoverRatio ?? metric?.turnoverRatio ?? calculateMarketCapTurnoverPercent(item.tradingValue ?? item.rankingTradeValue, rawMarketCap);
     const marketCap = rawMarketCap == null ? Number.NaN : Number(rawMarketCap);
     const turnover = rawTurnover == null ? Number.NaN : Number(rawTurnover);
     if (settings.maxPrice > 0 && !Number.isFinite(price)) return reject("missing_price");
