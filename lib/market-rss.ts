@@ -37,13 +37,23 @@ export function parseMarketRss(xml: string, source: string, url: string): Market
 }
 
 export async function fetchMarketRss(source: string, url: string, init: RequestInit = {}): Promise<MarketRssFeed> {
-  const response = await fetch(url, { ...init, headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml", ...(init.headers || {}) }, cache: "no-store" });
-  if (!response.ok) throw new Error(`${source} RSS 요청 실패: ${response.status}`);
-  const rawPayload = await response.text();
-  return {
-    ...parseMarketRss(rawPayload, source, url),
-    rawPayload,
-    responseStatus: response.status,
-    responseHeaders: Object.fromEntries(response.headers.entries()),
-  };
+  const timeoutMs = Math.max(1_000, Number(process.env.RSS_FETCH_TIMEOUT_MS || 30_000));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal, headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml", ...(init.headers || {}) }, cache: "no-store" });
+    if (!response.ok) throw new Error(`${source} RSS 요청 실패: ${response.status}`);
+    const rawPayload = await response.text();
+    return {
+      ...parseMarketRss(rawPayload, source, url),
+      rawPayload,
+      responseStatus: response.status,
+      responseHeaders: Object.fromEntries(response.headers.entries()),
+    };
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`${source} RSS 요청 시간 초과(${timeoutMs}ms)`);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

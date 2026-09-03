@@ -66,7 +66,18 @@ async function runSuite(checks: CheckName[]) {
   if (checks.includes("automation")) {
     result.automation = { ok: true, featureModuleSettings: await safeCount(pool, "feature_module_settings"), automationRuns: await safeCount(pool, "automation_runs") };
   }
-  if (checks.includes("rss")) result.rss = { ok: true, marketRssArticles: await safeCount(pool, "market_rss_articles"), fetchSnapshots: await safeCount(pool, "market_rss_fetch_snapshots") };
+  if (checks.includes("rss")) {
+    try {
+      const [articles, snapshots, runs] = await Promise.all([
+        pool.query(`SELECT source, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at, MAX(created_at) AS latest_created_at FROM market_rss_articles GROUP BY source ORDER BY source`),
+        pool.query(`SELECT DISTINCT ON (source) source, status, item_count, fetched_at, url FROM market_rss_fetch_snapshots ORDER BY source, fetched_at DESC`),
+        pool.query(`SELECT status, started_at, finished_at, duration_ms, summary, error_message FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 5`),
+      ]);
+      result.rss = { ok: true, marketRssArticles: await safeCount(pool, "market_rss_articles"), fetchSnapshots: await safeCount(pool, "market_rss_fetch_snapshots"), bySource: articles.rows, latestFetchBySource: snapshots.rows, recentRuns: runs.rows };
+    } catch (error) {
+      result.rss = { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
   if (checks.includes("sec")) result.sec = { ok: true, filingEvents: await safeCount(pool, "sec_filing_events"), sourceSnapshots: await safeCount(pool, "sec_source_snapshots") };
   return { ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, checks, result };
 }
