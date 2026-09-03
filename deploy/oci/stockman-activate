@@ -48,7 +48,7 @@ FLYWAY_USER="${DB_AUTH%%:*}"
 FLYWAY_PASSWORD="${DB_AUTH#*:}"
 FLYWAY_JDBC_URL="jdbc:postgresql://${DB_HOST_AND_NAME}"
 stage="flyway-migrate"
-docker run --rm --network host \
+timeout --signal=TERM --kill-after=30s 600s docker run --rm --network host \
   -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
   "$FLYWAY_IMAGE" \
   -url="$FLYWAY_JDBC_URL" \
@@ -69,15 +69,15 @@ install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.service" /etc/systemd/sys
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.timer" /etc/systemd/system/stockman-cron.timer
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-rss.service" /etc/systemd/system/stockman-rss.service
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-rss.timer" /etc/systemd/system/stockman-rss.timer
-systemctl daemon-reload
-systemctl restart stockman.service
+timeout --signal=TERM --kill-after=10s 30s systemctl daemon-reload
+timeout --signal=TERM --kill-after=20s 120s systemctl restart stockman.service
 systemctl enable stockman-cron.timer
-systemctl restart stockman-cron.timer
-systemctl enable stockman-rss.timer
-systemctl restart stockman-rss.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-cron.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl enable stockman-rss.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-rss.timer
 # Run one scheduler pass immediately after activation so a fresh deployment
 # never leaves the cache health view stale until the next calendar boundary.
-systemctl start --no-block stockman-cron.service
+timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-cron.service
 systemctl is-active --quiet stockman.service
 systemctl is-active --quiet stockman-cron.timer
 systemctl is-active --quiet stockman-rss.timer
