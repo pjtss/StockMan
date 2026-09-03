@@ -42,6 +42,8 @@ async function runSuite(checks: CheckName[]) {
       ok: Boolean(process.env.DATABASE_URL && process.env.CRON_SECRET),
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       kisConfigured: Boolean(process.env.KIS_APPKEY && process.env.KIS_APPSECRET),
+      googleTranslationApiKeyConfigured: Boolean(process.env.GOOGLE_TRANSLATION_API_KEY?.trim()),
+      googleTranslationAuthMode: process.env.GOOGLE_TRANSLATION_API_KEY?.trim() ? "api-key" : "not-configured",
       discordConfigured: Boolean(process.env.DISCORD_WEBHOOK_URL || process.env.MARKET_RSS_DISCORD_WEBHOOK_URL || process.env.SEC_DISCORD_WEBHOOK_URL),
       cronSecretConfigured: Boolean(process.env.CRON_SECRET),
     };
