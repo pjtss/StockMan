@@ -57,6 +57,7 @@ const DEFAULT_SETTINGS: ModuleSettings = {
 
 export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModuleKey }) {
   const [settings, setSettings] = useState<ModuleSettings>(DEFAULT_SETTINGS);
+  const [turnoverRatio, setTurnoverRatio] = useState(5);
   const [message, setMessage] = useState("");
   const [manualJob, setManualJob] = useState<{ jobId: string; status: string; processedCount?: number; instrumentCount?: number; successCount?: number; failureCount?: number } | null>(null);
 
@@ -70,8 +71,20 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
       });
   }, [moduleKey]);
 
+  useEffect(() => {
+    if (moduleKey !== "us-scanners") return;
+    void fetch("/api/admin/us-turnover-settings", { cache: "no-store" }).then((response) => response.json()).then((value) => {
+      if (value?.settings) setTurnoverRatio(Number(value.settings.minTurnoverRatio ?? 5));
+    });
+  }, [moduleKey]);
+
   async function save() {
     const response = await fetch(`/api/admin/feature-modules/${moduleKey}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
+    if (response.ok && moduleKey === "us-scanners") {
+      const ratioResponse = await fetch("/api/admin/us-turnover-settings", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ minTurnoverRatio: turnoverRatio }) });
+      setMessage(ratioResponse.ok ? "공통 운영 설정과 거래대금 비율이 저장되었습니다." : "거래대금 비율 저장에 실패했습니다.");
+      return;
+    }
     setMessage(response.ok ? "공통 운영 설정이 저장되었습니다." : "저장 실패");
   }
 
@@ -143,6 +156,7 @@ export function FeatureModuleOperations({ moduleKey }: { moduleKey: FeatureModul
     {moduleKey === "us-news-radar" && <><h3>Discord 티커 뉴스 조회 설정</h3><div className={styles.fields}><label>기간 미입력 시 기본 기간<select value={newsLookup.defaultPeriod} onChange={(event) => updateNewsLookup(event.target.value as "today" | "3d" | "7d" | "1m")}><option value="today">오늘</option><option value="3d">최근 3일</option><option value="7d">최근 7일</option><option value="1m">최근 1개월</option></select></label></div><p className={styles.scheduleHint}>Discord에서 <strong>/news symbol:AAPL</strong>처럼 티커만 입력하면 이 기본 기간으로 KIS 뉴스를 조회합니다.</p></>}
     {moduleKey === "us-minute-bollinger-band" && <><h3>1분봉 볼린저밴드 조건</h3><div className={styles.fields}><label>상승률 TOP N<input type="number" min="1" max="100" value={Number(minuteBollingerPolicy.topN ?? 30)} onChange={(event) => updateMinuteBollinger("topN", Number(event.target.value))} /></label><label>볼린저 기간(분)<input type="number" min="2" max="120" value={Number(minuteBollingerPolicy.period ?? 20)} onChange={(event) => updateMinuteBollinger("period", Number(event.target.value))} /></label><label>표준편차 배수<input type="number" min="0.1" max="10" step="0.1" value={Number(minuteBollingerPolicy.stdDevMultiplier ?? 2)} onChange={(event) => updateMinuteBollinger("stdDevMultiplier", Number(event.target.value))} /></label><label>최소 등락률(%)<input type="number" step="0.1" value={Number(minuteBollingerPolicy.minChangeRate ?? 0)} onChange={(event) => updateMinuteBollinger("minChangeRate", Number(event.target.value))} /></label></div><p className={styles.scheduleHint}>NAS·AMS·NYS별 상승률 TOP N을 대상으로 ETF·레버리지·파생상품을 제외하고 KIS 1분봉 종가가 하단선 이하인 종목을 탐지합니다.</p></>}
     {moduleKey === "us-minute-obv-adl" && <><h3>1분봉 OBV·ADL 상승 조건</h3><div className={styles.fields}><label>상승률 TOP N<input type="number" min="1" max="100" value={Number(minuteObvAdlPolicy.topN ?? 100)} onChange={(event) => updateMinuteObvAdl("topN", Number(event.target.value))} /></label><label>OBV Signal 기간<input type="number" min="2" max="100" value={Number(minuteObvAdlPolicy.obvSignalPeriod ?? 9)} onChange={(event) => updateMinuteObvAdl("obvSignalPeriod", Number(event.target.value))} /></label><label>ADL Signal 기간<input type="number" min="2" max="100" value={Number(minuteObvAdlPolicy.adlSignalPeriod ?? 9)} onChange={(event) => updateMinuteObvAdl("adlSignalPeriod", Number(event.target.value))} /></label><label>최소 등락률(%)<input type="number" step="0.1" value={Number(minuteObvAdlPolicy.minChangeRate ?? 0)} onChange={(event) => updateMinuteObvAdl("minChangeRate", Number(event.target.value))} /></label><label><input type="checkbox" checked={Boolean(minuteObvAdlPolicy.requireRisingSignals ?? true)} onChange={(event) => updateMinuteObvAdl("requireRisingSignals", event.target.checked)} /> OBV·ADL Signal 동시 상승 필수</label></div><p className={styles.scheduleHint}>NAS·AMS·NYS별 상승률 TOP N의 KIS 1분봉에서 거래량 기반 OBV와 고가·저가·종가 기반 ADL을 계산합니다.</p></>}
+    {moduleKey === "us-scanners" && <><h3>시총 대비 거래대금 조건</h3><div className={styles.fields}><label>최소 비율(%)<input type="number" min="0" step="0.1" value={turnoverRatio} onChange={(event) => setTurnoverRatio(Number(event.target.value))} /></label></div><p className={styles.scheduleHint}>거래대금 ÷ 시가총액 × 100으로 계산합니다. 기본값 5%이며, 시총 또는 거래대금이 없는 종목은 제외됩니다.</p></>}
     <label>기능 전용 Discord Webhook URL<p>비워두면 해당 기능의 환경변수 fallback을 사용합니다.</p><input type="url" value={webhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateWebhook(event.target.value)} /></label>
     <label>디버깅 전용 Discord Webhook URL<p>실패·재시도·복구 통계만 전송합니다. 비워두면 STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL을 사용합니다.</p><input type="url" value={debugWebhookUrl} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateDebugWebhook(event.target.value)} /></label>
     {(moduleKey === "kr-daily-cache" || moduleKey === "us-daily-cache" || moduleKey === "us-daily-open-cache") && <><h3>자동 수집 완료 알림</h3><label className={styles.toggle}><input type="checkbox" checked={completion.enabled !== false} onChange={(event) => updateCompletion("enabled", event.target.checked)} /><span>작업 완료 요약을 Discord로 전송</span></label><label>완료 알림 Discord Webhook URL<p>비워두면 AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL 환경변수를 사용합니다.</p><input type="url" value={completion.webhookUrl || ""} placeholder="https://discord.com/api/webhooks/..." onChange={(event) => updateCompletion("webhookUrl", event.target.value)} /></label></>}
