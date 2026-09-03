@@ -20,4 +20,12 @@ describe("CloudTranslationClient", () => {
     expect(String(url)).toContain("/language/translate/v2?key=test-key");
     expect(init.body).toContain('"q":"Hello"');
   });
+
+  it("retries a transient provider failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response("temporary", { status: 503 })).mockResolvedValueOnce(new Response(JSON.stringify({ data: { translations: [{ translatedText: "재시도 성공" }] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await new CloudTranslationClient("test-key").translate("Retry");
+    expect(result.translatedText).toBe("재시도 성공");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

@@ -81,7 +81,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
   const client = CloudTranslationClient.fromEnvironment();
   if (!client) return { attempted: 0, translated: 0, cached: 0, fallback: 0, failed: 0, skipped: true, reason: "cloud_translation_not_configured" };
-  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.translationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
+  const rows = await db.select().from(marketRssArticles).where(and(or(eq(marketRssArticles.translationStatus, "PENDING"), and(eq(marketRssArticles.translationStatus, "FAILED"), lt(marketRssArticles.translationAttempts, 3))), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
   const cachedClient: TranslationClient = { translate: async (text: string, source: TranslationLanguage = "en", target: TranslationLanguage = "ko"): Promise<TranslationResult> => {
     const provider = "google-cloud-translation";
     const cached = await loadTranslationCache(text, provider, target);
