@@ -21,7 +21,7 @@ export async function GET() {
       items: ranked,
     });
   } catch (error) {
-    console.error("Ranking API error:", error);
-    return NextResponse.json({ error: "Failed to fetch ranking" }, { status: 500 });
+    console.error("[API /dart/ranking] Error:", error instanceof Error ? error.message : "unknown error");
+    return NextResponse.json({ error: "DART 순위 데이터를 불러오지 못했습니다." }, { status: 503 });
   }
 }

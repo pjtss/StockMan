@@ -93,7 +93,7 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
   });
   if (!response.ok) {
     const responseText = await response.text();
-    console.warn(`[KIS] Token issuance failed with HTTP ${response.status}: ${responseText}`);
+    console.warn(`[KIS] Token issuance failed with HTTP ${response.status}: ${responseText.slice(0, 500)}`);
     return null;
   }
 
@@ -119,7 +119,7 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
       return stored.accessToken;
     }
   } catch (error) {
-    console.warn("[KIS] DB token lookup failed; token issuance was blocked:", error);
+    console.warn("[KIS] DB token lookup failed; token issuance was blocked:", error instanceof Error ? error.message.slice(0, 500) : "unknown error");
     return null;
   }
 
@@ -169,7 +169,7 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
     return issued.accessToken;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
-    console.warn("[KIS] Token lifecycle failed:", error);
+    console.warn("[KIS] Token lifecycle failed:", error instanceof Error ? error.message.slice(0, 500) : "unknown error");
     return null;
   } finally {
     client.release();
@@ -216,7 +216,7 @@ export async function clearTokenCache() {
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
-    console.warn("[KIS] DB token cache clear failed:", error);
+    console.warn("[KIS] DB token cache clear failed:", error instanceof Error ? error.message.slice(0, 500) : "unknown error");
   } finally {
     client.release();
   }

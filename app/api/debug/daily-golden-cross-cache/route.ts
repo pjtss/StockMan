@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     ["bollinger", "KR", "D:LOWER_OR_BELOW"], ["bollinger", "KR", "D:MIDDLE_TO_LOWER"],
     ["bollinger", "US", "D:LOWER_OR_BELOW"], ["bollinger", "US", "D:MIDDLE_TO_LOWER"],
   ] as const;
+  try {
   const caches = await Promise.all(definitions.map(async ([kind, scope, suffix]) => {
     const key = kind === "golden-cross" ? `daily-golden-cross:${scope}:D` : `daily-bollinger:${scope}:${suffix}`;
     const data = await readKisCache<CachedGoldenCross>(key);
@@ -42,4 +43,8 @@ export async function GET(request: Request) {
     };
   }));
   return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), caches });
+  } catch (error) {
+    console.error("[API /debug/daily-golden-cross-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, error: "DAILY_GOLDEN_CROSS_CACHE_UNAVAILABLE" }, { status: 503 });
+  }
 }

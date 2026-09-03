@@ -9,5 +9,10 @@ export async function GET(_request: Request, context: { params: Promise<{ key: s
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { key } = await context.params;
   if (!getFeatureModule(key)) return NextResponse.json({ error: "기능 모듈을 찾을 수 없습니다." }, { status: 404 });
-  return NextResponse.json({ runs: await loadRecentAutomationRuns(key as FeatureModuleKey) });
+  try {
+    return NextResponse.json({ runs: await loadRecentAutomationRuns(key as FeatureModuleKey) });
+  } catch (error) {
+    console.error("[API /admin/feature-modules/runs] Error:", error instanceof Error ? error.message : "unknown error");
+    return NextResponse.json({ ok: false, error: "FEATURE_MODULE_RUNS_UNAVAILABLE" }, { status: 503 });
+  }
 }

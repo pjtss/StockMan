@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const result = await detectNewsCandidates({ date: params.get("date") || undefined, time: params.get("time") || undefined });
     return NextResponse.json({ ok: true, ...result });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+  } catch {
+    return NextResponse.json({ ok: false, error: "US_NEWS_RADAR_UNAVAILABLE" }, { status: 503 });
   }
 }

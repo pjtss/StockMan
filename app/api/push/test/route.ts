@@ -10,7 +10,7 @@ export async function POST() {
     await sendTestPush();
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "테스트 푸시 발송에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[API /push/test] Error:", error instanceof Error ? error.message : "unknown error");
+    return NextResponse.json({ error: "테스트 푸시 발송에 실패했습니다." }, { status: 503 });
   }
 }

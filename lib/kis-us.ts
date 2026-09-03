@@ -89,8 +89,9 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank HTTP error: status ${response.status}, body: ${errText}`);
-      pushKisUsDebugLog("KIS-US-HTTP-ERR", { status: response.status, body: errText });
+      const bodyPreview = errText.slice(0, 1000);
+      console.error(`[KIS-US-DEBUG] fetchRealUsVolumeRank HTTP error: status ${response.status}, body: ${bodyPreview}`);
+      pushKisUsDebugLog("KIS-US-HTTP-ERR", { status: response.status, body: bodyPreview });
       throw new Error(`KIS Overseas API returned HTTP ${response.status}`);
     }
 
@@ -285,8 +286,9 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[KIS-US-DEBUG] fetchRealUsVolumePower HTTP error: status ${response.status}, body: ${errText}`);
-      pushKisUsDebugLog("KIS-US-HTTP-ERR", { status: response.status, body: errText });
+      const bodyPreview = errText.slice(0, 1000);
+      console.error(`[KIS-US-DEBUG] fetchRealUsVolumePower HTTP error: status ${response.status}, body: ${bodyPreview}`);
+      pushKisUsDebugLog("KIS-US-HTTP-ERR", { status: response.status, body: bodyPreview });
       throw new Error(`KIS Overseas API returned HTTP ${response.status}`);
     }
 

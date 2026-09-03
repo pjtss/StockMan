@@ -1,2 +1,2 @@
 import { NextResponse } from "next/server"; import { addLike } from "@/lib/inquiries"; import { getRequestIdentity } from "@/lib/request-identity";
-export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){const id=Number((await params).id);const count=await addLike(id,getRequestIdentity(request));return NextResponse.json({ok:true,count});}
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){const id=Number((await params).id);if(!Number.isInteger(id)||id<1)return NextResponse.json({error:"INVALID_INQUIRY"},{status:400});try{const count=await addLike(id,getRequestIdentity(request));return NextResponse.json({ok:true,count});}catch{return NextResponse.json({error:"LIKE_FAILED"},{status:503});}}

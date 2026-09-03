@@ -59,5 +59,5 @@ export async function POST(request: Request) {
     };
     });
     return NextResponse.json({ intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, ...result });
-  } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
+  } catch (error) { console.error("[API /cron/us-daily-indicators] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, error: "US_DAILY_INDICATORS_FAILED" }, { status: 502 }); }
 }

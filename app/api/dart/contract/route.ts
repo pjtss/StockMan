@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(details);
   } catch (error) {
-    console.error("API Route Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("API Route Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ error: "CONTRACT_DETAILS_UNAVAILABLE" }, { status: 503 });
   }
 }

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const details = await fetchDisclosureDetails(corpCode, category);
     return NextResponse.json(details);
   } catch (err) {
-    console.error("Disclosure Details API Error:", err);
-    return NextResponse.json({ error: "Failed to fetch disclosure details" }, { status: 500 });
+    console.error("Disclosure Details API Error:", err instanceof Error ? err.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ error: "DISCLOSURE_DETAILS_UNAVAILABLE" }, { status: 503 });
   }
 }

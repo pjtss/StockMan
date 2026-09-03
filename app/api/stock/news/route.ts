@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   try {
     const rows = await getDb().select({ id: marketRssArticles.id, title: marketRssArticles.title, translatedTitle: marketRssArticles.translatedTitle, summary: marketRssArticles.summary, translatedSummary: marketRssArticles.translatedSummary, link: marketRssArticles.link, publishedAt: marketRssArticles.publishedAt, source: marketRssArticles.source, detectedTicker: marketRssArticles.detectedTicker, translationStatus: marketRssArticles.translationStatus }).from(marketRssArticles).where(sql`UPPER(${marketRssArticles.detectedTicker}) = ${ticker}`).orderBy(desc(marketRssArticles.publishedAt), desc(marketRssArticles.id)).limit(50);
     return NextResponse.json({ ok: true, ticker, source: "ALL_MARKET_RSS", items: rows });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, error: "STOCK_NEWS_UNAVAILABLE" }, { status: 503 });
   }
 }

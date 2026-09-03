@@ -4,19 +4,32 @@ import { loadPushSubscriptionDebug, savePushSubscription, updatePushSubscription
 
 export const dynamic = "force-dynamic";
 
+function parseSubscriptionBody(body: unknown, requireKeys: boolean) {
+  if (!body || typeof body !== "object") throw new Error("INVALID_PUSH_SUBSCRIPTION");
+  const value = body as Record<string, unknown>;
+  const endpoint = typeof value.endpoint === "string" ? value.endpoint.trim() : "";
+  if (!endpoint || endpoint.length > 2048) throw new Error("INVALID_PUSH_SUBSCRIPTION");
+  const keys = value.keys && typeof value.keys === "object" ? value.keys as Record<string, unknown> : {};
+  const p256dh = typeof keys.p256dh === "string" ? keys.p256dh : "";
+  const auth = typeof keys.auth === "string" ? keys.auth : "";
+  if (requireKeys && (!p256dh || !auth || p256dh.length > 512 || auth.length > 512)) throw new Error("INVALID_PUSH_SUBSCRIPTION");
+  const bool = (input: unknown, fallback = true) => typeof input === "boolean" ? input : fallback;
+  return { endpoint, p256dh, auth, enabled: bool(value.enabled), dartEnabled: bool(value.dartEnabled), intensityEnabled: bool(value.intensityEnabled), risingEnabled: bool(value.risingEnabled) };
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = parseSubscriptionBody(await request.json(), true);
     await ensureSchema();
     await savePushSubscription({
       endpoint: body.endpoint,
-      p256dh: body.keys?.p256dh,
-      auth: body.keys?.auth,
+      p256dh: body.p256dh,
+      auth: body.auth,
       userAgent: request.headers.get("user-agent") ?? undefined,
-      enabled: body.enabled ?? true,
-      dartEnabled: body.dartEnabled ?? true,
-      intensityEnabled: body.intensityEnabled ?? true,
-      risingEnabled: body.risingEnabled ?? true,
+      enabled: body.enabled,
+      dartEnabled: body.dartEnabled,
+      intensityEnabled: body.intensityEnabled,
+      risingEnabled: body.risingEnabled,
     });
 
     const debug = await loadPushSubscriptionDebug(body.endpoint);
@@ -33,23 +46,24 @@ export async function POST(request: Request) {
       risingEnabled: debug.currentDevice?.risingEnabled ?? true,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "푸시 구독 저장에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const invalid = error instanceof SyntaxError || error instanceof Error && error.message === "INVALID_PUSH_SUBSCRIPTION";
+    if (!invalid) console.error("[API /push/subscribe POST] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ error: invalid ? "INVALID_PUSH_SUBSCRIPTION" : "PUSH_SUBSCRIPTION_FAILED" }, { status: invalid ? 400 : 503 });
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const body = await request.json();
+    const body = parseSubscriptionBody(await request.json(), false);
     await ensureSchema();
     await updatePushSubscriptionPreferences({
       endpoint: body.endpoint,
       p256dh: "",
       auth: "",
-      enabled: body.enabled ?? true,
-      dartEnabled: body.dartEnabled ?? true,
-      intensityEnabled: body.intensityEnabled ?? true,
-      risingEnabled: body.risingEnabled ?? true,
+      enabled: body.enabled,
+      dartEnabled: body.dartEnabled,
+      intensityEnabled: body.intensityEnabled,
+      risingEnabled: body.risingEnabled,
     });
 
     const debug = await loadPushSubscriptionDebug(body.endpoint);
@@ -64,8 +78,9 @@ export async function PATCH(request: Request) {
       risingEnabled: debug.currentDevice?.risingEnabled ?? true,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "푸시 설정 저장에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const invalid = error instanceof SyntaxError || error instanceof Error && error.message === "INVALID_PUSH_SUBSCRIPTION";
+    if (!invalid) console.error("[API /push/subscribe PATCH] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ error: invalid ? "INVALID_PUSH_SUBSCRIPTION" : "PUSH_PREFERENCES_FAILED" }, { status: invalid ? 400 : 503 });
   }
 }
 
@@ -88,7 +103,7 @@ export async function GET(request: Request) {
       risingEnabled: debug.currentDevice?.risingEnabled ?? true,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "푸시 구독 상태 조회에 실패했습니다.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[API /push/subscribe] Error:", error instanceof Error ? error.message : "unknown error");
+    return NextResponse.json({ error: "푸시 구독 상태 조회에 실패했습니다." }, { status: 503 });
   }
 }

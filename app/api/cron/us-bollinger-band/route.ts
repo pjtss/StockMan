@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ debugRun, intervalSeconds, cooldownSeconds: settings.cooldownSeconds, effectiveIntervalSeconds, ...result });
   } catch (error) {
-    return NextResponse.json({ ok: false, intervalSeconds, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+    console.error("[API /cron/us-bollinger-band] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, intervalSeconds, error: "US_BOLLINGER_BAND_FAILED" }, { status: 502 });
   }
 }

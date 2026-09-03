@@ -96,8 +96,11 @@ async function notifyDailyWebhook(task: string, send: () => Promise<unknown>) {
 
 export async function POST(request: Request) {
   const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > 512 * 1024) return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   if (!verifyDiscordSignature(body, request.headers.get("x-signature-ed25519"), request.headers.get("x-signature-timestamp"))) return new NextResponse("invalid request signature", { status: 401 });
-  const interaction = JSON.parse(body);
+  let interaction: any;
+  try { interaction = JSON.parse(body); } catch { return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 }); }
+  if (!interaction || typeof interaction !== "object") return NextResponse.json({ ok: false, error: "INVALID_PAYLOAD" }, { status: 400 });
   if (interaction.type === 1) return NextResponse.json({ type: 1 });
   if (["daily-obv", "mfi-oversold", "dmi", "macd", "daily-trend", "daily-filter-refresh"].includes(interaction.data?.name)) return NextResponse.json({ type: 4, data: { content: "일봉 OBV·MFI·MACD·DMI·ADL 기능은 현재 비활성화되어 있습니다.", flags: 64 } });
   const cacheCommand = getDailyCacheCommand(interaction.data?.name);

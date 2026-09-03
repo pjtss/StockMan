@@ -24,7 +24,7 @@ async function cacheStats(table: "us_instrument_universe_candles" | "kr_instrume
 export async function GET() {
   const startedAt = Date.now();
   try {
-    await requireAdminSession();
+    if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
     const db = getDb();
     const [us, kr, usRuns, krRuns, failureRows, failureCountRows, retryRows, retryDueRows, bbRetryRows, bbRetryPendingRows] = await Promise.all([
       cacheStats("us_instrument_universe_candles"),
@@ -42,6 +42,7 @@ export async function GET() {
     const addCacheKst = (rows: any[]) => rows.map((row) => ({ ...row, latest_candle_time_kst: formatKst(row.latest_candle_time), latest_fetched_at_kst: formatKst(row.latest_fetched_at) }));
     return NextResponse.json({ ok: true, checkedAt, checkedAtKst: formatKst(checkedAt), timezone: "Asia/Seoul", durationMs: Date.now() - startedAt, policy: { D: 86400, W: 86400, M: 604800, unit: "seconds", source: "DB fetched_at" }, cache: { us: addCacheKst(us as any[]), kr: addCacheKst(kr as any[]) }, automation: { us: usRuns.map(withKstTimestamp), kr: krRuns.map(withKstTimestamp) }, failures: { last24h: Number((failureCountRows.rows[0] as any)?.count ?? 0), recent: failureRows.rows.map((row: any) => ({ ...row, observed_at_kst: formatKst(row.observed_at) })) }, retries: { byStatus: retryRows.rows, pending: retryDueRows.rows.map((row: any) => ({ ...row, next_attempt_at_kst: formatKst(row.next_attempt_at) })), pendingCount: retryDueRows.rows.length }, bollingerRetries: { byScopeZoneStatus: bbRetryRows.rows, pending: bbRetryPendingRows.rows.map((row: any) => ({ ...row, next_attempt_at_kst: formatKst(row.next_attempt_at), last_attempt_at_kst: formatKst(row.last_attempt_at), succeeded_at_kst: formatKst(row.succeeded_at) })), pendingCount: bbRetryPendingRows.rows.length } });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
+    console.error("[API /admin/daily-candle-cache-debug] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, error: "DAILY_CANDLE_CACHE_DEBUG_UNAVAILABLE", durationMs: Date.now() - startedAt }, { status: 503 });
   }
 }

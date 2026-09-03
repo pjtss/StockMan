@@ -55,13 +55,14 @@ describe('CompanyTimeline Component', () => {
       expect(screen.getByText('삼성전자 공시 역사 타임라인 (1년)')).toBeInTheDocument();
     });
 
-    // Check rendering of judgment levels and styles
-    expect(screen.getByText('최강호재')).toBeInTheDocument();
-    expect(screen.getByText('호재')).toBeInTheDocument();
-    expect(screen.getByText('악재')).toBeInTheDocument();
-    expect(screen.getByText('평이')).toBeInTheDocument();
-
-    expect(screen.getByText('삼성전자 단일판매공급계약체결')).toBeInTheDocument();
+    // Wait for the async API result before checking timeline contents.
+    await waitFor(() => {
+      expect(screen.getByText('최강호재')).toBeInTheDocument();
+      expect(screen.getByText('호재')).toBeInTheDocument();
+      expect(screen.getByText('악재')).toBeInTheDocument();
+      expect(screen.getByText('평이')).toBeInTheDocument();
+      expect(screen.getByText('삼성전자 단일판매공급계약체결')).toBeInTheDocument();
+    });
   });
 
   it('triggers onClose when overlay or close button is clicked', async () => {

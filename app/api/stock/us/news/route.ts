@@ -10,12 +10,14 @@ export async function GET(request: Request) {
   const ticker = params.get("ticker") || "";
   const period = (params.get("period") || "today") as KisNewsPeriod;
   const exchange = (params.get("exchange") || "").toUpperCase();
-  if (!ticker.trim()) return NextResponse.json({ ok: false, error: "ticker is required" }, { status: 400 });
+  const normalizedTicker = ticker.trim().toUpperCase();
+  if (!normalizedTicker || normalizedTicker.length > 32 || !/^[A-Z0-9./_-]+$/.test(normalizedTicker)) return NextResponse.json({ ok: false, error: "invalid ticker" }, { status: 400 });
   if (!periods.has(period)) return NextResponse.json({ ok: false, error: "period must be today, 3d, 7d, or 1m" }, { status: 400 });
+  if (exchange && !/^(NAS|NYS|AMS)$/.test(exchange)) return NextResponse.json({ ok: false, error: "invalid exchange" }, { status: 400 });
   try {
-    const result = await fetchTickerNews(ticker, { period, exchange: exchange || undefined });
+    const result = await fetchTickerNews(normalizedTicker, { period, exchange: exchange || undefined });
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), ticker, period }, { status: 502 });
+    return NextResponse.json({ ok: false, error: "US_STOCK_NEWS_UNAVAILABLE", ticker, period }, { status: 503 });
   }
 }

@@ -114,6 +114,41 @@
   color: #e2e8f0;
 }
 
+.watchlistAction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.watchlistBtn {
+  border: 1px solid rgba(0, 255, 163, 0.35);
+  border-radius: 9px;
+  background: rgba(0, 255, 163, 0.08);
+  color: #9fffd5;
+  padding: 8px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.watchlistBtn:hover, .watchlistBtnActive {
+  background: rgba(0, 255, 163, 0.18);
+  color: #00ffa3;
+}
+
+.watchlistBtn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.watchlistMessage {
+  color: #94a3b8;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 /* ── 탭 ── */
 .tabs {
   display: flex;
@@ -320,6 +355,9 @@
     margin-left: 0;
     background: rgba(10, 14, 26, 0.96);
   }
+
+  .watchlistAction { margin-left: 0; }
+  .watchlistMessage { position: absolute; left: 24px; top: 76px; }
   .body { padding: 16px; }
   .tabs { padding-left: 16px; padding-right: 16px; }
   .indicators { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

@@ -11,11 +11,13 @@ export async function GET(request: Request) {
   if (!code) return NextResponse.json({ error: "종목코드를 입력하세요." }, { status: 400 });
   if (!["AMS", "NAS", "NYSE"].includes(market)) return NextResponse.json({ error: "지원하지 않는 거래소입니다." }, { status: 400 });
 
-  const config = await loadKisApiConfig("us_price_detail");
-  const query = new URLSearchParams({ AUTH: "", EXCD: market, SYMB: code });
-  const result = await fetchKisUsPriceDetail({ code, market });
-  if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
-  return NextResponse.json({
+  if (code.length > 32 || !/^[A-Z0-9./_-]+$/.test(code)) return NextResponse.json({ error: "유효하지 않은 종목코드입니다." }, { status: 400 });
+  try {
+    const config = await loadKisApiConfig("us_price_detail");
+    const query = new URLSearchParams({ AUTH: "", EXCD: market, SYMB: code });
+    const result = await fetchKisUsPriceDetail({ code, market });
+    if (!result) return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 503 });
+    return NextResponse.json({
     ok: result.ok,
     status: result.status,
     request: {
@@ -32,5 +34,9 @@ export async function GET(request: Request) {
       },
     },
     response: { parsed: result.parsed },
-  });
+    });
+  } catch (error) {
+    console.error("[API /admin/kis-us-price-detail-test] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, error: "KIS_US_PRICE_DETAIL_UNAVAILABLE" }, { status: 502 });
+  }
 }

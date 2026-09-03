@@ -26,5 +26,5 @@ export async function POST(request: Request) {
   }
   const result = await withAutomationRun("kr-daily-cache", runKrDailyCacheNow);
   return NextResponse.json({ ok: true, intervalSeconds, ...result });
-  } catch (error) { return NextResponse.json({ ok: false, stage: "kr-daily-cache-cron", error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
+  } catch (error) { console.error("[API /cron/kr-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "kr-daily-cache-cron", error: "KR_DAILY_CACHE_FAILED" }, { status: 502 }); }
 }

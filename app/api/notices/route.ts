@@ -9,6 +9,8 @@ export async function POST(request: Request) {
     const id = await createNotice(body.title, body.content);
     return NextResponse.json({ ok: true, id }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "공지사항 등록에 실패했습니다." }, { status: 400 });
+    const message = error instanceof Error ? error.message : "";
+    const validation = ["제목과 내용을 입력해주세요.", "제목은 1~100자로 입력해주세요.", "내용은 1~5,000자로 입력해주세요."];
+    return NextResponse.json({ error: validation.includes(message) ? message : "NOTICE_CREATE_FAILED" }, { status: validation.includes(message) ? 400 : 503 });
   }
 }

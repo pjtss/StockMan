@@ -55,6 +55,13 @@
 .destinationCopy small { color: #8497ab; font-size: 12px; line-height: 1.4; }
 .arrow { margin-left: auto; color: #6f849a; font-size: 20px; }
 
+:global([data-theme="light"]) .page { color: #0f172a; }
+:global([data-theme="light"]) .workspace { background: #ffffff; border-color: rgba(15,23,42,.12); box-shadow: 0 18px 48px rgba(15,23,42,.1); }
+:global([data-theme="light"]) .topBar { background: #f8fafc; border-color: rgba(15,23,42,.1); }
+:global([data-theme="light"]) .brand, :global([data-theme="light"]) .contentHeader h1 { color: #0f172a; }
+:global([data-theme="light"]) .description, :global([data-theme="light"]) .statusBar, :global([data-theme="light"]) .destinationCopy small { color: #475569; }
+:global([data-theme="light"]) .sectionHeading h2, :global([data-theme="light"]) .destination { color: #1e293b; }
+
 @media (max-width: 700px) {
   .page { width: min(100% - 16px, 1240px); padding-top: 8px; }
   .topBar, .contentHeader, .statusBar, .destinationSection { padding-left: 16px; padding-right: 16px; }

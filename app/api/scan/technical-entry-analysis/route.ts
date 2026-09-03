@@ -11,7 +11,8 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const market = isMarket(params.get("market")?.toUpperCase() ?? null) ? params.get("market")!.toUpperCase() as "KR" | "US" : "KR";
   const mode = isMode(params.get("mode")) ? params.get("mode") as "scalp" | "swing" | "all" : "all";
-  const limit = Math.max(1, Math.min(100, Number(params.get("limit") ?? 30) || 30));
+  const rawLimit = Number(params.get("limit") ?? 30);
+  const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, Math.trunc(rawLimit))) : 30;
   try {
     const analysis = await withAutomationRun(`technical-entry-analysis:${market}` as string, () => recommendMultiTimeframe(market, mode, limit), { market, timeframe: "D/W/M" });
     const results = analysis.results.map((result: any, index: number) => ({ rank: index + 1, ...result }));
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
         dataPolicy: "DB 저장 완료봉만 사용",
       },
     });
-  } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, error: "TECHNICAL_ENTRY_ANALYSIS_UNAVAILABLE" }, { status: 503 });
   }
 }

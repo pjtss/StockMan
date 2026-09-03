@@ -83,7 +83,7 @@ async function fetchDailyOHLCV(code: string, token: string, timeframe: "D" | "W"
   }
 
   const output2: any[] = json.output2 ?? [];
-  // 날짜 오름차순으로 정렬
+  // KIS 응답 순서는 시장·환경에 따라 달라질 수 있으므로 날짜를 기준으로 정렬한다.
   return output2
     .filter((r: any) => r.stck_bsop_date && r.stck_clpr)
     .map((r: any) => ({
@@ -95,7 +95,7 @@ async function fetchDailyOHLCV(code: string, token: string, timeframe: "D" | "W"
       volume: parseInt(r.acml_vol, 10) || 0,
       tradingValue: Number(r.acml_tr_pbmn ?? 0) || null,
     }))
-    .reverse();
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** RSI 계산 (단순 Wilder's Smoothing) */

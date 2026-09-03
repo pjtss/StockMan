@@ -11,7 +11,7 @@ const timestampCandidates = ["updated_at", "fetched_at", "observed_at", "created
 export async function GET() {
   const startedAt = Date.now();
   try {
-    await requireAdminSession();
+    if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
     const db = getDb();
     const tableRows = await db.execute(sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name`);
     const tables = (tableRows.rows as Array<{ table_name: string }>).map((row) => row.table_name);
@@ -24,11 +24,13 @@ export async function GET() {
         const latestResult = timestampColumn ? await db.execute(sql.raw(`SELECT MAX(${quoteIdentifier(timestampColumn)}) AS latest_updated_at FROM public.${quoteIdentifier(table)}`)) : null;
         return { table, rowCount: Number((countResult.rows[0] as any)?.row_count ?? 0), timestampColumn, latestUpdatedAt: (latestResult?.rows[0] as any)?.latest_updated_at ?? null, ok: true };
       } catch (error) {
-        return { table, rowCount: null, timestampColumn: null, latestUpdatedAt: null, ok: false, error: error instanceof Error ? error.message : String(error) };
+        console.error(`[API /admin/database-status] Table ${table} failed:`, error instanceof Error ? error.message.slice(0, 500) : "unknown error");
+        return { table, rowCount: null, timestampColumn: null, latestUpdatedAt: null, ok: false, error: "TABLE_STATUS_UNAVAILABLE" };
       }
     }));
     return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, tableCount: results.length, tables: results });
   } catch (error) {
-    return NextResponse.json({ ok: false, durationMs: Date.now() - startedAt, error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    console.error("[API /admin/database-status] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, durationMs: Date.now() - startedAt, error: "DATABASE_STATUS_UNAVAILABLE" }, { status: 503 });
   }
 }

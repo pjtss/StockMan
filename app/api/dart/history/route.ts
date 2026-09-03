@@ -8,23 +8,24 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const company = searchParams.get("company");
 
-    if (!company) {
+    if (!company || company.length > 200) {
       return NextResponse.json({ error: "Company parameter is required" }, { status: 400 });
     }
 
     await ensureSchema();
     const client = await getPool().connect();
+    const companyPattern = company.replace(/[\\%_]/g, (value) => `\\${value}`);
 
     try {
       const { rows } = await client.query(
         `
           SELECT title, judgment, published_at as "publishedAt", link
           FROM filings
-          WHERE company ILIKE $1
+          WHERE company ILIKE $1 ESCAPE '\\'
           ORDER BY published_at DESC
           LIMIT 50
         `,
-        [company]
+        [companyPattern]
       );
 
       // If database contains historical records, return them.
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       client.release();
     }
   } catch (error) {
-    console.error("Failed to fetch historical filings:", error);
-    return NextResponse.json({ error: "Failed to fetch historical filings" }, { status: 500 });
+    console.error("Failed to fetch historical filings:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ error: "공시 이력 데이터를 불러오지 못했습니다." }, { status: 503 });
   }
 }

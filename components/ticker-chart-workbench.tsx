@@ -33,7 +33,7 @@ export function TickerChartWorkbench() {
   const [scanTimeframe, setScanTimeframe] = useState<"D" | "W" | "M">("D");
   const [scanRows, setScanRows] = useState<any[]>([]);
   const [scanCompleted, setScanCompleted] = useState(false);
-  const [scanSort, setScanSort] = useState<"marketCapDesc" | "marketCapAsc">("marketCapDesc");
+  const [scanSort, setScanSort] = useState<"marketCapDesc" | "marketCapAsc" | "rvolDesc">("marketCapDesc");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [accumulationLoading, setAccumulationLoading] = useState(false);
@@ -64,7 +64,7 @@ export function TickerChartWorkbench() {
 
   async function runAccumulationScan() {
     setAccumulationLoading(true); setScanError(null);
-    try { const response = await fetch("/api/scan/kr-accumulation?limit=100"); const json = await response.json(); if (!response.ok || !json.ok) throw new Error(json.error ?? "매집 의심 종목 추출 실패"); setScanRows(json.results ?? []); setMarket("KR"); }
+    try { const response = await fetch("/api/scan/kr-accumulation?limit=100"); const json = await response.json(); if (!response.ok || !json.ok) throw new Error(json.error ?? "매집 의심 종목 추출 실패"); setScanRows(json.results ?? []); setScanCompleted(true); setMarket("KR"); }
     catch (error) { setScanError(error instanceof Error ? error.message : "매집 의심 종목 추출 실패"); }
     finally { setAccumulationLoading(false); }
   }
@@ -106,7 +106,7 @@ export function TickerChartWorkbench() {
           {scanError&&<p className={styles.error}>{scanError}</p>}
         </div>
       </section>
-      {scanCompleted && <section className={styles.results}><div className={styles.resultHeader}><div><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div>{scanRows.length > 0 && <label className={styles.sortControl}>정렬<select value={scanSort} onChange={e=>setScanSort(e.target.value as "marketCapDesc"|"marketCapAsc")}><option value="marketCapDesc">시총 큰 순</option><option value="marketCapAsc">시총 작은 순</option></select></label>}</div>{scanRows.length === 0 ? <p className={styles.empty}>현재 조건과 캐시 기준을 모두 만족하는 종목이 없습니다.</p> : <div className={styles.grid}>{[...scanRows].sort((a,b)=>{const av=Number(a.marketCap??-1),bv=Number(b.marketCap??-1);return scanSort === "marketCapAsc" ? av-bv : bv-av;}).map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · 시총 {row.marketCap==null?"-":Number(row.marketCap).toLocaleString()} · RVOL {row.metrics?.["D.rvol"]==null?"-":Number(row.metrics["D.rvol"]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedCompany(row.name || row.code);setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div>}</section>}
+      {scanCompleted && <section className={styles.results}><div className={styles.resultHeader}><div><h2>조건 추출 결과</h2><span>{scanRows.length}개</span></div>{scanRows.length > 0 && <label className={styles.sortControl}>정렬<select value={scanSort} onChange={e=>setScanSort(e.target.value as "marketCapDesc"|"marketCapAsc"|"rvolDesc")}><option value="marketCapDesc">시총 큰 순</option><option value="marketCapAsc">시총 작은 순</option><option value="rvolDesc">RVOL 높은 순</option></select></label>}</div>{scanRows.length === 0 ? <p className={styles.empty}>현재 조건과 캐시 기준을 모두 만족하는 종목이 없습니다.</p> : <div className={styles.grid}>{[...scanRows].sort((a,b)=>{if(scanSort === "rvolDesc") return Number(b.metrics?.[`${scanTimeframe}.rvol`]??-1)-Number(a.metrics?.[`${scanTimeframe}.rvol`]??-1); const av=Number(a.marketCap??-1),bv=Number(b.marketCap??-1);return scanSort === "marketCapAsc" ? av-bv : bv-av;}).map(row=><article key={`${row.market}:${row.code}`} className={styles.card}><div><strong>{row.name}</strong><small>{row.code} · {row.market} · 시총 {row.marketCap==null?"-":Number(row.marketCap).toLocaleString()} · RVOL {row.metrics?.[`${scanTimeframe}.rvol`]==null?"-":Number(row.metrics[`${scanTimeframe}.rvol`]).toFixed(2)}</small></div><button type="button" onClick={()=>{setNames(n=>({...n,[row.code]:row.name}));setSelectedCompany(row.name || row.code);setSelectedMarket(row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" : "US");setSelected(row.code)}}>차트 보기</button></article>)}</div>}</section>}
 
       <section className={styles.results} aria-live="polite">
         <div className={styles.resultHeader}>

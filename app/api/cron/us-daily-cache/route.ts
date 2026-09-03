@@ -26,5 +26,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), schedule: "DB schedule, hourly" });
   }
   return NextResponse.json({ ok: true, ...(await withAutomationRun("us-daily-cache", warmUsDailyPriceCache)) });
-  } catch (error) { return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
+  } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
 }

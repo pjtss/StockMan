@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   });
 
   if (!result) {
-    return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 500 });
+    return NextResponse.json({ error: "KIS access token is unavailable" }, { status: 503 });
   }
 
   return NextResponse.json({

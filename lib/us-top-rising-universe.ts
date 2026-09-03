@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { usInstrumentUniverse } from "@/lib/schema";
+import { usCommonStockUniverse } from "@/lib/schema";
 import { classifyUsInstrumentProduct, isEligibleUsCommonStock } from "@/lib/us-instrument-product";
 import { fetchKisUsTopRisingApi } from "@/lib/kis-us-api";
 import { getPool } from "@/lib/db";
@@ -58,8 +58,8 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
   if (storedScopeInflight) return storedScopeInflight;
   storedScopeInflight = (async () => {
     const db = getDb();
-    const rows = db ? await db.select({ market: usInstrumentUniverse.market, code: usInstrumentUniverse.code, name: usInstrumentUniverse.name, englishName: usInstrumentUniverse.englishName, instrumentType: usInstrumentUniverse.instrumentType, isEtf: usInstrumentUniverse.isEtf, isLeveraged: usInstrumentUniverse.isLeveraged, isInverse: usInstrumentUniverse.isInverse, isWarrant: usInstrumentUniverse.isWarrant, isDerivative: usInstrumentUniverse.isDerivative, isDr: usInstrumentUniverse.isDr })
-      .from(usInstrumentUniverse).where(and(eq(usInstrumentUniverse.enabled, true), sql`daily_active = true`, inArray(usInstrumentUniverse.market, [...US_EXCHANGES])))
+    const rows = db ? await db.select({ market: usCommonStockUniverse.market, code: usCommonStockUniverse.code, name: usCommonStockUniverse.name, englishName: usCommonStockUniverse.englishName, instrumentType: usCommonStockUniverse.instrumentType, isEtf: usCommonStockUniverse.isEtf, isLeveraged: usCommonStockUniverse.isLeveraged, isInverse: usCommonStockUniverse.isInverse, isWarrant: usCommonStockUniverse.isWarrant, isDerivative: usCommonStockUniverse.isDerivative, isDr: usCommonStockUniverse.isDr })
+      .from(usCommonStockUniverse).where(and(eq(usCommonStockUniverse.enabled, true), sql`daily_active = true`, inArray(usCommonStockUniverse.market, [...US_EXCHANGES])))
       : [];
     const settings = await loadUsTurnoverFilterSettings();
     // Cache membership is deliberately independent from market-cap, turnover,

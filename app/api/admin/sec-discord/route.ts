@@ -30,11 +30,7 @@ export async function POST(request: Request) {
       discord,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Discord webhook send failed",
-      },
-      { status: 500 },
-    );
+    console.error("[API /admin/sec-discord] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, error: "SEC_DISCORD_SEND_FAILED" }, { status: 502 });
   }
 }

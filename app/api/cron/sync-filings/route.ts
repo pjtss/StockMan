@@ -10,7 +10,12 @@ async function handleSyncFilings(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(await withAutomationRun("dart-realtime", runFilingSync));
+  try {
+    return NextResponse.json(await withAutomationRun("dart-realtime", runFilingSync));
+  } catch (error) {
+    console.error("[API /cron/sync-filings] Error:", error instanceof Error ? error.message : "unknown error");
+    return NextResponse.json({ ok: false, error: "FILING_SYNC_FAILED" }, { status: 502 });
+  }
 }
 
 export const GET = handleSyncFilings;

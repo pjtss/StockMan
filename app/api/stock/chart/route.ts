@@ -9,12 +9,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const code = searchParams.get("code");
+  const rawCode = searchParams.get("code");
+  const code = rawCode?.trim() || null;
   const company = searchParams.get("company") ?? code;
-  const market = searchParams.get("market") ?? (code?.toUpperCase().startsWith("US:") ? "US" : "KR");
-  const timeframe = (["D", "W", "M"] as const).includes(searchParams.get("timeframe") as "D" | "W" | "M") ? searchParams.get("timeframe") as "D" | "W" | "M" : "D";
+  const requestedMarket = searchParams.get("market")?.trim().toUpperCase();
+  const market = requestedMarket === "US" || requestedMarket === "KR" ? requestedMarket : (code?.toUpperCase().startsWith("US:") ? "US" : "KR");
+  const requestedTimeframe = searchParams.get("timeframe")?.trim().toUpperCase();
+  const timeframe = (["D", "W", "M"] as const).includes(requestedTimeframe as "D" | "W" | "M") ? requestedTimeframe as "D" | "W" | "M" : "D";
 
-  if (!code) {
+  if (!code || code.length > 64 || (company && company.length > 200)) {
     return NextResponse.json({ error: "code is required" }, { status: 400 });
   }
 
@@ -36,9 +39,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data);
   } catch (err: any) {
-    console.error("[API /stock/chart] Error:", err.message);
+    console.error("[API /stock/chart] Error:", err instanceof Error ? err.message : "unknown error");
     const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe).catch(() => unknownFundamentals(market));
-    return NextResponse.json({ error: err.message ?? "Internal error", chartStatus: "UNAVAILABLE", fundamentals }, { status: 502 });
+    return NextResponse.json({ error: "차트 데이터를 처리할 수 없습니다.", chartStatus: "UNAVAILABLE", fundamentals }, { status: 502 });
   }
 }
 

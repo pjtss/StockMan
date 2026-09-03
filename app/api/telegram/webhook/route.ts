@@ -3,9 +3,15 @@ import { addTelegramSubscriber, removeTelegramSubscriber, sendTelegramMessage } 
 import { getPool, ensureSchema } from "@/lib/db";
 
 export async function POST(request: Request) {
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  if (expectedSecret && request.headers.get("x-telegram-bot-api-secret-token") !== expectedSecret) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > 256 * 1024) return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   try {
-    const payload = await request.json();
-    const message = payload.message;
+    let payload: unknown;
+    try { payload = await request.json(); } catch { return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 }); }
+    if (!payload || typeof payload !== "object") return NextResponse.json({ ok: false, error: "INVALID_PAYLOAD" }, { status: 400 });
+    const message = (payload as Record<string, any>).message;
 
     if (!message || !message.text || !message.chat || !message.chat.id) {
       return NextResponse.json({ ok: true });
@@ -65,8 +71,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Telegram webhook error:", error);
-    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+  } catch {
+    console.error("Telegram webhook error");
+    return NextResponse.json({ ok: false, error: "TELEGRAM_WEBHOOK_FAILED" }, { status: 503 });
   }
 }

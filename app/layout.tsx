@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { PushProvider } from "@/components/push-provider";
+import { ClientErrorReporter } from "@/components/client-error-reporter";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -20,8 +21,8 @@ const themeScript = `
   (function() {
     try {
       var stored = localStorage.getItem('stockman-theme');
-      var preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', stored || preferred);
+      var resolved = stored === 'light' || stored === 'dark' ? stored : 'dark';
+      document.documentElement.setAttribute('data-theme', resolved);
     } catch(e) {
       document.documentElement.setAttribute('data-theme', 'dark');
     }
@@ -40,7 +41,7 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <PushProvider>{children}</PushProvider>
+          <PushProvider><ClientErrorReporter />{children}</PushProvider>
         </ThemeProvider>
       </body>
     </html>

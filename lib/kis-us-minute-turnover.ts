@@ -158,7 +158,11 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
     next = following.next;
   }
   console.info("[US-TURNOVER] request", { url: result.url, market, code, trId, contentType, pageCount });
-  console.info("[US-TURNOVER] raw response", result.rawText);
+  console.info("[US-TURNOVER] response summary", {
+    status: result.response.status,
+    rawBytes: Buffer.byteLength(result.rawText, "utf8"),
+    pointCount: allPoints.length,
+  });
 
   return {
     ok: result.response.ok,

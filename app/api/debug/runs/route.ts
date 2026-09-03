@@ -15,6 +15,10 @@ export async function GET(request: Request) {
   const where = moduleKey ? "WHERE module_key = $1" : "";
   if (moduleKey) params.push(moduleKey);
   params.push(limit);
-  const result = await getPool().query(`SELECT id, module_key, status, started_at, finished_at, duration_ms, job_type, market, timeframe, trigger_type, retry_count, summary, error_message FROM automation_runs ${where} ORDER BY started_at DESC LIMIT $${params.length}`, params);
-  return NextResponse.json({ ok: true, requestId, generatedAt: new Date().toISOString(), count: result.rows.length, runs: result.rows });
+  try {
+    const result = await getPool().query(`SELECT id, module_key, status, started_at, finished_at, duration_ms, job_type, market, timeframe, trigger_type, retry_count, summary, error_message FROM automation_runs ${where} ORDER BY started_at DESC LIMIT $${params.length}`, params);
+    return NextResponse.json({ ok: true, requestId, generatedAt: new Date().toISOString(), count: result.rows.length, runs: result.rows });
+  } catch {
+    return NextResponse.json({ ok: false, requestId, error: "DEBUG_RUNS_UNAVAILABLE" }, { status: 503, headers: { "x-request-id": requestId } });
+  }
 }

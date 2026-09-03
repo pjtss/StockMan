@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const result = await withAutomationRun("us-daily-open-cache", refreshUsDailyOpenCache);
     return NextResponse.json({ ok: true, intervalSeconds, ...result });
   } catch (error) {
-    return NextResponse.json({ ok: false, intervalSeconds, error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+    console.error("[API /cron/us-daily-open-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, intervalSeconds, error: "US_DAILY_OPEN_CACHE_FAILED" }, { status: 502 });
   }
 }

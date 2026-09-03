@@ -7,7 +7,7 @@ import { requireAdminSession } from "@/lib/admin-auth";
 export async function GET() {
   const startedAt = Date.now();
   try {
-    await requireAdminSession();
+    if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
     const db = getDb();
     const [kr, us, runs] = await Promise.all([
       db.execute(sql`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE enabled)::int AS enabled, COUNT(*) FILTER (WHERE NOT enabled)::int AS disabled, COUNT(DISTINCT market)::int AS markets, COUNT(*) - COUNT(DISTINCT market || ':' || code)::int AS duplicate_keys FROM kr_instrument_universe`),
@@ -22,6 +22,7 @@ export async function GET() {
     ]);
     return NextResponse.json({ ok: true, checkedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, tables: { kr: kr.rows[0], us: us.rows[0] }, marketCounts: { kr: krMarkets.rows, us: usMarkets.rows }, productSummary: productSummary.rows, officialKrClassification: krOfficial.rows, recentSyncRuns: runs });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error), durationMs: Date.now() - startedAt }, { status: 500 });
+    console.error("[API /admin/instrument-universe-debug] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, error: "INSTRUMENT_UNIVERSE_DEBUG_UNAVAILABLE", durationMs: Date.now() - startedAt }, { status: 503 });
   }
 }

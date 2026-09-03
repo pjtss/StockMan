@@ -1,2 +1,2 @@
 import { NextResponse } from "next/server"; import { incrementView } from "@/lib/inquiries";
-export async function POST(_:Request,{params}:{params:Promise<{id:string}>}){await incrementView(Number((await params).id));return NextResponse.json({ok:true});}
+export async function POST(_:Request,{params}:{params:Promise<{id:string}>}){const id=Number((await params).id);if(!Number.isInteger(id)||id<1)return NextResponse.json({error:"INVALID_INQUIRY"},{status:400});try{await incrementView(id);return NextResponse.json({ok:true});}catch{return NextResponse.json({error:"VIEW_FAILED"},{status:503});}}

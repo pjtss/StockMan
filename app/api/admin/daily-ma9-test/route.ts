@@ -10,5 +10,5 @@ export async function GET(request: Request) {
   const value = new URL(request.url).searchParams.get("market")?.toUpperCase();
   const market: DailyMa9Market | "BOTH" = value === "KR" || value === "US" ? value : "BOTH";
   try { return NextResponse.json({ mode: "ADMIN_MANUAL_TEST", ...(await scanDailyMa9(market)) }); }
-  catch (error) { return NextResponse.json({ ok: false, mode: "ADMIN_MANUAL_TEST", market, error: error instanceof Error ? error.message : String(error) }, { status: 502 }); }
+  catch (error) { console.error("[API /admin/daily-ma9-test] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, mode: "ADMIN_MANUAL_TEST", market, error: "DAILY_MA9_TEST_FAILED" }, { status: 502 }); }
 }

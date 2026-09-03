@@ -120,8 +120,60 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
   const [news, setNews] = useState<StockTitanNewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isWatchlisted, setIsWatchlisted] = useState(false);
+  const [watchlistBusy, setWatchlistBusy] = useState(false);
+  const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  const watchlistMarket = code.startsWith("US:") ? "US" : "KR";
+  const watchlistCode = code.replace(/^US:/i, "").trim().toUpperCase();
+
+  // 로그인 사용자만 현재 종목의 개인 관심종목 상태를 조회한다.
+  useEffect(() => {
+    let cancelled = false;
+    setIsAuthenticated(null);
+    setIsWatchlisted(false);
+    setWatchlistMessage(null);
+    fetch(`/api/auth/me?ts=${Date.now()}`, { credentials: "same-origin", cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then(async (body: { authenticated?: boolean } | null) => {
+        if (cancelled) return;
+        const authenticated = Boolean(body?.authenticated);
+        setIsAuthenticated(authenticated);
+        if (!authenticated) return;
+        const response = await fetch(`/api/watchlist?ts=${Date.now()}`, { credentials: "same-origin", cache: "no-store" });
+        if (!response.ok) return;
+        const watchlist = await response.json() as { items?: Array<{ market: string; code: string }> };
+        if (!cancelled) setIsWatchlisted((watchlist.items ?? []).some((item) => item.market === watchlistMarket && item.code.toUpperCase() === watchlistCode));
+      })
+      .catch(() => { if (!cancelled) setIsAuthenticated(false); });
+    return () => { cancelled = true; };
+  }, [watchlistCode, watchlistMarket]);
+
+  async function toggleWatchlist() {
+    if (isAuthenticated !== true || watchlistBusy) return;
+    const nextWatchlisted = !isWatchlisted;
+    setWatchlistBusy(true);
+    setWatchlistMessage(null);
+    try {
+      const response = await fetch("/api/watchlist", {
+        method: nextWatchlisted ? "POST" : "DELETE",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ market: watchlistMarket, code: watchlistCode }),
+      });
+      const body = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(body?.error === "UNAUTHORIZED" ? "로그인이 필요합니다." : "관심종목 변경에 실패했습니다.");
+      setIsWatchlisted(nextWatchlisted);
+      setWatchlistMessage(nextWatchlisted ? "관심종목에 추가했습니다." : "관심종목에서 삭제했습니다.");
+    } catch (error) {
+      setWatchlistMessage(error instanceof Error ? error.message : "관심종목 변경에 실패했습니다.");
+    } finally {
+      setWatchlistBusy(false);
+    }
+  }
 
   // ESC 닫기
   useEffect(() => {
@@ -138,14 +190,16 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
     setError(null);
     setFallbackFundamentals(undefined);
     const market = code.startsWith("US:") ? "US" : "KR";
-    fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`)
+    const controller = new AbortController();
+    fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) return r.json().then((e) => { if (e.fundamentals) setFallbackFundamentals(e.fundamentals); return Promise.reject(new Error(e.error ?? `HTTP ${r.status}`)); });
         return r.json();
       })
       .then((json: ChartData) => setData(json))
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e: Error) => { if (e.name !== "AbortError") setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [code, company, timeframe]);
 
   useEffect(() => {
@@ -340,6 +394,14 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
                 <span className={isUp ? styles.changeUp : styles.changeDown}>
                   {data.latestChange} ({data.latestChangeRate})
                 </span>
+              </div>
+            )}
+            {isAuthenticated === true && (
+              <div className={styles.watchlistAction}>
+                <button type="button" className={`${styles.watchlistBtn} ${isWatchlisted ? styles.watchlistBtnActive : ""}`} onClick={toggleWatchlist} disabled={watchlistBusy} aria-pressed={isWatchlisted}>
+                  {watchlistBusy ? "처리 중…" : isWatchlisted ? "★ 관심종목 삭제" : "☆ 관심종목 추가"}
+                </button>
+                {watchlistMessage && <span className={styles.watchlistMessage} role="status">{watchlistMessage}</span>}
               </div>
             )}
           </div>
