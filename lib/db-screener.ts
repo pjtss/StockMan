@@ -1,12 +1,17 @@
 import { getPool } from "./db";
 import type { ScreenerRequest, ScreenerResult } from "./screener-types";
-import { evaluateScreenerFilters, rankScreenerResults } from "./screener-engine";
+import {
+  evaluateScreenerFilters,
+  rankScreenerResults,
+} from "./screener-engine";
 
 function ema(values: number[], period = 9) {
   if (!values.length) return [];
   const alpha = 2 / (period + 1);
   return values.reduce<number[]>((out, value, index) => {
-    out.push(index === 0 ? value : value * alpha + out[index - 1] * (1 - alpha));
+    out.push(
+      index === 0 ? value : value * alpha + out[index - 1] * (1 - alpha),
+    );
     return out;
   }, []);
 }
@@ -22,20 +27,174 @@ function flowSeries(candles: any[]) {
     if (i > 0) obv += volume * Math.sign(close - Number(candles[i - 1].close));
     const high = Number(candles[i].high ?? close);
     const low = Number(candles[i].low ?? close);
-    adl += high === low ? 0 : (((close - low) - (high - close)) / (high - low)) * volume;
-    obvs.push(obv); adls.push(adl);
+    adl +=
+      high === low
+        ? 0
+        : ((close - low - (high - close)) / (high - low)) * volume;
+    obvs.push(obv);
+    adls.push(adl);
   }
-  const obvSignal = ema(obvs, 9), adlSignal = ema(adls, 9);
-  const trend = (values: number[]) => values.length < 2 ? null : values.at(-1)! > values.at(-2)! ? "RISING" : values.at(-1)! < values.at(-2)! ? "FALLING" : "FLAT";
+  const obvSignal = ema(obvs, 9),
+    adlSignal = ema(adls, 9);
+  const trend = (values: number[]) =>
+    values.length < 2
+      ? null
+      : values.at(-1)! > values.at(-2)!
+        ? "RISING"
+        : values.at(-1)! < values.at(-2)!
+          ? "FALLING"
+          : "FLAT";
   return { obvSignalTrend: trend(obvSignal), adlSignalTrend: trend(adlSignal) };
 }
 
-export async function runDbScreener(request: ScreenerRequest): Promise<ScreenerResult[]> {
-  if (request.market === "ALL") { const [kr, us] = await Promise.all([runDbScreener({ ...request, market: "KR" }), runDbScreener({ ...request, market: "US" })]); return rankScreenerResults([...kr, ...us], request); }
-  const pool = getPool(); const isUs = request.market === "US"; const timeframe = request.timeframe ?? "D"; const markets = isUs ? ["NAS", "NYS", "AMS"] : ["KOSPI", "KOSDAQ"]; const universeTable = isUs ? "us_common_stock_universe" : "kr_common_stock_universe"; const candleTable = isUs ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
-  const rows = (await pool.query(`WITH market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) GROUP BY market,code) SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume FROM ${universeTable} u LEFT JOIN instrument_fundamental_snapshots f ON f.market=u.market AND f.code=u.code JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (SELECT * FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe=$2 AND c.volume > 0 ORDER BY c.candle_date DESC LIMIT 30) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.market=ANY($1) ORDER BY u.market,u.code,c.candle_date ASC`, [markets, timeframe])).rows;
-  const groups = new Map<string, any>(); for (const row of rows) { const key=`${row.market}:${row.code}`; if(!groups.has(key))groups.set(key,{...row,candles:[]}); groups.get(key).candles.push(row); }
-  const results:ScreenerResult[]=[];
-  for(const item of groups.values()){if(request.exchange?.length && !request.exchange.includes(item.market))continue; const c=item.candles; if(c.length<20)continue; const closes=c.map((x:any)=>Number(x.close)), last=c.at(-1), prev=c.at(-2); const avg=c.slice(-20,-1).reduce((s:number,x:any)=>s+Number(x.volume||0),0)/19; const mid=closes.slice(-20).reduce((a:number,b:number)=>a+b,0)/20; const sd=Math.sqrt(closes.slice(-20).reduce((a:number,b:number)=>a+(b-mid)**2,0)/20); const lower=mid-2*sd; const prefix=timeframe; const e9=ema(closes,9),e20=ema(closes,20),golden= e9.length>1 && e9.at(-2)!<=e20.at(-2)! && e9.at(-1)!>e20.at(-1)!; const flow=flowSeries(c); const metrics:any={marketCap:item.market_cap==null?null:Number(item.market_cap),[`${prefix}.close`]:Number(last.close),[`${prefix}.emaGoldenCross`]:golden,[`${prefix}.high`]:Number(last.high),[`${prefix}.low`]:Number(last.low),[`${prefix}.volume`]:Number(last.volume),[`${prefix}.rvol`]:avg?Number(last.volume)/avg:null,[`${prefix}.bb.upper`]:mid+2*sd,[`${prefix}.bb.middle`]:mid,[`${prefix}.bb.lower`]:lower,[`${prefix}.bb.width`]:mid?(4*sd/mid)*100:null,[`${prefix}.bb.lowerTouch`]:Number(last.low)<=lower,[`${prefix}.bb.lowerBreak`]:Number(last.close)<lower,[`${prefix}.obv.signalTrend`]:flow.obvSignalTrend,[`${prefix}.adl.signalTrend`]:flow.adlSignalTrend}; const evaluation=evaluateScreenerFilters(metrics,request); results.push({market:item.market,exchange:item.market,code:item.code,name:item.name,status:"ACTIVE",marketCap:metrics.marketCap,sharesOutstanding:item.shares_outstanding==null?null:Number(item.shares_outstanding),currency:item.currency,candleDate:last.candle_date,candleFetchedAt:new Date(last.fetched_at).toISOString(),metrics,conditions:evaluation.conditions,matched:evaluation.matched,failureReasons:evaluation.failureReasons}); }
-  return rankScreenerResults(results.filter(x=>x.matched),request);
+export async function runDbScreener(
+  request: ScreenerRequest,
+): Promise<ScreenerResult[]> {
+  if (request.market === "ALL") {
+    const [kr, us] = await Promise.all([
+      runDbScreener({ ...request, market: "KR" }),
+      runDbScreener({ ...request, market: "US" }),
+    ]);
+    return rankScreenerResults([...kr, ...us], request);
+  }
+  const pool = getPool();
+  const isUs = request.market === "US";
+  const timeframe = request.timeframe ?? "D";
+  const markets = isUs ? ["NAS", "NYS", "AMS"] : ["KOSPI", "KOSDAQ"];
+  const universeTable = isUs
+    ? "us_common_stock_universe"
+    : "kr_common_stock_universe";
+  const candleTable = isUs
+    ? "us_instrument_universe_candles"
+    : "kr_instrument_universe_candles";
+  const multiEma9 = Object.values(request.ema9Conditions ?? {}).some(
+    (value) => value && value !== "ANY",
+  );
+  const requestedTimeframes = multiEma9 ? ["D", "W", "M"] : [timeframe];
+  const rows = (
+    await pool.query(
+      `WITH market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) GROUP BY market,code) SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN instrument_fundamental_snapshots f ON f.market=u.market AND f.code=u.code JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (SELECT * FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe=ANY($2) AND c.volume > 0 ORDER BY c.timeframe,c.candle_date ASC) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.market=ANY($1) ORDER BY u.market,u.code,c.timeframe,c.candle_date ASC`,
+      [markets, requestedTimeframes],
+    )
+  ).rows;
+  const groups = new Map<string, any>();
+  for (const row of rows) {
+    const key = `${row.market}:${row.code}`;
+    if (!groups.has(key))
+      groups.set(key, { ...row, candles: [], byTimeframe: new Map() });
+    const group = groups.get(key);
+    const bucket = group.byTimeframe.get(row.timeframe ?? timeframe) ?? [];
+    bucket.push(row);
+    group.byTimeframe.set(row.timeframe ?? timeframe, bucket);
+    if ((row.timeframe ?? timeframe) === timeframe) group.candles.push(row);
+  }
+  const results: ScreenerResult[] = [];
+  for (const item of groups.values()) {
+    if (request.exchange?.length && !request.exchange.includes(item.market))
+      continue;
+    const c = item.candles;
+    if (c.length < 20) continue;
+    const closes = c.map((x: any) => Number(x.close)),
+      last = c.at(-1),
+      prev = c.at(-2);
+    const avg =
+      c
+        .slice(-20, -1)
+        .reduce((s: number, x: any) => s + Number(x.volume || 0), 0) / 19;
+    const mid =
+      closes.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
+    const sd = Math.sqrt(
+      closes
+        .slice(-20)
+        .reduce((a: number, b: number) => a + (b - mid) ** 2, 0) / 20,
+    );
+    const lower = mid - 2 * sd;
+    const prefix = timeframe;
+    const e9 = ema(closes, 9),
+      e20 = ema(closes, 20),
+      golden =
+        e9.length > 1 && e9.at(-2)! <= e20.at(-2)! && e9.at(-1)! > e20.at(-1)!;
+    const flow = flowSeries(c);
+    const metrics: any = {
+      marketCap: item.market_cap == null ? null : Number(item.market_cap),
+      [`${prefix}.close`]: Number(last.close),
+      [`${prefix}.ema9`]: e9.at(-1) ?? null,
+      [`${prefix}.emaGoldenCross`]: golden,
+      [`${prefix}.high`]: Number(last.high),
+      [`${prefix}.low`]: Number(last.low),
+      [`${prefix}.volume`]: Number(last.volume),
+      [`${prefix}.rvol`]: avg ? Number(last.volume) / avg : null,
+      [`${prefix}.bb.upper`]: mid + 2 * sd,
+      [`${prefix}.bb.middle`]: mid,
+      [`${prefix}.bb.lower`]: lower,
+      [`${prefix}.bb.width`]: mid ? ((4 * sd) / mid) * 100 : null,
+      [`${prefix}.bb.lowerTouch`]: Number(last.low) <= lower,
+      [`${prefix}.bb.lowerBreak`]: Number(last.close) < lower,
+      [`${prefix}.obv.signalTrend`]: flow.obvSignalTrend,
+      [`${prefix}.adl.signalTrend`]: flow.adlSignalTrend,
+    };
+    const emaConditions = Object.entries(request.ema9Conditions ?? {}).filter(
+      ([, condition]) => condition && condition !== "ANY",
+    );
+    const emaResults = emaConditions.map(([tf, condition]) => {
+      const candles = item.byTimeframe.get(tf) ?? [];
+      const closes = candles.map((x: any) => Number(x.close));
+      const latest = candles.at(-1);
+      const latestEma9 = closes.length ? ema(closes, 9).at(-1) : null;
+      const above =
+        latest && latestEma9 != null && Number(latest.close) >= latestEma9;
+      const passed = condition === "ABOVE" ? Boolean(above) : !above;
+      return {
+        field: `${tf}.closeVsEma9`,
+        passed,
+        actual: latestEma9 == null ? null : above ? "ABOVE" : "NOT_ABOVE",
+        target: condition,
+      };
+    });
+    const evaluation = evaluateScreenerFilters(metrics, request);
+    const allConditions = [...evaluation.conditions, ...emaResults];
+    results.push({
+      market: item.market,
+      exchange: item.market,
+      code: item.code,
+      name: item.name,
+      status: "ACTIVE",
+      marketCap: metrics.marketCap,
+      sharesOutstanding:
+        item.shares_outstanding == null
+          ? null
+          : Number(item.shares_outstanding),
+      currency: item.currency,
+      candleDate: last.candle_date,
+      candleFetchedAt: new Date(last.fetched_at).toISOString(),
+      metrics,
+      conditions: allConditions,
+      matched:
+        evaluation.matched && emaResults.every((condition) => condition.passed),
+      failureReasons: [
+        ...evaluation.failureReasons,
+        ...emaResults
+          .filter((condition) => !condition.passed)
+          .map((condition) => `${condition.field} ${condition.target}`),
+      ],
+      timeframeMeta: Object.fromEntries(
+        (["D", "W", "M"] as const).map((tf) => {
+          const candle = (item.byTimeframe.get(tf) ?? []).at(-1);
+          return [
+            tf,
+            {
+              candleDate: candle?.candle_date ?? "",
+              candleFetchedAt: candle?.fetched_at
+                ? new Date(candle.fetched_at).toISOString()
+                : null,
+            },
+          ];
+        }),
+      ),
+    });
+  }
+  return rankScreenerResults(
+    results.filter((x) => x.matched),
+    request,
+  );
 }
