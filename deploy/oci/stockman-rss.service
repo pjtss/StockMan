@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Stockman RSS ingestion
+After=stockman.service
+Requires=stockman.service
+
+[Service]
+Type=oneshot
+User=stockman
+WorkingDirectory=/opt/stockman/current
+EnvironmentFile=/etc/stockman/stockman.env
+ExecStart=/opt/stockman/current/scripts/oci-rss-cron.sh
+TimeoutStartSec=240s
+TimeoutStopSec=30s

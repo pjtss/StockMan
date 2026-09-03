@@ -21,6 +21,7 @@ mkdir -p "$TEMP_PATH"
 stage="extract-release"
 tar -xzf "$RELEASE" -C "$TEMP_PATH"
 chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
+chmod +x "$TEMP_PATH/scripts/oci-rss-cron.sh"
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required for the Flyway migration container but was not found on OCI" >&2
   exit 1
@@ -66,15 +67,20 @@ chown -R stockman:stockman "$DEPLOY_PATH"
 stage="service-restart"
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.service" /etc/systemd/system/stockman-cron.service
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.timer" /etc/systemd/system/stockman-cron.timer
+install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-rss.service" /etc/systemd/system/stockman-rss.service
+install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-rss.timer" /etc/systemd/system/stockman-rss.timer
 systemctl daemon-reload
 systemctl restart stockman.service
 systemctl enable stockman-cron.timer
 systemctl restart stockman-cron.timer
+systemctl enable stockman-rss.timer
+systemctl restart stockman-rss.timer
 # Run one scheduler pass immediately after activation so a fresh deployment
 # never leaves the cache health view stale until the next calendar boundary.
 systemctl start --no-block stockman-cron.service
 systemctl is-active --quiet stockman.service
 systemctl is-active --quiet stockman-cron.timer
+systemctl is-active --quiet stockman-rss.timer
 
 # Keep the reverse proxy upload limit in sync with the application release.
 if command -v nginx >/dev/null 2>&1 && [ -f "$DEPLOY_PATH/deploy/oci/nginx-stockman.conf" ]; then
