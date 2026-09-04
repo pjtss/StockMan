@@ -28,22 +28,19 @@ jobs:
         timeout-minutes: 5
         run: npm ci --no-audit --no-fund
 
-      - name: Run quality gates
+      - name: Verify deployment
         timeout-minutes: 15
-        run: |
-          npm test -- --run
-          npm run typecheck
-          npm run docs:check
-          npm run cron:check
-          bash -n scripts/oci-cron.sh
+        env:
+          STOCKMAN_BUILD_VERSION: ${{ github.sha }}
+          STOCKMAN_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.run_started_at }}
+        run: npm run deploy:verify
 
-      - name: Build Next.js standalone
+      - name: Package Next.js standalone
         timeout-minutes: 15
         env:
           STOCKMAN_BUILD_VERSION: ${{ github.sha }}
           STOCKMAN_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.run_started_at }}
         run: |
-          npm run build
           cp -r public .next/standalone/public
           cp -r .next/static .next/standalone/.next/static
           mkdir -p .next/standalone/scripts
