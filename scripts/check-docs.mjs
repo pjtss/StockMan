@@ -5,6 +5,7 @@ const root = process.cwd();
 const required = [
   "docs/README.md",
   "docs/architecture/code-structure.md",
+  "docs/architecture/documentation-and-srp.md",
   "docs/architecture/project-architecture.md",
   "docs/architecture/feature-inventory.md",
   "docs/development/conventions.md",
