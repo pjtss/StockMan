@@ -7,7 +7,7 @@ export async function runKrAccumulationScreener(limit = 100) {
     FROM kr_common_stock_universe u JOIN instrument_fundamental_snapshots f ON f.market=u.market AND f.code=u.code
     JOIN kr_instrument_universe_candles c ON c.market=u.market AND c.code=u.code
     WHERE u.enabled=true AND u.daily_active=true AND NOT u.is_etp AND NOT u.is_warrant AND NOT u.is_preferred AND NOT u.is_suspended
-      AND f.market_cap >= 50000000000 AND c.market IN ('KOSPI','KOSDAQ') AND c.timeframe='D' AND c.volume>0
+      AND f.market_cap > 30000000000 AND c.market IN ('KOSPI','KOSDAQ') AND c.timeframe='D' AND c.volume>0
     ORDER BY u.code,c.candle_date`)).rows;
   const groups = new Map<string, any[]>(); for (const row of rows) { if (!groups.has(row.code)) groups.set(row.code, []); groups.get(row.code)!.push(row); }
   const results: any[] = [];
@@ -20,7 +20,7 @@ export async function runKrAccumulationScreener(limit = 100) {
     const bullish=recent.filter(x=>Number(x.close)>Number(x.open)).reduce((s,x)=>s+Number(x.volume),0), bearish=recent.filter(x=>Number(x.close)<Number(x.open)).reduce((s,x)=>s+Number(x.volume),0), last=candles.at(-1)!;
     const turnover5=recent.reduce((s,x)=>s+Number(x.close)*Number(x.volume),0)/5, turnover20=prior.reduce((s,x)=>s+Number(x.close)*Number(x.volume),0)/20;
     const i=close.length-1, priceChange=Math.abs((close[i]-close[i-20])/close[i-20]), rvol=volume[i]/avg20;
-    if (obvs[i]>obvs[i-20] && adls[i]>adls[i-20] && avg5>avg20 && turnover5>turnover20 && bullish>bearish && priceChange<=0.10 && (close[i]>=e9[i] || close[i]>=e20[i]) && rvol>=1) results.push({market:last.market,exchange:last.market,code,name:last.name,status:"ACTIVE",marketCap:Number(last.market_cap),sharesOutstanding:null,currency:"KRW",candleDate:last.candle_date,candleFetchedAt:last.fetched_at,latestDate:last.candle_date,rvol,obvChange20:obvs[i]-obvs[i-20],adlChange20:adls[i]-adls[i-20],turnoverRatio:turnover5/Number(last.market_cap),metrics:{"D.rvol":rvol,"D.obv.change20":obvs[i]-obvs[i-20],"D.adl.change20":adls[i]-adls[i-20],"D.close":close[i],"D.ema9":e9[i],"D.ema20":e20[i]}});
+    if (obvs[i]>obvs[i-20] && adls[i]>adls[i-20] && rvol>=2) results.push({market:last.market,exchange:last.market,code,name:last.name,status:"ACTIVE",marketCap:Number(last.market_cap),sharesOutstanding:null,currency:"KRW",candleDate:last.candle_date,candleFetchedAt:last.fetched_at,latestDate:last.candle_date,rvol,obvChange20:obvs[i]-obvs[i-20],adlChange20:adls[i]-adls[i-20],turnoverRatio:turnover5/Number(last.market_cap),timeframeMeta:{daily:{date:last.candle_date,updatedAt:last.fetched_at}},metrics:{"D.rvol":rvol,"D.obv.change20":obvs[i]-obvs[i-20],"D.adl.change20":adls[i]-adls[i-20],"D.close":close[i],"D.ema9":e9[i],"D.ema20":e20[i]}});
   }
-  return results.sort((a,b)=>(b.obvChange20+b.adlChange20)-(a.obvChange20+a.adlChange20)).slice(0, Math.max(1, Math.min(1000, limit)));
+  return results.sort((a,b)=>b.rvol-a.rvol).slice(0, Math.max(1, Math.min(1000, limit)));
 }
