@@ -32,7 +32,10 @@ function emptyFeed(source: DomesticRssSource, url: string): MarketRssFeed {
 
 export function domesticRssConfig(source: DomesticRssSource) {
   const envName = envNames[source];
-  const url = process.env[envName]?.trim() || defaultUrls[source] || "";
+  const configuredValue = process.env[envName];
+  // An explicitly empty variable disables the adapter; an absent variable uses
+  // the provider's official default feed.
+  const url = configuredValue === "" ? "" : configuredValue?.trim() || defaultUrls[source] || "";
   return { source, envName, url, configured: Boolean(url) };
 }
 

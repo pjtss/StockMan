@@ -15,12 +15,12 @@ afterEach(() => {
 
 describe("domestic RSS source adapters", () => {
   it("skips an unconfigured official source without making a network request", async () => {
-    delete process.env.NEWSIS_RSS_URL;
+    process.env.KRX_KIND_RSS_URL = "";
     const fetchMock = vi.spyOn(globalThis, "fetch");
-    const result = await fetchDomesticRss("NEWSIS");
-    expect(result).toMatchObject({ source: "NEWSIS", items: [], responseStatus: 0 });
+    const result = await fetchDomesticRss("KRX_KIND");
+    expect(result).toMatchObject({ source: "KRX_KIND", items: [], responseStatus: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(domesticRssConfig("NEWSIS").configured).toBe(false);
+    expect(domesticRssConfig("KRX_KIND").configured).toBe(false);
   });
 
   it("calls the configured source and normalizes the response", async () => {
