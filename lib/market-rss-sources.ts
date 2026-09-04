@@ -4,6 +4,7 @@ import { fetchNasdaqTraderRss } from "./nasdaq-trader-rss";
 import { fetchSecEdgarRss } from "./sec-edgar-rss";
 import { fetchStockTitanRss } from "./stocktitan-rss";
 import type { MarketRssFeed } from "./market-rss";
+import { fetchDomesticRss, DOMESTIC_RSS_SOURCES, type DomesticRssSource } from "./domestic-rss-sources";
 
 export const MARKET_RSS_SOURCES = ["GLOBENEWSWIRE", "NASDAQ", "NASDAQ_TRADER", "SEC_EDGAR", "STOCKTITAN"] as const;
 export type MarketRssSource = typeof MARKET_RSS_SOURCES[number];
@@ -24,8 +25,10 @@ const fetchers: Record<MarketRssSource, () => Promise<MarketRssFeed>> = {
   STOCKTITAN: fetchStockTitanRss,
 };
 
-export async function fetchMarketRssSource(source: MarketRssSource) {
-  return fetchers[source]();
+export async function fetchMarketRssSource(source: MarketRssSource | DomesticRssSource) {
+  return DOMESTIC_RSS_SOURCES.includes(source as DomesticRssSource)
+    ? fetchDomesticRss(source as DomesticRssSource)
+    : fetchers[source as MarketRssSource]();
 }
 
 export async function fetchAllMarketRss(enabledSources?: unknown) {

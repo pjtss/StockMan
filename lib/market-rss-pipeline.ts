@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
+import { fetchAllDomesticRss } from "./domestic-rss-sources";
 import { translateMarketRssItem } from "./translate-market-rss-item";
 import { CloudTranslationClient } from "./cloud-translation-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
@@ -18,15 +19,19 @@ const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES |
 
 export async function ingestMarketRssArticles(options?: { sources?: MarketRssSource[] }) {
   const db = getDb();
-  const fetched = await fetchAllMarketRss(options?.sources);
-  const secItems = fetched.results.find((result) => result.ok && result.source === "SEC_EDGAR");
+  const [fetched, domesticFetched] = await Promise.all([
+    fetchAllMarketRss(options?.sources),
+    fetchAllDomesticRss(),
+  ]);
+  const allResults = [...fetched.results, ...domesticFetched.results];
+  const secItems = allResults.find((result) => result.ok && result.source === "SEC_EDGAR");
   const secCiks = secItems?.ok ? secItems.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : [];
   let secTickerMap = new Map<string, string>();
   if (secCiks.length) {
     try { secTickerMap = new Map((await resolvePreferredSecCompanyTickers(secCiks)).map((row) => [row.cik, row.ticker])); } catch { secTickerMap = new Map(); }
   }
   let inserted = 0;
-  for (const result of fetched.results) {
+  for (const result of allResults) {
     if (!result.ok) continue;
     const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
     for (const item of result.feed.items) {
@@ -74,7 +79,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       inserted += rows.length;
     }
   }
-  return { fetchedAt: fetched.fetchedAt, sourceResults: fetched.results.map((item) => ({ source: item.source, ok: item.ok, count: item.ok ? item.feed.items.length : 0 })), inserted };
+  return { fetchedAt: fetched.fetchedAt, sourceResults: allResults.map((item) => ({ source: item.source, ok: item.ok, skipped: "skipped" in item ? item.skipped : false, count: item.ok ? item.feed.items.length : 0 })), inserted };
 }
 
 export async function translatePendingMarketRssArticles(limit = 10) {

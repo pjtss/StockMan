@@ -21,7 +21,8 @@ export async function GET(request: Request) {
   if (!range.valid) return NextResponse.json({ ok: false, error: "INVALID_DATE" }, { status: 400 });
   try {
     const db = getDb();
-    const includeRss = source === "ALL" || source === "RSS" || source === "STOCKTITAN" || source === "NASDAQ" || source === "NASDAQ_TRADER" || source === "GLOBENEWSWIRE" || source === "SEC_EDGAR";
+    const domesticSources = ["KRX_KIND", "NEWSIS", "MK", "HANKYUNG", "ETODAY"];
+    const includeRss = source === "ALL" || source === "RSS" || source === "STOCKTITAN" || source === "NASDAQ" || source === "NASDAQ_TRADER" || source === "GLOBENEWSWIRE" || source === "SEC_EDGAR" || domesticSources.includes(source);
     const includeFilings = source === "ALL" || source === "DART" || source === "SEC" || source === "SEC_EDGAR";
     const [rssRows, filingRows] = await Promise.all([
       includeRss ? db.select({ id: marketRssArticles.id, source: marketRssArticles.source, externalId: marketRssArticles.externalId, title: marketRssArticles.title, summary: marketRssArticles.summary, content: marketRssArticles.content, link: marketRssArticles.link, publishedAt: marketRssArticles.publishedAt, detectedTicker: marketRssArticles.detectedTicker, fetchedAt: marketRssArticles.updatedAt }).from(marketRssArticles).where(and(gte(marketRssArticles.publishedAt, range.start), lt(marketRssArticles.publishedAt, range.end), source === "ALL" ? undefined : eq(marketRssArticles.source, source))).orderBy(desc(marketRssArticles.publishedAt)).limit(limit) : [],
