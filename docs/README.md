@@ -19,6 +19,7 @@
 - 코드 구조: [`architecture/code-structure.md`](./architecture/code-structure.md)
 - 문서 관리·SRP 기준: [`architecture/documentation-and-srp.md`](./architecture/documentation-and-srp.md)
 - 일별 공시·RSS 통합 조회 설계: [`architecture/daily-disclosure-feed-design.md`](./architecture/daily-disclosure-feed-design.md)
+- 국내 공시·RSS 통합 수집 및 ChatGPT 분석 JSON 설계: [`architecture/unified-disclosure-rss-ingestion-design.md`](./architecture/unified-disclosure-rss-ingestion-design.md)
 - 데이터베이스·전체 테이블 구조: [`architecture/database-schema.md`](./architecture/database-schema.md)
 - 전체 제품·데이터·자동화 구조: [`architecture/project-architecture.md`](./architecture/project-architecture.md)
 - 국내·해외 전체 종목 통합 유니버스 동기화 설계: [`architecture/instrument-universe-sync.md`](./architecture/instrument-universe-sync.md)
