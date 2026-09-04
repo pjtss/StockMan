@@ -82,6 +82,16 @@ function HelpMark({ text }: { text: string }) {
   );
 }
 
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as { error?: unknown; results?: any[] };
+  } catch {
+    const contentType = response.headers.get("content-type") || "unknown";
+    throw new Error(`종목 추출 API가 JSON이 아닌 응답을 반환했습니다. HTTP ${response.status} · ${contentType}`);
+  }
+}
+
 export function TickerChartWorkbench() {
   const [input, setInput] = useState("");
   const [market, setMarket] = useState<"KR" | "US">("KR");
@@ -244,8 +254,8 @@ export function TickerChartWorkbench() {
           limit: 100,
         }),
       });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error ?? "추출 실패");
+      const json = await readJsonResponse(response);
+      if (!response.ok) throw new Error(typeof json.error === "string" ? json.error : "추출 실패");
       setScanRows(json.results ?? []);
       setScanCompleted(true);
     } catch (error) {
