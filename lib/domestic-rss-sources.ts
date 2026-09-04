@@ -17,8 +17,9 @@ const envNames: Record<DomesticRssSource, string> = {
 };
 
 // 공식 RSS 서비스 페이지에 게시된 투자·경제 관련 대표 feed를 기본값으로 사용한다.
-// KIND는 종목코드 매개변수에 따라 주소가 달라져 명시 등록을 요구한다.
+// KIND는 공식 오늘의공시 RSS의 전체시장(mktTpCd=0) endpoint를 기본 사용한다.
 const defaultUrls: Partial<Record<DomesticRssSource, string>> = {
+  KRX_KIND: "https://kind.krx.co.kr/disclosure/rsstodaydistribute.do?method=searchRssTodayDistribute&repIsuSrtCd=&mktTpCd=0&searchCorpName=&currentPageSize=100",
   NEWSIS: "https://www.newsis.com/RSS/economy.xml",
   MK: "https://www.mk.co.kr/rss/50200011/",
   HANKYUNG: "https://www.hankyung.com/feed/finance",

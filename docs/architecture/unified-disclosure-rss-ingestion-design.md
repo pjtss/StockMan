@@ -33,9 +33,9 @@
 
 출처별 adapter는 `fetch → parse → normalize`만 담당한다. 호재 판정, 번역, Discord 전송은 수집 adapter에 넣지 않고 후속 파이프라인에서 처리한다.
 
-현재 1차 구현은 `lib/domestic-rss-sources.ts`에서 출처별 환경변수 URL을 읽어 공통 RSS parser로 정규화한다. 설정된 국내 RSS는 기존 `market-rss-pipeline`을 통해 `market_rss_fetch_snapshots`와 `market_rss_articles`에 저장되고, `/api/disclosures?source=KRX_KIND|NEWSIS|MK|HANKYUNG|ETODAY`로 조회한다. URL이 설정되지 않은 출처는 `SKIPPED`로 처리하여 전체 cron을 실패시키지 않는다.
+현재 1차 구현은 `lib/domestic-rss-sources.ts`에서 출처별 URL을 읽어 공통 RSS parser로 정규화한다. 국내 RSS는 기존 `market-rss-pipeline`을 통해 `market_rss_fetch_snapshots`와 `market_rss_articles`에 저장되고, `/api/disclosures?source=KRX_KIND|NEWSIS|MK|HANKYUNG|ETODAY`로 조회한다. URL이 설정되지 않은 출처는 `SKIPPED`로 처리하여 전체 cron을 실패시키지 않는다.
 
-환경변수 이름은 `KRX_KIND_RSS_URL`, `NEWSIS_RSS_URL`, `MK_RSS_URL`, `HANKYUNG_RSS_URL`, `ETODAY_RSS_URL`이다. 실제 값은 각 제공자가 공개한 공식 RSS 주소만 사용하며 문서나 저장소에 URL 인증값을 기록하지 않는다.
+기본값은 KIND 전체시장 RSS, 뉴시스 경제 RSS, 매일경제 증권 RSS, 한국경제 증권 RSS, 이투데이 마켓 RSS이며, 환경변수 `KRX_KIND_RSS_URL`, `NEWSIS_RSS_URL`, `MK_RSS_URL`, `HANKYUNG_RSS_URL`, `ETODAY_RSS_URL`로 교체할 수 있다. 실제 값은 각 제공자가 공개한 공식 RSS 주소만 사용하며 문서나 저장소에 URL 인증값을 기록하지 않는다.
 
 ### 공식 출처 사용 원칙
 
