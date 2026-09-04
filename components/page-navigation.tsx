@@ -18,6 +18,7 @@ type PageKey =
   | "inquiries"
   | "notices"
   | "market-news"
+  | "disclosures"
   | "login"
   | "register"
 
@@ -55,6 +56,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link aria-current={current === "market-news" ? "page" : undefined} className={current === "market-news" ? styles.navActive : styles.navLink} href="/market-news" prefetch={false}>
           해외 뉴스
+        </Link>
+        <Link aria-current={current === "disclosures" ? "page" : undefined} className={current === "disclosures" ? styles.navActive : styles.navLink} href="/disclosures" prefetch={false}>
+          일별 공시
         </Link>
         <Link
           aria-current={current === "notifications" ? "page" : undefined}
