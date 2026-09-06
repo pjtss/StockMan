@@ -148,6 +148,7 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const requestIdRef = useRef(0);
 
   const watchlistMarket = code.startsWith("US:") ? "US" : "KR";
   const watchlistCode = code.replace(/^US:/i, "").trim().toUpperCase();
@@ -208,15 +209,24 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
 
   // 차트 데이터 로드
   useEffect(() => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setLoading(true);
     setError(null);
+    setData(null);
     setFallbackFundamentals(undefined);
     const controller = new AbortController();
     fetchChartData(code, company, timeframe, controller.signal)
-      .then((json) => setData(json))
-      .catch((e: Error & { fundamentals?: ChartFundamentals }) => { if (e.name !== "AbortError") { setFallbackFundamentals(e.fundamentals); setError(e.message); } })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+      .then((json) => { if (!controller.signal.aborted && requestIdRef.current === requestId) setData(json); })
+      .catch((e: Error & { fundamentals?: ChartFundamentals }) => { if (!controller.signal.aborted && requestIdRef.current === requestId) { setFallbackFundamentals(e.fundamentals); setError(e.message); } })
+      .finally(() => { if (!controller.signal.aborted && requestIdRef.current === requestId) setLoading(false); });
+    return () => {
+      controller.abort();
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+    };
   }, [code, company, timeframe]);
 
   useEffect(() => {
