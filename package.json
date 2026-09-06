@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "docs:check": "node scripts/check-docs.mjs",
     "cron:check": "node scripts/check-oci-cron.mjs",
+    "measure:accumulation": "node scripts/measure-accumulation-api.mjs",
     "typecheck": "tsc --noEmit",
     "deploy:verify": "node scripts/verify-deploy.mjs",
     "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run cron:check && npm run build"

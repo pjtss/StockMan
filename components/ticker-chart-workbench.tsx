@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChartModal } from "@/components/chart-modal";
+import { AccumulationDetails, AccumulationSummary } from "@/components/accumulation-details";
+import type { AccumulationReport } from "@/lib/accumulation-scan";
 import styles from "./ticker-chart-workbench.module.css";
+import accumulationStyles from "./accumulation-details.module.css";
 
 function HelpMark({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -119,11 +122,12 @@ export function TickerChartWorkbench() {
   const [scanRows, setScanRows] = useState<any[]>([]);
   const [scanCompleted, setScanCompleted] = useState(false);
   const [scanSort, setScanSort] = useState<
-    "marketCapDesc" | "marketCapAsc" | "rvolDesc"
+    "marketCapDesc" | "marketCapAsc" | "rvolDesc" | "scoreDesc"
   >("marketCapDesc");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [accumulationLoading, setAccumulationLoading] = useState(false);
+  const [accumulationReport, setAccumulationReport] = useState<AccumulationReport | null>(null);
   const capUnit = market === "KR" ? "억원" : "달러";
   const capMultiplier = market === "KR" ? 100000000 : 1;
   const tickers = useMemo(
@@ -142,6 +146,12 @@ export function TickerChartWorkbench() {
     ],
     [input, market],
   );
+  const chartItems = useMemo(() => {
+    if (scanCompleted && scanRows.length) return scanRows.map((row) => ({ code: row.code, company: row.name || row.code, market: row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" as const : "US" as const }));
+    return tickers.map((code) => ({ code, company: names[code] || code, market }));
+  }, [market, names, scanCompleted, scanRows, tickers]);
+  const selectedChartIndex = selected ? chartItems.findIndex((item) => item.code === selected && item.market === selectedMarket) : -1;
+  const adjacentChartItems = selectedChartIndex >= 0 ? chartItems.slice(Math.max(0, selectedChartIndex - 1), selectedChartIndex + 2).map((item) => ({ code: item.market === "US" ? `US:${item.code}` : item.code, company: item.company })) : [];
 
   useEffect(() => {
     if (!tickers.length) {
@@ -168,6 +178,9 @@ export function TickerChartWorkbench() {
   }, [market]);
 
   async function runScan() {
+    setAccumulationReport(null);
+    setScanCompleted(false);
+    if (scanSort === "scoreDesc") setScanSort("rvolDesc");
     setScanLoading(true);
     setScanError(null);
     setScanCompleted(false);
@@ -267,15 +280,19 @@ export function TickerChartWorkbench() {
 
   async function runAccumulationScan() {
     setAccumulationLoading(true);
+    setScanCompleted(false);
+    setAccumulationReport(null);
     setScanError(null);
     try {
-      const response = await fetch("/api/scan/kr-accumulation?limit=100");
+      const response = await fetch(`/api/scan/${market.toLowerCase()}-accumulation?limit=100`);
       const json = await response.json();
       if (!response.ok || !json.ok)
         throw new Error(json.error ?? "매집 의심 종목 추출 실패");
       setScanRows(json.results ?? []);
       setScanCompleted(true);
-      setMarket("KR");
+      setAccumulationReport(json);
+      setScanTimeframe("D");
+      setScanSort("scoreDesc");
     } catch (error) {
       setScanError(
         error instanceof Error ? error.message : "매집 의심 종목 추출 실패",
@@ -308,6 +325,7 @@ export function TickerChartWorkbench() {
             type="button"
             className={market === "KR" ? styles.modeActive : styles.mode}
             onClick={() => setMarket("KR")}
+            disabled={scanLoading || accumulationLoading}
           >
             국내
           </button>
@@ -315,6 +333,7 @@ export function TickerChartWorkbench() {
             type="button"
             className={market === "US" ? styles.modeActive : styles.mode}
             onClick={() => setMarket("US")}
+            disabled={scanLoading || accumulationLoading}
           >
             해외
           </button>
@@ -325,11 +344,12 @@ export function TickerChartWorkbench() {
         </p>
         <div className={styles.scanBox}>
           <strong>조건으로 종목 추출</strong>
+          <p className={styles.hint}>매집 탐지는 일봉·RVOL 2 이상·OBV/ADL 증가의 별도 v2 조건을 사용합니다. 아래 일반 조건 입력은 ‘종목 추출’ 버튼에 적용됩니다.</p>
           <div className={styles.scanFields}>
             <button
               type="button"
               onClick={runAccumulationScan}
-              disabled={accumulationLoading}
+              disabled={accumulationLoading || scanLoading}
             >
               {accumulationLoading
                 ? "매집 후보 추출 중…"
@@ -508,7 +528,7 @@ export function TickerChartWorkbench() {
                 <option value="FALLING">하락세</option>
               </select>
             </label>
-            <button type="button" onClick={runScan} disabled={scanLoading}>
+            <button type="button" onClick={runScan} disabled={scanLoading || accumulationLoading}>
               {scanLoading ? "추출 중…" : "종목 추출"}
             </button>
           </div>
@@ -519,7 +539,7 @@ export function TickerChartWorkbench() {
         <section className={styles.results}>
           <div className={styles.resultHeader}>
             <div>
-              <h2>조건 추출 결과</h2>
+              <h2>{accumulationReport ? "매집 의심 종목 결과" : "조건 추출 결과"}</h2>
               <span>{scanRows.length}개</span>
             </div>
             {scanRows.length > 0 && (
@@ -530,29 +550,32 @@ export function TickerChartWorkbench() {
                   onChange={(e) =>
                     setScanSort(
                       e.target.value as
-                        "marketCapDesc" | "marketCapAsc" | "rvolDesc",
+                        "marketCapDesc" | "marketCapAsc" | "rvolDesc" | "scoreDesc",
                     )
                   }
                 >
                   <option value="marketCapDesc">시총 큰 순</option>
                   <option value="marketCapAsc">시총 작은 순</option>
                   <option value="rvolDesc">RVOL 높은 순</option>
+                  {accumulationReport && <option value="scoreDesc">매집 점수 높은 순</option>}
                 </select>
               </label>
             )}
           </div>
+          {accumulationReport && <AccumulationSummary report={accumulationReport} />}
           {scanRows.length === 0 ? (
             <p className={styles.empty}>
               현재 조건과 캐시 기준을 모두 만족하는 종목이 없습니다.
             </p>
           ) : (
-            <div className={styles.grid}>
+            <div className={`${styles.grid} ${accumulationReport ? accumulationStyles.grid : ""}`}>
               {[...scanRows]
                 .sort((a, b) => {
+                  if (scanSort === "scoreDesc") return b.score - a.score || b.rvol - a.rvol;
                   if (scanSort === "rvolDesc")
                     return (
-                      Number(b.metrics?.[`${scanTimeframe}.rvol`] ?? -1) -
-                      Number(a.metrics?.[`${scanTimeframe}.rvol`] ?? -1)
+                      Number(b.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] ?? -1) -
+                      Number(a.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] ?? -1)
                     );
                   const av = Number(a.marketCap ?? -1),
                     bv = Number(b.marketCap ?? -1);
@@ -561,7 +584,7 @@ export function TickerChartWorkbench() {
                 .map((row) => (
                   <article
                     key={`${row.market}:${row.code}`}
-                    className={styles.card}
+                    className={`${styles.card} ${accumulationReport ? accumulationStyles.card : ""}`}
                   >
                     <div>
                       <strong>{row.name}</strong>
@@ -571,12 +594,13 @@ export function TickerChartWorkbench() {
                           ? "-"
                           : Number(row.marketCap).toLocaleString()}{" "}
                         · RVOL{" "}
-                        {row.metrics?.[`${scanTimeframe}.rvol`] == null
+                        {row.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] == null
                           ? "-"
                           : Number(
-                              row.metrics[`${scanTimeframe}.rvol`],
+                              row.metrics[`${accumulationReport ? "D" : scanTimeframe}.rvol`],
                             ).toFixed(2)}
                       </small>
+                      {accumulationReport && <AccumulationDetails row={row} />}
                     </div>
                     <button
                       type="button"
@@ -641,6 +665,10 @@ export function TickerChartWorkbench() {
         <ChartModal
           code={selectedMarket === "US" ? `US:${selected}` : selected}
           company={selectedCompany || names[selected] || selected}
+          position={selectedChartIndex >= 0 ? { current: selectedChartIndex + 1, total: chartItems.length } : undefined}
+          prefetchCodes={adjacentChartItems}
+          onPrevious={selectedChartIndex > 0 ? () => { const item = chartItems[selectedChartIndex - 1]; setSelectedMarket(item.market); setSelectedCompany(item.company); setSelected(item.code); } : undefined}
+          onNext={selectedChartIndex >= 0 && selectedChartIndex < chartItems.length - 1 ? () => { const item = chartItems[selectedChartIndex + 1]; setSelectedMarket(item.market); setSelectedCompany(item.company); setSelected(item.code); } : undefined}
           onClose={() => {
             setSelected(null);
             setSelectedCompany(null);

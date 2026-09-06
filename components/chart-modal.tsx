@@ -12,6 +12,28 @@ interface ChartModalProps {
   code: string;
   company: string;
   onClose: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  position?: { current: number; total: number };
+  prefetchCodes?: Array<{ code: string; company: string }>;
+}
+
+const chartDataCache = new Map<string, ChartData>();
+const chartCacheKey = (code: string, timeframe: string) => `${code}:${timeframe}`;
+async function fetchChartData(code: string, company: string, timeframe: "D" | "W" | "M", signal?: AbortSignal) {
+  const key = chartCacheKey(code, timeframe);
+  const cached = chartDataCache.get(key);
+  if (cached) return cached;
+  const market = code.startsWith("US:") ? "US" : "KR";
+  const response = await fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`, { signal });
+  const body = await response.json();
+  if (!response.ok) {
+    const error = new Error(body.error ?? `HTTP ${response.status}`) as Error & { fundamentals?: ChartFundamentals };
+    error.fundamentals = body.fundamentals;
+    throw error;
+  }
+  chartDataCache.set(key, body as ChartData);
+  return body as ChartData;
 }
 
 /** RSI 해석 */
@@ -110,7 +132,7 @@ function NewsPanel({ items, loading, error }: { items: StockTitanNewsItem[]; loa
   return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.source} · {item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}{(item.translatedSummary || item.summary) && <p>{item.translatedSummary || item.summary}</p>}</article>)}</div>;
 }
 
-export function ChartModal({ code, company, onClose }: ChartModalProps) {
+export function ChartModal({ code, company, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
   const [timeframe, setTimeframe] = useState<"D" | "W" | "M">("D");
   const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "news">("chart");
   const [data, setData] = useState<ChartData | null>(null);
@@ -189,18 +211,18 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
     setLoading(true);
     setError(null);
     setFallbackFundamentals(undefined);
-    const market = code.startsWith("US:") ? "US" : "KR";
     const controller = new AbortController();
-    fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`, { signal: controller.signal })
-      .then((r) => {
-        if (!r.ok) return r.json().then((e) => { if (e.fundamentals) setFallbackFundamentals(e.fundamentals); return Promise.reject(new Error(e.error ?? `HTTP ${r.status}`)); });
-        return r.json();
-      })
-      .then((json: ChartData) => setData(json))
-      .catch((e: Error) => { if (e.name !== "AbortError") setError(e.message); })
+    fetchChartData(code, company, timeframe, controller.signal)
+      .then((json) => setData(json))
+      .catch((e: Error & { fundamentals?: ChartFundamentals }) => { if (e.name !== "AbortError") { setFallbackFundamentals(e.fundamentals); setError(e.message); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [code, company, timeframe]);
+
+  useEffect(() => {
+    const targets = prefetchCodes.filter((item) => item.code !== code).slice(0, 2);
+    void Promise.allSettled(targets.map((item) => fetchChartData(item.code, item.company, "D")));
+  }, [code, prefetchCodes]);
 
   useEffect(() => {
     if (activeTab !== "news") return;
@@ -405,7 +427,12 @@ export function ChartModal({ code, company, onClose }: ChartModalProps) {
               </div>
             )}
           </div>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="닫기">✕</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {position && <span className={styles.code}>{position.current} / {position.total}</span>}
+            <button type="button" onClick={onPrevious} disabled={!onPrevious} aria-label="이전 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>←</button>
+            <button type="button" onClick={onNext} disabled={!onNext} aria-label="다음 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>→</button>
+            <button className={styles.closeBtn} onClick={onClose} aria-label="닫기">✕</button>
+          </div>
         </div>
 
         <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button><button id="news-tab" className={`${styles.tab} ${activeTab === "news" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "news"} aria-controls="news-panel" onClick={() => setActiveTab("news")}>뉴스</button></div>

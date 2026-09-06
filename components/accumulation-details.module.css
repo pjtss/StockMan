@@ -1,0 +1,20 @@
+.grid.grid {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+}
+.card.card {
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.card.card > div { min-width: 0; }
+.card.card p { margin: 8px 0; font-size: 13px; line-height: 1.5; }
+.card.card details { font-size: 13px; line-height: 1.5; }
+.card.card summary { cursor: pointer; }
+.card.card ul { padding-left: 18px; margin: 8px 0; }
+.card.card li { margin: 4px 0; }
+.card.card > button { align-self: flex-start; }
+@media (max-width: 600px) {
+  .grid.grid { grid-template-columns: minmax(0, 1fr); }
+}

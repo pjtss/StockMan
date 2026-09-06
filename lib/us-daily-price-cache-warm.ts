@@ -87,7 +87,9 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
     }
     await Promise.all(Array.from({ length: Math.min(laneConcurrency[timeframe], Math.max(1, laneItems.length)) }, worker));
   }
-  await Promise.all((Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => dueTimeframes.includes(timeframe)).map(runLane));
+  for (const timeframe of ["D", "W", "M"] as const) {
+    if (dueTimeframes.includes(timeframe)) await runLane(timeframe);
+  }
   const completedAt = new Date().toISOString();
   const durationMs = Date.parse(completedAt) - Date.parse(startedAt);
   const weeklyDerived = { skipped: true, reason: "US_WEEKLY_USES_KIS_ORIGINAL_CANDLES", source: "KIS" as const };
