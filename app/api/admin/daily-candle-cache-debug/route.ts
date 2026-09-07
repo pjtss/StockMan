@@ -17,6 +17,13 @@ function withKstTimestamp<T extends Record<string, any>>(row: T) {
 
 async function cacheStats(table: "us_instrument_universe_candles" | "kr_instrument_universe_candles") {
   const db = getDb();
+  if (table === "us_instrument_universe_candles") {
+    // Never scan the multi-million-row US history table from an admin request.
+    // The daily summary is sufficient to report current US freshness; KR keeps
+    // the exact grouped stats because its cache is the incident under audit.
+    const rows = await db.execute(sql`SELECT 'D' AS timeframe, COUNT(*)::int AS candle_count, COUNT(*)::int AS instrument_count, MAX(candle_date) AS latest_candle_date, MIN(candle_date) AS earliest_candle_date, NULL::timestamptz AS latest_candle_time, MAX(fetched_at) AS latest_fetched_at FROM us_latest_daily_candles`);
+    return rows.rows;
+  }
   // The US cache is large enough that COUNT(DISTINCT ...) makes this admin
   // diagnostic endpoint exceed the reverse-proxy timeout. Keep the snapshot
   // bounded: the row count and date aggregates are sufficient for freshness
