@@ -411,6 +411,14 @@
 
 같은 정책을 해외 일봉 breakout·indicator·open-cache 및 Bollinger·breaking-news·minute 지표 cron에도 적용했다.
 
+### 국내 캔들 캐시가 0건으로 남는 유니버스 분리 오류
+
+- **원인**: `V85__split_kr_instrument_universe.sql`이 `managed_issue_code <> 'Y'`를 사용해 NULL인 정상 보통주를 `kr_special_instrument_universe`로 분류했다. 이후 공통 유니버스에 없는 종목의 캔들이 정리되어 국내 캐시 작업의 대상 수가 0건이 됐다.
+- **영향**: 전체 `kr_instrument_universe` 뷰의 종목 수는 정상처럼 보였지만, 실제 캐시 작업이 참조하는 `kr_common_stock_universe`가 비어 국내 일·주·월봉이 재수집되지 않았다.
+- **해결**: `V118__repair_kr_common_stock_split.sql`에서 `COALESCE(managed_issue_code, '') <> 'Y'`를 적용해 정상 보통주를 공통 유니버스로 복구하고, 중복·재실행을 안전하게 처리한다.
+- **재발 방지**: 분리·분류 SQL의 NULL 비교를 반드시 `COALESCE` 또는 명시적 NULL 정책으로 작성하고, 배포 후 `kr_common_stock_universe` 대상 수·국내 캔들 수·캐시 작업의 `instrumentCount`와 `dailySuccessCount`를 함께 검증한다.
+- **검증**: `V118` 로컬 트랜잭션 롤백 드라이런, `npm run typecheck`, `npm run docs:check`, `npm run build`.
+
 푸시 구독 저장·설정 변경도 입력 오류(400)와 저장소 장애(503)를 분리하고 서버 로그를 추가했다.
 
 ## 검증 명령
