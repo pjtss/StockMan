@@ -8,6 +8,7 @@ import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/ca
 import { refreshDailyBollingerCaches, refreshDailyGoldenCrossCache } from "@/lib/daily-cache-followup";
 import { upsertWeeklyFromDaily } from "@/lib/daily-to-weekly-upsert";
 import { measureCandleRefresh } from "@/lib/candle-refresh-observability";
+import { withAutomationLock } from "@/lib/automation-lock";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -43,10 +44,19 @@ async function run(job: Job) {
     // frequently while keeping weekly/monthly traffic bounded.
     // 일봉·주봉은 매일 1회, 월봉은 주 1회 갱신한다. 실패한 캔들은 retry queue가 우선한다.
     const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
-    const fetched = await getDb().execute(sql`SELECT timeframe, MAX(fetched_at) AS fetched_at FROM kr_instrument_universe_candles GROUP BY timeframe`);
-    const latestByTimeframe = new Map(fetched.rows.map((row: any) => [String(row.timeframe), row.fetched_at ? new Date(row.fetched_at).getTime() : 0]));
-    const missingDailyPayload = await getDb().execute(sql`SELECT COUNT(*) AS count FROM kr_instrument_universe_candles WHERE timeframe = 'D' AND COALESCE(raw_payload, '') = ''`);
-    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (timeframe === "D" && Number((missingDailyPayload.rows[0] as any)?.count ?? 0) > 0) || !latestByTimeframe.get(timeframe) || nowMs - Number(latestByTimeframe.get(timeframe)) >= freshness[timeframe]);
+    const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
+    await Promise.all((Object.keys(freshness) as Array<keyof typeof freshness>).map(async (timeframe) => {
+      const stale = await getDb().execute(sql`SELECT u.market, u.code
+        FROM kr_common_stock_universe u
+        LEFT JOIN kr_instrument_universe_candles c
+          ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe}
+        WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
+        GROUP BY u.market, u.code
+        HAVING MAX(c.fetched_at) IS NULL
+          OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')`);
+      staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
+    }));
+    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);
     const retryRows = await loadDueCandleCacheRetries();
     const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
     for (const row of retryRows) if (!dueTimeframes.includes(row.timeframe)) dueTimeframes.push(row.timeframe);
@@ -57,21 +67,23 @@ async function run(job: Job) {
       while (true) {
         const item = scopes[cursor++];
         if (!item) return;
+        const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
+        const requestedTimeframes = dueTimeframes.filter((timeframe) => staleKeysByTimeframe.get(timeframe)?.has(key) || retryKeys.has(`${key}:${timeframe}`));
+        if (!requestedTimeframes.length) continue;
         try {
-          const dailyMeasured = dueTimeframes.includes("D") ? await measureCandleRefresh({market:item.market,timeframe:"D",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"D",item.market); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
-          const weeklyMeasured = dueTimeframes.includes("W") ? await measureCandleRefresh({market:item.market,timeframe:"W",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"W",item.market); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
-          const monthlyMeasured = dueTimeframes.includes("M") ? await measureCandleRefresh({market:item.market,timeframe:"M",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"M",item.market); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
+          const dailyMeasured = requestedTimeframes.includes("D") ? await measureCandleRefresh({market:item.market,timeframe:"D",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"D",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
+          const weeklyMeasured = requestedTimeframes.includes("W") ? await measureCandleRefresh({market:item.market,timeframe:"W",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"W",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
+          const monthlyMeasured = requestedTimeframes.includes("M") ? await measureCandleRefresh({market:item.market,timeframe:"M",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"M",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
           const daily=dailyMeasured?.value, weekly=weeklyMeasured?.value, monthly=monthlyMeasured?.value;
           const result = { market: item.market, code: item.code, daily: (daily as any)?.diagnostics ?? null, weekly: (weekly as any)?.diagnostics ?? null, monthly: (monthly as any)?.diagnostics ?? null };
           if (Number(result.daily?.parsedCandleCount ?? 0) > 0) dailySuccessCount += 1;
           job.results.push(result);
-          const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
-          const success = (!dueTimeframes.includes("D") || Number(result.daily?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("W") || Number(result.weekly?.parsedCandleCount ?? 0) > 0) && (!dueTimeframes.includes("M") || Number(result.monthly?.parsedCandleCount ?? 0) > 0);
-          for (const timeframe of dueTimeframes) { const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly; if (Number(diagnostic?.parsedCandleCount ?? 0) > 0 && retryKeys.has(`${key}:${timeframe}`)) await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe }); }
+          const success = requestedTimeframes.every((timeframe) => Number((timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly)?.parsedCandleCount ?? 0) > 0);
+          for (const timeframe of requestedTimeframes) { const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly; if (Number(diagnostic?.parsedCandleCount ?? 0) > 0 && retryKeys.has(`${key}:${timeframe}`)) await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe }); }
           if (success) job.successCount += 1;
           else {
             job.failureCount += 1;
-            for (const timeframe of dueTimeframes) {
+            for (const timeframe of requestedTimeframes) {
               const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly;
               if (Number(diagnostic?.parsedCandleCount ?? 0) <= 0) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: `${timeframe}: ${diagnostic?.msg1 ?? "KIS returned no candles"}` });
             }
@@ -80,7 +92,7 @@ async function run(job: Job) {
           job.failureCount += 1;
           const message = error instanceof Error ? error.message : String(error);
           job.results.push({ market: item.market, code: item.code, error: message });
-          for (const timeframe of dueTimeframes) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
+          for (const timeframe of requestedTimeframes) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
       } finally {
         job.processedCount += 1;
         const elapsedMs = Date.now() - progressStartedAt;
@@ -92,6 +104,9 @@ async function run(job: Job) {
     // Each worker performs daily, weekly, monthly and quote requests. Keep
     // the fan-out below KIS per-second limits instead of creating bursts.
     await Promise.all(Array.from({ length: Math.min(2, Math.max(1, scopes.length)) }, worker));
+    if (scopes.length > 0 && dailySuccessCount === 0) {
+      throw new Error(`KR daily candle refresh returned no usable candles for ${scopes.length} instruments`);
+    }
     job.status = "COMPLETED";
     (job as any).debugItems = job.results.flatMap((item: any) => ([
       item.daily ? { market: item.market, code: item.code, timeframe: "D", status: Number(item.daily.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.daily.msg1 ?? null, metadata: item.daily } : null,
@@ -122,7 +137,13 @@ export function startKrDailyCacheJob() {
   const job = createJob();
   jobs.set(job.jobId, job);
   trimJobs();
-  void run(job);
+  void withAutomationLock("kr-daily-cache-worker", () => run(job)).then((result) => {
+    if (result === null) {
+      job.status = "FAILED";
+      job.error = "KR daily cache job is already running";
+      job.completedAt = new Date().toISOString();
+    }
+  });
   return job;
 }
 
@@ -135,7 +156,12 @@ export async function runKrDailyCacheNow() {
   const job = createJob();
   jobs.set(job.jobId, job);
   trimJobs();
-  await run(job);
+  const result = await withAutomationLock("kr-daily-cache-worker", () => run(job));
+  if (result === null) {
+    job.status = "FAILED";
+    job.error = "KR daily cache job is already running";
+    job.completedAt = new Date().toISOString();
+  }
   return job;
 }
 
