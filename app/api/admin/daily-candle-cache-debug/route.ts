@@ -17,7 +17,12 @@ function withKstTimestamp<T extends Record<string, any>>(row: T) {
 
 async function cacheStats(table: "us_instrument_universe_candles" | "kr_instrument_universe_candles") {
   const db = getDb();
-  const rows = await db.execute(sql.raw(`SELECT timeframe, COUNT(*)::int AS candle_count, COUNT(DISTINCT market || ':' || code)::int AS instrument_count, MAX(candle_date) AS latest_candle_date, MIN(candle_date) AS earliest_candle_date, MAX(candle_time) AS latest_candle_time, MAX(fetched_at) AS latest_fetched_at FROM ${table} GROUP BY timeframe ORDER BY timeframe`));
+  // The US cache is large enough that COUNT(DISTINCT ...) makes this admin
+  // diagnostic endpoint exceed the reverse-proxy timeout. Keep the snapshot
+  // bounded: the row count and date aggregates are sufficient for freshness
+  // diagnosis, while the instrument count is explicitly marked unavailable.
+  const instrumentCount = table.startsWith("kr_") ? "COUNT(DISTINCT market || ':' || code)::int" : "NULL::int";
+  const rows = await db.execute(sql.raw(`SELECT timeframe, COUNT(*)::int AS candle_count, ${instrumentCount} AS instrument_count, MAX(candle_date) AS latest_candle_date, MIN(candle_date) AS earliest_candle_date, MAX(candle_time) AS latest_candle_time, MAX(fetched_at) AS latest_fetched_at FROM ${table} GROUP BY timeframe ORDER BY timeframe`));
   return rows.rows;
 }
 
