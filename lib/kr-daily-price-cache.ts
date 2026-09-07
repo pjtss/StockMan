@@ -21,22 +21,28 @@ export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string
   return result;
 }
 
-export async function saveKrDailyCandles(market: string, code: string, candles: OHLCVCandle[], timeframe: CandleTimeframe = "D") {
+export async function saveKrDailyCandles(market: string, code: string, candles: OHLCVCandle[], timeframe: CandleTimeframe = "D", options: { skipUniverseCheck?: boolean } = {}) {
   if (!candles.length) return 0;
   const db = getDb();
-  const common = await db.select({ code: krCommonStockUniverse.code }).from(krCommonStockUniverse).where(and(eq(krCommonStockUniverse.market, market), eq(krCommonStockUniverse.code, code), eq(krCommonStockUniverse.enabled, true))).limit(1);
-  if (!common.length) return 0;
+  if (!options.skipUniverseCheck) {
+    const common = await db.select({ code: krCommonStockUniverse.code }).from(krCommonStockUniverse).where(and(eq(krCommonStockUniverse.market, market), eq(krCommonStockUniverse.code, code), eq(krCommonStockUniverse.enabled, true))).limit(1);
+    if (!common.length) return 0;
+  }
   await db.insert(krInstrumentUniverseCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, candleTime: null, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, rawPayload: JSON.stringify(candle.raw ?? {}), source: "KIS" }))).onConflictDoUpdate({ target: [krInstrumentUniverseCandles.market, krInstrumentUniverseCandles.code, krInstrumentUniverseCandles.timeframe, krInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, rawPayload: sql`excluded.raw_payload`, fetchedAt: new Date() } });
+  if (timeframe === "D") {
+    const latest = [...candles].filter((c) => Number(c.volume ?? 0) > 0 && Number.isFinite(c.close)).sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (latest) await db.execute(sql`INSERT INTO kr_latest_daily_candles (market, code, candle_date, open, high, low, close, volume, fetched_at) VALUES (${market}, ${code}, ${latest.date}, ${latest.open}, ${latest.high}, ${latest.low}, ${latest.close}, ${latest.volume}, NOW()) ON CONFLICT (market, code) DO UPDATE SET candle_date=excluded.candle_date, open=excluded.open, high=excluded.high, low=excluded.low, close=excluded.close, volume=excluded.volume, fetched_at=excluded.fetched_at WHERE kr_latest_daily_candles.candle_date <= excluded.candle_date`);
+  }
   if (timeframe === "D") {
     const latest = [...candles].sort((a, b) => b.date.localeCompare(a.date))[0];
     const latestVolume = Number(latest?.volume ?? 0);
-    await getDb().execute(sql`UPDATE kr_common_stock_universe SET enabled = ${latestVolume > 0}, updated_at = NOW() WHERE market = ${market} AND code = ${code} AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1') AND COALESCE(managed_issue_code, '') <> 'Y'`);
+    await db.execute(sql`UPDATE kr_common_stock_universe SET enabled = ${latestVolume > 0}, updated_at = NOW() WHERE market = ${market} AND code = ${code} AND instrument_type = 'COMMON_STOCK' AND COALESCE(is_suspended, false) = false AND COALESCE(trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(liquidation_code, '') NOT IN ('Y','1') AND COALESCE(managed_issue_code, '') <> 'Y'`);
   }
   return candles.length;
 }
 
-export async function refreshKrDailyCandles(code: string, timeframe: CandleTimeframe = "D", market = "KOSPI") {
+export async function refreshKrDailyCandles(code: string, timeframe: CandleTimeframe = "D", market = "KOSPI", options: { skipUniverseCheck?: boolean } = {}) {
   const response = await fetchKrDailyPrice({ code, timeframe });
-  if (response?.ok && response.candles.length) await saveKrDailyCandles(market, code, response.candles, timeframe);
+  if (response?.ok && response.candles.length) await saveKrDailyCandles(market, code, response.candles, timeframe, options);
   return response;
 }

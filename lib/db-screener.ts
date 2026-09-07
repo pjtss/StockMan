@@ -47,6 +47,12 @@ function flowSeries(candles: any[]) {
   return { obvSignalTrend: trend(obvSignal), adlSignalTrend: trend(adlSignal) };
 }
 
+export function calculateRvol(latestVolume: number, baselineVolumes: number[]) {
+  if (!Number.isFinite(latestVolume) || baselineVolumes.length === 0) return null;
+  const average = baselineVolumes.reduce((sum, volume) => sum + volume, 0) / baselineVolumes.length;
+  return average > 0 ? latestVolume / average : null;
+}
+
 export async function runDbScreener(
   request: ScreenerRequest,
 ): Promise<ScreenerResult[]> {
@@ -71,10 +77,17 @@ export async function runDbScreener(
     (value) => value && value !== "ANY",
   );
   const requestedTimeframes = multiEma9 ? ["D", "W", "M"] : [timeframe];
+  const asOf = request.asOf && request.asOf !== "LATEST" ? request.asOf : null;
+  const latestSummaryTable = isUs
+    ? "us_latest_daily_candles"
+    : "kr_latest_daily_candles";
+  const latestCtes = asOf
+    ? `market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date <= $3::date GROUP BY market), instrument_daily_latest AS (SELECT market,code,MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date <= $3::date GROUP BY market,code)`
+    : `market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1))`;
   const rows = (
     await pool.query(
-      `WITH market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,MAX(candle_date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) GROUP BY market,code) SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code ORDER BY f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (SELECT * FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe=ANY($2) AND c.volume > 0 ORDER BY c.timeframe,c.candle_date ASC) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) ORDER BY u.market,u.code,c.timeframe,c.candle_date ASC`,
-      [markets, requestedTimeframes],
+      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (SELECT * FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe=ANY($2) AND c.volume > 0 AND ($3::date IS NULL OR c.candle_date <= $3::date) ORDER BY c.timeframe,c.candle_date ASC) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) ORDER BY u.market,u.code,c.timeframe,c.candle_date ASC`,
+      [markets, requestedTimeframes, asOf],
     )
   ).rows;
   const groups = new Map<string, any>();
@@ -93,14 +106,14 @@ export async function runDbScreener(
     if (request.exchange?.length && !request.exchange.includes(item.market))
       continue;
     const c = item.candles;
-    if (c.length < 20) continue;
+    if (c.length < 21) continue;
     const closes = c.map((x: any) => Number(x.close)),
       last = c.at(-1),
       prev = c.at(-2);
-    const avg =
-      c
-        .slice(-20, -1)
-        .reduce((s: number, x: any) => s + Number(x.volume || 0), 0) / 19;
+    const baselineVolumes = c.slice(-21, -1);
+    const avg = baselineVolumes.length
+      ? baselineVolumes.reduce((s: number, x: any) => s + Number(x.volume || 0), 0) / baselineVolumes.length
+      : null;
     const mid =
       closes.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
     const sd = Math.sqrt(
@@ -123,7 +136,7 @@ export async function runDbScreener(
       [`${prefix}.high`]: Number(last.high),
       [`${prefix}.low`]: Number(last.low),
       [`${prefix}.volume`]: Number(last.volume),
-      [`${prefix}.rvol`]: avg ? Number(last.volume) / avg : null,
+      [`${prefix}.rvol`]: avg ? calculateRvol(Number(last.volume), baselineVolumes.map((x: any) => Number(x.volume || 0))) : null,
       [`${prefix}.bb.upper`]: mid + 2 * sd,
       [`${prefix}.bb.middle`]: mid,
       [`${prefix}.bb.lower`]: lower,
