@@ -419,6 +419,13 @@
 - **재발 방지**: 분리·분류 SQL의 NULL 비교를 반드시 `COALESCE` 또는 명시적 NULL 정책으로 작성하고, 배포 후 `kr_common_stock_universe` 대상 수·국내 캔들 수·캐시 작업의 `instrumentCount`와 `dailySuccessCount`를 함께 검증한다.
 - **검증**: `V118` 로컬 트랜잭션 롤백 드라이런, `npm run typecheck`, `npm run docs:check`, `npm run build`.
 
+### 국내 캔들 복구 중 주·월봉 요청으로 인한 일봉 복구 지연
+
+- **원인**: 콜드 상태에서 종목별 일·주·월봉을 한 작업에서 순차 호출해, 일봉이 저장되기 전에 주·월봉 요청이 누적됐다.
+- **영향**: 국내 스캐너가 사용하는 일봉 캐시가 장시간 0건으로 남고, cron의 중복 실행 방지로 후속 작업도 건너뛰었다.
+- **해결**: `lib/kr-daily-cache-job.ts`에서 일봉이 stale이면 일봉만 우선 처리하고, 주·월봉은 다음 실행으로 이연한다.
+- **검증**: `npm test -- --run` (141개 파일·464개 테스트), `npm run typecheck`, `npm run build`.
+
 푸시 구독 저장·설정 변경도 입력 오류(400)와 저장소 장애(503)를 분리하고 서버 로그를 추가했다.
 
 ## 검증 명령

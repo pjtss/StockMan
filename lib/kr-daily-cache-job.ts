@@ -57,9 +57,19 @@ async function run(job: Job) {
       staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
     }));
     const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);
+    // Recover the primary daily dataset first. Fetching D/W/M for every
+    // instrument in one worker pass made a cold production database spend
+    // hours on weekly/monthly requests before any daily candles were usable.
+    // Once D is current, the next scheduled run naturally handles W and M.
+    if (dueTimeframes.includes("D") && dueTimeframes.length > 1) {
+      dueTimeframes.splice(0, dueTimeframes.length, "D");
+    }
     const retryRows = await loadDueCandleCacheRetries();
     const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
     for (const row of retryRows) if (!dueTimeframes.includes(row.timeframe)) dueTimeframes.push(row.timeframe);
+    if (dueTimeframes.includes("D") && dueTimeframes.length > 1) {
+      dueTimeframes.splice(0, dueTimeframes.length, "D");
+    }
     job.dueTimeframes = dueTimeframes;
   let cursor = 0;
     let dailySuccessCount = 0;
