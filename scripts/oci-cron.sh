@@ -72,6 +72,10 @@ run_cron_endpoint "instrument-fundamentals" 300 "/api/cron/instrument-fundamenta
 # Full-universe daily candle refresh can take longer than five minutes.
 # Keep the request alive so the DB automation run can finalize SUCCESS/FAILED
 # and its per-instrument retry queue is committed instead of being orphaned.
+# 국내 일봉은 해외 전체 캐시보다 먼저 실행해 긴 해외 작업 때문에
+# 국내 장중 스케줄이 지나가거나 서비스 타임아웃으로 누락되지 않게 한다.
+run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
+
 run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
 run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
 run_cron_endpoint "us-bollinger-middle-lower" 180 "/api/cron/us-bollinger-middle-lower"
@@ -85,7 +89,6 @@ run_cron_endpoint "us-daily-breakout" 120 "/api/cron/us-daily-breakout"
 run_cron_endpoint "us-minute-bollinger-band" 180 "/api/cron/us-minute-bollinger-band"
 run_cron_endpoint "us-minute-obv-adl" 180 "/api/cron/us-minute-obv-adl"
 
-run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
 run_cron_endpoint "kr-bollinger-band" 180 "/api/cron/kr-bollinger-band"
 run_cron_endpoint "kr-bollinger-middle-lower" 180 "/api/cron/kr-bollinger-middle-lower"
 run_cron_endpoint "kr-golden-cross" 180 "/api/cron/kr-golden-cross"
