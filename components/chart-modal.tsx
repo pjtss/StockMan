@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./chart-modal.module.css";
 import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart";
@@ -147,6 +147,8 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const chartNodeRef = useRef<HTMLDivElement | null>(null);
+  const [chartContainerVersion, setChartContainerVersion] = useState(0);
   const cleanupRef = useRef<(() => void) | null>(null);
   const requestIdRef = useRef(0);
 
@@ -242,21 +244,22 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
     return () => { cancelled = true; };
   }, [activeTab, code]);
 
-  // TradingView Lightweight Charts 렌더링
-  useEffect(() => {
+  // TradingView Lightweight Charts 렌더링: 종목 전환 직후 새 DOM ref가 확정된 뒤 초기화한다.
+  useLayoutEffect(() => {
     if (activeTab !== "chart" || !data || !chartRef.current) return;
 
     // cleanup previous instance
     if (cleanupRef.current) cleanupRef.current();
 
     let cancelled = false;
+    const container = chartRef.current;
 
     import("lightweight-charts").then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle, HistogramSeries }) => {
-      if (cancelled || !chartRef.current) return;
+      if (cancelled || !container || !container.isConnected) return;
 
-      const chart = createChart(chartRef.current, {
-        width: chartRef.current.clientWidth,
-        height: chartRef.current.clientHeight,
+      const chart = createChart(container, {
+        width: container.clientWidth,
+        height: container.clientHeight,
         layout: {
           background: { color: "transparent" },
           textColor: "#94a3b8",
@@ -381,7 +384,7 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
           });
         }
       });
-      if (chartRef.current) ro.observe(chartRef.current);
+      ro.observe(container);
 
       cleanupRef.current = () => {
         cancelled = true;
@@ -395,7 +398,7 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
       cancelled = true;
       if (cleanupRef.current) cleanupRef.current();
     };
-  }, [data, activeTab]);
+  }, [data, activeTab, code, timeframe, chartContainerVersion]);
 
   // cleanup on unmount
   useEffect(() => {
@@ -477,14 +480,20 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
           {error && activeTab === "fundamentals" && <FundamentalsPanel fundamentals={fallbackFundamentals} timeframe={timeframe} isUsChart={isUsChart} />}
 
           {!loading && !error && data && activeTab === "chart" && (
-            <div id="chart-panel" role="tabpanel" aria-labelledby="chart-tab">
+            <div key={`${code}:${timeframe}`} id="chart-panel" role="tabpanel" aria-labelledby="chart-tab">
               {/* 캔들 차트 */}
               <div className={styles.chartLegend} aria-label="지수이동평균선 범례">
                 <span style={{ color: "#facc15" }}>● EMA 9</span>
                 <span style={{ color: "#fb923c" }}>● EMA 20</span>
                 <span style={{ color: "#c084fc" }}>● EMA 60</span>
               </div>
-              <div className={styles.chartWrap} ref={chartRef} />
+              <div className={styles.chartWrap} ref={(node) => {
+                chartRef.current = node;
+                if (node && node !== chartNodeRef.current) {
+                  chartNodeRef.current = node;
+                  setChartContainerVersion((version) => version + 1);
+                }
+              }} />
               <IndicatorCharts candles={data.candles} />
 
             </div>

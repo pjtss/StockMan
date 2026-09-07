@@ -3,7 +3,7 @@ import { fetchChartData } from "@/lib/kis-chart";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { getDb } from "@/lib/db";
 import { sql } from "drizzle-orm";
-import type { ChartData, ChartFundamentals } from "@/lib/kis-chart";
+import { buildChartDataFromCandles, type ChartData, type ChartFundamentals, type OHLCVCandle } from "@/lib/kis-chart";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +22,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = market === "US"
+    let data = market === "US"
       ? await fetchUsChartData(code, timeframe)
       : await fetchChartData(code, timeframe);
+    let chartSource = "KIS";
+    if (!data && market === "KR") {
+      data = await loadCachedChartData(code, timeframe);
+      if (data) chartSource = "DB_CACHE";
+    }
     if (!data) {
       const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe).catch(() => unknownFundamentals(market));
       return NextResponse.json(
@@ -35,6 +40,7 @@ export async function GET(request: Request) {
 
     // caller가 넘긴 company명이 있으면 덮어씀
     if (company) data.company = company;
+    if (chartSource === "DB_CACHE") data.fundamentals = { ...unknownFundamentals(market), status: "STALE", source: "DB_CACHE" };
     data.fundamentals = await loadChartFundamentals(data, market, timeframe).catch(() => unknownFundamentals(market));
 
     return NextResponse.json(data);
@@ -43,6 +49,22 @@ export async function GET(request: Request) {
     const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe).catch(() => unknownFundamentals(market));
     return NextResponse.json({ error: "차트 데이터를 처리할 수 없습니다.", chartStatus: "UNAVAILABLE", fundamentals }, { status: 502 });
   }
+}
+
+async function loadCachedChartData(rawCode: string, timeframe: "D" | "W" | "M"): Promise<ChartData | null> {
+  const db = getDb();
+  const code = rawCode.replace(/^US:/i, "").trim().toUpperCase();
+  const result = await db.execute(sql`SELECT date AS "date", open, high, low, close, volume, fetched_at AS "fetchedAt" FROM (
+    SELECT candle_date AS date, open, high, low, close, volume, fetched_at,
+           ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
+      FROM kr_instrument_universe_candles
+     WHERE code = ${code} AND timeframe = ${timeframe} AND close IS NOT NULL
+  ) cached WHERE rn = 1 ORDER BY date ASC`);
+  const candles = (result.rows as Array<Record<string, unknown>>).map((row): OHLCVCandle => ({
+    date: String(row.date), open: Number(row.open ?? 0), high: Number(row.high ?? 0), low: Number(row.low ?? 0), close: Number(row.close ?? 0), volume: Number(row.volume ?? 0),
+  })).filter((candle) => /^\d{8}$/.test(candle.date) && Number.isFinite(candle.close));
+  const fetchedAt = result.rows.at(-1)?.fetchedAt ? new Date(String(result.rows.at(-1)?.fetchedAt)).toISOString() : null;
+  return candles.length ? buildChartDataFromCandles(code, candles, fetchedAt) : null;
 }
 
 function unknownFundamentals(market: string): ChartFundamentals {

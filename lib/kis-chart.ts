@@ -175,6 +175,30 @@ function calcBollingerBands(closes: number[], period = 20): { upper: number | nu
   };
 }
 
+/** KIS가 일시적으로 unavailable일 때 DB 캐시로 차트 payload를 구성한다. */
+export function buildChartDataFromCandles(code: string, candles: OHLCVCandle[], candleDataUpdatedAt?: string | null): ChartData | null {
+  if (!candles.length) return null;
+  const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
+  const closes = ordered.map((candle) => candle.close);
+  const rsi14 = calcRSI(closes);
+  const { macd, signal: macdSignal, hist: macdHist } = calcMACD(closes);
+  const { upper: bbUpper, middle: bbMiddle, lower: bbLower } = calcBollingerBands(closes);
+  const last = ordered.at(-1)!;
+  const previous = ordered.at(-2);
+  const change = previous ? last.close - previous.close : 0;
+  const rate = previous && previous.close !== 0 ? (change / previous.close) * 100 : 0;
+  return {
+    code,
+    company: code,
+    candles: ordered,
+    indicators: { rsi14, macd, macdSignal, macdHist, bbUpper, bbMiddle, bbLower },
+    latestPrice: last.close,
+    latestChange: `${change >= 0 ? "+" : ""}${change.toLocaleString()}`,
+    latestChangeRate: `${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%`,
+    candleDataUpdatedAt: candleDataUpdatedAt ?? new Date().toISOString(),
+  };
+}
+
 /** 메인 함수: 차트 데이터 + 기술적 지표 반환 */
 export async function fetchChartData(code: string, timeframe: "D" | "W" | "M" = "D"): Promise<ChartData | null> {
   const token = await getAccessToken();
