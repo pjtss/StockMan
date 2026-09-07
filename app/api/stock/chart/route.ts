@@ -22,10 +22,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    let data = market === "US"
-      ? await fetchUsChartData(code, timeframe)
-      : await fetchChartData(code, timeframe);
+    let data: ChartData | null = null;
     let chartSource = "KIS";
+    try {
+      data = market === "US"
+        ? await fetchUsChartData(code, timeframe)
+        : await fetchChartData(code, timeframe);
+    } catch (error) {
+      if (market !== "KR") throw error;
+      console.warn("[API /stock/chart] KIS unavailable; trying domestic DB cache");
+      data = await loadCachedChartData(code, timeframe);
+      if (data) chartSource = "DB_CACHE";
+    }
     if (!data && market === "KR") {
       data = await loadCachedChartData(code, timeframe);
       if (data) chartSource = "DB_CACHE";

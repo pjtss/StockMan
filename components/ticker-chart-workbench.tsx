@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatDisplayAmount } from "@/lib/display-number";
 import { ChartModal } from "@/components/chart-modal";
 import { AccumulationDetails, AccumulationSummary } from "@/components/accumulation-details";
 import type { AccumulationReport } from "@/lib/accumulation-scan";
@@ -114,7 +115,6 @@ export function TickerChartWorkbench() {
   const [obvTrend, setObvTrend] = useState<"ANY" | "RISING" | "FALLING">("ANY");
   const [adlTrend, setAdlTrend] = useState<"ANY" | "RISING" | "FALLING">("ANY");
   const [goldenCross, setGoldenCross] = useState<"ANY" | "RECENT">("ANY");
-  const [lowerTouch, setLowerTouch] = useState(true);
   const [scanTimeframe, setScanTimeframe] = useState<"D" | "W" | "M">("D");
   const [ema9Conditions, setEma9Conditions] = useState<
     Record<"D" | "W" | "M", "ANY" | "ABOVE" | "NOT_ABOVE">
@@ -158,8 +158,10 @@ export function TickerChartWorkbench() {
       setNames({});
       return;
     }
+    const controller = new AbortController();
     fetch(
       `/api/stock/lookup?market=${market}&codes=${encodeURIComponent(tickers.join(","))}`,
+      { signal: controller.signal },
     )
       .then((response) =>
         response.ok
@@ -169,13 +171,37 @@ export function TickerChartWorkbench() {
       .then((json: { names?: Record<string, string> }) =>
         setNames(json.names ?? {}),
       )
-      .catch(() => setNames({}));
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setNames({});
+      });
+    return () => controller.abort();
   }, [market, tickers]);
 
   useEffect(() => {
     setMinCap(market === "KR" ? "1000" : "100000000");
     setMaxCap("");
+    setScanRows([]);
+    setScanCompleted(false);
+    setAccumulationReport(null);
+    setScanError(null);
   }, [market]);
+
+  // 입력 티커가 바뀌면 이전 조건 검색 결과를 재사용하지 않는다.
+  useEffect(() => {
+    setScanRows([]);
+    setScanCompleted(false);
+    setAccumulationReport(null);
+  }, [input]);
+
+  // 검색 조건이 바뀌면 재실행 전까지 이전 결과를 표시하지 않는다.
+  useEffect(() => {
+    setScanRows([]);
+    setScanCompleted(false);
+    setAccumulationReport(null);
+  }, [
+    market, scanTimeframe, minCap, maxCap, minRvol, maxRvol, minPrice, maxPrice,
+    bbPosition, obvTrend, adlTrend, goldenCross, ema9Conditions,
+  ]);
 
   async function runScan() {
     setAccumulationReport(null);
@@ -185,6 +211,18 @@ export function TickerChartWorkbench() {
     setScanError(null);
     setScanCompleted(false);
     try {
+      const numericFields = [
+        ["최소 시총", minCap], ["최대 시총", maxCap], ["최소 RVOL", minRvol],
+        ["최대 RVOL", maxRvol], ["최저 종가", minPrice], ["최고 종가", maxPrice],
+      ] as const;
+      for (const [label, value] of numericFields) {
+        if (value.trim() !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+          throw new Error(`${label} 조건은 0 이상의 숫자로 입력하세요.`);
+        }
+      }
+      if (Number(maxCap) > 0 && Number(minCap) > 0 && Number(maxCap) < Number(minCap)) throw new Error("최대 시총은 최소 시총보다 작을 수 없습니다.");
+      if (Number(maxRvol) > 0 && Number(minRvol) > 0 && Number(maxRvol) < Number(minRvol)) throw new Error("최대 RVOL은 최소 RVOL보다 작을 수 없습니다.");
+      if (Number(maxPrice) > 0 && Number(minPrice) > 0 && Number(maxPrice) < Number(minPrice)) throw new Error("최고 종가는 최저 종가보다 작을 수 없습니다.");
       const prefix = scanTimeframe;
       const filters: any[] = [];
       if (Number(minCap) > 0)
@@ -592,7 +630,12 @@ export function TickerChartWorkbench() {
                         {row.code} · {row.market} · 시총{" "}
                         {row.marketCap == null
                           ? "-"
-                          : Number(row.marketCap).toLocaleString()}{" "}
+                          : formatDisplayAmount(
+                              Number(row.marketCap),
+                              row.market === "KOSPI" || row.market === "KOSDAQ" || row.market === "KRX"
+                                ? "KRW"
+                                : "USD",
+                            )}{" "}
                         · RVOL{" "}
                         {row.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] == null
                           ? "-"
