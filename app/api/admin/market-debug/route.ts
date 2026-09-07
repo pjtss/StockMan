@@ -17,6 +17,17 @@ async function safeQuery<T extends import("pg").QueryResultRow>(sql: string, val
   }
 }
 
+function databaseTarget() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return { host: url.hostname, port: url.port || "5432", database: url.pathname.replace(/^\//, "") || null };
+  } catch {
+    return { host: "unparseable", port: null, database: null };
+  }
+}
+
 async function inventory() {
   const tables = ["kr_instrument_universe", "kr_instrument_universe_candles", "us_instrument_universe", "us_instrument_universe_candles"];
   const tableResult = await safeQuery<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1::text[]) ORDER BY table_name", [tables]);
@@ -38,7 +49,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const market = (url.searchParams.get("market") ?? "all").toUpperCase();
   const run = ["1", "true", "yes"].includes((url.searchParams.get("run") ?? "").toLowerCase());
-  const body: Record<string, unknown> = { ok: true, mode: run ? "ADMIN_DEBUG_RUN" : "ADMIN_DEBUG_SNAPSHOT", checkedAt: new Date().toISOString(), requestId, responseTimeMs: responseTimeMs(startedAt), requestedMarket: market, environment: { kisConfigured: Boolean(process.env.KIS_APPKEY && process.env.KIS_APPSECRET), databaseConfigured: Boolean(process.env.DATABASE_URL), cronSecretConfigured: Boolean(process.env.CRON_SECRET) }, inventory: await inventory() };
+  const body: Record<string, unknown> = { ok: true, mode: run ? "ADMIN_DEBUG_RUN" : "ADMIN_DEBUG_SNAPSHOT", checkedAt: new Date().toISOString(), requestId, responseTimeMs: responseTimeMs(startedAt), requestedMarket: market, environment: { kisConfigured: Boolean(process.env.KIS_APPKEY && process.env.KIS_APPSECRET), databaseConfigured: Boolean(process.env.DATABASE_URL), databaseTarget: databaseTarget(), cronSecretConfigured: Boolean(process.env.CRON_SECRET) }, inventory: await inventory() };
   if (run && (market === "KR" || market === "ALL")) {
     try { body.kr = { scan: await scanStoredKrBollingerBands() }; }
     catch (error) { body.kr = { ok: false, error: error instanceof Error ? error.message : String(error) }; }
