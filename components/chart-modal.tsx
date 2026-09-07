@@ -147,6 +147,7 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const chartNodeRef = useRef<HTMLDivElement | null>(null);
   const [chartContainerVersion, setChartContainerVersion] = useState(0);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -200,14 +201,30 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
     }
   }
 
-  // ESC 닫기
+  // 키보드 단축키: 입력 컨트롤에서는 브라우저의 기본 방향키 동작을 보존한다.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase();
+      if (tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === "ArrowLeft" && onPrevious) {
+        e.preventDefault();
+        onPrevious();
+      } else if (e.key === "ArrowRight" && onNext) {
+        e.preventDefault();
+        onNext();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, onPrevious, onNext]);
+
+  useEffect(() => {
+    modalRef.current?.focus();
+  }, []);
 
   // 차트 데이터 로드
   useEffect(() => {
@@ -415,7 +432,7 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
 
   return createPortal(
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={styles.modal} role="dialog" aria-modal="true">
+      <div ref={modalRef} className={styles.modal} role="dialog" aria-modal="true" tabIndex={-1}>
         {/* 헤더 */}
         <div className={styles.header}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
@@ -448,7 +465,8 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
           </div>
         </div>
 
-        <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button><button id="news-tab" className={`${styles.tab} ${activeTab === "news" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "news"} aria-controls="news-panel" onClick={() => setActiveTab("news")}>뉴스</button></div>
+          <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button><button id="news-tab" className={`${styles.tab} ${activeTab === "news" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "news"} aria-controls="news-panel" onClick={() => setActiveTab("news")}>뉴스</button></div>
+          <p className={styles.keyboardHint} aria-label="키보드 단축키">← → 종목 이동 · ESC 닫기</p>
 
         {/* 바디 */}
         <div className={styles.body}>

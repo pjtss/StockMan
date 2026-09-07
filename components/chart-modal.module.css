@@ -175,6 +175,13 @@
   border-bottom: 2px solid #00ffa3;
 }
 
+.keyboardHint {
+  margin: 8px 24px 0;
+  color: #64748b;
+  font-size: 11px;
+  text-align: right;
+}
+
 /* ── 바디 ── */
 .body {
   overflow-y: auto;
