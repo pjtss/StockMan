@@ -97,7 +97,7 @@ export function evaluateAccumulationScan(region: AccumulationRegion, instruments
   return {
     ok: true as const, region, logicVersion: ACCUMULATION_POLICY.version, checkedAt: settings.asOf.toISOString(),
     source: "database_daily_cache", criteria: (region === "KR" ? "국내 활성 보통주·시총 300억 초과" : "해외 활성 보통주")
-      + ", RVOL(전일 거래량 EMA20 대비) " + settings.minRvol + " 이상, OBV·ADL 20봉 증가, 최소 점수 " + settings.minScore,
+      + ", RVOL(전일 거래량 SMA20 대비) " + settings.minRvol + " 이상, OBV·ADL 20봉 증가, 최소 점수 " + settings.minScore,
     policy: { ...ACCUMULATION_POLICY, minRvol: settings.minRvol, minScore: settings.minScore, marketCapFloor: region === "KR" ? 30000000000 : null },
     cache: { latestDateByMarket, storedDateByMarket, unusableBars }, warnings,
     summary: { eligible: instruments.length, evaluated, matched: results.length, returned: selected.length,

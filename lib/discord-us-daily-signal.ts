@@ -68,7 +68,7 @@ export async function sendUsDailyIndicatorSignals(input: { mfi?: Signal[]; dmi?:
   ].filter((section) => section.items.length > 0);
   const count = (input.mfi?.length || 0) + (input.dmi?.length || 0) + (input.macd?.length || 0) + (input.obv?.length || 0) + (input.adl?.length || 0);
   const responses = [];
-  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", color: 0x2563eb, fields: fieldData.map((section) => ({ name: section.name, value: fitEmbedField(section.lines, section.items.length), inline: false })), footer: { text: "STOCKMAN · DB 저장 일봉 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] })) });
+  const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload({ username: "STOCKMAN DAILY INDICATORS", allowed_mentions: { parse: [] }, embeds: [{ title: "🚨 해외주식 일봉 지표 알림", color: 0x2563eb, fields: fieldData.map((section) => ({ name: section.name, value: fitEmbedField(section.lines, section.items.length), inline: false })), footer: { text: "STOCKMAN · DB 저장 일봉 기준 · 카드 1개 통합" }, timestamp: new Date().toISOString() }] })), signal: AbortSignal.timeout(8_000) });
   responses.push({ ok: response.ok, status: response.status, responseText: await response.text() });
   const successful = responses.filter((response) => response.ok).length;
   return {

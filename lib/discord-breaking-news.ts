@@ -18,7 +18,7 @@ export async function sendBreakingNewsToDiscord(event: KisBreakingNews) {
   const configured = await loadFeatureDiscordWebhook("us-breaking-news-forwarder", ["KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL"]);
   if (!configured) throw new Error("KIS_BREAKING_NEWS_DISCORD_WEBHOOK_URL is not configured");
   const url = new URL(configured); url.searchParams.set("wait", "true");
-  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildBreakingNewsPayload(event)) });
+  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(buildBreakingNewsPayload(event)), signal: AbortSignal.timeout(8_000) });
   const responseText = await response.text();
   return { ok: response.status === 200 || response.status === 204, status: response.status, responseText };
 }

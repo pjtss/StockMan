@@ -63,7 +63,7 @@ async function kisGet(path: string, params: Record<string, string>, trId: string
   // other features. Keep these calls on the same process-wide queue so two
   // cron endpoints cannot burst concurrently and trigger EGW00201.
   const result = await withKisRequestThrottle(async () => {
-    const response = await fetch(`${BASE_URL}${path}?${new URLSearchParams(params)}`, { headers: headers(token, trId), cache: "no-store" });
+    const response = await fetch(`${BASE_URL}${path}?${new URLSearchParams(params)}`, { headers: headers(token, trId), cache: "no-store", signal: AbortSignal.timeout(8_000) });
     const body = await response.json().catch(() => ({}));
     return { response, body };
   });

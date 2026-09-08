@@ -123,13 +123,14 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
       method: "GET",
       headers: {
         "content-type": contentType,
-        authorization: buildKisAuthorization(token),
+        Authorization: buildKisAuthorization(token),
         appkey,
         appsecret,
         tr_id: trId,
         custtype,
         tr_cont: "",
       },
+      signal: AbortSignal.timeout(8_000),
     }));
     const rawText = await response.text();
     return { response, rawText, parsed: parseJson(rawText), url };

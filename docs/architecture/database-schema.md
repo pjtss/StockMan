@@ -42,6 +42,8 @@ scanner·API·알림·관리자 화면
 |---|---|---|
 | `kis_tokens` | `id`, `access_token`, `issued_at`, `expires_at` | 실전 KIS REST 토큰. `id=1` 단일 행 |
 | `kis_cache` | `key`, `data`, `updated_at` | 실시간·장외 복원용 JSON 캐시. `key` PK |
+| `kis_signal_snapshots` | `market`, `code`, `signal_type`, `status`, `source`, `observed_at`, `fetched_at`, `payload`, `raw_payload` | KIS 탐지 신호 원본 스냅샷. 외인·기관 확정/추정과 프로그램 데이터를 종목·시각별로 분리 보존 |
+| `kis_realtime_events` | `market`, `code`, `channel`, `tr_id`, `observed_at`, `payload`, `raw_payload` | KIS WebSocket 체결·호가 이벤트 append-only 로그. REST 스냅샷과 분리하고 클라이언트는 초당 1건으로 저장해 고빈도 폭주를 제한 |
 | `kr_instrument_universe_candles` | `id`, `market`, `code`, `timeframe`, `candle_date`, `candle_time`, `open`, `high`, `low`, `close`, `volume`, `source`, `fetched_at` | 국내 일·주·월봉. `(market, code, timeframe, candle_date)` 유일 |
 | `us_instrument_universe_candles` | `id`, `market`, `code`, `timeframe`, `candle_date`, `candle_time`, `open`, `high`, `low`, `close`, `volume`, `source`, `fetched_at` | 미국 일·주·월봉. 동일 복합 유일키 |
 | `kr_minute_candles` | `market`, `code`, `candle_date`, `candle_time`, `open`, `high`, `low`, `close`, `volume`, `source`, `fetched_at` | 국내 분봉. `(market, code, candle_date, candle_time)` 유일 |

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { accumulationCandles } from "./accumulation-test-fixtures";
-import { ACCUMULATION_POLICY as P, calculateEma, calculateAccumulationFeatures as features, explainAccumulationScore as explain, findRecentGoldenCross, scoreAccumulation, validOhlcv, validTradingDate } from "./accumulation-screener-core";
+import { ACCUMULATION_POLICY as P, calculateEma, calculateSma, calculateAccumulationFeatures as features, explainAccumulationScore as explain, findRecentGoldenCross, scoreAccumulation, validOhlcv, validTradingDate } from "./accumulation-screener-core";
 
 describe("accumulation v2 math", () => {
   it("uses recursive EMA with first observation seed", () => {
@@ -9,13 +9,12 @@ describe("accumulation v2 math", () => {
     expect(() => calculateEma([1], 0)).toThrow();
     expect(() => calculateEma([NaN], 9)).toThrow();
   });
-  it("uses strictly lagged volume EMA20 and includes the last four completed bars", () => {
+  it("uses strictly lagged volume SMA20 and includes the last four completed bars", () => {
     const c = accumulationCandles();
-    let baseline = c[0].volume;
-    for (const row of c.slice(1, -1)) baseline += (row.volume - baseline) * 2 / 21;
+    const baseline = calculateSma(c.map(row => row.volume), 20).at(-2)!;
     const f = features(c);
     expect(f.rvol).toBeCloseTo(600 / baseline, 12);
-    expect(f.rvol).not.toBeCloseTo(600 / 100, 4);
+    expect(f.rvol).toBeCloseTo(600 / calculateSma(c.map(row => row.volume), 20).at(-2)!, 12);
     c[c.length - 1].volume *= 2;
     expect(features(c).rvol).toBeCloseTo(f.rvol * 2, 12);
   });

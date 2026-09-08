@@ -140,7 +140,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   if (limitReached && await claimTranslationLimitAlert()) {
     const webhook = await loadFeatureDiscordDebugWebhook("market-rss", ["STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL"]);
     if (webhook) {
-      const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `⚠️ Cloud Translation 번역 중지\n사유: 월간 공백 포함 문자 한도(${(300000).toLocaleString()}자) 도달\n대상: StockTitan RSS` }) }).catch(() => null);
+      const response = await fetch(`${webhook}${webhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `⚠️ Cloud Translation 번역 중지\n사유: 월간 공백 포함 문자 한도(${(300000).toLocaleString()}자) 도달\n대상: StockTitan RSS`, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }).catch(() => null);
       limitAlertSent = Boolean(response?.ok);
     }
   }
@@ -148,7 +148,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   const thresholdWebhook = thresholdAlerts.size ? await loadFeatureDiscordDebugWebhook("market-rss", ["STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL"]) : null;
   if (thresholdWebhook) {
     for (const threshold of [...thresholdAlerts].sort((a, b) => a - b)) {
-      const response = await fetch(`${thresholdWebhook}${thresholdWebhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `ℹ️ Cloud Translation 누적 사용량 알림\n누적 번역량: ${threshold.toLocaleString()}자 이상\n대상: StockTitan RSS` }) }).catch(() => null);
+      const response = await fetch(`${thresholdWebhook}${thresholdWebhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `ℹ️ Cloud Translation 누적 사용량 알림\n누적 번역량: ${threshold.toLocaleString()}자 이상\n대상: StockTitan RSS`, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }).catch(() => null);
       if (response?.ok) thresholdAlertSent++;
     }
   }
@@ -182,7 +182,7 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       reaction?.ok ? `등락률: ${reaction.rate ?? "-"}% · 거래대금: ${reaction.tradingValue ?? "-"}달러` : "",
     ].filter(Boolean).join("\n");
     try {
-      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body }) });
+      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) });
       if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
       await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: row.notificationAttempts + 1, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       sent++;

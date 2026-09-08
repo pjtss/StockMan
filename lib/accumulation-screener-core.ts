@@ -2,7 +2,7 @@
 export const ACCUMULATION_POLICY = {
   version: "2.0.0", minimumBars: 41, historyBars: 120,
   defaultMinRvol: 2, defaultMinScore: 0,
-  rvol: "volume[t] / EMA20(volume)[t-1]",
+  rvol: "volume[t] / SMA20(volume)[t-1]",
   volumeExpansion: "EMA5(volume)[t] / EMA20(volume)[t-5]",
   atr: "EMA20(true range) / close; not Wilder ATR",
   elevatedVolumeRatio: 1.1, sustainedVolumeDays: 3,
@@ -35,6 +35,14 @@ export function calculateEma(values: number[], period: number): number[] {
   return out;
 }
 
+export function calculateSma(values: number[], period: number): number[] {
+  if (!Number.isInteger(period) || period < 1 || values.some(v => !Number.isFinite(v))) throw new Error("INVALID_SMA_INPUT");
+  return values.map((_, i) => {
+    const window = values.slice(Math.max(0, i - period + 1), i + 1);
+    return window.reduce((sum, value) => sum + value, 0) / window.length;
+  });
+}
+
 export function validTradingDate(date: string): boolean {
   if (!/^\d{8}$/.test(date)) return false;
   const parsed = new Date(date.slice(0, 4) + "-" + date.slice(4, 6) + "-" + date.slice(6) + "T00:00:00Z");
@@ -62,7 +70,7 @@ export function calculateAccumulationFeatures(candles: AccumulationCandle[]): Ac
     || !validTradingDate(c.date) || (i > 0 && candles[i - 1].date >= c.date))) throw new Error("INVALID_CANDLES");
   const closes = candles.map(c => c.close), volumes = candles.map(c => c.volume);
   const ema9 = calculateEma(closes, 9), ema20 = calculateEma(closes, 20);
-  const volume20 = calculateEma(volumes, 20), volume5 = calculateEma(volumes, 5);
+  const volume20 = calculateSma(volumes, 20), volume5 = calculateEma(volumes, 5);
   const obv: number[] = [], adl: number[] = [], ranges: number[] = [];
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i], previous = candles[Math.max(0, i - 1)];
@@ -108,7 +116,7 @@ export function explainAccumulationScore(f: AccumulationFeatures, minRvol: numbe
   const p = ACCUMULATION_POLICY;
   const checks: [keyof typeof p.weights, string, boolean][] = [
     ["obv", "OBV 20봉 증가", f.obvChange20 > 0], ["adl", "ADL 20봉 증가", f.adlChange20 > 0],
-    ["rvol", "전일 거래량 EMA20 대비 RVOL 통과", f.rvol >= minRvol],
+    ["rvol", "전일 거래량 SMA20 대비 RVOL 통과", f.rvol >= minRvol],
     ["emaAligned", "EMA9 > EMA20", f.emaAligned], ["goldenCross", "최근 5봉 상향 교차 및 정배열 유지", f.recentGoldenCross],
     ["aboveEma9", "종가 > EMA9", f.closeAboveEma9], ["volumeBalance", "상승일 거래량 비중 ≥ 55%", f.volumeBalance >= 0.55],
     ["persistence", "최근 5봉 중 3봉 이상 거래량 확장", f.elevatedVolumeDays5 >= p.sustainedVolumeDays && f.volumeExpansion5 >= p.elevatedVolumeRatio],

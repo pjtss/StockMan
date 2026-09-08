@@ -10,7 +10,9 @@ async function requestRanking(path: string, trId: string, params: Record<string,
   if (!response.ok) throw new Error(`KIS API returned HTTP ${response.status}`);
   if (!data) throw new Error("KIS API returned invalid JSON");
   if (data.rt_cd !== "0") throw new Error(`KIS API Error [${data.rt_cd}]: ${data.msg1}`);
-  const rows = (data.output || []) as DomesticRankingRows;
+  // KIS가 업무 오류/일시 장애 시 output을 생략하거나 객체로 반환할 수 있다.
+  // 타입 단언만 하면 이후 length/sort에서 런타임 예외가 발생하므로 배열만 허용한다.
+  const rows = (Array.isArray(data.output) ? data.output : []) as DomesticRankingRows;
   rows.diagnostics = { status: response.status, rtCd: data.rt_cd ?? null, msgCd: data.msg_cd ?? null, msg1: data.msg1 ?? null, recordCount: rows.length, rawTextPreview: rawText.slice(0, 2000) };
   return rows;
 }

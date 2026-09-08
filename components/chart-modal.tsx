@@ -7,6 +7,11 @@ import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart"
 import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 
 type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; summary?: string | null; translatedSummary?: string | null; link: string; publishedAt: string | null; source: string; translationStatus?: string | null };
+type FlowResponse = { ok: boolean; source?: string; mode?: string; flowStatus?: string; collectedAt?: string; rows?: Array<Record<string, unknown>>; note?: string; instrumentDetail?: Record<string, unknown> };
+type RatioResponse = { ok: boolean; rows?: Array<Record<string, unknown>>; collectedAt?: string };
+type RatioType = "financial" | "growth" | "profit" | "stability" | "balance-sheet" | "income-statement" | "other-major";
+type OpinionResponse = { ok: boolean; rows?: Array<Record<string, unknown>>; collectedAt?: string };
+type FlowMode = "investor" | "estimate" | "investor-daily" | "foreign-member" | "foreign-member-tick" | "program" | "program-daily" | "member" | "member-daily" | "conclusion" | "ccnl" | "price2" | "asking" | "price-detail" | "minute" | "daily-minute" | "daily" | "info" | "product-info" | "stock-info" | "lendable" | "etf-price" | "etf-components" | "etf-nav" | "etf-nav-daily" | "daily-price" | "opinion-by-broker" | "exp-price-trend" | "overtime-conclusion" | "overtime-daily" | "overtime-price" | "overtime-asking" | "short-sale" | "credit" | "loan" | "trade-volume" | "vi" | "pbar" | "trade-participation" | "highlow" | "lowhigh";
 
 interface ChartModalProps {
   code: string;
@@ -132,9 +137,41 @@ function NewsPanel({ items, loading, error }: { items: StockTitanNewsItem[]; loa
   return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.source} · {item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}{(item.translatedSummary || item.summary) && <p>{item.translatedSummary || item.summary}</p>}</article>)}</div>;
 }
 
+function KISFlowPanel({ data, loading, error, isUs, mode, onModeChange, realtimeStatus }: { data: FlowResponse | null; loading: boolean; error: string | null; isUs: boolean; mode: FlowMode; onModeChange: (mode: FlowMode) => void; realtimeStatus: "connecting" | "connected" | "unavailable" | "closed" }) {
+  if (isUs) return <div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}><button type="button" onClick={() => onModeChange("asking")} aria-pressed={mode === "asking"} style={{ padding: "7px 10px", borderRadius: 8, background: mode === "asking" ? "#00ffa3" : "rgba(148,163,184,.12)", color: mode === "asking" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>KIS 해외 1호가</button><button type="button" onClick={() => onModeChange("price-detail")} aria-pressed={mode === "price-detail"} style={{ padding: "7px 10px", borderRadius: 8, background: mode === "price-detail" ? "#00ffa3" : "rgba(148,163,184,.12)", color: mode === "price-detail" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>해외 상세시세</button><button type="button" onClick={() => onModeChange("minute")} aria-pressed={mode === "minute"} style={{ padding: "7px 10px", borderRadius: 8, background: mode === "minute" ? "#00ffa3" : "rgba(148,163,184,.12)", color: mode === "minute" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>해외 분봉</button><button type="button" onClick={() => onModeChange("daily")} aria-pressed={mode === "daily"} style={{ padding: "7px 10px", borderRadius: 8, background: mode === "daily" ? "#00ffa3" : "rgba(148,163,184,.12)", color: mode === "daily" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>해외 기간봉</button></div>{data?.rows?.length ? data.rows.map((row, index) => <div className={styles.indicators} key={index}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 24).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{({ pbid1: "매수 1호가", pask1: "매도 1호가", vbid1: "매수 잔량", vask1: "매도 잔량", ovrs: "해외시장", last: "현재가", open: "시가", high: "고가", low: "저가", tvol: "누적 거래량", t_xprc: "거래대금" } as Record<string, string>)[key] ?? key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div>) : <div className={styles.empty}>{data?.note ?? "KIS 해외 시세 데이터가 없습니다."}</div>}</div>;
+  if (loading) return <div className={styles.chartLoading}>KIS 수급 데이터를 불러오는 중…</div>;
+  if (error) return <div className={styles.error}>{error}</div>;
+  const row = data?.rows?.[0];
+  if (!row) return <div className={styles.empty}>KIS 수급 데이터가 없습니다.</div>;
+  const labels: Record<string, string> = { frgn_ntby_qty: "외국인 순매수 수량", frgn_ntby_tr_pbmn: "외국인 순매수 금액", orgn_ntby_qty: "기관 순매수 수량", orgn_ntby_tr_pbmn: "기관 순매수 금액", prgrss_netprc: "프로그램 순매수", total_seln_qty: "총 매도 수량", total_shnu_qty: "총 매수 수량", ntby_qty: "순매수 수량", stck_bsop_date: "기준일", prpr_name: "체결금액 구간", smtn_avrg_prpr: "합산 평균 체결가", acml_vol: "누적 거래량", whol_ntby_qty_rate: "전체 순매수 비율", ntby_cntg_csnu: "순매수 체결건수", seln_cnqn_smtn: "총 매도 체결량", whol_seln_vol_rate: "전체 매도 비율", seln_cntg_csnu: "매도 체결건수", shnu_cnqn_smtn: "총 매수 체결량", whol_shun_vol_rate: "전체 매수 비율", shnu_cntg_csnu: "매수 체결건수" };
+  return <div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{([ ["investor", "투자자 확정"], ["estimate", "외인·기관 추정"], ["investor-daily", "투자자 일별"], ["foreign-member", "외인 회원사"], ["foreign-member-tick", "외국계 틱 동향"], ["program", "프로그램"], ["program-daily", "프로그램 일별"], ["member", "회원사"], ["member-daily", "회원사 일별"], ["conclusion", "시간대별 체결"], ["ccnl", "현재 체결"], ["price-detail", "상세 시세"], ["price2", "현재가 시세2"], ["asking", "호가·예상체결"], ["pbar", "매물대·거래비중"], ["trade-participation", "체결금액별 비중"], ["minute", "당일分봉"], ["daily-minute", "과거일 분봉"], ["lendable", "대주 가능"], ["etf-components", "ETF 구성"], ["etf-nav", "ETF NAV"], ["etf-nav-daily", "ETF NAV 일별"], ["daily-price", "최근 30건 일자별 시세"], ["opinion-by-broker", "증권사별 투자의견"], ["exp-price-trend", "예상체결가 추이"], ["overtime-conclusion", "시간외 시간대별 체결"], ["overtime-daily", "시간외 일별"], ["overtime-price", "시간외 현재가"], ["overtime-asking", "시간외 호가"], ["trade-volume", "거래량"], ["vi", "VI 상태"], ["short-sale", "공매도"], ["credit", "신용잔고"], ["loan", "대차거래"], ["highlow", "신고가 근접"], ["lowhigh", "신저가 근접"] ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => onModeChange(value)} aria-pressed={mode === value} style={{ padding: "7px 10px", borderRadius: 8, background: mode === value ? "#00ffa3" : "rgba(148,163,184,.12)", color: mode === value ? "#020617" : "#cbd5e1", fontWeight: 700 }}>{label}</button>)}</div><div className={styles.indicatorSub}>출처: KIS · 상태: {data?.flowStatus ?? "확인"} · 실시간: {realtimeStatus === "connected" ? "연결됨" : realtimeStatus === "connecting" ? "연결 중" : realtimeStatus === "unavailable" ? "사용 불가" : "종료"} · 수집: {formatDisplayDateTime(data?.collectedAt)}</div><div className={styles.indicators}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 24).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{labels[key] ?? key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div></div>;
+}
+
+function RealtimePanel({ row }: { row: Record<string, unknown> | null }) {
+  if (!row) return null;
+  return <div className={styles.indicators}>{Object.entries(row).slice(0, 12).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>실시간 {key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div>;
+}
+
+function KISRatioPanel({ data, loading, error, isUs, type, onTypeChange }: { data: RatioResponse | null; loading: boolean; error: string | null; isUs: boolean; type: RatioType; onTypeChange: (type: RatioType) => void }) {
+  if (isUs) return <div className={styles.empty}>KIS 해외주식에는 국내식 재무비율 API가 제공되지 않습니다.</div>;
+  if (loading) return <div className={styles.chartLoading}>재무비율을 불러오는 중…</div>;
+  if (error) return <div className={styles.error}>{error}</div>;
+  const row = data?.rows?.[0];
+  return <div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{([ ["financial", "재무비율"], ["growth", "성장성"], ["profit", "수익성"], ["stability", "안정성"], ["balance-sheet", "대차대조표"], ["income-statement", "손익계산서"], ["other-major", "기타 주요비율"] ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => onTypeChange(value)} aria-pressed={type === value} style={{ padding: "7px 10px", borderRadius: 8, background: type === value ? "#00ffa3" : "rgba(148,163,184,.12)", color: type === value ? "#020617" : "#cbd5e1", fontWeight: 700 }}>{label}</button>)}</div>{row ? <><div className={styles.indicators}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 24).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div><div className={styles.indicatorSub}>출처: KIS · 수집: {formatDisplayDateTime(data?.collectedAt)}</div></> : <div className={styles.empty}>KIS 재무 데이터가 없습니다.</div>}</div>;
+}
+
+function KISOpinionPanel({ data, loading, error, isUs }: { data: OpinionResponse | null; loading: boolean; error: string | null; isUs: boolean }) {
+  if (isUs) return null;
+  if (loading) return <div className={styles.chartLoading}>투자의견을 불러오는 중…</div>;
+  if (error) return <div className={styles.error}>{error}</div>;
+  const row = data?.rows?.[0];
+  return row ? <div><div className={styles.indicators}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 18).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div><div className={styles.indicatorSub}>KIS 종목 투자의견·목표가 보조신호 · 수집: {formatDisplayDateTime(data?.collectedAt)}</div></div> : <div className={styles.empty}>KIS 투자의견 데이터가 없습니다.</div>;
+}
+
 export function ChartModal({ code, company, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
+  const isUsChart = code.startsWith("US:");
   const [timeframe, setTimeframe] = useState<"D" | "W" | "M">("D");
-  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "news">("chart");
+  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "flow" | "ratio" | "news">("chart");
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +179,19 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
   const [news, setNews] = useState<StockTitanNewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsError, setNewsError] = useState<string | null>(null);
+  const [flow, setFlow] = useState<FlowResponse | null>(null);
+  const [flowLoading, setFlowLoading] = useState(false);
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "unavailable" | "closed">("closed");
+  const [realtimeRow, setRealtimeRow] = useState<Record<string, unknown> | null>(null);
+  const [flowMode, setFlowMode] = useState<FlowMode>("investor");
+  const [ratio, setRatio] = useState<RatioResponse | null>(null);
+  const [ratioLoading, setRatioLoading] = useState(false);
+  const [ratioError, setRatioError] = useState<string | null>(null);
+  const [ratioType, setRatioType] = useState<RatioType>("financial");
+  const [opinion, setOpinion] = useState<OpinionResponse | null>(null);
+  const [opinionLoading, setOpinionLoading] = useState(false);
+  const [opinionError, setOpinionError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const [watchlistBusy, setWatchlistBusy] = useState(false);
@@ -260,6 +310,78 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
     fetch(`/api/stock/news?ticker=${encodeURIComponent(code)}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: { items?: StockTitanNewsItem[] }) => { if (!cancelled) setNews(body.items ?? []); }).catch((error: Error) => { if (!cancelled) setNewsError(error.message); }).finally(() => { if (!cancelled) setNewsLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, code]);
+
+  useEffect(() => {
+    if (activeTab !== "flow") return;
+    let cancelled = false;
+    setFlowLoading(true); setFlowError(null);
+    const queryMode = isUsChart ? (flowMode === "asking" ? "asking" : flowMode === "price-detail" ? "price-detail" : flowMode === "minute" ? "minute" : flowMode === "daily" ? "daily" : flowMode === "info" ? "info" : "trade") : flowMode;
+    const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body as FlowResponse; });
+    const detailRequest = isUsChart ? Promise.resolve(null) : fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=KR&mode=price-detail`, { cache: "no-store" }).then(async (response) => response.ok ? await response.json() as FlowResponse : null);
+    Promise.all([flowRequest, detailRequest]).then(([body, detail]) => { if (!cancelled) { const detailRow = detail?.rows?.[0]; const flowRows = body.rows ?? []; const labeledDetail = detailRow ? { "발행·상장주수 (유통주식수 아님)": detailRow.sharesOutstanding, ...detailRow } : null; const rows = labeledDetail ? (flowRows.length ? [labeledDetail ? { ...labeledDetail, ...flowRows[0] } : flowRows[0], ...flowRows.slice(1)] : [labeledDetail]) : flowRows; setFlow({ ...body, rows, instrumentDetail: detailRow }); } }).catch((e: Error) => { if (!cancelled) setFlowError(e.message); }).finally(() => { if (!cancelled) setFlowLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, code, isUsChart, flowMode]);
+
+  useEffect(() => {
+    if (activeTab !== "flow" || typeof WebSocket === "undefined") {
+      setRealtimeStatus("closed");
+      return;
+    }
+    let cancelled = false;
+    let socket: WebSocket | null = null;
+    let lastPersistAt = 0;
+    setRealtimeStatus("connecting");
+    setRealtimeRow(null);
+    const market = isUsChart ? "US" : "KR";
+    const channel = flowMode === "asking" ? "asking" : "trade";
+    fetch(`/api/kis/realtime/approval?market=${market}&channel=${channel}&code=${encodeURIComponent(code)}`, { cache: "no-store" })
+      .then(async (response) => { const body = await response.json(); if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body as { wsUrl: string; frame: string }; })
+      .then((body) => {
+        if (cancelled) return;
+        socket = new WebSocket(body.wsUrl);
+        socket.onopen = () => { if (!cancelled) { socket?.send(body.frame); setRealtimeStatus("connected"); } };
+        socket.onmessage = (event) => {
+          if (cancelled || typeof event.data !== "string") return;
+          const persist = (trId: string, payload: unknown) => {
+            const now = Date.now();
+            if (now - lastPersistAt < 1000) return;
+            lastPersistAt = now;
+            void fetch("/api/kis/realtime/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ market, code, channel, trId, payload, rawPayload: event.data }), keepalive: true }).catch(() => undefined);
+          };
+          try {
+            const parsed = JSON.parse(event.data) as { body?: { output?: Record<string, unknown> } };
+            if (parsed.body?.output) { const trId = String((parsed.body.output as Record<string, unknown>).tr_id ?? "realtime"); setRealtimeRow(parsed.body.output); persist(trId, parsed.body.output); }
+            return;
+          } catch { /* KIS data frames are pipe-delimited */ }
+          const [, trId, , rawValues] = event.data.split("|");
+          if (!rawValues) return;
+          const values = rawValues.split("^");
+          const normalizedPayload = { tr_id: trId, values: values.slice(0, 12).join(" | ") };
+          setRealtimeRow(normalizedPayload);
+          persist(trId, normalizedPayload);
+        };
+        socket.onerror = () => { if (!cancelled) setRealtimeStatus("unavailable"); };
+        socket.onclose = () => { if (!cancelled) setRealtimeStatus("closed"); };
+      })
+      .catch(() => { if (!cancelled) setRealtimeStatus("unavailable"); });
+    return () => { cancelled = true; socket?.close(); };
+  }, [activeTab, code, flowMode, isUsChart]);
+
+  useEffect(() => {
+    if (activeTab !== "ratio" || isUsChart) return;
+    let cancelled = false;
+    setRatioLoading(true); setRatioError(null);
+    fetch(`/api/kis/financial-ratios?code=${encodeURIComponent(code)}&type=${ratioType}&period=annual`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: RatioResponse) => { if (!cancelled) setRatio(body); }).catch((e: Error) => { if (!cancelled) setRatioError(e.message); }).finally(() => { if (!cancelled) setRatioLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, code, isUsChart, ratioType]);
+
+  useEffect(() => {
+    if (activeTab !== "ratio" || isUsChart) return;
+    let cancelled = false;
+    setOpinionLoading(true); setOpinionError(null);
+    if (!isUsChart) fetch(`/api/kis/investment-opinion?code=${encodeURIComponent(code)}&startDate=${new Date().getFullYear() - 1}0101&endDate=${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: OpinionResponse) => { if (!cancelled) setOpinion(body); }).catch((e: Error) => { if (!cancelled) setOpinionError(e.message); }).finally(() => { if (!cancelled) setOpinionLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, code, isUsChart]);
 
   // TradingView Lightweight Charts 렌더링: 종목 전환 직후 새 DOM ref가 확정된 뒤 초기화한다.
   useLayoutEffect(() => {
@@ -425,7 +547,6 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
   }, []);
 
   const indicators = data?.indicators;
-  const isUsChart = code.startsWith("US:");
   const rsiInfo = rsiLabel(indicators?.rsi14 ?? null);
   const bbInfo = bbLabel(data?.latestPrice ?? 0, indicators?.bbUpper ?? null, indicators?.bbLower ?? null);
   const isUp = data?.latestChangeRate?.startsWith("+") ?? false;
@@ -465,7 +586,7 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
           </div>
         </div>
 
-          <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button><button id="news-tab" className={`${styles.tab} ${activeTab === "news" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "news"} aria-controls="news-panel" onClick={() => setActiveTab("news")}>뉴스</button></div>
+          <div className={styles.tabs} role="tablist" aria-label="차트 정보"><button id="chart-tab" className={`${styles.tab} ${activeTab === "chart" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "chart"} aria-controls="chart-panel" onClick={() => setActiveTab("chart")}>차트</button><button id="fundamentals-tab" className={`${styles.tab} ${activeTab === "fundamentals" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "fundamentals"} aria-controls="fundamentals-panel" onClick={() => setActiveTab("fundamentals")}>기본 정보</button><button id="flow-tab" className={`${styles.tab} ${activeTab === "flow" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "flow"} aria-controls="flow-panel" onClick={() => setActiveTab("flow")}>수급</button><button id="ratio-tab" className={`${styles.tab} ${activeTab === "ratio" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "ratio"} aria-controls="ratio-panel" onClick={() => setActiveTab("ratio")}>재무</button><button id="news-tab" className={`${styles.tab} ${activeTab === "news" ? styles.tabActive : ""}`} type="button" role="tab" aria-selected={activeTab === "news"} aria-controls="news-panel" onClick={() => setActiveTab("news")}>뉴스</button></div>
           <p className={styles.keyboardHint} aria-label="키보드 단축키">← → 종목 이동 · ESC 닫기</p>
 
         {/* 바디 */}
@@ -517,6 +638,8 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
             </div>
           )}
           {!loading && data && activeTab === "fundamentals" && <div id="fundamentals-panel" role="tabpanel" aria-labelledby="fundamentals-tab"><FundamentalsPanel data={data} timeframe={timeframe} isUsChart={isUsChart} /></div>}
+          {activeTab === "flow" && <div id="flow-panel" role="tabpanel" aria-labelledby="flow-tab"><KISFlowPanel data={flow} loading={flowLoading} error={flowError} isUs={isUsChart} mode={flowMode} onModeChange={setFlowMode} realtimeStatus={realtimeStatus} />{isUsChart && <button type="button" onClick={() => setFlowMode("info")} aria-pressed={flowMode === "info"} style={{ padding: "7px 10px", borderRadius: 8, background: flowMode === "info" ? "#00ffa3" : "rgba(148,163,184,.12)", color: flowMode === "info" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>해외 기본정보</button>}{!isUsChart && <><button type="button" onClick={() => setFlowMode("product-info")} aria-pressed={flowMode === "product-info"} style={{ padding: "7px 10px", borderRadius: 8, background: flowMode === "product-info" ? "#00ffa3" : "rgba(148,163,184,.12)", color: flowMode === "product-info" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>국내 상품정보</button><button type="button" onClick={() => setFlowMode("stock-info")} aria-pressed={flowMode === "stock-info"} style={{ padding: "7px 10px", borderRadius: 8, background: flowMode === "stock-info" ? "#00ffa3" : "rgba(148,163,184,.12)", color: flowMode === "stock-info" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>국내 주식기본정보</button><button type="button" onClick={() => setFlowMode("etf-price")} aria-pressed={flowMode === "etf-price"} style={{ padding: "7px 10px", borderRadius: 8, background: flowMode === "etf-price" ? "#00ffa3" : "rgba(148,163,184,.12)", color: flowMode === "etf-price" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>ETF 전용 현재가</button></>}<RealtimePanel row={realtimeRow} /></div>}
+          {activeTab === "ratio" && <div id="ratio-panel" role="tabpanel" aria-labelledby="ratio-tab"><KISRatioPanel data={ratio} loading={ratioLoading} error={ratioError} isUs={isUsChart} type={ratioType} onTypeChange={setRatioType} /><div style={{ marginTop: 20, borderTop: "1px solid rgba(148,163,184,.16)", paddingTop: 16 }}><div className={styles.indicatorSub} style={{ marginBottom: 10 }}>투자의견·목표가 이력</div><KISOpinionPanel data={opinion} loading={opinionLoading} error={opinionError} isUs={isUsChart} /></div></div>}
           {activeTab === "news" && <div id="news-panel" role="tabpanel" aria-labelledby="news-tab"><NewsPanel items={news} loading={newsLoading} error={newsError} /></div>}
         </div>
       </div>

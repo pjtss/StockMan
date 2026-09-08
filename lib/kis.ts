@@ -6,6 +6,28 @@ import { getDb } from "./db";
 import { getAccessToken } from "./kis-token";
 import { readKisCache, writeKisCache } from "./kis-cache";
 import { fetchDomesticFluctuation, fetchDomesticVolumePower } from "./kis-domestic-api";
+import { fetchInvestorByStock, fetchProgramTradeByStock, fetchNearNewHighLow } from "./kis-investor-flow";
+
+function kisNumber(row: Record<string, unknown> | undefined, ...keys: string[]) {
+  for (const key of keys) {
+    const value = Number(String(row?.[key] ?? "").replace(/,/g, ""));
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function signedAmount(value: number | null, unit: "억" | "만주", scale = 1) {
+  if (value === null) return null;
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${Math.round(value / scale)}${unit}`;
+}
+
+function flowText(row: Record<string, unknown> | undefined, amountKeys: string[], quantityKeys: string[]) {
+  const amount = kisNumber(row, ...amountKeys);
+  if (amount !== null) return signedAmount(amount, "억", 100_000_000);
+  const quantity = kisNumber(row, ...quantityKeys);
+  return signedAmount(quantity, "만주", 10_000);
+}
 
 export { clearTokenCache, getAccessToken, refreshAccessToken } from "./kis-token";
 
@@ -53,7 +75,7 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
       if (realItems && realItems.length > 0) {
         const mappedData = realItems.slice(0, 10).map((item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
-          const rate = parseFloat(item.prdy_ctrt) || 0.0;
+          const rate = parseFloat(String(item.prdy_ctrt ?? "0")) || 0.0;
           const isUp = rate >= 0;
           const rawTrVal = parseFloat(item.acml_tr_pbmn) || 0; // 원 단위
           const tradingValueBillion = Math.round(rawTrVal / 100_000_000); // 억 원 단위 변환
@@ -131,21 +153,31 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
-          const rawPrice = parseInt(item.stck_prpr, 10) || 0;
-          const rate = parseFloat(item.prdy_ctrt) || 0.0;
+        const mappedData = (await Promise.all(realItems.slice(0, 10).map(async (item, i) => {
+          const rawPrice = parseInt(String(item.stck_prpr ?? "0"), 10) || 0;
+          const rate = parseFloat(String(item.prdy_ctrt ?? "0")) || 0.0;
           const isUp = rate >= 0;
+          const code = String(item.mksc_shrn_iscd || item.stck_shrn_iscd || "");
+          if (!code) return null;
+          const investor = await fetchInvestorByStock(token, code);
+          const row = investor.rows[0];
+          const foreignText = flowText(row, ["frgn_ntby_tr_pbmn", "frgn_ntby_amt"], ["frgn_ntby_qty"]);
+          const institutionText = flowText(row, ["orgn_ntby_tr_pbmn", "orgn_ntby_amt"], ["orgn_ntby_qty"]);
+          if (foreignText === null && institutionText === null) return null;
 
           return {
             rank: i + 1,
             company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
-            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
-            foreignNetBuy: `+${Math.round(280 - i * 18)}억`,
-            instNetBuy: `+${Math.round(220 - i * 12)}억`,
+            code,
+            foreignNetBuy: foreignText ?? "데이터 없음",
+            instNetBuy: institutionText ?? "데이터 없음",
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(1)}%`,
+            source: "KIS" as const,
+            flowStatus: investor.ok ? "CONFIRMED" as const : "UNAVAILABLE" as const,
+            observedAt: new Date().toISOString(),
           };
-        });
+        }))).filter(Boolean) as NetBuyingItem[];
 
         // 캐시 업데이트
         try {
@@ -211,20 +243,30 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
+        const mappedData = (await Promise.all(realItems.slice(0, 10).map(async (item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
           const rate = parseFloat(item.prdy_ctrt) || 0.0;
           const isUp = rate >= 0;
+          const code = String(item.mksc_shrn_iscd || item.stck_shrn_iscd || "");
+          if (!code) return null;
+          const program = await fetchProgramTradeByStock(token, code);
+          const row = program.rows[0];
+          const netBuy = kisNumber(row, "whol_ntby_qty", "pgtr_ntby_qty", "program_net_buy_qty", "ntby_qty");
+          const programText = signedAmount(netBuy, "만주");
+          if (programText === null) return null;
 
           return {
             rank: i + 1,
             company: String(item.hts_kor_shr_nlen || item.hts_kor_isnm || "").trim() || "(UNKNOWN)",
-            code: String(item.mksc_shrn_iscd || item.stck_shrn_iscd || ""),
-            programNetBuy: `+${Math.round(140 - i * 9)}만주`,
+            code,
+            programNetBuy: programText,
             price: rawPrice.toLocaleString(),
             changeRate: `${isUp ? "+" : ""}${rate.toFixed(1)}%`,
+            source: "KIS" as const,
+            flowStatus: program.ok ? "CONFIRMED" as const : "UNAVAILABLE" as const,
+            observedAt: new Date().toISOString(),
           };
-        });
+        }))).filter(Boolean) as ProgramTradingItem[];
 
         // 캐시 업데이트
         try {
@@ -288,11 +330,12 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
   // C. 실시간 KIS OpenAPI 조회 시도 및 성공 시 DB 캐시 업데이트
   try {
     if (token) {
-      const realItems = await fetchRealVolumeRank(token);
-      if (realItems && realItems.length > 0) {
+      const highlow = await fetchNearNewHighLow(token, "0000", "high");
+      const realItems = highlow.rows;
+      if (highlow.ok && realItems.length > 0) {
         const mappedData = realItems.slice(0, 10).map((item, i) => {
-          const rawPrice = parseInt(item.stck_prpr, 10) || 0;
-          const rate = parseFloat(item.prdy_ctrt) || 0.0;
+          const rawPrice = parseInt(String(item.stck_prpr ?? "0"), 10) || 0;
+          const rate = parseFloat(String(item.prdy_ctrt ?? "0")) || 0.0;
           const isUp = rate >= 0;
 
           return {

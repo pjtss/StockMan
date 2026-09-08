@@ -5,7 +5,7 @@ import { queryEligibleUniverse } from "@/lib/instrument-eligibility";
 type Candle = { date: string; open: number; high: number; low: number; close: number; volume: number };
 const ema = (v: number[], p: number) => { if (!v.length) return []; const k = 2 / (p + 1); return v.reduce<number[]>((o, x, i) => { o.push(i ? x * k + o[i - 1] * (1 - k) : x); return o; }, []); };
 const bands = (v: number[]) => { if (v.length < 20) return null; const w = v.slice(-20); const mid = w.reduce((a, b) => a + b, 0) / 20; const sd = Math.sqrt(w.reduce((a, b) => a + (b - mid) ** 2, 0) / 20); return { middle: mid, lower: mid - 2 * sd, upper: mid + 2 * sd }; };
-const rvol = (rows: Candle[]) => { const base = rows.slice(-20).reduce((a, x) => a + x.volume, 0) / Math.min(20, rows.length); return base > 0 ? (rows.at(-1)?.volume ?? 0) / base : 0; };
+const rvol = (rows: Candle[]) => { if (rows.length < 21) return 0; const baseline = rows.slice(-21, -1); const base = baseline.reduce((a, x) => a + x.volume, 0) / baseline.length; return base > 0 ? (rows.at(-1)?.volume ?? 0) / base : 0; };
 const obv = (rows: Candle[]) => { let n = 0; return rows.map((x, i) => { if (i) n += x.close > rows[i - 1].close ? x.volume : x.close < rows[i - 1].close ? -x.volume : 0; return n; }); };
 const adl = (rows: Candle[]) => { let n = 0; return rows.map(x => { const range = x.high - x.low; n += range > 0 ? (((x.close - x.low) - (x.high - x.close)) / range) * x.volume : 0; return n; }); };
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluateScreenerFilters, rankScreenerResults } from "./screener-engine";
+import { calculateRvol } from "./db-screener";
 describe("screener engine", () => {
   it("evaluates AND conditions", () => { const r=evaluateScreenerFilters({marketCap:100, "D.rvol":1.2},{filters:[{field:"marketCap",operator:">=",value:100},{field:"D.rvol",operator:">=",value:1}],logic:"AND"}); expect(r.matched).toBe(true); });
   it("keeps failed reasons", () => { const r=evaluateScreenerFilters({marketCap:90},{filters:[{field:"marketCap",operator:">=",value:100}]}); expect(r.failureReasons).toHaveLength(1); });
@@ -11,5 +12,9 @@ describe("screener engine", () => {
   it("filters OBV and ADL signal trends independently", () => {
     const r = evaluateScreenerFilters({ "D.obv.signalTrend": "RISING", "D.adl.signalTrend": "FALLING" }, { filters: [{ field: "D.obv.signalTrend", operator: "=", value: "RISING" }, { field: "D.adl.signalTrend", operator: "=", value: "FALLING" }] });
     expect(r.matched).toBe(true);
+  });
+  it("calculates RVOL from the actual baseline candle count", () => {
+    expect(calculateRvol(300, [100, 100, 100])).toBe(3);
+    expect(calculateRvol(300, [])).toBeNull();
   });
 });

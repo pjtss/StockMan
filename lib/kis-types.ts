@@ -28,6 +28,9 @@ export interface NetBuyingItem {
   instNetBuy: string;
   price: string;
   changeRate: string;
+  source?: "KIS";
+  flowStatus?: "CONFIRMED" | "ESTIMATED" | "UNAVAILABLE";
+  observedAt?: string;
 }
 
 export interface ProgramTradingItem {
@@ -37,6 +40,9 @@ export interface ProgramTradingItem {
   programNetBuy: string;
   price: string;
   changeRate: string;
+  source?: "KIS";
+  flowStatus?: "CONFIRMED" | "ESTIMATED" | "UNAVAILABLE";
+  observedAt?: string;
 }
 
 export interface NewHighItem {

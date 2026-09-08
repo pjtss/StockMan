@@ -8,11 +8,12 @@ import { latestDmi } from "@/lib/us-dmi";
 import { calculateAdlSeries } from "@/lib/us-adl";
 import { calculateUsObvSeries } from "@/lib/us-obv-signal";
 import { formatKoreanFloorCompact } from "@/lib/korean-number-format";
+import { formatDisplayAmount } from "@/lib/display-number";
 export type DailyTickerIndicators={candleCount:number;latestDate:string|null;averageVolume20:number|null;averageTradingValue20:number|null;mfi14:number|null;macd:number|null;macdSignal:number|null;macdHistogram:number|null;plusDi14:number|null;minusDi14:number|null;adx14:number|null;stochasticK14:number|null;roc12:number|null;obv:number|null;obvChange20:number|null;adl:number|null;adlChange20:number|null};
-export type TickerInfo={ticker:string;market:string;name:string;price:number|null;rate:number|null;tradingValue:number|null;marketCap:number|null;open:number|null;high:number|null;low:number|null;previousClose:number|null;volume:number|null;bid:number|null;ask:number|null;dailyIndicators?:DailyTickerIndicators};
+export type TickerInfo={ticker:string;market:string;name:string;price:number|null;rate:number|null;tradingValue:number|null;marketCap:number|null;open:number|null;high:number|null;low:number|null;previousClose:number|null;volume:number|null;bid:number|null;ask:number|null;quoteSource?:string;dailyIndicators?:DailyTickerIndicators};
 const n=(v:unknown)=>{const x=Number(String(v??"").replace(/,/g,"").replace(/%/g,""));return Number.isFinite(x)?x:null}; const r=(v:number|null)=>v==null?null:Number(v.toFixed(2));
 export function calculateDailyTickerIndicators(input:Array<{date:string;high:number;low:number;close:number;volume:number}>):DailyTickerIndicators{const c=[...input].sort((a,b)=>a.date.localeCompare(b.date)),last=c.at(-1),a=c.slice(-20),m=latestMfi(c,14),mac=latestMacd(c),di=latestDmi(c,14),adl=calculateAdlSeries(c),obv=calculateUsObvSeries(c as any),av=adl.at(-1),ap=adl.at(-21),ov=obv.at(-1),op=obv.at(-21),w=c.slice(-14),hi=w.length?Math.max(...w.map(x=>x.high)):null,lo=w.length?Math.min(...w.map(x=>x.low)):null;return{candleCount:c.length,latestDate:last?.date??null,averageVolume20:r(a.length?a.reduce((s,x)=>s+x.volume,0)/a.length:null),averageTradingValue20:r(a.length?a.reduce((s,x)=>s+x.close*x.volume,0)/a.length:null),mfi14:r(m?.value??null),macd:r(mac?.macd??null),macdSignal:r(mac?.signal??null),macdHistogram:r(mac?.histogram??null),plusDi14:r(di?.plusDi??null),minusDi14:r(di?.minusDi??null),adx14:r(di?.adx??null),stochasticK14:r(last&&hi!==null&&lo!==null&&hi!==lo?(last.close-lo)/(hi-lo)*100:null),roc12:r(last&&c.at(-13)?(last.close-c.at(-13)!.close)/c.at(-13)!.close*100:null),obv:r(ov?.obv??null),obvChange20:r(ov&&op?ov.obv-op.obv:null),adl:r(av?.adl??null),adlChange20:r(av&&ap?av.adl-ap.adl:null)};}
-async function domestic(ticker:string):Promise<TickerInfo|null>{const q=await fetchKrPriceDetail(ticker).catch(()=>null);if(!q?.ok)return null;const market=q.productMarket.includes("코스닥")?"KOSDAQ":"KOSPI",m=await loadCachedKrDailyCandlesBulk([{market,code:ticker}],100,"D").catch(()=>new Map());return{ticker,market,name:q.productName||ticker,price:q.price,rate:q.changeRate,tradingValue:q.tradingValue,marketCap:q.marketCap,open:null,high:null,low:null,previousClose:null,volume:q.volume,bid:null,ask:null,dailyIndicators:calculateDailyTickerIndicators(m.get(`${market}:${ticker}`)??[])};}
+async function domestic(ticker:string):Promise<TickerInfo|null>{const q=await fetchKrPriceDetail(ticker).catch(()=>null);if(!q?.ok)return null;const market=q.productMarket.includes("코스닥")?"KOSDAQ":"KOSPI",m=await loadCachedKrDailyCandlesBulk([{market,code:ticker}],100,"D").catch(()=>new Map());return{ticker,market,name:q.productName||ticker,price:q.price,rate:q.changeRate,tradingValue:q.tradingValue,marketCap:q.marketCap,open:null,high:null,low:null,previousClose:null,volume:q.volume,bid:null,ask:null,quoteSource:"KIS 실시간 시세",dailyIndicators:calculateDailyTickerIndicators(m.get(`${market}:${ticker}`)??[])};}
 export async function getTickerInfo(raw:string):Promise<TickerInfo|null>{const t=raw.trim().toUpperCase();if(/^\d{6}$/.test(t))return domestic(t);if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(t))return null;for(const market of ["NAS","NYS","AMS"]){const q=await fetchKisUsPriceDetail({code:t,market}),o=getKisUsPriceDetailOutput(q?.parsed);if(!q?.ok)continue;const c=await loadCachedUsDailyCandlesBulk([{market,code:t}],100,"D").catch(()=>new Map());return{ticker:t,market,name:String(o.name??o.enname??t),price:n(o.last??o.t_prpr),rate:n(o.t_xrat??o.t_rate),tradingValue:n(o.tamt??o.tamnt),marketCap:n(o.tomv),open:n(o.t_open??o.open),high:n(o.t_high??o.high),low:n(o.t_low??o.low),previousClose:n(o.t_prev??o.prev),volume:n(o.tvol??o.pvol??o.vol),bid:n(o.pbid),ask:n(o.pask),dailyIndicators:calculateDailyTickerIndicators(c.get(`${market}:${t}`)??[])};}return null;}
 export function formatTickerInfo(i: TickerInfo | null) {
   if (!i) return "해당 국내·해외 종목을 찾을 수 없습니다.";
@@ -24,19 +25,26 @@ export function formatTickerInfo(i: TickerInfo | null) {
     x == null ? "-" : `${truncate2(x).toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(truncate2(x)) ? 0 : 2, maximumFractionDigits: 2 })}${suffix}`;
   const a = (x: number | null, suffix = "") =>
     x == null ? "-" : `${formatKoreanFloorCompact(x)}${suffix}`;
+  const amount = (x: number | null, market: string) =>
+    formatDisplayAmount(x, market === "KOSPI" || market === "KOSDAQ" || market === "KRX" ? "KRW" : "USD");
+  const isDomestic = i.market === "KOSPI" || i.market === "KOSDAQ" || i.market === "KRX";
+  const quantity = (x: number | null) => x == null ? "-" : Math.floor(x).toLocaleString("en-US");
   const d = i.dailyIndicators;
 
-  return [
+  const content = [
     `**${i.ticker}** (${i.market})`,
     `종목명: ${i.name}`,
-    `현재가: ${i.price == null ? "-" : i.price.toLocaleString("en-US")}`,
+    `현재가: ${i.price == null ? "-" : `${isDomestic ? "₩" : "$"}${i.price.toLocaleString("en-US", { maximumFractionDigits: 4 })}`}`,
     `등락률: ${v(i.rate, "%")}`,
-    `거래대금: ${a(i.tradingValue)}`,
-    `시가총액: ${a(i.marketCap)}`,
+    `시가: ${v(i.open)} · 고가: ${v(i.high)} · 저가: ${v(i.low)} · 전일 종가: ${v(i.previousClose)}`,
+    `거래량: ${quantity(i.volume)} · 거래대금: ${amount(i.tradingValue, i.market)}`,
+    `시가총액: ${amount(i.marketCap, i.market)}`,
+    `호가: 매수 ${v(i.bid)} · 매도 ${v(i.ask)}`,
+    `시세 출처: ${i.quoteSource ?? (i.market === "KOSPI" || i.market === "KOSDAQ" || i.market === "KRX" ? "KIS 국내 시세" : "KIS 해외 시세")} · 일봉 출처: DB 캐시`,
     "",
     `📈 일봉 지표 (${d?.latestDate ?? "캐시 없음"} · ${d?.candleCount ?? 0}봉)`,
-    `평균 거래량(20): ${a(d?.averageVolume20 ?? null)}`,
-    `평균 거래대금(20): ${a(d?.averageTradingValue20 ?? null)}`,
+    `평균 거래량(20): ${quantity(d?.averageVolume20 ?? null)}`,
+    `평균 거래대금(20): ${amount(d?.averageTradingValue20 ?? null, i.market)}`,
     `MFI(14): ${v(d?.mfi14 ?? null)}`,
     `MACD(12,26,9): ${v(d?.macd ?? null)}`,
     `MACD Signal: ${v(d?.macdSignal ?? null)}`,
@@ -51,4 +59,6 @@ export function formatTickerInfo(i: TickerInfo | null) {
     `ADL: ${a(d?.adl ?? null)}`,
     `ADL 20봉 변화: ${a(d?.adlChange20 ?? null)}`,
   ].join("\n");
+  if (content.length <= 1900) return content;
+  return `${content.slice(0, 1850).trimEnd()}\n… Discord 메시지 길이 제한으로 일부 지표가 생략되었습니다.`;
 }

@@ -24,10 +24,10 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
   const timeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
   const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
-  for (const timeframe of timeframes) {
+  await Promise.all(timeframes.map(async (timeframe) => {
     const stale = await getDb().execute(sql`SELECT u.market, u.code FROM us_common_stock_universe u LEFT JOIN us_instrument_universe_candles c ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe} WHERE u.instrument_type = 'COMMON_STOCK' GROUP BY u.market, u.code HAVING MAX(c.fetched_at) IS NULL OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')`);
     staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
-  }
+  }));
   const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryRows.some((row) => row.timeframe === timeframe));
   // A global MAX(fetched_at) cannot prove that every ticker has enough
   // history. Backfill only symbols whose daily cache is below the scanner's
@@ -96,7 +96,9 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   // Partial KIS failures must not block follow-up caches for instruments
   // whose candles were saved successfully. The scanners read the DB cache
   // and naturally omit the failed instruments.
-  const followupBlocked = successCount === 0;
+  // Indicator follow-ups consume the daily candle cache. Weekly/monthly
+  // success must not make them run when every daily request failed.
+  const followupBlocked = dailySuccessCount === 0;
   const bollingerCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyBollingerCaches("US");
   const goldenCrossCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyGoldenCrossCache("US");
   return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures, bollingerCache, goldenCrossCache };

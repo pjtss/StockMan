@@ -75,6 +75,7 @@ export async function sendDartAlertToDiscord(alert: AlertItem): Promise<DartDisc
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(toTextWebhookPayload(buildDartDiscordWebhookPayload(alert) as unknown as Record<string, unknown>)),
+    signal: AbortSignal.timeout(8_000),
   });
   const responseText = await response.text();
 

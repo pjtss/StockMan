@@ -29,13 +29,15 @@ function optionValue(data: any, name: string) {
 }
 
 async function updateOriginalResponse(applicationId: string, token: string, content: string) {
-  await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }) });
+  const response = await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`Discord 응답 갱신 실패 (HTTP ${response.status})`);
 }
 
 async function sendDailyCacheResponses(applicationId: string, token: string, chunks: string[]) {
   await updateOriginalResponse(applicationId, token, chunks[0] ?? "캐시 결과가 없습니다.");
   for (const content of chunks.slice(1)) {
-    await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }) });
+    const response = await fetch(`https://discord.com/api/v10/webhooks/${applicationId}/${token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) });
+    if (!response.ok) throw new Error(`Discord 후속 응답 전송 실패 (HTTP ${response.status})`);
   }
 }
 
@@ -116,7 +118,12 @@ export async function POST(request: Request) {
     const link = `${base}/api/scan/multi-timeframe-bb-pullback/html?market=${market}&mode=${mode}&token=${token}`;
     void updateOriginalResponse(applicationId, interaction.token, `${mode === "all-middle-above" ? "📈 일·주·월봉 BB 중단선 이상" : "📥 다중 시간봉 볼린저밴드"} HTML 결과\n\n${link}\n\n링크는 15분 후 만료됩니다.`);
   } else if (interaction.data.name === "ticker") {
-    void getTickerInfo(ticker).then((result) => updateOriginalResponse(applicationId, interaction.token, formatTickerInfo(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `티커 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
+    void getTickerInfo(ticker)
+      .then((result) => updateOriginalResponse(applicationId, interaction.token, formatTickerInfo(result)))
+      .catch(async (error) => {
+        const message = `티커 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`;
+        try { await updateOriginalResponse(applicationId, interaction.token, message); } catch (updateError) { console.error("[Discord] ticker response update failed", updateError); }
+      });
   } else if (cacheCommand) {
     void loadDailyCacheCommand(interaction.data.name as DailyCacheCommand).then((result) => sendDailyCacheResponses(applicationId, interaction.token, splitDailyCacheCommand(result))).catch((error) => updateOriginalResponse(applicationId, interaction.token, `캐시 조회 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`));
   } else if (["refresh-daily", "refresh-us-daily", "refresh-kr-daily"].includes(interaction.data.name)) {

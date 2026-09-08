@@ -40,7 +40,7 @@ export function formatDisplayAmount(value: number | null | undefined, currency: 
   const amount = Math.abs(value);
   const units = currency === "KRW"
     ? [{ divisor: 1_000_000_000_000, label: "조" }, { divisor: 100_000_000, label: "억" }, { divisor: 10_000, label: "만" }]
-    : [{ divisor: 1_000_000_000, label: "B" }, { divisor: 1_000_000, label: "M" }, { divisor: 1_000, label: "K" }];
+    : [{ divisor: 1_000_000_000_000, label: "T" }, { divisor: 1_000_000_000, label: "B" }, { divisor: 1_000_000, label: "M" }, { divisor: 1_000, label: "K" }];
   const unit = units.find((item) => amount >= item.divisor);
   if (!unit) return `${sign}${currency === "USD" ? "$" : ""}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}${currency === "KRW" ? "원" : ""}`;
   return `${sign}${currency === "USD" ? "$" : ""}${(amount / unit.divisor).toLocaleString("en-US", { maximumFractionDigits: 2 })}${unit.label}`;

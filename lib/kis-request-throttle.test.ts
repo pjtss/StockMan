@@ -11,4 +11,12 @@ describe("KIS failure classification", () => {
     expect(classifyKisFailure({ response: { status: 401 } })).toBe("AUTH_EXPIRED");
     expect(classifyKisFailure({ response: { status: 400 } })).toBe("PERMANENT");
   });
+
+  it("classifies HTTP 200 business errors from rt_cd", () => {
+    expect(classifyKisFailure({ response: { status: 200 }, parsed: { rt_cd: "1", msg_cd: "EGW99999", msg1: "business error" } })).toBe("PERMANENT");
+  });
+
+  it("classifies a non-JSON response as a permanent protocol error", () => {
+    expect(classifyKisFailure({ response: { status: 200 }, rawText: "<!doctype html>", parsed: null })).toBe("PERMANENT");
+  });
 });

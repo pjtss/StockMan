@@ -7,8 +7,8 @@ import { loadKisApiConfig } from "./kis-api-config";
 import { buildKisUsRequestDebug, pushKisUsDebugLog } from "./kis-us-debug";
 import { withKisRequestThrottle } from "./kis-request-throttle";
 
-const KIS_APPKEY = process.env.KIS_APPKEY;
-const KIS_APPSECRET = process.env.KIS_APPSECRET;
+const KIS_APPKEY = process.env.KIS_APPKEY?.trim();
+const KIS_APPSECRET = process.env.KIS_APPSECRET?.trim();
 
 interface KisUsOutput {
   symb: string;
@@ -32,13 +32,6 @@ interface KisUsIntensityOutput {
   pbid: string;
   tpow: string;
   powx: string;
-}
-
-// 실시간처럼 변화를 주어 극도의 하이엔드 퀀트 대시보드를 체감할 수 있게 해주는 노이즈 함수
-function getDynamicOffset(seed: number): number {
-  if (process.env.NODE_ENV === 'test') return 0;
-  const seconds = new Date().getSeconds();
-  return Math.sin(seconds + seed) * 1.5;
 }
 
 // 해외 주식 시세 API 직접 조회 헬퍼
@@ -66,7 +59,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
       "KIS-US-REQ",
       buildKisUsRequestDebug("GET", url, {
       "content-type": "application/json; charset=utf-8",
-        authorization: buildKisAuthorization(token),
+        Authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
@@ -78,13 +71,14 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
       method: "GET",
       headers: {
         "content-type": "application/json; charset=utf-8",
-        authorization: buildKisAuthorization(token),
+        Authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
         custtype: config.custtype || "P",  // 해외주식 API 필수 헤더 (P: 개인, B: 법인)
         tr_cont: "",    // 연속조회 비사용
       },
+      signal: AbortSignal.timeout(8_000),
     }));
 
     if (!response.ok) {
@@ -136,7 +130,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
             "KIS-US-REQ-RETRY",
             buildKisUsRequestDebug("GET", url, {
               "content-type": "application/json; charset=utf-8",
-              authorization: buildKisAuthorization(freshToken),
+              Authorization: buildKisAuthorization(freshToken),
               appkey: KIS_APPKEY || "",
               appsecret: KIS_APPSECRET || "",
               tr_id: config.tr_id || trId,
@@ -148,13 +142,14 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
             method: "GET",
             headers: {
               "content-type": "application/json; charset=utf-8",
-              authorization: buildKisAuthorization(freshToken),
+              Authorization: buildKisAuthorization(freshToken),
               appkey: KIS_APPKEY || "",
               appsecret: KIS_APPSECRET || "",
               tr_id: config.tr_id || trId,
               custtype: config.custtype || "P",
               tr_cont: "",
             },
+            signal: AbortSignal.timeout(8_000),
           }));
           if (retryResponse.ok) {
             const retryData = await retryResponse.json();
@@ -193,7 +188,7 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-      });
+      , signal: AbortSignal.timeout(8_000) });
       if (yfRes.ok) {
         const yfData = await yfRes.json();
         
@@ -263,7 +258,7 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
       "KIS-US-REQ",
       buildKisUsRequestDebug("GET", url, {
         "content-type": "application/json; charset=utf-8",
-        authorization: buildKisAuthorization(token),
+        Authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
@@ -275,13 +270,14 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
       method: "GET",
       headers: {
         "content-type": "application/json; charset=utf-8",
-        authorization: buildKisAuthorization(token),
+        Authorization: buildKisAuthorization(token),
         appkey: KIS_APPKEY || "",
         appsecret: KIS_APPSECRET || "",
         tr_id: config.tr_id || trId,
         custtype: config.custtype || "P",
         tr_cont: "",
       },
+      signal: AbortSignal.timeout(8_000),
     }));
 
     if (!response.ok) {

@@ -95,6 +95,36 @@ export const kisCache = pgTable(
   }
 );
 
+export const kisSignalSnapshots = pgTable("kis_signal_snapshots", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code").notNull(),
+  signalType: text("signal_type").notNull(),
+  status: text("status").notNull(),
+  source: text("source").notNull().default("KIS"),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  payload: jsonb("payload").notNull().default({}),
+  rawPayload: text("raw_payload").notNull().default(""),
+}, (table) => [
+  index("kis_signal_snapshots_lookup_idx").on(table.market, table.code, table.signalType, table.observedAt),
+  index("kis_signal_snapshots_fetched_idx").on(table.fetchedAt),
+]);
+
+export const kisRealtimeEvents = pgTable("kis_realtime_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code").notNull(),
+  channel: text("channel").notNull(),
+  trId: text("tr_id").notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  payload: jsonb("payload").notNull().default({}),
+  rawPayload: text("raw_payload").notNull().default(""),
+}, (table) => [
+  index("kis_realtime_events_lookup_idx").on(table.market, table.code, table.channel, table.observedAt),
+  index("kis_realtime_events_observed_idx").on(table.observedAt),
+]);
+
 // 8. ê´ë¦¬ì KIS ìì²­ ì¤ì  ì ì¥ì
 export const kisApiConfigs = pgTable(
   "kis_api_configs",

@@ -90,6 +90,7 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
       appkey: appKey,
       appsecret: appSecret,
     }),
+    signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) {
     const responseText = await response.text();

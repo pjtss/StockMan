@@ -34,7 +34,7 @@ export async function retryDiscordDeliveries(limit = 50) {
     const webhook = await webhookFor(delivery.channelKey);
     try {
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
-      const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(delivery.payload as Record<string, unknown>)) });
+      const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(delivery.payload as Record<string, unknown>)), signal: AbortSignal.timeout(8_000) });
       if (!response.ok) throw new Error(`discord_http_${response.status}`);
       await markDiscordDeliverySent(delivery.id);
       const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;

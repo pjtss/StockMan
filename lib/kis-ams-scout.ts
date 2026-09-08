@@ -61,7 +61,7 @@ function sum(values: number[]) {
 }
 
 async function fetchJson(url: string, headers: Record<string, string>) {
-  const res = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers }));
+  const res = await withKisRequestThrottle(() => fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(8_000) }));
   const rawText = await res.text();
   let parsed: any = null;
   try {
@@ -88,7 +88,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     tr_id: "HHDFS76320010",
     custtype: "P",
     tr_cont: "",
-    authorization: buildKisAuthorization(activeToken),
+    Authorization: buildKisAuthorization(activeToken),
   };
 
   let refreshAttempt: Promise<string | null> | null = null;
@@ -99,7 +99,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     const freshToken = await refreshAttempt;
     if (freshToken) {
       activeToken = freshToken;
-      baseHeaders.authorization = buildKisAuthorization(freshToken);
+      baseHeaders.Authorization = buildKisAuthorization(freshToken);
     }
     return freshToken;
   };
@@ -112,7 +112,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
   const rankingRows = Array.isArray(rankingOutput) ? rankingOutput.slice(0, topN) : [];
   const detailRequestHeaders = {
     ...baseHeaders,
-    authorization: buildKisAuthorization(activeToken),
+    Authorization: buildKisAuthorization(activeToken),
     tr_id: detailConfig.tr_id || "HHDFS76200200",
   };
 
@@ -130,7 +130,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
       if (freshToken) {
         const refreshedDetailHeaders = {
           ...baseHeaders,
-          authorization: buildKisAuthorization(freshToken),
+          Authorization: buildKisAuthorization(freshToken),
           tr_id: detailConfig.tr_id || "HHDFS76200200",
         };
         detailRes = await fetchJson(detailUrl, {
@@ -238,7 +238,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
       detail: {
         url: `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price-detail?AUTH=&EXCD=AMS&SYMB=<masked>`,
         headers: {
-          authorization: detailRequestHeaders.authorization ? "Bearer <masked>" : "",
+          authorization: detailRequestHeaders.Authorization ? "Bearer <masked>" : "",
           appkey: "<masked>",
           appsecret: "<masked>",
           "content-type": detailRequestHeaders["content-type"],

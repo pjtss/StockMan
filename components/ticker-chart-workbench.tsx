@@ -8,6 +8,53 @@ import type { AccumulationReport } from "@/lib/accumulation-scan";
 import styles from "./ticker-chart-workbench.module.css";
 import accumulationStyles from "./accumulation-details.module.css";
 
+type ScanSort =
+  | "marketCapDesc"
+  | "marketCapAsc"
+  | "rvolDesc"
+  | "rvolAsc"
+  | "turnoverDesc"
+  | "turnoverAsc"
+  | "scoreDesc"
+  | "scoreAsc"
+  | "latestDateDesc"
+  | "latestDateAsc"
+  | "nameAsc"
+  | "codeAsc";
+
+function compareNullableNumber(a: unknown, b: unknown, direction: 1 | -1) {
+  const av = typeof a === "number" && Number.isFinite(a) ? a : Number(a);
+  const bv = typeof b === "number" && Number.isFinite(b) ? b : Number(b);
+  const aMissing = !Number.isFinite(av);
+  const bMissing = !Number.isFinite(bv);
+  if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1;
+  return (av - bv) * direction;
+}
+
+function compareScanRows(a: any, b: any, sort: ScanSort, rvolKey: string) {
+  let result = 0;
+  switch (sort) {
+    case "marketCapDesc": result = compareNullableNumber(b.marketCap, a.marketCap, 1); break;
+    case "marketCapAsc": result = compareNullableNumber(a.marketCap, b.marketCap, 1); break;
+    case "rvolDesc": result = compareNullableNumber(b.metrics?.[rvolKey], a.metrics?.[rvolKey], 1); break;
+    case "rvolAsc": result = compareNullableNumber(a.metrics?.[rvolKey], b.metrics?.[rvolKey], 1); break;
+    case "turnoverDesc": result = compareNullableNumber(b.turnoverRatio, a.turnoverRatio, 1); break;
+    case "turnoverAsc": result = compareNullableNumber(a.turnoverRatio, b.turnoverRatio, 1); break;
+    case "scoreDesc": result = compareNullableNumber(b.score, a.score, 1); break;
+    case "scoreAsc": result = compareNullableNumber(a.score, b.score, 1); break;
+    case "latestDateDesc": result = String(b.latestDate ?? b.candleDate ?? "").localeCompare(String(a.latestDate ?? a.candleDate ?? "")); break;
+    case "latestDateAsc": result = String(a.latestDate ?? a.candleDate ?? "").localeCompare(String(b.latestDate ?? b.candleDate ?? "")); break;
+    case "nameAsc": result = String(a.name ?? "").localeCompare(String(b.name ?? ""), "ko"); break;
+    case "codeAsc": result = String(a.code ?? "").localeCompare(String(b.code ?? "")); break;
+  }
+  if (result !== 0) return result;
+  return String(a.code ?? "").localeCompare(String(b.code ?? ""));
+}
+
+function isDomesticMarket(market: unknown) {
+  return market === "KR" || market === "KOSPI" || market === "KOSDAQ" || market === "KRX";
+}
+
 function HelpMark({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -103,7 +150,7 @@ export function TickerChartWorkbench() {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<"KR" | "US">("KR");
-  const [minCap, setMinCap] = useState("1000");
+  const [minCap, setMinCap] = useState("300");
   const [maxCap, setMaxCap] = useState("");
   const [minRvol, setMinRvol] = useState("0");
   const [maxRvol, setMaxRvol] = useState("");
@@ -121,9 +168,7 @@ export function TickerChartWorkbench() {
   >({ D: "ANY", W: "ANY", M: "ANY" });
   const [scanRows, setScanRows] = useState<any[]>([]);
   const [scanCompleted, setScanCompleted] = useState(false);
-  const [scanSort, setScanSort] = useState<
-    "marketCapDesc" | "marketCapAsc" | "rvolDesc" | "scoreDesc"
-  >("marketCapDesc");
+  const [scanSort, setScanSort] = useState<ScanSort>("marketCapDesc");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [accumulationLoading, setAccumulationLoading] = useState(false);
@@ -147,7 +192,7 @@ export function TickerChartWorkbench() {
     [input, market],
   );
   const chartItems = useMemo(() => {
-    if (scanCompleted && scanRows.length) return scanRows.map((row) => ({ code: row.code, company: row.name || row.code, market: row.market === "KOSPI" || row.market === "KOSDAQ" ? "KR" as const : "US" as const }));
+    if (scanCompleted && scanRows.length) return scanRows.map((row) => ({ code: row.code, company: row.name || row.code, market: isDomesticMarket(row.market) ? "KR" as const : "US" as const }));
     return tickers.map((code) => ({ code, company: names[code] || code, market }));
   }, [market, names, scanCompleted, scanRows, tickers]);
   const selectedChartIndex = selected ? chartItems.findIndex((item) => item.code === selected && item.market === selectedMarket) : -1;
@@ -178,7 +223,7 @@ export function TickerChartWorkbench() {
   }, [market, tickers]);
 
   useEffect(() => {
-    setMinCap(market === "KR" ? "1000" : "100000000");
+    setMinCap(market === "KR" ? "300" : "100000000");
     setMaxCap("");
     setScanRows([]);
     setScanCompleted(false);
@@ -206,7 +251,7 @@ export function TickerChartWorkbench() {
   async function runScan() {
     setAccumulationReport(null);
     setScanCompleted(false);
-    if (scanSort === "scoreDesc") setScanSort("rvolDesc");
+    if (scanSort === "scoreDesc" || scanSort === "scoreAsc") setScanSort("rvolDesc");
     setScanLoading(true);
     setScanError(null);
     setScanCompleted(false);
@@ -587,15 +632,22 @@ export function TickerChartWorkbench() {
                   value={scanSort}
                   onChange={(e) =>
                     setScanSort(
-                      e.target.value as
-                        "marketCapDesc" | "marketCapAsc" | "rvolDesc" | "scoreDesc",
+                      e.target.value as ScanSort,
                     )
                   }
                 >
                   <option value="marketCapDesc">시총 큰 순</option>
                   <option value="marketCapAsc">시총 작은 순</option>
                   <option value="rvolDesc">RVOL 높은 순</option>
+                  <option value="rvolAsc">RVOL 낮은 순</option>
+                  <option value="turnoverDesc">거래대금/시총 높은 순</option>
+                  <option value="turnoverAsc">거래대금/시총 낮은 순</option>
                   {accumulationReport && <option value="scoreDesc">매집 점수 높은 순</option>}
+                  {accumulationReport && <option value="scoreAsc">매집 점수 낮은 순</option>}
+                  <option value="latestDateDesc">최신 기준일 순</option>
+                  <option value="latestDateAsc">오래된 기준일 순</option>
+                  <option value="nameAsc">종목명 가나다순</option>
+                  <option value="codeAsc">종목코드 오름차순</option>
                 </select>
               </label>
             )}
@@ -608,17 +660,7 @@ export function TickerChartWorkbench() {
           ) : (
             <div className={`${styles.grid} ${accumulationReport ? accumulationStyles.grid : ""}`}>
               {[...scanRows]
-                .sort((a, b) => {
-                  if (scanSort === "scoreDesc") return b.score - a.score || b.rvol - a.rvol;
-                  if (scanSort === "rvolDesc")
-                    return (
-                      Number(b.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] ?? -1) -
-                      Number(a.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] ?? -1)
-                    );
-                  const av = Number(a.marketCap ?? -1),
-                    bv = Number(b.marketCap ?? -1);
-                  return scanSort === "marketCapAsc" ? av - bv : bv - av;
-                })
+                .sort((a, b) => compareScanRows(a, b, scanSort, `${accumulationReport ? "D" : scanTimeframe}.rvol`))
                 .map((row) => (
                   <article
                     key={`${row.market}:${row.code}`}
@@ -632,7 +674,7 @@ export function TickerChartWorkbench() {
                           ? "-"
                           : formatDisplayAmount(
                               Number(row.marketCap),
-                              row.market === "KOSPI" || row.market === "KOSDAQ" || row.market === "KRX"
+                              isDomesticMarket(row.market)
                                 ? "KRW"
                                 : "USD",
                             )}{" "}
@@ -651,7 +693,7 @@ export function TickerChartWorkbench() {
                         setNames((n) => ({ ...n, [row.code]: row.name }));
                         setSelectedCompany(row.name || row.code);
                         setSelectedMarket(
-                          row.market === "KOSPI" || row.market === "KOSDAQ"
+                          isDomesticMarket(row.market)
                             ? "KR"
                             : "US",
                         );
