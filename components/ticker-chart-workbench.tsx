@@ -136,7 +136,7 @@ function HelpMark({ text }: { text: string }) {
 async function readJsonResponse(response: Response) {
   const text = await response.text();
   try {
-    return JSON.parse(text) as { error?: unknown; results?: any[] };
+    return JSON.parse(text) as { ok?: boolean; error?: unknown; results?: any[] };
   } catch {
     const contentType = response.headers.get("content-type") || "unknown";
     throw new Error(`종목 추출 API가 JSON이 아닌 응답을 반환했습니다. HTTP ${response.status} · ${contentType}`);
@@ -368,9 +368,12 @@ export function TickerChartWorkbench() {
     setScanError(null);
     try {
       const response = await fetch(`/api/scan/${market.toLowerCase()}-accumulation?limit=100`);
-      const json = await response.json();
+      const json = (await readJsonResponse(response)) as AccumulationReport & {
+        error?: unknown;
+        results?: any[];
+      };
       if (!response.ok || !json.ok)
-        throw new Error(json.error ?? "매집 의심 종목 추출 실패");
+        throw new Error(String(json.error ?? "매집 의심 종목 추출 실패"));
       setScanRows(json.results ?? []);
       setScanCompleted(true);
       setAccumulationReport(json);

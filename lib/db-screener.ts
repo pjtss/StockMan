@@ -82,12 +82,24 @@ export async function runDbScreener(
     ? "us_latest_daily_candles"
     : "kr_latest_daily_candles";
   const latestCtes = asOf
-    ? `market_latest AS (SELECT market, MAX(candle_date::date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date::date <= $3::date GROUP BY market), instrument_daily_latest AS (SELECT market,code,MAX(candle_date::date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date::date <= $3::date GROUP BY market,code)`
+    ? `market_latest AS (SELECT market, MAX(candle_date::date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date::date <= \$2::date GROUP BY market), instrument_daily_latest AS (SELECT market,code,MAX(candle_date::date) AS candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date::date <= \$2::date GROUP BY market,code)`
     : `market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1))`;
+  const candleLookups = requestedTimeframes
+    .map(
+      (requestedTimeframe, index) => `SELECT c${index}.candle_date,c${index}.fetched_at,c${index}.close,c${index}.high,c${index}.low,c${index}.volume,c${index}.timeframe
+        FROM ${candleTable} c${index}
+        WHERE c${index}.market=u.market AND c${index}.code=u.code
+          AND c${index}.timeframe='${requestedTimeframe}'
+          AND c${index}.volume > 0
+          AND ($2::date IS NULL OR c${index}.candle_date::date <= $2::date)
+        ORDER BY c${index}.candle_date DESC
+        LIMIT 120`,
+    )
+    .join(" UNION ALL ");
   const rows = (
     await pool.query(
-      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (SELECT recent.* FROM (SELECT ranked.* FROM (SELECT c.*,ROW_NUMBER() OVER (PARTITION BY c.timeframe ORDER BY c.candle_date DESC) AS row_number FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe=ANY($2) AND c.volume > 0 AND ($3::date IS NULL OR c.candle_date::date <= $3::date)) ranked WHERE ranked.row_number <= 120) recent ORDER BY recent.timeframe,recent.candle_date ASC) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) ORDER BY u.market,u.code,c.timeframe,c.candle_date ASC`,
-      [markets, requestedTimeframes, asOf],
+      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($2::date IS NULL OR f.observed_at < ($2::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (${candleLookups}) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) ORDER BY u.market,u.code,c.timeframe,c.candle_date ASC`,
+      [markets, asOf],
     )
   ).rows;
   const groups = new Map<string, any>();
