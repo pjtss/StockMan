@@ -38,6 +38,7 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
 
 const DEFAULT_SETTINGS: UsTurnoverFilterSettings = { maxPrice: 0, maxRate: 0, maxOpenToHighRate: 0, minMarketCap: 0, maxMarketCap: 0, globalMinMarketCap: 0, globalMaxMarketCap: 0, minTurnoverRatio: 0, maxTurnoverRatio: 0, tradingValueIncreaseAlert: 0, minIntensity: 0, minTradingValueRvol: 0, minTradingValueIncreaseRate: 0, minPersistenceWindows: 0 };
 const STORED_SCOPE_CACHE_TTL_MS = 5 * 60_000;
+const LIVE_SCOPE_CACHE_TTL_MS = 30_000;
 export type StoredUsInstrumentScopes = {
   scopes: UsTopRisingScope[];
   universe: {
@@ -50,6 +51,8 @@ export type StoredUsInstrumentScopes = {
 };
 let storedScopeCache: { expiresAt: number; value: StoredUsInstrumentScopes } | null = null;
 let storedScopeInflight: Promise<StoredUsInstrumentScopes> | null = null;
+let liveScopeCache: { expiresAt: number; value: Awaited<ReturnType<typeof loadUsTopRisingScopesUncached>> } | null = null;
+let liveScopeInflight: Promise<Awaited<ReturnType<typeof loadUsTopRisingScopesUncached>>> | null = null;
 
 /** Canonical persisted universe used by daily indicators. No live ranking API is called. */
 export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrumentScopes> {
@@ -89,6 +92,19 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
  * the integrated instrument table must use this source instead.
  */
 export async function loadUsTopRisingScopes() {
+  if (liveScopeCache && liveScopeCache.expiresAt > Date.now()) return liveScopeCache.value;
+  if (liveScopeInflight) return liveScopeInflight;
+  liveScopeInflight = loadUsTopRisingScopesUncached();
+  try {
+    const value = await liveScopeInflight;
+    liveScopeCache = { value, expiresAt: Date.now() + LIVE_SCOPE_CACHE_TTL_MS };
+    return value;
+  } finally {
+    liveScopeInflight = null;
+  }
+}
+
+async function loadUsTopRisingScopesUncached() {
   const scopes: UsTopRisingScope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
   for (const market of US_EXCHANGES) {
     let response = await fetchKisUsTopRisingApi({ excd: market });
@@ -113,7 +129,12 @@ export async function loadUsTopRisingScopes() {
     markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, productExcluded, fallbackUsed, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange; verify market hours and KIS ranking availability" : undefined });
   }
   const settings = await loadUsTurnoverFilterSettings();
+  if (settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0) {
+    const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market IN ('NAS','AMS','NYS')").catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null }> }));
+    const caps = new Map(capRows.rows.map((row) => [`${row.market}:${row.code}`, row.market_cap]));
+    for (const scope of scopes) scope.marketCap = caps.get(`${scope.market}:${scope.code}`) ?? null;
+  }
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
-  return { scopes: filteredScopes, universe: { ok: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topN: 100, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" } } } };
+  return { scopes: filteredScopes, universe: { ok: filteredScopes.length > 0, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" } } } };
 }

@@ -16,6 +16,7 @@ type FlowMode = "investor" | "estimate" | "investor-daily" | "foreign-member" | 
 interface ChartModalProps {
   code: string;
   company: string;
+  exchange?: "NAS" | "AMS" | "NYS";
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -168,7 +169,7 @@ function KISOpinionPanel({ data, loading, error, isUs }: { data: OpinionResponse
   return row ? <div><div className={styles.indicators}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 18).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div><div className={styles.indicatorSub}>KIS 종목 투자의견·목표가 보조신호 · 수집: {formatDisplayDateTime(data?.collectedAt)}</div></div> : <div className={styles.empty}>KIS 투자의견 데이터가 없습니다.</div>;
 }
 
-export function ChartModal({ code, company, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
+export function ChartModal({ code, company, exchange, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
   const isUsChart = code.startsWith("US:");
   const [timeframe, setTimeframe] = useState<"D" | "W" | "M">("D");
   const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "flow" | "ratio" | "news">("chart");
@@ -317,7 +318,8 @@ export function ChartModal({ code, company, onClose, onPrevious, onNext, positio
     setFlowLoading(true); setFlowError(null);
     const queryMode = isUsChart ? (flowMode === "asking" ? "asking" : flowMode === "price-detail" ? "price-detail" : flowMode === "minute" || flowMode === "minute-5" ? "minute" : flowMode === "daily" ? "daily" : flowMode === "info" ? "info" : "trade") : flowMode;
     const minute = flowMode === "minute-5" ? "5" : "1";
-    const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}${queryMode === "minute" ? `&minute=${minute}&count=120` : ""}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body as FlowResponse; });
+    const exchangeQuery = isUsChart && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+    const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}${exchangeQuery}${queryMode === "minute" ? `&minute=${minute}&count=120` : ""}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body as FlowResponse; });
     const detailRequest = isUsChart ? Promise.resolve(null) : fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=KR&mode=price-detail`, { cache: "no-store" }).then(async (response) => response.ok ? await response.json() as FlowResponse : null);
     Promise.all([flowRequest, detailRequest]).then(([body, detail]) => { if (!cancelled) { const detailRow = detail?.rows?.[0]; const flowRows = body.rows ?? []; const labeledDetail = detailRow ? { "발행·상장주수 (유통주식수 아님)": detailRow.sharesOutstanding, ...detailRow } : null; const rows = labeledDetail ? (flowRows.length ? [labeledDetail ? { ...labeledDetail, ...flowRows[0] } : flowRows[0], ...flowRows.slice(1)] : [labeledDetail]) : flowRows; setFlow({ ...body, rows, instrumentDetail: detailRow }); } }).catch((e: Error) => { if (!cancelled) setFlowError(e.message); }).finally(() => { if (!cancelled) setFlowLoading(false); });
     return () => { cancelled = true; };
