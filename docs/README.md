@@ -16,6 +16,8 @@
 
 ## 시작점
 
+- 현재 시스템 기준서: [`architecture/current-system-reference.md`](./architecture/current-system-reference.md)
+
 - 코드 구조: [`architecture/code-structure.md`](./architecture/code-structure.md)
 - 문서 관리·SRP 기준: [`architecture/documentation-and-srp.md`](./architecture/documentation-and-srp.md)
 - 일별 공시·RSS 통합 조회 설계: [`architecture/daily-disclosure-feed-design.md`](./architecture/daily-disclosure-feed-design.md)

@@ -41,6 +41,8 @@
 
 ## 현재 점검 결과
 
+- 최신 현재 상태 기준서는 [`current-system-reference.md`](./current-system-reference.md)다. 구조·정책·SRP 판단의 출발점으로 사용한다.
+
 - 문서 진입점: 충족 (`docs/README.md`, 영역별 README 존재).
 - 공식 문서 보관 경계: 충족 (`docs/official/`, `docs/references/`).
 - 코드 책임 분류: 충족하는 구조가 있으나, 대형 UI·통합 모듈은 기능 추가 시 분리 후보로 계속 점검한다.
