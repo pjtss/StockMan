@@ -8,6 +8,12 @@ import { buildChartDataFromCandles, type ChartData, type ChartFundamentals, type
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const startedAt = performance.now();
+  const timedJson = (body: unknown, init?: ResponseInit) => {
+    const response = NextResponse.json(body, init);
+    response.headers.set("server-timing", `chart;dur=${Math.max(0, Math.round(performance.now() - startedAt))}`);
+    return response;
+  };
   const { searchParams } = new URL(request.url);
   const rawCode = searchParams.get("code");
   const code = rawCode?.trim() || null;
@@ -18,7 +24,7 @@ export async function GET(request: Request) {
   const timeframe = (["D", "W", "M"] as const).includes(requestedTimeframe as "D" | "W" | "M") ? requestedTimeframe as "D" | "W" | "M" : "D";
 
   if (!code || code.length > 64 || (company && company.length > 200)) {
-    return NextResponse.json({ error: "code is required" }, { status: 400 });
+    return timedJson({ error: "code is required" }, { status: 400 });
   }
 
   try {
@@ -40,7 +46,7 @@ export async function GET(request: Request) {
     }
     if (!data) {
       const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe).catch(() => unknownFundamentals(market));
-      return NextResponse.json(
+      return timedJson(
         { error: "차트 데이터를 불러올 수 없습니다. KIS API 자격증명을 확인하세요.", chartStatus: "UNAVAILABLE", fundamentals },
         { status: 503 }
       );
@@ -51,11 +57,11 @@ export async function GET(request: Request) {
     if (chartSource === "DB_CACHE") data.fundamentals = { ...unknownFundamentals(market), status: "STALE", source: "DB_CACHE" };
     data.fundamentals = await loadChartFundamentals(data, market, timeframe).catch(() => unknownFundamentals(market));
 
-    return NextResponse.json(data);
+    return timedJson(data);
   } catch (err: any) {
     console.error("[API /stock/chart] Error:", err instanceof Error ? err.message : "unknown error");
     const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe).catch(() => unknownFundamentals(market));
-    return NextResponse.json({ error: "차트 데이터를 처리할 수 없습니다.", chartStatus: "UNAVAILABLE", fundamentals }, { status: 502 });
+    return timedJson({ error: "차트 데이터를 처리할 수 없습니다.", chartStatus: "UNAVAILABLE", fundamentals }, { status: 502 });
   }
 }
 
