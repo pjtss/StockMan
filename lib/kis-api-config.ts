@@ -112,14 +112,30 @@ export const DEFAULT_KIS_API_CONFIGS: Record<KisApiConfigKey, KisApiConfig> = {
   },
 };
 
+const CONFIG_CACHE_TTL_MS = 30_000;
+const configCache = new Map<KisApiConfigKey, { value: KisApiConfig; expiresAt: number }>();
+const configLoads = new Map<KisApiConfigKey, Promise<KisApiConfig>>();
+
 export async function loadKisApiConfig(key: KisApiConfigKey): Promise<KisApiConfig> {
+  const cached = configCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const inFlight = configLoads.get(key);
+  if (inFlight) return inFlight;
   const defaults = DEFAULT_KIS_API_CONFIGS[key];
   const db = getDb();
-  if (!db) return defaults;
-
-  const rows = await db.select().from(kisApiConfigs).where(eq(kisApiConfigs.key, key)).limit(1);
-  if (rows.length === 0) return defaults;
-  return normalizeKisApiConfig({ ...defaults, ...(rows[0].config as Partial<KisApiConfig>) }, defaults);
+  const load = (async () => {
+    if (!db) return defaults;
+    const rows = await db.select().from(kisApiConfigs).where(eq(kisApiConfigs.key, key)).limit(1);
+    return rows.length === 0 ? defaults : normalizeKisApiConfig({ ...defaults, ...(rows[0].config as Partial<KisApiConfig>) }, defaults);
+  })();
+  configLoads.set(key, load);
+  try {
+    const value = await load;
+    configCache.set(key, { value, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS });
+    return value;
+  } finally {
+    configLoads.delete(key);
+  }
 }
 
 export async function saveKisApiConfig(key: KisApiConfigKey, config: KisApiConfig) {
@@ -132,4 +148,6 @@ export async function saveKisApiConfig(key: KisApiConfigKey, config: KisApiConfi
       target: kisApiConfigs.key,
       set: { config: normalized, updatedAt: new Date() },
     });
+  configCache.delete(key);
+  configLoads.delete(key);
 }
