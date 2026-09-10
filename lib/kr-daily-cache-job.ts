@@ -48,13 +48,17 @@ async function run(job: Job) {
     await Promise.all((Object.keys(freshness) as Array<keyof typeof freshness>).map(async (timeframe) => {
       const stale = await getDb().execute(sql`SELECT u.market, u.code
         FROM kr_common_stock_universe u
-        LEFT JOIN kr_instrument_universe_candles c
-          ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe}
+        LEFT JOIN LATERAL (
+          SELECT c.fetched_at, c.candle_date
+          FROM kr_instrument_universe_candles c
+          WHERE c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe}
+          ORDER BY c.candle_date DESC, c.fetched_at DESC
+          LIMIT 1
+        ) latest ON true
         WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
-        GROUP BY u.market, u.code
-        HAVING MAX(c.fetched_at) IS NULL
-          OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
-          OR MAX(c.candle_date) < (SELECT MAX(c2.candle_date) FROM kr_instrument_universe_candles c2 WHERE c2.timeframe = ${timeframe} AND c2.volume > 0)`);
+          AND (latest.fetched_at IS NULL
+            OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
+            OR latest.candle_date < (SELECT MAX(c2.candle_date) FROM kr_instrument_universe_candles c2 WHERE c2.timeframe = ${timeframe} AND c2.volume > 0))`);
       staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
     }));
     const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);
