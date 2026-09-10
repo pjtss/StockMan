@@ -13,6 +13,13 @@ type RatioType = "financial" | "growth" | "profit" | "stability" | "balance-shee
 type OpinionResponse = { ok: boolean; rows?: Array<Record<string, unknown>>; collectedAt?: string };
 type FlowMode = "investor" | "estimate" | "investor-daily" | "foreign-member" | "foreign-member-tick" | "program" | "program-daily" | "member" | "member-daily" | "conclusion" | "ccnl" | "price2" | "asking" | "price-detail" | "minute" | "minute-5" | "daily-minute" | "daily" | "info" | "product-info" | "stock-info" | "lendable" | "etf-price" | "etf-components" | "etf-nav" | "etf-nav-daily" | "daily-price" | "opinion-by-broker" | "exp-price-trend" | "overtime-conclusion" | "overtime-daily" | "overtime-price" | "overtime-asking" | "short-sale" | "credit" | "loan" | "trade-volume" | "vi" | "pbar" | "trade-participation" | "highlow" | "lowhigh";
 
+const MODAL_SETTINGS_KEY = "stockman:chart-modal-settings";
+type ModalSettings = { timeframe: "D" | "W" | "M"; activeTab: "chart" | "fundamentals" | "flow" | "ratio" | "news"; flowMode: FlowMode; ratioType: RatioType };
+function readModalSettings(): Partial<ModalSettings> {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(window.sessionStorage.getItem(MODAL_SETTINGS_KEY) ?? "{}"); } catch { return {}; }
+}
+
 interface ChartModalProps {
   code: string;
   company: string;
@@ -171,8 +178,8 @@ function KISOpinionPanel({ data, loading, error, isUs }: { data: OpinionResponse
 
 export function ChartModal({ code, company, exchange, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
   const isUsChart = code.startsWith("US:");
-  const [timeframe, setTimeframe] = useState<"D" | "W" | "M">("D");
-  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "flow" | "ratio" | "news">("chart");
+  const [timeframe, setTimeframe] = useState<"D" | "W" | "M">(() => readModalSettings().timeframe ?? "D");
+  const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "flow" | "ratio" | "news">(() => readModalSettings().activeTab ?? "chart");
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -185,11 +192,11 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   const [flowError, setFlowError] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "unavailable" | "closed">("closed");
   const [realtimeRow, setRealtimeRow] = useState<Record<string, unknown> | null>(null);
-  const [flowMode, setFlowMode] = useState<FlowMode>("investor");
+  const [flowMode, setFlowMode] = useState<FlowMode>(() => readModalSettings().flowMode ?? "investor");
   const [ratio, setRatio] = useState<RatioResponse | null>(null);
   const [ratioLoading, setRatioLoading] = useState(false);
   const [ratioError, setRatioError] = useState<string | null>(null);
-  const [ratioType, setRatioType] = useState<RatioType>("financial");
+  const [ratioType, setRatioType] = useState<RatioType>(() => readModalSettings().ratioType ?? "financial");
   const [opinion, setOpinion] = useState<OpinionResponse | null>(null);
   const [opinionLoading, setOpinionLoading] = useState(false);
   const [opinionError, setOpinionError] = useState<string | null>(null);
@@ -201,8 +208,28 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   const modalRef = useRef<HTMLDivElement>(null);
   const chartNodeRef = useRef<HTMLDivElement | null>(null);
   const [chartContainerVersion, setChartContainerVersion] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
   const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(document.fullscreenElement === modalRef.current);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement === modalRef.current) await document.exitFullscreen();
+      else await modalRef.current?.requestFullscreen();
+    } catch (error) {
+      console.warn("[ChartModal] fullscreen toggle failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    try { window.sessionStorage.setItem(MODAL_SETTINGS_KEY, JSON.stringify({ timeframe, activeTab, flowMode, ratioType } satisfies ModalSettings)); } catch { /* sessionStorage may be unavailable */ }
+  }, [timeframe, activeTab, flowMode, ratioType]);
 
   const watchlistMarket = code.startsWith("US:") ? "US" : "KR";
   const watchlistCode = code.replace(/^US:/i, "").trim().toUpperCase();
@@ -556,7 +583,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
 
   return createPortal(
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={modalRef} className={styles.modal} role="dialog" aria-modal="true" tabIndex={-1}>
+      <div ref={modalRef} className={`${styles.modal} ${isFullscreen ? styles.modalFullscreen : ""}`} role="dialog" aria-modal="true" tabIndex={-1}>
         {/* 헤더 */}
         <div className={styles.header}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
@@ -585,6 +612,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
             {position && <span className={styles.code}>{position.current} / {position.total}</span>}
             <button type="button" onClick={onPrevious} disabled={!onPrevious} aria-label="이전 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>←</button>
             <button type="button" onClick={onNext} disabled={!onNext} aria-label="다음 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>→</button>
+            <button type="button" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "전체화면 종료" : "전체화면"} style={{ padding: "8px 11px", borderRadius: "8px" }}>{isFullscreen ? "⤢" : "⛶"}</button>
             <button className={styles.closeBtn} onClick={onClose} aria-label="닫기">✕</button>
           </div>
         </div>
