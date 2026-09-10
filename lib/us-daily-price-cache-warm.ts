@@ -84,8 +84,11 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
           await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error });
         } else {
           const dbWriteStartedAt = Date.now();
-          candleCount += await saveUsDailyCandles(item.market, item.code, response.candles, timeframe);
-          dbWriteDurationMs += Date.now() - dbWriteStartedAt;
+          try {
+            candleCount += await saveUsDailyCandles(item.market, item.code, response.candles, timeframe);
+          } finally {
+            dbWriteDurationMs += Date.now() - dbWriteStartedAt;
+          }
           if (timeframe === "D") dailySuccessCount += 1;
           await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe });
         }
