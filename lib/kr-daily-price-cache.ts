@@ -6,7 +6,9 @@ import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 
 export type CandleTimeframe = "D" | "W" | "M";
 
-export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 100, timeframe: CandleTimeframe = "D") {
+const bulkInflight = new Map<string, Promise<Map<string, OHLCVCandle[]>>>();
+
+async function loadCachedKrDailyCandlesBulkUncached(items: Array<{ market: string; code: string }>, limit = 100, timeframe: CandleTimeframe = "D") {
   const result = new Map<string, OHLCVCandle[]>();
   if (!items.length) return result;
   const normalized = Array.from(new Map(items.map((item) => [`${item.market}:${item.code}`, { market: item.market, code: item.code }])).values());
@@ -29,6 +31,21 @@ export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string
     result.set(key, candles);
   }
   return result;
+}
+
+export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 100, timeframe: CandleTimeframe = "D") {
+  const normalizedKey = Array.from(new Set(items.map((item) => `${item.market.trim().toUpperCase()}:${item.code.trim().toUpperCase()}`))).sort().join("|");
+  if (!normalizedKey) return new Map<string, OHLCVCandle[]>();
+  const key = `${timeframe}:${limit}:${normalizedKey}`;
+  const existing = bulkInflight.get(key);
+  if (existing) return existing;
+  const request = loadCachedKrDailyCandlesBulkUncached(items, limit, timeframe);
+  bulkInflight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (bulkInflight.get(key) === request) bulkInflight.delete(key);
+  }
 }
 
 export async function saveKrDailyCandles(market: string, code: string, candles: OHLCVCandle[], timeframe: CandleTimeframe = "D", options: { skipUniverseCheck?: boolean } = {}) {
