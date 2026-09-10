@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { validateScreenerRequest } from "@/lib/screener-validation";
+
+vi.mock("@/lib/db-screener", () => ({
+  runDbScreener: vi.fn().mockResolvedValue([{ code: "TEST", name: "Test" }]),
+}));
+
+import { runDbScreener } from "@/lib/db-screener";
+import { POST } from "./route";
 
 describe("screener request validation", () => {
   it("rejects unsupported timeframe and limit", () => {
@@ -29,5 +36,26 @@ describe("screener request validation", () => {
     expect(validateScreenerRequest({ filters: [{ field: "D.close", operator: ">=", value: -1 }] })).toBe("INVALID_FILTERS");
     expect(validateScreenerRequest({ filters: [{ field: "D.close", operator: "<=", value: "D.bb.middle" }] })).toBeNull();
     expect(validateScreenerRequest({ filters: [{ field: "D.close", operator: "<=", value: "close" }] })).toBe("INVALID_FILTERS");
+  });
+});
+
+describe("screener run API performance headers", () => {
+  it("reports execution timing and cache status", async () => {
+    const request = () => new Request("http://localhost/api/screener/run", {
+      method: "POST",
+      body: JSON.stringify({ market: "KR", limit: 10 }),
+      headers: { "content-type": "application/json" },
+    });
+
+    const first = await POST(request());
+    expect(first.status).toBe(200);
+    expect(first.headers.get("server-timing")).toMatch(/^screener;dur=\d+$/);
+    expect(first.headers.get("x-screener-cache")).toBe("MISS");
+
+    const second = await POST(request());
+    expect(second.status).toBe(200);
+    expect(second.headers.get("server-timing")).toMatch(/^screener;dur=\d+$/);
+    expect(second.headers.get("x-screener-cache")).toBe("HIT");
+    expect(runDbScreener).toHaveBeenCalledTimes(1);
   });
 });
