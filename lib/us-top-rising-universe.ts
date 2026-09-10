@@ -63,10 +63,10 @@ let liveScopeInflight: Promise<Awaited<ReturnType<typeof loadUsTopRisingScopesUn
 
 /** Canonical persisted universe used by daily indicators. No live ranking API is called. */
 export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrumentScopes> {
-  await syncDailyActivityStatus("US");
   if (storedScopeCache && storedScopeCache.expiresAt > Date.now()) return storedScopeCache.value;
   if (storedScopeInflight) return storedScopeInflight;
   storedScopeInflight = (async () => {
+    await syncDailyActivityStatus("US");
     const db = getDb();
     const rows = db ? await db.select({ market: usCommonStockUniverse.market, code: usCommonStockUniverse.code, name: usCommonStockUniverse.name, englishName: usCommonStockUniverse.englishName, instrumentType: usCommonStockUniverse.instrumentType, isEtf: usCommonStockUniverse.isEtf, isLeveraged: usCommonStockUniverse.isLeveraged, isInverse: usCommonStockUniverse.isInverse, isWarrant: usCommonStockUniverse.isWarrant, isDerivative: usCommonStockUniverse.isDerivative, isDr: usCommonStockUniverse.isDr })
       .from(usCommonStockUniverse).where(and(eq(usCommonStockUniverse.enabled, true), sql`daily_active = true`, inArray(usCommonStockUniverse.market, [...US_EXCHANGES])))
