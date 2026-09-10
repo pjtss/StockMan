@@ -2,19 +2,20 @@ import { getPool } from "@/lib/db";
 
 /** 시장별 최신 일봉에서 7일을 초과해 지연된 종목과 일봉이 없는 종목을 비활성화한다. */
 const ACTIVITY_STATUS_TTL_MS = 60_000;
-let lastActivityStatus: { market?: "KR" | "US"; expiresAt: number; value: Record<string, number> } | null = null;
+const activityStatusCache = new Map<string, { expiresAt: number; value: Record<string, number> }>();
 const activityStatusInflight = new Map<string, Promise<Record<string, number>>>();
 
 export async function syncDailyActivityStatus(market?: "KR" | "US") {
-  if (lastActivityStatus && lastActivityStatus.market === market && lastActivityStatus.expiresAt > Date.now()) return lastActivityStatus.value;
   const inflightKey = market ?? "ALL";
+  const cached = activityStatusCache.get(inflightKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
   const existing = activityStatusInflight.get(inflightKey);
   if (existing) return existing;
   const request = syncDailyActivityStatusUncached(market);
   activityStatusInflight.set(inflightKey, request);
   try {
     const value = await request;
-    lastActivityStatus = { market, value, expiresAt: Date.now() + ACTIVITY_STATUS_TTL_MS };
+    activityStatusCache.set(inflightKey, { value, expiresAt: Date.now() + ACTIVITY_STATUS_TTL_MS });
     return value;
   } finally {
     if (activityStatusInflight.get(inflightKey) === request) activityStatusInflight.delete(inflightKey);
