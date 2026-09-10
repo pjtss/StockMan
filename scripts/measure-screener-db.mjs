@@ -40,6 +40,26 @@ async function explain(label, text, params) {
   return { label, planningMs: plan["Planning Time"], executionMs: plan["Execution Time"], buffers: plan["Plan"]?.['Shared Read Blocks'] ?? 0 };
 }
 
+function percentile(values, p) {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (!sorted.length) return 0;
+  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1)];
+}
+
+async function explainRepeated(label, text, params, repetitions = 5) {
+  const samples = [];
+  for (let i = 0; i < repetitions; i += 1) samples.push(await explain(label, text, params));
+  return {
+    label,
+    repetitions,
+    planningMsP50: percentile(samples.map((sample) => sample.planningMs), 0.5),
+    planningMsP95: percentile(samples.map((sample) => sample.planningMs), 0.95),
+    executionMsP50: percentile(samples.map((sample) => sample.executionMs), 0.5),
+    executionMsP95: percentile(samples.map((sample) => sample.executionMs), 0.95),
+    buffersP50: percentile(samples.map((sample) => sample.buffers), 0.5),
+  };
+}
+
 const output = { measuredAt: new Date().toISOString(), scopes: {} };
 for (const [scope, config] of Object.entries(queries)) {
   const params = [config.markets, "20260901"];
@@ -49,9 +69,9 @@ for (const [scope, config] of Object.entries(queries)) {
     indexes: (await client.query(`SELECT indexname FROM pg_indexes WHERE schemaname='public' AND indexname LIKE $1 ORDER BY indexname`, [`${scope}_candles_screener%`])).rows.map((row) => row.indexname),
     plans: [],
   };
-  output.scopes[scope].plans.push(await explain(`${scope}-asof-market-latest`, `WITH instrument_daily_latest AS (SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC) SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market`, params));
-  output.scopes[scope].plans.push(await explain(`${scope}-asof-instrument-latest`, `SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC`, params));
-  output.scopes[scope].plans.push(await explain(`${scope}-summary-latest`, `SELECT market, code, candle_date FROM ${config.summary} WHERE volume>0 AND market=ANY($1)`, [config.markets]));
+  output.scopes[scope].plans.push(await explainRepeated(`${scope}-asof-market-latest`, `WITH instrument_daily_latest AS (SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC) SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market`, params));
+  output.scopes[scope].plans.push(await explainRepeated(`${scope}-asof-instrument-latest`, `SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC`, params));
+  output.scopes[scope].plans.push(await explainRepeated(`${scope}-summary-latest`, `SELECT market, code, candle_date FROM ${config.summary} WHERE volume>0 AND market=ANY($1)`, [config.markets]));
 }
 console.log(JSON.stringify(output, null, 2));
 await client.end();
