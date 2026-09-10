@@ -124,20 +124,21 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
 
     const detailUrl =
       `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price-detail?AUTH=&EXCD=AMS&SYMB=${encodeURIComponent(symb)}`;
-    let detailRes = await fetchJson(detailUrl, detailRequestHeaders);
-    if (isKisTokenExpiredResponse(detailRes.res.status, detailRes.parsed)) {
-      const freshToken = await refreshTokenOnce();
-      if (freshToken) {
-        const refreshedDetailHeaders = {
-          ...baseHeaders,
-          Authorization: buildKisAuthorization(freshToken),
-          tr_id: detailConfig.tr_id || "HHDFS76200200",
-        };
-        detailRes = await fetchJson(detailUrl, {
-          ...refreshedDetailHeaders,
-        });
+    const detailPromise = (async () => {
+      let detailRes = await fetchJson(detailUrl, detailRequestHeaders);
+      if (isKisTokenExpiredResponse(detailRes.res.status, detailRes.parsed)) {
+        const freshToken = await refreshTokenOnce();
+        if (freshToken) {
+          const refreshedDetailHeaders = {
+            ...baseHeaders,
+            Authorization: buildKisAuthorization(freshToken),
+            tr_id: detailConfig.tr_id || "HHDFS76200200",
+          };
+          detailRes = await fetchJson(detailUrl, { ...refreshedDetailHeaders });
+        }
       }
-    }
+      return detailRes;
+    })();
 
     const chartUrl =
       `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice?` +
@@ -156,6 +157,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
       }
     }
 
+    const detailRes = await detailPromise;
     const detail = pickDetailOutput(detailRes.parsed);
     const chartRows = Array.isArray(chartRes.parsed?.output2) ? chartRes.parsed.output2 : [];
     const minuteValues = chartRows.map((r: any) => {
