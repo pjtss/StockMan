@@ -11,7 +11,7 @@ const rising = (values: number[]) => values.at(-1)! > values.at(-2)! && values.a
 export async function scanUsDailySidewaysObvAdl() {
   const db = getDb();
   const universe = await queryEligibleUniverse(db, "US");
-  const candles = await db.execute(sql.raw("SELECT market,code,candle_date AS date,high,low,close,volume,fetched_at FROM us_instrument_universe_candles WHERE timeframe='D' AND close IS NOT NULL ORDER BY market,code,candle_date"));
+  const candles = await db.execute(sql.raw("SELECT c.market,c.code,c.candle_date AS date,c.high,c.low,c.close,c.volume,c.fetched_at FROM us_instrument_universe_candles c JOIN us_common_stock_universe u ON u.market = c.market AND u.code = c.code WHERE c.timeframe='D' AND c.close IS NOT NULL ORDER BY c.market,c.code,c.candle_date"));
   const byInstrument = new Map<string, Candle[]>();
   for (const row of candles.rows as any[]) { const key = `${row.market}:${row.code}`; const list = byInstrument.get(key) ?? []; list.push({ date: String(row.date), updatedAt: row.fetched_at ? new Date(row.fetched_at).toISOString() : null, high: +(row.high ?? row.close), low: +(row.low ?? row.close), close: +row.close, volume: +(row.volume ?? 0) }); byInstrument.set(key, list); }
   const results: any[] = [];
