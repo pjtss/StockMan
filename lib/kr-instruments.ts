@@ -6,6 +6,9 @@ import { syncDailyActivityStatus } from "@/lib/daily-activity-status";
 
 export const KR_MARKETS = ["KOSPI", "KOSDAQ"] as const;
 export type KrInstrumentScope = { market: string; code: string; name: string };
+const STORED_SCOPE_CACHE_TTL_MS = 5 * 60_000;
+let storedScopeCache: { expiresAt: number; value: Awaited<ReturnType<typeof loadStoredKrInstrumentScopesUncached>> } | null = null;
+let storedScopeInflight: Promise<Awaited<ReturnType<typeof loadStoredKrInstrumentScopesUncached>>> | null = null;
 
 /** KRX short codes are exactly six numeric digits. Never admit US/alpha tickers. */
 function normalizeCode(code: unknown) {
@@ -17,6 +20,19 @@ export function isExcludedKrOfficialName(name: string) {
 }
 export async function loadStoredKrInstrumentScopes() {
   await syncDailyActivityStatus();
+  if (storedScopeCache && storedScopeCache.expiresAt > Date.now()) return storedScopeCache.value;
+  if (storedScopeInflight) return storedScopeInflight;
+  storedScopeInflight = loadStoredKrInstrumentScopesUncached();
+  try {
+    const value = await storedScopeInflight;
+    storedScopeCache = { value, expiresAt: Date.now() + STORED_SCOPE_CACHE_TTL_MS };
+    return value;
+  } finally {
+    storedScopeInflight = null;
+  }
+}
+
+async function loadStoredKrInstrumentScopesUncached() {
   const rows = await getDb().select({ market: krCommonStockUniverse.market, code: krCommonStockUniverse.code, name: krCommonStockUniverse.name, instrumentType: krCommonStockUniverse.instrumentType, isEtp: krCommonStockUniverse.isEtp, isWarrant: krCommonStockUniverse.isWarrant, isPreferred: krCommonStockUniverse.isPreferred, tradingHaltCode: krCommonStockUniverse.tradingHaltCode, liquidationCode: krCommonStockUniverse.liquidationCode, managedIssueCode: krCommonStockUniverse.managedIssueCode, isSuspended: krCommonStockUniverse.isSuspended }).from(krCommonStockUniverse).where(and(eq(krCommonStockUniverse.enabled, true), inArray(krCommonStockUniverse.market, [...KR_MARKETS]))).orderBy(asc(krCommonStockUniverse.market), asc(krCommonStockUniverse.code));
   // Eligibility is derived exclusively from the official KIS master fields
   // persisted on the universe row. Do not reinterpret the security type from
