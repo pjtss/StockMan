@@ -29,12 +29,14 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   // sequential to respect the upstream quota, but determine all due sets in
   // parallel so DB planning does not add latency before the first request.
   await Promise.all(timeframes.map(async (timeframe) => {
-    const stale = await getDb().execute(sql`SELECT u.market, u.code
+    const latestTable = timeframe === "D" ? "us_latest_daily_candles" : "us_instrument_universe_candles";
+    const timeframeFilter = timeframe === "D" ? "" : ` AND c.timeframe = '${timeframe}'`;
+    const stale = await getDb().execute(sql.raw(`SELECT u.market, u.code
       FROM us_common_stock_universe u
       LEFT JOIN LATERAL (
         SELECT c.fetched_at, c.candle_date
-        FROM us_instrument_universe_candles c
-        WHERE c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe}
+        FROM ${latestTable} c
+        WHERE c.market = u.market AND c.code = u.code${timeframeFilter}
         ORDER BY c.candle_date DESC, c.fetched_at DESC
         LIMIT 1
       ) latest ON true
@@ -48,7 +50,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
         AND COALESCE(u.is_inverse, false) = false
         AND (latest.fetched_at IS NULL
           OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
-          OR (${timeframe} = 'D' AND latest.candle_date < (SELECT MAX(c2.candle_date) FROM us_instrument_universe_candles c2 WHERE c2.timeframe = 'D' AND c2.volume > 0)))`);
+          OR (${timeframe === "D" ? "true" : "false"} AND latest.candle_date < (SELECT MAX(c2.candle_date) FROM us_instrument_universe_candles c2 WHERE c2.timeframe = 'D' AND c2.volume > 0)))`));
     staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
   }));
   const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryTimeframes.has(timeframe));
