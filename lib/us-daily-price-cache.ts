@@ -9,7 +9,16 @@ const MEMORY_TTL_MS = 60_000;
 const BULK_CACHE_CANDLE_LIMIT = 100;
 const bulkInflight = new Map<string, Promise<Map<string, UsDailyCandle[]>>>();
 
+function normalizeTimeframe(timeframe: string) {
+  const value = timeframe.trim().toUpperCase();
+  if (value === "1D" || value === "DAY" || value === "DAILY") return "D";
+  if (value === "1W" || value === "WEEK" || value === "WEEKLY") return "W";
+  if (value === "1M" || value === "MONTH" || value === "MONTHLY") return "M";
+  return value;
+}
+
 export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 10, timeframe = "D") {
+  timeframe = normalizeTimeframe(timeframe);
   const normalized = Array.from(new Map(items.map((item) => {
     const value = { market: item.market.trim().toUpperCase(), code: item.code.trim().toUpperCase() };
     return [`${value.market}:${value.code}`, value] as const;
@@ -81,6 +90,7 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
 }
 
 export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10, timeframe = "D"): Promise<UsDailyCandle[]> {
+  timeframe = normalizeTimeframe(timeframe);
   const cacheKey = `${market}:${code}`;
   const memory = timeframe === "D" ? memoryCache.get(cacheKey) : undefined;
   if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) return memory.candles.slice(0, limit);
@@ -93,6 +103,7 @@ export async function loadCachedUsDailyCandles(market: string, code: string, lim
 }
 
 export async function saveUsDailyCandles(market: string, code: string, candles: UsDailyCandle[], timeframe = "D") {
+  timeframe = normalizeTimeframe(timeframe);
   const db = getDb();
   if (!db || candles.length === 0) return 0;
   const periodEndDate = timeframe === "D" ? null : sql`excluded.candle_date`;
