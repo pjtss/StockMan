@@ -53,7 +53,8 @@ async function run(job: Job) {
         WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
         GROUP BY u.market, u.code
         HAVING MAX(c.fetched_at) IS NULL
-          OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')`);
+          OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
+          OR MAX(c.candle_date) < (SELECT MAX(c2.candle_date) FROM kr_instrument_universe_candles c2 WHERE c2.timeframe = ${timeframe} AND c2.volume > 0)`);
       staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
     }));
     const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);

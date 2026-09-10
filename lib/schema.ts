@@ -228,7 +228,7 @@ export const usInstrumentUniverseCandles = pgTable("us_instrument_universe_candl
 
 export const krInstrumentUniverseCandles = pgTable("kr_instrument_universe_candles", {
   id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), candleTime: timestamp("candle_time", { withTimezone: true }), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), close: doublePrecision("close"), volume: doublePrecision("volume"), rawPayload: text("raw_payload").notNull().default(""), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("kr_instrument_universe_candles_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_instrument_universe_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate)]);
+}, (table) => [uniqueIndex("kr_instrument_universe_candles_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_instrument_universe_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_instrument_universe_candles_refresh_idx").on(table.timeframe, table.fetchedAt, table.market, table.code), index("kr_instrument_universe_candles_latest_date_idx").on(table.timeframe, table.candleDate)]);
 
 export const krLatestDailyCandles = pgTable("kr_latest_daily_candles", {
   market: text("market").notNull(), code: text("code").notNull(), candleDate: text("candle_date").notNull(),
