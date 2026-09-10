@@ -57,6 +57,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         <Link aria-current={current === "market-news" ? "page" : undefined} className={current === "market-news" ? styles.navActive : styles.navLink} href="/market-news" prefetch={false}>
           해외 뉴스
         </Link>
+        <Link aria-current={current === "scanners-us" ? "page" : undefined} className={current === "scanners-us" ? styles.navActive : styles.navLink} href="/us-top-rising" prefetch={false}>
+          해외 상승률 TOP 100
+        </Link>
         <Link aria-current={current === "disclosures" ? "page" : undefined} className={current === "disclosures" ? styles.navActive : styles.navLink} href="/disclosures" prefetch={false}>
           일별 공시
         </Link>
