@@ -38,7 +38,14 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
         ORDER BY c.candle_date DESC, c.fetched_at DESC
         LIMIT 1
       ) latest ON true
-      WHERE u.instrument_type = 'COMMON_STOCK'
+      WHERE u.enabled = true
+        AND u.instrument_type = 'COMMON_STOCK'
+        AND COALESCE(u.is_etf, false) = false
+        AND COALESCE(u.is_warrant, false) = false
+        AND COALESCE(u.is_derivative, false) = false
+        AND COALESCE(u.is_dr, false) = false
+        AND COALESCE(u.is_leveraged, false) = false
+        AND COALESCE(u.is_inverse, false) = false
         AND (latest.fetched_at IS NULL
           OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
           OR (${timeframe} = 'D' AND latest.candle_date < (SELECT MAX(c2.candle_date) FROM us_instrument_universe_candles c2 WHERE c2.timeframe = 'D' AND c2.volume > 0)))`);
@@ -51,7 +58,14 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const underfilledDaily = new Set<string>();
   const underfilled = await getDb().execute(sql`SELECT u.market, u.code
     FROM us_common_stock_universe u
-    WHERE u.instrument_type = 'COMMON_STOCK'
+    WHERE u.enabled = true
+      AND u.instrument_type = 'COMMON_STOCK'
+      AND COALESCE(u.is_etf, false) = false
+      AND COALESCE(u.is_warrant, false) = false
+      AND COALESCE(u.is_derivative, false) = false
+      AND COALESCE(u.is_dr, false) = false
+      AND COALESCE(u.is_leveraged, false) = false
+      AND COALESCE(u.is_inverse, false) = false
       AND (
         NOT EXISTS (
           SELECT 1
