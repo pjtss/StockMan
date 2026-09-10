@@ -71,6 +71,7 @@ for (const [scope, config] of Object.entries(queries)) {
   };
   output.scopes[scope].plans.push(await explainRepeated(`${scope}-asof-market-latest`, `WITH instrument_daily_latest AS (SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC) SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market`, params));
   output.scopes[scope].plans.push(await explainRepeated(`${scope}-asof-instrument-latest`, `SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC`, params));
+  output.scopes[scope].plans.push(await explainRepeated(`${scope}-cache-stale-lateral`, `SELECT u.market, u.code FROM ${config.universe} u LEFT JOIN LATERAL (SELECT c.fetched_at, c.candle_date FROM ${config.candle} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe='D' ORDER BY c.candle_date DESC, c.fetched_at DESC LIMIT 1) latest ON true WHERE u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND (latest.fetched_at IS NULL OR latest.fetched_at <= NOW() - (3600000 * INTERVAL '1 millisecond'))`, [config.markets]));
   output.scopes[scope].plans.push(await explainRepeated(`${scope}-summary-latest`, `SELECT market, code, candle_date FROM ${config.summary} WHERE volume>0 AND market=ANY($1)`, [config.markets]));
 }
 console.log(JSON.stringify(output, null, 2));
