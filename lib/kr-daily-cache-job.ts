@@ -134,8 +134,12 @@ async function run(job: Job) {
     // whose candles were saved successfully. The scanners read the DB cache
     // and naturally omit the failed instruments.
     if (job.successCount > 0) {
-      (job as any).bollingerCache = await refreshDailyBollingerCaches("KR");
-      (job as any).goldenCrossCache = await refreshDailyGoldenCrossCache("KR");
+      const [bollingerCache, goldenCrossCache] = await Promise.all([
+        refreshDailyBollingerCaches("KR"),
+        refreshDailyGoldenCrossCache("KR"),
+      ]);
+      (job as any).bollingerCache = bollingerCache;
+      (job as any).goldenCrossCache = goldenCrossCache;
     } else {
       (job as any).bollingerCache = { skipped: true, reason: "daily_candle_failures", failureCount: job.failureCount };
       (job as any).goldenCrossCache = { skipped: true, reason: "daily_candle_failures", failureCount: job.failureCount };

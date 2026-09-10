@@ -132,8 +132,10 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   // Indicator follow-ups consume the daily candle cache. Weekly/monthly
   // success must not make them run when every daily request failed.
   const followupBlocked = dailySuccessCount === 0;
-  const bollingerCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyBollingerCaches("US");
-  const goldenCrossCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyGoldenCrossCache("US");
+  const skippedFollowup = { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length };
+  const [bollingerCache, goldenCrossCache] = followupBlocked
+    ? [skippedFollowup, skippedFollowup]
+    : await Promise.all([refreshDailyBollingerCaches("US"), refreshDailyGoldenCrossCache("US")]);
   return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
 }
 
