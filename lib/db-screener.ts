@@ -116,7 +116,7 @@ async function runDbScreenerUncached(
     ? "us_latest_daily_candles"
     : "kr_latest_daily_candles";
   const latestCtes = asOf
-    ? `instrument_daily_latest AS (SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${candleTable} WHERE timeframe='D' AND volume > 0 AND market=ANY($1) AND candle_date <= \$2 ORDER BY market, code, candle_date DESC), market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market)`
+    ? `instrument_daily_latest AS (SELECT u.market, u.code, latest.candle_date FROM ${universeTable} u JOIN LATERAL (SELECT c.candle_date FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe='D' AND c.volume > 0 AND c.candle_date <= \$2 ORDER BY c.candle_date DESC LIMIT 1) latest ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1)), market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market)`
     : `market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1))`;
   const candleLookups = requestedTimeframes
     .map(
