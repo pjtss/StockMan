@@ -24,8 +24,19 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
   const timeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
   const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
+  // The refresh indexes support these three bounded scans. Keep the lanes
+  // sequential to respect the upstream quota, but determine all due sets in
+  // parallel so DB planning does not add latency before the first request.
   await Promise.all(timeframes.map(async (timeframe) => {
-    const stale = await getDb().execute(sql`SELECT u.market, u.code FROM us_common_stock_universe u LEFT JOIN us_instrument_universe_candles c ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe} WHERE u.instrument_type = 'COMMON_STOCK' GROUP BY u.market, u.code HAVING MAX(c.fetched_at) IS NULL OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')`);
+    const stale = await getDb().execute(sql`SELECT u.market, u.code
+      FROM us_common_stock_universe u
+      LEFT JOIN us_instrument_universe_candles c
+        ON c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe}
+      WHERE u.instrument_type = 'COMMON_STOCK'
+      GROUP BY u.market, u.code
+      HAVING MAX(c.fetched_at) IS NULL
+        OR MAX(c.fetched_at) <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
+        OR (${timeframe} = 'D' AND MAX(c.candle_date) < (SELECT MAX(c2.candle_date) FROM us_instrument_universe_candles c2 WHERE c2.timeframe = 'D' AND c2.volume > 0))`);
     staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
   }));
   const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryRows.some((row) => row.timeframe === timeframe));
