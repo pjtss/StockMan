@@ -17,7 +17,10 @@ export async function refreshDailyBollingerCaches(market: "KR" | "US") {
   if (!isWithinSchedule(settings)) return { skipped: true, reason: "outside_schedule" };
   const scan = market === "KR" ? scanStoredKrBollingerBands : scanStoredUsBollingerBands;
   const results: Record<string, unknown> = {};
-  for (const zone of ["LOWER_OR_BELOW", "MIDDLE_TO_LOWER"] as const) {
+  await Promise.all(([
+    "LOWER_OR_BELOW",
+    "MIDDLE_TO_LOWER",
+  ] as const).map(async (zone) => {
     try {
       const scanned = await scan({ policy: { zone } } as any);
       results[zone] = await persistDailyBollingerResults(market, zone, scanned);
@@ -26,7 +29,7 @@ export async function refreshDailyBollingerCaches(market: "KR" | "US") {
       await enqueueDailyFollowupRetry(market, "BOLLINGER", message);
       results[zone] = { ok: false, error: message, retryQueued: true };
     }
-  }
+  }));
   if (Object.values(results).every((result: any) => result?.ok !== false)) await markDailyFollowupRetrySuccess(market, "BOLLINGER");
   return results;
 }
