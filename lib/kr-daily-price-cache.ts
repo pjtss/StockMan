@@ -1,5 +1,5 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { and, eq, sql } from "drizzle-orm";
+import { getDb, getPool } from "@/lib/db";
 import { krCommonStockUniverse, krInstrumentUniverseCandles } from "@/lib/schema";
 import type { OHLCVCandle } from "@/lib/kis-chart";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
@@ -7,11 +7,21 @@ import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 export type CandleTimeframe = "D" | "W" | "M";
 
 export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 100, timeframe: CandleTimeframe = "D") {
-  const db = getDb();
   const result = new Map<string, OHLCVCandle[]>();
   if (!items.length) return result;
-  const filters = items.map((item) => and(eq(krInstrumentUniverseCandles.market, item.market), eq(krInstrumentUniverseCandles.code, item.code), eq(krInstrumentUniverseCandles.timeframe, timeframe)));
-  const rows = await db.select().from(krInstrumentUniverseCandles).where(or(...filters)).orderBy(desc(krInstrumentUniverseCandles.candleDate));
+  const normalized = Array.from(new Map(items.map((item) => [`${item.market}:${item.code}`, { market: item.market, code: item.code }])).values());
+  const params: unknown[] = [];
+  const values = normalized.map((item, index) => { const marketParam = index * 2 + 1; params.push(item.market, item.code); return `($${marketParam}, $${marketParam + 1})`; }).join(",");
+  params.push(timeframe, limit);
+  const timeframeParam = params.length - 1;
+  const limitParam = params.length;
+  const rows = (await getPool().query(`SELECT v.market, v.code, c.candle_date, c.open, c.high, c.low, c.close, c.volume
+    FROM (VALUES ${values}) AS v(market, code)
+    CROSS JOIN LATERAL (SELECT candle_date, open, high, low, close, volume
+      FROM kr_instrument_universe_candles c
+      WHERE c.market = v.market AND c.code = v.code AND c.timeframe = $${timeframeParam}
+      ORDER BY c.candle_date DESC LIMIT $${limitParam}) c
+    ORDER BY v.market, v.code, c.candle_date DESC`, params)).rows;
   for (const row of rows) {
     const key = `${row.market}:${row.code}`;
     const candles = result.get(key) ?? [];

@@ -166,3 +166,20 @@ Discord 디버깅 채널에는 요약·requestId·시장·구간·오류 코드�
 - KIS 오류가 토큰 삭제 폭주나 재시도 폭주로 이어지지 않는다.
 - baseline 대비 KIS 호출량·DB round trip·조회 p95를 수치로 비교할 수 있다.
 - 테스트·타입체크·빌드와 로컬 실행이 모두 통과한 후에만 배포한다.
+
+## 11. 2026-09-10 측정 및 반영 결과
+
+`npm run measure:screener-db`를 로컬 `.env.local`의 DB에 실행했다. 측정 시점의 표본은 국내 활성 보통주 2,363개·일봉 265,448행, 해외 활성 보통주 5,316개·일봉 588,838행이다.
+
+| 조회 | 실행시간 | 비고 |
+|---|---:|---|
+| KR 기준일 시장별 최신일 | 69.617ms | EXPLAIN ANALYZE 기준 |
+| KR 기준일 종목별 최신일 | 74.310ms | EXPLAIN ANALYZE 기준 |
+| US 기준일 시장별 최신일 | 180.451ms | EXPLAIN ANALYZE 기준 |
+| US 기준일 종목별 최신일 | 242.706ms | EXPLAIN ANALYZE 기준 |
+| KR 최신 요약 테이블 | 1.871ms | 대형 봉 테이블 집계 회피 |
+| US 최신 요약 테이블 | 3.783ms | 대형 봉 테이블 집계 회피 |
+
+이번 개선에서는 `lib/kr-daily-price-cache.ts`의 bulk 조회를 종목별 `LATERAL` 조회와 `LIMIT`으로 변경했다. 기존의 종목 조건 OR + 전체 결과 정렬 방식보다 `(market, code, timeframe, candle_date)` 복합 인덱스를 직접 활용하며, 종목당 필요한 최근 봉만 반환한다. 해외 bulk 조회는 이미 동일한 `VALUES` 조인·윈도우 제한 패턴을 사용한다.
+
+검증 결과: 전체 Vitest 482개 통과, TypeScript 통과. 위 수치는 단일 실행의 관측값이므로 개선율을 확정할 때는 동일 DB 상태에서 warm/cold 각각 5회 이상 p50/p95로 재측정한다.
