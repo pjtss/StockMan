@@ -20,10 +20,11 @@ const flowState = (rows: Candle[]) => {
 
 export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = "all", limit = 30) {
   const candlesTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
+  const universeTable = market === "KR" ? "kr_common_stock_universe" : "us_common_stock_universe";
   const db = getDb();
   const eligibility = await queryEligibleUniverse(db, market);
   const scopes = { rows: eligibility.rows };
-  const candles = await db.execute(sql.raw(`SELECT market, code, timeframe, candle_date AS date, high, low, close, volume, fetched_at AS "updatedAt" FROM ${candlesTable} WHERE timeframe IN ('D','W','M') AND close IS NOT NULL ORDER BY market, code, timeframe, candle_date`));
+  const candles = await db.execute(sql.raw(`SELECT c.market, c.code, c.timeframe, c.candle_date AS date, c.high, c.low, c.close, c.volume, c.fetched_at AS "updatedAt" FROM ${candlesTable} c JOIN ${universeTable} u ON u.market = c.market AND u.code = c.code WHERE c.timeframe IN ('D','W','M') AND c.close IS NOT NULL ORDER BY c.market, c.code, c.timeframe, c.candle_date`));
   let fundamentals = new Map<string, any>();
   try {
     const rows = await db.execute(sql.raw(`SELECT market, code, price, trading_value AS "tradingValue", market_cap AS "marketCap", volume, fetched_at AS "fetchedAt" FROM instrument_fundamental_snapshots WHERE market = '${market}'`));
