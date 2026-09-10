@@ -7,6 +7,17 @@ import {
 
 const inFlightScreenerRuns = new Map<string, Promise<ScreenerResult[]>>();
 
+function screenerRequestKey(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(screenerRequestKey).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${screenerRequestKey(entry)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function ema(values: number[], period = 9) {
   if (!values.length) return [];
   const alpha = 2 / (period + 1);
@@ -284,7 +295,7 @@ async function runDbScreenerUncached(
  * same expensive latest-candle query twice.
  */
 export function runDbScreener(request: ScreenerRequest): Promise<ScreenerResult[]> {
-  const key = JSON.stringify(request);
+  const key = screenerRequestKey(request);
   const existing = inFlightScreenerRuns.get(key);
   if (existing) return existing;
   const run = runDbScreenerUncached(request).finally(() => {
