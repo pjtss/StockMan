@@ -8,6 +8,7 @@ const memoryCache = new Map<string, { expiresAt: number; candles: UsDailyCandle[
 const MEMORY_TTL_MS = 60_000;
 const BULK_CACHE_CANDLE_LIMIT = 100;
 const bulkInflight = new Map<string, Promise<Map<string, UsDailyCandle[]>>>();
+const cacheKeyFor = (market: string, code: string, timeframe: string) => `${market.trim().toUpperCase()}:${code.trim().toUpperCase()}:${normalizeTimeframe(timeframe)}`;
 
 function normalizeTimeframe(timeframe: string) {
   const value = timeframe.trim().toUpperCase();
@@ -27,7 +28,7 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
   const missing: typeof normalized = [];
   for (const item of normalized) {
     const key = `${item.market}:${item.code}`;
-    const memory = timeframe === "D" ? memoryCache.get(key) : undefined;
+    const memory = timeframe === "D" ? memoryCache.get(cacheKeyFor(item.market, item.code, timeframe)) : undefined;
     if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) result.set(key, memory.candles.slice(0, limit));
     else missing.push(item);
   }
@@ -84,15 +85,15 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
     const key = `${item.market}:${item.code}`;
     const candles = grouped.get(key) ?? [];
     result.set(key, candles.slice(0, limit));
-    memoryCache.set(key, { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
+    memoryCache.set(cacheKeyFor(item.market, item.code, timeframe), { expiresAt: Date.now() + MEMORY_TTL_MS, candles });
   }
   return result;
 }
 
 export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10, timeframe = "D"): Promise<UsDailyCandle[]> {
   timeframe = normalizeTimeframe(timeframe);
-  const cacheKey = `${market}:${code}`;
-  const memory = timeframe === "D" ? memoryCache.get(cacheKey) : undefined;
+  const cacheKey = cacheKeyFor(market, code, timeframe);
+  const memory = memoryCache.get(cacheKey);
   if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) return memory.candles.slice(0, limit);
   const db = getDb();
   if (!db) return [];
@@ -110,7 +111,7 @@ export async function saveUsDailyCandles(market: string, code: string, candles: 
   await db.insert(usInstrumentUniverseCandles).values(candles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, periodEndDate: timeframe === "D" ? null : candle.date, candleTime: null, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, priceSign: candle.priceSign ?? null, priceDiff: candle.priceDiff ?? null, changeRate: candle.changeRate ?? null, tradingValue: candle.tradingValue ?? null, rawPayload: JSON.stringify(candle.raw ?? {}), source: "KIS" }))).onConflictDoUpdate({ target: [usInstrumentUniverseCandles.market, usInstrumentUniverseCandles.code, usInstrumentUniverseCandles.timeframe, usInstrumentUniverseCandles.candleDate], set: { periodEndDate, open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, priceSign: sql`excluded.price_sign`, priceDiff: sql`excluded.price_diff`, changeRate: sql`excluded.change_rate`, tradingValue: sql`excluded.trading_value`, rawPayload: sql`excluded.raw_payload`, source: sql`excluded.source`, fetchedAt: new Date() } });
   const latest = [...candles].filter((c) => Number(c.volume ?? 0) > 0 && Number.isFinite(c.close)).sort((a, b) => b.date.localeCompare(a.date))[0];
   if (timeframe === "D" && latest) await db.execute(sql`INSERT INTO us_latest_daily_candles (market, code, candle_date, open, high, low, close, volume, fetched_at) VALUES (${market}, ${code}, ${latest.date}, ${latest.open}, ${latest.high}, ${latest.low}, ${latest.close}, ${latest.volume}, NOW()) ON CONFLICT (market, code) DO UPDATE SET candle_date=excluded.candle_date, open=excluded.open, high=excluded.high, low=excluded.low, close=excluded.close, volume=excluded.volume, fetched_at=excluded.fetched_at WHERE us_latest_daily_candles.candle_date <= excluded.candle_date`);
-  memoryCache.delete(`${market}:${code}`);
+  memoryCache.delete(cacheKeyFor(market, code, timeframe));
   return candles.length;
 }
 
