@@ -17,7 +17,14 @@ const ETF_NAME_HINT = /\b(?:ISHARES|VISTASHARES|ROUNDHILL|KRANESHARES|KFA|SPDR|V
 // security type 2 (stock). The official master name remains the authoritative
 // product descriptor for these cases, so exclude them from common-stock scans.
 export const EXCLUDED_US_OFFICIAL_NAME = /(?:preferred|\bpfd\b|\b(?:senior\s+)?notes?\b|\bnts\b|\bbonds?\b|\bunits?\b|\bwarrants?\b|\bright\b|\bdebentures?\b|우선주|채권|워런트)/i;
-function rows(parsed: any) { const output = parsed?.output ?? parsed?.output2 ?? parsed?.output1; return Array.isArray(output) ? output.slice(0, 100) : []; }
+// KIS ranking responses commonly contain metadata in output1 and the actual
+// rows in output2. Never prefer output1 merely because it exists: it is an
+// object for successful responses and would otherwise hide output2 entirely.
+function rows(parsed: any) {
+  const candidates = [parsed?.output, parsed?.output2, parsed?.output1];
+  const output = candidates.find((value) => Array.isArray(value));
+  return Array.isArray(output) ? output.slice(0, 100) : [];
+}
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
 export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null };
@@ -136,5 +143,6 @@ async function loadUsTopRisingScopesUncached() {
   }
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
-  return { scopes: filteredScopes, universe: { ok: filteredScopes.length > 0, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" } } } };
+  const hasSuccessfulResponse = markets.some((market) => market.status === 200 && (market as any).kis?.rtCd === "0");
+  return { scopes: filteredScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, emptyResponse: "normal_successful_response_is_not_transport_error" } } };
 }
