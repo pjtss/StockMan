@@ -14,6 +14,8 @@ describe("screener request validation", () => {
   it("rejects malformed ranking and EMA conditions", () => {
     expect(validateScreenerRequest({ ranking: [{ field: "D.rvol", direction: "SIDEWAYS" }] })).toBe("INVALID_RANKING");
     expect(validateScreenerRequest({ ema9Conditions: { Q: "ABOVE" } })).toBe("INVALID_EMA9_CONDITIONS");
+    expect(validateScreenerRequest({ emaPositionConditions: { EMA20: "ABOVE" } })).toBeNull();
+    expect(validateScreenerRequest({ filters: [{ field: "D.internal", operator: "=", value: true }] })).toBe("INVALID_FILTERS");
   });
 
   it("validates the optional as-of date", () => {

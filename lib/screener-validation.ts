@@ -2,7 +2,8 @@ const operators = new Set(["=", "!=", ">", ">=", "<", "<="]);
 const metricFields = new Set([
   "marketCap",
   ...["D", "W", "M"].flatMap((tf) => [
-    `${tf}.close`, `${tf}.high`, `${tf}.low`, `${tf}.volume`, `${tf}.rvol`,
+    `${tf}.close`, `${tf}.high`, `${tf}.low`, `${tf}.volume`, `${tf}.rvol`, `${tf}.changePct`,
+    `${tf}.closeVsEma20`, `${tf}.closeVsEma60`,
     `${tf}.emaGoldenCross`, `${tf}.bb.upper`, `${tf}.bb.middle`, `${tf}.bb.lower`,
     `${tf}.bb.width`, `${tf}.bb.lowerTouch`, `${tf}.bb.lowerBreak`,
     `${tf}.obv.signalTrend`, `${tf}.adl.signalTrend`,
@@ -31,7 +32,7 @@ export function validateScreenerRequest(body: unknown): string | null {
     const item = filter as Record<string, unknown>;
     if (typeof item.field !== "string" || !operators.has(String(item.operator)) || (typeof item.value !== "string" && typeof item.value !== "number" && typeof item.value !== "boolean")) return true;
     if (!isMetricField(item.field)) return true;
-    const numericField = item.field === "marketCap" || /\.(close|high|low|volume|rvol|bb\.(upper|middle|lower|width))$/.test(item.field);
+    const numericField = item.field === "marketCap" || /\.(close|high|low|volume|rvol|changePct|bb\.(upper|middle|lower|width))$/.test(item.field);
     if (!numericField) return false;
     if (typeof item.value === "number") return !Number.isFinite(item.value) || item.value < 0;
     return typeof item.value !== "string" || !/^[DWM]\.bb\.(upper|middle|lower)$/.test(item.value);
@@ -42,5 +43,6 @@ export function validateScreenerRequest(body: unknown): string | null {
     return typeof item.field !== "string" || !isMetricField(item.field) || !["ASC", "DESC"].includes(String(item.direction));
   }))) return "INVALID_RANKING";
   if (value.ema9Conditions != null && (!value.ema9Conditions || typeof value.ema9Conditions !== "object" || Object.entries(value.ema9Conditions as Record<string, unknown>).some(([timeframe, condition]) => !["D", "W", "M"].includes(timeframe) || !["ANY", "ABOVE", "NOT_ABOVE"].includes(String(condition))))) return "INVALID_EMA9_CONDITIONS";
+  if (value.emaPositionConditions != null && (!value.emaPositionConditions || typeof value.emaPositionConditions !== "object" || Object.entries(value.emaPositionConditions as Record<string, unknown>).some(([period, condition]) => !["EMA20", "EMA60"].includes(period) || !["ANY", "ABOVE", "NOT_ABOVE"].includes(String(condition))))) return "INVALID_EMA_POSITION_CONDITIONS";
   return null;
 }

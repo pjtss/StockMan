@@ -3,9 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDisplayAmount } from "@/lib/display-number";
 import { ChartModal } from "@/components/chart-modal";
+import { AccumulationDetails, AccumulationSummary } from "@/components/accumulation-details";
+import type { AccumulationReport } from "@/lib/accumulation-scan";
 import styles from "./ticker-chart-workbench.module.css";
+import accumulationStyles from "./accumulation-details.module.css";
 
 type ScanSort =
+  | "scoreDesc"
+  | "scoreAsc"
   | "marketCapDesc"
   | "marketCapAsc"
   | "rvolDesc"
@@ -29,6 +34,8 @@ function compareNullableNumber(a: unknown, b: unknown, direction: 1 | -1) {
 function compareScanRows(a: any, b: any, sort: ScanSort, rvolKey: string) {
   let result = 0;
   switch (sort) {
+    case "scoreDesc": result = compareNullableNumber(b.score, a.score, 1); break;
+    case "scoreAsc": result = compareNullableNumber(a.score, b.score, 1); break;
     case "marketCapDesc": result = compareNullableNumber(b.marketCap, a.marketCap, 1); break;
     case "marketCapAsc": result = compareNullableNumber(a.marketCap, b.marketCap, 1); break;
     case "rvolDesc": result = compareNullableNumber(b.metrics?.[rvolKey], a.metrics?.[rvolKey], 1); break;
@@ -147,8 +154,12 @@ export function TickerChartWorkbench() {
   const [maxCap, setMaxCap] = useState("");
   const [minRvol, setMinRvol] = useState("0");
   const [maxRvol, setMaxRvol] = useState("");
+  const [minVolume, setMinVolume] = useState("");
+  const [maxVolume, setMaxVolume] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [minChangePct, setMinChangePct] = useState("");
+  const [maxChangePct, setMaxChangePct] = useState("");
   const [bbPosition, setBbPosition] = useState<
     "LOWER_TOUCH" | "BELOW_MIDDLE" | "ANY"
   >("LOWER_TOUCH");
@@ -159,6 +170,10 @@ export function TickerChartWorkbench() {
   const [scanTimeframe, setScanTimeframe] = useState<"D" | "W" | "M">("D");
   const [scanAsOf, setScanAsOf] = useState("");
   const [scanExchanges, setScanExchanges] = useState<string[]>([]);
+  const [emaPositionConditions, setEmaPositionConditions] = useState<Record<"EMA20" | "EMA60", "ANY" | "ABOVE" | "NOT_ABOVE">>({ EMA20: "ANY", EMA60: "ANY" });
+  const [scanRanking, setScanRanking] = useState<"marketCap" | "rvol" | "close" | "volume">("marketCap");
+  const [scanRankingDirection, setScanRankingDirection] = useState<"ASC" | "DESC">("DESC");
+  const [scanLimit, setScanLimit] = useState("100");
   const [ema9Conditions, setEma9Conditions] = useState<
     Record<"D" | "W" | "M", "ANY" | "ABOVE" | "NOT_ABOVE">
   >({ D: "ANY", W: "ANY", M: "ANY" });
@@ -167,6 +182,8 @@ export function TickerChartWorkbench() {
   const [scanSort, setScanSort] = useState<ScanSort>("marketCapDesc");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [accumulationLoading, setAccumulationLoading] = useState(false);
+  const [accumulationReport, setAccumulationReport] = useState<AccumulationReport | null>(null);
   const capUnit = market === "KR" ? "억원" : "달러";
   const capMultiplier = market === "KR" ? 100000000 : 1;
   const tickers = useMemo(
@@ -221,6 +238,7 @@ export function TickerChartWorkbench() {
     setMaxCap("");
     setScanRows([]);
     setScanCompleted(false);
+    setAccumulationReport(null);
     setScanError(null);
     setScanExchanges([]);
   }, [market]);
@@ -229,6 +247,7 @@ export function TickerChartWorkbench() {
   useEffect(() => {
     setScanRows([]);
     setScanCompleted(false);
+    setAccumulationReport(null);
   }, [input]);
 
   // 검색 조건이 바뀌면 재실행 전까지 이전 결과를 표시하지 않는다.
@@ -236,28 +255,33 @@ export function TickerChartWorkbench() {
     setScanRows([]);
     setScanCompleted(false);
   }, [
-    market, scanTimeframe, scanAsOf, scanLogic, scanExchanges, minCap, maxCap, minRvol, maxRvol, minPrice, maxPrice,
-    bbPosition, obvTrend, adlTrend, goldenCross, ema9Conditions,
+    market, scanTimeframe, scanAsOf, scanLogic, scanExchanges, scanRanking, scanRankingDirection, scanLimit, minCap, maxCap, minRvol, maxRvol, minVolume, maxVolume, minPrice, maxPrice, minChangePct, maxChangePct,
+    bbPosition, obvTrend, adlTrend, goldenCross, ema9Conditions, emaPositionConditions,
   ]);
 
   async function runScan() {
+    setAccumulationReport(null);
     setScanCompleted(false);
     setScanLoading(true);
     setScanError(null);
     setScanCompleted(false);
+    let scanTimeout: number | undefined;
     try {
       const numericFields = [
         ["최소 시총", minCap], ["최대 시총", maxCap], ["최소 RVOL", minRvol],
-        ["최대 RVOL", maxRvol], ["최저 종가", minPrice], ["최고 종가", maxPrice],
+        ["최대 RVOL", maxRvol], ["최소 거래량", minVolume], ["최대 거래량", maxVolume], ["최저 종가", minPrice], ["최고 종가", maxPrice], ["최소 등락률", minChangePct], ["최대 등락률", maxChangePct],
       ] as const;
       for (const [label, value] of numericFields) {
-        if (value.trim() !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
-          throw new Error(`${label} 조건은 0 이상의 숫자로 입력하세요.`);
+        if (value.trim() !== "" && (!Number.isFinite(Number(value)) || (!label.includes("등락률") && Number(value) < 0))) {
+          throw new Error(`${label} 조건에 올바른 숫자를 입력하세요.`);
         }
       }
+      if (!/^[1-9]\d*$/.test(scanLimit) || Number(scanLimit) > 1000) throw new Error("결과 개수는 1~1000 사이의 정수로 입력하세요.");
       if (Number(maxCap) > 0 && Number(minCap) > 0 && Number(maxCap) < Number(minCap)) throw new Error("최대 시총은 최소 시총보다 작을 수 없습니다.");
       if (Number(maxRvol) > 0 && Number(minRvol) > 0 && Number(maxRvol) < Number(minRvol)) throw new Error("최대 RVOL은 최소 RVOL보다 작을 수 없습니다.");
+      if (Number(maxVolume) > 0 && Number(minVolume) > 0 && Number(maxVolume) < Number(minVolume)) throw new Error("최대 거래량은 최소 거래량보다 작을 수 없습니다.");
       if (Number(maxPrice) > 0 && Number(minPrice) > 0 && Number(maxPrice) < Number(minPrice)) throw new Error("최고 종가는 최저 종가보다 작을 수 없습니다.");
+      if (minChangePct.trim() !== "" && maxChangePct.trim() !== "" && Number(maxChangePct) < Number(minChangePct)) throw new Error("최대 등락률은 최소 등락률보다 작을 수 없습니다.");
       const prefix = scanTimeframe;
       const filters: any[] = [];
       if (Number(minCap) > 0)
@@ -284,6 +308,18 @@ export function TickerChartWorkbench() {
           operator: "<=",
           value: Number(maxRvol),
         });
+      if (Number(minVolume) > 0)
+        filters.push({
+          field: `${prefix}.volume`,
+          operator: ">=",
+          value: Number(minVolume),
+        });
+      if (Number(maxVolume) > 0)
+        filters.push({
+          field: `${prefix}.volume`,
+          operator: "<=",
+          value: Number(maxVolume),
+        });
       if (Number(minPrice) > 0)
         filters.push({
           field: `${prefix}.close`,
@@ -296,6 +332,8 @@ export function TickerChartWorkbench() {
           operator: "<=",
           value: Number(maxPrice),
         });
+      if (minChangePct.trim() !== "") filters.push({ field: `${prefix}.changePct`, operator: ">=", value: Number(minChangePct) });
+      if (maxChangePct.trim() !== "") filters.push({ field: `${prefix}.changePct`, operator: "<=", value: Number(maxChangePct) });
       if (bbPosition === "LOWER_TOUCH")
         filters.push({
           field: `${prefix}.bb.lowerTouch`,
@@ -326,21 +364,25 @@ export function TickerChartWorkbench() {
           operator: "=",
           value: true,
         });
+      const controller = new AbortController();
+      scanTimeout = window.setTimeout(() => controller.abort(), 45_000);
       const response = await fetch("/api/screener/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           market,
           timeframe: scanTimeframe,
           asOf: scanAsOf || "LATEST",
           logic: scanLogic,
           ...(scanExchanges.length ? { exchange: scanExchanges } : {}),
+          emaPositionConditions,
           instrumentType: "COMMON_STOCK",
           status: "ACTIVE",
           filters,
-          ranking: [{ field: `${prefix}.rvol`, direction: "DESC" }],
+          ranking: [{ field: scanRanking === "marketCap" ? "marketCap" : `${prefix}.${scanRanking}`, direction: scanRankingDirection }],
           ema9Conditions,
-          limit: 100,
+          limit: Number(scanLimit),
         }),
       });
       const json = await readJsonResponse(response);
@@ -348,16 +390,40 @@ export function TickerChartWorkbench() {
       setScanRows(json.results ?? []);
       setScanCompleted(true);
     } catch (error) {
-      setScanError(error instanceof Error ? error.message : "추출 실패");
+      setScanError(error instanceof DOMException && error.name === "AbortError"
+        ? "추출 시간이 초과되었습니다. 조건을 좁혀 다시 시도하세요."
+        : error instanceof Error ? error.message : "추출 실패");
     } finally {
+      if (scanTimeout !== undefined) window.clearTimeout(scanTimeout);
       setScanLoading(false);
     }
   }
 
+  async function runAccumulationScan() {
+    setAccumulationLoading(true);
+    setScanCompleted(false);
+    setAccumulationReport(null);
+    setScanError(null);
+    try {
+      const response = await fetch(`/api/scan/${market.toLowerCase()}-accumulation?limit=100`);
+      const json = (await readJsonResponse(response)) as AccumulationReport & { error?: unknown; results?: any[] };
+      if (!response.ok || !json.ok) throw new Error(String(json.error ?? "매집 의심 종목 추출 실패"));
+      setScanRows(json.results ?? []);
+      setScanCompleted(true);
+      setAccumulationReport(json);
+      setScanTimeframe("D");
+      setScanSort("scoreDesc");
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : "매집 의심 종목 추출 실패");
+    } finally {
+      setAccumulationLoading(false);
+    }
+  }
+
   function resetScanConditions() {
-    setScanTimeframe("D"); setScanAsOf(""); setScanLogic("AND"); setScanExchanges([]); setEma9Conditions({ D: "ANY", W: "ANY", M: "ANY" });
-    setMinCap(market === "KR" ? "300" : "100000000"); setMaxCap(""); setMinRvol("0"); setMaxRvol("");
-    setMinPrice(""); setMaxPrice(""); setBbPosition("ANY"); setObvTrend("ANY"); setAdlTrend("ANY"); setGoldenCross("ANY");
+    setScanTimeframe("D"); setScanAsOf(""); setScanLogic("AND"); setScanExchanges([]); setScanRanking("marketCap"); setScanRankingDirection("DESC"); setScanLimit("100"); setEma9Conditions({ D: "ANY", W: "ANY", M: "ANY" }); setEmaPositionConditions({ EMA20: "ANY", EMA60: "ANY" });
+    setMinCap(market === "KR" ? "300" : "100000000"); setMaxCap(""); setMinRvol("0"); setMaxRvol(""); setMinVolume(""); setMaxVolume("");
+    setMinPrice(""); setMaxPrice(""); setMinChangePct(""); setMaxChangePct(""); setBbPosition("ANY"); setObvTrend("ANY"); setAdlTrend("ANY"); setGoldenCross("ANY");
     setScanError(null); setScanRows([]); setScanCompleted(false);
   }
 
@@ -449,6 +515,42 @@ export function TickerChartWorkbench() {
                 </label>
               ))}
             </fieldset>
+            <label>
+              <span>서버 정렬 기준</span>
+              <select value={scanRanking} onChange={(e) => setScanRanking(e.target.value as typeof scanRanking)}>
+                <option value="marketCap">시가총액</option>
+                <option value="rvol">RVOL</option>
+                <option value="close">종가</option>
+                <option value="volume">거래량</option>
+              </select>
+            </label>
+            <label>
+              <span>정렬 방향</span>
+              <select value={scanRankingDirection} onChange={(e) => setScanRankingDirection(e.target.value as "ASC" | "DESC")}>
+                <option value="DESC">내림차순</option>
+                <option value="ASC">오름차순</option>
+              </select>
+            </label>
+            <label>
+              <span>결과 개수</span>
+              <input inputMode="numeric" value={scanLimit} onChange={(e) => setScanLimit(e.target.value)} />
+            </label>
+            <fieldset className={styles.ema9Fieldset}>
+              <legend>중·장기 EMA 위치</legend>
+              {(["EMA20", "EMA60"] as const).map((period) => (
+                <label key={period}>
+                  <span>{period}</span>
+                  <select
+                    value={emaPositionConditions[period]}
+                    onChange={(e) => setEmaPositionConditions((current) => ({ ...current, [period]: e.target.value as "ANY" | "ABOVE" | "NOT_ABOVE" }))}
+                  >
+                    <option value="ANY">제한 없음</option>
+                    <option value="ABOVE">종가가 위</option>
+                    <option value="NOT_ABOVE">종가가 아래</option>
+                  </select>
+                </label>
+              ))}
+            </fieldset>
             <fieldset className={styles.ema9Fieldset}>
               <legend>EMA9 위치 조건</legend>
               {(
@@ -524,6 +626,20 @@ export function TickerChartWorkbench() {
             </label>
             <label>
               <span>
+                최소 거래량
+                <HelpMark text="선택한 기준 봉의 거래량이 이 값 이상인 종목만 조회합니다." />
+              </span>
+              <input inputMode="numeric" value={minVolume} onChange={(e) => setMinVolume(e.target.value)} />
+            </label>
+            <label>
+              <span>
+                최대 거래량
+                <HelpMark text="선택한 기준 봉의 거래량이 이 값 이하인 종목만 조회합니다. 비워 두면 상한이 없습니다." />
+              </span>
+              <input inputMode="numeric" value={maxVolume} onChange={(e) => setMaxVolume(e.target.value)} />
+            </label>
+            <label>
+              <span>
                 최저 종가
                 <HelpMark text="선택한 기준 봉의 종가가 이 값 이상인 종목만 조회합니다." />
               </span>
@@ -541,6 +657,14 @@ export function TickerChartWorkbench() {
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
               />
+            </label>
+            <label>
+              <span>최소 등락률(%)</span>
+              <input inputMode="decimal" value={minChangePct} onChange={(e) => setMinChangePct(e.target.value)} />
+            </label>
+            <label>
+              <span>최대 등락률(%)</span>
+              <input inputMode="decimal" value={maxChangePct} onChange={(e) => setMaxChangePct(e.target.value)} />
             </label>
             <label>
               <span>
@@ -607,7 +731,10 @@ export function TickerChartWorkbench() {
                 <option value="FALLING">하락세</option>
               </select>
             </label>
-            <button type="button" onClick={runScan} disabled={scanLoading}>
+            <button type="button" onClick={runAccumulationScan} disabled={scanLoading || accumulationLoading}>
+              {accumulationLoading ? "매집 후보 추출 중…" : "매집 의심 종목 추출"}
+            </button>
+            <button type="button" onClick={runScan} disabled={scanLoading || accumulationLoading}>
               {scanLoading ? "추출 중…" : "종목 추출"}
             </button>
             <button type="button" onClick={resetScanConditions} disabled={scanLoading}>조건 초기화</button>
@@ -619,21 +746,23 @@ export function TickerChartWorkbench() {
         <section className={styles.results}>
           <div className={styles.resultHeader}>
             <div>
-              <h2>조건 추출 결과</h2>
+              <h2>{accumulationReport ? "매집 의심 종목 결과" : "조건 추출 결과"}</h2>
               <span>{scanRows.length}개</span>
             </div>
             {scanRows.length > 0 && (
               <label className={styles.sortControl}>
                 정렬
-                <select
+                  <select
                   value={scanSort}
                   onChange={(e) =>
                     setScanSort(
                       e.target.value as ScanSort,
                     )
                   }
-                >
-                  <option value="marketCapDesc">시총 큰 순</option>
+                  >
+                    {accumulationReport && <option value="scoreDesc">매집 점수 높은 순</option>}
+                    {accumulationReport && <option value="scoreAsc">매집 점수 낮은 순</option>}
+                    <option value="marketCapDesc">시총 큰 순</option>
                   <option value="marketCapAsc">시총 작은 순</option>
                   <option value="rvolDesc">RVOL 높은 순</option>
                   <option value="rvolAsc">RVOL 낮은 순</option>
@@ -647,18 +776,19 @@ export function TickerChartWorkbench() {
               </label>
             )}
           </div>
-          {scanRows.length === 0 ? (
+            {accumulationReport && <AccumulationSummary report={accumulationReport} />}
+            {scanRows.length === 0 ? (
             <p className={styles.empty}>
               현재 조건과 캐시 기준을 모두 만족하는 종목이 없습니다.
             </p>
           ) : (
-            <div className={styles.grid}>
+            <div className={`${styles.grid} ${accumulationReport ? accumulationStyles.grid : ""}`}>
               {[...scanRows]
                 .sort((a, b) => compareScanRows(a, b, scanSort, `${scanTimeframe}.rvol`))
                 .map((row) => (
                   <article
                     key={`${row.market}:${row.code}`}
-                    className={styles.card}
+                    className={`${styles.card} ${accumulationReport ? accumulationStyles.card : ""}`}
                   >
                     <div>
                       <strong>{row.name}</strong>
@@ -673,13 +803,14 @@ export function TickerChartWorkbench() {
                                 : "USD",
                             )}{" "}
                         · RVOL{" "}
-                        {row.metrics?.[`${scanTimeframe}.rvol`] == null
+                        {row.metrics?.[`${accumulationReport ? "D" : scanTimeframe}.rvol`] == null
                           ? "-"
                           : Number(
-                              row.metrics[`${scanTimeframe}.rvol`],
+                              row.metrics[`${accumulationReport ? "D" : scanTimeframe}.rvol`],
                             ).toFixed(2)}
                       </small>
-                    </div>
+                      </div>
+                    {accumulationReport && <AccumulationDetails row={row} />}
                     <button
                       type="button"
                       onClick={() => {

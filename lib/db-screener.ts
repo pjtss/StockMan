@@ -16,7 +16,8 @@ function ema(values: number[], period = 9) {
   }, []);
 }
 
-function flowSeries(candles: any[]) {
+function flowSeries(candles: any[], enabled: boolean) {
+  if (!enabled) return { obvSignalTrend: null, adlSignalTrend: null };
   let obv = 0;
   let adl = 0;
   const obvs: number[] = [];
@@ -66,18 +67,37 @@ export async function runDbScreener(
   const pool = getPool();
   const isUs = request.market === "US";
   const timeframe = request.timeframe ?? "D";
-  const markets = isUs ? ["NAS", "NYS", "AMS"] : ["KOSPI", "KOSDAQ"];
+  const allMarkets = isUs ? ["NAS", "NYS", "AMS"] : ["KOSPI", "KOSDAQ"];
+  const markets = request.exchange?.length
+    ? allMarkets.filter((market) => request.exchange!.includes(market))
+    : allMarkets;
+  if (markets.length === 0) return [];
   const universeTable = isUs
     ? "us_common_stock_universe"
     : "kr_common_stock_universe";
   const candleTable = isUs
     ? "us_instrument_universe_candles"
     : "kr_instrument_universe_candles";
-  const multiEma9 = Object.values(request.ema9Conditions ?? {}).some(
-    (value) => value && value !== "ANY",
-  );
-  const requestedTimeframes = multiEma9 ? ["D", "W", "M"] : [timeframe];
+  const requestedTimeframes = [
+    timeframe,
+    ...Object.entries(request.ema9Conditions ?? {})
+      .filter(([, value]) => value && value !== "ANY")
+      .map(([tf]) => tf),
+  ].filter((value, index, values) => values.indexOf(value) === index);
   const asOf = request.asOf && request.asOf !== "LATEST" ? request.asOf : null;
+  const marketCapFilters = request.logic === "OR"
+    ? []
+    : (request.filters ?? []).filter((filter) => filter.field === "marketCap");
+  const minMarketCap = marketCapFilters
+    .filter((filter) => filter.operator === ">=" || filter.operator === ">")
+    .map((filter) => Number(filter.value))
+    .filter(Number.isFinite)
+    .sort((a, b) => b - a)[0] ?? null;
+  const maxMarketCap = marketCapFilters
+    .filter((filter) => filter.operator === "<=" || filter.operator === "<")
+    .map((filter) => Number(filter.value))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)[0] ?? null;
   const latestSummaryTable = isUs
     ? "us_latest_daily_candles"
     : "kr_latest_daily_candles";
@@ -93,13 +113,13 @@ export async function runDbScreener(
           AND c${index}.volume > 0
           AND ($2::date IS NULL OR c${index}.candle_date::date <= $2::date)
         ORDER BY c${index}.candle_date DESC
-        LIMIT 120`,
+        LIMIT 65`,
     )
     .join(" UNION ALL ");
   const rows = (
     await pool.query(
-      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($2::date IS NULL OR f.observed_at < ($2::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (${candleLookups}) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) ORDER BY u.market,u.code,c.timeframe,c.candle_date ASC`,
-      [markets, asOf],
+      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.shares_outstanding,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($2::date IS NULL OR f.observed_at < ($2::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (${candleLookups}) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($3::numeric IS NULL OR f.market_cap >= $3) AND ($4::numeric IS NULL OR f.market_cap <= $4)`,
+      [markets, asOf, minMarketCap, maxMarketCap],
     )
   ).rows;
   const groups = new Map<string, any>();
@@ -113,7 +133,16 @@ export async function runDbScreener(
     group.byTimeframe.set(row.timeframe ?? timeframe, bucket);
     if ((row.timeframe ?? timeframe) === timeframe) group.candles.push(row);
   }
+  for (const group of groups.values()) {
+    group.candles.sort((a: any, b: any) => String(a.candle_date).localeCompare(String(b.candle_date)));
+    for (const candles of group.byTimeframe.values()) {
+      candles.sort((a: any, b: any) => String(a.candle_date).localeCompare(String(b.candle_date)));
+    }
+  }
   const results: ScreenerResult[] = [];
+  const requestedMetricFields = new Set((request.filters ?? []).map((filter) => filter.field));
+  const needsFlow = requestedMetricFields.has(`${timeframe}.obv.signalTrend`)
+    || requestedMetricFields.has(`${timeframe}.adl.signalTrend`);
   for (const item of groups.values()) {
     if (request.exchange?.length && !request.exchange.includes(item.market))
       continue;
@@ -137,13 +166,21 @@ export async function runDbScreener(
     const prefix = timeframe;
     const e9 = ema(closes, 9),
       e20 = ema(closes, 20),
+      e60 = ema(closes, 60),
       golden =
         e9.length > 1 && e9.at(-2)! <= e20.at(-2)! && e9.at(-1)! > e20.at(-1)!;
-    const flow = flowSeries(c);
+    const flow = flowSeries(c, needsFlow);
     const metrics: any = {
       marketCap: item.market_cap == null ? null : Number(item.market_cap),
       [`${prefix}.close`]: Number(last.close),
+      [`${prefix}.changePct`]: prev && Number(prev.close) !== 0
+        ? ((Number(last.close) - Number(prev.close)) / Number(prev.close)) * 100
+        : null,
       [`${prefix}.ema9`]: e9.at(-1) ?? null,
+      [`${prefix}.ema20`]: e20.at(-1) ?? null,
+      [`${prefix}.ema60`]: e60.at(-1) ?? null,
+      [`${prefix}.closeVsEma20`]: e20.length && Number(last.close) >= e20.at(-1)! ? "ABOVE" : "NOT_ABOVE",
+      [`${prefix}.closeVsEma60`]: e60.length && Number(last.close) >= e60.at(-1)! ? "ABOVE" : "NOT_ABOVE",
       [`${prefix}.emaGoldenCross`]: golden,
       [`${prefix}.high`]: Number(last.high),
       [`${prefix}.low`]: Number(last.low),
@@ -176,8 +213,15 @@ export async function runDbScreener(
         target: condition,
       };
     });
+    const positionResults = Object.entries(request.emaPositionConditions ?? {}).filter(
+      ([, condition]) => condition && condition !== "ANY",
+    ).map(([period, condition]) => {
+      const field = `${prefix}.closeVs${period}`;
+      const actual = metrics[field];
+      return { field, passed: actual === condition, actual, target: condition };
+    });
     const evaluation = evaluateScreenerFilters(metrics, request);
-    const allConditions = [...evaluation.conditions, ...emaResults];
+    const allConditions = [...evaluation.conditions, ...emaResults, ...positionResults];
     const matched = allConditions.length === 0
       ? true
       : request.logic === "OR"
@@ -203,6 +247,9 @@ export async function runDbScreener(
       failureReasons: [
         ...evaluation.failureReasons,
         ...emaResults
+          .filter((condition) => !condition.passed)
+          .map((condition) => `${condition.field} ${condition.target}`),
+        ...positionResults
           .filter((condition) => !condition.passed)
           .map((condition) => `${condition.field} ${condition.target}`),
       ],

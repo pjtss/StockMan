@@ -19,6 +19,7 @@ export type ScreenerRequest = {
   ranking?: { field: string; direction: "ASC" | "DESC" }[];
   limit?: number;
   ema9Conditions?: Partial<Record<Timeframe, Ema9Condition>>;
+  emaPositionConditions?: Partial<Record<"EMA20" | "EMA60", Ema9Condition>>;
 };
 export type ScreenerResult = {
   market: string;
