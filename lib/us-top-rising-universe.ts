@@ -112,6 +112,7 @@ export async function loadUsTopRisingScopes() {
 }
 
 async function loadUsTopRisingScopesUncached() {
+  const seen = new Set<string>();
   const loadMarket = async (market: typeof US_EXCHANGES[number]) => {
     const selected: UsTopRisingScope[] = [];
     let response = await fetchKisUsTopRisingApi({ excd: market });
@@ -136,7 +137,7 @@ async function loadUsTopRisingScopesUncached() {
     return { selected, market: { market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: selected.length, productExcluded, fallbackUsed, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange; verify market hours and KIS ranking availability" : undefined } };
   };
   const marketResults = await Promise.all(US_EXCHANGES.map(loadMarket));
-  const scopes: UsTopRisingScope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
+  const scopes: UsTopRisingScope[] = []; const markets: Record<string, unknown>[] = [];
   for (const result of marketResults) { markets.push(result.market); for (const scope of result.selected) { const key = `${scope.market}:${scope.code}`; if (!seen.has(key)) { seen.add(key); scopes.push(scope); } } }
   const settings = await loadUsTurnoverFilterSettings();
   if (settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0) {
