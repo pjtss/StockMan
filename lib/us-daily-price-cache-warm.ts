@@ -22,6 +22,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
   const retryRows = await loadDueCandleCacheRetries();
   const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
+  const retryTimeframes = new Set(retryRows.map((row) => row.timeframe));
   const timeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
   const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
   // The refresh indexes support these three bounded scans. Keep the lanes
@@ -39,7 +40,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
         OR (${timeframe} = 'D' AND MAX(c.candle_date) < (SELECT MAX(c2.candle_date) FROM us_instrument_universe_candles c2 WHERE c2.timeframe = 'D' AND c2.volume > 0))`);
     staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
   }));
-  const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryRows.some((row) => row.timeframe === timeframe));
+  const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryTimeframes.has(timeframe));
   // A global MAX(fetched_at) cannot prove that every ticker has enough
   // history. Backfill only symbols whose daily cache is below the scanner's
   // minimum history, even when the normal daily timeframe is not due yet.
