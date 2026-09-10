@@ -35,10 +35,10 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
   if (missing.length === 0) return result;
   const db = getDb();
   if (!db) return result;
-  const batchKey = missing.map((item) => `${item.market}:${item.code}`).sort().join("|");
+  const fetchLimit = Math.max(limit, BULK_CACHE_CANDLE_LIMIT);
+  const batchKey = `${timeframe}:${fetchLimit}:${missing.map((item) => `${item.market}:${item.code}`).sort().join("|")}`;
   let request = bulkInflight.get(batchKey);
   if (!request) {
-    const fetchLimit = Math.max(limit, BULK_CACHE_CANDLE_LIMIT);
     request = (async () => {
       const grouped = new Map<string, UsDailyCandle[]>();
       // Join against a VALUES list so PostgreSQL can use the composite
