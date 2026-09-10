@@ -138,7 +138,9 @@ async function loadUsTopRisingScopesUncached() {
   };
   const marketResults = await Promise.all(US_EXCHANGES.map(loadMarket));
   const scopes: UsTopRisingScope[] = []; const markets: Record<string, unknown>[] = [];
-  for (const result of marketResults) { markets.push(result.market); for (const scope of result.selected) { const key = `${scope.market}:${scope.code}`; if (!seen.has(key)) { seen.add(key); scopes.push(scope); } } }
+  // `seen` is populated while each exchange is parsed. Do not check it again
+  // here: that would discard every valid row before the API response is built.
+  for (const result of marketResults) { markets.push(result.market); scopes.push(...result.selected); }
   const settings = await loadUsTurnoverFilterSettings();
   if (settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0) {
     const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])", [[...US_EXCHANGES], scopes.map((scope) => scope.code)]).catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null }> }));
