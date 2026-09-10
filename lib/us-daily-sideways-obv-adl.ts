@@ -11,7 +11,7 @@ const rising = (values: number[]) => values.at(-1)! > values.at(-2)! && values.a
 export async function scanUsDailySidewaysObvAdl() {
   const db = getDb();
   const universe = await queryEligibleUniverse(db, "US");
-  const candles = await db.execute(sql.raw("SELECT c.market,c.code,c.candle_date AS date,c.high,c.low,c.close,c.volume,c.fetched_at FROM us_instrument_universe_candles c JOIN us_common_stock_universe u ON u.market = c.market AND u.code = c.code WHERE c.timeframe='D' AND c.close IS NOT NULL ORDER BY c.market,c.code,c.candle_date"));
+  const candles = await db.execute(sql.raw("SELECT c.market,c.code,c.candle_date AS date,c.high,c.low,c.close,c.volume,c.fetched_at FROM us_instrument_universe_candles c JOIN us_common_stock_universe u ON u.market = c.market AND u.code = c.code WHERE c.timeframe='D' AND c.close IS NOT NULL AND u.enabled = true AND u.daily_active = true AND u.instrument_type = 'COMMON_STOCK' AND COALESCE(u.is_etf, false) = false AND COALESCE(u.is_warrant, false) = false AND COALESCE(u.is_derivative, false) = false AND COALESCE(u.is_dr, false) = false AND COALESCE(u.is_leveraged, false) = false AND COALESCE(u.is_inverse, false) = false ORDER BY c.market,c.code,c.candle_date"));
   const byInstrument = new Map<string, Candle[]>();
   for (const row of candles.rows as any[]) { const key = `${row.market}:${row.code}`; const list = byInstrument.get(key) ?? []; list.push({ date: String(row.date), updatedAt: row.fetched_at ? new Date(row.fetched_at).toISOString() : null, high: +(row.high ?? row.close), low: +(row.low ?? row.close), close: +row.close, volume: +(row.volume ?? 0) }); byInstrument.set(key, list); }
   const results: any[] = [];
