@@ -57,6 +57,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   let successCount = 0;
   let dailySuccessCount = 0;
   let candleCount = 0;
+  let dbWriteDurationMs = 0;
   let processedCount = 0;
   const progressStarted = Date.now();
   const failures: Array<{ market: string; code: string; error: string }> = [];
@@ -82,7 +83,9 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
           failures.push({ market: item.market, code: item.code, error });
           await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error });
         } else {
+          const dbWriteStartedAt = Date.now();
           candleCount += await saveUsDailyCandles(item.market, item.code, response.candles, timeframe);
+          dbWriteDurationMs += Date.now() - dbWriteStartedAt;
           if (timeframe === "D") dailySuccessCount += 1;
           await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe });
         }
@@ -113,7 +116,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const followupBlocked = dailySuccessCount === 0;
   const bollingerCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyBollingerCaches("US");
   const goldenCrossCache = followupBlocked ? { skipped: true, reason: "no_successful_daily_candles", failureCount: failures.length } : await refreshDailyGoldenCrossCache("US");
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, failures, bollingerCache, goldenCrossCache };
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
 }
 
 export function warmUsDailyPriceCache(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {
