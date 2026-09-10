@@ -82,11 +82,13 @@ function unknownFundamentals(market: string): ChartFundamentals {
 async function loadChartFundamentals(data: ChartData, market: string, timeframe: "D" | "W" | "M"): Promise<ChartFundamentals> {
   const db = getDb();
   const code = data.code.replace(/^US:/i, "").trim().toUpperCase();
-  const rows = await db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE code = ${code} ORDER BY fetched_at DESC LIMIT 1`);
-  const snapshot = (rows.rows[0] ?? {}) as Record<string, unknown>;
   const table = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
   const tradingValueColumn = market === "US" ? `trading_value AS "tradingValue"` : `NULL AS "tradingValue"`;
-  const stored = await db.execute(sql.raw(`SELECT ${tradingValueColumn}, close, volume FROM ${table} WHERE code = '${code.replace(/'/g, "''")}' AND timeframe = '${timeframe}' AND close IS NOT NULL ORDER BY candle_date DESC LIMIT 21`));
+  const [rows, stored] = await Promise.all([
+    db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE code = ${code} ORDER BY fetched_at DESC LIMIT 1`),
+    db.execute(sql.raw(`SELECT ${tradingValueColumn}, close, volume FROM ${table} WHERE code = '${code.replace(/'/g, "''")}' AND timeframe = '${timeframe}' AND close IS NOT NULL ORDER BY candle_date DESC LIMIT 21`)),
+  ]);
+  const snapshot = (rows.rows[0] ?? {}) as Record<string, unknown>;
   const storedCandles = (stored.rows as Array<Record<string, unknown>>).map((row) => ({ volume: finiteOrNull(row.volume), tradingValue: finiteOrNull(row.tradingValue) ?? derivedTradingValue(row.close, row.volume) }));
   const candles = storedCandles.length ? storedCandles.reverse() : data.candles.filter((c) => Number.isFinite(c.volume) && c.volume >= 0).slice(-21);
   const previous = candles.slice(0, -1);
@@ -122,11 +124,13 @@ async function loadFundamentalsSnapshot(rawCode: string | null, market: string, 
   if (!rawCode) return unknownFundamentals(market);
   const db = getDb();
   const code = rawCode.replace(/^US:/i, "").trim().toUpperCase();
-  const rows = await db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE code = ${code} ORDER BY fetched_at DESC LIMIT 1`);
-  const snapshot = (rows.rows[0] ?? {}) as Record<string, unknown>;
   const table = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
   const tradingValueColumn = market === "US" ? `trading_value AS "tradingValue"` : `NULL AS "tradingValue"`;
-  const stored = await db.execute(sql.raw(`SELECT ${tradingValueColumn}, close, volume FROM ${table} WHERE code = '${code.replace(/'/g, "''")}' AND timeframe = '${timeframe}' AND close IS NOT NULL ORDER BY candle_date DESC LIMIT 21`));
+  const [rows, stored] = await Promise.all([
+    db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE code = ${code} ORDER BY fetched_at DESC LIMIT 1`),
+    db.execute(sql.raw(`SELECT ${tradingValueColumn}, close, volume FROM ${table} WHERE code = '${code.replace(/'/g, "''")}' AND timeframe = '${timeframe}' AND close IS NOT NULL ORDER BY candle_date DESC LIMIT 21`)),
+  ]);
+  const snapshot = (rows.rows[0] ?? {}) as Record<string, unknown>;
   const candles = (stored.rows as Array<Record<string, unknown>>).map((row) => ({ tradingValue: finiteOrNull(row.tradingValue) ?? derivedTradingValue(row.close, row.volume), volume: finiteOrNull(row.volume) })).reverse();
   const latest = candles.at(-1);
   const previous = candles.slice(0, -1);
