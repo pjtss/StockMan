@@ -49,8 +49,8 @@ for (const [scope, config] of Object.entries(queries)) {
     indexes: (await client.query(`SELECT indexname FROM pg_indexes WHERE schemaname='public' AND indexname LIKE $1 ORDER BY indexname`, [`${scope}_candles_screener%`])).rows.map((row) => row.indexname),
     plans: [],
   };
-  output.scopes[scope].plans.push(await explain(`${scope}-asof-market-latest`, `SELECT market, MAX(candle_date) AS candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 GROUP BY market`, params));
-  output.scopes[scope].plans.push(await explain(`${scope}-asof-instrument-latest`, `SELECT market, code, MAX(candle_date) AS candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 GROUP BY market, code`, params));
+  output.scopes[scope].plans.push(await explain(`${scope}-asof-market-latest`, `WITH instrument_daily_latest AS (SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC) SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market`, params));
+  output.scopes[scope].plans.push(await explain(`${scope}-asof-instrument-latest`, `SELECT DISTINCT ON (market, code) market, code, candle_date FROM ${config.candle} WHERE timeframe='D' AND volume>0 AND market=ANY($1) AND candle_date <= $2 ORDER BY market, code, candle_date DESC`, params));
   output.scopes[scope].plans.push(await explain(`${scope}-summary-latest`, `SELECT market, code, candle_date FROM ${config.summary} WHERE volume>0 AND market=ANY($1)`, [config.markets]));
 }
 console.log(JSON.stringify(output, null, 2));
