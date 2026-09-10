@@ -112,8 +112,8 @@ export async function loadUsTopRisingScopes() {
 }
 
 async function loadUsTopRisingScopesUncached() {
-  const scopes: UsTopRisingScope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
-  for (const market of US_EXCHANGES) {
+  const loadMarket = async (market: typeof US_EXCHANGES[number]) => {
+    const selected: UsTopRisingScope[] = [];
     let response = await fetchKisUsTopRisingApi({ excd: market });
     let sourceRows = rows(response?.response?.parsed); let fallbackUsed = false;
     if (sourceRows.length === 0) {
@@ -130,14 +130,17 @@ async function loadUsTopRisingScopesUncached() {
       if (!ticker || excluded) { if (excluded) productExcluded += 1; continue; }
       const key = `${market}:${ticker}`; if (seen.has(key)) continue; seen.add(key);
       const numeric = (value: unknown) => { const parsed = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : null; };
-      scopes.push({ market, code: ticker, name, rank: index + 1, changeRate: numeric(item.rate ?? item.changeRate ?? item.n_rate), rankingVolume: numeric(item.tvol ?? item.vol ?? item.volume), rankingTradeValue: numeric(item.tamt ?? item.tamnt ?? item.amount) });
+      selected.push({ market, code: ticker, name, rank: index + 1, changeRate: numeric(item.rate ?? item.changeRate ?? item.n_rate), rankingVolume: numeric(item.tvol ?? item.vol ?? item.volume), rankingTradeValue: numeric(item.tamt ?? item.tamnt ?? item.amount) });
     }
     const parsed = response?.response?.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output1?: { nrec?: unknown } } | null;
-    markets.push({ market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: scopes.filter((item) => item.market === market).length, productExcluded, fallbackUsed, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange; verify market hours and KIS ranking availability" : undefined });
-  }
+    return { selected, market: { market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: selected.length, productExcluded, fallbackUsed, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange; verify market hours and KIS ranking availability" : undefined } };
+  };
+  const marketResults = await Promise.all(US_EXCHANGES.map(loadMarket));
+  const scopes: UsTopRisingScope[] = []; const seen = new Set<string>(); const markets: Record<string, unknown>[] = [];
+  for (const result of marketResults) { markets.push(result.market); for (const scope of result.selected) { const key = `${scope.market}:${scope.code}`; if (!seen.has(key)) { seen.add(key); scopes.push(scope); } } }
   const settings = await loadUsTurnoverFilterSettings();
   if (settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0) {
-    const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market IN ('NAS','AMS','NYS')").catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null }> }));
+    const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])", [[...US_EXCHANGES], scopes.map((scope) => scope.code)]).catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null }> }));
     const caps = new Map(capRows.rows.map((row) => [`${row.market}:${row.code}`, row.market_cap]));
     for (const scope of scopes) scope.marketCap = caps.get(`${scope.market}:${scope.code}`) ?? null;
   }
