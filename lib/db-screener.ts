@@ -5,6 +5,8 @@ import {
   rankScreenerResults,
 } from "./screener-engine";
 
+const inFlightScreenerRuns = new Map<string, Promise<ScreenerResult[]>>();
+
 function ema(values: number[], period = 9) {
   if (!values.length) return [];
   const alpha = 2 / (period + 1);
@@ -54,7 +56,7 @@ export function calculateRvol(latestVolume: number, baselineVolumes: number[]) {
   return average > 0 ? latestVolume / average : null;
 }
 
-export async function runDbScreener(
+async function runDbScreenerUncached(
   request: ScreenerRequest,
 ): Promise<ScreenerResult[]> {
   if (request.market === "ALL") {
@@ -274,4 +276,20 @@ export async function runDbScreener(
     results.filter((x) => x.matched),
     request,
   );
+}
+
+/**
+ * Coalesce identical concurrent scans without retaining stale results. This
+ * prevents a chart page and an API retry arriving together from executing the
+ * same expensive latest-candle query twice.
+ */
+export function runDbScreener(request: ScreenerRequest): Promise<ScreenerResult[]> {
+  const key = JSON.stringify(request);
+  const existing = inFlightScreenerRuns.get(key);
+  if (existing) return existing;
+  const run = runDbScreenerUncached(request).finally(() => {
+    if (inFlightScreenerRuns.get(key) === run) inFlightScreenerRuns.delete(key);
+  });
+  inFlightScreenerRuns.set(key, run);
+  return run;
 }
