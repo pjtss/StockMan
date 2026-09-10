@@ -1,7 +1,24 @@
 import { getPool } from "@/lib/db";
 
 /** 시장별 최신 일봉에서 7일을 초과해 지연된 종목과 일봉이 없는 종목을 비활성화한다. */
+const ACTIVITY_STATUS_TTL_MS = 60_000;
+let lastActivityStatus: { expiresAt: number; value: Record<string, number> } | null = null;
+let activityStatusInflight: Promise<Record<string, number>> | null = null;
+
 export async function syncDailyActivityStatus() {
+  if (lastActivityStatus && lastActivityStatus.expiresAt > Date.now()) return lastActivityStatus.value;
+  if (activityStatusInflight) return activityStatusInflight;
+  activityStatusInflight = syncDailyActivityStatusUncached();
+  try {
+    const value = await activityStatusInflight;
+    lastActivityStatus = { value, expiresAt: Date.now() + ACTIVITY_STATUS_TTL_MS };
+    return value;
+  } finally {
+    activityStatusInflight = null;
+  }
+}
+
+async function syncDailyActivityStatusUncached() {
   const pool = getPool();
   const result: Record<string, number> = {};
   await Promise.all(([
