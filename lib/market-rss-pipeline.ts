@@ -34,7 +34,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
   for (const result of allResults) {
     if (!result.ok) continue;
     const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
-    for (const item of result.feed.items) {
+    const values = result.feed.items.map((item) => {
       const classification = classifyMarketRssItem(item);
       const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
       // SEC filings without a preferred common-share mapping (for example
@@ -46,7 +46,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       const notifyEligible = item.source === "STOCKTITAN" || (classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker)));
       const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
       const isBacklog = item.source === "STOCKTITAN" ? false : Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
-      const rows = await db.insert(marketRssArticles).values({
+      return {
         source: item.source,
         externalId: item.id,
         title: item.title,
@@ -65,7 +65,10 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         priority: classification.priority,
         notifyEligible,
         isBacklog,
-      }).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
+      };
+    });
+    if (values.length === 0) continue;
+    const rows = await db.insert(marketRssArticles).values(values).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
         title: sql`excluded.title`, summary: sql`excluded.summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         link: sql`CASE WHEN ${marketRssArticles.link} = '' THEN excluded.link ELSE ${marketRssArticles.link} END`,
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,
@@ -75,9 +78,8 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         // turn an already delivered article into a backlog item merely
         // because the article is now older than RSS_MAX_ARTICLE_AGE_MINUTES.
         isBacklog: sql`CASE WHEN ${marketRssArticles.notificationStatus} = 'PENDING' THEN excluded.is_backlog ELSE ${marketRssArticles.isBacklog} END`, updatedAt: new Date(),
-      }}).returning({ id: marketRssArticles.id });
-      inserted += rows.length;
-    }
+    }}).returning({ id: marketRssArticles.id });
+    inserted += rows.length;
   }
   return { fetchedAt: fetched.fetchedAt, sourceResults: allResults.map((item) => ({ source: item.source, ok: item.ok, skipped: "skipped" in item ? item.skipped : false, count: item.ok ? item.feed.items.length : 0 })), inserted };
 }
