@@ -51,11 +51,22 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const underfilledDaily = new Set<string>();
   const underfilled = await getDb().execute(sql`SELECT u.market, u.code
     FROM us_common_stock_universe u
-    LEFT JOIN us_instrument_universe_candles c
-      ON c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
     WHERE u.instrument_type = 'COMMON_STOCK'
-    GROUP BY u.market, u.code
-    HAVING COUNT(c.candle_date) < 35 OR COUNT(*) FILTER (WHERE COALESCE(c.raw_payload, '') = '') > 0`);
+      AND (
+        NOT EXISTS (
+          SELECT 1
+          FROM us_instrument_universe_candles c
+          WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
+          LIMIT 1 OFFSET 34
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM us_instrument_universe_candles c
+          WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
+            AND COALESCE(c.raw_payload, '') = ''
+          LIMIT 1
+        )
+      )`);
   for (const row of underfilled.rows as Array<{ market: string; code: string }>) underfilledDaily.add(`${String(row.market).toUpperCase()}:${String(row.code).toUpperCase()}`);
   const concurrency = Math.max(1, Math.min(Math.floor(options.concurrency ?? 4), 8));
   let successCount = 0;
