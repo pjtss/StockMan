@@ -290,3 +290,8 @@ AMS 스캐너는 종목별 상세 시세와 1분봉 요청을 겹쳐 실행하�
 ### 2026-09-11 KIS 디버그 로그 비동기 적재
 
 KIS 요청 성공·실패 후 수행하던 `debug_kis_calls` INSERT 대기를 bounded write queue로 분리했다. 디버그 테이블 장애나 큐 포화가 업무 API 응답을 차단하지 않으며, 디버그 기록은 최대 동시성 2와 유한 큐로 DB 연결 폭주를 제한한다. 업무 결과·토큰·throttle 정책은 변경하지 않는다.
+## 2026-09-11: 주봉·월봉 stale 탐색 커버링 인덱스
+
+로컬 측정에서 일봉 요약 캐시는 빠른 반면, 주봉·월봉은 원본 캔들에서 종목별 최신 봉과 `fetched_at`을 찾는 경로가 남아 있었다. `V129`는 주봉·월봉만 대상으로 `(market, code, timeframe, candle_date DESC)`를 유지하면서 `fetched_at`을 `INCLUDE`하는 부분 커버링 인덱스를 추가한다. 기존 인덱스와 질의 결과는 유지하고, 대상 인덱스의 크기와 heap 접근을 줄이는 것이 목적이다.
+
+운영 적용 후 `EXPLAIN (ANALYZE, BUFFERS)`에서 index-only scan 여부와 stale 탐색 p95를 확인한다. 일봉은 기존 요약 캐시 경로를 계속 사용한다.
