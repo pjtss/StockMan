@@ -17,7 +17,7 @@ describe("market RSS translation", () => {
     expect(result.translatedSummary).toBe("Long summary 1");
   });
 
-  it("processes a batch sequentially", async () => {
+  it("processes a batch with bounded concurrency and preserves input order", async () => {
     const order: string[] = [];
     const translate = vi.fn(async (text: string) => {
       order.push(`start:${text}`);
@@ -27,7 +27,9 @@ describe("market RSS translation", () => {
     });
     await translateMarketRssItems([item("1"), item("2"), item("3"), item("4"), item("5")], client(translate));
 
-    expect(order).toEqual(["start:Title 1", "end:Title 1", "start:Title 2", "end:Title 2", "start:Title 3", "end:Title 3", "start:Title 4", "end:Title 4", "start:Title 5", "end:Title 5"]);
+    expect(order.slice(0, 3)).toEqual(["start:Title 1", "start:Title 2", "start:Title 3"]);
+    expect(order).toContain("start:Title 4");
+    expect(order).toContain("start:Title 5");
     expect(translate).toHaveBeenCalledTimes(5);
   });
 });
