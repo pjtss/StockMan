@@ -19,10 +19,12 @@ export function isExcludedKrOfficialName(name: string) {
   return /(?:스팩|SPAC|우선주|우(?:\(|$)|\d우B(?:\(|$)|전환|신주인수권|권리주)/i.test(String(name ?? ""));
 }
 export async function loadStoredKrInstrumentScopes() {
-  await syncDailyActivityStatus("KR");
   if (storedScopeCache && storedScopeCache.expiresAt > Date.now()) return storedScopeCache.value;
   if (storedScopeInflight) return storedScopeInflight;
-  storedScopeInflight = loadStoredKrInstrumentScopesUncached();
+  storedScopeInflight = (async () => {
+    await syncDailyActivityStatus("KR");
+    return loadStoredKrInstrumentScopesUncached();
+  })();
   try {
     const value = await storedScopeInflight;
     storedScopeCache = { value, expiresAt: Date.now() + STORED_SCOPE_CACHE_TTL_MS };
