@@ -50,15 +50,20 @@ export function groupAccumulationRows(rows: AccumulationDbRow[]): AccumulationIn
 /** One SELECT snapshot, no fetch providers or writes. Values remain parameterized. */
 export async function loadAccumulationInstruments(region: AccumulationRegion, asOf: Date): Promise<AccumulationInstrument[]> {
   const config = tables[region];
-  const sql = "SELECT u.market,u.code,u.name,f.market_cap,f.shares_outstanding,f.fetched_at AS fundamental_updated_at,"
-    + "c.candle_date,c.candle_time,c.fetched_at,c.open,c.high,c.low,c.close,c.volume FROM " + config.universe + " u "
+  const sql = "WITH eligible AS (SELECT u.market,u.code,u.name,f.market_cap,f.shares_outstanding,f.fetched_at AS fundamental_updated_at "
+    + "FROM " + config.universe + " u "
     + "LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,fetched_at FROM instrument_fundamental_snapshots f "
     + "WHERE f.market=u.market AND f.code=u.code AND f.observed_at < (to_date($2, 'YYYYMMDD') + INTERVAL '1 day') "
     + "ORDER BY f.observed_at DESC NULLS LAST,f.fetched_at DESC NULLS LAST LIMIT 1) f ON true "
-    + "LEFT JOIN LATERAL (SELECT candle_date,candle_time,fetched_at,open,high,low,close,volume FROM " + config.candles
-    + " WHERE market=u.market AND code=u.code AND timeframe='D' AND candle_date <= $2 ORDER BY candle_date DESC LIMIT $3) c ON true "
     + "WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1::text[]) "
-    + config.filter + " ORDER BY u.market,u.code,c.candle_date";
+    + config.filter + "), ranked_candles AS (SELECT c.market,c.code,c.candle_date,c.candle_time,c.fetched_at,c.open,c.high,c.low,c.close,c.volume, "
+    + "ROW_NUMBER() OVER (PARTITION BY c.market,c.code ORDER BY c.candle_date DESC) AS row_number FROM " + config.candles + " c "
+    + "JOIN eligible e ON e.market=c.market AND e.code=c.code "
+    + "WHERE c.timeframe='D' AND c.candle_date <= $2) "
+    + "SELECT e.market,e.code,e.name,e.market_cap,e.shares_outstanding,e.fundamental_updated_at, "
+    + "c.candle_date,c.candle_time,c.fetched_at,c.open,c.high,c.low,c.close,c.volume FROM eligible e "
+    + "LEFT JOIN ranked_candles c ON c.market=e.market AND c.code=e.code AND c.row_number <= $3 "
+    + "ORDER BY e.market,e.code,c.candle_date";
   const response = await getPool().query<AccumulationDbRow>({
     name: `accumulation-scan-${region.toLowerCase()}-daily-v1`,
     text: sql,
