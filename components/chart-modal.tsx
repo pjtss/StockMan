@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./chart-modal.module.css";
 import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart";
@@ -121,7 +121,7 @@ function indicatorLines(candles: OHLCVCandle[]): IndicatorLine[] {
 }
 
 function IndicatorCharts({ candles }: { candles: OHLCVCandle[] }) {
-  const lines = indicatorLines(candles);
+  const lines = useMemo(() => indicatorLines(candles), [candles]);
   const groups = [[lines[0], lines[1]], [lines[2], lines[3]], [lines[4], lines[5]], [lines[6]], [lines[7]], [lines[8]]];
   return <div className={styles.indicatorCharts}>{groups.map((group, groupIndex) => { const all = group.flatMap((line) => line.values).filter((v): v is number => v !== null && Number.isFinite(v)); const min = Math.min(...all), max = Math.max(...all), span = max - min || 1; return <div className={styles.indicatorPlot} key={groupIndex}><div className={styles.plotLegend}>{group.map((line) => <span key={line.label} style={{ color: line.color }}>● {line.label}</span>)}</div><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-label={group.map((line) => line.label).join(", ")}><line x1="0" y1="14" x2="100" y2="14" stroke="rgba(148,163,184,.12)" />{group.map((line) => { const points = line.values.map((value, i) => value === null ? null : `${(i / Math.max(1, line.values.length - 1)) * 100},${28 - ((value - min) / span) * 24 - 2}`).filter(Boolean).join(" "); return <polyline key={line.label} points={points} fill="none" stroke={line.color} strokeWidth="0.8" vectorEffect="non-scaling-stroke" />; })}</svg></div>; })}</div>;
 }
