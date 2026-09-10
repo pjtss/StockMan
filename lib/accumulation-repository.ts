@@ -52,7 +52,9 @@ export async function loadAccumulationInstruments(region: AccumulationRegion, as
   const config = tables[region];
   const sql = "SELECT u.market,u.code,u.name,f.market_cap,f.shares_outstanding,f.fetched_at AS fundamental_updated_at,"
     + "c.candle_date,c.candle_time,c.fetched_at,c.open,c.high,c.low,c.close,c.volume FROM " + config.universe + " u "
-    + "LEFT JOIN instrument_fundamental_snapshots f ON f.market=u.market AND f.code=u.code "
+    + "LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,fetched_at FROM instrument_fundamental_snapshots f "
+    + "WHERE f.market=u.market AND f.code=u.code AND f.observed_at < (to_date($2, 'YYYYMMDD') + INTERVAL '1 day') "
+    + "ORDER BY f.observed_at DESC NULLS LAST,f.fetched_at DESC NULLS LAST LIMIT 1) f ON true "
     + "LEFT JOIN LATERAL (SELECT candle_date,candle_time,fetched_at,open,high,low,close,volume FROM " + config.candles
     + " WHERE market=u.market AND code=u.code AND timeframe='D' AND candle_date <= $2 ORDER BY candle_date DESC LIMIT $3) c ON true "
     + "WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1::text[]) "
