@@ -56,6 +56,11 @@
 .count { color: var(--neon-green, #00ffa3); font-size: 12px; }
 .watchGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 12px; min-width: 0; }
 .watchCard { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: rgba(255,255,255,.035); border: 1px solid var(--glass-border); border-radius: 14px; min-width: 0; }
+.watchCardSelected { border-color: var(--neon-green, #00ffa3); background: rgba(0,255,163,.08); }
+.watchCheck { display: flex; align-items: center; }
+.watchCheck input, .selectAll input { accent-color: var(--neon-green, #00ffa3); }
+.selectAll { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+.feedHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .watchCard > div:first-child { min-width: 0; flex: 1 1 auto; }
 .watchCard strong, .watchCard small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .watchCard strong { color: var(--text-primary); }

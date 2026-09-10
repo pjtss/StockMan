@@ -70,4 +70,13 @@ describe("WatchlistWorkbench", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/watchlist", expect.objectContaining({ method: "DELETE" })));
     expect(screen.queryByTestId("chart-modal")).not.toBeInTheDocument();
   });
+
+  it("selects all items in a market and deletes them together", async () => {
+    const fetchMock = vi.mocked(fetch);
+    render(<WatchlistWorkbench />);
+    await screen.findByText("삼성전자");
+    fireEvent.click(screen.getAllByText("전체 선택")[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "선택 삭제" })[0]);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/watchlist", expect.objectContaining({ method: "DELETE", body: JSON.stringify({ market: "KR", code: "005930" }) })));
+  });
 });
