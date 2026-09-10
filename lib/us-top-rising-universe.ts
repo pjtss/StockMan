@@ -63,7 +63,7 @@ let liveScopeInflight: Promise<Awaited<ReturnType<typeof loadUsTopRisingScopesUn
 
 /** Canonical persisted universe used by daily indicators. No live ranking API is called. */
 export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrumentScopes> {
-  await syncDailyActivityStatus();
+  await syncDailyActivityStatus("US");
   if (storedScopeCache && storedScopeCache.expiresAt > Date.now()) return storedScopeCache.value;
   if (storedScopeInflight) return storedScopeInflight;
   storedScopeInflight = (async () => {
