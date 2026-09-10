@@ -231,3 +231,5 @@ Discord 디버깅 채널에는 요약·requestId·시장·구간·오류 코드�
 국내 저장 유니버스 로더에도 5분 TTL과 in-flight 병합을 적용했다. 여러 국내 스캐너가 같은 시점에 실행될 때 동일한 유니버스 SELECT를 반복하지 않으며, `daily_active` 상태는 별도 60초 갱신 정책을 따른다.
 
 시장별 저장 유니버스 호출은 `syncDailyActivityStatus("KR"|"US")`로 해당 시장만 갱신한다. 양 시장을 함께 확인해야 하는 자동화의 기존 무인자 호출은 그대로 유지해 기능 범위를 바꾸지 않았다.
+
+`daily_active` 갱신 UPDATE에는 `IS DISTINCT FROM` 조건을 추가해 상태가 바뀐 행만 기록한다. 최신일이 그대로인 주기 실행에서는 불필요한 WAL·행 잠금·`updated_at` 쓰기를 피한다.
