@@ -178,6 +178,11 @@ export async function runDbScreener(
     });
     const evaluation = evaluateScreenerFilters(metrics, request);
     const allConditions = [...evaluation.conditions, ...emaResults];
+    const matched = allConditions.length === 0
+      ? true
+      : request.logic === "OR"
+        ? allConditions.some((condition) => condition.passed)
+        : allConditions.every((condition) => condition.passed);
     results.push({
       market: item.market,
       exchange: item.market,
@@ -194,8 +199,7 @@ export async function runDbScreener(
       candleFetchedAt: new Date(last.fetched_at).toISOString(),
       metrics,
       conditions: allConditions,
-      matched:
-        evaluation.matched && emaResults.every((condition) => condition.passed),
+      matched,
       failureReasons: [
         ...evaluation.failureReasons,
         ...emaResults

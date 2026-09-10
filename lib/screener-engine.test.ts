@@ -6,6 +6,19 @@ describe("screener engine", () => {
     expect(evaluateScreenerFilters({ "D.close": 100 }, { filters: [], logic: "OR" }).matched).toBe(true);
   });
   it("evaluates AND conditions", () => { const r=evaluateScreenerFilters({marketCap:100, "D.rvol":1.2},{filters:[{field:"marketCap",operator:">=",value:100},{field:"D.rvol",operator:">=",value:1}],logic:"AND"}); expect(r.matched).toBe(true); });
+  it("evaluates OR conditions across the direct filter list", () => {
+    const r = evaluateScreenerFilters(
+      { marketCap: 90, "D.rvol": 1.2 },
+      {
+        filters: [
+          { field: "marketCap", operator: ">=", value: 100 },
+          { field: "D.rvol", operator: ">=", value: 1 },
+        ],
+        logic: "OR",
+      },
+    );
+    expect(r.matched).toBe(true);
+  });
   it("keeps failed reasons", () => { const r=evaluateScreenerFilters({marketCap:90},{filters:[{field:"marketCap",operator:">=",value:100}]}); expect(r.failureReasons).toHaveLength(1); });
   it("ranks descending", () => { const rows:any=[{name:"a",metrics:{score:1}},{name:"b",metrics:{score:2}}]; expect(rankScreenerResults(rows,{ranking:[{field:"score",direction:"DESC"}]}).map(x=>x.name)).toEqual(["b","a"]); });
   it("does not crash when a market-data name is missing", () => { const rows:any=[{name:null,code:"ZZZ",metrics:{}},{name:"Alpha",code:"AAA",metrics:{}}]; expect(rankScreenerResults(rows,{} as any).map(x=>x.code)).toEqual(["AAA","ZZZ"]); });

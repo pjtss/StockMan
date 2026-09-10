@@ -1,4 +1,14 @@
 const operators = new Set(["=", "!=", ">", ">=", "<", "<="]);
+const metricFields = new Set([
+  "marketCap",
+  ...["D", "W", "M"].flatMap((tf) => [
+    `${tf}.close`, `${tf}.high`, `${tf}.low`, `${tf}.volume`, `${tf}.rvol`,
+    `${tf}.emaGoldenCross`, `${tf}.bb.upper`, `${tf}.bb.middle`, `${tf}.bb.lower`,
+    `${tf}.bb.width`, `${tf}.bb.lowerTouch`, `${tf}.bb.lowerBreak`,
+    `${tf}.obv.signalTrend`, `${tf}.adl.signalTrend`,
+  ]),
+]);
+const isMetricField = (field: string) => metricFields.has(field);
 
 export function validateScreenerRequest(body: unknown): string | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return "INVALID_BODY";
@@ -20,7 +30,8 @@ export function validateScreenerRequest(body: unknown): string | null {
     if (!filter || typeof filter !== "object") return true;
     const item = filter as Record<string, unknown>;
     if (typeof item.field !== "string" || !operators.has(String(item.operator)) || (typeof item.value !== "string" && typeof item.value !== "number" && typeof item.value !== "boolean")) return true;
-    const numericField = item.field === "marketCap" || /\.(close|rvol)$/.test(item.field);
+    if (!isMetricField(item.field)) return true;
+    const numericField = item.field === "marketCap" || /\.(close|high|low|volume|rvol|bb\.(upper|middle|lower|width))$/.test(item.field);
     if (!numericField) return false;
     if (typeof item.value === "number") return !Number.isFinite(item.value) || item.value < 0;
     return typeof item.value !== "string" || !/^[DWM]\.bb\.(upper|middle|lower)$/.test(item.value);
@@ -28,7 +39,7 @@ export function validateScreenerRequest(body: unknown): string | null {
   if (value.ranking != null && (!Array.isArray(value.ranking) || value.ranking.some((rule) => {
     if (!rule || typeof rule !== "object") return true;
     const item = rule as Record<string, unknown>;
-    return typeof item.field !== "string" || !["ASC", "DESC"].includes(String(item.direction));
+    return typeof item.field !== "string" || !isMetricField(item.field) || !["ASC", "DESC"].includes(String(item.direction));
   }))) return "INVALID_RANKING";
   if (value.ema9Conditions != null && (!value.ema9Conditions || typeof value.ema9Conditions !== "object" || Object.entries(value.ema9Conditions as Record<string, unknown>).some(([timeframe, condition]) => !["D", "W", "M"].includes(timeframe) || !["ANY", "ABOVE", "NOT_ABOVE"].includes(String(condition))))) return "INVALID_EMA9_CONDITIONS";
   return null;
