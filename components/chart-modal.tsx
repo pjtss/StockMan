@@ -515,18 +515,31 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         lastValueVisible: false,
         priceLineVisible: false,
       });
-      volumeAverageSeries.setData(candles.map((candle, index) => ({
-        time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
-        value: candles.slice(Math.max(0, index - 19), index + 1).reduce((sum, item) => sum + item.volume, 0) / Math.min(20, index + 1),
-      })));
+      let volumeWindowSum = 0;
+      volumeAverageSeries.setData(candles.map((candle, index) => {
+        volumeWindowSum += candle.volume;
+        if (index >= 20) volumeWindowSum -= candles[index - 20].volume;
+        return {
+          time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+          value: volumeWindowSum / Math.min(20, index + 1),
+        };
+      }));
 
       // 볼린저 밴드: 각 일봉 시점의 최근 20개 종가로 전체 구간을 계산한다.
       if (candles.length >= 20) {
+        let closeWindowSum = 0;
+        let closeWindowSquareSum = 0;
         const bands = candles.slice(19).map((candle, index) => {
           const end = index + 20;
-          const closes = candles.slice(end - 20, end).map((item) => item.close);
-          const middle = closes.reduce((sum, value) => sum + value, 0) / 20;
-          const variance = closes.reduce((sum, value) => sum + (value - middle) ** 2, 0) / 20;
+          closeWindowSum += candle.close;
+          closeWindowSquareSum += candle.close ** 2;
+          if (end > 20) {
+            const removed = candles[end - 21].close;
+            closeWindowSum -= removed;
+            closeWindowSquareSum -= removed ** 2;
+          }
+          const middle = closeWindowSum / 20;
+          const variance = Math.max(0, closeWindowSquareSum / 20 - middle ** 2);
           const deviation = Math.sqrt(variance);
           return {
             time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
