@@ -12,14 +12,15 @@ export function UsTopRisingChartPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [market, setMarket] = useState("ALL");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setNotice(null);
     try {
       const response = await fetch("/api/stock/us/top-rising-chart", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
-      setItems(body.items ?? []); setCollectedAt(body.collectedAt ?? null);
+      setItems(body.items ?? []); setCollectedAt(body.collectedAt ?? null); setNotice(body.items?.length ? null : body.message ?? "현재 조회 가능한 상승률 데이터가 없습니다.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "조회에 실패했습니다."); }
     finally { setLoading(false); }
   }, []);
