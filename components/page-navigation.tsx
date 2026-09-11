@@ -22,6 +22,8 @@ type PageKey =
   | "login"
   | "register"
   | "notes"
+  | "investment-calendar"
+  | "other"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   const [username, setUsername] = useState<string | null>(null);
@@ -60,6 +62,12 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link aria-current={current === "market-news" ? "page" : undefined} className={current === "market-news" ? styles.navActive : styles.navLink} href="/market-news" prefetch={false}>
           해외 뉴스
+        </Link>
+        <Link aria-current={current === "investment-calendar" ? "page" : undefined} className={current === "investment-calendar" ? styles.navActive : styles.navLink} href="/investment-calendar" prefetch={false}>
+          투자 일정
+        </Link>
+        <Link aria-current={current === "other" ? "page" : undefined} className={current === "other" ? styles.navActive : styles.navLink} href="/other" prefetch={false}>
+          기타
         </Link>
         <Link aria-current={current === "scanners-us" ? "page" : undefined} className={current === "scanners-us" ? styles.navActive : styles.navLink} href="/us-top-rising" prefetch={false}>
           해외 상승률 TOP 100

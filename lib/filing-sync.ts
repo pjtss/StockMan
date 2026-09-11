@@ -4,6 +4,7 @@ import { loadFeatureModuleSettings } from "./feature-module-settings";
 import { isWithinSchedule } from "./schedule-time";
 import { withAutomationRun } from "./automation-run";
 import { recordSkippedAutomationRun } from "./automation-run-repository";
+import { syncDartCalendarEvents } from "./dart-calendar-sync";
 
 export type FilingSyncResult = {
   success: true;
@@ -31,7 +32,10 @@ export async function runFilingSync(): Promise<FilingSyncResult> {
       ? "outside_schedule"
       : "outside_schedule";
   const dart = dartSettings.enabled && dartInWindow && dartOpen
-    ? await withAutomationRun("dart-realtime", runDartAutomation)
+    ? await withAutomationRun("dart-realtime", async () => {
+        const [automation, calendar] = await Promise.allSettled([runDartAutomation(), syncDartCalendarEvents()]);
+        return { automation: automation.status === "fulfilled" ? automation.value : { failed: true, error: String(automation.reason) }, calendar: calendar.status === "fulfilled" ? calendar.value : { failed: true, error: String(calendar.reason) } };
+      })
     : (await recordSkippedAutomationRun("dart-realtime", dartSkippedReason), { skipped: true, reason: dartSkippedReason });
 
   return {

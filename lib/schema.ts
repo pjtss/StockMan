@@ -267,6 +267,28 @@ export const usInstrumentUniverse = makeUsUniverseTable("us_instrument_universe"
 export const instrumentUniverseSyncRuns = pgTable("instrument_universe_sync_runs", { id: bigserial("id", { mode: "number" }).primaryKey(), scope: text("scope").notNull(), sourceDirectory: text("source_directory").notNull(), status: text("status").notNull(), sourceCount: integer("source_count").notNull().default(0), insertedCount: integer("inserted_count").notNull().default(0), updatedCount: integer("updated_count").notNull().default(0), deactivatedCount: integer("deactivated_count").notNull().default(0), excludedCount: integer("excluded_count").notNull().default(0), errorCount: integer("error_count").notNull().default(0), errorSummary: text("error_summary"), startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(), completedAt: timestamp("completed_at", { withTimezone: true }) });
 export const instrumentFundamentalSnapshots = pgTable("instrument_fundamental_snapshots", { id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), name: text("name").notNull().default(""), price: doublePrecision("price"), changeRate: doublePrecision("change_rate"), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), sharesOutstanding: doublePrecision("shares_outstanding"), freeFloatShares: doublePrecision("free_float_shares"), freeFloatPercent: doublePrecision("free_float_percent"), currency: text("currency"), source: text("source").notNull(), rawPayload: text("raw_payload").notNull().default(""), observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow() }, (table) => [uniqueIndex("instrument_fundamental_snapshots_market_code_unique").on(table.market, table.code), index("instrument_fundamental_snapshots_fetched_idx").on(table.fetchedAt)]);
 
+export const investmentCalendarEvents = pgTable("investment_calendar_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  market: text("market").notNull(),
+  code: text("code"),
+  companyName: text("company_name").notNull().default(""),
+  eventType: text("event_type").notNull(),
+  eventDate: date("event_date").notNull(),
+  eventEndDate: date("event_end_date"),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  source: text("source").notNull(),
+  sourceUrl: text("source_url"),
+  externalId: text("external_id").notNull(),
+  rawPayload: jsonb("raw_payload").notNull().default(sql`'{}'::jsonb`),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("investment_calendar_events_source_external_unique").on(table.source, table.externalId),
+  index("investment_calendar_events_date_type_idx").on(table.eventDate, table.eventType),
+  index("investment_calendar_events_market_code_date_idx").on(table.market, table.code, table.eventDate),
+]);
+
 export const usPriceDetailCache = pgTable("us_price_detail_cache", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   market: text("market").notNull(),
