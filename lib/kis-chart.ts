@@ -6,6 +6,8 @@
 
 import { getAccessToken } from "./kis";
 import { kisRequest } from "./kis-request-framework";
+import { normalizeOHLCVCandles } from "./chart-candles";
+export { normalizeOHLCVCandles } from "./chart-candles";
 
 const BASE_URL =
   process.env.KIS_MODE === "mock"
@@ -177,8 +179,8 @@ function calcBollingerBands(closes: number[], period = 20): { upper: number | nu
 
 /** KIS가 일시적으로 unavailable일 때 DB 캐시로 차트 payload를 구성한다. */
 export function buildChartDataFromCandles(code: string, candles: OHLCVCandle[], candleDataUpdatedAt?: string | null): ChartData | null {
-  if (!candles.length) return null;
-  const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
+  const ordered = normalizeOHLCVCandles(candles);
+  if (!ordered.length) return null;
   const closes = ordered.map((candle) => candle.close);
   const rsi14 = calcRSI(closes);
   const { macd, signal: macdSignal, hist: macdHist } = calcMACD(closes);

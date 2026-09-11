@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./chart-modal.module.css";
 import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart";
+import { normalizeOHLCVCandles } from "@/lib/chart-candles";
 import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
@@ -218,6 +219,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   const [isWatchlisted, setIsWatchlisted] = useState(false);
   const [watchlistBusy, setWatchlistBusy] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
+  const [resolvedCompany, setResolvedCompany] = useState(company);
   const chartRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const chartNodeRef = useRef<HTMLDivElement | null>(null);
@@ -225,6 +227,25 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   const [isFullscreen, setIsFullscreen] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
   const requestIdRef = useRef(0);
+
+  // 직접 입력한 티커는 상위 화면의 이름 조회가 아직 끝나지 않았을 수 있다.
+  // 모달 자체에서도 한 번 보완 조회해 헤더에 티커만 남지 않게 한다.
+  useEffect(() => {
+    setResolvedCompany(company);
+    const fallback = company.trim().toUpperCase() === code.replace(/^US:/i, "").trim().toUpperCase();
+    if (!fallback) return;
+    const controller = new AbortController();
+    const market = code.startsWith("US:") ? "US" : "KR";
+    const lookupCode = code.replace(/^US:/i, "").trim().toUpperCase();
+    fetch(`/api/stock/lookup?market=${market}&codes=${encodeURIComponent(lookupCode)}`, { signal: controller.signal, cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<{ names?: Record<string, string> }> : null)
+      .then((body) => {
+        const name = body?.names?.[lookupCode];
+        if (name) setResolvedCompany(name);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [code, company]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(document.fullscreenElement === modalRef.current);
@@ -439,6 +460,8 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
 
     import("lightweight-charts").then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle, HistogramSeries }) => {
       if (cancelled || !container || !container.isConnected) return;
+      const candles = normalizeOHLCVCandles(data.candles);
+      if (!candles.length) return;
 
       const chart = createChart(container, {
         width: container.clientWidth,
@@ -475,13 +498,6 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
       // KIS 응답 순서가 시장/주기에 따라 달라질 수 있으므로 차트 입력 직전에
       // 숫자 날짜 기준으로 오름차순 정렬하고, 같은 날짜의 중복 봉을 제거한다.
       // Lightweight Charts는 setData()에 strictly ascending time을 요구한다.
-      const candles = Array.from(
-        new Map(
-          data.candles
-            .filter((c) => /^\d{8}$/.test(c.date) && Number.isFinite(c.close))
-            .map((c) => [c.date, c] as const),
-        ).values(),
-      ).sort((a, b) => Number(a.date) - Number(b.date));
       const candleData = candles.map((c) => ({
         time: `${c.date.slice(0, 4)}-${c.date.slice(4, 6)}-${c.date.slice(6, 8)}` as any,
           open: Number(c.open),
@@ -604,6 +620,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   }, []);
 
   const indicators = data?.indicators;
+  const normalizedCandles = useMemo(() => normalizeOHLCVCandles(data?.candles ?? []), [data?.candles]);
   const rsiInfo = rsiLabel(indicators?.rsi14 ?? null);
   const bbInfo = bbLabel(data?.latestPrice ?? 0, indicators?.bbUpper ?? null, indicators?.bbLower ?? null);
   const isUp = data?.latestChangeRate?.startsWith("+") ?? false;
@@ -615,7 +632,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         <div className={styles.header}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
             <div className={styles.titleBlock}>
-              <span className={styles.company}>{company}</span>
+              <span className={styles.company}>{resolvedCompany || code.replace(/^US:/i, "")}</span>
               <span className={styles.code}>{code}</span>
             </div>
             {data && (
@@ -679,19 +696,21 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
           {!loading && !error && data && activeTab === "chart" && (
             <div key={`${code}:${timeframe}`} id="chart-panel" role="tabpanel" aria-labelledby="chart-tab">
               {/* 캔들 차트 */}
-              <div className={styles.chartLegend} aria-label="지수이동평균선 범례">
+              <div className={styles.chartLegend} aria-label="차트 범례">
                 <span style={{ color: "#facc15" }}>● EMA 9</span>
                 <span style={{ color: "#fb923c" }}>● EMA 20</span>
                 <span style={{ color: "#c084fc" }}>● EMA 60</span>
+                <span style={{ color: "rgba(0,255,163,.8)" }}>● 볼린저밴드</span>
+                <span style={{ color: "#facc15" }}>▮ 거래량·평균</span>
               </div>
-              <div className={styles.chartWrap} ref={(node) => {
+              {normalizedCandles.length === 0 ? <div className={styles.empty}>표시할 유효한 봉 데이터가 없습니다.</div> : <div className={styles.chartWrap} ref={(node) => {
                 chartRef.current = node;
                 if (node && node !== chartNodeRef.current) {
                   chartNodeRef.current = node;
                   setChartContainerVersion((version) => version + 1);
                 }
-              }} />
-              <IndicatorCharts candles={data.candles} />
+              }} />}
+              {normalizedCandles.length > 0 && <IndicatorCharts candles={normalizedCandles} />}
 
             </div>
           )}

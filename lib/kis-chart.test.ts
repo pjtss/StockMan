@@ -2,6 +2,7 @@
  * lib/kis-chart.test.ts — 기술적 지표 연산 단위 테스트
  */
 import { describe, it, expect } from "vitest";
+import { normalizeOHLCVCandles } from "./chart-candles";
 
 // 내부 함수들을 테스트하기 위해 직접 재구현 (private helper들)
 function calcRSI(closes: number[], period = 14): number | null {
@@ -85,5 +86,22 @@ describe("Technical Indicators", () => {
     expect(result.upper).not.toBeNull();
     expect(result.upper!).toBeGreaterThan(result.middle!);
     expect(result.middle!).toBeGreaterThan(result.lower!);
+  });
+});
+
+describe("Chart candle normalization", () => {
+  const candle = (date: string, close: number, overrides: Partial<{ open: number; high: number; low: number; volume: number }> = {}) => ({
+    date, open: overrides.open ?? close, high: overrides.high ?? close, low: overrides.low ?? close, close, volume: overrides.volume ?? 100,
+  });
+
+  it("sorts candles ascending and removes duplicate dates", () => {
+    const result = normalizeOHLCVCandles([candle("20260903", 3), candle("20260901", 1), candle("20260902", 2), candle("20260902", 99)]);
+    expect(result.map((item) => item.date)).toEqual(["20260901", "20260902", "20260903"]);
+    expect(result[1].close).toBe(99);
+  });
+
+  it("drops malformed OHLCV candles so chart series stay aligned", () => {
+    const result = normalizeOHLCVCandles([candle("20260901", 1), candle("20260902", Number.NaN), candle("20260903", 3, { high: 1 }), candle("bad", 4)]);
+    expect(result.map((item) => item.date)).toEqual(["20260901"]);
   });
 });
