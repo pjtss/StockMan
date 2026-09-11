@@ -184,3 +184,17 @@
   color: #f87171;
   background: rgba(239, 68, 68, 0.1);
 }
+
+@media (max-width: 480px) {
+  .container { padding: 16px; border-radius: 16px; }
+  .header { align-items: flex-start; }
+  .desc { margin-bottom: 14px; }
+  .form { align-items: stretch; }
+  .input { min-width: 0; flex-basis: 100%; min-height: 46px; font-size: 16px; }
+  .checkLabel { min-height: 44px; }
+  .addBtn { flex: 1; min-height: 44px; }
+  .listItem { align-items: flex-start; flex-wrap: wrap; padding: 12px; }
+  .companyName { min-width: calc(100% - 28px); overflow-wrap: anywhere; }
+  .levelToggle { margin-left: 22px; min-height: 36px; }
+  .removeBtn { min-width: 36px; min-height: 36px; }
+}

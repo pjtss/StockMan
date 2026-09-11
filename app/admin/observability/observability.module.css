@@ -34,4 +34,4 @@
 .run pre { max-height: 280px; margin: 10px 0 0; padding: 10px; overflow: auto; border-radius: 6px; background: #050b12; color: #c7d3df; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .toolbar { align-items: flex-start; flex-direction: column; } .toolbarActions { width: 100%; justify-content: space-between; } .grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .toolbar { align-items: flex-start; flex-direction: column; } .toolbarActions { width: 100%; justify-content: space-between; } .toolbarActions > * { min-height: 44px; } .grid { grid-template-columns: 1fr; } .summary dd { white-space: normal; overflow-wrap: anywhere; } .runHeader { align-items: flex-start; flex-direction: column; gap: 4px; } }

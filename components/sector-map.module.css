@@ -104,3 +104,11 @@
   text-shadow: 0 0 8px rgba(255, 0, 163, 0.5);
   box-shadow: 0 0 10px rgba(255, 0, 163, 0.1);
 }
+
+@media (max-width: 480px) {
+  .container { margin-top: 24px; }
+  .grid { gap: 8px; }
+  .cell { padding: 12px 10px; border-radius: 13px; }
+  .cell:hover { transform: translateY(-2px); }
+  .name { overflow-wrap: anywhere; font-size: 11px; }
+}

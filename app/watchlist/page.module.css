@@ -437,3 +437,18 @@
   .watchLayout { grid-template-columns: 1fr; }
   .addCard { position: static; }
 }
+
+@media (max-width: 480px) {
+  .page { width: calc(100% - 20px); padding-bottom: 56px; }
+  .hero { padding: 28px 8px 22px; }
+  .heroTitle { font-size: clamp(30px, 10vw, 38px); }
+  .watchLayout { gap: 14px; }
+  .addCard, .watchGroup { padding: 18px 16px; border-radius: 16px; }
+  .mode, .modeActive, .addBtn { min-height: 44px; }
+  .watchInput { min-height: 48px; font-size: 16px; }
+  .feedHeader { align-items: flex-start; flex-wrap: wrap; }
+  .watchCard { align-items: flex-start; flex-wrap: wrap; padding: 14px; }
+  .watchCard > div:first-child { flex-basis: calc(100% - 28px); }
+  .watchActions { width: 100%; padding-left: 28px; }
+  .watchActions button { flex: 1; min-height: 42px; }
+}

@@ -110,3 +110,11 @@
   font-weight: 800;
   color: #64748b;
 }
+
+@media (max-width: 480px) {
+  .container { padding: 18px 14px; border-radius: 20px; }
+  .gauge, .track, .fill { width: 144px; height: 72px; }
+  .track, .fill { height: 144px; border-width: 10px; }
+  .score { font-size: 28px; }
+  .historyWrap { margin-top: 18px; }
+}

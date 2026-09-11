@@ -179,6 +179,18 @@
   padding: 40px 0;
 }
 
+@media (max-width: 480px) {
+  .overlay { align-items: flex-end; padding-bottom: env(safe-area-inset-bottom); }
+  .modal { width: 100%; max-height: calc(94vh - env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
+  .header { padding: 16px; }
+  .header h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 16px; }
+  .closeBtn { width: 40px; height: 40px; flex-shrink: 0; }
+  .content { padding: 22px 16px max(24px, env(safe-area-inset-bottom)); }
+  .timeline { gap: 22px; }
+  .item { padding-left: 24px; }
+  .details { padding: 11px 12px; }
+}
+
 .title {
   font-size: 14px;
   font-weight: 600;

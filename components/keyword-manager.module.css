@@ -131,3 +131,12 @@
   margin: 0;
   padding: 4px 0;
 }
+
+@media (max-width: 480px) {
+  .container { padding: 16px; border-radius: 18px; gap: 13px; }
+  .header { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .inputGroup { width: 100%; flex-direction: column; gap: 8px; }
+  .input { width: 100%; min-height: 48px; box-sizing: border-box; font-size: 16px; }
+  .button { width: 100%; min-height: 46px; }
+  .badge { max-width: 100%; min-height: 32px; box-sizing: border-box; }
+}

@@ -59,6 +59,8 @@
   flex-shrink: 0;
 }
 
+.header > div:first-child { min-width: 0; }
+
 .titleBlock {
   display: flex;
   flex-direction: column;
@@ -209,6 +211,8 @@
 /* ── 바디 ── */
 .body {
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   flex: 1;
   padding: 20px 24px 24px;
   display: flex;
@@ -386,21 +390,27 @@
     min-height: 72px;
     padding: 16px 64px 12px 16px;
     background: rgba(10, 14, 26, 0.98);
+    gap: 8px;
   }
-  .titleBlock { min-width: 0; }
+  .header > div:first-child { flex-wrap: wrap; row-gap: 6px !important; }
+  .titleBlock { min-width: 0; max-width: 62%; }
   .company, .code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* iOS Safari can scroll the fixed modal itself while the chart canvas is
      being interacted with. Keep the dismiss action viewport-visible. */
   .closeBtn {
     position: absolute;
-    top: 16px;
-    right: 12px;
+    top: 12px;
+    right: 10px;
     z-index: 1060;
     margin-left: 0;
+    width: 44px;
+    height: 44px;
     background: rgba(10, 14, 26, 0.96);
   }
 
-  .watchlistAction { margin-left: 0; }
+  .priceBlock { min-width: 0; max-width: 34%; align-items: flex-start; }
+  .price { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .watchlistAction { flex-basis: 100%; margin-left: 0; min-width: 0; }
   .watchlistMessage { position: absolute; left: 24px; top: 76px; }
   .body { padding: 16px; }
   .tabs { padding-left: 16px; padding-right: 16px; }
@@ -415,7 +425,11 @@
 
 @media (max-width: 480px) {
   .overlay { padding-bottom: env(safe-area-inset-bottom); }
-  .modal { max-height: calc(95vh - env(safe-area-inset-bottom)); }
+  .modal {
+    max-height: calc(95vh - env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .header { padding-top: max(12px, env(safe-area-inset-top)); }
   .body { padding: 12px; }
   .tabs { gap: 4px; overflow-x: auto; scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }

@@ -14,6 +14,18 @@ type RatioType = "financial" | "growth" | "profit" | "stability" | "balance-shee
 type OpinionResponse = { ok: boolean; rows?: Array<Record<string, unknown>>; collectedAt?: string };
 type FlowMode = "investor" | "estimate" | "investor-daily" | "foreign-member" | "foreign-member-tick" | "program" | "program-daily" | "member" | "member-daily" | "conclusion" | "ccnl" | "price2" | "asking" | "price-detail" | "minute" | "minute-5" | "daily-minute" | "daily" | "info" | "product-info" | "stock-info" | "lendable" | "etf-price" | "etf-components" | "etf-nav" | "etf-nav-daily" | "daily-price" | "opinion-by-broker" | "exp-price-trend" | "overtime-conclusion" | "overtime-daily" | "overtime-price" | "overtime-asking" | "short-sale" | "credit" | "loan" | "trade-volume" | "vi" | "pbar" | "trade-participation" | "highlow" | "lowhigh";
 
+const ratioFieldLabels: Record<string, string> = {
+  stac_yymm: "기준 연월", bsop_date: "기준일", per: "PER", pbr: "PBR", eps: "EPS", bps: "BPS", roe: "ROE",
+  sps: "주당매출액", cps: "주당현금흐름", grs: "매출액 증가율", bsop_prti: "영업이익률", ntin_prti: "순이익률",
+  lblt_rate: "부채비율", lqdty_rate: "유동비율", rsrv_rate: "유보율", ttm: "매출액", sale_account: "매출액",
+  bsop_prti_rate: "영업이익률", ntin_rate: "순이익률", totl_assets: "총자산", totl_lblt: "총부채", totl_cptl: "총자본",
+  operating_income: "영업이익", net_income: "당기순이익",
+};
+
+function ratioFieldLabel(key: string) {
+  return ratioFieldLabels[key] ?? key.replaceAll("_", " ");
+}
+
 const MODAL_SETTINGS_KEY = "stockman:chart-modal-settings";
 type ModalSettings = { timeframe: "D" | "W" | "M"; activeTab: "chart" | "fundamentals" | "flow" | "ratio" | "news"; flowMode: FlowMode; ratioType: RatioType };
 function readModalSettings(): Partial<ModalSettings> {
@@ -166,7 +178,7 @@ function KISRatioPanel({ data, loading, error, isUs, type, onTypeChange }: { dat
   if (loading) return <div className={styles.chartLoading}>재무비율을 불러오는 중…</div>;
   if (error) return <div className={styles.error}>{error}</div>;
   const row = data?.rows?.[0];
-  return <div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{([ ["financial", "재무비율"], ["growth", "성장성"], ["profit", "수익성"], ["stability", "안정성"], ["balance-sheet", "대차대조표"], ["income-statement", "손익계산서"], ["other-major", "기타 주요비율"] ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => onTypeChange(value)} aria-pressed={type === value} style={{ padding: "7px 10px", borderRadius: 8, background: type === value ? "#00ffa3" : "rgba(148,163,184,.12)", color: type === value ? "#020617" : "#cbd5e1", fontWeight: 700 }}>{label}</button>)}</div>{row ? <><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}><button type="button" onClick={() => void copyToClipboard(JSON.stringify(data, null, 2))} style={{ padding: "7px 10px", borderRadius: 8, background: "rgba(148,163,184,.12)", color: "#cbd5e1", fontWeight: 700 }}>전체 JSON 복사</button></div><div className={styles.indicators}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 24).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{key}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div><div className={styles.indicatorSub}>출처: KIS · 수집: {formatDisplayDateTime(data?.collectedAt)}</div></> : <div className={styles.empty}>KIS 재무 데이터가 없습니다.</div>}</div>;
+  return <div><div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{([ ["financial", "재무비율"], ["growth", "성장성"], ["profit", "수익성"], ["stability", "안정성"], ["balance-sheet", "대차대조표"], ["income-statement", "손익계산서"], ["other-major", "기타 주요비율"] ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => onTypeChange(value)} aria-pressed={type === value} style={{ padding: "7px 10px", borderRadius: 8, background: type === value ? "#00ffa3" : "rgba(148,163,184,.12)", color: type === value ? "#020617" : "#cbd5e1", fontWeight: 700 }}>{label}</button>)}</div>{row ? <><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}><button type="button" onClick={() => void copyToClipboard(JSON.stringify(data, null, 2))} style={{ padding: "7px 10px", borderRadius: 8, background: "rgba(148,163,184,.12)", color: "#cbd5e1", fontWeight: 700 }}>전체 JSON 복사</button></div><div className={styles.indicators}>{Object.entries(row).filter(([, value]) => value !== undefined && value !== null && value !== "").slice(0, 24).map(([key, value]) => <div className={styles.indicatorCard} key={key}><span className={styles.indicatorLabel}>{ratioFieldLabel(key)}</span><span className={styles.indicatorValue}>{String(value)}</span></div>)}</div><div className={styles.indicatorSub}>출처: KIS · 수집: {formatDisplayDateTime(data?.collectedAt)}</div></> : <div className={styles.empty}>KIS 재무 데이터가 없습니다.</div>}</div>;
 }
 
 function KISOpinionPanel({ data, loading, error, isUs }: { data: OpinionResponse | null; loading: boolean; error: string | null; isUs: boolean }) {

@@ -242,3 +242,17 @@
   color: var(--text-secondary);
   margin-left: auto;
 }
+
+@media (max-width: 480px) {
+  .container { padding: 18px 14px; border-radius: 16px; }
+  .header { align-items: center; }
+  .title { font-size: 16px; }
+  .desc { margin-bottom: 14px; }
+  .listItem { gap: 8px; padding: 12px; border-radius: 12px; }
+  .rank { min-width: 26px; font-size: 16px; }
+  .topRow { gap: 6px; }
+  .company { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+  .score { flex: 0 0 auto; font-size: 12px; }
+  .meta { gap: 6px; }
+  .time { margin-left: 0; }
+}

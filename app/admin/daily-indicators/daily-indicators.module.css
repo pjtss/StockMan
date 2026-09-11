@@ -209,5 +209,13 @@
 
 @media (max-width: 640px) {
   .summaryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .toolbar > button { flex: 1 1 150px; }
+  .toolbar { align-items: stretch; }
+  .toolbar label, .toolbar input, .toolbar select { width: 100%; }
+  .toolbar > button { flex: 1 1 150px; min-height: 44px; }
+  .cardCopyButton { min-height: 40px; }
+}
+
+@media (max-width: 380px) {
+  .summaryGrid { grid-template-columns: 1fr; }
+  .policyCard, .outputCard { padding: 14px; }
 }

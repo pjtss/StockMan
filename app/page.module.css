@@ -51,7 +51,7 @@
 .destination:hover { background: rgba(0, 231, 155, .055); }
 .index { color: #00e79b; font-size: 12px; font-weight: 900; }
 .destinationCopy { min-width: 0; display: grid; gap: 5px; }
-.destinationCopy strong { font-size: 14px; }
+.destinationCopy strong { font-size: 14px; overflow-wrap: anywhere; }
 .destinationCopy small { color: #8497ab; font-size: 12px; line-height: 1.4; }
 .arrow { margin-left: auto; color: #6f849a; font-size: 20px; }
 
@@ -65,6 +65,9 @@
 @media (max-width: 700px) {
   .page { width: min(100% - 16px, 1240px); padding-top: 8px; }
   .topBar, .contentHeader, .statusBar, .destinationSection { padding-left: 16px; padding-right: 16px; }
+  .topBar { min-height: 52px; gap: 10px; }
+  .statusBar { min-height: 48px; padding-top: 10px; padding-bottom: 10px; align-items: flex-start; flex-wrap: wrap; }
+  .statusBar > span { overflow-wrap: anywhere; }
   .contentHeader h1 { font-size: 26px; }
   .destinationList { grid-template-columns: 1fr; }
   .destination:nth-child(odd) { border-right: 0; }

@@ -121,3 +121,13 @@
 .error {
   color: #ff4d4d;
 }
+
+@media (max-width: 480px) {
+  .container { padding: 16px; border-radius: 16px; }
+  .title { margin-bottom: 14px; }
+  .list { gap: 13px; }
+  .item { grid-template-columns: 20px minmax(0, 1fr) auto; gap: 8px; }
+  .name, .price { overflow-wrap: anywhere; }
+  .priceInfo { min-width: 0; }
+  .loading, .error { padding: 28px 12px; }
+}

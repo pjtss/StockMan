@@ -521,4 +521,14 @@
   }
 }
 
+@media (max-width: 480px) {
+  .page { width: calc(100% - 20px); padding-top: 16px; padding-bottom: 56px; }
+  .nav { display: flex; max-width: 100%; margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .navLink, .navActive { flex: 0 0 auto; padding: 9px 14px; font-size: 13px; }
+  .hero { gap: 14px; margin-bottom: 22px; }
+  .hero h1 { font-size: clamp(32px, 11vw, 46px); }
+  .description { margin-top: 12px; font-size: 14px; line-height: 1.6; }
+  .statusCard { padding: 18px; border-radius: 18px; }
+}
 

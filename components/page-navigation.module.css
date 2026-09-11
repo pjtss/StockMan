@@ -188,3 +188,12 @@ button.navLink { border: 0; background: transparent; }
     transition: none;
   }
 }
+
+@media (max-width: 380px) {
+  .header { gap: 10px; padding: 10px 6px; border-radius: 13px; }
+  .brand { gap: 6px; }
+  .brandName { font-size: 17px; letter-spacing: .03em; }
+  .brandSubtitle { padding: 2px 6px; font-size: 10px; }
+  .nav { gap: 2px; padding: 3px; }
+  .navLink, .navActive { padding-inline: 11px; font-size: 11px; }
+}

@@ -309,3 +309,14 @@
     justify-content: flex-end;
   }
 }
+
+@media (max-width: 480px) {
+  .page { width: calc(100% - 20px); padding-bottom: 56px; }
+  .hero { padding: 28px 8px 22px; }
+  .heroTitle { font-size: clamp(30px, 10vw, 38px); }
+  .toolbar { gap: 10px; margin-bottom: 16px; }
+  .tabs { width: 100%; }
+  .tabBtn, .actionBtn { min-height: 44px; }
+  .actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .actions button { width: 100%; }
+}
