@@ -1,4 +1,4 @@
-.page { width: min(100% - 32px, 1240px); min-height: 100vh; margin: 0 auto; padding: 24px 0 48px; color: #e8eef5; }
+.page { width: min(100% - 48px, 1200px); min-height: 100vh; margin: 0 auto; padding: 24px 0 48px; color: #e8eef5; }
 .workspace { width: 100%; border: 1px solid rgba(130,150,175,.2); border-radius: 8px; background: rgba(7,12,20,.94); box-shadow: 0 18px 48px rgba(0,0,0,.34); overflow: hidden; }
 .adminBar { min-height: 58px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid rgba(130,150,175,.16); background: rgba(11,18,28,.92); }
 .adminBrand { display: inline-flex; align-items: center; gap: 10px; color: #f5f8fb; font-size: 13px; font-weight: 900; text-decoration: none; }

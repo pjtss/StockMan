@@ -195,6 +195,44 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   touch-action: manipulation;
 }
 
+/* Shared content frame: pages should align to one readable column instead of
+   independently stretching to the viewport width. Wide data workbenches can
+   opt into their own explicit max-width. */
+.page-shell {
+  width: min(1200px, calc(100% - 48px));
+  min-width: 0;
+  margin-inline: auto;
+  padding: 0 0 80px;
+}
+
+.page-shell > * {
+  min-width: 0;
+}
+
+.page-shell .hero {
+  width: 100%;
+  min-width: 0;
+}
+
+.page-shell .panel,
+.page-shell .results,
+.page-shell .inquiryBoard,
+.page-shell .inquiryForm {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page-shell:not(.chartsPage) .hero {
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.otherExportCard { display:grid; gap:22px; max-width:960px; margin:0 auto; padding:28px; border:1px solid color-mix(in srgb,var(--primary) 18%,var(--border)); border-radius:20px; background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,var(--primary)),var(--card)); }
+.otherExportCard h2 { margin:7px 0 0; font-size:clamp(22px,3vw,30px); letter-spacing:-.04em; }
+.otherExportCard p { margin:8px 0 0; color:var(--text-muted); line-height:1.65; }
+.otherExportCard button { justify-self:start; min-height:44px; padding:0 16px; border:1px solid var(--primary); border-radius:10px; background:var(--primary); color:var(--primary-foreground); font-weight:900; }
+.otherExportStatus { color:var(--primary)!important; font-size:13px; font-weight:800; }
+
 .chartsEntryEffect{position:fixed;inset:0;z-index:80;pointer-events:none;overflow:hidden}.chartsEntryEffect span{position:absolute;display:block}.chartsEntryEffect-meteor span{width:3px;height:120px;border-radius:999px;background:linear-gradient(transparent,#00ffa3);box-shadow:0 0 18px #00ffa3;transform:rotate(38deg);animation:chartsMeteor 1.8s ease-out forwards}.chartsEntryEffect-meteor span:nth-child(1){left:15%;top:-10%;animation-delay:.05s}.chartsEntryEffect-meteor span:nth-child(2){left:38%;top:-20%;animation-delay:.22s}.chartsEntryEffect-meteor span:nth-child(3){left:62%;top:-12%;animation-delay:.1s}.chartsEntryEffect-meteor span:nth-child(4){left:78%;top:-18%;animation-delay:.35s}.chartsEntryEffect-meteor span:nth-child(5){left:91%;top:-8%;animation-delay:.18s}@keyframes chartsMeteor{0%{opacity:0;transform:translate(0,0) rotate(38deg)}20%{opacity:1}100%{opacity:0;transform:translate(-35vw,120vh) rotate(38deg)}}.chartsEntryEffect-pulse{background:radial-gradient(circle,rgba(0,255,163,.24),transparent 38%);animation:chartsPulse 2.4s ease-out forwards}.chartsEntryEffect-pulse span{left:50%;top:50%;width:28px;height:28px;border:2px solid #00ffa3;border-radius:50%;transform:translate(-50%,-50%);animation:chartsRing 1.8s ease-out forwards}.chartsEntryEffect-pulse span:nth-child(2){animation-delay:.2s}.chartsEntryEffect-pulse span:nth-child(3){animation-delay:.4s}.chartsEntryEffect-pulse span:nth-child(4){animation-delay:.6s}.chartsEntryEffect-pulse span:nth-child(5){animation-delay:.8s}@keyframes chartsPulse{from{opacity:1}to{opacity:0}}@keyframes chartsRing{from{opacity:.8;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(22)}}@media(prefers-reduced-motion:reduce){.chartsEntryEffect{display:none}}
 
 @media (max-width: 600px) {
@@ -227,6 +265,8 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .inquiryCommentFormFooter { align-items: stretch; flex-direction: column; }
   .inquiryCommentFormFooter button { width: 100%; min-height: 44px; }
   .disclosureControls input, .disclosureControls select, .disclosureControls button { min-height: 44px; }
+  .otherExportCard { padding:20px 16px; border-radius:16px; }
+  .otherExportCard button { width:100%; }
 }
 
 /* Shared mobile guardrails: keep every screen inside the viewport and make
