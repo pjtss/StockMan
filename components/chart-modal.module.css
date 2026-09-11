@@ -411,3 +411,4 @@
   .company { font-size: 15px; }
   .price { font-size: 18px; }
 }
+.minuteControls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.minuteControls button{min-height:40px;padding:8px 12px;border:1px solid rgba(148,163,184,.22);border-radius:9px;background:rgba(148,163,184,.12);color:#cbd5e1;font-weight:700}.minuteControls button[aria-pressed="true"]{background:#00ffa3;color:#020617;border-color:#00ffa3}

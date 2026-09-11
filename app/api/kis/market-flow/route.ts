@@ -41,6 +41,27 @@ function currentKstDate() {
   return `${values.year}${values.month}${values.day}`;
 }
 
+function aggregateDomesticMinuteRows(rows: Record<string, unknown>[], interval: 1 | 5) {
+  if (interval === 1) return rows;
+  const timeKey = (row: Record<string, unknown>) => String(row.stck_cntg_hour ?? row.cntg_hour ?? row.time ?? "");
+  const price = (row: Record<string, unknown>) => Number(row.stck_prpr ?? row.prpr ?? row.price ?? 0);
+  const volume = (row: Record<string, unknown>) => Number(row.cntg_vol ?? row.stck_cntg_vol ?? row.volume ?? 0);
+  const ordered = [...rows].sort((a, b) => timeKey(a).localeCompare(timeKey(b)));
+  const grouped = new Map<string, Record<string, unknown>[]>();
+  for (const row of ordered) {
+    const time = timeKey(row);
+    const minute = Number(time.slice(2, 4));
+    const bucket = time.length >= 4 && Number.isFinite(minute) ? `${time.slice(0, 2)}${String(Math.floor(minute / interval) * interval).padStart(2, "0")}` : time;
+    grouped.set(bucket, [...(grouped.get(bucket) ?? []), row]);
+  }
+  return [...grouped.entries()].map(([bucket, group]) => {
+    const first = group[0];
+    const prices = group.map(price).filter((value) => value > 0);
+    const result = { ...first, stck_cntg_hour: bucket, stck_oprc: prices[0] ?? null, stck_hgpr: prices.length ? Math.max(...prices) : null, stck_lwpr: prices.length ? Math.min(...prices) : null, stck_prpr: prices.at(-1) ?? null, cntg_vol: group.reduce((sum, row) => sum + volume(row), 0), interval: 5 };
+    return result;
+  }).reverse();
+}
+
 async function handleGet(request: Request) {
   const url = new URL(request.url);
   const rawCode = (url.searchParams.get("code") ?? "").trim();
@@ -126,9 +147,11 @@ async function handleGet(request: Request) {
   if (url.searchParams.get("mode") === "minute") {
     const token = await getAccessToken();
     if (!token) return NextResponse.json({ ok: false, error: "KIS_TOKEN_UNAVAILABLE", source: "KIS", market: "KR", code: rawCode }, { status: 503 });
+    const interval = url.searchParams.get("minute") === "5" ? 5 : 1;
     const result = await fetchTimeItemChartPrice(token, rawCode, url.searchParams.get("hour") ?? "153000", url.searchParams.get("includePrevious") ?? "Y");
+    if (interval === 5) result.rows = aggregateDomesticMinuteRows(result.rows as Record<string, unknown>[], interval) as typeof result.rows;
     await writeKisSignalSnapshot({ market: "KR", code: rawCode, signalType: "domestic_minute_chart", status: result.ok ? "AVAILABLE" : "UNAVAILABLE", payload: result.rows });
-    return NextResponse.json({ ...result, source: "KIS", market: "KR", code: rawCode, instrument: { code: rawCode, name: company }, mode: "minute", collectedAt: new Date().toISOString() }, { status: result.ok ? 200 : 502 });
+    return NextResponse.json({ ...result, source: "KIS", market: "KR", code: rawCode, instrument: { code: rawCode, name: company }, mode: "minute", interval, collectedAt: new Date().toISOString() }, { status: result.ok ? 200 : 502 });
   }
   if (url.searchParams.get("mode") === "daily-minute") {
     const requestedDate = url.searchParams.get("date");

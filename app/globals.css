@@ -78,6 +78,25 @@
 .healthGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }.healthGrid article { border: 1px solid var(--panel-border); border-radius: 14px; padding: 20px; background: var(--panel-bg); }.healthGrid h2 { margin-top: 0; font-size: 18px; }.healthGrid dl { display: grid; grid-template-columns: 1fr 1.5fr; gap: 9px; font-size: 14px; }.healthGrid dt { color: var(--groupHeader-span); }.healthGrid dd { margin: 0; overflow-wrap: anywhere; }.healthCheck, .healthEnv { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--panel-border); }.healthCheck strong, .healthEnv b { margin-left: auto; font-size: 12px; }.healthEnv { font-size: 12px; }.healthEnv b { color: #4ade80; }.healthDot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }.healthOk { background: #4ade80; box-shadow: 0 0 10px #4ade80; }.healthBad { background: #fb7185; box-shadow: 0 0 10px #fb7185; }.healthMuted { color: var(--groupHeader-span); font-size: 13px; }
 @media (max-width: 760px) { .healthGrid { grid-template-columns: 1fr; }.healthStatus { align-items: flex-start; flex-wrap: wrap; }.healthStatus small { width: 100%; margin-left: 19px; } }
 
+.investmentCalendarBoard { margin-top: 18px; }
+.calendarControls, .calendarFilters, .calendarChips { display:flex; gap:10px; align-items:end; flex-wrap:wrap; }
+.calendarControls label { color:var(--text-muted); font-size:12px; display:grid; gap:5px; }
+.calendarControls input, .calendarFilters select { min-height:38px; border:1px solid var(--border); border-radius:9px; background:var(--input); color:var(--foreground); padding:7px 10px; }
+.calendarFilters { justify-content:space-between; margin:22px 0; align-items:center; }
+.calendarFilterRight { display:flex; gap:8px; align-items:center; }.calendarExport { min-height:38px; border:1px solid var(--border); border-radius:9px; background:var(--glass); color:var(--text-secondary); padding:7px 12px; cursor:pointer; font-weight:700; }
+.calendarStats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:22px 0 4px; }.calendarStats div { border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:var(--glass); }.calendarStats small,.calendarStats strong { display:block; }.calendarStats small { color:var(--text-muted); font-size:12px; }.calendarStats strong { margin-top:5px; color:var(--card-foreground); font-size:22px; }
+.calendarChip { border:1px solid var(--border); border-radius:999px; background:var(--glass); color:var(--text-secondary); padding:8px 13px; cursor:pointer; }
+.calendarChip.active { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); font-weight:800; }
+.calendarTimeline { display:grid; gap:20px; }
+.calendarDay { display:grid; grid-template-columns:110px 1fr; gap:16px; }
+.calendarDay > time { color:var(--neon-blue); font-weight:800; padding-top:14px; }
+.calendarDay > div { display:grid; gap:10px; }
+.calendarEvent { display:grid; grid-template-columns:auto 1fr auto; gap:13px; align-items:start; padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface-elevated); }
+.calendarEvent strong { display:block; color:var(--card-foreground); }.calendarEvent p,.calendarEvent small { display:block; margin:5px 0 0; color:var(--text-muted); }.calendarEvent em { font-size:12px; color:var(--text-muted); font-style:normal; }.calendarEvent a { color:var(--neon-blue); }
+.calendarBadge { border-radius:7px; padding:5px 8px; background:rgba(41,163,255,.14); color:var(--neon-blue); font-size:12px; font-weight:800; white-space:nowrap; }.calendar-earnings { color:#fbbf24; background:rgba(251,191,36,.14); }.calendar-ex_dividend,.calendar-dividend_payment { color:#00e79b; background:rgba(0,231,155,.12); }.calendar-ipo { color:#c084fc; background:rgba(192,132,252,.14); }
+.calendarEmpty { padding:42px 16px; text-align:center; color:var(--text-muted); border:1px dashed var(--border); border-radius:14px; }
+@media (max-width:760px) { .calendarDay { grid-template-columns:1fr; gap:7px; }.calendarDay > time { padding-top:0; }.calendarEvent { grid-template-columns:auto 1fr; }.calendarEvent em { grid-column:2; }.calendarControls { width:100%; }.calendarControls label { flex:1; }.calendarControls input { width:100%; }.calendarStats { grid-template-columns:repeat(2,1fr); }.calendarFilterRight { width:100%; }.calendarFilterRight select,.calendarExport { flex:1; } }
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -197,6 +216,27 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .inquiryCommentFormFooter button { width: 100%; min-height: 44px; }
   .disclosureControls input, .disclosureControls select, .disclosureControls button { min-height: 44px; }
 }
+
+/* Shared mobile guardrails: keep every screen inside the viewport and make
+   primary controls comfortable for touch without changing desktop layouts. */
+@media (max-width: 480px) {
+  body { min-width: 320px; }
+  .page-shell { padding-inline: 10px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+  .hero { text-align: left; }
+  .hero h1 { letter-spacing: -.045em; }
+  .panel, .results, .inquiryBoard, .inquiryForm { padding: 14px; border-radius: 14px; }
+  button, input, select, textarea { font-size: 16px; } /* avoids iOS input zoom */
+  button, select { min-height: 44px; }
+  textarea { max-width: 100%; }
+  .tableWrap, [style*="overflowX: auto"] { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 620px; }
+  .chartsPage .panel, .chartsPage .results { padding: 13px; }
+  .chartsHeroMeta span { font-size: 11px; }
+}
+
+.disclosuresPage{max-width:1180px}.disclosuresHero{padding-bottom:28px}.disclosuresHero h1{max-width:720px;letter-spacing:-.055em}.disclosuresHero p{max-width:680px;color:#9aa8c2}.disclosureSurface{margin-top:8px;padding:28px;border:1px solid rgba(148,163,184,.18);border-radius:24px;background:linear-gradient(145deg,rgba(15,23,42,.94),rgba(7,12,24,.98));box-shadow:0 24px 70px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.035)}.disclosureBoardHead{display:flex;align-items:flex-end;justify-content:space-between;gap:28px}.disclosureEyebrow{display:block;margin-bottom:8px;color:#00e79b;font-size:11px;font-weight:800;letter-spacing:.16em}.disclosureTitle h2{margin:0;color:#f4f7ff;font-size:clamp(22px,3vw,30px);letter-spacing:-.045em}.disclosureTitle p{margin:8px 0 0;color:#8795b0;font-size:14px}.disclosureControlsModern{display:flex;align-items:flex-end;gap:10px}.disclosureControlsModern label{display:grid;gap:7px;color:#8d9ab3;font-size:12px;font-weight:700;letter-spacing:.02em}.disclosureControlsModern input,.disclosureControlsModern select{height:44px;min-width:150px;padding:0 12px;border:1px solid rgba(148,163,184,.24);border-radius:11px;background:#0c1323;color:#e8edf8;font:600 14px Inter,system-ui,sans-serif}.disclosureControlsModern input:focus,.disclosureControlsModern select:focus{outline:2px solid rgba(0,231,155,.4);outline-offset:2px}.disclosureCopyButton{height:44px;padding:0 16px;border:1px solid rgba(0,231,155,.38);border-radius:11px;background:#00e79b;color:#03131a;font-weight:850;white-space:nowrap}.disclosureJsonHint{margin-top:22px;padding:14px 16px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(148,163,184,.055);color:#8694ae;font-size:13px;line-height:1.65}.disclosureStatus{margin:18px 0 0;color:#00e79b;font-size:13px;font-weight:700}
+@media (max-width:700px){.disclosureSurface{padding:18px;border-radius:18px}.disclosureBoardHead{display:grid;align-items:stretch}.disclosureControlsModern{display:grid;grid-template-columns:1fr 1fr}.disclosureControlsModern label,.disclosureControlsModern input,.disclosureControlsModern select{min-width:0;width:100%}.disclosureCopyButton{grid-column:1/-1;width:100%}}
+@media (max-width:480px){.disclosuresHero{padding-top:18px}.disclosuresHero h1{font-size:clamp(34px,11vw,48px)}.disclosureControlsModern{grid-template-columns:1fr}.disclosureCopyButton{grid-column:auto}}
 
 /* Animations */
 @keyframes fadeInUp {
