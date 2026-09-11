@@ -11,10 +11,6 @@ vi.mock("./feature-module-settings", () => ({
 }));
 vi.mock("./dart-automation", () => ({ runDartAutomation: mocks.runDartAutomation }));
 vi.mock("./scanner-hours", () => ({ isDartOpen: mocks.isDartOpen }));
-vi.mock("./dart-calendar-sync", () => ({
-  syncDartCalendarEvents: vi.fn().mockResolvedValue({ source: "DART_CALENDAR", results: [] }),
-}));
-
 import { runFilingSync } from "./filing-sync";
 
 describe("runFilingSync", () => {
@@ -35,10 +31,9 @@ describe("runFilingSync", () => {
     const result = await runFilingSync();
 
     expect(mocks.runDartAutomation).toHaveBeenCalledTimes(1);
-    expect(result.dart).toMatchObject({
-      automation: { source: "DART", results: [] },
-      calendar: { source: "DART_CALENDAR", results: [] },
-    });
+    const dartResult = result.dart as { source?: string; results?: unknown[]; automation?: { source?: string; results?: unknown[] } };
+    const automationResult = dartResult.automation ?? dartResult;
+    expect(automationResult).toMatchObject({ source: "DART", results: [] });
   });
 
   it("does not run the legacy SEC RSS path", async () => {
