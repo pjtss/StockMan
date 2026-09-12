@@ -6,6 +6,8 @@ import { fetchKisUsTopRisingApi } from "@/lib/kis-us-api";
 import { getPool } from "@/lib/db";
 import { loadUsTurnoverFilterSettings, type UsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { syncDailyActivityStatus } from "@/lib/daily-activity-status";
+import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
+import { intradayMemoryState } from "@/lib/intraday-memory-state";
 
 export const US_EXCHANGES = ["NAS", "AMS", "NYS"] as const;
 const EXCLUDED = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i;
@@ -27,7 +29,7 @@ function rows(parsed: any) {
 }
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
-export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null };
+export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null; priority?: number; turnoverToMarketCap?: number; priorityReasons?: string[] };
 
 export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(scopes: T[], settings: UsTurnoverFilterSettings = DEFAULT_SETTINGS): Promise<T[]> {
   const enabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
@@ -148,7 +150,13 @@ async function loadUsTopRisingScopesUncached() {
     for (const scope of scopes) scope.marketCap = caps.get(`${scope.market}:${scope.code}`) ?? null;
   }
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
+  const prioritizedScopes = filteredScopes.map((scope) => {
+    const scored = scoreIntradayCandidate({ market: scope.market, code: scope.code, currency: "USD", marketCap: scope.marketCap ?? null, tradingValue: scope.rankingTradeValue ?? null, isTopRising: true, isNewEntry: false, rankChange: 0, rateChange: scope.changeRate ?? 0, volumeChange: 0, aboveVwap: false });
+    if (scored) intradayMemoryState.upsertCandidate(scored);
+    return scored ? { ...scope, priority: scored.priority, turnoverToMarketCap: scored.turnoverToMarketCap, priorityReasons: scored.reasons } : scope;
+  }).sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1));
+  intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
   const hasSuccessfulResponse = markets.some((market) => market.status === 200 && (market as any).kis?.rtCd === "0");
-  return { scopes: filteredScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, emptyResponse: "normal_successful_response_is_not_transport_error" } } };
+  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, priority: "turnover_to_market_cap_plus_intraday_signals", currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
 }

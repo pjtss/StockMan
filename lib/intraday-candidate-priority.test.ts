@@ -1,0 +1,8 @@
+import { describe, expect, it } from "vitest";
+import { calculateTurnoverToMarketCap, scoreIntradayCandidate } from "./intraday-candidate-priority";
+describe("intraday candidate priority", () => {
+  it("keeps KRW and USD calculations separate", () => { expect(calculateTurnoverToMarketCap({ currency: "KRW", marketCap: 1_000_000_000, tradingValue: 50_000_000 })).toBe(0.05); expect(calculateTurnoverToMarketCap({ currency: "USD", marketCap: 100_000_000, tradingValue: 5_000_000 })).toBe(0.05); });
+  it("rejects missing, invalid, or unsupported currency inputs", () => { expect(calculateTurnoverToMarketCap({ currency: "KRW", marketCap: 0, tradingValue: 1 })).toBeNull(); expect(calculateTurnoverToMarketCap({ currency: "USD", marketCap: 10, tradingValue: -1 })).toBeNull(); expect(calculateTurnoverToMarketCap({ currency: "KRW", marketCap: null, tradingValue: 1 })).toBeNull(); });
+  it("adds the high-frequency priority reason at five percent", () => { const result = scoreIntradayCandidate({ market: "NAS", code: "ABC", currency: "USD", marketCap: 100, tradingValue: 5, isTopRising: true, isNewEntry: true, rankChange: 20, rateChange: 1, volumeChange: 1, aboveVwap: true, now: 100 }); expect(result?.turnoverToMarketCap).toBe(0.05); expect(result?.priority).toBe(130); expect(result?.reasons).toContain("TURNOVER_TO_MARKET_CAP_5PCT"); });
+  it("does not enqueue a candidate without a comparable ratio", () => { expect(scoreIntradayCandidate({ market: "NAS", code: "ABC", currency: "USD", marketCap: null, tradingValue: 5, isTopRising: true, isNewEntry: false, rankChange: 0, rateChange: 0, volumeChange: 0, aboveVwap: false })).toBeNull(); });
+});
