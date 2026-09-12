@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BarChart3,
   Database,
   ChartNoAxesCombined,
   FlaskConical,
@@ -32,6 +33,7 @@ const NAV_ICONS = {
   "stocktitan-rss": Newspaper,
   "user-activity": Users,
   database: Database,
+  "kis-calls": BarChart3,
 } satisfies Record<AdminNavId, typeof LayoutDashboard>;
 
 type AdminPageShellProps = {

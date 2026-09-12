@@ -1,4 +1,4 @@
-export type AdminNavId = "dashboard" | "modules" | "api-config" | "api-tests" | "daily-indicators" | "daily-rss" | "blacklist" | "sec-test" | "observability" | "stocktitan-rss" | "user-activity" | "database";
+export type AdminNavId = "dashboard" | "modules" | "api-config" | "api-tests" | "daily-indicators" | "daily-rss" | "blacklist" | "sec-test" | "observability" | "stocktitan-rss" | "user-activity" | "database" | "kis-calls";
 
 export type AdminNavItem = {
   id: AdminNavId;
@@ -30,6 +30,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     description: "기능별 자동화 실행 이력과 오류 확인",
     href: "/admin/observability",
   },
+  { id: "kis-calls", group: "진단", label: "KIS 호출량", description: "KIS API 호출량·지연시간·실패율 집계", href: "/admin/kis-calls" },
   { id: "stocktitan-rss", group: "진단", label: "RSS 공시", description: "출처·호재 등급별 원문·번역·알림 디버깅", href: "/admin/stocktitan-rss" },
   { id: "user-activity", group: "진단", label: "유저 행동", description: "요청 경로·사용자 키·오류 흐름 확인", href: "/admin/user-activity" },
   { id: "database", group: "진단", label: "DB 데이터 조회", description: "테이블·컬럼·최근 저장 데이터 확인", href: "/admin/database" },
