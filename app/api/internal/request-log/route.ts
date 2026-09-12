@@ -21,7 +21,10 @@ export async function POST(request: Request) {
     // Geolocation is optional; request logging must remain best-effort.
   }
   try {
-    await getPool().query("INSERT INTO request_logs(request_id,method,path,status_code,ip_address,user_agent,user_key,duration_ms,geo_country_code,geo_country_name,geo_region,geo_city,geo_timezone,geo_asn,geo_org,geo_source,geo_confidence) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)", [clip(request.headers.get("x-request-id") || crypto.randomUUID(), 128), clip(body.method || "GET", 16), clip(body.path || "/", 512), null, clip(identity.ip, 128), clip(identity.userAgent, 1024), identity.userKey, null, clip(geo.countryCode, 64), clip(geo.countryName, 128), clip(geo.region, 128), clip(geo.city, 128), clip(geo.timezone, 128), nullableInteger(geo.asn), clip(geo.org, 256), clip(geo.source, 64), geo.confidence]);
+    const path = clip(body.path || "/", 512);
+    const feature = path.includes("login") ? "auth" : path.includes("screen") || path.includes("scan") ? "screener" : path.includes("chart") ? "chart" : path.includes("watchlist") ? "watchlist" : path.includes("rss") || path.includes("filing") ? "news" : path.includes("inquir") || path.includes("comment") ? "community" : path.includes("notice") ? "notice" : "api";
+    const action = String(body.method || "GET") === "GET" ? "view" : "submit";
+    await getPool().query("INSERT INTO request_logs(request_id,method,path,status_code,ip_address,user_agent,user_key,duration_ms,feature,action,resource,result,geo_country_code,geo_country_name,geo_region,geo_city,geo_timezone,geo_asn,geo_org,geo_source,geo_confidence) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)", [clip(request.headers.get("x-request-id") || crypto.randomUUID(), 128), clip(body.method || "GET", 16), path, null, clip(identity.ip, 128), clip(identity.userAgent, 1024), identity.userKey, null, feature, action, path, "requested", clip(geo.countryCode, 64), clip(geo.countryName, 128), clip(geo.region, 128), clip(geo.city, 128), clip(geo.timezone, 128), nullableInteger(geo.asn), clip(geo.org, 256), clip(geo.source, 64), geo.confidence]);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false, error: "REQUEST_LOG_UNAVAILABLE" }, { status: 503 });
