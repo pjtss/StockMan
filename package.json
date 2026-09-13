@@ -10,12 +10,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "docs:check": "node scripts/check-docs.mjs",
+    "audit:kis-boundary": "node scripts/audit-kis-boundary.mjs",
+    "measure:verify": "node scripts/measure-verify.mjs",
+    "compare:verify": "node scripts/compare-verify.mjs",
+    "audit:verify-scope": "node scripts/audit-verify-scope-change.mjs",
     "cron:check": "node scripts/check-oci-cron.mjs",
     "measure:accumulation": "node scripts/measure-accumulation-api.mjs",
     "measure:screener-db": "node scripts/measure-screener-db.mjs",
     "typecheck": "tsc --noEmit",
     "deploy:verify": "node scripts/verify-deploy.mjs",
-    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run cron:check && npm run build"
+    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:verify-scope && npm run audit:kis-boundary && npm run cron:check && npm run build"
   },
   "dependencies": {
     "@netlify/functions": "^5.2.0",

@@ -3,6 +3,8 @@
 배포는 아래 순서를 모두 통과한 경우에만 진행한다. 체크리스트는 사람이 읽는 운영 기준이고, 자동 검증은 `npm run deploy:verify`가 담당한다.
 
 전체 기획·개발·테스트·배포·개선 흐름은 [`delivery-lifecycle.md`](../development/delivery-lifecycle.md)를 기준으로 한다.
+운영 지표와 개선 과제 관리는 [`continuous-improvement.md`](./continuous-improvement.md)를 기준으로 한다.
+검토 주기와 성과 판정은 [`improvement-review.md`](./improvement-review.md)를 기준으로 한다.
 
 ## 배포 전
 

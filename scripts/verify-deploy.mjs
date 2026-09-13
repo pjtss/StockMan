@@ -1,23 +1,43 @@
 import { spawn } from "node:child_process";
+import { createServer } from "node:net";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
+const verifyDistDir = process.env.DEPLOY_VERIFY_DIST_DIR || ".next-deploy-verify";
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: "inherit", shell: isWindows, ...options });
-    child.on("error", reject);
+    const startedAt = Date.now();
+    const executable = isWindows ? process.env.ComSpec : command;
+    const executableArgs = isWindows ? ["/d", "/s", "/c", [command, ...args].join(" ")] : args;
+    const child = spawn(executable, executableArgs, { stdio: "inherit", shell: false, ...options });
+    const label = `${command} ${args.join(" ")}`;
+    console.log(`[deploy-verify] started: ${label}`);
+    const progressTimer = setInterval(() => {
+      console.log(`[deploy-verify] still running: ${label} (${Date.now() - startedAt}ms)`);
+    }, 30_000);
+    const finish = () => clearInterval(progressTimer);
+    child.on("error", (error) => {
+      finish();
+      reject(error);
+    });
     child.on("exit", (code, signal) => {
-      if (code === 0) resolve();
-      else reject(new Error(`${command} ${args.join(" ")} failed (code=${code}, signal=${signal ?? "none"})`));
+      finish();
+      if (code === 0) {
+        console.log(`[deploy-verify] completed: ${label} (${Date.now() - startedAt}ms)`);
+        resolve();
+      } else reject(new Error(`${label} failed (code=${code}, signal=${signal ?? "none"})`));
     });
   });
 }
 
 async function verifyQuality() {
+  console.log("[deploy-verify] quality gates");
   await run(npm, ["test", "--", "--run"]);
   await run(npm, ["run", "typecheck"]);
   await run(npm, ["run", "docs:check"]);
+  await run(npm, ["run", "audit:verify-scope"]);
+  await run(npm, ["run", "audit:kis-boundary"]);
   await run(npm, ["run", "cron:check"]);
   if (!isWindows) await run("bash", ["-n", "scripts/oci-cron.sh"]);
 }
@@ -28,8 +48,10 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   while (Date.now() < deadline) {
     try {
       const response = await fetch(url);
-      if (response.ok) return;
-      lastError = new Error(`HTTP ${response.status}`);
+      const contentType = response.headers.get("content-type") ?? "";
+      const body = await response.text();
+      if (response.ok && contentType.includes("text/html") && body.trim().length > 100) return;
+      lastError = new Error(`HTTP ${response.status}, content-type=${contentType}, bodyLength=${body.length}`);
     } catch (error) {
       lastError = error;
     }
@@ -38,26 +60,47 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
 }
 
-async function verifyRuntime() {
-  const port = process.env.DEPLOY_VERIFY_PORT || "3100";
-  const command = isWindows ? "node" : "node";
-  const args = [".next/standalone/server.js"];
-  const child = spawn(command, args, {
-    env: { ...process.env, PORT: port, NODE_ENV: "production" },
-    stdio: "inherit",
-    shell: isWindows,
+function findAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close((error) => error ? reject(error) : resolve(address.port));
+    });
   });
+}
+
+function stopProcess(child) {
+  if (child.exitCode !== null) return;
+  if (isWindows) {
+    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false });
+  } else {
+    child.kill("SIGTERM");
+  }
+}
+
+async function verifyRuntime() {
+  const port = process.env.DEPLOY_VERIFY_PORT || await findAvailablePort();
+  const command = isWindows ? "node" : "node";
+  const args = [`${verifyDistDir}/standalone/server.js`];
+  const executable = isWindows ? process.env.ComSpec : command;
+  const executableArgs = isWindows ? ["/d", "/s", "/c", [command, ...args].join(" ")] : args;
+  const child = spawn(executable, executableArgs, {
+    env: { ...process.env, PORT: port, NODE_ENV: "production" },
+    stdio: "ignore",
+    shell: false,
+    detached: true,
+  });
+  child.unref();
   try {
     await waitForHealth(`http://127.0.0.1:${port}/charts`);
   } finally {
-    if (child.exitCode === null) {
-      if (isWindows) spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
-      else child.kill("SIGTERM");
-    }
+    await stopProcess(child);
   }
 }
 
 await verifyQuality();
-await run(npm, ["run", "build"], { env: { ...process.env } });
+await run(npm, ["run", "build"], { env: { ...process.env, NEXT_DIST_DIR: verifyDistDir } });
 await verifyRuntime();
 console.log("Deployment verification passed: quality gates, build, and runtime smoke test.");

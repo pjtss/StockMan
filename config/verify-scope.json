@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "changeReason": "검증 파이프라인의 성능 비교 범위를 명시적으로 승인하고 회귀를 방지한다.",
+  "approvedBy": "project-maintainers",
+  "approvedAt": "2026-09-13",
+  "approvedStages": ["test", "typecheck", "docs", "verifyScope", "kisBoundary", "cron", "build"]
+}
