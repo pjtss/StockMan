@@ -2,10 +2,13 @@ import { createDebugContext, type DebugContext } from "@/lib/debug-context";
 import { writeDebugLog } from "@/lib/debug-logger";
 
 /** Serializes KIS calls in this process and backs off on gateway rate limits. */
-// Keep the default at the documented live-account ceiling (TPS 18), while
-// allowing operations to choose a more conservative fixed interval.
-// 1000 / 18 = 55.56ms, so 56ms prevents rounding above the limit.
-const BASE_INTERVAL_MS = Math.max(50, Number(process.env.KIS_MIN_REQUEST_INTERVAL_MS ?? 56) || 56);
+// KIS may document a higher ceiling, but this application deliberately uses
+// a conservative hard ceiling of 10 TPS for stability and recovery headroom.
+// The environment variable may lower the rate, never raise it.
+const MAX_SAFE_TPS = 10;
+const MIN_SAFE_INTERVAL_MS = 1000 / MAX_SAFE_TPS;
+const configuredIntervalMs = Number(process.env.KIS_MIN_REQUEST_INTERVAL_MS ?? MIN_SAFE_INTERVAL_MS) || MIN_SAFE_INTERVAL_MS;
+const BASE_INTERVAL_MS = Math.max(MIN_SAFE_INTERVAL_MS, configuredIntervalMs);
 const MAX_ADAPTIVE_INTERVAL_MS = 250;
 const RATE_LIMIT_STEP_MS = 25;
 let adaptiveIntervalMs = BASE_INTERVAL_MS;
@@ -45,7 +48,7 @@ export function classifyKisFailure(result: any): "RATE_LIMITED" | "TRANSIENT_HTT
   return null;
 }
 
-export async function withKisRequestThrottle<T>(request: () => Promise<T>, context?: DebugContext): Promise<T> {
+export async function withKisRequestThrottle<T>(request: () => Promise<T>, context?: DebugContext, onRateLimit?: (result: T, attempt: number, backoffMs: number) => void): Promise<T> {
   const trace = context ?? createDebugContext({ feature: "kis-api" });
   for (let attempt = 0; ; attempt += 1) {
     const attemptStartedAt = Date.now();
@@ -57,6 +60,7 @@ export async function withKisRequestThrottle<T>(request: () => Promise<T>, conte
       if (failure === "RATE_LIMITED") {
         adaptiveIntervalMs = Math.min(MAX_ADAPTIVE_INTERVAL_MS, adaptiveIntervalMs + RATE_LIMIT_STEP_MS);
         consecutiveSuccesses = 0;
+        onRateLimit?.(result, attempt + 1, RETRY_DELAYS_MS[attempt] ?? 0);
       } else if (!failure) {
         consecutiveSuccesses += 1;
         if (consecutiveSuccesses >= 25 && adaptiveIntervalMs > BASE_INTERVAL_MS) {

@@ -13,6 +13,7 @@ type PageKey =
   | "watchlist"
   | "notifications"
   | "scanners-us"
+  | "scanners-kr"
   | "us-intensity"
   | "charts"
   | "inquiries"
@@ -71,6 +72,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link aria-current={current === "scanners-us" ? "page" : undefined} className={current === "scanners-us" ? styles.navActive : styles.navLink} href="/us-top-rising" prefetch={false}>
           해외 상승률 TOP 100
+        </Link>
+        <Link aria-current={current === "scanners-kr" ? "page" : undefined} className={current === "scanners-kr" ? styles.navActive : styles.navLink} href="/kr-top-rising" prefetch={false}>
+          국내 상승률 TOP 100
         </Link>
         <Link aria-current={current === "disclosures" ? "page" : undefined} className={current === "disclosures" ? styles.navActive : styles.navLink} href="/disclosures" prefetch={false}>
           일별 공시

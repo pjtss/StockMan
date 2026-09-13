@@ -6,7 +6,7 @@ export function normalizeOHLCVCandles(candles: OHLCVCandle[]): OHLCVCandle[] {
     new Map(
       candles
         .filter((candle) =>
-          /^\d{8}$/.test(candle.date) &&
+          /^\d{8}(?:\d{6})?$/.test(candle.date) &&
           [candle.open, candle.high, candle.low, candle.close, candle.volume].every((value) => Number.isFinite(Number(value))) &&
           Number(candle.open) >= 0 && Number(candle.high) >= 0 && Number(candle.low) >= 0 && Number(candle.close) >= 0 && Number(candle.volume) >= 0 &&
           Number(candle.high) >= Math.max(Number(candle.open), Number(candle.close), Number(candle.low)) &&

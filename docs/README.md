@@ -28,6 +28,8 @@
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 전체 전달 생명주기: [`development/delivery-lifecycle.md`](./development/delivery-lifecycle.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
+- 지속 개선 운영 기준: [`operations/continuous-improvement.md`](./operations/continuous-improvement.md)
+- 지속 개선 검토 주기: [`operations/improvement-review.md`](./operations/improvement-review.md)
 - 프로젝트 전체 디버깅 구조: [`DEBUGGING_ARCHITECTURE.md`](./DEBUGGING_ARCHITECTURE.md)
 - 일·주·월봉 캐시 갱신: [`CANDLE_REFRESH_DESIGN.md`](./CANDLE_REFRESH_DESIGN.md)
 - 볼린저밴드 탐지 계약: [`bollinger-band-operations.md`](./bollinger-band-operations.md)

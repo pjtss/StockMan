@@ -1,0 +1,51 @@
+export const kisModuleRegistry = {
+  "kis-ams-scout.ts": "overseas-market-scout",
+  "kis-api-config.ts": "configuration",
+  "kis-authorization.ts": "authorization",
+  "kis-breaking-news-forwarder.ts": "news-forwarding",
+  "kis-cache.ts": "cache",
+  "kis-chart.ts": "domestic-chart",
+  "kis-domestic-api.ts": "domestic-ranking",
+  "kis-investor-flow.ts": "domestic-investor-flow",
+  "kis-kr-daily-price.ts": "domestic-daily-price",
+  "kis-kr-price-detail.ts": "domestic-price-detail",
+  "kis-news-radar.ts": "overseas-news",
+  "kis-rate-limit-event.ts": "rate-limit-observability",
+  "kis-realtime-event.ts": "realtime-observability",
+  "kis-realtime.ts": "realtime-approval",
+  "kis-request-framework.ts": "shared-request-boundary",
+  "kis-request-throttle.ts": "shared-throttle",
+  "kis-runtime.ts": "runtime",
+  "kis-signal-snapshot.ts": "signal-snapshot",
+  "kis-token.ts": "token-lifecycle",
+  "kis-types.ts": "types",
+  "kis-us-api.ts": "overseas-ranking",
+  "kis-us-daily-price.ts": "overseas-daily-price",
+  "kis-us-debug.ts": "overseas-debug",
+  "kis-us-market-cap.ts": "overseas-market-cap",
+  "kis-us-minute-turnover.ts": "overseas-minute-turnover",
+  "kis-us-price-detail.ts": "overseas-price-detail",
+  "kis-us-trade-trend.ts": "overseas-trade-trend",
+  "kis-us.ts": "overseas-scanner",
+  "kis.ts": "domestic-scanner",
+};
+
+export const kisModulePathRegistry = {
+  "kis-chart.ts": ["/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"],
+  "kis-domestic-api.ts": [
+    "/uapi/domestic-stock/v1/ranking/volume-power",
+    "/uapi/domestic-stock/v1/ranking/fluctuation",
+    "/uapi/domestic-stock/v1/quotations/volume-rank",
+  ],
+  "kis-kr-daily-price.ts": ["/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"],
+  "kis-us-api.ts": ["/uapi/overseas-stock/v1/ranking/updown-rate"],
+  "kis-us-daily-price.ts": ["/uapi/overseas-price/v1/quotations/dailyprice"],
+};
+
+export const kisModuleFeatureRegistry = {
+  "kis-chart.ts": ["fetchChartData"],
+  "kis-domestic-api.ts": ["fetchDomesticVolumePower"],
+  "kis-kr-daily-price.ts": ["fetchKrDailyPrice"],
+  "kis-us-api.ts": ["fetchKisUsTopRisingApi"],
+  "kis-us-daily-price.ts": ["fetchUsDailyPrice"],
+};

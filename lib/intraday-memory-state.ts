@@ -1,6 +1,7 @@
-export type CandidateState = { market: string; code: string; priority: number; lastSeenAt: number; lastCheckedAt: number; nextCheckAt: number; consecutiveFailures: number };
+export type CandidateLifecycle = "OBSERVED" | "PRIORITIZED" | "CONFIRMED" | "QUALIFIED" | "STALE" | "DEGRADED" | "WARMING_UP";
+export type CandidateState = { market: string; code: string; priority: number; lastSeenAt: number; lastCheckedAt: number; nextCheckAt: number; consecutiveFailures: number; state?: CandidateLifecycle; consecutiveObservations?: number; lastObservedAt?: number; dataAgeSeconds?: number };
 export type VwapState = { sessionDate: string; cumulativeVolume: number; cumulativeTradingValue: number; vwap: number; lastTradeAt: number };
-export type TopRisingItem = { market: string; code: string; rank?: number; rate?: number; volume?: number; tradingValue?: number };
+export type TopRisingItem = { market: string; code: string; name?: string; rank?: number; rate?: number; volume?: number; tradingValue?: number };
 
 export class IntradayMemoryState {
   private readonly snapshots = new Map<string, Map<string, TopRisingItem>>();
@@ -14,6 +15,7 @@ export class IntradayMemoryState {
   dueCandidates(now = Date.now(), limit = 20) { return [...this.candidates.values()].filter((candidate) => candidate.nextCheckAt <= now).sort((a, b) => b.priority - a.priority || a.nextCheckAt - b.nextCheckAt).slice(0, limit); }
   scheduleCandidate(market: string, code: string, now = Date.now()) { const candidate = this.getCandidate(market, code); if (!candidate) return undefined; const intervalMs = candidate.priority >= 100 ? 10_000 : candidate.priority >= 60 ? 30_000 : 120_000; const updated = { ...candidate, lastCheckedAt: now, nextCheckAt: now + intervalMs }; this.candidates.set(this.key(market, code), updated); return updated; }
   upsertCandidate(value: CandidateState) { this.candidates.set(this.key(value.market, value.code), value); this.evictCandidates(); }
+  recordQuality(market: string, code: string, state: CandidateLifecycle, observedAt = Date.now(), dataAgeSeconds?: number) { const candidate = this.getCandidate(market, code); if (!candidate) return undefined; const previousState = candidate.state; const consecutiveObservations = state === "STALE" || state === "DEGRADED" || state === "WARMING_UP" ? 0 : (candidate.consecutiveObservations ?? 0) + 1; const updated = { ...candidate, state, consecutiveObservations, lastObservedAt: observedAt, dataAgeSeconds }; this.candidates.set(this.key(market, code), updated); return { ...updated, previousState }; }
   removeCandidate(market: string, code: string) { this.candidates.delete(this.key(market, code)); this.vwap.delete(this.key(market, code)); }
   updateVwap(market: string, code: string, sessionDate: string, volume: number, tradingValue: number, lastTradeAt = Date.now()) { const key = this.key(market, code); const previous = this.vwap.get(key); const state = previous?.sessionDate === sessionDate ? { ...previous, cumulativeVolume: previous.cumulativeVolume + volume, cumulativeTradingValue: previous.cumulativeTradingValue + tradingValue, lastTradeAt } : { sessionDate, cumulativeVolume: volume, cumulativeTradingValue: tradingValue, vwap: volume > 0 ? tradingValue / volume : 0, lastTradeAt }; state.vwap = state.cumulativeVolume > 0 ? state.cumulativeTradingValue / state.cumulativeVolume : 0; this.vwap.set(key, state); return state; }
   getVwap(market: string, code: string) { return this.vwap.get(this.key(market, code)); }
