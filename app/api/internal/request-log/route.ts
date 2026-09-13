@@ -10,6 +10,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const identity = getRequestIdentity(request);
   const clip = (value: unknown, max: number) => String(value ?? "").slice(0, max);
+  const nullableText = (value: unknown, max: number) => {
+    const clipped = clip(value, max);
+    return clipped || null;
+  };
   const nullableInteger = (value: unknown) => {
     const parsed = typeof value === "number" ? value : Number(String(value ?? "").trim());
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -24,7 +28,7 @@ export async function POST(request: Request) {
     const path = clip(body.path || "/", 512);
     const feature = path.includes("login") ? "auth" : path.includes("screen") || path.includes("scan") ? "screener" : path.includes("chart") ? "chart" : path.includes("watchlist") ? "watchlist" : path.includes("rss") || path.includes("filing") ? "news" : path.includes("inquir") || path.includes("comment") ? "community" : path.includes("notice") ? "notice" : "api";
     const action = String(body.method || "GET") === "GET" ? "view" : "submit";
-    await getPool().query("INSERT INTO request_logs(request_id,method,path,status_code,ip_address,user_agent,user_key,duration_ms,feature,action,resource,result,geo_country_code,geo_country_name,geo_region,geo_city,geo_timezone,geo_asn,geo_org,geo_source,geo_confidence) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)", [clip(request.headers.get("x-request-id") || crypto.randomUUID(), 128), clip(body.method || "GET", 16), path, null, clip(identity.ip, 128), clip(identity.userAgent, 1024), identity.userKey, null, feature, action, path, "requested", clip(geo.countryCode, 64), clip(geo.countryName, 128), clip(geo.region, 128), clip(geo.city, 128), clip(geo.timezone, 128), nullableInteger(geo.asn), clip(geo.org, 256), clip(geo.source, 64), geo.confidence]);
+    await getPool().query("INSERT INTO request_logs(request_id,method,path,status_code,ip_address,user_agent,user_key,duration_ms,feature,action,resource,result,geo_country_code,geo_country_name,geo_region,geo_city,geo_timezone,geo_asn,geo_org,geo_source,geo_confidence) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)", [clip(request.headers.get("x-request-id") || crypto.randomUUID(), 128), clip(body.method || "GET", 16), path, null, clip(identity.ip, 128), clip(identity.userAgent, 1024), identity.userKey, null, feature, action, path, "requested", nullableText(geo.countryCode, 64), nullableText(geo.countryName, 128), nullableText(geo.region, 128), nullableText(geo.city, 128), nullableText(geo.timezone, 128), nullableInteger(geo.asn), nullableText(geo.org, 256), nullableText(geo.source, 64), nullableText(geo.confidence, 64)]);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false, error: "REQUEST_LOG_UNAVAILABLE" }, { status: 503 });
