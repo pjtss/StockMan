@@ -2,6 +2,8 @@
 
 모든 배포 경로는 실제 배포 전에 동일한 `npm run deploy:verify` 게이트를 통과해야 한다.
 
+사람이 확인할 운영 항목은 [`deployment-checklist.md`](deployment-checklist.md)에 관리한다. 체크리스트와 자동 게이트가 불일치하지 않도록 검증 명령을 추가하거나 변경할 때 문서도 함께 갱신한다.
+
 ## 검증 순서
 
 1. `npm test -- --run`
