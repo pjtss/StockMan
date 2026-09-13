@@ -28,32 +28,66 @@ function ratioFieldLabel(key: string) {
 }
 
 const MODAL_SETTINGS_KEY = "stockman:chart-modal-settings";
-type ModalSettings = { timeframe: "D" | "W" | "M"; activeTab: "chart" | "fundamentals" | "flow" | "ratio" | "news"; flowMode: FlowMode; ratioType: RatioType };
+type ChartTimeframe = "D" | "W" | "M" | "1" | "5";
+type ModalSettings = { timeframe: ChartTimeframe; activeTab: "chart" | "fundamentals" | "flow" | "ratio" | "news"; flowMode: FlowMode; ratioType: RatioType };
 function readModalSettings(): Partial<ModalSettings> {
   if (typeof window === "undefined") return {};
   try { return JSON.parse(window.sessionStorage.getItem(MODAL_SETTINGS_KEY) ?? "{}"); } catch { return {}; }
 }
 
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const raw = await response.text();
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`API가 JSON이 아닌 응답을 반환했습니다 (HTTP ${response.status})`);
+  }
+}
+
 interface ChartModalProps {
   code: string;
   company: string;
-  exchange?: "NAS" | "AMS" | "NYS";
+  exchange?: "NAS" | "AMS" | "NYS" | "KOSPI" | "KOSDAQ";
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
   position?: { current: number; total: number };
-  prefetchCodes?: Array<{ code: string; company: string }>;
+  prefetchCodes?: Array<{ code: string; company: string; exchange?: "NAS" | "AMS" | "NYS" | "KOSPI" | "KOSDAQ" }>;
 }
 
 const chartDataCache = new Map<string, ChartData>();
-const chartCacheKey = (code: string, timeframe: string) => `${code}:${timeframe}`;
-async function fetchChartData(code: string, company: string, timeframe: "D" | "W" | "M", signal?: AbortSignal) {
-  const key = chartCacheKey(code, timeframe);
+const chartCacheKey = (code: string, timeframe: string, exchange?: string) => `${code}:${exchange ?? ""}:${timeframe}`;
+function minuteRowsToChartData(code: string, company: string, rows: Array<Record<string, unknown>>): ChartData {
+  const number = (value: unknown) => { const parsed = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : 0; };
+  const parsedCandles = rows.map((row) => {
+    const date = String(row.stck_bsop_date ?? row.xymd ?? row.date ?? "").replace(/-/g, "");
+    const time = String(row.stck_cntg_hour ?? row.khms ?? row.time ?? "000000").padStart(6, "0");
+    const last = number(row.stck_prpr ?? row.last ?? row.price);
+    return { date: `${date}${time}`, open: number(row.stck_oprc ?? row.open) || last, high: number(row.stck_hgpr ?? row.high) || last, low: number(row.stck_lwpr ?? row.low) || last, close: last, volume: number(row.cntg_vol ?? row.evol ?? row.volume), tradingValue: null, raw: row };
+  }).filter((candle) => /^\d{14}$/.test(candle.date) && candle.close > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const candles = [...new Map(parsedCandles.map((candle) => [candle.date, candle])).values()];
+  const last = candles.at(-1);
+  const previous = candles.at(-2);
+  const change = previous ? (last?.close ?? 0) - previous.close : 0;
+  const rate = previous?.close ? (change / previous.close) * 100 : 0;
+  return { code, company, candles, indicators: { rsi14: null, macd: null, macdSignal: null, macdHist: null, bbUpper: null, bbMiddle: null, bbLower: null }, latestPrice: last?.close ?? 0, latestChange: previous ? `${change >= 0 ? "+" : ""}${change.toFixed(4)}` : "", latestChangeRate: previous ? `${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%` : "", candleDataUpdatedAt: new Date().toISOString() };
+}
+async function fetchChartData(code: string, company: string, timeframe: ChartTimeframe, signal?: AbortSignal, exchange?: string) {
+  const key = chartCacheKey(code, timeframe, exchange);
   const cached = chartDataCache.get(key);
   if (cached) return cached;
   const market = code.startsWith("US:") ? "US" : "KR";
+  if (timeframe === "1" || timeframe === "5") {
+    const exchangeQuery = code.startsWith("US:") && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+    const response = await fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&mode=minute&minute=${timeframe}&count=120${exchangeQuery}`, { signal, cache: "no-store" });
+    const body = await readJsonResponse<{ rows?: Array<Record<string, unknown>>; error?: string }>(response);
+    if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+    const result = minuteRowsToChartData(code, company, body.rows ?? []);
+    chartDataCache.set(key, result);
+    return result;
+  }
   const response = await fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`, { signal });
-  const body = await response.json();
+  const body = await readJsonResponse<ChartData & { error?: string }>(response);
   if (!response.ok) {
     const error = new Error(body.error ?? `HTTP ${response.status}`) as Error & { fundamentals?: ChartFundamentals };
     error.fundamentals = body.fundamentals;
@@ -77,6 +111,12 @@ function bbLabel(close: number, upper: number | null, lower: number | null): { t
   if (close >= upper) return { text: "상단 돌파 ⚠", cls: styles.bbOverBought };
   if (close <= lower) return { text: "하단 이탈 ✅", cls: styles.bbOverSold };
   return { text: "밴드 내", cls: styles.bbNormal };
+}
+
+function chartTime(date: string) {
+  if (!/^\d{14}$/.test(date)) return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}` as any;
+  const value = new Date(Number(date.slice(0, 4)), Number(date.slice(4, 6)) - 1, Number(date.slice(6, 8)), Number(date.slice(8, 10)), Number(date.slice(10, 12)), Number(date.slice(12, 14)));
+  return Math.floor(value.getTime() / 1000) as any;
 }
 
 type IndicatorLine = { label: string; color: string; values: Array<number | null> };
@@ -140,9 +180,9 @@ function IndicatorCharts({ candles }: { candles: OHLCVCandle[] }) {
   return <div className={styles.indicatorCharts}>{groups.map((group, groupIndex) => { const all = group.flatMap((line) => line.values).filter((v): v is number => v !== null && Number.isFinite(v)); const min = Math.min(...all), max = Math.max(...all), span = max - min || 1; return <div className={styles.indicatorPlot} key={groupIndex}><div className={styles.plotLegend}>{group.map((line) => <span key={line.label} style={{ color: line.color }}>● {line.label}</span>)}</div><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-label={group.map((line) => line.label).join(", ")}><line x1="0" y1="14" x2="100" y2="14" stroke="rgba(148,163,184,.12)" />{group.map((line) => { const points = line.values.map((value, i) => value === null ? null : `${(i / Math.max(1, line.values.length - 1)) * 100},${28 - ((value - min) / span) * 24 - 2}`).filter(Boolean).join(" "); return <polyline key={line.label} points={points} fill="none" stroke={line.color} strokeWidth="0.8" vectorEffect="non-scaling-stroke" />; })}</svg></div>; })}</div>;
 }
 
-function FundamentalsPanel({ data, fundamentals, timeframe, isUsChart }: { data?: ChartData; fundamentals?: ChartFundamentals; timeframe: "D" | "W" | "M"; isUsChart: boolean }) {
+function FundamentalsPanel({ data, fundamentals, timeframe, isUsChart }: { data?: ChartData; fundamentals?: ChartFundamentals; timeframe: ChartTimeframe; isUsChart: boolean }) {
   const f = fundamentals ?? data?.fundamentals;
-  const timeframeLabel = timeframe === "D" ? "일봉" : timeframe === "W" ? "주봉" : "월봉";
+  const timeframeLabel = timeframe === "D" ? "일봉" : timeframe === "W" ? "주봉" : timeframe === "M" ? "월봉" : `${timeframe}분봉`;
   const candleDate = data?.candles.at(-1)?.date;
   const normalizedCandleDate = candleDate && /^\d{8}$/.test(candleDate) ? `${candleDate.slice(0, 4)}-${candleDate.slice(4, 6)}-${candleDate.slice(6, 8)}` : candleDate;
   const sourceLabel = f?.source === "KIS_DOMESTIC_PRICE" ? "KIS 국내 시세" : f?.source === "KIS_US_PRICE" ? "KIS 해외 시세" : f?.source ?? "미확인";
@@ -192,7 +232,7 @@ function KISOpinionPanel({ data, loading, error, isUs }: { data: OpinionResponse
 
 export function ChartModal({ code, company, exchange, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
   const isUsChart = code.startsWith("US:");
-  const [timeframe, setTimeframe] = useState<"D" | "W" | "M">(() => readModalSettings().timeframe ?? "D");
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>(() => readModalSettings().timeframe ?? "D");
   const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "flow" | "ratio" | "news">(() => readModalSettings().activeTab ?? "chart");
   const [data, setData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -284,7 +324,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         if (!authenticated) return;
         const response = await fetch(`/api/watchlist?ts=${Date.now()}`, { credentials: "same-origin", cache: "no-store" });
         if (!response.ok) return;
-        const watchlist = await response.json() as { items?: Array<{ market: string; code: string }> };
+        const watchlist = await readJsonResponse<{ items?: Array<{ market: string; code: string }> }>(response);
         if (!cancelled) setIsWatchlisted((watchlist.items ?? []).some((item) => item.market === watchlistMarket && item.code.toUpperCase() === watchlistCode));
       })
       .catch(() => { if (!cancelled) setIsAuthenticated(false); });
@@ -348,7 +388,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     setData(null);
     setFallbackFundamentals(undefined);
     const controller = new AbortController();
-    fetchChartData(code, company, timeframe, controller.signal)
+    fetchChartData(code, company, timeframe, controller.signal, exchange)
       .then((json) => { if (!controller.signal.aborted && requestIdRef.current === requestId) setData(json); })
       .catch((e: Error & { fundamentals?: ChartFundamentals }) => { if (!controller.signal.aborted && requestIdRef.current === requestId) { setFallbackFundamentals(e.fundamentals); setError(e.message); } })
       .finally(() => { if (!controller.signal.aborted && requestIdRef.current === requestId) setLoading(false); });
@@ -359,18 +399,18 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         cleanupRef.current = null;
       }
     };
-  }, [code, company, timeframe]);
+  }, [code, company, exchange, timeframe]);
 
   useEffect(() => {
     const targets = prefetchCodes.filter((item) => item.code !== code).slice(0, 2);
-    void Promise.allSettled(targets.map((item) => fetchChartData(item.code, item.company, "D")));
+    void Promise.allSettled(targets.map((item) => fetchChartData(item.code, item.company, "D", undefined, item.exchange)));
   }, [code, prefetchCodes]);
 
   useEffect(() => {
     if (activeTab !== "news") return;
     let cancelled = false;
     setNewsLoading(true); setNewsError(null);
-    fetch(`/api/stock/news?ticker=${encodeURIComponent(code)}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: { items?: StockTitanNewsItem[] }) => { if (!cancelled) setNews(body.items ?? []); }).catch((error: Error) => { if (!cancelled) setNewsError(error.message); }).finally(() => { if (!cancelled) setNewsLoading(false); });
+    fetch(`/api/stock/news?ticker=${encodeURIComponent(code)}`, { cache: "no-store" }).then(async (response) => { const body = await readJsonResponse<{ error?: string; items?: StockTitanNewsItem[] }>(response); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body) => { if (!cancelled) setNews(body.items ?? []); }).catch((error: Error) => { if (!cancelled) setNewsError(error.message); }).finally(() => { if (!cancelled) setNewsLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, code]);
 
@@ -381,11 +421,11 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     const queryMode = flowMode === "minute" || flowMode === "minute-5" ? "minute" : isUsChart ? (flowMode === "asking" ? "asking" : flowMode === "price-detail" ? "price-detail" : flowMode === "daily" ? "daily" : flowMode === "info" ? "info" : "trade") : flowMode;
     const minute = flowMode === "minute-5" ? "5" : "1";
     const exchangeQuery = isUsChart && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
-    const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}${exchangeQuery}${queryMode === "minute" ? `&minute=${minute}&count=120` : ""}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body as FlowResponse; });
-    const detailRequest = isUsChart ? Promise.resolve(null) : fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=KR&mode=price-detail`, { cache: "no-store" }).then(async (response) => response.ok ? await response.json() as FlowResponse : null);
+    const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}${exchangeQuery}${queryMode === "minute" ? `&minute=${minute}&count=120` : ""}`, { cache: "no-store" }).then(async (response) => { const body = await readJsonResponse<FlowResponse & { error?: string }>(response); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; });
+    const detailRequest = isUsChart ? Promise.resolve(null) : fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=KR&mode=price-detail`, { cache: "no-store" }).then(async (response) => response.ok ? await readJsonResponse<FlowResponse>(response) : null);
     Promise.all([flowRequest, detailRequest]).then(([body, detail]) => { if (!cancelled) { const detailRow = detail?.rows?.[0]; const flowRows = body.rows ?? []; const labeledDetail = detailRow ? { "발행·상장주수 (유통주식수 아님)": detailRow.sharesOutstanding, ...detailRow } : null; const rows = labeledDetail ? (flowRows.length ? [labeledDetail ? { ...labeledDetail, ...flowRows[0] } : flowRows[0], ...flowRows.slice(1)] : [labeledDetail]) : flowRows; setFlow({ ...body, rows, instrumentDetail: detailRow }); } }).catch((e: Error) => { if (!cancelled) setFlowError(e.message); }).finally(() => { if (!cancelled) setFlowLoading(false); });
     return () => { cancelled = true; };
-  }, [activeTab, code, isUsChart, flowMode, flowRefreshKey]);
+  }, [activeTab, code, company, exchange, isUsChart, flowMode, flowRefreshKey]);
 
   useEffect(() => {
     if (activeTab !== "flow" || typeof WebSocket === "undefined") {
@@ -436,7 +476,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     if (activeTab !== "ratio" || isUsChart) return;
     let cancelled = false;
     setRatioLoading(true); setRatioError(null);
-    fetch(`/api/kis/financial-ratios?code=${encodeURIComponent(code)}&type=${ratioType}&period=annual`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: RatioResponse) => { if (!cancelled) setRatio(body); }).catch((e: Error) => { if (!cancelled) setRatioError(e.message); }).finally(() => { if (!cancelled) setRatioLoading(false); });
+    fetch(`/api/kis/financial-ratios?code=${encodeURIComponent(code)}&type=${ratioType}&period=annual`, { cache: "no-store" }).then(async (response) => { const body = await readJsonResponse<RatioResponse & { error?: string }>(response); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body) => { if (!cancelled) setRatio(body); }).catch((e: Error) => { if (!cancelled) setRatioError(e.message); }).finally(() => { if (!cancelled) setRatioLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, code, isUsChart, ratioType]);
 
@@ -444,7 +484,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     if (activeTab !== "ratio" || isUsChart) return;
     let cancelled = false;
     setOpinionLoading(true); setOpinionError(null);
-    if (!isUsChart) fetch(`/api/kis/investment-opinion?code=${encodeURIComponent(code)}&startDate=${new Date().getFullYear() - 1}0101&endDate=${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`, { cache: "no-store" }).then(async (response) => { const body = await response.json(); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body: OpinionResponse) => { if (!cancelled) setOpinion(body); }).catch((e: Error) => { if (!cancelled) setOpinionError(e.message); }).finally(() => { if (!cancelled) setOpinionLoading(false); });
+    if (!isUsChart) fetch(`/api/kis/investment-opinion?code=${encodeURIComponent(code)}&startDate=${new Date().getFullYear() - 1}0101&endDate=${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`, { cache: "no-store" }).then(async (response) => { const body = await readJsonResponse<OpinionResponse & { error?: string }>(response); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; }).then((body) => { if (!cancelled) setOpinion(body); }).catch((e: Error) => { if (!cancelled) setOpinionError(e.message); }).finally(() => { if (!cancelled) setOpinionLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, code, isUsChart]);
 
@@ -499,7 +539,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
       // 숫자 날짜 기준으로 오름차순 정렬하고, 같은 날짜의 중복 봉을 제거한다.
       // Lightweight Charts는 setData()에 strictly ascending time을 요구한다.
       const candleData = candles.map((c) => ({
-        time: `${c.date.slice(0, 4)}-${c.date.slice(4, 6)}-${c.date.slice(6, 8)}` as any,
+        time: chartTime(c.date),
           open: Number(c.open),
           high: Number(c.high),
           low: Number(c.low),
@@ -519,7 +559,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
           priceLineVisible: false,
         });
         series.setData(candles.map((candle, index) => ({
-          time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+          time: chartTime(candle.date),
           value: values[index],
         })).filter((point): point is { time: any; value: number } => point.value != null));
       }
@@ -532,7 +572,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         priceLineVisible: false,
       });
       volumeSeries.setData(candles.map((candle, index) => ({
-        time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+        time: chartTime(candle.date),
         value: Number(candle.volume),
         color: index > 0 && candle.close >= candles[index - 1].close ? "rgba(255,77,77,0.55)" : "rgba(77,148,255,0.55)",
       })));
@@ -549,34 +589,30 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         volumeWindowSum += candle.volume;
         if (index >= 20) volumeWindowSum -= candles[index - 20].volume;
         return {
-          time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+          time: chartTime(candle.date),
           value: volumeWindowSum / Math.min(20, index + 1),
         };
       }));
 
       // 볼린저 밴드: 각 일봉 시점의 최근 20개 종가로 전체 구간을 계산한다.
       if (candles.length >= 20) {
-        let closeWindowSum = 0;
-        let closeWindowSquareSum = 0;
-        const bands = candles.slice(19).map((candle, index) => {
-          const end = index + 20;
-          closeWindowSum += candle.close;
-          closeWindowSquareSum += candle.close ** 2;
-          if (end > 20) {
-            const removed = candles[end - 21].close;
-            closeWindowSum -= removed;
-            closeWindowSquareSum -= removed ** 2;
-          }
+        const bands = candles.map((candle, index) => {
+          const start = index - 19;
+          if (start < 0) return null;
+          const window = candles.slice(start, index + 1).map((item) => item.close);
+          const closeWindowSum = window.reduce((sum, value) => sum + value, 0);
+          const closeWindowSquareSum = window.reduce((sum, value) => sum + value ** 2, 0);
           const middle = closeWindowSum / 20;
           const variance = Math.max(0, closeWindowSquareSum / 20 - middle ** 2);
           const deviation = Math.sqrt(variance);
           return {
-            time: `${candle.date.slice(0, 4)}-${candle.date.slice(4, 6)}-${candle.date.slice(6, 8)}` as any,
+            time: chartTime(candle.date),
             upper: middle + 2 * deviation,
             middle,
-            lower: middle - 2 * deviation,
+            // 주가는 음수가 될 수 없으므로 밴드 하단도 가격축을 음수로 확장하지 않는다.
+            lower: Math.max(0, middle - 2 * deviation),
           };
-        });
+        }).filter((band): band is { time: any; upper: number; middle: number; lower: number } => band !== null);
         const bbUpperSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.45)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
         const bbMiddleSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.7)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false, lineStyle: LineStyle.Dotted });
         const bbLowerSeries = chart.addSeries(LineSeries, { color: "rgba(0,255,163,0.4)", lineWidth: 1, lastValueVisible: false, priceLineVisible: false });
@@ -673,6 +709,14 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
                 {label}
               </button>
             ))}
+            <button type="button" onClick={() => { setActiveTab("chart"); setTimeframe("1"); }} aria-label="1분봉 차트 보기"
+              style={{ marginLeft: "auto", padding: "8px 14px", borderRadius: "8px", background: activeTab === "chart" && timeframe === "1" ? "#00ffa3" : "rgba(148,163,184,.16)", color: activeTab === "chart" && timeframe === "1" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
+              1분봉
+            </button>
+            <button type="button" onClick={() => { setActiveTab("chart"); setTimeframe("5"); }} aria-label="5분봉 차트 보기"
+              style={{ padding: "8px 14px", borderRadius: "8px", background: activeTab === "chart" && timeframe === "5" ? "#00ffa3" : "rgba(148,163,184,.16)", color: activeTab === "chart" && timeframe === "5" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
+              5분봉
+            </button>
           </div>
           {loading && (
             <div className={styles.chartWrap}>
