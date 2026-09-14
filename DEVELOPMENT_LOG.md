@@ -2,6 +2,203 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-14] 상승률 TOP100 배포 전 통합 검증
+
+### 목표
+- Docker Desktop의 로컬 PostgreSQL을 포함해 상승률 TOP100 개선사항의 전체 검증 게이트를 통과시킨다.
+
+### 반영
+- 시간 의존 DART 테스트를 고정 스케줄 mock으로 보완했다.
+- Docker PostgreSQL 통합 테스트 환경을 복구해 전체 검증을 재실행했다.
+
+### 검증
+- `npm.cmd run verify` 통과.
+- 156개 테스트 파일·521개 테스트 통과.
+- 타입체크, 문서 검증, verify-scope, KIS boundary, OCI cron 검사 및 Next.js 프로덕션 빌드 통과.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-14-061
+- 성과 판정: IMPROVED
+- 근거: 로컬 DB 통합 테스트를 포함한 배포 전 자동 검증 게이트가 재현 가능하게 통과했다.
+
+### 다음 개선
+- 배포 후 운영 서버에서 TOP100 MVP 관측 주기와 KIS 호출 지연을 디버깅 API로 확인하고, 기준 초과 시 자동 경고하도록 개선한다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청 범위는 상승률 TOP100 기능 개선 및 검증이다.
+
+## [2026-09-13] TOP 100 MVP 롤링 윈도우·해외 후보 추적 보강
+
+### 목표
+- 1분 단위 5분 거래대금 계산에서 윈도우 밖 관측치를 제거하고, 국내·해외 TOP100 후보를 동일한 MVP 추적 큐로 관리한다.
+
+### 반영
+- 5분 경계에서 가장 오래된 분 버킷이 제거되는 회귀 테스트를 추가했다.
+- 해외 상승률 TOP100 후보에도 `mvpTracking`을 부여해 1분 주기 관측과 TOP100 이탈 시 메모리 정리가 적용되도록 했다.
+- 관리자 디버깅 API의 flow 요약에 MVP 추적 후보 수, 확정 수, 임계값, 윈도우, 필요 샘플 수를 명시했다.
+- 300개 후보 전체를 한 배치로 큐에 넘기도록 조정해 `dueCandidates(..., 20)`으로 인해 1분 관측이 수분 단위로 지연되는 병목을 제거했다. 실제 KIS 호출 속도는 공용 10 TPS throttle이 제한한다.
+- 확정된 MVP 종목만 반환하는 `/api/kis/intraday-mvp` 조회 API와 기준 메타데이터 응답을 추가했다.
+- 해외 분봉 파싱에서 누적 `tvol`·`acml_*` fallback을 제거하고 증분 분당 거래량만 MVP 거래대금에 사용하도록 오탐 경로를 차단했다.
+- 종목별 롤링 거래대금 합계를 메모리 인덱스로 유지해 매 관측의 전체 재합산을 제거하고, 버킷 교체·만료·삭제 시 합계를 동기화했다.
+- 세션 날짜를 UTC가 아닌 거래소 현지 시간(미국: 뉴욕, 국내: 서울)으로 계산해 정규장 중 UTC 자정에 버퍼가 초기화되는 오류를 차단했다.
+- MVP 결과 API가 현재 TOP100 스냅샷 소속까지 검증하도록 해 원천 갱신 실패 시 직전 확정 후보가 노출되는 stale 결과를 차단했다.
+- MVP 임계값·윈도우·필요 샘플 수를 단일 정책 상수로 통합해 worker·결과 API·디버깅 API 간 기준 불일치 위험을 제거했다.
+- 전체 검증에서 현재 시각에 따라 실패하던 DART 스케줄 테스트를 고정된 스케줄 mock으로 바꿔 검증 게이트의 시간 의존성을 제거했다.
+- 종목별 롤링 버퍼가 장시간 실행에도 최근 5개 1분 버킷으로 제한되는 메모리 상한 회귀 테스트를 추가했다.
+
+### 검증
+- `npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts lib/intraday-candidate-priority.test.ts app/api/kis/intraday-mvp/route.test.ts lib/kis-us-minute-turnover.test.ts --run` 통과: 5개 파일·22개 테스트.
+- `npm.cmd run typecheck` 통과.
+- 추가 stale 결과 회귀 검증: `npx vitest run app/api/kis/intraday-mvp/route.test.ts lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 3개 파일·17개 테스트.
+- Docker Desktop의 `stockman-postgres-local` 컨테이너 기동 후 전체 `npm.cmd test -- --run` 통과: 156개 파일·521개 테스트.
+- `npm.cmd run typecheck` 실행 완료.
+- `npm.cmd run docs:check` 실행 완료.
+- `npm.cmd run build` 통과: Next.js 프로덕션 빌드 성공.
+
+### 다음 개선
+- 국내·해외 KIS 분봉 원천 payload fixture로 거래대금 필드와 후보 추적을 통합 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-13-060
+- 성과 판정: UNMEASURED
+- 근거: 롤링 윈도우 경계·해외 후보 추적·누적 거래량 오탐·합산 비용을 코드와 회귀 테스트로 보강했다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청은 MVP 기능 개발과 로컬 검증 단계다.
+
+## [2026-09-13] TOP 100 MVP 최신 1분봉 선택 오류 수정
+
+### 목표
+- KIS 분봉 응답 순서와 무관하게 가장 최근 1분봉만 5분 거래대금 계산에 사용한다.
+
+### 반영
+- worker에서 분봉을 날짜·시간 오름차순으로 정렬한 뒤 최신 봉을 선택한다.
+- KIS 국내 수집기가 반환하는 내림차순 응답을 오래된 봉으로 잘못 처리하던 경로를 차단했다.
+- 최신 봉 선택 회귀 테스트를 추가했다.
+
+### 검증
+- `npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·13개 테스트.
+- `npm.cmd run typecheck` 통과.
+- `npm.cmd run docs:check` 통과.
+
+### 다음 개선
+- 국내·해외 KIS 분봉 원천 payload fixture를 추가해 날짜·시간 필드별 정렬을 통합 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-13-059
+- 성과 판정: IMPROVED
+- 근거: provider 응답 순서에 의존하던 최신봉 선택을 제거해 MVP 누적 계산의 입력 정확성을 높였다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청 범위는 MVP 기능 개선과 로컬 검증이다.
+
+## [2026-09-13] TOP 100 MVP 확정 상태 관측 연계
+
+### 목표
+- 5분 거래대금 5% 조건의 확정 상태가 관리자 전환 이력과 일치하도록 한다.
+
+### 반영
+- 품질 상태와 MVP 거래대금 조건을 먼저 결합한 뒤 최종 상태를 한 번만 기록한다.
+- `QUALIFIED` 전환이 `intraday_detection_transitions` 관측 로그에 누락되지 않도록 정리했다.
+
+### 검증
+- `npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
+- `npm.cmd run typecheck` 통과.
+- `npm.cmd run docs:check` 통과.
+
+### 다음 개선
+- 실제 KIS 응답 fixture를 사용한 확정 전환 통합 테스트를 추가한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-13-058
+- 성과 판정: IMPROVED
+- 근거: MVP 확정 상태와 관리자 관측 전환의 기록 경로를 단일화했다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청 범위는 MVP 기능 개선과 로컬 검증이다.
+
+## [2026-09-13] TOP 100 MVP 1분 버킷·품질 게이트 보강
+
+### 목표
+- rolling 5분 계산의 버킷 중복과 stale 데이터 확정 오탐을 차단한다.
+
+### 반영
+- rolling 관측 시각을 1분 경계로 정규화해 초 단위 차이를 같은 봉으로 처리한다.
+- 거래량이 없는 원천 응답은 거래대금 필드 fallback을 사용한다.
+- `STALE`·`DEGRADED`·`WARMING_UP` 품질 상태에서는 5% 비율을 확정 탐지로 승격하지 않는다.
+
+### 검증
+- `npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
+- `npm.cmd run typecheck` 통과.
+- `npm.cmd run docs:check` 통과.
+
+### 다음 개선
+- 실제 국내·해외 KIS 응답 fixture를 이용해 최신 1분봉 거래대금 필드 매핑을 통합 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-13-057
+- 성과 판정: IMPROVED
+- 근거: 1분 버킷 중복 합산과 품질 불량 상태의 확정 승격을 코드·테스트로 차단했다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청 범위는 MVP 기능 개선과 로컬 검증이다.
+
+## [2026-09-13] TOP 100 MVP 메모리 정리·관측성 보강
+
+### 목표
+- TOP 100 변동 시 MVP rolling 버퍼가 남지 않게 하고 5분 상태를 운영 디버깅에서 확인한다.
+
+### 반영
+- MVP 추적 후보가 현재 TOP 100에서 이탈하면 후보·VWAP·rolling 버퍼를 함께 제거한다.
+- 후보 eviction 시 rolling 버퍼도 함께 삭제해 메모리 상한을 보장한다.
+- 세션 변경 시 rolling 버퍼를 초기화한다.
+- 디버깅 스냅샷에 종목별 1분 거래대금 버킷을 노출한다.
+
+### 검증
+- `npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·11개 테스트.
+- `npm.cmd run typecheck` 통과.
+- `npm.cmd run docs:check` 통과.
+
+### 다음 개선
+- 운영 환경에서 실제 KIS 1분봉 시간 필드와 버킷 간격을 확인하는 통합 검증을 추가한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-13-056
+- 성과 판정: IMPROVED
+- 근거: TOP 100 이탈·후보 eviction 경로의 rolling 메모리 회수를 테스트로 고정하고 디버깅 가시성을 추가했다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청 범위는 기능 개선과 로컬 검증이다.
+
+## [2026-09-13] TOP 100 5분 거래대금 집중 MVP
+
+### 목표
+- 상승률 TOP 100 후보 중 KIS 고정 시가총액 대비 최근 5분 거래대금이 5% 이상인 종목만 메모리에서 확정 탐지한다.
+
+### 반영
+- `IntradayMemoryState`에 종목별 고유 1분 버킷 기반 rolling turnover window를 추가했다.
+- 동일 버킷 재수신은 덮어써 중복 합산을 방지하고, 세션별로 윈도우를 초기화한다.
+- 5개 관측값이 모이고 `최근 5분 거래대금 / 고정 시가총액 >= 0.05`일 때만 `mvpQualified`와 `QUALIFIED` 상태를 부여한다.
+- 기존 5% 우선순위 점수는 유지하되, MVP 확정 조건과 분리했다.
+- `intraday-detection-worker`가 매 tick의 최신 1분봉 거래대금만 rolling window에 넣도록 연결했다.
+
+### 검증
+- `npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·8개 테스트.
+- `npm.cmd run typecheck` 통과.
+- `node --check scripts/verify-deploy.mjs` 통과.
+
+### 다음 개선
+- 남은 위험: KIS 원천 응답의 최신 1분봉 시간 필드가 누락되면 수신 시각을 버킷 키로 사용하므로 운영 로그에서 시간 품질을 계속 감시해야 한다.
+- 국내·해외 실응답을 각각 5분 연속 수집하는 통합 테스트와 MVP 확정 이벤트 전용 알림 연결은 다음 단계다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-13-055
+- 성과 판정: IMPROVED
+- 근거: 단일 5% 점수 조건을 5개 고유 1분 관측 기반의 명시적 확정 상태로 분리했고, 중복 합산 방지 테스트를 추가했다.
+
+### 커밋·푸시·배포
+- 미실행. 현재 요청 범위는 MVP 설계·개발 및 로컬 검증이다.
+
 ## [2026-09-13] 배포 검증 런타임 종료 안정화
 
 ### 목표

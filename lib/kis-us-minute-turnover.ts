@@ -81,7 +81,7 @@ function buildRequest(code: string, market: string, config: Awaited<ReturnType<t
   return { url, params };
 }
 
-function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
+export function parseUsMinuteTurnoverPoints(parsed: any): UsMinuteTurnoverPoint[] {
   const output = Array.isArray(parsed?.output)
     ? parsed.output
     : Array.isArray(parsed?.output2)
@@ -97,7 +97,10 @@ function parsePoints(parsed: any): UsMinuteTurnoverPoint[] {
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??
         row.amount ?? row.tvol ?? row.cum_amount ?? row.cumTradeAmount ?? row.cntg_pbmn ?? row.value ?? row.eamt ?? row.evol
       ),
-      volume: parseNumber(row.evol ?? row.tvol ?? row.volume ?? row.acml_vol ?? row.acml_volume) || undefined,
+      // MVP turnover uses the value traded during this minute. Never fall
+      // back to tvol/acml_* here: those are cumulative session fields and
+      // summing them across five observations would overstate turnover.
+      volume: parseNumber(row.evol ?? row.volume ?? row.cntg_vol ?? row.cntg_volume) || undefined,
       high: parseNumber(row.high ?? row.hprc ?? row.high_price ?? row.hts_high) || undefined,
       low: parseNumber(row.low ?? row.lprc ?? row.low_price ?? row.hts_low) || undefined,
       bid: parseNumber(row.pbid ?? row.bid) || undefined,
@@ -145,13 +148,13 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
     result = await fetchOnce(token);
   }
 
-  const allPoints = [...parsePoints(result.parsed)];
+  const allPoints = [...parseUsMinuteTurnoverPoints(result.parsed)];
   let pageCount = 1;
   let cursor = continuation(result.parsed);
   let next = cursor.hasMore ? cursor.next : "";
   while (next && pageCount < 10) {
     const page = await fetchOnce(token, next);
-    const pagePoints = parsePoints(page.parsed);
+    const pagePoints = parseUsMinuteTurnoverPoints(page.parsed);
     if (!page.response.ok || pagePoints.length === 0) break;
     allPoints.push(...pagePoints); pageCount += 1;
     const following = continuation(page.parsed);

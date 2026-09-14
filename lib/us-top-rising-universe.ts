@@ -152,7 +152,7 @@ async function loadUsTopRisingScopesUncached() {
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
   const prioritizedScopes = filteredScopes.map((scope) => {
     const scored = scoreIntradayCandidate({ market: scope.market, code: scope.code, currency: "USD", marketCap: scope.marketCap ?? null, tradingValue: scope.rankingTradeValue ?? null, isTopRising: true, isNewEntry: false, rankChange: 0, rateChange: scope.changeRate ?? 0, volumeChange: 0, aboveVwap: false });
-    if (scored) intradayMemoryState.upsertCandidate(scored);
+    if (scored) intradayMemoryState.upsertCandidate({ ...scored, mvpTracking: true });
     return scored ? { ...scope, priority: scored.priority, turnoverToMarketCap: scored.turnoverToMarketCap, priorityReasons: scored.reasons } : scope;
   }).sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1));
   intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));

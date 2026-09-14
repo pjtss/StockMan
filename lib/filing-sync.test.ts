@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   isDartOpen: vi.fn(),
   loadFeatureModuleSettings: vi.fn(),
   runDartAutomation: vi.fn(),
+  isWithinSchedule: vi.fn(),
 }));
 
 vi.mock("./feature-module-settings", () => ({
@@ -11,12 +12,14 @@ vi.mock("./feature-module-settings", () => ({
 }));
 vi.mock("./dart-automation", () => ({ runDartAutomation: mocks.runDartAutomation }));
 vi.mock("./scanner-hours", () => ({ isDartOpen: mocks.isDartOpen }));
+vi.mock("./schedule-time", () => ({ isWithinSchedule: mocks.isWithinSchedule }));
 import { runFilingSync } from "./filing-sync";
 
 describe("runFilingSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isDartOpen.mockResolvedValue(true);
+    mocks.isWithinSchedule.mockReturnValue(true);
     mocks.loadFeatureModuleSettings.mockImplementation((key: string) => Promise.resolve({
       enabled: key === "dart-realtime",
       startTime: "00:00",
