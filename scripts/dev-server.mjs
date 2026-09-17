@@ -33,11 +33,18 @@ const env = {
 };
 env.NEXT_DIST_DIR = ".next-dev";
 delete env.ADMIN_DASHBOARD_PASSWORD;
+const port = process.env.DEV_SERVER_PORT || process.env.PORT || "3000";
 
-const child = spawn("next", ["dev", "-p", "3000"], {
+const nextBin = resolve(process.cwd(), "node_modules", "next", "dist", "bin", "next");
+const child = spawn(process.execPath, [nextBin, "dev", "-p", port], {
   stdio: "inherit",
   env,
-  shell: true,
+  shell: false,
+});
+
+child.on("error", (error) => {
+  console.error(`[dev] failed to start Next.js: ${error.message}`);
+  process.exit(1);
 });
 
 child.on("exit", (code, signal) => {
