@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
 const verifyDistDir = process.env.DEPLOY_VERIFY_DIST_DIR || ".next-deploy-verify";
+const commandTimeoutMs = Number(process.env.DEPLOY_VERIFY_COMMAND_TIMEOUT_MS || 900_000);
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -16,7 +17,13 @@ function run(command, args, options = {}) {
     const progressTimer = setInterval(() => {
       console.log(`[deploy-verify] still running: ${label} (${Date.now() - startedAt}ms)`);
     }, 30_000);
-    const finish = () => clearInterval(progressTimer);
+    const timeout = setTimeout(() => {
+      console.error(`[deploy-verify] timed out: ${label} (${commandTimeoutMs}ms)`);
+      if (isWindows) spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false });
+      else child.kill("SIGTERM");
+      reject(new Error(`${label} timed out after ${commandTimeoutMs}ms`));
+    }, commandTimeoutMs);
+    const finish = () => { clearInterval(progressTimer); clearTimeout(timeout); };
     child.on("error", (error) => {
       finish();
       reject(error);
@@ -43,6 +50,7 @@ async function verifyQuality() {
 }
 
 async function waitForHealth(url, timeoutMs = 30_000) {
+  console.log(`[deploy-verify] smoke start: ${url}`);
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
@@ -50,7 +58,7 @@ async function waitForHealth(url, timeoutMs = 30_000) {
       const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
-      if (response.ok && contentType.includes("text/html") && body.trim().length > 100) return;
+      if (response.ok && contentType.includes("text/html") && body.trim().length > 100) { console.log(`[deploy-verify] smoke ok: ${url} (${response.status})`); return; }
       lastError = new Error(`HTTP ${response.status}, content-type=${contentType}, bodyLength=${body.length}`);
     } catch (error) {
       lastError = error;
@@ -61,6 +69,7 @@ async function waitForHealth(url, timeoutMs = 30_000) {
 }
 
 async function waitForJson(url, timeoutMs = 30_000) {
+  console.log(`[deploy-verify] smoke start: ${url}`);
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
@@ -71,6 +80,7 @@ async function waitForJson(url, timeoutMs = 30_000) {
       if (contentType.includes("application/json")) {
         try {
           JSON.parse(body);
+          console.log(`[deploy-verify] smoke ok: ${url} (${response.status})`);
           return;
         } catch (error) {
           lastError = new Error(`invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
@@ -118,10 +128,16 @@ async function verifyRuntime() {
     shell: false,
     detached: false,
   });
+  const childExit = new Promise((_, reject) => child.once("exit", (code, signal) => reject(new Error(`runtime exited before smoke completed (code=${code}, signal=${signal ?? "none"})`))));
   try {
-    await waitForHealth(`http://127.0.0.1:${port}/charts`);
-    await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
-    await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
+    await Promise.race([
+      (async () => {
+        await waitForHealth(`http://127.0.0.1:${port}/charts`);
+        await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
+        await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
+      })(),
+      childExit,
+    ]);
   } finally {
     await stopProcess(child);
   }
