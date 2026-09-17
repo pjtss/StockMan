@@ -89,7 +89,15 @@ async function fetchRealUsVolumeRank(token: string, excd = "NAS"): Promise<KisUs
       throw new Error(`KIS Overseas API returned HTTP ${response.status}`);
     }
 
-    const resData = await response.json();
+    let resData: any;
+    try {
+      resData = await response.json();
+    } catch (error) {
+      const contentType = response.headers.get("content-type") || "unknown";
+      const parseMessage = error instanceof Error ? error.message : String(error);
+      pushKisUsDebugLog("KIS-US-JSON-ERR", { status: response.status, contentType, message: parseMessage });
+      throw new Error(`KIS Overseas API returned invalid JSON (HTTP ${response.status}, ${contentType})`);
+    }
     console.info(`[KIS-US-DEBUG] fetchRealUsVolumeRank raw response:`, JSON.stringify(resData, null, 2));
     pushKisUsDebugLog("KIS-US-RES", { status: response.status, data: resData });
 
@@ -288,7 +296,15 @@ async function fetchRealUsVolumePower(token: string, excd = "NAS"): Promise<KisU
       throw new Error(`KIS Overseas API returned HTTP ${response.status}`);
     }
 
-    const resData = await response.json();
+    let resData: any;
+    try {
+      resData = await response.json();
+    } catch (error) {
+      const contentType = response.headers.get("content-type") || "unknown";
+      const parseMessage = error instanceof Error ? error.message : String(error);
+      pushKisUsDebugLog("KIS-US-JSON-ERR", { status: response.status, contentType, message: parseMessage });
+      throw new Error(`KIS Overseas API returned invalid JSON (HTTP ${response.status}, ${contentType})`);
+    }
     console.info(`[KIS-US-DEBUG] fetchRealUsVolumePower raw response snippet:`, JSON.stringify(resData.output2?.slice(0, 2), null, 2));
     pushKisUsDebugLog("KIS-US-RES", { status: response.status, data: resData });
 
