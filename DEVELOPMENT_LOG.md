@@ -2337,3 +2337,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 재발 방지: KIS rate limit 정책을 우회하는 개별 fetch 병렬화는 하지 않고, 공용 요청 경계를 유지한다. 결과 순서는 입력 티커 순서를 유지한다.
 - 검증: `npm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
 - 커밋·푸시·배포: 검증 후 커밋·푸시 진행; 운영 배포는 CI 결과 확인 대상.
+
+## 2026-09-17 — 관리자 시장 디버그 인벤토리 병렬화
+
+- 목적: 운영 DB 규모 증가 시 `/api/admin/market-debug` 응답시간 누적을 줄인다.
+- 원인: 네 개의 대형 테이블 `COUNT(*)`를 순차 실행해 각 스캔 시간이 합산됨.
+- 변경: `app/api/admin/market-debug/route.ts`에서 테이블별 count를 `Promise.all`로 실행하고, 개별 실패 격리는 유지한다.
+- 재발 방지: 응답 구조와 정확한 count 의미는 유지하며, 독립적인 읽기 쿼리만 병렬화한다.
+- 검증: `npm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
+- 커밋·푸시·배포: 검증 후 커밋·푸시 진행; 운영 배포는 CI 결과 확인 대상.

@@ -32,12 +32,12 @@ async function inventory() {
   const tables = ["kr_instrument_universe", "kr_instrument_universe_candles", "us_instrument_universe", "us_instrument_universe_candles"];
   const tableResult = await safeQuery<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY($1::text[]) ORDER BY table_name", [tables]);
   const present = new Set(tableResult.rows.map((row) => row.table_name));
-  const counts: Record<string, unknown> = {};
-  for (const table of tables) {
-    if (!present.has(table)) { counts[table] = { exists: false, count: null }; continue; }
+  const countEntries = await Promise.all(tables.map(async (table) => {
+    if (!present.has(table)) return [table, { exists: false, count: null }] as const;
     const result = await safeQuery<{ count: string }>(`SELECT COUNT(*)::text AS count FROM "${table}"`);
-    counts[table] = { exists: true, count: result.ok ? Number(result.rows[0]?.count ?? 0) : null, error: result.error };
-  }
+    return [table, { exists: true, count: result.ok ? Number(result.rows[0]?.count ?? 0) : null, error: result.error }] as const;
+  }));
+  const counts = Object.fromEntries(countEntries);
   const flyway = await safeQuery<{ version: string | null; description: string | null }>("SELECT version, description FROM flyway_schema_history WHERE success=true ORDER BY installed_rank DESC LIMIT 1");
   return { tables: counts, flyway: flyway.ok ? flyway.rows[0] ?? null : { error: flyway.error } };
 }
