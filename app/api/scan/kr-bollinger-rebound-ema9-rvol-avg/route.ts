@@ -33,12 +33,13 @@ export async function GET() {
     for (const item of instruments) {
       if (item.marketCap === null || item.marketCap <= 30_000_000_000 || item.candles.length < 41) continue;
       const candles = [...item.candles].sort((a, b) => a.date.localeCompare(b.date));
+      const candlesByDate = new Map(candles.map((candle) => [candle.date, candle]));
       const bands = calculateKrBollingerBands(candles, 20, 2);
       const latest = candles.at(-1);
       const ema9 = ema(candles.map((row) => Number(row.close)), 9);
       const recentBands = bands.slice(-4);
       const priorBands = recentBands.slice(0, -1);
-      const touchedLower = priorBands.some((band) => { const candle = candles.find((row) => row.date === band.date); return candle ? Number(candle.low) <= band.lower : false; });
+      const touchedLower = priorBands.some((band) => { const candle = candlesByDate.get(band.date); return candle ? Number(candle.low) <= band.lower : false; });
       const latestBand = bands.at(-1);
       const rebound = touchedLower && latestBand ? { qualifies: Number(latest?.close) >= latestBand.lower, state: "LOWER_TOUCH_THEN_REBOUND" as const } : { qualifies: false, state: "NO_REBOUND" as const };
       const rvolAverage = recentRvolAverage(candles, 5);
