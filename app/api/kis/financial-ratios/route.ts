@@ -19,12 +19,11 @@ export async function GET(request: Request) {
   const token = await getAccessToken();
   if (!token) return NextResponse.json({ ok: false, error: "KIS_TOKEN_UNAVAILABLE", source: "KIS", code, type, collectedAt }, { status: 503 });
   try {
-    const items = [];
-    for (const currentCode of codes) {
+    const items = await Promise.all(codes.map(async (currentCode) => {
       const result = type === "growth" ? await fetchGrowthRatio(token, currentCode, period) : type === "profit" ? await fetchProfitRatio(token, currentCode, period) : type === "stability" ? await fetchStabilityRatio(token, currentCode, period) : type === "balance-sheet" ? await fetchBalanceSheet(token, currentCode, period) : type === "income-statement" ? await fetchIncomeStatement(token, currentCode, period) : type === "other-major" ? await fetchOtherMajorRatios(token, currentCode, period) : await fetchFinancialRatio(token, currentCode, period);
       await writeKisSignalSnapshot({ market: "KR", code: currentCode, signalType: `ratio_${type}_${period}`, status: result.ok ? "AVAILABLE" : "UNAVAILABLE", observedAt: new Date(collectedAt), payload: result.rows });
-      items.push({ ok: result.ok, source: "KIS", market: "KR", code: currentCode, type, period, collectedAt, rows: result.rows, diagnostics: { status: result.status, rtCd: result.rtCd, msgCd: result.msgCd, msg1: result.msg1 } });
-    }
+      return { ok: result.ok, source: "KIS", market: "KR", code: currentCode, type, period, collectedAt, rows: result.rows, diagnostics: { status: result.status, rtCd: result.rtCd, msgCd: result.msgCd, msg1: result.msg1 } };
+    }));
     if (codes.length === 1) return NextResponse.json(items[0], { status: items[0].ok ? 200 : 502 });
     return NextResponse.json({ ok: items.every((item) => item.ok), source: "KIS", market: "KR", codes, type, period, collectedAt, items }, { status: items.some((item) => item.ok) ? 200 : 502 });
   } catch (error) {
