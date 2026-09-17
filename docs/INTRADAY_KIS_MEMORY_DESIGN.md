@@ -237,7 +237,7 @@ next start
 ```
 
 - 개발 환경에서는 `NODE_ENV=development`일 때 worker를 자동 시작하지 않고 수동 실행 플래그로만 켠다.
-- 운영 환경에서는 `INTRADAY_WORKER_ENABLED=true`일 때만 시작한다.
+- 운영 환경에서는 `INTRADAY_DETECTION_ENABLED=true`일 때만 시작한다. 이 값은 `instrumentation.ts`의 실제 기동 조건과 동일하게 유지한다.
 - 프로세스가 두 번 초기화되는 Next.js 개발 리로드에서는 전역 singleton과 실행 토큰으로 중복 worker를 차단한다.
 - 장외 시간에는 tick을 유지하되 KIS 호출은 하지 않고 세션 전환·재개 시각만 갱신한다.
 - worker 예외는 웹 서버 예외로 전파하지 않고 `lastError`에 기록한 뒤 backoff 후 재시작한다.

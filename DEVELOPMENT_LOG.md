@@ -2,6 +2,31 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-17] 인트라데이 워커 환경변수 문서 계약 정합성 개선
+
+### 목표
+- 실제 워커 기동 코드와 설계 문서의 환경변수 명칭을 일치시켜 운영 설정 오류를 예방한다.
+
+### 반영
+- `docs/INTRADAY_KIS_MEMORY_DESIGN.md`의 잘못된 `INTRADAY_WORKER_ENABLED` 표기를 실제 코드 조건인 `INTRADAY_DETECTION_ENABLED`로 수정했다.
+
+### 검증
+- `rg -n "INTRADAY_(WORKER|DETECTION)_ENABLED" instrumentation.ts docs/INTRADAY_KIS_MEMORY_DESIGN.md`로 실행 코드와 문서의 명칭을 대조한다.
+- `npm.cmd run docs:check`로 문서 계약과 마이그레이션 검사를 수행한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-014
+- 성과 판정: IMPROVED
+- 근거: 운영자가 문서만 보고 설정할 때 실제 기동 조건과 다른 환경변수를 사용할 가능성을 제거했다.
+- 재발 감지: CI에서 `instrumentation.ts`의 기동 플래그와 인트라데이 설계 문서의 플래그가 동일한지 문자열 감사한다.
+
+### 다음 개선
+- 환경변수 계약을 단일 예시 파일과 자동 감사 스크립트로 통합한다.
+
+### 커밋·푸시·배포
+- 배포 상태: 미실행
+- 전체 검증 통과 후 변경 파일만 커밋하고 푸시한다.
+
 ## [2026-09-17] 운영 상승률 TOP 100 거래대금 비율 API 실데이터 검증
 
 ### 목표
