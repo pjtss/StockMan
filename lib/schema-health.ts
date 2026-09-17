@@ -59,26 +59,29 @@ export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
   const startedAt = Date.now();
   try {
     const pool = getPool();
-    await pool.query("SELECT 1");
-    const tableResult = await pool.query<{ table_name: string }>(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
-      [OPERATIONAL_SCHEMA_TABLES],
-    );
+    const [connectionResult, tableResult, columnResult, retiredResult] = await Promise.all([
+      pool.query("SELECT 1"),
+      pool.query<{ table_name: string }>(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
+        [OPERATIONAL_SCHEMA_TABLES],
+      ),
+      pool.query<{ table_name: string; column_name: string }>(
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (($1, $2), ($3, $4))",
+        ["kr_common_stock_universe", "daily_active", "us_common_stock_universe", "daily_active"],
+      ),
+      pool.query<{ table_name: string }>(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
+        [RETIRED_SCHEMA_TABLES],
+      ),
+    ]);
+    void connectionResult;
     const checkedTables = tableResult.rows.map((row) => row.table_name);
     const missingTables = getMissingSchemaTables(checkedTables);
     const missingOperationalTables = getMissingSchemaTables(checkedTables, OPERATIONAL_SCHEMA_TABLES);
-    const columnResult = await pool.query<{ table_name: string; column_name: string }>(
-      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (($1, $2), ($3, $4))",
-      ["kr_common_stock_universe", "daily_active", "us_common_stock_universe", "daily_active"],
-    );
     const availableColumns = new Set(columnResult.rows.map((row) => `${row.table_name}.${row.column_name}`));
     const missingOperationalColumns = REQUIRED_OPERATIONAL_COLUMNS
       .map(([table, column]) => `${table}.${column}`)
       .filter((column) => !availableColumns.has(column));
-    const retiredResult = await pool.query<{ table_name: string }>(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
-      [RETIRED_SCHEMA_TABLES],
-    );
     const retiredTablesPresent = retiredResult.rows.map((row) => row.table_name);
     let flywayVersion: string | null = null;
     if (!missingTables.includes("flyway_schema_history")) {
