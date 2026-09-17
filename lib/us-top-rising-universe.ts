@@ -34,7 +34,10 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
   const enabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
   if (!enabled || scopes.length === 0) return scopes;
   const caps = new Map<string, number | null>();
-  const missing = scopes.filter((scope) => scope.marketCap == null);
+  // `null` can be a known lookup result (unknown market cap). Only query
+  // scopes whose field was never populated; this avoids repeating the live
+  // path's batch lookup for the same candidates.
+  const missing = scopes.filter((scope) => !Object.prototype.hasOwnProperty.call(scope, "marketCap"));
   if (missing.length > 0) {
     const rows = await getPool().query<{ market: string; code: string; market_cap: number | null }>(
       "SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])",
