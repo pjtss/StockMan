@@ -150,7 +150,13 @@ async function fetchDisclosureList(searchType: (typeof SEARCH_TYPES)[number], ma
     throw new Error(`OPEN DART 공시검색 요청 실패: ${response.status}`);
   }
 
-  const payload = (await response.json()) as OpenDartResponse;
+  let payload: OpenDartResponse;
+  try {
+    payload = (await response.json()) as OpenDartResponse;
+  } catch (error) {
+    const contentType = response.headers.get("content-type") || "unknown";
+    throw new Error(`OPEN DART 공시검색 응답 JSON 파싱 실패 (HTTP ${response.status}, ${contentType}): ${error instanceof Error ? error.message : String(error)}`);
+  }
   if (payload.status && payload.status !== "000" && payload.status !== "013") {
     throw new Error(payload.message || `OPEN DART 오류 코드: ${payload.status}`);
   }

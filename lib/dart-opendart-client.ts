@@ -77,7 +77,13 @@ async function fetchPage(apiKey: string, dateKey: string, pageNo: number) {
     throw new Error(`OPEN DART 공시검색 요청 실패: ${response.status}`);
   }
 
-  const payload = (await response.json()) as OpenDartListResponse;
+  let payload: OpenDartListResponse;
+  try {
+    payload = (await response.json()) as OpenDartListResponse;
+  } catch (error) {
+    const contentType = response.headers.get("content-type") || "unknown";
+    throw new Error(`OPEN DART 응답 JSON 파싱 실패 (HTTP ${response.status}, ${contentType}): ${error instanceof Error ? error.message : String(error)}`);
+  }
   if (payload.status === "013") {
     return { rows: [] as OpenDartListRow[], totalCount: 0, totalPages: 0 };
   }

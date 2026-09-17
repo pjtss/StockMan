@@ -98,7 +98,14 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
     return null;
   }
 
-  const payload = (await response.json()) as TokenResponse;
+  let payload: TokenResponse;
+  try {
+    payload = (await response.json()) as TokenResponse;
+  } catch (error) {
+    const contentType = response.headers.get("content-type") || "unknown";
+    console.warn(`[KIS] Token issuance returned invalid JSON (HTTP ${response.status}, ${contentType}): ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
   const accessToken = typeof payload.access_token === "string" ? payload.access_token.trim() : "";
   if (!accessToken) return null;
 
