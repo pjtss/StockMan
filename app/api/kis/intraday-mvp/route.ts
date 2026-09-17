@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const snapshot = intradayMemoryState.snapshot();
   const currentTop100 = new Set(snapshot.current.map((item) => `${item.market}:${item.code}`));
+  const rollingByKey = new Map(snapshot.rollingTurnover.map((entry) => [entry.key, entry]));
   const items = snapshot.candidates
     .filter((candidate) => candidate.mvpTracking && candidate.mvpQualified && currentTop100.has(`${candidate.market}:${candidate.code}`))
     .map((candidate) => ({
@@ -18,7 +19,7 @@ export async function GET() {
       rollingTurnoverRatio: candidate.rollingTurnoverRatio ?? null,
       windowStart: candidate.turnoverWindowStart ?? null,
       windowEnd: candidate.turnoverWindowEnd ?? null,
-      sampleCount: snapshot.rollingTurnover.find((entry) => entry.key === `${candidate.market}:${candidate.code}`)?.buckets.length ?? 0,
+      sampleCount: rollingByKey.get(`${candidate.market}:${candidate.code}`)?.buckets.length ?? 0,
       state: candidate.state ?? null,
       lastObservedAt: candidate.lastObservedAt ?? null,
     }));
