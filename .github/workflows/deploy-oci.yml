@@ -57,6 +57,10 @@ jobs:
           cp db/migration/*.sql "$release_dir/db/migration/"
           node -e "const fs=require('fs'); const p=require('./package.json'); fs.writeFileSync('.next-deploy-verify/standalone/build-info.json', JSON.stringify({version:p.version,commit:process.env.STOCKMAN_BUILD_VERSION||'unknown',builtAt:process.env.STOCKMAN_BUILD_TIME||new Date().toISOString()}));"
           tar -czf stockman-oci.tar.gz -C "$release_dir" .
+          tar -tzf stockman-oci.tar.gz | grep -Fx './server.js'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './build-info.json'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-cron.sh'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V1__initial_schema.sql'
 
       - name: Configure SSH
         timeout-minutes: 3
