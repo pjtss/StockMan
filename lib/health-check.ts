@@ -71,8 +71,9 @@ export async function getHealthSnapshot() {
       const latestSuccess = await getPool().query<{ module_key: string; finished_at: Date | null }>("SELECT DISTINCT ON (module_key) module_key, finished_at FROM automation_runs WHERE module_key = ANY($1) AND status = 'SUCCESS' ORDER BY module_key, started_at DESC", [cacheModules]);
       const latestByModule = new Map(latest.rows.map((row) => [row.module_key, row]));
       const successByModule = new Map(latestSuccess.rows.map((row) => [row.module_key, row]));
+      const settingsByModule = new Map((await Promise.all(cacheModules.map(async (moduleKey) => [moduleKey, await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null)] as const))).map(([moduleKey, settings]) => [moduleKey, settings]));
       for (const moduleKey of cacheModules) {
-        const settings = await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null);
+        const settings = settingsByModule.get(moduleKey);
         const row = latestByModule.get(moduleKey);
         // A completed run's freshness is measured from completion, not start.
         // Long-running cache jobs must not look stale while they are still finishing.
