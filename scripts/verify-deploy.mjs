@@ -47,7 +47,7 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
       if (response.ok && contentType.includes("text/html") && body.trim().length > 100) return;
@@ -58,6 +58,32 @@ async function waitForHealth(url, timeoutMs = 30_000) {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
+}
+
+async function waitForJson(url, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+      const contentType = response.headers.get("content-type") ?? "";
+      const body = await response.text();
+      if (contentType.includes("application/json")) {
+        try {
+          JSON.parse(body);
+          return;
+        } catch (error) {
+          lastError = new Error(`invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else {
+        lastError = new Error(`HTTP ${response.status}, content-type=${contentType}, bodyLength=${body.length}`);
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Deployment JSON smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
 }
 
 function findAvailablePort() {
@@ -95,6 +121,8 @@ async function verifyRuntime() {
   child.unref();
   try {
     await waitForHealth(`http://127.0.0.1:${port}/charts`);
+    await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
+    await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
   } finally {
     await stopProcess(child);
   }
