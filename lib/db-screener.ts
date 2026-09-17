@@ -125,7 +125,7 @@ async function runDbScreenerUncached(
         WHERE c${index}.market=u.market AND c${index}.code=u.code
           AND c${index}.timeframe='${requestedTimeframe}'
           AND c${index}.volume > 0
-          AND ($2 IS NULL OR c${index}.candle_date <= $2)
+          AND ($2::text IS NULL OR c${index}.candle_date <= $2::text)
         ORDER BY c${index}.candle_date DESC
         LIMIT 65`,
     )
