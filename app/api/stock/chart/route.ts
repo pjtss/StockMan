@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawCode = searchParams.get("code");
   const code = rawCode?.trim() || null;
-  const company = searchParams.get("company") ?? code;
+  const company = searchParams.get("company")?.trim() || null;
   const requestedMarket = searchParams.get("market")?.trim().toUpperCase();
   const market = requestedMarket === "US" || requestedMarket === "KR" ? requestedMarket : (code?.toUpperCase().startsWith("US:") ? "US" : "KR");
   const requestedTimeframe = searchParams.get("timeframe")?.trim().toUpperCase();

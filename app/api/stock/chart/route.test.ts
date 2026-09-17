@@ -17,6 +17,7 @@ describe("chart fundamentals response", () => {
     const response = await GET(new Request("http://localhost/api/stock/chart?code=005930&market=KR&timeframe=D"));
     const json = await response.json();
     expect(response.status).toBe(200);
+    expect(json.company).toBe("삼성전자");
     expect(json.fundamentals.currency).toBe("KRW");
     expect(json.fundamentals.averageVolume20).toBe(1000);
     expect(json.fundamentals.averageTradingValue20).toBe(500000);

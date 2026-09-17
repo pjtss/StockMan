@@ -116,9 +116,8 @@ async function verifyRuntime() {
     env: { ...process.env, PORT: port, NODE_ENV: "production" },
     stdio: "ignore",
     shell: false,
-    detached: true,
+    detached: false,
   });
-  child.unref();
   try {
     await waitForHealth(`http://127.0.0.1:${port}/charts`);
     await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
