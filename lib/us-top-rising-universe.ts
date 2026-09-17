@@ -1,9 +1,8 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { getDb } from "@/lib/db";
+import { getDb, getPool } from "@/lib/db";
 import { usCommonStockUniverse } from "@/lib/schema";
 import { classifyUsInstrumentProduct, isEligibleUsCommonStock } from "@/lib/us-instrument-product";
 import { fetchKisUsTopRisingApi } from "@/lib/kis-us-api";
-import { getPool } from "@/lib/db";
 import { loadUsTurnoverFilterSettings, type UsTurnoverFilterSettings } from "@/lib/us-turnover-settings";
 import { syncDailyActivityStatus } from "@/lib/daily-activity-status";
 import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
@@ -35,10 +34,14 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
   const enabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
   if (!enabled || scopes.length === 0) return scopes;
   const caps = new Map<string, number | null>();
-  try {
-    // Only values already present in
-    // the persisted universe can satisfy an optional market-cap constraint.
-  } catch { return []; }
+  const missing = scopes.filter((scope) => scope.marketCap == null);
+  if (missing.length > 0) {
+    const rows = await getPool().query<{ market: string; code: string; market_cap: number | null }>(
+      "SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])",
+      [Array.from(new Set(scopes.map((scope) => scope.market))), Array.from(new Set(missing.map((scope) => scope.code)))],
+    ).then((result) => result.rows).catch(() => [] as Array<{ market: string; code: string; market_cap: number | null }>);
+    for (const row of rows) caps.set(`${row.market}:${row.code}`, row.market_cap);
+  }
   return scopes.filter((scope) => {
     const marketCap = scope.marketCap ?? caps.get(`${scope.market}:${scope.code}`) ?? null;
     return marketCap != null && marketCap >= settings.globalMinMarketCap && (settings.globalMaxMarketCap <= 0 || marketCap <= settings.globalMaxMarketCap);
