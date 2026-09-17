@@ -11,6 +11,7 @@ describe("intraday MVP result API", () => {
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.criteria).toMatchObject({ windowMinutes: 5, requiredSamples: 5, minTurnoverToMarketCapRatio: 0.05, marketCapSource: "KIS_FIXED" });
+    expect(body.status.reason).toBe("QUALIFIED");
     expect(body.items).toEqual([expect.objectContaining({ market: "NAS", code: "MVP", sampleCount: 5, rollingTurnoverRatio: 0.05 })]);
     intradayMemoryState.removeCandidate("NAS", "MVP");
   });
@@ -20,6 +21,7 @@ describe("intraday MVP result API", () => {
     intradayMemoryState.rotateSnapshot([{ market: "NAS", code: "OTHER" }]);
     const body = await (await GET()).json();
     expect(body.items).toEqual([]);
+    expect(body.status.reason).toBe("NO_TOP100");
     intradayMemoryState.removeCandidate("NAS", "STALE");
   });
 });
