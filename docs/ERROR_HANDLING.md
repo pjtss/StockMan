@@ -521,5 +521,6 @@ npm test -- --run
 - **증상**: 운영 홈 HTML은 200이지만 `/_next/static/chunks/app/page-*.js`가 404여서 브라우저에 `ChunkLoadError`가 발생했다.
 - **근본 원인**: standalone 패키지에 정적 자산이 누락된 상태에서, 홈 페이지가 장기 프리렌더 캐시(`x-nextjs-cache: HIT`, `s-maxage`)로 이전 HTML을 계속 제공해 현재 릴리스에 없는 해시 청크를 참조했다.
 - **해결**: 배포 패키지에 `.next/static`을 포함하고, 홈 페이지를 `dynamic = "force-dynamic"`으로 전환해 릴리스 이후 현재 청크를 참조하는 HTML을 생성한다. 클라이언트에는 기존 청크 오류 1회 자동 복구를 유지한다.
+- **추가 보강**: 운영 standalone 런타임의 정적 경로 차이에 대비해 동일한 해시 자산을 `public/_next/static`에도 패키징하고, 이전 릴리스 자산 보존도 두 경로에 적용한다.
 - **재발 방지**: 배포 검증에서 standalone 정적 청크 존재와 런타임 smoke를 확인하고, 운영 검증에서 홈 HTML의 참조 청크를 직접 GET해 200 및 JavaScript 응답을 확인한다.
 - **남은 위험**: 외부 CDN이 HTML을 별도 캐시하는 경우 CDN purge 또는 `no-store` 정책이 필요하다.

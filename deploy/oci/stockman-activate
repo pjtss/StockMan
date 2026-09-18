@@ -28,6 +28,9 @@ chmod +x "$TEMP_PATH/scripts/oci-rss-cron.sh"
 if [ -d "$DEPLOY_PATH/.next/static" ] && [ -d "$TEMP_PATH/.next/static" ]; then
   cp -rn "$DEPLOY_PATH/.next/static/." "$TEMP_PATH/.next/static/"
 fi
+if [ -d "$DEPLOY_PATH/public/_next/static" ] && [ -d "$TEMP_PATH/public/_next/static" ]; then
+  cp -rn "$DEPLOY_PATH/public/_next/static/." "$TEMP_PATH/public/_next/static/"
+fi
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required for the Flyway migration container but was not found on OCI" >&2
   exit 1

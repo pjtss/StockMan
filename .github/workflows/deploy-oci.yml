@@ -44,11 +44,14 @@ jobs:
           set -euo pipefail
           release_dir=.next-deploy-verify/standalone
           test -f "$release_dir/server.js"
-          mkdir -p "$release_dir/public" "$release_dir/.next/static" "$release_dir/scripts" "$release_dir/deploy/oci" "$release_dir/db/migration"
+          mkdir -p "$release_dir/public/_next/static" "$release_dir/.next/static" "$release_dir/scripts" "$release_dir/deploy/oci" "$release_dir/db/migration"
           # Next standalone does not include hashed client assets by itself.
           # Without this copy, HTML returns 200 while every app chunk returns 404.
           cp -r .next-deploy-verify/static/. "$release_dir/.next/static/"
           cp -r public/. "$release_dir/public/"
+          # Keep a public fallback for runtimes that do not resolve the standalone
+          # .next/static directory after an atomic release switch.
+          cp -r .next-deploy-verify/static/. "$release_dir/public/_next/static/"
           cp scripts/oci-cron.sh "$release_dir/scripts/oci-cron.sh"
           cp scripts/oci-rss-cron.sh "$release_dir/scripts/oci-rss-cron.sh"
           cp scripts/register-discord-commands.mjs "$release_dir/scripts/register-discord-commands.mjs"
