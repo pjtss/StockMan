@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadFeatureModuleSettings, saveFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { getFeatureModule, type FeatureModuleKey } from "@/lib/feature-modules";
 import { requireAdminSession } from "@/lib/admin-auth";
+import { invalidateIntradayMvpPolicyCache } from "@/lib/intraday-mvp-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
         marketRss: incomingFeatureSettings.marketRss === undefined ? current.featureSettings?.marketRss : { ...current.featureSettings?.marketRss, ...incomingFeatureSettings.marketRss },
         secEdgar: incomingFeatureSettings.secEdgar === undefined ? current.featureSettings?.secEdgar : { ...current.featureSettings?.secEdgar, ...incomingFeatureSettings.secEdgar },
         newsLookup: incomingFeatureSettings.newsLookup === undefined ? current.featureSettings?.newsLookup : { ...current.featureSettings?.newsLookup, ...incomingFeatureSettings.newsLookup },
+        intradayMvpPolicy: incomingFeatureSettings.intradayMvpPolicy === undefined ? current.featureSettings?.intradayMvpPolicy : { ...current.featureSettings?.intradayMvpPolicy, ...incomingFeatureSettings.intradayMvpPolicy },
         minuteBollingerPolicy: incomingFeatureSettings.minuteBollingerPolicy === undefined ? current.featureSettings?.minuteBollingerPolicy : { ...current.featureSettings?.minuteBollingerPolicy, ...incomingFeatureSettings.minuteBollingerPolicy },
       };
     const settings = await saveFeatureModuleSettings(key as FeatureModuleKey, {
@@ -44,6 +46,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
       activeDays: Array.isArray(body.activeDays) ? body.activeDays.map(Number) : current.activeDays,
       featureSettings,
     });
+    if (key === "intraday-mvp") invalidateIntradayMvpPolicyCache();
     return NextResponse.json(settings);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "저장에 실패했습니다." }, { status: 400 });

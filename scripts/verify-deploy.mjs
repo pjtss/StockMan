@@ -1,10 +1,27 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { existsSync, readFileSync } from "node:fs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
 const verifyDistDir = process.env.DEPLOY_VERIFY_DIST_DIR || ".next-deploy-verify";
 const commandTimeoutMs = Number(process.env.DEPLOY_VERIFY_COMMAND_TIMEOUT_MS || 900_000);
+
+function loadLocalEnv() {
+  const file = ".env.local";
+  if (!existsSync(file)) return {};
+  const values = {};
+  for (const raw of readFileSync(file, "utf8").split(/\r?\n/)) {
+    const line = raw.trim();
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match || line.startsWith("#")) continue;
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    else value = value.replace(/\s+#.*$/, "").trim();
+    values[match[1]] = value;
+  }
+  return values;
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -41,7 +58,10 @@ function run(command, args, options = {}) {
 async function verifyQuality() {
   console.log("[deploy-verify] quality gates");
   await run(npm, ["test", "--", "--run"]);
-  await run(npm, ["run", "typecheck"]);
+  // Keep verification's incremental TypeScript state out of the shared
+  // workspace file. Concurrent local tools can otherwise lock or replace
+  // tsconfig.tsbuildinfo and make a read-only typecheck fail with TS5033.
+  await run(npm, ["run", "typecheck", "--", "--tsBuildInfoFile", `${verifyDistDir}/tsconfig.tsbuildinfo`]);
   await run(npm, ["run", "docs:check"]);
   await run(npm, ["run", "audit:verify-scope"]);
   await run(npm, ["run", "audit:kis-boundary"]);
@@ -123,7 +143,7 @@ async function verifyRuntime() {
   const executable = isWindows ? process.env.ComSpec : command;
   const executableArgs = isWindows ? ["/d", "/s", "/c", [command, ...args].join(" ")] : args;
   const child = spawn(executable, executableArgs, {
-    env: { ...process.env, PORT: port, NODE_ENV: "production" },
+    env: { ...process.env, ...loadLocalEnv(), PORT: port, NODE_ENV: "production" },
     stdio: "ignore",
     shell: false,
     detached: false,
@@ -143,7 +163,12 @@ async function verifyRuntime() {
   }
 }
 
-await verifyQuality();
+// Build before the full Vitest suite. On constrained developer/CI hosts the
+// test workers can retain enough filesystem/CPU pressure to make a following
+// Next build appear hung even though the same build succeeds in isolation.
+// Keeping the build first makes that resource dependency explicit and fails
+// fast before the longer quality suite runs.
 await run(npm, ["run", "build"], { env: { ...process.env, NEXT_DIST_DIR: verifyDistDir } });
+await verifyQuality();
 await verifyRuntime();
 console.log("Deployment verification passed: quality gates, build, and runtime smoke test.");

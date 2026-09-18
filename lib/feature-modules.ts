@@ -17,6 +17,7 @@ export type FeatureSpecificSettings = {
   newsLookup?: { defaultPeriod: "today" | "3d" | "7d" | "1m" };
   minuteBollingerPolicy?: { topN: number; period: number; stdDevMultiplier: number; minChangeRate: number };
   minuteObvAdlPolicy?: { topN: number; obvSignalPeriod: number; adlSignalPeriod: number; requireRisingSignals: boolean; minChangeRate: number };
+  intradayMvpPolicy?: { windowMinutes?: 1 | 5; thresholdPercent?: number; webhookUrl?: string };
 };
 
 export type FeatureModuleDefinition = {
@@ -36,6 +37,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "market-rss", label: "시장 RSS 통합", description: "SEC EDGAR·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss", scheduler: "OCI_CRON" },
   { key: "us-scanners", label: "미국 스캐너", description: "미국 상승률·체결강도 스캐너", settingsPath: "/admin/modules/us-scanners", scheduler: "NOT_SCHEDULED" },
   { key: "domestic-trade-intensity", label: "국내 체결강도", description: "국내 주식 체결강도 스캐너", settingsPath: "/admin/modules/domestic-trade-intensity", scheduler: "NOT_SCHEDULED" },
+  { key: "intraday-mvp", label: "TOP100 장중 거래대금 탐지", description: "국내·미국 상승률 TOP100의 시총 대비 단기 거래대금 탐지·Discord 알림", settingsPath: "/admin/modules/intraday-mvp", scheduler: "NOT_SCHEDULED" },
   { key: "us-bollinger-band", label: "일봉 볼린저밴드 하단 이탈", description: "해외 유니버스의 최신 저장 일봉(당일 포함) 저가가 볼린저밴드 하단 이하인 종목 탐지", settingsPath: "/admin/modules/us-bollinger-band", scheduler: "OCI_CRON" },
   { key: "us-bollinger-middle-lower", label: "일봉 볼린저밴드 중단선~하단선", description: "해외 유니버스의 최신 저장 일봉 종가가 중단선과 하단선 사이인 종목 탐지", settingsPath: "/admin/modules/us-bollinger-middle-lower", scheduler: "OCI_CRON" },
   { key: "us-golden-cross", label: "해외 일봉 골든크로스", description: "해외 보통주의 일봉 9일 EMA가 20일 EMA를 상향 돌파하는 종목 탐지", settingsPath: "/admin/modules/us-golden-cross", scheduler: "OCI_CRON" },

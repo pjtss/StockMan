@@ -1,7 +1,7 @@
 import { intradayMemoryState } from "@/lib/intraday-memory-state";
 import { loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 import crypto from "node:crypto";
-import { recordIntradayTick, recordIntradayTransition } from "@/lib/intraday-detection-observability";
+import { recordIntradayTick, recordIntradayTransitions, type IntradayTransition } from "@/lib/intraday-detection-observability";
 import { fetchUsMinuteTurnover } from "@/lib/kis-us-minute-turnover";
 import { evaluateIntradayQuality } from "@/lib/intraday-quality-gate";
 import { getAccessToken } from "@/lib/kis-token";
@@ -9,6 +9,8 @@ import { fetchDomesticFluctuation } from "@/lib/kis-domestic-api";
 import { fetchKrMinuteCandles } from "@/lib/kr-minute-candle-cache";
 import { isDomesticScannerOpen, isUsScannerOpen } from "@/lib/scanner-hours";
 import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
+import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
+import { sendIntradayMvpAlerts, type IntradayMvpAlert } from "@/lib/discord-intraday-mvp";
 
 export type IntradayWorkerStatus = "STOPPED" | "RUNNING" | "WARMING_UP" | "STOPPING" | "DEGRADED";
 export type IntradayWorkerSnapshot = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number };
@@ -37,9 +39,15 @@ export async function runIntradayTick(now = Date.now()) {
       runtime.status = "WARMING_UP";
       const started = Date.now();
       const tickId = crypto.randomUUID();
+      const policy = await loadIntradayMvpPolicy();
+      if (process.env.INTRADAY_DETECTION_ENABLED !== "true") { runtime.status = "STOPPED"; return; }
       const [domesticOpen, usOpen] = await Promise.all([isDomesticScannerOpen(new Date(now)), isUsScannerOpen(new Date(now))]);
-      const scopes = usOpen ? await loadUsTopRisingScopes() : { scopes: [], universe: { markets: [] } as any };
-      const domestic = domesticOpen ? await loadDomesticTopRising().catch(() => []) : [];
+      // The market feeds are independent. Fetch them concurrently so a slow
+      // exchange does not delay the other market's candidate refresh.
+      const [scopes, domestic] = await Promise.all([
+        usOpen ? loadUsTopRisingScopes() : Promise.resolve({ scopes: [], universe: { markets: [] } as any }),
+        domesticOpen ? loadDomesticTopRising().catch(() => []) : Promise.resolve([]),
+      ]);
       if (scopes.scopes.length || domestic.length) intradayMemoryState.rotateSnapshot([...scopes.scopes.map((item) => ({ market: item.market, code: item.code, name: item.name, rank: item.rank, rate: item.changeRate ?? undefined, volume: item.rankingVolume ?? undefined, tradingValue: item.rankingTradeValue ?? undefined })), ...domestic]);
       for (const item of domestic) {
         const scored = scoreIntradayCandidate({ market: item.market, code: item.code, currency: "KRW", marketCap: item.marketCap, tradingValue: item.tradingValue, isTopRising: true, isNewEntry: false, rankChange: 0, rateChange: 0, volumeChange: 0, aboveVwap: false, now });
@@ -51,7 +59,8 @@ export async function runIntradayTick(now = Date.now()) {
       // violate the one-minute observation requirement.
       const due = intradayMemoryState.dueCandidates(now, 300);
       let failedCount = 0;
-      const transitions: Array<Parameters<typeof recordIntradayTransition>[0]> = [];
+      const transitions: IntradayTransition[] = [];
+      const alerts: IntradayMvpAlert[] = [];
       await Promise.all(due.map(async (candidate) => {
         try {
           const isUs = ["NAS", "AMS", "NYS"].includes(candidate.market);
@@ -75,10 +84,11 @@ export async function runIntradayTick(now = Date.now()) {
           const latestBarValue = Number.isFinite(latestVolume) && latestVolume >= 0 ? latestPrice * latestVolume : 0;
           const latestObservedAt = Number.isFinite(sourceObservedAt) && sourceObservedAt ? sourceObservedAt : now;
           const minuteBucket = Math.floor(latestObservedAt / 60_000) * 60_000;
-          const turnover = intradayMemoryState.recordRollingTurnover(candidate.market, candidate.code, sessionDate, minuteBucket, Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0, candidate.marketCap ?? 0);
+          const turnover = intradayMemoryState.recordRollingTurnover(candidate.market, candidate.code, sessionDate, minuteBucket, Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0, candidate.marketCap ?? 0, policy.windowMs, policy.threshold);
           const finalState = turnover.qualified && !["STALE", "DEGRADED", "WARMING_UP"].includes(quality.state) ? "QUALIFIED" : quality.state;
           const transition = intradayMemoryState.recordQuality(candidate.market, candidate.code, finalState, now, quality.dataAgeSeconds ?? undefined);
           if (transition?.previousState !== finalState) transitions.push({ tickId, market: candidate.market, code: candidate.code, fromState: transition?.previousState, toState: finalState, observedAt: new Date(now), dedupeKey: `${candidate.market}:${candidate.code}:${finalState}:${new Date(now).toISOString().slice(0, 16)}` });
+          if (finalState === "QUALIFIED" && transition?.previousState !== "QUALIFIED" && turnover.ratio != null && candidate.marketCap) alerts.push({ market: candidate.market, code: candidate.code, marketCap: candidate.marketCap, rollingTradingValue: turnover.tradingValue, ratioPercent: turnover.ratio * 100, windowMinutes: policy.windowMinutes, observedAt: new Date(now).toISOString() });
           intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now);
         } catch { failedCount += 1; intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now); }
       }));
@@ -87,7 +97,8 @@ export async function runIntradayTick(now = Date.now()) {
       runtime.status = "RUNNING";
       runtime.lastError = null;
       await recordIntradayTick({ runId: workerRunId, tickId, workerStatus: runtime.status, plannedCount: scopes.scopes.length + domestic.length, executedCount: due.length - failedCount, deferredCount: Math.max(0, scopes.scopes.length + domestic.length - due.length), throttledCount: 0, failedCount, queueDepth: intradayMemoryState.dueCandidates(now).length, observedAt: new Date(now), durationMs: Date.now() - started });
-      await Promise.all(transitions.map((transition) => recordIntradayTransition(transition)));
+      await recordIntradayTransitions(transitions);
+      if (alerts.length) await sendIntradayMvpAlerts(alerts).catch((error) => { runtime.lastError = error instanceof Error ? `discord:${error.message}` : "discord:send_failed"; });
     } catch (error) {
       runtime.status = "DEGRADED";
       runtime.lastError = error instanceof Error ? error.message : String(error);

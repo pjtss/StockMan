@@ -27,6 +27,7 @@ const defaultsByModule: Record<FeatureModuleKey, CommonModuleSettings> = {
   "market-rss": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5, 6, 0], featureSettings: { marketRss: { enabledSources: [...MARKET_RSS_SOURCES] } } },
   "us-scanners": { enabled: true, startTime: "17:00", endTime: "02:00", cooldownSeconds: 60, intervalSeconds: 30, activeDays: [1, 2, 3, 4, 5] },
   "domestic-trade-intensity": { enabled: true, startTime: "08:00", endTime: "15:30", cooldownSeconds: 60, activeDays: [1, 2, 3, 4, 5] },
+  "intraday-mvp": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 60, activeDays: [1, 2, 3, 4, 5], featureSettings: { intradayMvpPolicy: { windowMinutes: 5, thresholdPercent: 5 } } },
   "us-bollinger-band": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "LOWER_OR_BELOW", requireObvAdlSignal: false, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "us-golden-cross": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 86400, activeDays: [1, 2, 3, 4, 5, 6], featureSettings: { goldenCrossPolicy: { shortPeriod: 9, longPeriod: 20, recentCrossLookback: 5, approachingProximityPercent: 0.5, requireObvAboveSignal: true, requireAdlAboveSignal: true, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
   "us-bollinger-middle-lower": { enabled: true, startTime: "00:00", endTime: "23:59", cooldownSeconds: 60, intervalSeconds: 600, activeDays: [1, 2, 3, 4, 5], featureSettings: { bollingerPolicy: { period: 20, stdDevMultiplier: 2, minPrice: 0, minVolume: 0, minTurnoverRatio: 0, zone: "MIDDLE_TO_LOWER", requireObvAdlSignal: false, obvSignalPeriod: 9, adlSignalPeriod: 9 } } },
@@ -152,6 +153,11 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
     for (const name of ["obvSignalPeriod", "adlSignalPeriod"]) if (policy?.[name] !== undefined && (!Number.isInteger(Number(policy[name])) || Number(policy[name]) < 2 || Number(policy[name]) > 100)) throw new Error(`INVALID_MINUTE_OBV_ADL_${name.toUpperCase()}`);
     if (policy?.requireRisingSignals !== undefined && typeof policy.requireRisingSignals !== "boolean") throw new Error("INVALID_MINUTE_OBV_ADL_RISING");
     if (policy?.minChangeRate !== undefined && !Number.isFinite(Number(policy.minChangeRate))) throw new Error("INVALID_MINUTE_OBV_ADL_RATE");
+  }
+  if (key === "intraday-mvp") {
+    const policy = settings.featureSettings?.intradayMvpPolicy;
+    if (policy?.windowMinutes !== undefined && ![1, 5].includes(Number(policy.windowMinutes))) throw new Error("INVALID_INTRADAY_WINDOW_MINUTES");
+    if (policy?.thresholdPercent !== undefined && (!Number.isFinite(Number(policy.thresholdPercent)) || Number(policy.thresholdPercent) <= 0 || Number(policy.thresholdPercent) > 100)) throw new Error("INVALID_INTRADAY_THRESHOLD_PERCENT");
   }
   if (!Array.isArray(settings.activeDays) || settings.activeDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error("INVALID_ACTIVE_DAYS");
   const db = getDb();
