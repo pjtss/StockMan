@@ -17,6 +17,8 @@
 - **해결 위치**: `deploy/oci/stockman-activate`가 이전 릴리스의 `.next/static`을 incoming 릴리스에 보존한다. `deploy/oci/nginx-stockman.conf`는 HTML·API를 재검증하고 해시 정적 파일만 장기 캐시한다.
 - **클라이언트 복구**: `components/client-error-reporter.tsx`가 청크 로딩 오류를 감지하면 세션당 한 번 캐시 버스터 URL로 재진입해 이미 열린 탭도 새 HTML을 받도록 한다.
 - **재발 자동 감지**: `npm run deploy:verify`의 standalone `/charts` smoke와 운영 배포 후 메인 페이지 확인에서 청크 로딩 오류를 확인한다. 배포 체크리스트에 캐시·정적 청크 검사를 추가했다.
+- **추가 원인**: standalone 패키지에 `.next/static` 복사가 빠지면 HTML은 200이어도 JavaScript 청크가 404가 된다. workflow에서 정적 파일을 명시적으로 복사하고 tar 내부 청크 존재를 검증한다.
+- **검증 강화**: `deploy:verify`가 `/charts` HTML에서 실제 JS 경로를 추출해 해당 청크의 200·JavaScript 응답까지 확인한다.
 - **검증**: 수정 후 전체 테스트, 타입체크, 문서·감사·cron 검사, production build 및 runtime smoke를 다시 통과시킨다.
 
 ## 2026-09-04 점검 기록

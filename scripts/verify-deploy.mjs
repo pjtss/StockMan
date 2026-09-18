@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { existsSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
@@ -88,6 +88,15 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
 }
 
+async function verifyStaticAsset(url) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!response.ok || !contentType.includes("javascript")) {
+    throw new Error(`Static asset smoke failed: HTTP ${response.status}, content-type=${contentType}, url=${url}`);
+  }
+  console.log(`[deploy-verify] static asset ok: ${url} (${response.status})`);
+}
+
 async function waitForJson(url, timeoutMs = 30_000) {
   console.log(`[deploy-verify] smoke start: ${url}`);
   const deadline = Date.now() + timeoutMs;
@@ -138,6 +147,11 @@ function stopProcess(child) {
 
 async function verifyRuntime() {
   const port = process.env.DEPLOY_VERIFY_PORT || await findAvailablePort();
+  const staticSource = `${verifyDistDir}/static`;
+  const staticTarget = `${verifyDistDir}/standalone/.next/static`;
+  if (!existsSync(staticSource)) throw new Error(`Standalone package smoke failed: missing ${staticSource}`);
+  mkdirSync(staticTarget, { recursive: true });
+  cpSync(staticSource, staticTarget, { recursive: true });
   const command = isWindows ? "node" : "node";
   const args = [`${verifyDistDir}/standalone/server.js`];
   const executable = isWindows ? process.env.ComSpec : command;
@@ -153,6 +167,11 @@ async function verifyRuntime() {
     await Promise.race([
       (async () => {
         await waitForHealth(`http://127.0.0.1:${port}/charts`);
+        const htmlResponse = await fetch(`http://127.0.0.1:${port}/charts`, { signal: AbortSignal.timeout(5_000) });
+        const html = await htmlResponse.text();
+        const assetPath = html.match(/(?:src|href)="(\/_next\/static\/[^"?]+\.js)"/)?.[1];
+        if (!assetPath) throw new Error("Static asset smoke failed: no JavaScript asset found in /charts HTML");
+        await verifyStaticAsset(`http://127.0.0.1:${port}${assetPath}`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
       })(),
