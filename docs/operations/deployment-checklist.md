@@ -22,6 +22,7 @@
 - [ ] OCI cron 구조·셸 문법 검사 통과
 - [ ] production build 성공
 - [ ] standalone 서버 실행 및 `/charts` smoke test 성공
+- [ ] Next.js HTML은 재검증되고, 이전 릴리스의 해시 정적 청크 호환 보존 경로가 포함되어 있는지 확인
 
 ## 배포 후
 

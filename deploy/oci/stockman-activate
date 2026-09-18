@@ -22,6 +22,12 @@ stage="extract-release"
 tar -xzf "$RELEASE" -C "$TEMP_PATH"
 chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-rss-cron.sh"
+# Keep hashed static assets from the previous release available for clients
+# that still hold an older HTML document during a browser/proxy cache transition.
+# New assets already present in the incoming release win.
+if [ -d "$DEPLOY_PATH/.next/static" ] && [ -d "$TEMP_PATH/.next/static" ]; then
+  cp -rn "$DEPLOY_PATH/.next/static/." "$TEMP_PATH/.next/static/"
+fi
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker is required for the Flyway migration container but was not found on OCI" >&2
   exit 1
