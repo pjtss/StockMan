@@ -2,6 +2,10 @@ import { PageNavigation } from "@/components/page-navigation";
 import Link from "next/link";
 import styles from "./page.module.css";
 
+// The shell must not be served from a long-lived prerender cache after a release.
+// Otherwise clients can receive HTML that references chunks from an older build.
+export const dynamic = "force-dynamic";
+
 const destinations = [
   { href: "/dart", label: "DART 공시 분석", description: "실시간 국내 공시와 상세 분석" },
 ];
