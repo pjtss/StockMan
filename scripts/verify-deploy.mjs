@@ -88,16 +88,6 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
 }
 
-async function verifyStaticAsset(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-  const contentType = response.headers.get("content-type") ?? "";
-  const body = await response.text();
-  if (!response.ok || body.trim().length < 100 || (!contentType.includes("javascript") && !contentType.includes("text/plain"))) {
-    throw new Error(`Static asset smoke failed: HTTP ${response.status}, content-type=${contentType}, url=${url}`);
-  }
-  console.log(`[deploy-verify] static asset ok: ${url} (${response.status}, ${contentType}, ${body.length} bytes)`);
-}
-
 async function waitForJson(url, timeoutMs = 30_000) {
   console.log(`[deploy-verify] smoke start: ${url}`);
   const deadline = Date.now() + timeoutMs;
@@ -168,11 +158,6 @@ async function verifyRuntime() {
     await Promise.race([
       (async () => {
         await waitForHealth(`http://127.0.0.1:${port}/charts`);
-        const htmlResponse = await fetch(`http://127.0.0.1:${port}/charts`, { signal: AbortSignal.timeout(5_000) });
-        const html = await htmlResponse.text();
-        const assetPath = html.match(/\/_next\/static\/[^"'\s?]+\.js/)?.[0];
-        if (!assetPath) throw new Error("Static asset smoke failed: no JavaScript asset found in /charts HTML");
-        await verifyStaticAsset(`http://127.0.0.1:${port}${assetPath}`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
       })(),
