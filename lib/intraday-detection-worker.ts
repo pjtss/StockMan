@@ -57,7 +57,10 @@ export async function runIntradayTick(now = Date.now()) {
       // throttle serializes requests at the configured safe rate, so limiting
       // this batch to 20 would leave candidates waiting several minutes and
       // violate the one-minute observation requirement.
-      const due = intradayMemoryState.dueCandidates(now, 300);
+      const due = intradayMemoryState.dueCandidates(now, 300).filter((candidate) => {
+        const isUs = ["NAS", "AMS", "NYS"].includes(candidate.market);
+        return !isUs || candidate.focusTracking;
+      });
       let failedCount = 0;
       const transitions: IntradayTransition[] = [];
       const alerts: IntradayMvpAlert[] = [];

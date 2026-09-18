@@ -9,6 +9,7 @@ import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
 import { intradayMemoryState } from "@/lib/intraday-memory-state";
 
 export const US_EXCHANGES = ["NAS", "AMS", "NYS"] as const;
+export const US_INTRADAY_FOCUS_POOL_SIZE = 30;
 const EXCLUDED = /ETF|ETN|인버스|레버리지|inverse|leverag|\bshort\b|\b\d+(?:\.\d+)?x\b/i;
 // KIS occasionally omits etyp_nm for exchange-traded products. These issuer
 // and product-name hints prevent the live VWAP universe from treating an ETF
@@ -25,6 +26,13 @@ function rows(parsed: any) {
   const candidates = [parsed?.output, parsed?.output2, parsed?.output1];
   const output = candidates.find((value) => Array.isArray(value));
   return Array.isArray(output) ? output.slice(0, 100) : [];
+}
+export function chooseTopRisingRows(primary: any, fallback: any) {
+  const primaryRows = rows(primary);
+  if (primaryRows.length >= 100) return { rows: primaryRows, fallbackUsed: false };
+  const fallbackRows = rows(fallback);
+  if (fallbackRows.length > primaryRows.length) return { rows: fallbackRows, fallbackUsed: true };
+  return { rows: primaryRows, fallbackUsed: false };
 }
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
@@ -125,10 +133,14 @@ async function loadUsTopRisingScopesUncached() {
     const selected: UsTopRisingScope[] = [];
     let response = await fetchKisUsTopRisingApi({ excd: market });
     let sourceRows = rows(response?.response?.parsed); let fallbackUsed = false;
-    if (sourceRows.length === 0) {
+    // Some KIS sessions return HTTP 200/rt_cd=0 with only a partial page when
+    // the configured volume range is applied. Keep the full TOP100 contract:
+    // prefer a richer VOL_RANG=0 response rather than silently treating a
+    // short page as complete.
+    if (sourceRows.length < 100) {
       const fallback = await fetchKisUsTopRisingApi({ excd: market, volRang: "0" });
-      const fallbackRows = rows(fallback?.response?.parsed);
-      if (fallbackRows.length > 0) { response = fallback; sourceRows = fallbackRows; fallbackUsed = true; }
+      const selected = chooseTopRisingRows(response?.response?.parsed, fallback?.response?.parsed);
+      if (selected.fallbackUsed) { response = fallback; sourceRows = selected.rows; fallbackUsed = true; }
     }
     let productExcluded = 0;
     for (const [index, item] of sourceRows.entries()) {
@@ -161,8 +173,15 @@ async function loadUsTopRisingScopesUncached() {
     if (scored) intradayMemoryState.upsertCandidate({ ...scored, mvpTracking: true });
     return scored ? { ...scope, priority: scored.priority, turnoverToMarketCap: scored.turnoverToMarketCap, priorityReasons: scored.reasons } : scope;
   }).sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1));
+  const focusKeys = new Set(prioritizedScopes.slice(0, US_INTRADAY_FOCUS_POOL_SIZE).map((scope) => `${scope.market}:${scope.code}`));
+  for (const [index, scope] of prioritizedScopes.entries()) {
+    const candidate = intradayMemoryState.getCandidate(scope.market, scope.code);
+    if (!candidate) continue;
+    const isFocused = focusKeys.has(`${scope.market}:${scope.code}`);
+    intradayMemoryState.upsertCandidate({ ...candidate, focusTracking: isFocused, focusRank: isFocused ? index + 1 : undefined });
+  }
   intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
   const hasSuccessfulResponse = markets.some((market) => market.status === 200 && (market as any).kis?.rtCd === "0");
-  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, priority: "turnover_to_market_cap_plus_intraday_signals", currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
+  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc", refresh: "every_live_scope_refresh" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
 }
