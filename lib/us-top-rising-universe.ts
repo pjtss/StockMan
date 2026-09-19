@@ -38,6 +38,10 @@ function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").
 
 export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null; priority?: number; turnoverToMarketCap?: number; priorityReasons?: string[] };
 
+export function retainOfficialCommonStocks<T extends UsTopRisingScope>(scopes: T[], officialKeys: Set<string>) {
+  return scopes.filter((scope) => officialKeys.has(`${scope.market}:${scope.code}`));
+}
+
 export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(scopes: T[], settings: UsTurnoverFilterSettings = DEFAULT_SETTINGS): Promise<T[]> {
   const enabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
   if (!enabled || scopes.length === 0) return scopes;
@@ -62,6 +66,8 @@ export async function applyCommonMarketCapFilter<T extends UsTopRisingScope>(sco
 const DEFAULT_SETTINGS: UsTurnoverFilterSettings = { maxPrice: 0, maxRate: 0, maxOpenToHighRate: 0, minMarketCap: 0, maxMarketCap: 0, globalMinMarketCap: 0, globalMaxMarketCap: 0, minTurnoverRatio: 0, maxTurnoverRatio: 0, tradingValueIncreaseAlert: 0, minIntensity: 0, minTradingValueRvol: 0, minTradingValueIncreaseRate: 0, minPersistenceWindows: 0 };
 const STORED_SCOPE_CACHE_TTL_MS = 5 * 60_000;
 const LIVE_SCOPE_CACHE_TTL_MS = 30_000;
+const OFFICIAL_ELIGIBILITY_CACHE_TTL_MS = 60 * 60_000;
+const officialEligibilityCache = new Map<string, { eligible: boolean; expiresAt: number }>();
 export type StoredUsInstrumentScopes = {
   scopes: UsTopRisingScope[];
   universe: {
@@ -76,6 +82,48 @@ let storedScopeCache: { expiresAt: number; value: StoredUsInstrumentScopes } | n
 let storedScopeInflight: Promise<StoredUsInstrumentScopes> | null = null;
 let liveScopeCache: { expiresAt: number; value: Awaited<ReturnType<typeof loadUsTopRisingScopesUncached>> } | null = null;
 let liveScopeInflight: Promise<Awaited<ReturnType<typeof loadUsTopRisingScopesUncached>>> | null = null;
+
+export function clearOfficialEligibilityCache() {
+  officialEligibilityCache.clear();
+}
+
+async function loadOfficialEligibility(scopes: UsTopRisingScope[]) {
+  const now = Date.now();
+  const keys = [...new Set(scopes.map((scope) => `${scope.market}:${scope.code}`))];
+  const eligibleKeys = new Set<string>();
+  const missingKeys: string[] = [];
+  for (const key of keys) {
+    const cached = officialEligibilityCache.get(key);
+    if (cached && cached.expiresAt > now) {
+      if (cached.eligible) eligibleKeys.add(key);
+    } else {
+      missingKeys.push(key);
+    }
+  }
+  if (missingKeys.length === 0) return { eligibleKeys, lookupFailed: false, cacheHits: keys.length, cacheMisses: 0 };
+  const pairs = missingKeys.map((key) => { const separator = key.indexOf(":"); return { market: key.slice(0, separator), code: key.slice(separator + 1) }; });
+  try {
+    const result = await getPool().query<{ market: string; code: string }>(
+      `SELECT market, code FROM us_common_stock_universe
+       WHERE market = ANY($1::text[]) AND code = ANY($2::text[])
+         AND enabled = TRUE AND daily_active = TRUE
+         AND instrument_type = 'COMMON_STOCK'
+         AND is_etf = FALSE AND is_warrant = FALSE AND is_derivative = FALSE
+         AND is_dr = FALSE AND is_leveraged = FALSE AND is_inverse = FALSE`,
+      [[...new Set(pairs.map((pair) => pair.market))], [...new Set(pairs.map((pair) => pair.code))]],
+    );
+    const loaded = new Set(result.rows.map((row) => `${row.market}:${row.code}`));
+    for (const key of missingKeys) {
+      const eligible = loaded.has(key);
+      officialEligibilityCache.set(key, { eligible, expiresAt: now + OFFICIAL_ELIGIBILITY_CACHE_TTL_MS });
+      if (eligible) eligibleKeys.add(key);
+    }
+    return { eligibleKeys, lookupFailed: false, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
+  } catch (error) {
+    console.error("[US TOP RISING] official eligibility lookup failed; detection is fail-closed:", error);
+    return { eligibleKeys: new Set<string>(), lookupFailed: true, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
+  }
+}
 
 /** Canonical persisted universe used by daily indicators. No live ranking API is called. */
 export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrumentScopes> {
@@ -161,6 +209,15 @@ async function loadUsTopRisingScopesUncached() {
   // `seen` is populated while each exchange is parsed. Do not check it again
   // here: that would discard every valid row before the API response is built.
   for (const result of marketResults) { markets.push(result.market); scopes.push(...result.selected); }
+  // The live KIS ranking is only a candidate source. The persisted official
+  // universe is authoritative for detection eligibility. Fail closed when the
+  // lookup cannot prove that a row is an active common stock.
+  const officialEligibility = await loadOfficialEligibility(scopes);
+  const officialCommonStockKeys = officialEligibility.eligibleKeys;
+  const sourceScopeCount = scopes.length;
+  const officialScopes = retainOfficialCommonStocks(scopes, officialCommonStockKeys);
+  scopes.length = 0;
+  scopes.push(...officialScopes);
   const settings = await loadUsTurnoverFilterSettings();
   if (settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0) {
     const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])", [[...US_EXCHANGES], scopes.map((scope) => scope.code)]).catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null }> }));
@@ -173,6 +230,9 @@ async function loadUsTopRisingScopesUncached() {
     if (scored) intradayMemoryState.upsertCandidate({ ...scored, mvpTracking: true });
     return scored ? { ...scope, priority: scored.priority, turnoverToMarketCap: scored.turnoverToMarketCap, priorityReasons: scored.reasons } : scope;
   }).sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1));
+  // Focus selection is intentionally downstream of product eligibility and
+  // market-cap filtering. Only the final common-stock candidate set may enter
+  // high-frequency tracking; raw KIS ranking rows never enter this pool.
   const focusKeys = new Set(prioritizedScopes.slice(0, US_INTRADAY_FOCUS_POOL_SIZE).map((scope) => `${scope.market}:${scope.code}`));
   for (const [index, scope] of prioritizedScopes.entries()) {
     const candidate = intradayMemoryState.getCandidate(scope.market, scope.code);
@@ -183,5 +243,5 @@ async function loadUsTopRisingScopesUncached() {
   intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
   const hasSuccessfulResponse = markets.some((market) => market.status === 200 && (market as any).kis?.rtCd === "0");
-  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc", refresh: "every_live_scope_refresh" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
+  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, officialEligibility: { source: "us_common_stock_universe", enabled: true, dailyActive: true, instrumentType: "COMMON_STOCK", sourceScopeCount, eligibleScopeCount: officialScopes.length, unknownOrInactiveExcluded: sourceScopeCount - officialScopes.length, failClosed: true, cache: "process_memory", cacheTtlSeconds: OFFICIAL_ELIGIBILITY_CACHE_TTL_MS / 1000, cacheHits: officialEligibility.cacheHits, cacheMisses: officialEligibility.cacheMisses, lookupFailed: officialEligibility.lookupFailed }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc_after_product_and_market_cap_filters", refresh: "every_live_scope_refresh", eligibleUniverse: "active_common_stock_only" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
 }

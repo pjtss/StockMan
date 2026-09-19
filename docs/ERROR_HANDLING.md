@@ -534,3 +534,8 @@ npm test -- --run
 - **해결**: 거래소 TOP100 수집은 부분 응답(100개 미만)도 불완전 응답으로 판단해 `VOL_RANG=0` 전체 페이지를 비교하고 더 많은 행을 선택한다. 공개 원본 순위 API의 기본값도 전체 페이지 요청으로 고정했다.
 - **재발 방지**: 부분 응답 선택 로직에 회귀 테스트를 추가하고, 운영 디버깅 시 거래소별 `sourceCount`, `selectedCount`, `productExcluded`를 함께 확인한다.
 - **남은 위험**: KIS가 전체 페이지 자체를 제공하지 않는 장외/장애 상황에서는 해당 시점의 실시간 TOP100을 보장할 수 없으며, 마지막 정상 스냅샷 정책을 별도로 유지한다.
+- **집중 탐색 불변조건**: focus pool은 원본 TOP100이 아니라 상품·활성·시총 필터를 모두 통과한 최종 보통주 후보에서만 구성한다. 이 조건은 응답 `criteria.focusPool.eligibleUniverse`로 노출하고 설계 문서와 회귀 검증에서 함께 관리한다.
+- **공식 보통주 교차검증**: 라이브 KIS 순위 행은 `us_common_stock_universe`의 `enabled`, `daily_active`, `COMMON_STOCK`, ETF·워런트·파생·DR·레버리지·인버스 제외 조건을 모두 통과해야만 탐지된다. 마스터 조회 실패는 빈 후보로 처리한다.
+- **교차검증 성능**: 공식 판정은 프로세스 메모리 1시간 TTL 캐시를 사용하고 캐시 미스만 배치 조회한다. 캐시 상태와 적중·미스 수는 `criteria.officialEligibility.cacheHits/cacheMisses`로 관측한다.
+- **운영 탐지 상태 해석**: `/api/kis/intraday-mvp`에서 `worker.status=STOPPED`, `status.reason=DISABLED`이면 계산 오류가 아니라 관리자 기능 설정으로 탐지가 중지된 상태다. 이 경우 TOP100 후보 수는 표시하되 거래대금 비율·알림 결과를 정상 동작으로 간주하지 않는다.
+- **시총 대비 거래대금 무자료 상태**: `qualifiedCandidateCount=0`이고 후보의 거래대금·시총 비율이 0이면 최근 1분 샘플이 아직 누적되지 않았거나 워커가 비활성인 상태다. 운영 검증은 `worker.lastTickAt`, `trackedCandidateCount`, `requiredSamples`, `minTurnoverToMarketCapPercent`를 함께 확인한다.
