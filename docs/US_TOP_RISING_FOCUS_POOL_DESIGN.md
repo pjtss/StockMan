@@ -43,3 +43,12 @@
 
 - 실제 운영 관측값으로 focus pool 크기 20·30·40을 비교한다.
 - KIS TPS 10 정책과 focus pool별 예상 호출량을 관리자 대시보드에 함께 표시한다.
+
+## 2026-09-19 성능·정확성 점검 결과
+
+- 공식 보통주 조회는 시장 배열과 코드 배열의 독립적인 `ANY` 조건을 사용하지 않고, 동일 순서의 `(market, code)` pair를 `unnest`로 조인한다. 따라서 NAS의 코드와 NYS의 코드가 교차 결합되어 잘못 적격 판정되는 경로를 차단한다.
+- 공식 적격성 메모리 캐시는 1시간 TTL을 유지하고, 조회 시작 시 만료 항목을 정리하며 최대 5,000개로 제한한다. 양성·음성 판정 모두 캐시한다.
+- TOP 100 재평가에서 후보 상태를 점수 계산 단계와 focus 적용 단계에 각각 쓰던 중복 갱신을 제거했다. 최종 upsert는 후보별 1회이며, 기존 rolling turnover/VWAP 파생 상태는 보존한다.
+- 후보 eviction은 매번 전체 Map을 정렬하지 않고 선형 최소 탐색으로 수행한다. 최대 후보 수가 300개인 현재 경계에서 불필요한 배열·정렬 할당을 줄인다.
+- 검증: `lib/us-top-rising-universe.test.ts`, `lib/intraday-memory-state.test.ts` 통과(19개), `npm run typecheck` 통과, `npm run docs:check` 통과.
+- 아직 운영에서 확인할 값: 거래소별 TOP 100 응답시간, 공식 적격성 cache hit/miss, focus 30개 대비 worker `executedCount`·`deferredCount`·`queueDepth`, process RSS.

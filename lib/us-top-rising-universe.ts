@@ -67,6 +67,7 @@ const DEFAULT_SETTINGS: UsTurnoverFilterSettings = { maxPrice: 0, maxRate: 0, ma
 const STORED_SCOPE_CACHE_TTL_MS = 5 * 60_000;
 const LIVE_SCOPE_CACHE_TTL_MS = 30_000;
 const OFFICIAL_ELIGIBILITY_CACHE_TTL_MS = 60 * 60_000;
+const OFFICIAL_ELIGIBILITY_CACHE_MAX_ENTRIES = 5_000;
 const officialEligibilityCache = new Map<string, { eligible: boolean; expiresAt: number }>();
 export type StoredUsInstrumentScopes = {
   scopes: UsTopRisingScope[];
@@ -89,6 +90,9 @@ export function clearOfficialEligibilityCache() {
 
 async function loadOfficialEligibility(scopes: UsTopRisingScope[]) {
   const now = Date.now();
+  for (const [key, entry] of officialEligibilityCache) {
+    if (entry.expiresAt <= now) officialEligibilityCache.delete(key);
+  }
   const keys = [...new Set(scopes.map((scope) => `${scope.market}:${scope.code}`))];
   const eligibleKeys = new Set<string>();
   const missingKeys: string[] = [];
@@ -105,18 +109,25 @@ async function loadOfficialEligibility(scopes: UsTopRisingScope[]) {
   try {
     const result = await getPool().query<{ market: string; code: string }>(
       `SELECT market, code FROM us_common_stock_universe
-       WHERE market = ANY($1::text[]) AND code = ANY($2::text[])
-         AND enabled = TRUE AND daily_active = TRUE
-         AND instrument_type = 'COMMON_STOCK'
-         AND is_etf = FALSE AND is_warrant = FALSE AND is_derivative = FALSE
-         AND is_dr = FALSE AND is_leveraged = FALSE AND is_inverse = FALSE`,
-      [[...new Set(pairs.map((pair) => pair.market))], [...new Set(pairs.map((pair) => pair.code))]],
+       JOIN unnest($1::text[], $2::text[]) AS requested(market, code)
+         ON us_common_stock_universe.market = requested.market
+        AND us_common_stock_universe.code = requested.code
+       WHERE us_common_stock_universe.enabled = TRUE AND us_common_stock_universe.daily_active = TRUE
+         AND us_common_stock_universe.instrument_type = 'COMMON_STOCK'
+         AND us_common_stock_universe.is_etf = FALSE AND us_common_stock_universe.is_warrant = FALSE AND us_common_stock_universe.is_derivative = FALSE
+         AND us_common_stock_universe.is_dr = FALSE AND us_common_stock_universe.is_leveraged = FALSE AND us_common_stock_universe.is_inverse = FALSE`,
+      [pairs.map((pair) => pair.market), pairs.map((pair) => pair.code)],
     );
     const loaded = new Set(result.rows.map((row) => `${row.market}:${row.code}`));
     for (const key of missingKeys) {
       const eligible = loaded.has(key);
       officialEligibilityCache.set(key, { eligible, expiresAt: now + OFFICIAL_ELIGIBILITY_CACHE_TTL_MS });
       if (eligible) eligibleKeys.add(key);
+    }
+    while (officialEligibilityCache.size > OFFICIAL_ELIGIBILITY_CACHE_MAX_ENTRIES) {
+      const oldestKey = officialEligibilityCache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      officialEligibilityCache.delete(oldestKey);
     }
     return { eligibleKeys, lookupFailed: false, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
   } catch (error) {
@@ -225,9 +236,10 @@ async function loadUsTopRisingScopesUncached() {
     for (const scope of scopes) scope.marketCap = caps.get(`${scope.market}:${scope.code}`) ?? null;
   }
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
+  const scoredByKey = new Map<string, ReturnType<typeof scoreIntradayCandidate>>();
   const prioritizedScopes = filteredScopes.map((scope) => {
     const scored = scoreIntradayCandidate({ market: scope.market, code: scope.code, currency: "USD", marketCap: scope.marketCap ?? null, tradingValue: scope.rankingTradeValue ?? null, isTopRising: true, isNewEntry: false, rankChange: 0, rateChange: scope.changeRate ?? 0, volumeChange: 0, aboveVwap: false });
-    if (scored) intradayMemoryState.upsertCandidate({ ...scored, mvpTracking: true });
+    scoredByKey.set(`${scope.market}:${scope.code}`, scored);
     return scored ? { ...scope, priority: scored.priority, turnoverToMarketCap: scored.turnoverToMarketCap, priorityReasons: scored.reasons } : scope;
   }).sort((a, b) => (b.priority ?? -1) - (a.priority ?? -1));
   // Focus selection is intentionally downstream of product eligibility and
@@ -235,10 +247,11 @@ async function loadUsTopRisingScopesUncached() {
   // high-frequency tracking; raw KIS ranking rows never enter this pool.
   const focusKeys = new Set(prioritizedScopes.slice(0, US_INTRADAY_FOCUS_POOL_SIZE).map((scope) => `${scope.market}:${scope.code}`));
   for (const [index, scope] of prioritizedScopes.entries()) {
-    const candidate = intradayMemoryState.getCandidate(scope.market, scope.code);
-    if (!candidate) continue;
+    const scored = scoredByKey.get(`${scope.market}:${scope.code}`) ?? null;
+    if (!scored) continue;
     const isFocused = focusKeys.has(`${scope.market}:${scope.code}`);
-    intradayMemoryState.upsertCandidate({ ...candidate, focusTracking: isFocused, focusRank: isFocused ? index + 1 : undefined });
+    const previous = intradayMemoryState.getCandidate(scope.market, scope.code);
+    intradayMemoryState.upsertCandidate({ ...previous, ...scored, mvpTracking: true, focusTracking: isFocused, focusRank: isFocused ? index + 1 : undefined });
   }
   intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;

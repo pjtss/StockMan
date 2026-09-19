@@ -44,7 +44,24 @@ export class IntradayMemoryState {
   snapshot() { return { current: [...(this.snapshots.get("current")?.values() ?? [])], previous: [...(this.snapshots.get("previous")?.values() ?? [])], candidates: [...this.candidates.values()].sort((a, b) => b.priority - a.priority), rollingTurnover: [...this.rollingTurnover.entries()].map(([key, buckets]) => ({ key, buckets: [...buckets.entries()].sort(([a], [b]) => a - b).map(([observedAt, tradingValue]) => ({ observedAt, tradingValue })) })), vwap: [...this.vwap.entries()].map(([key, value]) => ({ key, ...value })), inflightCount: this.inflight.size }; }
   async shared<T>(key: string, task: () => Promise<T>) { const running = this.inflight.get(key); if (running) return running as Promise<T>; const next = task().finally(() => this.inflight.delete(key)); this.inflight.set(key, next); return next; }
   clearSession(sessionDate: string) { for (const [key, value] of this.vwap) if (value.sessionDate !== sessionDate) this.vwap.delete(key); for (const key of this.rollingTurnover.keys()) { this.rollingTurnover.delete(key); this.rollingTurnoverTotals.delete(key); this.rollingTurnoverSession.delete(key); } }
-  private evictCandidates() { while (this.candidates.size > this.maxCandidates) { const oldest = [...this.candidates.entries()].sort((a, b) => a[1].priority - b[1].priority || a[1].lastSeenAt - b[1].lastSeenAt)[0]?.[0]; if (!oldest) break; this.candidates.delete(oldest); this.vwap.delete(oldest); this.rollingTurnover.delete(oldest); this.rollingTurnoverTotals.delete(oldest); this.rollingTurnoverSession.delete(oldest); } }
+  private evictCandidates() {
+    while (this.candidates.size > this.maxCandidates) {
+      let evictionKey: string | undefined;
+      let evictionCandidate: CandidateState | undefined;
+      for (const [key, candidate] of this.candidates) {
+        if (!evictionCandidate || candidate.priority < evictionCandidate.priority || (candidate.priority === evictionCandidate.priority && candidate.lastSeenAt < evictionCandidate.lastSeenAt)) {
+          evictionKey = key;
+          evictionCandidate = candidate;
+        }
+      }
+      if (!evictionKey) break;
+      this.candidates.delete(evictionKey);
+      this.vwap.delete(evictionKey);
+      this.rollingTurnover.delete(evictionKey);
+      this.rollingTurnoverTotals.delete(evictionKey);
+      this.rollingTurnoverSession.delete(evictionKey);
+    }
+  }
 }
 
 export const intradayMemoryState = new IntradayMemoryState();
