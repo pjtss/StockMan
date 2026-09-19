@@ -106,18 +106,36 @@ async function loadOfficialEligibility(scopes: UsTopRisingScope[]) {
   }
   if (missingKeys.length === 0) return { eligibleKeys, lookupFailed: false, cacheHits: keys.length, cacheMisses: 0 };
   const pairs = missingKeys.map((key) => { const separator = key.indexOf(":"); return { market: key.slice(0, separator), code: key.slice(separator + 1) }; });
-  try {
-    const result = await getPool().query<{ market: string; code: string }>(
-      `SELECT market, code FROM us_common_stock_universe
+  const query = `SELECT u.market, u.code FROM us_common_stock_universe u
        JOIN unnest($1::text[], $2::text[]) AS requested(market, code)
-         ON us_common_stock_universe.market = requested.market
-        AND us_common_stock_universe.code = requested.code
-       WHERE us_common_stock_universe.enabled = TRUE AND us_common_stock_universe.daily_active = TRUE
-         AND us_common_stock_universe.instrument_type = 'COMMON_STOCK'
-         AND us_common_stock_universe.is_etf = FALSE AND us_common_stock_universe.is_warrant = FALSE AND us_common_stock_universe.is_derivative = FALSE
-         AND us_common_stock_universe.is_dr = FALSE AND us_common_stock_universe.is_leveraged = FALSE AND us_common_stock_universe.is_inverse = FALSE`,
-      [pairs.map((pair) => pair.market), pairs.map((pair) => pair.code)],
-    );
+         ON u.market = requested.market AND u.code = requested.code
+       WHERE u.enabled = TRUE AND u.daily_active = TRUE
+         AND u.instrument_type = 'COMMON_STOCK'
+         AND u.is_etf = FALSE AND u.is_warrant = FALSE AND u.is_derivative = FALSE
+         AND u.is_dr = FALSE AND u.is_leveraged = FALSE AND u.is_inverse = FALSE`;
+  const compatibilityQuery = `SELECT u.market, u.code FROM us_common_stock_universe u
+       JOIN unnest($1::text[], $2::text[]) AS requested(market, code)
+         ON u.market = requested.market AND u.code = requested.code
+       WHERE u.enabled = TRUE
+         AND u.instrument_type = 'COMMON_STOCK'
+         AND u.is_etf = FALSE AND u.is_warrant = FALSE AND u.is_derivative = FALSE
+         AND u.is_dr = FALSE AND u.is_leveraged = FALSE AND u.is_inverse = FALSE`;
+  let lookupFallbackUsed = false;
+  try {
+    let result: { rows: Array<{ market: string; code: string }> };
+    try {
+      result = await getPool().query<{ market: string; code: string }>(query, [pairs.map((pair) => pair.market), pairs.map((pair) => pair.code)]);
+    } catch (error) {
+      // V100 added daily_active. Older production databases can temporarily
+      // report a lower Flyway schema while still having the authoritative
+      // product columns. Do not turn that compatibility case into zero
+      // candidates; omit only the optional activity column and preserve the
+      // common-stock/product fail-closed filters.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/daily_active|column .* does not exist/i.test(message)) throw error;
+      lookupFallbackUsed = true;
+      result = await getPool().query<{ market: string; code: string }>(compatibilityQuery, [pairs.map((pair) => pair.market), pairs.map((pair) => pair.code)]);
+    }
     const loaded = new Set(result.rows.map((row) => `${row.market}:${row.code}`));
     for (const key of missingKeys) {
       const eligible = loaded.has(key);
@@ -129,10 +147,11 @@ async function loadOfficialEligibility(scopes: UsTopRisingScope[]) {
       if (!oldestKey) break;
       officialEligibilityCache.delete(oldestKey);
     }
-    return { eligibleKeys, lookupFailed: false, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
+    return { eligibleKeys, lookupFailed: false, lookupFallbackUsed, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
   } catch (error) {
-    console.error("[US TOP RISING] official eligibility lookup failed; detection is fail-closed:", error);
-    return { eligibleKeys: new Set<string>(), lookupFailed: true, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[US TOP RISING] official eligibility lookup failed; detection is fail-closed:", message);
+    return { eligibleKeys: new Set<string>(), lookupFailed: true, lookupFallbackUsed, lookupError: message.slice(0, 240), cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
   }
 }
 
@@ -256,5 +275,5 @@ async function loadUsTopRisingScopesUncached() {
   intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));
   const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
   const hasSuccessfulResponse = markets.some((market) => market.status === 200 && (market as any).kis?.rtCd === "0");
-  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, officialEligibility: { source: "us_common_stock_universe", enabled: true, dailyActive: true, instrumentType: "COMMON_STOCK", sourceScopeCount, eligibleScopeCount: officialScopes.length, unknownOrInactiveExcluded: sourceScopeCount - officialScopes.length, failClosed: true, cache: "process_memory", cacheTtlSeconds: OFFICIAL_ELIGIBILITY_CACHE_TTL_MS / 1000, cacheHits: officialEligibility.cacheHits, cacheMisses: officialEligibility.cacheMisses, lookupFailed: officialEligibility.lookupFailed }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc_after_product_and_market_cap_filters", refresh: "every_live_scope_refresh", eligibleUniverse: "active_common_stock_only" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
+  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, officialEligibility: { source: "us_common_stock_universe", enabled: true, dailyActive: true, instrumentType: "COMMON_STOCK", sourceScopeCount, eligibleScopeCount: officialScopes.length, unknownOrInactiveExcluded: sourceScopeCount - officialScopes.length, failClosed: true, cache: "process_memory", cacheTtlSeconds: OFFICIAL_ELIGIBILITY_CACHE_TTL_MS / 1000, cacheHits: officialEligibility.cacheHits, cacheMisses: officialEligibility.cacheMisses, lookupFailed: officialEligibility.lookupFailed, lookupFallbackUsed: officialEligibility.lookupFallbackUsed, lookupError: officialEligibility.lookupError }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc_after_product_and_market_cap_filters", refresh: "every_live_scope_refresh", eligibleUniverse: "active_common_stock_only" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
 }
