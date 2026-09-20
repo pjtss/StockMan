@@ -46,7 +46,14 @@ async function run(job: Job) {
     const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
     const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
     await Promise.all((Object.keys(freshness) as Array<keyof typeof freshness>).map(async (timeframe) => {
-      const stale = await getDb().execute(sql`SELECT u.market, u.code
+      const stale = await getDb().execute(timeframe === "D" ? sql`SELECT u.market, u.code
+        FROM kr_common_stock_universe u
+        LEFT JOIN kr_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code
+        CROSS JOIN (SELECT MAX(candle_date) AS candle_date FROM kr_latest_daily_candles) market_latest
+        WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
+          AND (latest.fetched_at IS NULL
+            OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
+            OR latest.candle_date < market_latest.candle_date)` : sql`SELECT u.market, u.code
         FROM kr_common_stock_universe u
         LEFT JOIN LATERAL (
           SELECT c.fetched_at, c.candle_date

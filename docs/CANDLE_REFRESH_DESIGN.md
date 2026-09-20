@@ -42,6 +42,14 @@
 - 갱신 시간 측정: `lib/candle-refresh-observability.ts`
 - 관련 테스트: `lib/candle-refresh-observability.test.ts`
 
+### 2026-09-21 일봉 stale 판정 최적화
+
+일봉 freshness 판정은 원본 캔들 테이블을 다시 읽지 않고 `kr_latest_daily_candles`·`us_latest_daily_candles` 요약 캐시를 사용한다. 종목별 `fetched_at`과 요약 캐시의 시장 최신 `candle_date`만 비교하므로, 대형 원본 테이블의 종목별 LATERAL 조회와 전체 `MAX(candle_date)` 집계를 제거한다. 주봉·월봉은 기존 정책대로 해당 timeframe 원본에서 최신 봉을 판정한다.
+
+이 변경은 KIS 호출 수·대상 선정 규칙·freshness 주기를 바꾸지 않는다. 요약 캐시가 없는 종목은 `LEFT JOIN` 결과가 NULL이 되어 정상적으로 갱신 대상에 포함된다. 요약 캐시가 오래된 경우에도 원본을 직접 재집계하지 않고 보수적으로 갱신한다.
+
+운영 검증 시 `durationMs`, `dbWriteDurationMs`, 대상 수를 함께 비교하고, `EXPLAIN (ANALYZE, BUFFERS)`에서 일봉 stale 판정이 `*_latest_daily_candles`를 사용하는지 확인한다. 요약 캐시 누락·시장 최신일 불일치가 발견되면 원본 적재를 중단하지 않고 기존 실패·재시도 정책으로 처리한다.
+
 현재 갱신 결과 객체에는 시장별 전체 작업 시간과 성공·실패·저장 건수가 포함된다. 타임프레임별 영속 운영 리포트는 다음 단계에서 `candle_refresh_runs` 테이블로 분리할 수 있으며, 기존 캔들 데이터와 분리해 재수집 이력과 운영 지표를 보존한다.
 
 ## 실패·재시도 원칙

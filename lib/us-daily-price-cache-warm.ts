@@ -31,7 +31,21 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   await Promise.all(timeframes.map(async (timeframe) => {
     const latestTable = timeframe === "D" ? "us_latest_daily_candles" : "us_instrument_universe_candles";
     const timeframeFilter = timeframe === "D" ? "" : ` AND c.timeframe = '${timeframe}'`;
-    const stale = await getDb().execute(sql.raw(`SELECT u.market, u.code
+    const stale = await getDb().execute(sql.raw(timeframe === "D" ? `SELECT u.market, u.code
+      FROM us_common_stock_universe u
+      LEFT JOIN us_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code
+      CROSS JOIN (SELECT MAX(candle_date) AS candle_date FROM us_latest_daily_candles) market_latest
+      WHERE u.enabled = true
+        AND u.instrument_type = 'COMMON_STOCK'
+        AND COALESCE(u.is_etf, false) = false
+        AND COALESCE(u.is_warrant, false) = false
+        AND COALESCE(u.is_derivative, false) = false
+        AND COALESCE(u.is_dr, false) = false
+        AND COALESCE(u.is_leveraged, false) = false
+        AND COALESCE(u.is_inverse, false) = false
+        AND (latest.fetched_at IS NULL
+          OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
+          OR latest.candle_date < market_latest.candle_date)` : `SELECT u.market, u.code
       FROM us_common_stock_universe u
       LEFT JOIN LATERAL (
         SELECT c.fetched_at, c.candle_date
@@ -49,8 +63,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
         AND COALESCE(u.is_leveraged, false) = false
         AND COALESCE(u.is_inverse, false) = false
         AND (latest.fetched_at IS NULL
-          OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
-          OR (${timeframe === "D" ? "true" : "false"} AND latest.candle_date < (SELECT MAX(c2.candle_date) FROM us_instrument_universe_candles c2 WHERE c2.timeframe = 'D' AND c2.volume > 0)))`));
+          OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond'))`));
     staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
   }));
   const dueTimeframes = timeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0 || retryTimeframes.has(timeframe));
