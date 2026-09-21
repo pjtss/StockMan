@@ -98,7 +98,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, Math.max(1, Math.min(limit, 100)));
   const generatedAt = new Date().toISOString();
-  const policy = { source: "*_instrument_universe_candles", timeframes: ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" };
+  const policy = { source: "*_instrument_universe_candles", timeframes: mode === "scalp" ? ["D"] : ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" };
   const output = { ok: true, market, mode, instrumentCount: scopes.rows.length, qualifiedCount: results.length, latestDailyDate, tickers: results.map((result: any) => result.code).join(","), results, policy, responseMeta: { generatedAt, generatedAtTimeZone: "Asia/Seoul", dataSource: "DB_CACHE_ONLY", signalBasis: "latest completed daily candle only; next session open required", executionKey: `technical-entry-analysis:${market}:${mode}` } };
   await writeKisCache(`technical-entry-analysis:${market}:${mode}`, output);
   return output;
