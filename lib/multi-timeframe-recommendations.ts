@@ -33,7 +33,66 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
   } catch { /* fundamentals are an enhancement; candle-only scoring remains available during migration */ }
   const grouped = new Map<string, { D: Candle[]; W: Candle[]; M: Candle[] }>();
   for (const row of candles.rows as any[]) { const key = `${row.market}:${row.code}`; const item = grouped.get(key) ?? { D: [], W: [], M: [] }; item[row.timeframe as "D" | "W" | "M"].push({ date: String(row.date), open: Number(row.open ?? row.close), high: Number(row.high ?? row.close), low: Number(row.low ?? row.close), close: Number(row.close), volume: Number(row.volume ?? 0), updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null }); grouped.set(key, item); }
-  const results = (scopes.rows as any[]).map((scope) => { const g = grouped.get(`${scope.market}:${scope.code}`); if (!g || g.D.length < 20 || g.W.length < 20 || g.M.length < 20) return null; const f = fundamentals.get(`${scope.market}:${scope.code}`); const d = g.D, w = g.W, m = g.M; const dc = d.at(-1)!, wc = w.at(-1)!, mc = m.at(-1)!; if (!Number.isFinite(dc.volume) || dc.volume <= 0) return null; const technical = analyzeTechnicalEntry(d); const dbb = bb(d.map(x => x.close))!, wbb = bb(w.map(x => x.close))!, mbb = bb(m.map(x => x.close))!; const dE9 = ema(d.map(x => x.close), 9)!, dE20 = ema(d.map(x => x.close), 20)!; const wE9 = ema(w.map(x => x.close), 9)!, wE20 = ema(w.map(x => x.close), 20)!; const flow = flowState(d); const dVol = avg(d.slice(-20).map(x => x.volume)) ?? 0; const volRatio = dVol > 0 ? dc.volume / dVol : 0; const tradingValue = Number(f?.tradingValue ?? 0); const marketCap = Number(f?.marketCap ?? 0); const valuePerCap = marketCap > 0 ? tradingValue / marketCap : 0; const trend = (dc.close > dE9 ? 10 : 0) + (dE9 > dE20 ? 10 : 0) + (wc.close > wE9 && wE9 > wE20 ? 15 : 0) + (mc.close >= mbb.mid ? 10 : 0); const momentum = dc.close >= dbb.mid && dc.close <= dbb.upper ? 10 : dc.close > dbb.upper ? 5 : 0; const liquidity = volRatio >= 1.5 ? 15 : volRatio >= 1 ? 8 : 0; const turnover = valuePerCap >= 0.03 ? 10 : valuePerCap >= 0.01 ? 5 : 0; const pullback = dc.close <= dbb.mid && dc.close >= dbb.lower ? 10 : 0; const flowScore = flow.obvAboveSignal && flow.adlAboveSignal ? 10 : flow.obvAboveSignal || flow.adlAboveSignal ? 5 : 0; const score = mode === "scalp" ? trend + momentum + liquidity + turnover + flowScore : mode === "swing" ? trend + pullback + (mc.close >= mbb.mid ? 10 : 0) + turnover + flowScore : trend + momentum + liquidity + pullback + turnover + flowScore; if (mode === "scalp" && liquidity === 0) return null; if (mode === "swing" && !(wc.close >= wbb.mid && mc.close >= mbb.mid)) return null; return { market: scope.market, code: scope.code, name: scope.name, score, technical, latest: { date: dc.date, updatedAt: dc.updatedAt, close: dc.close, volume: dc.volume }, fundamentals: f ? { price: Number(f.price ?? dc.close), tradingValue, marketCap, fetchedAt: f.fetchedAt } : null, averages: { volume20: dVol, volumeRatio: volRatio, tradingValueToMarketCap: valuePerCap }, trend: { dailyEma9: dE9, dailyEma20: dE20, weeklyEma9: wE9, weeklyEma20: wE20 }, bollinger: { daily: dbb, weekly: wbb, monthly: mbb }, flow, timeframeMeta: { daily: { date: dc.date, updatedAt: dc.updatedAt }, weekly: { date: wc.date, updatedAt: wc.updatedAt }, monthly: { date: mc.date, updatedAt: mc.updatedAt } }, reasons: [trend >= 25 ? "다중 시간봉 상승 추세" : null, flowScore >= 5 ? "OBV·ADL 자금 흐름 양호" : null, liquidity >= 8 ? "일봉 거래량 증가" : null, turnover >= 5 ? "시총 대비 거래대금 양호" : null, momentum > 0 ? "일봉 BB 상단 접근" : null, pullback > 0 ? "일봉 눌림목" : null].filter(Boolean) }; }).filter(Boolean).sort((a: any, b: any) => b.score - a.score).slice(0, Math.max(1, Math.min(limit, 100)));
+  const results = (scopes.rows as any[])
+    .map((scope) => {
+      const g = grouped.get(`${scope.market}:${scope.code}`);
+      if (!g || g.D.length < 20 || g.W.length < 20 || g.M.length < 20) return null;
+      const f = fundamentals.get(`${scope.market}:${scope.code}`);
+      const d = g.D;
+      const w = g.W;
+      const m = g.M;
+      const dc = d.at(-1)!;
+      const wc = w.at(-1)!;
+      const mc = m.at(-1)!;
+      if (!Number.isFinite(dc.volume) || dc.volume <= 0) return null;
+
+      const technical = analyzeTechnicalEntry(d);
+      const dbb = bb(d.map((x) => x.close))!;
+      const wbb = bb(w.map((x) => x.close))!;
+      const mbb = bb(m.map((x) => x.close))!;
+      const dE9 = ema(d.map((x) => x.close), 9)!;
+      const dE20 = ema(d.map((x) => x.close), 20)!;
+      const wE9 = ema(w.map((x) => x.close), 9)!;
+      const wE20 = ema(w.map((x) => x.close), 20)!;
+      const flow = flowState(d);
+      const dVol = avg(d.slice(-20).map((x) => x.volume)) ?? 0;
+      const volRatio = dVol > 0 ? dc.volume / dVol : 0;
+      const tradingValue = Number(f?.tradingValue ?? 0);
+      const marketCap = Number(f?.marketCap ?? 0);
+      const valuePerCap = marketCap > 0 ? tradingValue / marketCap : 0;
+      const dayTrade = evaluateDayTradeSignal(d, { minRvol: 1 });
+      if (mode === "scalp" && !dayTrade.qualifies) return null;
+
+      const trend = (dc.close > dE9 ? 10 : 0) + (dE9 > dE20 ? 10 : 0) + (wc.close > wE9 && wE9 > wE20 ? 15 : 0) + (mc.close >= mbb.mid ? 10 : 0);
+      const momentum = dc.close >= dbb.mid && dc.close <= dbb.upper ? 10 : dc.close > dbb.upper ? 5 : 0;
+      const liquidity = volRatio >= 1.5 ? 15 : volRatio >= 1 ? 8 : 0;
+      const turnover = valuePerCap >= 0.03 ? 10 : valuePerCap >= 0.01 ? 5 : 0;
+      const pullback = dc.close <= dbb.mid && dc.close >= dbb.lower ? 10 : 0;
+      const flowScore = flow.obvAboveSignal && flow.adlAboveSignal ? 10 : flow.obvAboveSignal || flow.adlAboveSignal ? 5 : 0;
+      const score = mode === "scalp" ? trend + momentum + liquidity + turnover + flowScore : mode === "swing" ? trend + pullback + (mc.close >= mbb.mid ? 10 : 0) + turnover + flowScore : trend + momentum + liquidity + pullback + turnover + flowScore;
+      if (mode === "scalp" && liquidity === 0) return null;
+      if (mode === "swing" && !(wc.close >= wbb.mid && mc.close >= mbb.mid)) return null;
+
+      return {
+        market: scope.market,
+        code: scope.code,
+        name: scope.name,
+        score,
+        dayTrade,
+        technical,
+        latest: { date: dc.date, updatedAt: dc.updatedAt, close: dc.close, volume: dc.volume },
+        fundamentals: f ? { price: Number(f.price ?? dc.close), tradingValue, marketCap, fetchedAt: f.fetchedAt } : null,
+        averages: { volume20: dVol, volumeRatio: volRatio, tradingValueToMarketCap: valuePerCap },
+        trend: { dailyEma9: dE9, dailyEma20: dE20, weeklyEma9: wE9, weeklyEma20: wE20 },
+        bollinger: { daily: dbb, weekly: wbb, monthly: mbb },
+        flow,
+        timeframeMeta: { daily: { date: dc.date, updatedAt: dc.updatedAt }, weekly: { date: wc.date, updatedAt: wc.updatedAt }, monthly: { date: mc.date, updatedAt: mc.updatedAt } },
+        reasons: [trend >= 25 ? "다중 시간봉 상승 추세" : null, mode === "scalp" ? "단타 신호 조건 충족" : null, flowScore >= 5 ? "OBV·ADL 자금 흐름 양호" : null, liquidity >= 8 ? "일봉 거래량 증가" : null, turnover >= 5 ? "시총 대비 거래대금 양호" : null, momentum > 0 ? "일봉 BB 상단 접근" : null, pullback > 0 ? "일봉 눌림목" : null].filter(Boolean),
+      };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => b.score - a.score)
+    .slice(0, Math.max(1, Math.min(limit, 100)));
   const generatedAt = new Date().toISOString();
   const policy = { source: "*_instrument_universe_candles", timeframes: ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" };
   const output = { ok: true, market, mode, instrumentCount: scopes.rows.length, qualifiedCount: results.length, tickers: results.map((result: any) => result.code).join(","), results, policy, responseMeta: { generatedAt, generatedAtTimeZone: "Asia/Seoul", dataSource: "DB_CACHE_ONLY", executionKey: `technical-entry-analysis:${market}:${mode}` } };

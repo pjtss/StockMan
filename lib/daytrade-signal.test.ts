@@ -7,6 +7,8 @@ describe("daytrade signal", () => {
   it("requires a complete daily confirmation set", () => {
     const result = evaluateDayTradeSignal(makeCandles(Array.from({ length: 40 }, (_, index) => 100 + index), Array.from({ length: 39 }, () => 100).concat(250)));
     expect(result.qualifies).toBe(true);
+    expect(result.entryReference).toBeNull();
+    expect(result.warnings).toContain("NEXT_SESSION_OPEN_REQUIRED");
     expect(result.reasons).toEqual(expect.arrayContaining(["CLOSE_ABOVE_EMA9", "EMA9_ABOVE_EMA20", "RVOL_CONFIRMED", "OBV_RISING", "ADL_RISING"]));
   });
   it("does not manufacture a signal without enough history", () => expect(evaluateDayTradeSignal(makeCandles([100, 101, 102])).state).toBe("INSUFFICIENT_HISTORY"));

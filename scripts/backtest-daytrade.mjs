@@ -18,7 +18,9 @@ function signalAt(rows, index, minRvol) {
   return { entry: last.close, date: last.date, rvol };
 }
 function outcome(rows, index, target, stop, hold) {
-  const entry = rows[index].close * (1 + feeBps / 10000), end = Math.min(rows.length - 1, index + hold);
+  const entryRow = rows[index + 1];
+  if (!entryRow || !(entryRow.open > 0)) return null;
+  const entry = entryRow.open * (1 + feeBps / 10000), end = Math.min(rows.length - 1, index + hold);
   for (let i = index + 1; i <= end; i += 1) {
     const up = rows[i].high >= entry * (1 + target), down = rows[i].low <= entry * (1 - stop);
     if (up && down) return { result: "STOP", returnPct: -stop - feeBps / 10000 };
@@ -38,6 +40,6 @@ try {
   const grouped = new Map();
   for (const row of rows.rows) { const key = `${row.market}:${row.code}`; const list = grouped.get(key) ?? []; list.push({ date: String(row.date), open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume) }); grouped.set(key, list); }
   const grid = []; for (const minRvol of [0.7, 1, 1.2, 1.5]) for (const target of [0.005, 0.01, 0.02]) for (const stop of [0.005, 0.01]) for (const hold of [1, 3]) grid.push({ minRvol, target, stop, hold });
-  const results = grid.map((config) => { const outcomes = []; for (const list of grouped.values()) for (let i = 35; i < list.length - 1; i += 1) { if (signalAt(list, i, config.minRvol)) outcomes.push(outcome(list, i, config.target, config.stop, config.hold)); } const wins = outcomes.filter((item) => item.returnPct > 0).length; const average = outcomes.length ? outcomes.reduce((sum, item) => sum + item.returnPct, 0) / outcomes.length : 0; return { ...config, signals: outcomes.length, wins, winRate: outcomes.length ? wins / outcomes.length : 0, averageReturn: average, totalReturn: outcomes.reduce((sum, item) => sum + item.returnPct, 0) }; }).filter((item) => item.signals >= 30).sort((a, b) => b.totalReturn - a.totalReturn);
+  const results = grid.map((config) => { const outcomes = []; for (const list of grouped.values()) for (let i = 35; i < list.length - 1; i += 1) { if (signalAt(list, i, config.minRvol)) { const result = outcome(list, i, config.target, config.stop, config.hold); if (result) outcomes.push(result); } } const wins = outcomes.filter((item) => item.returnPct > 0).length; const average = outcomes.length ? outcomes.reduce((sum, item) => sum + item.returnPct, 0) / outcomes.length : 0; return { ...config, signals: outcomes.length, wins, winRate: outcomes.length ? wins / outcomes.length : 0, averageReturn: average, totalReturn: outcomes.reduce((sum, item) => sum + item.returnPct, 0) }; }).filter((item) => item.signals >= 30).sort((a, b) => b.totalReturn - a.totalReturn);
   console.log(JSON.stringify({ market, lookbackDays: lookback, feeBps, instrumentCount: grouped.size, sourceRows: rows.rowCount, tested: results.length, topByTotalReturn: results.slice(0, 10), topByWinRate: [...results].sort((a, b) => b.winRate - a.winRate).slice(0, 10) }, null, 2));
 } finally { await client.end(); }
