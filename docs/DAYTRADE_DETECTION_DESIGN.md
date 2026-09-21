@@ -18,6 +18,8 @@
 
 `recommendMultiTimeframe(market, "scalp")`는 이 순수 신호 평가기를 실제 후보 추출 경로에서 호출한다. 따라서 기존 점수만 높은 종목이 단타 결과에 섞이지 않고, 일봉 조건을 모두 충족한 `QUALIFIED` 종목만 반환된다. 응답에는 `dayTrade`와 일·주·월봉 갱신 메타데이터가 함께 포함된다. `swing`과 `all` 모드는 기존 다중 시간봉 점수 계약을 유지한다.
 
+운영 호출은 전용 `GET /api/scan/daytrade?market=KR|US&limit=30` 라우트를 사용한다. `market`은 국내(`KR`) 또는 해외(`US`, 기본값)로 고정하고 `limit`은 1~100으로 제한한다. 내부 오류는 HTML 오류 페이지가 아닌 `{ ok: false, error: "DAYTRADE_SCAN_UNAVAILABLE" }` JSON과 HTTP 503으로 반환하여 UI와 디버깅 API가 동일한 계약을 사용한다. 이 라우트는 기존 `scalp` 판정기를 재사용하므로 신호 기준이 분기되지 않는다.
+
 ## 실제 DB 검증
 
 `scripts/backtest-daytrade.mjs`는 `.env.local`의 `DATABASE_URL`로 국내 또는 해외 보통주·활성·일봉 캐시를 읽는다. 기본 최근 180일을 시간순으로 재생하며, 다음 조합을 비교한다.
