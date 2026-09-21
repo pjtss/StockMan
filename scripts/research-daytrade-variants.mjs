@@ -15,7 +15,7 @@ const metrics = (rows, index, variant) => {
 const outcome = (rows, index, target, stop, hold) => {
   const entryRow = rows[index + 1];
   if (!entryRow || !(entryRow.open > 0)) return null;
-  const entry = entryRow.open * (1 + fee), end = Math.min(rows.length - 1, index + hold);
+  const entry = entryRow.open, end = Math.min(rows.length - 1, index + hold);
   for (let i = index + 1; i <= end; i += 1) {
     const hit = rows[i].high >= entry * (1 + target), stopped = rows[i].low <= entry * (1 - stop);
     if (hit && stopped) return -stop - fee;

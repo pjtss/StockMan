@@ -15,7 +15,7 @@ const outcome = (rows, i, gap, target, stop) => {
   if (!entryRow || !(entryRow.open > 0)) return null;
   const entryGap = entryRow.open / rows[i].close - 1;
   if (entryGap < gap.min || entryGap > gap.max) return null;
-  const entry = entryRow.open * (1 + fee);
+  const entry = entryRow.open;
   const hit = entryRow.high >= entry * (1 + target), stopped = entryRow.low <= entry * (1 - stop);
   if (hit && stopped) return -stop - fee;
   if (hit) return target - fee;

@@ -21,7 +21,7 @@ function signalAt(rows, index, minRvol) {
 function outcome(rows, index, target, stop, hold) {
   const entryRow = rows[index + 1];
   if (!entryRow || !(entryRow.open > 0)) return null;
-  const entry = entryRow.open * (1 + feeBps / 10000), end = Math.min(rows.length - 1, index + hold);
+  const entry = entryRow.open, end = Math.min(rows.length - 1, index + hold);
   for (let i = index + 1; i <= end; i += 1) {
     const up = rows[i].high >= entry * (1 + target), down = rows[i].low <= entry * (1 - stop);
     if (up && down) return { result: "STOP", returnPct: -stop - feeBps / 10000 };
