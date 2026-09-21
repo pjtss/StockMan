@@ -26,7 +26,8 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
   const db = getDb();
   const eligibility = await queryEligibleUniverse(db, market);
   const scopes = { rows: eligibility.rows };
-  const candles = await db.execute(sql.raw(`WITH ranked_candles AS (SELECT c.market, c.code, c.timeframe, c.candle_date AS date, c.open, c.high, c.low, c.close, c.volume, c.fetched_at AS "updatedAt", ROW_NUMBER() OVER (PARTITION BY c.market, c.code, c.timeframe ORDER BY c.candle_date DESC, c.fetched_at DESC) AS rn FROM ${candlesTable} c JOIN ${universeTable} u ON u.market = c.market AND u.code = c.code WHERE c.timeframe IN ('D','W','M') AND c.close IS NOT NULL AND u.enabled = true AND u.daily_active = true AND u.instrument_type = 'COMMON_STOCK' ${market === "KR" ? "AND COALESCE(u.is_suspended, false) = false AND COALESCE(u.trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(u.liquidation_code, '') NOT IN ('Y','1') AND COALESCE(u.managed_issue_code, '') <> 'Y'" : "AND COALESCE(u.is_etf, false) = false AND COALESCE(u.is_warrant, false) = false AND COALESCE(u.is_derivative, false) = false AND COALESCE(u.is_dr, false) = false AND COALESCE(u.is_leveraged, false) = false AND COALESCE(u.is_inverse, false) = false"}) SELECT market, code, timeframe, date, open, high, low, close, volume, "updatedAt" FROM ranked_candles WHERE (timeframe = 'D' AND rn <= 140) OR (timeframe IN ('W','M') AND rn <= 30) ORDER BY market, code, timeframe, date`));
+  const timeframeFilter = mode === "scalp" ? "c.timeframe = 'D'" : "c.timeframe IN ('D','W','M')";
+  const candles = await db.execute(sql.raw(`WITH ranked_candles AS (SELECT c.market, c.code, c.timeframe, c.candle_date AS date, c.open, c.high, c.low, c.close, c.volume, c.fetched_at AS "updatedAt", ROW_NUMBER() OVER (PARTITION BY c.market, c.code, c.timeframe ORDER BY c.candle_date DESC, c.fetched_at DESC) AS rn FROM ${candlesTable} c JOIN ${universeTable} u ON u.market = c.market AND u.code = c.code WHERE ${timeframeFilter} AND c.close IS NOT NULL AND u.enabled = true AND u.daily_active = true AND u.instrument_type = 'COMMON_STOCK' ${market === "KR" ? "AND COALESCE(u.is_suspended, false) = false AND COALESCE(u.trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(u.liquidation_code, '') NOT IN ('Y','1') AND COALESCE(u.managed_issue_code, '') <> 'Y'" : "AND COALESCE(u.is_etf, false) = false AND COALESCE(u.is_warrant, false) = false AND COALESCE(u.is_derivative, false) = false AND COALESCE(u.is_dr, false) = false AND COALESCE(u.is_leveraged, false) = false AND COALESCE(u.is_inverse, false) = false"}) SELECT market, code, timeframe, date, open, high, low, close, volume, "updatedAt" FROM ranked_candles WHERE (timeframe = 'D' AND rn <= 140) OR (timeframe IN ('W','M') AND rn <= 30) ORDER BY market, code, timeframe, date`));
   let fundamentals = new Map<string, any>();
   try {
     const rows = await db.execute(sql.raw(`SELECT market, code, price, trading_value AS "tradingValue", market_cap AS "marketCap", volume, fetched_at AS "fetchedAt" FROM instrument_fundamental_snapshots WHERE market = '${market}'`));
@@ -38,25 +39,25 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
   const results = (scopes.rows as any[])
     .map((scope) => {
       const g = grouped.get(`${scope.market}:${scope.code}`);
-      if (!g || g.D.length < 20 || g.W.length < 20 || g.M.length < 20) return null;
+      if (!g || g.D.length < 20 || (mode !== "scalp" && (g.W.length < 20 || g.M.length < 20))) return null;
       const f = fundamentals.get(`${scope.market}:${scope.code}`);
       const d = g.D;
       const w = g.W;
       const m = g.M;
       const dc = d.at(-1)!;
-      const wc = w.at(-1)!;
-      const mc = m.at(-1)!;
+      const wc = w.at(-1) ?? null;
+      const mc = m.at(-1) ?? null;
       if (!Number.isFinite(dc.volume) || dc.volume <= 0) return null;
       if (latestDailyDate !== null && dc.date !== latestDailyDate) return null;
 
       const technical = analyzeTechnicalEntry(d);
       const dbb = bb(d.map((x) => x.close))!;
-      const wbb = bb(w.map((x) => x.close))!;
-      const mbb = bb(m.map((x) => x.close))!;
+      const wbb = bb(w.map((x) => x.close));
+      const mbb = bb(m.map((x) => x.close));
       const dE9 = ema(d.map((x) => x.close), 9)!;
       const dE20 = ema(d.map((x) => x.close), 20)!;
-      const wE9 = ema(w.map((x) => x.close), 9)!;
-      const wE20 = ema(w.map((x) => x.close), 20)!;
+      const wE9 = w.length ? ema(w.map((x) => x.close), 9)! : null;
+      const wE20 = w.length ? ema(w.map((x) => x.close), 20)! : null;
       const flow = calculateDayTradeFlowState(d);
       const dVol = avg(d.slice(-20).map((x) => x.volume)) ?? 0;
       const volRatio = dVol > 0 ? dc.volume / dVol : 0;
@@ -66,15 +67,15 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
       const dayTrade = evaluateDayTradeSignal(d, { minRvol: 1 });
       if (mode === "scalp" && !dayTrade.qualifies) return null;
 
-      const trend = (dc.close > dE9 ? 10 : 0) + (dE9 > dE20 ? 10 : 0) + (wc.close > wE9 && wE9 > wE20 ? 15 : 0) + (mc.close >= mbb.mid ? 10 : 0);
+      const trend = (dc.close > dE9 ? 10 : 0) + (dE9 > dE20 ? 10 : 0) + (wc && wE9 && wE20 && wc.close > wE9 && wE9 > wE20 ? 15 : 0) + (mc && mbb && mc.close >= mbb.mid ? 10 : 0);
       const momentum = dc.close >= dbb.mid && dc.close <= dbb.upper ? 10 : dc.close > dbb.upper ? 5 : 0;
       const liquidity = volRatio >= 1.5 ? 15 : volRatio >= 1 ? 8 : 0;
       const turnover = valuePerCap >= 0.03 ? 10 : valuePerCap >= 0.01 ? 5 : 0;
       const pullback = dc.close <= dbb.mid && dc.close >= dbb.lower ? 10 : 0;
       const flowScore = flow.obvAboveSignal && flow.adlAboveSignal ? 10 : flow.obvAboveSignal || flow.adlAboveSignal ? 5 : 0;
-      const score = mode === "scalp" ? trend + momentum + liquidity + turnover + flowScore : mode === "swing" ? trend + pullback + (mc.close >= mbb.mid ? 10 : 0) + turnover + flowScore : trend + momentum + liquidity + pullback + turnover + flowScore;
+      const score = mode === "scalp" ? trend + momentum + liquidity + turnover + flowScore : mode === "swing" ? trend + pullback + (mc && mbb && mc.close >= mbb.mid ? 10 : 0) + turnover + flowScore : trend + momentum + liquidity + pullback + turnover + flowScore;
       if (mode === "scalp" && liquidity === 0) return null;
-      if (mode === "swing" && !(wc.close >= wbb.mid && mc.close >= mbb.mid)) return null;
+      if (mode === "swing" && !(wc && wbb && mc && mbb && wc.close >= wbb.mid && mc.close >= mbb.mid)) return null;
 
       return {
         market: scope.market,
@@ -89,7 +90,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
         trend: { dailyEma9: dE9, dailyEma20: dE20, weeklyEma9: wE9, weeklyEma20: wE20 },
         bollinger: { daily: dbb, weekly: wbb, monthly: mbb },
         flow,
-        timeframeMeta: { daily: { date: dc.date, updatedAt: dc.updatedAt }, weekly: { date: wc.date, updatedAt: wc.updatedAt }, monthly: { date: mc.date, updatedAt: mc.updatedAt } },
+        timeframeMeta: { daily: { date: dc.date, updatedAt: dc.updatedAt }, weekly: wc ? { date: wc.date, updatedAt: wc.updatedAt } : null, monthly: mc ? { date: mc.date, updatedAt: mc.updatedAt } : null },
         reasons: [trend >= 25 ? "다중 시간봉 상승 추세" : null, mode === "scalp" ? "단타 신호 조건 충족" : null, flowScore >= 5 ? "OBV·ADL 자금 흐름 양호" : null, liquidity >= 8 ? "일봉 거래량 증가" : null, turnover >= 5 ? "시총 대비 거래대금 양호" : null, momentum > 0 ? "일봉 BB 상단 접근" : null, pullback > 0 ? "일봉 눌림목" : null].filter(Boolean),
       };
     })
