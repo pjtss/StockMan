@@ -18,6 +18,7 @@ export const calculateDayTradeFlowState = (rows: Candle[]) => {
   const obvSignal = signal(obvs), adlSignal = signal(adls);
   return { obv: obvs.at(-1) ?? null, obvSignal: obvSignal ?? 0, adl: adls.at(-1) ?? null, adlSignal: adlSignal ?? 0, obvAboveSignal: (obvs.at(-1) ?? 0) > (obvSignal ?? 0), adlAboveSignal: (adls.at(-1) ?? 0) > (adlSignal ?? 0) };
 };
+export const latestCompletedDailyDate = (groups: Iterable<{ D: Candle[] }>) => [...groups].flatMap((item) => item.D.map((row) => row.date)).sort().at(-1) ?? null;
 
 export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = "all", limit = 30) {
   const candlesTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
@@ -33,6 +34,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
   } catch { /* fundamentals are an enhancement; candle-only scoring remains available during migration */ }
   const grouped = new Map<string, { D: Candle[]; W: Candle[]; M: Candle[] }>();
   for (const row of candles.rows as any[]) { const key = `${row.market}:${row.code}`; const item = grouped.get(key) ?? { D: [], W: [], M: [] }; item[row.timeframe as "D" | "W" | "M"].push({ date: String(row.date), open: Number(row.open ?? row.close), high: Number(row.high ?? row.close), low: Number(row.low ?? row.close), close: Number(row.close), volume: Number(row.volume ?? 0), updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null }); grouped.set(key, item); }
+  const latestDailyDate = latestCompletedDailyDate(grouped.values());
   const results = (scopes.rows as any[])
     .map((scope) => {
       const g = grouped.get(`${scope.market}:${scope.code}`);
@@ -45,6 +47,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
       const wc = w.at(-1)!;
       const mc = m.at(-1)!;
       if (!Number.isFinite(dc.volume) || dc.volume <= 0) return null;
+      if (latestDailyDate !== null && dc.date !== latestDailyDate) return null;
 
       const technical = analyzeTechnicalEntry(d);
       const dbb = bb(d.map((x) => x.close))!;
@@ -95,7 +98,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
     .slice(0, Math.max(1, Math.min(limit, 100)));
   const generatedAt = new Date().toISOString();
   const policy = { source: "*_instrument_universe_candles", timeframes: ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" };
-  const output = { ok: true, market, mode, instrumentCount: scopes.rows.length, qualifiedCount: results.length, tickers: results.map((result: any) => result.code).join(","), results, policy, responseMeta: { generatedAt, generatedAtTimeZone: "Asia/Seoul", dataSource: "DB_CACHE_ONLY", executionKey: `technical-entry-analysis:${market}:${mode}` } };
+  const output = { ok: true, market, mode, instrumentCount: scopes.rows.length, qualifiedCount: results.length, latestDailyDate, tickers: results.map((result: any) => result.code).join(","), results, policy, responseMeta: { generatedAt, generatedAtTimeZone: "Asia/Seoul", dataSource: "DB_CACHE_ONLY", signalBasis: "latest completed daily candle only; next session open required", executionKey: `technical-entry-analysis:${market}:${mode}` } };
   await writeKisCache(`technical-entry-analysis:${market}:${mode}`, output);
   return output;
 }

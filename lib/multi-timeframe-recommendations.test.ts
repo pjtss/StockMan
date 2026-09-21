@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateDayTradeFlowState } from "./multi-timeframe-recommendations";
+import { calculateDayTradeFlowState, latestCompletedDailyDate } from "./multi-timeframe-recommendations";
 
 describe("multi-timeframe day-trade flow", () => {
   it("uses OHLC money-flow multiplier for ADL", () => {
@@ -15,5 +15,8 @@ describe("multi-timeframe day-trade flow", () => {
     const flow = calculateDayTradeFlowState(rows);
     expect(flow.adl).toBeGreaterThan(0);
     expect(flow.adlAboveSignal).toBe(true);
+  });
+  it("uses the latest completed daily date as the scan basis", () => {
+    expect(latestCompletedDailyDate([{ D: [{ date: "20260917" } as any] }, { D: [{ date: "20260918" } as any] }])).toBe("20260918");
   });
 });
