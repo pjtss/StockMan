@@ -7,7 +7,7 @@ const signal = (rows, i) => {
   const w = rows.slice(0, i + 1), last = w.at(-1), closes = w.map((x) => x.close), e9 = ema(closes, 9), e20 = ema(closes, 20), avgVolume = w.slice(-21, -1).reduce((s, x) => s + x.volume, 0) / 20;
   if (!last || !(last.close > e9 && e9 > e20 && last.close > last.open && last.volume >= avgVolume)) return false;
   let obv = 0, adl = 0, oldObv = 0, oldAdl = 0;
-  for (let j = 1; j < w.length; j += 1) { obv += w[j].volume * Math.sign(w[j].close - w[j - 1].close); adl += w[j].close >= w[j - 1].close ? w[j].volume : -w[j].volume; if (j === w.length - 3) { oldObv = obv; oldAdl = adl; } }
+  for (let j = 1; j < w.length; j += 1) { const row = w[j], range = row.high - row.low; obv += row.volume * Math.sign(row.close - w[j - 1].close); adl += range > 0 ? row.volume * ((row.close - row.low) - (row.high - row.close)) / range : 0; if (j === w.length - 3) { oldObv = obv; oldAdl = adl; } }
   return obv > oldObv && adl > oldAdl;
 };
 const outcome = (rows, i, gap, target, stop) => {

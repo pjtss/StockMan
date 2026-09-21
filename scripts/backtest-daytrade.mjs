@@ -13,7 +13,7 @@ function signalAt(rows, index, minRvol) {
   const e9 = ema(closes.slice(-60), 9), e20 = ema(closes.slice(-60), 20), averageVolume = window.slice(-21, -1).reduce((sum, row) => sum + row.volume, 0) / 20;
   const rvol = averageVolume > 0 ? last.volume / averageVolume : null;
   let obv = 0, adl = 0, obvThreeAgo = 0, adlThreeAgo = 0;
-  for (let i = 1; i < window.length; i += 1) { obv += window[i].volume * Math.sign(window[i].close - window[i - 1].close); adl += window[i].close >= window[i - 1].close ? window[i].volume : -window[i].volume; if (i === window.length - 3) { obvThreeAgo = obv; adlThreeAgo = adl; } }
+  for (let i = 1; i < window.length; i += 1) { const row = window[i], range = row.high - row.low; obv += row.volume * Math.sign(row.close - window[i - 1].close); adl += range > 0 ? row.volume * ((row.close - row.low) - (row.high - row.close)) / range : 0; if (i === window.length - 3) { obvThreeAgo = obv; adlThreeAgo = adl; } }
   if (!(last.close > e9 && e9 > e20 && rvol >= minRvol && last.close > last.open && obv > obvThreeAgo && adl > adlThreeAgo)) return null;
   return { entry: last.close, date: last.date, rvol };
 }
