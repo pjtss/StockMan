@@ -13,7 +13,14 @@ export function evaluateDayTradeSignal(candles: DayTradeCandle[], options: { min
   const closes = rows.map((row) => row.close), e9 = ema(closes, 9), e20 = ema(closes, 20), last = rows.at(-1)!;
   const priorVolumes = rows.slice(-21, -1).map((row) => row.volume), averageVolume = priorVolumes.reduce((sum, value) => sum + value, 0) / priorVolumes.length, rvol = averageVolume > 0 ? last.volume / averageVolume : null;
   const obv = [0], adl = [0];
-  for (let i = 1; i < rows.length; i += 1) { obv.push(obv.at(-1)! + rows[i].volume * Math.sign(rows[i].close - rows[i - 1].close)); adl.push(adl.at(-1)! + (rows[i].close >= rows[i - 1].close ? rows[i].volume : -rows[i].volume)); }
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i];
+    const previous = rows[i - 1];
+    obv.push(obv.at(-1)! + row.volume * Math.sign(row.close - previous.close));
+    const range = row.high - row.low;
+    const moneyFlowMultiplier = range > 0 ? ((row.close - row.low) - (row.high - row.close)) / range : 0;
+    adl.push(adl.at(-1)! + row.volume * moneyFlowMultiplier);
+  }
   const obvSlope = slope(obv), adlSlope = slope(adl), bbLower = lowerBand(closes), reasons: string[] = [], warnings: string[] = [];
   let score = 0;
   const add = (condition: boolean, points: number, reason: string, warning: string) => { if (condition) { score += points; reasons.push(reason); } else warnings.push(warning); };
@@ -23,8 +30,10 @@ export function evaluateDayTradeSignal(candles: DayTradeCandle[], options: { min
   add(last.close > last.open, 10, "BULLISH_CLOSE", "NOT_BULLISH_CLOSE");
   add(obvSlope !== null && obvSlope > 0, 15, "OBV_RISING", "OBV_NOT_RISING");
   add(adlSlope !== null && adlSlope > 0, 15, "ADL_RISING", "ADL_NOT_RISING");
-  if (options.marketCap && options.tradingValue && options.marketCap > 0 && options.tradingValue / options.marketCap < (options.minTurnoverRatio ?? 0)) warnings.push("TURNOVER_BELOW_THRESHOLD");
-  const qualifies = reasons.length === 6;
+  const turnoverRatio = options.marketCap && options.tradingValue && options.marketCap > 0 ? options.tradingValue / options.marketCap : null;
+  const turnoverGateEnabled = turnoverRatio !== null && (options.minTurnoverRatio ?? 0) > 0;
+  if (turnoverGateEnabled && turnoverRatio < options.minTurnoverRatio!) warnings.push("TURNOVER_BELOW_THRESHOLD");
+  const qualifies = reasons.length === 6 && (!turnoverGateEnabled || turnoverRatio >= options.minTurnoverRatio!);
   warnings.push("NEXT_SESSION_OPEN_REQUIRED");
   return { qualifies, state: qualifies ? "QUALIFIED" : score >= 50 ? "WATCH" : "REJECTED", score, signalDate: last.date, entryReference: null, indicators: { ema9: e9.at(-1)!, ema20: e20.at(-1)!, rvol, obvSlope, adlSlope, bbLower }, reasons, warnings };
 }

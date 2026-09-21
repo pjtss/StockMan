@@ -14,6 +14,8 @@
 - 최근 3봉 OBV 기울기 상승
 - 최근 3봉 ADL 기울기 상승
 
+OBV는 종가 방향에 따른 거래량 누적을 사용하고, ADL은 각 봉의 고가·저가·종가로 계산한 표준 Money Flow Multiplier와 거래량을 누적한다. 고가와 저가가 같은 봉의 ADL 기여도는 0으로 처리한다. `marketCap`, `tradingValue`, `minTurnoverRatio`를 함께 명시한 호출에서는 거래대금/시가총액 비율도 실제 통과 게이트로 적용하며, 기준 미달 후보는 `TURNOVER_BELOW_THRESHOLD`로 탈락시킨다.
+
 조건 일부만 만족하면 `WATCH`, 이력이 부족하면 `INSUFFICIENT_HISTORY`, 그 외는 `REJECTED`다. 진입 가격은 신호 종가가 아니라 다음 거래일 시가를 기준으로 검증해야 한다. 신호 결과에는 기준일, EMA, RVOL, OBV·ADL 변화, 근거와 탈락 사유를 함께 보존한다.
 
 `recommendMultiTimeframe(market, "scalp")`는 이 순수 신호 평가기를 실제 후보 추출 경로에서 호출한다. 따라서 기존 점수만 높은 종목이 단타 결과에 섞이지 않고, 일봉 조건을 모두 충족한 `QUALIFIED` 종목만 반환된다. 응답에는 `dayTrade`와 일·주·월봉 갱신 메타데이터가 함께 포함된다. `swing`과 `all` 모드는 기존 다중 시간봉 점수 계약을 유지한다.
