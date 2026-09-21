@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { instrumentFundamentalSnapshots, krCommonStockUniverse, usCommonStockUniverse } from "@/lib/schema";
+import { instrumentFundamentalHistory, instrumentFundamentalSnapshots, krCommonStockUniverse, usCommonStockUniverse } from "@/lib/schema";
 import { fetchKrPriceDetail } from "@/lib/kis-kr-price-detail";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { withAutomationLock } from "@/lib/automation-lock";
@@ -28,6 +28,7 @@ async function executeInstrumentFundamentalsRefresh() {
   await Promise.all(Array.from({ length: Math.min(8, Math.max(1, instruments.length)) }, fetchWorker));
   for (let i = 0; i < fetchedRows.length; i += 200) {
     const batch = fetchedRows.slice(i, i + 200); const now = new Date();
+    await db.insert(instrumentFundamentalHistory).values(batch.map((row) => ({ ...row, observedAt: now, fetchedAt: now }))).onConflictDoNothing({ target: [instrumentFundamentalHistory.market, instrumentFundamentalHistory.code, instrumentFundamentalHistory.observedAt] });
     await db.insert(instrumentFundamentalSnapshots).values(batch.map((row) => ({ ...row, observedAt: now, fetchedAt: now }))).onConflictDoUpdate({ target: [instrumentFundamentalSnapshots.market, instrumentFundamentalSnapshots.code], set: { name: sql`excluded.name`, price: sql`excluded.price`, changeRate: sql`excluded.change_rate`, volume: sql`excluded.volume`, tradingValue: sql`excluded.trading_value`, marketCap: sql`excluded.market_cap`, sharesOutstanding: sql`excluded.shares_outstanding`, currency: sql`excluded.currency`, source: sql`excluded.source`, rawPayload: sql`excluded.raw_payload`, observedAt: now, fetchedAt: now } });
     successCount += batch.length;
   }

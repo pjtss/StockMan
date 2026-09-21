@@ -1,3 +1,4 @@
+import "./load-local-env.mjs";
 import { Client } from "pg";
 
 const market = process.env.MARKET === "US" ? "US" : "KR";
@@ -8,7 +9,7 @@ const fee = Number(process.env.DAYTRADE_FEE_BPS ?? 20) / 10000;
 const ema = (values, period) => { const k = 2 / (period + 1); let value = values[0]; for (const next of values.slice(1)) value = next * k + value * (1 - k); return value; };
 const candidateAt = (rows, index) => {
   if (index < 35) return null;
-  const w = rows.slice(0, index + 1), last = w.at(-1), closes = w.map((row) => row.close), e9 = ema(closes.slice(-60), 9), e20 = ema(closes.slice(-60), 20), avgVolume = w.slice(-21, -1).reduce((sum, row) => sum + row.volume, 0) / 20;
+  const w = rows.slice(0, index + 1), last = w.at(-1), closes = w.map((row) => row.close), e9 = ema(closes, 9), e20 = ema(closes, 20), avgVolume = w.slice(-21, -1).reduce((sum, row) => sum + row.volume, 0) / 20;
   const rvol = avgVolume > 0 ? last.volume / avgVolume : 0;
   let obv = 0, adl = 0, oldObv = 0, oldAdl = 0;
   for (let i = 1; i < w.length; i += 1) { const row = w[i], range = row.high - row.low; obv += row.volume * Math.sign(row.close - w[i - 1].close); adl += range > 0 ? row.volume * ((row.close - row.low) - (row.high - row.close)) / range : 0; if (i === w.length - 3) { oldObv = obv; oldAdl = adl; } }

@@ -1,3 +1,4 @@
+import "./load-local-env.mjs";
 import { Client } from "pg";
 
 const fee = Number(process.env.DAYTRADE_FEE_BPS ?? 20) / 10000;
