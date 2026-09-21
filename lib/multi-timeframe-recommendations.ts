@@ -11,10 +11,10 @@ const ema = (values: number[], period: number) => { if (!values.length) return n
 const bb = (values: number[]) => { if (values.length < 20) return null; const w = values.slice(-20); const mid = w.reduce((a, b) => a + b, 0) / w.length; const sd = Math.sqrt(w.reduce((a, b) => a + (b - mid) ** 2, 0) / w.length); return { mid, lower: mid - 2 * sd, upper: mid + 2 * sd }; };
 const avg = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 const signal = (values: number[], period = 20) => ema(values, period);
-const flowState = (rows: Candle[]) => {
+export const calculateDayTradeFlowState = (rows: Candle[]) => {
   let obv = 0, adl = 0;
   const obvs: number[] = [], adls: number[] = [];
-  rows.forEach((row, index) => { if (index && row.close !== rows[index - 1].close) obv += row.volume * Math.sign(row.close - rows[index - 1].close); if (index) adl += row.close >= rows[index - 1].close ? row.volume : -row.volume; obvs.push(obv); adls.push(adl); });
+  rows.forEach((row, index) => { if (index && row.close !== rows[index - 1].close) obv += row.volume * Math.sign(row.close - rows[index - 1].close); if (index) { const range = row.high - row.low; adl += range > 0 ? row.volume * ((row.close - row.low) - (row.high - row.close)) / range : 0; } obvs.push(obv); adls.push(adl); });
   const obvSignal = signal(obvs), adlSignal = signal(adls);
   return { obv: obvs.at(-1) ?? null, obvSignal: obvSignal ?? 0, adl: adls.at(-1) ?? null, adlSignal: adlSignal ?? 0, obvAboveSignal: (obvs.at(-1) ?? 0) > (obvSignal ?? 0), adlAboveSignal: (adls.at(-1) ?? 0) > (adlSignal ?? 0) };
 };
@@ -54,7 +54,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
       const dE20 = ema(d.map((x) => x.close), 20)!;
       const wE9 = ema(w.map((x) => x.close), 9)!;
       const wE20 = ema(w.map((x) => x.close), 20)!;
-      const flow = flowState(d);
+      const flow = calculateDayTradeFlowState(d);
       const dVol = avg(d.slice(-20).map((x) => x.volume)) ?? 0;
       const volRatio = dVol > 0 ? dc.volume / dVol : 0;
       const tradingValue = Number(f?.tradingValue ?? 0);
