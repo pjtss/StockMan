@@ -25,6 +25,7 @@ type PageKey =
   | "notes"
   | "investment-calendar"
   | "other"
+  | "intraday"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   const [username, setUsername] = useState<string | null>(null);
@@ -48,6 +49,9 @@ export function PageNavigation({ current }: { current: PageKey }) {
 
         <Link aria-current={current === "charts" ? "page" : undefined} className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
           티커 차트
+        </Link>
+        <Link aria-current={current === "intraday" ? "page" : undefined} className={current === "intraday" ? styles.navActive : styles.navLink} href="/intraday" prefetch={false}>
+          탐지 후보
         </Link>
         <Link aria-current={current === "watchlist" ? "page" : undefined} className={current === "watchlist" ? styles.navActive : styles.navLink} href="/watchlist" prefetch={false}>
           관심종목
