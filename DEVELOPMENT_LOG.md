@@ -2,6 +2,88 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-22] KIS 누적 거래대금 차분 기반 장중 탐지
+
+### 목적
+- 1분봉 종가×거래량 근사값 대신 KIS 누적 거래대금의 직전 관측값 차분을 우선 사용한다.
+
+### 변경
+- `lib/intraday-turnover.ts`: 누적 거래대금 차분 및 검증 불가 시 fallback 계산을 모듈화했다.
+- `lib/kis-us-minute-turnover.ts`, `lib/kr-minute-candle-cache.ts`: KIS 누적 거래대금 필드를 보존한다.
+- `lib/intraday-detection-worker.ts`: `KIS_CUMULATIVE_DELTA`를 우선 사용하고, 누락·리셋 시 `PRICE_VOLUME_FALLBACK`을 사용한다.
+- `lib/intraday-turnover.test.ts`: 정상 차분과 카운터 리셋 fallback을 검증한다.
+
+### 재발 방지 및 남은 위험
+- 세션 변경·누적값 감소·필드 누락은 fallback으로 처리하며, 운영 관측에 계산 source를 노출할 후속 작업이 필요하다.
+- KIS 시장별 필드 의미가 변경될 수 있으므로 원본 필드와 계산 source를 디버깅 API에 추가해야 한다.
+
+### 검증
+- 단위 테스트·타입체크·프로덕션 빌드 후 커밋/배포한다.
+
+## [2026-09-22] 운영 RSS API 조회 및 로컬 호재 재분석
+
+### 목적
+- 운영 서버에 저장된 RSS를 공개 조회 API로 가져와 로컬 프로젝트의 호재 분류기로 재분석한다.
+
+### 확인 대상 및 방법
+- 운영 API: `GET https://stockman.r-e.kr/api/disclosures?date=2026-09-22&source=ALL&limit=500`
+- 운영 API 응답의 `items`를 로컬 `lib/market-rss-classifier.ts`의 `classifyMarketRssItem()`에 전달했다.
+- 운영 API의 `source=RSS`는 실제 저장 source명이 `STOCKTITAN`, `NASDAQ`, `SEC_EDGAR`, `NEWSIS` 등으로 분리되어 있어 0건을 반환하므로 `source=ALL`을 사용했다.
+
+### 결과
+- 조회 성공: 500건(페이지/limit 상한에 도달)
+- source별: STOCKTITAN 369건, NASDAQ 74건, SEC_EDGAR 43건, NEWSIS 5건, HANKYUNG 6건, MK 3건
+- 로컬 분류 결과: POSITIVE 91건
+- 분류 구성: STOCKTITAN ACTIONABLE 69건·FINANCING 11건, NASDAQ ACTIONABLE 13건·FINANCING 3건, SEC_EDGAR ACTIONABLE 5건, HANKYUNG ACTIONABLE 3건, NEWSIS ACTIONABLE 1건
+- 상위 후보 예시: SPCB(전자 모니터링 계약), JAGX(FDA fee waiver), SBH(다년 파트너십), TBLA(신규 제품 출시), AMGN(Phase 3 긍정 결과)
+
+### 해석 및 한계
+- 운영 저장 RSS를 로컬 호재 분류기로 재분석하는 경로는 동작한다.
+- `classifyMarketRssItem()`은 제목·요약의 키워드 기반 분류이므로 POSITIVE가 곧 투자 판단 또는 실제 주가 상승을 의미하지 않는다.
+- `/api/disclosures`는 현재 최대 500건만 반환하므로 전체 일자 분석에는 source별 조회 또는 페이지네이션 확장이 필요하다.
+- 운영 API 원문을 별도 파일로 저장하지 않았으며, 이번 결과는 2026-09-22 조회 시점의 분석 결과다.
+- 커밋·푸시·배포: 미실행.
+
+### 목표
+- 운영 RSS 원본을 제한 없이 내부 배치로 순회하고, 로컬 호재 분류 결과와 번역 상태를 별도 운영 DB 테이블에 저장한다.
+
+### 반영
+- `market_rss_bullish_articles` 스키마와 `V135__market_rss_bullish_articles.sql` 마이그레이션을 추가했다.
+- `syncMarketRssBullishArticles()`가 원본 RSS를 500건 단위 keyset으로 끝까지 순회해 중복 없이 upsert한다.
+- `/api/bullish-rss` 조회 API를 추가하고, market-rss cron에서 수집·번역 후 호재 결과 저장을 실행한다.
+- 원본의 번역 상태·번역 제목·fallback·오류를 별도 호재 테이블에 함께 저장한다.
+
+### 검증
+- `npm run typecheck` 통과.
+- `npx vitest run lib/market-rss-classifier.test.ts` 통과: 9개 테스트.
+- `npm run docs:check`는 최신 문서 항목 형식 보강 전 1회 실패했으며, 현재 항목에 필수 문서 계약을 반영했다.
+- `npm run build`를 2회 실행했으나 `next build` 시작 메시지 이후 2분 이상 출력·종료가 없어 중단했다. 배포와 운영 DB 마이그레이션은 실행하지 않았다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-22-005
+- 성과 판정: IMPROVED
+- 근거: 기존 원본 RSS 테이블과 Discord 전송을 변경하지 않고, 전체 순회·호재 materialization·번역 상태 저장 경계를 추가했다.
+
+### 다음 개선
+- 운영 Flyway V135 적용 후 실제 cron 1회 실행으로 저장 건수·중복키·번역 상태를 검증하고, 대량 번역 한도에 따른 batch 운영값을 확정한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행.
+
+## [2026-09-22] 운영 RSS 호재 분석 HTML 보고서 생성
+
+### 목적
+- 운영 RSS 조회·로컬 호재분석 결과를 사용자가 열어볼 수 있는 HTML 파일로 정리한다.
+
+### 변경 파일 및 산출물
+- `operating-rss-bullish-analysis-2026-09-22.html` 생성.
+- `C:\Users\dldbs\Downloads\operating-rss-bullish-analysis-2026-09-22.html`로 복사 완료.
+
+### 검증
+- 보고서에 API 경로, 분석 기준, 조회 건수, source별 집계, 주요 후보, 한계를 포함했다.
+- 산출물 크기 6,573 bytes 확인.
+- 커밋·푸시·배포: 미실행.
+
 ## [2026-09-22] RSS 번역·Discord 전송 동작 검증
 
 ### 목적

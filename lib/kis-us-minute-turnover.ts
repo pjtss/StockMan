@@ -13,6 +13,7 @@ export type UsMinuteTurnoverPoint = {
   time: string;
   price: number;
   amount: number;
+  cumulativeTradingValue?: number;
   volume?: number;
   high?: number;
   low?: number;
@@ -97,6 +98,7 @@ export function parseUsMinuteTurnoverPoints(parsed: any): UsMinuteTurnoverPoint[
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??
         row.amount ?? row.tvol ?? row.cum_amount ?? row.cumTradeAmount ?? row.cntg_pbmn ?? row.value ?? row.eamt ?? row.evol
       ),
+      cumulativeTradingValue: parseNumber(row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.cum_amount ?? row.cumTradeAmount) || undefined,
       // MVP turnover uses the value traded during this minute. Never fall
       // back to tvol/acml_* here: those are cumulative session fields and
       // summing them across five observations would overstate turnover.

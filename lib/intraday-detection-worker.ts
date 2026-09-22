@@ -11,6 +11,7 @@ import { isDomesticScannerOpen, isUsScannerOpen } from "@/lib/scanner-hours";
 import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
 import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
 import { sendIntradayMvpAlerts, type IntradayMvpAlert } from "@/lib/discord-intraday-mvp";
+import { minuteTradingValue } from "@/lib/intraday-turnover";
 
 export type IntradayWorkerStatus = "STOPPED" | "RUNNING" | "WARMING_UP" | "STOPPING" | "DEGRADED";
 export type IntradayWorkerSnapshot = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number; lastAlertAt: number | null; lastAlertResult: "sent" | "webhook_not_configured" | "send_failed" | "no_qualified_items" | null; alertCount: number };
@@ -81,12 +82,13 @@ export async function runIntradayTick(now = Date.now()) {
           const sessionDate = intradaySessionDate(candidate.market, now);
           const quality = evaluateIntradayQuality({ sourceObservedAt: Number.isFinite(sourceObservedAt) ? sourceObservedAt : null, receivedAt: Date.now(), sessionId: sessionDate, currentPrice: latest?.price ?? null, volume, tradingValue, vwap, aboveVwap: latest?.price != null && vwap != null ? Number(latest.price) >= vwap : null }, candidate.consecutiveObservations ?? 0, now);
           intradayMemoryState.updateVwap(candidate.market, candidate.code, sessionDate, volume, tradingValue, sourceObservedAt || now);
-          const latestPrice = Number(latest?.price ?? 0);
+          const latestPrice = Number(latest?.price ?? latest?.close ?? 0);
           const latestVolume = Number(latest?.volume);
           // Only an incremental minute volume is valid for the five-minute
           // MVP window. Cumulative amount/volume fields are intentionally not
           // used as a fallback because summing them creates false positives.
-          const latestBarValue = Number.isFinite(latestVolume) && latestVolume >= 0 ? latestPrice * latestVolume : 0;
+          const latestBar = minuteTradingValue({ price: latestPrice, volume: latestVolume, cumulativeTradingValue: latest?.cumulativeTradingValue }, valid.length > 1 ? { price: Number(valid.at(-2)?.price ?? valid.at(-2)?.close ?? 0), volume: Number(valid.at(-2)?.volume), cumulativeTradingValue: valid.at(-2)?.cumulativeTradingValue } : undefined);
+          const latestBarValue = latestBar.value;
           const latestObservedAt = Number.isFinite(sourceObservedAt) && sourceObservedAt ? sourceObservedAt : now;
           const minuteBucket = Math.floor(latestObservedAt / 60_000) * 60_000;
           const turnover = intradayMemoryState.recordRollingTurnover(candidate.market, candidate.code, sessionDate, minuteBucket, Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0, candidate.marketCap ?? 0, policy.windowMs, policy.threshold);
