@@ -52,12 +52,16 @@ export async function GET() {
             ? "STOPPED"
         : "OBSERVING";
   const statusMessage = items.length > 0 ? `${items.length}개 종목이 ${policy.windowMinutes}분 거래대금 조건을 충족했습니다.` : tracked === 0 ? "현재 TOP100 후보를 수집하지 못했습니다. 장중 여부와 KIS 응답, 워커 상태를 확인하세요." : `TOP100 후보 ${tracked}개를 관측 중입니다. 종목별 최소 ${policy.requiredSamples}개 1분 샘플과 최근 ${policy.windowMinutes}분 누적 거래대금 ${policy.thresholdPercent}% 조건이 아직 충족되지 않았습니다.`;
+  const explicitKillSwitch = process.env.INTRADAY_DETECTION_ENABLED === "false";
+  const resolvedStatusMessage = explicitKillSwitch
+    ? "탐지 워커가 운영 환경변수 INTRADAY_DETECTION_ENABLED=false로 중지되어 있습니다. 알림을 사용하려면 해당 긴급 중지값을 제거하거나 true로 변경하세요."
+    : statusMessage;
   return NextResponse.json({
     ok: true,
     mode: "INTRADAY_MVP_TURNOVER",
     collectedAt: new Date().toISOString(),
     criteria: { source: "TOP100_RISING", windowMinutes: policy.windowMinutes, requiredSamples: policy.requiredSamples, minTurnoverToMarketCapRatio: policy.threshold, minTurnoverToMarketCapPercent: policy.thresholdPercent, bucketMinutes: 1, marketCapSource: "KIS_FIXED" },
-    status: { worker, reason: statusReason, top100CandidateCount: snapshot.current.length, trackedCandidateCount: tracked, qualifiedCandidateCount: qualified, message: statusMessage },
+    status: { worker, reason: statusReason, detectionEnabled: !explicitKillSwitch, explicitKillSwitch, top100CandidateCount: snapshot.current.length, trackedCandidateCount: tracked, qualifiedCandidateCount: qualified, message: resolvedStatusMessage },
     items,
   });
 }
