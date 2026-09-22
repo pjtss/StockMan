@@ -9,6 +9,7 @@ const requestedMarket = String(args.get("market") || "ALL").toUpperCase();
 const timeframe = String(args.get("timeframe") || "D").toUpperCase();
 const limit = Math.min(Math.max(Number(args.get("limit") || 120), 1), 300);
 const batchSize = Math.min(Math.max(Number(args.get("batch") || 100), 1), 100);
+const skipFundamentals = args.get("skip-fundamentals") === "true";
 
 if (!process.env.LOCAL_DATABASE_URL || !process.env.DAILY_CACHE_API_URL || !process.env.DAILY_CACHE_READ_API_KEY) {
   throw new Error("LOCAL_DATABASE_URL, DAILY_CACHE_API_URL, DAILY_CACHE_READ_API_KEY가 모두 필요합니다.");
@@ -43,6 +44,29 @@ async function syncMarket(kind, universeTable) {
       if (!payload.ok || !Array.isArray(payload.items)) throw new Error(`운영 API 응답 형식 오류: ${market}`);
       received += payload.items.reduce((sum, item) => sum + (item.candles?.length ?? 0), 0);
       const table = kind === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
+      if (skipFundamentals) {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          for (const item of payload.items) for (const candle of item.candles ?? []) {
+            await client.query(`INSERT INTO ${table} (market, code, timeframe, candle_date, open, high, low, close, volume, source, fetched_at)
+              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'OPERATING_DB_CACHE',NOW())
+              ON CONFLICT (market, code, timeframe, candle_date) DO UPDATE SET open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, close=EXCLUDED.close, volume=EXCLUDED.volume, source=EXCLUDED.source, fetched_at=EXCLUDED.fetched_at`,
+              [market, item.code, timeframe, candle.date, candle.open, candle.high, candle.low, candle.close, candle.volume]);
+            saved += 1;
+          }
+          await client.query("COMMIT");
+        } catch (error) { await client.query("ROLLBACK"); throw error; }
+        finally { client.release(); }
+        continue;
+      }
+      const fundamentalsUrl = new URL("/api/public/instrument-fundamentals", process.env.DAILY_CACHE_API_URL);
+      fundamentalsUrl.searchParams.set("market", market);
+      fundamentalsUrl.searchParams.set("codes", codes.join(","));
+      const fundamentalsResponse = await fetch(fundamentalsUrl, { headers: { authorization: `Bearer ${process.env.DAILY_CACHE_READ_API_KEY}` } });
+      if (!fundamentalsResponse.ok) throw new Error(`운영 기본정보 API 실패: ${fundamentalsResponse.status} ${market}`);
+      const fundamentalsPayload = await fundamentalsResponse.json();
+      if (!fundamentalsPayload.ok || !Array.isArray(fundamentalsPayload.items)) throw new Error(`운영 기본정보 API 응답 형식 오류: ${market}`);
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -52,6 +76,12 @@ async function syncMarket(kind, universeTable) {
             ON CONFLICT (market, code, timeframe, candle_date) DO UPDATE SET open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, close=EXCLUDED.close, volume=EXCLUDED.volume, source=EXCLUDED.source, fetched_at=EXCLUDED.fetched_at`,
             [market, item.code, timeframe, candle.date, candle.open, candle.high, candle.low, candle.close, candle.volume]);
           saved += 1;
+        }
+        for (const item of fundamentalsPayload.items) {
+          await client.query(`INSERT INTO instrument_fundamental_snapshots (market, code, name, price, change_rate, open, high, low, volume, trading_value, market_cap, shares_outstanding, free_float_shares, free_float_percent, currency, source, raw_payload, observed_at, fetched_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'OPERATING_DB_API','{}',COALESCE($16,NOW()),COALESCE($17,NOW()))
+            ON CONFLICT (market, code) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, change_rate=EXCLUDED.change_rate, open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, volume=EXCLUDED.volume, trading_value=EXCLUDED.trading_value, market_cap=EXCLUDED.market_cap, shares_outstanding=EXCLUDED.shares_outstanding, free_float_shares=EXCLUDED.free_float_shares, free_float_percent=EXCLUDED.free_float_percent, currency=EXCLUDED.currency, source=EXCLUDED.source, observed_at=EXCLUDED.observed_at, fetched_at=EXCLUDED.fetched_at`,
+            [item.market, item.code, item.name ?? "", item.price, item.changeRate, item.open, item.high, item.low, item.volume, item.tradingValue, item.marketCap, item.sharesOutstanding, item.freeFloatShares, item.freeFloatPercent, item.currency, item.observedAt, item.fetchedAt]);
         }
         await client.query("COMMIT");
       } catch (error) {
