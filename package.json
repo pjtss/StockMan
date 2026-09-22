@@ -19,6 +19,7 @@
     "measure:screener-db": "node scripts/measure-screener-db.mjs",
     "typecheck": "tsc --noEmit",
     "deploy:verify": "node scripts/verify-deploy.mjs",
+    "sync:daily-cache": "node --env-file=.env.local scripts/sync-daily-cache-from-remote.mjs",
     "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:verify-scope && npm run audit:kis-boundary && npm run cron:check && npm run build"
   },
   "dependencies": {
