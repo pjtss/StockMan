@@ -108,9 +108,11 @@ export async function runIntradayTick(now = Date.now()) {
       runtime.lastError = null;
       await recordIntradayTick({ runId: workerRunId, tickId, workerStatus: runtime.status, plannedCount: scopes.scopes.length + domestic.length, executedCount: due.length - failedCount, deferredCount: Math.max(0, scopes.scopes.length + domestic.length - due.length), throttledCount: 0, failedCount, queueDepth: intradayMemoryState.dueCandidates(now).length, observedAt: new Date(now), durationMs: Date.now() - started });
       await recordIntradayTransitions(transitions);
-      const alertResult = await sendIntradayMvpAlerts(alerts).catch((error) => { runtime.lastError = error instanceof Error ? `discord:${error.message}` : "discord:send_failed"; return { ok: false, sent: false, skipped: false, reason: "send_failed" as const, itemCount: alerts.length }; });
-      runtime.lastAlertResult = alertResult.sent ? "sent" : alertResult.reason === "webhook_not_configured" ? "webhook_not_configured" : alertResult.reason === "no_qualified_items" ? "no_qualified_items" : "send_failed";
-      if (alertResult.sent) { runtime.lastAlertAt = Date.now(); runtime.alertCount += alerts.length; }
+      if (alerts.length) {
+        const alertResult = await sendIntradayMvpAlerts(alerts).catch((error) => { runtime.lastError = error instanceof Error ? `discord:${error.message}` : "discord:send_failed"; return { ok: false, sent: false, skipped: false, reason: "send_failed" as const, itemCount: alerts.length }; });
+        runtime.lastAlertResult = alertResult.sent ? "sent" : alertResult.reason === "webhook_not_configured" ? "webhook_not_configured" : "send_failed";
+        if (alertResult.sent) { runtime.lastAlertAt = Date.now(); runtime.alertCount += alerts.length; }
+      }
     } catch (error) {
       runtime.status = "DEGRADED";
       runtime.lastError = error instanceof Error ? error.message : String(error);
