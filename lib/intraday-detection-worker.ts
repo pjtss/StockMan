@@ -90,7 +90,12 @@ export async function runIntradayTick(now = Date.now()) {
           const latestObservedAt = Number.isFinite(sourceObservedAt) && sourceObservedAt ? sourceObservedAt : now;
           const minuteBucket = Math.floor(latestObservedAt / 60_000) * 60_000;
           const turnover = intradayMemoryState.recordRollingTurnover(candidate.market, candidate.code, sessionDate, minuteBucket, Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0, candidate.marketCap ?? 0, policy.windowMs, policy.threshold);
-          const finalState = turnover.qualified && !["STALE", "DEGRADED", "WARMING_UP"].includes(quality.state) ? "QUALIFIED" : quality.state;
+          // The MVP contract is the five completed minute buckets and the
+          // turnover-to-market-cap threshold. A fresh observation may still be
+          // marked WARMING_UP by the auxiliary VWAP quality gate; that state
+          // must not suppress the primary turnover alert. Only stale or
+          // degraded source data may block a qualified turnover event.
+          const finalState = turnover.qualified && !["STALE", "DEGRADED"].includes(quality.state) ? "QUALIFIED" : quality.state;
           const transition = intradayMemoryState.recordQuality(candidate.market, candidate.code, finalState, now, quality.dataAgeSeconds ?? undefined);
           if (transition?.previousState !== finalState) transitions.push({ tickId, market: candidate.market, code: candidate.code, fromState: transition?.previousState, toState: finalState, observedAt: new Date(now), dedupeKey: `${candidate.market}:${candidate.code}:${finalState}:${new Date(now).toISOString().slice(0, 16)}` });
           if (finalState === "QUALIFIED" && transition?.previousState !== "QUALIFIED" && turnover.ratio != null && candidate.marketCap) alerts.push({ market: candidate.market, code: candidate.code, marketCap: candidate.marketCap, rollingTradingValue: turnover.tradingValue, ratioPercent: turnover.ratio * 100, windowMinutes: policy.windowMinutes, observedAt: new Date(now).toISOString() });

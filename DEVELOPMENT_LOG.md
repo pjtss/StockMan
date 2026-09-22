@@ -12,6 +12,7 @@
 - `instrumentation.ts`에서 Node 전용 워커 import를 제거하고, `/api/kis/intraday-mvp`의 singleton 지연 기동을 유일한 워커 실행 경로로 사용한다. 이로써 instrumentation 번들에 `pg`/Node core 모듈이 포함되지 않는다.
 - `ensureIntradayDetectionWorker()`를 추가하고 상태 API 첫 조회에서 프로세스 singleton 워커를 보장 기동한다.
 - 개발 환경과 명시적 `INTRADAY_DETECTION_ENABLED=false` 긴급 중지 조건은 유지한다.
+- 운영에서 `mvpQualified=true`인데 `WARMING_UP` 상태 때문에 Discord 알림이 차단되던 상태 불일치를 수정했다. 신선한 관측은 MVP 거래대금 조건을 우선하고 `STALE`·`DEGRADED`만 차단한다.
 
 ### 검증
 - `npm.cmd test -- --run app/api/kis/intraday-mvp/route.test.ts lib/intraday-detection-worker.test.ts lib/intraday-memory-state.test.ts`: 3개 파일, 21개 테스트 통과.
