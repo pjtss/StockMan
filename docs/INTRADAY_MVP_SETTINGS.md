@@ -24,4 +24,4 @@
 - 정책 로더의 10분 캐시와 저장 직후 무효화 테스트
 - 1분·5분 정책이 rolling turnover 판정에 반영되는지 테스트
 - 타입 검사와 프로덕션 빌드 통과
-- 운영 전 `INTRADAY_DETECTION_ENABLED=true` 및 Webhook 설정 확인
+- 운영에서 기본 활성화되며, 긴급 중지는 `INTRADAY_DETECTION_ENABLED=false`를 명시한다. Webhook 설정도 함께 확인한다.

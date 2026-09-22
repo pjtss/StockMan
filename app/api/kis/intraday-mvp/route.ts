@@ -35,7 +35,7 @@ export async function GET() {
   const tracked = snapshot.candidates.filter((candidate) => candidate.mvpTracking).length;
   const qualified = snapshot.candidates.filter((candidate) => candidate.mvpTracking && candidate.mvpQualified).length;
   const sessionOpen = domesticOpen || usOpen;
-  const detectionEnabled = process.env.INTRADAY_DETECTION_ENABLED === "true";
+  const detectionEnabled = process.env.INTRADAY_DETECTION_ENABLED !== "false";
   const statusReason = items.length > 0
     ? "QUALIFIED"
     : tracked === 0

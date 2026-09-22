@@ -40,7 +40,9 @@ export async function runIntradayTick(now = Date.now()) {
       const started = Date.now();
       const tickId = crypto.randomUUID();
       const policy = await loadIntradayMvpPolicy();
-      if (process.env.INTRADAY_DETECTION_ENABLED !== "true") { runtime.status = "STOPPED"; return; }
+      // Keep an explicit false value as the only disable switch. A missing
+      // environment variable must not turn off production alerts silently.
+      if (process.env.INTRADAY_DETECTION_ENABLED === "false") { runtime.status = "STOPPED"; return; }
       const [domesticOpen, usOpen] = await Promise.all([isDomesticScannerOpen(new Date(now)), isUsScannerOpen(new Date(now))]);
       // The market feeds are independent. Fetch them concurrently so a slow
       // exchange does not delay the other market's candidate refresh.

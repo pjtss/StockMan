@@ -237,7 +237,7 @@ next start
 ```
 
 - 개발 환경에서는 `NODE_ENV=development`일 때 worker를 자동 시작하지 않고 수동 실행 플래그로만 켠다.
-- 운영 환경에서는 `INTRADAY_DETECTION_ENABLED=true`일 때만 시작한다. 이 값은 `instrumentation.ts`의 실제 기동 조건과 동일하게 유지한다.
+- 운영 환경에서는 기본 시작하며 `INTRADAY_DETECTION_ENABLED=false`를 명시한 경우에만 중지한다. 이 값은 `instrumentation.ts`와 worker의 실제 조건과 동일하게 유지한다.
 - 프로세스가 두 번 초기화되는 Next.js 개발 리로드에서는 전역 singleton과 실행 토큰으로 중복 worker를 차단한다.
 - 장외 시간에는 tick을 유지하되 KIS 호출은 하지 않고 세션 전환·재개 시각만 갱신한다.
 - worker 예외는 웹 서버 예외로 전파하지 않고 `lastError`에 기록한 뒤 backoff 후 재시작한다.
@@ -508,7 +508,7 @@ DB에 원본 1분봉 전체를 보존하지 않는 정책에서는 관측 ID만�
 
 운영 배포 단위는 끝까지 하나의 모놀리식 애플리케이션 프로세스다. 탐지 worker를 별도 컨테이너·서버·큐 소비자로 분리하지 않고, 동일 Next.js 런타임이 제공하는 애플리케이션 내부 singleton으로 실행한다.
 
-- 프로세스 시작 시 `INTRADAY_DETECTION_ENABLED`와 시장 캘린더를 확인한 뒤 worker를 한 번만 기동한다.
+- 프로세스 시작 시 명시적 중지값(`INTRADAY_DETECTION_ENABLED=false`)과 시장 캘린더를 확인한 뒤 worker를 한 번만 기동한다.
 - 개발 HMR이나 모듈 재평가로 timer가 중복 생성되지 않도록 전역 singleton에 실행 핸들과 `startedAt`을 보관한다.
 - HTTP 요청은 worker를 새로 만들거나 tick을 직접 실행하지 않고, 메모리 상태의 읽기 전용 snapshot만 사용한다.
 - `SIGTERM`·`SIGINT` 수신 시 신규 KIS 호출을 받지 않고 in-flight 요청의 제한 시간 내 종료를 기다린 뒤 timer와 semaphore를 해제한다.
@@ -537,7 +537,7 @@ DB에 원본 1분봉 전체를 보존하지 않는 정책에서는 관측 ID만�
 
 - `RUNNING`은 worker가 기동됐다는 뜻만이 아니라 최근 tick·스냅샷·큐 처리가 모두 허용된 지연 이내라는 뜻으로 정의한다.
 - `snapshotAgeSeconds`가 60초를 넘으면 `STALE`, 최근 tick이 90초를 넘으면 `DEGRADED`로 판정하고 신규 알림을 차단한다.
-- `INTRADAY_DETECTION_ENABLED=false` 또는 세션 외 시간에는 `DISABLED`·`OUTSIDE_SESSION`을 정상 상태로 표시한다. 이를 장애로 재시작하지 않는다.
+- `INTRADAY_DETECTION_ENABLED=false` 또는 세션 외 시간에는 `DISABLED`·`OUTSIDE_SESSION`을 정상 상태로 표시한다. 환경변수 미설정은 활성 상태로 간주하며, 이를 장애로 재시작하지 않는다.
 - 운영 기동 시 필수 환경변수의 존재 여부만 검증하고 값은 출력하지 않는다. DB 연결과 KIS 설정 검증에 실패하면 웹 서버는 유지하되 worker는 `DEGRADED`로 시작한다.
 - 상태 endpoint는 메모리 상태와 PostgreSQL의 마지막 실행 기록을 함께 사용하되, 메모리의 현재 tick 시각을 DB 기록보다 우선한다.
 
