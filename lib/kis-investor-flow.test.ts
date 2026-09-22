@@ -16,6 +16,15 @@ describe("KIS investor flow", () => {
     expect(classifyFlow(Number.NaN)).toBe("UNAVAILABLE");
   });
 
+  it("normalizes KIS dividend rate units without changing the raw value", async () => {
+    vi.mocked(kisRequest).mockResolvedValueOnce({
+      response: new Response(null, { status: 200 }),
+      parsed: { rt_cd: "0", output: [{ divi_rate: "3900.00", sht_cd: "000810" }] },
+    } as never);
+    const result = await fetchDividendRateRanking("token", "20250101", "20260921");
+    expect(result.rows).toEqual([{ divi_rate: "3900.00", divi_rate_percent: "3.900", sht_cd: "000810" }]);
+  });
+
   it("normalizes an official two-object output response", async () => {
     vi.mocked(kisRequest).mockResolvedValueOnce({
       response: new Response(null, { status: 200 }),

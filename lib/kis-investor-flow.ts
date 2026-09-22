@@ -653,7 +653,17 @@ export function fetchDividendRateRanking(token: string, fromDate: string, toDate
     F_DT: fromDate,
     T_DT: toDate,
     GB4: dividendClass,
-  }, token);
+  }, token).then((result) => ({
+    ...result,
+    // KIS returns divi_rate in 1/1000 percentage-point units (3900 => 3.900%).
+    // Keep divi_rate untouched for raw debugging and expose the display-safe value.
+    rows: result.rows.map((row) => {
+      const raw = Number(row.divi_rate);
+      return Number.isFinite(raw)
+        ? { ...row, divi_rate_percent: (raw / 1000).toFixed(3) }
+        : row;
+    }),
+  }));
 }
 
 /** 공식 샘플 [국내주식-214] HTS 조회상위 20종목. */
