@@ -2,6 +2,61 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-22] RSS 번역·Discord 전송 동작 검증
+
+### 목적
+- LibreTranslate는 사용하지 않는 운영 전제에서 RSS 번역 결과와 Discord 전송 결과의 차이를 확인한다.
+
+### 확인 대상
+- 운영 cron의 `ingestMarketRssArticles → translatePendingMarketRssArticles → notifyPendingMarketRssArticles` 순서.
+- `lib/translate-market-rss-item.ts`, `lib/market-rss-pipeline.ts`, 관리자 RSS 미리보기 경로.
+
+### 검증 결과
+- 운영 cron은 `GOOGLE_TRANSLATION_API_KEY`가 있을 때만 Google Cloud Translation 경로를 사용한다.
+- 번역 대상은 `notifyEligible=true`이고 `isBacklog=false`인 항목이며, 현재 제목만 번역하고 요약·본문은 원문을 유지한다.
+- 번역 성공 시 Discord 제목은 번역문이고 원문 제목을 함께 표시한다.
+- API 키 없음, 월간 문자 한도 초과, 번역 API fallback 또는 실패 시 Discord 전송 자체는 계속되며 제목은 원문으로 표시된다. 이 경우 데이터에 `translationFallback`/상태가 남는다.
+- `notifyEligible=false` 또는 backlog 항목은 번역 단계에서 제외된다.
+- 관리자 RSS 미리보기의 `translateMarketRssItems()` 기본 인자는 아직 `LibreTranslateClient`다. LibreTranslate를 사용하지 않는 운영 기준과 불일치하므로 관리자 미리보기 결과는 운영 Discord 결과 검증 근거로 사용할 수 없다.
+
+### 테스트
+- `npx vitest run lib/translate-market-rss-item.test.ts lib/cloud-translation-client.test.ts lib/libretranslate-client.test.ts` 통과: 3개 파일, 6개 테스트.
+
+### 결론 및 남은 위험
+- Discord에서 어떤 항목은 번역되고 어떤 항목은 원문인 현상은 현재 코드상 정상적인 fallback·대상 제외 결과일 수 있다. 다만 관리자 미리보기의 LibreTranslate 기본 경로는 별도 정리 대상이다.
+- 실제 운영 건별 판정에는 관리자 debug suite 또는 DB의 `translationStatus`, `translationFallback`, `translationError`, `notificationStatus` 값을 함께 확인해야 한다.
+- 추가 로컬 DB 확인: `.env.local`에는 `DATABASE_URL`만 존재하고 `GOOGLE_TRANSLATION_API_KEY`는 없었다. `market_rss_articles` 전체 집계는 ETODAY 38, HANKYUNG 50, KRX_KIND 100, MK 50, NASDAQ 15, NEWSIS 100, SEC_EDGAR 99, STOCKTITAN 100건이 모두 `translation_status=PENDING`이었다. 최근 7일 행은 없으므로 이 DB 결과만으로 운영 Discord 이력을 확정할 수는 없지만, 현재 로컬 실행 환경에서는 번역이 시작되지 않는 상태다.
+- **수정**: LibreTranslate를 사용하지 않는 운영 정책과 관리자 미리보기의 기본 동작을 일치시키기 위해 `lib/translate-market-rss-item.ts`에서 LibreTranslate import 및 기본 클라이언트를 제거했다. 이제 명시적 클라이언트가 없으면 Cloud Translation 환경 키를 사용하고, 키가 없으면 운영 cron과 동일하게 원문 fallback한다.
+- **재발 방지**: 번역 미리보기·운영 cron 모두 번역 공급자를 암묵적으로 LibreTranslate로 선택하지 않으며, 공급자 테스트는 명시적 테스트 클라이언트를 주입한다.
+- **검증**: 번역 관련 Vitest 2개 파일·5개 테스트 통과, `npm run typecheck` 통과.
+- 커밋·푸시·배포: 미실행.
+
+### 목표
+
+- RSS 번역 공급자와 Discord 전송 동작의 운영 기준을 문서화하고 미리보기와 운영 경로의 차이를 식별한다.
+
+### 반영
+
+- 제목 번역·fallback·알림 대상과 관리자 미리보기의 공급자 차이를 확인했다.
+
+### 검증
+
+- 번역 관련 테스트와 typecheck 결과를 확인했다.
+
+### 개선 과제
+
+- 개선 과제 ID: CI-2026-09-22-004
+- 성과 판정: IMPROVED
+- 근거: 운영 기준과 미리보기 경로의 불일치를 식별했고 후속 수정 대상을 명확히 했다.
+
+### 다음 개선
+
+- 관리자 미리보기와 운영 cron의 번역 공급자 선택을 동일하게 유지하는 회귀 테스트를 추가한다.
+
+### 커밋·푸시·배포
+
+- 해당 작업의 커밋·푸시·배포는 미실행.
+
 ## [2026-09-22] TOP100 거래대금 알림 워커 지연 기동 보강
 
 ### 목표
@@ -3353,6 +3408,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm run docs:check` 통과.
 - 운영 `GET /api/kis/intraday-mvp`에서 워커 `RUNNING`, `lastTickAt` 갱신, TOP100 후보 관측을 확인했다.
 - 배포 실행 `35731972698`이 성공했고 운영 `/intraday` HTTP 200 및 API JSON 응답을 확인했다. 배포 직후 API는 워커 `WARMING_UP`·`detectionEnabled=true`·`explicitKillSwitch=false`로 반환됐다.
+- Discord 알림 결과가 기존에는 워커 내부에서 소실되던 문제를 확인해 보강했다. 웹훅 원문은 노출하지 않고 전송 성공·미설정·실패 상태만 런타임에 기록한다.
+- 로컬 `NEXT_DIST_DIR=.next-local-final npm run build` 성공. 운영 API에서 5샘플을 충족한 `QUALIFIED` 후보 6개를 확인했으며, 배포 후 `lastAlertResult`로 전송 결과를 확인한다.
 
 ### 개선 과제
 

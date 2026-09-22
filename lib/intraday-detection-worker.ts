@@ -13,7 +13,7 @@ import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
 import { sendIntradayMvpAlerts, type IntradayMvpAlert } from "@/lib/discord-intraday-mvp";
 
 export type IntradayWorkerStatus = "STOPPED" | "RUNNING" | "WARMING_UP" | "STOPPING" | "DEGRADED";
-export type IntradayWorkerSnapshot = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number };
+export type IntradayWorkerSnapshot = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number; lastAlertAt: number | null; lastAlertResult: "sent" | "webhook_not_configured" | "send_failed" | "no_qualified_items" | null; alertCount: number };
 
 export function orderIntradayPoints<T extends { date?: string; time?: string }>(points: T[]) {
   return [...points].sort((a, b) => `${a.date ?? ""}${a.time ?? ""}`.localeCompare(`${b.date ?? ""}${b.time ?? ""}`));
@@ -25,12 +25,12 @@ export function intradaySessionDate(market: string, at: number) {
 }
 
 const globalKey = "__stockman_intraday_worker__";
-type Runtime = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number; timer: ReturnType<typeof setInterval> | null; running: Promise<void> | null };
+type Runtime = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number; lastAlertAt: number | null; lastAlertResult: IntradayWorkerSnapshot["lastAlertResult"]; alertCount: number; timer: ReturnType<typeof setInterval> | null; running: Promise<void> | null };
 const globalStore = globalThis as typeof globalThis & { [globalKey]?: Runtime };
-const runtime = globalStore[globalKey] ?? (globalStore[globalKey] = { status: "STOPPED", startedAt: null, lastTickAt: null, lastError: null, tickCount: 0, timer: null, running: null });
+const runtime = globalStore[globalKey] ?? (globalStore[globalKey] = { status: "STOPPED", startedAt: null, lastTickAt: null, lastError: null, tickCount: 0, lastAlertAt: null, lastAlertResult: null, alertCount: 0, timer: null, running: null });
 const workerRunId = (globalStore as any).__stockman_intraday_run_id__ ?? ((globalStore as any).__stockman_intraday_run_id__ = crypto.randomUUID());
 
-export function getIntradayWorkerSnapshot(): IntradayWorkerSnapshot { const { status, startedAt, lastTickAt, lastError, tickCount } = runtime; return { status, startedAt, lastTickAt, lastError, tickCount }; }
+export function getIntradayWorkerSnapshot(): IntradayWorkerSnapshot { const { status, startedAt, lastTickAt, lastError, tickCount, lastAlertAt, lastAlertResult, alertCount } = runtime; return { status, startedAt, lastTickAt, lastError, tickCount, lastAlertAt, lastAlertResult, alertCount }; }
 
 export async function runIntradayTick(now = Date.now()) {
   if (runtime.running) return runtime.running;
@@ -108,7 +108,9 @@ export async function runIntradayTick(now = Date.now()) {
       runtime.lastError = null;
       await recordIntradayTick({ runId: workerRunId, tickId, workerStatus: runtime.status, plannedCount: scopes.scopes.length + domestic.length, executedCount: due.length - failedCount, deferredCount: Math.max(0, scopes.scopes.length + domestic.length - due.length), throttledCount: 0, failedCount, queueDepth: intradayMemoryState.dueCandidates(now).length, observedAt: new Date(now), durationMs: Date.now() - started });
       await recordIntradayTransitions(transitions);
-      if (alerts.length) await sendIntradayMvpAlerts(alerts).catch((error) => { runtime.lastError = error instanceof Error ? `discord:${error.message}` : "discord:send_failed"; });
+      const alertResult = await sendIntradayMvpAlerts(alerts).catch((error) => { runtime.lastError = error instanceof Error ? `discord:${error.message}` : "discord:send_failed"; return { ok: false, sent: false, skipped: false, reason: "send_failed" as const, itemCount: alerts.length }; });
+      runtime.lastAlertResult = alertResult.sent ? "sent" : alertResult.reason === "webhook_not_configured" ? "webhook_not_configured" : alertResult.reason === "no_qualified_items" ? "no_qualified_items" : "send_failed";
+      if (alertResult.sent) { runtime.lastAlertAt = Date.now(); runtime.alertCount += alerts.length; }
     } catch (error) {
       runtime.status = "DEGRADED";
       runtime.lastError = error instanceof Error ? error.message : String(error);
