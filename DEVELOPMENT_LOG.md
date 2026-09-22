@@ -2,6 +2,36 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-22] TOP100 거래대금 알림 워커 지연 기동 보강
+
+### 목표
+- 운영 `/api/kis/intraday-mvp`에서 TOP100 후보는 존재하지만 `worker=STOPPED`, `tickCount=0`으로 남아 알림 평가가 시작되지 않는 현상을 해결한다.
+
+### 반영
+- **근본 원인**: standalone 운영 프로세스의 instrumentation hook이 `new Function()`으로 `@/lib/intraday-detection-worker` 별칭을 런타임 import해 `ERR_MODULE_NOT_FOUND`로 실패했고, 워커가 시작되지 않았다.
+- `instrumentation.ts`에서 Node 전용 워커 import를 제거하고, `/api/kis/intraday-mvp`의 singleton 지연 기동을 유일한 워커 실행 경로로 사용한다. 이로써 instrumentation 번들에 `pg`/Node core 모듈이 포함되지 않는다.
+- `ensureIntradayDetectionWorker()`를 추가하고 상태 API 첫 조회에서 프로세스 singleton 워커를 보장 기동한다.
+- 개발 환경과 명시적 `INTRADAY_DETECTION_ENABLED=false` 긴급 중지 조건은 유지한다.
+
+### 검증
+- `npm.cmd test -- --run app/api/kis/intraday-mvp/route.test.ts lib/intraday-detection-worker.test.ts lib/intraday-memory-state.test.ts`: 3개 파일, 21개 테스트 통과.
+- `npm.cmd run typecheck`: 통과.
+- `npm.cmd run docs:check`: 통과.
+- 배포 전 production build와 운영 API에서 `RUNNING`, `tickCount>0`, `lastTickAt` 갱신을 확인한다.
+
+### 개선 과제
+- 운영 배포 후 장중 실제 tick·후보 평가·Discord 전송 결과를 직접 확인하고, webhook 미설정·KIS 실패·5샘플 미충족을 각각 구분해 대시보드에 기록한다.
+
+개선 과제 ID: CI-2026-09-22-002
+성과 판정: UNMEASURED
+근거: 로컬 단위 검증은 통과했으나 수정 반영 전 운영 응답이 `STOPPED/DISABLED`, `tickCount=0`이어서 운영 재검증 전이다.
+
+### 다음 개선
+- 배포 후 운영 API를 장중에 재호출하여 워커가 실제로 tick하는지 확인하고, 미동작이면 배포 런타임의 명시적 kill switch와 instrumentation 실행 상태를 점검한다.
+
+### 커밋·푸시·배포
+- 상태: 검증 후 커밋·푸시 예정; 운영 배포 후 직접 상태 재검증 필요.
+
 ## [2026-09-22] 운영 일봉 캐시 조회 API 1단계
 
 ### 목표
@@ -3301,6 +3331,15 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **판정 기준**: 직전 일봉 BB 하단 터치·이탈 후 최신 양봉 및 하단선 회복, 주·월봉 BB 중단선 이상, EMA 기반이 아닌 기존 프로젝트 정의의 OBV·ADL Signal 상승, 최신 반등봉 RVOL 1.5 이상.
 - **결과**: 모든 조건을 동시에 만족한 후보 0건. 따라서 현재 캐시 기준으로 즉시 “가장 유리한” 반등 종목은 탐지되지 않았다.
 - **검증**: DB 연결 및 캐시 최신일·유니버스 건수 확인 후 조건 계산 실행 완료.
+- **커밋·푸시·배포**: 없음.
+
+### 2026-09-22
+
+- **작업 목적**: 미국 일봉 로컬 캐시에서 시총 5,000만 달러 이하 급등 관심 후보 상위 100개를 산출했다.
+- **변경 파일**: `scripts/export-us-smallcap-surge-top100.cjs`, `us-smallcap-surge-top100-20260922.csv`
+- **기준**: 활성 보통주·ETF 제외·일봉 25개 이상·RVOL(SMA20) 1 이상. RVOL, 1/5거래일 수익률, EMA9·EMA20 위치, 20일 고점 돌파, 종가 위치, 거래대금으로 점수화했다.
+- **검증 결과**: 기준일 2026-09-21, 적격 226개, CSV 100개 생성.
+- **주의**: 2026-09-22 거래 결과가 캐시에 없으므로 예측값이 아닌 2026-09-21 마감 기준 후보 점수다.
 - **커밋·푸시·배포**: 없음.
 
 ## [2026-09-21] STOCKTITAN 후보와 해외 로컬 DB 교차검증

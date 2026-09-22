@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { intradayMemoryState } from "@/lib/intraday-memory-state";
-import { getIntradayWorkerSnapshot } from "@/lib/intraday-detection-worker";
+import { ensureIntradayDetectionWorker, getIntradayWorkerSnapshot } from "@/lib/intraday-detection-worker";
 import { isDomesticScannerOpen, isUsScannerOpen } from "@/lib/scanner-hours";
 import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
 
@@ -8,6 +8,10 @@ export const dynamic = "force-dynamic";
 
 /** Returns only live TOP100 candidates that passed the MVP five-minute gate. */
 export async function GET() {
+  // Do not rely exclusively on Next instrumentation in standalone/container
+  // deployments. This remains process-singleton and is a no-op in development
+  // or when the explicit emergency kill switch is set.
+  ensureIntradayDetectionWorker();
   const snapshot = intradayMemoryState.snapshot();
   const policy = await loadIntradayMvpPolicy();
   const [domesticOpen, usOpen] = await Promise.all([

@@ -132,6 +132,18 @@ export function startIntradayDetectionWorker(intervalMs = 10_000) {
   return getIntradayWorkerSnapshot();
 }
 
+/**
+ * Standalone deployments may serve a route before the instrumentation hook
+ * has completed. Keep the process singleton, but make the first status read
+ * a safe activation point as well. The explicit false kill switch still wins.
+ */
+export function ensureIntradayDetectionWorker(intervalMs = 10_000) {
+  if (process.env.NODE_ENV !== "production" || process.env.INTRADAY_DETECTION_ENABLED === "false") {
+    return getIntradayWorkerSnapshot();
+  }
+  return startIntradayDetectionWorker(intervalMs);
+}
+
 export async function stopIntradayDetectionWorker() {
   runtime.status = "STOPPING";
   if (runtime.timer) { clearInterval(runtime.timer); runtime.timer = null; }
