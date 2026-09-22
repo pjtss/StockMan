@@ -3352,6 +3352,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm run typecheck` 통과.
 - `npm run docs:check` 통과.
 - 운영 `GET /api/kis/intraday-mvp`에서 워커 `RUNNING`, `lastTickAt` 갱신, TOP100 후보 관측을 확인했다.
+- 배포 실행 `35731972698`이 성공했고 운영 `/intraday` HTTP 200 및 API JSON 응답을 확인했다. 배포 직후 API는 워커 `WARMING_UP`·`detectionEnabled=true`·`explicitKillSwitch=false`로 반환됐다.
 
 ### 개선 과제
 
@@ -3365,6 +3366,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - Discord 전송 성공·실패 이력을 관리자 화면에서 확인하는 관측성을 추가한다.
 
 ### 커밋·푸시·배포
+
+- 커밋 `8081f5be`, `oci` 푸시 완료, 배포 실행 `35731972698` 성공.
 
 - 구현 및 검증 후 커밋·푸시·배포한다.
 
