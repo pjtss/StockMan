@@ -204,7 +204,7 @@ export const marketRssBullishArticles = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     source: text("source").notNull(),
     externalId: text("external_id").notNull(),
-    sourceArticleId: bigint("source_article_id", { mode: "number" }).notNull(),
+    sourceArticleId: bigint("source_article_id", { mode: "number" }),
     title: text("title").notNull(),
     translatedTitle: text("translated_title"),
     summary: text("summary").notNull().default(""),

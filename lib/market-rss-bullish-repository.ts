@@ -5,6 +5,84 @@ import { classifyMarketRssItem } from "./market-rss-classifier";
 
 const BATCH_SIZE = 500;
 
+export type MarketRssBullishIngestItem = {
+  source: string;
+  externalId: string;
+  title: string;
+  translatedTitle?: string | null;
+  summary?: string | null;
+  translatedSummary?: string | null;
+  content?: string | null;
+  link?: string | null;
+  publishedAt?: string | Date | null;
+  ticker?: string | null;
+  category: string;
+  direction: string;
+  matchedTerms?: string[];
+  priority?: number;
+  financingAmountUsd?: number | null;
+  dilutionRisk?: string | null;
+  translationStatus?: string;
+  translationFallback?: boolean;
+  translationError?: string | null;
+};
+
+export async function upsertMarketRssBullishArticles(items: MarketRssBullishIngestItem[]) {
+  const db = getDb();
+  let stored = 0;
+  for (const item of items) {
+    await db.insert(marketRssBullishArticles).values({
+      source: item.source,
+      externalId: item.externalId,
+      sourceArticleId: null,
+      title: item.title,
+      translatedTitle: item.translatedTitle ?? null,
+      summary: item.summary ?? "",
+      translatedSummary: item.translatedSummary ?? null,
+      content: item.content ?? "",
+      link: item.link ?? "",
+      publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
+      ticker: item.ticker ?? null,
+      category: item.category,
+      direction: item.direction,
+      matchedTerms: item.matchedTerms ?? [],
+      priority: item.priority ?? 0,
+      financingAmountUsd: item.financingAmountUsd ?? null,
+      dilutionRisk: item.dilutionRisk ?? null,
+      translationStatus: item.translationStatus ?? "PENDING",
+      translationFallback: item.translationFallback ?? false,
+      translationError: item.translationError ?? null,
+      analyzedAt: new Date(),
+      updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [marketRssBullishArticles.source, marketRssBullishArticles.externalId],
+      set: {
+        title: item.title,
+        translatedTitle: item.translatedTitle ?? null,
+        summary: item.summary ?? "",
+        translatedSummary: item.translatedSummary ?? null,
+        content: item.content ?? "",
+        link: item.link ?? "",
+        publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
+        ticker: item.ticker ?? null,
+        category: item.category,
+        direction: item.direction,
+        matchedTerms: item.matchedTerms ?? [],
+        priority: item.priority ?? 0,
+        financingAmountUsd: item.financingAmountUsd ?? null,
+        dilutionRisk: item.dilutionRisk ?? null,
+        translationStatus: item.translationStatus ?? "PENDING",
+        translationFallback: item.translationFallback ?? false,
+        translationError: item.translationError ?? null,
+        analyzedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    stored++;
+  }
+  return { received: items.length, stored };
+}
+
 export async function syncMarketRssBullishArticles() {
   const db = getDb();
   let cursor = 0;

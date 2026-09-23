@@ -2,6 +2,33 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-23] 로컬 LLM 호재 분석 POST 저장 경로
+
+### 목표
+- 로컬에서 운영 RSS를 조회하고 LLM이 직접 호재 여부를 판단한 결과를 운영 API POST로 저장한다.
+
+### 반영
+- `/api/bullish-rss`에 `CRON_SECRET` 인증 POST 저장 경로를 추가했다.
+- V136에서 로컬 분석 결과가 운영 원본 RSS 행 ID 없이도 저장되도록 `source_article_id`를 nullable로 변경했다.
+
+### 검증
+- `tsc --noEmit` 통과.
+- RSS 분류·등급 테스트 13개 통과.
+- `npm.cmd run docs:check` 통과: migrations 136개, latest V136.
+- production build에서 `/api/bullish-rss` 라우트 생성 확인.
+- `scripts/dev-server.mjs` 실행 후 인증 없는 POST가 HTTP 401로 차단됨을 확인했다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-23-004
+- 성과 판정: IMPROVED
+- 근거: 호재 분석 책임을 저장 API에서 분리하고, 로컬 분석 결과를 인증된 운영 POST로 전달할 수 있는 경계를 추가했다.
+
+### 다음 개선
+- V136 배포 후 LLM이 직접 분석한 실제 RSS 후보를 POST하고 운영 GET 결과의 저장 건수와 내용을 확인한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행.
+
 ## [2026-09-23] RSS 호재 저장 운영 배포
 
 ### 목표
