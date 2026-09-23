@@ -6,6 +6,7 @@ import { isWithinSchedule } from "@/lib/schedule-time";
 import { normalizeMarketRssSources } from "@/lib/market-rss-sources";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { syncMarketRssBullishArticles } from "@/lib/market-rss-bullish-repository";
 
 function authorized(request: Request) { return Boolean(process.env.CRON_SECRET && request.headers.get("x-cron-secret") === process.env.CRON_SECRET); }
 
@@ -23,8 +24,9 @@ export async function POST(request: Request) {
     const result = await withAutomationRun("market-rss", async () => {
       const ingested = await ingestMarketRssArticles({ sources });
       const translated = await translatePendingMarketRssArticles(Number(process.env.RSS_TRANSLATION_BATCH_SIZE || 50));
+      const bullish = await syncMarketRssBullishArticles();
       const notified = await notifyPendingMarketRssArticles(Number(process.env.RSS_NOTIFICATION_BATCH_SIZE || 10));
-      return { ok: true, mode: "COMMIT", sources, ingested, translated, notified };
+      return { ok: true, mode: "COMMIT", sources, ingested, translated, bullish, notified };
     });
     return NextResponse.json(result);
   } catch (error) {

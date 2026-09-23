@@ -198,6 +198,41 @@ export const marketRssArticles = pgTable(
   ],
 );
 
+export const marketRssBullishArticles = pgTable(
+  "market_rss_bullish_articles",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    source: text("source").notNull(),
+    externalId: text("external_id").notNull(),
+    sourceArticleId: bigint("source_article_id", { mode: "number" }).notNull(),
+    title: text("title").notNull(),
+    translatedTitle: text("translated_title"),
+    summary: text("summary").notNull().default(""),
+    translatedSummary: text("translated_summary"),
+    content: text("content").notNull().default(""),
+    link: text("link").notNull().default(""),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    ticker: text("ticker"),
+    category: text("category").notNull(),
+    direction: text("direction").notNull(),
+    matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`),
+    priority: integer("priority").notNull().default(0),
+    financingAmountUsd: doublePrecision("financing_amount_usd"),
+    dilutionRisk: text("dilution_risk"),
+    translationStatus: text("translation_status").notNull().default("PENDING"),
+    translationFallback: boolean("translation_fallback").notNull().default(false),
+    translationError: text("translation_error"),
+    analyzedAt: timestamp("analyzed_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("market_rss_bullish_source_external_unique").on(table.source, table.externalId),
+    uniqueIndex("market_rss_bullish_source_article_unique").on(table.sourceArticleId),
+    index("market_rss_bullish_published_idx").on(table.publishedAt, table.priority),
+  ],
+);
+
 /** Content-addressed archive of the exact RSS response returned by a source. */
 export const marketRssFetchSnapshots = pgTable(
   "market_rss_fetch_snapshots",

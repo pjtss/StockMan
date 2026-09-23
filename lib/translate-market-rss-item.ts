@@ -3,7 +3,6 @@ import type { TranslationClient } from "./translation-types";
 
 const TRANSLATION_CONCURRENCY = 3;
 import { CloudTranslationClient } from "./cloud-translation-client";
-import { LibreTranslateClient } from "./libretranslate-client";
 
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationFallback: boolean; translationFallbackReason?: string };
 export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient): Promise<TranslatedMarketRssItem> {
@@ -16,7 +15,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   return { ...item, translatedTitle: title.translatedText, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason };
 }
 
-export async function translateMarketRssItems(items: MarketRssItem[], client: TranslationClient = new LibreTranslateClient()) {
+export async function translateMarketRssItems(items: MarketRssItem[], client?: TranslationClient) {
   // 외부 번역 API의 과부하를 막기 위해 동시성을 제한하되, 항목별 네트워크
   // 대기시간이 전체 배치에 직렬로 누적되지 않도록 bounded worker를 사용한다.
   const translated = new Array<TranslatedMarketRssItem>(items.length);
