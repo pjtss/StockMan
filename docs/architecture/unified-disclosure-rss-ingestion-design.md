@@ -182,6 +182,10 @@ ticker mapping → translation(title 선택) → analysis queue
 
 `GET /api/disclosures?date=YYYY-MM-DD&source=all&page=1&pageSize=500`
 
+`page`는 1부터 시작하며 `pageSize`는 1~500이다. 응답의 `total`은 조건에 맞는 전체 행 수이고 `hasMore`가 true이면 다음 페이지를 조회한다. 원본 전체가 500건을 넘어도 페이지를 순회해 누락 없이 읽을 수 있다. 기존 `limit` 매개변수는 호환을 위해 `pageSize` 별칭으로 지원한다.
+
+`page`, `pageSize`, `limit`을 모두 생략하면 해당 일자·출처의 전체 행을 기본 반환한다. API 내부에서는 DB를 500행씩 읽어 합치며, 응답에는 `total` 전체 건수와 `hasMore: false`를 표시한다.
+
 응답 예시:
 
 ```json
