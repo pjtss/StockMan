@@ -19,9 +19,9 @@ export function SecCompanyFactsLookup() {
     event.preventDefault();
     setLoading(true); setMessage(""); setLookup(null); setSnapshot(null); setShowJson(false);
     try {
-      const response = await fetch("/api/admin/sec-company-facts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: query.trim() }), cache: "no-store" });
+      const response = await fetch("/api/sec/company-facts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: query.trim() }), cache: "no-store" });
       const body = await response.json().catch(() => null);
-      if (!response.ok || !body?.ok) throw new Error(response.status === 401 ? "관리자 세션으로 로그인해야 조회할 수 있습니다." : body?.error || `조회 실패 (HTTP ${response.status})`);
+      if (!response.ok || !body?.ok) throw new Error(body?.error || `조회 실패 (HTTP ${response.status})`);
       setLookup(body as LookupResult);
       setMessage("SEC Company Facts를 조회해 DB 최신 스냅샷과 원문 이력에 저장했습니다.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "조회에 실패했습니다."); }
@@ -32,9 +32,9 @@ export function SecCompanyFactsLookup() {
     if (!lookup) return;
     setLoadingJson(true); setMessage("");
     try {
-      const response = await fetch(`/api/admin/sec-company-facts?cik=${encodeURIComponent(lookup.cik)}`, { cache: "no-store" });
+      const response = await fetch(`/api/sec/company-facts?cik=${encodeURIComponent(lookup.cik)}`, { cache: "no-store" });
       const body = await response.json().catch(() => null);
-      if (!response.ok || !body?.ok) throw new Error(response.status === 401 ? "관리자 세션으로 로그인해야 합니다." : body?.error || `저장 데이터 조회 실패 (HTTP ${response.status})`);
+      if (!response.ok || !body?.ok) throw new Error(body?.error || `저장 데이터 조회 실패 (HTTP ${response.status})`);
       setSnapshot(body.snapshot as Snapshot); setShowJson(true);
     } catch (error) { setMessage(error instanceof Error ? error.message : "저장 JSON 조회에 실패했습니다."); }
     finally { setLoadingJson(false); }
@@ -64,6 +64,6 @@ export function SecCompanyFactsLookup() {
       <div className={styles.actions}><button type="button" onClick={() => void loadSavedJson()} disabled={loadingJson}>{loadingJson ? "DB에서 불러오는 중…" : showJson ? "저장 JSON 새로고침" : "저장된 전체 JSON 보기"}</button>{snapshot && <><button type="button" onClick={() => void copyJson()}>전체 JSON 복사</button><button type="button" className={styles.secondary} onClick={downloadJson}>JSON 파일 다운로드</button></>}</div>
       {showJson && snapshot && <textarea className={styles.json} aria-label="저장된 전체 SEC Company Facts JSON" readOnly value={json} spellCheck={false} />}
     </div>}
-    <p className={styles.note}>수동 수집은 관리자 세션이 필요합니다. 자동 갱신은 <code>/admin/modules/sec-company-facts</code>에서 설정하며, CIK 목록이 없으면 SEC_SYNC_CIKS 환경변수 대상만 실행합니다.</p>
+    <p className={styles.note}>이 조회·복사·다운로드 기능은 로그인 없이 이용할 수 있으며, 수동 SEC 조회에는 IP별·서비스 전체 요청 제한이 적용됩니다. 자동 갱신 대상과 스케줄은 관리자만 <code>/admin/modules/sec-company-facts</code>에서 설정할 수 있습니다.</p>
   </section>;
 }

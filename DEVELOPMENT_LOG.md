@@ -2,6 +2,42 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-09-26] SEC Company Facts 일반 사용자 조회 허용
+
+### 목표
+- 일반 사용자가 관리자 로그인 없이 SEC Company Facts 원천 JSON을 조회·저장·열람할 수 있도록 한다.
+
+### 반영
+- 공개 `/api/sec/company-facts` GET/POST 경로를 추가하고, 기존 `/api/admin/sec-company-facts` 인증·관리자 설정 경로는 그대로 유지한다.
+- 기존 활성 보통주 검증을 공개 경로에도 적용해 ETF·워런트·비활성·미확인 대상을 fail-closed로 차단한다.
+- SEC 수동 조회 및 저장 JSON 읽기에 클라이언트별·인스턴스 전체 고정창 제한, 429와 `Retry-After`를 추가했다.
+- `기타` 페이지에서 새 공개 API를 호출하고 로그인 불필요 및 요청 제한을 안내한다.
+
+### 근본 원인 및 재발 방지
+- 기존 UI가 관리자 전용 API에만 연결되어 일반 사용자는 Company Facts 기능을 쓸 수 없었다.
+- 일반 경로를 열되 기존 권한 경계를 낮추지 않고 API route 단위 테스트로 익명 접근, 보통주 차단, 스냅샷 응답, rate limit을 자동 검사한다.
+
+### 검증
+- `npm run verify` 통과: 170 test files passed, 1 skipped; 564 tests passed, 1 skipped. 타입체크, docs contract, verify-scope, KIS boundary, cron 검사 및 Next.js production build 모두 통과했다.
+- 신규 API·rate-limit 및 기존 관리자 API 집중 테스트 통과: 3 files, 11 tests.
+- 이후 재검증에서 빌드가 worktree 안에 생긴 부분 `node_modules/next`를 우선 해석해 모듈 누락으로 실패했다. 부분 의존성 폴더는 삭제하지 않고 worktree 안 별도 경로에 보존한 뒤 `npm run build`를 다시 실행해 통과했다.
+- production build에 `/api/sec/company-facts`와 `/other`가 포함됨을 확인했다. 로컬 production server 실행 후 `/other` HTTP 200, 공개 API 입력 검증 HTTP 400, 동일 IP의 7번째 조회 HTTP 429 및 `Retry-After: 600`을 확인했다. 생성 client bundle에 공개 안내문과 새 API 경로가 포함됨도 확인했다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-26-115
+- 성과 판정: IMPROVED
+- 근거: 관리자 전용 경로를 보존하면서 일반 사용자용 제한된 공개 경로를 분리하고, 회귀 검사를 추가했다.
+
+### 남은 위험
+- rate limit은 단일 인스턴스 메모리 기반이다. 다중 인스턴스로 바뀌면 공유 저장소로 이전해야 한다.
+
+### 다음 개선
+- 배포 후 운영에서 429 비율과 SEC upstream 오류율을 확인하고, 합산 요청량이 한도에 근접하면 제한값을 재조정한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행. 검증 통과 후 커밋하며, 푸시는 저장소·브랜치·커밋 SHA를 명시한 별도 승인을 받은 뒤 진행한다.
+- 운영 배포 및 API/UI 검증은 push와 CI 통과 후 수행한다.
+
 ## [2026-09-23] 로컬 LLM 호재 분석 POST 저장 경로
 
 ### 목표

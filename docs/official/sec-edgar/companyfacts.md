@@ -4,9 +4,9 @@
 
 ## 운영 조회와 일일 갱신
 
-- `/api/admin/sec-company-facts`는 관리자 세션만 허용한다. POST에서 티커 또는 CIK를 받아 SEC 공식 Company Facts를 수집·저장한다. GET은 저장된 전체 JSON을 읽으며 SEC를 다시 호출하지 않는다.
+- `/api/sec/company-facts`는 공개 수동 조회 경로다. 로그인 없이 POST에서 티커 또는 CIK를 받아 SEC 공식 Company Facts를 수집·저장하고, GET은 저장된 전체 JSON만 읽으며 SEC upstream을 다시 호출하지 않는다. 기존 `/api/admin/sec-company-facts`는 관리자 전용으로 유지한다.
 - 수동·예약 경로 모두 SEC 티커 매핑 후 `us_common_stock_universe`의 활성 `COMMON_STOCK` 상태와 ETF·워런트·파생·DR·레버리지·인버스 제외 플래그를 확인한다. 조회 실패, 티커 매핑 불가, 비활성/비보통주는 fail-closed로 거부한다.
-- `기타` 페이지에서 단일 종목을 조회하고 저장 JSON을 펼쳐 복사하거나 다운로드할 수 있다. 대용량 JSON은 사용자가 열기를 선택했을 때만 브라우저로 가져온다.
+- `기타` 페이지에서 일반 사용자가 단일 종목을 조회하고 저장 JSON을 펼쳐 복사하거나 다운로드할 수 있다. 공개 API에는 클라이언트별 조회 6회/10분 및 JSON 읽기 30회/분과 인스턴스 전체 제한이 적용된다. 초과 요청은 HTTP 429와 `Retry-After`를 반환한다. 제한 상태는 단일 인스턴스 메모리 기반이므로 서버 재시작 시 초기화된다. 다중 인스턴스 구성으로 바뀌면 공유 rate-limit 저장소를 도입한다. 대용량 JSON은 사용자가 열기를 선택했을 때만 브라우저로 가져온다.
 - OCI cron은 `/api/cron/sec-company-facts`를 5분 주기로 호출한다. 전용 기능 모듈의 기본 KST 시간창은 매일 08:00–08:10이며, DB advisory lock과 KST 날짜별 성공 이력으로 중복 실행을 방지한다. 실패 실행은 시간창 안에서 재시도할 수 있다.
 - 일일 후보 CIK는 `/admin/modules/sec-company-facts` 설정 또는 `SEC_SYNC_CIKS`에서 가져오되, 저장 전에 공식 해외 보통주 마스터로 필터링한다. 비보통주 CIK는 Company Facts endpoint를 호출하지 않는다.
 - `sec-realtime`의 Submissions/Discord 스케줄 및 CIK 설정은 변경하지 않는다.
