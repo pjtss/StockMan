@@ -3,11 +3,11 @@ import { getDb } from "./db";
 import { secCompanies, secFilingDocuments, secFilingEvents, secSubmissions, secXbrlSnapshots } from "./schema";
 import { fetchSecSubmissions, type SecSubmissionRow } from "./sec-submissions";
 import { classifySecEvent } from "./sec-event-classifier";
-import { fetchSecJson, companyFactsUrl } from "./sec-edgar-client";
 import { fetchSecPrimaryDocument } from "./sec-primary-document";
 import { analyzeSecFinancing } from "./sec-financing-analyzer";
 import { analyzeSecInsider } from "./sec-insider-analysis";
 import { archiveSecFilingDocument, archiveSecSourceSnapshot } from "./source-payload-archive";
+export { syncSecCompanyFacts } from "./sec-company-facts-sync";
 
 export function secFilingUrl(cik: string, accession: string, primaryDocument: string) { return `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${accession.replace(/-/g, "")}/${primaryDocument}`; }
 
@@ -26,14 +26,6 @@ export async function syncSecCompany(cik: string) {
     await db.insert(secFilingEvents).values({ accession: row.accession, cik: result.cik, category: classification.category, direction: classification.direction, score: classification.score, matchedTerms: classification.matchedTerms, updatedAt: new Date() }).onConflictDoUpdate({ target: secFilingEvents.accession, set: { category: classification.category, direction: classification.direction, score: classification.score, matchedTerms: classification.matchedTerms, updatedAt: new Date() } });
   }
   return { ok: true, cik: result.cik, company: result.name, source: { ok: true, status: result.source.status, url: result.source.url, fetchedAt: result.source.fetchedAt, responseHeaders: result.source.responseHeaders }, submissions: result.filings.length, inserted };
-}
-
-export async function syncSecCompanyFacts(cik: string) {
-  const source = await fetchSecJson<Record<string, unknown>>(companyFactsUrl(cik));
-  if (!source.ok) return { ok: false, cik, status: source.status, error: source.error };
-  await archiveSecSourceSnapshot({ sourceType: "COMPANY_FACTS", sourceKey: cik.replace(/\D/g, "").padStart(10, "0"), url: source.url, status: source.status, responseHeaders: source.responseHeaders, rawPayload: source.rawText, fetchedAt: source.fetchedAt });
-  await getDb().insert(secXbrlSnapshots).values({ cik: cik.replace(/\D/g, "").padStart(10, "0"), payload: source.data, fetchedAt: new Date() }).onConflictDoUpdate({ target: secXbrlSnapshots.cik, set: { payload: source.data, fetchedAt: new Date() } });
-  return { ok: true, cik, status: source.status, fetchedAt: source.fetchedAt, factCount: Object.keys((source.data as any).facts || {}).length };
 }
 
 export async function loadSecSubmission(accession: string) { const rows = await getDb().select().from(secSubmissions).where(eq(secSubmissions.accession, accession)).limit(1); return rows[0] || null; }

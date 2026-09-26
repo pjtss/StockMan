@@ -51,6 +51,10 @@ run_cron_endpoint() {
   fi
 }
 
+# Run before other potentially long cron tasks so the daily KST 08:00 window
+# is not missed when market-data refreshes or delivery retries run slowly.
+run_cron_endpoint "sec-company-facts" 900 "/api/cron/sec-company-facts"
+
 run_cron_endpoint "discord-delivery-retry" 50 "/api/cron/discord-delivery-retry"
 
 # Run the news ingestion before long-running market-data refreshes. A delayed

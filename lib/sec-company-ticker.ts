@@ -28,7 +28,7 @@ export async function resolveSecCompanyTickers(ciks: string[]) {
 }
 
 const nonCommonTicker = /(?:^|[-.])(UN|U|WT|W|WS|WW|RT|R|P[A-Z]?)$/i;
-const nonCommonName = /\b(?:units?|warrants?|rights?|preferred)\b/i;
+const nonCommonName = /\b(?:units?|warrants?|rights?|preferred|etfs?|etns?|etps?|funds?|trusts?|indexes|index funds?|notes?|bonds?|debentures?|depositary shares?)\b|exchange[- ]traded/i;
 
 function isLikelyDerivative(row: SecTickerRow, candidates: SecTickerRow[]) {
   if (nonCommonTicker.test(row.ticker) || nonCommonName.test(row.name)) return true;
@@ -81,4 +81,15 @@ export async function resolveSecTickerCandidates(ticker: string) {
   const rows = await loadRows();
   const value = ticker.trim().toUpperCase();
   return rows.filter((row) => row.ticker === value);
+}
+
+export async function resolveSecCikTickers(cik: string) {
+  const rows = await loadRows();
+  const normalized = cik.replace(/\D/g, "").padStart(10, "0");
+  return rows.filter((row) => row.cik === normalized);
+}
+
+/** Conservative SEC-name/ticker prefilter; callers must also check the live official instrument master. */
+export function isLikelySecCommonStock(row: SecTickerRow, candidates: SecTickerRow[] = [row]) {
+  return !isLikelyDerivative(row, candidates);
 }

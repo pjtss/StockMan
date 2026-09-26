@@ -9,7 +9,7 @@ const groups: ModuleGroup[] = [
   { key: "bollinger", title: "볼린저밴드 탐지", description: "국내·해외 저장 캔들의 밴드 구간 탐지", keys: ["us-bollinger-band", "us-bollinger-middle-lower", "kr-bollinger-band", "kr-bollinger-middle-lower", "us-minute-bollinger-band"] },
   { key: "daily-signals", title: "일봉 지표·추세 탐지", description: "일봉 돌파 탐지", keys: ["us-daily-breakout"] },
   { key: "flow", title: "실시간 수급·거래 탐지", description: "국내·해외 스캐너", keys: ["domestic-trade-intensity", "us-scanners"] },
-  { key: "news-filings", title: "뉴스·공시 수집·알림", description: "RSS·SEC·DART·해외 속보와 알림 전달", keys: ["market-rss", "sec-realtime", "dart-realtime", "us-breaking-news-forwarder"] },
+  { key: "news-filings", title: "뉴스·공시 수집·알림", description: "RSS·SEC·DART·해외 속보와 알림 전달", keys: ["market-rss", "sec-realtime", "sec-company-facts", "dart-realtime", "us-breaking-news-forwarder"] },
   { key: "delivery", title: "운영·알림 관리", description: "Discord 재전송 및 운영 보조 모듈", keys: ["discord-delivery-retry"] },
 ];
 const moduleMap = new Map(FEATURE_MODULES.map((module) => [module.key, module]));

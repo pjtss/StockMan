@@ -12,6 +12,7 @@ export type FeatureSpecificSettings = {
   automationCompletion?: { enabled?: boolean; webhookUrl?: string };
   marketRss?: { enabledSources?: string[] };
   secEdgar?: { ciks?: string[]; syncXbrl?: boolean; discordBatch?: number };
+  secCompanyFacts?: { ciks?: string[] };
   bollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER"; requireObvAdlSignal?: boolean; obvSignalPeriod?: number; adlSignalPeriod?: number; reboundAfterBreakout?: boolean; reboundLookback?: number; reboundTolerancePercent?: number };
   krBollingerPolicy?: { timeframe?: "D" | "W" | "M"; period: number; stdDevMultiplier: number; minPrice: number; minVolume: number; minTurnoverRatio: number; zone?: "LOWER_OR_BELOW" | "MIDDLE_TO_LOWER"; requireObvAdlSignal?: boolean; obvSignalPeriod?: number; adlSignalPeriod?: number; reboundAfterBreakout?: boolean; reboundLookback?: number; reboundTolerancePercent?: number };
   newsLookup?: { defaultPeriod: "today" | "3d" | "7d" | "1m" };
@@ -33,6 +34,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "instrument-fundamentals", label: "종목 기본정보 갱신", description: "국내·해외 유니버스의 현재가·거래량·거래대금·시가총액 기본정보를 하루 1회 저장", settingsPath: "/admin/modules/instrument-fundamentals", scheduler: "OCI_CRON" },
   { key: "dart-realtime", label: "DART 공시 자동화", description: "OpenDART 수집·평가·알림", settingsPath: "/admin/modules/dart-realtime", scheduler: "OCI_CRON" },
   { key: "sec-realtime", label: "SEC Submissions 자동화", description: "CIK 기반 SEC Submissions·Form/Item·XBRL 수집·알림", settingsPath: "/admin/modules/sec-realtime", scheduler: "OCI_CRON" },
+  { key: "sec-company-facts", label: "SEC Company Facts 일일 갱신", description: "설정한 CIK 목록의 SEC Company Facts 원본을 매일 08:00 KST에 수집·저장", settingsPath: "/admin/modules/sec-company-facts", scheduler: "OCI_CRON" },
   { key: "sec-edgar", label: "SEC EDGAR RSS 자동화", description: "SEC EDGAR RSS 수집·분류·알림", settingsPath: "/admin/modules/sec-edgar", scheduler: "OCI_CRON" },
   { key: "market-rss", label: "시장 RSS 통합", description: "SEC EDGAR·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss", scheduler: "OCI_CRON" },
   { key: "us-scanners", label: "미국 스캐너", description: "미국 상승률·체결강도 스캐너", settingsPath: "/admin/modules/us-scanners", scheduler: "NOT_SCHEDULED" },

@@ -30,6 +30,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ key: 
         evaluation: incomingFeatureSettings.evaluation === undefined ? current.featureSettings?.evaluation : { ...current.featureSettings?.evaluation, ...incomingFeatureSettings.evaluation },
         marketRss: incomingFeatureSettings.marketRss === undefined ? current.featureSettings?.marketRss : { ...current.featureSettings?.marketRss, ...incomingFeatureSettings.marketRss },
         secEdgar: incomingFeatureSettings.secEdgar === undefined ? current.featureSettings?.secEdgar : { ...current.featureSettings?.secEdgar, ...incomingFeatureSettings.secEdgar },
+        secCompanyFacts: incomingFeatureSettings.secCompanyFacts === undefined ? current.featureSettings?.secCompanyFacts : { ...current.featureSettings?.secCompanyFacts, ...incomingFeatureSettings.secCompanyFacts },
         newsLookup: incomingFeatureSettings.newsLookup === undefined ? current.featureSettings?.newsLookup : { ...current.featureSettings?.newsLookup, ...incomingFeatureSettings.newsLookup },
         intradayMvpPolicy: incomingFeatureSettings.intradayMvpPolicy === undefined ? current.featureSettings?.intradayMvpPolicy : { ...current.featureSettings?.intradayMvpPolicy, ...incomingFeatureSettings.intradayMvpPolicy },
         minuteBollingerPolicy: incomingFeatureSettings.minuteBollingerPolicy === undefined ? current.featureSettings?.minuteBollingerPolicy : { ...current.featureSettings?.minuteBollingerPolicy, ...incomingFeatureSettings.minuteBollingerPolicy },
