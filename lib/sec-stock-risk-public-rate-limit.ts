@@ -1,0 +1,6 @@
+type Window = { startedAt: number; count: number };
+const windows = new Map<string, Window>();
+const POLICIES = { read: { perClient: 60, perClientWindowMs: 60_000, global: 1_200, globalWindowMs: 60_000 }, write: { perClient: 10, perClientWindowMs: 60_000, global: 120, globalWindowMs: 60_000 } } as const;
+function take(key: string, limit: number, durationMs: number, now: number) { const current = windows.get(key); if (!current || now - current.startedAt >= durationMs) { windows.set(key, { startedAt: now, count: 1 }); return { allowed: true, retryAfterSeconds: 0 }; } if (current.count >= limit) return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((durationMs - (now - current.startedAt)) / 1000)) }; current.count += 1; return { allowed: true, retryAfterSeconds: 0 }; }
+export function consumeSecStockRiskLimit(kind: keyof typeof POLICIES, clientIp: string, now = Date.now()) { const policy = POLICIES[kind]; const client = take(`${kind}:client:${clientIp || "unknown"}`, policy.perClient, policy.perClientWindowMs, now); if (!client.allowed) return client; return take(`${kind}:global`, policy.global, policy.globalWindowMs, now); }
+export function resetSecStockRiskLimitsForTest() { windows.clear(); }
