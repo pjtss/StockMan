@@ -28,6 +28,7 @@
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 전체 전달 생명주기: [`development/delivery-lifecycle.md`](./development/delivery-lifecycle.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
+- RSS 번역 상태 공개 검수 API: [`operations/market-rss-translation-debug-api.md`](./operations/market-rss-translation-debug-api.md)
 - 지속 개선 운영 기준: [`operations/continuous-improvement.md`](./operations/continuous-improvement.md)
 - 지속 개선 검토 주기: [`operations/improvement-review.md`](./operations/improvement-review.md)
 - 프로젝트 전체 디버깅 구조: [`DEBUGGING_ARCHITECTURE.md`](./DEBUGGING_ARCHITECTURE.md)
