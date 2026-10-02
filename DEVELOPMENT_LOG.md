@@ -13,8 +13,8 @@
 - 익명 조회, 필터, 입력 경계, 오류 마스킹 및 DB 실패 응답을 회귀 테스트로 고정하고 운영 API 런북을 문서 인덱스에 등록했다.
 
 ### 검증
-- API 단위 테스트 4개, 전체 `npm run deploy:verify`의 구조 검사·전체 테스트·타입 검사·빌드·standalone 실행 smoke를 배포 전 수행한다.
-- 로컬 DB가 실행되지 않아 로컬 API는 DB 연결 단계에서 503을 반환했다. 운영 DB의 실제 행 조회는 배포 이후 운영 URL 호출로 확인해야 한다.
+- API 단위 테스트 4개 통과. `npm run deploy:verify` 통과: production build, 전체 테스트 568개 통과·1개 skip, 타입 검사, 문서/구조 게이트 및 standalone 실행 smoke 통과.
+- 로컬 DB가 실행되지 않아 로컬 API는 DB 연결 단계에서 503을 반환했다. 운영 익명 API 호출은 HTTP 200 JSON, 최근 1시간 13건 모두 `PENDING`, 표본 1건 반환을 확인했다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-02-001
@@ -28,7 +28,7 @@
 - 배포 후 운영 URL을 익명 호출해 운영 DB의 상태별 건수와 항목 표본을 확인하고, 응답시간·조회량을 기준으로 DB 쿼리 비용을 점검한다.
 
 ### 커밋·푸시·배포
-- 미실행: 배포 전 검증 후 `oci`에 push하여 CI 배포를 실행하고 운영 API를 확인한다.
+- 상태: 완료. 구현 커밋 `091c5969`를 `oci`에 push했고 [GitHub Actions Deploy OCI run 36982189795](https://github.com/pjtss/StockMan/actions/runs/36982189795)이 성공했다. 운영 익명 GET도 HTTP 200 JSON으로 확인했다.
 
 ## [2026-09-26] SEC Company Facts 일반 사용자 조회 허용
 
