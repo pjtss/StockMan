@@ -12,6 +12,7 @@ import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "./dis
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { isRetryableDiscordError, marketRssDeliveryExternalId } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
+import { dedupeMarketRssItems } from "./market-rss-dedupe";
 import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
 import { claimTranslationLimitAlert, claimTranslationThresholdAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
 
@@ -31,10 +32,13 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
     try { secTickerMap = new Map((await resolvePreferredSecCompanyTickers(secCiks)).map((row) => [row.cik, row.ticker])); } catch { secTickerMap = new Map(); }
   }
   let inserted = 0;
+  const duplicateCounts = new Map<string, number>();
   for (const result of allResults) {
     if (!result.ok) continue;
     const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
-    const values = result.feed.items.map((item) => {
+    const { items, duplicateCount } = dedupeMarketRssItems(result.feed.items);
+    duplicateCounts.set(result.source, duplicateCount);
+    const values = items.map((item) => {
       const classification = classifyMarketRssItem(item);
       const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
       // SEC filings without a preferred common-share mapping (for example
@@ -81,7 +85,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
     }}).returning({ id: marketRssArticles.id });
     inserted += rows.length;
   }
-  return { fetchedAt: fetched.fetchedAt, sourceResults: allResults.map((item) => ({ source: item.source, ok: item.ok, skipped: "skipped" in item ? item.skipped : false, count: item.ok ? item.feed.items.length : 0 })), inserted };
+  return { fetchedAt: fetched.fetchedAt, sourceResults: allResults.map((item) => ({ source: item.source, ok: item.ok, skipped: "skipped" in item ? item.skipped : false, count: item.ok ? item.feed.items.length : 0, duplicateCount: duplicateCounts.get(item.source) ?? 0 })), inserted };
 }
 
 export async function translatePendingMarketRssArticles(limit = 10) {

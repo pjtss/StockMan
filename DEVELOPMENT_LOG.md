@@ -2,6 +2,35 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-03] RSS feed bulk upsert 중복 키 방어
+
+### 목표와 범위
+- 운영에서 확인된 PostgreSQL `21000` (`ON CONFLICT DO UPDATE command cannot affect row a second time`) 재발을 방지하고, 동일 RSS feed batch 안의 중복 `(source, external_id)`를 저장 전에 제거한다.
+
+### 반영
+- `dedupeMarketRssItems`가 DB text conflict key와 같은 `(String(source), String(id))` 기준으로 첫 항목을 유지하고 중복 수를 계산한다.
+- `ingestMarketRssArticles`는 dedupe 결과만 bulk upsert에 전달하고 출처별 `duplicateCount`를 결과에 포함해 다음 automation run에서 관측 가능하게 한다.
+- 동일 source/id, 다른 source의 동일 id, 서로 다른 id, 숫자/문자열 ID canonicalization 테스트를 추가한다.
+- 운영 원본 기준 `82541aee`에서 별도 정리된 `codex/rss-translation-debug` worktree에만 반영했다. 주 작업 디렉터리의 기존 변경사항은 포함하지 않았다.
+
+### 검증
+- 전용 중복 제거/ingest 테스트 실행: `npm.cmd exec vitest run -- lib/market-rss-dedupe.test.ts lib/market-rss.test.ts` 통과 (2 files / 5 tests).
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 전체 테스트 172개 파일(571 통과·1 skip), typecheck, docs:check(18 entry points, migration V143), audit verify scope, KIS boundary audit, cron check(19 endpoints), standalone runtime smoke.
+- 실행 검증에서 `/charts`는 HTTP 200. 국내/해외 TOP 상승률 API는 JSON 응답 파싱을 확인했으나 해외 API가 HTTP 502를 반환했다. 격리된 worktree에는 `.env.local`이 없어 외부 KIS/DB 의존 경로는 정상 데이터 응답까지 검증하지 못했다. 이는 RSS 변경 검증 범위와 별개이며 정상 API 동작으로 간주하지 않는다.
+- `git diff --check` 통과. production RSS API의 post-deploy 재검증은 배포 후 별도로 수행한다.
+
+### 다음 개선 및 재발 자동감지
+- 운영 배포 후 automation summary의 source별 `duplicateCount`와 `market-rss` run status를 관찰한다. 같은 SQLSTATE `21000`이 재발하면 `docs/ERROR_HANDLING.md` 절차로 source/feed 입력을 조사한다.
+- 성공 run과 번역 상태(PENDING 감소, TRANSLATED 증가)가 확인되기 전까지 장애 해결로 간주하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-03-001
+- 성과 판정: UNMEASURED
+- 근거: 중복 키 방어 로직 및 회귀 테스트는 추가했지만 운영 적용 전이므로 장애율 감소나 번역 복구 효과는 아직 측정하지 않았다.
+
+### 커밋·푸시·배포
+- 아직 미실행.
+
 ## [2026-10-02] RSS 번역 상태 공개 검수 API
 
 ### 목표
