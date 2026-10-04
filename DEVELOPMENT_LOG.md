@@ -17,7 +17,10 @@
 - 전용 중복 제거/ingest 테스트 실행: `npm.cmd exec vitest run -- lib/market-rss-dedupe.test.ts lib/market-rss.test.ts` 통과 (2 files / 5 tests).
 - 전체 `npm.cmd run deploy:verify` 통과: production build, 전체 테스트 172개 파일(571 통과·1 skip), typecheck, docs:check(18 entry points, migration V143), audit verify scope, KIS boundary audit, cron check(19 endpoints), standalone runtime smoke.
 - 실행 검증에서 `/charts`는 HTTP 200. 국내/해외 TOP 상승률 API는 JSON 응답 파싱을 확인했으나 해외 API가 HTTP 502를 반환했다. 격리된 worktree에는 `.env.local`이 없어 외부 KIS/DB 의존 경로는 정상 데이터 응답까지 검증하지 못했다. 이는 RSS 변경 검증 범위와 별개이며 정상 API 동작으로 간주하지 않는다.
-- `git diff --check` 통과. production RSS API의 post-deploy 재검증은 배포 후 별도로 수행한다.
+- `git diff --check` 통과.
+- GitHub Actions `Deploy OCI` run 950 (`6d67912d74f7f831cf036cdaadf0f9d174739136`) 전체 단계 성공, 운영 `/api/health` HTTP 200.
+- 배포 후 운영 자동화 진단에서 06:35 및 06:40 UTC `market-rss` 두 run 연속 SUCCESS 확인. 각 run은 359건 ingest, translation attempted=3, translated=3, failed=0, fallback=0. 직전 배포 전 run은 SQLSTATE 21000 실패였으며 후속 두 run에서 같은 오류는 재발하지 않았다.
+- 운영 번역 진단에는 여전히 `PENDING` 199건이 보인다. 파이프라인 성공과 새 번역 성공은 확인했지만 이 카운트의 backlog/notifyEligible 구성은 확인하지 않았으므로 전체 대기열 해소로 간주하지 않는다.
 
 ### 다음 개선 및 재발 자동감지
 - 운영 배포 후 automation summary의 source별 `duplicateCount`와 `market-rss` run status를 관찰한다. 같은 SQLSTATE `21000`이 재발하면 `docs/ERROR_HANDLING.md` 절차로 source/feed 입력을 조사한다.
@@ -25,11 +28,11 @@
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-03-001
-- 성과 판정: UNMEASURED
-- 근거: 중복 키 방어 로직 및 회귀 테스트는 추가했지만 운영 적용 전이므로 장애율 감소나 번역 복구 효과는 아직 측정하지 않았다.
+- 성과 판정: IMPROVED
+- 근거: 배포 후 두 번의 연속 자동화 성공과 각 3건 번역 성공, 실패 0건, SQLSTATE 21000 재발 없음. 다만 운영 진단상 PENDING 199건은 남아 있어 전체 큐 복구는 미확인이다.
 
 ### 커밋·푸시·배포
-- 아직 미실행.
+- 코드 커밋 `6d67912d`를 `oci`에 push 완료, GitHub 배포 run 950 성공. 운영 RSS 결과까지 이 로그 항목에서 추적한다.
 
 ## [2026-10-02] RSS 번역 상태 공개 검수 API
 
