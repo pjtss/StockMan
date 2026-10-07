@@ -2,6 +2,39 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-07] 최신 원격 기준 미국 상승률 TOP100 UI 신뢰성 개선
+
+### 목표
+- 최신 `origin/oci` 기준으로 TOP100 거래소별 원천 상태와 집중 관측 후보가 정확히 표시되도록 수정하고, 작업 트리의 무관한 사용자 변경을 배포 대상에서 제외한다.
+
+### 반영
+- KIS 원천 순위행 감산을 상품 제외·잘못된 ticker·중복·유효 후보로 나눠 진단하고, 공식 활성 보통주 선별과 focus 후보 분배의 기준을 유지했다.
+- 점수 입력이 누락되어도 보통주 필터를 통과한 후보로 분봉 큐를 채우되 거래소 round-robin을 적용한다. API에 실제 큐 순번을 제공한다.
+- 화면에서 수집시각의 KST와 경과 시간을 명시하고, 오래된 값은 stale로 알린다. 자동 갱신 중 종목 선택은 `market:code`로 유지한다.
+- UI/API/유니버스 회귀 테스트와 `docs/US_TOP_RISING_UI_DATA_QUALITY.md`를 추가했다.
+
+### 검증
+- 최신 원격 기준 격리 작업 트리에서 `npm.cmd run deploy:verify` 통과: production build 성공, 174개 테스트 파일 586 passed / 1 skipped, typecheck 통과, docs:check(18 entry points, V143) 통과, verify-scope/KIS boundary/cron 19 endpoints 통과.
+- standalone runtime smoke에서 `/charts`, `/api/stock/us/top-rising-chart`, `/api/stock/kr/top-rising-chart` 모두 HTTP 200 및 HTML/JSON 응답을 확인했다.
+- 첫 실행에서 테스트 통과 후 문서 계약 오류를 발견해 로그를 수정했다. 다음 실행은 불완전한 `node_modules/next` 파일 누락으로 빌드 실패했으며, 격리 작업 트리에서 lockfile 기준 `npm.cmd ci`로 복구한 후 전체 게이트를 다시 실행해 통과했다. 원본 작업 트리 의존성은 건드리지 않았다.
+- `git diff --check` 통과. LF→CRLF 안내만 확인했다.
+
+### 다음 개선
+- KIS 상승률 응답에 시가총액·랭킹 거래대금이 없을 때 공식 USD 시총 스냅샷 연결을 별도 검증하고, 값과 시점이 확인되기 전에는 비율을 미확인으로 표시한다.
+- 운영 워커에서 30개 집중 후보의 실제 분봉 coverage와 stale 비율을 관찰한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-07-004
+- 성과 판정: IMPROVED
+- 근거: TOP100 원천 범위·필터·분봉 후보 표시의 누락 및 혼동 위험을 수정한다. 운영 DB·worker의 실시간 coverage 및 시총 비율 데이터 원천은 이번 로컬 검증 범위에서 확정하지 않는다.
+- 자동 감지: focus round-robin/순번, 행 감산 카운터, stale KST, 재정렬 중 ticker 고정, 원문 payload 미노출을 회귀 테스트와 `deploy:verify`로 확인한다.
+- 남은 위험: 로컬 환경에 TOP100 스냅샷·요청 로그 테이블이 없으면 부가 저장/사용 로그는 실패할 수 있으며, 이는 읽기 API 검증과 구분한다.
+
+### 커밋·푸시·배포
+- 아직 미실행.
+
+이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
+
 ## [2026-10-03] RSS feed bulk upsert 중복 키 방어
 
 ### 목표와 범위

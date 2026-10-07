@@ -17,6 +17,7 @@
 ## 시작점
 
 - 현재 시스템 기준서: [`architecture/current-system-reference.md`](./architecture/current-system-reference.md)
+- 미국 상승률 TOP100 UI 데이터 품질·부분 응답·원천 시각·누락 방지 계약: [`US_TOP_RISING_UI_DATA_QUALITY.md`](./US_TOP_RISING_UI_DATA_QUALITY.md)
 
 - 코드 구조: [`architecture/code-structure.md`](./architecture/code-structure.md)
 - 문서 관리·SRP 기준: [`architecture/documentation-and-srp.md`](./architecture/documentation-and-srp.md)

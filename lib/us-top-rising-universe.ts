@@ -27,6 +27,17 @@ function rows(parsed: any) {
   const output = candidates.find((value) => Array.isArray(value));
   return Array.isArray(output) ? output.slice(0, 100) : [];
 }
+export function parseOptionalKisNumber(value: unknown): number | null {
+  if (value == null) return null;
+  const text = String(value).trim().replace(/,/g, "");
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+export function parseKisSourceRank(row: unknown, fallbackRank: number) {
+  const sourceRank = parseOptionalKisNumber((row as any)?.rank ?? (row as any)?.rank_no ?? (row as any)?.rnk);
+  return sourceRank != null && Number.isInteger(sourceRank) && sourceRank > 0 ? sourceRank : fallbackRank;
+}
 export function chooseTopRisingRows(primary: any, fallback: any) {
   const primaryRows = rows(primary);
   if (primaryRows.length >= 100) return { rows: primaryRows, fallbackUsed: false };
@@ -34,9 +45,58 @@ export function chooseTopRisingRows(primary: any, fallback: any) {
   if (fallbackRows.length > primaryRows.length) return { rows: fallbackRows, fallbackUsed: true };
   return { rows: primaryRows, fallbackUsed: false };
 }
+export function isSuccessfulTopRisingResponse(response: { status?: number; response?: { parsed?: any } } | null | undefined) {
+  return Boolean(response && Number(response.status) >= 200 && Number(response.status) < 300 && String(response.response?.parsed?.rt_cd ?? "") === "0");
+}
+export function chooseTopRisingResponses(primary: any, fallback: any) {
+  const primaryOk = isSuccessfulTopRisingResponse(primary);
+  const fallbackOk = isSuccessfulTopRisingResponse(fallback);
+  const primaryRows = primaryOk ? rows(primary?.response?.parsed) : [];
+  const fallbackRows = fallbackOk ? rows(fallback?.response?.parsed) : [];
+  if (fallbackOk && (!primaryOk || fallbackRows.length > primaryRows.length)) return { response: fallback, rows: fallbackRows, fallbackUsed: true };
+  return { response: primaryOk ? primary : fallbackOk ? fallback : primary, rows: primaryRows, fallbackUsed: false };
+}
+export function isCompleteUsTopRisingMarket(input: { status: number; rtCd: unknown; sourceCount: number }) {
+  return input.status >= 200 && input.status < 300 && String(input.rtCd ?? "") === "0" && input.sourceCount >= 100;
+}
+export function selectIntradayFocusKeys<T extends UsTopRisingScope>(
+  scopes: T[],
+  scoresByKey: Map<string, ReturnType<typeof scoreIntradayCandidate>>,
+  limit = US_INTRADAY_FOCUS_POOL_SIZE,
+) {
+  const maxItems = Math.max(0, limit);
+  // Minute candles are the source for the live turnover signal. The upstream
+  // gainers ranking often omits both market cap and traded value, so requiring
+  // a pre-existing score here can leave the minute queue empty forever. Keep
+  // score-ranked candidates first, then fill the remaining bounded queue in
+  // the already source-ranked order; callers have already applied the official
+  // active-common-stock and configured market-cap filters.
+  const scored = scopes.filter((scope) => scoresByKey.get(`${scope.market}:${scope.code}`) != null);
+  const scoredKeys = new Set(scored.map((scope) => `${scope.market}:${scope.code}`));
+  const remainderByMarket = new Map<string, T[]>();
+  for (const scope of scopes) {
+    if (scoredKeys.has(`${scope.market}:${scope.code}`)) continue;
+    const marketScopes = remainderByMarket.get(scope.market) ?? [];
+    marketScopes.push(scope);
+    remainderByMarket.set(scope.market, marketScopes);
+  }
+  // A market's rows arrive in contiguous batches (NAS, AMS, NYS). Selecting
+  // the fallback pool by array order would spend all 30 slots on NAS whenever
+  // KIS omits score inputs. Round-robin by market, preserving each market's
+  // source rank order, while keeping scoreable candidates globally first.
+  const markets = [...remainderByMarket.keys()];
+  const balancedRemainder: T[] = [];
+  for (let rankIndex = 0; markets.some((market) => rankIndex < (remainderByMarket.get(market)?.length ?? 0)); rankIndex += 1) {
+    for (const market of markets) {
+      const scope = remainderByMarket.get(market)?.[rankIndex];
+      if (scope) balancedRemainder.push(scope);
+    }
+  }
+  return new Set([...scored, ...balancedRemainder].slice(0, maxItems).map((scope) => `${scope.market}:${scope.code}`));
+}
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
-export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null; priority?: number; turnoverToMarketCap?: number; priorityReasons?: string[] };
+export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null; priority?: number; turnoverToMarketCap?: number; priorityReasons?: string[]; focusTracking?: boolean };
 
 export function retainOfficialCommonStocks<T extends UsTopRisingScope>(scopes: T[], officialKeys: Set<string>) {
   return scopes.filter((scope) => officialKeys.has(`${scope.market}:${scope.code}`));
@@ -83,6 +143,11 @@ let storedScopeCache: { expiresAt: number; value: StoredUsInstrumentScopes } | n
 let storedScopeInflight: Promise<StoredUsInstrumentScopes> | null = null;
 let liveScopeCache: { expiresAt: number; value: Awaited<ReturnType<typeof loadUsTopRisingScopesUncached>> } | null = null;
 let liveScopeInflight: Promise<Awaited<ReturnType<typeof loadUsTopRisingScopesUncached>>> | null = null;
+
+/** Returns the last upstream result without refreshing it, including its true source timestamp. */
+export function getCachedUsTopRisingScopes() {
+  return liveScopeCache?.value ?? null;
+}
 
 export function clearOfficialEligibilityCache() {
   officialEligibilityCache.clear();
@@ -209,30 +274,71 @@ async function loadUsTopRisingScopesUncached() {
   const seen = new Set<string>();
   const loadMarket = async (market: typeof US_EXCHANGES[number]) => {
     const selected: UsTopRisingScope[] = [];
-    let response = await fetchKisUsTopRisingApi({ excd: market });
-    let sourceRows = rows(response?.response?.parsed); let fallbackUsed = false;
+    let response: Awaited<ReturnType<typeof fetchKisUsTopRisingApi>> = null;
+    let sourceRows: any[] = [];
+    let fallbackUsed = false;
+    let primaryError: string | undefined;
+    let fallbackError: string | undefined;
+    try {
+      response = await fetchKisUsTopRisingApi({ excd: market });
+    } catch (error) {
+      primaryError = `primary: ${error instanceof Error ? error.message : String(error)}`.slice(0, 180);
+    }
+    sourceRows = isSuccessfulTopRisingResponse(response) ? rows(response?.response?.parsed) : [];
+    if (response && !isSuccessfulTopRisingResponse(response)) primaryError = `primary response unsuccessful (${response.status})`;
     // Some KIS sessions return HTTP 200/rt_cd=0 with only a partial page when
     // the configured volume range is applied. Keep the full TOP100 contract:
     // prefer a richer VOL_RANG=0 response rather than silently treating a
     // short page as complete.
     if (sourceRows.length < 100) {
-      const fallback = await fetchKisUsTopRisingApi({ excd: market, volRang: "0" });
-      const selected = chooseTopRisingRows(response?.response?.parsed, fallback?.response?.parsed);
-      if (selected.fallbackUsed) { response = fallback; sourceRows = selected.rows; fallbackUsed = true; }
+      try {
+        const fallback = await fetchKisUsTopRisingApi({ excd: market, volRang: "0" });
+        const selection = chooseTopRisingResponses(response, fallback);
+        response = selection.response;
+        sourceRows = selection.rows;
+        fallbackUsed = selection.fallbackUsed;
+        if (!isSuccessfulTopRisingResponse(fallback)) fallbackError = `fallback response unsuccessful (${fallback?.status ?? "no response"})`;
+      } catch (error) {
+        fallbackError = `fallback: ${error instanceof Error ? error.message : String(error)}`.slice(0, 180);
+      }
     }
+    const parsed = response?.response?.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output1?: { nrec?: unknown } } | null;
+    const responseOk = isSuccessfulTopRisingResponse(response);
+    const collectedAt = new Date().toISOString();
+    const sourceComplete = isCompleteUsTopRisingMarket({ status: response?.status ?? 0, rtCd: parsed?.rt_cd, sourceCount: sourceRows.length });
     let productExcluded = 0;
+    let invalidRows = 0;
+    let duplicateExcluded = 0;
     for (const [index, item] of sourceRows.entries()) {
-      const ticker = code(item); const name = String(item.name ?? item.company ?? item.enName ?? "").trim();
+      const ticker = code(item);
+      const name = [item.name, item.company, item.enName, item.ename].map((value) => String(value ?? "").trim()).find(Boolean) ?? "";
       const product = classifyUsInstrumentProduct({ name, englishName: item.ename, type: item.etyp_nm, market });
       const productText = `${name} ${String(item.ename ?? "")} ${String(item.etyp_nm ?? "")}`;
       const excluded = !isEligibleUsCommonStock(product) || EXCLUDED.test(productText) || ETF_NAME_HINT.test(productText);
-      if (!ticker || excluded) { if (excluded) productExcluded += 1; continue; }
-      const key = `${market}:${ticker}`; if (seen.has(key)) continue; seen.add(key);
-      const numeric = (value: unknown) => { const parsed = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : null; };
-      selected.push({ market, code: ticker, name, rank: index + 1, changeRate: numeric(item.rate ?? item.changeRate ?? item.n_rate), rankingVolume: numeric(item.tvol ?? item.vol ?? item.volume), rankingTradeValue: numeric(item.tamt ?? item.tamnt ?? item.amount), marketCap: numeric(item.marketCap ?? item.market_cap ?? item.mcap ?? item.stck_avls ?? item.stckAvls) });
+      if (!ticker) { invalidRows += 1; continue; }
+      if (excluded) { productExcluded += 1; continue; }
+      const key = `${market}:${ticker}`;
+      if (seen.has(key)) { duplicateExcluded += 1; continue; }
+      seen.add(key);
+      selected.push({
+        market,
+        code: ticker,
+        name,
+        rank: parseKisSourceRank(item, index + 1),
+        changeRate: parseOptionalKisNumber(item.rate ?? item.changeRate ?? item.n_rate),
+        rankingVolume: parseOptionalKisNumber(item.tvol ?? item.vol ?? item.volume),
+        rankingTradeValue: parseOptionalKisNumber(item.tamt ?? item.tamnt ?? item.amount ?? item.tradeValue ?? item.tradingValue),
+        marketCap: parseOptionalKisNumber(item.marketCap ?? item.market_cap ?? item.mcap ?? item.stck_avls ?? item.stckAvls),
+      });
     }
-    const parsed = response?.response?.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output1?: { nrec?: unknown } } | null;
-    return { selected, market: { market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: selected.length, productExcluded, fallbackUsed, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, rawTextPreview: response?.response?.rawText?.slice(0, 500) ?? "", error: sourceRows.length === 0 ? "KIS returned no TOP100 rows for this exchange; verify market hours and KIS ranking availability" : undefined } };
+    const errorMessage = !responseOk
+      ? `KIS_RESPONSE_NOT_SUCCESSFUL: ${String(parsed?.msg_cd ?? response?.status ?? "NO_RESPONSE")}${primaryError ? `; ${primaryError}` : ""}${fallbackError ? `; fallback: ${fallbackError}` : ""}`
+      : sourceRows.length === 0
+        ? "NO_RANKING_ROWS: KIS returned a successful response without rows"
+        : sourceRows.length < 100
+          ? `PARTIAL_RANKING_PAGE: received ${sourceRows.length}/100 rows${fallbackError ? `; fallback failed: ${fallbackError}` : ""}`
+          : undefined;
+    return { selected, market: { market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: selected.length, productExcluded, invalidRows, duplicateExcluded, fallbackUsed, responseOk, sourceComplete, collectedAt, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, error: errorMessage, warning: primaryError && responseOk ? `기본 순위 요청 실패 후 전체 순위 재조회로 복구됨: ${primaryError}` : undefined } };
   };
   const marketResults = await Promise.all(US_EXCHANGES.map(loadMarket));
   const scopes: UsTopRisingScope[] = []; const markets: Record<string, unknown>[] = [];
@@ -264,16 +370,49 @@ async function loadUsTopRisingScopesUncached() {
   // Focus selection is intentionally downstream of product eligibility and
   // market-cap filtering. Only the final common-stock candidate set may enter
   // high-frequency tracking; raw KIS ranking rows never enter this pool.
-  const focusKeys = new Set(prioritizedScopes.slice(0, US_INTRADAY_FOCUS_POOL_SIZE).map((scope) => `${scope.market}:${scope.code}`));
-  for (const [index, scope] of prioritizedScopes.entries()) {
-    const scored = scoredByKey.get(`${scope.market}:${scope.code}`) ?? null;
-    if (!scored) continue;
-    const isFocused = focusKeys.has(`${scope.market}:${scope.code}`);
+  const focusKeys = selectIntradayFocusKeys(prioritizedScopes, scoredByKey);
+  const focusRanks = new Map([...focusKeys].map((key, index) => [key, index + 1]));
+  for (const scope of prioritizedScopes) {
+    const key = `${scope.market}:${scope.code}`;
+    const scored = scoredByKey.get(key) ?? null;
     const previous = intradayMemoryState.getCandidate(scope.market, scope.code);
-    intradayMemoryState.upsertCandidate({ ...previous, ...scored, mvpTracking: true, focusTracking: isFocused, focusRank: isFocused ? index + 1 : undefined });
+    if (!scored) {
+      // Rank-selected candidates still need minute candles even when the KIS
+      // ranking omits market cap/trading value. Amount windows remain visible;
+      // the market-cap ratio and ratio-based alert stay unavailable until a
+      // valid cap is known. Never synthesize the missing financial inputs.
+      const isFocused = focusKeys.has(key);
+      if (isFocused) intradayMemoryState.upsertCandidate({
+        ...previous,
+        market: scope.market,
+        code: scope.code,
+        priority: previous?.priority ?? Math.max(1, 101 - (scope.rank ?? 100)),
+        lastSeenAt: Date.now(),
+        lastCheckedAt: previous?.lastCheckedAt ?? 0,
+        nextCheckAt: previous?.nextCheckAt ?? Date.now(),
+        consecutiveFailures: previous?.consecutiveFailures ?? 0,
+        marketCap: scope.marketCap ?? null,
+        tradingValue: scope.rankingTradeValue ?? null,
+        mvpTracking: true,
+        focusTracking: true,
+        focusRank: focusRanks.get(key),
+      });
+      else if (previous) intradayMemoryState.upsertCandidate({ ...previous, marketCap: scope.marketCap ?? null, tradingValue: scope.rankingTradeValue ?? null, mvpTracking: true, focusTracking: false, focusRank: undefined });
+      continue;
+    }
+    const isFocused = focusKeys.has(key);
+    intradayMemoryState.upsertCandidate({ ...previous, ...scored, mvpTracking: true, focusTracking: isFocused, focusRank: isFocused ? focusRanks.get(key) : undefined });
   }
+  const displayScopes = prioritizedScopes.map((scope) => {
+    const key = `${scope.market}:${scope.code}`;
+    const focusRank = focusRanks.get(key);
+    return { ...scope, focusTracking: focusRank != null, focusRank };
+  });
   intradayMemoryState.rotateSnapshot(prioritizedScopes.map((scope) => ({ market: scope.market, code: scope.code, name: scope.name, rank: scope.rank, rate: scope.changeRate ?? undefined, volume: scope.rankingVolume ?? undefined, tradingValue: scope.rankingTradeValue ?? undefined })));
-  const availableMarkets = markets.filter((market) => Number(market.sourceCount) > 0).length;
-  const hasSuccessfulResponse = markets.some((market) => market.status === 200 && (market as any).kis?.rtCd === "0");
-  return { scopes: prioritizedScopes, universe: { ok: hasSuccessfulResponse, complete: availableMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", markets, availableMarketCount: availableMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, officialEligibility: { source: "us_common_stock_universe", enabled: true, dailyActive: true, instrumentType: "COMMON_STOCK", sourceScopeCount, eligibleScopeCount: officialScopes.length, unknownOrInactiveExcluded: sourceScopeCount - officialScopes.length, failClosed: true, cache: "process_memory", cacheTtlSeconds: OFFICIAL_ELIGIBILITY_CACHE_TTL_MS / 1000, cacheHits: officialEligibility.cacheHits, cacheMisses: officialEligibility.cacheMisses, lookupFailed: officialEligibility.lookupFailed, lookupFallbackUsed: officialEligibility.lookupFallbackUsed, lookupError: officialEligibility.lookupError }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc_after_product_and_market_cap_filters", refresh: "every_live_scope_refresh", eligibleUniverse: "active_common_stock_only" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
+  const availableMarkets = markets.filter((market) => Boolean((market as any).responseOk)).length;
+  const completeMarkets = markets.filter((market) => Boolean((market as any).sourceComplete)).length;
+  const collectedAt = markets.map((market) => Date.parse(String((market as any).collectedAt ?? ""))).filter(Number.isFinite).reduce((latest, value) => Math.max(latest, value), 0);
+  const collectedAtIso = collectedAt ? new Date(collectedAt).toISOString() : null;
+  for (const market of markets) (market as any).eligibleCommonStockCount = displayScopes.filter((scope) => scope.market === (market as any).market).length;
+  return { scopes: displayScopes, universe: { ok: availableMarkets > 0, complete: completeMarkets === US_EXCHANGES.length, source: "KIS_UPDOWN_RATE_TOP100", collectedAt: collectedAtIso, markets, availableMarketCount: availableMarkets, completeMarketCount: completeMarkets, criteria: { exchanges: [...US_EXCHANGES], topNPerExchange: 100, maxSourceRows: 300, excludeEtfAndLeveraged: true, commonFilter: { enabled: settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0, minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap, unknownMarketCap: "excluded" }, officialEligibility: { source: "us_common_stock_universe", enabled: true, dailyActive: true, instrumentType: "COMMON_STOCK", sourceScopeCount, eligibleScopeCount: officialScopes.length, unknownOrInactiveExcluded: sourceScopeCount - officialScopes.length, failClosed: true, cache: "process_memory", cacheTtlSeconds: OFFICIAL_ELIGIBILITY_CACHE_TTL_MS / 1000, cacheHits: officialEligibility.cacheHits, cacheMisses: officialEligibility.cacheMisses, lookupFailed: officialEligibility.lookupFailed, lookupFallbackUsed: officialEligibility.lookupFallbackUsed, lookupError: officialEligibility.lookupError }, priority: "turnover_to_market_cap_plus_intraday_signals", focusPool: { size: US_INTRADAY_FOCUS_POOL_SIZE, selection: "priority_desc_after_product_and_market_cap_filters", refresh: "every_live_scope_refresh", eligibleUniverse: "active_common_stock_only" }, currency: "USD", emptyResponse: "normal_successful_response_is_not_transport_error" } } };
 }
