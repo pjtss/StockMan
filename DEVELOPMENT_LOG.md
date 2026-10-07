@@ -2,6 +2,36 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-07] 공시·RSS API 및 사용자 화면 최근 1~24시간 필터
+
+### 목표
+- `/api/disclosures`와 `/disclosures`에서 현재 시각 기준 최근 1~24시간을 1시간 단위로 조회하고 기존 날짜 조회를 보존한다.
+
+### 반영
+- `app/api/disclosures/route.ts`: `hours=1..24`를 받아 RSS와 DART/SEC 공시 게시 시각을 같은 rolling 구간 `[from,to)`로 필터링하고, 응답에 `window.hours/from/to`를 반환한다. 잘못된 값은 HTTP 400이다.
+- `components/daily-disclosures-page.tsx`: 최근 시간 선택(기본 1시간), 기존 날짜 모드, 출처 선택, JSON 복사·다운로드 기준 정보를 추가했다.
+- `lib/rss-time-window.ts`에서 구간 검증·계산을 모듈화했다. 테스트 파일은 route validation, 시간 구간, 화면 동작을 각각 확인한다. RSS 수집/저장 주기는 변경하지 않았다.
+
+### 검증
+- 운영 GET 기준선: `/api/disclosures?hours=1`과 `hours=24`가 같은 날짜 조회 결과를 반환하고 `window`가 없어 아직 운영 미반영임을 확인했다.
+- `.env.local` 개발서버에서 `hours=1/24` HTTP 200 및 각각 정확한 1/24시간 window, `hours=25` HTTP 400, `/disclosures` HTTP 200을 확인했다. 선택 시간에 저장된 기사가 0건이라 실제 기사행을 통한 경계 비교는 불가했다.
+- `npm.cmd run test -- --maxWorkers=1 lib/rss-time-window.test.ts app/api/disclosures/route.test.ts components/daily-disclosures-page.test.tsx`: 3개 파일·5개 테스트 통과. `npm.cmd run typecheck`와 `npm.cmd run build` 통과(111개 정적 페이지).
+- 첫 standalone 빌드에서 `node_modules` junction 추적 경고를 확인해 worktree 의존성을 `npm.cmd ci`로 독립 설치했다. `deploy:verify` 최초 실행은 문서 계약 섹션 누락으로 실패해 로그를 보완했고, 재실행은 전체 통과했다: build 성공, 테스트 178파일(591 passed/1 skipped), typecheck/docs:check/verify-scope/KIS boundary/cron(19 endpoints) 통과, standalone runtime smoke 3개 경로 HTTP 200.
+- 분리 작업공간에서도 `.env.local` 우선 주입 개발 서버 실행: `/disclosures` HTTP 200, `hours=1/24` JSON HTTP 200이며 응답 window 폭이 각각 정확히 1/24시간, `hours=25` HTTP 400. 해당 구간의 DB 저장 RSS/공시는 0건이었다. 임시 `.env.local` hard link는 검증 후 제거했고 원본 환경 파일을 보존했다.
+
+### 다음 개선
+- 운영 반영 후 `hours=1`과 `hours=24`를 운영에서 재조회해 window 길이·응답행 게시시각·기준시각을 함께 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-07-005
+- 성과 판정: IMPROVED
+- 근거: 날짜 기준 조회만 있던 API와 UI에 최근 1~24시간 모드 및 검증을 추가했고, 기능 전용 테스트 5개와 로컬 응답으로 확인했다. 운영 반영은 아직 증명되지 않았다.
+- 자동 감지: 1·24시간 경계, 무효 0·25 및 문자열, 정확한 구간 길이, 날짜 모드 유지, API 400을 테스트한다. 배포 후 운영 응답의 `window` 계약도 확인한다.
+- 남은 위험: 선택 시간에 로컬 저장 건수가 0이라 실데이터 행을 통한 게시시각 경계 비교는 미완이며, 운영 push/deploy 승인이 남아 있다.
+
+### 커밋·푸시·배포
+- 상태: 미실행 (운영 반영 승인 대기).
+
 ## [2026-10-07] 최신 원격 기준 미국 상승률 TOP100 UI 신뢰성 개선
 
 ### 목표
