@@ -26,7 +26,8 @@
 - 근거: 종목 자격을 유니버스의 COMMON_STOCK 분류·세 거래소·USD·신선 시총·1억 달러 이하로 fail-closed 제한하며 상한 경계값도 일관되게 허용한다.
 
 ### 커밋·푸시·배포
-- 미실행: 아직 commit/push하지 않았다. 앞선 사용자 요청에 따라 `oci` push로 OCI 자동 배포를 시작할 예정이다.
+- 완료: `94a89205a91348cc795e5eb84103449ac6cc229c`를 `origin/oci`에 push했다. GitHub Actions `Deploy OCI` run `38033736720`의 Verify deployment·Upload release·Activate release 전체 단계가 성공했고, Activate release 성공으로 Flyway V148 적용 및 OCI 서비스 활성화가 완료됐다.
+- 운영 smoke: 홈페이지와 manifest HTTP 200, 새 SEC cron의 무인증 POST는 HTTP 401(`Unauthorized`)로 응답해 route와 인증이 활성 상태임을 확인했다. 관리자 인증이 필요한 automation_runs 조회는 하지 않아 최초 SEC 수집 건수와 실제 실행 성공 여부는 미확인으로 남긴다.
 
 ## [2026-10-10] SEC 주식수 XBRL fact 분리 및 일일 수집 배포 준비
 
