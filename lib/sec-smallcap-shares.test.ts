@@ -3,10 +3,11 @@ import { isSecEligibleSmallcapCandidate, SEC_SMALLCAP_MAX_USD, selectLatestSecSh
 
 describe("SEC small-cap common-stock share selection", () => {
   const base = { market: "NAS", ticker: "ABCD", name: "Example Inc.", marketCapUsd: 99_999_999, priceUsd: 2 };
-  it("requires a supported US market and a market cap strictly below USD 100 million", () => {
+  it("requires a supported US market and a market cap at or below USD 100 million", () => {
     expect(SEC_SMALLCAP_MAX_USD).toBe(100_000_000);
     expect(isSecEligibleSmallcapCandidate(base)).toBe(true);
-    expect(isSecEligibleSmallcapCandidate({ ...base, marketCapUsd: SEC_SMALLCAP_MAX_USD })).toBe(false);
+    expect(isSecEligibleSmallcapCandidate({ ...base, marketCapUsd: SEC_SMALLCAP_MAX_USD })).toBe(true);
+    expect(isSecEligibleSmallcapCandidate({ ...base, marketCapUsd: SEC_SMALLCAP_MAX_USD + 1 })).toBe(false);
     expect(isSecEligibleSmallcapCandidate({ ...base, market: "OTC" })).toBe(false);
   });
 

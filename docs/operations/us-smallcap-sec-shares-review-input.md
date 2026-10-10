@@ -3,7 +3,7 @@
 ## 자동 수집 fact 보존
 
 - `sec_smallcap_common_stock_shares`는 `dei:EntityCommonStockSharesOutstanding`와 `us-gaap:CommonStockSharesOutstanding` 값을 각기 별도 컬럼에 저장하고, 각 값의 기준일·접수일·공시 양식·accession도 concept별로 보존한다. 마이그레이션 `V146__split_sec_shares_facts.sql`은 기존 단일 DEI fact를 새 DEI 컬럼으로 옮긴 뒤 이전 단일 컬럼을 제거한다.
-- OCI cron의 `/api/cron/sec-smallcap-share-facts`가 자동화 설정(`sec-smallcap-share-facts`)을 확인해 하루 1회 기본 실행한다. 설정 페이지에서 기능 활성화, 시간표, 실행 간격을 관리하며 중복 실행은 DB advisory lock으로 막는다. 최신 fact 선택은 두 concept별로 독립 수행하고, 응답에서 누락된 concept은 NULL로 기록한다.
+- OCI cron의 `/api/cron/sec-smallcap-share-facts`가 자동화 설정(`sec-smallcap-share-facts`)을 확인해 하루 1회 기본 실행한다. 대상은 공식 미국 보통주 유니버스의 NASDAQ·NYSE·NYSE American(AMS) 종목 중 USD 시가총액 스냅샷과 마지막 KIS 성공 시세 조회가 모두 24시간 이내이고, 시가총액이 0 초과 1억 달러 이하인 종목이다. 같은 cron 회차에서 fundamental 스냅샷 갱신을 먼저 호출하며, KIS API 실패 시 반환될 수 있는 오래된 fallback 시세는 마지막 성공 조회시각 조건에서 제외된다. 신선한 USD 시총을 확인할 수 없으면 수집 대상에서 제외한다. 설정 페이지에서 기능 활성화, 시간표, 실행 간격을 관리하며 중복 실행은 DB advisory lock으로 막는다. 최신 fact 선택은 두 concept별로 독립 수행하고, 응답에서 누락된 concept은 NULL로 기록한다.
 - 두 SEC concept은 모두 보통주 outstanding 수량이며, DEI tag를 free float으로 해석하지 않는다. 기준일·접수일을 함께 사용하고 값 하나로 합치거나 서로 대체하지 않는다.
 
 ## Source review data

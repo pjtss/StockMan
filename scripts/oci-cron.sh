@@ -69,10 +69,10 @@ run_cron_endpoint "sync-filings" 50 "/api/cron/sync-filings"
 # back to SEC_SYNC_CIKS. Always call it so CIKs saved in the admin UI work
 # without requiring a duplicate environment-variable configuration.
 run_cron_endpoint "sec-edgar" 180 "/api/cron/sec-edgar"
-run_cron_endpoint "sec-smallcap-share-facts" 900 "/api/cron/sec-smallcap-share-facts"
 
 run_cron_endpoint "us-breaking-news-forwarder" 50 "/api/cron/us-breaking-news-forwarder"
 run_cron_endpoint "instrument-fundamentals" 300 "/api/cron/instrument-fundamentals"
+run_cron_endpoint "sec-smallcap-share-facts" 900 "/api/cron/sec-smallcap-share-facts"
 
 # Full-universe daily candle refresh can take longer than five minutes.
 # Keep the request alive so the DB automation run can finalize SUCCESS/FAILED

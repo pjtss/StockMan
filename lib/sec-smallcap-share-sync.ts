@@ -40,13 +40,16 @@ export async function syncSecSmallcapShareFacts(pool: Pool) {
              f.market_cap AS "marketCapUsd", f.price AS "priceUsd"
         FROM us_common_stock_universe u
         JOIN instrument_fundamental_snapshots f USING (market, code)
+        JOIN us_price_detail_cache q USING (market, code)
        WHERE u.enabled = TRUE AND u.daily_active = TRUE
          AND u.instrument_type = 'COMMON_STOCK'
          AND COALESCE(u.is_etf, FALSE) = FALSE AND COALESCE(u.is_warrant, FALSE) = FALSE
          AND COALESCE(u.is_derivative, FALSE) = FALSE AND COALESCE(u.is_dr, FALSE) = FALSE
          AND COALESCE(u.is_leveraged, FALSE) = FALSE AND COALESCE(u.is_inverse, FALSE) = FALSE
          AND u.market IN ('NAS','NASDAQ','NYS','NYSE','AMS','AMEX')
-         AND f.currency = 'USD' AND f.market_cap > 0 AND f.market_cap < 100000000
+         AND f.currency = 'USD' AND f.market_cap > 0 AND f.market_cap <= 100000000
+         AND f.fetched_at >= NOW() - INTERVAL '24 hours'
+         AND q.fetched_at >= NOW() - INTERVAL '24 hours'
        ORDER BY f.market_cap ASC, u.market, u.code
     `);
 

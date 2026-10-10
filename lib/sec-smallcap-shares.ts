@@ -30,7 +30,7 @@ export function isSecEligibleSmallcapCandidate(candidate: SecSmallcapCandidate) 
     && /^[A-Z][A-Z0-9.-]{0,14}$/.test(candidate.ticker.toUpperCase())
     && Number.isFinite(candidate.marketCapUsd)
     && candidate.marketCapUsd > 0
-    && candidate.marketCapUsd < SEC_SMALLCAP_MAX_USD;
+    && candidate.marketCapUsd <= SEC_SMALLCAP_MAX_USD;
 }
 
 function selectLatestFact(payload: Record<string, any>, taxonomy: "dei" | "us-gaap", tag: string): SecSharesFact | null {
