@@ -16,10 +16,11 @@
 - `npm.cmd run deploy:verify` 1차는 build, 전체 테스트(602 통과·1 skip), typecheck, docs:check, scope/KIS/cron 검사를 통과했으나 테스트 직후 standalone `/charts` smoke가 30초 제한을 초과했다. 잔류 프로세스를 종료한 뒤 같은 standalone 산출물을 직접 실행해 231ms 기동 및 `/charts` HTTP 200을 재현했다.
 - 자원 압박 해소 후 공식 `npm.cmd run deploy:verify` 재실행 성공: production build, 전체 테스트 180개 파일(602 통과·1 skip), 타입 검사, 문서·범위·KIS·OCI cron(V148까지), standalone `/charts`와 국내·미국 차트 API HTTP 200.
 - 1차 commit `aee52cc74402852cb802d094ceb3374b8d3e77a` 배포 run `38044246277` 성공. 운영 무인증 GET은 HTTP 200·실데이터·pagination을 반환했으나 첫 row의 공식 마스터 이름에 `(ADR)`가 명시됐는데 common-stock 플래그가 true인 분류 충돌을 확인했다.
-- 이 충돌을 fail-closed로 막도록 공개 API에 마스터 한글/영문명의 ADR·ADS·American Depositary·Depositary Receipt/Shares 제외 조건과 테스트를 추가했다. 이 후속 수정은 아직 배포 전이므로 아래 검증을 다시 실행한다.
+- 이 충돌을 fail-closed로 막도록 공개 API에 마스터 한글/영문명의 ADR·ADS·American Depositary·Depositary Receipt/Shares 제외 조건과 테스트를 추가했다. 관련 테스트 5개 통과 및 공식 전체 `npm.cmd run deploy:verify` 재통과(602 통과·1 skip, build/typecheck/docs/cron/standalone smoke 포함).
+- 후속 commit `49a2ea9e007cc0f85bd7da552e55a7f14ad33413` Deploy OCI run `38045036495` 성공. 운영 공개 목록 100건에서 ADR/ADS 표기 결과 0건, ticker `LGHL`은 빈 결과, 일반 ticker `SXTC`는 HTTP 200·1건·SEC 수량 958,077주를 반환했다.
 
 ### 다음 개선
-- 배포 후 unauthenticated production GET, pagination 및 rate limit 응답을 확인하고, `DEVELOPMENT_LOG.md`에 최종 GitHub Actions run과 운영 smoke 결과를 반영한다.
+- SEC Company Facts 원시 수량과 검토 수량이 크게 다른 종목 및 시총 대비 발행주식수 불일치 사례를 데이터 감사 과제로 별도 추적한다. 종목 마스터에 depositary 타입 필드가 정식 제공되면 이름 표기 방어를 그 공식 타입 기준으로 대체한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-10-003
@@ -28,7 +29,7 @@
 
 ### 커밋·푸시·배포
 - 완료: 1차 공개 API commit `aee52cc74402852cb802d094ceb3374b8d3e77a`를 `origin/oci`에 push했고 Deploy OCI run `38044246277` 성공 및 운영 GET 200을 확인했다.
-- 미실행: 운영에서 확인한 ADR 마스터 분류 충돌의 후속 차단 수정은 별도 검증 후 같은 격리 범위로 재배포한다.
+- 완료: ADR/ADS fail-closed 후속 commit `49a2ea9e007cc0f85bd7da552e55a7f14ad33413`를 `origin/oci`에 push했고 Deploy OCI run `38045036495` 성공 및 ticker/목록 운영 smoke를 확인했다. 배포 범위는 공개 API·테스트·API 문서·이 작업 로그뿐이다.
 
 ## [2026-10-10] SEC 발행주수 자동화 대상 및 시총 경계 보강
 
