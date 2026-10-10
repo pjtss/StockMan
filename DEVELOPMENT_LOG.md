@@ -15,7 +15,8 @@
 ### 검증
 - `npm.cmd run deploy:verify` 1차는 build, 전체 테스트(602 통과·1 skip), typecheck, docs:check, scope/KIS/cron 검사를 통과했으나 테스트 직후 standalone `/charts` smoke가 30초 제한을 초과했다. 잔류 프로세스를 종료한 뒤 같은 standalone 산출물을 직접 실행해 231ms 기동 및 `/charts` HTTP 200을 재현했다.
 - 자원 압박 해소 후 공식 `npm.cmd run deploy:verify` 재실행 성공: production build, 전체 테스트 180개 파일(602 통과·1 skip), 타입 검사, 문서·범위·KIS·OCI cron(V148까지), standalone `/charts`와 국내·미국 차트 API HTTP 200.
-- 로컬 실제 DB API는 격리 전 동일 route 코드에서 인증 없는 HTTP 200·실제 row·검토 상태·페이지네이션을 확인했다. 이번 격리 worktree에는 비밀 `.env.local`을 복사하지 않아 API DB 연동을 별도로 실행하지 않았으며, 운영 공개 GET은 배포 후 확인한다.
+- 1차 commit `aee52cc74402852cb802d094ceb3374b8d3e77a` 배포 run `38044246277` 성공. 운영 무인증 GET은 HTTP 200·실데이터·pagination을 반환했으나 첫 row의 공식 마스터 이름에 `(ADR)`가 명시됐는데 common-stock 플래그가 true인 분류 충돌을 확인했다.
+- 이 충돌을 fail-closed로 막도록 공개 API에 마스터 한글/영문명의 ADR·ADS·American Depositary·Depositary Receipt/Shares 제외 조건과 테스트를 추가했다. 이 후속 수정은 아직 배포 전이므로 아래 검증을 다시 실행한다.
 
 ### 다음 개선
 - 배포 후 unauthenticated production GET, pagination 및 rate limit 응답을 확인하고, `DEVELOPMENT_LOG.md`에 최종 GitHub Actions run과 운영 smoke 결과를 반영한다.
@@ -26,7 +27,8 @@
 - 근거: 이번 변경은 새 공개 read 기능이며 운영 호출량·실제 사용량은 배포 후 측정 대상이다. raw SEC fact와 별도 검토 수량의 의미를 분리해 과도한 현재성 주장을 방지한다.
 
 ### 커밋·푸시·배포
-- 미실행(검증 통과; 격리된 4개 파일만 stage/commit 후 `oci` push로 배포 트리거 예정).
+- 완료: 1차 공개 API commit `aee52cc74402852cb802d094ceb3374b8d3e77a`를 `origin/oci`에 push했고 Deploy OCI run `38044246277` 성공 및 운영 GET 200을 확인했다.
+- 미실행: 운영에서 확인한 ADR 마스터 분류 충돌의 후속 차단 수정은 별도 검증 후 같은 격리 범위로 재배포한다.
 
 ## [2026-10-10] SEC 발행주수 자동화 대상 및 시총 경계 보강
 

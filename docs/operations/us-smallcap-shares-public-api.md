@@ -4,7 +4,7 @@
 
 인증 없이 미국 활성 보통주 중 현재 로컬 시총 스냅샷이 USD 100,000,000 이하인 종목의 SEC 발행주식수 사실을 조회한다. SEC를 매 요청마다 호출하지 않고 일일 자동화가 저장한 `sec_smallcap_common_stock_shares` 및 검토 테이블을 읽는다.
 
-- 범위: NASDAQ/NYSE/NYSE American의 `COMMON_STOCK`, `enabled=true`, `daily_active=true`; ETF·워런트·파생·DR·레버리지·인버스 제외.
+- 범위: NASDAQ/NYSE/NYSE American의 `COMMON_STOCK`, `enabled=true`, `daily_active=true`; ETF·워런트·파생·DR·레버리지·인버스 제외. 유니버스 분류 플래그가 잘못된 경우에 대비해 공식 마스터의 한국어/영어 종목명에 ADR·ADS·American Depositary·Depositary Receipt/Shares가 명시된 항목도 공개 결과에서 보수적으로 제외한다.
 - 현재 StockMan USD 시총 스냅샷을 기준으로 1억 달러 이하를 조회하며, 경계값은 포함한다.
 - `sharesOutstanding`와 `facts.dei`/`facts.usGaap`은 SEC Company Facts의 원천 값과 접수 메타데이터다. 양은 BIGINT 정밀도를 보존하는 문자열이며 `asOfDate`는 fact 기준일, `filedDate`는 SEC 접수일이다. 현행 발행주식수나 유통주식수를 보장하지 않는다.
 - `reviewedSharesOutstanding`는 사람이 검토한 별도 값이다. `VERIFIED`이고 기준일이 최근 1년 이내일 때만 숫자를 제공한다. 기준일이 오래되거나 `REVIEW_REQUIRED`/`UNAVAILABLE`이면 수량은 `null`; 내부 검토 메모는 공개하지 않는다. 이 검증값은 SEC 원천 facts를 덮어쓰지 않는다.

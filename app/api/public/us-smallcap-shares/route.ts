@@ -126,6 +126,8 @@ export async function GET(request: Request) {
           AND COALESCE(u.is_etf, FALSE) = FALSE AND COALESCE(u.is_warrant, FALSE) = FALSE
           AND COALESCE(u.is_derivative, FALSE) = FALSE AND COALESCE(u.is_dr, FALSE) = FALSE
           AND COALESCE(u.is_leveraged, FALSE) = FALSE AND COALESCE(u.is_inverse, FALSE) = FALSE
+          AND COALESCE(u.name, '') !~* '(^|[^[:alnum:]])(ADR|ADS)([^[:alnum:]]|$)|AMERICAN DEPOSITARY|DEPOSITARY (RECEIPT|SHARES)'
+          AND COALESCE(u.english_name, '') !~* '(^|[^[:alnum:]])(ADR|ADS)([^[:alnum:]]|$)|AMERICAN DEPOSITARY|DEPOSITARY (RECEIPT|SHARES)'
           AND u.market IN ('NAS','NASDAQ','NYS','NYSE','AMS','AMEX')
           AND f.currency = 'USD' AND f.market_cap > 0 AND f.market_cap <= $1
           AND (s.dei_shares_outstanding IS NOT NULL OR s.us_gaap_shares_outstanding IS NOT NULL)

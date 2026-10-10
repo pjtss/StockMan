@@ -45,6 +45,9 @@ describe("GET /api/public/us-smallcap-shares", () => {
     expect(String(state.query.mock.calls[0][0])).toContain("u.instrument_type = 'COMMON_STOCK'");
     expect(String(state.query.mock.calls[0][0])).toContain("u.daily_active = TRUE");
     expect(String(state.query.mock.calls[0][0])).toContain("COALESCE(u.is_dr, FALSE) = FALSE");
+    expect(String(state.query.mock.calls[0][0])).toContain("COALESCE(u.name, '') !~*");
+    expect(String(state.query.mock.calls[0][0])).toContain("COALESCE(u.english_name, '') !~*");
+    expect(String(state.query.mock.calls[0][0])).toContain("AMERICAN DEPOSITARY");
     expect(String(state.query.mock.calls[0][0])).toContain("LEFT JOIN sec_smallcap_share_review r");
     expect(String(state.query.mock.calls[0][0])).toContain("f.currency = 'USD'");
     expect(String(state.query.mock.calls[0][0])).toContain("f.market_cap <= $1");
