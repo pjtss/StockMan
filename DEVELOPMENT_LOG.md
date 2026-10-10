@@ -2,6 +2,33 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-10] SEC 주식수 XBRL fact 분리 및 일일 수집 배포 준비
+
+### 목표
+- `dei:EntityCommonStockSharesOutstanding`와 `us-gaap:CommonStockSharesOutstanding`를 혼합하지 않고 별도 값·공시 메타데이터로 저장하고 SEC 자동 수집에 연결한다.
+
+### 반영
+- 원격 `oci` 기준에서 누락됐던 기반 테이블 V144/V145와 concept별 열·검토 모듈 V146/V147을 적용 범위에 포함했다.
+- SEC Company Facts에서 각 concept의 shares 단위·양수 정수·허용 공시 양식·기준일을 독립 선택하고, 기준일·접수일·공시 양식·accession을 별도 저장한다. 한쪽 fact가 없으면 해당 열만 NULL로 둔다.
+- OCI cron에 일일 SEC 주식수 동기화를 추가했다. Flyway 배포 옵션은 이력에 빠졌으나 이미 스키마에 존재하는 과거 migration을 재실행하지 않도록 기본 순서와 `*:ignored` 검증 패턴을 사용한다.
+- 운영 설명, SEC 검토 근거 문서와 로컬 전용 동기화·보고서 스크립트를 추가했다.
+
+### 검증
+- 로컬 Docker PostgreSQL 16에서 Flyway V146/V147 적용 성공. 기존 1,000행 모두 DEI 열로 보존됐고, US-GAAP 열은 첫 수집 전이라 0행, 두 값 모두 비어 있거나 0 이하인 행은 0건이다.
+- 원격 기반 worktree의 `npm run deploy:verify` 통과: production build, typecheck, 문서·배포 구조 검사, standalone smoke 성공. Vitest 179개 파일 중 597개 통과·1개 skip. `/charts`, 미국/국내 상승차트 API smoke는 HTTP 200이었다.
+- DB integration 테스트는 원격 기반 worktree에 `.env.local`이 없어 skip됐다. 별도 로컬 DB migration 및 row 보존 확인으로 migration 경로를 검증했다.
+
+### 다음 개선
+- OCI 배포 후 첫 SEC 자동 실행 기록에서 성공·실패·미수집 fact 건수를 확인하고 두 concept별 최근 기준일을 점검한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-10-001
+- 성과 판정: IMPROVED
+- 근거: concept별 저장·자동 실행 경로와 배포 검증은 준비됐으나 OCI push 및 첫 운영 수집은 아직 실행되지 않았다.
+
+### 커밋·푸시·배포
+- 검증 시점 배포 상태: 미실행. 이번 SEC 주식수 전용 커밋을 `oci`에 push하면 GitHub Actions `Deploy OCI`가 실행된다.
+
 ## [2026-10-07] 공시·RSS API 및 사용자 화면 최근 1~24시간 필터
 
 ### 목표

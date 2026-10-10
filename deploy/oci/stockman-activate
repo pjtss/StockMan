@@ -64,8 +64,8 @@ timeout --signal=TERM --kill-after=30s 600s docker run --rm --network host \
   -user="$FLYWAY_USER" \
   -password="$FLYWAY_PASSWORD" \
   -locations="filesystem:/flyway/sql" \
+  -ignoreMigrationPatterns="*:ignored" \
   -connectRetries=3 \
-  -outOfOrder=true \
   migrate
 rm -f "$RELEASE"
 stage="activate-files"

@@ -11,6 +11,10 @@ OCI 인스턴스에 Docker를 설치해야 합니다. Flyway CLI나 Java는 호�
 명령이 실행되어야 합니다. 배포 스크립트는
 `/etc/stockman/stockman.env`를 읽어 `DATABASE_URL`에 번들된 migration을
 먼저 적용하고, Flyway 컨테이너의 `migrate`가 성공한 경우에만 Stockman을 재시작합니다.
+배포 시 이력상 현재 버전보다 낮은 migration은 재실행하지 않습니다. 기존 스키마에
+이미 반영됐지만 Flyway 이력에서 누락된 과거 migration은 `*:ignored` 패턴으로
+검증에서 제외하고, 새 버전 migration은 순서대로 적용합니다. 과거 migration을
+뒤늦게 실행해 기존 relation과 충돌하는 일을 방지합니다.
 
 기존 런타임 bootstrap으로 이미 스키마가 생성된 데이터베이스는 최초 1회만
 baseline 처리합니다.
