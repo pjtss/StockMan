@@ -2,6 +2,32 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-10] 미국 소형 보통주 발행주식수 공개 API
+
+### 목표
+- 운영에 이미 배포된 SEC 보통주 발행주식수 일일 수집 결과를 누구나 인증 없이 조회할 수 있도록 API로 공개한다.
+
+### 반영
+- 공개 GET `/api/public/us-smallcap-shares`를 추가했다. 인증 없이 종목별·시장별 조회, 최대 100건 keyset 페이지네이션을 제공하고 기존 SEC 공개 read rate limiter를 사용한다.
+- 활성 COMMON_STOCK, 승인 거래소, USD 시총 1억 달러 이하만 필터한다. SEC DEI/US-GAAP 원천 facts와 검토 테이블의 VERIFIED 값을 분리하고, 검증 기준일이 1년을 넘으면 검증 숫자를 숨긴다. 내부 review note는 응답에 포함하지 않는다.
+- 회귀 테스트와 `docs/operations/us-smallcap-shares-public-api.md` 운영 문서를 추가했다. 이번 배포는 최신 `origin/oci` 기반 격리 worktree에서 API·테스트·문서·본 로그만 대상으로 한다. 기존 자동화/테이블 V144~V148은 배포 브랜치에 이미 존재한다.
+
+### 검증
+- `npm.cmd run deploy:verify` 1차는 build, 전체 테스트(602 통과·1 skip), typecheck, docs:check, scope/KIS/cron 검사를 통과했으나 테스트 직후 standalone `/charts` smoke가 30초 제한을 초과했다. 잔류 프로세스를 종료한 뒤 같은 standalone 산출물을 직접 실행해 231ms 기동 및 `/charts` HTTP 200을 재현했다.
+- 자원 압박 해소 후 공식 `npm.cmd run deploy:verify` 재실행 성공: production build, 전체 테스트 180개 파일(602 통과·1 skip), 타입 검사, 문서·범위·KIS·OCI cron(V148까지), standalone `/charts`와 국내·미국 차트 API HTTP 200.
+- 로컬 실제 DB API는 격리 전 동일 route 코드에서 인증 없는 HTTP 200·실제 row·검토 상태·페이지네이션을 확인했다. 이번 격리 worktree에는 비밀 `.env.local`을 복사하지 않아 API DB 연동을 별도로 실행하지 않았으며, 운영 공개 GET은 배포 후 확인한다.
+
+### 다음 개선
+- 배포 후 unauthenticated production GET, pagination 및 rate limit 응답을 확인하고, `DEVELOPMENT_LOG.md`에 최종 GitHub Actions run과 운영 smoke 결과를 반영한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-10-003
+- 성과 판정: UNMEASURED
+- 근거: 이번 변경은 새 공개 read 기능이며 운영 호출량·실제 사용량은 배포 후 측정 대상이다. raw SEC fact와 별도 검토 수량의 의미를 분리해 과도한 현재성 주장을 방지한다.
+
+### 커밋·푸시·배포
+- 미실행(검증 통과; 격리된 4개 파일만 stage/commit 후 `oci` push로 배포 트리거 예정).
+
 ## [2026-10-10] SEC 발행주수 자동화 대상 및 시총 경계 보강
 
 ### 목표
