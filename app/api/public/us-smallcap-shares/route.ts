@@ -18,6 +18,7 @@ type PublicFilters = {
   maxMarketCapUsd: number;
   minShares: string | null;
   maxSharesExclusive: string | null;
+  sharesBasis: "sec_latest" | "reviewed";
 };
 
 function clientIp(request: Request) {
@@ -104,6 +105,7 @@ export async function GET(request: Request) {
   const requestedMaxMarketCapUsd = parseOptionalPositiveNumber(params, "maxMarketCapUsd");
   const minShares = parseOptionalShares(params, "minShares");
   const maxSharesExclusive = parseOptionalShares(params, "maxSharesExclusive");
+  const rawSharesBasis = params.get("sharesBasis")?.trim().toLowerCase() ?? "sec_latest";
   const maxMarketCapUsd = typeof requestedMaxMarketCapUsd === "number" ? requestedMaxMarketCapUsd : MAX_MARKET_CAP_USD;
   const filters: PublicFilters = {
     market: rawMarket || null,
@@ -111,6 +113,7 @@ export async function GET(request: Request) {
     maxMarketCapUsd,
     minShares: minShares === "invalid" ? null : minShares,
     maxSharesExclusive: maxSharesExclusive === "invalid" ? null : maxSharesExclusive,
+    sharesBasis: rawSharesBasis === "reviewed" ? "reviewed" : "sec_latest",
   };
   const currentFilterKey = filterKey(filters);
 
@@ -132,6 +135,9 @@ export async function GET(request: Request) {
   if (minShares === "invalid" || maxSharesExclusive === "invalid") {
     return NextResponse.json({ ok: false, error: "INVALID_SHARES_RANGE" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
+  if (rawSharesBasis !== "sec_latest" && rawSharesBasis !== "reviewed") {
+    return NextResponse.json({ ok: false, error: "INVALID_SHARES_BASIS", allowed: ["sec_latest", "reviewed"] }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
   if (minShares !== null && maxSharesExclusive !== null && BigInt(minShares) >= BigInt(maxSharesExclusive)) {
     return NextResponse.json({ ok: false, error: "INVALID_SHARES_RANGE" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
@@ -141,6 +147,17 @@ export async function GET(request: Request) {
   }
 
   try {
+    const latestSecSharesSql = `CASE
+      WHEN s.dei_shares_outstanding IS NOT NULL
+       AND (s.us_gaap_shares_outstanding IS NULL
+         OR COALESCE(s.dei_fact_filed_date, DATE '0001-01-01') >= COALESCE(s.us_gaap_fact_filed_date, DATE '0001-01-01'))
+      THEN s.dei_shares_outstanding
+      ELSE s.us_gaap_shares_outstanding
+    END`;
+    const sharesForFilterSql = `CASE WHEN $8::text = 'reviewed'
+      THEN CASE WHEN r.review_status = 'VERIFIED' AND r.shares_outstanding IS NOT NULL
+        AND r.as_of_date >= CURRENT_DATE - INTERVAL '1 year' THEN r.shares_outstanding END
+      ELSE ${latestSecSharesSql} END`;
     const result = await getPool().query<Record<string, unknown>>(
       `SELECT u.market,
               UPPER(u.code) AS ticker,
@@ -190,18 +207,16 @@ export async function GET(request: Request) {
           AND f.currency = 'USD' AND f.market_cap > 0 AND f.market_cap <= $1
           AND ($4::double precision IS NULL OR f.market_cap >= $4::double precision)
           AND f.market_cap <= $5::double precision
-          AND ($6::numeric IS NULL OR (r.review_status = 'VERIFIED' AND r.shares_outstanding IS NOT NULL
-               AND r.as_of_date >= CURRENT_DATE - INTERVAL '1 year' AND r.shares_outstanding >= $6::numeric))
-          AND ($7::numeric IS NULL OR (r.review_status = 'VERIFIED' AND r.shares_outstanding IS NOT NULL
-               AND r.as_of_date >= CURRENT_DATE - INTERVAL '1 year' AND r.shares_outstanding < $7::numeric))
+          AND ($6::numeric IS NULL OR ${sharesForFilterSql} >= $6::numeric)
+          AND ($7::numeric IS NULL OR ${sharesForFilterSql} < $7::numeric)
           AND (s.dei_shares_outstanding IS NOT NULL OR s.us_gaap_shares_outstanding IS NOT NULL)
           AND ($2::text IS NULL OR UPPER(u.code) = $2)
           AND ($3::text IS NULL OR u.market = $3)
-          AND ($8::double precision IS NULL OR ROW(f.market_cap, u.market, UPPER(u.code)) > ROW($8::double precision, $9::text, $10::text))
+          AND ($9::double precision IS NULL OR ROW(f.market_cap, u.market, UPPER(u.code)) > ROW($9::double precision, $10::text, $11::text))
         ORDER BY f.market_cap ASC, u.market ASC, UPPER(u.code) ASC
-        LIMIT $11`,
+        LIMIT $12`,
       [MAX_MARKET_CAP_USD, rawTicker || null, rawMarket || null, minMarketCapUsd, maxMarketCapUsd,
-        minShares, maxSharesExclusive, cursor?.marketCapUsd ?? null, cursor?.market ?? null, cursor?.ticker ?? null, limit + 1],
+        minShares, maxSharesExclusive, rawSharesBasis, cursor?.marketCapUsd ?? null, cursor?.market ?? null, cursor?.ticker ?? null, limit + 1],
     );
 
     const hasMore = result.rows.length > limit;
@@ -273,7 +288,7 @@ export async function GET(request: Request) {
         maximumMarketCapUsd: MAX_MARKET_CAP_USD,
         maximumInclusive: true,
         marketCapBoundsInclusive: true,
-        sharesFilterBasis: "FRESH_VERIFIED_REVIEWED_SHARES_OUTSTANDING",
+        sharesFilterBasis: rawSharesBasis === "reviewed" ? "FRESH_VERIFIED_REVIEWED_SHARES_OUTSTANDING" : "LATEST_SEC_COMPANY_FACTS",
         sharesMinimumInclusive: true,
         sharesMaximumExclusive: true,
       },

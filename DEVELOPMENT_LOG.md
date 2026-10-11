@@ -9,28 +9,29 @@
 - 기존 활성 보통주·ADR 방어·USD 1억 달러 이하라는 데이터 범위는 유지한다. UI·수집·DB 스키마는 변경하지 않는다.
 
 ### 반영
-- `app/api/public/us-smallcap-shares/route.ts`: `minMarketCapUsd`, `maxMarketCapUsd`, `minShares`, `maxSharesExclusive` 필터를 추가했다. 시총 하한/상한은 포함 경계이며, 주식수 하한은 포함·상한은 미포함이다. 주식수 조건은 기준일 1년 이내의 `VERIFIED` 검토 수량에만 적용한다. 기존 SEC 원천 사실을 검토 완료 수량인 것처럼 취급하지 않는다.
+- `app/api/public/us-smallcap-shares/route.ts`: `minMarketCapUsd`, `maxMarketCapUsd`, `minShares`, `maxSharesExclusive`, `sharesBasis` 필터를 추가했다. 시총 하한/상한은 포함 경계이며, 주식수 하한은 포함·상한은 미포함이다. 기본 주식수 기준은 공개 필드 `sharesOutstanding`과 같은 SEC 최신 Company Facts이고, `sharesBasis=reviewed`일 때만 최근 1년 내 `VERIFIED` 검토 수량을 사용한다.
 - 페이지네이션 커서 버전을 올리고 현재 시장·시총·주식수 조건을 커서에 결합했다. 다른 조건으로 커서를 재사용하면 `CURSOR_FILTER_MISMATCH`로 거부한다.
 - `app/api/public/us-smallcap-shares/route.test.ts`: 필터의 SQL 바인딩·exclusive 경계·잘못된 범위·커서 필터 변경을 회귀 테스트에 추가했다.
 - `docs/operations/us-smallcap-shares-public-api.md`: 매개변수, 경계 포함 규칙, 데이터 기준과 호출 예시를 기록했다.
 
 ### 검증
-- API 집중 테스트: 7개 통과.
-- `npm.cmd run deploy:verify` 초기에 BigInt 리터럴의 컴파일 타깃 비호환, 시총 상한 union type narrowing, 개발 로그 계약 누락을 순서대로 발견해 수정했다. 최종 재실행은 빌드 성공, 전체 604 tests passed·1 skipped, typecheck/docs/scope/KIS/cron 검사 통과, standalone `/charts`·국내/해외 차트 API HTTP 200으로 성공했다.
-- 로컬 standalone 배포 산출물을 `.env.local`로 기동(준비 약 198ms)하고 실제 로컬 DB에 read-only 요청: 시총 구간만 지정 시 100건 반환·추가 페이지 있음(394ms); `maxSharesExclusive=1000000`은 12건 반환(169ms), 그중 USD 1천만~5천만 범위는 0건. 실제로는 11개가 시총 USD 1천만 미만이고 1개(JEM)가 USD 80,117,500으로, 지정 시총 구간과 겹치는 종목이 없음을 확인했다. 하한=exclusive 상한 입력은 HTTP 400으로 거부됐다.
-- `next start`는 검증 스크립트가 `.next-deploy-verify`에 생성한 산출물을 찾지 못해 첫 시도에 실패했다. 검증 대상과 동일한 `.next-deploy-verify/standalone/server.js`를 직접 시작해 정상 기동과 API 실제 응답을 재확인했다.
+- 최초 API 버전은 커밋 `3a294c22`, Actions `38105461335`로 운영 배포 성공. 운영에서 reviewed 기준 1M 미만 결과가 0건임을 확인해 기본 주식수 필터 기준을 SEC 최신 원천값으로 바꾸고 reviewed 옵션을 별도 제공했다.
+- 최신 코드의 `npm.cmd run deploy:verify` 통과: build 성공, 전체 605 passed·1 skipped, typecheck/docs/scope/KIS/cron 통과, standalone `/charts` 및 국내/해외 차트 API HTTP 200.
+- 새 standalone 실행(준비 약 200ms)과 로컬 DB API read-only 검증: `sharesBasis=sec_latest`의 1M 미만 46건(435ms), `sharesBasis=reviewed` 12건(100ms), SEC 최신 수량 1M 미만+시총 USD 1천만~5천만 조합 5건(92ms). 잘못된 basis는 HTTP 400(5ms).
+- 1차 로컬·운영 API 기준 차이를 바꾼 뒤에도 새 버전 SQL이 실제 응답하는 것을 확인했다. 1차 운영 데이터에서는 reviewed 수량 필터가 비었고, 운영 원천 facts 기준 결과는 후속 배포 후 확인한다.
+- `next start`는 검증 스크립트의 별도 `.next-deploy-verify` 산출물을 찾지 못해 첫 시도에 실패했다. 검증 대상과 동일한 standalone `server.js`를 직접 시작해 API를 조회했고 환경 인증 값은 노출하지 않았다.
 
 ### 다음 개선
 - 배포 후 운영 API에서 1M 미만·시총 구간 조합을 실제 조회하고 결과 수, 응답시간, DB 실행계획을 확인해 filter index 필요 여부를 결정한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-11-001
-- 성과 판정: IMPROVED
-- 근거: 전체 테스트/배포 게이트를 통과했고 로컬 standalone에서 발행주식수·시총 복합 조회와 유효성 검사를 실제 DB 결과로 확인했다. 복합 조건 결과가 0건인 이유도 각 조건의 단독 결과와 대조해 설명 가능함을 확인했다. 운영 배포 후 실측은 별도 남은 단계다.
-- 성공 기준: `maxSharesExclusive=1000000`이 SQL에 엄격한 `<`로 적용되고, USD 시총 범위가 기존 1억 달러 ceiling 아래에서 동작하며, 필터 변경 커서가 차단된다. 회귀 자동 감지로 위 테스트를 유지하고 `deploy:verify`를 릴리스 게이트로 실행한다.
+- 성과 판정: UNMEASURED
+- 근거: 전체 게이트와 로컬 실제 DB에서 두 발행주수 기준 및 복합 시총 조건을 확인했다. 최신 SEC 기준의 운영 결과는 후속 배포 후 확인이 남아 있어 최종 운영 성과는 아직 미측정이다.
+- 성공 기준: `maxSharesExclusive=1000000`이 선택된 `sharesBasis`에 엄격한 `<`로 적용되고, USD 시총 범위가 기존 1억 달러 ceiling 아래에서 동작하며, 필터 변경 커서가 차단된다. 회귀 테스트와 `deploy:verify`를 릴리스 게이트로 유지한다.
 
 ### 커밋·푸시·배포
-- 미실행. 이번 작업의 API·테스트·운영문서·작업로그만 stage/commit/push하고 해당 변경만 운영 반영한다.
+- 미실행(후속 수정 push 전): 최초 필터 버전은 `3a294c22` 및 Actions `38105461335`로 배포됐다. 데이터 검증에서 발견한 기준 차이를 보완한 후속 API·테스트·운영문서·로그 변경만 별도 push·배포한다.
 
 ## [2026-10-10] 미국 소형 보통주 발행주식수 공개 API
 

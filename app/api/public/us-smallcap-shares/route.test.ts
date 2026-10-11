@@ -51,7 +51,7 @@ describe("GET /api/public/us-smallcap-shares", () => {
     expect(String(state.query.mock.calls[0][0])).toContain("LEFT JOIN sec_smallcap_share_review r");
     expect(String(state.query.mock.calls[0][0])).toContain("f.currency = 'USD'");
     expect(String(state.query.mock.calls[0][0])).toContain("f.market_cap <= $1");
-    expect(state.query.mock.calls[0][1]).toEqual([100_000_000, "ABCD", null, null, 100_000_000, null, null, null, null, null, 101]);
+    expect(state.query.mock.calls[0][1]).toEqual([100_000_000, "ABCD", null, null, 100_000_000, null, null, "sec_latest", null, null, null, 101]);
     expect(state.rateLimit).toHaveBeenCalledWith("read", "unknown");
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -67,7 +67,7 @@ describe("GET /api/public/us-smallcap-shares", () => {
     state.query.mockResolvedValueOnce({ rows: [makeRow({ ticker: "EFGH", current_market_cap_usd: "96000000" })] });
     const second = await GET(new Request(`https://stockman.test/api/public/us-smallcap-shares?limit=1&cursor=${encodeURIComponent(firstBody.pagination.nextCursor)}`));
     expect((await second.json()).items[0].ticker).toBe("EFGH");
-    expect(state.query.mock.calls[1][1].slice(7, 10)).toEqual([95_000_000, "NAS", "ABCD"]);
+    expect(state.query.mock.calls[1][1].slice(8, 11)).toEqual([95_000_000, "NAS", "ABCD"]);
   });
 
   it("does not publish a stale verified count or an unverified count", async () => {
@@ -95,18 +95,29 @@ describe("GET /api/public/us-smallcap-shares", () => {
     });
     expect(body.criteria).toMatchObject({
       marketCapBoundsInclusive: true,
-      sharesFilterBasis: "FRESH_VERIFIED_REVIEWED_SHARES_OUTSTANDING",
+      sharesFilterBasis: "LATEST_SEC_COMPANY_FACTS",
       sharesMinimumInclusive: true,
       sharesMaximumExclusive: true,
     });
     expect(query).toContain("f.market_cap >= $4::double precision");
     expect(query).toContain("f.market_cap <= $5::double precision");
     expect(query).toContain("r.as_of_date >= CURRENT_DATE - INTERVAL '1 year'");
-    expect(query).toContain("r.shares_outstanding >= $6::numeric");
-    expect(query).toContain("r.shares_outstanding < $7::numeric");
+    expect(query).toContain("CASE WHEN $8::text = 'reviewed'");
+    expect(query).toContain("r.as_of_date >= CURRENT_DATE - INTERVAL '1 year'");
+    expect(query).toContain("s.dei_shares_outstanding IS NOT NULL");
+    expect(query).toContain(">= $6::numeric");
+    expect(query).toContain("< $7::numeric");
     expect(state.query.mock.calls[0][1]).toEqual([
-      100_000_000, null, null, 10_000_000, 50_000_000, "100000", "1000000", null, null, null, 101,
+      100_000_000, null, null, 10_000_000, 50_000_000, "100000", "1000000", "sec_latest", null, null, null, 101,
     ]);
+  });
+
+  it("supports verified review shares as an explicit alternative filter basis", async () => {
+    const response = await GET(new Request("https://stockman.test/api/public/us-smallcap-shares?maxSharesExclusive=1000000&sharesBasis=reviewed"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.criteria.sharesFilterBasis).toBe("FRESH_VERIFIED_REVIEWED_SHARES_OUTSTANDING");
+    expect(state.query.mock.calls[0][1][7]).toBe("reviewed");
   });
 
   it("binds pagination cursors to the same filters", async () => {
@@ -123,7 +134,7 @@ describe("GET /api/public/us-smallcap-shares", () => {
     state.query.mockResolvedValueOnce({ rows: [makeRow({ ticker: "EFGH", current_market_cap_usd: "21000000" })] });
     const second = await GET(new Request(`https://stockman.test/api/public/us-smallcap-shares?${query}&cursor=${cursor}`));
     expect(second.status).toBe(200);
-    expect(state.query.mock.calls[1][1].slice(7, 10)).toEqual([20_000_000, "NAS", "ABCD"]);
+    expect(state.query.mock.calls[1][1].slice(8, 11)).toEqual([20_000_000, "NAS", "ABCD"]);
   });
 
   it("rejects invalid filters and cursors before querying the database", async () => {
@@ -133,6 +144,7 @@ describe("GET /api/public/us-smallcap-shares", () => {
     expect((await GET(new Request("https://stockman.test/api/public/us-smallcap-shares?maxMarketCapUsd=100000001"))).status).toBe(400);
     expect((await GET(new Request("https://stockman.test/api/public/us-smallcap-shares?minShares=1000000&maxSharesExclusive=1000000"))).status).toBe(400);
     expect((await GET(new Request("https://stockman.test/api/public/us-smallcap-shares?maxSharesExclusive=1.5"))).status).toBe(400);
+    expect((await GET(new Request("https://stockman.test/api/public/us-smallcap-shares?sharesBasis=unverified"))).status).toBe(400);
     expect((await GET(new Request("https://stockman.test/api/public/us-smallcap-shares?cursor=not-a-cursor"))).status).toBe(400);
     expect(state.query).not.toHaveBeenCalled();
   });
