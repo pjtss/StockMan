@@ -2,6 +2,36 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-11] 미국 소형주 발행주식수 공개 API 검색 조건 확장
+
+### 목표
+- 공개 API에서 발행주식수 100만 주 미만과 사용자가 지정하는 USD 시총 구간을 검색할 수 있도록 한다.
+- 기존 활성 보통주·ADR 방어·USD 1억 달러 이하라는 데이터 범위는 유지한다. UI·수집·DB 스키마는 변경하지 않는다.
+
+### 반영
+- `app/api/public/us-smallcap-shares/route.ts`: `minMarketCapUsd`, `maxMarketCapUsd`, `minShares`, `maxSharesExclusive` 필터를 추가했다. 시총 하한/상한은 포함 경계이며, 주식수 하한은 포함·상한은 미포함이다. 주식수 조건은 기준일 1년 이내의 `VERIFIED` 검토 수량에만 적용한다. 기존 SEC 원천 사실을 검토 완료 수량인 것처럼 취급하지 않는다.
+- 페이지네이션 커서 버전을 올리고 현재 시장·시총·주식수 조건을 커서에 결합했다. 다른 조건으로 커서를 재사용하면 `CURSOR_FILTER_MISMATCH`로 거부한다.
+- `app/api/public/us-smallcap-shares/route.test.ts`: 필터의 SQL 바인딩·exclusive 경계·잘못된 범위·커서 필터 변경을 회귀 테스트에 추가했다.
+- `docs/operations/us-smallcap-shares-public-api.md`: 매개변수, 경계 포함 규칙, 데이터 기준과 호출 예시를 기록했다.
+
+### 검증
+- API 집중 테스트: 7개 통과.
+- `npm.cmd run deploy:verify` 초기에 BigInt 리터럴의 컴파일 타깃 비호환, 시총 상한 union type narrowing, 개발 로그 계약 누락을 순서대로 발견해 수정했다. 최종 재실행은 빌드 성공, 전체 604 tests passed·1 skipped, typecheck/docs/scope/KIS/cron 검사 통과, standalone `/charts`·국내/해외 차트 API HTTP 200으로 성공했다.
+- 로컬 standalone 배포 산출물을 `.env.local`로 기동(준비 약 198ms)하고 실제 로컬 DB에 read-only 요청: 시총 구간만 지정 시 100건 반환·추가 페이지 있음(394ms); `maxSharesExclusive=1000000`은 12건 반환(169ms), 그중 USD 1천만~5천만 범위는 0건. 실제로는 11개가 시총 USD 1천만 미만이고 1개(JEM)가 USD 80,117,500으로, 지정 시총 구간과 겹치는 종목이 없음을 확인했다. 하한=exclusive 상한 입력은 HTTP 400으로 거부됐다.
+- `next start`는 검증 스크립트가 `.next-deploy-verify`에 생성한 산출물을 찾지 못해 첫 시도에 실패했다. 검증 대상과 동일한 `.next-deploy-verify/standalone/server.js`를 직접 시작해 정상 기동과 API 실제 응답을 재확인했다.
+
+### 다음 개선
+- 배포 후 운영 API에서 1M 미만·시총 구간 조합을 실제 조회하고 결과 수, 응답시간, DB 실행계획을 확인해 filter index 필요 여부를 결정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-11-001
+- 성과 판정: IMPROVED
+- 근거: 전체 테스트/배포 게이트를 통과했고 로컬 standalone에서 발행주식수·시총 복합 조회와 유효성 검사를 실제 DB 결과로 확인했다. 복합 조건 결과가 0건인 이유도 각 조건의 단독 결과와 대조해 설명 가능함을 확인했다. 운영 배포 후 실측은 별도 남은 단계다.
+- 성공 기준: `maxSharesExclusive=1000000`이 SQL에 엄격한 `<`로 적용되고, USD 시총 범위가 기존 1억 달러 ceiling 아래에서 동작하며, 필터 변경 커서가 차단된다. 회귀 자동 감지로 위 테스트를 유지하고 `deploy:verify`를 릴리스 게이트로 실행한다.
+
+### 커밋·푸시·배포
+- 미실행. 이번 작업의 API·테스트·운영문서·작업로그만 stage/commit/push하고 해당 변경만 운영 반영한다.
+
 ## [2026-10-10] 미국 소형 보통주 발행주식수 공개 API
 
 ### 목표

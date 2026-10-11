@@ -11,7 +11,14 @@ const TICKER_PATTERN = /^[A-Z][A-Z0-9./-]{0,14}$/;
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 100;
 
-type PageCursor = { version: 1; marketCapUsd: number; market: string; ticker: string };
+type PageCursor = { version: 2; marketCapUsd: number; market: string; ticker: string; filterKey: string };
+type PublicFilters = {
+  market: string | null;
+  minMarketCapUsd: number | null;
+  maxMarketCapUsd: number;
+  minShares: string | null;
+  maxSharesExclusive: string | null;
+};
 
 function clientIp(request: Request) {
   return request.headers.get("x-real-ip")?.trim()
@@ -30,6 +37,10 @@ function encodeCursor(cursor: PageCursor) {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
+function filterKey(filters: PublicFilters) {
+  return JSON.stringify(filters);
+}
+
 function decodeCursor(value: string | null): PageCursor | null | "invalid" {
   if (!value) return null;
   if (value.length > 512) return "invalid";
@@ -38,9 +49,30 @@ function decodeCursor(value: string | null): PageCursor | null | "invalid" {
     const market = String(parsed.market ?? "").toUpperCase();
     const ticker = String(parsed.ticker ?? "").toUpperCase();
     const marketCapUsd = Number(parsed.marketCapUsd);
-    if (parsed.version !== 1 || !Number.isFinite(marketCapUsd) || marketCapUsd <= 0 || marketCapUsd > MAX_MARKET_CAP_USD
-      || !ALLOWED_MARKETS.has(market) || !TICKER_PATTERN.test(ticker)) return "invalid";
-    return { version: 1, marketCapUsd, market, ticker };
+    const cursorFilterKey = String(parsed.filterKey ?? "");
+    if (parsed.version !== 2 || !Number.isFinite(marketCapUsd) || marketCapUsd <= 0 || marketCapUsd > MAX_MARKET_CAP_USD
+      || !ALLOWED_MARKETS.has(market) || !TICKER_PATTERN.test(ticker) || cursorFilterKey.length > 256) return "invalid";
+    return { version: 2, marketCapUsd, market, ticker, filterKey: cursorFilterKey };
+  } catch {
+    return "invalid";
+  }
+}
+
+function parseOptionalPositiveNumber(params: URLSearchParams, key: string): number | null | "invalid" {
+  const raw = params.get(key);
+  if (raw === null) return null;
+  if (!/^\d+(?:\.\d+)?$/.test(raw)) return "invalid";
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 && value <= MAX_MARKET_CAP_USD ? value : "invalid";
+}
+
+function parseOptionalShares(params: URLSearchParams, key: string): string | null | "invalid" {
+  const raw = params.get(key);
+  if (raw === null) return null;
+  if (!/^\d+$/.test(raw)) return "invalid";
+  try {
+    const value = BigInt(raw);
+    return value >= BigInt(0) && value <= BigInt("9223372036854775807") ? value.toString() : "invalid";
   } catch {
     return "invalid";
   }
@@ -68,6 +100,19 @@ export async function GET(request: Request) {
   const rawLimit = params.get("limit");
   const limit = rawLimit === null || rawLimit === "" ? DEFAULT_LIMIT : Number(rawLimit);
   const cursor = decodeCursor(params.get("cursor"));
+  const minMarketCapUsd = parseOptionalPositiveNumber(params, "minMarketCapUsd");
+  const requestedMaxMarketCapUsd = parseOptionalPositiveNumber(params, "maxMarketCapUsd");
+  const minShares = parseOptionalShares(params, "minShares");
+  const maxSharesExclusive = parseOptionalShares(params, "maxSharesExclusive");
+  const maxMarketCapUsd = typeof requestedMaxMarketCapUsd === "number" ? requestedMaxMarketCapUsd : MAX_MARKET_CAP_USD;
+  const filters: PublicFilters = {
+    market: rawMarket || null,
+    minMarketCapUsd: minMarketCapUsd === "invalid" ? null : minMarketCapUsd,
+    maxMarketCapUsd,
+    minShares: minShares === "invalid" ? null : minShares,
+    maxSharesExclusive: maxSharesExclusive === "invalid" ? null : maxSharesExclusive,
+  };
+  const currentFilterKey = filterKey(filters);
 
   if (rawTicker && !TICKER_PATTERN.test(rawTicker)) {
     return NextResponse.json({ ok: false, error: "INVALID_TICKER" }, { status: 400, headers: { "Cache-Control": "no-store" } });
@@ -78,8 +123,21 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
     return NextResponse.json({ ok: false, error: "INVALID_LIMIT", allowed: [1, MAX_LIMIT] }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
-  if (cursor === "invalid" || (rawTicker && cursor)) {
-    return NextResponse.json({ ok: false, error: cursor === "invalid" ? "INVALID_CURSOR" : "CURSOR_NOT_ALLOWED_WITH_TICKER" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  if (minMarketCapUsd === "invalid" || requestedMaxMarketCapUsd === "invalid") {
+    return NextResponse.json({ ok: false, error: "INVALID_MARKET_CAP_RANGE", maximumUsd: MAX_MARKET_CAP_USD }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  if (minMarketCapUsd !== null && maxMarketCapUsd < minMarketCapUsd) {
+    return NextResponse.json({ ok: false, error: "INVALID_MARKET_CAP_RANGE", maximumUsd: MAX_MARKET_CAP_USD }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  if (minShares === "invalid" || maxSharesExclusive === "invalid") {
+    return NextResponse.json({ ok: false, error: "INVALID_SHARES_RANGE" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  if (minShares !== null && maxSharesExclusive !== null && BigInt(minShares) >= BigInt(maxSharesExclusive)) {
+    return NextResponse.json({ ok: false, error: "INVALID_SHARES_RANGE" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  if (cursor === "invalid" || (rawTicker && cursor) || (cursor && cursor.filterKey !== currentFilterKey)) {
+    const error = cursor === "invalid" ? "INVALID_CURSOR" : rawTicker && cursor ? "CURSOR_NOT_ALLOWED_WITH_TICKER" : "CURSOR_FILTER_MISMATCH";
+    return NextResponse.json({ ok: false, error }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
   try {
@@ -130,13 +188,20 @@ export async function GET(request: Request) {
           AND COALESCE(u.english_name, '') !~* '(^|[^[:alnum:]])(ADR|ADS)([^[:alnum:]]|$)|AMERICAN DEPOSITARY|DEPOSITARY (RECEIPT|SHARES)'
           AND u.market IN ('NAS','NASDAQ','NYS','NYSE','AMS','AMEX')
           AND f.currency = 'USD' AND f.market_cap > 0 AND f.market_cap <= $1
+          AND ($4::double precision IS NULL OR f.market_cap >= $4::double precision)
+          AND f.market_cap <= $5::double precision
+          AND ($6::numeric IS NULL OR (r.review_status = 'VERIFIED' AND r.shares_outstanding IS NOT NULL
+               AND r.as_of_date >= CURRENT_DATE - INTERVAL '1 year' AND r.shares_outstanding >= $6::numeric))
+          AND ($7::numeric IS NULL OR (r.review_status = 'VERIFIED' AND r.shares_outstanding IS NOT NULL
+               AND r.as_of_date >= CURRENT_DATE - INTERVAL '1 year' AND r.shares_outstanding < $7::numeric))
           AND (s.dei_shares_outstanding IS NOT NULL OR s.us_gaap_shares_outstanding IS NOT NULL)
           AND ($2::text IS NULL OR UPPER(u.code) = $2)
           AND ($3::text IS NULL OR u.market = $3)
-          AND ($4::double precision IS NULL OR ROW(f.market_cap, u.market, UPPER(u.code)) > ROW($4::double precision, $5::text, $6::text))
+          AND ($8::double precision IS NULL OR ROW(f.market_cap, u.market, UPPER(u.code)) > ROW($8::double precision, $9::text, $10::text))
         ORDER BY f.market_cap ASC, u.market ASC, UPPER(u.code) ASC
-        LIMIT $7`,
-      [MAX_MARKET_CAP_USD, rawTicker || null, rawMarket || null, cursor?.marketCapUsd ?? null, cursor?.market ?? null, cursor?.ticker ?? null, limit + 1],
+        LIMIT $11`,
+      [MAX_MARKET_CAP_USD, rawTicker || null, rawMarket || null, minMarketCapUsd, maxMarketCapUsd,
+        minShares, maxSharesExclusive, cursor?.marketCapUsd ?? null, cursor?.market ?? null, cursor?.ticker ?? null, limit + 1],
     );
 
     const hasMore = result.rows.length > limit;
@@ -195,15 +260,24 @@ export async function GET(request: Request) {
     });
     const last = rows.at(-1);
     const nextCursor = hasMore && last
-      ? encodeCursor({ version: 1, marketCapUsd: Number(last.current_market_cap_usd), market: String(last.market), ticker: String(last.ticker) })
+      ? encodeCursor({ version: 2, marketCapUsd: Number(last.current_market_cap_usd), market: String(last.market), ticker: String(last.ticker), filterKey: currentFilterKey })
       : null;
 
     return NextResponse.json({
       ok: true,
       source: "SEC_COMPANY_FACTS_AND_STOCKMAN_DB",
       checkedAt: new Date().toISOString(),
-      criteria: { securityType: "ACTIVE_COMMON_STOCK", marketCapCurrency: "USD", maximumMarketCapUsd: MAX_MARKET_CAP_USD, maximumInclusive: true },
-      filters: { ticker: rawTicker || null, market: rawMarket || null, limit },
+      criteria: {
+        securityType: "ACTIVE_COMMON_STOCK",
+        marketCapCurrency: "USD",
+        maximumMarketCapUsd: MAX_MARKET_CAP_USD,
+        maximumInclusive: true,
+        marketCapBoundsInclusive: true,
+        sharesFilterBasis: "FRESH_VERIFIED_REVIEWED_SHARES_OUTSTANDING",
+        sharesMinimumInclusive: true,
+        sharesMaximumExclusive: true,
+      },
+      filters: { ticker: rawTicker || null, ...filters, limit },
       items,
       pagination: { returnedCount: items.length, hasMore, nextCursor },
     }, { headers: { "Cache-Control": "no-store" } });
