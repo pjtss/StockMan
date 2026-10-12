@@ -8,7 +8,7 @@
 - 보관된 KIS Open API 공식 명세를 기준으로 해외 조건검색의 요청·응답 계약을 명확히 하고, 검색 결과가 프로젝트의 활성 보통주 전용 원칙을 지키도록 한다.
 
 ### 반영
-- `lib/kis-us-condition-search.ts`: 조건 파라미터·숫자 범위·시장·중복 입력을 검증하고 KIS 응답의 `output2`만 종목 행으로 파싱한다. HTML/잘못된 JSON/잘못된 응답 구조를 분리하고 토큰 만료 시 1회 갱신한다. KIS 호출은 기존 공통 제한기(최대 안전 TPS 10)를 사용한다.
+- `lib/kis-us-condition-search.ts`: 조건 파라미터·숫자 범위·시장·중복 입력을 검증하고 KIS 응답의 `output2`만 종목 행으로 파싱한다. HTML/잘못된 JSON/객체 배열이 아닌 `output2`를 분리하고 토큰 만료 시 1회 갱신한다. KIS 호출은 기존 공통 제한기(최대 안전 TPS 10)를 사용한다. 종목 행에 거래소 코드가 없거나 요청 시장과 다르면 fail-closed한다.
 - `app/api/kis/us-search/route.ts`: 후보 티커를 `us_common_stock_universe`의 `enabled`, `daily_active`, `COMMON_STOCK`, 상품 제외 플래그와 대조한다. 마스터 조회 실패는 fail-closed로 HTTP 503을 반환한다. 제외 종목은 JSON 응답과 `kis_signal_snapshots`의 payload/rawPayload에 쓰지 않는다. 토큰 중복 조회를 제거하고 스냅샷 쓰기 실패는 응답의 warning으로 표시한다.
 - `lib/kis-us-trade-trend.ts`: 조건검색 구현을 전용 모듈로 이동해 기존 일반 시세 모듈의 미검증 입력 병합 경로를 제거했다.
 - `lib/kis-us-condition-search.test.ts`, `app/api/kis/us-search/route.test.ts`: 입력 검증, 100건·페이지네이션 계약, 토큰 재발급, `output1` 오파싱 방지, DB 보통주 fail-closed, 응답·스냅샷 비보통주 차단 테스트를 추가했다. 실제 PostgreSQL 배열 조건은 프로젝트의 `getPool().query` 바인딩을 사용한다.
@@ -17,10 +17,11 @@
 
 ### 검증
 - 공식 문서 `docs/references/한국투자증권_오픈API_전체문서_20260727_030000.xlsx`의 `해외주식조건검색` 시트를 확인했다. 공식 API ID `v1_해외주식-015`, TR ID `HHDFS76410000`, endpoint, 입력 필드, `output2` 스키마, 최대 100건 및 다음 조회 미지원 사항을 대조했다.
-- 전용 Vitest: 23개 통과. `npm.cmd run typecheck`: 통과.
+- 전용 Vitest: 24개 통과. `npm.cmd run typecheck`: 통과.
 - 첫 `npm.cmd run deploy:verify`에서 production build와 전체 Vitest(182개 파일, 628 통과·1 skip), typecheck, docs 및 범위 감사는 통과했다. KIS boundary audit가 신규 모듈 registry 누락을 검출해 등록과 감사 테스트 매핑을 보완했다.
 - PostgreSQL 실제 실행에서 Drizzle 템플릿의 배열 파라미터 표현이 `ANY(text[])`와 호환되지 않는 점을 발견했다. 드라이버 네이티브 바인딩으로 수정하고 회귀 테스트를 추가했다.
-- 최종 `npm.cmd run deploy:verify`: production build, 전체 Vitest(182개 파일, 628 통과·1 skip), typecheck, docs, 변경 범위 감사, KIS boundary audit, cron 검사와 standalone HTTP smoke 모두 통과.
+- 완료 감사에서 `output2`의 잘못된 원소 타입과 거래소 코드 누락 행이 보수적으로 거부되지 않음을 찾아 수정했다. 객체 배열 shape를 엄격 검증하고, KIS가 `excd`를 생략하면 요청 거래소로 간주하지 않는다.
+- 추가 fail-closed 수정 후 최종 `npm.cmd run deploy:verify`: production build, 전체 Vitest(182개 파일, 629 통과·1 skip), typecheck, docs, 변경 범위 감사, KIS boundary audit, cron 검사와 standalone HTTP smoke 모두 통과.
 - 새 standalone 서버에서 `.env.local`의 로컬 DB 및 KIS 자격증명을 사용해 조건검색을 직접 실행했다. NAS 응답은 HTTP 200, KIS `rt_cd=0`, 원본 100건 중 활성 보통주 80건만 반환하고 20건을 제외했다. 조회 경로의 실제 DB 자격 확인도 통과했다. 스냅샷 저장은 로컬 DB에 기존 `kis_signal_snapshots` 테이블이 없어 실패했으나 검색 응답은 정상이며 `snapshot.stored=false`로 노출됐다. 로컬 DB에 마이그레이션을 임의 적용하지 않았다.
 
 ### 다음 개선
@@ -33,7 +34,7 @@
 - 성공 기준: 잘못된 조건은 HTTP 400, KIS transport/schema 실패는 구조화된 HTTP 502, 마스터 장애는 fail-closed HTTP 503이어야 한다. 성공 시 응답과 저장 스냅샷에 활성 보통주 외 행이 없어야 하며, KIS 최대 100건/페이지 미지원이 API 문서 및 응답 메타데이터와 일치해야 한다.
 
 ### 커밋·푸시·배포
-- 기능 배포 완료: 코드 커밋 `ed48439c`를 `oci`에 푸시했고 [OCI 배포 workflow](https://github.com/pjtss/StockMan/actions/runs/38246642788)가 성공했다. 운영 API에서 잘못된 market 요청이 HTTP 400 JSON으로 처리되는 것을 확인했다. 운영 KIS 실조회는 호출 비용·운영 부하를 고려해 별도로 실행하지 않았다. 이후 이 결과를 기록하기 위한 문서 전용 커밋은 아직 반영 전이다.
+- 기존 기능 배포 완료: 코드 커밋 `ed48439c`와 문서 커밋 `58298d4e`를 `oci`에 푸시했고 [최종 OCI 배포 workflow](https://github.com/pjtss/StockMan/actions/runs/38247656132)가 성공했다. 운영 API에서 잘못된 market 요청이 HTTP 400 JSON으로 처리되는 것을 확인했다. 이번 감사에서 보강한 응답 행 shape·거래소 코드 검증도 전체 빌드·테스트·standalone 실행에서 통과했으며, 별도 커밋·푸시·배포 전이다. 운영 KIS 실조회는 호출 비용·운영 부하를 고려해 별도로 실행하지 않았다.
 
 ## [2026-10-11] 미국 소형주 발행주식수 공개 API 검색 조건 확장
 

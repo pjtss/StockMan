@@ -106,6 +106,15 @@ describe("KIS overseas condition search contract", () => {
     })).toMatchObject({ ok: false, error: "KIS_INVALID_RESPONSE_SHAPE", rows: [], raw: null });
   });
 
+  it("rejects output2 entries that do not match the documented row-object shape", () => {
+    expect(parseKisUsConditionResponse({
+      status: 200,
+      contentType: "application/json",
+      rawText: JSON.stringify({ output1: { crec: "1" }, output2: [null], rt_cd: "0", msg_cd: "MCA00000" }),
+      market: "NAS",
+    })).toMatchObject({ ok: false, error: "KIS_INVALID_RESPONSE_SHAPE", rows: [], raw: null });
+  });
+
   it("rejects HTML and malformed JSON without returning provider body content", () => {
     expect(parseKisUsConditionResponse({ status: 504, contentType: "text/html", rawText: "private proxy page", market: "NAS" })).toMatchObject({ ok: false, error: "KIS_NON_JSON_RESPONSE", rows: [], raw: null });
     expect(parseKisUsConditionResponse({ status: 200, contentType: "application/json", rawText: "{broken", market: "NAS" })).toMatchObject({ ok: false, error: "KIS_INVALID_JSON_RESPONSE", rows: [], raw: null });
@@ -118,10 +127,11 @@ describe("KIS overseas condition search contract", () => {
       { symb: "AAA", excd: "NAS", name: "duplicate row" },
       { symb: "BBB", excd: "NAS", name: "Fund" },
       { symb: "CCC", excd: "NYS", name: "Wrong exchange" },
+      { symb: "DDD", name: "Missing exchange" },
       { name: "Unknown code" },
     ];
     const filtered = await filterKisUsConditionRows("NAS", providerRows);
-    expect(filtered).toEqual({ rows: [providerRows[0]], requestedCount: 5, eligibleCount: 1, excludedCount: 4 });
+    expect(filtered).toEqual({ rows: [providerRows[0]], requestedCount: 6, eligibleCount: 1, excludedCount: 5 });
     expect(mocks.query).toHaveBeenCalledTimes(1);
     expect(mocks.query.mock.calls[0][1]).toEqual(["NAS", ["AAA", "BBB"]]);
   });

@@ -121,7 +121,7 @@ export function parseKisUsConditionResponse(input: { status: number; contentType
     return { ok: false, status: input.status, market: input.market, rows: [], raw: null, diagnostics: { rt_cd: null, msg_cd: null, msg1: null, contentType: input.contentType }, error: "KIS_INVALID_JSON_RESPONSE" };
   }
   const output2 = raw.output2;
-  if (!Array.isArray(output2)) {
+  if (!Array.isArray(output2) || output2.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
     return {
       ok: false,
       status: input.status,
@@ -137,9 +137,7 @@ export function parseKisUsConditionResponse(input: { status: number; contentType
       error: "KIS_INVALID_RESPONSE_SHAPE",
     };
   }
-  const rows = Array.isArray(output2)
-    ? output2.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
-    : [];
+  const rows = output2 as Record<string, unknown>[];
   const rtCd = raw.rt_cd == null ? null : String(raw.rt_cd);
   const msgCd = raw.msg_cd == null ? null : String(raw.msg_cd);
   const msg1 = raw.msg1 == null ? null : String(raw.msg1);
@@ -194,7 +192,7 @@ export async function filterKisUsConditionRows(market: KisUsConditionMarket, row
   const seen = new Set<string>();
   const keyed = rows.flatMap((row) => {
     const code = String(row.symb ?? row.code ?? "").trim().toUpperCase();
-    const rowMarket = String(row.excd ?? market).trim().toUpperCase();
+    const rowMarket = String(row.excd ?? "").trim().toUpperCase();
     if (!code || rowMarket !== market || seen.has(code)) return [];
     seen.add(code);
     return [{ code, row }];
