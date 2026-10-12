@@ -121,25 +121,6 @@ export async function fetchKisUsIndustryTheme(input: { market?: KisUsTradeMarket
   return { ok: response.ok && raw?.rt_cd === "0", status: response.status, market, rows, raw, diagnostics: { rt_cd: raw?.rt_cd ?? null, msg_cd: raw?.msg_cd ?? null, msg1: raw?.msg1 ?? null } };
 }
 
-/** 공식 해외주식 조건검색 API. 필터 미사용 값은 ""로 전달합니다. */
-export async function fetchKisUsSearch(input: { market?: KisUsTradeMarket; filters?: Record<string, string> }): Promise<KisUsSearchResult | null> {
-  const config = await loadKisApiConfig("us_trade_trend");
-  const token = await getAccessToken(); if (!token) return null;
-  const headers = { "content-type": config.content_type, Authorization: buildKisAuthorization(token), appkey: process.env.KIS_APPKEY?.trim() || "", appsecret: process.env.KIS_APPSECRET?.trim() || "", tr_id: "HHDFS76410000", custtype: config.custtype || "P", tr_cont: "" };
-  const defaults: Record<string, string> = {
-    AUTH: config.AUTH ?? "", EXCD: input.market ?? "NAS", CO_YN_PRICECUR: "", CO_ST_PRICECUR: "", CO_EN_PRICECUR: "",
-    CO_YN_RATE: "", CO_ST_RATE: "", CO_EN_RATE: "", CO_YN_VALX: "", CO_ST_VALX: "", CO_EN_VALX: "",
-    CO_YN_SHAR: "", CO_ST_SHAR: "", CO_EN_SHAR: "", CO_YN_VOLUME: "", CO_ST_VOLUME: "", CO_EN_VOLUME: "",
-    CO_YN_AMT: "", CO_ST_AMT: "", CO_EN_AMT: "", CO_YN_EPS: "", CO_ST_EPS: "", CO_EN_EPS: "",
-    CO_YN_PER: "", CO_ST_PER: "", CO_EN_PER: "", KEYB: "",
-  };
-  const params = new URLSearchParams({ ...defaults, ...(input.filters ?? {}) });
-  const response = await withKisRequestThrottle(() => fetch(`https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-search?${params}`, { headers, signal: AbortSignal.timeout(8_000) }));
-  const text = await response.text(); let raw: any = null; try { raw = JSON.parse(text); } catch {}
-  const rows = [raw?.output, raw?.output1, raw?.output2].flatMap((value) => Array.isArray(value) ? value : value && typeof value === "object" ? [value] : []) as Record<string, unknown>[];
-  return { ok: response.ok && raw?.rt_cd === "0", status: response.status, market: input.market ?? "NAS", rows, raw, diagnostics: { rt_cd: raw?.rt_cd ?? null, msg_cd: raw?.msg_cd ?? null, msg1: raw?.msg1 ?? null } };
-}
-
 /** 공식 해외주식 순위분석 API 묶음: 거래량·거래대금·거래량급증·체결강도·신고/신저가. */
 export async function fetchKisUsRanking(kind: KisUsRankingKind, market: KisUsTradeMarket = "NAS"): Promise<KisUsRankingResult | null> {
   const config = await loadKisApiConfig("us_trade_trend");

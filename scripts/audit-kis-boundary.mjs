@@ -10,6 +10,7 @@ const moduleTests = new Map([
   ["kis-token.ts", "lib/kis-token.test.ts"],
   ["kis-realtime.ts", "lib/kis-realtime.test.ts"],
   ["kis-us-trade-trend.ts", "lib/kis-us-trade-trend.test.ts"],
+  ["kis-us-condition-search.ts", "lib/kis-us-condition-search.test.ts"],
 ]);
 const exceptions = new Map([
   ["kis-token.ts", { purpose: "토큰 발급", endpoint: "/oauth2/tokenP" }],

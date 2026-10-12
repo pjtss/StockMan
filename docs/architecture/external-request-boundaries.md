@@ -9,6 +9,7 @@
 - 일반 KIS 데이터 요청은 `lib/kis-request-framework.ts`와 `withKisRequestThrottle`를 통과한다.
 - `lib/kis-token.ts`의 토큰 발급(`/oauth2/tokenP`)과 `lib/kis-realtime.ts`의 Approval WebSocket 티켓 발급(`/oauth2/Approval`)은 각각 인증 수명주기 예외이며, 일반 데이터 요청과 섞지 않는다.
 - 기능 모듈은 URL·헤더·파라미터 조립과 도메인 파싱을 담당하고, 재시도·timeout·rate limit 이벤트 기록은 공통 경계가 담당한다.
+- 해외 조건검색은 `lib/kis-us-condition-search.ts`가 전담한다. KIS 결과를 검증한 뒤 공식 활성 보통주 마스터와 대조하며, DB 판정 실패 때는 fail-closed한다. API 필드와 100건 제한은 `docs/api/KIS_US_CONDITION_SEARCH.md`에서 관리한다.
 - 새 KIS API를 추가할 때는 모듈 테스트에 성공 응답, 비정상 JSON, HTTP 오류, rate limit 경로를 함께 기록한다.
 
 ## 지속 개선 연결

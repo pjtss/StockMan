@@ -2,6 +2,39 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-12] KIS 해외주식 조건검색 API 계약·보통주 검증 보강
+
+### 목표
+- 보관된 KIS Open API 공식 명세를 기준으로 해외 조건검색의 요청·응답 계약을 명확히 하고, 검색 결과가 프로젝트의 활성 보통주 전용 원칙을 지키도록 한다.
+
+### 반영
+- `lib/kis-us-condition-search.ts`: 조건 파라미터·숫자 범위·시장·중복 입력을 검증하고 KIS 응답의 `output2`만 종목 행으로 파싱한다. HTML/잘못된 JSON/잘못된 응답 구조를 분리하고 토큰 만료 시 1회 갱신한다. KIS 호출은 기존 공통 제한기(최대 안전 TPS 10)를 사용한다.
+- `app/api/kis/us-search/route.ts`: 후보 티커를 `us_common_stock_universe`의 `enabled`, `daily_active`, `COMMON_STOCK`, 상품 제외 플래그와 대조한다. 마스터 조회 실패는 fail-closed로 HTTP 503을 반환한다. 제외 종목은 JSON 응답과 `kis_signal_snapshots`의 payload/rawPayload에 쓰지 않는다. 토큰 중복 조회를 제거하고 스냅샷 쓰기 실패는 응답의 warning으로 표시한다.
+- `lib/kis-us-trade-trend.ts`: 조건검색 구현을 전용 모듈로 이동해 기존 일반 시세 모듈의 미검증 입력 병합 경로를 제거했다.
+- `lib/kis-us-condition-search.test.ts`, `app/api/kis/us-search/route.test.ts`: 입력 검증, 100건·페이지네이션 계약, 토큰 재발급, `output1` 오파싱 방지, DB 보통주 fail-closed, 응답·스냅샷 비보통주 차단 테스트를 추가했다. 실제 PostgreSQL 배열 조건은 프로젝트의 `getPool().query` 바인딩을 사용한다.
+- `docs/api/KIS_US_CONDITION_SEARCH.md`, `docs/KIS_DETECTION_API_CATALOG.md`: 공식 명세 시트 `해외주식조건검색` 기반으로 파라미터·단위·응답·오류·페이지 제한·프로젝트 필터를 기록했다.
+- `scripts/kis-module-registry.mjs`, `scripts/audit-kis-boundary.mjs`, `docs/architecture/external-request-boundaries.md`: 새 KIS 모듈·endpoint·테스트의 경계 감사 연결을 등록해 다음 유사 API 추가 때도 빠진 등록을 자동 탐지한다.
+
+### 검증
+- 공식 문서 `docs/references/한국투자증권_오픈API_전체문서_20260727_030000.xlsx`의 `해외주식조건검색` 시트를 확인했다. 공식 API ID `v1_해외주식-015`, TR ID `HHDFS76410000`, endpoint, 입력 필드, `output2` 스키마, 최대 100건 및 다음 조회 미지원 사항을 대조했다.
+- 전용 Vitest: 23개 통과. `npm.cmd run typecheck`: 통과.
+- 첫 `npm.cmd run deploy:verify`에서 production build와 전체 Vitest(182개 파일, 628 통과·1 skip), typecheck, docs 및 범위 감사는 통과했다. KIS boundary audit가 신규 모듈 registry 누락을 검출해 등록과 감사 테스트 매핑을 보완했다.
+- PostgreSQL 실제 실행에서 Drizzle 템플릿의 배열 파라미터 표현이 `ANY(text[])`와 호환되지 않는 점을 발견했다. 드라이버 네이티브 바인딩으로 수정하고 회귀 테스트를 추가했다.
+- 최종 `npm.cmd run deploy:verify`: production build, 전체 Vitest(182개 파일, 628 통과·1 skip), typecheck, docs, 변경 범위 감사, KIS boundary audit, cron 검사와 standalone HTTP smoke 모두 통과.
+- 새 standalone 서버에서 `.env.local`의 로컬 DB 및 KIS 자격증명을 사용해 조건검색을 직접 실행했다. NAS 응답은 HTTP 200, KIS `rt_cd=0`, 원본 100건 중 활성 보통주 80건만 반환하고 20건을 제외했다. 조회 경로의 실제 DB 자격 확인도 통과했다. 스냅샷 저장은 로컬 DB에 기존 `kis_signal_snapshots` 테이블이 없어 실패했으나 검색 응답은 정상이며 `snapshot.stored=false`로 노출됐다. 로컬 DB에 마이그레이션을 임의 적용하지 않았다.
+
+### 다음 개선
+- 배포 후 운영 API에서 NAS/NYS/AMS를 각각 호출해 KIS row 수, 보통주 제외 수, snapshot 저장 여부와 응답 시간을 확인한다. 로컬 스냅샷 저장을 확인하려면 운영에 이미 적용된 V119 이후의 DB migration을 로컬 DB에도 별도 승인 절차로 적용해야 한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-12-001
+- 성과 판정: UNMEASURED
+- 근거: 회귀 테스트와 전체 배포 검증 통과. 로컬 실제 KIS 호출에서 100개 중 활성 보통주 80개만 반환됨을 확인했다. 운영 배포 및 운영 API 검증은 아직이다.
+- 성공 기준: 잘못된 조건은 HTTP 400, KIS transport/schema 실패는 구조화된 HTTP 502, 마스터 장애는 fail-closed HTTP 503이어야 한다. 성공 시 응답과 저장 스냅샷에 활성 보통주 외 행이 없어야 하며, KIS 최대 100건/페이지 미지원이 API 문서 및 응답 메타데이터와 일치해야 한다.
+
+### 커밋·푸시·배포
+- 미실행(검증 통과, 커밋·푸시·배포 대기): 최종 빌드·전체 테스트·standalone smoke 및 로컬 KIS 실호출 검증을 통과했다. 현재 작업 파일만 별도 커밋해 `oci`에 푸시하고 해당 배포 실행만 확인한다. 배포 뒤 Actions 결과와 운영 API를 확인한다.
+
 ## [2026-10-11] 미국 소형주 발행주식수 공개 API 검색 조건 확장
 
 ### 목표

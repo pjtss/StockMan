@@ -20,6 +20,7 @@ export const kisModuleRegistry = {
   "kis-token.ts": "token-lifecycle",
   "kis-types.ts": "types",
   "kis-us-api.ts": "overseas-ranking",
+  "kis-us-condition-search.ts": "overseas-condition-search",
   "kis-us-daily-price.ts": "overseas-daily-price",
   "kis-us-debug.ts": "overseas-debug",
   "kis-us-market-cap.ts": "overseas-market-cap",
@@ -39,6 +40,7 @@ export const kisModulePathRegistry = {
   ],
   "kis-kr-daily-price.ts": ["/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"],
   "kis-us-api.ts": ["/uapi/overseas-stock/v1/ranking/updown-rate"],
+  "kis-us-condition-search.ts": ["/uapi/overseas-price/v1/quotations/inquire-search"],
   "kis-us-daily-price.ts": ["/uapi/overseas-price/v1/quotations/dailyprice"],
 };
 
@@ -47,5 +49,6 @@ export const kisModuleFeatureRegistry = {
   "kis-domestic-api.ts": ["fetchDomesticVolumePower"],
   "kis-kr-daily-price.ts": ["fetchKrDailyPrice"],
   "kis-us-api.ts": ["fetchKisUsTopRisingApi"],
+  "kis-us-condition-search.ts": ["fetchKisUsConditionSearch", "filterKisUsConditionRows"],
   "kis-us-daily-price.ts": ["fetchUsDailyPrice"],
 };
