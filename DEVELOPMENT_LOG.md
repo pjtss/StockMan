@@ -16,6 +16,7 @@
 - 전체 `npm.cmd run deploy:verify` 통과: production build, 193개 테스트 파일 중 192개 통과/1개 skip(657개 통과/1개 skip), typecheck, docs:check, verify-scope, KIS boundary, OCI cron 21 endpoints.
 - Standalone smoke 통과: `/charts` 200, invalid KIS market 400, KR/US top-rising chart 200, 보호된 admin/cron 미인증 401, 프로세스 종료 정리 완료.
 - 운영 API 사전 진단: 9개 probe 모두 성공, 전체 응답 63ms; health-probe-history 최근 기록에도 실패·경보 없음.
+- 배포 후 운영 Bearer 인증 검증: `POST /api/cron/health-probe-snapshot` 응답 `ok:true`, `recorded:3`; db_connection 12ms, automation_history_latest 3ms, health_schema 31ms 모두 성공.
 
 ### 다음 개선
 - 다른 cron endpoint의 Bearer 파서 변형을 정적 검사해 이중 이스케이프가 재발하지 않는지 일괄 점검한다.
@@ -25,7 +26,7 @@
 - 근거: 이전 정규식은 정상 Bearer 헤더를 토큰으로 정규화하지 못했다. 수정 후 대소문자 혼합 및 공백 포함 요청이 인증되어 성공하는 회귀 테스트를 추가했다.
 
 ### 커밋·푸시·배포
-- 미실행: 로컬 필수 검증을 통과했으며 커밋·푸시·배포 예정.
+- 코드 커밋 `58721213f686f28e6308a754509c5c1c7131e5c0`를 `oci`에 push했고, Deploy OCI run `38787242166` 성공으로 운영 배포 완료.
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
