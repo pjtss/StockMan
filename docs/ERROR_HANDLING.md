@@ -561,8 +561,15 @@ npm test -- --run
 
 - **관측**: 배포 workflow는 성공했고 `/charts`는 HTTP 200이었다. 운영 `/api/health`는 40초, 관리자 `/api/debug/health`는 45초 제한 안에 응답하지 않았다. 단순 관리자 DB 목록 조회는 HTTP 200/약 0.8초, `automation_runs` 1행 조회는 HTTP 200/약 1초였다.
 - **환경 구분**: 로컬 `.env.local`의 DB는 localhost:5433이며 각 health 관련 SQL은 약 80–110ms였다. 이는 운영 DB와 다른 연결이므로 운영 SQL 성능의 근거로 사용하지 않는다.
-- **판단**: 운영 DB 연결 자체가 완전히 불가능한 상태는 아니지만, 전체 health 스냅샷에서 어느 SQL 단계가 지연되는지는 기존 진단 API가 스냅샷 전체를 기다려 분리 확인할 수 없었다. `automation_runs` 전체 최신 행 조회는 조사 후보일 뿐, 원인으로 확정하지 않는다.
+- **초기 판단**: 운영 DB 연결 자체가 완전히 불가능한 상태는 아니지만, 기존 진단 API는 전체 스냅샷을 기다려 어느 SQL 단계가 지연되는지 분리할 수 없었다. 후속 단계별 진단 결과와 원인 확정은 아래 automation_runs 조사 항목을 기준으로 한다.
 - **개선**: 관리자 전용 `/api/admin/health-diagnostics`를 추가한다. 동일 health 관련 SELECT들을 단계별로 실행하고 각 단계의 소요 시간·행 수·오류 코드와 DB pool 점유량만 반환한다. SQL 상세·행 데이터·환경변수 값은 노출하지 않는다. 단일 연결의 read-only transaction과 쿼리별 1.5초 `statement_timeout`을 사용해 느린 쿼리 하나가 전체 진단을 무기한 막지 않게 한다.
 - **재발 감지**: API 테스트가 비관리자 요청의 DB 접근 차단, read-only transaction, 쿼리 타임아웃 오류 코드의 안전한 노출, 후속 probe 진행을 확인한다. 운영에서는 `probes[].name`, `durationMs`, `errorCode`, `pool.waiting`으로 병목 구간을 판별한다.
 - **남은 위험**: pool 연결 획득 자체가 밀리면 진단은 3초 후 pool 상태와 함께 실패할 수 있다. 본 API 결과가 확인되기 전까지 운영 health 지연의 근본 원인은 미확정으로 유지한다.
+
+## 2026-10-15 automation_runs health 조회 병목 완화
+
+- **운영 근거**: `/api/admin/health-diagnostics`에서 연결·테이블·컬럼·Flyway probe는 1–184ms, 캐시 설정 조회는 21ms였으나 세 개의 `DISTINCT ON (module_key) ... ORDER BY module_key, started_at DESC` 이력 조회는 모두 쿼리 타임아웃 코드 `57014`로 끝났다. 따라서 DB 연결이나 전체 스냅샷의 모든 쿼리가 느린 것이 아니라, 자동화 이력의 모듈별 최신 행 조회 형태가 병목임을 확인했다.
+- **개선**: 전체 이력을 정렬·중복 제거하지 않고 등록된 모듈 키 각각에 대해 `LEFT JOIN LATERAL` 내부에서 `ORDER BY started_at DESC LIMIT 1`을 조회한다. 캐시 최신 실행과 마지막 성공도 같은 방식으로 바꾸고, 세 이력 조회 및 설정 로딩을 함께 시작한다. 기존 `(module_key, started_at DESC)` 인덱스를 활용하는 point lookup 형태다.
+- **재발 자동 감지**: 회귀 테스트는 health snapshot의 세 이력 SQL이 모두 `LATERAL`과 `LIMIT 1`을 쓰고 이전 `DISTINCT ON` 방식으로 돌아가지 않는지 확인한다. 배포 후 `/api/admin/health-diagnostics`에서 세 probe가 각각 1.5초 안에 끝나는지 확인한다.
+- **검증 한계**: 로컬 DB는 localhost:5433이며 automation 이력이 8행뿐이라 로컬 실행시간은 운영 성능 증거가 아니다. 운영 인덱스 사용 및 처리시간은 수정 배포 후 진단 API로 다시 검증해야 한다.
 

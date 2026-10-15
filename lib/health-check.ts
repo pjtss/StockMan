@@ -62,22 +62,25 @@ export async function getHealthSnapshot() {
   let cacheAutomation: Record<string, unknown> = {};
   if (database.connected && database.checkedTables.includes("automation_runs")) {
     try {
-      const result = await getPool().query<{ module_key: string; status: string; started_at: Date; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message, summary FROM automation_runs ORDER BY module_key, started_at DESC");
-      automation = Object.fromEntries(result.rows.map((row) => { const startedAt = row.started_at?.toISOString() ?? null; const finishedAt = row.finished_at?.toISOString() ?? null; const durationMs = startedAt && finishedAt ? Math.max(0, new Date(finishedAt).getTime() - new Date(startedAt).getTime()) : null; return [row.module_key, { status: row.status, startedAt, finishedAt, durationMs, durationSeconds: durationMs == null ? null : Number((durationMs / 1000).toFixed(2)), error: row.error_message, metrics: summarizeAutomationMetrics(row.summary) }]; }));
+      const pool = getPool();
       const expected = FEATURE_MODULES.filter((module) => module.scheduler === "OCI_CRON").map((module) => module.key);
-      automationCoverage = getAutomationCoverage(expected, Object.keys(automation));
       const cacheModules = ["us-daily-cache", "us-daily-open-cache", "kr-daily-cache"];
-      const [latest, latestSuccess, cacheSettings] = await Promise.all([
-        getPool().query<{ module_key: string; status: string; started_at: Date | null; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message, summary FROM automation_runs WHERE module_key = ANY($1) AND status <> 'SKIPPED' ORDER BY module_key, started_at DESC", [cacheModules]),
-        getPool().query<{ module_key: string; finished_at: Date | null }>("SELECT DISTINCT ON (module_key) module_key, finished_at FROM automation_runs WHERE module_key = ANY($1) AND status = 'SUCCESS' ORDER BY module_key, started_at DESC", [cacheModules]),
+      const moduleKeys = FEATURE_MODULES.map((module) => module.key);
+      const [latestAutomation, latest, latestSuccess, cacheSettings] = await Promise.all([
+        pool.query<{ module_key: string; status: string | null; started_at: Date | null; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT requested.module_key, latest.status, latest.started_at, latest.finished_at, latest.error_message, latest.summary FROM unnest($1::text[]) WITH ORDINALITY AS requested(module_key, ordinal) LEFT JOIN LATERAL (SELECT history.status, history.started_at, history.finished_at, history.error_message, history.summary FROM automation_runs AS history WHERE history.module_key = requested.module_key ORDER BY history.started_at DESC LIMIT 1) AS latest ON TRUE ORDER BY requested.ordinal", [moduleKeys]),
+        pool.query<{ module_key: string; status: string | null; started_at: Date | null; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT requested.module_key, latest.status, latest.started_at, latest.finished_at, latest.error_message, latest.summary FROM unnest($1::text[]) WITH ORDINALITY AS requested(module_key, ordinal) LEFT JOIN LATERAL (SELECT history.status, history.started_at, history.finished_at, history.error_message, history.summary FROM automation_runs AS history WHERE history.module_key = requested.module_key AND history.status <> 'SKIPPED' ORDER BY history.started_at DESC LIMIT 1) AS latest ON TRUE ORDER BY requested.ordinal", [cacheModules]),
+        pool.query<{ module_key: string; finished_at: Date | null }>("SELECT requested.module_key, latest.finished_at FROM unnest($1::text[]) WITH ORDINALITY AS requested(module_key, ordinal) LEFT JOIN LATERAL (SELECT history.finished_at FROM automation_runs AS history WHERE history.module_key = requested.module_key AND history.status = 'SUCCESS' ORDER BY history.started_at DESC LIMIT 1) AS latest ON TRUE ORDER BY requested.ordinal", [cacheModules]),
         Promise.all(cacheModules.map(async (moduleKey) => [moduleKey, await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null)] as const)),
       ]);
+      automation = Object.fromEntries(latestAutomation.rows.filter((row) => row.status != null).map((row) => { const startedAt = row.started_at?.toISOString() ?? null; const finishedAt = row.finished_at?.toISOString() ?? null; const durationMs = startedAt && finishedAt ? Math.max(0, new Date(finishedAt).getTime() - new Date(startedAt).getTime()) : null; return [row.module_key, { status: row.status!, startedAt, finishedAt, durationMs, durationSeconds: durationMs == null ? null : Number((durationMs / 1000).toFixed(2)), error: row.error_message, metrics: summarizeAutomationMetrics(row.summary) }]; }));
+      automationCoverage = getAutomationCoverage(expected, Object.keys(automation));
       const latestByModule = new Map(latest.rows.map((row) => [row.module_key, row]));
       const successByModule = new Map(latestSuccess.rows.map((row) => [row.module_key, row]));
       const settingsByModule = new Map(cacheSettings);
       for (const moduleKey of cacheModules) {
         const settings = settingsByModule.get(moduleKey);
-        const row = latestByModule.get(moduleKey);
+        const latestRow = latestByModule.get(moduleKey);
+        const row = latestRow?.status == null ? undefined : latestRow;
         // A completed run's freshness is measured from completion, not start.
         // Long-running cache jobs must not look stale while they are still finishing.
         const activityAt = row?.finished_at ?? row?.started_at ?? null;

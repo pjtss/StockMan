@@ -13,7 +13,7 @@ vi.mock("@/lib/market-rss-translation-configuration", () => ({
 import { getHealthSnapshot } from "./health-check";
 
 describe("health snapshot database query concurrency", () => {
-  it("starts both cache-run queries and all settings reads without serial DB round trips", async () => {
+  it("uses indexed per-module lookups and starts the independent health reads together", async () => {
     const resolveQueries: Array<(value: { rows: never[] }) => void> = [];
     mocks.query.mockImplementationOnce(async () => ({ rows: [] }))
       .mockImplementation(() => new Promise((resolve) => resolveQueries.push(resolve)));
@@ -30,6 +30,11 @@ describe("health snapshot database query concurrency", () => {
       expect(mocks.loadSettings).toHaveBeenCalledTimes(3);
     });
     expect(resolveQueries).toHaveLength(2);
+    for (const [query] of mocks.query.mock.calls) {
+      expect(String(query)).toContain("LEFT JOIN LATERAL");
+      expect(String(query)).toContain("LIMIT 1");
+      expect(String(query)).not.toContain("DISTINCT ON");
+    }
     resolveQueries.forEach((resolve) => resolve({ rows: [] }));
     await expect(snapshotPromise).resolves.toMatchObject({ database: { schemaReady: true } });
   });

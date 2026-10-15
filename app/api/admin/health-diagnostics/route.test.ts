@@ -42,7 +42,7 @@ describe("admin health diagnostics API", () => {
     state.allowed = true;
     setupClient();
     state.query.mockImplementation(async (text: string) => {
-      if (text.startsWith("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message, summary FROM automation_runs ORDER BY")) {
+      if (text.includes("LEFT JOIN LATERAL") && text.includes("FROM automation_runs AS history WHERE history.module_key = requested.module_key ORDER BY")) {
         throw Object.assign(new Error("database details must not leak"), { code: "57014" });
       }
       return { rows: [], rowCount: 0 };
