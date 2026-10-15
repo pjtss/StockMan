@@ -8,6 +8,7 @@
 
 - 일반 KIS 데이터 요청은 `lib/kis-request-framework.ts`와 `withKisRequestThrottle`를 통과한다.
 - `lib/kis-token.ts`의 토큰 발급(`/oauth2/tokenP`)과 `lib/kis-realtime.ts`의 Approval WebSocket 티켓 발급(`/oauth2/Approval`)은 각각 인증 수명주기 예외이며, 일반 데이터 요청과 섞지 않는다.
+- WebSocket Approval 키는 단일 OCI 인스턴스의 메모리에서 실전/모의 및 자격증명 fingerprint별로 캐시하고, 발급 요청은 in-flight Promise로 합친다. KIS 공식 샘플이 86,400초 경과 시 재인증하므로 애플리케이션은 23시간에 갱신해 1시간 안전 여유를 둔다. 자격증명 원문과 Approval 키는 캐시 키·로그에 포함하지 않는다. 근거: [한국투자증권 공식 Open API 인증 샘플](https://github.com/koreainvestment/open-trading-api/blob/main/examples_user/kis_auth.py).
 - 기능 모듈은 URL·헤더·파라미터 조립과 도메인 파싱을 담당하고, 재시도·timeout·rate limit 이벤트 기록은 공통 경계가 담당한다.
 - 해외 조건검색은 `lib/kis-us-condition-search.ts`가 전담한다. KIS 결과를 검증한 뒤 공식 활성 보통주 마스터와 대조하며, DB 판정 실패 때는 fail-closed한다. API 필드와 100건 제한은 `docs/api/KIS_US_CONDITION_SEARCH.md`에서 관리한다.
 - 새 KIS API를 추가할 때는 모듈 테스트에 성공 응답, 비정상 JSON, HTTP 오류, rate limit 경로를 함께 기록한다.

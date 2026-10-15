@@ -1,11 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildKisRealtimeFrame,
+  clearKisRealtimeApprovalKeyCacheForTest,
   getKisRealtimeKey,
   getKisRealtimeTrId,
   getKisRealtimeUrl,
+  issueKisRealtimeApprovalKey,
   parseKisRealtimeEnvelope,
 } from "./kis-realtime";
+
+afterEach(() => {
+  clearKisRealtimeApprovalKeyCacheForTest();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("KIS realtime websocket protocol", () => {
   it("builds domestic trade subscription frames", () => {
@@ -51,5 +59,66 @@ describe("KIS realtime websocket protocol", () => {
   it("selects production and paper websocket endpoints", () => {
     expect(getKisRealtimeUrl(false)).toBe("wss://ops.koreainvestment.com:21000");
     expect(getKisRealtimeUrl(true)).toBe("wss://ops.koreainvestment.com:31000");
+  });
+
+  it("reuses an approval key instead of calling KIS for every chart connection", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ approval_key: "approval-1" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" })).resolves.toBe("approval-1");
+    await expect(issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" })).resolves.toBe("approval-1");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces simultaneous approval requests into one KIS call", async () => {
+    let resolveResponse!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { resolveResponse = resolve; }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" });
+    const second = issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolveResponse(Response.json({ approval_key: "shared-approval" }));
+    await expect(Promise.all([first, second])).resolves.toEqual(["shared-approval", "shared-approval"]);
+  });
+
+  it("separates production, paper, and rotated credentials in the cache", async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn(async () => Response.json({ approval_key: `approval-${++callCount}` }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await issueKisRealtimeApprovalKey({ appKey: "key-1", appSecret: "secret", paper: false });
+    await issueKisRealtimeApprovalKey({ appKey: "key-1", appSecret: "secret", paper: true });
+    await issueKisRealtimeApprovalKey({ appKey: "key-2", appSecret: "secret", paper: false });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("refreshes before the official 24-hour key boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-16T00:00:00Z"));
+    let callCount = 0;
+    const fetchMock = vi.fn(async () => Response.json({ approval_key: `approval-${++callCount}` }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" });
+    vi.advanceTimersByTime(23 * 60 * 60 * 1000 - 1);
+    await issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(2);
+    await issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache failed approval responses", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ error: "unavailable" }, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ approval_key: "recovered" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" })).resolves.toBeNull();
+    await expect(issueKisRealtimeApprovalKey({ appKey: "key", appSecret: "secret" })).resolves.toBe("recovered");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,5 +1,40 @@
 # Development Log
 
+## [2026-10-16] 차트 WebSocket Approval 발급 호출 캐시
+
+### 목표
+- 실시간 차트 연결 때마다 반복 발급되던 KIS WebSocket Approval 키를 메모리 캐시해 외부 호출을 줄이고, 병렬 연결의 토큰 발급 경합을 제거한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-015
+- `/api/kis/realtime/approval`이 차트 모달 연결마다 `issueKisRealtimeApprovalKey()`를 호출하고, 기존 모듈은 모든 요청에서 KIS `/oauth2/Approval`에 POST했다.
+- 실전/모의 환경 및 credential fingerprint별 23시간 메모리 캐시를 추가하고, 동시 요청은 같은 in-flight Promise를 공유하도록 했다. KIS 자격증명 교체는 fingerprint가 바뀌어 새 키를 발급하며, 성공하지 않은 응답은 저장하지 않는다.
+- 승인 API의 KIS 네트워크 예외는 내부 메시지를 노출하지 않고 `KIS_APPROVAL_KEY_UNAVAILABLE` 503으로 정규화한다.
+- 캐시 재사용, 동시 요청 병합, 실전/모의 분리, credential 회전, 23시간 만료, 실패 비캐시와 route 응답을 회귀 테스트로 고정했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: Approval 키 수명주기/재사용 관리가 없어서 UI 연결 빈도가 그대로 OAuth Approval 호출 빈도가 됐다.
+- 재발 감지: KIS realtime module 테스트에서 같은 키 요청 2회 및 동시 요청의 실제 fetch 횟수를 1회로 검사하고, 모의/실전·키 회전·만료 격리를 테스트한다.
+- 공식 기준: 한국투자증권 [공식 Open API 인증 샘플](https://github.com/koreainvestment/open-trading-api/blob/main/examples_user/kis_auth.py)은 `_last_auth_time`으로 인증시각을 관리하고 86,400초 경과 후 WebSocket 키 재인증을 수행한다. 구현 TTL은 23시간이다.
+- 남은 위험: 프로세스 메모리 캐시는 사용자가 확정한 단일 인스턴스 배포 구조에 종속된다. 다중 인스턴스로 바뀌면 공유 저장소 또는 단일 발급 서비스로 재설계해야 한다.
+
+### 검증
+- `npm.cmd test -- --run lib/kis-realtime.test.ts app/api/kis/realtime/approval/route.test.ts`: 2개 파일, 12개 테스트 통과.
+- `npm.cmd run deploy:verify`: 통과. Next.js 빌드, standalone `/charts` 200과 국내/해외 차트 API smoke, 200개 테스트 파일(692개 통과, 1개 skip), typecheck, docs, verify-scope, KIS boundary, bearer-auth 및 cron 구조 게이트 성공.
+- `git diff --check`: 통과.
+- 기준선 호출량: 모달 WebSocket 연결 N회당 Approval 요청 N회. 변경 후 프로세스/환경/자격증명당 23시간 내 첫 요청 1회, 동시 첫 요청도 1회로 병합한다(정량값은 호출계약 테스트로 확인하며 운영 트래픽 비율은 아직 수집하지 않음).
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 호출계약 테스트에서 같은 키 2회 요청 및 동시 요청이 각각 KIS fetch 1회로 합쳐지고, 만료 전에 키를 갱신하며 실전/모의와 credential 변경을 격리함을 확인했다. 운영 반영 후 실트래픽 절감량은 관측해야 한다.
+- 완료 기준: 모듈·route 테스트와 deploy verification 통과, 운영 서비스 SHA 확인.
+
+### 다음 개선
+- 차트 realtime Approval 경로 공개 호출량과 client/IP별 WebSocket 연결 남용을 계측하고 제한 정책을 검토한다.
+
+### 커밋·푸시·배포
+- 미실행: 로컬 검증 통과 후 진행한다.
+
 ## [2026-10-16] 공개 데이터 API 오류 응답 및 SEC 리스크 쓰기 권한 강화
 
 ### 목표

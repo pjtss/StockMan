@@ -11,6 +11,11 @@ const TR_IDS: Record<KisRealtimeMarket, Record<KisRealtimeChannel, string>> = {
   US: { trade: "HDFSCNT0", asking: "HDFSASP0" },
 };
 
+const APPROVAL_KEY_CACHE_TTL_MS = 23 * 60 * 60 * 1000;
+type CachedApprovalKey = { value: string; expiresAt: number };
+const approvalKeys = new Map<string, CachedApprovalKey>();
+const approvalRequests = new Map<string, Promise<string | null>>();
+
 export function getKisRealtimeTrId(subscription: KisRealtimeSubscription) {
   return TR_IDS[subscription.market][subscription.channel];
 }
@@ -30,10 +35,38 @@ export async function issueKisRealtimeApprovalKey(input: { appKey?: string; appS
   const appKey = input.appKey?.trim() || process.env.KIS_APPKEY?.trim();
   const appSecret = input.appSecret?.trim() || process.env.KIS_APPSECRET?.trim();
   if (!appKey || !appSecret) return null;
-  const baseUrl = input.paper ? "https://openapivts.koreainvestment.com:29443" : "https://openapi.koreainvestment.com:9443";
-  const response = await fetch(`${baseUrl}/oauth2/Approval`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ grant_type: "client_credentials", appkey: appKey, secretkey: appSecret }), signal: AbortSignal.timeout(8_000) });
-  const parsed = await response.json().catch(() => null) as { approval_key?: string } | null;
-  return response.ok && parsed?.approval_key ? parsed.approval_key : null;
+  const environment = input.paper ? "paper" : "production";
+  const credentialFingerprint = crypto.createHash("sha256").update(`${appKey}\0${appSecret}`).digest("hex");
+  const cacheKey = `${environment}:${credentialFingerprint}`;
+  const cached = approvalKeys.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (cached) approvalKeys.delete(cacheKey);
+
+  const pending = approvalRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const baseUrl = input.paper ? "https://openapivts.koreainvestment.com:29443" : "https://openapi.koreainvestment.com:9443";
+    const response = await fetch(`${baseUrl}/oauth2/Approval`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ grant_type: "client_credentials", appkey: appKey, secretkey: appSecret }), signal: AbortSignal.timeout(8_000) });
+    const parsed = await response.json().catch(() => null) as { approval_key?: string } | null;
+    const approvalKey = response.ok && typeof parsed?.approval_key === "string" ? parsed.approval_key.trim() : "";
+    if (!approvalKey) return null;
+    // KIS's official sample refreshes the WebSocket approval key after 86,400 seconds.
+    // Cache for 23 hours to leave a one-hour safety margin before that boundary.
+    approvalKeys.set(cacheKey, { value: approvalKey, expiresAt: Date.now() + APPROVAL_KEY_CACHE_TTL_MS });
+    return approvalKey;
+  })();
+  approvalRequests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (approvalRequests.get(cacheKey) === request) approvalRequests.delete(cacheKey);
+  }
+}
+
+export function clearKisRealtimeApprovalKeyCacheForTest() {
+  approvalKeys.clear();
+  approvalRequests.clear();
 }
 
 export function getKisRealtimeUrl(paper = false) {

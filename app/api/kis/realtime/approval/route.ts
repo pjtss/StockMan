@@ -14,7 +14,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "INVALID_REALTIME_SUBSCRIPTION" }, { status: 400 });
   }
   const subscription: KisRealtimeSubscription = { market, channel, code, ...(market === "US" && (exchange === "NAS" || exchange === "NYS" || exchange === "AMS") ? { exchange } : {}) };
-  const approvalKey = await issueKisRealtimeApprovalKey({ paper });
+  let approvalKey: string | null;
+  try {
+    approvalKey = await issueKisRealtimeApprovalKey({ paper });
+  } catch {
+    return NextResponse.json({ ok: false, error: "KIS_APPROVAL_KEY_UNAVAILABLE" }, { status: 503 });
+  }
   if (!approvalKey) return NextResponse.json({ ok: false, error: "KIS_APPROVAL_KEY_UNAVAILABLE" }, { status: 503 });
   return NextResponse.json({ ok: true, market, channel, code, wsUrl: getKisRealtimeUrl(paper), frame: buildKisRealtimeFrame({ approvalKey, subscription }) }, { headers: { "cache-control": "no-store" } });
 }
