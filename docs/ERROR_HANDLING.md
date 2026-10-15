@@ -539,3 +539,21 @@ npm test -- --run
 - **교차검증 성능**: 공식 판정은 프로세스 메모리 1시간 TTL 캐시를 사용하고 캐시 미스만 배치 조회한다. 캐시 상태와 적중·미스 수는 `criteria.officialEligibility.cacheHits/cacheMisses`로 관측한다.
 - **운영 탐지 상태 해석**: `/api/kis/intraday-mvp`에서 `worker.status=STOPPED`, `status.reason=DISABLED`이면 계산 오류가 아니라 관리자 기능 설정으로 탐지가 중지된 상태다. 이 경우 TOP100 후보 수는 표시하되 거래대금 비율·알림 결과를 정상 동작으로 간주하지 않는다.
 - **시총 대비 거래대금 무자료 상태**: `qualifiedCandidateCount=0`이고 후보의 거래대금·시총 비율이 0이면 최근 1분 샘플이 아직 누적되지 않았거나 워커가 비활성인 상태다. 운영 검증은 `worker.lastTickAt`, `trackedCandidateCount`, `requiredSamples`, `minTurnoverToMarketCapPercent`를 함께 확인한다.
+# 2026-10-15 운영 health API 지연 조사
+
+- **증상**: 운영 `/api/health`가 반복해서 클라이언트 제한 시간(20초) 안에 응답하지 않았지만 `/charts`는 HTTP 200이었다.
+- **근본 원인**: 공개 health 라우트가 상세 운영 스냅샷 전체를 기다렸다. 스키마 점검과 전체 자동화 이력 조회 외에, 캐시 자동화 최근 실행·마지막 성공 조회 및 세 기능 설정 조회가 이어지는 단계로 실행되어 독립 DB 왕복 지연이 합산될 수 있었다.
+- **해결**: 캐시 자동화 최근 실행·마지막 성공 조회와 세 기능 설정 조회를 하나의 `Promise.all` 경계에서 시작한다. 응답 필드와 상세 스키마 판정은 유지한다.
+- **재발 자동 감지**: `lib/health-check-query-concurrency.test.ts`는 캐시 자동화 두 DB 조회와 기능 설정 조회가 모두 동시에 시작되는지 검증한다.
+- **검증**: 회귀 테스트, 전체 배포 검증, 로컬 `/api/health` 실행 및 배포 후 운영 응답시간을 확인한다. HTTP 503 `degraded`는 빠른 응답과 별개의 readiness 문제로 분류한다.
+- **남은 위험**: 이 수정은 상세 스냅샷 내부의 독립 DB 왕복 합산만 제거한다. DB 연결 대기 또는 스키마 확인 자체가 느린 문제까지 해결한다고 보장하지 않는다.
+
+## 2026-10-15 standalone 배포 smoke 프로세스 정리
+
+- **증상**: 배포 검증의 `/charts` smoke 요청이 제한 시간 초과로 실패했지만, 동일 standalone 서버를 직접 기동한 뒤에는 `/charts`가 HTTP 200으로 응답했다.
+- **근본 원인**: Windows 검증 경로가 standalone Node 서버를 `cmd.exe` 하위 프로세스로 실행해 timeout cleanup 대상이 실제 서버 프로세스가 아닌 짧게 유지되는 command wrapper가 될 수 있었다. 실패 뒤에도 검증 서버 프로세스가 남는 것을 확인했다.
+- **해결**: `scripts/verify-deploy.mjs`에서 standalone 서버를 `process.execPath`로 직접 기동해 실제 Node 프로세스를 정리 대상으로 지정한다. 제한된 로컬 Windows 환경에서 첫 요청이 5초를 넘는 경우가 확인되어 smoke 개별 요청 제한을 기본 15초로 늘리고 환경변수로 조정 가능하게 한다. endpoint와 응답 조건은 유지한다.
+- **재발 자동 감지**: 전체 `deploy:verify`가 standalone `/charts` 및 API smoke를 계속 수행한다. 검증 후 `server.js` 프로세스 잔존 여부도 확인한다.
+- **검증**: 독립 기동 시 `/charts` HTTP 200을 확인했다. 직접 실행·프로세스 종료 처리와 15초 요청 제한은 전체 배포 검증으로 확인한다.
+- **남은 위험**: Windows 프로세스 정리는 운영체제 프로세스 상태에 의존한다. CI smoke가 실패하면 해당 build의 standalone server 프로세스가 남았는지 우선 확인한다.
+

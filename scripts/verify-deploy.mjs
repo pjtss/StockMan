@@ -6,6 +6,7 @@ const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
 const verifyDistDir = process.env.DEPLOY_VERIFY_DIST_DIR || ".next-deploy-verify";
 const commandTimeoutMs = Number(process.env.DEPLOY_VERIFY_COMMAND_TIMEOUT_MS || 900_000);
+const smokeRequestTimeoutMs = Number(process.env.DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS || 15_000);
 
 function loadLocalEnv() {
   const file = ".env.local";
@@ -75,7 +76,7 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+      const response = await fetch(url, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
       if (response.ok && contentType.includes("text/html") && body.trim().length > 100) { console.log(`[deploy-verify] smoke ok: ${url} (${response.status})`); return; }
@@ -94,7 +95,7 @@ async function waitForJson(url, timeoutMs = 30_000, expectedStatus) {
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+      const response = await fetch(url, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
       if (contentType.includes("application/json")) {
@@ -153,17 +154,20 @@ async function verifyRuntime() {
   mkdirSync(`${verifyDistDir}/standalone/public/_next`, { recursive: true });
   cpSync(staticSource, staticTarget, { recursive: true });
   cpSync(staticSource, publicStaticTarget, { recursive: true });
-  const command = isWindows ? "node" : "node";
   const args = [`${verifyDistDir}/standalone/server.js`];
-  const executable = isWindows ? process.env.ComSpec : command;
-  const executableArgs = isWindows ? ["/d", "/s", "/c", [command, ...args].join(" ")] : args;
-  const child = spawn(executable, executableArgs, {
+  // Launch Node directly on Windows. Wrapping it in cmd.exe can orphan the
+  // standalone server when the smoke check times out and cleanup targets the
+  // short-lived command shell instead of the actual server process.
+  const child = spawn(process.execPath, args, {
     env: { ...process.env, ...loadLocalEnv(), PORT: port, NODE_ENV: "production" },
     stdio: "ignore",
     shell: false,
     detached: false,
   });
-  const childExit = new Promise((_, reject) => child.once("exit", (code, signal) => reject(new Error(`runtime exited before smoke completed (code=${code}, signal=${signal ?? "none"})`))));
+  const childExit = new Promise((_, reject) => {
+    child.once("error", (error) => reject(new Error(`runtime failed to start: ${error.message}`)));
+    child.once("exit", (code, signal) => reject(new Error(`runtime exited before smoke completed (code=${code}, signal=${signal ?? "none"})`)));
+  });
   try {
     await Promise.race([
       (async () => {

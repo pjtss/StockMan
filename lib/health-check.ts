@@ -67,11 +67,14 @@ export async function getHealthSnapshot() {
       const expected = FEATURE_MODULES.filter((module) => module.scheduler === "OCI_CRON").map((module) => module.key);
       automationCoverage = getAutomationCoverage(expected, Object.keys(automation));
       const cacheModules = ["us-daily-cache", "us-daily-open-cache", "kr-daily-cache"];
-      const latest = await getPool().query<{ module_key: string; status: string; started_at: Date; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message, summary FROM automation_runs WHERE module_key = ANY($1) AND status <> 'SKIPPED' ORDER BY module_key, started_at DESC", [cacheModules]);
-      const latestSuccess = await getPool().query<{ module_key: string; finished_at: Date | null }>("SELECT DISTINCT ON (module_key) module_key, finished_at FROM automation_runs WHERE module_key = ANY($1) AND status = 'SUCCESS' ORDER BY module_key, started_at DESC", [cacheModules]);
+      const [latest, latestSuccess, cacheSettings] = await Promise.all([
+        getPool().query<{ module_key: string; status: string; started_at: Date | null; finished_at: Date | null; error_message: string | null; summary: unknown }>("SELECT DISTINCT ON (module_key) module_key, status, started_at, finished_at, error_message, summary FROM automation_runs WHERE module_key = ANY($1) AND status <> 'SKIPPED' ORDER BY module_key, started_at DESC", [cacheModules]),
+        getPool().query<{ module_key: string; finished_at: Date | null }>("SELECT DISTINCT ON (module_key) module_key, finished_at FROM automation_runs WHERE module_key = ANY($1) AND status = 'SUCCESS' ORDER BY module_key, started_at DESC", [cacheModules]),
+        Promise.all(cacheModules.map(async (moduleKey) => [moduleKey, await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null)] as const)),
+      ]);
       const latestByModule = new Map(latest.rows.map((row) => [row.module_key, row]));
       const successByModule = new Map(latestSuccess.rows.map((row) => [row.module_key, row]));
-      const settingsByModule = new Map((await Promise.all(cacheModules.map(async (moduleKey) => [moduleKey, await loadFeatureModuleSettings(moduleKey as FeatureModuleKey).catch(() => null)] as const))).map(([moduleKey, settings]) => [moduleKey, settings]));
+      const settingsByModule = new Map(cacheSettings);
       for (const moduleKey of cacheModules) {
         const settings = settingsByModule.get(moduleKey);
         const row = latestByModule.get(moduleKey);
