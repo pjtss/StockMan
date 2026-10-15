@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createServer } from "node:net";
+import { createConnection, createServer } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 
 const isWindows = process.platform === "win32";
@@ -131,13 +131,55 @@ function findAvailablePort() {
   });
 }
 
-function stopProcess(child) {
+function waitForChildExit(child, timeoutMs) {
+  if (child.exitCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let timer;
+    const finish = (exited) => {
+      clearTimeout(timer);
+      child.off("exit", onExit);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    timer = setTimeout(() => finish(false), timeoutMs);
+    child.once("exit", onExit);
+  });
+}
+
+async function stopProcess(child) {
   if (child.exitCode !== null) return;
   if (isWindows) {
-    spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false });
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false });
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 10_000);
+      killer.once("error", resolve);
+      killer.once("exit", resolve);
+    });
   } else {
     child.kill("SIGTERM");
   }
+  if (!(await waitForChildExit(child, 5_000))) {
+    if (isWindows) child.kill();
+    else child.kill("SIGKILL");
+    if (!(await waitForChildExit(child, 5_000))) throw new Error("Standalone runtime process did not exit after cleanup.");
+  }
+}
+
+async function waitForTcpListener(port, child, timeoutMs = 30_000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (child.exitCode !== null) throw new Error(`Standalone runtime exited before listening (code=${child.exitCode}).`);
+    const connected = await new Promise((resolve) => {
+      const socket = createConnection({ host: "127.0.0.1", port });
+      const finish = (result) => { socket.destroy(); resolve(result); };
+      socket.once("connect", () => finish(true));
+      socket.once("error", () => finish(false));
+      socket.setTimeout(500, () => finish(false));
+    });
+    if (connected) return Date.now() - startedAt;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`Standalone runtime did not open its TCP listener within ${timeoutMs}ms.`);
 }
 
 async function verifyRuntime() {
@@ -160,15 +202,29 @@ async function verifyRuntime() {
   // short-lived command shell instead of the actual server process.
   const child = spawn(process.execPath, args, {
     env: { ...process.env, ...loadLocalEnv(), PORT: port, NODE_ENV: "production" },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     shell: false,
     detached: false,
   });
+  const runtimeDiagnostics = { port, tcpReadyMs: null, nextReady: false, startupErrorSeen: false, errorCodes: [] };
+  const inspectSafeStartupSignals = (chunk) => {
+    const output = chunk.toString("utf8");
+    if (/\bReady in\b/i.test(output)) runtimeDiagnostics.nextReady = true;
+    if (/Failed to start server|Error: listen/i.test(output)) runtimeDiagnostics.startupErrorSeen = true;
+    for (const match of output.matchAll(/\b(EADDRINUSE|EACCES|EADDRNOTAVAIL|ECONNREFUSED|ETIMEDOUT)\b/g)) {
+      if (!runtimeDiagnostics.errorCodes.includes(match[1])) runtimeDiagnostics.errorCodes.push(match[1]);
+    }
+  };
+  child.stdout.on("data", inspectSafeStartupSignals);
+  child.stderr.on("data", inspectSafeStartupSignals);
   const childExit = new Promise((_, reject) => {
     child.once("error", (error) => reject(new Error(`runtime failed to start: ${error.message}`)));
     child.once("exit", (code, signal) => reject(new Error(`runtime exited before smoke completed (code=${code}, signal=${signal ?? "none"})`)));
   });
+  void childExit.catch(() => undefined);
   try {
+    runtimeDiagnostics.tcpReadyMs = await waitForTcpListener(port, child);
+    console.log(`[deploy-verify] standalone TCP ready: port=${port}, elapsedMs=${runtimeDiagnostics.tcpReadyMs}, nextReady=${runtimeDiagnostics.nextReady}`);
     await Promise.race([
       (async () => {
         await waitForHealth(`http://127.0.0.1:${port}/charts`);
@@ -180,8 +236,11 @@ async function verifyRuntime() {
       })(),
       childExit,
     ]);
+  } catch (error) {
+    throw new Error(`${error instanceof Error ? error.message : String(error)}; runtimeDiagnostics=${JSON.stringify(runtimeDiagnostics)}`);
   } finally {
     await stopProcess(child);
+    console.log(`[deploy-verify] standalone process cleanup complete: port=${port}`);
   }
 }
 

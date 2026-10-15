@@ -37,6 +37,34 @@
 ### 커밋·푸시·배포
 - 완료: commit `aa5d607b8a0fad04b7ae39825e323df170508a0f`를 `oci`에 push. Deploy OCI run `38771175760` 성공, 운영 Flyway/API/실제 probe 기록 검증 완료.
 
+## [2026-10-16] 배포 smoke 실패 원인 관측 강화
+
+### 목표
+- standalone smoke timeout이 재발하면 서버 미기동과 HTTP route 지연을 구분하고, 테스트 프로세스가 다음 검증과 겹치지 않게 종료를 확인한다.
+
+### 반영
+- 발견: `verify-deploy.mjs`가 standalone stdout/stderr를 버려 기동 상태를 알 수 없고, Windows `taskkill`을 시작만 한 뒤 종료를 기다리지 않았다.
+- TCP listener 준비시간, Next `Ready` 신호, 허용된 오류 코드(EADDRINUSE/EACCES 등)만 비민감 요약으로 보존한다. 원시 서버 로그는 출력하지 않는다.
+- smoke 전에 TCP listener를 별도 대기해 bind 실패와 HTTP 응답 timeout을 분리하며, Windows tree-kill 종료를 기다리고 미종료 시 직접 종료 후 실패시킨다.
+
+### 검증
+- `node --check scripts/verify-deploy.mjs` 통과. `npm.cmd run deploy:verify` 성공: build, 191개 테스트 파일/651 tests 통과, typecheck, docs, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- standalone runtime: TCP listener 준비 5,419ms, `/charts` 200, invalid KIS market 400, KR/US rising chart 200, admin/cron unauthenticated 401. 자식 프로세스 종료 확인 후 게이트 성공.
+- 이번 실행은 통과했지만 이전 AbortError의 구체적 재현 원인은 확정되지 않았다. 새 TCP 단계 계측은 미기동과 라우트 지연을 다음 재발 때 구분하기 위한 방지책이며, 근본 원인 확정으로 간주하지 않는다.
+- 로컬 `.env.local`은 해시 검증된 임시 하드링크만 사용하고 검증 종료 후 제거한다. 환경 파일 값은 출력하지 않는다.
+
+### 다음 개선
+- 결과에서 TCP 준비는 성공하지만 `/charts`만 지연되는 것으로 확인되면 route별 SSR/runtime dependency를 다음 단계로 추적한다. listener가 열리지 않으면 포트 충돌·bind·기동 오류 코드부터 조사한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-16-002
+- 성과 판정: IMPROVED
+- 근거: 새 계측 적용 후 전체 deploy gate가 통과했고 TCP 준비시간 5,419ms, HTTP smoke 상태코드, 자식 프로세스 종료를 실제로 확인했다. 다만 과거 AbortError의 근본 원인은 미확정으로 남아 있다.
+- 성공 기준: 배포 검증에 성공하거나, 실패 시 TCP 단계·HTTP 단계·안전한 기동 오류 요약 중 어느 단계인지 명확히 남기고 자식 프로세스 종료 완료를 확인한다.
+
+### 커밋·푸시·배포
+- 미실행: 로컬 전체 검증은 통과했으며 commit/push/deploy 대기.
+
 ## [2026-10-15] health 이력 조회 부분 실패 격리
 
 ### 목표
