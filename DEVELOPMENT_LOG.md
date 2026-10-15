@@ -2,32 +2,34 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
-## [2026-10-15] 운영 health 자동화 이력 조회 2차 인덱스 최적화
+## [2026-10-15] 운영 health 자동화 이력 조회 병목 해소
 
 ### 목표
-- 운영 단계별 진단에서 확인한 automation_runs 이력 병목을 줄이고, 캐시 상태 조회가 statement timeout에 걸리는 원인을 status 조건 인덱스로 제거한다.
+- 운영 단계별 진단에서 확인한 automation_runs 이력 병목을 줄이고, 캐시 상태 조회의 statement timeout 재발을 운영 데이터로 검증한다.
 
 ### 반영
-- 앞선 commit `29183d6e`에서 전체·캐시별 DISTINCT ON 조회를 모듈별 LATERAL LIMIT 1로 변경하고 독립 조회를 병렬화했다. 운영 배포 후 전체 자동화 최신 조회는 51ms였지만 캐시 최신/마지막 성공은 각각 1.5초 timeout이었다.
-- 이번에는 status 조건에 맞춘 부분 인덱스 V149를 추가한다. non-SKIPPED 실행용 `(module_key, started_at DESC)`와 SUCCESS 실행용 같은 인덱스에 `finished_at` INCLUDE를 사용한다.
-- 이번 변경 범위는 마이그레이션, 회귀/진단 코드, 운영 오류 문서와 본 개발 로그로 제한한다.
+- commit `29183d6e`에서 전체·캐시별 DISTINCT ON 조회를 모듈별 LATERAL LIMIT 1로 변경하고 독립 조회를 병렬화했다. 첫 운영 배포 결과 전체 자동화 조회는 51ms였으나 캐시 최신/마지막 성공은 각각 1.5초 timeout이었다.
+- commit `05867f09`에서 상태 조건별 부분 인덱스 V149를 추가했다. non-SKIPPED 실행용 `(module_key, started_at DESC)` 및 SUCCESS 실행용 같은 인덱스에 `finished_at` INCLUDE를 적용했다.
+- 범위는 health query, 관리자 단계별 진단, 회귀 테스트, Flyway migration 및 운영/개발 문서다.
 
 ### 검증
 - 최초 적용 근거는 운영 `/api/admin/health-diagnostics`: automation_latest_by_module 51ms, cache_latest_by_module 1503ms/57014, cache_last_success_by_module 1510ms/57014, 설정 조회 8ms.
-- 전체 `npm.cmd run deploy:verify`: production build, 642 tests passed/1 skipped, typecheck, docs, 범위/KIS/cron 검사 및 standalone `/charts`·차트 API smoke 통과.
-- commit `29183d6e` 배포 workflow `38700748463` 성공. V149 적용 후 운영 진단과 `/api/health` 재검증은 후속 배포 단계에서 수행한다.
+- V149 적용 확인은 운영 `/api/admin/market-debug?market=ALL`: Flyway version 149, description `automation cache history partial indexes`.
+- 최종 운영 `/api/admin/health-diagnostics`: 전체 응답 355ms, automation_latest_by_module 94ms, cache_latest_by_module 22ms, cache_last_success_by_module 11ms, 나머지 probe 모두 성공. 공개 `/api/health` HTTP 200, status `ok`.
+- `npm.cmd run deploy:verify`: production build, 642 tests passed/1 skipped, typecheck, docs(143개 migration/V149), 범위/KIS/cron 검사 및 standalone `/charts`·차트 API smoke 통과. V149 SQL은 로컬 PostgreSQL transaction에서 실제 생성 확인 후 rollback했다.
+- Deploy OCI run `38700748463`(1차 query) 및 `38702097741`(V149) 모두 성공했다.
 
 ### 다음 개선
-- V149 적용 이후 운영 진단 API에서 cache 이력 두 probe가 1.5초 이내에 완료되는지 확인하고, 공개 `/api/health` 응답도 재측정한다. 실패 시 production explain/실제 인덱스 존재 여부를 관리자 read-only 진단으로 좁힌다.
+- 다음 개선: 운영 진단 API 응답시간과 health probe를 주기적으로 추세화하고, 개별 DB probe가 1초를 넘거나 57014가 재발하면 관리자 관측 화면에서 바로 식별할 수 있도록 경보 임계값을 설계한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-15-001
 - 성과 판정: IMPROVED
-- 근거: 전체 자동화 이력 조회는 운영에서 미측정(40초 초과) 상태에서 51ms로 줄었다. 캐시 전용 경로 두 개는 timeout이 남아 있어 이번 부분 인덱스 배포로 완료 기준을 추가 확인한다.
-- 성공 기준: 배포 후 전체·캐시 최신 이력 probe가 각각 1.5초 이내 성공하고 `/api/health`가 정상 응답하며, 같은 인덱스·쿼리 구조를 회귀 테스트로 고정한다.
+- 근거: cache_latest_by_module 1503ms/57014 → 22ms, cache_last_success_by_module 1510ms/57014 → 11ms. automation_latest_by_module은 51ms~94ms이며 전체 진단은 355ms, `/api/health`는 200/ok. Flyway 149 적용도 확인했다.
+- 성공 기준: 운영 캐시 이력 probe가 각각 1.5초 이내 정상 완료하고, `/api/health`가 정상이며, 마이그레이션 버전이 149 이상일 것. 세 기준을 모두 충족했다.
 
 ### 커밋·푸시·배포
-- 완료: 1차 쿼리 최적화 commit `29183d6e31436419fc968ce6cf4c8d2496a8998d`를 `oci`로 push했고 Deploy OCI run `38700748463` 성공. 운영 진단 결과에서 남은 두 timeout을 확인해 2차 변경을 진행 중이다.
+- 완료: query 최적화 commit `29183d6e31436419fc968ce6cf4c8d2496a8998d` 및 V149 인덱스 commit `05867f0959a11954cb95fd76955c8fb85451c35f`를 `oci`에 순차 push했다. Deploy OCI run `38700748463`, `38702097741` 모두 성공했고 최종 운영 진단 및 health endpoint까지 확인했다.
 
 ## [2026-10-12] KIS 해외주식 조건검색 API 계약·보통주 검증 보강
 

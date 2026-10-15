@@ -572,7 +572,8 @@ npm test -- --run
 - **개선**: 전체 이력을 정렬·중복 제거하지 않고 등록된 모듈 키 각각에 대해 `LEFT JOIN LATERAL` 내부에서 `ORDER BY started_at DESC LIMIT 1`을 조회한다. 캐시 최신 실행과 마지막 성공도 같은 방식으로 바꾸고, 세 이력 조회 및 설정 로딩을 함께 시작한다. 기존 `(module_key, started_at DESC)` 인덱스를 활용하는 point lookup 형태다.
 - **재발 자동 감지**: 회귀 테스트는 health snapshot의 세 이력 SQL이 모두 `LATERAL`과 `LIMIT 1`을 쓰고 이전 `DISTINCT ON` 방식으로 돌아가지 않는지 확인한다. 배포 후 `/api/admin/health-diagnostics`에서 세 probe가 각각 1.5초 안에 끝나는지 확인한다.
 - **후속 운영 검증**: commit `29183d6e` / Deploy OCI run `38700748463` 성공 후 전체 automation probe는 51ms로 개선됐으나, cache 최신 실행과 마지막 성공 probe는 다시 1.5초 제한에 걸렸다. 기존 복합 인덱스가 있어도 status 필터를 만족하는 행을 찾기 위해 오래된 인덱스 엔트리를 계속 훑을 수 있음을 확인했다.
-- **추가 개선**: V149에서 `status <> 'SKIPPED'` 및 `status = 'SUCCESS'` 조건별 부분 인덱스를 추가한다. 마지막 성공 조회 인덱스에는 `finished_at`을 INCLUDE해 heap 방문을 줄인다. 데이터 행과 JSON summary는 인덱스에 포함하지 않는다.
+- **추가 개선 및 운영 확인**: V149의 `status <> 'SKIPPED'` 및 `status = 'SUCCESS'` 조건별 부분 인덱스를 적용했다. 마지막 성공 조회 인덱스에는 `finished_at`을 INCLUDE했다. 운영 Flyway version 149를 확인했다.
 - **재발 자동 감지**: 회귀 테스트는 health snapshot의 세 이력 SQL이 모두 `LATERAL`과 `LIMIT 1`을 쓰고 이전 `DISTINCT ON` 방식으로 돌아가지 않는지 확인한다. 배포 후 `/api/admin/health-diagnostics`에서 세 probe를 각각 확인하고, cache 두 probe의 timeout 재발 여부를 기록한다.
-- **검증 한계**: 로컬 DB는 localhost:5433이며 automation 이력이 8행뿐이라 로컬 실행시간은 운영 성능 증거가 아니다. V149 적용 및 운영 인덱스 사용 이후 진단 API 결과가 최종 성과 판단 기준이다.
+- **운영 성과**: 적용 전 cache 최신 조회 1503ms/57014 및 마지막 성공 1510ms/57014에서 적용 후 각각 22ms와 11ms로 개선됐다. 전체 진단은 355ms, 공개 `/api/health`는 HTTP 200/status `ok`였다.
+- **남은 위험과 감지**: 데이터량·상태분포가 변하면 실행시간도 달라질 수 있다. 관리자 health 진단에서 cache probe별 시간과 57014를 지속 확인하고, 정기 관측 경보 개선을 후속 과제로 남긴다.
 
