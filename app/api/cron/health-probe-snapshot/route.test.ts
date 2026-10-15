@@ -19,6 +19,22 @@ describe("health probe snapshot cron", () => {
     expect(state.query).not.toHaveBeenCalled();
   });
 
+  it("accepts a Bearer authorization header", async () => {
+    state.query.mockResolvedValue({ rows: [], rowCount: 0 });
+    state.clientQuery.mockImplementation(async (input: string) => {
+      if (input === "SELECT to_regclass('public.health_probe_history') IS NOT NULL AS ready") return { rows: [{ ready: true }], rowCount: 1 };
+      return { rows: [{ value: 1 }], rowCount: 1 };
+    });
+
+    const response = await POST(new Request("http://localhost/api/cron/health-probe-snapshot", {
+      method: "POST",
+      headers: { authorization: "bEaReR   cron-test" },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, recorded: 3 });
+  });
+
   it("records measured probes and returns degraded when a probe fails", async () => {
     state.query.mockResolvedValue({ rows: [], rowCount: 0 });
     state.clientQuery.mockImplementation(async (input: string) => {

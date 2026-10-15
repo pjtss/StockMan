@@ -14,7 +14,7 @@ const PROBES: Probe[] = [
 ];
 
 function suppliedSecret(request: Request) {
-  return request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "");
+  return request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
 }
 
 export async function POST(request: Request) {

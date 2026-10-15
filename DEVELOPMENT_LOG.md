@@ -1,5 +1,32 @@
 # Development Log
 
+## [2026-10-16] 헬스 스냅샷 cron Bearer 인증 파서 수정
+
+### 목표
+- 지원되는 `Authorization: Bearer <secret>` 호출이 헬스 스냅샷 API에서 정상 인증되도록 수정한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-005
+- 원인: route의 정규식이 공백 문자 `\s` 대신 리터럴 `\\s`를 찾도록 이중 이스케이프되어 Bearer 접두사를 제거하지 못했다. `x-cron-secret` 인증에는 영향이 없다.
+- 정규식을 바로잡고 접두사 뒤 토큰을 trim했다. 대소문자 혼합·복수 공백을 포함한 Bearer 회귀 테스트를 추가했다.
+- 재발 자동 감지: endpoint 테스트가 Bearer 인증으로 실제 POST 성공(200) 및 3개 probe 기록을 검증한다.
+
+### 검증
+- 전용 Vitest: 1개 파일, 3개 테스트 통과.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 193개 테스트 파일 중 192개 통과/1개 skip(657개 통과/1개 skip), typecheck, docs:check, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- Standalone smoke 통과: `/charts` 200, invalid KIS market 400, KR/US top-rising chart 200, 보호된 admin/cron 미인증 401, 프로세스 종료 정리 완료.
+- 운영 API 사전 진단: 9개 probe 모두 성공, 전체 응답 63ms; health-probe-history 최근 기록에도 실패·경보 없음.
+
+### 다음 개선
+- 다른 cron endpoint의 Bearer 파서 변형을 정적 검사해 이중 이스케이프가 재발하지 않는지 일괄 점검한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 이전 정규식은 정상 Bearer 헤더를 토큰으로 정규화하지 못했다. 수정 후 대소문자 혼합 및 공백 포함 요청이 인증되어 성공하는 회귀 테스트를 추가했다.
+
+### 커밋·푸시·배포
+- 미실행: 로컬 필수 검증을 통과했으며 커밋·푸시·배포 예정.
+
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
 ## [2026-10-16] 검증 명령 timeout 후 프로세스 트리 정리 보장
