@@ -7,6 +7,7 @@ import { loadUsTurnoverFilterSettings, type UsTurnoverFilterSettings } from "@/l
 import { syncDailyActivityStatus } from "@/lib/daily-activity-status";
 import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
 import { intradayMemoryState } from "@/lib/intraday-memory-state";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const US_EXCHANGES = ["NAS", "AMS", "NYS"] as const;
 export const US_INTRADAY_FOCUS_POOL_SIZE = 30;
@@ -19,6 +20,10 @@ const ETF_NAME_HINT = /\b(?:ISHARES|VISTASHARES|ROUNDHILL|KRANESHARES|KFA|SPDR|V
 // security type 2 (stock). The official master name remains the authoritative
 // product descriptor for these cases, so exclude them from common-stock scans.
 export const EXCLUDED_US_OFFICIAL_NAME = /(?:preferred|\bpfd\b|\b(?:senior\s+)?notes?\b|\bnts\b|\bbonds?\b|\bunits?\b|\bwarrants?\b|\bright\b|\bdebentures?\b|우선주|채권|워런트)/i;
+function safeProviderCode(value: unknown) {
+  const candidate = value == null ? "" : String(value);
+  return /^[A-Za-z0-9_-]{1,40}$/.test(candidate) ? candidate : null;
+}
 // KIS ranking responses commonly contain metadata in output1 and the actual
 // rows in output2. Never prefer output1 merely because it exists: it is an
 // object for successful responses and would otherwise hide output2 entirely.
@@ -214,9 +219,9 @@ async function loadOfficialEligibility(scopes: UsTopRisingScope[]) {
     }
     return { eligibleKeys, lookupFailed: false, lookupFallbackUsed, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[US TOP RISING] official eligibility lookup failed; detection is fail-closed:", message);
-    return { eligibleKeys: new Set<string>(), lookupFailed: true, lookupFallbackUsed, lookupError: message.slice(0, 240), cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
+    const diagnostics = safeErrorMetadata(error);
+    console.error("[US TOP RISING] official eligibility lookup failed; detection is fail-closed", diagnostics);
+    return { eligibleKeys: new Set<string>(), lookupFailed: true, lookupFallbackUsed, lookupError: diagnostics.errorCode, cacheHits: keys.length - missingKeys.length, cacheMisses: missingKeys.length };
   }
 }
 
@@ -282,7 +287,7 @@ async function loadUsTopRisingScopesUncached() {
     try {
       response = await fetchKisUsTopRisingApi({ excd: market });
     } catch (error) {
-      primaryError = `primary: ${error instanceof Error ? error.message : String(error)}`.slice(0, 180);
+      primaryError = `primary: ${safeErrorMetadata(error).errorCode}`;
     }
     sourceRows = isSuccessfulTopRisingResponse(response) ? rows(response?.response?.parsed) : [];
     if (response && !isSuccessfulTopRisingResponse(response)) primaryError = `primary response unsuccessful (${response.status})`;
@@ -299,7 +304,7 @@ async function loadUsTopRisingScopesUncached() {
         fallbackUsed = selection.fallbackUsed;
         if (!isSuccessfulTopRisingResponse(fallback)) fallbackError = `fallback response unsuccessful (${fallback?.status ?? "no response"})`;
       } catch (error) {
-        fallbackError = `fallback: ${error instanceof Error ? error.message : String(error)}`.slice(0, 180);
+        fallbackError = `fallback: ${safeErrorMetadata(error).errorCode}`;
       }
     }
     const parsed = response?.response?.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output1?: { nrec?: unknown } } | null;
@@ -332,13 +337,13 @@ async function loadUsTopRisingScopesUncached() {
       });
     }
     const errorMessage = !responseOk
-      ? `KIS_RESPONSE_NOT_SUCCESSFUL: ${String(parsed?.msg_cd ?? response?.status ?? "NO_RESPONSE")}${primaryError ? `; ${primaryError}` : ""}${fallbackError ? `; fallback: ${fallbackError}` : ""}`
+      ? `KIS_RESPONSE_NOT_SUCCESSFUL: ${safeProviderCode(parsed?.msg_cd) ?? response?.status ?? "NO_RESPONSE"}${primaryError ? `; ${primaryError}` : ""}${fallbackError ? `; fallback: ${fallbackError}` : ""}`
       : sourceRows.length === 0
         ? "NO_RANKING_ROWS: KIS returned a successful response without rows"
         : sourceRows.length < 100
           ? `PARTIAL_RANKING_PAGE: received ${sourceRows.length}/100 rows${fallbackError ? `; fallback failed: ${fallbackError}` : ""}`
           : undefined;
-    return { selected, market: { market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: selected.length, productExcluded, invalidRows, duplicateExcluded, fallbackUsed, responseOk, sourceComplete, collectedAt, kis: { rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, recordCount: parsed?.output1?.nrec ?? sourceRows.length }, error: errorMessage, warning: primaryError && responseOk ? `기본 순위 요청 실패 후 전체 순위 재조회로 복구됨: ${primaryError}` : undefined } };
+    return { selected, market: { market, status: response?.status ?? 0, sourceCount: sourceRows.length, selectedCount: selected.length, productExcluded, invalidRows, duplicateExcluded, fallbackUsed, responseOk, sourceComplete, collectedAt, kis: { rtCd: safeProviderCode(parsed?.rt_cd), msgCd: safeProviderCode(parsed?.msg_cd), recordCount: parseOptionalKisNumber(parsed?.output1?.nrec) ?? sourceRows.length }, error: errorMessage, warning: primaryError && responseOk ? `기본 순위 요청 실패 후 전체 순위 재조회로 복구됨: ${primaryError}` : undefined } };
   };
   const marketResults = await Promise.all(US_EXCHANGES.map(loadMarket));
   const scopes: UsTopRisingScope[] = []; const markets: Record<string, unknown>[] = [];

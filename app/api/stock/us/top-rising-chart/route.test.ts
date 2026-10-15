@@ -35,7 +35,22 @@ describe("GET /api/stock/us/top-rising-chart", () => {
     expect(body.ageSeconds).toBeGreaterThanOrEqual(4);
     expect(body.markets[0]).toMatchObject({ market: "NAS", sourceCount: 4, requestedCount: 100, sourceComplete: false, eligibleCommonStockCount: 1, productExcluded: 1, invalidRows: 0, duplicateExcluded: 1, selectedCount: 2 });
     expect(body.markets[0]).not.toHaveProperty("rawTextPreview");
+    expect(body.markets[0].kis).toEqual({ rtCd: "0", msgCd: "MCA00000", recordCount: null });
+    expect(JSON.stringify(body)).not.toContain("success");
     expect(mocks.load).not.toHaveBeenCalled();
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it("returns a stable public error without exposing exception details", async () => {
+    mocks.getCached.mockReturnValue(null);
+    mocks.load.mockRejectedValue(new Error("postgres://dbuser:db-password@host/stockman token=secret-token"));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body).toMatchObject({ ok: false, error: "US_TOP_RISING_UNAVAILABLE", errorCode: "INTEGRATION_ERROR" });
+    expect(JSON.stringify(body)).not.toContain("db-password");
+    expect(JSON.stringify(body)).not.toContain("secret-token");
   });
 });

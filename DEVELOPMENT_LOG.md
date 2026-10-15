@@ -1,5 +1,39 @@
 # Development Log
 
+## [2026-10-16] 해외 KIS 진단 로그 및 TOP 상승률 공개 오류 응답 정제
+
+### 목표
+- 해외 KIS 요청 실패 진단에서 원문 예외·공급자 자유형 메시지가 로그/Rate Limit 테이블 또는 공개 API에 남지 않도록 한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-012
+- 공통 `kisRequest` 경계가 네트워크 예외 원문을 KIS debug log에 저장하고, Rate Limit 이벤트의 `msg1` 전체 문자열을 `kis_msg1_code`에 저장하던 경로를 확인했다.
+- `safeErrorMetadata` 기반 분류 코드만 debug log에 남기며, Rate Limit 이벤트의 KIS 코드 필드는 영숫자·`_`·`-`로 제한했다. 자유형 `msg1`은 정형 코드인 경우에만 저장한다.
+- 미국 TOP 상승률 유니버스의 DB/KIS 예외 문자열을 일반 진단 코드로 치환하고, KIS 응답 메시지는 공개 응답에서 제거했다. 공개 차트 API의 예외·스냅샷 오류도 안정적인 오류 코드만 노출한다.
+- 회귀 테스트는 데이터베이스 URL·비밀번호·토큰이 공통 KIS 로그와 공개 API 응답에 포함되지 않는지 검사한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 공통 통신 경계와 오류 응답에서 분류 진단 객체 대신 공급자/예외 원문을 보존하는 관행.
+- 재발 감지: KIS 공통 경계 및 TOP 상승률 API의 secret-canary 회귀 테스트를 유지하고, 새로운 외부 연동 오류 저장은 `safeErrorMetadata`와 명시적인 허용 필드로만 구성한다.
+- 범위 한계: 이번에는 공통 KIS 통신 경계와 US TOP 상승률 경로를 수정했다. 다른 외부 연동의 로그·저장·API 응답은 다음 감사 항목이다.
+
+### 검증
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/kis-request-framework.test.ts app/api/stock/us/top-rising-chart/route.test.ts lib/us-top-rising-universe.test.ts`: 4개 파일, 20개 테스트 통과.
+- `npm.cmd run docs:check`: 통과(문서 entry 18개, migration 최신 V150).
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: 통과. production build 성공, standalone smoke(`/charts` 200, invalid KIS market 400, 국내·해외 top-rising chart API 200, 미인증 관리자·cron API 401), 테스트 196개 파일 통과/1개 skip(672개 통과/1개 skip), typecheck 및 docs/auth/KIS boundary/cron 게이트 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 공통 KIS 네트워크 로그와 rate-limit 이벤트에서 자유형 입력 제거 테스트가 통과했고, 공개 TOP 상승률 API의 DB/KIS 예외 메시지 비노출 회귀 테스트도 통과했다. 전체 빌드·테스트·standalone smoke가 성공했으며 운영 반영은 배포 후 확인한다.
+- 완료 기준: 전체 테스트·빌드·standalone smoke 통과, 커밋/배포 후 서비스 SHA 확인.
+
+### 다음 개선
+- RSS·SEC·Discord·기타 외부 공급자 응답에서 자유형 오류 문자열이 저장되거나 API에 반사되는지 조사한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증과 운영 배포 확인 후 기록한다.
+
 ## [2026-10-16] 국내 KIS 스캐너 오류 로그의 원문 메시지 제거
 
 ### 목표

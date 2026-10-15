@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCachedUsTopRisingScopes, loadUsTopRisingScopes } from "@/lib/us-top-rising-universe";
 import { saveUsTopRisingSnapshot } from "@/lib/us-top-rising-snapshot";
 import { intradayMemoryState } from "@/lib/intraday-memory-state";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,8 @@ export async function GET() {
         snapshotId = await saveUsTopRisingSnapshot({ ok: result.universe.ok, markets: result.universe.markets, scopes: result.scopes });
       }
     } catch (error) {
-      snapshotError = error instanceof Error ? error.message : "SNAPSHOT_SAVE_FAILED";
-      console.warn("[US TOP RISING] snapshot save failed:", snapshotError);
+      snapshotError = safeErrorMetadata(error).errorCode;
+      console.warn("[US TOP RISING] snapshot save failed", { errorCode: snapshotError });
     }
     const collectedAt = result?.universe.collectedAt ?? null;
     const collectedAtMs = collectedAt ? Date.parse(collectedAt) : NaN;
@@ -43,7 +44,11 @@ export async function GET() {
       collectedAt: market.collectedAt,
       error: market.error,
       warning: market.warning,
-      kis: market.kis,
+      kis: market.kis ? {
+        rtCd: market.kis.rtCd ?? null,
+        msgCd: market.kis.msgCd ?? null,
+        recordCount: market.kis.recordCount ?? null,
+      } : null,
     })) ?? [];
     return NextResponse.json({
       ok: result ? Boolean(result.universe.ok) : items.length > 0,
@@ -65,6 +70,6 @@ export async function GET() {
       stale: ageSeconds == null || ageSeconds > 60,
     }, { status: 200, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return NextResponse.json({ ok: false, items: [], error: error instanceof Error ? error.message : "US_TOP_RISING_UNAVAILABLE" }, { status: 502 });
+    return NextResponse.json({ ok: false, items: [], error: "US_TOP_RISING_UNAVAILABLE", errorCode: safeErrorMetadata(error).errorCode }, { status: 502 });
   }
 }
