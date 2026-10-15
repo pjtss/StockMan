@@ -26,8 +26,9 @@ describe("sync-filings cron route", () => {
     ["POST", POST],
   ])("accepts an authorized %s request", async (method, handler) => {
     const response = await handler(
-      new Request(`http://localhost/api/cron/sync-filings?secret=test-secret`, {
+      new Request("http://localhost/api/cron/sync-filings", {
         method,
+        headers: { "x-cron-secret": "test-secret" },
       }),
     );
 
@@ -38,6 +39,17 @@ describe("sync-filings cron route", () => {
   it("rejects an invalid cron secret", async () => {
     const response = await POST(
       new Request("http://localhost/api/cron/sync-filings?secret=invalid", {
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mocks.runFilingSync).not.toHaveBeenCalled();
+  });
+
+  it("rejects secrets supplied in the URL query string", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/cron/sync-filings?secret=test-secret", {
         method: "POST",
       }),
     );

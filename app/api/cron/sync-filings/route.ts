@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { runFilingSync } from "@/lib/filing-sync";
 import { withAutomationRun } from "@/lib/automation-run";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
 async function handleSyncFilings(request: Request) {
-  const secret = request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret") || "";
-  if (!secret || secret !== process.env.CRON_SECRET) {
+  if (!isCronRequestAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

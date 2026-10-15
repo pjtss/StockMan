@@ -1,5 +1,38 @@
 # Development Log
 
+## [2026-10-16] Cron 비밀값의 URL 쿼리 전달 제거
+
+### 목표
+- 예약 작업 인증 비밀값이 URL에 들어가 프록시·웹서버 접근 로그 등에 남을 수 있는 경로를 제거하고, 저장소에서 사용하는 헤더 방식만 지원한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-008
+- OCI cron 호출은 이미 `x-cron-secret` 헤더를 사용함을 `scripts/oci-cron.sh`에서 확인했다.
+- `/api/cron/sync-filings`와 `/api/cron/us-breaking-news-forwarder`가 지원하던 `?secret=` fallback을 제거하고, 공통 `isCronRequestAuthorized`를 사용하도록 변경했다.
+- 공통 검사기는 `x-cron-secret`과 대소문자 무관 `Bearer` Authorization을 지원하고, 기대값·헤더 공백을 정규화하며 URL query는 절대 인증에 사용하지 않는다.
+- 회귀 테스트는 헤더 인증, Bearer 공백, 빈 사용자 정의 헤더 fallback, 미설정/오류 비밀값, query 거부 및 두 API 메서드(GET/POST) 동작을 고정한다.
+
+### 검증
+- `npm.cmd run deploy:verify` 최종 재실행 통과: production build, standalone smoke(`/charts` 200, 국내·해외 top-rising API 200, unauthenticated admin/cron 401), 테스트 195개 파일 통과/1개 skip(666개 통과/1개 skip), typecheck, docs, verify-scope, KIS boundary, Bearer audit(170 routes), OCI cron(21 endpoints).
+- 최초 전체 검증은 최신 DEVELOPMENT_LOG 계약 누락으로 `docs:check`에서 실패했다. 로그 계약을 충족하도록 수정한 뒤 전체 검증을 처음부터 다시 실행해 통과했다.
+- 집중 테스트: 2개 파일, 9개 테스트 통과; `git diff --check` 통과.
+
+### 남은 위험 및 다음 개선
+- 다른 API 경로에도 legacy CRON_SECRET 파서가 남아 있어 인증 계약의 전면 통일은 미완료다. 이 변경은 URL query secret을 허용했던 두 엔드포인트만 다루며, 나머지 호출 경로는 별도 호출자 호환성 확인 후 순차 이전한다.
+- 배포 후 query credential 요청은 401, 기존 `scripts/oci-cron.sh` 헤더 요청은 정상 동작하는지 운영 스모크로 확인한다.
+- 쿼리 파라미터 자체를 애플리케이션 접근 로그에 기록하는 다른 API도 별도 점검한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: query parameter만 제공된 요청이 두 cron route에서 401로 거부되고, 내부 OCI의 기존 헤더 인증 방식은 route 테스트와 배포 검증에서 유지됨을 확인했다. 첫 문서 게이트 실패도 로그 계약 수정 후 전체 검증 재실행으로 해소했다. 운영 반영은 아직 미확인이다.
+- 완료 기준: 전체 배포 검증 통과, 호출 스크립트 호환성 검증, 운영 SHA 및 인증 스모크 확인.
+
+### 다음 개선
+- 나머지 CRON_SECRET 보호 라우트의 인증 방식과 호출자를 인벤토리화하고, 공통 helper 이전을 단계별로 적용한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증은 통과했으며, 이 검증 결과 기록 변경의 재검증 후 커밋·푸시·배포한다.
+
 ## [2026-10-16] standalone smoke를 테스트 자원 사용 전에 실행
 
 ### 목표
@@ -25,7 +58,7 @@
 - 근거: 테스트 자원 압박 전 runtime smoke를 수행한 최종 검증에서 `/charts` 제한시간 초과가 재현되지 않았고 모든 smoke·quality gate가 통과했다.
 
 ### 커밋·푸시·배포
-- 미실행: 수정 후 전체 검증을 거쳐 진행 예정.
+- 완료: 커밋 `b3069d2f000f283409eba0e163731127b8d66b4a`을 `oci`에 push했다. 운영 `/api/debug/health`가 동일한 SHA와 `status: ok`를 반환해 배포를 확인했다.
 
 ## [2026-10-16] Bearer 인증 정규식 재발 방지 게이트 추가
 
