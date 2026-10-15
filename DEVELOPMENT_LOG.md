@@ -2,6 +2,37 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-16] DB health probe 추세 수집과 관리자 경보
+
+### 목표
+- 진단 API의 일회성 응답시간만으로는 시간대별 지연·연속 오류를 알 수 없으므로, 운영에서 주기적으로 측정하고 관리자 화면에서 추세를 확인한다.
+
+### 반영
+- 원인: 기존 `/api/admin/health-diagnostics`는 호출 시점에만 probe별 `durationMs`를 반환하며 결과를 저장하거나 추세/경보를 계산하지 않았다.
+- Flyway V150 `health_probe_history` 및 probe별·시간별 조회 인덱스를 추가한다. 스키마는 probe 이름, 소요시간, 성공 여부, 오류 코드, 실행 식별자만 보관하고 14일 보존한다.
+- OCI 5분 cron 시작 시 DB 연결·automation history 조회·health schema probe를 실행하고 개별 측정 결과를 기록한다. 자격 증명/SQL 결과 행은 저장하지 않는다.
+- 관리자 전용 `/api/admin/health-probe-history`와 `/admin/health-probes`를 추가한다. 최근 24시간 표본/평균/최대/실패 수와 최근 기록을 제공하고, probe 3회 연속 실패 및 최근 성공 probe 1,000ms 이상을 표시한다.
+- 검증 대상을 cron 인증/부분 실패 기록, 경보 임계값, 관리자 메뉴 등록 및 OCI cron 등록으로 고정한다.
+
+### 검증
+- `npm.cmd run deploy:verify` 성공: Next production build, 191개 테스트 파일에서 651 passed, TypeScript, docs(최신 migration V150), verify-scope, KIS boundary, OCI cron 21 endpoints 및 standalone HTTP smoke.
+- Standalone HTTP 결과: `/charts` 200, 유효하지 않은 KIS market 400, 국내/해외 TOP 상승 차트 API 200, 관리자 history API와 cron API는 자격증명 없이 각각 401.
+- 첫 smoke 실패를 조사하며 격리 worktree에 `.env.local`이 없음을 확인했다. 주 프로젝트 파일을 수정하지 않고 임시 하드링크로 환경만 연결했으며 SHA-256 일치를 확인했다. 기본 동적 포트에서 timeout이 재현됐으나 고정 포트 `3333`의 최종 전체 검증은 통과했다. 별도 수동 standalone 재현도 `/charts` 200을 반환했다.
+- 수동 standalone 프로세스가 `.next-deploy-verify`를 사용하는 동안 후속 빌드가 겹치는 것을 발견하고, 최종 전체 검증 전에 두 프로세스를 종료했다. 이 worktree의 `.env.local` 임시 링크는 검증 후 제거한다.
+- 로컬 DB migration V150은 적용하지 않는다. 현재 운영 migration/API 확인은 push 후 Deploy OCI 성공을 확인한 다음 수행한다.
+
+### 다음 개선
+- 운영 표본 24시간이 쌓인 뒤 실제 평균/최대/연속 실패를 확인하고, 1초 기준이 유의미한지 재평가한다. 현재는 단일 스냅샷 slow alert이며 p95 및 복구 알림은 후속 과제다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-16-001
+- 성과 판정: UNMEASURED
+- 근거: 코드와 테스트 및 전체 local deploy gate는 통과했으나 아직 운영에서 V150 적용과 주기 수집을 확인하지 않았다.
+- 성공 기준: cron이 probe를 기록하고 실패 일부를 보존, 관리자 전용 trend API/UI가 24시간 데이터와 지정 경보를 제공, 배포 검증 및 운영에서 migration/API 응답을 확인.
+
+### 커밋·푸시·배포
+- 미실행: 검증 및 배포 단계를 진행 중이다.
+
 ## [2026-10-15] health 이력 조회 부분 실패 격리
 
 ### 목표

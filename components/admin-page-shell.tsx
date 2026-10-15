@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  HeartPulse,
   BarChart3,
   Database,
   ChartNoAxesCombined,
@@ -30,6 +31,7 @@ const NAV_ICONS = {
   blacklist: ListFilter,
   "sec-test": ChartNoAxesCombined,
   observability: Activity,
+  "health-probes": HeartPulse,
   "stocktitan-rss": Newspaper,
   "user-activity": Users,
   database: Database,

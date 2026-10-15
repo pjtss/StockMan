@@ -89,13 +89,13 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
 }
 
-async function waitForJson(url, timeoutMs = 30_000, expectedStatus) {
+async function waitForJson(url, timeoutMs = 30_000, expectedStatus, init = {}) {
   console.log(`[deploy-verify] smoke start: ${url}`);
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+      const response = await fetch(url, { ...init, signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
       if (contentType.includes("application/json")) {
@@ -175,6 +175,8 @@ async function verifyRuntime() {
         await waitForJson(`http://127.0.0.1:${port}/api/kis/us-search?market=INVALID`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
+        await waitForJson(`http://127.0.0.1:${port}/api/admin/health-probe-history`, 30_000, 401);
+        await waitForJson(`http://127.0.0.1:${port}/api/cron/health-probe-snapshot`, 30_000, 401, { method: "POST" });
       })(),
       childExit,
     ]);
