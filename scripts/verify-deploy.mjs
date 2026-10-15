@@ -3,6 +3,7 @@ import { createConnection, createServer } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { stopChildProcess, waitForProcessExit } from "./child-process-lifecycle.mjs";
 import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
+import { runDeploymentVerification } from "./deployment-verification-order.mjs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
@@ -228,12 +229,13 @@ async function verifyRuntime() {
   }
 }
 
-// Build before the full Vitest suite. On constrained developer/CI hosts the
-// test workers can retain enough filesystem/CPU pressure to make a following
-// Next build appear hung even though the same build succeeds in isolation.
-// Keeping the build first makes that resource dependency explicit and fails
-// fast before the longer quality suite runs.
-await run(npm, ["run", "build"], { env: { ...process.env, NEXT_DIST_DIR: verifyDistDir } });
-await verifyQuality();
-await verifyRuntime();
+// Keep build first so tests cannot hold build output or build resources, then
+// smoke the standalone server before Vitest workers add memory/CPU pressure.
+// On constrained local runners, running runtime smoke after the full suite can
+// make an otherwise ready /charts response exceed the per-request timeout.
+await runDeploymentVerification({
+  build: () => run(npm, ["run", "build"], { env: { ...process.env, NEXT_DIST_DIR: verifyDistDir } }),
+  runtime: verifyRuntime,
+  quality: verifyQuality,
+});
 console.log("Deployment verification passed: quality gates, build, and runtime smoke test.");

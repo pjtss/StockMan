@@ -1,5 +1,32 @@
 # Development Log
 
+## [2026-10-16] standalone smoke를 테스트 자원 사용 전에 실행
+
+### 목표
+- constrained local runner에서 전체 테스트 뒤 standalone `/charts` smoke가 간헐적으로 request timeout되는 검증 순서 문제를 줄인다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-007
+- 원인 근거: 같은 빌드·코드에서 test suite는 통과하고 Next readiness도 startup 오류 없이 확인됐지만, 테스트 완료 직후 standalone `/charts`만 15초 timeout됐다. 시스템 메모리 여유는 약 2.7GB였다.
+- 검증 순서를 `build → standalone runtime smoke → resource-heavy quality suite`로 분리하는 `runDeploymentVerification`을 추가했다.
+- 단계 순서를 회귀 테스트로 고정해 runtime smoke가 테스트 suite 뒤로 이동하면 테스트가 실패한다.
+
+### 검증
+- 단계 순서 단위 테스트 및 전체 배포 검증은 커밋 전 실행 예정이다.
+- 이전 재시도에서도 build·659개 전체 테스트·typecheck·정적 감사는 통과했으나 runtime smoke가 반복 timeout되어 최종 성공으로 처리하지 않았다.
+- 수정 후 `npm.cmd run deploy:verify` 통과: production build, 195개 테스트 파일 중 194개 통과/1개 skip(660개 통과/1개 skip), typecheck, docs, verify-scope, KIS boundary, Bearer auth audit(170 routes), OCI cron 21 endpoints.
+- Runtime smoke가 테스트 suite 전에 통과: TCP 7,532ms, Next ready 10,968ms, `/charts` 200, KR/US top-rising 200, 예상한 invalid/unauthorized 400·401, 종료 정리 완료.
+
+### 다음 개선
+- 이 순서 변경 후 CI와 로컬에서 `/charts`의 cold-start 응답 시간을 누적 기록해 15초 상한이 적정한지 실측한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 테스트 자원 압박 전 runtime smoke를 수행한 최종 검증에서 `/charts` 제한시간 초과가 재현되지 않았고 모든 smoke·quality gate가 통과했다.
+
+### 커밋·푸시·배포
+- 미실행: 수정 후 전체 검증을 거쳐 진행 예정.
+
 ## [2026-10-16] Bearer 인증 정규식 재발 방지 게이트 추가
 
 ### 목표
@@ -26,7 +53,7 @@
 - 근거: 이전에는 발견된 오타를 고치는 회귀 테스트만 있었고 다른 route의 재발은 자동 감지하지 않았다. 이제 배포 검증이 API route 전부를 검사하고 잘못된 source pattern이 있으면 실패한다.
 
 ### 커밋·푸시·배포
-- 미실행: 전체 로컬 검증 이후 커밋·푸시·배포 예정.
+- 완료: 커밋 `d5bf82b8204397b6ccc650d89149d32e627d0ac3`을 `oci`에 push했다. 운영 `/api/debug/health`가 동일한 commit SHA와 `status: ok`를 반환해 배포 반영을 확인했다.
 
 ## [2026-10-16] 헬스 스냅샷 cron Bearer 인증 파서 수정
 
