@@ -571,5 +571,8 @@ npm test -- --run
 - **운영 근거**: `/api/admin/health-diagnostics`에서 연결·테이블·컬럼·Flyway probe는 1–184ms, 캐시 설정 조회는 21ms였으나 세 개의 `DISTINCT ON (module_key) ... ORDER BY module_key, started_at DESC` 이력 조회는 모두 쿼리 타임아웃 코드 `57014`로 끝났다. 따라서 DB 연결이나 전체 스냅샷의 모든 쿼리가 느린 것이 아니라, 자동화 이력의 모듈별 최신 행 조회 형태가 병목임을 확인했다.
 - **개선**: 전체 이력을 정렬·중복 제거하지 않고 등록된 모듈 키 각각에 대해 `LEFT JOIN LATERAL` 내부에서 `ORDER BY started_at DESC LIMIT 1`을 조회한다. 캐시 최신 실행과 마지막 성공도 같은 방식으로 바꾸고, 세 이력 조회 및 설정 로딩을 함께 시작한다. 기존 `(module_key, started_at DESC)` 인덱스를 활용하는 point lookup 형태다.
 - **재발 자동 감지**: 회귀 테스트는 health snapshot의 세 이력 SQL이 모두 `LATERAL`과 `LIMIT 1`을 쓰고 이전 `DISTINCT ON` 방식으로 돌아가지 않는지 확인한다. 배포 후 `/api/admin/health-diagnostics`에서 세 probe가 각각 1.5초 안에 끝나는지 확인한다.
-- **검증 한계**: 로컬 DB는 localhost:5433이며 automation 이력이 8행뿐이라 로컬 실행시간은 운영 성능 증거가 아니다. 운영 인덱스 사용 및 처리시간은 수정 배포 후 진단 API로 다시 검증해야 한다.
+- **후속 운영 검증**: commit `29183d6e` / Deploy OCI run `38700748463` 성공 후 전체 automation probe는 51ms로 개선됐으나, cache 최신 실행과 마지막 성공 probe는 다시 1.5초 제한에 걸렸다. 기존 복합 인덱스가 있어도 status 필터를 만족하는 행을 찾기 위해 오래된 인덱스 엔트리를 계속 훑을 수 있음을 확인했다.
+- **추가 개선**: V149에서 `status <> 'SKIPPED'` 및 `status = 'SUCCESS'` 조건별 부분 인덱스를 추가한다. 마지막 성공 조회 인덱스에는 `finished_at`을 INCLUDE해 heap 방문을 줄인다. 데이터 행과 JSON summary는 인덱스에 포함하지 않는다.
+- **재발 자동 감지**: 회귀 테스트는 health snapshot의 세 이력 SQL이 모두 `LATERAL`과 `LIMIT 1`을 쓰고 이전 `DISTINCT ON` 방식으로 돌아가지 않는지 확인한다. 배포 후 `/api/admin/health-diagnostics`에서 세 probe를 각각 확인하고, cache 두 probe의 timeout 재발 여부를 기록한다.
+- **검증 한계**: 로컬 DB는 localhost:5433이며 automation 이력이 8행뿐이라 로컬 실행시간은 운영 성능 증거가 아니다. V149 적용 및 운영 인덱스 사용 이후 진단 API 결과가 최종 성과 판단 기준이다.
 
