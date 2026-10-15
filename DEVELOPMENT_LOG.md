@@ -22,17 +22,19 @@
 - `npm.cmd run docs:check`: 통과(문서 entry 18개, migration 최신 V150).
 - `git diff --check`: 통과.
 - `npm.cmd run deploy:verify`: 통과. production build 성공, standalone smoke(`/charts` 200, invalid KIS market 400, 국내·해외 top-rising chart API 200, 미인증 관리자·cron API 401), 테스트 196개 파일 통과/1개 skip(672개 통과/1개 skip), typecheck 및 docs/auth/KIS boundary/cron 게이트 통과.
+- OCI 배포 workflow `38805231990`: 성공, 대상 커밋 `bbb18273f721334881588bbd808634be3b779c89`.
+- 운영 관리자 health API: `status=ok`, 서비스 SHA `bbb18273f721334881588bbd808634be3b779c89`, 빌드 시각 `2026-10-16T05:50:46+09:00` 확인.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
-- 근거: 공통 KIS 네트워크 로그와 rate-limit 이벤트에서 자유형 입력 제거 테스트가 통과했고, 공개 TOP 상승률 API의 DB/KIS 예외 메시지 비노출 회귀 테스트도 통과했다. 전체 빌드·테스트·standalone smoke가 성공했으며 운영 반영은 배포 후 확인한다.
+- 근거: 공통 KIS 네트워크 로그와 rate-limit 이벤트에서 자유형 입력 제거 테스트가 통과했고, 공개 TOP 상승률 API의 DB/KIS 예외 메시지 비노출 회귀 테스트도 통과했다. 전체 빌드·테스트·standalone smoke가 성공했으며 운영 health API가 새 SHA와 `ok`를 확인했다.
 - 완료 기준: 전체 테스트·빌드·standalone smoke 통과, 커밋/배포 후 서비스 SHA 확인.
 
 ### 다음 개선
 - RSS·SEC·Discord·기타 외부 공급자 응답에서 자유형 오류 문자열이 저장되거나 API에 반사되는지 조사한다.
 
 ### 커밋·푸시·배포
-- 미실행: 전체 검증과 운영 배포 확인 후 기록한다.
+- 완료: 커밋 `bbb18273f721334881588bbd808634be3b779c89`를 `oci`에 푸시했고 workflow `38805231990` 성공 및 운영 health SHA 일치를 확인했다.
 
 ## [2026-10-16] 국내 KIS 스캐너 오류 로그의 원문 메시지 제거
 
