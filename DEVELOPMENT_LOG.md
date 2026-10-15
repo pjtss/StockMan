@@ -28,12 +28,14 @@
 - 성과 판정: IMPROVED
 - 근거: 호출계약 테스트에서 같은 키 2회 요청 및 동시 요청이 각각 KIS fetch 1회로 합쳐지고, 만료 전에 키를 갱신하며 실전/모의와 credential 변경을 격리함을 확인했다. 운영 반영 후 실트래픽 절감량은 관측해야 한다.
 - 완료 기준: 모듈·route 테스트와 deploy verification 통과, 운영 서비스 SHA 확인.
+- 운영 배포 완료: GitHub Actions `Deploy OCI #997` 성공 (run `38817560167`); `/api/debug/health`에서 `2026-10-16T07:37:03Z` 기준 service commit `2808bbafdd24352722ea8110bf947417e7f50713` 일치, DB 연결·스키마·Flyway health 정상.
 
 ### 다음 개선
 - 차트 realtime Approval 경로 공개 호출량과 client/IP별 WebSocket 연결 남용을 계측하고 제한 정책을 검토한다.
 
 ### 커밋·푸시·배포
-- 미실행: 로컬 검증 통과 후 진행한다.
+- 완료: 커밋 `2808bbafdd24352722ea8110bf947417e7f50713`을 `oci` 브랜치에 push.
+- 완료: GitHub Actions #997 성공 및 운영 `/api/debug/health`의 service SHA 일치 확인.
 
 ## [2026-10-16] 공개 데이터 API 오류 응답 및 SEC 리스크 쓰기 권한 강화
 
