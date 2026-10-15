@@ -2,6 +2,36 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-16] 배포 smoke 준비 로그 관측 경쟁 조건 수정
+
+### 목표
+- TCP listener 연결 직후 준비 로그를 확인해 실제 준비 신호가 도착하기 전에 `false`로 기록되는 관측 경쟁 조건을 없앤다.
+
+### 반영
+- 추적 ID: CI-2026-10-16-003
+- 이전 `deploy:verify` 실행에서 TCP 준비와 `/charts` HTTP smoke는 통과했지만 `nextReady=false`로 기록됐다.
+- standalone 서버를 별도로 실행해 Next 15 출력 `✓ Ready in 226ms`를 확인했다. TCP 연결 직후 로그를 찍는 순서 때문에 준비 문구가 아직 도착하지 않은 상태를 읽는 경쟁 조건이었다.
+- 준비 로그 최초 관측 시각(`nextReadyObservedMs`)을 측정하고, 임의 청크 경계에 걸친 로그 문구도 판별하도록 최근 128자만 안전하게 이어 붙인다. 원시 서버 로그는 기록하거나 노출하지 않는다.
+- 준비 상태 요약은 HTTP smoke 전체가 끝난 뒤에 출력해 진단 시점과 의미를 맞춘다. 실제 HTTP 요청 성공을 readiness 신호 대신으로 간주하지 않는다.
+
+### 검증
+- 첫 `npm.cmd run deploy:verify`는 새 개발 로그가 필수 템플릿을 따르지 않아 `docs:check`에서 실패했다. 로그를 프로젝트의 개선 과제 형식에 맞춘 뒤 재실행했다.
+- `node --check` 및 targeted tracker test 2/2 통과. 최종 `npm.cmd run deploy:verify` 성공: production build, 192 test files/653 tests, typecheck, docs, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- standalone runtime: TCP 준비 5,458ms, Next 준비 신호 최초 관측 7,326ms, `/charts` 200, invalid KIS market 400, KR/US rising APIs 200, 무인증 admin/cron 401, 프로세스 cleanup 완료.
+- 이전 실행에서 readiness가 false로 찍힌 현상은 TCP 연결 직후 상태를 읽은 경쟁 조건으로 설명된다. 과거 `/charts` AbortError 자체는 재현되지 않아 별도 근본 원인 미확정 상태를 유지한다.
+
+### 다음 개선
+- 전체 검증에서 `nextReadyObservedMs`, `/charts` 및 API 응답, 프로세스 cleanup가 모두 확인되는지 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-16-003
+- 성과 판정: IMPROVED
+- 근거: 최종 deploy gate가 통과했고, Next 준비 신호의 관측 시간이 표시되며 HTTP smoke 및 프로세스 cleanup가 실제 standalone 실행에서 성공했다.
+- 성공 기준: `deploy:verify` 전체 통과 및 Next 준비 관측시각, HTTP smoke 상태, 프로세스 cleanup 확인.
+
+### 커밋·푸시·배포
+- 미실행: 로컬 검증 통과, 커밋·푸시 후 OCI 자동 배포 결과를 확인한다.
+
 ## [2026-10-16] DB health probe 추세 수집과 관리자 경보
 
 ### 목표

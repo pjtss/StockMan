@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createConnection, createServer } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
@@ -206,14 +207,11 @@ async function verifyRuntime() {
     shell: false,
     detached: false,
   });
-  const runtimeDiagnostics = { port, tcpReadyMs: null, nextReady: false, startupErrorSeen: false, errorCodes: [] };
+  const runtimeStartedAt = Date.now();
+  const startupSignals = createRuntimeStartupSignalTracker(runtimeStartedAt);
+  const runtimeDiagnostics = { port, tcpReadyMs: null, ...startupSignals.snapshot() };
   const inspectSafeStartupSignals = (chunk) => {
-    const output = chunk.toString("utf8");
-    if (/\bReady in\b/i.test(output)) runtimeDiagnostics.nextReady = true;
-    if (/Failed to start server|Error: listen/i.test(output)) runtimeDiagnostics.startupErrorSeen = true;
-    for (const match of output.matchAll(/\b(EADDRINUSE|EACCES|EADDRNOTAVAIL|ECONNREFUSED|ETIMEDOUT)\b/g)) {
-      if (!runtimeDiagnostics.errorCodes.includes(match[1])) runtimeDiagnostics.errorCodes.push(match[1]);
-    }
+    Object.assign(runtimeDiagnostics, startupSignals.accept(chunk));
   };
   child.stdout.on("data", inspectSafeStartupSignals);
   child.stderr.on("data", inspectSafeStartupSignals);
@@ -224,7 +222,7 @@ async function verifyRuntime() {
   void childExit.catch(() => undefined);
   try {
     runtimeDiagnostics.tcpReadyMs = await waitForTcpListener(port, child);
-    console.log(`[deploy-verify] standalone TCP ready: port=${port}, elapsedMs=${runtimeDiagnostics.tcpReadyMs}, nextReady=${runtimeDiagnostics.nextReady}`);
+    console.log(`[deploy-verify] standalone TCP ready: port=${port}, elapsedMs=${runtimeDiagnostics.tcpReadyMs}`);
     await Promise.race([
       (async () => {
         await waitForHealth(`http://127.0.0.1:${port}/charts`);
@@ -236,6 +234,7 @@ async function verifyRuntime() {
       })(),
       childExit,
     ]);
+    console.log(`[deploy-verify] standalone startup signals: port=${port}, tcpReadyMs=${runtimeDiagnostics.tcpReadyMs}, nextReadyObservedMs=${runtimeDiagnostics.nextReadyObservedMs ?? "not-observed"}, startupErrorSeen=${runtimeDiagnostics.startupErrorSeen}`);
   } catch (error) {
     throw new Error(`${error instanceof Error ? error.message : String(error)}; runtimeDiagnostics=${JSON.stringify(runtimeDiagnostics)}`);
   } finally {
