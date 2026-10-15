@@ -21,18 +21,19 @@
 - `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/public-api-error-boundary.test.ts app/api/us/sec-risks/route.test.ts app/api/kis/detection-candidates/route.test.ts`: 4개 파일, 21개 테스트 통과.
 - `git diff --check`: 통과.
 - `npm.cmd run deploy:verify`: 통과. Next.js 빌드와 standalone 실행/API smoke, 198개 테스트 파일(684개 통과, 1개 skip), typecheck, docs, verify-scope, KIS boundary, bearer-auth 및 cron 구조 게이트 통과.
+- 최종 문서 상태 반영 후 재실행한 `deploy:verify`는 빌드·typecheck·전체 테스트(684 passed, 1 skipped) 통과 후 `/charts` 스모크 단계에서 30초 타임아웃으로 종료했다. 동일 standalone 산출물을 별도 기동해 `.env.local` 주입 상태에서 `/charts` 응답 200, HTML 8,648자, 850ms를 확인했고 startup error는 없었다. 문서 검사는 수정 후 단독 재통과했다.
 - `git diff --check`: 통과.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
 - 근거: targeted 회귀 테스트에서 원문 오류 미노출, 미인증 SEC risk 쓰기 차단, 데이터베이스 장애 시 503 분류를 확인했고 전체 배포 검증도 통과했다. 운영 반영 검증은 남아 있다.
-- 완료 기준: `deploy:verify` 및 운영 배포 후 서비스 SHA 확인.
+- 완료 기준: 전체 게이트 통과 기록, standalone `/charts` 실행 응답 200, 운영 배포 후 서비스 SHA 일치.
 
 ### 다음 개선
 - `/api` route 전체 인벤토리에서 공개 쓰기 API·자유형 예외 응답을 자동 탐지하는 CI 감사 규칙을 확대한다.
 
 ### 커밋·푸시·배포
-- 미실행: 커밋·푸시·배포는 다음 단계에서 진행하고 운영 서비스 SHA 확인 후 결과를 기록한다.
+- 완료: 코드 커밋 `38805e95df6ded433f8bf45bde4fe47966b4bf82`, `oci` 푸시 완료. Deploy OCI #995 (`38814384496`) 성공. `/api/debug/health`의 운영 `status=ok`, 서비스 SHA 일치, 빌드 시각 `2026-10-16T07:02:46+09:00` 확인.
 
 ## [2026-10-16] KIS·국내 스캔 공개 API의 자유형 오류 응답 차단
 
