@@ -183,11 +183,43 @@ describe("KIS token lifecycle", () => {
     database.setFailPoolRead(true);
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const { getAccessToken } = await import("./kis-token");
 
     expect(await getAccessToken()).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("DB unavailable");
+    expect(warn).toHaveBeenCalledWith("[KIS] DB token lookup failed; token issuance was blocked", { errorCode: "INTEGRATION_ERROR" });
+  });
+
+  it("logs only allow-listed metadata when token issuance returns sensitive content", async () => {
+    const responseBody = JSON.stringify({
+      rt_cd: "1",
+      msg_cd: "EGW00123",
+      msg1: "appsecret=test-app-secret access_token=provider-secret",
+      access_token: "provider-secret",
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: new Headers({ "content-type": "application/json; charset=utf-8" }),
+      text: async () => responseBody,
+    }));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const { getAccessToken } = await import("./kis-token");
+
+    expect(await getAccessToken()).toBeNull();
+    expect(warn).toHaveBeenCalledWith("[KIS] Token issuance failed", {
+      httpStatus: 401,
+      contentType: "application/json",
+      providerCode: "EGW00123",
+    });
+    const logOutput = JSON.stringify(warn.mock.calls);
+    expect(logOutput).not.toContain("test-app-secret");
+    expect(logOutput).not.toContain("provider-secret");
+    expect(logOutput).not.toContain("appsecret=");
   });
 
   it("uses a 24-hour fallback only when KIS omits all expiry fields", async () => {

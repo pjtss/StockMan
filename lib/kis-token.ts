@@ -1,4 +1,5 @@
 import { getPool } from "./db";
+import { describeError } from "./error-diagnostics";
 
 const TOKEN_ENDPOINT = "https://openapi.koreainvestment.com:9443/oauth2/tokenP";
 const TOKEN_LOCK_KEY = "kis-access-token";
@@ -14,12 +15,34 @@ type TokenResponse = {
   access_token?: unknown;
   expires_in?: unknown;
   access_token_token_expired?: unknown;
+  rt_cd?: unknown;
+  msg_cd?: unknown;
+  error_code?: unknown;
 };
 
 type TokenIssueReason = "expired" | "explicit_auth_refresh";
 
 let cachedToken: StoredKisToken | null = null;
 let tokenRequestPromise: Promise<string | null> | null = null;
+
+function safeProviderCode(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  const code = String(value);
+  return /^[A-Za-z0-9_-]{1,40}$/.test(code) ? code : undefined;
+}
+
+function safeContentType(value: string | null) {
+  const contentType = value?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(contentType) ? contentType : "unknown";
+}
+
+function safeDatabaseFailure(error: unknown) {
+  const diagnostics = describeError(error);
+  const databaseCode = typeof diagnostics.databaseCode === "string" && /^[A-Z0-9]{5,20}$/.test(diagnostics.databaseCode)
+    ? diagnostics.databaseCode
+    : undefined;
+  return { errorCode: diagnostics.errorCode, ...(databaseCode ? { databaseCode } : {}) };
+}
 
 function toDate(value: unknown) {
   const date = value instanceof Date ? value : new Date(String(value));
@@ -94,7 +117,18 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
   });
   if (!response.ok) {
     const responseText = await response.text();
-    console.warn(`[KIS] Token issuance failed with HTTP ${response.status}: ${responseText.slice(0, 500)}`);
+    let providerCode: string | undefined;
+    try {
+      const payload = JSON.parse(responseText) as TokenResponse;
+      providerCode = safeProviderCode(payload.msg_cd) ?? safeProviderCode(payload.rt_cd) ?? safeProviderCode(payload.error_code);
+    } catch {
+      // Provider response bodies are intentionally excluded from logs.
+    }
+    console.warn("[KIS] Token issuance failed", {
+      httpStatus: response.status,
+      contentType: safeContentType(response.headers.get("content-type")),
+      ...(providerCode ? { providerCode } : {}),
+    });
     return null;
   }
 
@@ -102,8 +136,11 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
   try {
     payload = (await response.json()) as TokenResponse;
   } catch (error) {
-    const contentType = response.headers.get("content-type") || "unknown";
-    console.warn(`[KIS] Token issuance returned invalid JSON (HTTP ${response.status}, ${contentType}): ${error instanceof Error ? error.message : String(error)}`);
+    console.warn("[KIS] Token issuance returned invalid JSON", {
+      httpStatus: response.status,
+      contentType: safeContentType(response.headers.get("content-type")),
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
     return null;
   }
   const accessToken = typeof payload.access_token === "string" ? payload.access_token.trim() : "";
@@ -127,7 +164,7 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
       return stored.accessToken;
     }
   } catch (error) {
-    console.warn("[KIS] DB token lookup failed; token issuance was blocked:", error instanceof Error ? error.message.slice(0, 500) : "unknown error");
+    console.warn("[KIS] DB token lookup failed; token issuance was blocked", safeDatabaseFailure(error));
     return null;
   }
 
@@ -177,7 +214,7 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
     return issued.accessToken;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
-    console.warn("[KIS] Token lifecycle failed:", error instanceof Error ? error.message.slice(0, 500) : "unknown error");
+    console.warn("[KIS] Token lifecycle failed", safeDatabaseFailure(error));
     return null;
   } finally {
     client.release();
@@ -224,7 +261,7 @@ export async function clearTokenCache() {
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
-    console.warn("[KIS] DB token cache clear failed:", error instanceof Error ? error.message.slice(0, 500) : "unknown error");
+    console.warn("[KIS] DB token cache clear failed", safeDatabaseFailure(error));
   } finally {
     client.release();
   }

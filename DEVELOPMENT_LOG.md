@@ -1,5 +1,36 @@
 # Development Log
 
+## [2026-10-16] KIS 토큰 실패 로그에서 민감 응답·오류 메시지 제거
+
+### 목표
+- KIS 토큰 발급 실패 응답 원문과 DB 오류 메시지에 포함될 수 있는 액세스 토큰·앱 시크릿·접속 문자열의 로그 노출을 막고, 운영 진단에 필요한 안전한 메타데이터는 보존한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-010
+- `lib/kis-token.ts`가 토큰 API 비성공 응답 본문 500자를 그대로 출력하던 문제와 DB 오류 메시지 원문을 출력하던 문제를 확인했다.
+- 공급자 응답 본문은 로그에서 제외하고 HTTP 상태, 정규화된 content-type, 정해진 문자 형식의 `msg_cd`/`rt_cd`/`error_code`만 허용한다. 자유 형식 `msg1`, access token, 앱 키·시크릿은 기록하지 않는다.
+- DB 오류는 `describeError`의 분류 코드와 형식 검증된 DB 코드만 로그에 남기고 원본 message/cause는 출력하지 않는다. JSON 파싱 실패도 오류 message 대신 오류 종류만 기록한다.
+- 공식 기준: OWASP Logging Cheat Sheet의 access token, 인증 비밀번호, DB connection string, encryption key 등 로그 제외 권고를 반영했다(https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
+
+### 검증
+- `npm.cmd test -- --run lib/kis-token.test.ts`: 8개 테스트 통과.
+- 신규 테스트는 응답 본문에 포함된 가짜 앱 시크릿·액세스 토큰이 warning 인자에 나타나지 않는지, DB 오류 원문이 출력되지 않는지 확인한다.
+- 전체 배포 검증과 운영 배포 전이다.
+
+### 남은 위험 및 다음 개선
+- 애플리케이션의 다른 외부 API 모듈에서도 자유 형식 응답·오류가 직접 로그에 전달되는지 별도 인벤토리화가 필요하다.
+- 기존 운영 로그의 보존·접근 정책과 이미 기록된 민감 문자열 여부는 OCI 로그 저장소에서 별도 확인해야 하며, 코드 변경만으로 과거 로그를 지우지는 않는다.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 토큰 발급 실패와 DB 오류를 포함하는 단위 테스트에서 로그 허용 목록과 비밀값 제외를 확인했지만, 전체 게이트 및 운영 배포 후 확인은 남아 있다.
+
+### 다음 개선
+- 다른 공급자(KIS 시세·SEC·RSS·Discord) 오류 로그에서 원문 payload나 URL query credential을 직접 출력하는 경로를 대조한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증 후 진행한다.
+
 ## [2026-10-16] CRON_SECRET 인증 검증 경로 공통화
 
 ### 목표
