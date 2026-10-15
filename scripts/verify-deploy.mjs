@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createConnection, createServer } from "node:net";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { stopChildProcess, waitForProcessExit } from "./child-process-lifecycle.mjs";
 import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
 
 const isWindows = process.platform === "win32";
@@ -36,23 +37,36 @@ function run(command, args, options = {}) {
     const progressTimer = setInterval(() => {
       console.log(`[deploy-verify] still running: ${label} (${Date.now() - startedAt}ms)`);
     }, 30_000);
-    const timeout = setTimeout(() => {
-      console.error(`[deploy-verify] timed out: ${label} (${commandTimeoutMs}ms)`);
-      if (isWindows) spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false });
-      else child.kill("SIGTERM");
-      reject(new Error(`${label} timed out after ${commandTimeoutMs}ms`));
-    }, commandTimeoutMs);
+    let timedOut = false;
+    let settled = false;
     const finish = () => { clearInterval(progressTimer); clearTimeout(timeout); };
-    child.on("error", (error) => {
+    const settle = (error) => {
+      if (settled) return;
+      settled = true;
       finish();
-      reject(error);
+      if (error) reject(error);
+      else resolve();
+    };
+    const timeoutError = () => new Error(`${label} timed out after ${commandTimeoutMs}ms`);
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      console.error(`[deploy-verify] timed out: ${label} (${commandTimeoutMs}ms)`);
+      void stopProcess(child)
+        .then(() => {
+          console.log(`[deploy-verify] timed-out process cleanup complete: ${label}`);
+          settle(timeoutError());
+        })
+        .catch((error) => settle(new Error(`${timeoutError().message}; cleanup failed: ${error instanceof Error ? error.message : String(error)}`)));
+    }, commandTimeoutMs);
+    child.on("error", (error) => {
+      if (!timedOut) settle(error);
     });
     child.on("exit", (code, signal) => {
-      finish();
+      if (timedOut) return;
       if (code === 0) {
         console.log(`[deploy-verify] completed: ${label} (${Date.now() - startedAt}ms)`);
-        resolve();
-      } else reject(new Error(`${label} failed (code=${code}, signal=${signal ?? "none"})`));
+        settle();
+      } else settle(new Error(`${label} failed (code=${code}, signal=${signal ?? "none"})`));
     });
   });
 }
@@ -132,38 +146,8 @@ function findAvailablePort() {
   });
 }
 
-function waitForChildExit(child, timeoutMs) {
-  if (child.exitCode !== null) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    let timer;
-    const finish = (exited) => {
-      clearTimeout(timer);
-      child.off("exit", onExit);
-      resolve(exited);
-    };
-    const onExit = () => finish(true);
-    timer = setTimeout(() => finish(false), timeoutMs);
-    child.once("exit", onExit);
-  });
-}
-
 async function stopProcess(child) {
-  if (child.exitCode !== null) return;
-  if (isWindows) {
-    const killer = spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", shell: false });
-    await new Promise((resolve) => {
-      const timer = setTimeout(resolve, 10_000);
-      killer.once("error", resolve);
-      killer.once("exit", resolve);
-    });
-  } else {
-    child.kill("SIGTERM");
-  }
-  if (!(await waitForChildExit(child, 5_000))) {
-    if (isWindows) child.kill();
-    else child.kill("SIGKILL");
-    if (!(await waitForChildExit(child, 5_000))) throw new Error("Standalone runtime process did not exit after cleanup.");
-  }
+  await stopChildProcess(child, { platform: isWindows ? "win32" : process.platform, spawnProcess: spawn });
 }
 
 async function waitForTcpListener(port, child, timeoutMs = 30_000) {

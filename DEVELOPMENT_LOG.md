@@ -2,6 +2,36 @@
 
 이 문서는 프로젝트의 개발 과정과 변경 사항을 기록합니다.
 
+## [2026-10-16] 검증 명령 timeout 후 프로세스 트리 정리 보장
+
+### 목표
+- build/test/typecheck 명령이 제한시간을 넘겨 실패할 때 자식 및 하위 프로세스가 백그라운드에 남거나 다음 검증과 겹치지 않도록 한다.
+
+### 반영
+- 추적 ID: CI-2026-10-16-004
+- 원인: `run()`의 timeout handler는 Windows `taskkill /t /f`를 시작만 하고 기다리지 않은 채 reject했다. taskkill 실행 오류도 listener가 없어 unhandled error가 날 수 있었다.
+- `scripts/child-process-lifecycle.mjs`로 종료 대기와 단계적 정리를 분리했다. Windows는 taskkill tree 종료 후 실패·미종료 시 직접 종료와 재시도를 하고, POSIX는 SIGTERM 후 필요 시 SIGKILL로 승격한다.
+- 검증 명령 timeout은 프로세스 정리 완료 후 반환하고, 정리 성공/실패를 구분해 로그에 기록한다.
+- Windows taskkill 완료 대기, taskkill 시작 실패 fallback, POSIX 강제 종료 승격에 대한 회귀 테스트를 추가한다.
+
+### 검증
+- `npx.cmd vitest run scripts/child-process-lifecycle.test.mjs scripts/runtime-startup-signals.test.mjs` 6/6 통과, `node --check` 및 `git diff --check` 통과.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 193개 테스트 파일/657개 테스트, typecheck, docs, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- standalone smoke: TCP 준비 5,456ms, Next ready 신호 관측 7,569ms, `/charts` 200, invalid KIS market 400, KR/US rising chart 200, admin/cron unauthenticated 401, standalone process cleanup 완료.
+- timeout 자체를 일부러 발생시키는 통합 smoke는 운영 검증 파이프라인을 지연시키므로 실행하지 않았다. OS별 종료 시나리오는 이식 가능한 fake-process 주입 테스트 4개로 검증했다.
+
+### 다음 개선
+- CI에서 실제 명령 timeout이 발생하면 `timed-out process cleanup complete`가 출력되고, 해당 run의 자식 프로세스가 남지 않는지 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-16-004
+- 성과 판정: IMPROVED
+- 근거: 전체 deploy gate/standalone smoke가 통과했고 테스트가 Windows taskkill 완료 대기, taskkill 시작 실패 및 정체 fallback, POSIX SIGTERM→SIGKILL 승격을 검증했다.
+- 성공 기준: `deploy:verify` 전체 통과, lifecycle 회귀 테스트 및 standalone cleanup 확인.
+
+### 커밋·푸시·배포
+- 미실행: 로컬 전체 검증 통과. 커밋·푸시 후 OCI 자동 배포와 운영 health를 확인한다.
+
 ## [2026-10-16] 배포 smoke 준비 로그 관측 경쟁 조건 수정
 
 ### 목표
