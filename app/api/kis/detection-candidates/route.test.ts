@@ -8,7 +8,7 @@ const { getAccessToken, writeKisSignalSnapshot, fetchMarketCapRanking, fetchTopI
   status: 200,
   rtCd: "0",
   msgCd: "MCA00000",
-  msg1: "정상처리",
+  msg1: "secret-token https://db.internal.example/abc",
   rows: [{ data_rank: "1", mksc_shrn_iscd: "005930", hts_kor_isnm: "삼성전자", stck_prpr: "70000", stck_avls: "500000" }, { data_rank: "2", mksc_shrn_iscd: "000001", hts_kor_isnm: "소형주", stck_avls: "299" }],
   }),
   fetchTopInterestStock: vi.fn().mockResolvedValue({ ok: true, status: 200, rtCd: "0", msgCd: "0", msg1: "정상", rows: [{ data_rank: "1", mksc_shrn_iscd: "005930", hts_kor_isnm: "삼성전자" }] }),
@@ -49,6 +49,9 @@ describe("KIS detection candidates route", () => {
     expect(json.rows).toHaveLength(1);
     expect(json.filter).toMatchObject({ floorInBillionWon: 300, excluded: 1, totalBefore: 2, totalAfter: 1 });
     expect(json.rows[0].observedAt).toBe(json.collectedAt);
+    expect(JSON.stringify(json)).not.toContain("secret-token");
+    expect(JSON.stringify(json)).not.toContain("db.internal.example");
+    expect(json.diagnostics).not.toHaveProperty("msg1");
     expect(writeKisSignalSnapshot).toHaveBeenCalledWith(expect.objectContaining({ signalType: "candidate_market-cap", code: "0000" }));
   });
 
@@ -60,5 +63,16 @@ describe("KIS detection candidates route", () => {
     expect(json.rows[0]).toMatchObject({ code: "005930", name: "삼성전자", rank: "1" });
     expect(fetchTopInterestStock).toHaveBeenCalled();
     expect(writeKisSignalSnapshot).toHaveBeenCalledWith(expect.objectContaining({ signalType: "candidate_top-interest-stock" }));
+  });
+
+  it("returns a stable error code instead of an exception message", async () => {
+    getAccessToken.mockResolvedValueOnce("token");
+    fetchMarketCapRanking.mockRejectedValueOnce(new Error("postgres://user:secret@db.internal/stockman token=private"));
+    const response = await GET(new Request("http://localhost/api/kis/detection-candidates?source=market-cap"));
+    const json = await response.json();
+    expect(response.status).toBe(502);
+    expect(json.error).toBe("INTEGRATION_ERROR");
+    expect(JSON.stringify(json)).not.toContain("secret");
+    expect(JSON.stringify(json)).not.toContain("private");
   });
 });

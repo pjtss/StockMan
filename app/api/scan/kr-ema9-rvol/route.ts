@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAccumulationInstruments } from "@/lib/accumulation-repository";
 import type { AccumulationInstrument } from "@/lib/accumulation-scan";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,6 @@ export async function GET() {
     results.sort((a, b) => (b.rvols.at(-1)?.rvol ?? 0) - (a.rvols.at(-1)?.rvol ?? 0) || a.code.localeCompare(b.code));
     return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, criteria: { timeframe: "D", movingAverage: "EMA9", position: "latest close > EMA9", rvol: "each latest 5 trading days >= 1.0 using prior 20-day average volume", marketCapFloor: "30,000,000,000 KRW" }, universeCount: instruments.length, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: error instanceof Error ? error.message.slice(0, 300) : "KR_EMA9_RVOL_FAILED" }, { status: 503 });
+    return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }

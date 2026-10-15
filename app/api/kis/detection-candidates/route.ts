@@ -26,6 +26,7 @@ import {
   fetchTopInterestStock,
 } from "@/lib/kis-investor-flow";
 import { writeKisSignalSnapshot } from "@/lib/kis-signal-snapshot";
+import { safeErrorMetadata, safeProviderCode } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -94,33 +95,33 @@ export async function GET(request: Request) {
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const from = url.searchParams.get("fromDate") ?? `${today.slice(0, 4)}0101`;
       const dividend = await fetchDividendRateRanking(token, from, url.searchParams.get("toDate") ?? today, url.searchParams.get("marketGroup") ?? "0", url.searchParams.get("sector") ?? "0001", url.searchParams.get("stockType") ?? "0", url.searchParams.get("dividendType") ?? "2", url.searchParams.get("dividendClass") ?? "0");
-      result = { ok: dividend.ok, rows: dividend.rows, diagnostics: { status: dividend.status, rtCd: dividend.rtCd, msgCd: dividend.msgCd, msg1: dividend.msg1 } };
+      result = { ok: dividend.ok, rows: dividend.rows, diagnostics: { status: dividend.status, rtCd: safeProviderCode(dividend.rtCd), msgCd: safeProviderCode(dividend.msgCd) } };
     } else if (source === "hts-top-view") {
       const top = await fetchHtsTopView(token);
-      result = { ok: top.ok, rows: top.rows, diagnostics: { status: top.status, rtCd: top.rtCd, msgCd: top.msgCd, msg1: top.msg1 } };
+      result = { ok: top.ok, rows: top.rows, diagnostics: { status: top.status, rtCd: safeProviderCode(top.rtCd), msgCd: safeProviderCode(top.msgCd) } };
     } else if (source === "quote-balance") {
       const quote = await fetchQuoteBalanceRanking(token, market, url.searchParams.get("marketCode") ?? "0000", url.searchParams.get("sort") ?? "0");
-      result = { ok: quote.ok, rows: quote.rows, diagnostics: { status: quote.status, rtCd: quote.rtCd, msgCd: quote.msgCd, msg1: quote.msg1 } };
+      result = { ok: quote.ok, rows: quote.rows, diagnostics: { status: quote.status, rtCd: safeProviderCode(quote.rtCd), msgCd: safeProviderCode(quote.msgCd) } };
     } else if (source === "overtime-volume" || source === "overtime-fluctuation") {
       const overtime = source === "overtime-volume"
         ? await fetchOvertimeVolumeRanking(token, market, url.searchParams.get("marketCode") ?? "0000", url.searchParams.get("sort") ?? "2")
         : await fetchOvertimeFluctuationRanking(token, market, url.searchParams.get("marketCode") ?? "0000", url.searchParams.get("sort") ?? "2");
-      result = { ok: overtime.ok, rows: overtime.rows, diagnostics: { status: overtime.status, rtCd: overtime.rtCd, msgCd: overtime.msgCd, msg1: overtime.msg1 } };
+      result = { ok: overtime.ok, rows: overtime.rows, diagnostics: { status: overtime.status, rtCd: safeProviderCode(overtime.rtCd), msgCd: safeProviderCode(overtime.msgCd) } };
     } else if (source === "profit-asset-index" || source === "finance-ratio-ranking") {
       const fiscalYear = url.searchParams.get("fiscalYear") ?? String(new Date().getFullYear() - 1);
       const ranking = source === "profit-asset-index"
         ? await fetchProfitAssetIndexRanking(token, fiscalYear, market, url.searchParams.get("metric") ?? "0", url.searchParams.get("quarter") ?? "3")
         : await fetchFinanceRatioRanking(token, fiscalYear, market, url.searchParams.get("metric") ?? "7", url.searchParams.get("quarter") ?? "3");
-      result = { ok: ranking.ok, rows: ranking.rows, diagnostics: { status: ranking.status, rtCd: ranking.rtCd, msgCd: ranking.msgCd, msg1: ranking.msg1 } };
+      result = { ok: ranking.ok, rows: ranking.rows, diagnostics: { status: ranking.status, rtCd: safeProviderCode(ranking.rtCd), msgCd: safeProviderCode(ranking.msgCd) } };
     } else if (source === "credit-by-company") {
       const credit = await fetchCreditByCompany(token, market, url.searchParams.get("marketCode") ?? "0000", url.searchParams.get("sort") ?? "1", url.searchParams.get("selectable") ?? "0");
-      result = { ok: credit.ok, rows: credit.rows, diagnostics: { status: credit.status, rtCd: credit.rtCd, msgCd: credit.msgCd, msg1: credit.msg1 } };
+      result = { ok: credit.ok, rows: credit.rows, diagnostics: { status: credit.status, rtCd: safeProviderCode(credit.rtCd), msgCd: safeProviderCode(credit.msgCd) } };
     } else if (source === "traded-by-company") {
       const traded = await fetchTradedByCompany(token, market, url.searchParams.get("divCode") ?? "0", url.searchParams.get("sort") ?? "0", url.searchParams.get("startDate") ?? "", url.searchParams.get("endDate") ?? "", url.searchParams.get("marketCode") ?? "0000", url.searchParams.get("priceFrom") ?? "", url.searchParams.get("priceTo") ?? "");
-      result = { ok: traded.ok, rows: traded.rows, diagnostics: { status: traded.status, rtCd: traded.rtCd, msgCd: traded.msgCd, msg1: traded.msg1 } };
+      result = { ok: traded.ok, rows: traded.rows, diagnostics: { status: traded.status, rtCd: safeProviderCode(traded.rtCd), msgCd: safeProviderCode(traded.msgCd) } };
     } else if (source === "top-interest-stock") {
       const interest = await fetchTopInterestStock(token, market, url.searchParams.get("sort") ?? "0", url.searchParams.get("marketCode") ?? "0000");
-      result = { ok: interest.ok, rows: interest.rows, diagnostics: { status: interest.status, rtCd: interest.rtCd, msgCd: interest.msgCd, msg1: interest.msg1 } };
+      result = { ok: interest.ok, rows: interest.rows, diagnostics: { status: interest.status, rtCd: safeProviderCode(interest.rtCd), msgCd: safeProviderCode(interest.msgCd) } };
     } else {
       const flow = source === "foreign-institution"
         ? await fetchForeignInstitutionTotal(token, market)
@@ -147,7 +148,7 @@ export async function GET(request: Request) {
                 : source === "market-cap"
                   ? await fetchMarketCapRanking(token, market)
                   : await fetchMarketValueRanking(token, url.searchParams.get("fiscalYear") ?? String(new Date().getFullYear() - 1), market, url.searchParams.get("metric") ?? "23", url.searchParams.get("quarter") ?? "3");
-      result = { ok: flow.ok, rows: flow.rows as Record<string, unknown>[], diagnostics: { status: flow.status, rtCd: flow.rtCd, msgCd: flow.msgCd, msg1: flow.msg1 } };
+      result = { ok: flow.ok, rows: flow.rows as Record<string, unknown>[], diagnostics: { status: flow.status, rtCd: safeProviderCode(flow.rtCd), msgCd: safeProviderCode(flow.msgCd) } };
     }
     const normalized = normalizeRows(result.rows, collectedAt);
     const filtered = applyDomesticMarketCapFloor(normalized);
@@ -155,6 +156,6 @@ export async function GET(request: Request) {
     await writeKisSignalSnapshot({ market: "KR", code: "0000", signalType: `candidate_${source}`, status: result.ok ? "AVAILABLE" : "UNAVAILABLE", observedAt: new Date(collectedAt), payload: rows });
     return NextResponse.json({ ok: result.ok, source: "KIS", market: "KR", signalType: source, collectedAt, rows, filter: filtered.stats, diagnostics: result.diagnostics }, { status: result.ok ? 200 : 502 });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "KIS", market: "KR", signalType: source, collectedAt, error: error instanceof Error ? error.message.slice(0, 500) : "KIS_REQUEST_FAILED" }, { status: 502 });
+    return NextResponse.json({ ok: false, source: "KIS", market: "KR", signalType: source, collectedAt, error: safeErrorMetadata(error).errorCode }, { status: 502 });
   }
 }

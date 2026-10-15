@@ -3,6 +3,7 @@ import { getAccessToken } from "@/lib/kis-token";
 import { fetchDomesticFluctuation, fetchDomesticTradeValueRanking } from "@/lib/kis-domestic-api";
 import { fetchForeignInstitutionTotal, fetchMarketCapRanking, fetchMarketValueRanking, fetchNearNewHighLow } from "@/lib/kis-investor-flow";
 import { writeKisSignalSnapshot } from "@/lib/kis-signal-snapshot";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 // 종목 탐지에 직접 기여하는 KIS 공식 후보군을 통합한다.
@@ -76,6 +77,6 @@ export async function GET(request: Request) {
     await writeKisSignalSnapshot({ market: "KR", code: "0000", signalType: "detection_scan", status: "AVAILABLE", observedAt: new Date(collectedAt), payload: { sources, rows } });
     return NextResponse.json({ ok: true, source: "KIS", market: "KR", collectedAt, sources, rows, filter: { marketCapFloorInBillionWon: 300 }, diagnostics: { sourceCount: sources.length, candidateCount: rows.length, maxSourcesPerRequest: 8 } });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "KIS", collectedAt, error: error instanceof Error ? error.message.slice(0, 500) : "KIS_REQUEST_FAILED" }, { status: 502 });
+    return NextResponse.json({ ok: false, source: "KIS", collectedAt, error: safeErrorMetadata(error).errorCode }, { status: 502 });
   }
 }

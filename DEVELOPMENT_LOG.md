@@ -1,5 +1,39 @@
 # Development Log
 
+## [2026-10-16] KIS·국내 스캔 공개 API의 자유형 오류 응답 차단
+
+### 목표
+- 공개 KIS 및 국내 스캔 API가 DB 접속 문자열·내부 URL·공급자 원문 오류를 응답에 반사하지 않도록 한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-013
+- 코드 검색에서 `financial-ratios`, `market-funds`, `investor-flow`, `investment-opinion`, `detection-scan`, `detection-candidates` 및 EMA/RVOL·볼린저 반등 국내 스캔 API가 예외 message를 응답하는 경로를 확인했다.
+- 오류 응답은 `safeErrorMetadata(...).errorCode`로 제한하고, KIS 진단에서는 형식 검증된 `rtCd`·`msgCd`만 남기며 자유형 `msg1`을 제거한다.
+- `safeProviderCode`와 비밀 URL/token canary 테스트를 추가해 공급자 코드만 보존되는 계약을 고정했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: API 라우트에서 예외·공급자 응답의 `message`를 진단 편의 목적으로 그대로 JSON에 싣는 패턴.
+- 재발 감지: 공개 API 경로에서 `error.message` 반환 및 `msg1` 응답 사용처를 정기 검색하고, 공통 진단 helper의 허용 목록 단위 테스트를 유지한다.
+- 남은 위험: 이번 작업은 확인한 KIS·국내 스캔 경로만 수정했다. `/api`의 다른 공개 기능(뉴스, 캘린더, 상장 일정, 재무 내보내기, SEC 리스크 등)의 오류 메시지 반환은 별도 점검 대상이다.
+
+### 검증
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts app/api/kis/detection-candidates/route.test.ts app/api/kis/investor-flow/route.test.ts`: 3개 파일, 12개 테스트 통과.
+- `git diff --check`: 통과.
+- `npm.cmd run docs:check`: 필수 로그 섹션을 보완한 뒤 통과(문서 entry 18개, 최신 migration V150).
+- `npm.cmd run deploy:verify`: 30초 smoke 제한을 적용한 전체 검증 1회는 통과(빌드, standalone `/charts` 및 API smoke, 전체 테스트 196개 파일 통과/1개 skip·674개 통과/1개 skip, typecheck와 정적 게이트)했다. 이후 재실행에서 `/charts` smoke의 간헐적 시간 초과가 발생했다. 분리 worktree에서 원본 `.env.local`을 비밀 출력 없이 주입한 standalone 직접 요청은 200, 1.4초, HTML 8,648 bytes를 반환했고 프로세스 정리도 정상 종료했다. `docs:check`와 단독 typecheck도 마지막 문서 수정 후 통과했다. verifier 재현성은 후속 개선 대상으로 남긴다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 6개 KIS 및 4개 국내 스캔 라우트의 오류 응답이 안전 진단 코드로 제한되고, 공급자 자유형 메시지와 DB URL/token canary가 응답에 나타나지 않는 단위 테스트가 통과했다. 전체 검증 성공 1회와 독립 standalone 직접 실행에서 빌드·674개 전체 테스트·실행 성공이 확인됐다. 최신 로그 기준 `docs:check`와 typecheck도 통과했다.
+- 완료 기준: 오류 응답 secret-canary 회귀 테스트, 빌드·전체 테스트·standalone 실행, docs:check 통과. 배포 검증 `/charts`의 간헐 타임아웃은 다음 개선 항목으로 추적하며, 이번 기능 변경의 직접 standalone 응답은 200으로 검증했다. 커밋/푸시 및 운영 배포 확인은 남아 있다.
+
+### 다음 개선
+- 배포 검증 `/charts` smoke의 간헐 30초 이상 지연 원인을 추적하고 계측·재현성을 보강한다. 이어 미점검 공개 경로(`/api/bullish-rss`, 캘린더, 상장 일정, 재무 내보내기, SEC 리스크)의 예외 메시지 반환도 확인한다.
+
+### 커밋·푸시·배포
+- 커밋 완료: `2f9b2d1e4a88c8fce165fbd2a01be2e6066471d7`.
+- `oci` 푸시 시 원격에서 `fatal error in commit_refs`로 거부됨. 원격 `oci`는 `d29cd1147a3ca1affc6cb4ac8ec834f7d2ac4a95`에 유지되며, 배포는 시작되지 않았다. 사용자 저장소 권한 확인 후 재시도 필요.
+
 ## [2026-10-16] 해외 KIS 진단 로그 및 TOP 상승률 공개 오류 응답 정제
 
 ### 목표

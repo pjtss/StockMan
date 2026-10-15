@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeError, isSchemaError, safeErrorMetadata } from "./error-diagnostics";
+import { describeError, isSchemaError, safeErrorMetadata, safeProviderCode } from "./error-diagnostics";
 
 describe("error-diagnostics", () => {
   it("unwraps a wrapped PostgreSQL missing-table error", () => {
@@ -36,5 +36,12 @@ describe("error-diagnostics", () => {
     expect(metadata).toEqual({ errorCode: "INTEGRATION_ERROR" });
     expect(JSON.stringify(metadata)).not.toContain(secret);
     expect(JSON.stringify(metadata)).not.toContain("secret-token");
+  });
+
+  it("allows structured provider codes but rejects free-form provider messages", () => {
+    expect(safeProviderCode("EGW00123")).toBe("EGW00123");
+    expect(safeProviderCode("MCA00000")).toBe("MCA00000");
+    expect(safeProviderCode("인증 토큰 https://internal.example failed")).toBeNull();
+    expect(safeProviderCode(null)).toBeNull();
   });
 });

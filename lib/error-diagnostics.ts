@@ -68,6 +68,13 @@ export function safeErrorMetadata(error: unknown): SafeErrorMetadata {
   return { errorCode: diagnostics.errorCode, ...(databaseCode ? { databaseCode } : {}) };
 }
 
+/** Keep provider diagnostics machine-readable; free-form provider text is not safe for public API responses. */
+export function safeProviderCode(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const code = value.trim();
+  return /^[A-Za-z0-9_-]{1,40}$/.test(code) ? code : null;
+}
+
 export function isSchemaError(error: unknown) {
   const diagnostics = describeError(error);
   return diagnostics.errorCode === "SCHEMA_TABLE_MISSING" || diagnostics.errorCode === "SCHEMA_COLUMN_MISSING";

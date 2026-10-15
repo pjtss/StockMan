@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/kis-token";
 import { fetchMarketFunds } from "@/lib/kis-investor-flow";
 import { writeKisSignalSnapshot } from "@/lib/kis-signal-snapshot";
+import { safeErrorMetadata, safeProviderCode } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,8 @@ export async function GET(request: Request) {
   try {
     const result = await fetchMarketFunds(token, date);
     await writeKisSignalSnapshot({ market: "KR", code: "MARKET", signalType: "market_funds", status: result.ok ? "AVAILABLE" : "UNAVAILABLE", observedAt: new Date(collectedAt), payload: result.rows });
-    return NextResponse.json({ ok: result.ok, source: "KIS", market: "KR", code: "MARKET", signalType: "market_funds", date: date || null, collectedAt, rows: result.rows, diagnostics: { status: result.status, rtCd: result.rtCd, msgCd: result.msgCd, msg1: result.msg1 } }, { status: result.ok ? 200 : 502 });
+    return NextResponse.json({ ok: result.ok, source: "KIS", market: "KR", code: "MARKET", signalType: "market_funds", date: date || null, collectedAt, rows: result.rows, diagnostics: { status: result.status, rtCd: safeProviderCode(result.rtCd), msgCd: safeProviderCode(result.msgCd) } }, { status: result.ok ? 200 : 502 });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "KIS", market: "KR", signalType: "market_funds", collectedAt, error: error instanceof Error ? error.message.slice(0, 500) : "KIS_REQUEST_FAILED" }, { status: 502 });
+    return NextResponse.json({ ok: false, source: "KIS", market: "KR", signalType: "market_funds", collectedAt, error: safeErrorMetadata(error).errorCode }, { status: 502 });
   }
 }

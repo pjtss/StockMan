@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 import { loadStoredKrInstrumentScopes } from "@/lib/kr-instruments";
 import { loadCachedKrDailyCandlesBulk } from "@/lib/kr-daily-price-cache";
 import { calculateKrBollingerBands } from "@/lib/kr-bollinger-band";
@@ -37,6 +38,6 @@ export async function GET() {
     results.sort((a, b) => (b.rvols.at(-1)?.rvol ?? 0) - (a.rvols.at(-1)?.rvol ?? 0) || a.code.localeCompare(b.code));
     return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, criteria: { timeframe: "D", bollinger: "20-period close-based lower band, 2 standard deviations", rebound: "prior close below lower band within 3 trading days, latest close back within 0.5% above lower band", rvol: "each of the latest 5 trading days >= 1.0 using prior 20-day average volume" }, universeCount: universe.scopes.length, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: error instanceof Error ? error.message.slice(0, 300) : "KR_BOLLINGER_REBOUND_RVOL_FAILED" }, { status: 503 });
+    return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }

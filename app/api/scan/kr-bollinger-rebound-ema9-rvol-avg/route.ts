@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 import { loadAccumulationInstruments } from "@/lib/accumulation-repository";
 import { calculateKrBollingerBands } from "@/lib/kr-bollinger-band";
 import type { AccumulationInstrument } from "@/lib/accumulation-scan";
@@ -49,6 +50,6 @@ export async function GET() {
     results.sort((a, b) => b.rvolAverage - a.rvolAverage || a.code.localeCompare(b.code));
     return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: error instanceof Error ? error.message.slice(0, 300) : "KR_BOLLINGER_REBOUND_EMA9_RVOL_AVG_FAILED" }, { status: 503 });
+    return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }

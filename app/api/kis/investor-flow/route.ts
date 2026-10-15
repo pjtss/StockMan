@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccessToken } from "@/lib/kis-token";
 import { fetchInvestorByStock, fetchInvestorTrendEstimate, fetchProgramTradeByStock } from "@/lib/kis-investor-flow";
+import { safeErrorMetadata, safeProviderCode } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +42,9 @@ export async function GET(request: Request) {
       flowStatus: mode === "estimate" ? "ESTIMATED" : "CONFIRMED",
       collectedAt,
       rows: result.rows,
-      diagnostics: { status: result.status, rtCd: result.rtCd, msgCd: result.msgCd, msg1: result.msg1 },
+      diagnostics: { status: result.status, rtCd: safeProviderCode(result.rtCd), msgCd: safeProviderCode(result.msgCd) },
     }, { status: result.ok ? 200 : 502 });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "KIS", market, code, mode, flowStatus: "UNAVAILABLE", collectedAt, error: error instanceof Error ? error.message.slice(0, 500) : "KIS_REQUEST_FAILED" }, { status: 502 });
+    return NextResponse.json({ ok: false, source: "KIS", market, code, mode, flowStatus: "UNAVAILABLE", collectedAt, error: safeErrorMetadata(error).errorCode }, { status: 502 });
   }
 }
