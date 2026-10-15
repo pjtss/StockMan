@@ -30,7 +30,9 @@
 - 성공 기준: `deploy:verify` 전체 통과 및 Next 준비 관측시각, HTTP smoke 상태, 프로세스 cleanup 확인.
 
 ### 커밋·푸시·배포
-- 미실행: 로컬 검증 통과, 커밋·푸시 후 OCI 자동 배포 결과를 확인한다.
+- 배포 완료: 코드 커밋 `95c6f2a1ef3c72ac0ce2301ee1ab55b33af6a5fd`를 `oci`에 push했고 Deploy OCI run `38779494187` 성공.
+- 배포 후 운영 `/api/health`: HTTP 200, `status=ok`, 응답시간 475ms.
+- 문서 결과 갱신 후에도 커밋 전 전체 `deploy:verify` 및 문서 검사를 다시 수행한다.
 
 ## [2026-10-16] DB health probe 추세 수집과 관리자 경보
 
