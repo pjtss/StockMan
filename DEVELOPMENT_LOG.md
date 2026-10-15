@@ -17,7 +17,8 @@
 - `git diff --check`: 통과.
 - KIS 파일의 직접 예외 로깅을 검색해 결과가 `safeErrorMetadata(...)` 호출만 남았음을 확인했다.
 - `npm.cmd run deploy:verify`: 통과. production build 성공, standalone runtime smoke(`/charts` 200, invalid KIS market 400, 국내·해외 top-rising chart API 200, 미인증 관리자·cron API 401), 테스트 195개 파일 통과/1개 skip(670개 통과/1개 skip), typecheck 및 문서·auth·KIS 경계·cron 게이트 통과.
-- 운영 반영 전: 검증 통과 후 커밋·푸시·배포 상태를 별도로 확인한다.
+- 배포 workflow `38802490718`: 성공적으로 새 릴리스를 활성화했다.
+- 운영 관리자 health API: `status=ok`, 서비스 SHA `eaf9592622f56c81015bb705e20a27efd11fae7f`, 빌드 시각 `2026-10-16T05:17:06+09:00` 확인.
 
 ### 근본 원인 및 재발 방지
 - 근본 원인: 로깅 시 분류된 진단 DTO가 아니라 원본 예외 객체를 직접 전달하는 관행.
@@ -26,14 +27,14 @@
 
 ### 개선 과제
 - 성과 판정: IMPROVED
-- 근거: 대상 스캐너 15개 예외 로그가 안전 메타데이터만 사용하도록 바뀌었고, 회귀 테스트에서 URL/token 제외를 확인했다. 전체 테스트·빌드·standalone smoke가 모두 통과했다. 운영 반영은 배포 후 확인한다.
+- 근거: 대상 스캐너 15개 예외 로그가 안전 메타데이터만 사용하도록 바뀌었고, 회귀 테스트에서 URL/token 제외를 확인했다. 전체 테스트·빌드·standalone smoke가 통과했으며 운영 health API에서 배포 SHA와 `ok`를 확인했다.
 - 완료 기준: 안전 로그 테스트, `deploy:verify`, standalone smoke, 배포 후 운영 커밋 확인.
 
 ### 다음 개선
 - 해외 KIS 및 외부 연동 오류 경로에서 원문 예외가 사용자 API 응답이나 로그에 노출되는지 조사한다.
 
 ### 커밋·푸시·배포
-- 미실행: 검증 통과 후 커밋·푸시·배포한다.
+- 완료: 코드 커밋 `eaf9592622f56c81015bb705e20a27efd11fae7f`를 `oci`에 푸시했고 workflow `38802490718` 및 운영 health SHA 일치를 확인했다.
 
 ## [2026-10-16] KIS 토큰 실패 로그에서 민감 응답·오류 메시지 제거
 
