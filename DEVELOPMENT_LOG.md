@@ -30,7 +30,8 @@
 - 성공 기준: `deploy:verify` 전체 통과, lifecycle 회귀 테스트 및 standalone cleanup 확인.
 
 ### 커밋·푸시·배포
-- 미실행: 로컬 전체 검증 통과. 커밋·푸시 후 OCI 자동 배포와 운영 health를 확인한다.
+- 배포 완료: commit `9bb3f3dd5ce4567b642d5a3cff6208959800eb2b`를 `oci`에 push, Deploy OCI run `38783610415` 성공.
+- 운영 확인: `/api/health` HTTP 200, `status=ok`, 응답시간 489ms.
 
 ## [2026-10-16] 배포 smoke 준비 로그 관측 경쟁 조건 수정
 
