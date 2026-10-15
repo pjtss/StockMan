@@ -21,7 +21,7 @@
 
 ### 개선 과제
 - 성과 판정: IMPROVED
-- 근거: rate-limit 테스트에서 client cap, global cap, 요청 제한 시 fetch 미호출, `Retry-After`가 검증됐다. 전체 및 운영 검증은 아직 완료 전이다.
+- 근거: rate-limit 테스트에서 client cap, global cap, 요청 제한 시 fetch 미호출, `Retry-After`가 검증됐다. GitHub Actions `Deploy OCI #999` 성공 후 운영 `/api/debug/health`에서 service SHA `5f1440ca6f3d97553adcc3a59bc18b1f76ee28ed`, DB 연결 및 Flyway V150 정상 확인.
 
 ### 남은 위험
 - 남은 위험: 같은 공인 IP를 공유하는 사용자(회사·통신사 NAT)는 합산 제한에 걸릴 수 있고, 분산 IP 공격은 전역 제한에 영향을 줄 수 있다. 운영 429 비율을 관측해 임계값을 조정해야 한다.
@@ -30,7 +30,8 @@
 - 운영 로그/메트릭에 IP 원문 없이 제한 발생 횟수, client/global scope, retry-after 분포를 집계해 정책을 조정한다.
 
 ### 커밋·푸시·배포
-- 미실행: 전체 검증 통과 후 커밋·푸시·배포한다.
+- 완료: 커밋 `5f1440ca6f3d97553adcc3a59bc18b1f76ee28ed`를 `oci` 브랜치에 push.
+- 완료: GitHub Actions #999 성공 및 운영 `/api/debug/health`에서 service SHA 일치 확인.
 
 ## [2026-10-16] 차트 WebSocket Approval 발급 호출 캐시
 
