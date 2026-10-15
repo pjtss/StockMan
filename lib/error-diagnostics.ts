@@ -7,6 +7,8 @@ export type ErrorDiagnostics = {
   constraint?: string;
 };
 
+export type SafeErrorMetadata = Pick<ErrorDiagnostics, "errorCode"> & { databaseCode?: string };
+
 function errorChain(error: unknown) {
   const chain: Array<Error & { code?: string; detail?: string; cause?: unknown }> = [];
   const seen = new Set<unknown>();
@@ -55,6 +57,15 @@ export function describeError(error: unknown): ErrorDiagnostics {
         : "INTEGRATION_ERROR";
   const message = rawMessage.replace(/(?:postgres(?:ql)?:\/\/)[^\s)]+/gi, "postgresql://[redacted]");
   return { errorCode, message, databaseCode, table, column, constraint };
+}
+
+/** Metadata suitable for logs: excludes free-form messages, URLs, query text, and causes. */
+export function safeErrorMetadata(error: unknown): SafeErrorMetadata {
+  const diagnostics = describeError(error);
+  const databaseCode = diagnostics.databaseCode && /^[A-Z0-9]{5,20}$/.test(diagnostics.databaseCode)
+    ? diagnostics.databaseCode
+    : undefined;
+  return { errorCode: diagnostics.errorCode, ...(databaseCode ? { databaseCode } : {}) };
 }
 
 export function isSchemaError(error: unknown) {

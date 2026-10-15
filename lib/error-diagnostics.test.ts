@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeError, isSchemaError } from "./error-diagnostics";
+import { describeError, isSchemaError, safeErrorMetadata } from "./error-diagnostics";
 
 describe("error-diagnostics", () => {
   it("unwraps a wrapped PostgreSQL missing-table error", () => {
@@ -28,5 +28,13 @@ describe("error-diagnostics", () => {
   it("classifies KIS rate-limit and authentication failures", () => {
     expect(describeError(new Error("KIS_NEWS_API_ERROR:EGW00201:초당 거래건수를 초과하였습니다.")).errorCode).toBe("KIS_RATE_LIMIT");
     expect(describeError(new Error("KIS request failed EGW00123 AUTH error")).errorCode).toBe("KIS_AUTH_ERROR");
+  });
+
+  it("returns only safe metadata for logging integration errors", () => {
+    const secret = "postgres://user:password@example.test/db?sslkey=private";
+    const metadata = safeErrorMetadata(new Error(`request failed ${secret} token=secret-token`));
+    expect(metadata).toEqual({ errorCode: "INTEGRATION_ERROR" });
+    expect(JSON.stringify(metadata)).not.toContain(secret);
+    expect(JSON.stringify(metadata)).not.toContain("secret-token");
   });
 });

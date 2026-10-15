@@ -1,5 +1,40 @@
 # Development Log
 
+## [2026-10-16] 국내 KIS 스캐너 오류 로그의 원문 메시지 제거
+
+### 목표
+- KIS 실시간 조회와 DB 캐시 read/write 예외에서 URL, 연결 문자열, 쿼리 또는 공급자 응답의 자유 형식 원문이 로그로 노출되지 않도록 한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-011
+- 직전 운영 개선 이후 국내 스캐너 5종(`fetchVolumeSpike`, `fetchNetBuying`, `fetchProgramTrading`, `fetchNewHigh`, `fetchBidAskRatio`)을 재점검했다. 15개 catch 경로가 예외 객체를 `console.warn/error`에 직접 전달하고 있었다.
+- `safeErrorMetadata`를 추가해 예외 분류 코드와 형식 검증된 DB 코드만 출력하도록 하고, 15개 로그를 모두 안전 메타데이터로 전환했다. 상세 원문은 반환 payload나 로그에 넣지 않는다.
+- 회귀 테스트는 예시 DB URL 및 token 문자열이 안전 메타데이터에 들어가지 않음을 확인한다.
+
+### 검증
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/kis.test.ts`: 2개 파일, 11개 테스트 통과.
+- `npm.cmd run docs:check`: 통과(문서 entry 18개, migration 최신 V150). 최초 실행에서 로그 필수 계약 누락이 검출되어 성과/근거/검증 필드를 보완한 뒤 통과했다.
+- `git diff --check`: 통과.
+- KIS 파일의 직접 예외 로깅을 검색해 결과가 `safeErrorMetadata(...)` 호출만 남았음을 확인했다.
+- `npm.cmd run deploy:verify`: 통과. production build 성공, standalone runtime smoke(`/charts` 200, invalid KIS market 400, 국내·해외 top-rising chart API 200, 미인증 관리자·cron API 401), 테스트 195개 파일 통과/1개 skip(670개 통과/1개 skip), typecheck 및 문서·auth·KIS 경계·cron 게이트 통과.
+- 운영 반영 전: 검증 통과 후 커밋·푸시·배포 상태를 별도로 확인한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 로깅 시 분류된 진단 DTO가 아니라 원본 예외 객체를 직접 전달하는 관행.
+- 재발 감지: `lib/kis.ts`에서 catch 변수 또는 예외 객체를 직접 로깅하는 패턴을 정기 감사하고, 안전 메타데이터 helper 테스트에서 URL/토큰 제외 계약을 유지한다.
+- 범위 한계: 이번 변경은 국내 KIS 스캐너 공통 모듈만 다룬다. 해외 KIS 및 RSS/SEC/Discord 오류 반환·저장은 다음 점검 범위다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 대상 스캐너 15개 예외 로그가 안전 메타데이터만 사용하도록 바뀌었고, 회귀 테스트에서 URL/token 제외를 확인했다. 전체 테스트·빌드·standalone smoke가 모두 통과했다. 운영 반영은 배포 후 확인한다.
+- 완료 기준: 안전 로그 테스트, `deploy:verify`, standalone smoke, 배포 후 운영 커밋 확인.
+
+### 다음 개선
+- 해외 KIS 및 외부 연동 오류 경로에서 원문 예외가 사용자 API 응답이나 로그에 노출되는지 조사한다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 통과 후 커밋·푸시·배포한다.
+
 ## [2026-10-16] KIS 토큰 실패 로그에서 민감 응답·오류 메시지 제거
 
 ### 목표

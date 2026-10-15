@@ -7,6 +7,7 @@ import { getAccessToken } from "./kis-token";
 import { readKisCache, writeKisCache } from "./kis-cache";
 import { fetchDomesticFluctuation, fetchDomesticVolumePower } from "./kis-domestic-api";
 import { fetchInvestorByStock, fetchProgramTradeByStock, fetchNearNewHighLow } from "./kis-investor-flow";
+import { safeErrorMetadata } from "./error-diagnostics";
 
 function kisNumber(row: Record<string, unknown> | undefined, ...keys: string[]) {
   for (const key of keys) {
@@ -95,14 +96,14 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
         try {
           await writeKisCache(cacheKey, mappedData);
         } catch (dbWriteErr) {
-          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
+          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache`, safeErrorMetadata(dbWriteErr));
         }
 
         return mappedData;
       }
     }
   } catch (err) {
-    console.warn(`[KIS] fetchVolumeSpike live fetch failed, reading closing session DB cache:`, err);
+    console.warn(`[KIS] fetchVolumeSpike live fetch failed, reading closing session DB cache`, safeErrorMetadata(err));
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 실거래 기록 복원
@@ -113,7 +114,7 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
         if (cached) return cached;
     }
   } catch (dbReadErr) {
-    console.error(`[KIS] Failed to read ${cacheKey} from DB cache:`, dbReadErr);
+    console.error(`[KIS] Failed to read ${cacheKey} from DB cache`, safeErrorMetadata(dbReadErr));
   }
 
   return [];
@@ -186,14 +187,14 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
             await writeKisCache(cacheKey, mappedData);
           }
         } catch (dbWriteErr) {
-          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
+          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache`, safeErrorMetadata(dbWriteErr));
         }
 
         return mappedData;
       }
     }
   } catch (err) {
-    console.warn(`[KIS] fetchNetBuying live fetch failed, reading closing session DB cache:`, err);
+    console.warn(`[KIS] fetchNetBuying live fetch failed, reading closing session DB cache`, safeErrorMetadata(err));
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 실거래 기록 복원
@@ -204,7 +205,7 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
       if (cached) return cached;
     }
   } catch (dbReadErr) {
-    console.error(`[KIS] Failed to read ${cacheKey} from DB cache:`, dbReadErr);
+    console.error(`[KIS] Failed to read ${cacheKey} from DB cache`, safeErrorMetadata(dbReadErr));
   }
 
   return [];
@@ -275,14 +276,14 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
             await writeKisCache(cacheKey, mappedData);
           }
         } catch (dbWriteErr) {
-          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
+          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache`, safeErrorMetadata(dbWriteErr));
         }
 
         return mappedData;
       }
     }
   } catch (err) {
-    console.warn(`[KIS] fetchProgramTrading live fetch failed, reading closing session DB cache:`, err);
+    console.warn(`[KIS] fetchProgramTrading live fetch failed, reading closing session DB cache`, safeErrorMetadata(err));
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 실거래 기록 복원
@@ -293,7 +294,7 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
       if (cached) return cached;
     }
   } catch (dbReadErr) {
-    console.error(`[KIS] Failed to read ${cacheKey} from DB cache:`, dbReadErr);
+    console.error(`[KIS] Failed to read ${cacheKey} from DB cache`, safeErrorMetadata(dbReadErr));
   }
 
   return [];
@@ -355,14 +356,14 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
             await writeKisCache(cacheKey, mappedData);
           }
         } catch (dbWriteErr) {
-          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
+          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache`, safeErrorMetadata(dbWriteErr));
         }
 
         return mappedData;
       }
     }
   } catch (err) {
-    console.warn(`[KIS] fetchNewHigh live fetch failed, reading closing session DB cache:`, err);
+    console.warn(`[KIS] fetchNewHigh live fetch failed, reading closing session DB cache`, safeErrorMetadata(err));
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 실거래 기록 복원
@@ -373,7 +374,7 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
       if (cached) return cached;
     }
   } catch (dbReadErr) {
-    console.error(`[KIS] Failed to read ${cacheKey} from DB cache:`, dbReadErr);
+    console.error(`[KIS] Failed to read ${cacheKey} from DB cache`, safeErrorMetadata(dbReadErr));
   }
 
   return [];
@@ -434,14 +435,14 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
             await writeKisCache(cacheKey, mappedData);
           }
         } catch (dbWriteErr) {
-          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache:`, dbWriteErr);
+          console.error(`[KIS] Failed to write ${cacheKey} to DB Cache`, safeErrorMetadata(dbWriteErr));
         }
 
         return mappedData;
       }
     }
   } catch (err) {
-    console.warn(`[KIS] fetchBidAskRatio live fetch failed, reading closing session DB cache:`, err);
+    console.warn(`[KIS] fetchBidAskRatio live fetch failed, reading closing session DB cache`, safeErrorMetadata(err));
   }
 
   // D. 장애/장외 시간 -> DB 캐시에서 마지막 실거래 기록 복원
@@ -452,7 +453,7 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
       if (cached) return cached;
     }
   } catch (dbReadErr) {
-    console.error(`[KIS] Failed to read ${cacheKey} from DB cache:`, dbReadErr);
+    console.error(`[KIS] Failed to read ${cacheKey} from DB cache`, safeErrorMetadata(dbReadErr));
   }
 
   return [];
