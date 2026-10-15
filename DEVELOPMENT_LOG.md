@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] 차트 WebSocket Approval API 호출 제한
+
+### 목표 및 원인
+- 개선 과제 ID: CI-2026-10-16-016
+- 차트 실시간 구독용 `/api/kis/realtime/approval`은 익명 공개 API이며 유효한 구독 요청에 호출 제한이 없었다. Approval 키 캐시로 KIS 발급 자체는 절약되지만, endpoint 응답 생성·전송과 키 노출을 무제한 요청할 수 있었다.
+- 운영 Nginx는 `X-Real-IP`를 `$remote_addr`로 덮어쓰는데 해당 route는 클라이언트 IP를 사용하지 않아 별도 남용 방어가 없었다.
+
+### 반영 및 재발 방지
+- 단일 인스턴스 전제에 맞춰 process memory fixed-window limiter를 추가했다: IP당 60초 120회, 전체 60초 1,800회. 키 수는 4,096개로 제한하고 만료 항목을 정리한다.
+- 초과 시 `429 RATE_LIMITED`와 `Retry-After`를 반환하며 Approval 키 조회/발급은 호출하지 않는다. 잘못된 종목 요청은 limiter quota를 소비하지 않는다.
+- 신뢰 경계에 맞게 `X-Real-IP`를 먼저 읽고, 마지막 `X-Forwarded-For` hop을 fallback으로 사용한다. 근거는 `deploy/oci/nginx-stockman.conf`의 프록시 헤더 설정이다.
+- 제한 및 IP 우선순위 정책은 `docs/architecture/external-request-boundaries.md`에 연결했다. 반복 호출·IP 격리·전역 cap·window reset·429/Retry-After 및 외부 fetch 미호출을 테스트로 고정했다.
+- 첫 전체 검증에서 KIS 모듈 registry에 새 rate-limit 모듈과 테스트 연결이 누락된 것을 audit가 탐지했다. `scripts/kis-module-registry.mjs` 및 `scripts/audit-kis-boundary.mjs`에 책임·대표 함수·테스트를 등록했고 audit 재실행이 통과했다.
+
+### 검증
+- targeted tests: 2개 파일, 6개 통과. `npm.cmd run typecheck`, `npm.cmd run docs:check`, `npm.cmd run audit:kis-boundary`, `git diff --check` 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드 및 standalone `/charts` 200, 국내·해외 차트 API 200, 보호 API 401, 테스트 201개 파일(695개 통과, 1개 skip), 타입·문서·scope·KIS boundary·bearer auth·cron 게이트 성공.
+- 전체 검증 중 문서 계약과 KIS registry 누락을 각각 감지해 수정하고 재실행 통과했다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: rate-limit 테스트에서 client cap, global cap, 요청 제한 시 fetch 미호출, `Retry-After`가 검증됐다. 전체 및 운영 검증은 아직 완료 전이다.
+
+### 남은 위험
+- 남은 위험: 같은 공인 IP를 공유하는 사용자(회사·통신사 NAT)는 합산 제한에 걸릴 수 있고, 분산 IP 공격은 전역 제한에 영향을 줄 수 있다. 운영 429 비율을 관측해 임계값을 조정해야 한다.
+
+### 다음 개선
+- 운영 로그/메트릭에 IP 원문 없이 제한 발생 횟수, client/global scope, retry-after 분포를 집계해 정책을 조정한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증 통과 후 커밋·푸시·배포한다.
+
 ## [2026-10-16] 차트 WebSocket Approval 발급 호출 캐시
 
 ### 목표

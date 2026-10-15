@@ -9,6 +9,7 @@ const moduleTests = new Map([
   ["kis-request-throttle.ts", "lib/kis-request-throttle.test.ts"],
   ["kis-token.ts", "lib/kis-token.test.ts"],
   ["kis-realtime.ts", "lib/kis-realtime.test.ts"],
+  ["kis-realtime-approval-rate-limit.ts", "lib/kis-realtime-approval-rate-limit.test.ts"],
   ["kis-us-trade-trend.ts", "lib/kis-us-trade-trend.test.ts"],
   ["kis-us-condition-search.ts", "lib/kis-us-condition-search.test.ts"],
   ["kis-ipo-listing-schedule.ts", "lib/kis-ipo-listing-schedule.test.ts"],

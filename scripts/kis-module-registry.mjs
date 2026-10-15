@@ -14,6 +14,7 @@ export const kisModuleRegistry = {
   "kis-rate-limit-event.ts": "rate-limit-observability",
   "kis-realtime-event.ts": "realtime-observability",
   "kis-realtime.ts": "realtime-approval",
+  "kis-realtime-approval-rate-limit.ts": "realtime-approval-rate-limit",
   "kis-request-framework.ts": "shared-request-boundary",
   "kis-request-throttle.ts": "shared-throttle",
   "kis-runtime.ts": "runtime",
@@ -47,6 +48,7 @@ export const kisModulePathRegistry = {
 };
 
 export const kisModuleFeatureRegistry = {
+  "kis-realtime-approval-rate-limit.ts": ["consumeKisRealtimeApprovalLimit"],
   "kis-chart.ts": ["fetchChartData"],
   "kis-domestic-api.ts": ["fetchDomesticVolumePower"],
   "kis-kr-daily-price.ts": ["fetchKrDailyPrice"],

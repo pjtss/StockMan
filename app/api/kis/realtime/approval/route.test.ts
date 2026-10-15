@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearKisRealtimeApprovalKeyCacheForTest } from "@/lib/kis-realtime";
+import { resetKisRealtimeApprovalLimitsForTest } from "@/lib/kis-realtime-approval-rate-limit";
 import { GET } from "./route";
 
 describe("KIS realtime approval API", () => {
   beforeEach(() => {
     clearKisRealtimeApprovalKeyCacheForTest();
+    resetKisRealtimeApprovalLimitsForTest();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
@@ -34,5 +36,20 @@ describe("KIS realtime approval API", () => {
     const response = await GET(new Request("https://local/api/kis/realtime/approval?market=KR&code=005930"));
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ ok: false, error: "KIS_APPROVAL_KEY_UNAVAILABLE" });
+  });
+
+  it("returns 429 with Retry-After when a client exceeds the public limit", async () => {
+    vi.stubEnv("KIS_APPKEY", "app-key");
+    vi.stubEnv("KIS_APPSECRET", "app-secret");
+    const fetchMock = vi.fn(async () => Response.json({ approval_key: "approval-key" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = () => new Request("https://local/api/kis/realtime/approval?market=KR&code=005930", { headers: { "x-real-ip": "192.0.2.99" } });
+
+    for (let index = 0; index < 120; index += 1) expect((await GET(request())).status).toBe(200);
+    const limited = await GET(request());
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect(await limited.json()).toEqual({ ok: false, error: "RATE_LIMITED" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
