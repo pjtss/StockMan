@@ -1,5 +1,33 @@
 # Development Log
 
+## [2026-10-16] Bearer 인증 정규식 재발 방지 게이트 추가
+
+### 목표
+- API route에 Bearer 공백 정규식 이중 이스케이프가 재도입되는 것을 배포 전 자동으로 차단한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-006
+- `scripts/audit-bearer-auth.mjs`가 `app/api`의 route 파일을 훑어 잘못된 `Bearer\\s` source 패턴을 찾으면 실패한다.
+- 정상 공백 정규식 허용 및 이중 이스케이프 감지 테스트를 추가했다.
+- `npm run audit:bearer-auth`를 `deploy:verify` 및 표준 `verify` 흐름에 연결하고 배포 체크리스트에도 추가했다.
+
+### 검증
+- 감사 단위 테스트: 2/2 통과.
+- 실제 API route 170개 감사 통과; 현재 이중 이스케이프 파서 0건.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 194개 테스트 파일 중 193개 통과/1개 skip(659개 통과/1개 skip), typecheck, docs:check, verify-scope, KIS boundary, Bearer auth audit, OCI cron 21 endpoints.
+- Standalone smoke 통과: `/charts` 200, invalid KIS market 400, KR/US top-rising chart 200, 보호된 admin/cron 미인증 401, 프로세스 종료 정리 완료.
+- `git diff --check` 통과.
+
+### 다음 개선
+- cron/API 인증 파서가 중앙 공통 함수를 사용하도록 점진적으로 통합하고, header precedence와 whitespace 동작을 동일한 계약 테스트로 검증한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 이전에는 발견된 오타를 고치는 회귀 테스트만 있었고 다른 route의 재발은 자동 감지하지 않았다. 이제 배포 검증이 API route 전부를 검사하고 잘못된 source pattern이 있으면 실패한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 로컬 검증 이후 커밋·푸시·배포 예정.
+
 ## [2026-10-16] 헬스 스냅샷 cron Bearer 인증 파서 수정
 
 ### 목표

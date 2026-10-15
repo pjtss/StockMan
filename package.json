@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "docs:check": "node scripts/check-docs.mjs",
     "audit:kis-boundary": "node scripts/audit-kis-boundary.mjs",
+    "audit:bearer-auth": "node scripts/audit-bearer-auth.mjs",
     "measure:verify": "node scripts/measure-verify.mjs",
     "compare:verify": "node scripts/compare-verify.mjs",
     "audit:verify-scope": "node scripts/audit-verify-scope-change.mjs",
@@ -20,7 +21,7 @@
     "typecheck": "tsc --noEmit",
     "deploy:verify": "node scripts/verify-deploy.mjs",
     "sync:daily-cache": "node --env-file=.env.local scripts/sync-daily-cache-from-remote.mjs",
-    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:verify-scope && npm run audit:kis-boundary && npm run cron:check && npm run build"
+    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:verify-scope && npm run audit:kis-boundary && npm run audit:bearer-auth && npm run cron:check && npm run build"
   },
   "dependencies": {
     "@netlify/functions": "^5.2.0",

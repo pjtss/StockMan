@@ -20,6 +20,7 @@
 - [ ] 타입검사 통과
 - [ ] 필수 문서 및 Flyway 검사 통과
 - [ ] OCI cron 구조·셸 문법 검사 통과
+- [ ] Bearer 인증 파서 이중 이스케이프 정적 감사 통과 (`npm run audit:bearer-auth`)
 - [ ] production build 성공
 - [ ] standalone 서버 실행 및 `/charts` smoke test 성공
 - [ ] Next.js HTML은 재검증되고, 이전 릴리스의 해시 정적 청크 호환 보존 경로가 포함되어 있는지 확인

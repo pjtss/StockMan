@@ -81,6 +81,7 @@ async function verifyQuality() {
   await run(npm, ["run", "docs:check"]);
   await run(npm, ["run", "audit:verify-scope"]);
   await run(npm, ["run", "audit:kis-boundary"]);
+  await run(npm, ["run", "audit:bearer-auth"]);
   await run(npm, ["run", "cron:check"]);
   if (!isWindows) await run("bash", ["-n", "scripts/oci-cron.sh"]);
 }
