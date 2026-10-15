@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { fetchChartData } from "@/lib/kis-chart";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { getDb } from "@/lib/db";
+import { loadRemoteDailyCandles } from "@/lib/remote-daily-candle-cache";
+import { loadRemoteStockChart } from "@/lib/remote-stock-chart";
+import { chartCandleMemoryKey, getChartCandleMemory, setChartCandleMemory } from "@/lib/chart-candle-memory-cache";
 import { sql } from "drizzle-orm";
 import { buildChartDataFromCandles, type ChartData, type ChartFundamentals, type OHLCVCandle } from "@/lib/kis-chart";
 
@@ -9,9 +12,20 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const startedAt = performance.now();
+  const phaseDurations = new Map<string, number>();
+  const measure = async <T,>(name: string, operation: () => Promise<T>): Promise<T> => {
+    const phaseStartedAt = performance.now();
+    try {
+      return await operation();
+    } finally {
+      phaseDurations.set(name, Math.round(performance.now() - phaseStartedAt));
+    }
+  };
   const timedJson = (body: unknown, init?: ResponseInit) => {
     const response = NextResponse.json(body, init);
-    response.headers.set("server-timing", `chart;dur=${Math.max(0, Math.round(performance.now() - startedAt))}`);
+    const timings = [`chart;dur=${Math.max(0, Math.round(performance.now() - startedAt))}`,
+      ...[...phaseDurations].map(([name, duration]) => `${name};dur=${duration}`)];
+    response.headers.set("server-timing", timings.join(", "));
     return response;
   };
   const { searchParams } = new URL(request.url);
@@ -20,6 +34,8 @@ export async function GET(request: Request) {
   const company = searchParams.get("company")?.trim() || null;
   const requestedMarket = searchParams.get("market")?.trim().toUpperCase();
   const market = requestedMarket === "US" || requestedMarket === "KR" ? requestedMarket : (code?.toUpperCase().startsWith("US:") ? "US" : "KR");
+  const requestedExchange = searchParams.get("exchange")?.trim().toUpperCase();
+  const exchange = ["KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"].includes(requestedExchange ?? "") ? requestedExchange! : null;
   const requestedTimeframe = searchParams.get("timeframe")?.trim().toUpperCase();
   const timeframe = (["D", "W", "M"] as const).includes(requestedTimeframe as "D" | "W" | "M") ? requestedTimeframe as "D" | "W" | "M" : "D";
 
@@ -30,32 +46,57 @@ export async function GET(request: Request) {
   try {
     let data: ChartData | null = null;
     let chartSource = "KIS";
+    const remoteConfigured = Boolean(process.env.DAILY_CACHE_API_URL?.trim());
+    const cacheMarket = exchange && (market === "KR" ? ["KOSPI", "KOSDAQ"].includes(exchange) : ["NAS", "NYS", "AMS"].includes(exchange)) ? exchange : market;
+    const memoryKey = chartCandleMemoryKey({ market, code, exchange, timeframe });
+    const memory = getChartCandleMemory(memoryKey);
+    if (memory?.candles.length) {
+      data = buildChartDataFromCandles(code, memory.candles, memory.updatedAt);
+      chartSource = "PROCESS_CANDLE_MEMORY";
+    }
+    if (!data) {
+      const remote = await measure("remote-cache", () => loadRemoteDailyCandles({ market: cacheMarket, code, timeframe }).catch(() => null));
+      if (remote?.candles.length) {
+        setChartCandleMemory(memoryKey, remote.candles, remote.updatedAt);
+        data = buildChartDataFromCandles(code, remote.candles, remote.updatedAt);
+        chartSource = "OPERATING_DB_CACHE_API";
+      }
+    }
     try {
-      data = market === "US"
-        ? await fetchUsChartData(code, timeframe)
-        : await fetchChartData(code, timeframe);
+      if (!data) {
+        data = await measure("kis", () => market === "US"
+          ? fetchUsChartData(code, timeframe, exchange)
+          : fetchChartData(code, timeframe));
+        if (data?.candles.length) setChartCandleMemory(memoryKey, data.candles, data.candleDataUpdatedAt ?? null);
+      }
     } catch (error) {
-      if (market !== "KR") throw error;
-      console.warn("[API /stock/chart] KIS unavailable; trying domestic DB cache");
-      data = await loadCachedChartData(code, timeframe);
+      console.warn(`[API /stock/chart] KIS unavailable; trying ${market} DB cache`);
+      data = await measure("db-cache", () => loadCachedChartData(code, timeframe, market, exchange));
       if (data) chartSource = "DB_CACHE";
     }
-    if (!data && market === "KR") {
-      data = await loadCachedChartData(code, timeframe);
+    if (!data) {
+      data = await measure("db-cache", () => loadCachedChartData(code, timeframe, market, exchange));
       if (data) chartSource = "DB_CACHE";
+    }
+    if (!data && remoteConfigured) {
+      data = await measure("remote-chart-fallback", () => loadRemoteStockChart({ market, code, company, timeframe, exchange, callerUrl: request.url }));
+      if (data) {
+        chartSource = "OPERATING_CHART_API";
+        setChartCandleMemory(memoryKey, data.candles, data.candleDataUpdatedAt ?? null);
+      }
     }
     if (!data) {
       const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe).catch(() => unknownFundamentals(market));
       return timedJson(
-        { error: "차트 데이터를 불러올 수 없습니다. KIS API 자격증명을 확인하세요.", chartStatus: "UNAVAILABLE", fundamentals },
+        { error: remoteConfigured ? "원격 캐시와 실시간 시세에서 차트 데이터를 찾지 못했습니다." : "차트 데이터를 불러올 수 없습니다. KIS API 자격증명을 확인하세요.", chartStatus: "UNAVAILABLE", fundamentals },
         { status: 503 }
       );
     }
 
     // caller가 넘긴 company명이 있으면 덮어씀
     if (company) data.company = company;
-    if (chartSource === "DB_CACHE") data.fundamentals = { ...unknownFundamentals(market), status: "STALE", source: "DB_CACHE" };
-    data.fundamentals = await loadChartFundamentals(data, market, timeframe).catch(() => unknownFundamentals(market));
+    if (chartSource === "DB_CACHE" || chartSource === "OPERATING_DB_CACHE_API" || chartSource === "OPERATING_CHART_API" || chartSource === "PROCESS_CANDLE_MEMORY") data.fundamentals = { ...unknownFundamentals(market), status: "STALE", source: chartSource };
+    data.fundamentals = await measure("fundamentals", () => loadChartFundamentals(data!, market, timeframe).catch(() => unknownFundamentals(market)));
 
     return timedJson(data);
   } catch (err: any) {
@@ -65,15 +106,23 @@ export async function GET(request: Request) {
   }
 }
 
-async function loadCachedChartData(rawCode: string, timeframe: "D" | "W" | "M"): Promise<ChartData | null> {
+async function loadCachedChartData(rawCode: string, timeframe: "D" | "W" | "M", market: "KR" | "US", exchange: string | null): Promise<ChartData | null> {
   const db = getDb();
   const code = rawCode.replace(/^US:/i, "").trim().toUpperCase();
-  const result = await db.execute(sql`SELECT date AS "date", open, high, low, close, volume, fetched_at AS "fetchedAt" FROM (
-    SELECT candle_date AS date, open, high, low, close, volume, fetched_at,
-           ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
-      FROM kr_instrument_universe_candles
-     WHERE code = ${code} AND timeframe = ${timeframe} AND close IS NOT NULL
-  ) cached WHERE rn = 1 ORDER BY date ASC`);
+  const result = market === "US"
+    ? await db.execute(sql`SELECT date AS "date", open, high, low, close, volume, fetched_at AS "fetchedAt" FROM (
+        SELECT candle_date AS date, open, high, low, close, volume, fetched_at,
+               ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
+          FROM us_instrument_universe_candles
+         WHERE code = ${code} AND timeframe = ${timeframe} AND close IS NOT NULL
+           AND (${exchange}::text IS NULL OR market = ${exchange})
+      ) cached WHERE rn = 1 ORDER BY date ASC`)
+    : await db.execute(sql`SELECT date AS "date", open, high, low, close, volume, fetched_at AS "fetchedAt" FROM (
+        SELECT candle_date AS date, open, high, low, close, volume, fetched_at,
+               ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
+          FROM kr_instrument_universe_candles
+         WHERE code = ${code} AND timeframe = ${timeframe} AND close IS NOT NULL
+      ) cached WHERE rn = 1 ORDER BY date ASC`);
   const candles = (result.rows as Array<Record<string, unknown>>).map((row): OHLCVCandle => ({
     date: String(row.date), open: Number(row.open ?? 0), high: Number(row.high ?? 0), low: Number(row.low ?? 0), close: Number(row.close ?? 0), volume: Number(row.volume ?? 0),
   })).filter((candle) => /^\d{8}$/.test(candle.date) && Number.isFinite(candle.close));
@@ -150,9 +199,11 @@ async function loadFundamentalsSnapshot(rawCode: string | null, market: string, 
   return { marketCap, latestTradingValue, averageTradingValue20, latestVolume, averageVolume20, rvol: averageVolume20 && latestVolume ? latestVolume / averageVolume20 : null, currency: String(snapshot.currency ?? (market === "US" ? "USD" : "KRW")), observedAt: snapshot.observedAt ? new Date(String(snapshot.observedAt)).toISOString() : null, fetchedAt, source: snapshot.source ? String(snapshot.source) : null, status: fetchedAt && Date.now() - new Date(fetchedAt).getTime() > 48 * 60 * 60 * 1000 ? "STALE" : hasData ? "AVAILABLE" : "UNKNOWN" };
 }
 
-async function fetchUsChartData(rawCode: string, timeframe: "D" | "W" | "M"): Promise<ChartData | null> {
+async function fetchUsChartData(rawCode: string, timeframe: "D" | "W" | "M", requestedExchange: string | null): Promise<ChartData | null> {
   const code = rawCode.replace(/^US:/i, "").trim().toUpperCase();
-  const markets = ["NAS", "NYS", "AMS"];
+  const markets = requestedExchange && ["NAS", "NYS", "AMS"].includes(requestedExchange)
+    ? [requestedExchange, ...["NAS", "NYS", "AMS"].filter((item) => item !== requestedExchange)]
+    : ["NAS", "NYS", "AMS"];
   for (const exchange of markets) {
     const result = await fetchUsDailyPrice({ code, market: exchange, timeframe }).catch(() => null);
     if (!result?.ok || result.candles.length === 0) continue;
