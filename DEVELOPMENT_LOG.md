@@ -16,10 +16,11 @@
 - 발견 근거: 실제 운영에서 캐시 이력 쿼리 timeout을 겪은 구조가 한 바깥 `try/catch`에 묶여 있어, `Promise.all` 한 곳의 rejection이 성공한 automation query 결과까지 버리는 것을 코드로 확인했다.
 - 장애 주입 데이터 테스트와 렌더 테스트: `npm.cmd test -- --run app/health-check/page.test.tsx lib/health-check-query-resilience.test.ts lib/health-check-query-concurrency.test.ts lib/health-check.test.ts` 4개 파일, 6개 테스트 통과. 타입 검사와 `git diff --check` 통과.
 - `scripts/dev-server.mjs` 실행에서 `/health-check` HTTP 200, 실제 빈 history는 `실행 이력 없음`으로 표시됐다. `/api/health`는 HTTP 503/degraded였으며 로컬 DB가 Flyway 148이고 필수 운영 테이블 `debug_run_items`, `debug_kis_calls`가 없어 발생한 기존 로컬 스키마 차이임을 read-only 조회로 확인했다. 로컬 DB에는 migration을 적용하지 않았다.
-- 전체 빌드·실행 검증은 변경 추가 후 `npm.cmd run deploy:verify`로 진행한다. 배포는 게이트 통과 후 수행한다.
+- 최종 `npm.cmd run deploy:verify`: production build, 전체 646 tests passed/1 skipped, typecheck, docs, 범위/KIS/cron 감사와 standalone HTTP smoke 통과.
+- Deploy OCI workflow `38706334906` 성공 후 운영 `/health-check` HTTP 200, `/api/health` HTTP 200/status `ok`/48ms. 정상 운영 데이터에서 실패 표시 문구는 없고 빈 이력 표시도 노출되지 않았다.
 
 ### 다음 개선
-- 강제 history query 실패에서 `/health-check`가 실제 이력 부재와 조회 실패를 구별하는지 standalone 서버에서 확인하고 운영 배포 뒤 기존 정상 응답도 재검증한다.
+- 운영 DB query 지연이 재발할 때 admin diagnostics의 probe 시간과 health 페이지의 `이력 조회 실패` 상태를 대조해 원인을 기록한다. 정기 수집·경보는 별도 개선 과제로 추적한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-15-002
@@ -28,7 +29,7 @@
 - 성공 기준: 개별 history query 실패 시 다른 query 결과 보존, 사용자 화면에 조회 실패 명시, 공개 `/api/health` 계약 유지.
 
 ### 커밋·푸시·배포
-- 미실행: 전체 deploy:verify, 커밋, 푸시 및 운영 배포 전이다.
+- 완료: commit `6bd927c5c8759d0bd7b25f99d70aca6a436b2fcf`를 `oci`에 push하고 Deploy OCI run `38706334906` 성공. 운영 health 페이지와 API를 확인했다.
 
 ## [2026-10-15] 운영 health 자동화 이력 조회 병목 해소
 
