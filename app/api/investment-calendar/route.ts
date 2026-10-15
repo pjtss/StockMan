@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { CALENDAR_EVENT_TYPES, listInvestmentCalendarEvents, upsertInvestmentCalendarEvents, type CalendarEventInput } from "@/lib/investment-calendar";
 
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
   const to = url.searchParams.get("to") || new Date(Date.now() + 1000 * 60 * 60 * 24 * 45).toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });
   try { const items = await listInvestmentCalendarEvents({ from, to, type: url.searchParams.get("type") || undefined, market: url.searchParams.get("market") || undefined, code: url.searchParams.get("code") || undefined }); return NextResponse.json({ ok: true, from, to, types: CALENDAR_EVENT_TYPES, items, count: items.length }); }
-  catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "CALENDAR_QUERY_FAILED" }, { status: 503 }); }
+  catch (error) { return NextResponse.json({ ok: false, error: safeErrorMetadata(error).errorCode }, { status: 503 }); }
 }
 
 export async function POST(request: Request) {
@@ -22,5 +23,8 @@ export async function POST(request: Request) {
     if (events.some((event) => !event.source || !event.externalId || !event.eventDate || !CALENDAR_EVENT_TYPES.includes(event.eventType))) return NextResponse.json({ ok: false, error: "INVALID_EVENT_FIELDS" }, { status: 400 });
     const count = await upsertInvestmentCalendarEvents(events);
     return NextResponse.json({ ok: true, upserted: count });
-  } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "CALENDAR_IMPORT_FAILED" }, { status: 503 }); }
+  } catch (error) {
+    if (error instanceof SyntaxError) return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: safeErrorMetadata(error).errorCode }, { status: 503 });
+  }
 }

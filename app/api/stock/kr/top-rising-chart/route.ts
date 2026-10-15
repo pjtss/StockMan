@@ -3,6 +3,7 @@ import { intradayMemoryState } from "@/lib/intraday-memory-state";
 import { getAccessToken } from "@/lib/kis-token";
 import { fetchDomesticFluctuation } from "@/lib/kis-domestic-api";
 import { normalizeKrTopRisingRows } from "@/lib/kr-top-rising";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,6 @@ export async function GET() {
     const items = normalizeKrTopRisingRows(rows as unknown as Array<Record<string, unknown>>, observedAt);
     return NextResponse.json({ ok: items.length > 0, source: "KIS_LAST_RANKING", items, collectedAt: items.length ? observedAt : null, message: items.length ? "장외 시간에는 KIS가 반환한 마지막 정상 상승률 순위를 표시합니다." : "KIS가 국내 상승률 순위를 반환하지 않았습니다." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return NextResponse.json({ ok: false, source: "KIS_LAST_RANKING_UNAVAILABLE", items: [], error: error instanceof Error ? error.message : "KR_TOP_RISING_UNAVAILABLE" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ok: false, source: "KIS_LAST_RANKING_UNAVAILABLE", items: [], error: safeErrorMetadata(error).errorCode }, { status: 502, headers: { "Cache-Control": "no-store" } });
   }
 }

@@ -1,5 +1,39 @@
 # Development Log
 
+## [2026-10-16] 공개 데이터 API 오류 응답 및 SEC 리스크 쓰기 권한 강화
+
+### 목표
+- 공개 데이터 API 오류에 내부 예외 원문이 노출되지 않도록 하고, SEC 리스크 DB 쓰기를 관리자 세션으로 제한한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-014
+- `bullish-rss`, `listings`, `investment-calendar`, 국내 재무 내보내기, 국내 TOP 상승 차트, daytrade scan 및 SEC 리스크 API에서 예외 원문이 응답될 수 있는 경로를 확인했다.
+- 응답은 공통 `safeErrorMetadata(...).errorCode`를 사용하도록 변경했다. JSON 파싱 오류는 `INVALID_JSON`으로 처리하고, DB/서비스 예외는 503 계열로 분류해 클라이언트 오류와 구분한다.
+- `/api/us/sec-risks` PATCH는 기존에 rate limit 외 인증이 없어 누구나 지속 저장되는 위험 데이터를 수정할 수 있었다. 저장소 내 호출처가 없는 것을 확인했고, PATCH에 관리자 세션을 요구하도록 변경했다. 검증 실패 코드는 allowlist 형식만 응답하며 DB 원문은 반환하지 않는다.
+- SEC risks route 회귀 테스트 3개와 공개 경로 소스 감사 7개를 추가했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 공개 API 예외를 그대로 JSON에 넣고, 데이터 변경 API에서 인증 대신 rate limiting만 적용한 책임 경계 누락.
+- 재발 감지: 선정된 공개 API의 직접 예외 메시지 반환을 소스 감사 테스트로 검사하고, SEC risk PATCH에 비로그인 401 및 쓰기 미호출 테스트를 유지한다.
+- 남은 위험: 이번 변경은 확인한 공개 경로에 한정했다. 공개 API 전수 목록의 인증·오류 응답 계약을 계속 감사한다.
+
+### 검증
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/public-api-error-boundary.test.ts app/api/us/sec-risks/route.test.ts app/api/kis/detection-candidates/route.test.ts`: 4개 파일, 21개 테스트 통과.
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: 통과. Next.js 빌드와 standalone 실행/API smoke, 198개 테스트 파일(684개 통과, 1개 skip), typecheck, docs, verify-scope, KIS boundary, bearer-auth 및 cron 구조 게이트 통과.
+- `git diff --check`: 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: targeted 회귀 테스트에서 원문 오류 미노출, 미인증 SEC risk 쓰기 차단, 데이터베이스 장애 시 503 분류를 확인했고 전체 배포 검증도 통과했다. 운영 반영 검증은 남아 있다.
+- 완료 기준: `deploy:verify` 및 운영 배포 후 서비스 SHA 확인.
+
+### 다음 개선
+- `/api` route 전체 인벤토리에서 공개 쓰기 API·자유형 예외 응답을 자동 탐지하는 CI 감사 규칙을 확대한다.
+
+### 커밋·푸시·배포
+- 미실행: 커밋·푸시·배포는 다음 단계에서 진행하고 운영 서비스 SHA 확인 후 결과를 기록한다.
+
 ## [2026-10-16] KIS·국내 스캔 공개 API의 자유형 오류 응답 차단
 
 ### 목표

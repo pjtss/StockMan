@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recommendMultiTimeframe } from "@/lib/multi-timeframe-recommendations";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -9,6 +10,6 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(await recommendMultiTimeframe(market, "scalp", limit));
   } catch (error) {
-    return NextResponse.json({ ok: false, error: "DAYTRADE_SCAN_UNAVAILABLE", detail: error instanceof Error ? error.message : String(error) }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "DAYTRADE_SCAN_UNAVAILABLE", detail: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }

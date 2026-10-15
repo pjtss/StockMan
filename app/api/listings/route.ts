@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 import { listInvestmentCalendarEvents } from "@/lib/investment-calendar";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,6 @@ export async function GET(request: Request) {
     const items = await listInvestmentCalendarEvents({ from, to, type: "IPO", market: "KR", limit: Number(url.searchParams.get("limit") || 200) });
     return NextResponse.json({ ok: true, market, from, to, sourceAvailable: true, source: "KRX_KIND", items, count: items.length, message: "KRX KIND RSS에서 수집·저장된 신규상장 관련 일정입니다." });
   } catch (error) {
-    return NextResponse.json({ ok: false, market, from, to, error: error instanceof Error ? error.message : "LISTING_QUERY_FAILED" }, { status: 503 });
+    return NextResponse.json({ ok: false, market, from, to, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }

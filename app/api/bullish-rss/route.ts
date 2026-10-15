@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { listMarketRssBullishArticles, upsertMarketRssBullishArticles } from "@/lib/market-rss-bullish-repository";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     const articles = await listMarketRssBullishArticles({ source, limit });
     return NextResponse.json({ ok: true, source: source || "ALL", count: articles.length, articles });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 503 });
+    return NextResponse.json({ ok: false, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }
 
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     const result = await upsertMarketRssBullishArticles(body.articles as Parameters<typeof upsertMarketRssBullishArticles>[0]);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    if (error instanceof SyntaxError) return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }
 }

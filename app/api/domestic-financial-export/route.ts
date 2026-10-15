@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,6 @@ export async function GET(request: Request) {
       headers: { "content-type": "application/json; charset=utf-8", "content-disposition": `attachment; filename="domestic-financial-${rawOnly ? "raw" : llmFormat ? "llm" : "data"}-${exportedAt.slice(0, 10)}.json"`, "cache-control": "no-store" },
     });
   } catch (error) {
-    return NextResponse.json({ ok: false, exportedAt, error: error instanceof Error ? error.message : "EXPORT_FAILED" }, { status: 500 });
+    return NextResponse.json({ ok: false, exportedAt, error: safeErrorMetadata(error).errorCode }, { status: 500 });
   }
 }
