@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { runUsDailyBreakoutScan } from "@/lib/us-daily-breakout-automation";
 import { sendUsDailyBreakoutToDiscord } from "@/lib/discord-us-daily-breakout";
 import { withAutomationRun } from "@/lib/automation-run";
@@ -9,9 +10,7 @@ import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/l
 
 export async function POST(request: Request) {
   if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("us-daily-breakout");
   if (!settings.enabled) { await recordSkippedAutomationRun("us-daily-breakout", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
   if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("us-daily-breakout", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }

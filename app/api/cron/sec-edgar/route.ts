@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { analyzeSecSubmission, loadPendingSecEvents, loadRecentSecSubmissions, markSecEventDiscord, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
@@ -9,8 +10,7 @@ import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-cron-secret")?.trim();
-  if (!secret || secret !== process.env.CRON_SECRET) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   try {
     const settings = await loadFeatureModuleSettings("sec-realtime");
     if (!settings.enabled) { await recordSkippedAutomationRun("sec-realtime", "disabled"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "disabled" }); }

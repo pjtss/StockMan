@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { readKisCache } from "@/lib/kis-cache";
 import { EXCLUDED_US_OFFICIAL_NAME } from "@/lib/us-top-rising-universe";
 
@@ -14,9 +15,7 @@ type CachedGoldenCross = {
 const excludedKrName = /(?:스팩|SPAC|우선주|우(?:\(|$)|\d우B(?:\(|$)|전환|신주인수권|권리주)/i;
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!secret || supplied !== secret) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const definitions = [
     ["golden-cross", "KR", "D"], ["golden-cross", "US", "D"],
     ["bollinger", "KR", "D:LOWER_OR_BELOW"], ["bollinger", "KR", "D:MIDDLE_TO_LOWER"],

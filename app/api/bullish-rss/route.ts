@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { listMarketRssBullishArticles, upsertMarketRssBullishArticles } from "@/lib/market-rss-bullish-repository";
 
 export const dynamic = "force-dynamic";
 
 function authorized(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  return Boolean(secret && supplied === secret);
+  return isCronRequestAuthorized(request);
 }
 
 export async function GET(request: Request) {

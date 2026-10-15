@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { getPool } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { inspectDatabaseSchema } from "@/lib/schema-health";
@@ -11,18 +11,9 @@ export const dynamic = "force-dynamic";
 const ALL_CHECKS = ["environment", "schema", "token", "automation", "rss", "sec"] as const;
 type CheckName = (typeof ALL_CHECKS)[number];
 
-function secretMatches(candidate: string | null, expected: string | undefined) {
-  if (!candidate || !expected) return false;
-  const left = Buffer.from(candidate);
-  const right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
 async function authorized(request: Request) {
   if (await requireAdminSession()) return true;
-  const header = request.headers.get("authorization");
-  const candidate = header?.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : request.headers.get("x-cron-secret");
-  return secretMatches(candidate, process.env.CRON_SECRET);
+  return isCronRequestAuthorized(request);
 }
 
 async function safeCount(pool: ReturnType<typeof getPool>, table: string) {

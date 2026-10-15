@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { scanStoredKrBollingerBands } from "@/lib/kr-bollinger-band";
@@ -11,9 +12,7 @@ import { withDailyBollingerRetry } from "@/lib/daily-bollinger-retry";
 
 export async function POST(request: Request) {
   const debugRun = new URL(request.url).searchParams.get("debug") === "true" || request.headers.get("x-debug-run") === "true";
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!secret || supplied !== secret) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("kr-bollinger-middle-lower");
   if (!debugRun && !(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   if (!debugRun && !settings.enabled) { await recordSkippedAutomationRun("kr-bollinger-middle-lower", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { getPool } from "@/lib/db";
@@ -10,9 +11,7 @@ export const runtime = "nodejs";
 export const maxDuration = 900;
 
 export async function POST(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!secret || supplied !== secret) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   if (!process.env.SEC_USER_AGENT?.trim()) return NextResponse.json({ ok: false, error: "SEC_USER_AGENT_REQUIRED" }, { status: 503 });
 
   try {

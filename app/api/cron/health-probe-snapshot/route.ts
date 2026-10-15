@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { getPool } from "@/lib/db";
 import { describeError } from "@/lib/error-diagnostics";
 import type { PoolClient } from "pg";
@@ -13,13 +14,8 @@ const PROBES: Probe[] = [
   { name: "health_schema", sql: "SELECT to_regclass('public.health_probe_history') IS NOT NULL AS ready", validate: (rows) => rows[0]?.ready === true },
 ];
 
-function suppliedSecret(request: Request) {
-  return request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-}
-
 export async function POST(request: Request) {
-  const expected = process.env.CRON_SECRET?.trim();
-  if (!expected || suppliedSecret(request) !== expected) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const pool = getPool();
   const requestId = request.headers.get("x-request-id")?.replace(/[^a-zA-Z0-9:_.-]/g, "").slice(0, 160) || null;

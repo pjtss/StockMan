@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { ingestMarketRssArticles, notifyPendingMarketRssArticles, translatePendingMarketRssArticles } from "@/lib/market-rss-pipeline";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
@@ -8,7 +9,7 @@ import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { syncMarketRssBullishArticles } from "@/lib/market-rss-bullish-repository";
 
-function authorized(request: Request) { return Boolean(process.env.CRON_SECRET && request.headers.get("x-cron-secret") === process.env.CRON_SECRET); }
+function authorized(request: Request) { return isCronRequestAuthorized(request); }
 
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

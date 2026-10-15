@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { getFeatureModule, type FeatureModuleKey } from "@/lib/feature-modules";
 import { loadAutomationDebugSnapshot } from "@/lib/automation-debug";
@@ -17,8 +18,7 @@ export async function GET(request: Request) {
   const startedAt = Date.now();
   const requestId = resolveRequestId(request);
   const tracedJson = (body: Record<string, unknown>, init?: ResponseInit) => json({ requestId, responseTimeMs: responseTimeMs(startedAt), ...body }, init, requestId, startedAt);
-  const supplied = request.headers.get("x-cron-secret") || "";
-  const cronAuthorized = Boolean(process.env.CRON_SECRET && supplied === process.env.CRON_SECRET);
+  const cronAuthorized = isCronRequestAuthorized(request);
   if (!cronAuthorized && !(await requireAdminSession())) return tracedJson({ error: "Unauthorized" }, { status: 401 });
   const params = new URL(request.url).searchParams;
   const moduleKey = params.get("module") || undefined;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { refreshUsDailyOpenCache } from "@/lib/us-daily-open-cache";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
@@ -8,9 +9,7 @@ import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/l
 
 export async function POST(request: Request) {
   if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!secret || supplied !== secret) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("us-daily-open-cache");
   if (!settings.enabled) {
     await recordSkippedAutomationRun("us-daily-open-cache", "disabled");

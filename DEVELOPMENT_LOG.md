@@ -1,5 +1,38 @@
 # Development Log
 
+## [2026-10-16] CRON_SECRET 인증 검증 경로 공통화
+
+### 목표
+- 예약·스캔·관리 진단 API에서 중복 구현된 CRON_SECRET 파싱을 공통 계약으로 통일하고, 인증 회귀가 새 라우트에서 재발하면 배포 전에 자동 차단한다.
+
+### 반영
+- 개선 과제 ID: CI-2026-10-16-009
+- 기존 인증 라우트 다수에서 `x-cron-secret`/Bearer 파싱과 공백 처리 방식이 달랐음을 확인했다. 일부는 header 값을 trim하지 않고, 일부는 Bearer prefix 처리 방식이 달랐다.
+- 예약·스캔·RSS 저장·캘린더·진단 API 30개 라우트를 `isCronRequestAuthorized`로 통합했다. helper는 설정값과 헤더를 trim하고, Bearer 스킴을 대소문자 무관하게 파싱하며, 상수 시간 비교를 수행하고 query secret을 받지 않는다.
+- 관리자 디버그 스위트는 기존 관리자 세션 인증을 유지하면서 cron 대체 인증만 공통 helper로 위임한다.
+- `audit:bearer-auth`를 확장해 API route에서 직접 CRON_SECRET 인증을 새로 구현하면 실패하도록 했다. CRON_SECRET 설정 여부만 진단 응답으로 제공하는 `admin/market-debug`는 명시적 비인증 예외로 둔다.
+
+### 검증
+- 집중 회귀 테스트: 3개 파일, 13개 테스트 통과.
+- 최종 `npm.cmd run deploy:verify` 통과: production build, standalone smoke(`/charts` 200, KR/US top-rising API 200, unauthenticated admin/cron 401), 테스트 195개 파일 통과/1개 skip(668개 통과/1개 skip), typecheck, docs, verify-scope, KIS boundary, auth audit, OCI cron(21 endpoints).
+- `npm.cmd run audit:bearer-auth`가 API route 170개를 검사했고, CRON_SECRET 인증 구현은 공통 helper 사용으로 통일됐다. 설정 상태만 진단하는 명시 예외는 1개다.
+- 최초 문서 검사는 `미실행` 설명에 포함된 단어를 배포 완료 상태로 오인해 실패했다. 상태 문구를 고친 뒤 최종 전체 검증에서 docs gate도 통과했다.
+
+### 남은 위험 및 다음 개선
+- 개별 비즈니스 라우트가 Cron 호출 후 수행하는 작업의 권한·중복실행 정책은 이번 인증 파서 변경 범위가 아니다.
+- 별도 키(`DAILY_CACHE_API_KEY`, 사용자 세션, webhook 서명 등)를 사용하는 공개·관리 API는 CRON_SECRET 계약과 별도 검토한다.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 공통 helper 적용, 집중·전체 테스트 및 local standalone 실행은 통과했지만 운영 배포 후 SHA/인증 확인은 아직 남아 있다.
+- 완료 기준: 전체 배포 검증 통과, OCI cron 헤더 호출 유지, 배포 후 commit SHA와 인증 응답 확인.
+
+### 다음 개선
+- 관리자·공개 API의 별도 인증 체계와 민감정보 로그 노출을 인벤토리화하고 토큰 노출 회귀 테스트를 추가한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증 후 커밋·푸시·배포한다.
+
 ## [2026-10-16] Cron 비밀값의 URL 쿼리 전달 제거
 
 ### 목표

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { CALENDAR_EVENT_TYPES, listInvestmentCalendarEvents, upsertInvestmentCalendarEvents, type CalendarEventInput } from "@/lib/investment-calendar";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret") || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!secret || supplied !== secret) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   try {
     const body = await request.json();
     if (!Array.isArray(body?.events) || body.events.length > 5000) return NextResponse.json({ ok: false, error: "INVALID_EVENTS" }, { status: 400 });
