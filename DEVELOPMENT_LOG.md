@@ -19,19 +19,23 @@
 - Standalone HTTP 결과: `/charts` 200, 유효하지 않은 KIS market 400, 국내/해외 TOP 상승 차트 API 200, 관리자 history API와 cron API는 자격증명 없이 각각 401.
 - 첫 smoke 실패를 조사하며 격리 worktree에 `.env.local`이 없음을 확인했다. 주 프로젝트 파일을 수정하지 않고 임시 하드링크로 환경만 연결했으며 SHA-256 일치를 확인했다. 기본 동적 포트에서 timeout이 재현됐으나 고정 포트 `3333`의 최종 전체 검증은 통과했다. 별도 수동 standalone 재현도 `/charts` 200을 반환했다.
 - 수동 standalone 프로세스가 `.next-deploy-verify`를 사용하는 동안 후속 빌드가 겹치는 것을 발견하고, 최종 전체 검증 전에 두 프로세스를 종료했다. 이 worktree의 `.env.local` 임시 링크는 검증 후 제거한다.
-- 로컬 DB migration V150은 적용하지 않는다. 현재 운영 migration/API 확인은 push 후 Deploy OCI 성공을 확인한 다음 수행한다.
+- 배포 결과: `https://github.com/pjtss/StockMan/actions/runs/38771175760` 성공. 운영 admin 진단 API가 Flyway V150(`health probe history`)을 확인했고, 공개 `/api/health`는 `ok`/21ms였다.
+- 운영 검증: cron snapshot POST HTTP 200/`recorded: 3`; 관리자 history GET HTTP 200, 새 probe 행 6개, 경보 0개. 무인증 admin/cron 요청은 로컬 standalone에서 모두 401이었다.
+- 배포 결과 기록 후 재실행한 docs-only 게이트도 build·651 tests·typecheck·docs·scope/KIS/cron 검사까지 통과했으나 자동 runtime smoke가 `/charts` timeout으로 종료됐다. 동일 freshly-built standalone을 별도 실행해 `/charts` 200, admin 무인증 401, cron 무인증 401을 직접 확인했다. 자동 smoke timeout 원인은 아직 미확정으로 남긴다.
+- 격리 worktree의 `.env.local` 임시 링크와 테스트용 standalone 프로세스는 모두 제거/종료했다. 원본 환경 파일은 남아 있다.
 
 ### 다음 개선
 - 운영 표본 24시간이 쌓인 뒤 실제 평균/최대/연속 실패를 확인하고, 1초 기준이 유의미한지 재평가한다. 현재는 단일 스냅샷 slow alert이며 p95 및 복구 알림은 후속 과제다.
+- 자동 `deploy:verify` smoke의 간헐 timeout 원인을 분리하기 위해 실행기 로그와 포트·프로세스 종료 상태를 추가 관측한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-16-001
-- 성과 판정: UNMEASURED
-- 근거: 코드와 테스트 및 전체 local deploy gate는 통과했으나 아직 운영에서 V150 적용과 주기 수집을 확인하지 않았다.
+- 성과 판정: IMPROVED
+- 근거: 운영 Flyway V150 확인, live cron snapshot 3개 probe 저장 성공, history API 6행 반환 성공. 진단 계측은 0개 표본에서 실제 운영 표본을 갖추게 됐다.
 - 성공 기준: cron이 probe를 기록하고 실패 일부를 보존, 관리자 전용 trend API/UI가 24시간 데이터와 지정 경보를 제공, 배포 검증 및 운영에서 migration/API 응답을 확인.
 
 ### 커밋·푸시·배포
-- 미실행: 검증 및 배포 단계를 진행 중이다.
+- 완료: commit `aa5d607b8a0fad04b7ae39825e323df170508a0f`를 `oci`에 push. Deploy OCI run `38771175760` 성공, 운영 Flyway/API/실제 probe 기록 검증 완료.
 
 ## [2026-10-15] health 이력 조회 부분 실패 격리
 
