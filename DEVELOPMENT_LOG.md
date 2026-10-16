@@ -19,18 +19,20 @@
 ### 검증
 - targeted test: `npm.cmd test -- --run lib/admin-optional-json.test.ts`, 3개 통과.
 - `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
-- 전체 `npm.cmd run deploy:verify` 및 운영 배포는 이 변경 검증·푸시 후 확인한다.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내·해외 chart API 200, 관리자·cron 비인증 401, 전체 테스트 203개 파일(705 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
+- 운영 적용 후 관리자 로그인, `/admin/kis-calls` 200, health DB 정상과 서비스 SHA 일치를 확인했다. Approval metrics API도 60분·60개 버킷을 반환했다.
 
 ### 개선 과제
 - 성과 판정: IMPROVED (보조 fetch 오류 격리의 회귀 테스트·typecheck 통과; 전체 게이트와 운영 반영은 다음 단계에서 확인).
 - 근거: 필수 요청 렌더링을 보조 실패에서 분리했고, 성공·HTTP 오류·네트워크 오류·JSON 파싱 오류 4개 경로 중 실패 경로를 포함한 3개 테스트가 통과했다.
 
 ### 다음 개선
-- 운영에서 보조 메트릭 API 장애 시 필수 KIS 호출량 표시는 유지되고, 해당 보조 섹션에만 오류가 노출되는지 배포 후 확인한다.
+- 컴포넌트 단위 검증을 추가해 RATE LIMIT/Approval 중 하나의 fetch가 실패해도 필수 KIS 호출량 섹션은 계속 렌더링되는 것을 UI 상태까지 확인한다.
 
 ### 커밋·푸시·배포
-- 검증 시점 상태: 미실행. 이 로그의 시점은 변경 커밋 전이며, 실제 완료 여부는 OCI Actions 성공과 운영 health SHA 일치로 확인한다.
-- 현재 기준 커밋: `594f208e` (기존 운영 적용 SHA; 이번 변경은 아직 포함되지 않음).
+- 상태: 완료.
+- 커밋·푸시: `2d94c7c7e6e805c19ed085b5873fc4976378fadd`를 `oci` 브랜치에 반영했다.
+- 배포: GitHub Actions #38830679867 성공. 운영 `/api/debug/health` SHA가 커밋과 일치하고 관리자 KIS 호출 페이지 및 메트릭 API가 정상 응답했다.
 
 ## [2026-10-16] Deployment smoke polling 재시도 여유 보장
 
