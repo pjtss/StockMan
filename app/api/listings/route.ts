@@ -2,18 +2,20 @@ import { NextResponse } from "next/server";
 import { safeErrorMetadata } from "@/lib/error-diagnostics";
 import { listInvestmentCalendarEvents } from "@/lib/investment-calendar";
 import { boundedIntegerQuery } from "@/lib/query-params";
+import { isValidCalendarDate } from "@/lib/calendar-date";
 
 export const dynamic = "force-dynamic";
-
-function date(value: string | null, fallback: string) {
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallback;
-}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const today = new Date().toISOString().slice(0, 10);
-  const from = date(url.searchParams.get("from"), today);
-  const to = date(url.searchParams.get("to"), new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10));
+  const fromParam = url.searchParams.get("from");
+  const toParam = url.searchParams.get("to");
+  if ((fromParam !== null && !isValidCalendarDate(fromParam)) || (toParam !== null && !isValidCalendarDate(toParam))) {
+    return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE", expected: "YYYY-MM-DD calendar dates" }, { status: 400 });
+  }
+  const from = fromParam ?? today;
+  const to = toParam ?? new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10);
   const market = (url.searchParams.get("market") || "KR").toUpperCase();
   if (from > to) return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });
   if (market === "US") {

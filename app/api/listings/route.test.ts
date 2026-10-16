@@ -23,4 +23,17 @@ describe("listings API", () => {
     await GET(new Request("http://localhost/api/listings?limit=invalid"));
     expect(listEvents).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 200 }));
   });
+
+  it.each(["2026-02-29", "2026-04-31", "2026-13-01", "2026-1-01", "0000-01-01"])("rejects impossible or malformed date %s before querying", async (date) => {
+    const response = await GET(new Request(`http://localhost/api/listings?from=${date}`));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, error: "INVALID_DATE_RANGE" });
+    expect(listEvents).not.toHaveBeenCalled();
+  });
+
+  it("accepts valid Gregorian leap days", async () => {
+    const response = await GET(new Request("http://localhost/api/listings?from=2024-02-29&to=2024-03-01"));
+    expect(response.status).toBe(200);
+    expect(listEvents).toHaveBeenCalledWith(expect.objectContaining({ from: "2024-02-29", to: "2024-03-01" }));
+  });
 });

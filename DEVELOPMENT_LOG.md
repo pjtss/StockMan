@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] 투자 일정 API 실제 달력 날짜 검증
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-023
+- 일정 조회 API가 형식만 맞고 존재하지 않는 날짜를 DB까지 전달해 503으로 반환하거나, 잘못된 요청을 기본 날짜로 조용히 치환하는 문제를 제거한다.
+
+### 반영
+- 공통 Gregorian 날짜 검증기에서 strict `YYYY-MM-DD`, 윤년, 월별 일수, 연도 0001..9999를 검증한다.
+- `/api/listings`와 `/api/investment-calendar` GET에서 DB 호출 전에 날짜를 검증하고, 잘못된 날짜/역전 범위는 기존 오류 코드 `INVALID_DATE_RANGE`로 HTTP 400을 반환한다.
+- 날짜 범위는 과거 일정 조회를 보존하도록 임의 상한을 두지 않았다. 두 경로 모두 결과 limit이 있으며 `event_date` 인덱스를 사용한다.
+- 윤년/불가능 날짜와 두 API 경계를 검증하는 회귀 테스트를 추가했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 정규식 형식 검사만으로 달력상 유효성을 검증할 수 있다고 가정했고, listings는 형태가 다른 입력을 기본값으로 대체했다.
+- 재발 감지: Gregorian 날짜 단위 테스트 및 두 API의 잘못된 날짜 입력 테스트를 CI에 유지한다.
+- 남은 위험: 날짜 범위 상한은 설정하지 않았다. 넓은 과거 범위 사용량과 DB query latency를 관찰하고, 인덱스 활용·상한 필요성을 실제 지표에 따라 판단한다.
+
+### 검증
+- 집중 테스트: 3개 파일, 14개 테스트 통과.
+- 타입 검사: `npm.cmd run typecheck -- --tsBuildInfoFile .next-deploy-verify/tsconfig.tsbuildinfo` 통과.
+- 전체 `npm.cmd run deploy:verify`: 성공. production build, standalone `/charts` 200, 차트 API 200, 보호 API/cron 401, 전체 214개 테스트 파일(734 통과·1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 불가능 날짜가 두 API에서 모두 DB 접근 전 400으로 거절되고, Gregorian leap day는 유효하게 처리됨을 확인했다.
+
+### 다음 개선
+- 운영 투자 일정 테이블의 규모와 `event_date` 인덱스 실행 계획을 조사해 광범위 날짜 조회의 지연·스캔 행 수를 측정한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행.
+
 ## [2026-10-16] 상장 일정 조회 limit SQL 정수화
 
 ### 목표
