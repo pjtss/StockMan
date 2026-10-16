@@ -1,5 +1,68 @@
 # Development Log
 
+## [2026-10-16] Deployment smoke polling 재시도 여유 보장
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-018
+- `/charts` standalone smoke가 간헐적으로 개별 요청 timeout과 전체 polling deadline이 동시에 끝나며 한 번도 재시도하지 못하고 실패하는 검증 결함을 보완한다.
+
+### 반영
+- 최초 증거: 서버 TCP listener와 Next readiness는 startup 오류 없이 확인됐으나 `/charts` 요청이 30초에 abort되어 loop deadline도 만료됐다. 해당 구조에서는 임시 지연 후 재시도 기회가 없었다.
+- `scripts/smoke-retry-policy.mjs`에서 smoke 총 polling deadline을 `max(configured deadline, per-request timeout × 2 + 1초)`로 계산한다. 요청 단위 timeout은 유지하면서 한 번 더 요청할 poll 시간을 확보한다.
+- 계산 정책의 정상/사용자 지정/유효하지 않은 값을 회귀 테스트하고, `deploy:verify`를 통한 standalone smoke 실행을 유지한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: per-request Abort timeout과 전체 retry deadline이 동일해 첫 응답이 늦으면 retry loop가 사실상 실행되지 않았다.
+- 재발 감지: `scripts/smoke-retry-policy.test.mjs`가 retry deadline의 최솟값과 override를 검증한다. 전체 배포 게이트는 실제 standalone `/charts`와 인증된 경로를 실행한다.
+- 남은 위험: 한 차례 재시도에서도 `/charts`가 계속 느리면 smoke는 실패해야 한다. 해당 timeout을 무제한 늘려 회귀를 숨기지는 않는다.
+
+### 검증
+- `npm.cmd test -- --run scripts/smoke-retry-policy.test.mjs lib/kis-realtime-approval-rate-limit.test.ts app/api/admin/kis-realtime-approval-metrics/route.test.ts app/api/kis/realtime/approval/route.test.ts`: 4개 파일, 13개 테스트 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내/해외 차트 API 200, protected API 401, 전체 테스트 202개 파일(702 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
+- 이 실행에서는 `/charts`와 신규 관리자 metrics endpoint 401 smoke도 통과했다. 운영 배포는 아직 전이다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 총 deadline을 개별 timeout보다 길게 유지해 일시 지연 후 재시도할 수 있고, 새 standalone smoke와 전체 품질 게이트가 통과했다. 무제한 대기는 허용하지 않는다.
+
+### 다음 개선
+- 새 timeout/retry 정책으로 전체 배포 검증을 통과시키고, 반복 timeout이면 `/charts` server render 및 주요 await 구간을 별도 계측한다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 통과 후 커밋·푸시·배포한다.
+
+## [2026-10-16] 차트 Approval Rate Limit 운영 관측
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-017
+- CI-2026-10-16-016에서 추가한 공개 chart WebSocket Approval rate limit이 실제로 몇 번, 어떤 범위(IP별/전역)에서 발생하는지 관리자 UI에서 확인하고 임계값 조정 근거를 만든다.
+
+### 반영
+- limiter는 IP·요청 ID 없이 허용 수, IP 제한 수, 전역 제한 수, Retry-After 구간을 1분 버킷 60개로 메모리에 집계한다. 만료된 분 버킷은 제거되어 사용량은 bounded다.
+- 관리자 인증이 필요한 `/api/admin/kis-realtime-approval-metrics`를 추가했다. DB 장애와 관계없이 같은 프로세스 메트릭을 조회하고 응답은 `no-store`다.
+- `/admin/kis-calls`에 최근 60분 요약, 최근 10분 분별 흐름, Retry-After 구간 및 한도 설정을 표시한다. 배포/재시작 시 메트릭이 초기화된다는 점도 UI에 표시한다.
+- 회귀 테스트는 60분 유지 범위, 개인/전역 제한의 구분, 식별정보 미포함, admin 인증, no-store와 DB 의존성 없는 조회를 확인한다.
+- `deploy:verify` standalone smoke에 새 관리자 경로의 비인증 401 확인을 등록해 배포에서도 인증 경계를 검사한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 제한 동작은 있었지만 카운터가 운영자에게 노출되지 않아 과잉 차단·공격·정상 사용자 NAT 영향 구분이 불가능했다.
+- 재발 감지: limiter 집계 계약 테스트와 관리 API 인증/PII 회귀 테스트를 유지하고 KIS module registry에 모듈 테스트 연결을 유지한다.
+- 남은 위험: 단일 프로세스 메모리 통계는 프로세스 재시작 때 초기화되며 여러 인스턴스 간 공유하지 않는다. 프로젝트 운영 전제인 단일 OCI 인스턴스에서만 전체 발생률로 해석한다.
+
+### 검증
+- `npm.cmd test -- --run lib/kis-realtime-approval-rate-limit.test.ts app/api/kis/realtime/approval/route.test.ts app/api/admin/kis-realtime-approval-metrics/route.test.ts`: 3개 파일, 10개 테스트 통과.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`, `npm.cmd run audit:kis-boundary`, `git diff --check`: 통과. 전체 배포 검증 및 runtime smoke는 CI-2026-10-16-018에서 통과했다. 운영 배포는 아직 전이다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 분별 집계·PII 미포함·관리자 인증·DB 독립 API/UI를 회귀 테스트와 전체 배포 검증에서 확인했다. 운영 rate-limit 발생률은 배포 이후 수집해야 한다.
+
+### 다음 개선
+- 운영 적용 후 실제 429 비율과 분별 요청량을 확인하고 NAT 영향이 관측되면 IP 한도 및 전역 한도를 조정한다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 후 커밋·푸시·배포한다.
+
 ## [2026-10-16] 차트 WebSocket Approval API 호출 제한
 
 ### 목표 및 원인

@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { stopChildProcess, waitForProcessExit } from "./child-process-lifecycle.mjs";
 import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
 import { runDeploymentVerification } from "./deployment-verification-order.mjs";
+import { getSmokeDeadlineMs } from "./smoke-retry-policy.mjs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
@@ -87,8 +88,9 @@ async function verifyQuality() {
   if (!isWindows) await run("bash", ["-n", "scripts/oci-cron.sh"]);
 }
 
-async function waitForHealth(url, timeoutMs = 30_000) {
+async function waitForHealth(url, configuredTimeoutMs = 30_000) {
   console.log(`[deploy-verify] smoke start: ${url}`);
+  const timeoutMs = getSmokeDeadlineMs(configuredTimeoutMs, smokeRequestTimeoutMs);
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
@@ -106,8 +108,9 @@ async function waitForHealth(url, timeoutMs = 30_000) {
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
 }
 
-async function waitForJson(url, timeoutMs = 30_000, expectedStatus, init = {}) {
+async function waitForJson(url, configuredTimeoutMs = 30_000, expectedStatus, init = {}) {
   console.log(`[deploy-verify] smoke start: ${url}`);
+  const timeoutMs = getSmokeDeadlineMs(configuredTimeoutMs, smokeRequestTimeoutMs);
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
@@ -216,6 +219,7 @@ async function verifyRuntime() {
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/admin/health-probe-history`, 30_000, 401);
+        await waitForJson(`http://127.0.0.1:${port}/api/admin/kis-realtime-approval-metrics`, 30_000, 401);
         await waitForJson(`http://127.0.0.1:${port}/api/cron/health-probe-snapshot`, 30_000, 401, { method: "POST" });
       })(),
       childExit,
