@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] operational relation 감사에서 후속 DROP/RENAME 추적
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-028
+- 필수 operational relation이 과거 migration에서는 생성됐지만 이후 제거·이름 변경되어 현재 누락되는 경우도 배포 전에 감지한다.
+
+### 반영
+- migration 파일을 버전 순서로 정렬하고 CREATE TABLE/VIEW, DROP TABLE/VIEW, ALTER TABLE RENAME 이벤트를 추적하도록 감사 로직을 확장했다.
+- 호환성 VIEW는 유효 relation으로 인정하고, 마지막 migration 상태에서 제거된 필수 relation은 `docs:check`를 실패시킨다.
+- 이후 DROP 후 VIEW 대체, 마지막에 DROP된 relation, RENAME source/destination을 포함한 회귀 테스트를 추가했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 최초 감사는 migration 전체에 생성 구문이 한 번이라도 있으면 통과시켜 후속 DROP/RENAME으로 현재 relation이 사라지는 경우를 놓칠 수 있었다. 국내·해외 universe migration은 물리 테이블을 compatibility view로 대체하므로 TABLE-only 검사도 부정확했다.
+- 재발 감지: ordered migration relation state를 docs:check 및 deploy:verify에 연결하고 CREATE/DROP/RENAME 회귀 케이스를 자동 검사한다.
+- 남은 위험: SQL 감사는 단순 DDL 패턴 분석이며 조건부 DO 블록, 동적 SQL, 외부 관리 스키마의 실행 결과를 완전히 해석하지 않는다. 운영 schema health 점검을 함께 유지한다.
+
+### 검증
+- `npm.cmd run docs:check`: 13개 operational relation이 버전순 migration 적용 후 존재하고 있음을 확인.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 5개 통과 (최종 DROP, rename source, drop 후 view 대체 등).
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크, 215개 테스트 파일(742 passed, 1 skipped), 타입·문서·보안·cron 검사 통과.
+- 커밋 및 OCI 배포 결과는 완료 후 기록한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: CREATE 이력 존재 여부만 검사하던 기존 감사가 후속 DROP/RENAME과 호환 뷰 전환을 순서대로 검증한다.
+
+### 다음 개선
+- ALTER TABLE DROP COLUMN과 필수 operational 컬럼 요구 목록 간 같은 시간순 검증을 추가할지 평가한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행.
+
 ## [2026-10-16] operational schema 필수 테이블의 migration 커버리지 자동 검사
 
 ### 목표
@@ -7,7 +39,7 @@
 - 헬스체크 필수 테이블이 선언만 되고 DB 생성 migration은 누락되는 회귀를 정적 품질 게이트에서 차단한다.
 
 ### 반영
-- `scripts/check-docs.mjs`가 `lib/schema-health.ts`의 `OPERATIONAL_SCHEMA_TABLES`를 읽고 모든 선언 테이블이 `db/migration/V*__*.sql` 중 적어도 하나에서 `CREATE TABLE`로 보장되는지 검사하도록 했다.
+- `scripts/check-docs.mjs`가 `lib/schema-health.ts`의 `OPERATIONAL_SCHEMA_TABLES`를 읽고 버전 순서대로 migration DDL을 추적해 최종 relation이 존재하는지 검사하도록 했다.
 - 테이블 목록 선언을 찾지 못하거나 migration 생성문이 없는 테이블이 있으면 `docs:check` 및 `deploy:verify`를 실패 처리한다.
 
 ### 근본 원인 및 재발 방지
@@ -16,18 +48,18 @@
 - 남은 위험: 이 정적 검사만으로 운영 DB의 실제 적용 상태나 테이블 컬럼/제약조건 동등성은 증명하지 않는다. 운영 상태는 Flyway validate/migrate 및 schema health API로 확인한다.
 
 ### 검증
-- `npm.cmd run docs:check`: 13개 operational 테이블 전체의 migration 생성문 커버리지 검사 성공.
-- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 3개 통과. 현재 저장소 전수검사, 필수 테이블 누락 음성 케이스, schema-qualified/quoted DDL 양성 케이스를 확인.
+- `npm.cmd run docs:check`: 13개 operational relation의 버전순 migration 상태 검사 성공.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 5개 통과. 저장소 전수검사, 누락 음성 케이스, schema-qualified/quoted DDL, DROP 후 VIEW 대체, 최종 DROP 및 RENAME 케이스를 확인.
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 런타임 스모크, 전체 215개 테스트 파일(740 passed, 1 skipped), 타입 검사 및 기존 문서/보안/cron 게이트 성공.
 - GitHub Actions Deploy OCI run `38854348257`: Verify deployment, standalone package, upload release, activate release 모두 성공.
 - 운영 `/api/debug/health`: HTTP 200, commit `268a0dbaaa5611ea61ceb9fdcc06f027353dcaff`, Flyway 153, 누락 operational table 없음.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
-- 근거: 기존 13개 필수 operational table 전체가 migration에서 생성되는지 자동 검증되고, 누락 테이블 회귀를 배포 전 테스트에서 재현해 차단한다.
+- 근거: 13개 필수 operational relation 전체를 버전순 migration 결과에 대조하고, missing relation 음성 케이스를 테스트로 차단한다.
 
 ### 다음 개선
-- 마이그레이션에 명시적으로 제거된 테이블을 추적해 operational 선언이 오래된 테이블을 가리키는 경우도 별도 감사할 수 있는지 검토한다.
+- 조건부 DO 블록이나 동적 DDL은 정적 relation 감사 대상에서 제외될 수 있으므로, operational relation 수동 예외를 명시할 기준을 검토한다.
 
 ### 커밋·푸시·배포
 - 코드 및 테스트 커밋: `268a0dbaaa5611ea61ceb9fdcc06f027353dcaff` (`oci` 푸시 완료).
