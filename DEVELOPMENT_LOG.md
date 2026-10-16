@@ -30,7 +30,7 @@
 - `/charts` 주요 상호작용 및 hydration을 브라우저 E2E로 검증할 수 있는 기존 CI 실행 기반을 확인한다.
 
 ### 커밋·푸시·배포
-- 미실행: 전체 검증의 문서 계약 실패를 수정한 뒤 코드·테스트 커밋 및 `oci` 푸시를 진행한다. OCI 배포 및 운영 health 결과는 후속 기록으로 확정한다.
+- 완료: 커밋 `5baf7028855fb7c7e3be261c668858af84b61d25`를 `oci`에 푸시했다. Actions run `38867577186`의 Verify, 패키징, 업로드가 성공했고 운영 `/api/debug/health`가 동일 커밋(HTTP 200, Flyway 153, 누락 relation 없음)을 실행하는 것을 확인했다. 운영 교체 확인 시점의 Actions 최종 상태는 아직 종료 전이었다.
 
 ## [2026-10-16] operational schema spread 상수 누락을 migration 감사에 반영
 
