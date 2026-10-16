@@ -15,7 +15,7 @@
 ### 근본 원인 및 재발 방지
 - 근본 원인: 로컬 DB에 migration SQL을 수동 적용하며 V142/V145/V148 history metadata가 현재 파일과 달라졌고, 이전 migration 무시 정책으로 V94/V95 debug table이 생성되지 않았다. health가 두 테이블을 필수로 요구하는데도 최신 migration이 재보장하지 않았다.
 - 재발 감지: Flyway `validate`와 `migrate`를 로컬 DB 실행 절차에 포함하고, operational schema-health test에서 디버그 테이블 누락을 회귀 검증한다.
-- 남은 위험: 운영 DB에 V153을 적용한 뒤 Flyway 153 및 health 정상 상태를 검증해야 한다.
+- 남은 위험: 이번 배포 및 API 검증으로 확인한 범위에서는 없음. 향후 operational table 추가 시 migration과 schema-health 테스트를 함께 갱신해야 한다.
 
 ### 검증
 - DB history before repair: V142 script/description mismatch, V148 prior script `V148__allow_us_smallcap_cap_at_limit.sql`; V148 실제 constraint 정의는 저장소 migration과 일치.
@@ -24,7 +24,9 @@
 - 집중 테스트 `npm.cmd test -- --run lib/schema-health.test.ts`: 4개 통과. `npm.cmd run docs:check`: 통과.
 - V153 후 동일한 dev server에서 `/api/health`: HTTP 200, `status=ok`.
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크 테스트·전체 214개 테스트 파일(737 passed, 1 skipped)·타입·문서·보안/cron 검사 성공.
-- 전체 배포 및 운영 결과는 완료 후 기록한다.
+- GitHub Actions Deploy OCI run `38852487119`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `ef2315f483dff2219559d50d69cdd8c0fdbd2090`, DB 연결 정상, Flyway 153, 누락 operational table 없음.
+- 운영 `/api/admin/database` read-only 확인: `debug_run_items`, `debug_kis_calls` 모두 존재.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
@@ -34,7 +36,9 @@
 - 적용 migration history와 operational table requirements를 자동 대조해 신규 필수 테이블이 보정 migration 및 health tests에서 누락되지 않도록 검사 자동화한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행.
+- 코드·migration·회귀 테스트 커밋: `ef2315f483dff2219559d50d69cdd8c0fdbd2090` (`oci` 푸시 완료).
+- OCI 배포: 성공 (GitHub Actions run `38852487119`).
+- 운영 API 검증: 성공 (commit `ef2315f4`, Flyway 153, health 정상).
 
 ## [2026-10-16] 사용자 관심종목 저장 스키마 누락 복구 및 감지
 
