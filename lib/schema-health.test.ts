@@ -16,4 +16,10 @@ describe("schema-health", () => {
     expect(OPERATIONAL_SCHEMA_TABLES).toContain("user_watchlist");
     expect(getMissingSchemaTables(["users", "user_sessions"], OPERATIONAL_SCHEMA_TABLES)).toContain("user_watchlist");
   });
+
+  it("treats both debugging observability stores as operational dependencies", () => {
+    const missing = getMissingSchemaTables(["automation_runs"], OPERATIONAL_SCHEMA_TABLES);
+    expect(missing).toContain("debug_run_items");
+    expect(missing).toContain("debug_kis_calls");
+  });
 });

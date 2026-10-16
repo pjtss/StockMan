@@ -1,5 +1,41 @@
 # Development Log
 
+## [2026-10-16] 디버그 관측 테이블 누락 복구 및 로컬 Flyway 이력 정합화
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-026
+- 로컬 API health가 degraded인 원인을 DB에서 확인하고, applied migration 누락/설명 충돌 및 필수 debug 테이블 누락을 바로잡는다.
+
+### 반영
+- 다른 체크아웃의 추적 가능한 V142 SQL과 원래 V142 적용 스크립트를 확인해 V142 migration 파일을 복원했다. V148의 기존 SQL도 현재 migration과 동일한 cap 조건(`0 < market_cap_usd <= 100,000,000`)을 설정함을 확인했다.
+- Redgate Flyway 공식 `repair`를 동일한 migration 위치 및 무시 패턴으로 로컬 DB에 실행해 V142, V145, V148의 checksum/description 충돌을 정렬했다. 운영 DB에는 실행하지 않았다.
+- 로컬 Flyway `migrate`가 기존 applied migrations 147개를 검증하고 pending V149-V152를 적용해 스키마를 152까지 올렸다.
+- 실제 로컬 `/api/health`가 503인 것을 관측했고, 원인이 `debug_run_items`와 `debug_kis_calls` 누락임을 DB schema 목록과 `OPERATIONAL_SCHEMA_TABLES` 대조로 확인했다. 보정 V153 및 회귀 테스트를 추가해 로컬 DB에 적용했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 로컬 DB에 migration SQL을 수동 적용하며 V142/V145/V148 history metadata가 현재 파일과 달라졌고, 이전 migration 무시 정책으로 V94/V95 debug table이 생성되지 않았다. health가 두 테이블을 필수로 요구하는데도 최신 migration이 재보장하지 않았다.
+- 재발 감지: Flyway `validate`와 `migrate`를 로컬 DB 실행 절차에 포함하고, operational schema-health test에서 디버그 테이블 누락을 회귀 검증한다.
+- 남은 위험: 운영 DB에 V153을 적용한 뒤 Flyway 153 및 health 정상 상태를 검증해야 한다.
+
+### 검증
+- DB history before repair: V142 script/description mismatch, V148 prior script `V148__allow_us_smallcap_cap_at_limit.sql`; V148 실제 constraint 정의는 저장소 migration과 일치.
+- Flyway repair는 V142/V145/V148 metadata 정렬 작업을 보고했고, `migrate`는 147개 applied migration 검증 및 V149-V152 네 migration 성공. V153 적용 시 148개 migration validate 후 V153 성공.
+- `.env.local`을 주입한 프로젝트 `npm.cmd run dev`에서 `/api/health` HTTP 503을 재현; read-only schema inventory는 `debug_run_items`, `debug_kis_calls`만 누락으로 반환.
+- 집중 테스트 `npm.cmd test -- --run lib/schema-health.test.ts`: 4개 통과. `npm.cmd run docs:check`: 통과.
+- V153 후 동일한 dev server에서 `/api/health`: HTTP 200, `status=ok`.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크 테스트·전체 214개 테스트 파일(737 passed, 1 skipped)·타입·문서·보안/cron 검사 성공.
+- 전체 배포 및 운영 결과는 완료 후 기록한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 로컬 Flyway 이력이 정렬되고 149-153 migration 적용에 성공했으며, missing operational tables로 발생하던 `/api/health` 503이 200으로 회복됐다.
+
+### 다음 개선
+- 적용 migration history와 operational table requirements를 자동 대조해 신규 필수 테이블이 보정 migration 및 health tests에서 누락되지 않도록 검사 자동화한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행.
+
 ## [2026-10-16] 사용자 관심종목 저장 스키마 누락 복구 및 감지
 
 ### 목표
@@ -14,7 +50,7 @@
 ### 근본 원인 및 재발 방지
 - 근본 원인: 관심종목 스키마는 V108 이전 migration으로만 보장되며, 이전 migration 무시 정책이 적용된 환경에서 미적용될 수 있었다. 해당 테이블은 operational health 검사 대상이 아니었다.
 - 재발 감지: health schema 단위 테스트와 운영 배포 후 Flyway 152 및 `missingOperationalTables`를 확인한다.
-- 남은 위험: local Flyway V142/V148 이력 불일치로 로컬 `migrate`가 V152까지 진행되지 못한다. 해당 이력은 확인 가능한 원본 근거 없이 수정하지 않는다.
+- 남은 위험: 당시 Flyway 이력 충돌로 V152까지 진행되지 않았으나, CI-2026-10-16-026에서 원본 대조 후 로컬 metadata를 정렬하고 V153까지 적용했다.
 
 ### 검증
 - 로컬 DB 스키마 점검: `user_watchlist` 누락, 운영 `/api/admin/database` read-only 확인: `user_watchlist` 존재.
@@ -30,7 +66,7 @@
 - 근거: 로컬에서 누락을 확인했고 V152 적용 후 운영 Flyway가 152로 올라갔으며, 운영 health에서 누락 테이블 경보가 사라지고 `user_watchlist`가 존재한다.
 
 ### 다음 개선
-- Flyway lineage의 원본 V142/V148을 확보해 로컬 검증 환경을 정합화하고, 테이블 누락 패턴이 있는 다른 기능 저장소를 점검한다.
+- resolved operational store 누락 여부를 다른 기능 테이블에도 대조해 migration 보정 및 health 테스트 누락을 확인한다.
 
 ### 커밋·푸시·배포
 - 상태: 완료.
@@ -52,7 +88,7 @@
 ### 근본 원인 및 재발 방지
 - 근본 원인: 테이블 생성은 V130에만 있었으나 배포 정책이 현재 버전보다 낮은 미적용 migration을 건너뛰며, 해당 테이블은 operational schema health 목록에도 없었다.
 - 재발 감지: schema-health 테스트에서 필수 목록 및 누락 결과를 확인하고, 배포 후 Flyway 151과 `missingOperationalTables`를 검증한다.
-- 남은 위험: local DB는 적용된 V142 파일이 소스에 없고 적용 V148의 description/checksum이 현재 파일과 달라 Flyway validation이 V149 이전에 중단된다. `repair`는 DB에 존재하지 않을 수 있는 V148 제약조건을 migration 이력에 반영한 것으로 가장할 수 있어 실행하지 않았다.
+- 당시 남은 위험: local DB는 V142 파일 누락 및 V148 description 불일치로 Flyway validation이 막혔다. 원본 및 실제 제약을 확인한 뒤 CI-2026-10-16-026에서 V142를 복구하고 로컬 metadata를 정렬했다.
 
 ### 검증
 - `npm.cmd test -- --run lib/schema-health.test.ts`: 2개 테스트 통과.
