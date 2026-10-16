@@ -21,8 +21,13 @@ export async function runChartsBrowserSmoke(baseUrl) {
       const response = await page.goto(new URL("/charts", baseUrl).href, { waitUntil: "domcontentloaded" });
       if (!response?.ok()) throw new Error(`${viewport.name} /charts returned HTTP ${response?.status() ?? "no response"}`);
       await page.getByRole("heading", { name: "티커 차트 조회" }).waitFor({ state: "visible" });
-      await page.getByRole("textbox", { name: "티커 입력" }).waitFor({ state: "visible" });
+      const tickerInput = page.getByRole("textbox", { name: "티커 입력" });
+      await tickerInput.waitFor({ state: "visible" });
       await page.getByRole("navigation", { name: "주요 메뉴" }).getByRole("link", { name: "티커 차트" }).waitFor({ state: "visible" });
+      await page.getByRole("button", { name: "해외", exact: true }).click();
+      await page.getByPlaceholder("예: AAPL, NVDA, MSFT").waitFor({ state: "visible" });
+      await page.getByRole("button", { name: "국내", exact: true }).click();
+      await page.getByPlaceholder("예: 005930, 000270, 012330").waitFor({ state: "visible" });
       // Let initial client effects and auth/push status checks settle before checking runtime errors.
       await page.waitForTimeout(750);
       await page.close();

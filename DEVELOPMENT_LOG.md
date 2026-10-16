@@ -1,5 +1,36 @@
 # Development Log
 
+## [2026-10-16] 차트 브라우저 검증에서 실제 클라이언트 상호작용 확인
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-032
+- `/charts`의 HTML 요소가 보이는 것만으로 hydration 성공을 간주하지 않고, React 이벤트 처리와 사용자 상태 전환까지 배포 전에 증명한다.
+
+### 반영
+- Chrome smoke가 데스크톱·모바일에서 국내/해외 시장 버튼을 클릭하고 티커 입력창 placeholder가 양방향으로 전환되는지 기다리도록 강화했다. 외부 데이터 조회·DB 쓰기 없이 클라이언트 hydration과 state update를 검증한다.
+- 배포 체크리스트와 검증 표준 문서에 이 브라우저 상호작용 게이트 및 설치 Chrome 의존성을 반영했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 기존 smoke의 visible selector 검사는 SSR HTML만으로도 통과할 수 있어, 실제 클라이언트 이벤트 핸들러가 연결되지 않은 상태를 구별하지 못했다. 또한 운영 문서가 새 브라우저 게이트와 동기화되지 않았다.
+- 재발 감지: 시장 전환 버튼 동작 및 입력 안내의 양방향 변화가 실제 브라우저에서 확인되지 않거나 hydration/runtime 오류가 발생하면 `deploy:verify`를 실패시킨다. 운영 문서의 검증 순서도 코드 게이트와 함께 갱신한다.
+- 남은 위험: smoke는 `/charts` 첫 화면의 핵심 상태전환까지만 검증하고 차트 모달의 데이터 조회·렌더링 상호작용 전체를 다루지 않는다.
+
+### 검증
+- 배포된 `/charts`에 `runChartsBrowserSmoke`를 직접 실행: desktop/mobile 모두 시장 버튼 전환 후 입력 안내 변경 확인.
+- `npm.cmd run docs:check`: 통과. 18개 entry point, 148개 migration, 21개 operational relation 확인.
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: 통과. production build, standalone `/charts` 및 11개 JavaScript chunk, desktop/mobile Chrome 상호작용 smoke, 핵심 API smoke, 테스트 216개 파일(215 passed·1 skipped; 746 tests passed·1 skipped), 타입·문서·검증 범위·KIS 경계·Bearer 인증·cron 게이트.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 단순 SSR 요소 표시에서 국내↔해외 버튼 이벤트를 통한 실제 client state 변화로 검증 강도를 높였다.
+
+### 다음 개선
+- 브라우저 스모크에 차트 모달 열기·닫기 및 읽기 전용 차트 데이터 렌더링을 추가할 필요가 있는지, 테스트 비용과 API 부작용을 확인해 설계한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증 통과 후 커밋·푸시 및 운영 배포 상태 확인 예정.
+
 ## [2026-10-16] JavaScript 청크 smoke의 MIME 판별 엄격화
 
 ### 목표

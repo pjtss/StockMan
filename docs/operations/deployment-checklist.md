@@ -23,6 +23,7 @@
 - [ ] Bearer 인증 파서 이중 이스케이프 정적 감사 통과 (`npm run audit:bearer-auth`)
 - [ ] production build 성공
 - [ ] standalone 서버 실행 및 `/charts` HTML과 HTML이 참조한 실제 JavaScript 청크 전체 smoke test 성공 (HTTP 200·JavaScript content-type·본문 존재)
+- [ ] Chrome 데스크톱·모바일에서 `/charts` 핵심 UI가 표시되고 국내↔해외 전환 상호작용, hydration 경고, 브라우저 런타임 예외 검증 통과
 - [ ] Next.js HTML은 재검증되고, 이전 릴리스의 해시 정적 청크 호환 보존 경로가 포함되어 있는지 확인
 
 ## 배포 후
