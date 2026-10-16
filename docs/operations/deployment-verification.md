@@ -19,6 +19,6 @@
 ## 운영 원칙
 
 - 검증 로직은 명령 실행, health polling, 프로세스 정리를 각각 독립 책임으로 유지한다.
-- 각 HTTP smoke 요청에는 개별 timeout을 두되, 전체 poll deadline은 최소한 한 차례 재시도할 수 있도록 `max(configured deadline, request timeout × 2 + 1초)`를 적용한다. 이로써 첫 요청이 개별 timeout에 닿아도 일시적인 로컬 resource 지연을 분리해 관측한다.
+- 각 HTTP smoke 요청의 기본 timeout은 30초이며 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS`로 조정할 수 있다. 전체 poll deadline은 최소한 한 차례 재시도할 수 있도록 `max(configured deadline, request timeout × 2 + 1초)`를 적용한다. 로컬 부하에서 `/charts`가 기본 15초에 중단되는 재현을 반영해 요청 제한과 재시도 창을 모두 확보한다.
 - 배포 워크플로에 개별 검증 명령을 다시 복제하지 않는다.
 - 실행 포트는 `DEPLOY_VERIFY_PORT`로 덮어쓸 수 있으며 기본값은 `3100`이다.

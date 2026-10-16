@@ -7,19 +7,19 @@
 - `/charts` standalone smoke가 간헐적으로 개별 요청 timeout과 전체 polling deadline이 동시에 끝나며 한 번도 재시도하지 못하고 실패하는 검증 결함을 보완한다.
 
 ### 반영
-- 최초 증거: 서버 TCP listener와 Next readiness는 startup 오류 없이 확인됐으나 `/charts` 요청이 30초에 abort되어 loop deadline도 만료됐다. 해당 구조에서는 임시 지연 후 재시도 기회가 없었다.
-- `scripts/smoke-retry-policy.mjs`에서 smoke 총 polling deadline을 `max(configured deadline, per-request timeout × 2 + 1초)`로 계산한다. 요청 단위 timeout은 유지하면서 한 번 더 요청할 poll 시간을 확보한다.
+- 최초 증거: 서버 TCP listener와 Next readiness는 startup 오류 없이 확인됐으나 `/charts` 요청이 제한시간에 abort됐다. 15초 기본값으로 반복 재현되고 30초 설정에서는 통과해 요청별 timeout과 전체 retry deadline 모두 부하 환경에 맞춰야 함을 확인했다.
+- `scripts/smoke-retry-policy.mjs`에서 smoke 총 polling deadline을 `max(configured deadline, per-request timeout × 2 + 1초)`로 계산하고, `/charts` 기본 요청 timeout도 15초에서 30초로 올렸다. 요청 제한을 늘리되 한 번 더 요청할 poll 시간도 확보한다.
 - 계산 정책의 정상/사용자 지정/유효하지 않은 값을 회귀 테스트하고, `deploy:verify`를 통한 standalone smoke 실행을 유지한다.
 
 ### 근본 원인 및 재발 방지
-- 근본 원인: per-request Abort timeout과 전체 retry deadline이 동일해 첫 응답이 늦으면 retry loop가 사실상 실행되지 않았다.
-- 재발 감지: `scripts/smoke-retry-policy.test.mjs`가 retry deadline의 최솟값과 override를 검증한다. 전체 배포 게이트는 실제 standalone `/charts`와 인증된 경로를 실행한다.
+- 근본 원인: per-request Abort timeout과 전체 retry deadline이 동일해 첫 응답이 늦으면 retry loop가 사실상 실행되지 않았고, 15초 기본 요청 제한은 부하 시 `/charts` 렌더링에 부족했다.
+- 재발 감지: `scripts/smoke-retry-policy.test.mjs`가 retry deadline의 최솟값과 override를 검증하고 전체 배포 게이트가 기본 30초 설정으로 실제 standalone `/charts`와 인증된 경로를 실행한다.
 - 남은 위험: 한 차례 재시도에서도 `/charts`가 계속 느리면 smoke는 실패해야 한다. 해당 timeout을 무제한 늘려 회귀를 숨기지는 않는다.
 
 ### 검증
 - `npm.cmd test -- --run scripts/smoke-retry-policy.test.mjs lib/kis-realtime-approval-rate-limit.test.ts app/api/admin/kis-realtime-approval-metrics/route.test.ts app/api/kis/realtime/approval/route.test.ts`: 4개 파일, 13개 테스트 통과.
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내/해외 차트 API 200, protected API 401, 전체 테스트 202개 파일(702 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
-- 이 실행에서는 `/charts`와 신규 관리자 metrics endpoint 401 smoke도 통과했다. 운영 배포는 아직 전이다.
+- 이 실행에서는 `/charts`와 신규 관리자 metrics endpoint 401 smoke도 통과했다. GitHub Actions [Deploy OCI #38826970184](https://github.com/pjtss/StockMan/actions/runs/38826970184)가 성공했고, 운영 `/api/debug/health`에서 적용 SHA `6abdf02af231962daf409e3efd11abade84b5054`, DB 연결 성공을 확인했다.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
@@ -29,7 +29,9 @@
 - 새 timeout/retry 정책으로 전체 배포 검증을 통과시키고, 반복 timeout이면 `/charts` server render 및 주요 await 구간을 별도 계측한다.
 
 ### 커밋·푸시·배포
-- 미실행: 검증 통과 후 커밋·푸시·배포한다.
+- 상태: 완료.
+- 커밋·푸시: `6abdf02a`를 `oci` 브랜치에 반영했다.
+- 배포: GitHub Actions #38826970184 성공. 운영 health의 적용 SHA가 해당 커밋과 일치한다.
 
 ## [2026-10-16] 차트 Approval Rate Limit 운영 관측
 
@@ -51,7 +53,7 @@
 
 ### 검증
 - `npm.cmd test -- --run lib/kis-realtime-approval-rate-limit.test.ts app/api/kis/realtime/approval/route.test.ts app/api/admin/kis-realtime-approval-metrics/route.test.ts`: 3개 파일, 10개 테스트 통과.
-- `npm.cmd run typecheck`, `npm.cmd run docs:check`, `npm.cmd run audit:kis-boundary`, `git diff --check`: 통과. 전체 배포 검증 및 runtime smoke는 CI-2026-10-16-018에서 통과했다. 운영 배포는 아직 전이다.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`, `npm.cmd run audit:kis-boundary`, `git diff --check`: 통과. 전체 배포 검증 및 runtime smoke는 CI-2026-10-16-018에서 통과했다. 운영 관리자 세션으로 새 메트릭 API가 60분·60개 버킷을 반환하고 IP 필드가 없음을 추가 확인했다.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
@@ -61,7 +63,9 @@
 - 운영 적용 후 실제 429 비율과 분별 요청량을 확인하고 NAT 영향이 관측되면 IP 한도 및 전역 한도를 조정한다.
 
 ### 커밋·푸시·배포
-- 미실행: 검증 후 커밋·푸시·배포한다.
+- 상태: 완료.
+- 커밋·푸시: `6abdf02a`를 `oci` 브랜치에 반영했다.
+- 배포: GitHub Actions #38826970184 성공. 운영 health SHA 일치 및 관리자 메트릭 응답을 확인했다.
 
 ## [2026-10-16] 차트 WebSocket Approval API 호출 제한
 

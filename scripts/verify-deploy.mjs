@@ -10,7 +10,7 @@ const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
 const verifyDistDir = process.env.DEPLOY_VERIFY_DIST_DIR || ".next-deploy-verify";
 const commandTimeoutMs = Number(process.env.DEPLOY_VERIFY_COMMAND_TIMEOUT_MS || 900_000);
-const smokeRequestTimeoutMs = Number(process.env.DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS || 15_000);
+const smokeRequestTimeoutMs = Number(process.env.DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS || 30_000);
 
 function loadLocalEnv() {
   const file = ".env.local";
