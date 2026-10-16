@@ -9,22 +9,23 @@
 ### 반영
 - `Promise.all`에 세 API를 그대로 묶어 둔 상태에서는 선택적인 보조 API의 네트워크 오류나 잘못된 JSON이 전체 `load()`를 reject하고, 이미 성공한 필수 호출량 데이터도 화면에 반영되지 않았다.
 - `lib/admin-optional-json.ts`로 보조 조회를 독립 격리하고, 실패 시 해당 섹션만 비우며 원인을 설명하는 UI 상태를 표시한다. 필수 호출량 API 실패만 전체 화면 오류로 처리한다.
-- 성공 JSON, HTTP 503, 네트워크 오류, 잘못된 JSON 응답을 테스트한다.
+- `components/admin-kis-calls.test.tsx`에서 실제 React 화면을 렌더링해 두 보조 API가 동시에 network/503 실패해도 필수 호출량과 각 섹션별 경고가 보존되는지 확인한다.
+- 성공 JSON, HTTP 503, 네트워크 오류, 잘못된 JSON 응답을 helper 회귀 테스트로 확인한다.
 
 ### 근본 원인 및 재발 방지
 - 근본 원인: 독립적인 운영 대시보드 데이터 source를 하나의 fail-fast Promise 그룹으로 모델링했다.
-- 재발 감지: `lib/admin-optional-json.test.ts`에서 보조 API 장애 격리를 고정한다. 이 컴포넌트에 새로운 선택 API를 추가할 때는 보조 요청이 필수 데이터 렌더링을 reject하지 않는지 검증한다.
+- 재발 감지: helper 계약과 mounted component 동작을 각각 테스트로 고정했다. 이 컴포넌트에 새로운 선택 API를 추가할 때도 보조 요청 실패가 필수 데이터 렌더링을 reject하지 않는지 확인한다.
 - 남은 위험: 필수 KIS 호출량 API 자체의 실패는 계속 전체 데이터 오류로 나타난다. 이는 대시보드 핵심 데이터이므로 현재 동작을 유지한다.
 
 ### 검증
-- targeted test: `npm.cmd test -- --run lib/admin-optional-json.test.ts`, 3개 통과.
+- targeted test: `npm.cmd test -- --run components/admin-kis-calls.test.tsx lib/admin-optional-json.test.ts`, 2개 파일, 4개 통과.
 - `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내·해외 chart API 200, 관리자·cron 비인증 401, 전체 테스트 203개 파일(705 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
 - 운영 적용 후 관리자 로그인, `/admin/kis-calls` 200, health DB 정상과 서비스 SHA 일치를 확인했다. Approval metrics API도 60분·60개 버킷을 반환했다.
 
 ### 개선 과제
 - 성과 판정: IMPROVED (보조 fetch 오류 격리의 회귀 테스트·typecheck 통과; 전체 게이트와 운영 반영은 다음 단계에서 확인).
-- 근거: 필수 요청 렌더링을 보조 실패에서 분리했고, 성공·HTTP 오류·네트워크 오류·JSON 파싱 오류 4개 경로 중 실패 경로를 포함한 3개 테스트가 통과했다.
+- 근거: 필수 요청 렌더링을 보조 실패에서 분리했고, helper 실패 경로와 React UI 렌더링을 포함한 4개 targeted 테스트가 통과했다.
 
 ### 다음 개선
 - 컴포넌트 단위 검증을 추가해 RATE LIMIT/Approval 중 하나의 fetch가 실패해도 필수 KIS 호출량 섹션은 계속 렌더링되는 것을 UI 상태까지 확인한다.
