@@ -1,5 +1,36 @@
 # Development Log
 
+## [2026-10-16] 상장 일정 조회 limit SQL 정수화
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-022
+- `/api/listings`의 소수 `limit`이 PostgreSQL `LIMIT`으로 전달되어 발생 가능한 503을 제거한다.
+
+### 반영
+- route query 경계에서 공통 `boundedIntegerQuery`를 적용해 기본 200, 범위 1..1000의 정수만 service에 전달한다.
+- 공용 `listInvestmentCalendarEvents`에서도 직접 호출자가 소수·NaN을 넘기는 경우를 방어하고 SQL bind 값의 정수 계약을 보장한다.
+- route 및 service 테스트로 소수, 범위 초과, 잘못된 입력, 직접 service 호출의 경계값을 확인했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: route가 입력을 단순 `Number()`로 변환했고 repository는 범위 clamp만 수행해 소수점이 SQL LIMIT 파라미터에 남았다.
+- 재발 감지: HTTP 경계 테스트와 repository bind 값 테스트를 유지한다.
+- 남은 위험: 날짜 문자열 형식 검증은 존재하지만 달력상 불가능한 날짜 검증은 이번 limit 문제 범위에 포함하지 않았다.
+
+### 검증
+- 집중 테스트: 3개 파일, 6개 테스트 통과.
+- `npm.cmd run typecheck -- --tsBuildInfoFile .next-deploy-verify/tsconfig.tsbuildinfo`: 통과.
+- `npm.cmd run deploy:verify`: 성공. production build, standalone `/charts` 200, chart API smoke 200, 인증 보호 API/cron 401, 전체 212개 테스트 파일(722 통과·1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: fractional limit이 route와 service 양쪽에서 정수 SQL bind 값으로 제한됨을 6개 테스트로 확인했다.
+
+### 다음 개선
+- 상장 일정 `from`/`to` 입력의 불가능한 날짜 및 과도한 조회 기간을 점검해 무효 날짜의 DB 오류와 과도한 결과 조회를 방지한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행.
+
 ## [2026-10-16] 진단 API 정수 query 경계 공통화
 
 ### 목표

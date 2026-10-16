@@ -29,7 +29,9 @@ export async function listInvestmentCalendarEvents(input: { from: string; to: st
   if (input.type && CALENDAR_EVENT_TYPES.includes(input.type as CalendarEventType)) { values.push(input.type); conditions.push(`event_type = $${values.length}`); }
   if (input.market && input.market !== "ALL") { values.push(input.market); conditions.push(`market = $${values.length}`); }
   if (input.code) { values.push(input.code); conditions.push(`code = $${values.length}`); }
-  values.push(Math.min(Math.max(input.limit ?? 200, 1), 1000));
+  const requestedLimit = input.limit ?? 200;
+  const limit = Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 200;
+  values.push(Math.min(Math.max(limit, 1), 1000));
   const result = await getPool().query<InvestmentCalendarEvent>(`SELECT id, market, code, company_name AS "companyName", event_type AS "eventType", event_date::text AS "eventDate", event_end_date::text AS "eventEndDate", title, description, source, source_url AS "sourceUrl" FROM investment_calendar_events WHERE ${conditions.join(" AND ")} ORDER BY event_date ASC, event_type ASC, company_name ASC LIMIT $${values.length}`, values);
   return result.rows;
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { safeErrorMetadata } from "@/lib/error-diagnostics";
 import { listInvestmentCalendarEvents } from "@/lib/investment-calendar";
+import { boundedIntegerQuery } from "@/lib/query-params";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export async function GET(request: Request) {
   }
   if (market !== "KR") return NextResponse.json({ ok: false, error: "UNSUPPORTED_MARKET" }, { status: 400 });
   try {
-    const items = await listInvestmentCalendarEvents({ from, to, type: "IPO", market: "KR", limit: Number(url.searchParams.get("limit") || 200) });
+    const limit = boundedIntegerQuery(url.searchParams.get("limit"), 200, 1, 1000);
+    const items = await listInvestmentCalendarEvents({ from, to, type: "IPO", market: "KR", limit });
     return NextResponse.json({ ok: true, market, from, to, sourceAvailable: true, source: "KRX_KIND", items, count: items.length, message: "KRX KIND RSS에서 수집·저장된 신규상장 관련 일정입니다." });
   } catch (error) {
     return NextResponse.json({ ok: false, market, from, to, error: safeErrorMetadata(error).errorCode }, { status: 503 });
