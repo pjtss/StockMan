@@ -29,7 +29,7 @@
 - 브라우저 스모크에 차트 모달 열기·닫기 및 읽기 전용 차트 데이터 렌더링을 추가할 필요가 있는지, 테스트 비용과 API 부작용을 확인해 설계한다.
 
 ### 커밋·푸시·배포
-- 미실행: 전체 검증 통과 후 커밋·푸시 및 운영 배포 상태 확인 예정.
+- 완료: 코드 커밋 `aaa21ed47ccdcf80d1d901164ed4c160e7c8847d`를 `oci`에 푸시했다. Deploy OCI run `38907280342` 성공. 운영 `https://stockman.r-e.kr/api/health`는 `ok`; 운영 `/charts` desktop/mobile Chrome 상호작용 smoke도 통과.
 
 ## [2026-10-16] JavaScript 청크 smoke의 MIME 판별 엄격화
 
