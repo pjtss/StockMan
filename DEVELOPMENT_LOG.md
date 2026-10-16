@@ -1,5 +1,36 @@
 # Development Log
 
+## [2026-10-16] operational schema 필수 테이블의 migration 커버리지 자동 검사
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-027
+- 헬스체크 필수 테이블이 선언만 되고 DB 생성 migration은 누락되는 회귀를 정적 품질 게이트에서 차단한다.
+
+### 반영
+- `scripts/check-docs.mjs`가 `lib/schema-health.ts`의 `OPERATIONAL_SCHEMA_TABLES`를 읽고 모든 선언 테이블이 `db/migration/V*__*.sql` 중 적어도 하나에서 `CREATE TABLE`로 보장되는지 검사하도록 했다.
+- 테이블 목록 선언을 찾지 못하거나 migration 생성문이 없는 테이블이 있으면 `docs:check` 및 `deploy:verify`를 실패 처리한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 기존 테스트는 필수 테이블이 operational 목록에 포함되었는지는 확인했지만, 해당 테이블을 실제 생성하는 migration이 저장소에 있는지 연결 검증하지 않았다. 따라서 V153 전의 디버그 테이블 누락 유형을 코드 리뷰 실수만으로 막을 수 없었다.
+- 재발 감지: migration filename/버전 점검과 같은 `docs:check` 자동 게이트에서 operational table 선언과 DDL을 교차 검사한다.
+- 남은 위험: 이 정적 검사만으로 운영 DB의 실제 적용 상태나 테이블 컬럼/제약조건 동등성은 증명하지 않는다. 운영 상태는 Flyway validate/migrate 및 schema health API로 확인한다.
+
+### 검증
+- `npm.cmd run docs:check`: 13개 operational 테이블 전체의 migration 생성문 커버리지 검사 성공.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 3개 통과. 현재 저장소 전수검사, 필수 테이블 누락 음성 케이스, schema-qualified/quoted DDL 양성 케이스를 확인.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 런타임 스모크, 전체 215개 테스트 파일(740 passed, 1 skipped), 타입 검사 및 기존 문서/보안/cron 게이트 성공.
+- 검증된 배포 산출물은 푸시 후 OCI 배포로 운영 활성화하고 production health/Flyway를 재확인한다.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 변경을 반영하고 부정 경로를 포함한 테스트/배포 검증을 수행해야 한다.
+
+### 다음 개선
+- 마이그레이션에 명시적으로 제거된 테이블을 추적해 operational 선언이 오래된 테이블을 가리키는 경우도 별도 감사할 수 있는지 검토한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행.
+
 ## [2026-10-16] 디버그 관측 테이블 누락 복구 및 로컬 Flyway 이력 정합화
 
 ### 목표
