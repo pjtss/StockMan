@@ -12,7 +12,8 @@
 4. `npm run cron:check` 및 OCI cron 스크립트 문법 검사
 5. `npm run build`
 6. 생성된 standalone production build를 임시 포트에서 실행
-7. `/charts` 응답이 성공한 뒤 서버 종료
+7. `/charts` HTML에서 참조된 모든 `/_next/static/*.js` 청크가 HTTP 200, JavaScript content-type, 비어 있지 않은 본문으로 응답하는지 확인
+8. 핵심 API smoke를 통과한 뒤 서버 종료
 
 검증 중 하나라도 실패하면 패키징·업로드·활성화 단계로 진행하지 않는다. 실행 검증은 `scripts/verify-deploy.mjs`가 담당하며, OCI GitHub Actions도 이 모듈을 호출한다. 패키징과 서버 활성화는 배포 환경에 종속된 별도 단계로 유지한다.
 

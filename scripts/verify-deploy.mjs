@@ -5,6 +5,7 @@ import { stopChildProcess, waitForProcessExit } from "./child-process-lifecycle.
 import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
 import { runDeploymentVerification } from "./deployment-verification-order.mjs";
 import { getSmokeDeadlineMs } from "./smoke-retry-policy.mjs";
+import { extractNextStaticScriptPaths, validateNextStaticScriptResponse } from "./next-static-assets.mjs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
@@ -98,7 +99,10 @@ async function waitForHealth(url, configuredTimeoutMs = 30_000) {
       const response = await fetch(url, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
-      if (response.ok && contentType.includes("text/html") && body.trim().length > 100) { console.log(`[deploy-verify] smoke ok: ${url} (${response.status})`); return; }
+      if (response.ok && contentType.includes("text/html") && body.trim().length > 100) {
+        console.log(`[deploy-verify] smoke ok: ${url} (${response.status})`);
+        return { html: body, url };
+      }
       lastError = new Error(`HTTP ${response.status}, content-type=${contentType}, bodyLength=${body.length}`);
     } catch (error) {
       lastError = error;
@@ -106,6 +110,19 @@ async function waitForHealth(url, configuredTimeoutMs = 30_000) {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new Error(`Deployment smoke test failed for ${url}: ${lastError?.message ?? "timeout"}`);
+}
+
+async function verifyNextStaticScripts(baseUrl, html) {
+  const paths = extractNextStaticScriptPaths(html);
+  if (paths.length === 0) throw new Error("Standalone /charts smoke failed: no Next.js static JavaScript chunks were found in the HTML.");
+  for (const path of paths) {
+    const response = await fetch(new URL(path, baseUrl), { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.arrayBuffer();
+    const validationError = validateNextStaticScriptResponse({ status: response.status, contentType, byteLength: body.byteLength });
+    if (validationError) throw new Error(`Standalone static chunk smoke failed for ${path}: ${validationError}`);
+  }
+  console.log(`[deploy-verify] static JavaScript chunks ok: ${paths.length} referenced chunks`);
 }
 
 async function waitForJson(url, configuredTimeoutMs = 30_000, expectedStatus, init = {}) {
@@ -214,7 +231,8 @@ async function verifyRuntime() {
     console.log(`[deploy-verify] standalone TCP ready: port=${port}, elapsedMs=${runtimeDiagnostics.tcpReadyMs}`);
     await Promise.race([
       (async () => {
-        await waitForHealth(`http://127.0.0.1:${port}/charts`);
+        const charts = await waitForHealth(`http://127.0.0.1:${port}/charts`);
+        await verifyNextStaticScripts(`http://127.0.0.1:${port}`, charts.html);
         await waitForJson(`http://127.0.0.1:${port}/api/kis/us-search?market=INVALID`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);

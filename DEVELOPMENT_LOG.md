@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] standalone 배포 검증에 실제 Next.js 청크 요청 추가
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-030
+- `/charts`의 HTML 성공만으로 배포 검증이 통과하는 허점을 막고, HTML이 참조하는 클라이언트 JavaScript도 standalone 런타임에서 실제 로드 가능한지 검증한다.
+
+### 반영
+- `scripts/next-static-assets.mjs`에 HTML에서 Next static JavaScript 경로를 추출하고 응답 상태·content-type·본문 길이를 검사하는 순수 함수를 추가했다.
+- `scripts/verify-deploy.mjs`의 standalone smoke가 `/charts` HTML 응답 후 중복 제거된 모든 `/_next/static/*.js` 스크립트를 요청해 HTTP 200, JavaScript 응답 유형, 비어 있지 않은 본문을 확인하게 했다. 시작 직후 HTML을 받을 때까지 기존 재시도 동작도 보존했다.
+- 경로 추출 및 404·잘못된 content-type·빈 본문 거부 회귀 테스트를 추가하고 배포 체크리스트·검증 표준을 실제 자동 게이트와 맞췄다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 체크리스트와 이전 오류 대응 문서는 HTML에서 실제 JS 경로를 검사한다고 설명했지만 실행기는 `/charts`의 HTML만 성공 확인했다. JS 파일 누락·404·HTML fallback이 있어도 배포 전 게이트가 통과할 수 있었다.
+- 재발 감지: `deploy:verify` standalone runtime에서 HTML이 실제 선언한 모든 Next static JS 경로를 가져오고, 회귀 테스트로 비정상 응답 유형을 차단한다.
+- 남은 위험: 이 smoke는 화면 렌더링/상호작용과 브라우저 내 hydration까지 검증하지 않는다. 향후 핵심 화면 브라우저 E2E를 별도 평가한다.
+
+### 검증
+- `npm.cmd test -- --run scripts/next-static-assets.test.ts`: 2개 통과.
+- `npm.cmd run docs:check`: 통과. 21개 operational relation, 148개 migration 파일 확인.
+- 전체 `npm.cmd run deploy:verify`: 통과. production build, standalone 실행 및 API smoke, 216개 테스트 파일(746 passed, 1 skipped), 타입·문서·인증·KIS 경계·cron 검사를 확인.
+- standalone `/charts`: HTTP 200, 실제 HTML 참조 JavaScript 청크 11개 모두 HTTP 200·JavaScript content-type·비어 있지 않은 응답 본문 확인.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 기존에 전혀 요청하지 않던 `/charts`의 11개 JavaScript 청크가 standalone smoke에서 모두 정상 응답함을 실측했다.
+
+### 다음 개선
+- `/charts` 주요 상호작용 및 hydration을 브라우저 E2E로 검증할 수 있는 기존 CI 실행 기반을 확인한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증의 문서 계약 실패를 수정한 뒤 코드·테스트 커밋 및 `oci` 푸시를 진행한다. OCI 배포 및 운영 health 결과는 후속 기록으로 확정한다.
+
 ## [2026-10-16] operational schema spread 상수 누락을 migration 감사에 반영
 
 ### 목표
