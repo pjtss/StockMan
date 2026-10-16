@@ -30,7 +30,7 @@
 - 핵심 페이지의 브라우저 hydration 검증을 위해 현재 CI에서 사용할 수 있는 브라우저 런타임 및 라이선스·운영 비용을 평가한다.
 
 ### 커밋·푸시·배포
-- 미실행: 최종 문서 반영 상태에서 deploy:verify를 다시 통과한 뒤 커밋·푸시·배포한다.
+- 완료: 코드 커밋 `7a1d25e7fc69e34a0d5dedd644b3e404c162c63d`를 `oci`에 푸시했다. GitHub Actions run `38871216557` 성공. 운영 `/api/debug/health`에서 동일 커밋, HTTP 200, Flyway 153, 누락 operational relation 없음을 확인했다.
 
 ## [2026-10-16] standalone 배포 검증에 실제 Next.js 청크 요청 추가
 
