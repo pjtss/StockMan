@@ -7,6 +7,7 @@ import type { ChartData, ChartFundamentals, OHLCVCandle } from "@/lib/kis-chart"
 import { normalizeOHLCVCandles } from "@/lib/chart-candles";
 import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { loadChartLibrary } from "@/lib/chart-library";
 
 type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; summary?: string | null; translatedSummary?: string | null; link: string; publishedAt: string | null; source: string; translationStatus?: string | null };
 type FlowResponse = { ok: boolean; source?: string; mode?: string; flowStatus?: string; collectedAt?: string; rows?: Array<Record<string, unknown>>; note?: string; instrumentDetail?: Record<string, unknown> };
@@ -32,7 +33,13 @@ type ChartTimeframe = "D" | "W" | "M" | "1" | "5";
 type ModalSettings = { timeframe: ChartTimeframe; activeTab: "chart" | "fundamentals" | "flow" | "ratio" | "news"; flowMode: FlowMode; ratioType: RatioType };
 function readModalSettings(): Partial<ModalSettings> {
   if (typeof window === "undefined") return {};
-  try { return JSON.parse(window.sessionStorage.getItem(MODAL_SETTINGS_KEY) ?? "{}"); } catch { return {}; }
+  try {
+    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(MODAL_SETTINGS_KEY) ?? "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Partial<ModalSettings>;
+  } catch {
+    return {};
+  }
 }
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
@@ -358,7 +365,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const tagName = target?.tagName.toLowerCase();
+      const tagName = target?.tagName?.toLowerCase();
       if (tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable) return;
       if (e.key === "Escape") {
         e.preventDefault();
@@ -498,7 +505,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     let cancelled = false;
     const container = chartRef.current;
 
-    import("lightweight-charts").then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle, HistogramSeries }) => {
+    loadChartLibrary().then(({ createChart, CrosshairMode, CandlestickSeries, LineSeries, LineStyle, HistogramSeries }) => {
       if (cancelled || !container || !container.isConnected) return;
       const candles = normalizeOHLCVCandles(data.candles);
       if (!candles.length) return;
