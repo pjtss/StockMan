@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] KIS 호출량 진단 API 정수 query 안정화
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-020
+- `/api/debug/kis-calls`에서 소수 query가 PostgreSQL 정수 바인딩 오류로 503을 내는 문제를 제거한다.
+
+### 반영
+- `days=3.5`나 `limit=1.9`가 현재 API의 `Number()` 경계값 검사만 통과해 DB의 `$n::int` / `LIMIT`에 전달될 수 있었다.
+- `days`와 `limit`을 유한한 정수 범위로 정규화하고, 잘못된 값은 기존 기본값·최소·최대 경계로 처리한다.
+- route 테스트로 관리자 인증, 소수, 범위 초과, 숫자가 아닌 입력이 DB 503 없이 정수 인자로 전달되는 것을 확인한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: JavaScript의 숫자 검증과 PostgreSQL 정수 매개변수 계약이 서로 다르지만 API 경계에서 정수화를 하지 않았다.
+- 재발 감지: `app/api/debug/kis-calls/route.test.ts`에 fractional·invalid·out-of-range query 회귀 테스트를 유지한다.
+- 남은 위험: 비정수 문자열을 400으로 거절하지 않고 clamp/default 처리하므로 입력 오류는 응답의 유효 기본값으로 바뀐다. 이 endpoint의 기존 관대한 bounds 동작과 일치한다.
+
+### 검증
+- `npm.cmd test -- --run app/api/debug/kis-calls/route.test.ts`: 1개 파일, 4개 통과.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
+- 전체 배포 검증은 커밋 전에 실행한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 소수·무효 문자열·범위 초과 query가 DB 정수 cast 실패 대신 확정된 정수 인자로 전달되는 것을 회귀 테스트에서 확인했다.
+
+### 다음 개선
+- 동일한 숫자 query 파싱 패턴이 있는 debug API를 추가 검사하고, 공통 정수 query parser 재사용 여부를 판단한다.
+
+### 커밋·푸시·배포
+- 검증 시점 상태: 미실행. 이 로그는 코드 커밋 전 결과를 기록한다.
+- 배포 확인 기준: OCI Actions 성공과 운영 health SHA가 해당 커밋을 반영하는지 확인한다.
+
 ## [2026-10-16] 관리자 KIS 호출 대시보드 보조 데이터 장애 격리
 
 ### 목표

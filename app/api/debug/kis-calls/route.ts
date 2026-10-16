@@ -5,12 +5,18 @@ import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+function boundedInteger(raw: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(raw);
+  const value = raw === null || Number.isNaN(parsed) || parsed === 0 ? fallback : Math.trunc(parsed);
+  return Math.min(max, Math.max(min, value));
+}
+
 export async function GET(request: Request) {
   const requestId = `req_${crypto.randomUUID()}`;
   if (!(await requireAdminSession())) return NextResponse.json({ ok: false, requestId, error: "Unauthorized" }, { status: 401, headers: { "x-request-id": requestId } });
   const url = new URL(request.url);
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
-  const days = Math.min(31, Math.max(1, Number(url.searchParams.get("days") ?? 7) || 7));
+  const limit = boundedInteger(url.searchParams.get("limit"), 50, 1, 100);
+  const days = boundedInteger(url.searchParams.get("days"), 7, 1, 31);
   try {
     const pool = getPool();
     const [summary, daily, hourly, features] = await Promise.all([
