@@ -27,6 +27,7 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "debug_run_items",
   "debug_kis_calls",
   "investment_calendar_events",
+  "user_watchlist",
 ] as const;
 
 /** Tables removed by V70 and not allowed in the active architecture. */

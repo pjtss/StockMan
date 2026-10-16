@@ -11,4 +11,9 @@ describe("schema-health", () => {
     expect(OPERATIONAL_SCHEMA_TABLES).toContain("investment_calendar_events");
     expect(getMissingSchemaTables(["automation_runs"], OPERATIONAL_SCHEMA_TABLES)).toContain("investment_calendar_events");
   });
+
+  it("treats per-user watchlist storage as an operational dependency", () => {
+    expect(OPERATIONAL_SCHEMA_TABLES).toContain("user_watchlist");
+    expect(getMissingSchemaTables(["users", "user_sessions"], OPERATIONAL_SCHEMA_TABLES)).toContain("user_watchlist");
+  });
 });

@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] 사용자 관심종목 저장 스키마 누락 복구 및 감지
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-025
+- 로컬에서 로그인 사용자별 관심종목 저장 API가 테이블 누락으로 실패할 수 있는 스키마 불일치를 복구하고 운영 health에서 탐지한다.
+
+### 반영
+- 로컬 DB에서 `users`, `user_sessions`는 존재하지만 `user_watchlist`가 없음을 확인했다. 운영 DB에는 세 테이블 모두 존재한다.
+- `user_watchlist` 테이블과 사용자별 unique key 및 조회 인덱스를 보장하는 idempotent V152 migration을 추가했다.
+- `user_watchlist`를 operational schema 필수 목록에 넣고 누락 감지 회귀 테스트를 추가했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 관심종목 스키마는 V108 이전 migration으로만 보장되며, 이전 migration 무시 정책이 적용된 환경에서 미적용될 수 있었다. 해당 테이블은 operational health 검사 대상이 아니었다.
+- 재발 감지: health schema 단위 테스트와 운영 배포 후 Flyway 152 및 `missingOperationalTables`를 확인한다.
+- 남은 위험: local Flyway V142/V148 이력 불일치로 로컬 `migrate`가 V152까지 진행되지 못한다. 해당 이력은 확인 가능한 원본 근거 없이 수정하지 않는다.
+
+### 검증
+- 로컬 DB 스키마 점검: `user_watchlist` 누락, 운영 `/api/admin/database` read-only 확인: `user_watchlist` 존재.
+- V152 SQL을 로컬 PostgreSQL 트랜잭션 안에서 2회 실행해 테이블/인덱스 생성과 재실행 안전성을 확인하고 `ROLLBACK`했다.
+- `npm.cmd test -- --run lib/schema-health.test.ts`: 3개 테스트 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 실행 스모크 테스트, 전체 214개 테스트 파일(736 passed, 1 skipped), 타입 검사 및 문서/보안/cron 게이트 통과.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 누락 상태를 재현하고 보정 migration 및 health 회귀 검사를 추가했으며, 운영 적용 후 API까지 검증해야 한다.
+
+### 다음 개선
+- Flyway lineage의 원본 V142/V148을 확보해 로컬 검증 환경을 정합화하고, 테이블 누락 패턴이 있는 다른 기능 저장소를 점검한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행.
+
 ## [2026-10-16] Flyway 스키마 누락 일정 테이블 복구 및 감지
 
 ### 목표
