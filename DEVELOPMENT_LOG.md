@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] JavaScript 청크 smoke의 MIME 판별 엄격화
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-031
+- 정적 청크 smoke가 JavaScript가 아닌 응답을 잘못 정상 처리하지 않도록 MIME 검사를 정확한 미디어 유형 allowlist로 제한한다.
+
+### 반영
+- `scripts/next-static-assets.mjs`가 Content-Type의 미디어 유형 부분만 파싱해 IANA에 등록된 JavaScript 및 기존 ECMAScript 유형과 정확히 비교한다. 대소문자 및 `charset` 파라미터는 허용한다.
+- `application/notjavascript` 유사 문자열 거부와 등록된 MIME 유형 허용 회귀 테스트를 추가한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 이전 검사는 Content-Type 전체에서 `javascript` 또는 `ecmascript` 문자열의 포함 여부만 확인해 `application/notjavascript` 같은 유사 MIME도 통과시킬 수 있었다.
+- 재발 감지: media type exact-match 회귀 사례를 helper 테스트에 고정하고 standalone smoke에 동일 검증을 적용한다.
+- 남은 위험: Content-Type은 서버 선언만 검증하며 본문 코드의 실행·브라우저 hydration까지 검증하지 않는다.
+
+### 검증
+- `npm.cmd test -- --run scripts/next-static-assets.test.ts`: 2개 통과.
+- 최초 `npm.cmd run docs:check`: 실패. 최신 로그의 검증란에 실행 가능한 검사 명령이 아직 없어 문서 계약이 이를 차단했다. 현재 이 항목에 명령 결과를 기록했으며 재실행한다.
+- 수정 후 `npm.cmd run docs:check`: 통과. 21개 operational relation과 148개 migration 확인.
+- 전체 `npm.cmd run deploy:verify`: 통과. production build, standalone 실행과 API smoke, 216개 테스트 파일(746 passed, 1 skipped), 타입·문서·인증·KIS 경계·cron 게이트 통과.
+- standalone `/charts`가 참조하는 11개 JavaScript 파일 전체가 HTTP 200·JavaScript content-type·비어 있지 않은 본문으로 응답함을 확인.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: `application/notjavascript`가 거부되고 등록된 미디어 유형 및 charset이 수용되는 회귀 테스트를 통과했다.
+
+### 다음 개선
+- 핵심 페이지의 브라우저 hydration 검증을 위해 현재 CI에서 사용할 수 있는 브라우저 런타임 및 라이선스·운영 비용을 평가한다.
+
+### 커밋·푸시·배포
+- 미실행: 최종 문서 반영 상태에서 deploy:verify를 다시 통과한 뒤 커밋·푸시·배포한다.
+
 ## [2026-10-16] standalone 배포 검증에 실제 Next.js 청크 요청 추가
 
 ### 목표

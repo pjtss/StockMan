@@ -17,7 +17,14 @@ export function extractNextStaticScriptPaths(html) {
 
 export function validateNextStaticScriptResponse({ status, contentType, byteLength }) {
   if (status !== 200) return `expected HTTP 200, received ${status}`;
-  if (!/(?:java|ecma)script/i.test(contentType ?? "")) return `expected JavaScript content-type, received ${contentType || "missing"}`;
+  const mediaType = (contentType ?? "").split(";", 1)[0].trim().toLowerCase();
+  const javascriptMediaTypes = new Set([
+    "text/javascript",
+    "application/javascript",
+    "text/ecmascript",
+    "application/ecmascript",
+  ]);
+  if (!javascriptMediaTypes.has(mediaType)) return `expected JavaScript content-type, received ${contentType || "missing"}`;
   if (!Number.isFinite(byteLength) || byteLength <= 0) return `expected a non-empty JavaScript body, received ${byteLength} bytes`;
   return null;
 }

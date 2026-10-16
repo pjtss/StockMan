@@ -20,7 +20,9 @@ describe("standalone Next.js static script smoke helpers", () => {
   it("rejects missing, non-JavaScript, and empty chunk responses", () => {
     expect(validateNextStaticScriptResponse({ status: 404, contentType: "text/html", byteLength: 20 })).toMatch(/HTTP 200/);
     expect(validateNextStaticScriptResponse({ status: 200, contentType: "text/html", byteLength: 20 })).toMatch(/JavaScript content-type/);
+    expect(validateNextStaticScriptResponse({ status: 200, contentType: "application/notjavascript", byteLength: 20 })).toMatch(/JavaScript content-type/);
     expect(validateNextStaticScriptResponse({ status: 200, contentType: "application/javascript", byteLength: 0 })).toMatch(/non-empty/);
     expect(validateNextStaticScriptResponse({ status: 200, contentType: "text/javascript; charset=utf-8", byteLength: 12 })).toBeNull();
+    expect(validateNextStaticScriptResponse({ status: 200, contentType: " APPLICATION/ECMASCRIPT ; charset=utf-8", byteLength: 12 })).toBeNull();
   });
 });
