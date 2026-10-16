@@ -19,7 +19,8 @@
 ### 검증
 - `npm.cmd test -- --run app/api/debug/kis-calls/route.test.ts`: 1개 파일, 4개 통과.
 - `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
-- 전체 배포 검증은 커밋 전에 실행한다.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내·해외 chart API 200, 관리자·cron 보호 경로 401, 전체 테스트 205개 파일(710 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
+- 운영 검증: health의 service SHA `a8063a5a27e929ab47ab05f6cedbd0d05e7127b6`, DB 정상. 관리자 API `?days=3.5&limit=1.9`가 200 JSON으로 반환되고 `days=3`, 최근 1건을 확인했다.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
@@ -29,8 +30,9 @@
 - 동일한 숫자 query 파싱 패턴이 있는 debug API를 추가 검사하고, 공통 정수 query parser 재사용 여부를 판단한다.
 
 ### 커밋·푸시·배포
-- 검증 시점 상태: 미실행. 이 로그는 코드 커밋 전 결과를 기록한다.
-- 배포 확인 기준: OCI Actions 성공과 운영 health SHA가 해당 커밋을 반영하는지 확인한다.
+- 상태: 완료.
+- 커밋·푸시: `a8063a5a27e929ab47ab05f6cedbd0d05e7127b6`를 `oci` 브랜치에 반영했다.
+- 배포: GitHub Actions #38839067989 성공. 운영 health SHA 일치와 fractional query 실응답을 확인했다.
 
 ## [2026-10-16] 관리자 KIS 호출 대시보드 보조 데이터 장애 격리
 
