@@ -26,6 +26,7 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "kis_token_issuance_history",
   "debug_run_items",
   "debug_kis_calls",
+  "investment_calendar_events",
 ] as const;
 
 /** Tables removed by V70 and not allowed in the active architecture. */

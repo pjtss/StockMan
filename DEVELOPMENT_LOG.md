@@ -1,5 +1,38 @@
 # Development Log
 
+## [2026-10-16] Flyway 스키마 누락 일정 테이블 복구 및 감지
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-024
+- 로컬 DB 상태를 확인하고, 누락된 투자 일정 테이블이 일정 API 장애를 일으키며 health에서 탐지되지 않는 스키마 불일치를 복구한다.
+
+### 반영
+- `.env.local`의 localhost PostgreSQL을 읽기 전용으로 조사했다. DB는 Flyway 148이지만 `investment_calendar_events` 및 V130 migration 이력이 없었다.
+- OCI 배포는 Flyway `*:ignored` 패턴으로 과거 누락 migration을 건너뛰므로 V130이 자동 적용되지 않을 수 있다. 최신 V151 보정 migration으로 테이블/인덱스를 idempotent하게 보장한다.
+- `investment_calendar_events`를 operational schema 필수 테이블에 추가해 같은 누락을 `/api/health`에서 스키마 준비 실패로 표시한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 테이블 생성은 V130에만 있었으나 배포 정책이 현재 버전보다 낮은 미적용 migration을 건너뛰며, 해당 테이블은 operational schema health 목록에도 없었다.
+- 재발 감지: schema-health 테스트에서 필수 목록 및 누락 결과를 확인하고, 배포 후 Flyway 151과 `missingOperationalTables`를 검증한다.
+- 남은 위험: local DB는 적용된 V142 파일이 소스에 없고 적용 V148의 description/checksum이 현재 파일과 달라 Flyway validation이 V149 이전에 중단된다. `repair`는 DB에 존재하지 않을 수 있는 V148 제약조건을 migration 이력에 반영한 것으로 가장할 수 있어 실행하지 않았다.
+
+### 검증
+- `npm.cmd test -- --run lib/schema-health.test.ts`: 2개 테스트 통과.
+- Read-only DB 확인: localhost DB 연결, Flyway 148, `investment_calendar_events` 없음. `SELECT to_regclass('public.investment_calendar_events')`는 NULL이고 해당 테이블 조회는 PostgreSQL `42P01`.
+- Flyway `info`: V130은 `Ignored`, V149/V150/V151은 `Pending`; `migrate`는 applied V142 missing 및 V148 description 불일치 검증 오류로 중단되어 persistent DDL은 적용되지 않았다.
+- V151 SQL을 PostgreSQL 트랜잭션 안에서 2회 실행해 table/index 생성과 재실행 안전성을 확인하고 `ROLLBACK`으로 DB 상태를 원복했다.
+- 단위 테스트 및 전체 배포 검증은 완료 후 기록한다.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 누락 테이블을 재현하고 재적용 가능한 migration 및 health 회귀 검사를 추가했지만, local Flyway validation 불일치로 지속 적용을 확인하지 못했다.
+
+### 다음 개선
+- 적용 V142/V148 lineage의 원본 근거를 확인해 local migration history를 안전하게 정합화한 뒤 V151, `/api/health`, 상장 일정 API 및 신규 이벤트 upsert를 검증한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행.
+
 ## [2026-10-16] 투자 일정 API 실제 달력 날짜 검증
 
 ### 목표
