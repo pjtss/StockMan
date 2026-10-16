@@ -28,7 +28,8 @@
 - `app/api/admin/database` 및 기타 숫자 query 입력 API의 SQL 바인딩 계약을 점검하고, 실제 정수 바인딩이 있는 경로만 동일 공통 파서를 적용한다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 미실행.
+- 배포 완료: 구현 커밋 `e101ebe4931898ea829b18f7dd304fede35d0398`를 `oci`에 푸시했고 OCI 배포 workflow `38841985065`가 성공했다.
+- 운영 검증: `/api/debug/health`가 동일 SHA와 DB 연결 정상/Flyway 150을 보고했다. `/api/debug/kis-calls?days=3.5&limit=1.9`는 HTTP 200 JSON, `days=3`, 최근 1건을 반환했다.
 
 ## [2026-10-16] KIS 호출량 진단 API 정수 query 안정화
 
