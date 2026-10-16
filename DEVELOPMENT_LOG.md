@@ -21,16 +21,22 @@
 - V152 SQL을 로컬 PostgreSQL 트랜잭션 안에서 2회 실행해 테이블/인덱스 생성과 재실행 안전성을 확인하고 `ROLLBACK`했다.
 - `npm.cmd test -- --run lib/schema-health.test.ts`: 3개 테스트 통과.
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 실행 스모크 테스트, 전체 214개 테스트 파일(736 passed, 1 skipped), 타입 검사 및 문서/보안/cron 게이트 통과.
+- GitHub Actions Deploy OCI run `38849867658`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `c935d7daf2dd62a424eefcfd0b8c1a80bceb12a9`, DB 연결 정상, Flyway 152, 누락 operational table 없음.
+- 운영 `/api/admin/database` read-only 점검에서 `user_watchlist` 존재 확인.
 
 ### 개선 과제
-- 성과 판정: UNMEASURED
-- 근거: 누락 상태를 재현하고 보정 migration 및 health 회귀 검사를 추가했으며, 운영 적용 후 API까지 검증해야 한다.
+- 성과 판정: IMPROVED
+- 근거: 로컬에서 누락을 확인했고 V152 적용 후 운영 Flyway가 152로 올라갔으며, 운영 health에서 누락 테이블 경보가 사라지고 `user_watchlist`가 존재한다.
 
 ### 다음 개선
 - Flyway lineage의 원본 V142/V148을 확보해 로컬 검증 환경을 정합화하고, 테이블 누락 패턴이 있는 다른 기능 저장소를 점검한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행.
+- 상태: 완료.
+- 커밋: `c935d7da` (`사용자 관심종목 저장 테이블 누락 복구`).
+- 푸시: `origin/oci` 성공.
+- 배포: OCI workflow `38849867658` 성공, 운영 health와 테이블 존재 확인.
 
 ## [2026-10-16] Flyway 스키마 누락 일정 테이블 복구 및 감지
 
