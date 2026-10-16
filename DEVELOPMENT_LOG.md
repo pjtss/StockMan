@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] operational schema spread 상수 누락을 migration 감사에 반영
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-029
+- 공통 core 테이블까지 포함한 실제 operational schema 전체를 migration 이력 감사 대상으로 만들고, 빠진 핵심 테이블 생성을 배포 전에 차단한다.
+
+### 반영
+- 감사기가 `OPERATIONAL_SCHEMA_TABLES`의 `...CORE_SCHEMA_TABLES` spread를 재귀적으로 해석하도록 수정했다. 미정의·순환 spread 참조도 명확한 오류로 실패시킨다.
+- `flyway_schema_history`는 애플리케이션 migration이 아니라 Flyway 자체가 소유하는 외부 관리 relation임을 명시적 예외로 지정했다.
+- 감사 개수를 문자열 직접 항목 수에서 해석된 전체 relation 수로 바꿨다. 실제 21개(공통 8 + 추가 13)를 검사한다.
+- core migration 누락 fixture를 포함해 회귀 테스트를 보강했다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: CI-027/028 감사기는 배열 본문에서 문자열 리터럴만 읽어 `...CORE_SCHEMA_TABLES` 안의 필수 relation 8개를 빠뜨렸다. 성공 메시지의 13은 전체 operational 목록이 아니라 spread를 제외한 직접 선언만 센 값이었다.
+- 재발 감지: 배열 참조 재귀 해석을 감사의 단일 진입점으로 사용하고, core 목록 migration 제거 음성 테스트와 정의되지 않은/순환 참조 테스트를 고정한다.
+- 남은 위험: relation DDL 감사는 조건부·동적 SQL과 실제 DB 적용 결과를 대체하지 않는다. 운영 health 및 Flyway 검증을 계속 병행한다.
+
+### 검증
+- `npm.cmd run docs:check`: 21개 전체 operational relation을 해석해 migration 상태 검사 통과.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 7개 통과, core relation migration 누락을 음성 케이스에서 검출.
+- 전체 배포 검증과 OCI/운영 확인 결과는 실행 후 기록한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 이전에는 미검사 상태였던 core 스키마 8개도 migration 감사에 포함되고 누락 시 실패한다.
+
+### 다음 개선
+- 필수 operational column의 `ADD/DROP/RENAME` 이력도 같은 방식으로 검증할지 검토한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행.
+
 ## [2026-10-16] operational relation 감사에서 후속 DROP/RENAME 추적
 
 ### 목표
@@ -15,6 +47,7 @@
 - 근본 원인: 최초 감사는 migration 전체에 생성 구문이 한 번이라도 있으면 통과시켜 후속 DROP/RENAME으로 현재 relation이 사라지는 경우를 놓칠 수 있었다. 국내·해외 universe migration은 물리 테이블을 compatibility view로 대체하므로 TABLE-only 검사도 부정확했다.
 - 재발 감지: ordered migration relation state를 docs:check 및 deploy:verify에 연결하고 CREATE/DROP/RENAME 회귀 케이스를 자동 검사한다.
 - 남은 위험: SQL 감사는 단순 DDL 패턴 분석이며 조건부 DO 블록, 동적 SQL, 외부 관리 스키마의 실행 결과를 완전히 해석하지 않는다. 운영 schema health 점검을 함께 유지한다.
+- 후속 발견: 이 시점의 감사는 `...CORE_SCHEMA_TABLES` spread를 펼치지 않아 직접 표기된 13개만 세었다. 이 누락은 CI-2026-10-16-029에서 바로잡는다.
 
 ### 검증
 - `npm.cmd run docs:check`: 13개 operational relation이 버전순 migration 적용 후 존재하고 있음을 확인.
@@ -49,6 +82,7 @@
 - 근본 원인: 기존 테스트는 필수 테이블이 operational 목록에 포함되었는지는 확인했지만, 해당 테이블을 실제 생성하는 migration이 저장소에 있는지 연결 검증하지 않았다. 따라서 V153 전의 디버그 테이블 누락 유형을 코드 리뷰 실수만으로 막을 수 없었다.
 - 재발 감지: migration filename/버전 점검과 같은 `docs:check` 자동 게이트에서 operational table 선언과 DDL을 교차 검사한다.
 - 남은 위험: 이 정적 검사만으로 운영 DB의 실제 적용 상태나 테이블 컬럼/제약조건 동등성은 증명하지 않는다. 운영 상태는 Flyway validate/migrate 및 schema health API로 확인한다.
+- 후속 발견: 당시 성공 메시지의 13개는 배열의 직접 항목만 센 수였고, spread된 core relation 8개는 검사에서 누락됐다. CI-2026-10-16-029에서 전체 21개를 대상으로 수정한다.
 
 ### 검증
 - `npm.cmd run docs:check`: 13개 operational relation의 버전순 migration 상태 검사 성공.

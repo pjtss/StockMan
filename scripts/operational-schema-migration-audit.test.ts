@@ -13,13 +13,26 @@ describe("operational schema migration audit", () => {
     .map((fileName) => ({ fileName, contents: readFileSync(join(migrationDirectory, fileName), "utf8") }));
 
   it("requires every operational health table to have a creation migration", () => {
-    expect(parseOperationalSchemaTables(schemaSource)).toHaveLength(13);
+    const operationalTables = parseOperationalSchemaTables(schemaSource);
+    expect(operationalTables).toHaveLength(21);
+    expect(operationalTables).toContain("market_rss_articles");
+    expect(operationalTables).toContain("sec_filing_events");
     expect(findMissingOperationalRelations(schemaSource, migrations)).toEqual([]);
+  });
+
+  it("expands shared core schema arrays and rejects unresolved references", () => {
+    expect(() => parseOperationalSchemaTables('export const OPERATIONAL_SCHEMA_TABLES = [...UNKNOWN_TABLES] as const;')).toThrow(/Unknown schema table array reference/);
+    expect(() => parseOperationalSchemaTables('export const CORE_SCHEMA_TABLES = [...OPERATIONAL_SCHEMA_TABLES] as const; export const OPERATIONAL_SCHEMA_TABLES = [...CORE_SCHEMA_TABLES] as const;')).toThrow(/Circular schema table array reference/);
   });
 
   it("reports an operational table when its creation migration is missing", () => {
     const schemaWithUnmigratedTable = schemaSource.replace('"debug_run_items"', '"migration_missing_regression_fixture"');
     expect(findMissingOperationalRelations(schemaWithUnmigratedTable, migrations)).toContain("migration_missing_regression_fixture");
+  });
+
+  it("audits tables inherited through CORE_SCHEMA_TABLES spreads", () => {
+    const withoutCoreTableMigration = migrations.filter((migration) => migration.fileName !== "V13__market_rss_articles.sql");
+    expect(findMissingOperationalRelations(schemaSource, withoutCoreTableMigration)).toContain("market_rss_articles");
   });
 
   it("recognizes quoted and schema-qualified CREATE TABLE statements", () => {

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { findMissingOperationalRelations } from "./operational-schema-migration-audit.mjs";
+import { findMissingOperationalRelations, parseOperationalSchemaTables } from "./operational-schema-migration-audit.mjs";
 
 const root = process.cwd();
 const required = [
@@ -127,5 +127,5 @@ if (missingOperationalMigrations.length) {
   console.error(`Operational schema migration audit failed; required relations are absent after the migration history: ${missingOperationalMigrations.join(", ")}`);
   process.exit(1);
 }
-const operationalTableCount = (schemaHealthSource.match(/export const OPERATIONAL_SCHEMA_TABLES\s*=\s*\[([\s\S]*?)\]\s*as const/)?.[1].match(/["'][a-z][a-z0-9_]*["']/g) ?? []).length;
+const operationalTableCount = parseOperationalSchemaTables(schemaHealthSource).length;
 console.log(`Documentation OK (${required.length} entry points); migrations OK (${versions.length} files, latest V${versions.at(-1) ?? 0}); operational relations present after migration history (${operationalTableCount}).`);

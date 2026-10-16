@@ -1,7 +1,25 @@
 export function parseOperationalSchemaTables(source) {
-  const block = source.match(/export const OPERATIONAL_SCHEMA_TABLES\s*=\s*\[([\s\S]*?)\]\s*as const/);
-  if (!block) throw new Error("OPERATIONAL_SCHEMA_TABLES was not found.");
-  return [...block[1].matchAll(/["']([a-z][a-z0-9_]*)["']/g)].map((match) => match[1]);
+  const arrays = new Map(
+    [...source.matchAll(/export const ([A-Z][A-Z0-9_]*)\s*=\s*\[([\s\S]*?)\]\s*as const/g)]
+      .map((match) => [match[1], match[2]]),
+  );
+  if (!arrays.has("OPERATIONAL_SCHEMA_TABLES")) throw new Error("OPERATIONAL_SCHEMA_TABLES was not found.");
+
+  function expand(name, stack = []) {
+    if (stack.includes(name)) throw new Error(`Circular schema table array reference: ${[...stack, name].join(" -> ")}`);
+    const body = arrays.get(name);
+    if (body === undefined) throw new Error(`Unknown schema table array reference: ${name}`);
+    const tables = [];
+    let remainder = body;
+    for (const match of body.matchAll(/\.\.\.\s*([A-Z][A-Z0-9_]*)|["']([a-z][a-z0-9_]*)["']/g)) {
+      tables.push(...(match[1] ? expand(match[1], [...stack, name]) : [match[2]]));
+      remainder = remainder.replace(match[0], " ");
+    }
+    if (remainder.replace(/[\s,]/g, "")) throw new Error(`Unsupported entry in ${name}: ${remainder.trim()}`);
+    return tables;
+  }
+
+  return expand("OPERATIONAL_SCHEMA_TABLES");
 }
 
 function normalizeIdentifier(identifier) {
@@ -35,6 +53,9 @@ function listRelationEvents(sql) {
   return events;
 }
 
+// Flyway creates and owns its schema-history table; application migrations must not create it.
+const externallyManagedRelations = new Set(["flyway_schema_history"]);
+
 export function findMissingOperationalRelations(schemaSource, migrations) {
   const tables = parseOperationalSchemaTables(schemaSource);
   const relationStates = new Map();
@@ -53,5 +74,5 @@ export function findMissingOperationalRelations(schemaSource, migrations) {
       }
     }
   }
-  return tables.filter((table) => !relationStates.get(table)?.exists);
+  return tables.filter((table) => !externallyManagedRelations.has(table) && !relationStates.get(table)?.exists);
 }
