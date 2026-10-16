@@ -20,7 +20,8 @@
 - `npm.cmd run docs:check`: 13개 operational relation이 버전순 migration 적용 후 존재하고 있음을 확인.
 - `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 5개 통과 (최종 DROP, rename source, drop 후 view 대체 등).
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크, 215개 테스트 파일(742 passed, 1 skipped), 타입·문서·보안·cron 검사 통과.
-- 커밋 및 OCI 배포 결과는 완료 후 기록한다.
+- GitHub Actions Deploy OCI run `38860665063`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `720dc34d29a67154374da5498b53e4cb8e4b911b`, Flyway 153, 누락 operational table 없음.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
@@ -30,7 +31,9 @@
 - ALTER TABLE DROP COLUMN과 필수 operational 컬럼 요구 목록 간 같은 시간순 검증을 추가할지 평가한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행.
+- 코드 및 회귀 테스트 커밋: `720dc34d29a67154374da5498b53e4cb8e4b911b` (`oci` 푸시 완료).
+- OCI 배포: 성공 (GitHub Actions run `38860665063`).
+- 운영 health/Flyway 확인: 성공 (commit `720dc34d`, Flyway 153, 누락 테이블 없음).
 
 ## [2026-10-16] operational schema 필수 테이블의 migration 커버리지 자동 검사
 
