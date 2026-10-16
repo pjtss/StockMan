@@ -20,7 +20,9 @@
 ### 검증
 - `npm.cmd run docs:check`: 21개 전체 operational relation을 해석해 migration 상태 검사 통과.
 - `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 7개 통과, core relation migration 누락을 음성 케이스에서 검출.
-- 전체 배포 검증과 OCI/운영 확인 결과는 실행 후 기록한다.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크, 215개 테스트 파일(744 passed, 1 skipped), 타입·문서·보안·cron 검사를 확인.
+- GitHub Actions Deploy OCI run `38863953972`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `79d1028503963ac361f83ba8f5631e31afa85949`, Flyway 153, 누락 operational relation 없음.
 
 ### 개선 과제
 - 성과 판정: IMPROVED
@@ -30,7 +32,9 @@
 - 필수 operational column의 `ADD/DROP/RENAME` 이력도 같은 방식으로 검증할지 검토한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행.
+- 코드·테스트 커밋: `79d1028503963ac361f83ba8f5631e31afa85949` (`oci` 푸시 완료).
+- OCI 배포: 성공 (GitHub Actions run `38863953972`).
+- 운영 health/Flyway 검증: 성공 (commit `79d10285`, Flyway 153, 누락 relation 없음).
 
 ## [2026-10-16] operational relation 감사에서 후속 DROP/RENAME 추적
 
