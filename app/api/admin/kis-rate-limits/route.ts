@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { getPool } from "@/lib/db";
+import { boundedIntegerQuery } from "@/lib/query-params";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,8 @@ export async function GET(request: Request) {
   const requestId = `req_${crypto.randomUUID()}`;
   if (!(await requireAdminSession())) return NextResponse.json({ ok: false, requestId, error: "Unauthorized" }, { status: 401 });
   const url = new URL(request.url);
-  const days = Math.min(31, Math.max(1, Number(url.searchParams.get("days") ?? 7) || 7));
-  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
+  const days = boundedIntegerQuery(url.searchParams.get("days"), 7, 1, 31);
+  const limit = boundedIntegerQuery(url.searchParams.get("limit"), 50, 1, 200);
   try {
     const pool = getPool();
     const [summary, byType, byEndpoint, events] = await Promise.all([

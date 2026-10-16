@@ -1,5 +1,35 @@
 # Development Log
 
+## [2026-10-16] 진단 API 정수 query 경계 공통화
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-021
+- `/api/debug/kis-calls` 외 진단 경로에서 같은 fractional query→PostgreSQL 정수 오류가 재발하지 않도록 실제 SQL `LIMIT` 및 `::int`에 전달되는 파라미터를 점검·정규화한다.
+
+### 반영
+- 재사용 `boundedIntegerQuery`를 추가하고 KIS 호출량, 자동화 실행 로그, 오류 로그, KIS rate-limit 로그 API에 적용했다.
+- 해당 API들은 소수 입력을 0 방향으로 절삭하고 허용 범위로 clamp하며, 비어 있거나 비수치/0 입력은 기존 기본값을 사용한다.
+- 회귀 테스트가 fractional/out-of-range 값을 정수 SQL 인자로 전달하는지 검사한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 유사한 숫자 query 검증이 각 route에 중복돼 소수 입력을 걸러내지 못했고, PostgreSQL 정수 계약과 불일치했다.
+- 재발 감지: 공통 parser 경계 테스트와 네 API route 통합 테스트를 지속 실행한다.
+- 남은 위험: 해당 네 API 외에 범위가 복잡한 관리 도구 route들은 별도 입력 정책이 있으므로 이 변경에 포함하지 않았다. 추가 SQL 숫자 입력 경로는 별도 점검 과제로 남긴다.
+
+### 검증
+- 집중 테스트: 공통 parser 및 네 route 테스트 5개 파일, 12개 테스트 통과.
+- `npm.cmd run deploy:verify`: 성공. Next.js production build 통과, standalone `/charts` 200, 주요 차트 API 200, 인증 보호 API/cron 401 smoke 통과, 전체 210개 테스트 파일(718 통과·1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 네 API에서 fractional 입력이 정수로 정규화되어 SQL에 전달되는 회귀 테스트 10개 및 공통 파서 테스트 2개가 통과했다. 최초 전체 검증은 로그 계약 누락으로 docs:check에서 막혔으며, 계약을 맞춘 뒤 재실행한 전체 검증은 모든 단계가 통과했다.
+
+### 다음 개선
+- `app/api/admin/database` 및 기타 숫자 query 입력 API의 SQL 바인딩 계약을 점검하고, 실제 정수 바인딩이 있는 경로만 동일 공통 파서를 적용한다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행.
+
 ## [2026-10-16] KIS 호출량 진단 API 정수 query 안정화
 
 ### 목표
