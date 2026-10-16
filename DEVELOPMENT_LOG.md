@@ -1,5 +1,37 @@
 # Development Log
 
+## [2026-10-16] 관리자 KIS 호출 대시보드 보조 데이터 장애 격리
+
+### 목표
+- 개선 과제 ID: CI-2026-10-16-019
+- `/admin/kis-calls`의 필수 KIS 호출량과 보조 RATE LIMIT/Approval 메트릭 조회가 서로 장애를 전파하지 않도록 한다.
+
+### 반영
+- `Promise.all`에 세 API를 그대로 묶어 둔 상태에서는 선택적인 보조 API의 네트워크 오류나 잘못된 JSON이 전체 `load()`를 reject하고, 이미 성공한 필수 호출량 데이터도 화면에 반영되지 않았다.
+- `lib/admin-optional-json.ts`로 보조 조회를 독립 격리하고, 실패 시 해당 섹션만 비우며 원인을 설명하는 UI 상태를 표시한다. 필수 호출량 API 실패만 전체 화면 오류로 처리한다.
+- 성공 JSON, HTTP 503, 네트워크 오류, 잘못된 JSON 응답을 테스트한다.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 독립적인 운영 대시보드 데이터 source를 하나의 fail-fast Promise 그룹으로 모델링했다.
+- 재발 감지: `lib/admin-optional-json.test.ts`에서 보조 API 장애 격리를 고정한다. 이 컴포넌트에 새로운 선택 API를 추가할 때는 보조 요청이 필수 데이터 렌더링을 reject하지 않는지 검증한다.
+- 남은 위험: 필수 KIS 호출량 API 자체의 실패는 계속 전체 데이터 오류로 나타난다. 이는 대시보드 핵심 데이터이므로 현재 동작을 유지한다.
+
+### 검증
+- targeted test: `npm.cmd test -- --run lib/admin-optional-json.test.ts`, 3개 통과.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
+- 전체 `npm.cmd run deploy:verify` 및 운영 배포는 이 변경 검증·푸시 후 확인한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED (보조 fetch 오류 격리의 회귀 테스트·typecheck 통과; 전체 게이트와 운영 반영은 다음 단계에서 확인).
+- 근거: 필수 요청 렌더링을 보조 실패에서 분리했고, 성공·HTTP 오류·네트워크 오류·JSON 파싱 오류 4개 경로 중 실패 경로를 포함한 3개 테스트가 통과했다.
+
+### 다음 개선
+- 운영에서 보조 메트릭 API 장애 시 필수 KIS 호출량 표시는 유지되고, 해당 보조 섹션에만 오류가 노출되는지 배포 후 확인한다.
+
+### 커밋·푸시·배포
+- 검증 시점 상태: 미실행. 이 로그의 시점은 변경 커밋 전이며, 실제 완료 여부는 OCI Actions 성공과 운영 health SHA 일치로 확인한다.
+- 현재 기준 커밋: `594f208e` (기존 운영 적용 SHA; 이번 변경은 아직 포함되지 않음).
+
 ## [2026-10-16] Deployment smoke polling 재시도 여유 보장
 
 ### 목표

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import styles from "@/app/admin/observability/observability.module.css";
+import { fetchOptionalJson } from "@/lib/admin-optional-json";
 
 type Row = { calls: number; success: number; failures?: number; avg_duration_ms: number; max_duration_ms?: number; day?: string; hour?: string; feature?: string; market?: string };
 type Data = { summary: Row; daily: Row[]; hourly: Row[]; features: Row[] };
@@ -27,6 +28,8 @@ export function AdminKisCalls() {
   const [data, setData] = useState<Data | null>(null);
   const [rate, setRate] = useState<Rate | null>(null);
   const [approvalMetrics, setApprovalMetrics] = useState<ApprovalMetrics | null>(null);
+  const [rateUnavailable, setRateUnavailable] = useState(false);
+  const [approvalMetricsUnavailable, setApprovalMetricsUnavailable] = useState(false);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,19 +38,17 @@ export function AdminKisCalls() {
     setLoading(true);
     setError("");
     try {
-      const [callsResponse, limitsResponse, approvalResponse] = await Promise.all([
+      const [callsResponse, limitsResult, approvalResult] = await Promise.all([
         fetch(`/api/debug/kis-calls?days=${days}&limit=1`, { cache: "no-store" }),
-        fetch(`/api/admin/kis-rate-limits?days=${days}&limit=20`, { cache: "no-store" }),
-        fetch("/api/admin/kis-realtime-approval-metrics", { cache: "no-store" }),
+        fetchOptionalJson<Rate>(fetch, `/api/admin/kis-rate-limits?days=${days}&limit=20`),
+        fetchOptionalJson<{ metrics?: ApprovalMetrics }>(fetch, "/api/admin/kis-realtime-approval-metrics"),
       ]);
       if (!callsResponse.ok) throw new Error("KIS call metrics unavailable");
       setData(await callsResponse.json());
-      if (limitsResponse.ok) setRate(await limitsResponse.json());
-      else setRate(null);
-      if (approvalResponse.ok) {
-        const result = await approvalResponse.json();
-        setApprovalMetrics(result.metrics ?? null);
-      } else setApprovalMetrics(null);
+      setRate(limitsResult.value);
+      setRateUnavailable(!limitsResult.available);
+      setApprovalMetrics(approvalResult.value?.metrics ?? null);
+      setApprovalMetricsUnavailable(!approvalResult.available || !approvalResult.value?.metrics);
     } catch {
       setError("KIS 호출량 집계를 불러오지 못했습니다.");
     } finally {
@@ -101,6 +102,7 @@ export function AdminKisCalls() {
           <article className={styles.card}><h2>최근 이벤트</h2>{rate!.events.map((item) => <p key={item.id}>{new Date(item.occurred_at).toLocaleString("ko-KR")} · {item.limit_type} · {item.kis_msg_cd ?? "-"}</p>)}</article>
         </div>
       </>}
+      {!rateSummary && rateUnavailable && <p className={styles.error}>KIS RATE LIMIT 집계를 불러오지 못했습니다. 실제 KIS 호출량은 계속 표시됩니다.</p>}
 
       {realtimeApproval && <>
         <header className={styles.toolbar}>
@@ -123,6 +125,7 @@ export function AdminKisCalls() {
           </article>
         </div>
       </>}
+      {!realtimeApproval && approvalMetricsUnavailable && <p className={styles.error}>차트 Approval 제한 메트릭을 불러오지 못했습니다. 다른 KIS 호출 집계에는 영향이 없습니다.</p>}
     </section>
   );
 }
