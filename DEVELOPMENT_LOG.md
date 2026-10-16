@@ -19,17 +19,20 @@
 - `npm.cmd run docs:check`: 13개 operational 테이블 전체의 migration 생성문 커버리지 검사 성공.
 - `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 3개 통과. 현재 저장소 전수검사, 필수 테이블 누락 음성 케이스, schema-qualified/quoted DDL 양성 케이스를 확인.
 - 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 런타임 스모크, 전체 215개 테스트 파일(740 passed, 1 skipped), 타입 검사 및 기존 문서/보안/cron 게이트 성공.
-- 검증된 배포 산출물은 푸시 후 OCI 배포로 운영 활성화하고 production health/Flyway를 재확인한다.
+- GitHub Actions Deploy OCI run `38854348257`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `268a0dbaaa5611ea61ceb9fdcc06f027353dcaff`, Flyway 153, 누락 operational table 없음.
 
 ### 개선 과제
-- 성과 판정: UNMEASURED
-- 근거: 변경을 반영하고 부정 경로를 포함한 테스트/배포 검증을 수행해야 한다.
+- 성과 판정: IMPROVED
+- 근거: 기존 13개 필수 operational table 전체가 migration에서 생성되는지 자동 검증되고, 누락 테이블 회귀를 배포 전 테스트에서 재현해 차단한다.
 
 ### 다음 개선
 - 마이그레이션에 명시적으로 제거된 테이블을 추적해 operational 선언이 오래된 테이블을 가리키는 경우도 별도 감사할 수 있는지 검토한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행.
+- 코드 및 테스트 커밋: `268a0dbaaa5611ea61ceb9fdcc06f027353dcaff` (`oci` 푸시 완료).
+- OCI 배포: 성공 (GitHub Actions run `38854348257`).
+- 운영 health/Flyway 확인: 성공 (commit `268a0dba`, Flyway 153, 누락 테이블 없음).
 
 ## [2026-10-16] 디버그 관측 테이블 누락 복구 및 로컬 Flyway 이력 정합화
 
