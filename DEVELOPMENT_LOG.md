@@ -21,7 +21,10 @@
 - Read-only DB 확인: localhost DB 연결, Flyway 148, `investment_calendar_events` 없음. `SELECT to_regclass('public.investment_calendar_events')`는 NULL이고 해당 테이블 조회는 PostgreSQL `42P01`.
 - Flyway `info`: V130은 `Ignored`, V149/V150/V151은 `Pending`; `migrate`는 applied V142 missing 및 V148 description 불일치 검증 오류로 중단되어 persistent DDL은 적용되지 않았다.
 - V151 SQL을 PostgreSQL 트랜잭션 안에서 2회 실행해 table/index 생성과 재실행 안전성을 확인하고 `ROLLBACK`으로 DB 상태를 원복했다.
-- 단위 테스트 및 전체 배포 검증은 완료 후 기록한다.
+- `npm.cmd run deploy:verify`: 통과. 빌드, standalone 실행, `/charts` 및 주요 API 스모크 테스트, 전체 품질 게이트를 통과했다 (735 tests passed, 1 skipped).
+- GitHub Actions Deploy OCI run `38847831266`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `eea34c416cb123c7c4fbeed99980ad4bf4f1ffe6`, DB 연결 정상, Flyway 151, 누락 operational table 없음.
+- 운영 `/api/listings?from=2026-10-16&to=2026-10-16`: HTTP 200 JSON, `ok=true`.
 
 ### 개선 과제
 - 성과 판정: UNMEASURED
@@ -31,7 +34,10 @@
 - 적용 V142/V148 lineage의 원본 근거를 확인해 local migration history를 안전하게 정합화한 뒤 V151, `/api/health`, 상장 일정 API 및 신규 이벤트 upsert를 검증한다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 미실행.
+- 상태: 완료.
+- 커밋: `eea34c41` (`투자 일정 테이블 스키마 누락 복구 및 헬스체크 강화`).
+- 푸시: `origin/oci` 성공.
+- 배포: OCI 활성화 성공, 운영 커밋/Flyway/API를 위와 같이 확인.
 
 ## [2026-10-16] 투자 일정 API 실제 달력 날짜 검증
 
