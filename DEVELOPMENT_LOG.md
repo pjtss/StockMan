@@ -4924,6 +4924,17 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **검증**: DB 연결 및 캐시 최신일·유니버스 건수 확인 후 조건 계산 실행 완료.
 - **커밋·푸시·배포**: 없음.
 
+## [2026-10-16] `/charts` 브라우저 hydration 게이트 및 운영 의존성 보안 패치
+
+- **목적**: HTML 응답과 JS 청크 HTTP 확인만으로 놓칠 수 있는 실제 브라우저 hydration·런타임 오류를 배포 전에 탐지하고, 설치 중 확인된 운영 의존성 취약점을 강제 메이저 업그레이드 없이 제거한다.
+- **원인/근거**: 기존 standalone smoke는 `/charts` HTML과 참조 JS 청크의 응답만 검사해 브라우저에서 React가 hydration된 뒤 발생하는 예외를 확인하지 않았다. `npm audit --omit=dev`는 PostCSS 및 fast-xml-parser 취약 버전을 운영 의존성으로 보고했다.
+- **변경**: `scripts/charts-browser-smoke.mjs`를 추가해 시스템 Chrome에서 desktop/mobile `/charts`를 열고 핵심 UI 렌더링, hydration 경고, 브라우저 uncaught exception을 검사한다. `scripts/verify-deploy.mjs`의 standalone runtime 게이트에 통합했다. Playwright는 라이브러리만 추가하고 로컬 Chrome 및 GitHub Actions Ubuntu Chrome을 사용한다. `fast-xml-parser` 5.x로 갱신하고, PostCSS를 8.5.23 이상으로 override하며 Vitest와 coverage 패키지를 함께 보안 패치 버전으로 갱신했다. Next.js 메이저 버전은 바꾸지 않는다.
+- **재발 자동 감지**: 모든 배포에서 `npm run deploy:verify`가 서버 시작 후 Chrome desktop/mobile로 hydration을 확인한다. 운영 의존성 감사는 `npm audit --omit=dev`로 계속 검증하며, 전체 감사에 남은 Drizzle Kit/esbuild 개발 의존성 경고는 별도 호환성 검토 대상으로 유지한다.
+- **검증**: `npm ci --no-audit --no-fund` 재현 설치 통과. RSS XML parser 관련 테스트 2개 파일·8개 통과. `npm audit --omit=dev`: 취약점 0건. 전체 `npm.cmd run deploy:verify` 통과: 프로덕션 빌드, standalone API smoke, `/charts` 데스크톱·모바일 Chrome hydration, 전체 216개 테스트 파일(215 passed·1 skipped; 746 tests passed·1 skipped), 타입·문서·범위·KIS 경계·인증·cron 검사.
+- **남은 위험**: CI의 `ubuntu-latest`에 Google Chrome이 포함된다는 runner 이미지 사양에 의존한다. GitHub runner 이미지에서 Chrome 채널이 사라지면 browser smoke가 명시적으로 실패하므로, runner 이미지 변경 시 공식 이미지 문서를 확인하고 테스트 환경을 갱신한다.
+- **공식 근거**: [Playwright branded browsers](https://playwright.dev/docs/browsers), [GitHub Actions Ubuntu 24.04 runner image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md), [PostCSS advisory](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp), [fast-xml-parser advisory](https://github.com/advisories/GHSA-gh4j-gqv2-49f6).
+- **커밋·푸시·배포**: 전체 게이트 통과 후 커밋하고 `oci`에 푸시해 배포한다.
+
 ## [2026-09-23] 일별 전체 공시 기본 조회 및 UI 내보내기
 
 ### 목표

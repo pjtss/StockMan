@@ -6,6 +6,7 @@ import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs
 import { runDeploymentVerification } from "./deployment-verification-order.mjs";
 import { getSmokeDeadlineMs } from "./smoke-retry-policy.mjs";
 import { extractNextStaticScriptPaths, validateNextStaticScriptResponse } from "./next-static-assets.mjs";
+import { runChartsBrowserSmoke } from "./charts-browser-smoke.mjs";
 
 const isWindows = process.platform === "win32";
 const npm = isWindows ? "npm.cmd" : "npm";
@@ -233,6 +234,7 @@ async function verifyRuntime() {
       (async () => {
         const charts = await waitForHealth(`http://127.0.0.1:${port}/charts`);
         await verifyNextStaticScripts(`http://127.0.0.1:${port}`, charts.html);
+        await runChartsBrowserSmoke(`http://127.0.0.1:${port}`);
         await waitForJson(`http://127.0.0.1:${port}/api/kis/us-search?market=INVALID`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);

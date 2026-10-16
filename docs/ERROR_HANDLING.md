@@ -508,8 +508,9 @@
 
 ### 의존성 감사
 
-- 현재 `npm audit --omit=dev --audit-level=high`에서 `postcss` 고위험 1건과 `fast-xml-parser` 중간 위험 2건이 확인된다.
-- 자동 해결은 Next.js 16 및 fast-xml-parser 5.x로의 호환성 변경을 포함하므로, 회귀 검증 없이 `--force` 업그레이드하지 않는다.
+- 2026-10-16 기준 `npm audit --omit=dev`는 0 vulnerabilities다. PostCSS를 8.5.23 이상으로 override하고 fast-xml-parser를 5.x로 전환해 운영 의존성 이슈를 해결했다. RSS 파서 관련 기존 단위 테스트를 통과시킨 뒤 전체 배포 검증으로 호환성을 확인한다.
+- 전체 `npm audit`에는 Drizzle Kit 개발 의존성 체인의 esbuild 중간 위험 4건이 남아 있다. npm이 제시한 자동 수정은 Drizzle Kit 0.18.1로의 하향 메이저 변경이어서 적용하지 않았다. Drizzle Kit 버전 체인을 별도 호환성 테스트와 함께 후속 검토한다.
+- Next 15 자체를 16으로 강제 업그레이드하지 않고, 영향받는 PostCSS 하위 의존성만 패치 버전으로 교체한다. 이를 변경할 때는 lockfile 재현 설치, 전체 테스트, standalone 실행 스모크를 필수로 한다.
 
 ```powershell
 npm run typecheck
