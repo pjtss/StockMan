@@ -34,7 +34,8 @@
 - 근거: 무제한 요청 대기와 무제한 응답 buffering 경계를 제한하고 실패 유형별 자동 회귀 감지를 추가한다.
 
 ### 커밋·푸시·배포
-- 미실행: 검증 통과 후 사용자 요청에 따라 `oci` 브랜치에 배포한다.
+- 완료: 코드 커밋 `5fb60eac`를 `oci` 브랜치에 푸시했고 GitHub Actions Deploy OCI run `39023232871` (#1038)이 성공했다.
+- 운영 확인: `https://stockman.r-e.kr/api/health`에서 JSON `status: ok` 및 HTTP 200, `/charts` HTTP 200 확인.
 
 ## [2026-10-17] SEC 원문 수집의 무제한 대기·응답 크기 경계 보강
 
