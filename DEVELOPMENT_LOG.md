@@ -1,5 +1,38 @@
 # Development Log
 
+## [2026-10-17] 미사용 취약 개발 의존성 제거 및 배포 감사 게이트 추가
+
+### 목표
+- `npm ci`가 보고한 중간 수준 취약점 4건을 원인 분석하고 실제 도달 가능한 취약 경로를 제거한다.
+
+### 반영
+- 저장소 코드·스크립트·문서 검색에서 `drizzle-kit` 사용처를 찾지 못해 미사용 개발 의존성으로 판정하고 `package.json` 및 lockfile에서 제거했다. ORM 런타임 의존성 `drizzle-orm`은 유지한다.
+- `package.json`에 `audit:dependencies`를 추가하고 `scripts/verify-deploy.mjs`에서 build 전 첫 검증 게이트로 실행한다. 설치 단계의 `npm ci --no-audit`가 감사를 생략해도 moderate 이상 취약점이면 배포 검증이 실패한다.
+
+### 근본 원인 및 영향
+- `drizzle-kit@0.31.11` → 폐기된 `@esbuild-kit/esm-loader@2.6.5` → `@esbuild-kit/core-utils@3.3.2` → 취약 `esbuild@0.18.20` 경로가 있었다.
+- GitHub Advisory `GHSA-67mh-4wv8-2f99`는 esbuild `<=0.24.2`에 해당하고 `0.25.0`부터 수정됐다. npm은 동일 advisory가 연결된 패키지 노드 4개를 moderate 취약점으로 집계했다.
+- 영향 경로는 개발 도구 의존성이며 `npm audit --omit=dev`는 변경 전에도 0건이었다. 운영 런타임 취약점으로 과장하지 않고, 미사용 개발 도구 제거로 공급망 경고도 해소했다.
+
+### 검증
+- 변경 전 `npm audit`: moderate 4건(동일 GHSA의 종속 패키지별 중복 항목); 변경 후 `npm ci` 및 전체 `npm audit`: 취약점 0건. `npm audit --omit=dev`도 0건이다.
+- 새 `audit:dependencies` 게이트는 `npm audit --audit-level=moderate`를 실행하고 현재 lockfile에서 0건으로 통과했다.
+- 검증 중 첫 실행은 `docs:check`가 본 로그의 필수 섹션 계약 누락을 찾아 실패했다. 로그 계약을 보완한 뒤 테스트 단독 실행과 최종 `npm.cmd run deploy:verify`를 다시 수행했다.
+- 최종 `deploy:verify` 게이트 통과: audit 0 취약점, production build 성공, standalone 서버 시작 5.9초 및 `/charts` HTTP 200, Chrome 데스크톱·모바일 hydration 성공, 국내·해외 차트 API 기대 응답, 관리자 API 401 보호, Vitest 216개 파일(752 pass/1 skip), 타입 검사, 문서·마이그레이션·KIS 경계·인증·cron 검사 통과.
+- 참고: [GitHub esbuild advisory](https://github.com/advisories/GHSA-67mh-4wv8-2f99), [Drizzle upstream issue](https://github.com/drizzle-team/drizzle-orm/issues/5145).
+
+### 다음 개선
+- future dependency 추가에서 audit gate가 인터넷 기반 npm audit metadata에 접근할 수 있어야 한다. 네트워크 장애도 fail-closed로 검증 실패가 되며, 이 동작을 임의로 무시하지 않는다.
+- CI 로그가 같은 advisory로 인해 중복 집계되는 건수를 별도 요약하도록 개선할지 검토하되, 현재는 npm 원본 report를 그대로 보존한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-17-001
+- 성과 판정: IMPROVED
+- 근거: 재현된 moderate 취약점 4건을 0건으로 줄였고, 이후 moderate 이상 취약점 재유입을 `deploy:verify` 시작 단계에서 차단하도록 자동 게이트를 연결했다.
+
+### 커밋·푸시·배포
+- 미실행. 배포 검증을 통과한 뒤 커밋·푸시·운영 배포를 순차 진행한다.
+
 ## [2026-10-16] 차트 브라우저 검증에서 실제 클라이언트 상호작용 확인
 
 ### 목표

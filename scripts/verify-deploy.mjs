@@ -257,6 +257,7 @@ async function verifyRuntime() {
 // smoke the standalone server before Vitest workers add memory/CPU pressure.
 // On constrained local runners, running runtime smoke after the full suite can
 // make an otherwise ready /charts response exceed the per-request timeout.
+await run(npm, ["run", "audit:dependencies"]);
 await runDeploymentVerification({
   build: () => run(npm, ["run", "build"], { env: { ...process.env, NEXT_DIST_DIR: verifyDistDir } }),
   runtime: verifyRuntime,
