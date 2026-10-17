@@ -58,6 +58,10 @@ export type SecAiEvaluationResult =
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const MAX_PROMPT_TEXT_LENGTH = 12000;
+const DEFAULT_OPENAI_TIMEOUT_MS = 45_000;
+const MAX_OPENAI_TIMEOUT_MS = 120_000;
+const MAX_OPENAI_RESPONSE_BYTES = 512 * 1024;
+const MAX_OPENAI_OUTPUT_TOKENS = 6000;
 const impactEnum = ["very_negative", "negative", "neutral", "positive", "strong_positive", "insufficient_data"] as const;
 const levelEnum = ["bullish", "bearish", "neutral", "mixed", "insufficient_data"] as const;
 
@@ -328,6 +332,49 @@ function getOpenAiConfig() {
   };
 }
 
+function openAiTimeoutMs() {
+  const configured = Number(process.env.SEC_AI_REQUEST_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured >= 1_000
+    ? Math.min(configured, MAX_OPENAI_TIMEOUT_MS)
+    : DEFAULT_OPENAI_TIMEOUT_MS;
+}
+
+async function readOpenAiResponseText(response: Response) {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_OPENAI_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    return { text: "", tooLarge: true };
+  }
+
+  if (!response.body) return { text: "", tooLarge: false };
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_OPENAI_RESPONSE_BYTES) {
+        await reader.cancel();
+        return { text: "", tooLarge: true };
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { text: new TextDecoder("utf-8").decode(bytes), tooLarge: false };
+}
+
 export function isSecAiEvaluationConfigured() {
   return Boolean(getOpenAiConfig().apiKey);
 }
@@ -338,16 +385,21 @@ export async function evaluateSecFilingWithAi(payload: SecAiPayload): Promise<Se
     return { skipped: true, reason: "OPENAI_API_KEY is not configured" };
   }
 
-  const response = await fetch(OPENAI_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      instructions:
-        [
+  const timeoutSignal = AbortSignal.timeout(openAiTimeoutMs());
+  let response: Response;
+  try {
+    response = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: timeoutSignal,
+      body: JSON.stringify({
+        model,
+        max_output_tokens: MAX_OPENAI_OUTPUT_TOKENS,
+        instructions:
+          [
           "너는 SEC 공시 기반 주가 영향 분석기다.",
           "SEC 공시 원문에 명시된 내용만 facts에 넣어라.",
           "공시 원문에 없는 계약 금액, 매출 증가율, 이익 증가율을 추정하지 마라.",
@@ -368,21 +420,38 @@ export async function evaluateSecFilingWithAi(payload: SecAiPayload): Promise<Se
           "JSON 외 설명 문장을 절대 출력하지 마라.",
           "모든 점수는 0~100 정수 또는 null이어야 한다.",
           "enum 값은 지정된 값만 사용해라.",
-        ].join("\n"),
-      input: buildEvaluationInput(payload),
-      store: false,
-      text: {
-        format: {
-          type: "json_schema",
-          name: "sec_filing_evaluation",
-          strict: true,
-          schema: evaluationSchema,
+          ].join("\n"),
+        input: buildEvaluationInput(payload),
+        store: false,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "sec_filing_evaluation",
+            strict: true,
+            schema: evaluationSchema,
+          },
         },
-      },
-    }),
-  });
+      }),
+    });
+  } catch {
+    return {
+      skipped: true,
+      reason: timeoutSignal.aborted
+        ? "OpenAI evaluation request timed out"
+        : "OpenAI evaluation request failed",
+    };
+  }
 
-  const raw = await response.text();
+  let boundedResponse: { text: string; tooLarge: boolean };
+  try {
+    boundedResponse = await readOpenAiResponseText(response);
+  } catch {
+    return { skipped: true, reason: "OpenAI evaluation response could not be read" };
+  }
+  if (boundedResponse.tooLarge) {
+    return { skipped: true, reason: "OpenAI evaluation response exceeded 512 KiB" };
+  }
+  const raw = boundedResponse.text;
   if (!response.ok) {
     return { skipped: true, reason: `OpenAI evaluation failed: ${response.status}`, rawText: raw };
   }

@@ -88,6 +88,8 @@ describe("SEC AI pipeline", () => {
   });
 
   it("requests the final AI schema and normalizes market-data-only fields", async () => {
+    process.env.SEC_AI_REQUEST_TIMEOUT_MS = "7000";
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     const payload = buildBroadcomPayload();
     const mockEvaluation = {
       level: "strong_bullish",
@@ -151,6 +153,9 @@ describe("SEC AI pipeline", () => {
     expect(schema.required).toContain("recommendedNextChecks");
     expect(schema.required).not.toContain("score");
     expect(schema.required).not.toContain("risks");
+    expect(body.max_output_tokens).toBe(6000);
+    expect(timeoutSpy).toHaveBeenCalledWith(7000);
+    expect(fetchMock.mock.calls[0][1].signal).toBeDefined();
     expect(schema.properties.level.enum).toEqual(["bullish", "bearish", "neutral", "mixed", "insufficient_data"]);
     expect(schema.properties.timeHorizon.required).toEqual(["immediate", "shortTerm", "longTerm"]);
     expect(body.instructions).toContain("좋은 뉴스와 단기 급등 뉴스는 다르다.");
@@ -181,6 +186,48 @@ describe("SEC AI pipeline", () => {
         longTerm: "strong_positive",
       });
     }
+  });
+
+  it("returns a stable skip result when the OpenAI request times out", async () => {
+    vi.spyOn(AbortSignal, "timeout").mockReturnValue(AbortSignal.abort(new DOMException("timeout", "TimeoutError")));
+    const fetchMock = vi.fn().mockRejectedValue(new DOMException("timeout", "TimeoutError"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await evaluateSecFilingWithAi(buildBroadcomPayload());
+
+    expect(result).toEqual({ skipped: true, reason: "OpenAI evaluation request timed out" });
+  });
+
+  it("rejects an OpenAI response larger than the configured byte ceiling", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/json", "content-length": "524289" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await evaluateSecFilingWithAi(buildBroadcomPayload());
+
+    expect(result).toEqual({ skipped: true, reason: "OpenAI evaluation response exceeded 512 KiB" });
+  });
+
+  it("enforces the OpenAI response byte ceiling when content-length is absent", async () => {
+    const oversized = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(300 * 1024));
+        controller.enqueue(new Uint8Array(300 * 1024));
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(oversized, { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await evaluateSecFilingWithAi(buildBroadcomPayload());
+
+    expect(result).toEqual({ skipped: true, reason: "OpenAI evaluation response exceeded 512 KiB" });
   });
 
   it("preserves raw text when the AI output is not JSON", async () => {

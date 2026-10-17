@@ -1,5 +1,41 @@
 # Development Log
 
+## [2026-10-17] SEC AI 평가 요청의 시간·응답 크기 제한 추가
+
+### 목표
+- SEC AI 평가가 OpenAI 응답 지연 또는 비정상적으로 큰 응답 때문에 cron 작업 시간과 메모리를 과도하게 점유하지 않도록 한다.
+
+### 반영
+- `lib/sec-ai-evaluator.ts`: 요청 timeout 기본 45초·최대 120초, API 출력 상한 6,000 토큰, 응답 본문 상한 512 KiB를 설정했다. content-length 선검사와 스트리밍 실제 byte 검사를 모두 적용하며, timeout/network/body-read/초과 크기는 명시적인 skip 결과로 반환한다.
+- `.env.example`, `docs/sec-edgar-official-reference.md`: timeout 환경변수와 제한 정책을 문서화했다.
+- `lib/sec-ai-pipeline.test.ts`: timeout 설정 전달, timeout 실패, 헤더 길이 초과 및 content-length 없는 스트림 초과 회귀 테스트를 추가했다.
+
+### 근본 원인 및 영향
+- 기존 evaluator는 OpenAI Responses API `fetch`와 `response.text()`에 시간·본문 크기 한계가 없었다. 단일 분석 요청이 지연되거나 큰 응답을 반환하면 순차 cron 처리 지연과 메모리 사용량 증가로 이어질 수 있었다.
+- 공식 Responses API는 `max_output_tokens`를 제공한다. 이번 변경은 토큰 상한과 별도로 전송된 실제 본문 byte도 제한해 헤더 누락·불일치 상황까지 방어한다.
+
+### 재발 감지 및 운영 기준
+- Vitest가 요청의 AbortSignal, timeout 환경변수 상한 전달, 크기 헤더 선검사와 스트리밍 초과를 자동 확인한다.
+- 제한 초과는 분석 결과를 성공으로 오인하지 않고 skip 처리한다. 운영 timeout 조정은 `SEC_AI_REQUEST_TIMEOUT_MS`로 하며 값은 최대 120초로 clamp 된다.
+- 남은 위험: 외부 API의 45초 timeout이 특정 운영 지연 구간에서 skip을 늘릴 수 있다. 배포 후 skip 비율과 처리 시간을 관찰하고 필요 시 실제 분포에 근거해 설정을 조정한다.
+
+### 검증
+- 전용 `npm.cmd test -- --run lib/sec-ai-pipeline.test.ts`: 6/6 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0건, Next production build, standalone `/charts` HTTP 200 및 desktop/mobile hydration, 국내·해외 chart API 200, 관리자/cron 비인증 API 401, Vitest 217개 파일(759 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth, cron 검사 통과.
+- `git diff --check`: 통과.
+- 공식 근거: [OpenAI Responses API reference](https://developers.openai.com/api/reference/resources/responses/methods/create), [Node.js AbortSignal.timeout](https://nodejs.org/docs/latest/api/globals.html#static-method-abortsignaltimeoutdelay).
+
+### 다음 개선
+- SEC AI 평가 요청의 timeout, 응답 크기, skip 원인을 개인정보·비밀키 없이 구조화 지표로 기록해 운영 설정을 관찰 데이터로 조정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-17-003
+- 성과 판정: IMPROVED
+- 근거: 무제한 요청 대기와 무제한 응답 buffering 경계를 제한하고 실패 유형별 자동 회귀 감지를 추가한다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 통과 후 사용자 요청에 따라 `oci` 브랜치에 배포한다.
+
 ## [2026-10-17] SEC 원문 수집의 무제한 대기·응답 크기 경계 보강
 
 ### 목표

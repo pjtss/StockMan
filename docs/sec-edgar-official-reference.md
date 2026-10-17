@@ -113,8 +113,10 @@ SEC_API_BASE_URL=https://data.sec.gov
 SEC_WEB_BASE_URL=https://www.sec.gov
 SEC_REQUEST_TIMEOUT_MS=15000
 SEC_MAX_REQUESTS_PER_SECOND=8
+SEC_AI_REQUEST_TIMEOUT_MS=45000
 ```
 
 공개 데이터 API 자체에는 SEC API key가 필요하지 않다. `SEC_USER_AGENT`는 사실상 운영 필수값으로 취급한다.
+SEC AI 평가 요청은 `SEC_AI_REQUEST_TIMEOUT_MS`(기본 45초, 최대 120초)로 제한하고, 모델 출력은 6,000 토큰, API 응답 본문은 512 KiB로 제한한다. 제한을 초과하거나 timeout/network 오류가 나면 해당 평가를 명시적 skip 결과로 반환하며 cron 처리를 계속할 수 있다.
 
 문서 확인 기준일: 2026-08-07 (공식 SEC 문서 링크를 기준으로 갱신)
