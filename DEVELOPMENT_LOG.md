@@ -1,5 +1,40 @@
 # Development Log
 
+## [2026-10-17] SEC 원문 수집의 무제한 대기·응답 크기 경계 보강
+
+### 목표
+- SEC 공시 원문 fetch가 네트워크 지연/비정상 대용량 본문에서 프로세스 시간과 메모리를 무제한 점유하지 않도록 공용 수집 경계를 보강한다.
+
+### 반영
+- `lib/sec-raw-document.ts`: SEC HTTPS host 검증, `SEC_REQUEST_TIMEOUT_MS`(기본 15초, 최대 120초) timeout signal, `SEC_DOCUMENT_MAX_BYTES`(기본 32 MiB, 최대 128 MiB) 응답 크기 한도를 적용한다.
+- `Content-Length`가 있으면 본문을 읽기 전에 거부하고, 없거나 거짓이어도 스트림을 읽으며 byte 수를 확인해 상한 초과 시 reader를 취소한다.
+- `lib/sec-raw-document.test.ts`: 비SEC URL 외부 fetch 차단, timeout signal 사용, 선언 길이 초과, content-length가 없는 streaming 초과를 자동 검증한다.
+
+### 근본 원인 및 영향
+- 공용 `fetchSecRawDocument`가 `fetch(url)` 및 `response.text()`를 그대로 사용해 요청 timeout·본문 크기 상한이 없었다. 호출자 일부의 SEC URL 검증만으로는 앞으로 추가될 다른 호출 경로까지 보장되지 않는다.
+- SEC 응답이 멈추거나 예상 밖으로 커지면 cron/관리자 공시 분석 처리 지연, 메모리 사용 급증, 주변 요청의 자원 경쟁을 일으킬 수 있다.
+
+### 재발 감지 및 운영 기준
+- 새 테스트가 URL, timeout signal, 헤더 기반 및 스트리밍 byte 제한을 보장한다. 모든 SEC 원문 수집은 이 단일 함수 경계를 사용한다.
+- timeout은 기존 SEC JSON API와 같은 기본 15초 정책을 사용하며 운영 필요 시 `SEC_REQUEST_TIMEOUT_MS`로 조절한다. 본문 기본 상한은 32 MiB이며 더 큰 공식 제출 자료가 반복적으로 확인되면 원문 크기 분포를 측정한 후 한도를 조정한다.
+- SEC 공식 fair-access 기준에 따라 요청 간격 제한 정책을 유지하고 이번 변경은 SEC 호출률을 높이지 않는다.
+
+### 검증
+- 전용 `npm.cmd test -- --run lib/sec-raw-document.test.ts`: 4/4 통과. SEC URL 차단, timeout duration 전달, 헤더 길이 초과 및 chunk 스트림 길이 초과를 검증했다.
+- 전체 `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0건, Next production build 성공, standalone `/charts` HTTP 200 및 desktop/mobile hydration 성공, 관련 public API 200·관리자/cron 비인증 API 401, Vitest 217개 파일(756 pass/1 skip), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth 및 cron 체크 통과.
+- 참고: [SEC EDGAR fair access](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data), [Node.js AbortSignal.timeout](https://nodejs.org/docs/latest/api/globals.html#static-method-abortsignaltimeoutdelay).
+
+### 다음 개선
+- SEC 원문 fetch timeout/byte cap 발생 건수와 body byte 분포를 구조화된 진단 지표로 축적해 기본 제한을 실제 운영 데이터에 기반해 조정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-17-002
+- 성과 판정: IMPROVED
+- 근거: 공용 SEC 원문 경계에서 비SEC 목적지, 무제한 대기, 무제한 본문 읽기 위험을 각각 제한하고 회귀 테스트로 재발을 감지한다.
+
+### 커밋·푸시·배포
+- 미실행. 검증 통과 후 별도 커밋·푸시·운영 배포한다.
+
 ## [2026-10-17] 미사용 취약 개발 의존성 제거 및 배포 감사 게이트 추가
 
 ### 목표
