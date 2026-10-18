@@ -1,0 +1,13 @@
+[Unit]
+Description=Stockman domestic and overseas fundamentals refresh
+After=stockman.service
+Requires=stockman.service
+
+[Service]
+Type=oneshot
+User=stockman
+WorkingDirectory=/opt/stockman/current
+EnvironmentFile=/etc/stockman/stockman.env
+ExecStart=/opt/stockman/current/scripts/oci-fundamentals-cron.sh
+TimeoutStartSec=4h30min
+TimeoutStopSec=30s

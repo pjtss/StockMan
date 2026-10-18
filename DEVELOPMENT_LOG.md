@@ -1,5 +1,46 @@
 # Development Log
 
+## [2026-10-18] 장시간 시총 갱신을 전용 systemd 작업으로 분리
+
+### 목표
+- 운영에서 수십 분~수 시간 걸리는 전 종목 Fundamentals 갱신을 공유 5분 cron의 300초 HTTP timeout 및 다른 자동화 지연으로부터 분리한다.
+
+### 반영
+- `scripts/oci-cron.sh`: inline `instrument-fundamentals` 호출을 제거해 일반 RSS·캔들 cron이 장시간 API 응답을 기다리거나 다른 KIS 호출과 겹치지 않게 했다.
+- `scripts/oci-fundamentals-cron.sh`: 전용 runner를 추가했다. 모듈 route 결과를 최대 4시간 15분 기다리고 HTTP/application 오류를 비정상 종료로 분류한다.
+- `deploy/oci/stockman-fundamentals.service`, `stockman-fundamentals.timer`: 4시간 30분 oneshot 제한과 5분 persistent timer를 추가했다. 실제 일일 실행 시각/활성 여부는 기존 관리자 모듈 설정이 결정한다.
+- `deploy/oci/stockman-activate`, `.github/workflows/deploy-oci.yml`: unit 설치·활성화·초기 실행 및 standalone release package 포함을 반영했다.
+- `lib/automation-run-repository.ts`: 일반 자동화의 2시간 stale-run 기준으로 장시간 활성 Fundamentals 작업이 조기 실패 처리되지 않도록 해당 모듈의 stale/중복 실행 기준을 5시간으로 분리했다(4시간 30분 서비스 상한보다 김).
+- `scripts/check-oci-cron.mjs`: 공유 cron에서의 회귀 호출, 전용 runner timeout, systemd unit/timer, 배포 패키징·활성화와 stale 기준 분리를 검사한다.
+- `docs/operations/instrument-fundamentals-refresh.md`: 운영에서 얻은 실행 시간 분포와 전용 timer/관측 명령을 기록했다.
+
+### 근본 원인 및 영향
+- 운영 `/api/debug/automation-runs?module=instrument-fundamentals` 결과(2026-10-18 06:02 UTC 확인): 최근 성공 49회 평균 1,467,054ms, 중앙값 856,411ms(14.3분), p95 5,794,045ms(96.6분), 최장 8,328,211ms(138.8분). 별도로 `AUTOMATION_RUN_STALE` 실패 11건이 있었다.
+- 공유 cron에서 이 작업을 300초 제한으로 호출하고 있었고, 5분마다 나머지 자동화를 순차 실행했다. 따라서 정상 전체 갱신 시간보다 HTTP 요청 제한이 짧았고, 연결 종료 후 다른 시장 데이터 작업이 겹칠 여지가 있었다.
+- systemd 공식 문서에 따라 전용 oneshot의 `TimeoutStartSec`와 persistent calendar timer를 사용한다. systemd service timeout은 oneshot 활성화에도 적용되고, persistent timer는 중단 중 놓친 일정을 복구한다.
+
+### 재발 감지 및 운영 기준
+- `npm run cron:check`는 전용 호출/시간 제한과 systemd·배포 연결을 자동 검사한다.
+- 운영 점검은 `systemctl status stockman-fundamentals.timer`, `journalctl -u stockman-fundamentals.service`, 관리자 실행 이력의 `durationMs`/상태를 사용한다.
+- 4h15m runner timeout은 운영 최장 성공 2h19m보다 길고, 4h30m systemd startup timeout보다 짧다. 이는 관측값에 기반한 완충값이며 새로운 max 초과가 관측되면 다시 평가한다.
+- 공식 근거: [systemd.service TimeoutStartSec](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#TimeoutStartSec=), [systemd.timer Persistent](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html#Persistent=).
+
+### 검증
+- `npm.cmd run deploy:verify` 통과: 프로덕션 빌드 및 타입검사, 221개 테스트 파일(785 통과·1 skip), 정적/보안 게이트, cron 구조 검증, standalone `/charts` HTTP 200 및 Chrome 데스크톱·모바일 hydration 검증.
+- Git Bash `bash -n`으로 공유/전용 cron runner 및 배포 activation 스크립트 문법 검증 통과.
+
+### 다음 개선
+- 배포 후 전용 timer/service 활성화 여부와 다음 실제 전체 갱신 duration을 운영 API 및 journal에서 검증한다. 4시간 timeout 초과나 `AUTOMATION_RUN_STALE` 재발 여부를 확인한다.
+- 종목별 durable resume cursor는 남은 후속 개선이다. 현재 배치별 원자 저장으로 이미 반영된 배치는 보존되지만 실패 후 전체 종목을 다시 순회한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-004
+- 성과 판정: IMPROVED
+- 근거: 실제 성공시간 분포가 기존 300초 timeout보다 크게 길다는 운영 이력을 확인했고, 이 실행을 독립 timer/service로 옮겨 다른 자동화와 timeout 간섭을 구조적으로 차단한다.
+
+### 커밋·푸시·배포
+- 미실행: 커밋·푸시 후 전용 scheduler의 운영 활성 여부까지 확인한다.
+
 ## [2026-10-18] 국내·해외 시가총액/재무 스냅샷 갱신 오류 방지
 
 ### 목표

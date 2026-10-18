@@ -8,6 +8,10 @@ import { readRequestTrace } from "@/lib/request-trace";
 // universe. Keep stale recovery above the cron request ceiling so an active
 // worker is never falsely finalized while it is still processing.
 const STALE_RUN_AFTER_SECONDS = 2 * 60 * 60;
+// Fundamentals refresh is an isolated, measured long-running systemd job. Other
+// automation starts must not mark its live run abandoned at the generic 2-hour
+// threshold while the dedicated service is still waiting for its HTTP result.
+const FUNDAMENTALS_STALE_RUN_AFTER_SECONDS = 5 * 60 * 60;
 const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
 
 export type AutomationRunDimensions = {
@@ -39,8 +43,11 @@ async function reconcileStaleRuns() {
               ),
               error_message = 'The worker stopped before finalizing the run'
         WHERE status = 'RUNNING'
-          AND started_at < NOW() - ($1 * INTERVAL '1 second')`,
-      [STALE_RUN_AFTER_SECONDS],
+          AND started_at < NOW() - (
+            CASE WHEN module_key = 'instrument-fundamentals' THEN $2 ELSE $1 END
+            * INTERVAL '1 second'
+          )`,
+      [STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS],
     );
   } catch (error) {
     // Observability recovery must never prevent the actual feature from
@@ -151,10 +158,13 @@ export async function loadRunningAutomationRun(moduleKey: FeatureModuleKey) {
        FROM automation_runs
       WHERE module_key = $1
         AND status = 'RUNNING'
-        AND started_at >= NOW() - ($2 * INTERVAL '1 second')
+        AND started_at >= NOW() - (
+          CASE WHEN module_key = 'instrument-fundamentals' THEN $3 ELSE $2 END
+          * INTERVAL '1 second'
+        )
       ORDER BY started_at DESC
       LIMIT 1`,
-    [moduleKey, STALE_RUN_AFTER_SECONDS],
+    [moduleKey, STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS],
   );
   return rows.rows[0] || null;
 }
