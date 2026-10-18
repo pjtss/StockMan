@@ -22,7 +22,8 @@
 - 공식 출처: [Nginx proxy_read_timeout](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout).
 
 ### 검증
-- 예정: `npm.cmd run deploy:verify`에서 빌드·전체 테스트·실행 및 운영 구조 게이트를 실행한다. 추가로 Nginx 배포 설정의 syntax 검증 가능 여부를 확인한다.
+- `npm.cmd run deploy:verify` 통과: 빌드/타입검사, 전체 786개 테스트 통과·1 skip, 정적·보안·cron 구조 게이트, standalone HTTP smoke와 Chrome 데스크톱·모바일 hydration.
+- `docker run --rm --entrypoint nginx -v <설정파일>:/etc/nginx/conf.d/default.conf:ro nginx:1.24.0-alpine -t` 통과.
 
 ### 다음 개선
 - 배포 후 실제 Nginx 설정 검사와 전용 route의 client disconnect/error 로그를 확인해 timeout을 넘는 upstream 처리 여부를 측정한다.
@@ -33,7 +34,8 @@
 - 근거: source 설정과 회귀 테스트를 보강했으며 운영 배포 후 동작 검증을 남겨 둔다.
 
 ### 커밋·푸시·배포
-- 미실행: 최종 배포 검증 후 커밋·푸시하고 운영에서 확인한다.
+- 완료: 커밋 `a0cef874`를 `oci`에 push했고 Deploy OCI run `39105080396` 성공.
+- 배포 후 `/api/health`와 `/charts` 모두 HTTP 200. 변경은 Nginx route 설정과 cron guard이며, 전체 갱신 실행은 강제로 유발하지 않았다.
 
 ## [2026-10-18] 장시간 시총 갱신을 전용 systemd 작업으로 분리
 
