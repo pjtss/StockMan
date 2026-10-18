@@ -14,7 +14,7 @@
 ### 검증
 - 전용 Vitest 18개 통과(재시도 대기 시 KIS 0회, 정상 미완료 회수 및 상태 SQL 포함).
 - 임시 PostgreSQL 16에서 V154·V155 적용 및 실패 상태/다음 재시각 쿼리 통과.
-- `npm.cmd run deploy:verify`: production build, standalone `/charts` 및 차트 API smoke, desktop/mobile hydration, 전체 Vitest 794개 통과·1개 skip, typecheck 통과. 최초 전체 게이트는 본 작업 문서의 필수 개선 과제/배포 상태 형식 누락으로 `docs:check`에서 실패했으며 이를 확인 후 보완했고, 전체 게이트 재실행 필요.
+- `npm.cmd run deploy:verify` 최종 재실행 통과: production build, standalone `/charts` 및 차트 API smoke, desktop/mobile hydration, 전체 Vitest 794개 통과·1개 skip, typecheck, docs/migration audit(V155), verify-scope, KIS boundary, Bearer auth, OCI cron 구조, npm audit 0 취약점.
 - 운영 점검 시 `progress.deferredRetryCount`, `progress.nextRetryAt`, 항목별 `attempt_count/next_attempt_at`을 확인한다. 실패 종목 호출이 다음 재시도 시각 전에 발생하면 회귀다.
 
 ### 다음 개선
@@ -26,7 +26,8 @@
 - 근거: 재시도 시각 미도래 항목은 실제 KIS 요청 없이 지연되고, PostgreSQL에서 V155와 interval 계산이 동작함을 확인했다. 운영 호출량 감소는 배포 후 실행 이력으로 추가 측정한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 전체 `deploy:verify` 재검증 성공 뒤 사용자 요청에 따라 진행 예정.
+- 상태: 완료. 코드·마이그레이션 커밋 `83462033`을 `oci`에 푸시했고 Deploy OCI run `39109744642` 성공.
+- 운영 관리자 디버그 API에서 Flyway V155(`instrument fundamental retry backoff`) 적용 확인. `/api/health` 정상, `/charts` HTTP 200.
 
 ## [2026-10-18] 시총 갱신 중단 복구를 위한 종목별 영속 진행 상태
 
