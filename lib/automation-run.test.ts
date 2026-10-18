@@ -25,6 +25,21 @@ describe("automation run result status", () => {
     expect(state.finished.at(-1)?.status).toBe("FAILED");
   });
 
+  it("does not mark an explicitly incomplete run successful when counters omit provider failures", async () => {
+    await withAutomationRun("instrument-fundamentals", async () => ({ ok: false, instrumentCount: 10, successCount: 9, failureCount: 0, unattemptedCount: 1 }));
+    expect(state.finished.at(-1)?.status).toBe("PARTIAL");
+  });
+
+  it("persists an incomplete result without enough detail as PARTIAL, not SUCCESS", async () => {
+    await withAutomationRun("instrument-fundamentals", async () => ({ ok: false, instrumentCount: 10, successCount: 9, failureCount: 0 }));
+    expect(state.finished.at(-1)?.status).toBe("PARTIAL");
+  });
+
+  it("treats malformed result counters as incomplete instead of defaulting to SUCCESS", async () => {
+    await withAutomationRun("instrument-fundamentals", async () => ({ ok: true, instrumentCount: "unknown", failureCount: 0 }));
+    expect(state.finished.at(-1)?.status).toBe("PARTIAL");
+  });
+
   it("retains SUCCESS for a fully successful result", async () => {
     await withAutomationRun("instrument-fundamentals", async () => ({ ok: true, instrumentCount: 10, successCount: 10, failureCount: 0 }));
     expect(state.finished.at(-1)?.status).toBe("SUCCESS");

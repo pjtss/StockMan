@@ -22,6 +22,8 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "kr_instrument_universe_candles",
   "us_instrument_universe_candles",
   "instrument_fundamental_snapshots",
+  "instrument_fundamental_refresh_jobs",
+  "instrument_fundamental_refresh_items",
   "kis_tokens",
   "kis_token_issuance_history",
   "debug_run_items",

@@ -63,13 +63,25 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
     // A worker can finish its loop while individual instruments failed. Persist
     // the same outcome that is sent to the completion notification so schedules
     // can distinguish a complete daily refresh from a partial/failed attempt.
-    const failureCount = Number(summary.failureCount ?? 0);
-    const instrumentCount = Number(summary.instrumentCount ?? 0);
+    const count = (value: unknown) => {
+      if (value == null) return { value: 0, valid: true };
+      if (typeof value === "string" && value.trim() === "") return { value: 0, valid: false };
+      const parsed = Number(value);
+      const valid = Number.isSafeInteger(parsed) && parsed >= 0;
+      return { value: valid ? parsed : 0, valid };
+    };
+    const failure = count(summary.failureCount);
+    const instrument = count(summary.instrumentCount);
+    const unattempted = count(summary.unattemptedCount);
+    const failureCount = failure.value;
+    const instrumentCount = instrument.value;
+    const unattemptedCount = unattempted.value;
+    const incomplete = summary.ok === false || failureCount > 0 || unattemptedCount > 0 || !failure.valid || !instrument.valid || !unattempted.valid;
     const runStatus = summary.skipped === true
       ? "SKIPPED"
-      : failureCount === 0
+      : !incomplete
         ? "SUCCESS"
-        : instrumentCount > 0 && failureCount >= instrumentCount
+        : instrumentCount > 0 && failureCount + unattemptedCount >= instrumentCount
           ? "FAILED"
           : "PARTIAL";
     try {

@@ -12,6 +12,11 @@ const state = vi.hoisted(() => ({
   insertAttemptCount: 0,
   failSnapshotWrites: false,
   fromIndex: 0,
+  progressJobId: 1,
+  progressItems: [] as Array<{ market: string; code: string; name: string }>,
+  progressStatuses: new Map<string, string>(),
+  progressResumed: false,
+  progressMarks: [] as Array<{ succeeded: Array<{ market: string; code: string }>; failed: Array<{ market: string; code: string; errorCode: string }> }>,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -30,6 +35,7 @@ vi.mock("@/lib/db", () => ({
           },
         }),
       }),
+      execute: async () => undefined,
     };
     return {
       select: () => ({ from: () => { const index = state.fromIndex++; return { where: async () => index === 0 ? state.krRows : state.usRows }; } }),
@@ -41,6 +47,25 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/automation-lock", () => ({ withAutomationLock: async (_key: string, task: () => Promise<unknown>) => task() }));
+vi.mock("@/lib/instrument-fundamental-progress", () => ({
+  beginFundamentalRefresh: async (items: Array<{ market: string; code: string; name: string }>) => {
+    if (!state.progressItems.length) state.progressItems = items;
+    for (const item of items) if (!state.progressStatuses.has(`${item.market}:${item.code}`)) state.progressStatuses.set(`${item.market}:${item.code}`, "PENDING");
+    const pending = state.progressItems.filter((item) => state.progressStatuses.get(`${item.market}:${item.code}`) !== "SUCCESS");
+    return { jobId: state.progressJobId, resumed: state.progressResumed, instruments: pending, skippedCompletedCount: items.length - pending.length };
+  },
+  markFundamentalBatchInTransaction: async (_tx: unknown, _jobId: number, succeeded: Array<{ market: string; code: string }>, failed: Array<{ market: string; code: string; errorCode: string }>) => {
+    state.progressMarks.push({ succeeded, failed });
+    for (const item of succeeded) state.progressStatuses.set(`${item.market}:${item.code}`, "SUCCESS");
+    for (const item of failed) state.progressStatuses.set(`${item.market}:${item.code}`, "FAILED");
+  },
+  finishFundamentalRefresh: async () => {
+    const values = [...state.progressStatuses.values()];
+    const successCount = values.filter((value) => value === "SUCCESS").length;
+    const failedCount = values.filter((value) => value === "FAILED").length;
+    return { status: successCount === values.length ? "SUCCESS" : successCount === 0 && failedCount === values.length ? "FAILED" : "PARTIAL", totalCount: values.length, successCount, failedCount, pendingCount: values.length - successCount - failedCount };
+  },
+}));
 vi.mock("@/lib/kis-kr-price-detail", () => ({ fetchKrPriceDetail: vi.fn(async () => ({ ok: true, status: 200, price: 100, marketCap: null, raw: {} })) }));
 vi.mock("@/lib/kis-us-price-detail", () => ({
   fetchKisUsPriceDetail: vi.fn(async ({ code, market }: { code: string; market: string }) => {
@@ -68,6 +93,11 @@ beforeEach(() => {
   state.insertAttemptCount = 0;
   state.failSnapshotWrites = false;
   state.fromIndex = 0;
+  state.progressJobId = 1;
+  state.progressItems = [];
+  state.progressStatuses = new Map();
+  state.progressResumed = false;
+  state.progressMarks = [];
 });
 
 describe("instrument-fundamentals refresh", () => {
@@ -99,7 +129,7 @@ describe("instrument-fundamentals refresh", () => {
     expect(state.fetchedUs).toEqual([{ code: "AAPL", market: "NAS" }]);
   });
 
-  it("does not send successful-but-stale or business-error KIS responses to the database", async () => {
+  it("does not save successful-but-stale or business-error KIS responses to snapshots/history", async () => {
     const { fetchKisUsPriceDetail } = await import("@/lib/kis-us-price-detail");
     vi.mocked(fetchKisUsPriceDetail).mockImplementationOnce(async () => ({ ok: true, status: 200, code: "AAPL", market: "NAS", stale: true, parsed: { rt_cd: "0", output: { last: "10", tomv: "100" } } }))
       .mockImplementationOnce(async () => ({ ok: true, status: 200, code: "MSFT", market: "NAS", parsed: { rt_cd: "1", output: { last: "10", tomv: "100" } } }));
@@ -108,10 +138,12 @@ describe("instrument-fundamentals refresh", () => {
     const result = await refreshInstrumentFundamentals();
 
     expect(result).toMatchObject({ ok: false, instrumentCount: 2, attemptedCount: 2, successCount: 0, failureCount: 2 });
-    expect(state.transactionCount).toBe(0);
+    expect(state.transactionCount).toBe(1);
+    expect(state.historyRows).toHaveLength(0);
+    expect(state.snapshotRows).toHaveLength(0);
   });
 
-  it("does not refresh a snapshot from a response with a missing market cap", async () => {
+  it("does not save a snapshot from a response with a missing market cap", async () => {
     const { fetchKisUsPriceDetail } = await import("@/lib/kis-us-price-detail");
     vi.mocked(fetchKisUsPriceDetail).mockResolvedValueOnce({ ok: true, status: 200, code: "AAPL", market: "NAS", parsed: { rt_cd: "0", output: { last: "10", tomv: "" } } });
 
@@ -119,7 +151,9 @@ describe("instrument-fundamentals refresh", () => {
 
     expect(result).toMatchObject({ ok: false, attemptedCount: 1, successCount: 0, failureCount: 1 });
     expect(result.failures[0]).toMatchObject({ market: "NAS", code: "AAPL", error: "KIS_MARKET_CAP_MISSING_OR_INVALID" });
-    expect(state.transactionCount).toBe(0);
+    expect(state.transactionCount).toBe(1);
+    expect(state.historyRows).toHaveLength(0);
+    expect(state.snapshotRows).toHaveLength(0);
   });
 
   it("commits successful snapshots in bounded atomic batches", async () => {
@@ -133,6 +167,8 @@ describe("instrument-fundamentals refresh", () => {
     expect(state.snapshotRows).toHaveLength(201);
     expect(state.snapshotRows[0].marketCap).toBe(100);
     expect(state.snapshotSet?.marketCap).toBeDefined();
+    expect(state.progressMarks).toHaveLength(2);
+    expect(state.progressMarks[0].succeeded).toHaveLength(200);
     expect(new PgDialect().sqlToQuery(state.snapshotSet?.marketCap as never).sql).toMatch(/COALESCE\(excluded\.market_cap,/i);
   });
 
@@ -146,6 +182,19 @@ describe("instrument-fundamentals refresh", () => {
     expect(result.successCount).toBe(0);
     expect(result.databaseFailure).toMatchObject({ errorCode: "DATABASE_CONNECTION_FAILED" });
     expect(state.insertAttemptCount).toBe(3);
+  });
+
+  it("resumes only unfinished instruments and skips already committed snapshots", async () => {
+    state.usRows = [usItem("AAPL"), usItem("MSFT")];
+    state.progressItems = state.usRows as Array<{ market: string; code: string; name: string }>;
+    state.progressStatuses.set("NAS:AAPL", "SUCCESS");
+    state.progressResumed = true;
+
+    const result = await refreshInstrumentFundamentals();
+
+    expect(result).toMatchObject({ instrumentCount: 2, attemptedCount: 1, successCount: 1, progress: { resumed: true, skippedCompletedCount: 1, cumulativeSuccessCount: 2 } });
+    expect(state.fetchedUs).toEqual([{ code: "MSFT", market: "NAS" }]);
+    expect(state.historyRows.map((row) => row.code)).toEqual(["MSFT"]);
   });
 
   it("uses transaction insert targets for both snapshot and history in each batch", async () => {

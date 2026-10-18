@@ -14,9 +14,11 @@ describe("operational schema migration audit", () => {
 
   it("requires every operational health table to have a creation migration", () => {
     const operationalTables = parseOperationalSchemaTables(schemaSource);
-    expect(operationalTables).toHaveLength(21);
+    expect(new Set(operationalTables).size).toBe(operationalTables.length);
     expect(operationalTables).toContain("market_rss_articles");
     expect(operationalTables).toContain("sec_filing_events");
+    expect(operationalTables).toContain("instrument_fundamental_refresh_jobs");
+    expect(operationalTables).toContain("instrument_fundamental_refresh_items");
     expect(findMissingOperationalRelations(schemaSource, migrations)).toEqual([]);
   });
 

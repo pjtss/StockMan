@@ -5,6 +5,7 @@ import { fetchKrPriceDetail } from "@/lib/kis-kr-price-detail";
 import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
 import { withAutomationLock } from "@/lib/automation-lock";
 import { safeErrorMetadata } from "@/lib/error-diagnostics";
+import { beginFundamentalRefresh, finishFundamentalRefresh, markFundamentalBatchInTransaction } from "@/lib/instrument-fundamental-progress";
 
 const BATCH_SIZE = 200;
 const WORKER_COUNT = 8;
@@ -39,6 +40,8 @@ async function executeInstrumentFundamentalsRefresh() {
     db.select({ market: usCommonStockUniverse.market, code: usCommonStockUniverse.code, name: usCommonStockUniverse.name, enabled: usCommonStockUniverse.enabled, instrumentType: usCommonStockUniverse.instrumentType, isEtp: usCommonStockUniverse.isEtf, isWarrant: usCommonStockUniverse.isWarrant, isDerivative: usCommonStockUniverse.isDerivative, isDr: usCommonStockUniverse.isDr, isLeveraged: usCommonStockUniverse.isLeveraged, isInverse: usCommonStockUniverse.isInverse }).from(usCommonStockUniverse).where(and(eq(usCommonStockUniverse.enabled, true), eq(usCommonStockUniverse.instrumentType, "COMMON_STOCK"), eq(usCommonStockUniverse.isEtf, false), eq(usCommonStockUniverse.isWarrant, false), eq(usCommonStockUniverse.isDerivative, false), eq(usCommonStockUniverse.isDr, false), eq(usCommonStockUniverse.isLeveraged, false), eq(usCommonStockUniverse.isInverse, false))),
   ]);
   const instruments = [...kr, ...us].filter(isEligibleFundamentalInstrument);
+  const progress = await beginFundamentalRefresh(instruments);
+  const pendingInstruments = progress.instruments;
   const failures: Array<{ market: string; code: string; error: string }> = [];
   let successCount = 0;
   let attemptedCount = 0;
@@ -47,17 +50,23 @@ async function executeInstrumentFundamentalsRefresh() {
   let batchCount = 0;
   let databaseFailure: { errorCode: string; databaseCode?: string } | null = null;
 
-  const persistBatch = async (batch: FundamentalRow[]) => {
+  const persistBatch = async (batch: FundamentalRow[], batchFailures: Array<{ market: string; code: string; error: string }>) => {
     const now = new Date();
     let lastError: unknown;
     for (let attempt = 1; attempt <= DB_WRITE_ATTEMPTS; attempt++) {
       const writeStartedAt = Date.now();
       try {
         await db.transaction(async (tx) => {
-          await tx.insert(instrumentFundamentalHistory).values(batch.map((row) => ({ ...row, observedAt: now, fetchedAt: now }))).onConflictDoNothing({ target: [instrumentFundamentalHistory.market, instrumentFundamentalHistory.code, instrumentFundamentalHistory.observedAt] });
-          await tx.insert(instrumentFundamentalSnapshots).values(batch.map((row) => ({ ...row, observedAt: now, fetchedAt: now }))).onConflictDoUpdate({ target: [instrumentFundamentalSnapshots.market, instrumentFundamentalSnapshots.code], set: {
+          if (batch.length) {
+            await tx.insert(instrumentFundamentalHistory).values(batch.map((row) => ({ ...row, observedAt: now, fetchedAt: now }))).onConflictDoNothing({ target: [instrumentFundamentalHistory.market, instrumentFundamentalHistory.code, instrumentFundamentalHistory.observedAt] });
+            await tx.insert(instrumentFundamentalSnapshots).values(batch.map((row) => ({ ...row, observedAt: now, fetchedAt: now }))).onConflictDoUpdate({ target: [instrumentFundamentalSnapshots.market, instrumentFundamentalSnapshots.code], set: {
             name: sql`excluded.name`, price: sql`excluded.price`, changeRate: sql`COALESCE(excluded.change_rate, ${instrumentFundamentalSnapshots.changeRate})`, open: sql`COALESCE(excluded.open, ${instrumentFundamentalSnapshots.open})`, high: sql`COALESCE(excluded.high, ${instrumentFundamentalSnapshots.high})`, low: sql`COALESCE(excluded.low, ${instrumentFundamentalSnapshots.low})`, volume: sql`COALESCE(excluded.volume, ${instrumentFundamentalSnapshots.volume})`, tradingValue: sql`COALESCE(excluded.trading_value, ${instrumentFundamentalSnapshots.tradingValue})`, marketCap: sql`COALESCE(excluded.market_cap, ${instrumentFundamentalSnapshots.marketCap})`, sharesOutstanding: sql`COALESCE(excluded.shares_outstanding, ${instrumentFundamentalSnapshots.sharesOutstanding})`, currency: sql`COALESCE(excluded.currency, ${instrumentFundamentalSnapshots.currency})`, source: sql`excluded.source`, rawPayload: sql`excluded.raw_payload`, observedAt: now, fetchedAt: now,
           } });
+          }
+          await markFundamentalBatchInTransaction(tx, progress.jobId,
+            batch.map(({ market, code, name }) => ({ market, code, name: String(name ?? "") })),
+            batchFailures.map(({ market, code, error }) => ({ market, code, name: "", errorCode: error })),
+          );
         });
         databaseDurationMs += Date.now() - writeStartedAt;
         batchCount++;
@@ -84,10 +93,11 @@ async function executeInstrumentFundamentalsRefresh() {
     marketSummary[item.market].eligibleCount++;
   }
 
-  for (let offset = 0; offset < instruments.length; offset += BATCH_SIZE) {
+  for (let offset = 0; offset < pendingInstruments.length; offset += BATCH_SIZE) {
     if (databaseFailure) break;
-    const candidates = instruments.slice(offset, offset + BATCH_SIZE);
+    const candidates = pendingInstruments.slice(offset, offset + BATCH_SIZE);
     const fetchedRows: FundamentalRow[] = [];
+    const batchFailures: Array<{ market: string; code: string; error: string }> = [];
     let cursor = 0;
     const fetchWorker = async () => {
       while (true) {
@@ -122,6 +132,7 @@ async function executeInstrumentFundamentalsRefresh() {
           const message = error instanceof Error ? error.message : "";
           const errorCode = /^KIS_[A-Z0-9_]+$/.test(message) ? message : safeErrorMetadata(error).errorCode;
           failures.push({ market: item.market, code: item.code, error: errorCode });
+          batchFailures.push({ market: item.market, code: item.code, error: errorCode });
           marketSummary[item.market].failureCount++;
         } finally {
           providerDurationMs += Date.now() - providerStartedAt;
@@ -129,13 +140,15 @@ async function executeInstrumentFundamentalsRefresh() {
       }
     };
     await Promise.all(Array.from({ length: Math.min(WORKER_COUNT, candidates.length) }, fetchWorker));
-    if (fetchedRows.length && !(await persistBatch(fetchedRows))) break;
+    if (!(await persistBatch(fetchedRows, batchFailures))) break;
   }
 
-  const unattemptedCount = instruments.length - attemptedCount;
-  const failureCount = failures.filter((failure) => failure.market !== "DB").length + (databaseFailure ? instruments.length - successCount - failures.filter((failure) => failure.market !== "DB").length : 0);
+  const unattemptedCount = pendingInstruments.length - attemptedCount;
+  const providerFailureCount = failures.filter((failure) => failure.market !== "DB").length;
+  const failureCount = providerFailureCount + (databaseFailure ? pendingInstruments.length - successCount - providerFailureCount : 0);
+  const progressResult = await finishFundamentalRefresh(progress.jobId);
   const completedAt = new Date();
-  return { ok: failureCount === 0 && unattemptedCount === 0, startedAt: startedAt.toISOString(), completedAt: completedAt.toISOString(), durationMs: completedAt.getTime() - startedAt.getTime(), instrumentCount: instruments.length, attemptedCount, successCount, failureCount, unattemptedCount, batchCount, providerDurationMs, databaseDurationMs, databaseFailure, marketSummary, failures: failures.slice(0, 100) };
+  return { ok: progressResult.status === "SUCCESS", startedAt: startedAt.toISOString(), completedAt: completedAt.toISOString(), durationMs: completedAt.getTime() - startedAt.getTime(), instrumentCount: instruments.length, attemptedCount, successCount, failureCount, unattemptedCount, batchCount, providerDurationMs, databaseDurationMs, databaseFailure, marketSummary, failures: failures.slice(0, 100), progress: { jobId: progress.jobId, resumed: progress.resumed, skippedCompletedCount: progress.skippedCompletedCount, status: progressResult.status, cumulativeSuccessCount: progressResult.successCount, cumulativeFailureCount: progressResult.failedCount, pendingCount: progressResult.pendingCount } };
 }
 
 export function refreshInstrumentFundamentals() {

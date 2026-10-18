@@ -13,6 +13,7 @@
   → 200종목 단위로 KIS 조회, 최대 8개 worker
   → HTTP + KIS 업무 코드 + 신선도 + 가격 + 시총 검증
   → 유효 행만 history + latest snapshot 트랜잭션 저장
+  → 같은 트랜잭션에서 종목별 SUCCESS/FAILED 진행 상태 저장
   → 배치별 재시도 및 계측 결과 기록
   → SUCCESS / PARTIAL / FAILED / SKIPPED로 실행상태 반영
 ```
@@ -27,6 +28,9 @@
 - nullable 필드는 snapshot upsert 시 기존 값을 `COALESCE`로 보존한다. 따라서 부분 응답의 null이 직전 정상값을 지우지 않는다.
 - 대상은 DB 질의 조건과 애플리케이션 eligibility 검사 양쪽에서 검증한다. 활성 상태·`COMMON_STOCK`·시장 분류 또는 제외 플래그를 신뢰할 수 없으면 provider 호출 전 제외한다.
 - 배치 내 history와 snapshot 저장은 하나의 DB 트랜잭션이다. 각 배치는 최대 3회 재시도하며 DB 오류가 지속되면 이후 배치 처리를 중단한다.
+- `instrument_fundamental_refresh_jobs/items`는 활성 보통주 대상 집합의 SHA-256 지문과 종목별 진행 상태를 저장한다. 재개 시 동일한 대상 집합의 `SUCCESS` 종목은 건너뛰고 `PENDING`·`FAILED`만 조회한다. 종목 마스터 구성/활성 상태가 바뀌어 지문이 달라지면 기존 미완료 작업을 `ABANDONED` 처리하고 새 전체 작업을 만든다.
+- 종목이 `SUCCESS`로 표시되는 것은 해당 종목의 history/snapshot 쓰기가 같은 DB 트랜잭션에서 커밋된 경우뿐이다. DB 쓰기가 모두 실패하면 배치의 진행 표식도 롤백되므로 다음 실행이 안전하게 다시 조회한다. KIS 실패는 종목별 `FAILED`, DB 미시도는 `PENDING`으로 구분한다.
+- 상태 요약은 `progress.jobId`, `progress.resumed`, `progress.skippedCompletedCount`, 누적 성공/실패/미완료 건수를 제공한다. 자동화 실행 자체의 `attemptedCount`와 `successCount`는 이번 실행분이며, `progress.cumulativeSuccessCount`는 작업 전체 누적값이다.
 
 ## 실행 상태 및 재시도
 
@@ -49,7 +53,7 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/kis-kr-price-detail.test.t
 
 ## 남은 한계
 
-- 전체 활성 보통주 수가 많으면 KIS의 글로벌 TPS 제한과 API 지연으로 한 번의 전체 갱신이 오래 걸릴 수 있다. 현재 구현은 200종목씩 수집·저장하므로 전체 결과를 메모리에 쌓아두지 않지만, durable resume cursor는 없다. 서버가 배치 중 종료되면 미완료/미시도 종목은 다음 전체 실행 때 다시 수집한다.
+- 전체 활성 보통주 수가 많으면 KIS의 글로벌 TPS 제한과 API 지연으로 한 번의 전체 갱신이 오래 걸릴 수 있다. 현재 구현은 200종목씩 수집·저장하므로 전체 결과를 메모리에 쌓아두지 않는다. 배치 중 서버가 종료되면 커밋된 종목은 건너뛰고, 당시 진행 중이던 최대 200종목 배치부터 다시 조회한다.
 - 단일 batch의 DB write가 3회 모두 실패하면 이후 provider 호출을 중단한다. 이미 커밋된 이전 배치는 유지되며, 해당 배치와 이후 종목은 `failureCount`/`unattemptedCount`로 실패 실행에 표시된다.
 - KIS 제공 시총의 기준 시각·공식 원천 갱신 주기는 이 작업에서 보장하지 않는다. 값은 수집 시각과 함께 snapshot/history에 보관한다.
 
@@ -61,4 +65,4 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/kis-kr-price-detail.test.t
 - 진행/실패 로그는 `journalctl -u stockman-fundamentals.service`에서 확인한다. API 상세 성공·실패 건수는 관리자 자동화 실행 이력에서 확인한다.
 - 공식 systemd 기준: [systemd.service `TimeoutStartSec`](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#TimeoutStartSec=)는 oneshot 활성화 timeout을 제어하고, [systemd.timer `OnCalendar`와 `Persistent`](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html#Persistent=)는 반복/정지 후 catch-up을 제어한다.
 - 공식 Nginx 기준: [ngx_http_proxy_module `proxy_read_timeout`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout)의 기본값은 60초이고 연속 upstream read 사이의 제한이다. API의 정확한 location에만 4시간 25분을 지정해 전용 요청만 curl/systemd timeout 사이에서 기다리게 한다.
-- 남은 위험: 응답이 전용 4시간 15분 한도도 넘으면 runner가 실패 종료하고 다음 timer 때 관리자 재시도 정책에 따른다. 아직 종목별 durable resume cursor는 없으며, 이미 저장한 배치는 보존되지만 재실행 시 전체 대상 목록을 다시 조회한다.
+- 남은 위험: 응답이 전용 4시간 15분 한도도 넘으면 runner가 실패 종료하고 다음 timer 때 관리자 재시도 정책에 따른다. 종료(성공·부분·실패·중단)된 진행 이력은 새 작업 시작 시 14일 이후 정리한다. 같은 대상 지문의 미완료 작업은 그보다 오래됐더라도 재개한다. 대상 유니버스가 변경되면 정합성 우선으로 전체 재시작하며, 이미 저장된 최신 스냅샷은 유지된다.

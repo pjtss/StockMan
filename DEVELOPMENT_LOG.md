@@ -1,5 +1,49 @@
 # Development Log
 
+## [2026-10-18] 시총 갱신 중단 복구를 위한 종목별 영속 진행 상태
+
+### 목표
+- 장시간 국내·해외 보통주 시총/기본정보 갱신이 중단되거나 부분 실패해도 이미 정상 저장된 종목은 재호출하지 않고, 미완료 종목만 다음 실행에서 재개한다.
+
+### 반영
+- `db/migration/V154__instrument_fundamental_refresh_progress.sql`: 작업별 대상 지문·상태와 종목별 진행/재시도/안전 오류 코드를 저장하는 테이블 및 부분 인덱스를 추가했다.
+- `lib/instrument-fundamental-progress.ts`: 대상 집합 SHA-256, 미완료 작업 재개, 바뀐 유니버스의 이전 작업 격리, 14일 지난 종료 이력 정리, 종목 진행상태 기록·요약을 구현했다.
+- `lib/instrument-fundamentals.ts`: `SUCCESS` 종목은 다시 호출하지 않고 `PENDING`/`FAILED`만 KIS에 요청한다. 성공 이력·최신 스냅샷과 종목 완료 표식은 하나의 DB 트랜잭션에서 같이 커밋한다. DB 실패 시 진행 표식도 롤백되어 다음 재시도에서 안전하게 회수된다.
+- `lib/automation-run.ts`: 요약의 `ok:false`, 미시도 종목, 음수/비정수/비숫자 카운터가 있는데 실패 건수가 0으로 빠진 결과를 SUCCESS로 기록하지 않도록 분류를 보강했다.
+- `lib/instrument-fundamental-progress.test.ts`, `lib/instrument-fundamentals.test.ts`, `lib/automation-run.test.ts`: 해시 안정성, 파라미터화 진행 SQL, 갱신 대상 미일치 방지, 완료 종목 건너뛰기, DB 실패 비성공 처리, 실행 상태 판정 회귀를 고정했다.
+- `lib/schema-health.ts`, `docs/architecture/database-schema.md`, `docs/operations/instrument-fundamentals-refresh.md`: 운영 스키마 필수 목록·DB 구조·재개/보존 정책을 동기화했다.
+
+### 근본 원인 및 영향
+- 기존 구현은 200종목 단위 커밋으로 저장 데이터는 보존했으나, 어떤 종목이 해당 갱신 작업에서 확정 저장되었는지 durable ledger가 없었다. 다음 실행은 항상 전체 유니버스를 다시 조회해 장시간 KIS 호출을 낭비했다.
+- 최신 스냅샷 시각은 다른 경로도 갱신할 수 있어 완료 표식으로 사용할 수 없다. 별도 작업 지문과 종목 상태 원장을 도입하고 snapshot/history와 같은 트랜잭션에서만 성공 상태를 전이한다.
+- 자동화 요약이 `ok:false`여도 `failureCount=0`이면 SUCCESS가 될 여지가 있었다. 실패와 미시도 카운터를 함께 판정하도록 변경해 일일 재시도 간격이 실패 작업을 성공으로 오인해 막는 위험을 줄였다.
+
+### 재발 감지 및 운영 기준
+- 다음 갱신의 실행 요약 `progress.resumed`, `progress.skippedCompletedCount`, `progress.cumulativeSuccessCount`, `progress.pendingCount`를 확인한다. 동일 지문 재실행에서 완료 종목 호출이 관측되면 회귀로 본다.
+- 성공 상태는 가격 history/snapshot 저장과 원자적이어야 한다. 진행 상태 UPDATE의 affected row 수가 예상 종목 수와 다르면 트랜잭션 전체를 실패시킨다.
+- 지문이 바뀐 경우(활성 보통주 추가/삭제/시장 변경) 이전 진행 건을 이어 붙이지 않고 전체 새 작업을 시작한다. KIS 미응답은 FAILED로 저장하고 다음 시도에 포함하며, DB 실패 배치는 진행 표식을 커밋하지 않는다.
+- 종료 이력은 새 작업 시작 시 14일 뒤 정리한다. 동일 지문의 미완료 작업은 다시 실행될 때 재개한다.
+
+### 검증
+- `npm.cmd run deploy:verify` 통과: production build, standalone 서버 기동 및 `/charts` HTTP 200, 11개 Next static chunk, Chrome 데스크톱·모바일 hydration, 국내·해외 차트 API 및 인증 경계 smoke.
+- 전체 Vitest: 222개 파일 중 221개 통과·1개 skip, 793 passed·1 skipped. 진행 원장/재개, 자동화 결과 상태, 운영 스키마 migration audit를 포함한 전용 테스트 28개도 통과했다.
+- typecheck, docs/migration audit(V154·필수 운영 관계 23개), verify-scope, KIS boundary, Bearer auth, OCI cron 구조 게이트 통과. npm audit 취약점 0건.
+- 임시 PostgreSQL 16에 V154 적용 및 SUCCESS/FAILED 상태 변경 쿼리를 확인했다. 작업 상태 SQL은 실제 PostgreSQL에서 정상 실행됐고, 애플리케이션 회귀는 별도 mocked resume 테스트로 검증했다.
+- 임시 PostgreSQL 16 컨테이너에 V154를 적용하고 작업/항목 테이블 생성, SUCCESS 및 FAILED 원자 상태 SQL을 실행해 결과를 확인했다.
+- `npm.cmd run docs:check` 통과: 마이그레이션 149개, 최신 V154, 필수 운영 관계 23개 확인.
+- 전체 게이트 첫 회차에서 운영 스키마 migration audit의 고정 기대치가 신규 테이블 추가에 취약한 점을 확인했다. 총 개수 고정 검증을 제거하고 중복 부재, 신규 테이블의 명시적 포함, 전체 migration 관계 검증으로 바꿔 향후 테이블 추가 때 같은 수정 누락이 재발하지 않게 했다.
+
+### 다음 개선
+- 운영에서 다음 예약 갱신 후 `progress.resumed` 및 실제 KIS 호출 감소량을 실행 이력으로 비교하고, 실패 종목의 재시도 간격이 KIS rate-limit 정책과 맞는지 관측한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-006
+- 성과 판정: IMPROVED
+- 근거: 회귀 테스트에서 완료 종목은 KIS 재호출·재저장 없이 건너뛰고 미완료 종목만 재개함을 확인했다. 상태 마커는 데이터 저장과 원자적이며, 유니버스 변경·오류 카운터 이상도 안전한 상태로 분류된다. 운영에서의 실제 호출 감소량은 다음 갱신 기록으로 측정해야 한다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 배포 검증 통과 후 커밋·푸시 및 운영 배포를 순차 진행한다.
+
 ## [2026-10-18] Fundamentals 장시간 요청 경로 timeout 정렬
 
 ### 목표
@@ -26,7 +70,7 @@
 - `docker run --rm --entrypoint nginx -v <설정파일>:/etc/nginx/conf.d/default.conf:ro nginx:1.24.0-alpine -t` 통과.
 
 ### 다음 개선
-- 배포 후 실제 Nginx 설정 검사와 전용 route의 client disconnect/error 로그를 확인해 timeout을 넘는 upstream 처리 여부를 측정한다.
+- 배포 후 실제 Nginx 설정 검사와 전용 route의 client disconnect/error 로그를 확인해 timeout을 넘는 upstream 처리 여부를 측정한다. 종목별 재개 상태 추적은 개선 과제 CI-2026-10-18-006에서 구현한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-18-005
