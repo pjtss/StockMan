@@ -58,6 +58,15 @@ describe("instrument fundamentals cron retry policy", () => {
     expect(state.runCalls).toBe(0);
   });
 
+  it("continues protecting a long-running refresh beyond two hours", async () => {
+    state.latest = { status: "RUNNING", started_at: new Date(Date.now() - 4 * 60 * 60_000).toISOString() };
+
+    const response = await post();
+
+    expect(await response.json()).toMatchObject({ skipped: true, reason: "already_running" });
+    expect(state.runCalls).toBe(0);
+  });
+
   it("fails closed when the prior-run status lookup cannot be trusted", async () => {
     state.latest = { status: "SUCCESS", started_at: "invalid timestamp" };
 

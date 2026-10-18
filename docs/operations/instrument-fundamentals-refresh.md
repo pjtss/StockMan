@@ -17,7 +17,7 @@
   → SUCCESS / PARTIAL / FAILED / SKIPPED로 실행상태 반영
 ```
 
-실행은 공유 `stockman-cron.service`가 아니라 전용 `stockman-fundamentals.timer`/`.service`가 담당한다. timer는 5분마다 모듈의 관리자 설정을 확인하고, 실제 전체 갱신은 전용 oneshot service가 응답을 기다린다. 이로써 긴 시총 갱신이 RSS·캔들 등 다른 cron 요청을 순차 지연시키거나 앞선 300초 curl timeout 뒤 다른 KIS 작업과 겹치는 일을 방지한다. HTTP 대기 제한은 4시간 15분, systemd 서비스 제한은 4시간 30분이며, 실행 중복 방지와 stale-run 판정은 5시간을 사용해 서비스 최대 실행시간보다 먼저 살아 있는 작업을 종료 처리하지 않는다.
+실행은 공유 `stockman-cron.service`가 아니라 전용 `stockman-fundamentals.timer`/`.service`가 담당한다. timer는 5분마다 모듈의 관리자 설정을 확인하고, 실제 전체 갱신은 전용 oneshot service가 응답을 기다린다. 이로써 긴 시총 갱신이 RSS·캔들 등 다른 cron 요청을 순차 지연시키거나 앞선 300초 curl timeout 뒤 다른 KIS 작업과 겹치는 일을 방지한다. HTTP 대기 제한은 4시간 15분, Nginx의 이 전용 경로는 4시간 25분, systemd 서비스 제한은 4시간 30분이며, route 중복 방지와 stale-run 판정은 5시간을 사용해 서비스 최대 실행시간보다 먼저 살아 있는 작업을 종료 처리하지 않는다.
 
 ## 데이터 무결성 규칙
 
@@ -34,8 +34,8 @@
 - `PARTIAL` / `FAILED`: 결과와 실제 저장 성공 건수를 구분해 기록한다. 최소 1시간 cooldown 뒤 재시도할 수 있다(관리 설정 간격이 더 짧더라도 1시간 최소 간격 적용).
 - `SKIPPED`: 이미 실행 중인 작업의 advisory lock 획득 실패 등으로 이번 실행을 건너뛴 상태이며 성공으로 기록하지 않는다.
 - 최근 실행 상태 조회 실패 또는 timestamp가 잘못된 경우 안전한 중복방지 기준을 세울 수 없으므로 cron은 503으로 중단한다.
-- 이전 RUNNING이 2시간 이내면 일반 cron route에서 중복 호출하지 않고, Fundamentals는 전용 경로에서 5시간 이내 실행을 활성 작업으로 취급한다. 실제 refresh 경로에는 PostgreSQL advisory lock도 적용한다. stale 판정 역시 일반 자동화는 2시간, Fundamentals는 5시간으로 분리해 다른 모듈이 장시간 정상 실행을 조기 실패 처리하지 않는다.
-- 전용 HTTP 호출 제한은 4시간 15분, systemd `TimeoutStartSec`은 4시간 30분이다. 5시간 활성/stale 임계값은 시스템 서비스 제한보다 길다. 운영에서 확인된 최장 성공(약 2시간 19분)보다 여유를 둔다. timer가 예약 설정을 5분 단위로 확인하므로 관리자 시간/활성 설정은 계속 적용된다.
+- 이전 RUNNING이 2시간 이내면 일반 cron route에서 중복 호출하지 않고, Fundamentals route는 5시간 이내 실행을 활성 작업으로 취급한다. 실제 refresh 경로에는 PostgreSQL advisory lock도 적용한다. stale 판정 역시 일반 자동화는 2시간, Fundamentals는 5시간으로 분리해 다른 모듈이 장시간 정상 실행을 조기 실패 처리하지 않는다.
+- 전용 HTTP 호출 제한은 4시간 15분, Nginx 전용 경로 제한은 4시간 25분, systemd `TimeoutStartSec`은 4시간 30분이다. 5시간 활성/stale 임계값은 시스템 서비스 제한보다 길다. 운영에서 확인된 최장 성공(약 2시간 19분)보다 여유를 둔다. timer가 예약 설정을 5분 단위로 확인하므로 관리자 시간/활성 설정은 계속 적용된다.
 
 ## 성능·관측 항목
 
@@ -60,4 +60,5 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/kis-kr-price-detail.test.t
 - 성공 후 `systemctl status stockman-fundamentals.timer`로 timer 활성 상태를 확인한다.
 - 진행/실패 로그는 `journalctl -u stockman-fundamentals.service`에서 확인한다. API 상세 성공·실패 건수는 관리자 자동화 실행 이력에서 확인한다.
 - 공식 systemd 기준: [systemd.service `TimeoutStartSec`](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#TimeoutStartSec=)는 oneshot 활성화 timeout을 제어하고, [systemd.timer `OnCalendar`와 `Persistent`](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html#Persistent=)는 반복/정지 후 catch-up을 제어한다.
+- 공식 Nginx 기준: [ngx_http_proxy_module `proxy_read_timeout`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout)의 기본값은 60초이고 연속 upstream read 사이의 제한이다. API의 정확한 location에만 4시간 25분을 지정해 전용 요청만 curl/systemd timeout 사이에서 기다리게 한다.
 - 남은 위험: 응답이 전용 4시간 15분 한도도 넘으면 runner가 실패 종료하고 다음 timer 때 관리자 재시도 정책에 따른다. 아직 종목별 durable resume cursor는 없으며, 이미 저장한 배치는 보존되지만 재실행 시 전체 대상 목록을 다시 조회한다.

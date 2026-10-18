@@ -1,5 +1,40 @@
 # Development Log
 
+## [2026-10-18] Fundamentals 장시간 요청 경로 timeout 정렬
+
+### 목표
+- 전용 Fundamentals 자동화가 API route, reverse proxy, systemd 수명주기에서 상충하는 timeout·중복 억제 기준 때문에 조기 실패하거나 불필요한 재실행을 시도하지 않게 한다.
+
+### 반영
+- `deploy/oci/nginx-stockman.conf`: Fundamentals cron location에만 `proxy_read_timeout`/`proxy_send_timeout` 4시간 25분을 지정했다. 일반 route에는 장시간 proxy 연결 한도를 적용하지 않는다.
+- `app/api/cron/instrument-fundamentals/route.ts`: RUNNING guard를 2시간에서 전용 service 한도보다 긴 5시간으로 늘렸다.
+- `app/api/cron/instrument-fundamentals/route.test.ts`: 4시간 실행 중인 작업이 새로운 갱신으로 재진입하지 않는 회귀 테스트를 추가했다.
+- `scripts/check-oci-cron.mjs`: Nginx의 경로별 timeout과 route 중복 억제 기준이 바뀌면 cron 구조 게이트가 실패하게 했다.
+- `docs/operations/instrument-fundamentals-refresh.md`: 네트워크 계층별 timeout 순서와 공식 Nginx 근거를 기록했다.
+
+### 근본 원인 및 영향
+- Nginx 공식 기본 `proxy_read_timeout`은 60초이며, 연속 upstream read 사이의 제한이다. 장시간 응답을 내지 않는 전체 갱신이 public proxy 경유 요청이면 client curl 제한과 무관하게 proxy가 먼저 끊을 수 있었다. 시스템 runner 기본 URL은 loopback이지만, 구성 override 또는 직접 API 호출에서도 역방향 프록시 경로가 안전하도록 해당 API location을 명시적으로 정렬했다.
+- 새 systemd oneshot은 4시간 30분을 허용하도록 분리됐지만 API route의 RUNNING guard는 2시간으로 남아 있었다. 실제 advisory lock은 중복 갱신을 막지만, 2시간 뒤 들어온 호출은 lock 경쟁과 불필요한 SKIPPED 실행 이력을 만들 수 있었다.
+
+### 재발 감지 및 운영 기준
+- timeout 순서는 curl 4시간 15분 < Nginx 전용 location 4시간 25분 < systemd 4시간 30분 < route/stale 실행 보호 5시간이어야 한다.
+- `npm run cron:check`는 경로별 Nginx timeout과 service/route/stale 보호가 이 순서를 유지하는지 검사한다.
+- 공식 출처: [Nginx proxy_read_timeout](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout).
+
+### 검증
+- 예정: `npm.cmd run deploy:verify`에서 빌드·전체 테스트·실행 및 운영 구조 게이트를 실행한다. 추가로 Nginx 배포 설정의 syntax 검증 가능 여부를 확인한다.
+
+### 다음 개선
+- 배포 후 실제 Nginx 설정 검사와 전용 route의 client disconnect/error 로그를 확인해 timeout을 넘는 upstream 처리 여부를 측정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-005
+- 성과 판정: UNMEASURED
+- 근거: source 설정과 회귀 테스트를 보강했으며 운영 배포 후 동작 검증을 남겨 둔다.
+
+### 커밋·푸시·배포
+- 미실행: 최종 배포 검증 후 커밋·푸시하고 운영에서 확인한다.
+
 ## [2026-10-18] 장시간 시총 갱신을 전용 systemd 작업으로 분리
 
 ### 목표

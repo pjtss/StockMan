@@ -6,6 +6,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 export const runtime = "nodejs";
+const MAX_FUNDAMENTALS_RUNNING_SECONDS = 5 * 60 * 60;
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("instrument-fundamentals");
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   const latestStartedAt = latest?.started_at ? new Date(latest.started_at).getTime() : Number.NaN;
   if (latest && !Number.isFinite(latestStartedAt)) return NextResponse.json({ ok: false, error: "INVALID_LAST_RUN_TIMESTAMP" }, { status: 503 });
   const elapsed = latest ? Math.max(0, Math.round((Date.now() - latestStartedAt) / 1000)) : null;
-  if (latestStatus === "RUNNING" && elapsed! < 2 * 60 * 60) {
+  if (latestStatus === "RUNNING" && elapsed! < MAX_FUNDAMENTALS_RUNNING_SECONDS) {
     await recordSkippedAutomationRun("instrument-fundamentals", "already_running", { elapsedSeconds: elapsed });
     return NextResponse.json({ ok: true, skipped: true, reason: "already_running", elapsedSeconds: elapsed });
   }

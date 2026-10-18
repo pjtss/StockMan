@@ -17,6 +17,7 @@ for (const [, label, timeout, endpoint] of matches) {
 const fundamentalsScript = fs.readFileSync(path.resolve("scripts/oci-fundamentals-cron.sh"), "utf8");
 const fundamentalsService = fs.readFileSync(path.resolve("deploy/oci/stockman-fundamentals.service"), "utf8");
 const fundamentalsTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-fundamentals.timer"), "utf8");
+const nginx = fs.readFileSync(path.resolve("deploy/oci/nginx-stockman.conf"), "utf8");
 const activation = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
 const workflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
 const automationRuns = fs.readFileSync(path.resolve("lib/automation-run-repository.ts"), "utf8");
@@ -29,6 +30,10 @@ if (!fundamentalsScript.includes("/api/cron/instrument-fundamentals") || !/--max
 }
 if (!/TimeoutStartSec=4h30min/.test(fundamentalsService) || !fundamentalsService.includes("oci-fundamentals-cron.sh")) {
   throw new Error("Dedicated fundamentals service must allow the measured long-run duration and call its own runner");
+}
+if (!/location\s*=\s*\/api\/cron\/instrument-fundamentals\s*\{[\s\S]*?proxy_read_timeout\s+4h25m;/.test(nginx) ||
+    !nginx.includes("proxy_send_timeout 4h25m;")) {
+  throw new Error("The fundamentals reverse-proxy route must outlive the client timeout without extending other routes");
 }
 if (!/OnCalendar=\*:0\/5/.test(fundamentalsTimer) || !/Persistent=true/.test(fundamentalsTimer)) {
   throw new Error("Dedicated fundamentals timer must poll the admin schedule and catch up after downtime");
@@ -50,6 +55,9 @@ for (const required of ["oci-fundamentals-cron.sh", "stockman-fundamentals.servi
 }
 if (!automationRuns.includes("FUNDAMENTALS_STALE_RUN_AFTER_SECONDS = 5 * 60 * 60") || !automationRuns.includes("module_key = 'instrument-fundamentals'")) {
   throw new Error("Long-running fundamentals executions must have a stale/active-run threshold above the service timeout");
+}
+if (!fs.readFileSync(path.resolve("app/api/cron/instrument-fundamentals/route.ts"), "utf8").includes("MAX_FUNDAMENTALS_RUNNING_SECONDS = 5 * 60 * 60")) {
+  throw new Error("Cron route duplicate-run guard must cover the full dedicated service lifetime");
 }
 if ((automationRuns.match(/CASE WHEN module_key = 'instrument-fundamentals' THEN \$[23] ELSE \$[12] END/g) ?? []).length < 2 ||
     !automationRuns.includes("[moduleKey, STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS]")) {
