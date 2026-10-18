@@ -42,6 +42,21 @@ async function executeInstrumentFundamentalsRefresh() {
   const instruments = [...kr, ...us].filter(isEligibleFundamentalInstrument);
   const progress = await beginFundamentalRefresh(instruments);
   const pendingInstruments = progress.instruments;
+  if (!pendingInstruments.length && progress.deferredRetryCount > 0) {
+    const progressResult = await finishFundamentalRefresh(progress.jobId);
+    return {
+      ok: true,
+      skipped: true,
+      reason: "instrument_retry_backoff",
+      nextRetryAt: progress.nextRetryAt,
+      instrumentCount: instruments.length,
+      attemptedCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      unattemptedCount: 0,
+      progress: { jobId: progress.jobId, resumed: progress.resumed, skippedCompletedCount: progress.skippedCompletedCount, deferredRetryCount: progress.deferredRetryCount, nextRetryAt: progress.nextRetryAt, status: progressResult.status, cumulativeSuccessCount: progressResult.successCount, cumulativeFailureCount: progressResult.failedCount, pendingCount: progressResult.pendingCount },
+    };
+  }
   const failures: Array<{ market: string; code: string; error: string }> = [];
   let successCount = 0;
   let attemptedCount = 0;
@@ -148,7 +163,7 @@ async function executeInstrumentFundamentalsRefresh() {
   const failureCount = providerFailureCount + (databaseFailure ? pendingInstruments.length - successCount - providerFailureCount : 0);
   const progressResult = await finishFundamentalRefresh(progress.jobId);
   const completedAt = new Date();
-  return { ok: progressResult.status === "SUCCESS", startedAt: startedAt.toISOString(), completedAt: completedAt.toISOString(), durationMs: completedAt.getTime() - startedAt.getTime(), instrumentCount: instruments.length, attemptedCount, successCount, failureCount, unattemptedCount, batchCount, providerDurationMs, databaseDurationMs, databaseFailure, marketSummary, failures: failures.slice(0, 100), progress: { jobId: progress.jobId, resumed: progress.resumed, skippedCompletedCount: progress.skippedCompletedCount, status: progressResult.status, cumulativeSuccessCount: progressResult.successCount, cumulativeFailureCount: progressResult.failedCount, pendingCount: progressResult.pendingCount } };
+  return { ok: progressResult.status === "SUCCESS", startedAt: startedAt.toISOString(), completedAt: completedAt.toISOString(), durationMs: completedAt.getTime() - startedAt.getTime(), instrumentCount: instruments.length, attemptedCount, successCount, failureCount, unattemptedCount, batchCount, providerDurationMs, databaseDurationMs, databaseFailure, marketSummary, failures: failures.slice(0, 100), progress: { jobId: progress.jobId, resumed: progress.resumed, skippedCompletedCount: progress.skippedCompletedCount, deferredRetryCount: progress.deferredRetryCount, nextRetryAt: progress.nextRetryAt, status: progressResult.status, cumulativeSuccessCount: progressResult.successCount, cumulativeFailureCount: progressResult.failedCount, pendingCount: progressResult.pendingCount } };
 }
 
 export function refreshInstrumentFundamentals() {

@@ -28,15 +28,15 @@
 - nullable 필드는 snapshot upsert 시 기존 값을 `COALESCE`로 보존한다. 따라서 부분 응답의 null이 직전 정상값을 지우지 않는다.
 - 대상은 DB 질의 조건과 애플리케이션 eligibility 검사 양쪽에서 검증한다. 활성 상태·`COMMON_STOCK`·시장 분류 또는 제외 플래그를 신뢰할 수 없으면 provider 호출 전 제외한다.
 - 배치 내 history와 snapshot 저장은 하나의 DB 트랜잭션이다. 각 배치는 최대 3회 재시도하며 DB 오류가 지속되면 이후 배치 처리를 중단한다.
-- `instrument_fundamental_refresh_jobs/items`는 활성 보통주 대상 집합의 SHA-256 지문과 종목별 진행 상태를 저장한다. 재개 시 동일한 대상 집합의 `SUCCESS` 종목은 건너뛰고 `PENDING`·`FAILED`만 조회한다. 종목 마스터 구성/활성 상태가 바뀌어 지문이 달라지면 기존 미완료 작업을 `ABANDONED` 처리하고 새 전체 작업을 만든다.
+- `instrument_fundamental_refresh_jobs/items`는 활성 보통주 대상 집합의 SHA-256 지문과 종목별 진행 상태를 저장한다. 재개 시 동일한 대상 집합의 `SUCCESS` 종목은 건너뛰고 `PENDING`·재시도 시각이 도래한 `FAILED`만 조회한다. provider 실패 재시도 간격은 해당 종목의 실패 횟수에 따라 1·2·4·8·24시간으로 증가하며 24시간에서 상한을 둔다. 성공 시 재시도 시각과 오류 코드를 지운다. 대상 집합이 바뀌면 기존 미완료 작업을 `ABANDONED` 처리하고 새 전체 작업을 만든다.
 - 종목이 `SUCCESS`로 표시되는 것은 해당 종목의 history/snapshot 쓰기가 같은 DB 트랜잭션에서 커밋된 경우뿐이다. DB 쓰기가 모두 실패하면 배치의 진행 표식도 롤백되므로 다음 실행이 안전하게 다시 조회한다. KIS 실패는 종목별 `FAILED`, DB 미시도는 `PENDING`으로 구분한다.
 - 상태 요약은 `progress.jobId`, `progress.resumed`, `progress.skippedCompletedCount`, 누적 성공/실패/미완료 건수를 제공한다. 자동화 실행 자체의 `attemptedCount`와 `successCount`는 이번 실행분이며, `progress.cumulativeSuccessCount`는 작업 전체 누적값이다.
 
 ## 실행 상태 및 재시도
 
 - `SUCCESS`: 대상 전체 저장 완료. 설정된 실행 간격 전에는 다시 실행하지 않는다.
-- `PARTIAL` / `FAILED`: 결과와 실제 저장 성공 건수를 구분해 기록한다. 최소 1시간 cooldown 뒤 재시도할 수 있다(관리 설정 간격이 더 짧더라도 1시간 최소 간격 적용).
-- `SKIPPED`: 이미 실행 중인 작업의 advisory lock 획득 실패 등으로 이번 실행을 건너뛴 상태이며 성공으로 기록하지 않는다.
+- `PARTIAL` / `FAILED`: 결과와 실제 저장 성공 건수를 구분해 기록한다. 실행은 최소 1시간 cooldown 뒤 재개될 수 있지만, 종목별 provider 실패는 개별 backoff 시각이 된 뒤에만 다시 KIS를 호출한다. 재시도 대상이 아직 없으면 실행을 `SKIPPED`로 기록하고 `nextRetryAt` 및 대기 종목 수를 요약에 남긴다. DB 미시도(PENDING)는 provider backoff를 적용하지 않아 기존 1시간 실행 재시도에서 회수한다.
+- `SKIPPED`: 이미 실행 중인 작업의 advisory lock 획득 실패, 또는 모든 FAILED 종목의 재시도 시각이 아직 오지 않은 경우다. 성공으로 기록하지 않는다.
 - 최근 실행 상태 조회 실패 또는 timestamp가 잘못된 경우 안전한 중복방지 기준을 세울 수 없으므로 cron은 503으로 중단한다.
 - 이전 RUNNING이 2시간 이내면 일반 cron route에서 중복 호출하지 않고, Fundamentals route는 5시간 이내 실행을 활성 작업으로 취급한다. 실제 refresh 경로에는 PostgreSQL advisory lock도 적용한다. stale 판정 역시 일반 자동화는 2시간, Fundamentals는 5시간으로 분리해 다른 모듈이 장시간 정상 실행을 조기 실패 처리하지 않는다.
 - 전용 HTTP 호출 제한은 4시간 15분, Nginx 전용 경로 제한은 4시간 25분, systemd `TimeoutStartSec`은 4시간 30분이다. 5시간 활성/stale 임계값은 시스템 서비스 제한보다 길다. 운영에서 확인된 최장 성공(약 2시간 19분)보다 여유를 둔다. timer가 예약 설정을 5분 단위로 확인하므로 관리자 시간/활성 설정은 계속 적용된다.
@@ -47,7 +47,7 @@
 
 ## 자동 검증 및 운영 점검
 
-Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/kis-kr-price-detail.test.ts`, `lib/automation-run.test.ts`, `app/api/cron/instrument-fundamentals/route.test.ts`가 누락 수치, fail-closed 상품 필터, stale/업무오류 응답, 시총 누락, 트랜잭션 배치, DB 재시도, 실행상태 및 cron cooldown을 검증한다. 변경 시 전체 배포 게이트도 실행한다.
+Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-progress.test.ts`, `lib/kis-kr-price-detail.test.ts`, `lib/automation-run.test.ts`, `app/api/cron/instrument-fundamentals/route.test.ts`가 누락 수치, fail-closed 상품 필터, stale/업무오류 응답, 시총 누락, 트랜잭션 배치, DB 재시도, 종목별 재시도 backoff 및 cron cooldown을 검증한다. 변경 시 전체 배포 게이트도 실행한다.
 
 운영에서 관리자 실행 이력의 상태와 요약을 확인한다. `PARTIAL`/`FAILED`이면 `failureCount`, `unattemptedCount`, `databaseFailure`, 시장별 실패 및 실패 샘플을 먼저 확인하고, 성공 건수는 시도 수가 아니라 커밋된 snapshot 배치 행 수로 해석한다.
 

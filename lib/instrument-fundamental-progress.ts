@@ -8,6 +8,8 @@ export type FundamentalRefreshProgress = {
   resumed: boolean;
   instruments: FundamentalRefreshInstrument[];
   skippedCompletedCount: number;
+  deferredRetryCount: number;
+  nextRetryAt: string | null;
 };
 
 export function fundamentalRefreshScopeHash(instruments: FundamentalRefreshInstrument[]) {
@@ -39,7 +41,7 @@ export async function beginFundamentalRefresh(instruments: FundamentalRefreshIns
     if (resumed) {
       jobId = Number(existing.rows[0].id);
       await client.query(
-        `UPDATE instrument_fundamental_refresh_jobs SET status = 'RUNNING', started_at = NOW(), finished_at = NULL, instrument_count = $2 WHERE id = $1`,
+        `UPDATE instrument_fundamental_refresh_jobs SET status = 'RUNNING', started_at = NOW(), finished_at = NULL, created_at = NOW(), instrument_count = $2 WHERE id = $1`,
         [jobId, instruments.length],
       );
       if (instruments.length) {
@@ -72,10 +74,10 @@ export async function beginFundamentalRefresh(instruments: FundamentalRefreshIns
       `DELETE FROM instrument_fundamental_refresh_jobs
        WHERE status <> 'RUNNING' AND created_at < NOW() - INTERVAL '14 days'`,
     );
-    const pending = await client.query<{ market: string; code: string; name: string; status: string }>(
-      `SELECT market, code, name, status
+    const pending = await client.query<{ market: string; code: string; name: string }>(
+      `SELECT market, code, name
        FROM instrument_fundamental_refresh_items
-       WHERE job_id = $1 AND status <> 'SUCCESS'
+       WHERE job_id = $1 AND (status = 'PENDING' OR (status = 'FAILED' AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())))
        ORDER BY ordinal`,
       [jobId],
     );
@@ -83,8 +85,14 @@ export async function beginFundamentalRefresh(instruments: FundamentalRefreshIns
       `SELECT COUNT(*)::text AS count FROM instrument_fundamental_refresh_items WHERE job_id = $1 AND status = 'SUCCESS'`,
       [jobId],
     );
+    const deferred = await client.query<{ count: string; next_retry_at: string | null }>(
+      `SELECT COUNT(*)::text AS count, MIN(next_attempt_at)::text AS next_retry_at
+       FROM instrument_fundamental_refresh_items
+       WHERE job_id = $1 AND status = 'FAILED' AND next_attempt_at > NOW()`,
+      [jobId],
+    );
     await client.query("COMMIT");
-    return { jobId, resumed, instruments: pending.rows.map(({ market, code, name }) => ({ market, code, name })), skippedCompletedCount: Number(completed.rows[0]?.count ?? 0) };
+    return { jobId, resumed, instruments: pending.rows.map(({ market, code, name }) => ({ market, code, name })), skippedCompletedCount: Number(completed.rows[0]?.count ?? 0), deferredRetryCount: Number(deferred.rows[0]?.count ?? 0), nextRetryAt: deferred.rows[0]?.next_retry_at ?? null };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -107,6 +115,13 @@ export async function markFundamentalBatchInTransaction(
       UPDATE instrument_fundamental_refresh_items AS item
       SET status = ${status},
           attempt_count = item.attempt_count + 1,
+          next_attempt_at = CASE
+            WHEN ${status} = 'SUCCESS' THEN NULL
+            ELSE NOW() + CASE
+              WHEN item.attempt_count >= 4 THEN INTERVAL '24 hours'
+              ELSE make_interval(hours => (power(2, item.attempt_count)::integer))
+            END
+          END,
           last_error_code = CASE WHEN ${status} = 'SUCCESS' THEN NULL ELSE source.error_code END,
           updated_at = NOW()
       FROM (VALUES ${sql.join(values, sql`, `)}) AS source(market, code, error_code)

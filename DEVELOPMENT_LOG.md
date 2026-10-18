@@ -1,5 +1,33 @@
 # Development Log
 
+## [2026-10-18] Fundamentals 실패 종목 재시도 폭주 방지
+
+### 목표
+- 기존 시총/기본정보 갱신 재개 과정에서 계속 실패하는 동일 종목을 매시간 다시 KIS에 요청할 수 있던 부분을 제한하되, 실패 종목을 영구 제외하지 않고 지연 재시도한다.
+
+### 반영
+- 원인: V154 진행 원장은 실패 횟수를 저장했지만 재시도 가능 시각이 없어 `FAILED` 전체가 매 실행마다 후보가 됐다.
+- V155에 `next_attempt_at`과 FAILED 부분 인덱스를 추가했다. 오류 항목별 대기시간을 1·2·4·8·24시간으로 늘리고 24시간 상한을 적용한다. 성공 시 backoff/error 상태를 초기화한다.
+- 재개 시 due 상태인 `FAILED`만 provider 요청에 넣고, 대기 건수와 다음 재시도 시각을 요약한다. 전부 대기 중이면 KIS 호출 없이 SKIPPED 기록으로 반환한다. DB 실패 후 미시도된 PENDING은 backoff 없이 기존 1시간 재시도 경로로 복구한다.
+- 오래된 미완료 작업을 재개할 때 `created_at`도 갱신해 같은 요청 안의 14일 정리 대상이 작업을 cascade-delete하지 않도록 함께 수정했다.
+
+### 검증
+- 전용 Vitest 18개 통과(재시도 대기 시 KIS 0회, 정상 미완료 회수 및 상태 SQL 포함).
+- 임시 PostgreSQL 16에서 V154·V155 적용 및 실패 상태/다음 재시각 쿼리 통과.
+- `npm.cmd run deploy:verify`: production build, standalone `/charts` 및 차트 API smoke, desktop/mobile hydration, 전체 Vitest 794개 통과·1개 skip, typecheck 통과. 최초 전체 게이트는 본 작업 문서의 필수 개선 과제/배포 상태 형식 누락으로 `docs:check`에서 실패했으며 이를 확인 후 보완했고, 전체 게이트 재실행 필요.
+- 운영 점검 시 `progress.deferredRetryCount`, `progress.nextRetryAt`, 항목별 `attempt_count/next_attempt_at`을 확인한다. 실패 종목 호출이 다음 재시도 시각 전에 발생하면 회귀다.
+
+### 다음 개선
+- 전체 게이트 재실행 후 새 마이그레이션이 운영에 적용되면 첫 재개 실행에서 `deferredRetryCount`와 실패 종목의 KIS 호출 간격을 대조한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-007
+- 성과 판정: IMPROVED
+- 근거: 재시도 시각 미도래 항목은 실제 KIS 요청 없이 지연되고, PostgreSQL에서 V155와 interval 계산이 동작함을 확인했다. 운영 호출량 감소는 배포 후 실행 이력으로 추가 측정한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 전체 `deploy:verify` 재검증 성공 뒤 사용자 요청에 따라 진행 예정.
+
 ## [2026-10-18] 시총 갱신 중단 복구를 위한 종목별 영속 진행 상태
 
 ### 목표

@@ -25,9 +25,11 @@ describe("instrument fundamental durable progress", () => {
     expect(queries[0].sql).toMatch(/FROM \(VALUES/i);
     expect(queries[0].params).toContain("SUCCESS");
     expect(queries[0].params).toContain("AAPL");
+    expect(queries[0].sql).toMatch(/next_attempt_at/i);
     expect(queries[1].params).toContain("FAILED");
     expect(queries[1].params).toContain("KIS_TIMEOUT");
     expect(queries[1].params).toContain(42);
+    expect(queries[1].sql).toMatch(/INTERVAL '24 hours'/i);
   });
 
   it("rejects a progress update that did not affect every expected row", async () => {

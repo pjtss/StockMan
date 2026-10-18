@@ -16,6 +16,8 @@ const state = vi.hoisted(() => ({
   progressItems: [] as Array<{ market: string; code: string; name: string }>,
   progressStatuses: new Map<string, string>(),
   progressResumed: false,
+  progressDeferred: 0,
+  progressNextRetryAt: null as string | null,
   progressMarks: [] as Array<{ succeeded: Array<{ market: string; code: string }>; failed: Array<{ market: string; code: string; errorCode: string }> }>,
 }));
 
@@ -51,8 +53,11 @@ vi.mock("@/lib/instrument-fundamental-progress", () => ({
   beginFundamentalRefresh: async (items: Array<{ market: string; code: string; name: string }>) => {
     if (!state.progressItems.length) state.progressItems = items;
     for (const item of items) if (!state.progressStatuses.has(`${item.market}:${item.code}`)) state.progressStatuses.set(`${item.market}:${item.code}`, "PENDING");
-    const pending = state.progressItems.filter((item) => state.progressStatuses.get(`${item.market}:${item.code}`) !== "SUCCESS");
-    return { jobId: state.progressJobId, resumed: state.progressResumed, instruments: pending, skippedCompletedCount: items.length - pending.length };
+    const pending = state.progressItems.filter((item) => {
+      const status = state.progressStatuses.get(`${item.market}:${item.code}`);
+      return status !== "SUCCESS" && !(status === "FAILED" && state.progressDeferred > 0);
+    });
+    return { jobId: state.progressJobId, resumed: state.progressResumed, instruments: pending, skippedCompletedCount: items.length - pending.length, deferredRetryCount: state.progressDeferred, nextRetryAt: state.progressNextRetryAt };
   },
   markFundamentalBatchInTransaction: async (_tx: unknown, _jobId: number, succeeded: Array<{ market: string; code: string }>, failed: Array<{ market: string; code: string; errorCode: string }>) => {
     state.progressMarks.push({ succeeded, failed });
@@ -97,6 +102,8 @@ beforeEach(() => {
   state.progressItems = [];
   state.progressStatuses = new Map();
   state.progressResumed = false;
+  state.progressDeferred = 0;
+  state.progressNextRetryAt = null;
   state.progressMarks = [];
 });
 
@@ -195,6 +202,19 @@ describe("instrument-fundamentals refresh", () => {
     expect(result).toMatchObject({ instrumentCount: 2, attemptedCount: 1, successCount: 1, progress: { resumed: true, skippedCompletedCount: 1, cumulativeSuccessCount: 2 } });
     expect(state.fetchedUs).toEqual([{ code: "MSFT", market: "NAS" }]);
     expect(state.historyRows.map((row) => row.code)).toEqual(["MSFT"]);
+  });
+
+  it("skips KIS calls while all failed instruments are in their persisted retry backoff", async () => {
+    state.progressItems = [usItem("AAPL")];
+    state.progressStatuses.set("NAS:AAPL", "FAILED");
+    state.progressDeferred = 1;
+    state.progressNextRetryAt = "2026-10-19T00:00:00.000Z";
+
+    const result = await refreshInstrumentFundamentals();
+
+    expect(result).toMatchObject({ ok: true, skipped: true, reason: "instrument_retry_backoff", attemptedCount: 0, nextRetryAt: state.progressNextRetryAt, progress: { deferredRetryCount: 1 } });
+    expect(state.fetchedUs).toEqual([]);
+    expect(state.transactionCount).toBe(0);
   });
 
   it("uses transaction insert targets for both snapshot and history in each batch", async () => {
