@@ -81,7 +81,7 @@ vi.mock("@/lib/kis-us-price-detail", () => ({
 }));
 
 import { instrumentFundamentalHistory, instrumentFundamentalSnapshots } from "@/lib/schema";
-import { isEligibleFundamentalInstrument, parseNullableFundamentalNumber, refreshInstrumentFundamentals } from "./instrument-fundamentals";
+import { classifyFundamentalProviderFailure, isEligibleFundamentalInstrument, parseNullableFundamentalNumber, refreshInstrumentFundamentals } from "./instrument-fundamentals";
 
 function usItem(code: string, extra: Record<string, unknown> = {}) {
   return { market: "NAS", code, name: `Company ${code}`, enabled: true, instrumentType: "COMMON_STOCK", isEtp: false, isWarrant: false, isDerivative: false, isDr: false, isLeveraged: false, isInverse: false, ...extra };
@@ -117,6 +117,17 @@ describe("instrument-fundamentals refresh", () => {
     expect(parseNullableFundamentalNumber("0")).toBe(0);
   });
 
+  it("classifies provider HTTP, business, stale, price, and market-cap failures without free-form messages", () => {
+    const base = { status: 200, responseOk: true, price: 10, marketCap: 100 };
+    expect(classifyFundamentalProviderFailure({ ...base, status: 503, responseOk: false })).toBe("KIS_HTTP_STATUS_503");
+    expect(classifyFundamentalProviderFailure({ ...base, rtCd: "1", messageCode: "EGW00123" })).toBe("KIS_BUSINESS_ERROR_EGW00123");
+    expect(classifyFundamentalProviderFailure({ ...base, rtCd: "1", messageCode: "Authorization error with token" })).toBe("KIS_BUSINESS_ERROR_UNKNOWN");
+    expect(classifyFundamentalProviderFailure({ ...base, stale: true })).toBe("KIS_STALE_DATA");
+    expect(classifyFundamentalProviderFailure({ ...base, price: null })).toBe("KIS_PRICE_INVALID");
+    expect(classifyFundamentalProviderFailure({ ...base, marketCap: null })).toBe("KIS_MARKET_CAP_MISSING_OR_INVALID");
+    expect(classifyFundamentalProviderFailure(base)).toBeNull();
+  });
+
   it("accepts only enabled common stocks without excluded product or halt flags", () => {
     const common = usItem("AAPL");
     expect(isEligibleFundamentalInstrument(common)).toBe(true);
@@ -145,6 +156,7 @@ describe("instrument-fundamentals refresh", () => {
     const result = await refreshInstrumentFundamentals();
 
     expect(result).toMatchObject({ ok: false, instrumentCount: 2, attemptedCount: 2, successCount: 0, failureCount: 2 });
+    expect(result.failures.map((failure) => failure.error).sort()).toEqual(["KIS_BUSINESS_ERROR_UNKNOWN", "KIS_STALE_DATA"]);
     expect(state.transactionCount).toBe(1);
     expect(state.historyRows).toHaveLength(0);
     expect(state.snapshotRows).toHaveLength(0);

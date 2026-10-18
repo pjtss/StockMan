@@ -1,5 +1,29 @@
 # Development Log
 
+## [2026-10-18] Fundamentals 공급자 오류 원인 세분화
+
+### 목표
+- 시총 갱신 실패 종목을 재시도할 때 HTTP 장애, KIS 업무 오류, 오래된 fallback, 가격/시총 누락을 안전하게 구분하여 운영자가 원인을 판별할 수 있게 한다.
+
+### 반영
+- `lib/instrument-fundamentals.ts`: 공급자 응답을 HTTP 상태 → KIS 업무 코드 → stale 여부 → 가격 → 시총 순으로 검증하고, 원문 메시지 대신 제한된 안전 오류 코드를 진행 원장에 기록한다. 토큰 부재·요청 timeout·네트워크 실패도 별도 코드로 구분한다.
+- `lib/instrument-fundamentals.test.ts`: HTTP 503, KIS 업무 코드, 비안전 메시지 코드, stale fallback, 가격/시총 누락의 분류와 실제 refresh 실패 요약을 회귀 테스트로 고정한다.
+
+### 검증
+- 전용 Vitest 14개 통과. 전체 `deploy:verify`와 PostgreSQL 런타임 확인은 진행 예정이며, 성공 전에는 커밋·푸시·배포하지 않는다.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, standalone `/charts`·API smoke, desktop/mobile hydration, Vitest 795개 통과·1개 skip, typecheck, docs/migration audit(V155), verify-scope, KIS boundary, Bearer auth, OCI cron 구조, npm audit 취약점 0건.
+
+### 다음 개선
+- 운영 재시도 이력에서 오류 코드별 발생 비율을 확인하고, 일시 장애와 영구적인 종목 데이터 결함에 대해 같은 backoff가 적절한지 측정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-008
+- 성과 판정: IMPROVED
+- 근거: 테스트에서 동일한 실패 카운터가 원인별 안전 코드로 정확히 분류되고 자유형 응답 문구는 저장되지 않음을 확인했다. 운영 분포는 배포 뒤 계측해야 한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 코드와 작업 로그를 커밋·푸시하고 배포한다.
+
 ## [2026-10-18] Fundamentals 실패 종목 재시도 폭주 방지
 
 ### 목표
