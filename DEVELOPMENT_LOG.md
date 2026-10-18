@@ -26,7 +26,8 @@
 - 첫 구현 커밋 `36debb92`의 `npm.cmd run deploy:verify` 및 Deploy OCI run `39097027526`는 통과했으나, 운영 AAPL 일봉 직접 호출이 45초 timeout되어 추가 원인을 수정 중이다. 해당 배포 중 일시 502가 있었지만 workflow 성공 뒤 health는 200으로 복구됐다.
 - 거래소 필터를 재무 요약 쿼리까지 확장한 후 전용 테스트 15개, `npm.cmd run typecheck`, `npm.cmd run docs:check`, `git diff --check` 통과.
 - 수정본 `npm.cmd run deploy:verify`: 통과. 의존성 감사 0건, production build, standalone `/charts` HTTP 200·11개 JS 청크·Chrome desktop/mobile hydration, 핵심 API smoke, 전체 Vitest 218개 파일(763 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, cron 검사 확인.
-- 수정본의 실운영 차트 직접 호출 및 최종 배포 확인은 뒤이어 수행한다.
+- 운영 배포: 커밋 `b960d522`의 Deploy OCI run `39098354489`가 성공했고 운영 `/api/health`와 `/charts` 모두 HTTP 200이다.
+- 실운영 AAPL 차트 API를 직접 호출해 HTTP 200, 총 1,629ms, `Server-Timing` 차트 911ms를 확인했다. 단계별 시간은 활성 종목 마스터 113ms, 원격 캐시 490ms, DB 캔들 192ms, 재무 요약 114ms다. 45초 timeout에서 정상 응답으로 회복했으며 153개 봉, 마지막 거래일 2026-10-16, 출처 `KIS_OVERSEAS_PRICE`, 재무 상태 `AVAILABLE`을 확인했다.
 - `git diff --check`: 통과.
 
 ### 다음 개선
@@ -38,7 +39,7 @@
 - 근거: 해외 거래소 순차 조회를 활성 보통주 마스터 기반 단일 거래소 요청으로 바꾸고 저장 캔들 캐시를 외부 API보다 먼저 조회하도록 회귀 테스트를 추가했다.
 
 ### 커밋·푸시·배포
-- 미실행: 수정본 전체 검증 후 커밋·푸시하여 운영 자동 배포를 다시 진행한다. 실운영 차트 endpoint까지 통과하기 전에는 정상화로 판정하지 않는다.
+- 완료: 구현 커밋 `b960d522`를 `https://github.com/pjtss/StockMan.git`의 `oci` 브랜치에 푸시했고 Deploy OCI run `39098354489`가 성공했다. 운영 health, `/charts`, AAPL 해외 차트 API의 HTTP 200 및 1.6초 응답을 검증했다.
 
 ## [2026-10-17] SEC AI 평가 요청의 시간·응답 크기 제한 추가
 
