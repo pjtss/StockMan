@@ -93,7 +93,8 @@ async function fetchChartData(code: string, company: string, timeframe: ChartTim
     chartDataCache.set(key, result);
     return result;
   }
-  const response = await fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}`, { signal });
+  const exchangeQuery = market === "US" && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+  const response = await fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}${exchangeQuery}`, { signal, cache: "no-store" });
   const body = await readJsonResponse<ChartData & { error?: string }>(response);
   if (!response.ok) {
     const error = new Error(body.error ?? `HTTP ${response.status}`) as Error & { fundamentals?: ChartFundamentals };

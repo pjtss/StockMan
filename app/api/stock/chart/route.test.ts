@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { poolQuery, dbExecute } = vi.hoisted(() => ({ poolQuery: vi.fn(), dbExecute: vi.fn() }));
+
 vi.mock("@/lib/kis-chart", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/kis-chart")>(),
   fetchChartData: vi.fn().mockResolvedValue({
@@ -12,7 +14,7 @@ vi.mock("@/lib/kis-us-daily-price", () => ({ fetchUsDailyPrice: vi.fn() }));
 vi.mock("@/lib/remote-daily-candle-cache", () => ({ loadRemoteDailyCandles: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/remote-stock-chart", () => ({ loadRemoteStockChart: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/chart-candle-memory-cache", async () => await vi.importActual("@/lib/chart-candle-memory-cache"));
-vi.mock("@/lib/db", () => ({ getDb: () => ({ execute: vi.fn().mockResolvedValue({ rows: [{ marketCap: 1000000000, tradingValue: 600000, volume: 1200, currency: "KRW", observedAt: "2026-08-28T00:00:00.000Z", fetchedAt: "2026-08-28T00:00:00.000Z", source: "TEST" }, ...Array.from({ length: 20 }, () => ({ tradingValue: 500000, volume: 1000 }))] }) }) }));
+vi.mock("@/lib/db", () => ({ getPool: () => ({ query: poolQuery }), getDb: () => ({ execute: dbExecute }) }));
 
 import { GET } from "./route";
 import { fetchChartData } from "@/lib/kis-chart";
@@ -27,6 +29,11 @@ beforeEach(() => {
   vi.mocked(loadRemoteDailyCandles).mockResolvedValue(null);
   vi.mocked(loadRemoteStockChart).mockResolvedValue(null);
   vi.mocked(fetchUsDailyPrice).mockReset().mockResolvedValue(null);
+  poolQuery.mockImplementation(async (query: string, params: unknown[] = []) => {
+    if (query.includes("FROM us_common_stock_universe")) return { rows: [{ market: params[1] ?? "NAS" }] };
+    return { rows: [] };
+  });
+  dbExecute.mockResolvedValue({ rows: [{ marketCap: 1000000000, tradingValue: 600000, volume: 1200, currency: "KRW", observedAt: "2026-08-28T00:00:00.000Z", fetchedAt: "2026-08-28T00:00:00.000Z", source: "TEST" }, ...Array.from({ length: 20 }, () => ({ tradingValue: 500000, volume: 1000 }))] });
 });
 
 describe("chart fundamentals response", () => {
@@ -74,6 +81,42 @@ describe("chart fundamentals response", () => {
     expect(fetchUsDailyPrice).toHaveBeenCalledWith({ code: "AAPL", market: "NYS", timeframe: "D" });
   });
 
+  it("resolves an omitted US exchange from the active common-stock master and makes one KIS request", async () => {
+    vi.mocked(fetchUsDailyPrice).mockResolvedValue({
+      ok: true, status: 200, request: { method: "GET", url: "", headers: {} }, response: { rawText: "", parsed: {} },
+      candles: [{ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100, raw: {} }],
+      diagnostics: { httpStatus: 200, kisOk: true, rtCd: "0", msgCd: null, msg1: null, outputKey: "output", rawOutputCount: 1, parsedCandleCount: 1, firstDate: "20261014", lastDate: "20261014" },
+    });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=US%3AAAPL&market=US&timeframe=D"));
+    expect(response.status).toBe(200);
+    expect(poolQuery).toHaveBeenCalledWith(expect.stringContaining("us_common_stock_universe"), ["AAPL", null]);
+    expect(fetchUsDailyPrice).toHaveBeenCalledTimes(1);
+    expect(fetchUsDailyPrice).toHaveBeenCalledWith({ code: "AAPL", market: "NAS", timeframe: "D" });
+  });
+
+  it("returns cached US candles before calling KIS", async () => {
+    poolQuery.mockImplementation(async (query: string, params: unknown[] = []) => {
+      if (query.includes("FROM us_common_stock_universe")) return { rows: [{ market: "NAS" }] };
+      if (query.includes("FROM us_instrument_universe_candles")) return { rows: [{ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100, fetchedAt: "2026-10-14T00:00:00.000Z" }] };
+      return { rows: [] };
+    });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=US%3AAAPL&market=US&timeframe=D"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).candles).toHaveLength(1);
+    expect(fetchUsDailyPrice).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without probing KIS when an active common stock cannot be confirmed", async () => {
+    poolQuery.mockImplementation(async (query: string) => query.includes("FROM us_instrument_universe_candles")
+      ? { rows: [{ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100 }] }
+      : { rows: [] });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=US%3AUNKNOWN&market=US&timeframe=D"));
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ chartStatus: "UNAVAILABLE", eligibility: "FAIL_CLOSED" });
+    expect(fetchUsDailyPrice).not.toHaveBeenCalled();
+    expect(poolQuery).toHaveBeenCalledTimes(1);
+  });
+
   it("uses raw candle memory without caching indicators or querying providers again", async () => {
     const key = chartCandleMemoryKey({ market: "US", code: "US:AAPL", exchange: "NAS", timeframe: "D" });
     setChartCandleMemory(key, [{ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100 }], "2026-10-14T00:00:00.000Z");
@@ -104,7 +147,7 @@ describe("chart fundamentals response", () => {
       const json = await response.json();
       expect(response.status).toBe(200);
       expect(json.candles).toHaveLength(1);
-      expect(fetchUsDailyPrice).toHaveBeenCalledTimes(3);
+      expect(fetchUsDailyPrice).toHaveBeenCalledTimes(1);
       expect(loadRemoteStockChart).toHaveBeenCalledWith(expect.objectContaining({ market: "US", code: "US:AAPL", exchange: "NAS", timeframe: "D" }));
     } finally {
       if (previousUrl === undefined) delete process.env.DAILY_CACHE_API_URL;

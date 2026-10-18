@@ -1,5 +1,41 @@
 # Development Log
 
+## [2026-10-18] 해외 차트 모달의 거래소 누락 및 불필요한 KIS 대기 수정
+
+### 목표
+- 해외 티커 차트 모달이 무한 대기처럼 보이는 흐름을 줄이고, 저장된 일봉을 우선 표시하며 거래소별 KIS 조회를 단일 요청으로 제한한다.
+
+### 반영
+- `components/chart-modal.tsx`: 일봉·주봉·월봉 차트 요청에도 모달이 가진 해외 거래소 코드를 전달한다.
+- `app/api/stock/chart/route.ts`: 해외 종목의 거래소를 활성 COMMON_STOCK 마스터에서 검증하고, 거래소가 확정된 종목에 한해 해당 거래소의 DB 캔들 캐시를 KIS보다 먼저 조회한다. 활성 보통주 또는 거래소를 확인할 수 없는 경우 KIS 거래소 순차 probing을 중단하고 명시적인 오류 상태를 반환한다.
+- `app/api/stock/chart/route.test.ts`, `components/chart-modal.test.tsx`: 거래소 미지정 시 마스터 기반 단일 KIS 요청, 캐시 우선 반환, 자격 확인 실패의 fail-closed, 클라이언트 거래소 전달 회귀 테스트를 추가했다.
+
+### 근본 원인 및 영향
+- 모달이 분봉 요청에는 거래소를 전달했지만 일·주·월봉 `/api/stock/chart` 요청에는 전달하지 않았다. 서버는 거래소가 없는 해외 티커를 NAS/NYS/AMS 순서로 최대 3회 KIS 조회했고, 로컬 DB 캔들도 KIS 요청 뒤에 조회했다. KIS 개별 요청 timeout이 30초이므로 캐시가 있어도 모달이 오래 로딩되거나 여러 요청이 연속 대기할 수 있었다.
+- 이제 모달 거래소 정보를 우선 전달하고, 직접 호출 등 거래소가 빠진 요청은 공식 활성 보통주 마스터에서 거래소를 찾는다. 로컬 DB 캐시가 존재하면 외부 KIS 조회를 생략하고, 거래소 정보가 모호하거나 종목을 확인할 수 없으면 무분별한 시장 요청 대신 422/503 JSON으로 종료한다.
+
+### 재발 감지 및 운영 기준
+- API 회귀 테스트에서 해외 티커의 거래소 미지정 요청이 마스터 조회 후 KIS를 정확히 한 번만 부르는지, DB 캐시 적중 시 KIS를 전혀 호출하지 않는지, 마스터 미확인 시 KIS 호출을 차단하는지 고정 검증한다.
+- 모달 테스트는 선택된 NAS/NYS/AMS 거래소가 `/api/stock/chart` URL에 포함되는지 확인한다. `Server-Timing`의 `instrument-master`, `db-cache`, `kis` 구간을 운영 응답에서 비교해 지연 구간을 판별할 수 있다.
+- 남은 위험: DB 캐시가 없고 KIS가 느리거나 무응답이면 해당 단일 KIS 호출은 기존 30초 timeout까지 대기할 수 있다. 운영에서 빈번할 경우 실제 호출 latency와 timeout 비율을 확인한 뒤 별도 timeout 정책을 검토한다.
+
+### 검증
+- `npm.cmd test -- --run app/api/stock/chart/route.test.ts components/chart-modal.test.tsx`: 2개 파일, 15개 테스트 통과.
+- `npm.cmd run typecheck`: 통과.
+- `npm.cmd run deploy:verify`: 통과. 의존성 감사 0건, production build, standalone `/charts` HTTP 200·11개 참조 JS 청크·Chrome 데스크톱/모바일 hydration, 관련 API smoke, 전체 Vitest 218개 파일(763 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, cron 검사 확인.
+- `git diff --check`: 통과.
+
+### 다음 개선
+- 배포 후 해외 차트 API의 `Server-Timing`과 KIS timeout/빈 응답 비율을 확인하고, DB 캐시 미스 경로의 사용자 대기시간이 반복적으로 길면 관측값에 근거해 별도 응답시간 개선을 설계한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-001
+- 성과 판정: IMPROVED
+- 근거: 해외 거래소 순차 조회를 활성 보통주 마스터 기반 단일 거래소 요청으로 바꾸고 저장 캔들 캐시를 외부 API보다 먼저 조회하도록 회귀 테스트를 추가했다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 통과 후 현재 변경만 커밋·푸시하여 운영 자동 배포를 진행한다. GitHub Actions와 운영 smoke 결과는 배포 이후 추가한다.
+
 ## [2026-10-17] SEC AI 평가 요청의 시간·응답 크기 제한 추가
 
 ### 목표

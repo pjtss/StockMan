@@ -106,6 +106,15 @@ describe("ChartModal", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it("passes the selected US exchange to the daily chart endpoint", async () => {
+    render(<ChartModal code="US:AAPL" company="Apple Inc." exchange="NAS" onClose={vi.fn()} />);
+    await screen.findByRole("dialog");
+    await waitFor(() => {
+      const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+      expect(requests.some((url) => url.startsWith("/api/stock/chart?") && url.includes("market=US") && url.includes("exchange=NAS"))).toBe(true);
+    });
+  });
+
   it.each([
     { storedValue: "null", code: "000660" },
     { storedValue: "[]", code: "000661" },
