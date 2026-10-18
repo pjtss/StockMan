@@ -7,22 +7,26 @@
 
 ### 반영
 - `components/chart-modal.tsx`: 일봉·주봉·월봉 차트 요청에도 모달이 가진 해외 거래소 코드를 전달한다.
-- `app/api/stock/chart/route.ts`: 해외 종목의 거래소를 활성 COMMON_STOCK 마스터에서 검증하고, 거래소가 확정된 종목에 한해 해당 거래소의 DB 캔들 캐시를 KIS보다 먼저 조회한다. 활성 보통주 또는 거래소를 확인할 수 없는 경우 KIS 거래소 순차 probing을 중단하고 명시적인 오류 상태를 반환한다.
+- `app/api/stock/chart/route.ts`: 해외 종목의 거래소를 활성 COMMON_STOCK 마스터에서 검증하고, 거래소가 확정된 종목에 한해 해당 거래소의 DB 캔들 캐시를 KIS보다 먼저 조회한다. 재무 요약의 캔들·스냅샷 쿼리도 거래소 조건으로 제한해 `(market, code, timeframe, candle_date)` 인덱스를 활용하도록 한다. 활성 보통주 또는 거래소를 확인할 수 없는 경우 KIS 거래소 순차 probing을 중단하고 명시적인 오류 상태를 반환한다.
 - `app/api/stock/chart/route.test.ts`, `components/chart-modal.test.tsx`: 거래소 미지정 시 마스터 기반 단일 KIS 요청, 캐시 우선 반환, 자격 확인 실패의 fail-closed, 클라이언트 거래소 전달 회귀 테스트를 추가했다.
 
 ### 근본 원인 및 영향
 - 모달이 분봉 요청에는 거래소를 전달했지만 일·주·월봉 `/api/stock/chart` 요청에는 전달하지 않았다. 서버는 거래소가 없는 해외 티커를 NAS/NYS/AMS 순서로 최대 3회 KIS 조회했고, 로컬 DB 캔들도 KIS 요청 뒤에 조회했다. KIS 개별 요청 timeout이 30초이므로 캐시가 있어도 모달이 오래 로딩되거나 여러 요청이 연속 대기할 수 있었다.
 - 이제 모달 거래소 정보를 우선 전달하고, 직접 호출 등 거래소가 빠진 요청은 공식 활성 보통주 마스터에서 거래소를 찾는다. 로컬 DB 캐시가 존재하면 외부 KIS 조회를 생략하고, 거래소 정보가 모호하거나 종목을 확인할 수 없으면 무분별한 시장 요청 대신 422/503 JSON으로 종료한다.
+- 첫 배포 후 실운영 AAPL 차트 요청이 45초 내 응답하지 않는 것을 확인했다. 운영 admin 진단 API에서는 DB health 약 207ms, 최근 KIS 일봉 호출 79~379ms와 유효 토큰을 확인했으며, 차트의 재무 보조 쿼리가 거래소 필터 없이 대형 캔들 테이블을 읽는 경로를 추가 원인으로 좁혔다. 수정 후 실운영 차트 API를 다시 검증한다.
 
 ### 재발 감지 및 운영 기준
 - API 회귀 테스트에서 해외 티커의 거래소 미지정 요청이 마스터 조회 후 KIS를 정확히 한 번만 부르는지, DB 캐시 적중 시 KIS를 전혀 호출하지 않는지, 마스터 미확인 시 KIS 호출을 차단하는지 고정 검증한다.
 - 모달 테스트는 선택된 NAS/NYS/AMS 거래소가 `/api/stock/chart` URL에 포함되는지 확인한다. `Server-Timing`의 `instrument-master`, `db-cache`, `kis` 구간을 운영 응답에서 비교해 지연 구간을 판별할 수 있다.
-- 남은 위험: DB 캐시가 없고 KIS가 느리거나 무응답이면 해당 단일 KIS 호출은 기존 30초 timeout까지 대기할 수 있다. 운영에서 빈번할 경우 실제 호출 latency와 timeout 비율을 확인한 뒤 별도 timeout 정책을 검토한다.
+- 남은 위험: DB 캐시가 없고 KIS가 느리거나 무응답이면 해당 단일 KIS 호출은 기존 30초 timeout까지 대기할 수 있다. 재무 보조 쿼리 필터 추가 후에도 운영 차트 요청이 느리면 단계별 Server-Timing과 SQL 실행계획을 재확인한다.
 
 ### 검증
 - `npm.cmd test -- --run app/api/stock/chart/route.test.ts components/chart-modal.test.tsx`: 2개 파일, 15개 테스트 통과.
 - `npm.cmd run typecheck`: 통과.
-- `npm.cmd run deploy:verify`: 통과. 의존성 감사 0건, production build, standalone `/charts` HTTP 200·11개 참조 JS 청크·Chrome 데스크톱/모바일 hydration, 관련 API smoke, 전체 Vitest 218개 파일(763 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, cron 검사 확인.
+- 첫 구현 커밋 `36debb92`의 `npm.cmd run deploy:verify` 및 Deploy OCI run `39097027526`는 통과했으나, 운영 AAPL 일봉 직접 호출이 45초 timeout되어 추가 원인을 수정 중이다. 해당 배포 중 일시 502가 있었지만 workflow 성공 뒤 health는 200으로 복구됐다.
+- 거래소 필터를 재무 요약 쿼리까지 확장한 후 전용 테스트 15개, `npm.cmd run typecheck`, `npm.cmd run docs:check`, `git diff --check` 통과.
+- 수정본 `npm.cmd run deploy:verify`: 통과. 의존성 감사 0건, production build, standalone `/charts` HTTP 200·11개 JS 청크·Chrome desktop/mobile hydration, 핵심 API smoke, 전체 Vitest 218개 파일(763 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, cron 검사 확인.
+- 수정본의 실운영 차트 직접 호출 및 최종 배포 확인은 뒤이어 수행한다.
 - `git diff --check`: 통과.
 
 ### 다음 개선
@@ -34,7 +38,7 @@
 - 근거: 해외 거래소 순차 조회를 활성 보통주 마스터 기반 단일 거래소 요청으로 바꾸고 저장 캔들 캐시를 외부 API보다 먼저 조회하도록 회귀 테스트를 추가했다.
 
 ### 커밋·푸시·배포
-- 미실행: 검증 통과 후 현재 변경만 커밋·푸시하여 운영 자동 배포를 진행한다. GitHub Actions와 운영 smoke 결과는 배포 이후 추가한다.
+- 미실행: 수정본 전체 검증 후 커밋·푸시하여 운영 자동 배포를 다시 진행한다. 실운영 차트 endpoint까지 통과하기 전에는 정상화로 판정하지 않는다.
 
 ## [2026-10-17] SEC AI 평가 요청의 시간·응답 크기 제한 추가
 

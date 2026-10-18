@@ -79,6 +79,7 @@ describe("chart fundamentals response", () => {
     expect(json.candles).toHaveLength(1);
     expect(fetchUsDailyPrice).toHaveBeenCalledTimes(1);
     expect(fetchUsDailyPrice).toHaveBeenCalledWith({ code: "AAPL", market: "NYS", timeframe: "D" });
+    expect(JSON.stringify(dbExecute.mock.calls)).toContain("NYS");
   });
 
   it("resolves an omitted US exchange from the active common-stock master and makes one KIS request", async () => {
