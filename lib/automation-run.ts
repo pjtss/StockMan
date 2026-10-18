@@ -48,7 +48,7 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
   const startedAt = Date.now();
   const trace = await readRequestTrace();
   try { runId = await startAutomationRun(moduleKey, dimensions); } catch (error) { console.warn(`[Automation] run history unavailable for ${moduleKey}:`, error instanceof Error ? error.message : error); }
-  const finishSafely = async (status: "SUCCESS" | "FAILED", summary: Record<string, unknown>, errorMessage?: string) => {
+  const finishSafely = async (status: "SUCCESS" | "PARTIAL" | "FAILED" | "SKIPPED", summary: Record<string, unknown>, errorMessage?: string) => {
     try { await finishAutomationRun(runId, status, summary, errorMessage); }
     catch (error) { console.warn(`[Automation] unable to finalize run history for ${moduleKey}:`, error instanceof Error ? error.message : error); }
   };
@@ -60,24 +60,27 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
     }
     const summary: Record<string, unknown> = compactAutomationSummary(result && typeof result === "object" ? { ...(result as Record<string, unknown>) } : { result }) as Record<string, unknown>;
     summary.observability = { ...(summary.observability && typeof summary.observability === "object" ? summary.observability as Record<string, unknown> : {}), ...(trace || {}), durationMs: Date.now() - startedAt };
-    try {
-      // A worker can finish its loop while individual instruments failed.
-      // Keep the run technically completed for scheduling, but surface the
-      // partial failure as a failure notification so the debug channel cannot
-      // silently report a green run with missing candles.
-      const failureCount = Number(summary.failureCount ?? 0);
-      const instrumentCount = Number(summary.instrumentCount ?? 0);
-      const notificationStatus = failureCount === 0
+    // A worker can finish its loop while individual instruments failed. Persist
+    // the same outcome that is sent to the completion notification so schedules
+    // can distinguish a complete daily refresh from a partial/failed attempt.
+    const failureCount = Number(summary.failureCount ?? 0);
+    const instrumentCount = Number(summary.instrumentCount ?? 0);
+    const runStatus = summary.skipped === true
+      ? "SKIPPED"
+      : failureCount === 0
         ? "SUCCESS"
         : instrumentCount > 0 && failureCount >= instrumentCount
           ? "FAILED"
           : "PARTIAL";
-      summary.notifications = { completion: await notifyAutomationCompletion(moduleKey, notificationStatus, summary, notificationStatus === "FAILED" ? `${summary.failureCount}개 종목 처리 실패` : undefined) };
+    try {
+      summary.notifications = runStatus === "SKIPPED"
+        ? { completion: { sent: false, skipped: true, reason: "already_running" } }
+        : { completion: await notifyAutomationCompletion(moduleKey, runStatus, summary, runStatus === "FAILED" ? `${summary.failureCount}개 종목 처리 실패` : undefined) };
     } catch (error) {
       summary.notifications = { completion: { sent: false, skipped: false, reason: "delivery_failed", error: error instanceof Error ? error.message : String(error) } };
       console.warn(`[Automation] completion notification failed for ${moduleKey}:`, error instanceof Error ? error.message : error);
     }
-    await finishSafely("SUCCESS", summary);
+    await finishSafely(runStatus, summary);
     return result;
   } catch (error) {
     const diagnostics = describeError(error);

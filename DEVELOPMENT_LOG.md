@@ -1,5 +1,47 @@
 # Development Log
 
+## [2026-10-18] 국내·해외 시가총액/재무 스냅샷 갱신 오류 방지
+
+### 목표
+- 종목 재무·시가총액 자동 갱신 중 누락 데이터를 0으로 오인하거나, KIS 오류/오래된 응답 및 부분 DB 실패를 성공으로 기록하는 문제를 차단한다.
+
+### 반영
+- `lib/instrument-fundamentals.ts`: 수치 파싱에서 빈 값·잘못된 숫자를 `null`로 보존하고, 활성 `COMMON_STOCK`와 제외 플래그를 DB 질의 및 애플리케이션 경계에서 이중 검증한다. 해외 KIS 응답은 HTTP 성공·`rt_cd=0`·비 stale 조건을 확인하고, 가격·시총 유효성 검사 후 저장한다. 200개 단위 수집/저장과 8개 provider worker로 메모리 상한을 두고, history+snapshot은 원자적 트랜잭션으로 저장하며 DB 배치는 최대 3회 재시도한다. 실행 결과에 provider/DB 시간, batch, 시도·성공·실패·미시도 수 및 시장별 요약을 기록한다.
+- `lib/kis-kr-price-detail.ts`: 국내 KIS 수치 변환도 빈 문자열을 0으로 바꾸지 않도록 공통 nullable parser를 적용한다.
+- `lib/automation-run.ts`, `app/api/cron/instrument-fundamentals/route.ts`: 실행 결과에 따라 SUCCESS/PARTIAL/FAILED/SKIPPED를 구분하고, 부분 실패는 성공한 갱신으로 오인하지 않도록 재시도 cooldown을 적용한다. 직전 실행 상태 조회 실패·잘못된 시각은 cron을 fail-closed 처리한다.
+- `lib/instrument-fundamentals.test.ts`, `lib/kis-kr-price-detail.test.ts`, `lib/automation-run.test.ts`, `app/api/cron/instrument-fundamentals/route.test.ts`: 파서, 자격/상품 필터, KIS stale·업무 오류, 시총 누락, 원자적 배치, DB 재시도, 상태 분류와 cron 재실행 정책에 대한 회귀 테스트를 추가했다. 기존 자동화 요약 압축 테스트도 유지했다.
+- `docs/operations/instrument-fundamentals-refresh.md`: 갱신 파이프라인, 데이터 무결성 규칙, 재시도·관측 및 남은 한계를 운영 기준으로 문서화했다.
+
+### 근본 원인 및 영향
+- `Number("")`가 0으로 해석되어 제공자가 필드를 누락한 상황과 실제 0을 구분하지 못했다. 특히 누락 시총이 snapshot을 덮어쓸 수 있었다.
+- 해외 API 경로가 일부 stale/업무 오류 응답을 성공 데이터처럼 처리할 여지가 있었고, 국내·해외 대상을 `enabled` 외의 보통주/상품 제외 조건으로 충분히 방어하지 않았다.
+- 모든 공급자 응답을 메모리에 모은 뒤 한꺼번에 저장해 장시간 실행 중단 시 앞서 받은 정상 데이터도 모두 유실될 수 있었다. history와 snapshot이 별도 쓰기라 한쪽만 반영될 수도 있었다.
+- 자동화 wrapper가 개별 종목 실패 또는 lock skip에도 SUCCESS를 남겨 설정된 일일 실행 간격이 실패 후 재시도를 막을 수 있었다.
+
+### 재발 감지 및 운영 기준
+- 전용 회귀 테스트와 `npm.cmd run deploy:verify`를 배포 전 게이트로 사용한다. 관측상 `successCount`는 DB 트랜잭션 완료 행만 뜻하고, 전체 실패 수는 provider 실패 및 미시도 행까지 포함한다.
+- 운영 실행 이력에서 PARTIAL/FAILED의 `failureCount`, `unattemptedCount`, `databaseFailure`, 시장별 실패 및 제한된 실패 샘플을 확인한다. 시총 누락은 기존 snapshot을 덮어쓰지 않고 오류로 드러나야 한다.
+- 공식 KIS 샘플도 HTTP 응답과 `rt_cd` 성공 여부를 함께 검사한다: [한국투자증권 Open Trading API 공식 샘플](https://github.com/koreainvestment/open-trading-api/blob/main/legacy/rest/current_price_samle.py).
+- 남은 위험: 장시간 전체 종목 수집에 대한 durable resume cursor는 없다. DB 배치 실패 시 이미 커밋된 배치는 유지되며 실패/미시도 상태로 기록되고, 다음 실행에서 전체 목록을 다시 순회한다. KIS TPS와 실제 전체 실행 소요는 운영 갱신 이력의 provider 시간 및 duration을 관찰해 후속 최적화를 결정한다.
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-18-002
+- 성과 판정: IMPROVED
+- 근거: 누락 수치·stale 응답·비보통주 대상·부분 저장/실행 상태를 각각 회귀 테스트로 고정했고, 성공 건수를 실제 커밋된 배치만 집계하도록 변경했다.
+
+### 검증
+- 전용 4개 테스트 파일: 24개 테스트 통과.
+- `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0건, Next production build, standalone 서버의 `/charts` HTTP 200, JS 청크 확인, desktop/mobile Chrome hydration, 핵심 API smoke 및 품질 게이트 전체 확인.
+- 전체 Vitest: 221개 파일 중 220개 통과·1개 skip, 785 passed·1 skipped.
+- typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 구조 검증 통과.
+- 배포 검증 과정에서 standalone 서버가 로컬 포트 56210으로 실제 기동되고 smoke 종료 후 정리됐다.
+- `git diff --check`: 통과.
+
+### 다음 개선
+- 배포 후 운영 실행 이력에서 국내·해외별 실제 갱신 소요시간, 시총 누락률, PARTIAL/FAILED 비율을 확인한다. 전체 갱신이 cron 응답/서비스 제한시간에 접근하면, 재시도 가능한 durable cursor 또는 재개 작업 설계를 별도 검토한다.
+
+### 커밋·푸시·배포
+- 아직 미실행: 구현 및 전체 로컬 배포 게이트는 통과했으며, 운영 배포는 커밋·푸시 후 별도 확인한다.
+
 ## [2026-10-18] 해외 차트 모달의 거래소 누락 및 불필요한 KIS 대기 수정
 
 ### 목표

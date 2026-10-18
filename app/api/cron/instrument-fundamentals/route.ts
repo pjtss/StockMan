@@ -14,11 +14,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule" });
   }
   const intervalSeconds = Math.max(3600, settings.intervalSeconds ?? 86400);
-  const latest = await loadLatestExecutedAutomationRun("instrument-fundamentals").catch(() => null);
-  const elapsed = latest?.started_at ? Math.round((Date.now() - new Date(latest.started_at).getTime()) / 1000) : null;
-  if (elapsed != null && elapsed < intervalSeconds) {
-    await recordSkippedAutomationRun("instrument-fundamentals", "outside_interval", { intervalSeconds, elapsedSeconds: elapsed });
-    return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: elapsed });
+  const latest = await loadLatestExecutedAutomationRun("instrument-fundamentals");
+  const latestStatus = String(latest?.status ?? "").toUpperCase();
+  const latestStartedAt = latest?.started_at ? new Date(latest.started_at).getTime() : Number.NaN;
+  if (latest && !Number.isFinite(latestStartedAt)) return NextResponse.json({ ok: false, error: "INVALID_LAST_RUN_TIMESTAMP" }, { status: 503 });
+  const elapsed = latest ? Math.max(0, Math.round((Date.now() - latestStartedAt) / 1000)) : null;
+  if (latestStatus === "RUNNING" && elapsed! < 2 * 60 * 60) {
+    await recordSkippedAutomationRun("instrument-fundamentals", "already_running", { elapsedSeconds: elapsed });
+    return NextResponse.json({ ok: true, skipped: true, reason: "already_running", elapsedSeconds: elapsed });
+  }
+  const retryIntervalSeconds = latestStatus === "SUCCESS" ? intervalSeconds : Math.min(intervalSeconds, 3600);
+  if (elapsed != null && elapsed < retryIntervalSeconds) {
+    await recordSkippedAutomationRun("instrument-fundamentals", latestStatus === "SUCCESS" ? "outside_interval" : "retry_cooldown", { intervalSeconds: retryIntervalSeconds, elapsedSeconds: elapsed, lastStatus: latestStatus });
+    return NextResponse.json({ ok: true, skipped: true, reason: latestStatus === "SUCCESS" ? "outside_interval" : "retry_cooldown", intervalSeconds: retryIntervalSeconds, elapsedSeconds: elapsed, lastStatus: latestStatus });
   }
   const result = await withAutomationRun("instrument-fundamentals", refreshInstrumentFundamentals);
   return NextResponse.json(result);
