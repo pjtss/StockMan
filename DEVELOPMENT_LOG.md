@@ -39,7 +39,9 @@
 - 근거: 실제 성공시간 분포가 기존 300초 timeout보다 크게 길다는 운영 이력을 확인했고, 이 실행을 독립 timer/service로 옮겨 다른 자동화와 timeout 간섭을 구조적으로 차단한다.
 
 ### 커밋·푸시·배포
-- 미실행: 커밋·푸시 후 전용 scheduler의 운영 활성 여부까지 확인한다.
+- 완료: 커밋 `0639d857`를 `oci`에 push했고 GitHub Actions Deploy OCI run `39103505050`이 성공했다.
+- 운영 `/api/health`와 `/charts`는 배포 직후 모두 HTTP 200. 배포 activation은 `stockman-fundamentals.timer`의 `systemctl is-active` 검증까지 통과했다.
+- 배포 직후 자동 실행 기록은 `outside_interval`로 SKIPPED(24시간 간격 중 41,995초 경과)였고 `RUNNING`/stale 항목은 0건이다. 따라서 이번 확인에서는 전체 갱신을 강제로 유발하지 않았다.
 
 ## [2026-10-18] 국내·해외 시가총액/재무 스냅샷 갱신 오류 방지
 
