@@ -43,13 +43,13 @@
 
 ## 성능·관측 항목
 
-실행 결과에 `durationMs`, `providerDurationMs`(병렬 worker 요청시간의 합), `databaseDurationMs`(실패 재시도 시간 포함), `batchCount`, `attemptedCount`, `successCount`, `failureCount`, `unattemptedCount`, `databaseFailure`, 시장별 대상/성공/실패 건수를 포함한다. 실패 샘플은 최대 100건이다. KIS 응답 원문이나 자격증명은 오류 메시지에 포함하지 않는다. 외부 오류는 기계 판독 가능한 안전 오류 코드로 축약한다.
+실행 결과에 `durationMs`, `providerDurationMs`(병렬 worker 요청시간의 합), `databaseDurationMs`(실패 재시도 시간 포함), `batchCount`, `attemptedCount`, `successCount`, `failureCount`, `unattemptedCount`, `databaseFailure`, 시장별 대상/성공/실패 건수를 포함한다. `failureCodeCounts`와 `failureCodeCountsByMarket`는 항목별 전체 실패를 오류 코드별/시장별로 누적한다. DB 저장 실패로 커밋되지 않은 성공 응답 및 중단되어 미시도된 항목은 해당 DB 오류 코드로 귀속해 집계 총합이 `failureCount`와 일치하게 한다. 개인정보·응답 전문 노출을 막기 위해 종목 상세 실패 샘플은 최대 100건만 남긴다. 따라서 샘플 제한이 전체 오류 분포를 가리지 않는다. KIS 응답 원문이나 자격증명은 오류 메시지에 포함하지 않는다. 외부 오류는 기계 판독 가능한 안전 오류 코드로 축약한다.
 
 ## 자동 검증 및 운영 점검
 
 Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-progress.test.ts`, `lib/kis-kr-price-detail.test.ts`, `lib/automation-run.test.ts`, `app/api/cron/instrument-fundamentals/route.test.ts`가 누락 수치, fail-closed 상품 필터, stale/업무오류 응답, 시총 누락, 트랜잭션 배치, DB 재시도, 종목별 재시도 backoff 및 cron cooldown을 검증한다. 변경 시 전체 배포 게이트도 실행한다.
 
-운영에서 관리자 실행 이력의 상태와 요약을 확인한다. `PARTIAL`/`FAILED`이면 `failureCount`, `unattemptedCount`, `databaseFailure`, 시장별 실패 및 실패 샘플을 먼저 확인하고, 성공 건수는 시도 수가 아니라 커밋된 snapshot 배치 행 수로 해석한다.
+운영에서 관리자 실행 이력의 상태와 요약을 확인한다. `PARTIAL`/`FAILED`이면 `failureCodeCountsByMarket`로 시장별 근본 원인 분포를 먼저 확인하고, `failureCodeCounts`로 전체 분포를 교차 검증한다. 이어 `unattemptedCount`, `databaseFailure`, 최대 100건의 실패 샘플을 확인한다. 성공 건수는 시도 수가 아니라 커밋된 snapshot 배치 행 수로 해석한다.
 
 ## 남은 한계
 

@@ -148,7 +148,9 @@ async function executeInstrumentFundamentalsRefresh() {
             source = "KIS_DOMESTIC_PRICE";
           } else {
             const response = await fetchKisUsPriceDetail({ code: item.code, market: item.market });
-            if (!response) throw new Error("KIS_RESPONSE_UNAVAILABLE");
+            // The price-detail module returns null when it cannot obtain a token
+            // and has no cached stale response to fall back to.
+            if (!response) throw new Error("KIS_TOKEN_UNAVAILABLE");
             const output = getKisUsPriceDetailOutput(response.parsed);
             const parsed = response.parsed as { rt_cd?: unknown; msg_cd?: unknown } | null;
             data = { ok: response.ok, status: response.status, stale: response.stale, rtCd: parsed?.rt_cd, messageCode: parsed?.msg_cd, price: parseNullableFundamentalNumber(output.last ?? output.t_prpr ?? output.price), changeRate: parseNullableFundamentalNumber(output.t_xrat ?? output.prdy_ctrt), volume: parseNullableFundamentalNumber(output.tvol ?? output.pvol ?? output.vol), tradingValue: parseNullableFundamentalNumber(output.tamt ?? output.tamnt), marketCap: parseNullableFundamentalNumber(output.tomv), sharesOutstanding: parseNullableFundamentalNumber(output.shar ?? output.shares ?? output.lstn_stcn), currency: String(output.crcy ?? output.currency ?? "USD"), raw: response.parsed };
@@ -184,9 +186,33 @@ async function executeInstrumentFundamentalsRefresh() {
   const unattemptedCount = pendingInstruments.length - attemptedCount;
   const providerFailureCount = failures.filter((failure) => failure.market !== "DB").length;
   const failureCount = providerFailureCount + (databaseFailure ? pendingInstruments.length - successCount - providerFailureCount : 0);
+  const failureCodeCounts: Record<string, number> = {};
+  const failureCodeCountsByMarket: Record<string, Record<string, number>> = {};
+  // Set from the async persistBatch closure above; TypeScript cannot observe
+  // that closure mutation in the outer control-flow graph.
+  const databaseFailureSummary = databaseFailure as { errorCode: string; databaseCode?: string } | null;
+  const providerFailures = failures.filter((failure) => failure.market !== "DB");
+  for (const failure of providerFailures) {
+    failureCodeCounts[failure.error] = (failureCodeCounts[failure.error] ?? 0) + 1;
+    failureCodeCountsByMarket[failure.market] ??= {};
+    failureCodeCountsByMarket[failure.market][failure.error] = (failureCodeCountsByMarket[failure.market][failure.error] ?? 0) + 1;
+  }
+  if (databaseFailureSummary) {
+    const databaseFailureCount = Math.max(0, pendingInstruments.length - successCount - providerFailureCount);
+    failureCodeCounts[databaseFailureSummary.errorCode] = (failureCodeCounts[databaseFailureSummary.errorCode] ?? 0) + databaseFailureCount;
+    const committedByMarket = new Map(Object.entries(marketSummary).map(([market, summary]) => [market, summary.successCount]));
+    const providerFailuresByMarket = new Map<string, number>();
+    for (const failure of providerFailures) providerFailuresByMarket.set(failure.market, (providerFailuresByMarket.get(failure.market) ?? 0) + 1);
+    for (const market of new Set(pendingInstruments.map((item) => item.market))) {
+      const unresolvedCount = Math.max(0, pendingInstruments.filter((item) => item.market === market).length - (committedByMarket.get(market) ?? 0) - (providerFailuresByMarket.get(market) ?? 0));
+      if (!unresolvedCount) continue;
+      failureCodeCountsByMarket[market] ??= {};
+      failureCodeCountsByMarket[market][databaseFailureSummary.errorCode] = (failureCodeCountsByMarket[market][databaseFailureSummary.errorCode] ?? 0) + unresolvedCount;
+    }
+  }
   const progressResult = await finishFundamentalRefresh(progress.jobId);
   const completedAt = new Date();
-  return { ok: progressResult.status === "SUCCESS", startedAt: startedAt.toISOString(), completedAt: completedAt.toISOString(), durationMs: completedAt.getTime() - startedAt.getTime(), instrumentCount: instruments.length, attemptedCount, successCount, failureCount, unattemptedCount, batchCount, providerDurationMs, databaseDurationMs, databaseFailure, marketSummary, failures: failures.slice(0, 100), progress: { jobId: progress.jobId, resumed: progress.resumed, skippedCompletedCount: progress.skippedCompletedCount, deferredRetryCount: progress.deferredRetryCount, nextRetryAt: progress.nextRetryAt, status: progressResult.status, cumulativeSuccessCount: progressResult.successCount, cumulativeFailureCount: progressResult.failedCount, pendingCount: progressResult.pendingCount } };
+  return { ok: progressResult.status === "SUCCESS", startedAt: startedAt.toISOString(), completedAt: completedAt.toISOString(), durationMs: completedAt.getTime() - startedAt.getTime(), instrumentCount: instruments.length, attemptedCount, successCount, failureCount, unattemptedCount, batchCount, providerDurationMs, databaseDurationMs, databaseFailure, marketSummary, failureCodeCounts, failureCodeCountsByMarket, failures: failures.slice(0, 100), progress: { jobId: progress.jobId, resumed: progress.resumed, skippedCompletedCount: progress.skippedCompletedCount, deferredRetryCount: progress.deferredRetryCount, nextRetryAt: progress.nextRetryAt, status: progressResult.status, cumulativeSuccessCount: progressResult.successCount, cumulativeFailureCount: progressResult.failedCount, pendingCount: progressResult.pendingCount } };
 }
 
 export function refreshInstrumentFundamentals() {

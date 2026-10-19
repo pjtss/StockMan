@@ -1,5 +1,33 @@
 # Development Log
 
+## [2026-10-19] 시총 갱신 실패 전체 분포 및 해외 토큰 진단
+
+### 목표
+- 실패 상세 샘플 100건 제한으로 가려질 수 있는 전체 오류 분포를 보존하고, 해외 토큰 미확보를 KIS 응답 오류와 구분한다.
+
+### 반영
+- 원인: 해외 가격 상세 모듈은 토큰과 stale 캐시가 모두 없으면 `null`을 반환했지만, 시총 갱신은 이를 `KIS_RESPONSE_UNAVAILABLE`로 오분류했다. 또 전체 실패 목록을 100건으로 잘라 기록해 샘플 바깥 오류의 유형·시장 분포를 알 수 없었다.
+- `lib/instrument-fundamentals.ts`: 토큰 부재 코드를 `KIS_TOKEN_UNAVAILABLE`로 정정하고, 전체·시장별 오류 코드 집계를 추가했다. 종목 상세 샘플은 종전 100건 제한을 유지한다.
+- `lib/instrument-fundamentals.test.ts`: 토큰 부재 분류와 120건 실패 시 전체 분포 120건 및 상세 샘플 100건 제한을 회귀 테스트로 검증한다.
+- `docs/operations/instrument-fundamentals-refresh.md`: 운영자가 전체 집계 → 시장 분포 → 제한된 상세 샘플 순으로 확인하도록 관측 기준을 갱신했다.
+
+### 검증
+- 최종 `npm.cmd run deploy:verify` 통과: production build, standalone `/charts` 및 API smoke, Chrome 데스크톱·모바일 hydration, 222개 test file 중 221개 통과/1개 skip(797개 통과/1개 skip), typecheck, docs/migration audit(V155), verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 첫 전체 게이트는 로그 계약 누락으로 docs 단계에서 차단됐고, 수정 후 다음 빌드에서 DB 콜백 제어흐름 타입 오류가 발견됐다. 두 원인을 각각 보완하고 회귀테스트·typecheck 후 최종 전체 게이트 성공까지 확인했다.
+- 전용 `lib/instrument-fundamentals.test.ts`: 13개 통과. DB batch 오류 시 항목별 실패 귀속 및 120건 분포/100건 샘플 제한 검증.
+- 운영 런타임 확인은 다음 실제 갱신 실행에서 새 `failureCodeCounts`와 `failureCodeCountsByMarket` 필드를 대조해야 한다.
+
+### 다음 개선
+- 다음 운영 갱신 후 관리자 실행 이력에서 전체 오류 코드 합계가 `failureCount`와 일치하는지, 시장별 합계가 시장별 실패 건수와 일치하는지 검증한다. 특히 DB 저장 장애·중단 때의 귀속 결과를 확인한 뒤 KIS 업무 오류별 backoff 정책을 실측 근거로 조정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-19-009
+- 성과 판정: IMPROVED
+- 근거: 최종 전체 배포 검증과 회귀테스트에서 상세 샘플 상한을 유지하면서 120건 전체 실패 분포, DB 쓰기 실패의 항목별 원인 귀속, 해외 토큰 미확보의 고유 안전 코드가 동작함을 확인했다. 운영 오류율은 다음 실제 갱신 후 측정한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행(커밋·푸시 전). 전체 검증은 통과했고 지금 커밋·푸시·운영 배포를 진행한다.
+
 ## [2026-10-18] Fundamentals 공급자 오류 원인 세분화
 
 ### 목표

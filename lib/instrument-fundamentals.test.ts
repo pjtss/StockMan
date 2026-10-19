@@ -175,6 +175,38 @@ describe("instrument-fundamentals refresh", () => {
     expect(state.snapshotRows).toHaveLength(0);
   });
 
+  it("identifies an unavailable overseas token separately from a quote response error", async () => {
+    const { fetchKisUsPriceDetail } = await import("@/lib/kis-us-price-detail");
+    vi.mocked(fetchKisUsPriceDetail).mockResolvedValueOnce(null);
+
+    const result = await refreshInstrumentFundamentals();
+
+    expect(result.failures).toEqual([{ market: "NAS", code: "AAPL", error: "KIS_TOKEN_UNAVAILABLE" }]);
+    expect(result.failureCodeCounts).toEqual({ KIS_TOKEN_UNAVAILABLE: 1 });
+  });
+
+  it("retains the complete failure-code distribution when detailed samples are capped", async () => {
+    const { fetchKisUsPriceDetail } = await import("@/lib/kis-us-price-detail");
+    state.usRows = Array.from({ length: 120 }, (_, index) => usItem(`T${String(index).padStart(3, "0")}`));
+    vi.mocked(fetchKisUsPriceDetail).mockImplementation(async ({ code, market }) => ({
+      ok: true, status: 200, code, market: market ?? "AMS",
+      parsed: { rt_cd: "1", msg_cd: "EGW00103", output: { last: "10", tomv: "100" } },
+    }));
+
+    const result = await refreshInstrumentFundamentals();
+    vi.mocked(fetchKisUsPriceDetail).mockImplementation(async ({ code, market }) => {
+      state.fetchedUs.push({ code, market: market ?? "AMS" });
+      return { ok: true, status: 200, code, market: market ?? "AMS", parsed: { rt_cd: "0", output: { last: "10", tomv: "100", crcy: "USD" } } };
+    });
+
+    expect(result).toMatchObject({
+      failureCount: 120,
+      failureCodeCounts: { KIS_BUSINESS_ERROR_EGW00103: 120 },
+      failureCodeCountsByMarket: { NAS: { KIS_BUSINESS_ERROR_EGW00103: 120 } },
+    });
+    expect(result.failures).toHaveLength(100);
+  });
+
   it("commits successful snapshots in bounded atomic batches", async () => {
     state.usRows = Array.from({ length: 201 }, (_, index) => usItem(`T${String(index).padStart(3, "0")}`));
 
@@ -200,6 +232,11 @@ describe("instrument-fundamentals refresh", () => {
     expect(result.ok).toBe(false);
     expect(result.successCount).toBe(0);
     expect(result.databaseFailure).toMatchObject({ errorCode: "DATABASE_CONNECTION_FAILED" });
+    expect(result).toMatchObject({
+      failureCount: 3,
+      failureCodeCounts: { DATABASE_CONNECTION_FAILED: 3 },
+      failureCodeCountsByMarket: { NAS: { DATABASE_CONNECTION_FAILED: 3 } },
+    });
     expect(state.insertAttemptCount).toBe(3);
   });
 
