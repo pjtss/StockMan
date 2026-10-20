@@ -15,7 +15,9 @@
 - `npm.cmd run docs:check`는 새 항목의 섹션 명칭과 전달 상태 문구를 자동 계약에 맞게 보완한 뒤 통과했다.
 - 원격 `oci`가 검증 도중 RSS 변경으로 전진해 해당 커밋을 rebase한 뒤 최종 상태에서 `npm.cmd run deploy:verify` 재통과: production build, standalone `/charts`·API smoke, Chrome desktop/mobile hydration, 815개 테스트 통과·1개 skip, typecheck, 문서·V156 migration 감사, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
 - 문서 충돌 정리 뒤 첫 `deploy:verify`는 standalone 서버 TCP 준비가 3.8초에서 18초로 늘어난 실행에서 `/charts` 요청 timeout으로 실패했다. 응용 코드 오류 신호는 없었고, 동시에 여러 프로젝트의 Node 프로세스가 실행 중인 환경 자원 경합 가능성을 원인 후보로 분류했다. 동일 최종 트리로 재시도해 standalone 준비 3.4초, `/charts`·API smoke, desktop/mobile Chrome, 815개 테스트 통과·1개 skip, typecheck와 모든 audit를 통과했다.
-- Flyway 운영 적용, 커밋·push·배포 결과는 아직 확인 전이다.
+- 원격 `oci`가 다시 전진한 뒤 해당 RSS 커밋을 포함해 최종 재검증: `npm.cmd run deploy:verify` 통과, 818개 테스트 통과·1개 skip, production build 및 standalone/browser/API smoke와 전체 audit 성공.
+- 운영 배포 workflow `39376235654`가 커밋 `86ab175e`에서 성공. `/api/health`, `/`, `/charts` HTTP 200 확인. 인증된 read-only 운영 확인에서 Flyway `156` (`instrument fundamental attempt timestamp`) 적용 확인.
+- 배포 직후 진단은 최근 원장 6,704건 중 성공 6,558·실패 146, 재시도 대기 146·기한 도래 0을 보였다. 이 146건은 V156 이전 레거시이므로 `last_attempt_at` 146건 모두 미상으로 정확히 표시되고 cache timing도 미상으로 분리됐다. 다음 재시도 예정은 2026-10-20 19:05 KST이므로, 새 시각 기록과 provider 결과 검증은 해당 자동 재시도 이후 남아 있다.
 
 ### 다음 개선
 - V156 운영 적용 후 다음 예약 재시도 결과에서 `last_attempt_at`, cache fetchedAt, 오류 분포를 확인한다. KIS 요청을 수동으로 유도하거나 전체 종목 갱신하지 않는다.
@@ -26,7 +28,7 @@
 - 근거: 운영 데이터가 실패 시각 오염 경로와 일치했고, 전용 시각 보존 및 오판 방지 코드를 추가했다. 마이그레이션·테스트·운영 배포와 다음 실제 재시도 검증은 남아 있다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 최종 검증 통과 후 원격 배포를 진행한다.
+- 상태: 구현 배포 완료. 코드 커밋 `86ab175e`를 `oci`에 push했고 Deploy OCI workflow `39376235654` 성공, health·메인·charts HTTP 200 및 Flyway V156 적용을 확인했다. 레거시 실패 146건의 실제 재시도 검증은 다음 자동 실행 후 진행한다.
 
 ## [2026-10-20] 외부 RSS 번역 API 대상을 StockTitan 제목으로 제한
 
