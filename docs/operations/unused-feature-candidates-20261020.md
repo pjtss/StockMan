@@ -110,4 +110,4 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 - `market-rss-discord-message.ts`의 Discord flag는 현재 `market-rss-notification-message.ts`가 소유하며 retry/runtime caller도 그 모듈을 사용한다. 관련 active notification 동작은 제거하지 않았다.
 - 제거된 localStorage key `rss_custom_keywords`, `rss_stock_alerts`, `market_sentiment_history`의 값은 이미 사용자 브라우저에 저장돼 있을 수 있다. 제거된 UI/runtime가 이를 읽지 않으며, 브라우저 저장소를 조회하거나 값을 지우는 변경은 하지 않았다.
 - `us-daily-indicators`는 삭제하지 않았다. 관리자 기능·route가 남아 있고, production read-only 조회(2026-10-20 15:46:58Z)에서 누적 2,696회 실행과 마지막 2026-08-19 `SKIPPED / outside_schedule`을 재확인했다. 현재 코드 기본 설정은 disabled이고 OCI 예약 호출은 없으나, 과거 실제 사용과 수동 관리자 경로가 있으므로 비활성/예약 연결 문제로 계속 분류한다.
-- 남은 한계: 외부에서 과거 localStorage를 직접 읽는 브라우저 소비자 여부와 운영 DB의 현재 effective `us-daily-indicators` 설정은 확인하지 않았다. 해당 데이터는 건드리지 않았다.
+- 남은 한계: 외부에서 과거 localStorage를 직접 읽는 브라우저 소비자 여부와 운영 DB의 현재 effective `us-daily-indicators` 설정은 확인하지 않았다. 해당 데이터는 건드리지 않았다.- 제거 변경은 commit `45ad28bd`로 `origin/oci`에 push됐고 Deploy OCI run `39452342209`가 성공했다. 운영 health는 2026-10-20 15:59:21Z `ok`를 반환했다. 제거된 코드가 포함된 tree에서 전체 배포 검증도 통과했다.
