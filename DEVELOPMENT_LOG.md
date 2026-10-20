@@ -5781,3 +5781,20 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 상태: 완료. 코드·테스트·문서 커밋 `29d847b6`을 `oci`에 푸시했고 Deploy OCI run `39384059865` 성공.
 - 배포 전 `npm.cmd run deploy:verify` 통과: 테스트 830개 통과·1개 skip, production build, standalone runtime·API smoke, Chrome 데스크톱·모바일 hydration, typecheck, docs/migration 및 보안·cron audit.
 
+## [2026-10-20] 종목 기본정보 재시도 대기 polling 비용 및 재개 회귀 방지
+
+### 목적 및 범위
+- 운영 원장에 저장된 종목별 `next_attempt_at`이 도래하면 예약 재개가 해당 FAILED 항목을 KIS 요청 후보로 선택하는지 회귀 테스트로 고정하고, 기한 전 5분마다 반복되던 전체 refresh no-op을 억제한다.
+
+### 변경 및 검증
+- `lib/instrument-fundamental-progress.test.ts`: 재시도 기한이 지난 FAILED 항목을 조회 후보로 선택하는 조건을 검증한다.
+- `lib/automation-run-repository.ts`, `app/api/cron/instrument-fundamentals/route.ts`: 최근 `instrument_retry_backoff` 관측과 `nextRetryAt`을 사용해 전체 universe 조회를 최대 1시간 또는 retry due까지 제한하고, retry deadline의 첫 cron tick에는 다시 실행하도록 개선했다. 관측 조회가 실패하면 retry를 지연하지 않고 기존 경로를 사용한다.
+- `app/api/cron/instrument-fundamentals/route.test.ts`: 반복 no-op throttle, retry deadline 직후 재개를 검증한다.
+- `docs/operations/instrument-fundamentals-refresh.md`: retry 전 universe 변경 탐지의 최대 1시간 지연과 운영 상태 규칙을 기록한다.
+- 운영 read-only 디버그: 2026-10-20 15:55 KST에는 6,704건 중 성공 6,558·실패 146, 모두 retry deferred였다. 16:10 KST에는 `instrument_retry_backoff` SKIPPED가 5분 간격으로 기록됐고, 매회 KIS 시도 0건인데도 1~14초를 사용함을 확인했다. `nextRetryAt=2026-10-20T10:05:10.627Z` (19:05:10 KST); 신규 provider 재시도는 여전히 미래 시각이다.
+- 통합 후 `npm.cmd run deploy:verify` 통과: Production build, standalone `/charts` HTTP 200 및 데스크톱·모바일 Chrome hydration, 833 passed/1 skipped, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 및 dependency audit. 실제 운영 KIS 재시도 결과는 아직 확인되지 않았다.
+
+### 남은 검증 및 배포
+- 재시도 기한 및 다음 타이머 tick 이후 운영 디버그 API에서 `lastAttemptAt`, `attemptCount`, 실패/성공 집계와 새 provider 응답 진단을 확인해야 운영 동작을 완료로 판정한다.
+- 현재 변경은 테스트·route·저장소 모듈·문서이며 커밋·푸시·OCI 배포 전이다. 원격 `oci` 최신 커밋 `012833ad`까지 포함하여 검증했다. 배포 후 운영 retry due 시각과 provider 결과를 재검증해야 종료할 수 있다.
+

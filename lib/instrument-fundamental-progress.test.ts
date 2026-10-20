@@ -58,6 +58,29 @@ describe("instrument fundamental durable progress", () => {
     expect(nameSyncSql).not.toContain("updated_at = NOW()");
   });
 
+  it("selects failed instruments for provider retry once their persisted backoff expires", async () => {
+    const due = { market: "NAS", code: "RETRY", name: "Retry Corp" };
+    const clientQuery = vi.fn(async (query: unknown) => {
+      const text = String(query);
+      if (text.includes("SELECT id FROM instrument_fundamental_refresh_jobs")) return { rows: [{ id: "42" }] };
+      if (text.includes("SELECT market, code, name")) return { rows: [due] };
+      if (text.includes("SELECT COUNT(*)::text AS count FROM instrument_fundamental_refresh_items WHERE job_id = $1 AND status = 'SUCCESS'")) return { rows: [{ count: "6558" }] };
+      if (text.includes("next_attempt_at > NOW()")) return { rows: [{ count: "145", next_retry_at: "2026-10-20T10:05:00Z" }] };
+      return { rows: [] };
+    });
+    dbState.connect.mockResolvedValueOnce({ query: clientQuery, release: vi.fn() });
+
+    const result = await beginFundamentalRefresh([
+      { market: "NAS", code: "RETRY", name: "Retry Corp" },
+    ]);
+
+    expect(result.instruments).toEqual([due]);
+    expect(result.deferredRetryCount).toBe(145);
+    const pendingQuery = clientQuery.mock.calls.find(([query]) => String(query).includes("SELECT market, code, name"));
+    expect(String(pendingQuery?.[0])).toMatch(/status = 'FAILED'[\s\S]*next_attempt_at <= NOW\(\)/i);
+    expect(pendingQuery?.[1]).toEqual([42]);
+  });
+
   it("rejects a progress update that did not affect every expected row", async () => {
     const tx = { execute: vi.fn(async () => ({ rowCount: 0 })) };
     await expect(markFundamentalBatchInTransaction(tx, 1, [{ market: "NAS", code: "AAPL", name: "Apple" }], []))
