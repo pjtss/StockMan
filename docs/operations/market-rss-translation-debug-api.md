@@ -17,6 +17,7 @@ GET /api/debug/market-rss-translations?hours=24&source=ALL&status=ALL&limit=50&o
 - `limit`: 1–100, 기본 50. `offset`: 0–1,000,000, 기본 0.
 - 요약은 선택 출처 및 시간 범위의 모든 번역 상태별 건수이고, 항목 목록은 출처·상태 조건으로 페이지 처리된다.
 - 항목에는 기사 식별·제목·링크·번역 시도/완료 시각·provider·fallback·skip/error 사유·번역 제목 등 검수에 필요한 메타데이터를 반환한다. 원문 summary/content 및 `raw_payload`는 반환하지 않는다. 저장된 번역 오류 메시지는 자격증명 마스킹 후 제공한다.
+- `translation_char_count`는 현재 로직에서 StockTitan 원문 제목의 입력 길이만 기록한다. 코드 변경 전 행은 예전 계산식을 사용했을 수 있으므로 해당 필드를 과거 provider 사용량의 정밀한 증거로 간주하지 않는다.
 - DB 오류는 상세 연결정보를 노출하지 않고 `503 RSS_TRANSLATION_DIAGNOSTICS_UNAVAILABLE`로 반환한다.
 
 ## 공개 API 보안 범위

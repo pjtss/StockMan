@@ -1,61 +1,33 @@
-# RSS 한국어 번역 모듈 설계
+# RSS 한국어 번역 설계
 
-## 목표
+## 번역 대상
 
-영문 RSS를 무료 기반으로 한국어 사용자에게 제공하되, 원문·티커·숫자·출처 링크를 보존한다. 번역 장애가 발생해도 RSS 수집과 알림은 중단하지 않는다.
-
-## 선택안
-
-OCI 인스턴스에서 Docker로 자체 운영하는 LibreTranslate를 기본 번역 엔진으로 사용한다. 외부 유료 번역 API에 의존하지 않고, 애플리케이션은 HTTP `TranslationClient` 인터페이스만 사용한다. 따라서 추후 Argos Translate 등 다른 무료 엔진으로 교체할 수 있다.
+외부 번역 API는 StockTitan RSS 기사의 제목(`source=STOCKTITAN`, field=`title`)만 처리한다. 요약·본문·원시 payload와 다른 RSS 출처는 provider에 전달하지 않는다. 일반 RSS 수집·분류·알림에서는 원문을 계속 사용할 수 있다.
 
 ## 처리 흐름
 
 ```text
-RSS 수집(영문 원문)
-  -> 원문 ID·본문 해시로 번역 캐시 조회
-  -> 캐시 미스일 때 제목 우선, 요약 선택 번역
-  -> 성공: 한국어 + 영문 원문 보존
-  -> 실패/타임아웃: 영문 원문 반환 + translationFallback=true
-  -> Discord/UI는 한국어 우선, 원문 링크 제공
+StockTitan RSS 제목
+  -> 원문 해시 + 대상 언어 + provider 기준 캐시 조회(운영 cron)
+  -> 캐시 미스면 제목 글자 수 예약
+  -> Google Cloud Translation Basic v2 (en -> ko)
+  -> 성공: 원문 title과 translated_title 저장
+  -> 오류/한도/설정 없음: 원문 fallback 및 상태 사유 저장
 ```
 
-탐지용 키워드·티커 추출은 반드시 영문 원문으로 수행하고, 번역문은 사용자 표시용으로만 사용한다. 제목의 심볼, 거래소 코드, 금액, 퍼센트, 회사명 고유명사는 보호하거나 원문을 병기한다.
+운영 cron은 StockTitan 행만 선택하며 공통 번역 함수도 다른 출처를 거부한다. 관리자 미리보기는 `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true`를 사용한다. 출처를 생략한 번역 테스트는 StockTitan으로 제한하고, 그 외 출처를 지정한 번역 요청은 HTTP 400으로 거부한다. 관리자 미리보기는 DB 캐시·월별 운영 예약을 통하지 않고 실제 provider를 호출하므로 사용량을 발생시킬 수 있다.
 
-## API 계약
+## 운영 API 및 상태
 
-`MarketRssItem`을 변경하지 않고 다음 표시 필드를 추가한다.
+- 읽기 전용 검수: `GET /api/debug/market-rss-translations?hours=24&source=STOCKTITAN&status=ALL`
+- 관리자 실제 feed 미리보기: `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true`
+- 운영 수집·번역·알림: cron 전용 `POST /api/cron/market-rss` (디버깅용 수동 API가 아니며 파이프라인 상태를 변경한다.)
+- 성공은 `translation_status=TRANSLATED` 및 `translation_fallback=false`로 판정한다. `SKIPPED` 또는 `FAILED`의 `translated_title`은 원문 fallback일 수 있으므로 번역 성공으로 간주하지 않는다.
 
-- `translatedTitle`
-- `translatedSummary`
-- `translationFallback`
-- `translationProvider`
+## 사용량과 저장
 
-관리자 RSS 테스트는 기본적으로 원문만 반환하며 `GET /api/admin/market-rss-test?translate=true`일 때 번역 필드를 추가한다. 번역 서비스가 꺼져 있거나 실패해도 HTTP 오류 대신 원문을 반환한다.
+운영 cron은 캐시 미스 때 제목 길이만 월별 사용량에 예약한다. 현재 한도는 300,000자다. `translation_char_count`는 제목 입력 길이를 기록한다. 원문은 `title`, 번역문은 `translated_title`에 보존하며, translated summary/content 필드는 번역하지 않고 기존 호환성을 위해 원문을 유지한다.
 
-## 운영 환경변수
+## 공식 Provider 문서
 
-```env
-TRANSLATION_ENABLED=true
-TRANSLATION_PROVIDER=google-cloud-translation
-GOOGLE_TRANSLATION_API_KEY=구글_번역_API_KEY
-LIBRETRANSLATE_URL=http://127.0.0.1:5000
-LIBRETRANSLATE_API_KEY=
-TRANSLATION_SOURCE_LANGUAGE=en
-TRANSLATION_TARGET_LANGUAGE=ko
-TRANSLATION_TIMEOUT_MS=10000
-```
-
-자체 호스팅 LibreTranslate는 API 키 없이 사용할 수 있다. 번역 요청에는 동시성 제한과 타임아웃을 두고, 캐시를 통해 같은 기사의 반복 번역을 방지한다.
-
-## 단계별 적용
-
-1. 현재 구현: `TranslationClient`, LibreTranslate HTTP 클라이언트, RSS 단건/배열 번역, 관리자 테스트 `translate=true`.
-2. 다음 구현: `market_rss_translations` 테이블과 원문 해시 기반 캐시.
-3. 다음 구현: OCI Docker Compose에 LibreTranslate를 localhost로 추가하고 헬스체크 구성.
-4. 최종 적용: Discord/UI 알림에 한국어 제목·요약을 사용하되 영문 원문 링크와 fallback 상태를 유지.
-
-## 공식 참고
-
-- LibreTranslate 문서: https://docs.libretranslate.com/
-- API 문서: https://docs.libretranslate.com/api/
-- 설치 안내: https://docs.libretranslate.com/guides/installation/
+- Google Cloud Translation Basic v2 `translate`: https://docs.cloud.google.com/translate/docs/reference/rest/v2/translate

@@ -92,7 +92,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
   const client = CloudTranslationClient.fromEnvironment();
   if (!client) return { attempted: 0, translated: 0, cached: 0, fallback: 0, failed: 0, skipped: true, reason: "cloud_translation_not_configured" };
-  const rows = await db.select().from(marketRssArticles).where(and(or(eq(marketRssArticles.translationStatus, "PENDING"), and(eq(marketRssArticles.translationStatus, "FAILED"), lt(marketRssArticles.translationAttempts, 3))), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
+  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.source, "STOCKTITAN"), or(eq(marketRssArticles.translationStatus, "PENDING"), and(eq(marketRssArticles.translationStatus, "FAILED"), lt(marketRssArticles.translationAttempts, 3))), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
   const cachedClient: TranslationClient = { translate: async (text: string, source: TranslationLanguage = "en", target: TranslationLanguage = "ko"): Promise<TranslationResult> => {
     const provider = "google-cloud-translation";
     const cached = await loadTranslationCache(text, provider, target);
@@ -129,7 +129,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   for (const row of rows) {
     try {
       const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient);
-      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translatedContent: result.translatedContent ?? null, translationProvider: "google-cloud-translation", translationCharCount: result.title.length + result.summary.length + (result.content?.length ?? 0), translationSkippedReason: result.translationFallbackReason ?? null, translationTranslatedAt: result.translationFallback ? null : new Date(), translationFallback: result.translationFallback, translationError: result.translationFallbackReason || null, translationAttempts: row.translationAttempts + 1, translationStatus: result.translationFallback ? "SKIPPED" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translatedContent: result.translatedContent ?? null, translationProvider: "google-cloud-translation", translationCharCount: result.title.length, translationSkippedReason: result.translationFallbackReason ?? null, translationTranslatedAt: result.translationFallback ? null : new Date(), translationFallback: result.translationFallback, translationError: result.translationFallbackReason || null, translationAttempts: row.translationAttempts + 1, translationStatus: result.translationFallback ? "SKIPPED" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       translated++;
       if (result.translationFallback) {
         fallback++;

@@ -10,6 +10,15 @@
 4. 실패한 단일 종목 또는 단일 요청으로 재현한 뒤 전체 작업을 실행한다.
 5. 한글 로그와 문서는 UTF-8을 유지한다.
 
+## 2026-10-20 StockTitan 제목 이외 RSS 번역 범위 차단
+
+- **증상**: 번역 API 요구 범위는 StockTitan RSS 제목인데 다른 출처의 RSS 제목도 번역 provider로 전달될 수 있었다.
+- **근본 원인**: 운영 `translatePendingMarketRssArticles()` 조회가 RSS 출처를 필터링하지 않았고, 관리자 `market-rss-test?translate=true`가 전체 피드를 대상으로 번역을 실행할 수 있었다. 공통 변환 함수도 출처 제한 없이 제목을 provider에 넘겼다.
+- **영향 범위**: 호출 조건을 만족한 비 StockTitan RSS 제목이 외부 번역 사용량과 월간 한도에 포함될 수 있었다. 공통 함수는 제목만 전달했으나 제목의 출처를 제한하지 않았다.
+- **해결 위치**: 운영 쿼리에 `source=STOCKTITAN`을 고정하고 공통 번역 함수에도 동일한 방어를 추가한다. 관리자 테스트는 `translate=true`에서 StockTitan만 기본 선택하고 다른 출처를 거부한다. 번역 문자 수 기록도 제목 길이로 맞춘다.
+- **재발 자동 감지**: 공통 함수 테스트에서 비 StockTitan 기사로 provider가 호출되지 않는지 검증하고, 관리자 API 테스트에서 기본 StockTitan 제한과 다른 출처 거부를 검증한다. `npm run deploy:verify`로 전체 회귀 검증한다.
+- **남은 위험**: 변경 전 이번 달 사용량 집계에는 이전의 비 StockTitan 제목 요청이 반영되어 있을 수 있다. 과거 `translation_char_count` 값도 구 계산식에 따라 summary/content 길이를 더해 실제 provider 입력량보다 클 수 있다. 과거 값을 삭제·수정하지 않으며 월별 한도는 다음 달에 새로 시작하고 이후 운영 호출부터 StockTitan 제목만 예약한다.
+
 ## 2026-09-18 운영 메인 페이지 ChunkLoadError
 
 - **증상**: 운영 `/`에서 `ChunkLoadError`가 발생하고 `페이지를 불러오지 못했습니다`가 표시됨. 브라우저가 이전 HTML이 참조하는 해시 청크를 요청했지만 활성화된 릴리스에서 404가 됨.

@@ -8,29 +8,21 @@ import { describeError } from "@/lib/error-diagnostics";
 const withTranslation = async (feed: Awaited<ReturnType<typeof fetchMarketRssSource>>, translate: boolean) =>
   translate ? { ...feed, items: await translateMarketRssItems(feed.items) } : feed;
 
-async function translateResultsSequentially(result: Awaited<ReturnType<typeof fetchAllMarketRss>>) {
-  const results = [];
-  for (const item of result.results) {
-    results.push(item.ok ? { ...item, feed: await withTranslation(item.feed, true) } : item);
-  }
-  return results;
-}
-
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const params = new URL(request.url).searchParams;
-  const source = params.get("source")?.toUpperCase();
+  const requestedSource = params.get("source")?.toUpperCase();
   const translate = params.get("translate") === "true";
+  const source = requestedSource || (translate ? "STOCKTITAN" : undefined);
   const mode = (params.get("mode") || "FETCH_ONLY").toUpperCase();
   if (mode !== "FETCH_ONLY" && mode !== "PREVIEW") return NextResponse.json({ ok: false, error: "mode는 FETCH_ONLY 또는 PREVIEW만 지원합니다. 실제 저장·전송은 cron COMMIT 경로를 사용합니다." }, { status: 400 });
+  if (translate && source !== "STOCKTITAN") return NextResponse.json({ ok: false, error: "번역 테스트는 STOCKTITAN 기사 제목만 지원합니다.", allowedSource: "STOCKTITAN", translatedField: "title" }, { status: 400 });
   if (source && !MARKET_RSS_SOURCES.includes(source as MarketRssSource)) return NextResponse.json({ error: "지원하지 않는 RSS source", sources: MARKET_RSS_SOURCES }, { status: 400 });
   try {
     if (!source) {
       const result = await fetchAllMarketRss();
       if (mode === "FETCH_ONLY" && !translate) return NextResponse.json({ ...result, mode });
-      const results = mode === "PREVIEW"
-        ? await previewMarketRssResults(result.results, translate)
-        : await translateResultsSequentially(result);
+      const results = await previewMarketRssResults(result.results, false);
       return NextResponse.json({ ...result, mode, results });
     }
     const feed = await fetchMarketRssSource(source as MarketRssSource);

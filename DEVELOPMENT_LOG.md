@@ -1,3 +1,30 @@
+## [2026-10-20] 외부 RSS 번역 API 대상을 StockTitan 제목으로 제한
+
+### 목표
+- 외부 번역 API 사용을 `STOCKTITAN` RSS 기사 `title` 필드만으로 제한한다.
+
+### 반영
+- 근본 원인: cron 조회와 관리자 번역 테스트가 출처를 제한하지 않아 다른 RSS 제목도 외부 provider에 전달될 수 있었다.
+- cron 쿼리에 StockTitan 출처 조건을 고정하고 공통 번역 함수에서 다른 출처를 거부한다. 관리자 테스트는 출처 생략 시 StockTitan만 조회하고 다른 출처의 번역 요청은 HTTP 400으로 거부한다.
+- 번역 provider 호출은 제목 문자열 하나로 제한되어 있으며 월간 사용량 예약·기사별 `translation_char_count`도 제목 문자 수만 반영한다.
+- 테스트 UI 설명, `docs/stocktitan-rss.md`, `docs/architecture/stocktitan-translation.md`, `docs/rss-translation-design.md`, `docs/ERROR_HANDLING.md`를 현재 구현과 일치시킨다.
+
+### 검증
+- `lib/translate-market-rss-item.test.ts`: 비 StockTitan 출처는 provider 호출이 없는지, StockTitan 기사에서는 제목만 전달되는지 검증한다.
+- `app/api/admin/market-rss-test/route.test.ts`: `translate=true`의 StockTitan 기본 범위와 다른 출처 거부를 검증한다.
+- 두 신규 회귀 테스트 포함 전체 테스트 813개 통과·1개 skip. `npm.cmd run deploy:verify` 통과: production build, standalone·Chrome desktop/mobile·API smoke, typecheck, 문서·migration, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+
+### 다음 개선
+- 다음 월 사용량 경계 이후 진단 API에서 StockTitan 제목 번역이 정상 재개되는지 확인한다. 이번 달 과거 사용량은 보존한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-003
+- 성과 판정: IMPROVED
+- 근거: cron, 관리자 미리보기, 공통 provider 진입점의 세 경계에서 출처와 번역 필드를 제한해 다른 RSS 제목이 외부 API로 전달되지 않게 한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 검증은 통과했고 변경을 커밋·push한 뒤 OCI 배포 결과를 기록한다.
+
 ## [2026-10-20] StockTitan Discord RSS 알림 형식 정리
 
 ### 목표

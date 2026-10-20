@@ -119,7 +119,7 @@ const TESTS: ApiTestDefinition[] = [
   {
     key: "market_rss",
     label: "시장 RSS 번역 테스트",
-    description: "GlobeNewswire·NASDAQ·NASDAQ Trader·SEC·StockTitan RSS를 한국어 번역과 함께 확인",
+    description: "StockTitan RSS 제목만 번역해 확인",
     endpoint: "/api/admin/market-rss-test",
     query: "translate=true",
   },
@@ -186,7 +186,7 @@ export function AdminApiTests() {
                 : test.key === "us_mfi"
                   ? `period=${encodeURIComponent(mfiPeriod)}&threshold=${encodeURIComponent(mfiThreshold)}`
               : test.key === "market_rss"
-                ? `mode=${marketRssMode}&translate=true`
+                ? `source=STOCKTITAN&mode=${marketRssMode}&translate=true`
               : test.query;
       const asyncCacheTest = test.key === "kr_daily_cache" || test.key === "us_daily_cache" || test.key === "us_bollinger_band" || test.key === "kr_bollinger_band";
       const response = await fetch(`${test.endpoint}${asyncCacheTest ? "" : query ? `?${query}` : ""}`, { method: asyncCacheTest ? "POST" : "GET", cache: "no-store" });

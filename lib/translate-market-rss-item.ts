@@ -6,6 +6,7 @@ import { CloudTranslationClient } from "./cloud-translation-client";
 
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationFallback: boolean; translationFallbackReason?: string };
 export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient): Promise<TranslatedMarketRssItem> {
+  if (item.source !== "STOCKTITAN") return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "unsupported_source" };
   const selectedClient = client ?? CloudTranslationClient.fromEnvironment();
   if (!selectedClient) return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "cloud_translation_not_configured" };
   const title = await selectedClient.translate(item.title);
