@@ -5972,3 +5972,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **변경 파일**: `docs/operations/unused-feature-candidates-20261020.md`, `DEVELOPMENT_LOG.md`. 제품 코드/DB/사용자 브라우저 데이터를 변경하지 않았다.
 - **검증**: 최신 HEAD와 remote SHA 일치 확인, route files 24개와 세 OCI scheduler script 비교, 주요 미사용 후보 import/키 사용 검색, production API read-only 및 `.env.local` DB `BEGIN READ ONLY` 조회. 후보 파일은 삭제하지 않았다. 전체 `npm.cmd run deploy:verify`도 통과했다.
 - **검증**: `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,431 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).
+
+### 최신 조사 기록의 통합 및 배포 완료
+- 문서 조사 변경 commit `05c9bb72`에 원격 동시 기록 `c884b255`를 merge해 통합 HEAD `83c25950b4904029e87d023c84ef0a29d99d00bc`를 만들었다. 전체 `npm.cmd run deploy:verify` 통과 후 `origin/oci`에 push했다.
+- GitHub Actions Deploy OCI run `39417086164` 전체 성공(Verify deployment, Package, Upload, Activate release 포함). 운영 `GET https://stockman.r-e.kr/api/health`는 2026-10-20 11:52:13Z `status=ok` (404ms)를 반환했다.
+- 제품 코드와 운영 데이터는 변경하지 않았다. 보고서/DEVELOPMENT_LOG만 갱신했다.
