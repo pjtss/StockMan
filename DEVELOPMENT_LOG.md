@@ -71,7 +71,8 @@
 ### 검증
 - `npm.cmd test -- --run lib/instrument-fundamentals.test.ts lib/kis-us-price-detail.test.ts`: 2개 파일, 18개 테스트 통과.
 - `npm.cmd run deploy:verify`: 최종 코드 기준 통과. dependency audit 0 취약점, production build, standalone `/charts` 200 및 11 JS chunk 확인, Chrome 데스크톱·모바일 hydration, API/auth smoke, 테스트 224개 파일 통과·1 skip(809 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS 경계, Bearer 인증, OCI cron 감사 완료.
-- 운영 재배포는 아직 실행하지 않았다. 배포 후 health와 공개 페이지/API를 재확인한다.
+- 코드 push 후 Deploy OCI workflow `39370209950`이 성공했다. 운영 `GET /api/health`, `/`, `/charts`가 모두 HTTP 200이고 인증된 read-only 진단 API도 정상 응답했다.
+- 배포 직후 최근 원장은 PARTIAL, 대상 6,704·성공 6,558·실패 146·retry due 0이다. 캐시 근접 실패는 여전히 0건이다. 예정된 개별 재시도 전이므로 수정 코드의 운영 데이터 개선은 아직 측정되지 않았으며 전체 갱신이나 KIS 호출은 실행하지 않았다.
 
 ### 다음 개선
 - 다음 정기 재시도 이후 새로운 실패의 캐시 시각과 안전 필드 상태를 다시 대조한다. 신선한 데이터에서도 값이 비면 KIS 공식 가격상세 응답 규격과 거래소별 종목 지원 범위를 종목 표본으로 확인한다. Retry 시각 전에는 수동 대량 요청을 하지 않는다.
@@ -82,7 +83,7 @@
 - 근거: alias fallback 및 오류 응답 캐시 덮어쓰기 회귀를 방지하는 단위 테스트는 통과했다. 운영의 기존 146개 오류 원인은 신선한 실패 응답이 없어 아직 미확정이며 전체 배포 게이트도 남아 있다.
 
 ### 커밋·푸시·배포
-- 상태: 전체 검증 통과. 커밋·푸시 후 배포한다.
+- 상태: 코드 커밋 `c1db8ac1`을 `oci`에 push했고 Deploy OCI run `39370209950` 성공. 운영 health, 메인, charts 및 인증된 read-only 진단 API를 확인했다. 오류 원인 검증은 신선한 재시도 응답 관측까지 진행 중.
 
 ## [2026-10-20] 해외 시총 실패 응답의 안전한 캐시형태 진단
 
