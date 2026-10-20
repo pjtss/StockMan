@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { marketRssArticles } from "@/lib/schema";
 import { parseMarketRssDeliveryArticleId } from "@/lib/discord-delivery-policy";
 import { toTextWebhookPayload } from "@/lib/discord-text";
+import { DISCORD_SUPPRESS_EMBEDS_FLAG, simplifyMarketRssDiscordMessage } from "@/lib/market-rss-discord-message";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -36,17 +37,18 @@ export async function retryDiscordDeliveries(limit = 50) {
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
       const payload: Record<string, unknown> = toTextWebhookPayload(delivery.payload as Record<string, unknown>);
       if (delivery.channelKey === "MARKET_RSS" && typeof payload.content === "string") {
-        const hasStockTitanMarker = /(?:^|\n)출처: STOCKTITAN(?:\s|·|$)/m.test(payload.content);
         const articleId = parseMarketRssDeliveryArticleId(delivery.externalId);
-        const hasTickerLine = payload.content.split("\n").some((line) => /^티커:/.test(line));
-        const article = !hasStockTitanMarker && hasTickerLine && articleId
+        const hasStockTitanMarker = /(?:^|\n)출처: STOCKTITAN(?:\s|·|$)/m.test(payload.content);
+        const article = articleId
           ? await getDb().select({ source: marketRssArticles.source }).from(marketRssArticles).where(eq(marketRssArticles.id, articleId)).limit(1)
           : [];
         const isStockTitan = hasStockTitanMarker || article[0]?.source === "STOCKTITAN";
         if (isStockTitan) {
           payload.content = payload.content.split("\n").filter((line) => !/^출처:\s*STOCKTITAN\b/.test(line) && !/^등락률:/.test(line) && !/^티커:/.test(line)).join("\n");
-          payload.flags = Number(payload.flags || 0) | (1 << 2);
+        } else {
+          payload.content = simplifyMarketRssDiscordMessage(payload.content);
         }
+        payload.flags = Number(payload.flags || 0) | DISCORD_SUPPRESS_EMBEDS_FLAG;
       }
       const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8_000) });
       if (!response.ok) throw new Error(`discord_http_${response.status}`);

@@ -6,7 +6,6 @@ import { fetchAllDomesticRss } from "./domestic-rss-sources";
 import { translateMarketRssItem } from "./translate-market-rss-item";
 import { CloudTranslationClient } from "./cloud-translation-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
-import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
@@ -15,6 +14,7 @@ import { archiveMarketRssFeed } from "./source-payload-archive";
 import { dedupeMarketRssItems } from "./market-rss-dedupe";
 import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
 import { claimTranslationLimitAlert, claimTranslationThresholdAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
+import { DISCORD_SUPPRESS_EMBEDS_FLAG } from "./market-rss-discord-message";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -177,19 +177,13 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
     if (remaining <= 0) break;
     const title = row.translatedTitle || row.title;
     const isStockTitan = row.source === "STOCKTITAN";
-    const reaction = !isStockTitan && row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
     const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
     const body = [
-      "🚨 **해외시장 RSS 속보**",
       titleLine,
-      row.translatedTitle && row.translatedTitle !== row.title ? `원문 제목: ${row.title}` : "",
       row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
-      !isStockTitan ? `출처: ${row.source}${row.translationFallback ? " · 번역 fallback" : ""}` : "",
-      !isStockTitan && row.detectedTicker ? `티커: ${row.detectedTicker}${reaction?.exchange ? ` · ${reaction.exchange}` : ""}` : "",
-      !isStockTitan && reaction?.ok ? `등락률: ${reaction.rate ?? "-"}% · 거래대금: ${reaction.tradingValue ?? "-"}달러` : "",
     ].filter(Boolean).join("\n");
     try {
-      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] }, ...(isStockTitan ? { flags: 1 << 2 } : {}) }), signal: AbortSignal.timeout(8_000) });
+      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] }, flags: DISCORD_SUPPRESS_EMBEDS_FLAG }), signal: AbortSignal.timeout(8_000) });
       if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
       await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: row.notificationAttempts + 1, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       sent++;

@@ -22,7 +22,7 @@ StockTitan RSS
 - 기존 `MARKET_RSS_DISCORD_WEBHOOK_URL`, 번역·알림 배치 설정을 그대로 사용한다.
 - Google Cloud Translation 요청 대상은 `source=STOCKTITAN`인 RSS 기사의 `title` 필드만이다. `summary`·`content` 및 다른 RSS 출처의 제목은 외부 번역 API로 보내지 않는다.
 - 운영 cron은 StockTitan 행만 번역 대상으로 고르고, 공통 번역 함수도 다른 출처를 거부한다. 관리자 API에서 `translate=true`이고 `source`를 생략하면 StockTitan으로 한정하며, 다른 출처를 지정하면 HTTP 400으로 거부한다.
-- Discord 알림은 제목과 발행 시각을 표시한다. 티커·출처·등락률·거래대금은 생략하고 링크 미리보기 임베드도 억제한다.
+- StockTitan Discord 알림은 기존 형식으로 유지한다. 다른 시장 RSS Discord 알림은 제목과 발행 시각만 표시하고 출처·번역 상태·티커 등 추가 항목과 링크 미리보기 임베드를 억제한다.
 - 대기 중인 재전송 알림에도 같은 형식을 적용해 이전 형식의 티커·출처·등락률 줄과 링크 임베드가 다시 나타나지 않도록 한다.
 
 ## 관리자 테스트
