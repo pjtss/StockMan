@@ -24,6 +24,8 @@
 
 - 빈 문자열·누락·숫자 변환 실패는 `0`이 아니라 `null`이다. 실제 숫자 0은 0으로 보존한다.
 - 해외 응답은 HTTP 성공, `rt_cd=0`, stale 아님을 모두 확인한다. 국내 응답도 HTTP 및 KIS 업무 성공 코드와 유효한 양의 가격을 요구한다.
+- 숫자 alias는 `??`로 먼저 고르지 않는다. KIS 우선 필드가 빈 문자열·비수치·0·음수이면 가격/시총은 다음 양수 alias를 찾고, 변동률은 첫 유한 숫자, 거래량·거래대금은 첫 0 이상 숫자를 사용한다. 응답에 `output`·`output1`·`output2`가 함께 있으면 가격/시총 필드가 실제로 채워진 객체를 선택한다.
+- 해외 가격상세 응답의 캐시는 HTTP 2xx만으로 갱신하지 않는다. KIS 업무 코드가 `rt_cd=0`이고 선택된 output에 양수 가격 또는 시총 값이 있을 때에만 메모리/DB 캐시를 덮어쓴다. 빈 200 응답이나 KIS 업무 오류는 호출 결과로 실패 판정하되 직전 캐시를 파괴하지 않는다.
 - 시가총액은 양수일 때만 해당 실행의 갱신값으로 인정한다. 누락·0·음수이면 해당 종목을 실패 처리하고 history/snapshot을 기록하지 않아 기존 snapshot을 손상시키지 않는다.
 - nullable 필드는 snapshot upsert 시 기존 값을 `COALESCE`로 보존한다. 따라서 부분 응답의 null이 직전 정상값을 지우지 않는다.
 - 대상은 DB 질의 조건과 애플리케이션 eligibility 검사 양쪽에서 검증한다. 활성 상태·`COMMON_STOCK`·시장 분류 또는 제외 플래그를 신뢰할 수 없으면 provider 호출 전 제외한다.
@@ -47,11 +49,13 @@
 
 ## 자동 검증 및 운영 점검
 
-Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-progress.test.ts`, `lib/kis-kr-price-detail.test.ts`, `lib/automation-run.test.ts`, `app/api/cron/instrument-fundamentals/route.test.ts`가 누락 수치, fail-closed 상품 필터, stale/업무오류 응답, 시총 누락, 트랜잭션 배치, DB 재시도, 종목별 재시도 backoff 및 cron cooldown을 검증한다. 변경 시 전체 배포 게이트도 실행한다.
+Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-progress.test.ts`, `lib/kis-kr-price-detail.test.ts`, `lib/kis-us-price-detail.test.ts`, `lib/automation-run.test.ts`, `app/api/cron/instrument-fundamentals/route.test.ts`가 누락 수치, fail-closed 상품 필터, stale/업무오류 응답, 숫자 alias fallback, 잘못된 성공 응답의 캐시 덮어쓰기 방지, 시총 누락, 트랜잭션 배치, DB 재시도, 종목별 재시도 backoff 및 cron cooldown을 검증한다. 변경 시 전체 배포 게이트도 실행한다.
 
 운영에서 관리자 실행 이력의 상태와 요약을 확인한다. `PARTIAL`/`FAILED`이면 `failureCodeCountsByMarket`로 시장별 근본 원인 분포를 먼저 확인하고, `failureCodeCounts`로 전체 분포를 교차 검증한다. 이어 `unattemptedCount`, `databaseFailure`, 최대 100건의 실패 샘플을 확인한다. 성공 건수는 시도 수가 아니라 커밋된 snapshot 배치 행 수로 해석한다.
 
 최근 작업의 종목별 durable ledger는 관리자 세션 또는 `CRON_SECRET`으로 인증된 read-only `GET /api/debug/instrument-fundamentals`에서 확인한다. 응답은 최근 작업 1건의 대상/성공/실패/대기 및 재시도 가능·연기 건수, 시장·오류코드별 실패 집계, 재시도 예정시각, 실패 종목 최대 25개(종목코드·오류코드·횟수·시각)를 제공한다. `responseDiagnostics`는 실패 원장과 `us_price_detail_cache`를 대조하여 실패 전체(최대 500건)에 대해 캐시 존재/시각 근접도, HTTP 및 KIS 업무 코드, 선택된 output 구조, 현재 가격 alias 상태와 대체 alias의 양수 존재 여부를 집계한다. 종목 표본에는 각 output 후보의 허용된 가격·시총 필드 상태를 제공한다. 원시 KIS 응답, 숫자값, 자유형 메시지나 자격증명은 반환하지 않는다. 500건 초과 시 `truncated=true`이며 집계는 조회한 표본에 한정된다. 캐시가 실패 기록 시각과 10분 이내에 있지 않으면 당시 응답을 재현한다고 볼 수 없으므로 근거로 과신하지 않는다. 이 endpoint는 provider 호출이나 DB 쓰기를 하지 않는다. 자동화 실행 이력에 저장된 전체 오류 집계와 ledger 집계는 대상 job이 같을 때 대조한다.
+
+2026-10-20 운영에서 가격/시총 실패 146건의 캐시는 전부 실패 시각과 10분 이상 떨어져 있었다. 따라서 저장된 캐시 값은 해당 실패 요청의 실제 응답을 증명하지 않는다. 정확한 원인 확인은 다음 예약 재시도에서 새로 기록되는 오류 및 신선한 캐시 증거로 수행하며, 진단을 위해 전체 갱신을 수동 실행하지 않는다.
 
 ## 남은 한계
 

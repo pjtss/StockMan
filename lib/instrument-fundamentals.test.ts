@@ -175,6 +175,22 @@ describe("instrument-fundamentals refresh", () => {
     expect(state.snapshotRows).toHaveLength(0);
   });
 
+  it("uses the next valid KIS field when a preferred price or market-cap alias is blank", async () => {
+    const { fetchKisUsPriceDetail } = await import("@/lib/kis-us-price-detail");
+    vi.mocked(fetchKisUsPriceDetail).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      code: "AAPL",
+      market: "NAS",
+      parsed: { rt_cd: "0", output: { last: "", t_prpr: "12.34", tomv: "", marketCap: "5000000", crcy: "USD" } },
+    });
+
+    const result = await refreshInstrumentFundamentals();
+
+    expect(result).toMatchObject({ ok: true, attemptedCount: 1, successCount: 1, failureCount: 0 });
+    expect(state.snapshotRows[0]).toMatchObject({ price: 12.34, marketCap: 5_000_000 });
+  });
+
   it("identifies an unavailable overseas token separately from a quote response error", async () => {
     const { fetchKisUsPriceDetail } = await import("@/lib/kis-us-price-detail");
     vi.mocked(fetchKisUsPriceDetail).mockResolvedValueOnce(null);

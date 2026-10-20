@@ -56,6 +56,34 @@
 ### 커밋·푸시·배포
 - 상태: 코드 커밋 `3ff29bfa`를 `oci`에 push했고 Deploy OCI run `39368775998` 성공. 검증, 패키징, 업로드와 서버 활성화가 모두 완료됐으며 health와 charts도 HTTP 200이다.
 
+## [2026-10-20] 해외 시총 갱신 숫자 alias 및 응답 캐시 무결성 보강
+
+### 목표
+- 운영 진단에서 실제 실패 시점 응답이 보존되지 않아 원인을 판별할 수 없음을 확인했다. 빈 우선 필드가 대체 alias를 가리는 파싱 결함과 HTTP 200만으로 잘못된 KIS 데이터를 캐시에 기록하는 위험을 회귀 테스트로 막는다.
+
+### 반영
+- `lib/instrument-fundamentals.ts`: 가격·시총 alias는 첫 비-null 값이 아니라 규칙에 맞는 첫 유효값(양수)을 선택한다. 변동률은 첫 유한 숫자, 거래량·거래대금은 첫 0 이상 숫자를 선택한다.
+- `lib/kis-us-price-detail.ts`: output 후보 중 실제 가격/시총 필드가 채워진 객체를 선택한다. `rt_cd`가 성공이 아니거나 유효한 양수 가격/시총이 없는 HTTP 2xx는 메모리·DB 캐시에 저장하지 않아 기존 정상 캐시가 빈 응답으로 덮이는 것을 방지한다.
+- `lib/instrument-fundamentals.test.ts`, 신규 `lib/kis-us-price-detail.test.ts`: 빈 우선 alias 뒤의 유효값, 빈/오류 HTTP-200 캐시 억제, 정상 응답 저장, output/output1 선택을 검증한다.
+- 운영 갱신 문서에 파싱·캐시 규칙 및 관측 한계를 기록했다.
+- 운영 진단 재조회: 최근 job PARTIAL, 전체 6,704건 중 성공 6,558·실패 146, retry due 0. 실패 146건 모두 연결 캐시는 있으나 10분 내 근접 캐시는 0건이며 HTTP 200/`rt_cd=0`이고 저장된 `last`는 비어 있다. 이 캐시들은 오래된 값이므로 당시 실패 응답에 대한 증거가 아니며, 운영 원인을 특정할 수 없다. 추가 KIS 호출이나 전체 갱신은 실행하지 않았다.
+
+### 검증
+- `npm.cmd test -- --run lib/instrument-fundamentals.test.ts lib/kis-us-price-detail.test.ts`: 2개 파일, 18개 테스트 통과.
+- `npm.cmd run deploy:verify`: 최종 코드 기준 통과. dependency audit 0 취약점, production build, standalone `/charts` 200 및 11 JS chunk 확인, Chrome 데스크톱·모바일 hydration, API/auth smoke, 테스트 224개 파일 통과·1 skip(809 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS 경계, Bearer 인증, OCI cron 감사 완료.
+- 운영 재배포는 아직 실행하지 않았다. 배포 후 health와 공개 페이지/API를 재확인한다.
+
+### 다음 개선
+- 다음 정기 재시도 이후 새로운 실패의 캐시 시각과 안전 필드 상태를 다시 대조한다. 신선한 데이터에서도 값이 비면 KIS 공식 가격상세 응답 규격과 거래소별 종목 지원 범위를 종목 표본으로 확인한다. Retry 시각 전에는 수동 대량 요청을 하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-012
+- 성과 판정: IN_PROGRESS
+- 근거: alias fallback 및 오류 응답 캐시 덮어쓰기 회귀를 방지하는 단위 테스트는 통과했다. 운영의 기존 146개 오류 원인은 신선한 실패 응답이 없어 아직 미확정이며 전체 배포 게이트도 남아 있다.
+
+### 커밋·푸시·배포
+- 상태: 전체 검증 통과. 커밋·푸시 후 배포한다.
+
 ## [2026-10-20] 해외 시총 실패 응답의 안전한 캐시형태 진단
 
 ### 목표

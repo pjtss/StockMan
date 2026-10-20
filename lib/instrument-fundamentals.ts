@@ -18,6 +18,30 @@ export function parseNullableFundamentalNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function firstPositiveFundamentalNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = parseNullableFundamentalNumber(value);
+    if (parsed !== null && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function firstFiniteFundamentalNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = parseNullableFundamentalNumber(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function firstNonNegativeFundamentalNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = parseNullableFundamentalNumber(value);
+    if (parsed !== null && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
 export function classifyFundamentalProviderFailure(input: {
   status: number; responseOk: boolean; stale?: boolean; rtCd?: unknown; messageCode?: unknown;
   price: unknown; marketCap: unknown;
@@ -153,7 +177,7 @@ async function executeInstrumentFundamentalsRefresh() {
             if (!response) throw new Error("KIS_TOKEN_UNAVAILABLE");
             const output = getKisUsPriceDetailOutput(response.parsed);
             const parsed = response.parsed as { rt_cd?: unknown; msg_cd?: unknown } | null;
-            data = { ok: response.ok, status: response.status, stale: response.stale, rtCd: parsed?.rt_cd, messageCode: parsed?.msg_cd, price: parseNullableFundamentalNumber(output.last ?? output.t_prpr ?? output.price), changeRate: parseNullableFundamentalNumber(output.t_xrat ?? output.prdy_ctrt), volume: parseNullableFundamentalNumber(output.tvol ?? output.pvol ?? output.vol), tradingValue: parseNullableFundamentalNumber(output.tamt ?? output.tamnt), marketCap: parseNullableFundamentalNumber(output.tomv), sharesOutstanding: parseNullableFundamentalNumber(output.shar ?? output.shares ?? output.lstn_stcn), currency: String(output.crcy ?? output.currency ?? "USD"), raw: response.parsed };
+            data = { ok: response.ok, status: response.status, stale: response.stale, rtCd: parsed?.rt_cd, messageCode: parsed?.msg_cd, price: firstPositiveFundamentalNumber(output.last, output.t_prpr, output.price), changeRate: firstFiniteFundamentalNumber(output.t_xrat, output.prdy_ctrt), volume: firstNonNegativeFundamentalNumber(output.tvol, output.pvol, output.vol), tradingValue: firstNonNegativeFundamentalNumber(output.tamt, output.tamnt), marketCap: firstPositiveFundamentalNumber(output.tomv, output.marketCap, output.market_cap), sharesOutstanding: firstPositiveFundamentalNumber(output.shar, output.shares, output.lstn_stcn), currency: String(output.crcy ?? output.currency ?? "USD"), raw: response.parsed };
             source = "KIS_OVERSEAS_PRICE";
           }
           const parsed = data.parsed ?? data.raw;

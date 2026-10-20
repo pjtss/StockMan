@@ -24,6 +24,28 @@ function parseJson(rawText: string) {
   try { return JSON.parse(rawText); } catch { return null; }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function hasPositiveValue(output: Record<string, unknown>, fields: readonly string[]) {
+  return fields.some((field) => {
+    const value = output[field];
+    if (value == null || String(value).trim() === "") return false;
+    const parsed = Number(String(value).replace(/,/g, "").trim());
+    return Number.isFinite(parsed) && parsed > 0;
+  });
+}
+
+function isCacheablePriceDetail(parsed: unknown) {
+  const root = asRecord(parsed);
+  if (!root || (root.rt_cd != null && String(root.rt_cd) !== "0")) return false;
+  const output = getKisUsPriceDetailOutput(root);
+  return hasPositiveValue(output, ["last", "t_prpr", "price", "tomv", "marketCap", "market_cap"]);
+}
+
 export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket = "AMS" }: KisUsPriceDetailRequest): Promise<KisUsPriceDetailResult | null> {
   const code = rawCode.trim().toUpperCase();
   const market = rawMarket.trim().toUpperCase();
@@ -72,7 +94,7 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
     result = await fetchOnce(token);
   }
   const value = { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
-  if (value.ok) {
+  if (value.ok && isCacheablePriceDetail(value.parsed)) {
     detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
     if (db) await db.insert(usPriceDetailCache).values({ market, code, status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() }).onConflictDoUpdate({ target: [usPriceDetailCache.market, usPriceDetailCache.code], set: { status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() } }).catch(() => undefined);
   }
@@ -80,6 +102,13 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
 }
 
 export function getKisUsPriceDetailOutput(parsed: unknown): Record<string, unknown> {
-  const value = (parsed as any)?.output ?? (parsed as any)?.output1 ?? (parsed as any)?.output2 ?? {};
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const root = asRecord(parsed);
+  if (!root) return {};
+  const candidates = (["output", "output1", "output2"] as const)
+    .map((key) => asRecord(root[key]))
+    .filter((output): output is Record<string, unknown> => output !== null);
+  const quoteFields = ["last", "t_prpr", "price", "tomv", "marketCap", "market_cap"] as const;
+  const populatedQuote = candidates.find((output) => hasPositiveValue(output, quoteFields));
+  if (populatedQuote) return populatedQuote;
+  return candidates.find((output) => Object.keys(output).length > 0) ?? {};
 }
