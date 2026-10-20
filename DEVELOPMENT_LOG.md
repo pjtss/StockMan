@@ -5977,3 +5977,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 문서 조사 변경 commit `05c9bb72`에 원격 동시 기록 `c884b255`를 merge해 통합 HEAD `83c25950b4904029e87d023c84ef0a29d99d00bc`를 만들었다. 전체 `npm.cmd run deploy:verify` 통과 후 `origin/oci`에 push했다.
 - GitHub Actions Deploy OCI run `39417086164` 전체 성공(Verify deployment, Package, Upload, Activate release 포함). 운영 `GET https://stockman.r-e.kr/api/health`는 2026-10-20 11:52:13Z `status=ok` (404ms)를 반환했다.
 - 제품 코드와 운영 데이터는 변경하지 않았다. 보고서/DEVELOPMENT_LOG만 갱신했다.
+
+## [2026-10-21] 확인된 미사용 보조 기능 코드 제거
+
+- **목적/범위**: 사용자가 미사용이 확실하면 삭제하라고 요청해, 과거 미사용 후보 5개의 현재 추적 소스 참조·관련 UI 이력·전용 테스트를 재점검하고 확정된 비연결 모듈만 제거했다.
+- **근거**: 커밋 `680f2a2d`에서 `keyword-manager`, `stock-alert-manager`, `market-sentiment`, `sector-map` UI가 제거됐다. 현재 tracked runtime `app/components/lib/scripts`에서 5개 라이브러리로 들어오는 import/call은 없고, 전용 테스트만 각 모듈을 import했다. Discord embed flag의 active consumer는 `market-rss-notification-message.ts`다.
+- **변경 파일**: 삭제 `lib/keywords.ts`, `lib/keywords.test.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sentiment.test.ts`, `lib/sectors.ts`, `lib/sectors.test.ts`, `lib/market-rss-discord-message.ts`, `lib/market-rss-discord-message.test.ts`; 조사 기록 `docs/operations/unused-feature-candidates-20261020.md`.
+- **보존/남은 위험**: `us-daily-indicators`는 과거 운영 run 2,696회, 관리자 경로 및 실행 route가 남아 있어 삭제하지 않았다. 현재 OCI scheduler 연결 누락과 기본 disabled 상태는 별도 유지보수 항목이다. 옛 localStorage 데이터는 브라우저에 남아 있을 수 있으나 강제 제거하지 않았다. 외부 소비자 및 production effective setting은 확인 불가다.
+- **검증**: `npm.cmd run deploy:verify` 통과. 의존성 audit 0 vulnerabilities, production build, standalone runtime 및 Chrome desktop/mobile browser·API smoke 통과, 290 test files (1,411 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 routes), OCI cron (22 shared endpoints + isolated fundamentals timer) 통과.
+- **커밋·푸시·배포**: 검증 완료. 삭제와 문서만 stage해 한국어 상세 커밋 후 원격 `oci`에 push하고 Deploy OCI 결과를 확인한다.

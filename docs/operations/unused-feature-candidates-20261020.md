@@ -103,3 +103,11 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 - `.env.local`로 연결한 DB의 같은 module은 최근 90일 실행 0건을 반환했고 설정 row에도 `enabled` key가 없었다. 이 결과는 production debug API의 2026-08-19 기록과 서로 다르므로 DB endpoint/대상 간 차이가 있다. 현재 production 설정을 이 로컬 DB 결과로 추정하지 않고, 두 결과를 분리 기록한다.
 - 기존 5개 runtime 후보(`lib/keywords.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sectors.ts`, `lib/market-rss-discord-message.ts`)는 최신 source에서도 app/components/lib/scripts runtime importer가 발견되지 않았다. 세 localStorage 키는 해당 writer 파일 외 runtime consumer가 보이지 않는다. 이는 repo 정적 참조 검사 결과이며 외부 소비자나 기존 브라우저 저장값까지 검증한 것은 아니다.
 - 조사로 제품 코드·운영 DB를 변경하지 않았고 실제 사용 여부가 불명확한 기능 삭제나 cron 연결 복구도 하지 않았다. 보고서/개발 로그 변경은 commit `05c9bb72` 및 통합 commit `83c25950`에 포함되어 원격에 push됐고 Deploy OCI run `39417086164`가 성공했다. 운영 `GET https://stockman.r-e.kr/api/health`는 2026-10-20 11:52:13Z `status=ok`를 반환했다. 통합 HEAD에서 `npm.cmd run deploy:verify`도 통과했다.
+## 2026-10-21 확정 미사용 코드 정리
+
+- 최신 추적 코드에서 `git grep`으로 직접 import·함수 호출·스토리지 키 consumer를 재검사했다. `680f2a2d`에서 관련 UI (`keyword-manager`, `stock-alert-manager`, `market-sentiment`, `sector-map`)가 제거된 뒤에도 남아 있던 아래 5개 라이브러리는 runtime caller가 없었다. 각 모듈을 참조한 것은 모듈 자체 또는 전용 단위 테스트뿐이었다.
+- 이 근거로 다음 소스와 해당 전용 테스트 4개를 제거했다: `lib/keywords.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sectors.ts`, `lib/market-rss-discord-message.ts`; `lib/keywords.test.ts`, `lib/sentiment.test.ts`, `lib/sectors.test.ts`, `lib/market-rss-discord-message.test.ts`. `lib/stock-alerts.ts`에는 별도 테스트 파일이 없었다.
+- `market-rss-discord-message.ts`의 Discord flag는 현재 `market-rss-notification-message.ts`가 소유하며 retry/runtime caller도 그 모듈을 사용한다. 관련 active notification 동작은 제거하지 않았다.
+- 제거된 localStorage key `rss_custom_keywords`, `rss_stock_alerts`, `market_sentiment_history`의 값은 이미 사용자 브라우저에 저장돼 있을 수 있다. 제거된 UI/runtime가 이를 읽지 않으며, 브라우저 저장소를 조회하거나 값을 지우는 변경은 하지 않았다.
+- `us-daily-indicators`는 삭제하지 않았다. 관리자 기능·route가 남아 있고, production read-only 조회(2026-10-20 15:46:58Z)에서 누적 2,696회 실행과 마지막 2026-08-19 `SKIPPED / outside_schedule`을 재확인했다. 현재 코드 기본 설정은 disabled이고 OCI 예약 호출은 없으나, 과거 실제 사용과 수동 관리자 경로가 있으므로 비활성/예약 연결 문제로 계속 분류한다.
+- 남은 한계: 외부에서 과거 localStorage를 직접 읽는 브라우저 소비자 여부와 운영 DB의 현재 effective `us-daily-indicators` 설정은 확인하지 않았다. 해당 데이터는 건드리지 않았다.
