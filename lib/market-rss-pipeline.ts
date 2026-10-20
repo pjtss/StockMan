@@ -176,19 +176,20 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   for (const row of rows) {
     if (remaining <= 0) break;
     const title = row.translatedTitle || row.title;
-    const reaction = row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
+    const isStockTitan = row.source === "STOCKTITAN";
+    const reaction = !isStockTitan && row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
     const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
     const body = [
       "🚨 **해외시장 RSS 속보**",
       titleLine,
       row.translatedTitle && row.translatedTitle !== row.title ? `원문 제목: ${row.title}` : "",
       row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
-      `출처: ${row.source}${row.translationFallback ? " · 번역 fallback" : ""}`,
+      !isStockTitan ? `출처: ${row.source}${row.translationFallback ? " · 번역 fallback" : ""}` : "",
       row.detectedTicker ? `티커: ${row.detectedTicker}${reaction?.exchange ? ` · ${reaction.exchange}` : ""}` : "",
-      reaction?.ok ? `등락률: ${reaction.rate ?? "-"}% · 거래대금: ${reaction.tradingValue ?? "-"}달러` : "",
+      !isStockTitan && reaction?.ok ? `등락률: ${reaction.rate ?? "-"}% · 거래대금: ${reaction.tradingValue ?? "-"}달러` : "",
     ].filter(Boolean).join("\n");
     try {
-      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) });
+      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] }, ...(isStockTitan ? { flags: 1 << 2 } : {}) }), signal: AbortSignal.timeout(8_000) });
       if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
       await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: row.notificationAttempts + 1, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
       sent++;

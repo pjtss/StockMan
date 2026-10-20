@@ -1,3 +1,29 @@
+## [2026-10-20] StockTitan Discord RSS 알림 형식 정리
+
+### 목표
+- StockTitan RSS Discord 알림에서 출처·등락률·거래대금 줄과 링크 미리보기 임베드를 제거한다.
+
+### 반영
+- 일반 시장 RSS 알림은 유지하고, 대기 중인 StockTitan 재전송에도 새 형식을 적용한다.
+- `lib/market-rss-pipeline.ts`: StockTitan 본문 항목을 정리하고 Discord `SUPPRESS_EMBEDS` 플래그를 설정한다.
+- `lib/discord-delivery-retry.ts`: 기존 큐 항목의 StockTitan 본문을 정리하고 임베드 억제 플래그를 적용한다.
+- `docs/stocktitan-rss.md`: 운영 형식과 재전송 동작을 기록한다.
+
+### 검증
+- 원격 `oci` 갱신 전 `npm.cmd run deploy:verify` 통과: production build, standalone API·페이지 smoke, Chrome desktop/mobile hydration, 테스트 797개 통과·1개 skip, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 감사, npm audit 취약점 0건.
+- 배포 기준 원격 커밋이 검증 중 갱신되어 현재 원격 HEAD 기준으로 전체 게이트를 재실행한다.
+- Discord 운영 메시지 수신은 배포 후 debug API 또는 StockTitan 관리자 테스트를 통해 확인한다.
+
+### 다음 개선
+- 배포 후 RSS Discord debug API와 실제 관리자 테스트 전송에서 세 항목 및 링크 미리보기 부재를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-001
+- 성과 판정: IMPROVED
+- 근거: 신규 전송 및 재시도 payload에 요구한 본문 필터와 Discord 임베드 억제 플래그를 적용했고, 원격 갱신 전 배포 검증을 통과했다. 운영 전송 결과는 배포 뒤 확인한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 최신 원격 기준 전체 검증 후 커밋·push 및 OCI workflow 배포를 진행한다.
 # Development Log
 
 ## [2026-10-20] 시총 갱신 원장 조회용 운영 진단 API

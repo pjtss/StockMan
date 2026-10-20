@@ -20,6 +20,8 @@ StockTitan RSS
 - 기본 피드: `https://www.stocktitan.net/rss`
 - 선택 환경변수: `STOCKTITAN_RSS_URL`
 - 기존 `MARKET_RSS_DISCORD_WEBHOOK_URL`, 번역·알림 배치 설정을 그대로 사용한다.
+- Discord 알림은 제목과 티커 등 기존 기본 정보만 표시한다. 출처, 등락률, 거래대금은 생략하고 링크 미리보기 임베드도 억제한다.
+- 대기 중인 재전송 알림에도 같은 형식을 적용해 이전 형식의 출처·등락률 줄과 링크 임베드가 다시 나타나지 않도록 한다.
 
 ## 관리자 테스트
 
