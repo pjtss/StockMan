@@ -5778,5 +5778,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 이미 전송된 과거 알림은 회수할 수 없고, 미전송 큐의 차단 건은 다음 retry run에서 SKIPPED 처리된다.
 
 ### 커밋·푸시·배포
-- 상태: 코드·문서 검증 완료. 커밋·푸시·OCI 배포 진행 중.
+- 상태: 완료. 코드·테스트·문서 커밋 `29d847b6`을 `oci`에 푸시했고 Deploy OCI run `39384059865` 성공.
+- 배포 전 `npm.cmd run deploy:verify` 통과: 테스트 830개 통과·1개 skip, production build, standalone runtime·API smoke, Chrome 데스크톱·모바일 hydration, typecheck, docs/migration 및 보안·cron audit.
 
