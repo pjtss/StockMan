@@ -51,7 +51,7 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-pro
 
 운영에서 관리자 실행 이력의 상태와 요약을 확인한다. `PARTIAL`/`FAILED`이면 `failureCodeCountsByMarket`로 시장별 근본 원인 분포를 먼저 확인하고, `failureCodeCounts`로 전체 분포를 교차 검증한다. 이어 `unattemptedCount`, `databaseFailure`, 최대 100건의 실패 샘플을 확인한다. 성공 건수는 시도 수가 아니라 커밋된 snapshot 배치 행 수로 해석한다.
 
-최근 작업의 종목별 durable ledger는 관리자 세션 또는 `CRON_SECRET`으로 인증된 read-only `GET /api/debug/instrument-fundamentals`에서 확인한다. 응답은 최근 작업 1건의 대상/성공/실패/대기 및 재시도 가능·연기 건수, 시장·오류코드별 실패 집계, 재시도 예정시각, 실패 종목 최대 25개(종목코드·오류코드·횟수·시각)를 제공한다. 원시 KIS 응답 payload나 자격증명은 반환하지 않는다. 이 endpoint는 provider 호출이나 DB 쓰기를 하지 않는다. 자동화 실행 이력에 저장된 전체 오류 집계와 ledger 집계는 대상 job이 같을 때 대조한다.
+최근 작업의 종목별 durable ledger는 관리자 세션 또는 `CRON_SECRET`으로 인증된 read-only `GET /api/debug/instrument-fundamentals`에서 확인한다. 응답은 최근 작업 1건의 대상/성공/실패/대기 및 재시도 가능·연기 건수, 시장·오류코드별 실패 집계, 재시도 예정시각, 실패 종목 최대 25개(종목코드·오류코드·횟수·시각)를 제공한다. `responseDiagnostics`는 실패 원장과 `us_price_detail_cache`를 대조하여 실패 전체(최대 500건)에 대해 캐시 존재/시각 근접도, HTTP 및 KIS 업무 코드, 선택된 output 구조, 현재 가격 alias 상태와 대체 alias의 양수 존재 여부를 집계한다. 종목 표본에는 각 output 후보의 허용된 가격·시총 필드 상태를 제공한다. 원시 KIS 응답, 숫자값, 자유형 메시지나 자격증명은 반환하지 않는다. 500건 초과 시 `truncated=true`이며 집계는 조회한 표본에 한정된다. 캐시가 실패 기록 시각과 10분 이내에 있지 않으면 당시 응답을 재현한다고 볼 수 없으므로 근거로 과신하지 않는다. 이 endpoint는 provider 호출이나 DB 쓰기를 하지 않는다. 자동화 실행 이력에 저장된 전체 오류 집계와 ledger 집계는 대상 job이 같을 때 대조한다.
 
 ## 남은 한계
 

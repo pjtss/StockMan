@@ -31,6 +31,36 @@
 - 상태: 완료. 코드 커밋 `bbd4ff14`를 `oci`에 push했고 Deploy OCI run `39359695006` 성공. 서버 활성화까지 완료했다.
 # Development Log
 
+## [2026-10-20] 해외 시총 실패 응답의 안전한 캐시형태 진단
+
+### 목표
+- 운영 원장에서 135건으로 확인된 `KIS_PRICE_INVALID`를 필드 누락·공백·비수치·0·output 선택 문제 중 어디에 해당하는지, 전체 KIS 재호출 없이 판별한다.
+
+### 반영
+- 원인 가설: 오류 코드는 `output.last ?? output.t_prpr ?? output.price` 후 값이 양수가 아닌 경우를 한데 묶는다. 또한 해외 가격상세 모듈은 HTTP 2xx이면 업무코드·필드 형태와 무관하게 응답 JSON을 `us_price_detail_cache`에 저장한다. 따라서 실패 시각과 가까운 기존 cache JSON을 안전하게 형태만 집계하면 파서 alias 문제와 공급자 응답 문제를 구분할 수 있다.
+- `lib/instrument-fundamental-debug.ts`: 최근 job 실패 항목을 기존 `us_price_detail_cache`와 조인하고 최대 500건에서 output 형태, `rt_cd/msg_cd`, 현재 선택 alias 상태, 다른 alias의 양수 여부, 시총 필드 상태를 안전 집계한다. 실패 시각과 cache 시간이 10분 이내인지도 계산한다.
+- 상세 표본은 output 후보별 허용 필드 상태만 반환한다. 응답 숫자값, 자유형 KIS 메시지 및 raw payload는 반환하지 않고, provider 요청/DB 쓰기도 하지 않는다. 대량 오류 시에도 조회는 최대 500행으로 상한을 둔다.
+- `lib/instrument-fundamental-debug.test.ts`는 `last` 공백인데 `t_prpr` 양수가 있는 응답에서 현재 파서가 실패할 수 있음을 진단값으로 드러내고, cache 시각·응답코드만 노출하는 계약을 검증한다.
+- 운영 문서에 진단 집계와 캐시 시각 해석의 한계를 추가했다.
+
+### 검증
+- `npm.cmd test -- --run app/api/debug/instrument-fundamentals/route.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 7개 테스트 통과.
+- `npm.cmd run docs:check` 통과: 개발 로그 계약 및 150개 migration/V155/23개 운영 관계 확인.
+- `npm.cmd run typecheck` 통과.
+- 최신 no-job 응답 shape 보완 후 `npm.cmd run deploy:verify` 최종 통과: production build, standalone 서버 기동과 `/charts` HTTP 200, Chrome 데스크톱·모바일 hydration, API/인증 smoke, 223개 파일 804개 테스트 통과·1개 skip, typecheck, docs·migration·verify-scope·KIS 경계·Bearer 인증·OCI cron 감사, npm audit 0 취약점.
+- 신규 쿼리는 provider 요청 없이 최근 실패 최대 500건을 조회하도록 제한했다. 실제 운영 캐시 field-state 집계 확인은 배포 후 진행한다.
+
+### 다음 개선
+- 운영 캐시 집계에서 실제 대체 alias 양수 사례가 나오면 해당 alias를 비어 있지 않은 값 우선으로 읽도록 파서를 수정하고, 기존 cache를 이용한 재현 테스트와 다음 예정 retry 실행 결과를 검증한다. 대체 alias가 관측되지 않는 경우에는 KIS 공식 응답의 거래소/종목 매핑과 미지원 종목 상태를 소량 표본으로 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-011
+- 성과 판정: UNMEASURED
+- 근거: 운영 cache 모양을 반환하는 read-only 진단 기능을 추가했지만, 해당 운영 결과와 전체 배포 검증은 아직 확인 중이다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 회귀·전체 검증 성공 후 커밋·푸시·배포한다.
+
 ## [2026-10-20] 시총 갱신 원장 조회용 운영 진단 API
 
 ### 목표
