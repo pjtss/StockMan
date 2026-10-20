@@ -50,11 +50,11 @@
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-002
-- 성과 판정: UNMEASURED
-- 근거: 코드 검증 및 운영 배포 완료 후 StockTitan과 다른 출처의 Discord 본문 항목을 점검한다.
+- 성과 판정: IMPROVED
+- 근거: 새 StockTitan 알림과 재시도 큐에서 티커 행을 제거하고 일반 RSS 알림 표시는 유지했다. 배포 전 전체 게이트 804개 테스트가 통과했고, 배포 뒤 health와 charts가 HTTP 200을 반환했다.
 
 ### 커밋·푸시·배포
-- 상태: 커밋 후 `oci` push 및 Deploy OCI workflow 결과를 확인한다.
+- 상태: 코드 커밋 `3ff29bfa`를 `oci`에 push했고 Deploy OCI run `39368775998` 성공. 검증, 패키징, 업로드와 서버 활성화가 모두 완료됐으며 health와 charts도 HTTP 200이다.
 
 ## [2026-10-20] 해외 시총 실패 응답의 안전한 캐시형태 진단
 
