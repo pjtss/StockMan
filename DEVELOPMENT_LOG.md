@@ -1,5 +1,34 @@
 # Development Log
 
+## [2026-10-20] 시총 갱신 원장 조회용 운영 진단 API
+
+### 목표
+- 운영 자동화 이력만으로 구분되지 않는 최근 시총 갱신 작업의 종목별 오류코드 전체 분포와 재시도 대기 상태를 read-only 방식으로 확인한다.
+
+### 반영
+- 운영 조회에서 최근 PARTIAL job의 실패 146건이 전부 재시도 연기 상태인 것까지 확인했지만, 오래된 실행 요약에는 새 오류코드 집계가 없어 전체 분포를 단정할 수 없었다. 이를 특정 코드 탓으로 추정하지 않고, V154/V155 진행 원장을 직접 읽는 `/api/debug/instrument-fundamentals`를 추가했다.
+- `lib/instrument-fundamental-debug.ts`는 최근 job의 전체/상태/재시도 집계, 시장·안전 오류코드별 실패 수, 최대 25개 제한 샘플을 조회한다. 공급자 원문 payload는 읽거나 반환하지 않는다.
+- `app/api/debug/instrument-fundamentals/route.ts`는 관리자 세션 또는 cron secret 인증을 요구하며, 실패 시 DB 오류 원문을 감춘다. DB를 변경하거나 KIS를 호출하지 않는다.
+- 운영 문서에 endpoint와 read-only 응답 범위를 추가했다.
+
+### 검증
+- `npm.cmd test -- --run app/api/debug/instrument-fundamentals/route.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 7개 테스트 통과. 인증 없이 DB를 호출하지 않음, 관리자/cron 인증, 빈 원장, 오류코드/재시도 표현, DB 오류 비노출을 검증했다.
+- `npm.cmd run docs:check` 통과: 150개 마이그레이션, 최신 V155, 운영 관계 23개 확인.
+- `npm.cmd run typecheck` 통과.
+- `npm.cmd run deploy:verify` 통과: production build, standalone 서버 기동 및 `/charts` HTTP 200, 데스크톱·모바일 Chrome hydration, API/인증 smoke, 223개 테스트 파일 통과·1개 skip(804 passed·1 skipped), 타입 검사, 문서·migration·verify scope·KIS 경계·Bearer 인증·OCI cron 검사, npm audit 취약점 0건.
+- 운영 API 배포 및 원장-automation 집계 대조는 아직 진행 전이며 완료 후 기록한다.
+
+### 다음 개선
+- 배포 후 같은 job에 대해 automation run의 전체 `failureCodeCounts` 합계와 원장 API의 `failuresByMarketAndCode` 합계가 일치하는지 대조하고, 다음 retry 실행에서 오류 유형별 해결/지속 여부를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-010
+- 성과 판정: IMPROVED
+- 근거: 로컬 전체 배포 게이트와 7개 신규 회귀 테스트가 통과해, 배포 가능한 인증 보호 read-only 진단 경로가 빌드·실행됨을 확인했다. 운영 데이터 대조 성과는 배포 후 측정한다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 전체 검증이 통과한 뒤에만 커밋·푸시·배포한다.
+
 ## [2026-10-19] 시총 갱신 실패 전체 분포 및 해외 토큰 진단
 
 ### 목표
