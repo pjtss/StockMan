@@ -7,7 +7,6 @@ BEGIN
        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='instrument_fundamental_snapshots' AND column_name='listed_shares') THEN
       ALTER TABLE instrument_fundamental_snapshots RENAME COLUMN shares_outstanding TO listed_shares;
     END IF;
-    ALTER TABLE instrument_fundamental_snapshots DROP COLUMN IF EXISTS free_float_shares, DROP COLUMN IF EXISTS free_float_percent;
   END IF;
   IF to_regclass('public.instrument_fundamental_history') IS NOT NULL
      AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='instrument_fundamental_history' AND column_name='shares_outstanding')
@@ -15,10 +14,6 @@ BEGIN
     ALTER TABLE instrument_fundamental_history RENAME COLUMN shares_outstanding TO listed_shares;
   END IF;
 END $$;
-
-DROP TABLE IF EXISTS sec_smallcap_share_review CASCADE;
-DROP TABLE IF EXISTS sec_smallcap_common_stock_shares CASCADE;
-DELETE FROM feature_module_settings WHERE module_key = 'sec-smallcap-share-facts';
 
 DO $$
 BEGIN

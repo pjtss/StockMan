@@ -10,7 +10,7 @@ import type { TranslationClient } from "@/lib/translation-types";
 import { getMarketRssTranslationConfiguration } from "@/lib/market-rss-translation-configuration";
 
 const withTranslation = async (feed: Awaited<ReturnType<typeof fetchMarketRssSource>>, translate: boolean, client?: TranslationClient) =>
-  translate ? { ...feed, items: await translateMarketRssItems(feed.items, client) } : feed;
+  translate ? { ...feed, items: await translateMarketRssItems(feed.items) } : feed;
 
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

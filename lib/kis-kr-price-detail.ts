@@ -36,7 +36,7 @@ export async function fetchKrPriceDetail(code: string) {
     volume: parseKisNullableNumber(output.acml_vol),
     tradingValue,
     marketCap,
-    sharesOutstanding: parseKisNullableNumber(output.lstn_stcn),
+    listedShares: parseKisNullableNumber(output.lstn_stcn),
     currency: "KRW",
     marketCapUnit: "KRW",
     marketCapRaw,

@@ -7,7 +7,7 @@ import { extractMarketRssTranslatedHeadline, MARKET_RSS_TRANSLATION_CONTEXT_MARK
 import { createQuotaAwareTranslationClient } from "./quota-aware-translation-client";
 import { parseMarketRss } from "./market-rss";
 
-const item = (id: string, source = "STOCKTITAN"): MarketRssItem => ({ id, title: `Title ${id}`, summary: `Long summary ${id}`, content: `Full text ${id}`, link: "https://example.com", publishedAt: null, source });
+const item = (id: string): MarketRssItem => ({ id, title: `Title ${["one", "two", "three", "four", "five"][Number(id) - 1] || id}`, summary: `Long summary ${id}`, link: "https://example.com", publishedAt: null, source: "TEST" });
 const client = (translate: TranslationClient["translate"]): TranslationClient => ({ translate });
 
 afterEach(() => {
@@ -133,25 +133,6 @@ describe("market RSS translation", () => {
     expect(translate).toHaveBeenCalledWith(expect.stringContaining(`${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}Title one${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}Long summary 1`), "auto", "ko", "html");
     expect(result.translatedTitle).toBe("제목 번역 완료");
     expect(result.translatedSummary).toBe("Long summary 1");
-    expect(result.translatedContent).toBe("Full text 1");
-  });
-
-  it("never sends titles from other RSS sources to the translation provider", async () => {
-    const translate = vi.fn(async (text: string) => ({ translatedText: `번역:${text}`, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
-    const result = await translateMarketRssItem(item("2", "NASDAQ"), client(translate));
-
-    expect(translate).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ translatedTitle: "Title 2", translationFallback: true, translationFallbackReason: "unsupported_source" });
-  });
-
-  it("sends only the StockTitan title, never the summary or body", async () => {
-    const translate = vi.fn(async (text: string) => ({ translatedText: `번역:${text}`, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
-    await translateMarketRssItem(item("3"), client(translate));
-
-    expect(translate).toHaveBeenCalledTimes(1);
-    expect(translate).toHaveBeenCalledWith("Title 3");
-    expect(translate).not.toHaveBeenCalledWith("Long summary 3");
-    expect(translate).not.toHaveBeenCalledWith("Full text 3");
   });
 
   it("uses a bounded, cleaned RSS summary as translation context but returns only the translated headline", async () => {

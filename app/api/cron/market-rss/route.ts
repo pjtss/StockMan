@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { ingestMarketRssArticles, notifyPendingMarketRssArticles, translatePendingMarketRssArticles } from "@/lib/market-rss-pipeline";
 import { withAutomationRun } from "@/lib/automation-run";
+import { withAutomationLock } from "@/lib/automation-lock";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { normalizeMarketRssSources } from "@/lib/market-rss-sources";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { syncMarketRssBullishArticles } from "@/lib/market-rss-bullish-repository";
+import { getMarketRssBatchSize } from "@/lib/market-rss-batch-size";
+import { getMarketRssCronStatus } from "@/lib/market-rss-cron-status";
 
 function authorized(request: Request) { return isCronRequestAuthorized(request); }
 
@@ -24,11 +27,16 @@ export async function POST(request: Request) {
     const sources = normalizeMarketRssSources(settings.featureSettings?.marketRss?.enabledSources);
     const result = await withAutomationLock("market-rss-pipeline", () => withAutomationRun("market-rss", async () => {
       const ingested = await ingestMarketRssArticles({ sources });
-      const translated = await translatePendingMarketRssArticles(Number(process.env.RSS_TRANSLATION_BATCH_SIZE || 50));
+      const translated = await translatePendingMarketRssArticles(getMarketRssBatchSize(process.env.RSS_TRANSLATION_BATCH_SIZE, 50, 100));
       const bullish = await syncMarketRssBullishArticles();
-      const notified = await notifyPendingMarketRssArticles(Number(process.env.RSS_NOTIFICATION_BATCH_SIZE || 10));
-      return { ok: true, mode: "COMMIT", sources, ingested, translated, bullish, notified };
-    });
+      const notified = await notifyPendingMarketRssArticles(getMarketRssBatchSize(process.env.RSS_NOTIFICATION_BATCH_SIZE, 10, 100));
+      const outcome = getMarketRssCronStatus(ingested.ingestFailureCount, translated);
+      return { ok: true, mode: "COMMIT", ...outcome, sources, ingested, translated, bullish, notified };
+    }));
+    if (result === null) {
+      await recordSkippedAutomationRun("market-rss", "already_running", { lockKey: "market-rss-pipeline" });
+      return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "already_running" });
+    }
     return NextResponse.json(result);
   } catch (error) {
     const diagnostics = describeError(error);

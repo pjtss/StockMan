@@ -292,6 +292,7 @@ describe("KIS token lifecycle", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 403,
+      headers: new Headers({ "content-type": "application/json; charset=utf-8" }),
       text: async () => "token issuance rate limit",
     });
     vi.stubGlobal("fetch", fetchMock);

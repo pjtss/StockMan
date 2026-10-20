@@ -2,7 +2,8 @@ import { claimDueDiscordDeliveries, getMarketRssDeliveryArticleSnapshot, markDis
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { isRetryableDiscordError, parseMarketRssDeliveryArticleId, withDiscordWaitParameter } from "@/lib/discord-delivery-policy";
 import { toTextWebhookPayload } from "@/lib/discord-text";
-import { DISCORD_SUPPRESS_EMBEDS_FLAG, simplifyMarketRssDiscordMessage } from "@/lib/market-rss-discord-message";
+import { isMarketRssNotificationSnapshot, matchesMarketRssNotificationSnapshot } from "@/lib/market-rss-notification-snapshot";
+import { DISCORD_SUPPRESS_EMBEDS_FLAG } from "@/lib/market-rss-notification-message";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -30,26 +31,67 @@ export async function retryDiscordDeliveries(limit = 50) {
     try {
       const webhook = await webhookFor(delivery.channelKey);
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
-      const payload: Record<string, unknown> = toTextWebhookPayload(delivery.payload as Record<string, unknown>);
-      if (delivery.channelKey === "MARKET_RSS" && typeof payload.content === "string") {
-        const articleId = parseMarketRssDeliveryArticleId(delivery.externalId);
-        const hasStockTitanMarker = /(?:^|\n)출처: STOCKTITAN(?:\s|·|$)/m.test(payload.content);
-        const article = articleId
-          ? await getDb().select({ source: marketRssArticles.source }).from(marketRssArticles).where(eq(marketRssArticles.id, articleId)).limit(1)
-          : [];
-        const isStockTitan = hasStockTitanMarker || article[0]?.source === "STOCKTITAN";
-        if (isStockTitan) {
-          payload.content = payload.content.split("\n").filter((line) => !/^출처:\s*STOCKTITAN\b/.test(line) && !/^등락률:/.test(line) && !/^티커:/.test(line)).join("\n");
-        } else {
-          payload.content = simplifyMarketRssDiscordMessage(payload.content);
+      if (articleId != null) {
+        let currentSnapshot;
+        try {
+          currentSnapshot = await getMarketRssDeliveryArticleSnapshot(articleId);
+        } catch {
+          // Do not send an RSS retry when its current translation snapshot cannot be verified.
+          results.persistenceFailed++;
+          continue;
         }
-        payload.flags = Number(payload.flags || 0) | DISCORD_SUPPRESS_EMBEDS_FLAG;
+        if (!isMarketRssNotificationSnapshot(storedSnapshot)
+          || !currentSnapshot
+          || !matchesMarketRssNotificationSnapshot(storedSnapshot, currentSnapshot)) {
+          try {
+            await markDiscordDeliverySuperseded({ id: delivery.id, articleId, claimedAt: delivery.updatedAt });
+            results.superseded++;
+          } catch {
+            results.persistenceFailed++;
+          }
+          continue;
+        }
       }
-      const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8_000) });
-      if (!response.ok) throw new Error(`discord_http_${response.status}`);
-      await markDiscordDeliverySent(delivery.id);
-      const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
-      if (articleId) await markMarketRssDelivery(articleId, "SENT");
+      expectedUpdatedAt = await markDiscordDeliverySending(delivery.id, delivery.updatedAt);
+      expectedStatus = "SENDING";
+      const { _marketRssSnapshot: _ignoredSnapshot, ...webhookPayload } = payload;
+      if (isMarketRssNotificationSnapshot(storedSnapshot) && storedSnapshot.source === "STOCKTITAN") {
+        if (typeof webhookPayload.content === "string") {
+          webhookPayload.content = webhookPayload.content
+            .split(/\r?\n/)
+            .filter((line) => !/^(?:출처|등락률):\s*/.test(line))
+            .join("\n");
+        }
+        webhookPayload.flags = Number(webhookPayload.flags || 0) | DISCORD_SUPPRESS_EMBEDS_FLAG;
+      }
+      const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(webhookPayload)), signal: AbortSignal.timeout(8_000) });
+      if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
+    } catch (error) {
+      sendFailed = true;
+      sendError = error;
+    }
+
+    if (sendFailed) {
+      const message = sendError instanceof Error ? sendError.message : String(sendError);
+      results.failed += 1;
+      results.attempts += delivery.attempts + 1;
+      const retryable = isRetryableDiscordError(sendError);
+      try {
+        await persistDiscordDeliveryOutcome({ id: delivery.id, articleId, status: retryable ? "PENDING" : "FAILED", attempts: delivery.attempts + 1, claimedAt: expectedUpdatedAt, expectedStatus, error: message });
+      } catch {
+        results.persistenceFailed++;
+        continue;
+      }
+      if (retryable) {
+        if (delivery.attempts + 1 >= 5) results.repeatedFailure += 1;
+      } else {
+        results.permanentFailed += 1;
+      }
+      continue;
+    }
+
+    try {
+      await persistDiscordDeliveryOutcome({ id: delivery.id, articleId, status: "SENT", attempts: delivery.attempts + 1, claimedAt: expectedUpdatedAt, expectedStatus });
       results.sent += 1;
       results.attempts += delivery.attempts + 1;
       if (delivery.attempts > 0) results.recovered += 1;

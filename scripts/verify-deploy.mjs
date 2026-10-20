@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createConnection, createServer } from "node:net";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { readLocalEnvFile } from "./local-env.mjs";
 import { stopChildProcess, waitForProcessExit } from "./child-process-lifecycle.mjs";
 import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
 import { runDeploymentVerification } from "./deployment-verification-order.mjs";
@@ -205,7 +206,7 @@ async function verifyRuntime() {
   // standalone server when the smoke check times out and cleanup targets the
   // short-lived command shell instead of the actual server process.
   const child = spawn(process.execPath, args, {
-    env: { ...process.env, ...loadLocalEnv(), PORT: port, NODE_ENV: "production" },
+    env: { ...process.env, ...readLocalEnvFile(), PORT: port, NODE_ENV: "production" },
     stdio: ["ignore", "pipe", "pipe"],
     shell: false,
     detached: false,

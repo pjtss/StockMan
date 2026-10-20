@@ -1,3 +1,96 @@
+## [2026-10-20] 미사용 기능 조사 결과와 배포 검증 재개
+
+### 목표
+- 기존 미사용 기능 조사 및 사용자가 요청한 완료 작업 배포를 이어서 진행하고 현재 검증 차단 원인을 확인한다.
+
+### 반영
+- `scripts/refresh-all-instrument-fundamentals.ts`에서 backoff로 정상 건너뛴 결과에 사후 검증을 실행하지 않도록 하고, 실제 완료 결과에 `startedAt`이 없으면 명시 오류를 내도록 보강했다. 삭제된 IPO 어댑터에 대한 잔여 KIS boundary audit 테스트 매핑도 제거했다.
+- `lib/kis-token.test.ts`의 HTTP 실패 응답 mock에 실제 Fetch `Response` 형태에 필요한 `headers`를 추가했다. 테스트 실패는 응답 mock의 `headers` 누락으로 발생한 `TypeError`였으며 제품 응답 처리 오류가 아니었다.
+- 미사용 기능 후보 및 DB scheduler 이력은 `docs/operations/unused-feature-candidates-20261020.md`에 기록했다.
+
+### 검증
+- `npm.cmd run deploy:verify`: 최신 실행 전체 통과. 의존성 audit 0건, production build, standalone·Chrome desktop/mobile·API smoke, Vitest 293개 파일(1,412 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 API routes), OCI cron(22 shared endpoints + fundamentals timer).
+- `npx.cmd vitest run lib/kis-token.test.ts -t 'backs off token issuance' --reporter=verbose` 통과.
+- 운영 DB read-only 이력에서 V148·V149는 원격과 같은 설명으로 이미 적용되어 있었고 DB에는 SEC shares 1,057행, review 1,311행 및 enabled 설정이 남아 있었다. 파괴적 V149 부분을 제거하고 KIS shares 전환을 V157로 옮겨 기존 데이터와 기능 설정을 보존했다. 원격 `origin/oci`는 공통 기준보다 6커밋 앞서고 로컬은 2커밋 앞서 있다.
+- 로컬 변경 집합의 전체 검증은 통과했으나 origin/oci보다 6커밋 뒤처져 있어 원격 통합 전이며 커밋·푸시·배포는 아직 수행하지 않았다.
+
+### 다음 개선
+- 원격 최신 6커밋과 로컬 변경을 통합하고 두 충돌 파일을 수동 검토한 뒤 전체 배포 검증을 다시 실행한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-005
+- 성과 판정: PARTIAL
+- 근거: 로컬 전체 배포 검증은 통과했고 V148/V149 중복 및 파괴적 SEC 삭제 migration을 정리했다. 원격과의 Discord retry/RSS pipeline 충돌 2건을 통합하고 push·배포하는 작업은 남아 있다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 전체 local verify는 통과했으나 remote integration이 끝나지 않아 커밋·푸시·배포하지 않았다.
+
+## [2026-10-20] 미국 최근 저점·VWAP 후보에 RVOL ≥ 1 조건 추가
+
+### 목표
+- 기존 미국 보통주 시총 USD 1억 이하·최근 10개 일봉 저점 이후 반등·종가와 VWAP ±5% 후보 718개를 프로젝트 표준 RVOL ≥ 1 조건으로 재추출했다.
+
+### 반영
+- RVOL은 기준 거래일 거래량을 기준일을 제외한 직전 20개 이용 가능 일봉 평균 거래량으로 나눴다. 계산 정의는 `lib/daytrade-signal.ts`와 동일하다.
+- 718개에 대해 KIS 해외주식 기간별 시세 API를 직접 GET했고, RVOL 계산에 사용한 최신 거래량이 기존 VWAP 원본의 최신 거래량과 일치하는 455개만 판정했다.
+- RVOL ≥ 1 통과 87개(AMS 9, NAS 72, NYS 6), RVOL < 1 368개다. 나머지 263개는 HTTP 500 / EGW00201 응답으로 RVOL을 확인할 수 없어 fail-closed 처리하고 상세 JSON `notAssessed`에 기록했다.
+- 기존 운영 RVOL 데이터는 같은 VWAP 후보와 최신 거래량이 일치하지 않아 혼합하지 않았다. 결과에 RVOL, 직전 20봉 평균 거래량·기준 구간·별도 조회시각을 포함했다.
+- 결과 Markdown·CSV·JSON과 `docs/README.md` 항목을 갱신했다. 조회 스크립트와 응답은 `.codex/` 임시 작업자료에 두었다.
+
+### 검증
+- 455개 성공 응답은 모두 기준일 20261019와 직전 20개 봉을 포함했고, 최신 거래량이 VWAP 원본과 전부 일치했다.
+- 최종 JSON 87개와 CSV 데이터 행 87개, 중복 0개를 확인했다. 출력 전체에 RVOL ≥ 1, USD 100,000,000 이하, VWAP 편차 ±5% 이내를 검사했다. `git diff --check` 통과.
+- KIS 미응답 263개가 있으므로 결과는 해당 455개 판정 가능 범위에서의 통과 목록이며, 미응답 종목의 RVOL 상태는 미확인이다.
+
+### 다음 개선
+- KIS가 EGW00201을 반환한 263개를 재조회할 수 있을 때 RVOL 범위를 완결하고, 캔들별 최신성 및 시총 스냅샷 시차를 검토한다.
+
+### 커밋·푸시·배포
+- 미실행. 문서·CSV·JSON만 갱신했다.
+
+## [2026-10-20] 미국 RVOL 후보에 최소 거래량 10만 주 조건 추가
+
+### 목표
+- 기존 RVOL ≥ 1 결과에 기준일 거래량 100,000주 이상을 추가 적용해 재추출했다.
+
+### 반영
+- 기준일 거래량이 100,000주 미만인 56개를 제외하고 31개를 유지했다(AMS 3, NAS 24, NYS 4).
+- 기존 RVOL≥1 결과 CSV·JSON·Markdown을 새 최종 결과로 갱신했다. JSON에는 거래량 하한, 제외 건수, 시장별 수를 기록했다.
+
+### 검증
+- 31개 전체에서 기준일 거래량 ≥100,000주, RVOL ≥1, USD 100,000,000 이하 시총, VWAP 편차 ±5% 이내를 확인했다. 최소 거래량 102,959주다.
+- 263개 KIS EGW00201 미응답은 앞선 판정과 동일하게 포함하지 않았다. CSV 31행과 JSON 31종목 일치를 확인한다.
+
+### 커밋·푸시·배포
+- 미실행. 결과 문서와 데이터만 갱신했다.
+
+## [2026-10-20] 현재 미사용 기능 후보 조사
+
+### 목표
+- 요청된 미사용 기능 확인을 위해 로컬 후보 커밋 `680f2a2d`의 삭제 67개 경로와 현재 checkout의 정적 runtime 도달성·자동화 실행 기록을 함께 조사했다. remote-tracking ref `012833ad`는 로컬보다 5커밋 앞서고 로컬 전용 커밋은 2개다.
+
+### 반영
+- `docs/operations/unused-feature-candidates-20261020.md`에 이미 비활성 안내 UI/API, 정적 runtime 후보, 외부 소비 확인이 필요한 동작 API, 운영 cron 및 실제 실행 이력을 구분해 기록했다. `docs/README.md`에서 연결했다.
+- AST import graph에서 955개 source 중 291개 entrypoint와 656개 도달 파일을 확인했다. `lib/keywords.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sectors.ts`, `lib/market-rss-discord-message.ts`는 app·운영 script 진입점에서 도달하지 않는 정적 후보이며 삭제 확정은 하지 않았다. 누적매집 fixture는 테스트 지원 코드로 구분했다.
+- `us-daily-indicators`는 registry와 route에 있으나 OCI cron 설정에서 호출되지 않고 연결 DB의 90일 실행 이력도 없어 scheduler 누락 후보로 기록했다. 다른 자동화의 무기록만으로 미사용 판정하지 않았다.
+
+### 검증
+- `git diff --check` 통과. API·import·navigation·OCI cron 정적 참조를 확인했고, SEC 자동 수집은 `/api/cron/sec-edgar` 및 `/api/cron/market-rss` 경로에 남아 있음을 확인했다.
+- 연결 DB는 `.env.local` 우선 환경으로 `BEGIN READ ONLY` 조회했다. 25 registry 항목 중 3개 `NOT_SCHEDULED`, 22개 `OCI_CRON`; 최근 30일 기록은 `dart-realtime` 132회뿐이고 나머지 scheduled 항목은 0회, 90일에는 7개 module만 기록이 있었다. 이는 DB에 기록된 이력이며 기능 미사용의 증거와 동일하지 않다.
+- `npm.cmd run docs:check`는 기존 migration 중복 V148 및 V149로 실패했다. V156 `instrument_fundamental_attempt_timestamp` 삭제는 원격 코드가 해당 컬럼을 읽고 쓰므로 배포 전 재검토가 필요하다.
+- `origin/oci` 기준 2 ahead·5 behind로 분기되어 있으며 이전 전체 검증의 테스트 실패도 남아 있어 deploy 검증은 통과하지 않았다.
+
+### 다음 개선
+- 원격 최신 이력과 migration을 먼저 조정하고 전체 검증을 재실행한다. 외부 DART API 소비자 및 관리자 KIS 대체 여부를 확인한 뒤에만 삭제 범위를 확정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-004
+- 성과 판정: PARTIAL
+- 근거: 저장소 정적 도달성·scheduler·DB 실행 이력을 조사했으나 외부 소비 확인 및 배포 게이트 문제가 남아 미사용 후보 제거와 배포는 확정하지 않았다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 조사 문서만 기록했으며 커밋·푸시·배포는 하지 않았다.
+
 ## [2026-10-20] 외부 RSS 번역 API 대상을 StockTitan 제목으로 제한
 
 ### 목표

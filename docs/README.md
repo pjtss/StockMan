@@ -21,6 +21,7 @@
 - 대한민국 기업 분석: [`company-analysis/kr/`](./company-analysis/kr/README.md)
 - 미국 기업 분석: [`company-analysis/us/`](./company-analysis/us/README.md)
 
+- 미국 보통주 시총 USD 1억 이하 최근 10개 일봉 저점 이후 VWAP ±5% 및 RVOL ≥ 1 후보 (2026-10-19): [`operations/us-common-stocks-recent-low-vwap-20261019.md`](./operations/us-common-stocks-recent-low-vwap-20261019.md) · [CSV](./operations/us-common-stocks-recent-low-vwap-20261019.csv) · [상세 JSON](./operations/us-common-stocks-recent-low-vwap-20261019.json)
 - 미국 보통주 시총 USD 5억 이하 중 최근 10거래일 최저 종가 목록 (2026-10-16): [`operations/us-common-stock-10day-close-low-20261016.md`](./operations/us-common-stock-10day-close-low-20261016.md)
 - 미국 보통주 시총 USD 5억 이하 중 최근 10거래일 저가 대비 최신 종가 반등 목록 (2026-10-16): [`operations/us-common-stock-10day-low-rebound-20261016.md`](./operations/us-common-stock-10day-low-rebound-20261016.md)
 
@@ -61,6 +62,7 @@
 - 미국 보통주 $0.10 이하·시가총액 $5억 이하 가격·시총 후보 및 상장주수 결측 기록 (2026-10-15): [`operations/us-common-stocks-under-10c-20261015.md`](./operations/us-common-stocks-under-10c-20261015.md)
 - 미국 상장 종목 급등 촉매·리스크 분석용 SEC FORM·ITEM 가이드: [`operations/us-sec-form-item-catalyst-risk-guide.md`](./operations/us-sec-form-item-catalyst-risk-guide.md)
 - 미국 상장 종목 워런트·유증·전환증권 희석 위험 조사 Harness: [`operations/us-equity-dilution-risk-harness.md`](./operations/us-equity-dilution-risk-harness.md)
+- 티커별 SEC 기업 공시 분석 문서 기준: [`operations/sec-ticker-company-analysis-dossier-standard.md`](./operations/sec-ticker-company-analysis-dossier-standard.md)
 - 미국 상승률 TOP100 UI 데이터 품질·부분 응답·원천 시각·누락 방지 계약: [`US_TOP_RISING_UI_DATA_QUALITY.md`](./US_TOP_RISING_UI_DATA_QUALITY.md)
 - 미국장 월간 전망 및 이벤트 검토: [`operations/us-market-october-2026-outlook.md`](./operations/us-market-october-2026-outlook.md)
 - 2026년 9월 운영 RSS에서 확인된 후속 이벤트: [`../reports/sec-edgar-analysis/daily/2026-09-forward-events.md`](../reports/sec-edgar-analysis/daily/2026-09-forward-events.md)
@@ -70,3 +72,5 @@
 - GENK 최근 1개월 SEC 공시 상세 — Roth 주식매입계약·희석 위험 (2026-10-15 기준): [`reports/sec-edgar-analysis/daily/2026-10-15-genk-one-month.md`](../reports/sec-edgar-analysis/daily/2026-10-15-genk-one-month.md)
 
 - 2026-10-15 소형주 급등 후보 262개의 최근 3개월 SEC 공시 요약·coverage: [`reports/sec-edgar-analysis/cohorts/2026-10-15-risers/`](../reports/sec-edgar-analysis/cohorts/2026-10-15-risers/README.md)
+
+- [미사용 기능 후보 조사 (2026-10-20)](operations/unused-feature-candidates-20261020.md)

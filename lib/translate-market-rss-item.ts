@@ -4,11 +4,29 @@ import { restoreMarketRssTranslationTokens } from "./market-rss-translation-prot
 import { extractMarketRssTranslatedHeadline, prepareMarketRssTranslationInput } from "./market-rss-translation-input";
 import { isMarketRssTranslationHeadlineComplete, isMarketRssTranslationKoreanEnough } from "./market-rss-translation-quality";
 import { CloudTranslationClient } from "./cloud-translation-client";
+import { mapWithConcurrency } from "./map-with-concurrency";
 
-export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationFallback: boolean; translationFallbackReason?: string };
-export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient): Promise<TranslatedMarketRssItem> {
-  if (item.source !== "STOCKTITAN") return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "unsupported_source" };
-  const selectedClient = client ?? CloudTranslationClient.fromEnvironment();
+export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
+
+export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProviderAttempts?: number };
+export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false): Promise<TranslatedMarketRssItem> {
+  const protectedHeadline = prepareMarketRssTranslationInput(item.title);
+  const preparedInput = prepareMarketRssTranslationInput(item.title, item.summary);
+  const translatableText = protectedHeadline.text.replace(/ZX\d+Q/g, "");
+  // Skip only titles whose remaining letters are all Hangul. Checking only
+  // Latin letters would incorrectly skip mixed Korean/CJK/Cyrillic headlines.
+  const normalizedHeadlineForLanguage = translatableText.normalize("NFC");
+  const hasHangul = /[가-힣]/.test(normalizedHeadlineForLanguage);
+  const hasNonHangulLetters = /\p{L}/u.test(normalizedHeadlineForLanguage.replace(/[가-힣]/g, ""));
+  if (hasHangul && !hasNonHangulLetters) {
+    return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: false, translationNotRequired: true };
+  }
+  // RSS publishers occasionally emit an empty or markup-only headline. Avoid
+  // charging the provider for input that cannot produce a useful title.
+  if (!translatableText.replace(/<[^>]*>/g, " ").replace(/[\s\p{P}\p{S}\p{N}]/gu, "").trim()) {
+    return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "translation_input_empty" };
+  }
+  const selectedClient: TranslationClient | null = client ?? CloudTranslationClient.fromEnvironment();
   if (!selectedClient) return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "cloud_translation_not_configured" };
   // RSS feeds can contain mixed-language headlines, so let Cloud Translation
   // detect the source instead of forcing English for every publisher.

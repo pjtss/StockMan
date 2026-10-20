@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
-import { analyzeSecSubmission, loadPendingSecEvents, loadRecentSecSubmissions, markSecEventDiscord, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
+import { analyzeSecSubmission, collectMissingSecCompanyDocuments, loadPendingSecEvents, loadRecentSecSubmissions, markSecEventDiscord, retryFailedSecCodexAnalyses, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";

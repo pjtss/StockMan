@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { fetchFdaAdvisoryCalendar } from "@/lib/fda-advisory-calendar";
 import { upsertInvestmentCalendarEvents } from "@/lib/investment-calendar";
 
 export const dynamic = "force-dynamic";
 
-function authorized(request: Request) {
-  const expected = process.env.CRON_SECRET?.trim();
-  const supplied = request.headers.get("x-cron-secret")?.trim() || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  return Boolean(expected && supplied && supplied === expected);
-}
-
 export async function POST(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   try {
     const events = await fetchFdaAdvisoryCalendar();
     const upserted = await upsertInvestmentCalendarEvents(events);

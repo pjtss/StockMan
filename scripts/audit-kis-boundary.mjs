@@ -12,7 +12,6 @@ const moduleTests = new Map([
   ["kis-realtime-approval-rate-limit.ts", "lib/kis-realtime-approval-rate-limit.test.ts"],
   ["kis-us-trade-trend.ts", "lib/kis-us-trade-trend.test.ts"],
   ["kis-us-condition-search.ts", "lib/kis-us-condition-search.test.ts"],
-  ["kis-ipo-listing-schedule.ts", "lib/kis-ipo-listing-schedule.test.ts"],
 ]);
 const exceptions = new Map([
   ["kis-token.ts", { purpose: "토큰 발급", endpoint: "/oauth2/tokenP" }],

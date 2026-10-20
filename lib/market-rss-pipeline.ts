@@ -6,15 +6,28 @@ import { fetchAllDomesticRss } from "./domestic-rss-sources";
 import { MARKET_RSS_TRANSLATION_CONCURRENCY, translateMarketRssItem } from "./translate-market-rss-item";
 import { CloudTranslationClient } from "./cloud-translation-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
+import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { buildMarketRssQueueEnqueueFailureState, getMarketRssDiscordPerMinuteLimit, isRetryableDiscordError, marketRssDeliveryExternalId, withDiscordWaitParameter } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import { dedupeMarketRssItems } from "./market-rss-dedupe";
-import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
-import { claimTranslationLimitAlert, claimTranslationThresholdAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
-import { DISCORD_SUPPRESS_EMBEDS_FLAG } from "./market-rss-discord-message";
+import { buildMarketRssTranslationCandidateCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
+import { buildMarketRssTranslationPersistence } from "./market-rss-translation-persistence";
+import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notification-message";
+import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";
+import { toTextWebhookPayload } from "./discord-text";
+import { createQuotaAwareTranslationClient } from "./quota-aware-translation-client";
+import { claimTranslationLimitAlert, claimTranslationThresholdAlert, releaseTranslationLimitAlert, releaseTranslationThresholdAlert } from "./translation-cache";
+import { sendClaimedTranslationUsageAlert } from "./translation-usage-alert";
+import { buildMarketRssNotificationClaimCondition, buildMarketRssNotificationRateWindowCondition, buildMarketRssNotificationTranslationGate } from "./market-rss-notification-translation-gate";
+import { createMarketRssNotificationSnapshot } from "./market-rss-notification-snapshot";
+import { runMarketRssIngestSource } from "./market-rss-ingest-outcome";
+import { buildMarketRssLinkUpsertValue, buildMarketRssTranslationUpsertReset } from "./market-rss-translation-upsert";
+import { mapWithConcurrency } from "./map-with-concurrency";
+import { countMarketRssTranslationFallbackReasons } from "./market-rss-translation-fallback-count";
+import { TranslationClientOperationError } from "./translation-types";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -33,46 +46,48 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
   }
   let inserted = 0;
   const duplicateCounts = new Map<string, number>();
+  const ingestOutcomes = new Map<string, { ok: true } | { ok: false; error: ReturnType<typeof import("./error-diagnostics").describeError> }>();
   for (const result of allResults) {
     if (!result.ok) continue;
-    const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
-    const { items, duplicateCount } = dedupeMarketRssItems(result.feed.items);
-    duplicateCounts.set(result.source, duplicateCount);
-    const values = items.map((item) => {
-      const classification = classifyMarketRssItem(item);
-      const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
-      // SEC filings without a preferred common-share mapping (for example
-      // trusts, units and warrants) cannot produce a useful stock alert.
-      // Keep the filing for diagnostics, but suppress the notification.
-      // StockTitan is an explicit publisher feed requested for full delivery:
-      // every item is notification-eligible, while other sources keep their
-      // classifier and SEC ticker safeguards.
-      const notifyEligible = item.source === "STOCKTITAN" || (classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker)));
-      const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
-      const isBacklog = item.source === "STOCKTITAN" ? false : Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
-      return {
-        source: item.source,
-        externalId: item.id,
-        title: item.title,
-        summary: item.summary,
-        content: item.content ?? "",
-        rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
-        sourceSnapshotId,
-        detectedTicker: classification.ticker || mappedTicker,
-        eventDirection: classification.direction,
-        matchedTerms: classification.matchedTerms,
-        financingAmountUsd: classification.financingAmountUsd,
-        dilutionRisk: classification.dilutionRisk,
-        link: item.link,
-        publishedAt,
-        category: classification.category,
-        priority: classification.priority,
-        notifyEligible,
-        isBacklog,
-      };
-    });
-    if (values.length === 0) continue;
-    const rows = await db.insert(marketRssArticles).values(values).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
+    if ("skipped" in result && result.skipped) continue;
+    const outcome = await runMarketRssIngestSource(result.source, async () => {
+      const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
+      const { items, duplicateCount } = dedupeMarketRssItems(result.feed.items);
+      const values = items.map((item) => {
+        const classification = classifyMarketRssItem(item);
+        const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
+        // SEC filings without a preferred common-share mapping (for example
+        // trusts, units and warrants) cannot produce a useful stock alert.
+        // Keep the filing for diagnostics, but suppress the notification.
+        // StockTitan is an explicit publisher feed requested for full delivery:
+        // every item is notification-eligible, while other sources keep their
+        // classifier and SEC ticker safeguards.
+        const notifyEligible = item.source === "STOCKTITAN" || (classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker)));
+        const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
+        const isBacklog = item.source === "STOCKTITAN" ? false : Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
+        return {
+          source: item.source,
+          externalId: item.id,
+          title: item.title,
+          summary: item.summary,
+          content: item.content ?? "",
+          rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
+          sourceSnapshotId,
+          detectedTicker: classification.ticker || mappedTicker,
+          eventDirection: classification.direction,
+          matchedTerms: classification.matchedTerms,
+          financingAmountUsd: classification.financingAmountUsd,
+          dilutionRisk: classification.dilutionRisk,
+          link: item.link,
+          publishedAt,
+          category: classification.category,
+          priority: classification.priority,
+          notifyEligible,
+          isBacklog,
+        };
+      });
+      if (values.length === 0) return { duplicateCount, inserted: 0 };
+      const rows = await db.insert(marketRssArticles).values(values).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
         title: sql`excluded.title`, summary: sql`excluded.summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         ...buildMarketRssTranslationUpsertReset(),
         link: buildMarketRssLinkUpsertValue(),
@@ -94,22 +109,48 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
     duplicateCounts.set(result.source, outcome.value.duplicateCount);
     inserted += outcome.value.inserted;
   }
-  return { fetchedAt: fetched.fetchedAt, sourceResults: allResults.map((item) => ({ source: item.source, ok: item.ok, skipped: "skipped" in item ? item.skipped : false, count: item.ok ? item.feed.items.length : 0, duplicateCount: duplicateCounts.get(item.source) ?? 0 })), inserted };
+  const sourceResults = allResults.map((item) => {
+    const skipped = "skipped" in item && item.skipped;
+    const ingestOutcome = ingestOutcomes.get(item.source);
+    const ingestStatus = !item.ok ? "FETCH_FAILED" : skipped ? "SKIPPED" : ingestOutcome?.ok === false ? "PERSIST_FAILED" : "STORED";
+    return {
+      source: item.source,
+      ok: item.ok && ingestOutcome?.ok !== false,
+      skipped,
+      ingestStatus,
+      ...(!item.ok ? { ingestError: { errorCode: "RSS_FETCH_FAILED" } } : ingestOutcome?.ok === false ? { ingestError: {
+        errorCode: ingestOutcome.error.errorCode,
+        ...(ingestOutcome.error.databaseCode ? { databaseCode: ingestOutcome.error.databaseCode } : {}),
+        ...(ingestOutcome.error.table ? { table: ingestOutcome.error.table } : {}),
+        ...(ingestOutcome.error.column ? { column: ingestOutcome.error.column } : {}),
+        ...(ingestOutcome.error.constraint ? { constraint: ingestOutcome.error.constraint } : {}),
+      } } : {}),
+      count: item.ok ? item.feed.items.length : 0,
+      duplicateCount: duplicateCounts.get(item.source) ?? 0,
+    };
+  });
+  const ingestFailureCount = sourceResults.filter((item) => item.ingestStatus === "FETCH_FAILED" || item.ingestStatus === "PERSIST_FAILED").length;
+  return { fetchedAt: fetched.fetchedAt, sourceResults, ingestFailureCount, inserted };
 }
 
 export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
   const client = CloudTranslationClient.fromEnvironment();
-  if (!client) return { attempted: 0, translated: 0, cached: 0, fallback: 0, failed: 0, skipped: true, reason: "cloud_translation_not_configured" };
-  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.source, "STOCKTITAN"), or(eq(marketRssArticles.translationStatus, "PENDING"), and(eq(marketRssArticles.translationStatus, "FAILED"), lt(marketRssArticles.translationAttempts, 3))), eq(marketRssArticles.notifyEligible, true), eq(marketRssArticles.isBacklog, false))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
-  const cachedClient: TranslationClient = { translate: async (text: string, source: TranslationLanguage = "en", target: TranslationLanguage = "ko"): Promise<TranslationResult> => {
-    const provider = "google-cloud-translation";
-    const cached = await loadTranslationCache(text, provider, target);
-    if (cached) return { translatedText: cached.translatedText, source, target, provider, fallback: false };
-    const reservation = await reserveTranslationCharacters(text.length);
-    if (!reservation.allowed) {
-      for (let threshold = 100000; threshold <= reservation.used; threshold += 100000) {
-        if (await claimTranslationThresholdAlert(threshold)) thresholdAlerts.add(threshold);
+  const retryCriteria = getMarketRssTranslationRetryCriteria(Boolean(client));
+  const candidates = buildMarketRssTranslationCandidateCondition(retryCriteria);
+  const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
+  if (!client) {
+    let notRequired = 0;
+    let fallback = 0;
+    const fallbackReasonCodes: Array<string | undefined> = [];
+    await mapWithConcurrency(rows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
+      const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source });
+      const processedAt = new Date();
+      await db.update(marketRssArticles).set(buildMarketRssTranslationPersistence(row, result, processedAt)).where(eq(marketRssArticles.id, row.id));
+      if (result.translationNotRequired) notRequired++;
+      else if (result.translationFallback) {
+        fallback++;
+        fallbackReasonCodes.push(result.translationFallbackReason);
       }
     });
     return { attempted: rows.length, translated: 0, notRequired, fallback, failed: 0, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), skipped: fallback > 0, ...(fallback ? { reason: "cloud_translation_not_configured" } : {}) };
@@ -133,15 +174,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   await mapWithConcurrency(rows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
     let result: Awaited<ReturnType<typeof translateMarketRssItem>>;
     try {
-      const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient);
-      await db.update(marketRssArticles).set({ translatedTitle: result.translatedTitle, translatedSummary: result.translatedSummary, translatedContent: result.translatedContent ?? null, translationProvider: "google-cloud-translation", translationCharCount: result.title.length, translationSkippedReason: result.translationFallbackReason ?? null, translationTranslatedAt: result.translationFallback ? null : new Date(), translationFallback: result.translationFallback, translationError: result.translationFallbackReason || null, translationAttempts: row.translationAttempts + 1, translationStatus: result.translationFallback ? "SKIPPED" : "TRANSLATED", updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
-      translated++;
-      if (result.translationFallback) {
-        fallback++;
-        const reason = result.translationFallbackReason || "unknown";
-        fallbackReasons[reason] = (fallbackReasons[reason] || 0) + 1;
-        if (reason === "monthly_character_limit_reached") limitReached = true;
-      }
+      result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient);
     } catch (error) {
       failed++;
       const failedAt = new Date();
@@ -222,24 +255,28 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   let queueEnqueueFailed = 0;
   for (const row of rows) {
     if (remaining <= 0) break;
-    const title = row.translatedTitle || row.title;
-    const isStockTitan = row.source === "STOCKTITAN";
-    const titleLine = row.link ? `[**${title}**](${row.link})` : `**${title}**`;
-    const body = [
-      titleLine,
-      row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
-    ].filter(Boolean).join("\n");
-    try {
-      const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] }, flags: DISCORD_SUPPRESS_EMBEDS_FLAG }), signal: AbortSignal.timeout(8_000) });
-      if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
-      await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: row.notificationAttempts + 1, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
-      sent++;
-      remaining--;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const nextAttempt = row.notificationAttempts + 1;
-      await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: nextAttempt, lastError: message, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
-      if (isRetryableDiscordError(error)) {
+    const reaction = row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
+    const notificationPayload = buildMarketRssDiscordNotificationPayload(row, reaction);
+    const delivery = await deliverMarketRssDiscordNotification({ notificationAttempts: row.notificationAttempts, payload: notificationPayload }, {
+      claimProcessing: async () => {
+        const claimed = await db.update(marketRssArticles).set({ notificationStatus: "PROCESSING", lastError: null, updatedAt: new Date() }).where(buildMarketRssNotificationClaimCondition(row)).returning({ id: marketRssArticles.id });
+        return claimed.length === 1;
+      },
+      markSending: async () => {
+        const sendingAt = new Date();
+        const updated = await db.update(marketRssArticles).set({ notificationStatus: "SENDING", notificationAttempts: row.notificationAttempts + 1, notifiedAt: sendingAt, updatedAt: sendingAt }).where(and(eq(marketRssArticles.id, row.id), eq(marketRssArticles.notificationStatus, "PROCESSING"))).returning({ id: marketRssArticles.id });
+        return updated.length === 1;
+      },
+      send: async (payload) => {
+        const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(payload)), signal: AbortSignal.timeout(8_000) });
+        if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
+      },
+      markFailed: async (attempt, error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: attempt, lastError: message, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+      },
+      isRetryable: isRetryableDiscordError,
+      enqueue: async (payload, attempt) => {
         await enqueueDiscordDelivery({
           externalId: marketRssDeliveryExternalId(row.id, attempt),
           channelKey: "MARKET_RSS",

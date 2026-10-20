@@ -135,6 +135,8 @@ async function main() {
       process.exitCode = 1;
       return;
     }
+    if (refresh.skipped) return;
+    if (!refresh.startedAt) throw new Error("Completed fundamentals refresh did not include its start time");
     const verificationExitCode = verifyCompletedFullRefresh(refresh.startedAt);
     if (!refresh.ok || verificationExitCode !== 0) process.exitCode = 1;
   } finally {

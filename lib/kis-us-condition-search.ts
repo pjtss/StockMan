@@ -176,7 +176,7 @@ export async function fetchKisUsConditionSearch(input: KisUsConditionInput): Pro
   let rawText = await response.text();
   let parsed = parseKisUsConditionResponse({ status: response.status, contentType: response.headers.get("content-type"), rawText, market: input.market });
   if (isKisTokenExpiredResponse(response.status, parsed.raw)) {
-    const refreshedToken = await refreshAccessToken();
+    const refreshedToken = await refreshAccessToken(token);
     if (!refreshedToken) return null;
     token = refreshedToken;
     response = await requestOnce();

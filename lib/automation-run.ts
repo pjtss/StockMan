@@ -16,7 +16,8 @@ export function extractDebugItems(result: Record<string, unknown>) {
   const failureItems = failures.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => ({ ...item, status: item.status ?? "FAILED" }));
   return [...candidates, ...failureItems].filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => {
     const errorMessage = item.errorMessage ?? item.error ?? null;
-    const errorCode = item.errorCode ?? (typeof errorMessage === "string" ? errorMessage.match(/^([A-Z][A-Z0-9_]+)/)?.[1] : null);
+    const rawCode = typeof errorMessage === "string" ? errorMessage.match(/^([A-Z][A-Z0-9_]+)/)?.[1] : null;
+    const errorCode = item.errorCode ?? rawCode;
     return {
     market: item.market ?? null,
     code: item.code ?? item.ticker ?? null,

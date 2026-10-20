@@ -10,7 +10,7 @@ vi.mock("@/lib/automation-run-repository", () => ({
 vi.mock("@/lib/request-trace", () => ({ readRequestTrace: async () => null }));
 vi.mock("@/lib/automation-completion-discord", () => ({ notifyAutomationCompletion: async () => ({ sent: false, skipped: true }) }));
 
-import { compactAutomationSummary, withAutomationRun } from "./automation-run";
+import { compactAutomationSummary, extractDebugItems, withAutomationRun } from "./automation-run";
 
 beforeEach(() => { state.finished = []; });
 
