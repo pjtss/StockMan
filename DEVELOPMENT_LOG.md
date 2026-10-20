@@ -6,7 +6,7 @@
 ### 반영
 - `scripts/refresh-all-instrument-fundamentals.ts`에서 backoff로 정상 건너뛴 결과에 사후 검증을 실행하지 않도록 하고, 실제 완료 결과에 `startedAt`이 없으면 명시 오류를 내도록 보강했다. 삭제된 IPO 어댑터에 대한 잔여 KIS boundary audit 테스트 매핑도 제거했다.
 - `lib/kis-token.test.ts`의 HTTP 실패 응답 mock에 실제 Fetch `Response` 형태에 필요한 `headers`를 추가했다. 테스트 실패는 응답 mock의 `headers` 누락으로 발생한 `TypeError`였으며 제품 응답 처리 오류가 아니었다.
-- 미사용 기능 후보 및 DB scheduler 이력은 `docs/operations/unused-feature-candidates-20261020.md`에 기록했다.
+- 미사용 기능 후보 및 DB scheduler 이력은 `docs/operations/unused-feature-candidates-20261020.md`에 기록했다. 후속 함수 단위 재조사에서 5개 후보의 현재 앱·운영 참조가 없음을 재확인하고, 세 localStorage 키(`rss_custom_keywords`, `rss_stock_alerts`, `market_sentiment_history`)의 read/write 참조가 writer 파일 외에 없음을 확인해 과거 브라우저 저장값의 orphan 가능성과 미확인 범위를 보고서에 추가했다.
 
 ### 검증
 - `npm.cmd run deploy:verify`: 최신 실행 전체 통과. 의존성 audit 0건, production build, standalone·Chrome desktop/mobile·API smoke, Vitest 293개 파일(1,412 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 API routes), OCI cron(22 shared endpoints + fundamentals timer).

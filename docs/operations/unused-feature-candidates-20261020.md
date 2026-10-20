@@ -66,6 +66,9 @@ V156 검토는 원격 snapshot `29d847b6`의 코드 근거를 사용했다. 현�
 - `lib/sectors.ts`: 섹터/시장 심리 분류 함수의 runtime import가 없고 테스트만 남아 있다.
 - `lib/market-rss-discord-message.ts`: runtime import가 없다. 현재 Discord 재시도는 `market-rss-notification-message.ts`의 embed flag를 import하며, 신규 알림 본문도 notification-message 모듈을 사용한다. 이 파일 테스트는 과거 `simplifyMarketRssDiscordMessage` 함수를 검증한다.
 
+세 localStorage 키(`rss_custom_keywords`, `rss_stock_alerts`, `market_sentiment_history`)는 현재 `app/`, `components/`, `lib/` runtime에서 writer 파일 외 참조가 확인되지 않았다. 따라서 해당 코드가 과거 브라우저에 저장한 값은 남아 있을 수 있지만 현재 앱에서 읽히지 않는 orphaned client data로 보인다. 사용자 브라우저 데이터는 이 저장소 검사로 확인할 수 없으므로 데이터 정리·마이그레이션은 하지 않았다.
+
+
 `lib/accumulation-test-fixtures.ts`는 제품 runtime 진입점에서 도달하지 않지만, 이름과 주석대로 누적매집 감지 테스트에서 사용하는 합성 데이터 fixture다. 제품 기능 미사용 파일로 분류하지 않고 테스트 지원 코드로 남긴다.
 
 ## 자동화 미실행 또는 scheduler 연결이 빠진 기능
