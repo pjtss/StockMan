@@ -62,6 +62,8 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-pro
 
 2026-10-20 운영 배포 후 `instrument_retry_backoff_cooldown` SKIPPED가 예약 실행 이력에 기록되고 `durationMs=0`으로 전체 universe 조회를 생략했다. 다음 종목 재시도는 10:10 UTC에 시작해 35건(AMS 4, NAS 20, NYS 11)을 호출했으며 모두 실패했다(`KIS_PRICE_INVALID` 34, `KIS_MARKET_CAP_MISSING_OR_INVALID` 1). 실제 시도한 35건은 `last_attempt_at`이 확인됐고 오래된 레거시 111건은 시도시각을 꾸며내지 않고 대기 원장에 남았다. 다음 재시도 예정은 11:05:27 UTC였다. 즉 예약·기록 파이프라인은 작동했지만 KIS의 HTTP 200 / `rt_cd=0` 응답에 유효 가격·시총이 없는 데이터 문제는 해결되지 않았다. 해당 KIS 응답을 유효 시세로 취급하거나 이전 캐시를 실패 근거로 갱신하지 않는다.
 
+2026-10-20 11:15 UTC 예약 재시도는 `automation_runs`에서 run `322895` PARTIAL로 확인했다. legacy 실패 중 111건(AMS 6, NAS 83, NYS 22)을 호출했고 1건 저장, 110건 실패했다. 실패 집계는 `KIS_PRICE_INVALID` 101건(AMS 6, NAS 77, NYS 18) 및 `KIS_MARKET_CAP_MISSING_OR_INVALID` 9건(NAS 5, NYS 4)이다. KIS 호출·실패 기록에 따라 전체 성공은 6,558→6,559, 실패는 146→145가 되었으며, 남은 35건은 다음날 retry로 연기됐다. 총 실행시간은 약 30초, provider fetch 시간 합은 약 208초(최대 8 worker 병렬)였다. 이 실행으로 예약·backoff 해제·재개·partial persistence가 동작함을 확인했지만, 빈 가격/시총 필드는 여전히 KIS 데이터 품질 문제이며 본 변경의 해결 범위가 아니다.
+
 ## 남은 한계
 
 - 전체 활성 보통주 수가 많으면 KIS의 글로벌 TPS 제한과 API 지연으로 한 번의 전체 갱신이 오래 걸릴 수 있다. 현재 구현은 200종목씩 수집·저장하므로 전체 결과를 메모리에 쌓아두지 않는다. 배치 중 서버가 종료되면 커밋된 종목은 건너뛰고, 당시 진행 중이던 최대 200종목 배치부터 다시 조회한다.

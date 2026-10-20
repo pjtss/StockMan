@@ -13,19 +13,20 @@
 ### 검증
 - `npx.cmd vitest run scripts/operational-schema-migration-audit.test.ts --reporter=verbose`: 8 tests passed. 구버전 V137/V140만 있는 회귀 fixture는 실패하고 V158 forward fixture는 통과한다.
 - `npm.cmd run docs:check`: 158개 migration, V158 최신, 운영 관계 및 forward 필수 컬럼 검사 통과.
-- 운영 Cron API: V157 운영 DB가 RSS translation 컬럼 2개 누락 상태이며 `/api/health` degraded를 반환하는 것을 확인했다. V158이 포함된 commit `459f74a5` 배포 run `39410821362`는 `Success`, `Activate release` 단계도 성공했다. 운영 `https://stockman.r-e.kr/api/health`는 2026-10-20 10:59:01 UTC 기준 `status=ok`(응답 189ms)를 반환했다. activation script가 Flyway migrate를 성공적으로 완료했고 health snapshot의 `schemaReady`는 두 컬럼 존재를 포함해 평가하므로 운영 readiness가 복구됐다. 공개 health 응답은 Flyway 버전을 노출하지 않아 버전 번호를 API 응답에서 직접 확인한 것으로 기록하지 않는다.
-- 운영 fundamentals 재시도: 2026-10-20 10:10 UTC에 35개 호출, 0 성공·35 실패(`KIS_PRICE_INVALID` 34, 시총 invalid 1). 실제 시도 35건의 timestamp 기록이 확인되고, 111건은 지연 원장으로 보존됐다. KIS 데이터 원인 개선은 별도 남은 위험이다.
+- 운영 Cron API: 배포 전 V157 운영 DB에서 RSS translation 필수 컬럼 2개 누락과 `/api/health` degraded를 확인했다. 배포 후 Flyway V158, `schemaReady=true`, `missingOperationalColumns=[]`, `missingOperationalTables=[]`, `/api/health=200`, `/` 및 `/charts` HTTP 200을 확인했다.
+- 운영 fundamentals 재시도: 10:10 UTC에 35개 호출(성공 0, 실패 35), 11:15 UTC에 legacy 재시도 111개 호출(성공 1, 실패 110)했다. 두 번째 실행은 29.9초였고 1건 저장, 101건 `KIS_PRICE_INVALID`, 9건 `KIS_MARKET_CAP_MISSING_OR_INVALID`로 종료했다. 실패는 KIS HTTP 200/`rt_cd=0`이어도 가격 또는 시총 필드가 비어있는 응답이 주원인이다. 전체 실패는 145건이고, 직전 시도 35건은 다음날 재시도 시각으로 연기됐다. 실제 실행 이력과 `last_attempt_at` 기록을 대조했다.
+- 최종 통합 트리에서 `npm.cmd run deploy:verify` 통과: 의존성 audit 취약점 0건, production build, standalone HTTP/Chrome desktop·mobile 및 API smoke, Vitest 293개 파일(1,430 passed, 3 skipped), typecheck, docs/migration·KIS boundary·Bearer auth·OCI cron 검사를 통과했다.
 
 ### 다음 개선
-- 2026-10-20 11:05:27 UTC 이후 예정된 fundamentals 재시도에서 last_attempt_at, cache fetchedAt, KIS 가격 유효성 및 재시도 원장 수를 다시 대조한다. 이번 readiness 복구와 별개로 기존 KIS invalid 데이터 원인은 해결되지 않았다.
+- KIS 가격·시총 필드 누락의 공식 API 응답 원인을 별도 확인한다. 유효하지 않은 응답을 성공으로 저장하거나 기존 캐시로 덮지 않는다. 현재 145 실패 및 다음 재시도 연기는 모니터링한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-006
 - 성과 판정: PARTIAL
-- 근거: Flyway 버전이 최신이어도 실제 필수 컬럼이 누락될 수 있는 out-of-order migration 공백을 재현 가능한 정적 회귀 게이트로 고정하고, 운영 복구 migration을 추가했다. DB readiness 복구 및 KIS 시세 성공은 배포 후 runtime 검증이 남아 있다.
+- 근거: 운영 스키마 복구와 readiness 확인은 완료했다. 예약 재시도도 실행됐고 legacy 대상 111개 중 1개를 저장했으나, 110개는 KIS 빈 가격·시총 응답으로 실패해 데이터 공급 문제는 미해결이다.
 
 ### 커밋·푸시·배포
-- 통합 commit `459f74a5` push 완료. `npm.cmd run deploy:verify` 통과(294개 test files, 1,431 passed, 2 skipped; build/runtime/browser/API smoke/type/docs/migration/security/cron), workflow `39410821362` 성공 및 OCI activation 확인. `/api/health`는 `stockman.r-e.kr`에서 200/status=ok. 다음 fundamentals 재시도 결과는 아직 확인 전이다.
+- 완료: V158 코드 commit `a5604d56`을 포함한 통합 commit `459f74a5` push, `npm.cmd run deploy:verify`, workflow `39410821362` 및 OCI activation 성공을 확인했다. 운영 readiness와 `/api/health`, `/`, `/charts`가 정상이다. Retry run `322895`의 결과는 위 검증 항목에 기록했다.
 
 ## [2026-10-20] 미사용 기능 조사 결과와 배포 검증 재개
 
