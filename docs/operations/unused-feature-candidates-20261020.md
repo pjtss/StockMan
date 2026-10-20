@@ -83,6 +83,6 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 
 ## 후속 배포 준비 및 검증 상태
 
-- 2026-10-20 현재 local `deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 293 test files (1,412 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).
+- 통합 후 `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,430 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer). 커밋 후 동일 전체 게이트를 다시 통과했다.
 - 검증 과정에서 새 cron routes의 비중앙화 인증을 공통 `cron-auth`로 교체했고, full-refresh backoff skip 처리와 KIS test mock도 바로잡았다. V148 중복은 제거, KIS shares migration은 V157로 번호를 이동하고 SEC tables/settings 및 free-float columns 삭제를 뺐으며 원격 V156 필수 migration을 복구했다.
-- `origin/oci`는 local보다 6 commits ahead. `git merge-tree` 기준 `lib/discord-delivery-retry.ts`와 `lib/market-rss-pipeline.ts` 두 파일에 충돌이 있다. 아직 커밋·푸시·배포하지 않았다. 충돌을 해결한 뒤 전체 검증을 다시 해야 한다.
+- 원격 6커밋을 병합하고 RSS Discord 출처 allowlist를 신규 및 재시도 경로 모두에 적용했다. 병합 커밋 `7ea1f960`을 `oci`에 push했고 Deploy OCI workflow `39405249354` success 및 Activate release 성공을 확인했다. 운영 `https://stockman.app/health-check`, `/`, `/charts`가 모두 HTTP 200을 반환했다. 운영 응답은 빌드 SHA를 노출하지 않아 commit identity는 workflow run으로 확인했다. 완료 기록 커밋 `84481f93`도 push했고 workflow `39406703102`가 2026-10-20 10:21 KST에 success 및 Activate release 성공했다.
