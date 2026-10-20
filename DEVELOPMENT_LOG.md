@@ -15,11 +15,13 @@
 - `npm.cmd test -- --run app/api/debug/instrument-fundamentals/route.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 7개 테스트 통과. 인증 없이 DB를 호출하지 않음, 관리자/cron 인증, 빈 원장, 오류코드/재시도 표현, DB 오류 비노출을 검증했다.
 - `npm.cmd run docs:check` 통과: 150개 마이그레이션, 최신 V155, 운영 관계 23개 확인.
 - `npm.cmd run typecheck` 통과.
-- `npm.cmd run deploy:verify` 통과: production build, standalone 서버 기동 및 `/charts` HTTP 200, 데스크톱·모바일 Chrome hydration, API/인증 smoke, 223개 테스트 파일 통과·1개 skip(804 passed·1 skipped), 타입 검사, 문서·migration·verify scope·KIS 경계·Bearer 인증·OCI cron 검사, npm audit 취약점 0건.
-- 운영 API 배포 및 원장-automation 집계 대조는 아직 진행 전이며 완료 후 기록한다.
+- 커밋 전 `npm.cmd run deploy:verify` 통과: production build, standalone 서버 기동 및 `/charts` HTTP 200, 데스크톱·모바일 Chrome hydration, API/인증 smoke, 223개 테스트 파일 통과·1개 skip(804 passed·1 skipped), 타입 검사, 문서·migration·verify scope·KIS 경계·Bearer 인증·OCI cron 검사, npm audit 취약점 0건.
+- 운영 배포 후 `GET /api/health`, `/`, `/charts` 모두 HTTP 200. 새 진단 API는 cron 인증 GET에서 200, 미인증 GET은 401로 확인.
+- 운영 원장 job 1 (2026-10-20 02:16 UTC): 대상 6,704, 저장 성공 6,558, 실패 146, 재시도 대기 146, due 0. 전체 오류 집계는 `KIS_PRICE_INVALID` 135건(NAS 97, NYS 28, AMS 10), `KIS_MARKET_CAP_MISSING_OR_INVALID` 11건(NAS 6, NYS 5)으로 총 실패 수와 일치했다. 모두 최대 5회 시도 상태이며 가장 이른 재시도는 2026-10-20 10:05:10 UTC(19:05:10 KST)이다.
+- 같은 job의 최신 automation run은 `SKIPPED/instrument_retry_backoff`, KIS 요청 0건, 누적 실패 146건이었다. 원장 전체분포와 이전 상세 partial 요약은 교차 확인되었으며, 실패 원문은 저장하지 않아 `KIS_PRICE_INVALID` 내부 원인(필드 누락/0/응답 형태)은 아직 구분되지 않는다.
 
 ### 다음 개선
-- 배포 후 같은 job에 대해 automation run의 전체 `failureCodeCounts` 합계와 원장 API의 `failuresByMarketAndCode` 합계가 일치하는지 대조하고, 다음 retry 실행에서 오류 유형별 해결/지속 여부를 확인한다.
+- 다음 예정 재시도 뒤 같은 ticker에서 KIS를 대량 호출하지 말고, 우선 1개씩 제한된 공식 price-detail 응답의 필드 존재 여부·양수 파싱 결과만 안전 메타데이터로 계측한다. `KIS_PRICE_INVALID`의 필드누락/0/비숫자 원인을 구분하고, 정상 응답이면 마스터의 거래소 코드/종목 매핑을 공식 자료와 교차 검증한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-010
@@ -27,7 +29,7 @@
 - 근거: 로컬 전체 배포 게이트와 7개 신규 회귀 테스트가 통과해, 배포 가능한 인증 보호 read-only 진단 경로가 빌드·실행됨을 확인했다. 운영 데이터 대조 성과는 배포 후 측정한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 전체 검증이 통과한 뒤에만 커밋·푸시·배포한다.
+- 상태: 완료. 커밋 `2342b779`를 `oci`에 푸시했고 Deploy OCI run `39357563114` 성공. 배포 후 health 및 핵심 페이지 HTTP 200, debug endpoint 인증/응답과 오류 집계를 확인했다.
 
 ## [2026-10-19] 시총 갱신 실패 전체 분포 및 해외 토큰 진단
 
