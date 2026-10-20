@@ -31,6 +31,31 @@
 - 상태: 완료. 코드 커밋 `bbd4ff14`를 `oci`에 push했고 Deploy OCI run `39359695006` 성공. 서버 활성화까지 완료했다.
 # Development Log
 
+## [2026-10-20] StockTitan Discord RSS 알림에서 티커 제거
+
+### 목표
+- StockTitan Discord Webhook 알림에서 `티커:` 항목을 제거한다.
+
+### 반영
+- 신규 알림 본문에서 StockTitan의 티커 행을 생략한다. 다른 시장 RSS 알림의 티커는 유지한다.
+- 재시도 큐도 원본 기사 출처를 확인해 StockTitan 티커 행을 제거하고, 기존 형식의 출처·등락률 행과 임베드 억제 동작을 계속 적용한다.
+- `docs/stocktitan-rss.md`와 본 개발 로그에 작업 범위 및 배포 결과를 기록한다.
+
+### 검증
+- `npm.cmd run deploy:verify` 통과: production build, standalone·Chrome desktop/mobile·API smoke, 테스트 804개 통과·1개 skip, typecheck, 문서·migration, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 신규 StockTitan 본문은 티커 조건이 false이고, 일반 RSS 본문은 기존 티커 행을 유지하는 조건을 코드에서 확인했다. StockTitan 재시도는 외부 ID로 기사 원본을 확인해 티커를 제거하고 임베드 억제 플래그를 유지한다.
+
+### 다음 개선
+- 없음.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-002
+- 성과 판정: UNMEASURED
+- 근거: 코드 검증 및 운영 배포 완료 후 StockTitan과 다른 출처의 Discord 본문 항목을 점검한다.
+
+### 커밋·푸시·배포
+- 상태: 커밋 후 `oci` push 및 Deploy OCI workflow 결과를 확인한다.
+
 ## [2026-10-20] 해외 시총 실패 응답의 안전한 캐시형태 진단
 
 ### 목표

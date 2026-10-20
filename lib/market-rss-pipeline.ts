@@ -185,7 +185,7 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       row.translatedTitle && row.translatedTitle !== row.title ? `원문 제목: ${row.title}` : "",
       row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
       !isStockTitan ? `출처: ${row.source}${row.translationFallback ? " · 번역 fallback" : ""}` : "",
-      row.detectedTicker ? `티커: ${row.detectedTicker}${reaction?.exchange ? ` · ${reaction.exchange}` : ""}` : "",
+      !isStockTitan && row.detectedTicker ? `티커: ${row.detectedTicker}${reaction?.exchange ? ` · ${reaction.exchange}` : ""}` : "",
       !isStockTitan && reaction?.ok ? `등락률: ${reaction.rate ?? "-"}% · 거래대금: ${reaction.tradingValue ?? "-"}달러` : "",
     ].filter(Boolean).join("\n");
     try {
