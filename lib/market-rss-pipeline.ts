@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
@@ -15,6 +15,7 @@ import { dedupeMarketRssItems } from "./market-rss-dedupe";
 import type { TranslationClient, TranslationResult, TranslationLanguage } from "./translation-types";
 import { claimTranslationLimitAlert, claimTranslationThresholdAlert, loadTranslationCache, recordTranslatedCharacters, releaseTranslationCharacters, reserveTranslationCharacters, saveTranslationCache } from "./translation-cache";
 import { DISCORD_SUPPRESS_EMBEDS_FLAG } from "./market-rss-discord-message";
+import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy";
 
 const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
 
@@ -167,8 +168,9 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   const db = getDb();
   const now = Date.now();
   const staleCutoff = new Date(now - articleAgeLimitMs());
+  await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "source_not_allowed_for_discord", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), notInArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES])));
   await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "backlog_or_stale_article", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), ne(marketRssArticles.source, "STOCKTITAN"), or(eq(marketRssArticles.isBacklog, true), lt(marketRssArticles.publishedAt, staleCutoff))));
-  const rows = await db.select().from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), or(eq(marketRssArticles.source, "STOCKTITAN"), eq(marketRssArticles.isBacklog, false)), or(eq(marketRssArticles.source, "STOCKTITAN"), or(isNull(marketRssArticles.publishedAt), gte(marketRssArticles.publishedAt, staleCutoff))))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.publishedAt)).limit(limit);
+  const rows = await db.select().from(marketRssArticles).where(and(inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]), eq(marketRssArticles.notificationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), or(eq(marketRssArticles.source, "STOCKTITAN"), eq(marketRssArticles.isBacklog, false)), or(eq(marketRssArticles.source, "STOCKTITAN"), or(isNull(marketRssArticles.publishedAt), gte(marketRssArticles.publishedAt, staleCutoff))))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.publishedAt)).limit(limit);
   const perMinuteLimit = Math.max(1, Number(process.env.RSS_DISCORD_PER_MINUTE || 5));
   const recent = await db.select({ count: sql<number>`count(*)` }).from(marketRssArticles).where(and(eq(marketRssArticles.notificationStatus, "SENT"), gte(marketRssArticles.notifiedAt, new Date(now - 60_000))));
   let remaining = Math.max(0, perMinuteLimit - Number(recent[0]?.count || 0));

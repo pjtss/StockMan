@@ -71,3 +71,8 @@ export async function markDiscordDeliverySent(id: number) {
   const db = getDb();
   await db.update(discordDeliveryQueue).set({ status: "SENT", sentAt: new Date(), updatedAt: new Date() }).where(eq(discordDeliveryQueue.id, id));
 }
+
+export async function markDiscordDeliverySkipped(id: number, reason: string) {
+  const db = getDb();
+  await db.update(discordDeliveryQueue).set({ status: "SKIPPED", lastError: reason, updatedAt: new Date() }).where(eq(discordDeliveryQueue.id, id));
+}

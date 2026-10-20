@@ -1,5 +1,14 @@
 # 오류 상황 및 해결 방법
 
+## 2026-10-20 RSS Discord 알림 출처 허용 목록 적용
+
+- **증상**: Newsis 등 SEC·StockTitan 이외 RSS도 공통 시장 RSS Discord webhook 알림을 받을 수 있었다.
+- **근본 원인**: RSS 수집 결과에는 허용 출처 외 국내 매체가 포함되지만, 알림 전송 쿼리와 재시도 워커에 출처 허용 목록이 없었다.
+- **영향 범위**: `MARKET_RSS` 신규 전송 및 `discord_delivery_queue` 재시도. RSS 데이터 수집은 계속되며, SEC 및 StockTitan 알림은 유지된다.
+- **해결 위치**: `market-rss-pipeline`에서 비허용 출처의 PENDING 행을 `SKIPPED`로 바꾸고 전송 조회를 SEC·StockTitan으로 제한한다. `discord-delivery-retry`는 큐의 원본 기사 출처를 확인해 비허용 또는 원본 미확인 메시지를 전송하지 않고 큐와 기사 상태를 `SKIPPED`로 기록한다.
+- **재발 자동 감지**: `market-rss-discord-policy.test.ts`에서 허용·차단 출처를 검증한다. 배포 전 `npm run deploy:verify`를 실행한다.
+- **남은 위험**: 이미 발송 완료된 과거 알림은 회수되지 않는다. 큐에 남은 기존 비허용 출처는 재시도 시 폐기 상태로 전환된다.
+
 ## 2026-10-20 비 StockTitan RSS Discord 메시지 형식 불일치
 
 - **증상**: RSS Discord 알림에 출처·번역 상태·티커·등락률 등의 불필요한 줄이 표시되거나, 제목 링크의 임베드가 붙을 수 있었다.

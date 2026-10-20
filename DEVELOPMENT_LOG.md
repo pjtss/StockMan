@@ -5759,3 +5759,24 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 커밋·푸시·배포
 - 상태: 완료. 커밋 `46a549d1`를 `oci`에 push했고 Deploy OCI run `39375611935` 성공. 외부 운영 호스트 확인은 도메인 설정이 현재 체크아웃에 공개되어 있지 않아 후속 운영 확인으로 남긴다.
 
+## [2026-10-20] RSS Discord webhook 출처를 SEC·StockTitan으로 제한
+
+### 목표
+- RSS Discord webhook 알림은 SEC와 StockTitan만 보내고 Newsis 등 다른 출처는 차단한다.
+
+### 반영
+- 근본 원인: 시장 RSS 발송은 국내 RSS를 포함해 수집한 모든 적격 기사를 전송했고 출처 제한이 없었다.
+- 신규 발송 쿼리에서 `SEC_EDGAR`, `STOCKTITAN`만 허용하고 기존 PENDING 비허용 기사는 `SKIPPED` 처리한다. Discord 재시도 큐도 원본 기사 출처를 확인해 비허용 또는 출처 확인 불가 건을 전송하지 않고 `SKIPPED`로 표시한다.
+- Newsis 및 기타 RSS 수집·열람은 유지한다. Discord 알림만 막는다.
+
+### 검증
+- `market-rss-discord-policy.test.ts`에서 SEC·StockTitan 허용과 Newsis·KRX KIND·매경·한국경제·이투데이·NASDAQ·GlobeNewswire 차단을 검증한다.
+- `npm.cmd run deploy:verify` 통과: 테스트 830개 통과·1개 skip, 프로덕션 빌드, 타입 검사, 문서·migration·scope·KIS boundary·Bearer auth·OCI cron 검사, standalone runtime smoke 및 Chrome 데스크톱·모바일 hydration 통과.
+
+### 재발 방지 및 남은 위험
+- 신규 전송과 재시도 양쪽에서 공통 allowlist 함수를 참조하며, 알 수 없는 기사 출처도 fail-closed로 차단한다.
+- 이미 전송된 과거 알림은 회수할 수 없고, 미전송 큐의 차단 건은 다음 retry run에서 SKIPPED 처리된다.
+
+### 커밋·푸시·배포
+- 상태: 코드·문서 검증 완료. 커밋·푸시·OCI 배포 진행 중.
+

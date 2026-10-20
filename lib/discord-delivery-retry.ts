@@ -1,11 +1,12 @@
 import { eq, sql } from "drizzle-orm";
-import { claimDueDiscordDeliveries, markDiscordDeliveryRetry, markDiscordDeliverySent } from "@/lib/discord-delivery-queue";
+import { claimDueDiscordDeliveries, markDiscordDeliveryRetry, markDiscordDeliverySent, markDiscordDeliverySkipped } from "@/lib/discord-delivery-queue";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { getDb } from "@/lib/db";
 import { marketRssArticles } from "@/lib/schema";
 import { parseMarketRssDeliveryArticleId } from "@/lib/discord-delivery-policy";
 import { toTextWebhookPayload } from "@/lib/discord-text";
 import { DISCORD_SUPPRESS_EMBEDS_FLAG, simplifyMarketRssDiscordMessage } from "@/lib/market-rss-discord-message";
+import { isMarketRssDiscordSourceAllowed } from "@/lib/market-rss-discord-policy";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -18,11 +19,11 @@ async function webhookFor(channelKey: string) {
   return target ? loadFeatureDiscordWebhook(target.module, target.env) : "";
 }
 
-async function markMarketRssDelivery(articleId: number, status: "SENT" | "FAILED", error?: string) {
+async function markMarketRssDelivery(articleId: number, status: "SENT" | "FAILED" | "SKIPPED", error?: string) {
   const db = getDb();
   await db.update(marketRssArticles).set({
     notificationStatus: status,
-    notificationAttempts: sql`${marketRssArticles.notificationAttempts} + 1`,
+    ...(status === "SKIPPED" ? {} : { notificationAttempts: sql`${marketRssArticles.notificationAttempts} + 1` }),
     ...(status === "SENT" ? { notifiedAt: new Date(), lastError: null } : { lastError: error || "Discord delivery failed" }),
     updatedAt: new Date(),
   }).where(eq(marketRssArticles.id, articleId));
@@ -30,10 +31,23 @@ async function markMarketRssDelivery(articleId: number, status: "SENT" | "FAILED
 
 export async function retryDiscordDeliveries(limit = 50) {
   const deliveries = await claimDueDiscordDeliveries(limit);
-  const results = { claimed: deliveries.length, sent: 0, failed: 0, recovered: 0, repeatedFailure: 0, attempts: 0 };
+  const results = { claimed: deliveries.length, sent: 0, skipped: 0, failed: 0, recovered: 0, repeatedFailure: 0, attempts: 0 };
   for (const delivery of deliveries) {
-    const webhook = await webhookFor(delivery.channelKey);
+    const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
     try {
+      if (delivery.channelKey === "MARKET_RSS") {
+        const article = articleId
+          ? await getDb().select({ source: marketRssArticles.source }).from(marketRssArticles).where(eq(marketRssArticles.id, articleId)).limit(1)
+          : [];
+        if (!isMarketRssDiscordSourceAllowed(article[0]?.source)) {
+          const reason = articleId ? "source_not_allowed_for_discord" : "market_rss_article_not_found";
+          await markDiscordDeliverySkipped(delivery.id, reason);
+          if (articleId && article[0]) await markMarketRssDelivery(articleId, "SKIPPED", reason);
+          results.skipped += 1;
+          continue;
+        }
+      }
+      const webhook = await webhookFor(delivery.channelKey);
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
       const payload: Record<string, unknown> = toTextWebhookPayload(delivery.payload as Record<string, unknown>);
       if (delivery.channelKey === "MARKET_RSS" && typeof payload.content === "string") {
@@ -53,7 +67,6 @@ export async function retryDiscordDeliveries(limit = 50) {
       const response = await fetch(webhook, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8_000) });
       if (!response.ok) throw new Error(`discord_http_${response.status}`);
       await markDiscordDeliverySent(delivery.id);
-      const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
       if (articleId) await markMarketRssDelivery(articleId, "SENT");
       results.sent += 1;
       results.attempts += delivery.attempts + 1;
@@ -61,7 +74,6 @@ export async function retryDiscordDeliveries(limit = 50) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await markDiscordDeliveryRetry(delivery.id, message, delivery.attempts + 1);
-      const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
       if (articleId) await markMarketRssDelivery(articleId, "FAILED", message);
       results.failed += 1;
       results.attempts += delivery.attempts + 1;

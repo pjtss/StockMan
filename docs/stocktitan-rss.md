@@ -37,6 +37,7 @@ StockTitan RSS
 ## 운영 원칙
 
 - `source=STOCKTITAN`으로 원문 출처를 보존한다.
+- RSS Discord 알림 허용 출처는 `SEC_EDGAR`와 `STOCKTITAN`뿐이다. Newsis를 포함한 국내 RSS 및 그 밖의 RSS는 수집·열람 데이터로 유지하되 Discord 알림은 건너뛴다. 이미 대기 중인 비허용 출처의 Discord 재시도도 전송하지 않는다.
 - `source + externalId`로 중복을 방지한다.
 - 기존 RSS 분류·번역 fallback·Discord rate limit·알림 상태 저장을 재사용한다.
 - Discord `408/425/429/5xx` 또는 네트워크 오류는 `discord_delivery_queue`에 등록하고 OCI의 `discord-delivery-retry` 작업에서 재전송한다. 재전송 성공·실패 결과는 원본 `market_rss_articles` 행에도 반영한다.
