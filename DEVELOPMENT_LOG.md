@@ -23,7 +23,7 @@
 - 근거: cron, 관리자 미리보기, 공통 provider 진입점의 세 경계에서 출처와 번역 필드를 제한해 다른 RSS 제목이 외부 API로 전달되지 않게 한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 검증은 통과했고 변경을 커밋·push한 뒤 OCI 배포 결과를 기록한다.
+- 상태: 완료. 코드 커밋 `ab3786ca`를 `oci`에 push했고 Deploy OCI run `39371903852` 성공. 배포 후 운영 health `ok`, `/charts` HTTP 200.
 
 ## [2026-10-20] StockTitan Discord RSS 알림 형식 정리
 
