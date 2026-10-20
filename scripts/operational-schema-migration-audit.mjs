@@ -30,6 +30,8 @@ function normalizeIdentifier(identifier) {
     .toLowerCase();
 }
 
+const sqlIdentifier = '(?:"?[a-z_][a-z0-9_$]*"?\\s*\\.\\s*)?"?[a-z_][a-z0-9_$]*"?';
+
 function listRelationEvents(sql) {
   const withoutComments = sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*--.*$/gm, " ");
   const events = [];
@@ -75,4 +77,23 @@ export function findMissingOperationalRelations(schemaSource, migrations) {
     }
   }
   return tables.filter((table) => !externallyManagedRelations.has(table) && !relationStates.get(table)?.exists);
+}
+
+export function findMissingForwardOperationalColumns(schemaSource, migrations, minimumVersion) {
+  const block = schemaSource.match(/export const FORWARD_REQUIRED_OPERATIONAL_COLUMNS\s*=\s*\[([\s\S]*?)\]\s*as const/);
+  if (!block) throw new Error("FORWARD_REQUIRED_OPERATIONAL_COLUMNS was not found.");
+  const requiredColumns = [...block[1].matchAll(/\[\s*["']([a-z_][a-z0-9_$]*)["']\s*,\s*["']([a-z_][a-z0-9_$]*)["']\s*\]/gi)]
+    .map((match) => `${match[1].toLowerCase()}.${match[2].toLowerCase()}`);
+  const addColumnPattern = new RegExp(`^\\s*ALTER\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(${sqlIdentifier})\\s+ADD\\s+COLUMN\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?("?[a-z_][a-z0-9_$]*"?)\\b`, "i");
+  const addedColumns = new Set();
+  for (const migration of migrations) {
+    const version = Number(migration.fileName.match(/^V(\d+)/)?.[1] ?? 0);
+    if (version < minimumVersion) continue;
+    const withoutComments = migration.contents.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*--.*$/gm, " ");
+    for (const statement of withoutComments.split(";")) {
+      const match = statement.match(addColumnPattern);
+      if (match) addedColumns.add(`${normalizeIdentifier(match[1])}.${normalizeIdentifier(match[2])}`);
+    }
+  }
+  return requiredColumns.filter((column) => !addedColumns.has(column));
 }

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { findMissingOperationalRelations, parseOperationalSchemaTables } from "./operational-schema-migration-audit.mjs";
+import { findMissingForwardOperationalColumns, findMissingOperationalRelations, parseOperationalSchemaTables } from "./operational-schema-migration-audit.mjs";
 
 const root = process.cwd();
 
@@ -57,5 +57,22 @@ describe("operational schema migration audit", () => {
       fileName: "V1__rename.sql",
       contents: "CREATE TABLE old_fixture (id BIGINT); ALTER TABLE old_fixture RENAME TO new_fixture;",
     }])).toEqual(["old_fixture"]);
+  });
+
+  it("requires readiness columns to be reasserted after the deployed Flyway floor", () => {
+    const schema = `export const FORWARD_REQUIRED_OPERATIONAL_COLUMNS = [\n  ["market_rss_articles", "translation_attempted_at"],\n  ["market_rss_articles", "translation_candidate_title"],\n] as const;`;
+    const oldOnly = [
+      { fileName: "V137__old_attempt.sql", contents: "ALTER TABLE market_rss_articles ADD COLUMN translation_attempted_at TIMESTAMPTZ;" },
+      { fileName: "V140__old_candidate.sql", contents: "ALTER TABLE market_rss_articles ADD COLUMN translation_candidate_title TEXT;" },
+    ];
+    expect(findMissingForwardOperationalColumns(schema, oldOnly, 157)).toEqual([
+      "market_rss_articles.translation_attempted_at",
+      "market_rss_articles.translation_candidate_title",
+    ]);
+    const forward = [
+      ...oldOnly,
+      { fileName: "V158__repair.sql", contents: "ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_attempted_at TIMESTAMPTZ; ALTER TABLE market_rss_articles ADD COLUMN IF NOT EXISTS translation_candidate_title TEXT;" },
+    ];
+    expect(findMissingForwardOperationalColumns(schema, forward, 157)).toEqual([]);
   });
 });

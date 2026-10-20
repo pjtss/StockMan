@@ -12,6 +12,7 @@
 - [ ] Flyway 파일명이 `V숫자__설명.sql` 형식이고 버전이 중복되지 않는지 확인한다.
 - [ ] 운영 환경변수와 비밀값을 로그에 출력하지 않는다.
 - [ ] DB 스키마 변경이 있으면 기존 운영 버전과 충돌하지 않는 새 버전을 사용한다.
+- [ ] 운영 Flyway 버전보다 낮은 migration에만 있는 필수 테이블/컬럼은 현재 운영 floor 이후의 forward repair migration으로 다시 보장한다. `npm run docs:check`가 운영 floor 기반 컬럼 회귀를 검사한다.
 - [ ] 변경 기능에 회귀 테스트가 있는지 확인한다.
 
 ## 자동 게이트
@@ -32,6 +33,7 @@
 - [ ] 운영 health endpoint와 핵심 변경 경로 확인
 - [ ] `stockman-rss.timer`가 active이며 `stockman-rss.service` 최근 실행과 `market-rss` 자동화 run이 갱신됐는지 확인
 - [ ] Flyway 적용 버전 확인
+- [ ] `/api/health`가 200/status=ok이며 `missingOperationalTables`와 `missingOperationalColumns`가 비어 있는지 확인
 - [ ] 실패 시 원인·영향·수정·검증 결과를 `docs/ERROR_HANDLING.md`에 기록한다.
 
 ## 재발 방지 원칙
