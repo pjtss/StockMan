@@ -11,8 +11,10 @@
 
 ### 검증
 - 원격 `oci` 갱신 전 `npm.cmd run deploy:verify` 통과: production build, standalone API·페이지 smoke, Chrome desktop/mobile hydration, 테스트 797개 통과·1개 skip, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 감사, npm audit 취약점 0건.
-- 배포 기준 원격 커밋이 검증 중 갱신되어 현재 원격 HEAD 기준으로 전체 게이트를 재실행한다.
-- Discord 운영 메시지 수신은 배포 후 debug API 또는 StockTitan 관리자 테스트를 통해 확인한다.
+- 배포 기준 원격 커밋이 검증 중 두 차례 갱신되어 최신 원격 HEAD 기준으로 전체 게이트를 재실행했다.
+- 최종 최신 기준 `npm.cmd run deploy:verify` 통과: production build, standalone 및 Chrome desktop/mobile/API smoke, 테스트 804개 통과·1개 skip, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 감사, npm audit 취약점 0건.
+- GitHub Deploy OCI workflow run `39359695006` 성공. Verify, standalone 패키징, SSH 업로드와 서버 활성화 단계 모두 성공했다.
+- Discord 메시지 실수신은 별도의 관리자 RSS 테스트 또는 예약 알림에서 확인한다.
 
 ### 다음 개선
 - 배포 후 RSS Discord debug API와 실제 관리자 테스트 전송에서 세 항목 및 링크 미리보기 부재를 확인한다.
@@ -20,10 +22,10 @@
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-001
 - 성과 판정: IMPROVED
-- 근거: 신규 전송 및 재시도 payload에 요구한 본문 필터와 Discord 임베드 억제 플래그를 적용했고, 원격 갱신 전 배포 검증을 통과했다. 운영 전송 결과는 배포 뒤 확인한다.
+- 근거: 신규 전송 및 재시도 payload에 요구한 본문 필터와 Discord 임베드 억제 플래그를 적용했고, 최신 원격 기준 배포 검증 및 OCI 서버 활성화가 성공했다. Discord 메시지 실수신 여부는 다음 알림에서 확인한다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 최신 원격 기준 전체 검증 후 커밋·push 및 OCI workflow 배포를 진행한다.
+- 상태: 완료. 코드 커밋 `bbd4ff14`를 `oci`에 push했고 Deploy OCI run `39359695006` 성공. 서버 활성화까지 완료했다.
 # Development Log
 
 ## [2026-10-20] 시총 갱신 원장 조회용 운영 진단 API
