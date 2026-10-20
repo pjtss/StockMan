@@ -60,6 +60,8 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-pro
 
 2026-10-20 16:10 KST 운영 `instrument-fundamentals` 실행 이력에서 `instrument_retry_backoff` SKIPPED가 5분마다 반복되어 있음을 확인했다. 각 no-op은 KIS 시도 0건이지만 6,704개 universe 재조회/원장 재개 경로에 1~14초를 사용했다. route가 실제 실행 이력의 cooldown만 확인하고 가장 최근 retry-backoff SKIPPED의 `nextRetryAt`은 사용하지 않는 것이 원인이었다. 개선 후 마지막 backoff skip부터 최대 1시간 또는 `nextRetryAt` 중 먼저 도래할 때까지 전체 refresh scope 재조회는 억제하고, 예정된 재시도와 시간 단위 universe 변경 감지는 유지한다.
 
+2026-10-20 운영 배포 후 `instrument_retry_backoff_cooldown` SKIPPED가 예약 실행 이력에 기록되고 `durationMs=0`으로 전체 universe 조회를 생략했다. 다음 종목 재시도는 10:10 UTC에 시작해 35건(AMS 4, NAS 20, NYS 11)을 호출했으며 모두 실패했다(`KIS_PRICE_INVALID` 34, `KIS_MARKET_CAP_MISSING_OR_INVALID` 1). 실제 시도한 35건은 `last_attempt_at`이 확인됐고 오래된 레거시 111건은 시도시각을 꾸며내지 않고 대기 원장에 남았다. 다음 재시도 예정은 11:05:27 UTC였다. 즉 예약·기록 파이프라인은 작동했지만 KIS의 HTTP 200 / `rt_cd=0` 응답에 유효 가격·시총이 없는 데이터 문제는 해결되지 않았다. 해당 KIS 응답을 유효 시세로 취급하거나 이전 캐시를 실패 근거로 갱신하지 않는다.
+
 ## 남은 한계
 
 - 전체 활성 보통주 수가 많으면 KIS의 글로벌 TPS 제한과 API 지연으로 한 번의 전체 갱신이 오래 걸릴 수 있다. 현재 구현은 200종목씩 수집·저장하므로 전체 결과를 메모리에 쌓아두지 않는다. 배치 중 서버가 종료되면 커밋된 종목은 건너뛰고, 당시 진행 중이던 최대 200종목 배치부터 다시 조회한다.

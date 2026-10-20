@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { findMissingOperationalRelations, parseOperationalSchemaTables } from "./operational-schema-migration-audit.mjs";
+import { findMissingForwardOperationalColumns, findMissingOperationalRelations, parseOperationalSchemaTables } from "./operational-schema-migration-audit.mjs";
 
 const root = process.cwd();
 const required = [
@@ -135,5 +135,14 @@ if (missingOperationalMigrations.length) {
   console.error(`Operational schema migration audit failed; required relations are absent after the migration history: ${missingOperationalMigrations.join(", ")}`);
   process.exit(1);
 }
+// Production had successfully advanced through V157 while two required
+// translation columns were only defined in older V137/V140 files. Keep a
+// forward-edge repair for every readiness column so out-of-order-ignore
+// deployments cannot report a false-green schema.
+const missingForwardColumns = findMissingForwardOperationalColumns(schemaHealthSource, migrationSources, 157);
+if (missingForwardColumns.length) {
+  console.error(`Forward operational column migration audit failed after V157: ${missingForwardColumns.join(", ")}`);
+  process.exit(1);
+}
 const operationalTableCount = parseOperationalSchemaTables(schemaHealthSource).length;
-console.log(`Documentation OK (${required.length} entry points); migrations OK (${versions.length} files, latest V${versions.at(-1) ?? 0}); operational relations present after migration history (${operationalTableCount}).`);
+console.log(`Documentation OK (${required.length} entry points); migrations OK (${versions.length} files, latest V${versions.at(-1) ?? 0}); operational relations and forward columns present after migration history (${operationalTableCount}).`);

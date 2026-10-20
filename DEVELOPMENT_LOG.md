@@ -1,3 +1,32 @@
+## [2026-10-20] V157 이후 운영 필수 RSS 컬럼 forward migration 복구
+
+### 목표
+- 배포 후 운영 `/api/health`가 503/degraded를 반환한 원인을 운영 Flyway 이력과 실제 컬럼 상태로 확인하고 readiness를 복구한다.
+- 시총 backoff 재시도 예약 실행의 실제 provider 호출과 종목별 시도시각 기록을 검증한다.
+
+### 반영
+- 근본 원인: 운영은 Flyway V157까지 성공했지만 번역 readiness 컬럼은 V137/V140에만 존재했다. OCI migration runner는 최신 이력보다 낮은 out-of-order migration을 `*:ignored`로 건너뛰므로, 늦게 추가된 이전 버전 파일은 기존 운영 DB를 보정하지 못했다.
+- V158 `restore_required_rss_translation_columns` migration을 추가해 두 컬럼을 `ADD COLUMN IF NOT EXISTS`로 전진 재보장하고 기존 실패/월간 제한 행의 시도시각을 backfill한다.
+- `FORWARD_REQUIRED_OPERATIONAL_COLUMNS` 및 `scripts/check-docs.mjs`의 migration floor V157 검사를 추가했다. 단순히 과거 migration 파일에 컬럼 선언이 존재하는 것만으로 readiness가 통과하지 않도록 한다.
+- 배포 체크리스트/runbook에 운영 floor 이후 forward migration 규칙을 연결하고, fundamentals 운영 기록에 실제 35건 재시도 결과와 남은 KIS 빈 필드 위험을 기록했다.
+
+### 검증
+- `npx.cmd vitest run scripts/operational-schema-migration-audit.test.ts --reporter=verbose`: 8 tests passed. 구버전 V137/V140만 있는 회귀 fixture는 실패하고 V158 forward fixture는 통과한다.
+- `npm.cmd run docs:check`: 158개 migration, V158 최신, 운영 관계 및 forward 필수 컬럼 검사 통과.
+- 운영 Cron API: V157 운영 DB가 RSS translation 컬럼 2개 누락 상태이며 `/api/health` degraded를 반환하는 것을 확인했다. V158 배포 후 Flyway 적용 버전, readiness 컬럼, `/api/health=200`을 다시 검증한다.
+- 운영 fundamentals 재시도: 2026-10-20 10:10 UTC에 35개 호출, 0 성공·35 실패(`KIS_PRICE_INVALID` 34, 시총 invalid 1). 실제 시도 35건의 timestamp 기록이 확인되고, 111건은 지연 원장으로 보존됐다. KIS 데이터 원인 개선은 별도 남은 위험이다.
+
+### 다음 개선
+- V158 배포 후 `/api/health`가 정상화되고 두 컬럼이 생겼는지 확인한 다음, 11:05:27 UTC 이후 남은 fundamentals 재시도와 provider 데이터 품질을 다시 대조한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-006
+- 성과 판정: PARTIAL
+- 근거: Flyway 버전이 최신이어도 실제 필수 컬럼이 누락될 수 있는 out-of-order migration 공백을 재현 가능한 정적 회귀 게이트로 고정하고, 운영 복구 migration을 추가했다. DB readiness 복구 및 KIS 시세 성공은 배포 후 runtime 검증이 남아 있다.
+
+### 커밋·푸시·배포
+- 아직 미실행. full deploy verification 이후 커밋·푸시·배포를 수행하고 운영 Flyway/readiness/health 결과를 같은 항목에 갱신한다.
+
 ## [2026-10-20] 미사용 기능 조사 결과와 배포 검증 재개
 
 ### 목표
