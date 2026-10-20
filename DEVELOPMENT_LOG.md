@@ -15,14 +15,17 @@
 - 최종 최신 기준 `npm.cmd run deploy:verify` 통과: production build, standalone 및 Chrome desktop/mobile/API smoke, 테스트 804개 통과·1개 skip, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 감사, npm audit 취약점 0건.
 - GitHub Deploy OCI workflow run `39359695006` 성공. Verify, standalone 패키징, SSH 업로드와 서버 활성화 단계 모두 성공했다.
 - Discord 메시지 실수신은 별도의 관리자 RSS 테스트 또는 예약 알림에서 확인한다.
+- 배포 운영 API `GET /api/debug/market-rss-translations?hours=24&source=STOCKTITAN` read-only 조회: StockTitan 654건 중 TRANSLATED 7건, SKIPPED 548건, PENDING 99건, FAILED 0건. 번역 완료 7건은 영문 제목에 대응하는 한국어 제목이 저장되어 있었다.
+- SKIPPED 548건은 전부 `monthly_character_limit_reached` 및 `translation_fallback=true`였고 `translated_title`은 원문과 같았다. 미번역 PENDING 99건은 시도 횟수 0이었다.
+- 근본 원인: 내부 월간 한도 300,000자가 소진되면 번역 래퍼가 원문을 fallback으로 반환한다. 알림 조회는 번역 상태 완료를 조건으로 확인하지 않고, 본문도 `translatedTitle || title`을 사용하므로 fallback 및 미번역 PENDING 행이 원문 제목으로 전송될 수 있다.
 
 ### 다음 개선
-- 배포 후 RSS Discord debug API와 실제 관리자 테스트 전송에서 세 항목 및 링크 미리보기 부재를 확인한다.
+- 사용량 한도 상향에 따른 비용과 미번역 시 알림 지연/제외 정책을 확정한 뒤, StockTitan 알림은 한국어 번역 완료 상태만 전송하도록 보호한다. 배포 후 RSS Discord 관리자 테스트에서 세 항목 및 링크 미리보기 부재도 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-001
 - 성과 판정: IMPROVED
-- 근거: 신규 전송 및 재시도 payload에 요구한 본문 필터와 Discord 임베드 억제 플래그를 적용했고, 최신 원격 기준 배포 검증 및 OCI 서버 활성화가 성공했다. Discord 메시지 실수신 여부는 다음 알림에서 확인한다.
+- 근거: 신규 전송 및 재시도 payload에 요구한 본문 필터와 Discord 임베드 억제 플래그를 적용해 OCI 배포했다. 운영 디버그 API 표본에서는 번역 경로가 정상일 때 한국어 결과를 확인했지만, 월간 300,000자 한도 도달로 548건은 원문 fallback이었고 notifier가 미번역 PENDING도 보낼 수 있음을 확인했다. 알림 게이트 정책은 별도 확정이 필요하다.
 
 ### 커밋·푸시·배포
 - 상태: 완료. 코드 커밋 `bbd4ff14`를 `oci`에 push했고 Deploy OCI run `39359695006` 성공. 서버 활성화까지 완료했다.
