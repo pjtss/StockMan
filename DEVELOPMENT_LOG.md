@@ -12,18 +12,18 @@
 - `npm.cmd run deploy:verify`: 최신 실행 전체 통과. 의존성 audit 0건, production build, standalone·Chrome desktop/mobile·API smoke, Vitest 293개 파일(1,412 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 API routes), OCI cron(22 shared endpoints + fundamentals timer).
 - `npx.cmd vitest run lib/kis-token.test.ts -t 'backs off token issuance' --reporter=verbose` 통과.
 - 운영 DB read-only 이력에서 V148·V149는 원격과 같은 설명으로 이미 적용되어 있었고 DB에는 SEC shares 1,057행, review 1,311행 및 enabled 설정이 남아 있었다. 파괴적 V149 부분을 제거하고 KIS shares 전환을 V157로 옮겨 기존 데이터와 기능 설정을 보존했다. 원격 `origin/oci`는 공통 기준보다 6커밋 앞서고 로컬은 2커밋 앞서 있다.
-- 로컬 변경 집합의 전체 검증은 통과했으나 origin/oci보다 6커밋 뒤처져 있어 원격 통합 전이며 커밋·푸시·배포는 아직 수행하지 않았다.
+- 로컬 변경을 원격 `oci` 6커밋과 통합해 `7ea1f960`을 생성했다. push 직전 `npm.cmd run deploy:verify` 전체 게이트를 재통과한 뒤 원격 반영 및 운영 배포를 완료했다.
 
 ### 다음 개선
-- 네트워크 회복 후 `git fetch origin oci`로 최신 원격을 확인하고 변경이 없으면 병합 커밋·push, OCI workflow 성공 및 운영 health 페이지를 확인한다.
+- 배포 완료: `7ea1f960`을 `oci`에 push하고 Deploy OCI workflow `39405249354` success를 확인했다. activation 성공 후 `/health-check`, `/`, `/charts` HTTP 200 응답을 확인했다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-005
 - 성과 판정: PARTIAL
-- 근거: V148/V149 중복 및 파괴적 SEC 삭제 migration을 정리했고 원격 6커밋과 RSS/Discord 정책을 통합했다. 통합 트리의 전체 build/test/runtime/audit는 통과했지만 push·배포가 남아 있다.
+- 근거: V148/V149 중복 및 파괴적 SEC 삭제 migration을 정리했고 원격 6커밋과 RSS/Discord 정책을 통합했다. 통합 트리의 전체 build/test/runtime/audit를 통과하고 push·OCI activation 및 운영 HTTP smoke까지 완료했다.
 
 ### 커밋·푸시·배포
-- 상태: 통합 검증 완료, push·배포 대기. 로컬 HEAD `f75192ad`와 기록된 `origin/oci` `8d0c0782` 사이 3 ahead·6 behind이므로 병합 커밋을 생성할 수 있다. push 전 fetch 재시도 후 원격이 변하지 않았을 때만 진행한다.
+- 상태: 완료. `7ea1f960` 커밋 및 push, Deploy OCI workflow 성공, 운영 `/health-check`·`/`·`/charts` HTTP 200 확인.
 
 ## [2026-10-20] 미국 최근 저점·VWAP 후보에 RVOL ≥ 1 조건 추가
 
