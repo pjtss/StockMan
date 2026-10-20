@@ -5962,3 +5962,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **변경 파일**: 조사 보고서와 `DEVELOPMENT_LOG.md`만 기록 추가. 제품 코드·운영 데이터 수정 없음.
 - **검증**: 원격/로컬 SHA 대조, 배포 run 결과, 운영 health, 인증된 read-only automation 기록 확인. `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,431 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).
 - **커밋·푸시·배포**: 이전 커밋 배포는 완료. 이번 기록 변경분은 검증 완료; commit/push/deploy는 아래 절차로 수행.
+
+## [2026-10-20] 미사용 후보와 OCI cron 누락 경로 최신 재검증
+
+- **목적/범위**: 최신 HEAD에서 runtime reference 후보 및 OCI cron 호출 커버리지를 다시 검사하고, `us-daily-indicators` production automation 기록을 read-only로 확인했다.
+- **핵심 결과**: 실제 cron route 24개 중 `us-daily-indicators`만 OCI 공용/fundamentals/RSS 스크립트에서 직접 호출되지 않는다. feature registry는 `OCI_CRON`으로 표시하지만 코드 기본 설정은 disabled다. production API의 누적 실행은 2,696회(성공 268, 실패 1, skipped 2,427), 마지막은 2026-08-19 `SKIPPED / outside_schedule`. 과거 사용 이력이 있으므로 미사용 삭제 후보가 아니라 비활성/예약 누락 후보로 분류했다.
+- **데이터 출처 주의**: `.env.local` 연결 DB의 최근 90일 실행 0건 및 설정 `enabled` key 부재는 production debug API의 8월 기록과 다르다. 서로 다른 대상일 수 있으므로 현재 production 설정의 증거로 사용하지 않았다.
+- **변경 파일**: `docs/operations/unused-feature-candidates-20261020.md`, `DEVELOPMENT_LOG.md`. 제품 코드/DB/사용자 브라우저 데이터를 변경하지 않았다.
+- **검증**: 최신 HEAD와 remote SHA 일치 확인, route files 24개와 세 OCI scheduler script 비교, 주요 미사용 후보 import/키 사용 검색, production API read-only 및 `.env.local` DB `BEGIN READ ONLY` 조회. 후보 파일은 삭제하지 않았다. 전체 `npm.cmd run deploy:verify`도 통과했다.
+- **검증**: `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,431 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).

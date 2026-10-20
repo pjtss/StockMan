@@ -73,9 +73,9 @@ V156 검토는 원격 snapshot `29d847b6`의 코드 근거를 사용했다. 현�
 
 ## 자동화 미실행 또는 scheduler 연결이 빠진 기능
 
-- `us-daily-indicators`: `FEATURE_MODULES`에는 `scheduler: "OCI_CRON"`이고 `/api/cron/us-daily-indicators` route도 구현되어 있다. 그러나 `scripts/oci-cron.sh`, 별도 systemd timer, workflow, Netlify 설정 어디에서도 해당 route URL을 호출하지 않는다. 연결된 configured DB의 `automation_runs`에도 최근 90일 run이 없다. 정기 자동화는 호출 설정에서 연결되지 않은 상태로 보이며, 실행 이력도 이를 뒷받침한다. 관리자/수동 호출 가능성은 별도로 남는다.
-- 연결 DB read-only 집계(2026-10-20 07:27:48 UTC): 기능 registry 25개 중 `NOT_SCHEDULED` 3개, `OCI_CRON` 22개. 30일 기록이 있는 것은 `dart-realtime` 하나(132회, 마지막 2026-10-16 SUCCESS)이고 다른 21개 scheduled module은 0회다. 90일 기록은 `dart-realtime`, `instrument-fundamentals`, `kr-daily-cache`, `market-rss`, `us-bollinger-band`, `us-daily-cache`, `us-golden-cross` 7개뿐이다. 이는 연결된 DB에 저장된 기록 기준이며, 모듈 미사용·사용자 비활성의 증거와 동일하지 않다.
-- `instrument-fundamentals` 설정은 enabled=true지만 최근 기록은 2026-08-25 SKIPPED이며 30일 실행은 0회다. `sec-smallcap-share-facts`도 enabled=true지만 이 DB에서 90일 automation run은 없었다. route는 cron runner에 등록되어 있다. 외부 환경 설정(예: `SEC_USER_AGENT`) 부족으로 automation run 생성 전 종료됐을 수도 있어 “미사용”으로 단정하지 않고 운영 설정/호출 로그 확인 대상으로 둔다.
+- `us-daily-indicators`: `FEATURE_MODULES`는 `scheduler: "OCI_CRON"`으로 표시하지만 실제 OCI 예약 스크립트에는 `/api/cron/us-daily-indicators` 호출이 없다. 아래 최신 운영 재확인에서 production automation history 2,696건(성공 268, 실패 1, skipped 2,427), 마지막 실행 2026-08-19 `SKIPPED / outside_schedule`을 확인했다. 기능 설정의 코드 기본값은 `enabled: false`다. 현재 자동 실행 경로에서 빠져 있고 비활성으로 보이지만, 과거 사용 이력이 크므로 삭제 후보가 아니라 scheduler/configuration 불일치로 분류한다. 관리자 테스트 UI는 별도 `/api/admin/us-daily-indicators-test`를 호출한다.
+- `.env.local` 우선 주입으로 연결한 DB의 read-only 집계(2026-10-20 07:27:48 UTC)는 registry 25개 중 `NOT_SCHEDULED` 3개, `OCI_CRON` 22개를 보였다. 이 DB snapshot은 production debug API가 반환한 `us-daily-indicators` 최근 실행(2026-08-19)과 일치하지 않으므로, 현재 운영 이력의 근거로 섞지 않는다. DB별 기록과 feature 설정은 각각 조회 대상 DB를 밝혀서 해석해야 한다. 어느 쪽도 모듈 미사용의 단독 증거로 삼지 않는다.
+- 초기 조사 때 연결한 DB snapshot에서 `instrument-fundamentals`와 `sec-smallcap-share-facts` 설정이 enabled=true였으나, 이는 해당 DB에 한정된 시점 자료다. 최신 production fundamentals 상태는 아래 운영 재확인 절의 별도 조회를 기준으로 한다. `sec-smallcap-share-facts`는 cron runner·route·저장 데이터가 확인되어 미사용으로 분류하지 않는다.
 
 DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ ONLY` 안에서 `automation_runs`, `feature_module_settings`의 비밀 아닌 key/status/timestamp만 SELECT했다. 자격증명이나 webhook 설정은 출력하지 않았다.
 ## SEC 소형주 주식수 기능은 미사용으로 판정하지 않음
@@ -95,3 +95,11 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 - 미사용 후보의 판정은 그대로다. 정적 참조가 없는 파일은 삭제 후보이지 사용 중단의 확정 증거가 아니며, 외부 API 소비자와 수동 운영자의 사용 여부는 저장소/운영 기록만으로 완전히 판정할 수 없다. 삭제는 하지 않았다.
 - 보조 운영 확인으로 `instrument-fundamentals`를 2026-10-20 11:18:52Z에 인증된 read-only debug GET으로 확인했다. 최근 실행은 11:15:00Z `PARTIAL`: 6,704개 대상 중 6,559개 누적 완료, 누적 성공 6,559·실패 145, 이번 실행에서 111건 시도 중 1건 저장·110건 실패, 미시도 0이다. 실패 사유는 주로 KIS 가격 응답 무효(`KIS_PRICE_INVALID`, 101건)와 시가총액 누락/무효(9건)이며 운영 자동화는 실제 실행 중이다. 이 실행은 미사용 기능 후보로 분류하지 않는다. debug 결과는 누적 실행 요약이며 새 수집이나 데이터 변경은 요청하지 않았다.
 - 조회 방법: `.env.local` 우선 주입으로 `CRON_SECRET`을 메모리에서 읽고, 비밀값은 출력하지 않은 채 `GET /api/debug/automation-runs?module=instrument-fundamentals&limit=1&includeSummary=true`를 호출했다. 제품 코드나 운영 데이터를 수정하지 않았다.
+## 2026-10-20 최신 HEAD·운영 경로 재검증
+
+- 조사 HEAD와 `origin/oci`는 `a5828bb611ae9e369c7ff361fb81b113a282aad5`로 일치한다. `app/api/cron` 아래 실제 `route.ts`는 24개다. OCI의 공용·fundamentals·RSS scheduler 세 스크립트를 대조한 결과 실제 구현된 route 중 `us-daily-indicators`만 직접 예약 호출되지 않는다. 이름만 남아 있는 빈 디렉터리는 route로 세지 않았다.
+- `us-daily-indicators`는 `lib/feature-modules.ts`에서 `OCI_CRON`으로 표기하지만 호출 스크립트에서 누락됐다. `lib/feature-module-settings.ts`의 기본 설정은 `enabled: false`, `intervalSeconds: 600`이다. 현재 `.env.local`이 주입한 DB의 해당 설정 row에는 `enabled` key가 없었고, 이 값은 production 설정이라고 확인할 수 없다. 별도의 admin test UI는 `/api/admin/us-daily-indicators-test`를 호출한다.
+- Production read-only debug API (`GET /api/debug/automation-runs?module=us-daily-indicators&limit=1&includeSummary=true`, 조회 2026-10-20 11:35:05Z)는 총 2,696회(성공 268, 실패 1, skipped 2,427), 최신 실행 2026-08-19 12:28:54Z `SKIPPED`, 사유 `outside_schedule`을 반환했다. 따라서 이 기능은 과거 실제 사용됐으며, 현재는 정기 호출과 실행 기록이 장기간 끊긴 상태다. 삭제 미사용 후보가 아니라 비활성·예약 연결 누락 항목이다.
+- `.env.local`로 연결한 DB의 같은 module은 최근 90일 실행 0건을 반환했고 설정 row에도 `enabled` key가 없었다. 이 결과는 production debug API의 2026-08-19 기록과 서로 다르므로 DB endpoint/대상 간 차이가 있다. 현재 production 설정을 이 로컬 DB 결과로 추정하지 않고, 두 결과를 분리 기록한다.
+- 기존 5개 runtime 후보(`lib/keywords.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sectors.ts`, `lib/market-rss-discord-message.ts`)는 최신 source에서도 app/components/lib/scripts runtime importer가 발견되지 않았다. 세 localStorage 키는 해당 writer 파일 외 runtime consumer가 보이지 않는다. 이는 repo 정적 참조 검사 결과이며 외부 소비자나 기존 브라우저 저장값까지 검증한 것은 아니다.
+- 원격 deployment, 제품 코드, 운영 데이터 변경은 없었다. 실제 사용 여부가 불명확한 기능 삭제나 cron 연결 복구는 하지 않았다.
