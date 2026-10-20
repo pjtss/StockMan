@@ -5953,3 +5953,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 상태: 검증 및 배포 진행 중.
+
+## [2026-10-20] 미사용 기능 후보 조사 및 운영 상태 재확인
+
+- **목적/범위**: 저장소 내 미사용 후보를 정적 참조·라우트·cron·DB 설정 및 사용 흔적과 대조하고, 배포 후 상태와 남아 있던 KIS fundamentals 재시도 상태를 확인했다.
+- **조사 대상**: `docs/operations/unused-feature-candidates-20261020.md`, `scripts/oci-cron.sh`, feature registry/automation-run 기록, 로컬 코드 참조. 후보 파일은 삭제하지 않았다.
+- **운영 검증**: 로컬 HEAD와 `origin/oci`가 `e74613d885e4eb822f8823330191cccef6ca020c`로 일치. Actions run `39412187639` 배포 성공, `GET https://stockman.r-e.kr/api/health`에서 2026-10-20 11:12:17Z `ok`. 인증된 read-only automation debug GET에서 fundamentals 11:15:00Z 실행은 PARTIAL로 확인: 누적 6,559 성공·145 실패, 최신 시도 111건 중 저장 1·실패 110·미시도 0. 따라서 해당 자동화는 미사용이 아니며 KIS 가격/시가총액 응답 실패가 남아 있다.
+- **변경 파일**: 조사 보고서와 `DEVELOPMENT_LOG.md`만 기록 추가. 제품 코드·운영 데이터 수정 없음.
+- **검증**: 원격/로컬 SHA 대조, 배포 run 결과, 운영 health, 인증된 read-only automation 기록 확인. `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,431 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).
+- **커밋·푸시·배포**: 이전 커밋 배포는 완료. 이번 기록 변경분은 검증 완료; commit/push/deploy는 아래 절차로 수행.

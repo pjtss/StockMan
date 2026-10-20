@@ -34,14 +34,14 @@
 
 `/sec` 비활성 안내 화면 삭제를 SEC 전체 비활성화로 해석하면 안 된다. `scripts/oci-cron.sh`는 `/api/cron/sec-edgar`를 호출하고, RSS cron은 `/api/cron/market-rss`를 실행한다. 따라서 SEC 운영 자동화는 별도 모듈 경로로 계속 동작하며 이 동작을 제거하는 변경은 사용자 확인 없이 미사용으로 판정할 수 없다.
 
-## 결론 및 검증 상태
+## 결론 및 당시 검증 상태 (2026-10-20 초기 조사)
 
 - 67개 삭제 파일 중 이미 비활성인 화면/API, 내부 참조가 발견되지 않은 정적 후보, 실제 조회 API, 운영 자동화와 관련된 파일을 구분했다.
 - 내부 참조가 없다는 결과는 저장소 안에서만 성립하며 외부 소비자·사람이 실행하는 작업까지 증명하지 않는다.
-- 전체 빌드/테스트/실행 검증은 수행하지 않았다. `origin/oci`와 branch가 갈라져 있고 이전 전체 검증도 실패했으므로 이 대규모 변경은 배포할 수 없는 상태다.
-- 이 조사는 코드 변경, 커밋, 푸시, 배포를 하지 않았다.
+- 당시 초기 checkout에서는 전체 빌드/테스트/실행 검증을 수행하지 않았다. 이후 원격 변경 통합 및 배포 검증 결과는 아래 최신 운영 재확인 절을 참조한다.
+- 당시 조사 시점에는 코드 변경, 커밋, 푸시, 배포를 하지 않았다. 이후 통합·배포 상태는 아래 최신 운영 재확인 절에 기록했다.
 
-## 원격 최신 기준에서 추가 확인한 항목
+## 원격 통합 전 추가 확인 내역 (2026-10-20 초기 조사)
 
 V156 검토는 원격 snapshot `29d847b6`의 코드 근거를 사용했다. 현재 remote-tracking ref `8d0c0782`이며 로컬 후보 커밋과는 2개 ahead·6개 behind로 갈라져 있다.
 
@@ -54,7 +54,7 @@ V156 검토는 원격 snapshot `29d847b6`의 코드 근거를 사용했다. 현�
 
 `680f2a2d`에는 V148, V149의 중복 migration 번호도 있어 `docs:check`의 migration 검증이 실패한다. 원격 최신 커밋 위에 맞춘 뒤 번호와 migration 적용 여부를 재검토해야 한다.
 
-## 현재 checkout의 미사용 runtime 코드 후보
+## 초기 checkout 기준 미사용 runtime 코드 후보
 
 현재 로컬 checkout `680f2a2d`의 `app/`, `components/`, `lib/`, `scripts/`에서 TypeScript AST로 정적 import·export·dynamic import 경로를 따라갔다. 앱 route/page와 운영 script를 진입점으로 삼고 test 파일은 제품 runtime 도달성에서 제외했다. 검사 대상 955개 source file 중 entry root 291개, root에서 도달 가능한 656개를 확인했다. 이 결과는 정적 분석이므로 string-built dynamic import나 외부 consumer는 별도 확인 대상이다.
 
@@ -89,3 +89,9 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 - 통합 후 `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,430 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer). 커밋 후 동일 전체 게이트를 다시 통과했다.
 - 검증 과정에서 새 cron routes의 비중앙화 인증을 공통 `cron-auth`로 교체했고, full-refresh backoff skip 처리와 KIS test mock도 바로잡았다. V148 중복은 제거, KIS shares migration은 V157로 번호를 이동하고 SEC tables/settings 및 free-float columns 삭제를 뺐으며 원격 V156 필수 migration을 복구했다.
 - 원격 6커밋을 병합하고 RSS Discord 출처 allowlist를 신규 및 재시도 경로 모두에 적용했다. 병합 커밋 `7ea1f960`과 배포 기록 커밋 `84481f93`, 보고서 기록 커밋 `23ffe4f4`를 `oci`에 push했으며 해당 Deploy OCI workflow `39405249354`, `39406703102`, `39408070579`가 모두 성공했다. V158 forward migration과 이번 조사 갱신은 `459f74a5`로 push했으며 workflow `39410821362`의 `Verify deployment`, `Activate release` 및 전체 run 성공을 확인했다. 운영 URL은 repository runbook에 기재된 `https://stockman.r-e.kr`이다. `/api/health`는 2026-10-20 10:59:01 UTC에 HTTP 200, `status=ok`를 반환했고, `/`, `/charts`도 HTTP 200이었다. `/api/health`는 상세 Flyway 번호를 공개하지 않으므로 V158은 migration activation 성공과 readiness 회복 근거로 기록한다.
+## 2026-10-20 운영 재확인
+
+- 조사 기록·운영 경로 확인은 현재 `e74613d885e4eb822f8823330191cccef6ca020c`를 기준으로 한다. `origin/oci`와 동일했고 GitHub Actions run `39412187639`은 배포 성공으로 완료됐다. `GET https://stockman.r-e.kr/api/health`는 2026-10-20 11:12:17Z `status=ok`를 반환했다.
+- 미사용 후보의 판정은 그대로다. 정적 참조가 없는 파일은 삭제 후보이지 사용 중단의 확정 증거가 아니며, 외부 API 소비자와 수동 운영자의 사용 여부는 저장소/운영 기록만으로 완전히 판정할 수 없다. 삭제는 하지 않았다.
+- 보조 운영 확인으로 `instrument-fundamentals`를 2026-10-20 11:18:52Z에 인증된 read-only debug GET으로 확인했다. 최근 실행은 11:15:00Z `PARTIAL`: 6,704개 대상 중 6,559개 누적 완료, 누적 성공 6,559·실패 145, 이번 실행에서 111건 시도 중 1건 저장·110건 실패, 미시도 0이다. 실패 사유는 주로 KIS 가격 응답 무효(`KIS_PRICE_INVALID`, 101건)와 시가총액 누락/무효(9건)이며 운영 자동화는 실제 실행 중이다. 이 실행은 미사용 기능 후보로 분류하지 않는다. debug 결과는 누적 실행 요약이며 새 수집이나 데이터 변경은 요청하지 않았다.
+- 조회 방법: `.env.local` 우선 주입으로 `CRON_SECRET`을 메모리에서 읽고, 비밀값은 출력하지 않은 채 `GET /api/debug/automation-runs?module=instrument-fundamentals&limit=1&includeSummary=true`를 호출했다. 제품 코드나 운영 데이터를 수정하지 않았다.
