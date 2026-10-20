@@ -1,3 +1,33 @@
+## [2026-10-20] 시총 재시도 원장의 실제 시각 보존
+
+### 목표
+- 재시도 대기 중 운영 실패 응답의 시간 근접 진단이 불가능했던 원인을 제거해 다음 실제 KIS 재시도와 기존 cache를 올바르게 대조한다.
+
+### 반영
+- 운영 read-only 진단(2026-10-20 04:52 UTC): job 6,704종목, 성공 6,558, 실패 146, retry due 0. 실패 146건 모두 deferred이며 최신 `item.updated_at`은 04:50 UTC, 기존 debug는 실패 시각으로 `updated_at`을 사용해 cache timing을 판정하고 있었다.
+- 코드 대조 결과 `beginFundamentalRefresh()` 재개 경로가 이름이 같은 모든 항목에 `updated_at=NOW()`를 기록했다. provider를 재호출하지 않고 대기 항목 이름을 재동기화할 때 실제 실패 시점이 소실되는 결함으로 확인했다.
+- V156 `instrument_fundamental_refresh_items.last_attempt_at`을 추가한다. 기존 값은 실패 시각을 복구할 근거가 없으므로 소급 채우지 않는다.
+- `markFundamentalBatchInTransaction()`은 성공/실패 상태 반영과 같은 DB 트랜잭션에서 `last_attempt_at=NOW()`를 기록한다. 재개 시 종목명이 실제 달라진 경우에만 업데이트해 쓸데없는 6,704행 쓰기와 시각 변조를 막는다.
+- 진단 API는 `last_attempt_at`이 명시된 항목에서만 cache 근접도를 비교하며, 레거시는 `attemptTimeMissingCount`와 `cacheTimingUnknownCount`로 격리한다. mutable `updated_at`으로 추정하지 않는다.
+
+### 검증
+- `npm.cmd test -- --run lib/instrument-fundamental-progress.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 8개 테스트 통과.
+- `npm.cmd run docs:check`는 새 항목의 섹션 명칭과 전달 상태 문구를 자동 계약에 맞게 보완한 뒤 통과했다.
+- 원격 `oci`가 검증 도중 RSS 변경으로 전진해 해당 커밋을 rebase한 뒤 최종 상태에서 `npm.cmd run deploy:verify` 재통과: production build, standalone `/charts`·API smoke, Chrome desktop/mobile hydration, 815개 테스트 통과·1개 skip, typecheck, 문서·V156 migration 감사, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 문서 충돌 정리 뒤 첫 `deploy:verify`는 standalone 서버 TCP 준비가 3.8초에서 18초로 늘어난 실행에서 `/charts` 요청 timeout으로 실패했다. 응용 코드 오류 신호는 없었고, 동시에 여러 프로젝트의 Node 프로세스가 실행 중인 환경 자원 경합 가능성을 원인 후보로 분류했다. 동일 최종 트리로 재시도해 standalone 준비 3.4초, `/charts`·API smoke, desktop/mobile Chrome, 815개 테스트 통과·1개 skip, typecheck와 모든 audit를 통과했다.
+- Flyway 운영 적용, 커밋·push·배포 결과는 아직 확인 전이다.
+
+### 다음 개선
+- V156 운영 적용 후 다음 예약 재시도 결과에서 `last_attempt_at`, cache fetchedAt, 오류 분포를 확인한다. KIS 요청을 수동으로 유도하거나 전체 종목 갱신하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-013
+- 성과 판정: IMPROVED
+- 근거: 운영 데이터가 실패 시각 오염 경로와 일치했고, 전용 시각 보존 및 오판 방지 코드를 추가했다. 마이그레이션·테스트·운영 배포와 다음 실제 재시도 검증은 남아 있다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 최종 검증 통과 후 원격 배포를 진행한다.
+
 ## [2026-10-20] 외부 RSS 번역 API 대상을 StockTitan 제목으로 제한
 
 ### 목표

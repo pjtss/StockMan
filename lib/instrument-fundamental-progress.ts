@@ -47,9 +47,10 @@ export async function beginFundamentalRefresh(instruments: FundamentalRefreshIns
       if (instruments.length) {
         await client.query(
           `UPDATE instrument_fundamental_refresh_items AS item
-           SET name = source.name, updated_at = NOW()
+          SET name = source.name
            FROM UNNEST($2::text[], $3::text[], $4::text[]) AS source(market, code, name)
-           WHERE item.job_id = $1 AND item.market = source.market AND item.code = source.code`,
+           WHERE item.job_id = $1 AND item.market = source.market AND item.code = source.code
+             AND item.name IS DISTINCT FROM source.name`,
           [jobId, instruments.map((item) => item.market), instruments.map((item) => item.code), instruments.map((item) => item.name)],
         );
       }
@@ -115,6 +116,7 @@ export async function markFundamentalBatchInTransaction(
       UPDATE instrument_fundamental_refresh_items AS item
       SET status = ${status},
           attempt_count = item.attempt_count + 1,
+          last_attempt_at = NOW(),
           next_attempt_at = CASE
             WHEN ${status} = 'SUCCESS' THEN NULL
             ELSE NOW() + CASE
