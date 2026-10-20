@@ -51,7 +51,7 @@ scanner·API·알림·관리자 화면
 | `us_price_detail_cache` | `id`, `market`, `code`, `status`, `parsed`, `fetched_at` | 미국 현재가 파싱 캐시. `(market, code)` 유일 |
 | `instrument_fundamental_snapshots` | `id`, `market`, `code`, `name`, `price`, `change_rate`, `open`, `high`, `low`, `volume`, `trading_value`, `market_cap`, `shares_outstanding`, `free_float_shares`, `free_float_percent`, `currency`, `source`, `raw_payload`, `observed_at`, `fetched_at` | 종목 기본·시세 스냅샷. `(market, code)` 유일 |
 | `instrument_fundamental_refresh_jobs` | `id`, `scope_hash`, `status`, `instrument_count`, `started_at`, `finished_at`, `created_at` | 국내·해외 기본정보 갱신 작업의 대상 집합과 재개 상태. 14일 이후 종료 작업 정리 |
-| `instrument_fundamental_refresh_items` | `job_id`, `market`, `code`, `name`, `ordinal`, `status`, `attempt_count`, `last_error_code`, `updated_at` | 종목별 진행 상태. 스냅샷/이력 저장과 `SUCCESS` 전이를 동일 트랜잭션으로 처리 |
+| `instrument_fundamental_refresh_items` | `job_id`, `market`, `code`, `name`, `ordinal`, `status`, `attempt_count`, `last_error_code`, `last_attempt_at`, `next_attempt_at`, `updated_at` | 종목별 진행 상태. 실제 시도 시각을 별도로 보존하며 스냅샷/이력 저장과 상태 전이를 동일 트랜잭션으로 처리 |
 
 ### 종목 유니버스·동기화
 

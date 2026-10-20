@@ -156,3 +156,12 @@ export async function persistDiscordDeliveryOutcome(input: {
     }).where(eq(marketRssArticles.id, input.articleId));
   });
 }
+
+export async function markDiscordDeliverySkipped(id: number, reason: string, articleId?: number) {
+  const db = getDb();
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx.update(discordDeliveryQueue).set({ status: "SKIPPED", lastError: reason, updatedAt: now }).where(eq(discordDeliveryQueue.id, id));
+    if (articleId != null) await tx.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: reason, updatedAt: now }).where(eq(marketRssArticles.id, articleId));
+  });
+}

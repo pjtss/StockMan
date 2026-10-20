@@ -148,6 +148,21 @@ export async function loadLatestExecutedAutomationRun(moduleKey: FeatureModuleKe
   return rows.rows[0] || null;
 }
 
+/** Last ledger-backoff skip, used to avoid rebuilding the full instrument scope every timer tick. */
+export async function loadLatestInstrumentFundamentalBackoffSkip() {
+  const rows = await getPool().query<{ started_at: string; next_retry_at: string }>(
+    `SELECT started_at, summary->>'nextRetryAt' AS next_retry_at
+       FROM automation_runs
+      WHERE module_key = 'instrument-fundamentals'
+        AND status = 'SKIPPED'
+        AND summary->>'reason' = 'instrument_retry_backoff'
+        AND summary->>'nextRetryAt' IS NOT NULL
+      ORDER BY started_at DESC
+      LIMIT 1`,
+  );
+  return rows.rows[0] || null;
+}
+
 /** Return an active worker so expensive scans cannot overlap. */
 export async function loadRunningAutomationRun(moduleKey: FeatureModuleKey) {
   const rows = await getPool().query<{

@@ -1,9 +1,10 @@
-import { claimDueDiscordDeliveries, getMarketRssDeliveryArticleSnapshot, markDiscordDeliverySending, markDiscordDeliverySuperseded, persistDiscordDeliveryOutcome } from "@/lib/discord-delivery-queue";
+import { claimDueDiscordDeliveries, getMarketRssDeliveryArticleSnapshot, markDiscordDeliverySending, markDiscordDeliverySkipped, markDiscordDeliverySuperseded, persistDiscordDeliveryOutcome } from "@/lib/discord-delivery-queue";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { isRetryableDiscordError, parseMarketRssDeliveryArticleId, withDiscordWaitParameter } from "@/lib/discord-delivery-policy";
 import { toTextWebhookPayload } from "@/lib/discord-text";
 import { isMarketRssNotificationSnapshot, matchesMarketRssNotificationSnapshot } from "@/lib/market-rss-notification-snapshot";
 import { DISCORD_SUPPRESS_EMBEDS_FLAG } from "@/lib/market-rss-notification-message";
+import { isMarketRssDiscordSourceAllowed } from "@/lib/market-rss-discord-policy";
 
 async function webhookFor(channelKey: string) {
   const map: Record<string, { module: Parameters<typeof loadFeatureDiscordWebhook>[0]; env: string[] }> = {
@@ -38,6 +39,11 @@ export async function retryDiscordDeliveries(limit = 50) {
         } catch {
           // Do not send an RSS retry when its current translation snapshot cannot be verified.
           results.persistenceFailed++;
+          continue;
+        }
+        if (isMarketRssNotificationSnapshot(storedSnapshot) && !isMarketRssDiscordSourceAllowed(currentSnapshot?.source)) {
+          await markDiscordDeliverySkipped(delivery.id, "source_not_allowed_for_discord", articleId);
+          results.superseded++;
           continue;
         }
         if (!isMarketRssNotificationSnapshot(storedSnapshot)

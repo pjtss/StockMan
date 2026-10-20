@@ -15,15 +15,15 @@
 - 로컬 변경 집합의 전체 검증은 통과했으나 origin/oci보다 6커밋 뒤처져 있어 원격 통합 전이며 커밋·푸시·배포는 아직 수행하지 않았다.
 
 ### 다음 개선
-- 원격 최신 6커밋과 로컬 변경을 통합하고 두 충돌 파일을 수동 검토한 뒤 전체 배포 검증을 다시 실행한다.
+- 네트워크 회복 후 `git fetch origin oci`로 최신 원격을 확인하고 변경이 없으면 병합 커밋·push, OCI workflow 성공 및 운영 health 페이지를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-20-005
 - 성과 판정: PARTIAL
-- 근거: 로컬 전체 배포 검증은 통과했고 V148/V149 중복 및 파괴적 SEC 삭제 migration을 정리했다. 원격과의 Discord retry/RSS pipeline 충돌 2건을 통합하고 push·배포하는 작업은 남아 있다.
+- 근거: V148/V149 중복 및 파괴적 SEC 삭제 migration을 정리했고 원격 6커밋과 RSS/Discord 정책을 통합했다. 통합 트리의 전체 build/test/runtime/audit는 통과했지만 push·배포가 남아 있다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 전체 local verify는 통과했으나 remote integration이 끝나지 않아 커밋·푸시·배포하지 않았다.
+- 상태: 통합 검증 완료, push·배포 대기. 로컬 HEAD `f75192ad`와 기록된 `origin/oci` `8d0c0782` 사이 3 ahead·6 behind이므로 병합 커밋을 생성할 수 있다. push 전 fetch 재시도 후 원격이 변하지 않았을 때만 진행한다.
 
 ## [2026-10-20] 미국 최근 저점·VWAP 후보에 RVOL ≥ 1 조건 추가
 
@@ -90,6 +90,38 @@
 
 ### 커밋·푸시·배포
 - 상태: 미실행. 조사 문서만 기록했으며 커밋·푸시·배포는 하지 않았다.
+
+## [2026-10-20] 시총 재시도 원장의 실제 시각 보존
+
+### 목표
+- 재시도 대기 중 운영 실패 응답의 시간 근접 진단이 불가능했던 원인을 제거해 다음 실제 KIS 재시도와 기존 cache를 올바르게 대조한다.
+
+### 반영
+- 운영 read-only 진단(2026-10-20 04:52 UTC): job 6,704종목, 성공 6,558, 실패 146, retry due 0. 실패 146건 모두 deferred이며 최신 `item.updated_at`은 04:50 UTC, 기존 debug는 실패 시각으로 `updated_at`을 사용해 cache timing을 판정하고 있었다.
+- 코드 대조 결과 `beginFundamentalRefresh()` 재개 경로가 이름이 같은 모든 항목에 `updated_at=NOW()`를 기록했다. provider를 재호출하지 않고 대기 항목 이름을 재동기화할 때 실제 실패 시점이 소실되는 결함으로 확인했다.
+- V156 `instrument_fundamental_refresh_items.last_attempt_at`을 추가한다. 기존 값은 실패 시각을 복구할 근거가 없으므로 소급 채우지 않는다.
+- `markFundamentalBatchInTransaction()`은 성공/실패 상태 반영과 같은 DB 트랜잭션에서 `last_attempt_at=NOW()`를 기록한다. 재개 시 종목명이 실제 달라진 경우에만 업데이트해 쓸데없는 6,704행 쓰기와 시각 변조를 막는다.
+- 진단 API는 `last_attempt_at`이 명시된 항목에서만 cache 근접도를 비교하며, 레거시는 `attemptTimeMissingCount`와 `cacheTimingUnknownCount`로 격리한다. mutable `updated_at`으로 추정하지 않는다.
+
+### 검증
+- `npm.cmd test -- --run lib/instrument-fundamental-progress.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 8개 테스트 통과.
+- `npm.cmd run docs:check`는 새 항목의 섹션 명칭과 전달 상태 문구를 자동 계약에 맞게 보완한 뒤 통과했다.
+- 원격 `oci`가 검증 도중 RSS 변경으로 전진해 해당 커밋을 rebase한 뒤 최종 상태에서 `npm.cmd run deploy:verify` 재통과: production build, standalone `/charts`·API smoke, Chrome desktop/mobile hydration, 815개 테스트 통과·1개 skip, typecheck, 문서·V156 migration 감사, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 문서 충돌 정리 뒤 첫 `deploy:verify`는 standalone 서버 TCP 준비가 3.8초에서 18초로 늘어난 실행에서 `/charts` 요청 timeout으로 실패했다. 응용 코드 오류 신호는 없었고, 동시에 여러 프로젝트의 Node 프로세스가 실행 중인 환경 자원 경합 가능성을 원인 후보로 분류했다. 동일 최종 트리로 재시도해 standalone 준비 3.4초, `/charts`·API smoke, desktop/mobile Chrome, 815개 테스트 통과·1개 skip, typecheck와 모든 audit를 통과했다.
+- 원격 `oci`가 다시 전진한 뒤 해당 RSS 커밋을 포함해 최종 재검증: `npm.cmd run deploy:verify` 통과, 818개 테스트 통과·1개 skip, production build 및 standalone/browser/API smoke와 전체 audit 성공.
+- 운영 배포 workflow `39376235654`가 커밋 `86ab175e`에서 성공. `/api/health`, `/`, `/charts` HTTP 200 확인. 인증된 read-only 운영 확인에서 Flyway `156` (`instrument fundamental attempt timestamp`) 적용 확인.
+- 배포 직후 진단은 최근 원장 6,704건 중 성공 6,558·실패 146, 재시도 대기 146·기한 도래 0을 보였다. 이 146건은 V156 이전 레거시이므로 `last_attempt_at` 146건 모두 미상으로 정확히 표시되고 cache timing도 미상으로 분리됐다. 다음 재시도 예정은 2026-10-20 19:05 KST이므로, 새 시각 기록과 provider 결과 검증은 해당 자동 재시도 이후 남아 있다.
+
+### 다음 개선
+- V156 운영 적용 후 다음 예약 재시도 결과에서 `last_attempt_at`, cache fetchedAt, 오류 분포를 확인한다. KIS 요청을 수동으로 유도하거나 전체 종목 갱신하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-20-013
+- 성과 판정: IMPROVED
+- 근거: 운영 데이터가 실패 시각 오염 경로와 일치했고, 전용 시각 보존 및 오판 방지 코드를 추가했다. 마이그레이션·테스트·운영 배포와 다음 실제 재시도 검증은 남아 있다.
+
+### 커밋·푸시·배포
+- 상태: 구현 배포 완료. 코드 커밋 `86ab175e`를 `oci`에 push했고 Deploy OCI workflow `39376235654` 성공, health·메인·charts HTTP 200 및 Flyway V156 적용을 확인했다. 레거시 실패 146건의 실제 재시도 검증은 다음 자동 실행 후 진행한다.
 
 ## [2026-10-20] 외부 RSS 번역 API 대상을 StockTitan 제목으로 제한
 
@@ -5892,4 +5924,3 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 상태: 검증 및 배포 진행 중.
-

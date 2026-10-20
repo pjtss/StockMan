@@ -4,9 +4,10 @@ import { refreshInstrumentFundamentals } from "@/lib/instrument-fundamentals";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
-import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { loadLatestExecutedAutomationRun, loadLatestInstrumentFundamentalBackoffSkip, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 export const runtime = "nodejs";
 const MAX_FUNDAMENTALS_RUNNING_SECONDS = 5 * 60 * 60;
+const MAX_BACKOFF_SCOPE_RECHECK_SECONDS = 60 * 60;
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("instrument-fundamentals");
@@ -28,6 +29,21 @@ export async function POST(request: Request) {
   if (elapsed != null && elapsed < retryIntervalSeconds) {
     await recordSkippedAutomationRun("instrument-fundamentals", latestStatus === "SUCCESS" ? "outside_interval" : "retry_cooldown", { intervalSeconds: retryIntervalSeconds, elapsedSeconds: elapsed, lastStatus: latestStatus });
     return NextResponse.json({ ok: true, skipped: true, reason: latestStatus === "SUCCESS" ? "outside_interval" : "retry_cooldown", intervalSeconds: retryIntervalSeconds, elapsedSeconds: elapsed, lastStatus: latestStatus });
+  }
+  const latestBackoffSkip = await loadLatestInstrumentFundamentalBackoffSkip().catch(() => null);
+  if (latestBackoffSkip) {
+    const backoffSkipStartedAt = new Date(latestBackoffSkip.started_at).getTime();
+    const nextRetryAt = new Date(latestBackoffSkip.next_retry_at).getTime();
+    const latestExecutionIsOlder = !Number.isFinite(latestStartedAt) || backoffSkipStartedAt >= latestStartedAt;
+    if (Number.isFinite(backoffSkipStartedAt) && Number.isFinite(nextRetryAt) && latestExecutionIsOlder && Date.now() < nextRetryAt) {
+      const recheckAt = Math.min(nextRetryAt, backoffSkipStartedAt + MAX_BACKOFF_SCOPE_RECHECK_SECONDS * 1000);
+      if (Date.now() < recheckAt) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((recheckAt - Date.now()) / 1000));
+        const nextRetryAtIso = new Date(nextRetryAt).toISOString();
+        await recordSkippedAutomationRun("instrument-fundamentals", "instrument_retry_backoff_cooldown", { nextRetryAt: nextRetryAtIso, retryAfterSeconds });
+        return NextResponse.json({ ok: true, skipped: true, reason: "instrument_retry_backoff_cooldown", nextRetryAt: nextRetryAtIso, retryAfterSeconds });
+      }
+    }
   }
   const result = await withAutomationRun("instrument-fundamentals", refreshInstrumentFundamentals);
   return NextResponse.json(result);

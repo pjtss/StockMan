@@ -30,7 +30,7 @@
 - nullable 필드는 snapshot upsert 시 기존 값을 `COALESCE`로 보존한다. 따라서 부분 응답의 null이 직전 정상값을 지우지 않는다.
 - 대상은 DB 질의 조건과 애플리케이션 eligibility 검사 양쪽에서 검증한다. 활성 상태·`COMMON_STOCK`·시장 분류 또는 제외 플래그를 신뢰할 수 없으면 provider 호출 전 제외한다.
 - 배치 내 history와 snapshot 저장은 하나의 DB 트랜잭션이다. 각 배치는 최대 3회 재시도하며 DB 오류가 지속되면 이후 배치 처리를 중단한다.
-- `instrument_fundamental_refresh_jobs/items`는 활성 보통주 대상 집합의 SHA-256 지문과 종목별 진행 상태를 저장한다. 재개 시 동일한 대상 집합의 `SUCCESS` 종목은 건너뛰고 `PENDING`·재시도 시각이 도래한 `FAILED`만 조회한다. provider 실패 재시도 간격은 해당 종목의 실패 횟수에 따라 1·2·4·8·24시간으로 증가하며 24시간에서 상한을 둔다. 성공 시 재시도 시각과 오류 코드를 지운다. 대상 집합이 바뀌면 기존 미완료 작업을 `ABANDONED` 처리하고 새 전체 작업을 만든다.
+- `instrument_fundamental_refresh_jobs/items`는 활성 보통주 대상 집합의 SHA-256 지문과 종목별 진행 상태를 저장한다. 재개 시 동일한 대상 집합의 `SUCCESS` 종목은 건너뛰고 `PENDING`·재시도 시각이 도래한 `FAILED`만 조회한다. provider 실패 재시도 간격은 해당 종목의 실패 횟수에 따라 1·2·4·8·24시간으로 증가하며 24시간에서 상한을 둔다. `last_attempt_at`은 provider 요청 결과를 진행 원장에 반영한 시각을 별도로 저장하고, 재개 중 종목명 동기화는 값이 달라진 종목에만 적용해 실패 시각을 건드리지 않는다. 성공 시 재시도 시각과 오류 코드를 지운다. 대상 집합이 바뀌면 기존 미완료 작업을 `ABANDONED` 처리하고 새 전체 작업을 만든다.
 - 종목이 `SUCCESS`로 표시되는 것은 해당 종목의 history/snapshot 쓰기가 같은 DB 트랜잭션에서 커밋된 경우뿐이다. DB 쓰기가 모두 실패하면 배치의 진행 표식도 롤백되므로 다음 실행이 안전하게 다시 조회한다. KIS 실패는 종목별 `FAILED`, DB 미시도는 `PENDING`으로 구분한다.
 - 상태 요약은 `progress.jobId`, `progress.resumed`, `progress.skippedCompletedCount`, 누적 성공/실패/미완료 건수를 제공한다. 자동화 실행 자체의 `attemptedCount`와 `successCount`는 이번 실행분이며, `progress.cumulativeSuccessCount`는 작업 전체 누적값이다.
 
@@ -38,6 +38,7 @@
 
 - `SUCCESS`: 대상 전체 저장 완료. 설정된 실행 간격 전에는 다시 실행하지 않는다.
 - `PARTIAL` / `FAILED`: 결과와 실제 저장 성공 건수를 구분해 기록한다. 실행은 최소 1시간 cooldown 뒤 재개될 수 있지만, 종목별 provider 실패는 개별 backoff 시각이 된 뒤에만 다시 KIS를 호출한다. 재시도 대상이 아직 없으면 실행을 `SKIPPED`로 기록하고 `nextRetryAt` 및 대기 종목 수를 요약에 남긴다. DB 미시도(PENDING)는 provider backoff를 적용하지 않아 기존 1시간 실행 재시도에서 회수한다.
+- `instrument_retry_backoff`가 기록된 뒤에는 해당 원장의 다음 KIS 재시도 시각 또는 마지막 backoff 관측 후 1시간 중 먼저 도래한 때까지 전체 보통주 universe 재조회/작업 재개를 제한한다. 전용 timer는 계속 5분마다 동작하지만 이 구간에는 소형 automation 이력 조회만 수행하고, 새 universe/보통주 변경 확인의 최대 지연은 1시간이다. 재시도 예정 시각 이후 첫 timer tick에서 재개하며, backoff 이력 조회가 실패하면 재시도를 지연하지 않고 기존 경로로 진행한다.
 - `SKIPPED`: 이미 실행 중인 작업의 advisory lock 획득 실패, 또는 모든 FAILED 종목의 재시도 시각이 아직 오지 않은 경우다. 성공으로 기록하지 않는다.
 - 최근 실행 상태 조회 실패 또는 timestamp가 잘못된 경우 안전한 중복방지 기준을 세울 수 없으므로 cron은 503으로 중단한다.
 - 이전 RUNNING이 2시간 이내면 일반 cron route에서 중복 호출하지 않고, Fundamentals route는 5시간 이내 실행을 활성 작업으로 취급한다. 실제 refresh 경로에는 PostgreSQL advisory lock도 적용한다. stale 판정 역시 일반 자동화는 2시간, Fundamentals는 5시간으로 분리해 다른 모듈이 장시간 정상 실행을 조기 실패 처리하지 않는다.
@@ -53,9 +54,11 @@ Vitest의 `lib/instrument-fundamentals.test.ts`, `lib/instrument-fundamental-pro
 
 운영에서 관리자 실행 이력의 상태와 요약을 확인한다. `PARTIAL`/`FAILED`이면 `failureCodeCountsByMarket`로 시장별 근본 원인 분포를 먼저 확인하고, `failureCodeCounts`로 전체 분포를 교차 검증한다. 이어 `unattemptedCount`, `databaseFailure`, 최대 100건의 실패 샘플을 확인한다. 성공 건수는 시도 수가 아니라 커밋된 snapshot 배치 행 수로 해석한다.
 
-최근 작업의 종목별 durable ledger는 관리자 세션 또는 `CRON_SECRET`으로 인증된 read-only `GET /api/debug/instrument-fundamentals`에서 확인한다. 응답은 최근 작업 1건의 대상/성공/실패/대기 및 재시도 가능·연기 건수, 시장·오류코드별 실패 집계, 재시도 예정시각, 실패 종목 최대 25개(종목코드·오류코드·횟수·시각)를 제공한다. `responseDiagnostics`는 실패 원장과 `us_price_detail_cache`를 대조하여 실패 전체(최대 500건)에 대해 캐시 존재/시각 근접도, HTTP 및 KIS 업무 코드, 선택된 output 구조, 현재 가격 alias 상태와 대체 alias의 양수 존재 여부를 집계한다. 종목 표본에는 각 output 후보의 허용된 가격·시총 필드 상태를 제공한다. 원시 KIS 응답, 숫자값, 자유형 메시지나 자격증명은 반환하지 않는다. 500건 초과 시 `truncated=true`이며 집계는 조회한 표본에 한정된다. 캐시가 실패 기록 시각과 10분 이내에 있지 않으면 당시 응답을 재현한다고 볼 수 없으므로 근거로 과신하지 않는다. 이 endpoint는 provider 호출이나 DB 쓰기를 하지 않는다. 자동화 실행 이력에 저장된 전체 오류 집계와 ledger 집계는 대상 job이 같을 때 대조한다.
+최근 작업의 종목별 durable ledger는 관리자 세션 또는 `CRON_SECRET`으로 인증된 read-only `GET /api/debug/instrument-fundamentals`에서 확인한다. 응답은 최근 작업 1건의 대상/성공/실패/대기 및 재시도 가능·연기 건수, 시장·오류코드별 실패 집계, 재시도 예정시각, 실패 종목 최대 25개(종목코드·오류코드·횟수·시각)를 제공한다. `responseDiagnostics`는 실패 원장과 `us_price_detail_cache`를 대조하여 실패 전체(최대 500건)에 대해 `last_attempt_at` 존재 여부 및 캐시 시각 근접도, HTTP 및 KIS 업무 코드, 선택된 output 구조, 현재 가격 alias 상태와 대체 alias의 양수 존재 여부를 집계한다. 실제 시도 시각이 없는 기존 레거시 실패는 `attemptTimeMissingCount`/`cacheTimingUnknownCount`로 분리하고 `updated_at`을 대용하지 않는다. 종목 표본에는 각 output 후보의 허용된 가격·시총 필드 상태를 제공한다. 원시 KIS 응답, 숫자값, 자유형 메시지나 자격증명은 반환하지 않는다. 500건 초과 시 `truncated=true`이며 집계는 조회한 표본에 한정된다. `last_attempt_at`이 확인된 항목에서만 캐시가 실패 시각과 10분 이내인지 판단한다. 이 endpoint는 provider 호출이나 DB 쓰기를 하지 않는다. 자동화 실행 이력에 저장된 전체 오류 집계와 ledger 집계는 대상 job이 같을 때 대조한다.
 
-2026-10-20 운영에서 가격/시총 실패 146건의 캐시는 전부 실패 시각과 10분 이상 떨어져 있었다. 따라서 저장된 캐시 값은 해당 실패 요청의 실제 응답을 증명하지 않는다. 정확한 원인 확인은 다음 예약 재시도에서 새로 기록되는 오류 및 신선한 캐시 증거로 수행하며, 진단을 위해 전체 갱신을 수동 실행하지 않는다.
+2026-10-20 운영에서 실패 원장 조회 시 146건 모두 retry가 연기된 상태였고, `updated_at`은 최근 재개 시각으로 바뀌어 있었다. 이는 재개 처리의 종목명 동기화가 내용이 동일해도 `updated_at`을 덮어쓰던 코드와 일치한다. V156부터 실제 시도 시각을 `last_attempt_at`에 별도 저장한다. 기존 실패 행은 원래 시도 시각을 복구할 증거가 없어 `last_attempt_at=NULL`로 남기며, API가 그 캐시를 실패 응답과 근접한 것으로 오판하지 않게 한다. 정확한 원인 확인은 다음 실제 예약 재시도 이후 수행하며, 진단을 위해 전체 갱신을 수동 실행하지 않는다.
+
+2026-10-20 16:10 KST 운영 `instrument-fundamentals` 실행 이력에서 `instrument_retry_backoff` SKIPPED가 5분마다 반복되어 있음을 확인했다. 각 no-op은 KIS 시도 0건이지만 6,704개 universe 재조회/원장 재개 경로에 1~14초를 사용했다. route가 실제 실행 이력의 cooldown만 확인하고 가장 최근 retry-backoff SKIPPED의 `nextRetryAt`은 사용하지 않는 것이 원인이었다. 개선 후 마지막 backoff skip부터 최대 1시간 또는 `nextRetryAt` 중 먼저 도래할 때까지 전체 refresh scope 재조회는 억제하고, 예정된 재시도와 시간 단위 universe 변경 감지는 유지한다.
 
 ## 남은 한계
 

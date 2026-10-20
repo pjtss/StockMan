@@ -6,13 +6,14 @@ const mocks = vi.hoisted(() => ({
   persistOutcome: vi.fn(),
   getArticleSnapshot: vi.fn(),
   supersede: vi.fn(),
+  skip: vi.fn(),
   loadWebhook: vi.fn(),
   loadDebugWebhook: vi.fn(),
   updateWhere: vi.fn(),
 }));
 
 const retrySnapshot = {
-  source: "NASDAQ",
+  source: "SEC_EDGAR",
   title: "Revenue rises",
   summary: "Raised guidance",
   translatedTitle: "매출 증가",
@@ -30,6 +31,7 @@ vi.mock("@/lib/discord-delivery-queue", () => ({
   markDiscordDeliverySending: mocks.markSending,
   getMarketRssDeliveryArticleSnapshot: mocks.getArticleSnapshot,
   markDiscordDeliverySuperseded: mocks.supersede,
+  markDiscordDeliverySkipped: mocks.skip,
   persistDiscordDeliveryOutcome: mocks.persistOutcome,
 }));
 vi.mock("@/lib/discord-config", () => ({
@@ -49,6 +51,7 @@ describe("Discord delivery retry worker", () => {
     mocks.persistOutcome.mockReset().mockResolvedValue(undefined);
     mocks.getArticleSnapshot.mockReset().mockResolvedValue(null);
     mocks.supersede.mockReset().mockResolvedValue(undefined);
+    mocks.skip.mockReset().mockResolvedValue(undefined);
     mocks.loadWebhook.mockReset().mockResolvedValue("https://discord.example/webhook");
     mocks.loadDebugWebhook.mockReset().mockResolvedValue("");
     mocks.claim.mockResolvedValue({ deliveries: [{
@@ -101,7 +104,7 @@ describe("Discord delivery retry worker", () => {
   it("requests Discord confirmation on retry and preserves the RSS translation review marker", async () => {
     const sourceTitle = "Nvidia Announces Quarterly Revenue Results";
     const rowSnapshot = {
-      source: "NASDAQ",
+      source: "SEC_EDGAR",
       title: sourceTitle,
       summary: "",
       translatedTitle: sourceTitle,
@@ -118,7 +121,7 @@ describe("Discord delivery retry worker", () => {
       translatedTitle: sourceTitle,
       link: "https://example.com/article",
       publishedAt: null,
-      source: "NASDAQ",
+      source: "SEC_EDGAR",
       translationFallback: false,
       translationStatus: "TRANSLATED",
       translationError: null,
@@ -161,7 +164,7 @@ describe("Discord delivery retry worker", () => {
       updatedAt: claimedAt,
     }], staleRecovered: 0, uncertain: 0 });
     mocks.getArticleSnapshot.mockResolvedValueOnce({
-      source: "NASDAQ",
+      source: "SEC_EDGAR",
       title: "Current source title",
       summary: "",
       translatedTitle: "현재 번역 제목",
@@ -186,7 +189,7 @@ describe("Discord delivery retry worker", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const snapshot = {
-      source: "NASDAQ",
+      source: "SEC_EDGAR",
       title: "Revenue rises",
       summary: "Raised guidance",
       translatedTitle: "매출 증가",
@@ -216,11 +219,24 @@ describe("Discord delivery retry worker", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("skips retries when the current RSS source is not allowlisted", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    mocks.getArticleSnapshot.mockResolvedValueOnce({ ...retrySnapshot, source: "NASDAQ" });
+
+    const result = await retryDiscordDeliveries();
+
+    expect(result).toMatchObject({ superseded: 1, sent: 0, failed: 0 });
+    expect(mocks.skip).toHaveBeenCalledWith(1, "source_not_allowed_for_discord", 10);
+    expect(mocks.markSending).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not send a snapshotted RSS retry when the article cannot be fetched for verification", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const snapshot = {
-      source: "NASDAQ",
+      source: "SEC_EDGAR",
       title: "Revenue rises",
       summary: "Raised guidance",
       translatedTitle: "매출 증가",

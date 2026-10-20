@@ -60,13 +60,17 @@ function summarizeCachedProviderResponse(row: Record<string, unknown>) {
     Object.values(candidate.priceFields).includes("POSITIVE"),
   );
   const fetchedAt = row.cached_fetched_at ? new Date(String(row.cached_fetched_at)).getTime() : NaN;
-  const failureUpdatedAt = row.updated_at ? new Date(String(row.updated_at)).getTime() : NaN;
-  const deltaMs = Number.isFinite(fetchedAt) && Number.isFinite(failureUpdatedAt) ? failureUpdatedAt - fetchedAt : NaN;
+  const lastAttemptAt = row.last_attempt_at ?? null;
+  const attemptTimeKnown = lastAttemptAt !== null && Number.isFinite(new Date(String(lastAttemptAt)).getTime());
+  const failureAttemptAt = attemptTimeKnown ? new Date(String(lastAttemptAt)).getTime() : NaN;
+  const deltaMs = Number.isFinite(fetchedAt) && Number.isFinite(failureAttemptAt) ? failureAttemptAt - fetchedAt : NaN;
 
   return {
     cacheFound: row.cached_parsed != null,
     cacheStatus: row.cached_status == null ? null : numeric(row.cached_status),
     cacheFetchedAt: row.cached_fetched_at ?? null,
+    lastAttemptAt,
+    attemptTimeKnown,
     cacheNearFailure: Number.isFinite(deltaMs) && Math.abs(deltaMs) <= 10 * 60_000,
     rtCd: safeProviderCode(parsed?.rt_cd) ?? "UNKNOWN",
     messageCode: safeProviderCode(parsed?.msg_cd) ?? "UNKNOWN",
@@ -140,7 +144,8 @@ export async function loadInstrumentFundamentalRefreshDebug() {
       `SELECT item.market, item.code, COALESCE(item.last_error_code, 'UNKNOWN_ERROR') AS error_code,
               item.attempt_count, item.next_attempt_at, item.updated_at,
               COUNT(*) OVER()::int AS total_failed_count,
-              cache.status AS cached_status, cache.parsed AS cached_parsed, cache.fetched_at AS cached_fetched_at
+              item.last_attempt_at, cache.status AS cached_status,
+              cache.parsed AS cached_parsed, cache.fetched_at AS cached_fetched_at
          FROM instrument_fundamental_refresh_items AS item
          LEFT JOIN us_price_detail_cache AS cache
            ON cache.market = item.market AND cache.code = item.code
@@ -162,8 +167,9 @@ export async function loadInstrumentFundamentalRefreshDebug() {
     let group = responseDiagnosticGroups.get(key);
     if (!group) {
       group = {
-        market, errorCode, failureCount: 0, cacheFoundCount: 0, cacheNearFailureCount: 0,
-        cacheMissingOrOldCount: 0, alternativePositivePriceCount: 0,
+        market, errorCode, failureCount: 0, cacheFoundCount: 0, attemptTimeKnownCount: 0,
+        attemptTimeMissingCount: 0, cacheNearFailureCount: 0, cacheMissingOrOldCount: 0,
+        cacheTimingUnknownCount: 0, alternativePositivePriceCount: 0,
         cacheStatusCounts: {} as Record<string, number>, rtCdCounts: {} as Record<string, number>,
         messageCodeCounts: {} as Record<string, number>, outputKeyCounts: {} as Record<string, number>,
         outputShapeCounts: {} as Record<string, number>, selectedPriceStateCounts: {} as Record<string, number>,
@@ -174,8 +180,14 @@ export async function loadInstrumentFundamentalRefreshDebug() {
     }
     group.failureCount = numeric(group.failureCount) + 1;
     if (provider.cacheFound) group.cacheFoundCount = numeric(group.cacheFoundCount) + 1;
-    if (provider.cacheNearFailure) group.cacheNearFailureCount = numeric(group.cacheNearFailureCount) + 1;
-    else group.cacheMissingOrOldCount = numeric(group.cacheMissingOrOldCount) + 1;
+    if (provider.attemptTimeKnown) {
+      group.attemptTimeKnownCount = numeric(group.attemptTimeKnownCount) + 1;
+      if (provider.cacheNearFailure) group.cacheNearFailureCount = numeric(group.cacheNearFailureCount) + 1;
+      else group.cacheMissingOrOldCount = numeric(group.cacheMissingOrOldCount) + 1;
+    } else {
+      group.attemptTimeMissingCount = numeric(group.attemptTimeMissingCount) + 1;
+      group.cacheTimingUnknownCount = numeric(group.cacheTimingUnknownCount) + 1;
+    }
     if (provider.alternativePositivePrice) group.alternativePositivePriceCount = numeric(group.alternativePositivePriceCount) + 1;
     incrementCount(group.cacheStatusCounts as Record<string, number>, String(provider.cacheStatus ?? "MISSING"));
     incrementCount(group.rtCdCounts as Record<string, number>, String(provider.rtCd));
@@ -232,6 +244,7 @@ export async function loadInstrumentFundamentalRefreshDebug() {
       attemptCount: numeric(row.attempt_count),
       nextAttemptAt: row.next_attempt_at ?? null,
       updatedAt: row.updated_at ?? null,
+      lastAttemptAt: row.last_attempt_at ?? null,
       providerResponse: summarizeCachedProviderResponse(row),
     })),
   };
