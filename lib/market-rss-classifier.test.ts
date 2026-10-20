@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { classifyMarketRssItem } from "./market-rss-classifier";
+import { parseMarketRss } from "./market-rss";
 
 describe("market RSS classifier", () => {
+  it("classifies an XML-decoded S&P market headline using the canonical parser output", () => {
+    const feed = parseMarketRss('<rss><channel><item><guid>sp500-story</guid><title>S&amp;P 500 rallies</title><link>https://example.com/sp500</link></item></channel></rss>', "NASDAQ", "https://example.com/feed");
+
+    expect(feed.items[0].title).toBe("S&P 500 rallies");
+    expect(classifyMarketRssItem(feed.items[0])).toMatchObject({ category: "MARKET", priority: 10, notifyEligible: false });
+  });
+
   it("suppresses earnings transcript noise", () => {
     expect(classifyMarketRssItem({ source: "NASDAQ", title: "ACME (ACM) Q2 2026 Earnings Call Transcript" })).toMatchObject({ category: "TRANSCRIPT", notifyEligible: false, priority: 0 });
   });

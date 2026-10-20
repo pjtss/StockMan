@@ -235,4 +235,72 @@ describe("KIS token lifecycle", () => {
     const stored = database.row!;
     expect(stored.expires_at.getTime() - stored.issued_at.getTime()).toBe(24 * 60 * 60 * 1000);
   });
+
+  it("coalesces concurrent refreshes for one rejected token and persists one replacement", async () => {
+    database.setRow({
+      access_token: "rejected-token",
+      issued_at: new Date("2026-07-10T03:00:00.000Z"),
+      expires_at: new Date("2026-07-12T03:00:00.000Z"),
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        access_token: "replacement-token",
+        access_token_token_expired: "2026-07-12 12:00:00",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { refreshAccessToken } = await import("./kis-token");
+    const results = await Promise.all([
+      refreshAccessToken("rejected-token"),
+      refreshAccessToken("rejected-token"),
+      refreshAccessToken("rejected-token"),
+    ]);
+
+    expect(results).toEqual(["replacement-token", "replacement-token", "replacement-token"]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(database.row?.access_token).toBe("replacement-token");
+  });
+
+  it("reuses a replacement committed by another worker instead of issuing another token", async () => {
+    database.setRow({
+      access_token: "rejected-token",
+      issued_at: new Date("2026-07-10T03:00:00.000Z"),
+      expires_at: new Date("2026-07-12T03:00:00.000Z"),
+    });
+    database.setLockedRow({
+      access_token: "other-worker-token",
+      issued_at: new Date("2026-07-11T02:59:00.000Z"),
+      expires_at: new Date("2026-07-12T02:59:00.000Z"),
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { refreshAccessToken } = await import("./kis-token");
+
+    await expect(refreshAccessToken("rejected-token")).resolves.toBe("other-worker-token");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("backs off token issuance after a failed refresh instead of retrying on every caller", async () => {
+    database.setRow({
+      access_token: "rejected-token",
+      issued_at: new Date("2026-07-10T03:00:00.000Z"),
+      expires_at: new Date("2026-07-12T03:00:00.000Z"),
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: async () => "token issuance rate limit",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getAccessToken, refreshAccessToken } = await import("./kis-token");
+
+    await expect(refreshAccessToken("rejected-token")).resolves.toBeNull();
+    const results = await Promise.all([getAccessToken(), getAccessToken(), getAccessToken()]);
+    expect(results).toEqual([null, null, null]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

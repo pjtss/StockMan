@@ -3,8 +3,6 @@ import { fetchDartFeed } from "./rss";
 import type { AlertItem, DartItem, FeedPayload } from "./types";
 import { minutesAgo } from "./utils";
 
-export { getTodaySecBullishFeed, syncSecAlerts } from "./sec-alerts";
-
 const DART_BULLISH_LEVELS = ["최강호재", "호재가능"];
 /*
 function toPublishedDateSeoul(value: string): string {

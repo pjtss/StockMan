@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { instrumentFundamentalHistory, instrumentFundamentalSnapshots, krCommonStockUniverse, usCommonStockUniverse } from "@/lib/schema";
 import { fetchKrPriceDetail } from "@/lib/kis-kr-price-detail";
-import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput } from "@/lib/kis-us-price-detail";
+import { fetchKisUsPriceDetail, getKisUsPriceDetailOutput, getKisUsPriceDetailPrice, getKisUsPriceDetailShares, getKisUsPriceDetailTradingValue } from "@/lib/kis-us-price-detail";
 import { withAutomationLock } from "@/lib/automation-lock";
 import { safeErrorMetadata, safeProviderCode } from "@/lib/error-diagnostics";
 import { beginFundamentalRefresh, finishFundamentalRefresh, markFundamentalBatchInTransaction } from "@/lib/instrument-fundamental-progress";

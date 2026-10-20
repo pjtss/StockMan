@@ -3,6 +3,9 @@ export type CandidateState = { market: string; code: string; priority: number; l
 export type VwapState = { sessionDate: string; cumulativeVolume: number; cumulativeTradingValue: number; vwap: number; lastTradeAt: number };
 export type TopRisingItem = { market: string; code: string; name?: string; rank?: number; rate?: number; volume?: number; tradingValue?: number };
 export const INTRADAY_MVP_POLICY = Object.freeze({ windowMs: 5 * 60_000, threshold: 0.05, requiredSamples: 5, bucketMs: 60_000 });
+export const ROLLING_TURNOVER_RETENTION_MINUTES = 10;
+const TURNOVER_BUCKET_MS = 60_000;
+export type RollingTurnoverWindow = { minutes: number; tradingValue: number | null; turnoverRatio: number | null; sampleCount: number; requiredSamples: number; complete: boolean; windowStart: number | null; windowEnd: number | null };
 
 export class IntradayMemoryState {
   private readonly snapshots = new Map<string, Map<string, TopRisingItem>>();
@@ -23,21 +26,39 @@ export class IntradayMemoryState {
   removeCandidate(market: string, code: string) { const key = this.key(market, code); this.candidates.delete(key); this.vwap.delete(key); this.rollingTurnover.delete(key); this.rollingTurnoverTotals.delete(key); this.rollingTurnoverSession.delete(key); }
   recordRollingTurnover(market: string, code: string, sessionDate: string, bucketAt: number, tradingValue: number, marketCap: number, windowMs: number = INTRADAY_MVP_POLICY.windowMs, threshold: number = INTRADAY_MVP_POLICY.threshold) {
     const key = this.key(market, code);
-    bucketAt = Number.isFinite(bucketAt) ? Math.floor(bucketAt / 60_000) * 60_000 : Date.now();
+    bucketAt = Number.isFinite(bucketAt) ? Math.floor(bucketAt / TURNOVER_BUCKET_MS) * TURNOVER_BUCKET_MS : Date.now();
     if (this.rollingTurnoverSession.get(key) !== sessionDate) { this.rollingTurnover.delete(key); this.rollingTurnoverTotals.delete(key); this.rollingTurnoverSession.set(key, sessionDate); }
     const buckets = this.rollingTurnover.get(key) ?? new Map<number, number>();
     this.rollingTurnover.set(key, buckets);
     if (Number.isFinite(bucketAt) && tradingValue >= 0) { const previous = buckets.get(bucketAt); buckets.set(bucketAt, tradingValue); this.rollingTurnoverTotals.set(key, (this.rollingTurnoverTotals.get(key) ?? 0) - (previous ?? 0) + tradingValue); }
-    const cutoff = bucketAt - windowMs + 60_000;
+    const newestBucket = Math.max(bucketAt, ...buckets.keys());
+    const cutoff = newestBucket - (ROLLING_TURNOVER_RETENTION_MINUTES - 1) * TURNOVER_BUCKET_MS;
     for (const [timestamp, value] of buckets) if (timestamp < cutoff) { buckets.delete(timestamp); this.rollingTurnoverTotals.set(key, (this.rollingTurnoverTotals.get(key) ?? 0) - value); }
     const entries = [...buckets.entries()].sort(([a], [b]) => a - b);
-    const total = this.rollingTurnoverTotals.get(key) ?? 0;
+    const activeCutoff = newestBucket - windowMs + TURNOVER_BUCKET_MS;
+    const activeEntries = entries.filter(([timestamp]) => timestamp >= activeCutoff && timestamp <= newestBucket);
+    const total = activeEntries.reduce((sum, [, value]) => sum + value, 0);
     const ratio = marketCap > 0 ? total / marketCap : null;
     const candidate = this.getCandidate(market, code);
-    if (!candidate) return { sessionDate, windowStart: entries[0]?.[0] ?? bucketAt, windowEnd: bucketAt, sampleCount: entries.length, tradingValue: total, ratio, qualified: ratio != null && entries.length >= 5 && ratio >= threshold };
-    const qualified = ratio != null && entries.length >= 5 && ratio >= threshold;
-    this.candidates.set(key, { ...candidate, rollingTurnoverValue: total, rollingTurnoverRatio: ratio ?? undefined, turnoverWindowStart: entries[0]?.[0] ?? bucketAt, turnoverWindowEnd: bucketAt, mvpQualified: qualified });
-    return { sessionDate, windowStart: entries[0]?.[0] ?? bucketAt, windowEnd: bucketAt, sampleCount: entries.length, tradingValue: total, ratio, qualified };
+    const requiredSamples = Math.max(1, Math.ceil(windowMs / TURNOVER_BUCKET_MS));
+    const qualified = ratio != null && activeEntries.length >= requiredSamples && ratio >= threshold;
+    const windowStart = activeEntries[0]?.[0] ?? newestBucket;
+    if (!candidate) return { sessionDate, windowStart, windowEnd: newestBucket, sampleCount: activeEntries.length, retainedSampleCount: entries.length, tradingValue: total, ratio, qualified };
+    this.candidates.set(key, { ...candidate, rollingTurnoverValue: total, rollingTurnoverRatio: ratio ?? undefined, turnoverWindowStart: windowStart, turnoverWindowEnd: newestBucket, mvpQualified: qualified });
+    return { sessionDate, windowStart, windowEnd: newestBucket, sampleCount: activeEntries.length, retainedSampleCount: entries.length, tradingValue: total, ratio, qualified };
+  }
+  getRollingTurnoverWindows(market: string, code: string, marketCap?: number | null): RollingTurnoverWindow[] {
+    const entries = [...(this.rollingTurnover.get(this.key(market, code))?.entries() ?? [])].sort(([a], [b]) => a - b);
+    const end = entries.at(-1)?.[0] ?? null;
+    return Array.from({ length: ROLLING_TURNOVER_RETENTION_MINUTES }, (_, index) => {
+      const minutes = index + 1;
+      if (end === null) return { minutes, tradingValue: null, turnoverRatio: null, sampleCount: 0, requiredSamples: minutes, complete: false, windowStart: null, windowEnd: null };
+      const start = end - (minutes - 1) * TURNOVER_BUCKET_MS;
+      const windowEntries = entries.filter(([timestamp]) => timestamp >= start && timestamp <= end);
+      const complete = windowEntries.length === minutes && windowEntries.every(([timestamp], entryIndex) => timestamp === start + entryIndex * TURNOVER_BUCKET_MS);
+      const value = windowEntries.reduce((sum, [, amount]) => sum + amount, 0);
+      return { minutes, tradingValue: complete ? value : null, turnoverRatio: complete && marketCap != null && marketCap > 0 ? value / marketCap : null, sampleCount: windowEntries.length, requiredSamples: minutes, complete, windowStart: complete ? start : windowEntries[0]?.[0] ?? null, windowEnd: end };
+    });
   }
   updateVwap(market: string, code: string, sessionDate: string, volume: number, tradingValue: number, lastTradeAt = Date.now()) { const key = this.key(market, code); const previous = this.vwap.get(key); const state = previous?.sessionDate === sessionDate ? { ...previous, cumulativeVolume: previous.cumulativeVolume + volume, cumulativeTradingValue: previous.cumulativeTradingValue + tradingValue, lastTradeAt } : { sessionDate, cumulativeVolume: volume, cumulativeTradingValue: tradingValue, vwap: volume > 0 ? tradingValue / volume : 0, lastTradeAt }; state.vwap = state.cumulativeVolume > 0 ? state.cumulativeTradingValue / state.cumulativeVolume : 0; this.vwap.set(key, state); return state; }
   getVwap(market: string, code: string) { return this.vwap.get(this.key(market, code)); }

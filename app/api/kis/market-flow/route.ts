@@ -133,7 +133,7 @@ async function handleGet(request: Request) {
   if (url.searchParams.get("mode") === "price-detail") {
     const result = await fetchKrPriceDetail(rawCode);
     if (!result) return NextResponse.json({ ok: false, error: "KIS_TOKEN_UNAVAILABLE", source: "KIS", market: "KR", code: rawCode }, { status: 503 });
-    const row = { price: result.price, volume: result.volume, tradingValue: result.tradingValue, marketCap: result.marketCap, sharesOutstanding: result.sharesOutstanding, turnoverRatio: result.turnoverRatio, changeRate: result.changeRate, productMarket: result.productMarket, productName: result.productName };
+    const row = { price: result.price, volume: result.volume, tradingValue: result.tradingValue, marketCap: result.marketCap, listedShares: result.listedShares, turnoverRatio: result.turnoverRatio, changeRate: result.changeRate, productMarket: result.productMarket, productName: result.productName };
     await writeKisSignalSnapshot({ market: "KR", code: rawCode, signalType: "kr_price_detail", status: result.ok ? "AVAILABLE" : "UNAVAILABLE", payload: [row], rawPayload: result.rawText });
     return NextResponse.json({ ok: result.ok, source: "KIS", market: "KR", code: rawCode, instrument: { code: rawCode, name: company }, mode: "price-detail", rows: [row], flowStatus: result.ok ? "AVAILABLE" : "UNAVAILABLE", collectedAt: new Date().toISOString() }, { status: result.ok ? 200 : 502 });
   }

@@ -9,7 +9,7 @@ import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDi
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { loadChartLibrary } from "@/lib/chart-library";
 
-type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; summary?: string | null; translatedSummary?: string | null; link: string; publishedAt: string | null; source: string; translationStatus?: string | null };
+type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; summary?: string | null; link: string; publishedAt: string | null; source: string; translationStatus?: string | null };
 type FlowResponse = { ok: boolean; source?: string; mode?: string; flowStatus?: string; collectedAt?: string; rows?: Array<Record<string, unknown>>; note?: string; instrumentDetail?: Record<string, unknown> };
 type RatioResponse = { ok: boolean; rows?: Array<Record<string, unknown>>; collectedAt?: string };
 type RatioType = "financial" | "growth" | "profit" | "stability" | "balance-sheet" | "income-statement" | "other-major";
@@ -204,7 +204,7 @@ function NewsPanel({ items, loading, error }: { items: StockTitanNewsItem[]; loa
   if (loading) return <div className={styles.chartLoading}>RSS·공시 뉴스를 불러오는 중…</div>;
   if (error) return <div className={styles.error}>{error}</div>;
   if (!items.length) return <div className={styles.empty}>저장된 RSS·공시 뉴스가 없습니다.</div>;
-  return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.source} · {item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}{(item.translatedSummary || item.summary) && <p>{item.translatedSummary || item.summary}</p>}</article>)}</div>;
+  return <div className={styles.newsList}>{items.map((item) => <article className={styles.newsItem} key={item.id}><time>{item.source} · {item.publishedAt ? formatDisplayDateTime(item.publishedAt) : "미확인"}</time><a href={item.link} target="_blank" rel="noreferrer">{item.translatedTitle || item.title}</a>{item.translatedTitle && item.translatedTitle !== item.title && <small>{item.title}</small>}{item.summary && <p><small>원문 요약 · 미번역</small><br />{item.summary}</p>}</article>)}</div>;
 }
 
 function KISFlowPanel({ data, loading, error, isUs, mode, onModeChange, realtimeStatus }: { data: FlowResponse | null; loading: boolean; error: string | null; isUs: boolean; mode: FlowMode; onModeChange: (mode: FlowMode) => void; realtimeStatus: "connecting" | "connected" | "unavailable" | "closed" }) {
@@ -431,7 +431,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     const exchangeQuery = isUsChart && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
     const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}${exchangeQuery}${queryMode === "minute" ? `&minute=${minute}&count=120` : ""}`, { cache: "no-store" }).then(async (response) => { const body = await readJsonResponse<FlowResponse & { error?: string }>(response); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; });
     const detailRequest = isUsChart ? Promise.resolve(null) : fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=KR&mode=price-detail`, { cache: "no-store" }).then(async (response) => response.ok ? await readJsonResponse<FlowResponse>(response) : null);
-    Promise.all([flowRequest, detailRequest]).then(([body, detail]) => { if (!cancelled) { const detailRow = detail?.rows?.[0]; const flowRows = body.rows ?? []; const labeledDetail = detailRow ? { "발행·상장주수 (유통주식수 아님)": detailRow.sharesOutstanding, ...detailRow } : null; const rows = labeledDetail ? (flowRows.length ? [labeledDetail ? { ...labeledDetail, ...flowRows[0] } : flowRows[0], ...flowRows.slice(1)] : [labeledDetail]) : flowRows; setFlow({ ...body, rows, instrumentDetail: detailRow }); } }).catch((e: Error) => { if (!cancelled) setFlowError(e.message); }).finally(() => { if (!cancelled) setFlowLoading(false); });
+    Promise.all([flowRequest, detailRequest]).then(([body, detail]) => { if (!cancelled) { const detailRow = detail?.rows?.[0]; const flowRows = body.rows ?? []; const labeledDetail = detailRow ? { "KIS 상장주수": detailRow.listedShares, ...detailRow } : null; const rows = labeledDetail ? (flowRows.length ? [labeledDetail ? { ...labeledDetail, ...flowRows[0] } : flowRows[0], ...flowRows.slice(1)] : [labeledDetail]) : flowRows; setFlow({ ...body, rows, instrumentDetail: detailRow }); } }).catch((e: Error) => { if (!cancelled) setFlowError(e.message); }).finally(() => { if (!cancelled) setFlowLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, code, company, exchange, isUsChart, flowMode, flowRefreshKey]);
 

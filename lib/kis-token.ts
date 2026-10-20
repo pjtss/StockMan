@@ -24,6 +24,9 @@ type TokenIssueReason = "expired" | "explicit_auth_refresh";
 
 let cachedToken: StoredKisToken | null = null;
 let tokenRequestPromise: Promise<string | null> | null = null;
+let tokenRefreshPromise: Promise<string | null> | null = null;
+let rejectedAccessToken: string | null = null;
+let tokenIssueRetryAfter = 0;
 
 function safeProviderCode(value: unknown) {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
@@ -154,12 +157,12 @@ async function requestNewToken(): Promise<StoredKisToken | null> {
   };
 }
 
-async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
+async function loadOrIssueToken(reason: TokenIssueReason = "expired", rejectedToken: string | null = null) {
   let pool: ReturnType<typeof getPool>;
   try {
     pool = getPool();
     const stored = await readStoredToken((sql, values) => pool.query(sql, values));
-    if (stored && canReuseToken(stored, new Date())) {
+    if (stored && stored.accessToken !== rejectedToken && canReuseToken(stored, new Date())) {
       cachedToken = stored;
       return stored.accessToken;
     }
@@ -174,15 +177,27 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [TOKEN_LOCK_KEY]);
 
     const storedAfterLock = await readStoredToken((sql, values) => client.query(sql, values));
-    if (storedAfterLock && canReuseToken(storedAfterLock, new Date())) {
+    if (storedAfterLock && storedAfterLock.accessToken !== rejectedToken && canReuseToken(storedAfterLock, new Date())) {
       await client.query("COMMIT");
       cachedToken = storedAfterLock;
       return storedAfterLock.accessToken;
     }
 
+    if (rejectedToken && storedAfterLock?.accessToken === rejectedToken) {
+      await client.query("DELETE FROM kis_tokens WHERE id = 1 AND access_token = $1", [rejectedToken]);
+    }
+
+    if (tokenIssueRetryAfter > Date.now()) {
+      await client.query("COMMIT");
+      return null;
+    }
+
     const issued = await requestNewToken();
     if (!issued) {
-      await client.query("ROLLBACK");
+      // KIS token issuance is limited to once per minute. Keep concurrent
+      // callers from turning one failed refresh into a token-endpoint storm.
+      tokenIssueRetryAfter = Date.now() + 60_000;
+      await client.query("COMMIT");
       return null;
     }
 
@@ -207,6 +222,8 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
     await client.query("COMMIT");
 
     cachedToken = issued;
+    rejectedAccessToken = null;
+    tokenIssueRetryAfter = 0;
     console.info("[KIS] Access token issued and persisted:", {
       issuedAt: issued.issuedAt.toISOString(),
       expiresAt: issued.expiresAt.toISOString(),
@@ -223,35 +240,39 @@ async function loadOrIssueToken(reason: TokenIssueReason = "expired") {
 
 export async function getAccessToken(): Promise<string | null> {
   const now = new Date();
-  if (cachedToken && canReuseToken(cachedToken, now)) {
+  if (cachedToken && cachedToken.accessToken !== rejectedAccessToken && canReuseToken(cachedToken, now)) {
     return cachedToken.accessToken;
   }
 
   if (!tokenRequestPromise) {
-    tokenRequestPromise = loadOrIssueToken("expired").finally(() => {
+    tokenRequestPromise = loadOrIssueToken("expired", rejectedAccessToken).finally(() => {
       tokenRequestPromise = null;
     });
   }
   return tokenRequestPromise;
 }
 
-export async function refreshAccessToken(): Promise<string | null> {
-  cachedToken = null;
-  // This path is reserved for an explicit KIS AUTH/401 failure. Remove the
-  // shared DB token so loadOrIssueToken cannot immediately reuse the invalid
-  // credential from another process.
-  await clearTokenCache();
-  if (!tokenRequestPromise) {
-    tokenRequestPromise = loadOrIssueToken("explicit_auth_refresh").finally(() => {
-      tokenRequestPromise = null;
-    });
-  }
-  return tokenRequestPromise;
+export function refreshAccessToken(rejectedToken: string): Promise<string | null> {
+  const invalidToken = rejectedToken.trim();
+  if (!invalidToken) return getAccessToken();
+  if (tokenRefreshPromise) return tokenRefreshPromise;
+
+  rejectedAccessToken = invalidToken;
+  if (cachedToken?.accessToken === invalidToken) cachedToken = null;
+
+  const request = loadOrIssueToken("explicit_auth_refresh", invalidToken);
+  tokenRequestPromise = request;
+  tokenRefreshPromise = request.finally(() => {
+    if (tokenRequestPromise === request) tokenRequestPromise = null;
+    tokenRefreshPromise = null;
+  });
+  return tokenRefreshPromise;
 }
 
 export async function clearTokenCache() {
   cachedToken = null;
-  tokenRequestPromise = null;
+  rejectedAccessToken = null;
+  tokenIssueRetryAfter = 0;
 
   const client = await getPool().connect();
   try {

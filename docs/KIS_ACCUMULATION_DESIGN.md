@@ -6,7 +6,7 @@ KIS Open API는 매집 여부를 직접 판정하지 않는다. 따라서 KIS를
 
 - 인증·토큰: 기존 \`lib/kis-token.ts\` 단일 모듈
 - 국내 수집: 기존 \`lib/kis.ts\` 및 국내 기간별 시세 경로
-- 해외 수집: 기존 \`lib/kis-us.ts\` 및 해외 기간별 시세 경로
+- 해외 수집: 기존 \`lib/kis-us-api.ts\` 및 해외 기간별 시세 경로
 - 저장: 기존 국내·해외 일봉 캐시와 원본 응답 스냅샷
 - 판정: \`lib/accumulation-screener-core.ts\`
 - 시장별 DB 조회: \`lib/accumulation-repository.ts\`

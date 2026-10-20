@@ -42,6 +42,8 @@ export function describeError(error: unknown): ErrorDiagnostics {
             ? "DATABASE_NOT_NULL_VIOLATION"
             : databaseCode === "57014"
               ? "DATABASE_QUERY_TIMEOUT"
+              : databaseCode === "21000"
+                ? "DATABASE_CARDINALITY_VIOLATION"
       : databaseCode === "ECONNREFUSED" || databaseCode === "ENOTFOUND" || databaseCode === "ETIMEDOUT"
         ? "DATABASE_CONNECTION_FAILED"
         : /Discord.*HTTP\s+429/i.test(allMessages)

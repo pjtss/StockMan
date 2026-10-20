@@ -219,6 +219,13 @@ instrument_sync_runs
 
 ## 11. 운영 결정 사항
 
+### 11.1 KIS domestic master parser offsets and partition moves (2026-09-25)
+
+- Read KOSPI/KOSDAQ fixed-width fields by byte offsets. Verified status offsets: KOSPI `trht/sltr/mang=121/122/123`, KOSDAQ `116/117/118`; ETP and preferred offsets are maintained in `lib/instrument-universe-import.ts` and `docs/references/kis-instrument-masters/header-definitions.md`.
+- KOSPI security group `EN` is an ETN and is excluded from the common-stock scanner universe.
+- If a ticker changes between common and special, disable its row in the opposite partition in the same import. This prevents stale rows from remaining enabled in both tables.
+- Validate expected market row counts and known normal common-stock flags before applying a whole-master refresh.
+
 1. KIS 종목 정보 파일을 국내·해외 유니버스의 공식 원본으로 사용한다.
 2. KIS 지원 목록 밖의 해외 종목은 별도 출처 검토 없이는 추가하지 않는다.
 3. ETF·파생상품은 원본 payload에 보존할 수 있지만 공통 탐지 대상에서는 제외한다.
@@ -264,6 +271,15 @@ AMSMST.COD
 ```
 
 일·주·월봉 캐시와 탐지 API는 신규 유니버스를 직접 사용한다. 적재 결과는 `instrument_universe_sync_runs`에 기록하고, 진단 API에서 원본·분류·건수를 함께 검증한다.
+
+### 전체 마스터 동기화의 누락 티커 수명주기
+
+- 5개 필수 원본 파일이 모두 읽히고 파싱 결과가 비어 있지 않을 때만 전체 마스터 동기화를 진행한다. 한 파일이라도 누락·빈 파일이면 활성 상태나 `missing_runs`를 변경하지 않는다.
+- 마스터에 다시 나타난 티커는 upsert 시 `enabled=true`, `missing_runs=0`으로 복구한다.
+- 정상 완료된 전체 마스터에서 처음 빠진 티커는 `missing_runs=1`로 남겨 유예한다. 다음 정상 완료 마스터에서도 빠지면 `missing_runs=2`, `enabled=false`로 전환한다. 가격·캔들·재무 이력은 삭제하지 않는다.
+- 처리가 실패한 run은 누락 횟수를 올리지 않는다. run 이력에는 비활성화한 행 수를 `deactivated_count`에 기록한다.
+- 단일 프로세스 내 중복 import 실행은 거절한다. 운영 배포가 다중 인스턴스로 바뀌면 이 보호를 DB 분산 잠금으로 대체하기 전까지 마스터 동기화 배포를 허용하지 않는다.
+- 현재 importer는 파싱 전체를 먼저 확인하고 모든 upsert가 성공한 뒤에만 누락 횟수를 갱신한다. 중간 DB 오류가 나면 앞서 커밋된 upsert 배치는 남을 수 있으나, run은 실패로 표시되고 누락 티커는 비활성화되지 않는다. 재시도는 멱등 upsert로 수렴한다.
 
 ## 12. 공식 참고
 

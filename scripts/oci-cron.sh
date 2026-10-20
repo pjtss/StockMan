@@ -61,6 +61,8 @@ run_cron_endpoint "discord-delivery-retry" 50 "/api/cron/discord-delivery-retry"
 # Run the news ingestion before long-running market-data refreshes. A delayed
 # candle job must not prevent RSS from being collected during the same cycle.
 run_cron_endpoint "market-rss" 180 "/api/cron/market-rss"
+run_cron_endpoint "fda-calendar" 120 "/api/cron/fda-calendar"
+run_cron_endpoint "earnings-calendar" 120 "/api/cron/earnings-calendar"
 
 run_cron_endpoint "sync-filings" 50 "/api/cron/sync-filings"
 # sync-filings is DART-only. SEC EDGAR RSS is handled by market-rss below,

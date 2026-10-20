@@ -17,7 +17,7 @@ export function accumulationCandles(count = 65): AccumulationCandle[] {
   return candles;
 }
 export function accumulationInstrument(code = "AAA", market = "NAS"): AccumulationInstrument {
-  return { market, code, name: "테스트 " + code, marketCap: 40000000000, sharesOutstanding: null,
+  return { market, code, name: "테스트 " + code, marketCap: 40000000000, listedShares: null,
     fundamentalUpdatedAt: null, candles: accumulationCandles() };
 }
 export const accumulationAsOf = new Date("2026-09-06T00:00:00Z");

@@ -5,7 +5,7 @@
 ## 연결·저장 원칙
 
 ```text
-KIS / SEC / DART / RSS
+KIS / DART / RSS
         ↓
 lib/* client·parser
         ↓

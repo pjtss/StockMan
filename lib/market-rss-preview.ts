@@ -2,19 +2,20 @@ import { classifyMarketRssItem } from "@/lib/market-rss-classifier";
 import { getMarketRssGrade } from "@/lib/market-rss-grade";
 import { translateMarketRssItems } from "@/lib/translate-market-rss-item";
 import type { MarketRssFeed } from "@/lib/market-rss";
+import type { TranslationClient } from "@/lib/translation-types";
 
 export type MarketRssFetchResult =
   | { source: string; ok: true; feed: MarketRssFeed }
   | { source: string; ok: false; error: string };
 
-export async function previewMarketRssResults(results: MarketRssFetchResult[], translate = false) {
+export async function previewMarketRssResults(results: MarketRssFetchResult[], translate = false, client?: TranslationClient) {
   const preview = [];
   for (const result of results) {
     if (!result.ok) {
       preview.push(result);
       continue;
     }
-    const items = translate ? await translateMarketRssItems(result.feed.items) : result.feed.items;
+    const items = translate ? await translateMarketRssItems(result.feed.items, client) : result.feed.items;
     const articles = items.map((item) => {
       const classification = classifyMarketRssItem(item);
       return {

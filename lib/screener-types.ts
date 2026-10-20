@@ -28,7 +28,7 @@ export type ScreenerResult = {
   name: string;
   status: string;
   marketCap: number | null;
-  sharesOutstanding: number | null;
+  listedShares: number | null;
   currency: string | null;
   candleDate: string;
   candleFetchedAt: string;

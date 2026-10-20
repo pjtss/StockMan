@@ -54,7 +54,7 @@
 | 해외 시가총액 | 해외주식 규모·유동성 필터 | `/api/kis/us-ranking?kind=market-cap&market=NAS` |
 | 해외 조건검색 | 가격·등락률·시가총액·주식수·거래량·거래대금·EPS·PER 복합 필터. 활성 보통주 마스터 검증, 최대 100건·페이지네이션 미지원 | [`GET /api/kis/us-search`](api/KIS_US_CONDITION_SEARCH.md) |
 | 해외 업종별 시세 | 해외 업종코드별 거래량 조건 종목 후보 | `/api/kis/us-industry?market=NAS&industry=010&volumeRange=0` |
-| 해외 상세시세 | 해외 종목 현재가·고가·저가·거래량·거래대금 등 상세 필드 | 차트 모달 수급 탭 `price-detail`, TR ID `HHDFS76200200` |
+| 해외 상세시세 | 해외 종목 현재가·고가·저가·거래량·거래대금 및 `output.shar` 상장주수 | 차트 모달 수급 탭 `price-detail`, TR ID `HHDFS76200200`; `getKisUsPriceDetailShares` |
 | 해외 상품기본정보 | 거래소별 상품명·상태·거래가능 여부 등 후보 검증 메타데이터 | `/api/kis/market-flow?market=US&mode=info&code=US:AAPL&productType=512`, TR ID `CTPF1702R` |
 | 해외 분봉 | 해외 1분~120분봉 장중 가격·거래량 흐름 | 차트 모달 수급 탭 `mode=minute`, TR ID `HHDFS76950200` |
 | 해외 기간봉 | 일반 해외 종목 일·주·월봉 가격·거래량 추세 | 차트 모달 수급 탭 `mode=daily`, TR ID `HHDFS76240000` |
@@ -76,6 +76,7 @@
 | 국내 업종 일자별지수 | 시장·업종 추세 및 종목 상대강도 기준선 | `/api/kis/market-flow?market=KR&mode=index-daily&indexCode=0001`, TR ID `FHKUP03500100` |
 | 국내 현재 체결 | 종목 현재 체결가·체결량 흐름 | 차트 모달 수급 탭 `mode=ccnl`, TR ID `FHKST01010300` |
 | 국내 상세 시세 | 현재가·거래량·거래대금·시가총액·회전율 등 종목 상세 | 차트 모달 수급 탭 `mode=price-detail`, TR ID `FHKST01010100` |
+| 국내 현재가 상장주수 | 국내 KIS 현재가 상세 응답의 `output.lstn_stcn`을 공통 `listedShares`로 정규화 | `/uapi/domestic-stock/v1/quotations/inquire-price`, `lib/kis-kr-price-detail.ts` |
 | 국내 대주 가능 종목 | 대주 가능 여부·대주 후보 필터 | 차트 모달 수급 탭 `mode=lendable`, TR ID `CTSC2702R` |
 | 국내 상품기본조회 | 상품명·판매상태·위험등급 등 후보 검증 메타데이터 | 차트 모달 수급 탭 `mode=product-info`, TR ID `CTPF1604R` |
 | 국내 주식기본조회 | 거래소·상장주수·업종·KOSPI200·NXT 거래정지 여부 | 차트 모달 수급 탭 `mode=stock-info`, TR ID `CTPF1002R` |

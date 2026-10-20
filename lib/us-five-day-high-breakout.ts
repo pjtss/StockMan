@@ -16,8 +16,6 @@ export type UsFiveDayHighBreakoutResult = {
   marketCap: number | null;
   tradingValue: number | null;
   turnoverRatio: number | null;
-  freeFloatShares?: number | null;
-  freeFloatPercent?: number | null;
   qualifies: boolean;
   daily: { ok: boolean; status: number; candleCount: number; rawText?: string; diagnostics?: unknown };
   price: { ok: boolean; status: number; raw?: unknown };

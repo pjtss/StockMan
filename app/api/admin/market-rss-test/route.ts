@@ -4,9 +4,13 @@ import { fetchAllMarketRss, fetchMarketRssSource, MARKET_RSS_SOURCES, type Marke
 import { translateMarketRssItems } from "@/lib/translate-market-rss-item";
 import { previewMarketRssResults } from "@/lib/market-rss-preview";
 import { describeError } from "@/lib/error-diagnostics";
+import { CloudTranslationClient } from "@/lib/cloud-translation-client";
+import { createQuotaAwareTranslationClient } from "@/lib/quota-aware-translation-client";
+import type { TranslationClient } from "@/lib/translation-types";
+import { getMarketRssTranslationConfiguration } from "@/lib/market-rss-translation-configuration";
 
-const withTranslation = async (feed: Awaited<ReturnType<typeof fetchMarketRssSource>>, translate: boolean) =>
-  translate ? { ...feed, items: await translateMarketRssItems(feed.items) } : feed;
+const withTranslation = async (feed: Awaited<ReturnType<typeof fetchMarketRssSource>>, translate: boolean, client?: TranslationClient) =>
+  translate ? { ...feed, items: await translateMarketRssItems(feed.items, client) } : feed;
 
 export async function GET(request: Request) {
   if (!(await requireAdminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,6 +23,10 @@ export async function GET(request: Request) {
   if (translate && source !== "STOCKTITAN") return NextResponse.json({ ok: false, error: "번역 테스트는 STOCKTITAN 기사 제목만 지원합니다.", allowedSource: "STOCKTITAN", translatedField: "title" }, { status: 400 });
   if (source && !MARKET_RSS_SOURCES.includes(source as MarketRssSource)) return NextResponse.json({ error: "지원하지 않는 RSS source", sources: MARKET_RSS_SOURCES }, { status: 400 });
   try {
+    const providerClient = translate ? CloudTranslationClient.fromEnvironment() : null;
+    const translationConfiguration = getMarketRssTranslationConfiguration(translate, Boolean(providerClient));
+    const tracked = providerClient ? createQuotaAwareTranslationClient(providerClient, undefined, undefined, { deferCacheWriteUntilValidated: true }) : null;
+    const translationClient = tracked?.client;
     if (!source) {
       const result = await fetchAllMarketRss();
       if (mode === "FETCH_ONLY" && !translate) return NextResponse.json({ ...result, mode });
@@ -26,9 +34,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ ...result, mode, results });
     }
     const feed = await fetchMarketRssSource(source as MarketRssSource);
-    if (mode === "FETCH_ONLY") return NextResponse.json({ fetchedAt: new Date().toISOString(), source, ok: true, mode, translate, feed: await withTranslation(feed, translate) });
-    const [preview] = await previewMarketRssResults([{ source, ok: true, feed }], translate);
-    return NextResponse.json({ ...preview, fetchedAt: new Date().toISOString(), mode, translate });
+    if (mode === "FETCH_ONLY") return NextResponse.json({ fetchedAt: new Date().toISOString(), source, ok: true, mode, translate, translationConfiguration, feed: await withTranslation(feed, translate, translationClient), ...(tracked ? { translationUsage: tracked.getMetrics() } : {}) });
+    const [preview] = await previewMarketRssResults([{ source, ok: true, feed }], translate, translationClient);
+    return NextResponse.json({ ...preview, fetchedAt: new Date().toISOString(), mode, translate, translationConfiguration, ...(tracked ? { translationUsage: tracked.getMetrics() } : {}) });
   } catch (error) {
     const diagnostics = describeError(error);
     return NextResponse.json({ fetchedAt: new Date().toISOString(), source: source || null, mode, ok: false, stage: mode === "PREVIEW" && translate ? "translation" : "fetch", ...diagnostics }, { status: 502 });

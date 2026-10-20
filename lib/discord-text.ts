@@ -23,5 +23,7 @@ export function toTextWebhookPayload(payload: Record<string, unknown>) {
     if (lines.length) sections.push(lines.join("\n"));
   }
   const content = sections.join("\n\n").trim() || "(알림 내용 없음)";
-  return { ...payload, content: content.length > 2000 ? `${content.slice(0, 1997)}…` : content, embeds: undefined };
+  const characters = Array.from(content);
+  const boundedContent = characters.length > 2000 ? `${characters.slice(0, 1999).join("")}…` : content;
+  return { ...payload, content: boundedContent, embeds: undefined };
 }

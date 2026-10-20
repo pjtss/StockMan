@@ -6,6 +6,9 @@ import { AdminModal } from "@/components/admin-modal";
 import { AdminPageShell } from "@/components/admin-page-shell";
 import styles from "@/app/admin/page.module.css";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { getMarketRssFallbackArticles, summarizeMarketRssTranslationResults } from "@/lib/market-rss-translation-summary";
+import { getMarketRssTranslationReasonDisplay } from "@/lib/market-rss-translation-reason";
+import { getTranslationUsageDiagnosticLine } from "@/lib/translation-usage-display";
 
 type Result = {
   ok?: boolean;
@@ -164,11 +167,13 @@ export function AdminApiTests() {
   const [marketRssMode, setMarketRssMode] = useState<"FETCH_ONLY" | "PREVIEW">("FETCH_ONLY");
   const [copied, setCopied] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
+  const [fallbackReasonFilter, setFallbackReasonFilter] = useState<string | null>(null);
 
   async function runTest(test: ApiTestDefinition) {
     setRunning(test.key);
     setCopied(false);
     setRawOpen(false);
+    setFallbackReasonFilter(null);
     setError(null);
     try {
       const query = test.key === "sec_raw"
@@ -225,6 +230,9 @@ export function AdminApiTests() {
   }
 
   const activeTest = ACTIVE_TESTS.find((test) => test.key === active);
+  const translationSummary = activeTest?.key === "market_rss" && result ? summarizeMarketRssTranslationResults(result) : null;
+  const fallbackArticles = translationSummary ? getMarketRssFallbackArticles(result, fallbackReasonFilter || undefined) : [];
+  const fallbackReasonLabel = (reason: string) => getMarketRssTranslationReasonDisplay(reason).shortLabel;
 
   return (
     <AdminPageShell
@@ -367,6 +375,55 @@ export function AdminApiTests() {
               <span>처리 단계</span>
               <strong>{(result.stages as Array<{ name: string; count: number }>).map((stage) => `${stage.name}: ${stage.count}`).join(" → ")}</strong>
             </div>
+          )}
+          {Boolean(activeTest.key === "market_rss" && result.translationUsage && typeof result.translationUsage === "object") && (() => {
+            const usage = result.translationUsage as Parameters<typeof getTranslationUsageDiagnosticLine>[0];
+            return <div className={styles.resultHeader}>
+              <span>번역 사용량</span>
+              <strong>{getTranslationUsageDiagnosticLine(usage)}</strong>
+            </div>;
+          })()}
+          {Boolean(activeTest.key === "market_rss" && result.translationConfiguration && typeof result.translationConfiguration === "object") && (() => {
+            const configuration = result.translationConfiguration as { requested?: boolean; configured?: boolean; status?: string; provider?: string | null };
+            const message = configuration.status === "API_KEY_MISSING"
+              ? `번역 요청 · Google 키 미설정 · 번역 불필요 ${translationSummary?.notRequiredCount ?? 0}건 · 원문 fallback ${translationSummary?.fallbackCount ?? 0}건`
+              : configuration.status === "READY"
+                ? `번역 요청 · ${configuration.provider} 설정 확인`
+                : "번역 요청 없음 · 원문 RSS만 조회";
+            return <div className={styles.resultHeader}><span>번역 설정</span><strong>{message}</strong></div>;
+          })()}
+          {translationSummary && (
+            <>
+              <div className={styles.resultHeader}>
+                <span>번역 결과</span>
+                <strong>기사 {translationSummary.articleCount}건 · 번역 {translationSummary.translatedCount}건 · 번역 불필요 {translationSummary.notRequiredCount}건 · 원문 fallback {translationSummary.fallbackCount}건{translationSummary.unchangedCount ? ` · 번역 응답 원문 동일 ${translationSummary.unchangedCount}건 검토` : ""}</strong>
+              </div>
+              {translationSummary.fallbackCount > 0 && (
+                <div className={styles.translationFallbackPanel}>
+                  <div className={styles.translationFallbackFilters} aria-label="번역 fallback 사유 필터">
+                    <button type="button" aria-pressed={!fallbackReasonFilter} className={!fallbackReasonFilter ? styles.translationFallbackActive : styles.translationFallbackButton} onClick={() => setFallbackReasonFilter(null)}>
+                      전체 fallback {translationSummary.fallbackCount}
+                    </button>
+                    {Object.entries(translationSummary.fallbackReasons).map(([reason, count]) => (
+                      <button type="button" key={reason} aria-pressed={fallbackReasonFilter === reason} className={fallbackReasonFilter === reason ? styles.translationFallbackActive : styles.translationFallbackButton} onClick={() => setFallbackReasonFilter(reason)}>
+                        {fallbackReasonLabel(reason)} {count}
+                      </button>
+                    ))}
+                  </div>
+                  <div className={styles.translationFallbackList} role="list" aria-label="번역 fallback 기사" aria-live="polite">
+                    {fallbackArticles.map((article, index) => (
+                      <article className={styles.translationFallbackArticle} role="listitem" key={`${article.source}:${article.externalId || index}`}>
+                        <strong>{article.title}</strong>
+                        <span>{article.source} · {fallbackReasonLabel(article.reason)}</span>
+                        {article.translatedTitle && article.translatedTitle !== article.title && <p>fallback 표시 제목: {article.translatedTitle}</p>}
+                        {article.link && <a href={article.link} target="_blank" rel="noreferrer">원문 열기</a>}
+                      </article>
+                    ))}
+                    {fallbackArticles.length === 0 && <p className={styles.empty}>선택한 사유의 fallback 기사가 없습니다.</p>}
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {Boolean(result.statistics && typeof result.statistics === "object") && (() => {
             const stats = result.statistics as { qualifiedTouch?: number; qualifiedBelow?: number; filtered?: number; insufficientHistory?: number; failed?: number };

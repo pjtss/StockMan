@@ -25,7 +25,7 @@ async function executeScan(options: { limit?: number; concurrency?: number; cont
       const item = scanList[index];
       if (!item) return;
       const result = await findUsFiveDayHighBreakout({ code: item.code, market: item.market, cachedCandles: cachedCandles.get(`${item.market}:${item.code}`) });
-      results[index] = { ...result, freeFloatShares: null, freeFloatPercent: null };
+      results[index] = result;
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, scanList.length)) }, worker));

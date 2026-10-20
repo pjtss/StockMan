@@ -3,6 +3,7 @@ import { getDb, getPool } from "@/lib/db";
 import { krCommonStockUniverse, krInstrumentUniverseCandles } from "@/lib/schema";
 import type { OHLCVCandle } from "@/lib/kis-chart";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
+import { loadRemoteDailyCandlesBulk } from "@/lib/remote-daily-candle-cache";
 
 export type CandleTimeframe = "D" | "W" | "M";
 
@@ -36,6 +37,7 @@ async function loadCachedKrDailyCandlesBulkUncached(items: Array<{ market: strin
 export async function loadCachedKrDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit = 100, timeframe: CandleTimeframe = "D") {
   const normalizedKey = Array.from(new Set(items.map((item) => `${item.market.trim().toUpperCase()}:${item.code.trim().toUpperCase()}`))).sort().join("|");
   if (!normalizedKey) return new Map<string, OHLCVCandle[]>();
+  if (process.env.DAILY_CACHE_API_URL?.trim()) return (await loadRemoteDailyCandlesBulk(items, limit, timeframe)) ?? new Map<string, OHLCVCandle[]>();
   const key = `${timeframe}:${limit}:${normalizedKey}`;
   const existing = bulkInflight.get(key);
   if (existing) return existing;

@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  ingest: vi.fn(),
+  translate: vi.fn(),
+  bullish: vi.fn(),
+  notify: vi.fn(),
+  withAutomationRun: vi.fn(),
+  loadSettings: vi.fn(),
+  isWithinSchedule: vi.fn(),
+  normalizeSources: vi.fn(),
+  describeError: vi.fn(),
+  isSchemaError: vi.fn(),
+  recordSkipped: vi.fn(),
+  withAutomationLock: vi.fn(),
+  getBatchSize: vi.fn(),
+  getCronStatus: vi.fn(),
+  order: [] as string[],
+}));
+
+vi.mock("@/lib/market-rss-pipeline", () => ({
+  ingestMarketRssArticles: mocks.ingest,
+  translatePendingMarketRssArticles: mocks.translate,
+  syncMarketRssBullishArticles: mocks.bullish,
+  notifyPendingMarketRssArticles: mocks.notify,
+}));
+vi.mock("@/lib/automation-run", () => ({ withAutomationRun: mocks.withAutomationRun }));
+vi.mock("@/lib/feature-module-settings", () => ({ loadFeatureModuleSettings: mocks.loadSettings }));
+vi.mock("@/lib/schedule-time", () => ({ isWithinSchedule: mocks.isWithinSchedule }));
+vi.mock("@/lib/market-rss-sources", () => ({ normalizeMarketRssSources: mocks.normalizeSources }));
+vi.mock("@/lib/error-diagnostics", () => ({ describeError: mocks.describeError, isSchemaError: mocks.isSchemaError }));
+vi.mock("@/lib/automation-run-repository", () => ({ recordSkippedAutomationRun: mocks.recordSkipped }));
+vi.mock("@/lib/market-rss-bullish-repository", () => ({ syncMarketRssBullishArticles: mocks.bullish }));
+vi.mock("@/lib/automation-lock", () => ({ withAutomationLock: mocks.withAutomationLock }));
+vi.mock("@/lib/market-rss-batch-size", () => ({ getMarketRssBatchSize: mocks.getBatchSize }));
+vi.mock("@/lib/market-rss-cron-status", () => ({ getMarketRssCronStatus: mocks.getCronStatus }));
+
+import { POST } from "./route";
+
+describe("market-rss cron route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.order.length = 0;
+    process.env.CRON_SECRET = "test-secret";
+    process.env.RSS_TRANSLATION_BATCH_SIZE = "";
+    process.env.RSS_NOTIFICATION_BATCH_SIZE = "";
+    mocks.loadSettings.mockResolvedValue({ enabled: true, featureSettings: { marketRss: { enabledSources: ["STOCKTITAN"] } } });
+    mocks.isWithinSchedule.mockReturnValue(true);
+    mocks.normalizeSources.mockReturnValue(["STOCKTITAN"]);
+    mocks.withAutomationLock.mockImplementation(async (_key: string, run: () => Promise<unknown>) => run());
+    mocks.withAutomationRun.mockImplementation(async (_key: string, run: () => Promise<unknown>) => run());
+    mocks.ingest.mockImplementation(async () => { mocks.order.push("ingest"); return { ingestFailureCount: 0 }; });
+    mocks.translate.mockImplementation(async () => { mocks.order.push("translate"); return { attempted: 3, translated: 2, fallback: 1, failed: 0 }; });
+    mocks.bullish.mockImplementation(async () => { mocks.order.push("bullish"); return { processed: 3 }; });
+    mocks.notify.mockImplementation(async () => { mocks.order.push("notify"); return { attempted: 3, sent: 3 }; });
+    mocks.getBatchSize.mockImplementation((configured: string, fallback: number) => Number(configured) || fallback);
+    mocks.getCronStatus.mockReturnValue({ degraded: true, partialFailureCount: 1, ingestFailureCount: 0, translationFailureCount: 1 });
+  });
+
+  it("runs ingest, translation, bullish sync, and notification in order and preserves fallback as PARTIAL", async () => {
+    const response = await POST(new Request("http://localhost/api/cron/market-rss", {
+      method: "POST",
+      headers: { "x-cron-secret": "test-secret" },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      degraded: true,
+      partialFailureCount: 1,
+      ingested: { ingestFailureCount: 0 },
+      translated: { fallback: 1 },
+      notified: { sent: 3 },
+    });
+    expect(mocks.order).toEqual(["ingest", "translate", "bullish", "notify"]);
+    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 50, 100);
+    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 10, 100);
+    expect(mocks.getCronStatus).toHaveBeenCalledWith(0, { attempted: 3, translated: 2, fallback: 1, failed: 0 });
+  });
+
+  it("rejects unauthorized requests before reading settings or starting work", async () => {
+    const response = await POST(new Request("http://localhost/api/cron/market-rss", {
+      method: "POST",
+      headers: { "x-cron-secret": "wrong-secret" },
+    }));
+
+    expect(response.status).toBe(401);
+    expect(mocks.loadSettings).not.toHaveBeenCalled();
+    expect(mocks.order).toEqual([]);
+  });
+
+  it("records and returns disabled state without running RSS stages", async () => {
+    mocks.loadSettings.mockResolvedValueOnce({ enabled: false, featureSettings: {} });
+
+    const response = await POST(new Request("http://localhost/api/cron/market-rss", {
+      method: "POST",
+      headers: { "x-cron-secret": "test-secret" },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ skipped: true, reason: "disabled" });
+    expect(mocks.recordSkipped).toHaveBeenCalledWith("market-rss", "disabled");
+    expect(mocks.order).toEqual([]);
+  });
+});

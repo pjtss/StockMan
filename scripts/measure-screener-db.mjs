@@ -1,18 +1,7 @@
-import { readFileSync } from "node:fs";
 import { Client } from "pg";
+import { loadLocalEnv } from "./local-env.mjs";
 
-function loadEnvFile() {
-  for (const raw of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
-    const line = raw.trim();
-    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match) continue;
-    let value = match[2].trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-    process.env[match[1]] = value;
-  }
-}
-
-loadEnvFile();
+loadLocalEnv({ required: true });
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured");
 const databaseUrl = new URL(process.env.DATABASE_URL);
 const isLocalDatabase = ["localhost", "127.0.0.1"].includes(databaseUrl.hostname);

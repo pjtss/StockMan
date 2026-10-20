@@ -9,6 +9,7 @@ npm-debug.log*
 # Local build and TypeScript caches
 tsconfig.tsbuildinfo
 reports/
+.local-rss-analysis-inbox/
 
 # Local server/debug output
 *.log

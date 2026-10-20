@@ -9,7 +9,14 @@ import { and, eq, gt } from "drizzle-orm";
 const detailCache = new Map<string, { expiresAt: number; result: KisUsPriceDetailResult }>();
 const DETAIL_TTL_MS = 10_000;
 
-export type KisUsPriceDetailRequest = { code: string; market?: string };
+export type KisUsPriceDetailRequest = {
+  code: string;
+  market?: string;
+  /** Bypass the 10-second process/DB cache when collecting an authoritative snapshot. */
+  forceRefresh?: boolean;
+  /** UI reads may use last-known data; snapshot jobs must opt out. Defaults to true. */
+  allowStaleFallback?: boolean;
+};
 
 export type KisUsPriceDetailResult = {
   ok: boolean;
@@ -51,14 +58,16 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   const market = rawMarket.trim().toUpperCase();
   const cacheKey = `${market}:${code}`;
   const cached = detailCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.result;
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.result;
   const db = getDb();
   const loadStale = async () => {
-    if (!db) return null;
+    if (!allowStaleFallback || !db) return null;
     const row = (await db.select().from(usPriceDetailCache).where(and(eq(usPriceDetailCache.market, market), eq(usPriceDetailCache.code, code))).limit(1).catch(() => []))[0];
-    return row ? { ok: row.status >= 200 && row.status < 300, status: row.status, code, market, parsed: row.parsed, stale: true } : null;
+    return row && row.status >= 200 && row.status < 300 && getKisUsPriceDetailPrice(row.parsed) !== null
+      ? { ok: true, status: row.status, code, market, parsed: row.parsed, stale: true }
+      : null;
   };
-  if (db) {
+  if (!forceRefresh && db) {
     const row = (await db.select().from(usPriceDetailCache).where(and(eq(usPriceDetailCache.market, market), eq(usPriceDetailCache.code, code), gt(usPriceDetailCache.fetchedAt, new Date(Date.now() - DETAIL_TTL_MS)))).limit(1).catch(() => []))[0];
     if (row) {
       const result = { ok: row.status >= 200 && row.status < 300, status: row.status, code, market, parsed: row.parsed };
@@ -86,11 +95,11 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
   }
 
   let token = await getAccessToken();
-  if (!token) return loadStale();
+  if (!token) return allowStaleFallback ? loadStale() : null;
   let result = await fetchOnce(token);
   if (isKisTokenExpiredResponse(result.response.status, result.parsed)) {
-    token = await refreshAccessToken();
-    if (!token) return loadStale();
+    token = await refreshAccessToken(token);
+    if (!token) return allowStaleFallback ? loadStale() : null;
     result = await fetchOnce(token);
   }
   const value = { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
@@ -98,7 +107,10 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
     detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
     if (db) await db.insert(usPriceDetailCache).values({ market, code, status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() }).onConflictDoUpdate({ target: [usPriceDetailCache.market, usPriceDetailCache.code], set: { status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() } }).catch(() => undefined);
   }
-  return value.ok ? value : await loadStale();
+  if (value.ok && !hasUsablePrice) {
+    return allowStaleFallback ? await loadStale() ?? value : value;
+  }
+  return value.ok || !allowStaleFallback ? value : await loadStale();
 }
 
 export function getKisUsPriceDetailOutput(parsed: unknown): Record<string, unknown> {
@@ -111,4 +123,41 @@ export function getKisUsPriceDetailOutput(parsed: unknown): Record<string, unkno
   const populatedQuote = candidates.find((output) => hasPositiveValue(output, quoteFields));
   if (populatedQuote) return populatedQuote;
   return candidates.find((output) => Object.keys(output).length > 0) ?? {};
+}
+
+export function getKisUsPriceDetailPrice(parsed: unknown): number | null {
+  const output = getKisUsPriceDetailOutput(parsed);
+  for (const key of ["last", "t_prpr", "price"]) {
+    const raw = output[key];
+    if (raw == null || String(raw).trim() === "") continue;
+    const price = Number(String(raw).replace(/,/g, ""));
+    if (Number.isFinite(price) && price > 0) return price;
+  }
+  return null;
+}
+
+/**
+ * Return the latest available KIS turnover: today's `tamt` when positive,
+ * otherwise the previous completed session's `pamt` (common before today's
+ * session has traded). Both fields are passed through unchanged, never derived.
+ */
+export function getKisUsPriceDetailTradingValue(parsed: unknown): number | null {
+  const output = getKisUsPriceDetailOutput(parsed);
+  const parseNonNegative = (raw: unknown) => {
+    if (raw == null || String(raw).trim() === "") return null;
+    const value = Number(String(raw).replace(/,/g, ""));
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  };
+  const current = parseNonNegative(output.tamt ?? output.tamnt);
+  if (current !== null && current > 0) return current;
+  return parseNonNegative(output.pamt) ?? current;
+}
+
+/** KIS price-detail `output.shar`: listed shares (상장주수). */
+export function getKisUsPriceDetailShares(parsed: unknown): number | null {
+  const output = getKisUsPriceDetailOutput(parsed);
+  const raw = output.shar;
+  if (raw == null || String(raw).trim() === "") return null;
+  const shares = Number(String(raw).replace(/,/g, "").trim());
+  return Number.isSafeInteger(shares) && shares > 0 ? shares : null;
 }

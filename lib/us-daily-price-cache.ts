@@ -3,6 +3,7 @@ import { getDb, getPool } from "@/lib/db";
 import { usInstrumentUniverseCandles } from "@/lib/schema";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily-price";
+import { loadRemoteDailyCandlesBulk } from "@/lib/remote-daily-candle-cache";
 
 const memoryCache = new Map<string, { expiresAt: number; candles: UsDailyCandle[] }>();
 const MEMORY_TTL_MS = 60_000;
@@ -25,6 +26,12 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
     return [`${value.market}:${value.code}`, value] as const;
   })).values());
   const result = new Map<string, UsDailyCandle[]>();
+  if (process.env.DAILY_CACHE_API_URL?.trim()) {
+    const remote = await loadRemoteDailyCandlesBulk(normalized, limit, timeframe as "D" | "W" | "M");
+    if (!remote) return result;
+    for (const item of normalized) result.set(`${item.market}:${item.code}`, (remote.get(`${item.market}:${item.code}`) ?? []) as UsDailyCandle[]);
+    return result;
+  }
   const missing: typeof normalized = [];
   for (const item of normalized) {
     const key = `${item.market}:${item.code}`;
@@ -92,6 +99,10 @@ export async function loadCachedUsDailyCandlesBulk(items: Array<{ market: string
 
 export async function loadCachedUsDailyCandles(market: string, code: string, limit = 10, timeframe = "D"): Promise<UsDailyCandle[]> {
   timeframe = normalizeTimeframe(timeframe);
+  if (process.env.DAILY_CACHE_API_URL?.trim()) {
+    const remote = await loadRemoteDailyCandlesBulk([{ market, code }], limit, timeframe as "D" | "W" | "M");
+    return (remote?.get(`${market.trim().toUpperCase()}:${code.trim().toUpperCase()}`) ?? []) as UsDailyCandle[];
+  }
   const cacheKey = cacheKeyFor(market, code, timeframe);
   const memory = memoryCache.get(cacheKey);
   if (memory && memory.expiresAt > Date.now() && memory.candles.length >= limit) return memory.candles.slice(0, limit);

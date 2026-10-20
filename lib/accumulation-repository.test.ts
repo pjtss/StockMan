@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { groupAccumulationRows, loadAccumulationInstruments, type AccumulationDbRow } from "./accumulation-repository";
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("./db", () => ({ getPool: () => ({ query }) }));
-const row: AccumulationDbRow = { market: "NAS", code: "A", name: "A", market_cap: null, shares_outstanding: null, fundamental_updated_at: null,
+const row: AccumulationDbRow = { market: "NAS", code: "A", name: "A", market_cap: null, listed_shares: null, fundamental_updated_at: null,
   candle_date: "20260903", candle_time: null, fetched_at: "2026-09-04T00:00:00Z", open: 1, high: 2, low: 1, close: 2, volume: 100 };
 beforeEach(() => { query.mockReset().mockResolvedValue({ rows: [] }); });
 describe("accumulation repository", () => {

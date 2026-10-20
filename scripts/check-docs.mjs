@@ -46,7 +46,12 @@ if (contractFailures.length) {
 }
 
 const developmentLog = readFileSync(join(root, "DEVELOPMENT_LOG.md"), "utf8");
-const latestEntry = developmentLog.match(/## \[[^\n]+\][\s\S]*?(?=\n## \[|\s*$)/)?.[0] ?? "";
+const datedHeadings = [...developmentLog.matchAll(/^## \[[^\r\n]+\]/gm)];
+// The log is newest-first. Inspect only the first dated entry and bound it at
+// the next dated entry so historical notes cannot satisfy today's checklist.
+const latestEntryStart = datedHeadings[0]?.index ?? -1;
+const latestEntryEnd = datedHeadings[1]?.index ?? developmentLog.length;
+const latestEntry = latestEntryStart >= 0 ? developmentLog.slice(latestEntryStart, latestEntryEnd) : "";
 const latestEntryContract = [
   "### 목표",
   "### 반영",
@@ -67,18 +72,21 @@ if (!/^CI-\d{4}-\d{2}-\d{2}-\d{3,}$/.test(improvementId)) {
   missingLatestEntryContract.push("DEVELOPMENT_LOG.md: latest entry has invalid improvement task ID (expected CI-YYYY-MM-DD-NNN)");
 }
 const outcome = latestEntry.match(/성과 판정:\s*([A-Z]+)/)?.[1] ?? "";
-if (!["IMPROVED", "UNCHANGED", "REGRESSED", "UNMEASURED"].includes(outcome)) {
-  missingLatestEntryContract.push("DEVELOPMENT_LOG.md: latest entry has invalid outcome (expected IMPROVED|UNCHANGED|REGRESSED|UNMEASURED)");
+if (!["IMPROVED", "PARTIAL", "UNCHANGED", "REGRESSED", "UNMEASURED"].includes(outcome)) {
+  missingLatestEntryContract.push("DEVELOPMENT_LOG.md: latest entry has invalid outcome (expected IMPROVED|PARTIAL|UNCHANGED|REGRESSED|UNMEASURED)");
 }
 const verificationSection = latestEntry.match(/### 검증[\s\S]*?(?=\n### |\s*$)/)?.[0] ?? "";
-if (!/(npm\s+run|npm\.cmd\s+run|git diff|vitest|tsc|측정|ms\b|초\b|개)/i.test(verificationSection)) {
+if (!/(npm\s+run|npm\.cmd\s+(?:run|exec)|git diff|vitest|tsc|측정|ms\b|초\b|개)/i.test(verificationSection)) {
   missingLatestEntryContract.push("DEVELOPMENT_LOG.md: latest verification must include an executable check or measured result");
 }
-const deliveryStatus = latestEntry.match(/### 커밋·푸시·배포[\s\S]*?(?=\n### |\s*$)/)?.[0] ?? "";
+const deliveryStatus = latestEntry.match(/### 커밋·푸시·배포[\s\S]*?(?=\n#{1,6}\s|\s*$)/)?.[0] ?? "";
 if (!/(미실행|완료|실패|차단)/.test(deliveryStatus)) {
   missingLatestEntryContract.push("DEVELOPMENT_LOG.md: latest delivery status must be normalized");
 }
-if (/완료/.test(deliveryStatus) && !/\b[0-9a-f]{7,40}\b/i.test(deliveryStatus)) {
+const completedDelivery = deliveryStatus.split(/\r?\n/).some((line) =>
+  /^\s*[-*]\s*(?!미실행|미완료|미진행)(?:.*\s)?완료(?:\s|$|:)/.test(line),
+);
+if (completedDelivery && !/\b[0-9a-f]{7,40}\b/i.test(deliveryStatus)) {
   missingLatestEntryContract.push("DEVELOPMENT_LOG.md: completed delivery must include a commit identifier");
 }
 const nextImprovement = latestEntry.match(/### 다음 개선[\s\S]*?(?=\n### |\s*$)/)?.[0] ?? "";

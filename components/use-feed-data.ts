@@ -2,20 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GLOBAL_POLLING_INTERVAL } from "@/lib/constants";
-import type { DartItem, FeedPayload, SecItem } from "@/lib/types";
+import type { DartItem, FeedPayload } from "@/lib/types";
 
-type FeedType = "dart" | "sec";
+type FeedType = "dart";
 
 export function useFeedData(type: FeedType) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dartData, setDartData] = useState<FeedPayload<DartItem> | null>(null);
-  const [secData, setSecData] = useState<FeedPayload<SecItem> | null>(null);
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const endpoint = type === "dart" ? "/api/dart" : "/api/sec";
+    const endpoint = "/api/dart";
 
     async function load() {
       try {
@@ -28,13 +27,8 @@ export function useFeedData(type: FeedType) {
           } catch { /* non-JSON error response */ }
           throw new Error(message);
         }
-        if (type === "dart") {
-          const data = (await response.json()) as FeedPayload<DartItem>;
-          if (!cancelled) setDartData(data);
-        } else {
-          const data = (await response.json()) as FeedPayload<SecItem>;
-          if (!cancelled) setSecData(data);
-        }
+        const data = (await response.json()) as FeedPayload<DartItem>;
+        if (!cancelled) setDartData(data);
         if (!cancelled) { setLoading(false); setError(null); }
       } catch (cause) {
         if (!cancelled) {
@@ -73,5 +67,5 @@ export function useFeedData(type: FeedType) {
     };
   }, [type]);
 
-  return { loading, error, dartData, secData };
+  return { loading, error, dartData };
 }

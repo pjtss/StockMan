@@ -10,14 +10,25 @@
 | 아키텍처 | 모듈 경계, 데이터 흐름, 저장 구조 | [`architecture/`](./architecture/) |
 | 개발 | 코딩·테스트·마이그레이션 규칙 | [`development/`](./development/) |
 | 운영 | 배포, 스케줄, 장애 대응, 디버깅 | [`operations/`](./operations/) |
+| 기업 분석 | 대한민국·미국 주식 기업별 분석 결과 | [`company-analysis/`](./company-analysis/README.md) |
 | 외부 문서 | KIS·SEC·DART 등 공식 문서 요약 | [`references/`](./references/) |
 | 기능 설계 | 특정 기능의 동작·필터·알림 계약 | 루트 `docs/*.md` |
 | 변경 기록 | 날짜별 구현·운영 변경 내역 | [`../Development.md`](../Development.md), [`../DEVELOPMENT_LOG.md`](../DEVELOPMENT_LOG.md) |
 
 ## 시작점
 
+- 기업 분석 전체 인덱스: [`company-analysis/`](./company-analysis/README.md)
+- 대한민국 기업 분석: [`company-analysis/kr/`](./company-analysis/kr/README.md)
+- 미국 기업 분석: [`company-analysis/us/`](./company-analysis/us/README.md)
+
+- 미국 보통주 시총 USD 5억 이하 중 최근 10거래일 최저 종가 목록 (2026-10-16): [`operations/us-common-stock-10day-close-low-20261016.md`](./operations/us-common-stock-10day-close-low-20261016.md)
+- 미국 보통주 시총 USD 5억 이하 중 최근 10거래일 저가 대비 최신 종가 반등 목록 (2026-10-16): [`operations/us-common-stock-10day-low-rebound-20261016.md`](./operations/us-common-stock-10day-low-rebound-20261016.md)
+
 - 현재 시스템 기준서: [`architecture/current-system-reference.md`](./architecture/current-system-reference.md)
 - 미국 상승률 TOP100 UI 데이터 품질·부분 응답·원천 시각·누락 방지 계약: [`US_TOP_RISING_UI_DATA_QUALITY.md`](./US_TOP_RISING_UI_DATA_QUALITY.md)
+
+- 상세 시스템 모듈 카탈로그·SRP 책임 지도: [`architecture/system-module-catalog.md`](./architecture/system-module-catalog.md)
+- 노트북 로컬 미국 RSS LLM 호재 분석·Discord 알림 설계안: [`architecture/local-us-rss-llm-alert-design.md`](./architecture/local-us-rss-llm-alert-design.md)
 
 - 코드 구조: [`architecture/code-structure.md`](./architecture/code-structure.md)
 - 문서 관리·SRP 기준: [`architecture/documentation-and-srp.md`](./architecture/documentation-and-srp.md)
@@ -46,3 +57,16 @@
 3. 운영 결과에는 확인 시각과 검증 방법을 함께 기록합니다.
 4. 비밀값·토큰·실제 웹훅 URL은 문서에 저장하지 않습니다.
 5. 기능 변경 시 관련 문서와 `Development.md`를 같은 변경 세트에서 갱신합니다.
+- 운영 서버 기준 미국 시총 USD 1천만 미만 보통주 티커 목록 (2026-10-03): [`operations/us-small-cap-under-10m-20261003.md`](./operations/us-small-cap-under-10m-20261003.md)
+- 미국 보통주 $0.10 이하·시가총액 $5억 이하 가격·시총 후보 및 상장주수 결측 기록 (2026-10-15): [`operations/us-common-stocks-under-10c-20261015.md`](./operations/us-common-stocks-under-10c-20261015.md)
+- 미국 상장 종목 급등 촉매·리스크 분석용 SEC FORM·ITEM 가이드: [`operations/us-sec-form-item-catalyst-risk-guide.md`](./operations/us-sec-form-item-catalyst-risk-guide.md)
+- 미국 상장 종목 워런트·유증·전환증권 희석 위험 조사 Harness: [`operations/us-equity-dilution-risk-harness.md`](./operations/us-equity-dilution-risk-harness.md)
+- 미국 상승률 TOP100 UI 데이터 품질·부분 응답·원천 시각·누락 방지 계약: [`US_TOP_RISING_UI_DATA_QUALITY.md`](./US_TOP_RISING_UI_DATA_QUALITY.md)
+- 미국장 월간 전망 및 이벤트 검토: [`operations/us-market-october-2026-outlook.md`](./operations/us-market-october-2026-outlook.md)
+- 2026년 9월 운영 RSS에서 확인된 후속 이벤트: [`../reports/sec-edgar-analysis/daily/2026-09-forward-events.md`](../reports/sec-edgar-analysis/daily/2026-09-forward-events.md)
+
+- 2026-10-15 소형주 급등 후보 262개의 최근 3개월 SEC 공시 요약·coverage: [`reports/sec-edgar-analysis/cohorts/2026-10-15-risers/`](../reports/sec-edgar-analysis/cohorts/2026-10-15-risers/README.md)
+- AZTR·AXG·DKI·HODO·SDST·SXTC·TWG 최근 1개월 SEC 공시 핵심 요약 (2026-10-15 기준): [`reports/sec-edgar-analysis/daily/2026-10-15-selected-seven.md`](../reports/sec-edgar-analysis/daily/2026-10-15-selected-seven.md)
+- GENK 최근 1개월 SEC 공시 상세 — Roth 주식매입계약·희석 위험 (2026-10-15 기준): [`reports/sec-edgar-analysis/daily/2026-10-15-genk-one-month.md`](../reports/sec-edgar-analysis/daily/2026-10-15-genk-one-month.md)
+
+- 2026-10-15 소형주 급등 후보 262개의 최근 3개월 SEC 공시 요약·coverage: [`reports/sec-edgar-analysis/cohorts/2026-10-15-risers/`](../reports/sec-edgar-analysis/cohorts/2026-10-15-risers/README.md)

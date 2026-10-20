@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { filterNewItems, syncDartAlerts, syncSecAlerts } from './alerts';
+import { filterNewItems, syncDartAlerts } from './alerts';
 import * as rss from './rss';
 
 describe('alerts.ts', () => {
@@ -41,29 +41,6 @@ describe('alerts.ts', () => {
       const result = await syncDartAlerts();
       expect(result.newAlerts).toHaveLength(1);
       expect(result.newAlerts![0].company).toBe('Test Co');
-    });
-
-    it('syncSecAlerts should fetch and return payload with newAlerts', async () => {
-      const mockPayload = {
-        source: 'SEC',
-        items: [
-          { 
-            source: 'SEC', 
-            company: 'SEC Co', 
-            title: 'SEC Title', 
-            publishedAt: new Date().toISOString(),
-            sentiment: '호재가능',
-            accession: 'acc',
-            link: 'https://link'
-          }
-        ]
-      };
-      
-      vi.spyOn(rss, 'fetchSecFeed').mockResolvedValue(mockPayload as any);
-      
-      const result = await syncSecAlerts();
-      expect(result.newAlerts).toHaveLength(1);
-      expect(result.newAlerts![0].company).toBe('SEC Co');
     });
   });
 });

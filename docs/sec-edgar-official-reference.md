@@ -23,6 +23,7 @@ GET https://data.sec.gov/submissions/CIK##########.json
 - CIK는 10자리 zero-padding 형식이다.
 - 회사명, 이전 회사명, 거래소, 티커, 최근 제출 이력이 포함된다.
 - 기본 응답에는 최소 1년 또는 최근 1,000건의 제출 이력이 포함되며, 오래된 이력은 추가 JSON 파일로 분리될 수 있다.
+- 전체 이력이 필요하면 응답의 `filings.files[].name`을 순회하여 추가 JSON을 읽고, `accessionNumber`로 합쳐야 한다. StockMan의 전체 공시 수집기는 이 규칙을 사용한다.
 
 ### 회사 전체 XBRL 사실
 
@@ -92,6 +93,7 @@ Accept-Encoding: gzip, deflate
 
 - SEC EDGAR **RSS**는 `market-rss` 통합 파이프라인에서만 수집한다. `market_rss_articles`에 `source=SEC_EDGAR`로 저장되고 공통 분류·등급·번역·RSS Discord 전송을 따른다.
 - SEC EDGAR **Submissions/XBRL**은 `sec-realtime`의 `/api/cron/sec-edgar`에서 CIK 목록을 기준으로 수집한다. 결과는 `sec_companies`, `sec_submissions`, `sec_filing_events`, `sec_xbrl_snapshots`에 저장한다.
+- 전체 공시 본문 수집은 회사별 전체 Submissions 이력을 accession별로 저장한 뒤 제출 인덱스/primary document 해석기를 통해 `sec_filing_documents.primary_text`에 실제 FORM 본문을 보존한다.
 - `sync-filings`는 DART 전용이며 SEC RSS 자동화를 호출하지 않는다. 따라서 같은 SEC RSS 공시를 두 자동화가 각각 Discord로 보내지 않도록 한다.
 - 관리자 설정은 `/admin/modules/market-rss`와 `/admin/modules/sec-realtime`, 원문·분류 테스트는 `/admin/api-tests`, 저장 결과는 `/admin/stocktitan-rss`, 실행 상태는 `/admin/observability`에서 확인한다.
 

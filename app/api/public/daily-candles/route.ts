@@ -3,11 +3,15 @@ import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-const MARKETS = new Set(["KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"]);
+const MARKETS = new Set(["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"]);
 const TIMEFRAMES = new Set(["D", "W", "M"]);
+const marketPredicate = "(($1 = 'KR' AND market IN ('KOSPI', 'KOSDAQ')) OR ($1 = 'US' AND market IN ('NAS', 'NYS', 'AMS')) OR market = $1)";
 
 function authorized(request: Request) {
   const expected = process.env.DAILY_CACHE_READ_API_KEY?.trim();
+  // Keep authenticated deployments protected, while allowing explicitly
+  // keyless read-only deployments to expose the bounded candle cache API.
+  if (!expected) return true;
   const supplied = request.headers.get("x-daily-cache-key")?.trim()
     || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   return Boolean(expected && supplied && supplied === expected);
@@ -30,22 +34,29 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "INVALID_QUERY" }, { status: 400 });
   }
 
-  const table = market === "KOSPI" || market === "KOSDAQ"
+  const table = market === "KR" || market === "KOSPI" || market === "KOSDAQ"
     ? "kr_instrument_universe_candles"
     : "us_instrument_universe_candles";
 
   try {
     if (codes.length > 0) {
       const result = await getPool().query(`
-        SELECT market, code, candle_date, open, high, low, close, volume, fetched_at
-          FROM (
-            SELECT market, code, candle_date, open, high, low, close, volume, fetched_at,
-                   ROW_NUMBER() OVER (PARTITION BY market, code ORDER BY candle_date DESC) AS row_number
-              FROM ${table}
-             WHERE market = $1 AND code = ANY($2::text[]) AND timeframe = $3
+        SELECT $1::text AS market, requested.code, cached.candle_date, cached.open, cached.high,
+               cached.low, cached.close, cached.volume, cached.fetched_at
+          FROM unnest($2::text[]) AS requested(code)
+          CROSS JOIN LATERAL (
+            SELECT candle_date, open, high, low, close, volume, fetched_at
+              FROM (
+                SELECT candle_date, open, high, low, close, volume, fetched_at,
+                       ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
+                  FROM ${table}
+                 WHERE ${marketPredicate} AND code = requested.code AND timeframe = $3
+              ) latest
+             WHERE rn = 1
+             ORDER BY candle_date DESC
+             LIMIT $4
           ) cached
-         WHERE row_number <= $4
-         ORDER BY code, candle_date DESC`,
+         ORDER BY requested.code, cached.candle_date DESC`,
         [market, codes, timeframe, limit],
       );
       const grouped = new Map<string, { date: string; open: number; high: number; low: number; close: number; volume: number }[]>();
@@ -66,8 +77,13 @@ export async function GET(request: Request) {
       fetched_at: Date | string | null;
     }>(
       `SELECT candle_date, open, high, low, close, volume, fetched_at
-         FROM ${table}
-        WHERE market = $1 AND code = $2 AND timeframe = $3
+         FROM (
+           SELECT candle_date, open, high, low, close, volume, fetched_at,
+                  ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
+             FROM ${table}
+            WHERE ${marketPredicate} AND code = $2 AND timeframe = $3
+         ) latest
+        WHERE rn = 1
         ORDER BY candle_date DESC
         LIMIT $4`,
       [market, code, timeframe, limit],

@@ -21,6 +21,12 @@ describe("error-diagnostics", () => {
     expect(describeError(error)).toMatchObject({ errorCode: "DATABASE_FOREIGN_KEY_VIOLATION", databaseCode: "23503", constraint: "us_turnover_ratio_attempts_instrument_fk" });
   });
 
+  it("classifies PostgreSQL cardinality violations by SQLSTATE", () => {
+    const cause = Object.assign(new Error("ON CONFLICT DO UPDATE command cannot affect row a second time"), { code: "21000" });
+    const error = Object.assign(new Error("Failed query: insert ..."), { cause });
+    expect(describeError(error)).toMatchObject({ errorCode: "DATABASE_CARDINALITY_VIOLATION", databaseCode: "21000" });
+  });
+
   it("classifies Discord server failures", () => {
     expect(describeError(new Error("US OBV Discord failed with HTTP 503")).errorCode).toBe("DISCORD_WEBHOOK_SERVER_ERROR");
   });

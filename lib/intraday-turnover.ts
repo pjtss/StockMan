@@ -1,4 +1,14 @@
 export type TurnoverPoint = { price: number; volume?: number; cumulativeTradingValue?: number | null };
+export type MinuteTradingValueSource = "KIS_CUMULATIVE_DELTA" | "PRICE_VOLUME_FALLBACK";
+
+/** Reject missing/invalid provider points before deriving or persisting turnover. */
+export function filterValidIntradayPoints<T extends { price?: unknown; volume?: unknown }>(points: T[]) {
+  return points.filter((point) => Number(point.price) > 0 && Number(point.volume ?? 0) >= 0);
+}
+
+export function isSuccessfulMinuteQuoteResponse(response: { ok?: boolean } | null | undefined) {
+  return response?.ok === true;
+}
 
 /**
  * Prefer the provider's cumulative traded-value field.  A delta is valid only

@@ -24,7 +24,10 @@ export async function kisRequest<T = any>(options: KisRequestOptions): Promise<K
   const startedAt = Date.now();
   const url = new URL(options.url);
   const context = createDebugContext({ feature: options.debug?.feature ?? "kis-api", market: options.debug?.market, code: options.debug?.code, timeframe: options.debug?.timeframe });
-  const result = await withKisRequestThrottle(async () => {
+  let attemptCount = 0;
+  let result: KisResponse<T>;
+  try {
+    result = await withKisRequestThrottle(async () => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.max(1_000, options.timeoutMs ?? DEFAULT_TIMEOUT_MS));
     try {
@@ -38,12 +41,12 @@ export async function kisRequest<T = any>(options: KisRequestOptions): Promise<K
       writeDebugLog("ERROR", "kis_api_request_error", context, { endpoint: url.pathname, trId: options.trId, durationMs: Date.now() - startedAt, retryable: true, error: safeErrorMetadata(error) });
       throw error;
     } finally { clearTimeout(timer); }
-  }, context, (rateLimitedResult, attempt, backoffMs) => {
+    }, context, (rateLimitedResult, attempt, backoffMs) => {
     const kisMeta = (rateLimitedResult as KisResponse<T>).parsed as Record<string, unknown> | null;
     recordKisRateLimitEvent({ requestId: context.requestId, endpoint: url.pathname, market: context.market, trId: options.trId, httpStatus: (rateLimitedResult as KisResponse<T>).response.status, kisRtCd: safeProviderCode(kisMeta?.rt_cd), kisMsgCd: safeProviderCode(kisMeta?.msg_cd), kisMsg1Code: safeProviderCode(kisMeta?.msg1), limitType: (rateLimitedResult as KisResponse<T>).response.status === 429 ? "KIS_429" : "KIS_BUSINESS_RATE_LIMIT", limitScope: "GLOBAL", configuredTps: 10, backoffMs, attempt, incidentId: context.requestId });
   });
   const failure = classifyKisFailure(result);
-  await recordDebugKisCall({ context, endpoint: url.pathname, trId: options.trId, httpStatus: result.response.status, failure, durationMs: Date.now() - startedAt, retryable: failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP" || failure === "AUTH_EXPIRED" });
+  await recordDebugKisCall({ context, endpoint: url.pathname, trId: options.trId, httpStatus: result.response.status, failure, attemptCount, durationMs: Date.now() - startedAt, retryable: failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP" || failure === "AUTH_EXPIRED" });
   if (failure) writeDebugLog(failure === "PERMANENT" ? "ERROR" : "WARN", "kis_api_business_error", context, { endpoint: url.pathname, trId: options.trId, failure, httpStatus: result.response.status, durationMs: Date.now() - startedAt, retryable: failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP" || failure === "AUTH_EXPIRED" });
   return result;
 }

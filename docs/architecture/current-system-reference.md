@@ -1,8 +1,10 @@
 # StockMan 현재 시스템 기준서
 
-상태: 현재 구현 기준 (2026-09-10)
+상태: 현재 구현 기준 (2026-09-19)
 
 이 문서는 기능 설계서가 아니라, 작업을 시작하기 전에 현재 저장소의 실행 경계·책임 경계·데이터 흐름·검증 방법을 확인하기 위한 기준서다. 코드와 충돌하면 코드를 우선하고, 동작이 바뀌면 이 문서와 관련 설계서를 함께 갱신한다.
+
+책임별 파일·호출 방향·금지 의존성·검증 증거의 상세 목록은 [`system-module-catalog.md`](./system-module-catalog.md)를 기준으로 한다. 이 문서는 전체 흐름과 불변식을, 카탈로그는 모듈 단위의 SRP 경계를 담당한다.
 
 ## 1. 실행 경계
 
@@ -31,7 +33,7 @@
 | 요청 추적·오류 | `lib/request-trace.ts`, `lib/error-diagnostics.ts`, `lib/debug-context.ts` | 도메인 모듈이 HTTP 응답을 직접 만들지 않음 |
 | KIS 인증 | `lib/kis-token.ts`, `lib/kis-authorization.ts` | 토큰 발급과 일반 시세 호출을 분리하고 DB 잠금·throttle 사용 |
 | KIS 호출 공통화 | `lib/kis-request-framework.ts`, `lib/kis-request-throttle.ts` | 개별 KIS 모듈이 재시도·인증·throttle을 복제하지 않음 |
-| KIS 국내·해외 | `lib/kis.ts`, `lib/kis-us.ts`, `lib/kis-us-api.ts`, 관련 `*-client.ts` | 원본 응답 파싱과 화면 DTO를 분리 |
+| KIS 국내·해외 | `lib/kis.ts`, `lib/kis-us-api.ts`, 관련 `*-client.ts` | 원본 응답 파싱과 화면 DTO를 분리 |
 | 시세 캐시 | `lib/kr-daily-price-cache.ts`, `lib/us-daily-price-cache*.ts`, 분봉 캐시 모듈 | 수집·upsert·조회·최신성 판정을 한 책임으로 취급하지 않음 |
 | 지표·스캐너 | `lib/*indicator*.ts`, `lib/*scan*.ts`, `lib/screener-engine.ts` | EMA 규칙과 원본 봉 기준일을 명시하고 HTTP를 모름 |
 | 유니버스·상품 분류 | `lib/us-top-rising-universe.ts`, `lib/instrument-universe-import.ts`, 상품 분류 모듈 | 활성 보통주 판정과 랭킹 수집을 구분 |
@@ -53,7 +55,7 @@
 
 ### 3.2 해외 상승률 TOP 100
 
-`/api/stock/us/top-rising-chart`는 거래소별 상승률 원본을 조회하고, ETF·레버리지·워런트·파생상품 등을 제외한 뒤 시총 정책을 적용하여 차트 페이지 DTO를 반환한다. 거래소 호출은 병렬화되어 있으며, 정상적인 `output1` 메타데이터와 `output2` 행 배열을 구분한다. 정상 응답의 0건은 전송 오류가 아니며, 유효한 스냅샷을 빈 결과로 덮어쓰지 않는다.
+`/api/stock/us/top-rising-chart`는 worker/universe가 최근 수집한 NAS·AMS·NYS 거래소별 KIS 상승률 최대 100행을 재사용하고, 프로세스 cold start 때만 hydration 한다. HTTP/KIS 성공 상태를 확인한 후 상품 제외, 공식 활성 보통주 마스터(fail-closed), 선택적 시총 조건을 적용해 차트 DTO를 만든다. 각 거래소의 원천 응답 수·완전성·실제 수집시각·오류를 별도로 반환하며, 세 거래소 모두 정상 100행을 받은 경우에만 전체 `complete=true`다. 브라우저 15초 재조회는 KIS 호출이 아니며, UI는 원천 시각 누락 또는 60초 초과를 최신성 경고로 표시한다. 분봉 큐는 점수 계산이 가능한 후보를 우선하고, 남은 최대 30개 슬롯은 같은 공식·설정 필터를 통과한 TOP100 원천 rank 순서로 채운다. KIS 해외 분봉 API의 실제 1분봉 조회에서 최근 1~10분 거래대금을 메모리 집계하며, 시총이 없으면 금액만 표시하고 시총 대비 비율·알림은 산출하지 않는다.
 
 ### 3.3 RSS·공시
 
@@ -81,7 +83,7 @@
 
 | 후보 | 위험 | 분리 기준 |
 |---|---|---|
-| `lib/kis.ts`, `lib/kis-us.ts` | 인증·원본 호출·fallback·캐시·도메인 매핑이 커지기 쉬움 | 새 API 추가 시 `client`, `mapper`, `repository`, `service` 중 하나로 분리 |
+| `lib/kis.ts`, `lib/kis-us-api.ts` | 인증·원본 호출·fallback·캐시·도메인 매핑이 커지기 쉬움 | 새 API 추가 시 `client`, `mapper`, `repository`, `service` 중 하나로 분리 |
 | 대형 차트 클라이언트 | 모달 상태·데이터 fetch·키보드·watchlist가 결합되기 쉬움 | 동일 상태가 두 화면에서 필요해지는 즉시 hook/표현 컴포넌트 분리 |
 | 스캐너 application service | 여러 지표와 SQL이 한 함수에 모일 위험 | 후보 universe, candle repository, indicator evaluator, result presenter 분리 |
 | API route | 진단·fallback·응답 포맷이 누적될 위험 | route에는 인증·입력·상태 코드만 남김 |
@@ -107,3 +109,4 @@
 - KIS 요청: [`../KIS_REQUEST_FRAMEWORK.md`](../KIS_REQUEST_FRAMEWORK.md)
 - 운영 런북: [`../operations/runbook.md`](../operations/runbook.md)
 - 오류 대응: [`../ERROR_HANDLING.md`](../ERROR_HANDLING.md)
+- 상세 모듈 카탈로그: [`./system-module-catalog.md`](./system-module-catalog.md)

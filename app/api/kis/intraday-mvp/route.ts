@@ -6,7 +6,7 @@ import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
 
 export const dynamic = "force-dynamic";
 
-/** Returns only live TOP100 candidates that passed the MVP five-minute gate. */
+/** Returns qualified candidates and recent in-memory turnover for the US focus pool. */
 export async function GET() {
   // Do not rely exclusively on Next instrumentation in standalone/container
   // deployments. This remains process-singleton and is a no-op in development
@@ -19,6 +19,7 @@ export async function GET() {
     isUsScannerOpen(),
   ]);
   const currentTop100 = new Set(snapshot.current.map((item) => `${item.market}:${item.code}`));
+  const currentByKey = new Map(snapshot.current.map((item) => [`${item.market}:${item.code}`, item]));
   const rollingByKey = new Map(snapshot.rollingTurnover.map((entry) => [entry.key, entry]));
   const items = snapshot.candidates
     .filter((candidate) => candidate.mvpTracking && candidate.mvpQualified && currentTop100.has(`${candidate.market}:${candidate.code}`))
@@ -28,12 +29,37 @@ export async function GET() {
       marketCap: candidate.marketCap ?? null,
       rollingTradingValue: candidate.rollingTurnoverValue ?? 0,
       rollingTurnoverRatio: candidate.rollingTurnoverRatio ?? null,
+      turnoverWindows: intradayMemoryState.getRollingTurnoverWindows(candidate.market, candidate.code, candidate.marketCap),
       windowStart: candidate.turnoverWindowStart ?? null,
       windowEnd: candidate.turnoverWindowEnd ?? null,
       sampleCount: rollingByKey.get(`${candidate.market}:${candidate.code}`)?.buckets.length ?? 0,
       state: candidate.state ?? null,
       lastObservedAt: candidate.lastObservedAt ?? null,
     }));
+
+  // Minute quotes are intentionally limited to the existing priority-selected
+  // focus pool to preserve KIS request budgets. This is not a claim that every
+  // common stock in the three exchange TOP100 lists has minute observations.
+  const usFocusItems = snapshot.candidates
+    .filter((candidate) => candidate.mvpTracking && candidate.focusTracking && ["NAS", "AMS", "NYS"].includes(candidate.market) && currentTop100.has(`${candidate.market}:${candidate.code}`))
+    .map((candidate) => {
+      const current = currentByKey.get(`${candidate.market}:${candidate.code}`);
+      const turnoverWindows = intradayMemoryState.getRollingTurnoverWindows(candidate.market, candidate.code, candidate.marketCap);
+      const latestWindow = turnoverWindows[0];
+      return {
+        market: candidate.market,
+        code: candidate.code,
+        name: current?.name ?? candidate.code,
+        rank: current?.rank ?? candidate.focusRank ?? null,
+        marketCap: candidate.marketCap ?? null,
+        currency: "USD",
+        status: latestWindow?.sampleCount ? "OBSERVING" : "WAITING_FOR_FIRST_SAMPLE",
+        state: candidate.state ?? "WARMING_UP",
+        turnoverWindows,
+        lastObservedAt: latestWindow?.windowEnd ? new Date(latestWindow.windowEnd).toISOString() : null,
+      };
+    })
+    .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER));
 
   const worker = getIntradayWorkerSnapshot();
   const tracked = snapshot.candidates.filter((candidate) => candidate.mvpTracking).length;
@@ -60,8 +86,9 @@ export async function GET() {
     ok: true,
     mode: "INTRADAY_MVP_TURNOVER",
     collectedAt: new Date().toISOString(),
-    criteria: { source: "TOP100_RISING", windowMinutes: policy.windowMinutes, requiredSamples: policy.requiredSamples, minTurnoverToMarketCapRatio: policy.threshold, minTurnoverToMarketCapPercent: policy.thresholdPercent, bucketMinutes: 1, marketCapSource: "KIS_FIXED" },
-    status: { worker, reason: statusReason, detectionEnabled: !explicitKillSwitch, explicitKillSwitch, top100CandidateCount: snapshot.current.length, trackedCandidateCount: tracked, qualifiedCandidateCount: qualified, message: resolvedStatusMessage },
+    criteria: { source: "TOP100_RISING", windowMinutes: policy.windowMinutes, requiredSamples: policy.requiredSamples, minTurnoverToMarketCapRatio: policy.threshold, minTurnoverToMarketCapPercent: policy.thresholdPercent, bucketMinutes: 1, retainedTurnoverMinutes: 10, retentionSource: "PROCESS_MEMORY", marketCapSource: "KIS_FIXED" },
+    status: { worker, reason: statusReason, detectionEnabled: !explicitKillSwitch, explicitKillSwitch, top100CandidateCount: snapshot.current.length, trackedCandidateCount: tracked, usFocusPoolCount: usFocusItems.length, qualifiedCandidateCount: qualified, message: resolvedStatusMessage },
     items,
+    usFocusItems,
   });
 }

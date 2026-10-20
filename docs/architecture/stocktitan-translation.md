@@ -10,7 +10,7 @@
 - 관리자 미리보기: `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true`는 최신 StockTitan feed를 가져와 제목만 번역한다. 저장하거나 Discord로 전송하지 않는다. `translate=true`에서 출처를 생략하면 StockTitan으로 기본 지정하고, 다른 출처를 지정하면 HTTP 400으로 거부한다.
 - 공통 번역 함수는 StockTitan이 아닌 항목에 대해 provider를 호출하지 않고 `unsupported_source` fallback을 반환한다.
 
-## Provider
+## 배포 설정
 
 현재 런타임 구현은 Google Cloud Translation Basic v2 REST API이며 `GOOGLE_TRANSLATION_API_KEY`로 인증한다. 공식 요청 주소는 `POST https://translation.googleapis.com/language/translate/v2`이고, JSON의 `q`에 제목 텍스트를 전달하며 source `en`, target `ko`, format `text`를 지정한다. 키가 설정되지 않으면 운영 번역은 provider 호출 없이 fallback 상태로 기록한다.
 

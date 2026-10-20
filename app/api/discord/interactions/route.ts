@@ -48,7 +48,6 @@ function formatBreakoutResult(result: Awaited<ReturnType<typeof runUsDailyBreako
     `당일 시가 ${item.currentPrice} · 직전 5일 최고가 ${item.previousFiveDayHigh}`,
     `등락률 ${formatDisplayPercent(item.rate)} · 거래량 ${formatDisplayNumber(item.volume)}`,
     `시총 ${formatDisplayNumber(item.marketCap)} · 거래대금 ${formatDisplayNumber(item.tradingValue)} · 시총 대비 ${formatDisplayPercent(item.turnoverRatio)}`,
-    `유통주 ${formatDisplayNumber(item.freeFloatShares)} · 유통비율 ${formatDisplayPercent(item.freeFloatPercent)}`,
   ].join("\n"))].join("\n\n");
 }
 

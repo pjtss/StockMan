@@ -71,10 +71,13 @@ sudo chmod 640 /etc/stockman/stockman.env
 sudo cp deploy/oci/stockman.service /etc/systemd/system/
 sudo cp deploy/oci/stockman-cron.service /etc/systemd/system/
 sudo cp deploy/oci/stockman-cron.timer /etc/systemd/system/
+sudo cp deploy/oci/stockman-rss.service /etc/systemd/system/
+sudo cp deploy/oci/stockman-rss.timer /etc/systemd/system/
 sudo install -o root -g root -m 755 deploy/oci/stockman-activate /usr/local/sbin/stockman-activate
 sudo systemctl daemon-reload
 sudo systemctl enable --now stockman.service
 sudo systemctl enable --now stockman-cron.timer
+sudo systemctl enable --now stockman-rss.timer
 ```
 
 GitHub Actions가 배포 교체 작업만 수행할 수 있도록 `sudoers`에 다음을 추가합니다.
@@ -101,52 +104,19 @@ HTTPS는 OCI 인스턴스 앞에 도메인과 인증서를 연결한 뒤 Certbot
 ```bash
 systemctl status stockman.service
 systemctl status stockman-cron.timer
+systemctl status stockman-rss.timer
 journalctl -u stockman.service -f
 journalctl -u stockman-cron.service -f
-```
-# LibreTranslate (선택 설치)
-
-StockMan의 RSS 번역을 OCI 내부에서만 제공하려면 다음처럼 설치한다. 이 compose 파일은 포트 5000을 `127.0.0.1`에만 공개하므로 인터넷에 번역 서버가 노출되지 않는다.
-
-```bash
-sudo mkdir -p /opt/stockman/libretranslate
-sudo cp /opt/stockman/current/deploy/oci/libretranslate.compose.yml /opt/stockman/libretranslate/compose.yml
-cd /opt/stockman/libretranslate
-sudo docker compose -f compose.yml pull
-sudo docker compose -f compose.yml up -d
-sudo docker compose -f compose.yml ps
-curl -fsS http://127.0.0.1:5000/health
+journalctl -u stockman-rss.service -n 50 --no-pager
 ```
 
-첫 기동은 영어·한국어 모델을 내려받아 1~2분 이상 걸릴 수 있다. 정상 확인 후 `/etc/stockman/stockman.env`에 다음을 추가하고 애플리케이션을 재시작한다.
+RSS timer는 5분마다 `/api/cron/market-rss`를 전용 scheduler 헤더와 함께 호출합니다. 운영 freshness를 조사할 때는 timer의 `Active` 상태만으로 성공을 판단하지 말고, `stockman-rss.service` journal의 HTTP/application 응답과 `/api/debug/automation-runs?module=market-rss&limit=20`의 마지막 실행을 함께 확인합니다. `market-rss` 실행이 오래됐으면 번역 provider부터 단정하지 말고 timer 활성화, 서비스 응답, 실행 로그 순으로 확인합니다.
+## RSS 제목 번역 설정
 
-```env
-TRANSLATION_ENABLED=true
-TRANSLATION_PROVIDER=libretranslate
-LIBRETRANSLATE_URL=http://127.0.0.1:5000
-LIBRETRANSLATE_API_KEY=
-TRANSLATION_SOURCE_LANGUAGE=en
-TRANSLATION_TARGET_LANGUAGE=ko
-TRANSLATION_TIMEOUT_MS=10000
-```
+현재 RSS 번역은 LibreTranslate를 사용하지 않는다. Google Cloud Translation Basic v2 REST API를 사용하므로 운영 환경변수 파일 `/etc/stockman/stockman.env`에 `GOOGLE_TRANSLATION_API_KEY`를 설정한다. 이 값은 필수 앱 시작 설정은 아니지만, 빠져 있으면 RSS 번역이 생략되고 알림에는 원문 fallback이 표시된다. 설정 후 웹 앱 프로세스를 재시작해 환경을 다시 읽힌다.
 
 ```bash
 sudo systemctl restart stockman.service
 ```
 
-검증:
-
-```bash
-curl -fsS http://127.0.0.1:5000/translate \
-  -H 'content-type: application/json' \
-  -d '{"q":"Sky Quarry raises funds","source":"en","target":"ko","format":"text"}'
-```
-
-중지·업데이트:
-
-```bash
-cd /opt/stockman/libretranslate
-sudo docker compose -f compose.yml down
-sudo docker compose -f compose.yml pull
-sudo docker compose -f compose.yml up -d
-```
+Basic v2 API key 인증은 [Google 공식 인증 안내](https://docs.cloud.google.com/translate/docs/authentication)와 [translate API 문서](https://docs.cloud.google.com/translate/docs/reference/rest/v2/translate)를 따른다. `TRANSLATION_PROVIDER`, `LIBRETRANSLATE_URL`, `LIBRETRANSLATE_API_KEY`는 현재 RSS 번역의 유효한 설정이 아니다. 저장소의 `libretranslate.compose.yml`과 설치 스크립트는 미사용 레거시이므로 새로 설치하거나 실행하지 않는다.

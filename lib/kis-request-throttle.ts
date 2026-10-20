@@ -1,34 +1,19 @@
 import { createDebugContext, type DebugContext } from "@/lib/debug-context";
 import { writeDebugLog } from "@/lib/debug-logger";
 
-/** Serializes KIS calls in this process and backs off on gateway rate limits. */
 // KIS may document a higher ceiling, but this application deliberately uses
-// a conservative hard ceiling of 10 TPS for stability and recovery headroom.
-// The environment variable may lower the rate, never raise it.
+// a conservative hard ceiling of 10 requests per rolling second.
 const MAX_SAFE_TPS = 10;
 const MIN_SAFE_INTERVAL_MS = 1000 / MAX_SAFE_TPS;
 const configuredIntervalMs = Number(process.env.KIS_MIN_REQUEST_INTERVAL_MS ?? MIN_SAFE_INTERVAL_MS) || MIN_SAFE_INTERVAL_MS;
 const BASE_INTERVAL_MS = Math.max(MIN_SAFE_INTERVAL_MS, configuredIntervalMs);
 const MAX_ADAPTIVE_INTERVAL_MS = 250;
 const RATE_LIMIT_STEP_MS = 25;
-let adaptiveIntervalMs = BASE_INTERVAL_MS;
-let consecutiveSuccesses = 0;
+const MAX_IN_FLIGHT = 10;
+const MAX_QUEUED_REQUESTS = 512;
 const RETRY_DELAYS_MS = [500, 1000, 2000];
-let tail: Promise<void> = Promise.resolve();
-let lastStartedAt = 0;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-async function acquire() {
-  const previous = tail;
-  let release!: () => void;
-  tail = new Promise<void>((resolve) => { release = resolve; });
-  await previous;
-  const wait = Math.max(0, adaptiveIntervalMs - (Date.now() - lastStartedAt));
-  if (wait) await sleep(wait);
-  lastStartedAt = Date.now();
-  return release;
-}
 
 export function classifyKisFailure(result: any): "RATE_LIMITED" | "TRANSIENT_HTTP" | "AUTH_EXPIRED" | "PERMANENT" | null {
   const status = result?.response?.status ?? result?.status;
@@ -48,41 +33,158 @@ export function classifyKisFailure(result: any): "RATE_LIMITED" | "TRANSIENT_HTT
   return null;
 }
 
-export async function withKisRequestThrottle<T>(request: () => Promise<T>, context?: DebugContext, onRateLimit?: (result: T, attempt: number, backoffMs: number) => void): Promise<T> {
-  const trace = context ?? createDebugContext({ feature: "kis-api" });
-  for (let attempt = 0; ; attempt += 1) {
-    const attemptStartedAt = Date.now();
-    const release = await acquire();
+type ThrottleOptions = {
+  baseIntervalMs: number;
+  maxInFlight?: number;
+  maxQueuedRequests?: number;
+  retryDelaysMs?: number[];
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  onStartReservation?: (startedAt: number) => void;
+  logRetry?: (trace: DebugContext, payload: Record<string, unknown>) => void;
+};
+
+/**
+ * Creates a process-local KIS request scheduler. It serializes start-time
+ * reservations, not network waits, and independently caps in-flight requests.
+ */
+export function createKisRequestThrottle(options: ThrottleOptions) {
+  const now = options.now ?? Date.now;
+  const wait = options.sleep ?? sleep;
+  const retryDelays = options.retryDelaysMs ?? RETRY_DELAYS_MS;
+  const maxInFlight = Math.max(1, Math.floor(options.maxInFlight ?? MAX_IN_FLIGHT));
+  const maxQueuedRequests = Math.max(0, Math.floor(options.maxQueuedRequests ?? MAX_QUEUED_REQUESTS));
+  const baseIntervalMs = Math.max(MIN_SAFE_INTERVAL_MS, options.baseIntervalMs);
+  const adaptiveIntervalCeilingMs = Math.max(baseIntervalMs, MAX_ADAPTIVE_INTERVAL_MS);
+  let adaptiveIntervalMs = baseIntervalMs;
+  let consecutiveSuccesses = 0;
+  let startGate: Promise<void> = Promise.resolve();
+  let lastStartedAt = 0;
+  let recentStarts: number[] = [];
+  let pauseUntil = 0;
+  let inFlight = 0;
+  const inFlightWaiters: Array<() => void> = [];
+
+  function applySharedBackoff(backoffMs: number) {
+    pauseUntil = Math.max(pauseUntil, now() + backoffMs);
+    adaptiveIntervalMs = Math.min(adaptiveIntervalCeilingMs, adaptiveIntervalMs + RATE_LIMIT_STEP_MS);
+    consecutiveSuccesses = 0;
+  }
+
+  async function acquireInFlightSlot() {
+    if (inFlight < maxInFlight) {
+      inFlight += 1;
+    } else {
+      if (inFlightWaiters.length >= maxQueuedRequests) throw new Error("KIS_REQUEST_QUEUE_FULL");
+      await new Promise<void>((resolve) => inFlightWaiters.push(resolve));
+    }
     let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const next = inFlightWaiters.shift();
+      if (next) next();
+      else inFlight -= 1;
+    };
+  }
+
+  async function reserveRequestStart() {
+    const previous = startGate;
+    let unlock!: () => void;
+    startGate = new Promise<void>((resolve) => { unlock = resolve; });
+    await previous;
     try {
-      const result = await request();
+      while (true) {
+        const currentTime = now();
+        recentStarts = recentStarts.filter((startedAt) => currentTime - startedAt < 1000);
+        const spacingWait = Math.max(0, adaptiveIntervalMs - (currentTime - lastStartedAt));
+        const cooldownWait = Math.max(0, pauseUntil - currentTime);
+        const rollingWindowWait = recentStarts.length >= MAX_SAFE_TPS
+          ? Math.max(0, recentStarts[0] + 1000 - currentTime + 1)
+          : 0;
+        const delay = Math.max(spacingWait, cooldownWait, rollingWindowWait);
+        if (delay > 0) {
+          await wait(delay);
+          continue;
+        }
+        const startedAt = now();
+        recentStarts.push(startedAt);
+        lastStartedAt = startedAt;
+        options.onStartReservation?.(startedAt);
+        return;
+      }
+    } finally {
+      unlock();
+    }
+  }
+
+  return async function withThrottle<T>(
+    request: () => Promise<T>,
+    context?: DebugContext,
+    onRateLimit?: (result: T, attempt: number, backoffMs: number) => void,
+    onAttempt?: (attempt: number) => void,
+  ): Promise<T> {
+    const trace = context ?? createDebugContext({ feature: "kis-api" });
+    for (let attempt = 0; ; attempt += 1) {
+      const attemptStartedAt = now();
+      const releaseInFlight = await acquireInFlightSlot();
+      try {
+        await reserveRequestStart();
+      } catch (error) {
+        releaseInFlight();
+        try { onAttempt?.(attempt + 1); } catch { /* Observability hooks cannot alter request delivery. */ }
+        throw error;
+      }
+
+      let result: T;
+      try {
+        result = await request();
+      } catch (error) {
+        releaseInFlight();
+        // A rejected fetch is still a real HTTP attempt. Record it before
+        // deciding whether it can be retried, and cool down queued callers as
+        // well so a shared network outage does not create a retry burst.
+        try { onAttempt?.(attempt + 1); } catch { /* Observability hooks cannot alter request delivery. */ }
+        const delayMs = retryDelays[attempt] ?? retryDelays.at(-1) ?? 1000;
+        applySharedBackoff(delayMs);
+        if (attempt >= retryDelays.length) throw error;
+        writeRetry(trace, { attempt: attempt + 1, failure: "NETWORK", delayMs, durationMs: now() - attemptStartedAt, retryable: true, error: error instanceof Error ? error.message : String(error) });
+        await wait(delayMs);
+        continue;
+      }
+
       const failure = classifyKisFailure(result);
-      if (failure === "RATE_LIMITED") {
-        adaptiveIntervalMs = Math.min(MAX_ADAPTIVE_INTERVAL_MS, adaptiveIntervalMs + RATE_LIMIT_STEP_MS);
-        consecutiveSuccesses = 0;
-        onRateLimit?.(result, attempt + 1, RETRY_DELAYS_MS[attempt] ?? 0);
+      try { onAttempt?.(attempt + 1); } catch { /* Observability hooks cannot alter request delivery. */ }
+      if (failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP") {
+        // Rate limits and upstream 5xx responses are process-wide pressure,
+        // not isolated failures. Slow queued starts too, preventing each
+        // concurrent request from retrying into the same unhealthy window.
+        const backoffMs = retryDelays[attempt] ?? retryDelays.at(-1) ?? 1000;
+        applySharedBackoff(backoffMs);
+        if (failure === "RATE_LIMITED") {
+          try { onRateLimit?.(result, attempt + 1, retryDelays[attempt] ?? 0); } catch { /* Observability hooks cannot alter request delivery. */ }
+        }
       } else if (!failure) {
         consecutiveSuccesses += 1;
-        if (consecutiveSuccesses >= 25 && adaptiveIntervalMs > BASE_INTERVAL_MS) {
-          adaptiveIntervalMs = Math.max(BASE_INTERVAL_MS, adaptiveIntervalMs - 1);
+        if (consecutiveSuccesses >= 25 && adaptiveIntervalMs > baseIntervalMs) {
+          adaptiveIntervalMs = Math.max(baseIntervalMs, adaptiveIntervalMs - 1);
           consecutiveSuccesses = 0;
         }
       }
-      if (!(failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP") || attempt >= RETRY_DELAYS_MS.length) return result;
-      writeDebugLog("WARN", "kis_api_retry_scheduled", trace, { attempt: attempt + 1, failure, delayMs: RETRY_DELAYS_MS[attempt], durationMs: Date.now() - attemptStartedAt, retryable: true });
-      release();
-      released = true;
-      await sleep(RETRY_DELAYS_MS[attempt]);
-      continue;
-    } catch (error) {
-      if (attempt >= RETRY_DELAYS_MS.length) throw error;
-      writeDebugLog("WARN", "kis_api_retry_scheduled", trace, { attempt: attempt + 1, failure: "NETWORK", delayMs: RETRY_DELAYS_MS[attempt], durationMs: Date.now() - attemptStartedAt, retryable: true, error: error instanceof Error ? error.message : String(error) });
-      release();
-      released = true;
-      await sleep(RETRY_DELAYS_MS[attempt]);
-      continue;
-    } finally {
-      if (!released) release();
+
+      const shouldRetry = (failure === "RATE_LIMITED" || failure === "TRANSIENT_HTTP") && attempt < retryDelays.length;
+      releaseInFlight();
+      if (!shouldRetry) return result;
+      const delayMs = retryDelays[attempt];
+      writeRetry(trace, { attempt: attempt + 1, failure, delayMs, durationMs: now() - attemptStartedAt, retryable: true });
+      await wait(delayMs);
     }
+  };
+
+  function writeRetry(trace: DebugContext, payload: Record<string, unknown>) {
+    if (options.logRetry) options.logRetry(trace, payload);
+    else writeDebugLog("WARN", "kis_api_retry_scheduled", trace, payload);
   }
 }
+
+export const withKisRequestThrottle = createKisRequestThrottle({ baseIntervalMs: BASE_INTERVAL_MS });

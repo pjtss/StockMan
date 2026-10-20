@@ -42,6 +42,7 @@
 ## 현재 점검 결과
 
 - 최신 현재 상태 기준서는 [`current-system-reference.md`](./current-system-reference.md)다. 구조·정책·SRP 판단의 출발점으로 사용한다.
+- 상세 책임·의존성·검증 증거는 [`system-module-catalog.md`](./system-module-catalog.md)에서 책임별로 나누어 관리한다. 이 문서가 전체 원칙을, 카탈로그가 파일군과 변경 촉발 조건을 담당한다.
 
 - 문서 진입점: 충족 (`docs/README.md`, 영역별 README 존재).
 - 공식 문서 보관 경계: 충족 (`docs/official/`, `docs/references/`).
@@ -49,3 +50,16 @@
 - 자동 검증: 문서 진입점과 migration 파일명은 `scripts/check-docs.mjs`가 검사한다. 본 문서가 추가되면서 문서 인덱스와 필수 진입점 검사에도 포함한다.
 
 이 문서는 특정 파일의 크기만으로 SRP 위반을 판정하지 않는다. 책임이 둘 이상으로 분리되어야 하는 근거가 있고, 테스트 가능한 경계가 필요한 경우에만 분리한다.
+
+## 문서 자체의 SRP
+
+문서도 하나의 변경 이유만 가져야 한다.
+
+- `current-system-reference.md`: 전체 실행 경계·데이터 흐름·불변식
+- `system-module-catalog.md`: 책임별 모듈·의존성·분리 백로그
+- `code-structure.md`: 디렉터리와 파일 배치 규칙
+- `external-request-boundaries.md`: 외부 요청 공통 계약
+- 기능별 설계서: 특정 기능의 정책과 사용자 계약
+- 운영 문서: 배포·장애·지속 개선 절차
+
+새 문서가 기존 문서의 책임을 복제하면 인덱스에 추가하기 전에 어느 문서를 권위로 삼을지 결정한다. 동일 내용을 여러 문서에 복사하지 않고 링크로 연결한다.

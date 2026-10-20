@@ -11,6 +11,7 @@ export type UsMinuteTurnoverRequest = {
 export type UsMinuteTurnoverPoint = {
   index: number;
   time: string;
+  observedAt: number | null;
   price: number;
   amount: number;
   cumulativeTradingValue?: number;
@@ -56,6 +57,34 @@ function parseJson(rawText: string) {
   }
 }
 
+function parseWallClock(value: unknown) {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})(\d{2})(\d{2})$/);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]), hour: Number(match[4]), minute: Number(match[5]), second: Number(match[6]) };
+}
+
+function wallClockInTimeZoneToEpoch(value: unknown, timeZone: string) {
+  const parts = parseWallClock(value);
+  if (!parts) return null;
+  const desired = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  let guess = desired;
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const values = Object.fromEntries(formatter.formatToParts(new Date(guess)).map((part) => [part.type, part.value]));
+    const represented = Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day), Number(values.hour), Number(values.minute), Number(values.second));
+    guess += desired - represented;
+  }
+  return Number.isFinite(guess) ? guess : null;
+}
+
+function parseExplicitTimestamp(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) return null;
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function continuation(parsed: any) {
   const output1 = parsed?.output1 ?? {};
   const next = String(output1.next ?? output1.nextkey ?? output1.NEXT ?? "").trim();
@@ -63,23 +92,19 @@ function continuation(parsed: any) {
   return { next, more, hasMore: more ? more !== "0" : Boolean(next) };
 }
 
-function buildRequest(code: string, market: string, config: Awaited<ReturnType<typeof loadKisApiConfig>>, next = "") {
+export function buildUsMinuteTurnoverUrl(code: string, market: string, config: Awaited<ReturnType<typeof loadKisApiConfig>>, next = "") {
   const params = new URLSearchParams({
     AUTH: asciiOnly(config.AUTH, ""),
     KEYB: asciiOnly(config.KEYB, ""),
     EXCD: market,
-    FID_COND_MRKT_DIV_CODE: asciiOnly(config.FID_COND_MRKT_DIV_CODE, market) || market,
     SYMB: code,
-    FID_INPUT_ISCD: code,
-    FID_HOUR_CLS_CODE: asciiOnly(config.FID_HOUR_CLS_CODE, "0") || "0",
     PINC: asciiOnly(config.FID_PW_DATA_INCU_YN, "N") || "N",
     NEXT: next,
     NREC: "120",
     FILL: "0",
     NMIN: "1",
   });
-  const url = `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice?${params.toString()}`;
-  return { url, params };
+  return `https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice?${params.toString()}`;
 }
 
 export function parseUsMinuteTurnoverPoints(parsed: any): UsMinuteTurnoverPoint[] {
@@ -90,9 +115,16 @@ export function parseUsMinuteTurnoverPoints(parsed: any): UsMinuteTurnoverPoint[
       : parsed?.output ?? parsed?.output1 ?? {};
   const rows = Array.isArray(output) ? output : Array.isArray(output?.data) ? output.data : [];
   return rows
-    .map((row: any, index: number) => ({
+    .map((row: any, index: number) => {
+      const koreaDateTime = row.kymd && row.khms ? `${row.kymd}T${row.khms}` : "";
+      const exchangeDateTime = row.xymd && row.xhms ? `${row.xymd}T${row.xhms}` : "";
+      const explicitTime = row.time ?? row.datetime ?? row.timestamp ?? row.date;
+      return ({
       index,
-      time: String(row.kymd && row.khms ? `${row.kymd}T${row.khms}` : row.xymd && row.xhms ? `${row.xymd}T${row.xhms}` : row.stck_cntg_hour || row.todt || row.time || row.date || "").trim(),
+      time: String(koreaDateTime || exchangeDateTime || row.stck_cntg_hour || explicitTime || "").trim(),
+      observedAt: wallClockInTimeZoneToEpoch(koreaDateTime, "Asia/Seoul")
+        ?? wallClockInTimeZoneToEpoch(exchangeDateTime, "America/New_York")
+        ?? parseExplicitTimestamp(explicitTime),
       price: parseNumber(row.last ?? row.price ?? row.stck_prpr ?? row.close ?? row.cprc),
       amount: parseNumber(
         row.tamnt ?? row.acml_tr_pbmn ?? row.acml_tr_value ?? row.trade_amount ?? row.pbmn ??
@@ -108,7 +140,8 @@ export function parseUsMinuteTurnoverPoints(parsed: any): UsMinuteTurnoverPoint[
       bid: parseNumber(row.pbid ?? row.bid) || undefined,
       ask: parseNumber(row.pask ?? row.ask) || undefined,
       raw: row,
-    }))
+    });
+    })
     .filter((row: UsMinuteTurnoverPoint) => row.price > 0 || row.amount > 0);
 }
 
@@ -123,7 +156,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
   const custtype = asciiOnly(config.custtype, "P") || "P";
 
   async function fetchOnce(token: string, next = "") {
-    const { url } = buildRequest(code, market, config, next);
+    const url = buildUsMinuteTurnoverUrl(code, market, config, next);
     const response = await withKisRequestThrottle(() => fetch(url, {
       method: "GET",
       headers: {
@@ -145,7 +178,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
   if (!token) return null;
   let result = await fetchOnce(token);
   if (isKisTokenExpiredResponse(result.response.status, result.parsed)) {
-    token = await refreshAccessToken();
+    token = await refreshAccessToken(token);
     if (!token) return null;
     result = await fetchOnce(token);
   }

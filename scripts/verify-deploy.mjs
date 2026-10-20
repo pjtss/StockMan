@@ -14,22 +14,6 @@ const verifyDistDir = process.env.DEPLOY_VERIFY_DIST_DIR || ".next-deploy-verify
 const commandTimeoutMs = Number(process.env.DEPLOY_VERIFY_COMMAND_TIMEOUT_MS || 900_000);
 const smokeRequestTimeoutMs = Number(process.env.DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS || 30_000);
 
-function loadLocalEnv() {
-  const file = ".env.local";
-  if (!existsSync(file)) return {};
-  const values = {};
-  for (const raw of readFileSync(file, "utf8").split(/\r?\n/)) {
-    const line = raw.trim();
-    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match || line.startsWith("#")) continue;
-    let value = match[2].trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-    else value = value.replace(/\s+#.*$/, "").trim();
-    values[match[1]] = value;
-  }
-  return values;
-}
-
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
@@ -75,8 +59,20 @@ function run(command, args, options = {}) {
   });
 }
 
+async function verifyFastGates() {
+  console.log("[deploy-verify] fast structural gates");
+  await run(npm, ["run", "docs:check"]);
+  await run(npm, ["run", "audit:verify-scope"]);
+  await run(npm, ["run", "audit:kis-boundary"]);
+  await run(npm, ["run", "cron:check"]);
+  if (!isWindows) {
+    await run("bash", ["-n", "scripts/oci-cron.sh"]);
+    await run("bash", ["-n", "scripts/oci-rss-cron.sh"]);
+  }
+}
+
 async function verifyQuality() {
-  console.log("[deploy-verify] quality gates");
+  console.log("[deploy-verify] full quality gates");
   await run(npm, ["test", "--", "--run"]);
   // Keep verification's incremental TypeScript state out of the shared
   // workspace file. Concurrent local tools can otherwise lock or replace
@@ -136,7 +132,7 @@ async function waitForJson(url, configuredTimeoutMs = 30_000, expectedStatus, in
       const response = await fetch(url, { ...init, signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
       const contentType = response.headers.get("content-type") ?? "";
       const body = await response.text();
-      if (contentType.includes("application/json")) {
+      if (contentType.includes("application/json") || contentType.includes("+json")) {
         try {
           JSON.parse(body);
           if (expectedStatus === undefined || response.status === expectedStatus) {

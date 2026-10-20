@@ -38,6 +38,8 @@ export const RETIRED_SCHEMA_TABLES = ["kr_daily_price_candles", "us_daily_price_
 export const REQUIRED_OPERATIONAL_COLUMNS = [
   ["kr_common_stock_universe", "daily_active"],
   ["us_common_stock_universe", "daily_active"],
+  ["market_rss_articles", "translation_attempted_at"],
+  ["market_rss_articles", "translation_candidate_title"],
 ] as const;
 
 export type SchemaHealth = {
@@ -59,10 +61,19 @@ export function getMissingSchemaTables(tableNames: string[], requiredTables: rea
   return requiredTables.filter((table) => !available.has(table));
 }
 
-export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
+export function getMissingSchemaColumns(
+  requiredColumns: readonly (readonly [string, string])[],
+  availableColumns: readonly (readonly [string, string])[],
+) {
+  const available = new Set(availableColumns.map(([table, column]) => `${table}.${column}`));
+  return requiredColumns
+    .map(([table, column]) => `${table}.${column}`)
+    .filter((column) => !available.has(column));
+}
+
+export async function inspectDatabaseSchema(pool = getPool()): Promise<SchemaHealth> {
   const startedAt = Date.now();
   try {
-    const pool = getPool();
     const [connectionResult, tableResult, columnResult, retiredResult] = await Promise.all([
       pool.query("SELECT 1"),
       pool.query<{ table_name: string }>(
@@ -70,8 +81,8 @@ export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
         [OPERATIONAL_SCHEMA_TABLES],
       ),
       pool.query<{ table_name: string; column_name: string }>(
-        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (($1, $2), ($3, $4))",
-        ["kr_common_stock_universe", "daily_active", "us_common_stock_universe", "daily_active"],
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (($1, $2), ($3, $4), ($5, $6), ($7, $8))",
+        ["kr_common_stock_universe", "daily_active", "us_common_stock_universe", "daily_active", "market_rss_articles", "translation_attempted_at", "market_rss_articles", "translation_candidate_title"],
       ),
       pool.query<{ table_name: string }>(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
@@ -82,10 +93,10 @@ export async function inspectDatabaseSchema(): Promise<SchemaHealth> {
     const checkedTables = tableResult.rows.map((row) => row.table_name);
     const missingTables = getMissingSchemaTables(checkedTables);
     const missingOperationalTables = getMissingSchemaTables(checkedTables, OPERATIONAL_SCHEMA_TABLES);
-    const availableColumns = new Set(columnResult.rows.map((row) => `${row.table_name}.${row.column_name}`));
-    const missingOperationalColumns = REQUIRED_OPERATIONAL_COLUMNS
-      .map(([table, column]) => `${table}.${column}`)
-      .filter((column) => !availableColumns.has(column));
+    const missingOperationalColumns = getMissingSchemaColumns(
+      REQUIRED_OPERATIONAL_COLUMNS,
+      columnResult.rows.map((row) => [row.table_name, row.column_name] as const),
+    );
     const retiredTablesPresent = retiredResult.rows.map((row) => row.table_name);
     let flywayVersion: string | null = null;
     if (!missingTables.includes("flyway_schema_history")) {

@@ -4,9 +4,6 @@ import { FeedPage } from './feed-page';
 import { PushProvider } from './push-provider';
 
 // Mock child components
-vi.mock('./market-sentiment', () => ({
-  MarketSentiment: () => <div data-testid="sentiment" />
-}));
 
 vi.mock('./page-navigation', () => ({
   PageNavigation: () => <nav data-testid="navigation" />

@@ -7,10 +7,15 @@ describe("SEC EDGAR runtime configuration", () => {
   });
 
   it("uses feature settings before environment fallbacks", () => {
-    expect(resolveSecEdgarRuntimeConfig({ secEdgar: { ciks: ["0000000001"], syncXbrl: true, discordBatch: 120 } }, { SEC_SYNC_CIKS: "0000000002", SEC_SYNC_XBRL: "false", SEC_EDGAR_DISCORD_BATCH: "5" })).toEqual({ ciks: ["0000000001"], syncXbrl: true, discordBatch: 100 });
+    expect(resolveSecEdgarRuntimeConfig({ secEdgar: { ciks: ["0000000001"], syncXbrl: true, discordBatch: 120 } }, { SEC_SYNC_CIKS: "0000000002", SEC_SYNC_XBRL: "false", SEC_EDGAR_DISCORD_BATCH: "5" })).toEqual({ ciks: ["0000000001"], smallcapUniverse: false, syncXbrl: true, discordBatch: 100 });
   });
 
   it("uses environment values when feature settings are not configured", () => {
-    expect(resolveSecEdgarRuntimeConfig(undefined, { SEC_SYNC_CIKS: "0000000003,0000000004", SEC_SYNC_XBRL: "true", SEC_EDGAR_DISCORD_BATCH: "7" })).toEqual({ ciks: ["0000000003", "0000000004"], syncXbrl: true, discordBatch: 7 });
+    expect(resolveSecEdgarRuntimeConfig(undefined, { SEC_SYNC_CIKS: "0000000003,0000000004", SEC_SYNC_XBRL: "true", SEC_EDGAR_DISCORD_BATCH: "7" })).toEqual({ ciks: ["0000000003", "0000000004"], smallcapUniverse: false, syncXbrl: true, discordBatch: 7 });
+  });
+
+  it("enables the small-cap universe only with the explicit environment flag", () => {
+    expect(resolveSecEdgarRuntimeConfig(undefined, { SEC_SYNC_SMALLCAP: "true" }).smallcapUniverse).toBe(true);
+    expect(resolveSecEdgarRuntimeConfig(undefined, { SEC_SYNC_SMALLCAP: "TRUE" }).smallcapUniverse).toBe(false);
   });
 });

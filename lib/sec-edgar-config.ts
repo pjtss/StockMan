@@ -2,6 +2,7 @@ import type { FeatureSpecificSettings } from "./feature-modules";
 
 export type SecEdgarRuntimeConfig = {
   ciks: string[];
+  smallcapUniverse: boolean;
   syncXbrl: boolean;
   discordBatch: number;
 };
@@ -20,7 +21,8 @@ export function resolveSecEdgarRuntimeConfig(
   const configured = featureSettings?.secEdgar;
   const ciks = normalizeSecCiks(configured?.ciks?.length ? configured.ciks : environment.SEC_SYNC_CIKS);
   const syncXbrl = typeof configured?.syncXbrl === "boolean" ? configured.syncXbrl : environment.SEC_SYNC_XBRL === "true";
+  const smallcapUniverse = environment.SEC_SYNC_SMALLCAP === "true";
   const discordBatchValue = configured?.discordBatch ?? Number(environment.SEC_EDGAR_DISCORD_BATCH || 10);
   const discordBatch = Number.isFinite(Number(discordBatchValue)) ? Math.min(100, Math.max(1, Math.trunc(Number(discordBatchValue)))) : 10;
-  return { ciks, syncXbrl, discordBatch };
+  return { ciks, smallcapUniverse, syncXbrl, discordBatch };
 }

@@ -4,7 +4,7 @@ import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { withKisRequestThrottle } from "@/lib/kis-request-throttle";
 
 export type KisUsTradeMarket = "NAS" | "AMS" | "NYS";
-export type KisUsTradeTrendRequest = { code: string; market?: KisUsTradeMarket; day?: "0" | "1" };
+export type KisUsTradeTrendRequest = { code: string; market?: KisUsTradeMarket; marketPriority?: KisUsTradeMarket[]; day?: "0" | "1" };
 export type KisUsTrade = { time: string; price: number | null; changeRate: number | null; volume: number | null; totalVolume: number | null; marketType: string; bid: number | null; ask: number | null; intensity: number | null };
 export type KisUsTradeTrendResult = { ok: boolean; status: number; code: string; market: string; day: string; trades: KisUsTrade[]; raw: unknown; rawText: string; diagnostics: { rt_cd: string | null; msg_cd: string | null; msg1: string | null; outputKey: string | null } };
 export type KisUsMinuteChartResult = { ok: boolean; status: number; code: string; market: string; rows: Record<string, unknown>[]; raw: unknown; rawText: string; diagnostics: { rt_cd: string | null; msg_cd: string | null; msg1: string | null } };
@@ -62,12 +62,15 @@ export async function fetchKisUsTradeTrend(input: KisUsTradeTrendRequest): Promi
   const headers = (token: string) => ({ "content-type": config.content_type, Authorization: buildKisAuthorization(token), appkey: process.env.KIS_APPKEY?.trim() || "", appsecret: process.env.KIS_APPSECRET?.trim() || "", tr_id: config.tr_id || "HHDFS76200300", custtype: config.custtype || "P", tr_cont: "" });
   async function once(token: string, exchange: KisUsTradeMarket) { const params = new URLSearchParams({ AUTH: config.AUTH ?? "", EXCD: exchange, TDAY: day, SYMB: code, KEYB: config.KEYB ?? "" }); const response = await withKisRequestThrottle(() => fetch(`https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/inquire-ccnl?${params}`, { headers: headers(token), signal: AbortSignal.timeout(8_000) })); const rawText = await response.text(); let raw: any = null; try { raw = JSON.parse(rawText); } catch {} return { response, raw, rawText }; }
   let token = await getAccessToken(); if (!token) return null;
-  const exchanges: KisUsTradeMarket[] = market ? [market] : ["NAS", "AMS", "NYS"];
+  const exchanges: KisUsTradeMarket[] = market
+    ? [market]
+    : [...new Set((input.marketPriority ?? ["NAS", "AMS", "NYS"]).filter((value): value is KisUsTradeMarket => ["NAS", "AMS", "NYS"].includes(value)))];
+  if (exchanges.length === 0) return null;
   let last: Awaited<ReturnType<typeof once>> | null = null;
   let resolvedMarket = exchanges[exchanges.length - 1];
   for (const exchange of exchanges) {
     let result = await once(token, exchange);
-    if (isKisTokenExpiredResponse(result.response.status, result.raw)) { token = await refreshAccessToken(); if (!token) return null; result = await once(token, exchange); }
+    if (isKisTokenExpiredResponse(result.response.status, result.raw)) { token = await refreshAccessToken(token); if (!token) return null; result = await once(token, exchange); }
     last = result; resolvedMarket = exchange;
     const parsed = parse(result.raw);
     if (result.response.ok && result.raw?.rt_cd !== "1" && parsed.trades.length > 0) {
@@ -156,6 +159,6 @@ export async function fetchKisUsAskingPrice(input: { code: string; market?: KisU
   let token = await getAccessToken(); if (!token) return null;
   const exchanges: KisUsTradeMarket[] = input.market ? [input.market] : ["NAS", "NYS", "AMS"];
   let last: Awaited<ReturnType<typeof once>> | null = null; let resolvedMarket = exchanges[exchanges.length - 1];
-  for (const exchange of exchanges) { let result = await once(token, exchange); if (isKisTokenExpiredResponse(result.response.status, result.raw)) { token = await refreshAccessToken(); if (!token) return null; result = await once(token, exchange); } last = result; resolvedMarket = exchange; if (result.response.ok && result.raw?.rt_cd === "0") { const rows = parseKisUsAskingRows(result.raw); return { ok: true, status: result.response.status, code, market: exchange, rows, raw: result.raw, rawText: result.rawText, diagnostics: { rt_cd: result.raw.rt_cd ?? null, msg_cd: result.raw.msg_cd ?? null, msg1: result.raw.msg1 ?? null } }; } }
+  for (const exchange of exchanges) { let result = await once(token, exchange); if (isKisTokenExpiredResponse(result.response.status, result.raw)) { token = await refreshAccessToken(token); if (!token) return null; result = await once(token, exchange); } last = result; resolvedMarket = exchange; if (result.response.ok && result.raw?.rt_cd === "0") { const rows = parseKisUsAskingRows(result.raw); return { ok: true, status: result.response.status, code, market: exchange, rows, raw: result.raw, rawText: result.rawText, diagnostics: { rt_cd: result.raw.rt_cd ?? null, msg_cd: result.raw.msg_cd ?? null, msg1: result.raw.msg1 ?? null } }; } }
   if (!last) return null; return { ok: false, status: last.response.status, code, market: resolvedMarket, rows: [], raw: last.raw, rawText: last.rawText, diagnostics: { rt_cd: last.raw?.rt_cd ?? null, msg_cd: last.raw?.msg_cd ?? null, msg1: last.raw?.msg1 ?? null } };
 }

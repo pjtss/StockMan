@@ -7,7 +7,6 @@ export const kisModuleRegistry = {
   "kis-chart.ts": "domestic-chart",
   "kis-domestic-api.ts": "domestic-ranking",
   "kis-investor-flow.ts": "domestic-investor-flow",
-  "kis-ipo-listing-schedule.ts": "domestic-ipo-listing-schedule",
   "kis-kr-daily-price.ts": "domestic-daily-price",
   "kis-kr-price-detail.ts": "domestic-price-detail",
   "kis-news-radar.ts": "overseas-news",
@@ -29,7 +28,6 @@ export const kisModuleRegistry = {
   "kis-us-minute-turnover.ts": "overseas-minute-turnover",
   "kis-us-price-detail.ts": "overseas-price-detail",
   "kis-us-trade-trend.ts": "overseas-trade-trend",
-  "kis-us.ts": "overseas-scanner",
   "kis.ts": "domestic-scanner",
 };
 
@@ -41,7 +39,6 @@ export const kisModulePathRegistry = {
     "/uapi/domestic-stock/v1/quotations/volume-rank",
   ],
   "kis-kr-daily-price.ts": ["/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"],
-  "kis-ipo-listing-schedule.ts": ["/uapi/domestic-stock/v1/ksdinfo/list-info"],
   "kis-us-api.ts": ["/uapi/overseas-stock/v1/ranking/updown-rate"],
   "kis-us-condition-search.ts": ["/uapi/overseas-price/v1/quotations/inquire-search"],
   "kis-us-daily-price.ts": ["/uapi/overseas-price/v1/quotations/dailyprice"],
@@ -52,7 +49,6 @@ export const kisModuleFeatureRegistry = {
   "kis-chart.ts": ["fetchChartData"],
   "kis-domestic-api.ts": ["fetchDomesticVolumePower"],
   "kis-kr-daily-price.ts": ["fetchKrDailyPrice"],
-  "kis-ipo-listing-schedule.ts": ["fetchKisIpoListingSchedule"],
   "kis-us-api.ts": ["fetchKisUsTopRisingApi"],
   "kis-us-condition-search.ts": ["fetchKisUsConditionSearch", "filterKisUsConditionRows"],
   "kis-us-daily-price.ts": ["fetchUsDailyPrice"],

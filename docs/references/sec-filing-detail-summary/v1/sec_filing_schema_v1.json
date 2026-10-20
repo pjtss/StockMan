@@ -1,0 +1,4709 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sec-filing-analysis:v1.0.0",
+  "title": "SEC filing deterministic analysis v1.0.0",
+  "description": "All declared fields required; unknown scalar values null. Evidence and consistency require supplementary business rule validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "meta",
+    "issuer",
+    "filing",
+    "documents",
+    "coverage",
+    "event",
+    "financing",
+    "capitalization",
+    "corporate_action",
+    "business",
+    "financials",
+    "market_snapshot",
+    "derived",
+    "assessment",
+    "evidence",
+    "null_reasons",
+    "warnings",
+    "derived_metrics",
+    "quality"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "record_type": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            "SEC_FILING_ANALYSIS"
+          ]
+        }
+      ]
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collected_at_utc",
+        "analyzed_at_utc",
+        "requested_window_start_utc",
+        "requested_window_end_utc",
+        "data_cutoff_at_utc",
+        "processing_status",
+        "analysis_scope",
+        "context_includes_previous_filings",
+        "model_or_parser_version",
+        "snapshot_id",
+        "source_hash"
+      ],
+      "properties": {
+        "collected_at_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "analyzed_at_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested_window_start_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested_window_end_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "data_cutoff_at_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "processing_status": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "NOT_PROCESSED",
+                "PARTIAL",
+                "COMPLETE",
+                "FAILED"
+              ]
+            }
+          ]
+        },
+        "analysis_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context_includes_previous_filings": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "model_or_parser_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_hash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cik_10_digits",
+        "legal_name",
+        "ticker",
+        "ticker_asof_date",
+        "exchange",
+        "sic",
+        "is_foreign_private_issuer",
+        "security_class",
+        "security_identifier",
+        "filer_status"
+      ],
+      "properties": {
+        "cik_10_digits": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "legal_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ticker": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ticker_asof_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchange": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_foreign_private_issuer": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "security_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "security_identifier": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filer_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "filing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accession_number",
+        "form",
+        "amended_form",
+        "file_number",
+        "filing_date_et",
+        "accepted_at_et",
+        "accepted_at_utc",
+        "accepted_at_kst",
+        "report_period_end",
+        "underlying_event_date",
+        "sec_filing_index_url",
+        "sec_primary_document_url",
+        "sec_complete_submission_url",
+        "feed_entry_url",
+        "feed_first_seen_at_utc",
+        "is_amendment",
+        "supersedes_accession",
+        "is_withdrawn_or_corrected"
+      ],
+      "properties": {
+        "accession_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "form": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "amended_form": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filing_date_et": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accepted_at_et": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accepted_at_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accepted_at_kst": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "report_period_end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "underlying_event_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sec_filing_index_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sec_primary_document_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sec_complete_submission_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feed_entry_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feed_first_seen_at_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_amendment": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "supersedes_accession": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_withdrawn_or_corrected": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document_id",
+          "document_type",
+          "exhibit_number",
+          "description",
+          "url",
+          "sha256",
+          "fetched_at_utc",
+          "fetch_status",
+          "content_type",
+          "text_extraction_status",
+          "accession_number"
+        ],
+        "properties": {
+          "document_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "document_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exhibit_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetched_at_utc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fetch_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "NOT_FETCHED",
+                  "FETCHED",
+                  "FAILED",
+                  "NOT_ACCESSIBLE"
+                ]
+              }
+            ]
+          },
+          "content_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text_extraction_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "NOT_PROCESSED",
+                  "EXTRACTED",
+                  "FAILED",
+                  "PARTIAL"
+                ]
+              }
+            ]
+          },
+          "accession_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filing_index_checked",
+        "main_document_checked",
+        "complete_submission_checked",
+        "all_exhibits_enumerated",
+        "material_exhibits_checked",
+        "cited_previous_filings_checked",
+        "companyfacts_checked",
+        "outside_market_data_used",
+        "reference_filing_count",
+        "unreadable_material_documents",
+        "collection_complete",
+        "coverage_comment"
+      ],
+      "properties": {
+        "filing_index_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "main_document_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "complete_submission_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "all_exhibits_enumerated": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "material_exhibits_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "cited_previous_filings_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "companyfacts_checked": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "outside_market_data_used": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reference_filing_count": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unreadable_material_documents": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "collection_complete": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "coverage_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_event_type",
+        "secondary_event_types",
+        "transaction_stage",
+        "dates_as_of",
+        "is_binding",
+        "conditions_outstanding",
+        "cash_new_to_issuer",
+        "number_of_share_classes_affected",
+        "event_summary_factual",
+        "economically_material_change",
+        "previous_announcement_repeat",
+        "event_status"
+      ],
+      "properties": {
+        "primary_event_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "secondary_event_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transaction_stage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dates_as_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_binding": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "conditions_outstanding": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cash_new_to_issuer": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "number_of_share_classes_affected": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "event_summary_factual": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "economically_material_change": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "previous_announcement_repeat": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "event_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "financing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atm_programs",
+        "shelf_registrations",
+        "primary_offerings",
+        "resale_registrations",
+        "warrants",
+        "convertible_instruments",
+        "equity_lines",
+        "debt",
+        "overall"
+      ],
+      "properties": {
+        "atm_programs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "program_id",
+              "agreement_date",
+              "agent_names",
+              "status",
+              "status_asof_date",
+              "currency",
+              "sales_agreement_url",
+              "registration_file_number",
+              "registration_effective_date",
+              "prospectus_supplement_date",
+              "contractual_total_cap",
+              "prospectus_total_cap",
+              "registered_remaining_capacity",
+              "s3_ib6_remaining_capacity",
+              "sold_gross_cumulative",
+              "sold_gross_period",
+              "sold_net_cumulative",
+              "sold_net_period",
+              "sold_shares_cumulative",
+              "sold_shares_period",
+              "weighted_average_sale_price_cumulative",
+              "weighted_average_sale_price_period",
+              "sale_report_period_start",
+              "sale_report_period_end",
+              "contractual_remaining_cap",
+              "effective_current_remaining_cap",
+              "remaining_cap_asof",
+              "fixed_share_price",
+              "share_price_type",
+              "company_minimum_sale_price",
+              "total_share_limit",
+              "agent_commission_pct",
+              "actual_sales_confirmed",
+              "sales_suspended",
+              "termination_date",
+              "sale_method",
+              "key_conditions"
+            ],
+            "properties": {
+              "program_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "agreement_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "agent_names": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status_asof_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sales_agreement_url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_file_number": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_effective_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prospectus_supplement_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "contractual_total_cap": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "prospectus_total_cap": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "registered_remaining_capacity": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "s3_ib6_remaining_capacity": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sold_gross_cumulative": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sold_gross_period": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sold_net_cumulative": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sold_net_period": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sold_shares_cumulative": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sold_shares_period": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "weighted_average_sale_price_cumulative": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "weighted_average_sale_price_period": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sale_report_period_start": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sale_report_period_end": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "contractual_remaining_cap": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "effective_current_remaining_cap": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "remaining_cap_asof": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "fixed_share_price": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "share_price_type": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "enum": [
+                      "MARKET_VARIABLE",
+                      "FIXED",
+                      "FORMULA",
+                      "UNKNOWN"
+                    ]
+                  }
+                ]
+              },
+              "company_minimum_sale_price": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "total_share_limit": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "agent_commission_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "actual_sales_confirmed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "sales_suspended": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "termination_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sale_method": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "key_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "shelf_registrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "registration_file_number",
+              "registration_form",
+              "currency",
+              "nominal_registration_amount",
+              "statement_filed_date",
+              "declared_effective",
+              "effective_date",
+              "shelf_expiry_date",
+              "shelf_remaining_amount",
+              "issuer_eligible_under_form_s3",
+              "s3_ib6_floating_cap_amount",
+              "public_float_used_for_s3",
+              "public_float_measurement_date",
+              "amount_sold_under_ib6_12m",
+              "issuer_primary_or_resale",
+              "description"
+            ],
+            "properties": {
+              "registration_file_number": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_form": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "nominal_registration_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "statement_filed_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "declared_effective": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "effective_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "shelf_expiry_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "shelf_remaining_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "issuer_eligible_under_form_s3": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "s3_ib6_floating_cap_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "public_float_used_for_s3": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "public_float_measurement_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "amount_sold_under_ib6_12m": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "issuer_primary_or_resale": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "primary_offerings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "offering_id",
+              "offering_type",
+              "stage",
+              "is_primary_issuance",
+              "currency",
+              "agreement_date",
+              "announcement_date",
+              "pricing_date",
+              "expected_closing_date",
+              "actual_closing_date",
+              "share_class",
+              "share_count",
+              "units_count",
+              "shares_per_unit",
+              "fixed_price_per_share",
+              "fixed_price_per_unit",
+              "price_type",
+              "gross_proceeds",
+              "net_proceeds",
+              "issuer_cash_received",
+              "placement_agent",
+              "agent_fee_pct",
+              "lockup_end_date",
+              "market_price_reference",
+              "market_price_reference_date",
+              "placement_discount_pct",
+              "included_warrant_series",
+              "completion_confirmed",
+              "use_of_proceeds",
+              "conditions"
+            ],
+            "properties": {
+              "offering_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "offering_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "is_primary_issuance": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "agreement_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "announcement_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "pricing_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expected_closing_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "actual_closing_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "share_class": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "share_count": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "units_count": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shares_per_unit": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "fixed_price_per_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "fixed_price_per_unit": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gross_proceeds": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "net_proceeds": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "issuer_cash_received": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "placement_agent": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "agent_fee_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "lockup_end_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "market_price_reference": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "market_price_reference_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "placement_discount_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "included_warrant_series": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "completion_confirmed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "use_of_proceeds": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "resale_registrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "registration_id",
+              "registration_file_number",
+              "stage",
+              "resale_registered_shares",
+              "already_issued_shares",
+              "unissued_warrant_underlying_shares",
+              "unissued_convertible_underlying_shares",
+              "selling_stockholder_names",
+              "currency",
+              "proceeds_to_selling_holders",
+              "proceeds_to_issuer_from_resale",
+              "potential_issuer_cash_from_warrant_exercise",
+              "effectiveness_date",
+              "sale_completed_confirmed",
+              "creates_new_shares_directly",
+              "note"
+            ],
+            "properties": {
+              "registration_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registration_file_number": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "stage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "resale_registered_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "already_issued_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "unissued_warrant_underlying_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "unissued_convertible_underlying_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "selling_stockholder_names": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "proceeds_to_selling_holders": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "proceeds_to_issuer_from_resale": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "potential_issuer_cash_from_warrant_exercise": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "effectiveness_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sale_completed_confirmed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "creates_new_shares_directly": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "warrants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "series_id",
+              "series_name",
+              "holder",
+              "instrument_kind",
+              "currency",
+              "issued_warrants",
+              "outstanding_warrants",
+              "shares_per_warrant",
+              "underlying_shares_outstanding",
+              "original_exercise_price",
+              "current_exercise_price",
+              "price_type",
+              "repricing_allowed",
+              "repricing_formula",
+              "alternative_exercise_price",
+              "price_floor",
+              "price_ceiling",
+              "cashless_exercise_allowed",
+              "cashless_conditions",
+              "exercise_start_date",
+              "expiry_date",
+              "ownership_blocker_pct",
+              "exchange_share_cap_pct",
+              "anti_dilution_adjustment",
+              "adjustment_for_reverse_split",
+              "current_share_basis_asof",
+              "exercised_shares_reported",
+              "exercise_cash_received",
+              "cashless_exercise_confirmed",
+              "outstanding_status",
+              "note"
+            ],
+            "properties": {
+              "series_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "series_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "holder": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "instrument_kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "issued_warrants": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "outstanding_warrants": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shares_per_warrant": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "underlying_shares_outstanding": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "original_exercise_price": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "current_exercise_price": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_type": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "enum": [
+                      "FIXED",
+                      "VARIABLE",
+                      "RESETTABLE",
+                      "UNKNOWN"
+                    ]
+                  }
+                ]
+              },
+              "repricing_allowed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "repricing_formula": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "alternative_exercise_price": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_floor": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_ceiling": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cashless_exercise_allowed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "cashless_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exercise_start_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expiry_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ownership_blocker_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "exchange_share_cap_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "anti_dilution_adjustment": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "adjustment_for_reverse_split": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "current_share_basis_asof": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exercised_shares_reported": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "exercise_cash_received": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cashless_exercise_confirmed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "outstanding_status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "convertible_instruments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "instrument_id",
+              "kind",
+              "holder",
+              "currency",
+              "face_principal",
+              "outstanding_principal",
+              "original_issue_discount_pct",
+              "interest_rate_pct",
+              "issue_date",
+              "maturity_date",
+              "fixed_conversion_price",
+              "conversion_price_type",
+              "floating_conversion_formula",
+              "market_lookback_days",
+              "conversion_discount_pct",
+              "conversion_floor",
+              "conversion_ceiling",
+              "cash_redemption_premium_pct",
+              "covenant_or_default_trigger",
+              "trigger_status",
+              "remaining_conversion_shares",
+              "converted_shares_to_date",
+              "shares_reserved",
+              "ownership_blocker_pct",
+              "exchange_share_cap_pct",
+              "secured",
+              "note"
+            ],
+            "properties": {
+              "instrument_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "holder": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "face_principal": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "outstanding_principal": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "original_issue_discount_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "interest_rate_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "issue_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "maturity_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "fixed_conversion_price": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "conversion_price_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "floating_conversion_formula": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "market_lookback_days": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "conversion_discount_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "conversion_floor": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "conversion_ceiling": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cash_redemption_premium_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "covenant_or_default_trigger": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trigger_status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "remaining_conversion_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "converted_shares_to_date": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shares_reserved": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "ownership_blocker_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "exchange_share_cap_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "secured": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "equity_lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "facility_id",
+              "counterparty",
+              "currency",
+              "committed_purchase_amount",
+              "drawdown_amount_cumulative",
+              "drawable_remaining",
+              "commitment_fee",
+              "price_type",
+              "reference_price_formula",
+              "discount_pct",
+              "price_floor",
+              "put_conditions",
+              "exchange_cap_pct",
+              "facility_expires_at",
+              "registered_shares",
+              "shares_issued_to_date",
+              "is_active",
+              "note"
+            ],
+            "properties": {
+              "facility_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "counterparty": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "committed_purchase_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "drawdown_amount_cumulative": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "drawable_remaining": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "commitment_fee": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reference_price_formula": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "discount_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_floor": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "put_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exchange_cap_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "facility_expires_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "registered_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shares_issued_to_date": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "is_active": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "debt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "total_debt_issued",
+            "outstanding_principal",
+            "secured",
+            "interest_pct",
+            "maturity_date",
+            "covenant_breached",
+            "covenant_cure_deadline",
+            "lender",
+            "use_of_proceeds",
+            "notes"
+          ],
+          "properties": {
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "total_debt_issued": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "outstanding_principal": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "secured": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "interest_pct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "maturity_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "covenant_breached": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "covenant_cure_deadline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lender": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "use_of_proceeds": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "overall": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "new_cash_inflow_confirmed",
+            "gross_financing_announced",
+            "net_cash_received_confirmed",
+            "potential_future_proceeds",
+            "issuance_completed",
+            "all_issuer_proceeds_unconditional",
+            "cumulative_potential_new_shares",
+            "shares_already_issued_this_event",
+            "funding_status",
+            "cash_flow_uncertainty"
+          ],
+          "properties": {
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "new_cash_inflow_confirmed": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "gross_financing_announced": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "net_cash_received_confirmed": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "potential_future_proceeds": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "issuance_completed": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "all_issuer_proceeds_unconditional": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "cumulative_potential_new_shares": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "shares_already_issued_this_event": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "funding_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cash_flow_uncertainty": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "capitalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "share_class",
+        "as_of_date",
+        "split_adjusted_basis_asof",
+        "common_shares_outstanding",
+        "common_shares_authorized",
+        "public_float_shares",
+        "public_float_asof",
+        "treasury_shares",
+        "restricted_shares",
+        "preferred_as_converted_shares",
+        "reserved_for_issuance",
+        "outstanding_warrant_underlying_shares",
+        "outstanding_convertible_underlying_shares",
+        "maximum_new_issuable_shares_from_this_event",
+        "confirmed_newly_issued_shares_from_this_event",
+        "pro_forma_common_shares_if_all_issued",
+        "fully_diluted_common_shares",
+        "share_count_source_date",
+        "preferred_stock_outstanding",
+        "share_count_notes"
+      ],
+      "properties": {
+        "share_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "as_of_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "split_adjusted_basis_asof": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "common_shares_outstanding": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "common_shares_authorized": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "public_float_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "public_float_asof": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "treasury_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "restricted_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "preferred_as_converted_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reserved_for_issuance": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outstanding_warrant_underlying_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outstanding_convertible_underlying_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maximum_new_issuable_shares_from_this_event": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "confirmed_newly_issued_shares_from_this_event": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pro_forma_common_shares_if_all_issued": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fully_diluted_common_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "share_count_source_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preferred_stock_outstanding": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "share_count_notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "corporate_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_type",
+        "action_status",
+        "announced_date",
+        "record_date",
+        "legal_effective_at_et",
+        "split_adjusted_trading_at_et",
+        "reverse_split_pre_shares",
+        "reverse_split_post_shares",
+        "reverse_split_denominator_before",
+        "reverse_split_numerator_after",
+        "forward_split_denominator_before",
+        "forward_split_numerator_after",
+        "authorized_shares_changed",
+        "authorized_shares_after",
+        "fractions_policy",
+        "security_symbol_before",
+        "security_symbol_after",
+        "cusip_before",
+        "cusip_after",
+        "listing_effect",
+        "shareholder_approval_status",
+        "note"
+      ],
+      "properties": {
+        "action_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "announced_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "record_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "legal_effective_at_et": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "split_adjusted_trading_at_et": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reverse_split_pre_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reverse_split_post_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reverse_split_denominator_before": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reverse_split_numerator_after": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "forward_split_denominator_before": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "forward_split_numerator_after": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "authorized_shares_changed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "authorized_shares_after": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fractions_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "security_symbol_before": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "security_symbol_after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cusip_before": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cusip_after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "listing_effect": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shareholder_approval_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "business": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contracts",
+        "acquisitions_mergers",
+        "regulatory_events",
+        "litigation_events",
+        "insider_transactions",
+        "management_changes",
+        "beneficial_ownership",
+        "listing_compliance",
+        "operational"
+      ],
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contract_id",
+              "parties",
+              "product_or_service",
+              "currency",
+              "announced_total_value",
+              "guaranteed_minimum_value",
+              "contingent_maximum_value",
+              "contract_start_date",
+              "contract_end_date",
+              "duration_months",
+              "binding",
+              "signed",
+              "counterparty_confirmed",
+              "funding_secured",
+              "recurring_revenue",
+              "revenue_recognition_period",
+              "milestone_conditions",
+              "early_termination_conditions",
+              "expected_margin",
+              "related_party",
+              "note"
+            ],
+            "properties": {
+              "contract_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "product_or_service": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "announced_total_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "guaranteed_minimum_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "contingent_maximum_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "contract_start_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "contract_end_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "duration_months": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "binding": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "signed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "counterparty_confirmed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "funding_secured": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "recurring_revenue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "revenue_recognition_period": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "milestone_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "early_termination_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "expected_margin": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "related_party": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "acquisitions_mergers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "transaction_id",
+              "type",
+              "acquirer",
+              "target",
+              "currency",
+              "announced_transaction_value",
+              "cash_consideration",
+              "stock_consideration",
+              "share_issuance_count",
+              "consideration_per_share",
+              "binding",
+              "definitive_agreement_signed",
+              "closing_conditions",
+              "regulatory_approvals_required",
+              "expected_closing_date",
+              "completed_date",
+              "termination_fee",
+              "financing_source",
+              "note"
+            ],
+            "properties": {
+              "transaction_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "acquirer": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "announced_transaction_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cash_consideration": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "stock_consideration": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "share_issuance_count": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "consideration_per_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "binding": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "definitive_agreement_signed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "closing_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "regulatory_approvals_required": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "expected_closing_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "completed_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "termination_fee": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "financing_source": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "regulatory_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id",
+              "authority",
+              "subject",
+              "product",
+              "program",
+              "action_type",
+              "approval_status",
+              "phase",
+              "event_date",
+              "effective_date",
+              "approval_scope",
+              "primary_endpoint_met",
+              "trial_sample_size",
+              "safety_findings",
+              "commercialization_restrictions",
+              "follow_up_deadline",
+              "material_conditions",
+              "note"
+            ],
+            "properties": {
+              "event_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "authority": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "subject": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "product": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "program": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "action_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "approval_status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phase": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "event_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effective_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "approval_scope": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "primary_endpoint_met": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "trial_sample_size": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "safety_findings": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "commercialization_restrictions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "follow_up_deadline": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "material_conditions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "litigation_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "subject",
+              "jurisdiction",
+              "currency",
+              "claims_amount",
+              "settlement_amount",
+              "cash_due",
+              "status",
+              "date",
+              "adverse_order",
+              "injunction",
+              "potential_liability",
+              "note"
+            ],
+            "properties": {
+              "case_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "subject": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "jurisdiction": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "claims_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "settlement_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "cash_due": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "adverse_order": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "injunction": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "potential_liability": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "insider_transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "person",
+              "role",
+              "form_type",
+              "transaction_code",
+              "security",
+              "shares",
+              "price_per_share",
+              "transaction_value",
+              "acquired_or_disposed",
+              "direct_or_indirect",
+              "derivative_transaction",
+              "transaction_date",
+              "rule_10b5_1",
+              "ownership_after",
+              "note"
+            ],
+            "properties": {
+              "person": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "role": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "form_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "transaction_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "security": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "price_per_share": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "transaction_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "acquired_or_disposed": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "direct_or_indirect": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "derivative_transaction": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "transaction_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rule_10b5_1": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "ownership_after": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "management_changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "person",
+              "position",
+              "event_type",
+              "effective_date",
+              "reason_disclosed",
+              "replacement",
+              "severance_amount",
+              "internal_control_issue",
+              "note"
+            ],
+            "properties": {
+              "person": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "position": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "event_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "effective_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason_disclosed": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "replacement": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "severance_amount": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "internal_control_issue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "beneficial_ownership": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "filer",
+              "form_type",
+              "class_of_stock",
+              "shares_beneficially_owned",
+              "ownership_pct",
+              "voting_power_shares",
+              "reported_asof",
+              "prior_ownership_pct",
+              "position_change_shares",
+              "activist_intent_or_purpose",
+              "group_filing",
+              "note"
+            ],
+            "properties": {
+              "owner": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "filer": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "form_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "class_of_stock": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "shares_beneficially_owned": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "ownership_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "voting_power_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "reported_asof": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prior_ownership_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "position_change_shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "activist_intent_or_purpose": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "group_filing": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "listing_compliance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exchange",
+            "notice_date",
+            "rule_violated",
+            "deficiency_type",
+            "bid_price_threshold",
+            "minimum_below_threshold_days",
+            "cure_deadline",
+            "extension_granted",
+            "extension_deadline",
+            "compliance_plan_submitted",
+            "hearing_requested",
+            "compliance_regained",
+            "trading_suspension_date",
+            "delisting_effective_date",
+            "shareholder_equity_requirement",
+            "market_value_requirement",
+            "reverse_split_used_for_compliance",
+            "issuer_quote_asof",
+            "note"
+          ],
+          "properties": {
+            "exchange": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notice_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rule_violated": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "deficiency_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bid_price_threshold": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "minimum_below_threshold_days": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "cure_deadline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "extension_granted": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "extension_deadline": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "compliance_plan_submitted": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "hearing_requested": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "compliance_regained": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "trading_suspension_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "delisting_effective_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shareholder_equity_requirement": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "market_value_requirement": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reverse_split_used_for_compliance": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "issuer_quote_asof": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "operational": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "guidance_metric",
+            "guidance_period",
+            "guidance_low",
+            "guidance_high",
+            "guidance_currency",
+            "customer_concentration_pct",
+            "backlog_amount",
+            "rpo_amount",
+            "workforce_reduction_count",
+            "cybersecurity_incident_material",
+            "bankruptcy_or_receivership",
+            "going_concern_doubt",
+            "related_party_transaction",
+            "material_event_other"
+          ],
+          "properties": {
+            "guidance_metric": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "guidance_period": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "guidance_low": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "guidance_high": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "guidance_currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "customer_concentration_pct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "backlog_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "rpo_amount": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "workforce_reduction_count": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "cybersecurity_incident_material": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "bankruptcy_or_receivership": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "going_concern_doubt": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "related_party_transaction": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "material_event_other": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "financials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reporting_period_start",
+        "reporting_period_end",
+        "period_type",
+        "currency",
+        "amounts_scale",
+        "revenue",
+        "revenue_prior_comparable",
+        "gross_profit",
+        "operating_income",
+        "net_income",
+        "diluted_eps",
+        "operating_cash_flow",
+        "capex",
+        "cash_and_equivalents",
+        "restricted_cash",
+        "total_debt",
+        "total_assets",
+        "total_liabilities",
+        "stockholders_equity",
+        "current_assets",
+        "current_liabilities",
+        "working_capital",
+        "share_based_compensation",
+        "weighted_avg_diluted_shares",
+        "auditor_opinion",
+        "going_concern_warning",
+        "filing_audited",
+        "report_currency_source"
+      ],
+      "properties": {
+        "reporting_period_start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reporting_period_end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "amounts_scale": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "revenue": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "revenue_prior_comparable": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "gross_profit": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "operating_income": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "net_income": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "diluted_eps": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "operating_cash_flow": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "capex": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cash_and_equivalents": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "restricted_cash": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_debt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_assets": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_liabilities": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stockholders_equity": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "current_assets": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "current_liabilities": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "working_capital": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "share_based_compensation": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weighted_avg_diluted_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "auditor_opinion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "going_concern_warning": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "filing_audited": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "report_currency_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "market_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "exchange_quote_timestamp_utc",
+        "quote_is_realtime_confirmed",
+        "quote_delay_seconds",
+        "currency",
+        "last_price",
+        "previous_close",
+        "bid",
+        "ask",
+        "intraday_volume",
+        "average_20day_volume",
+        "intraday_dollar_volume",
+        "float_shares",
+        "market_cap",
+        "market_cap_asof",
+        "vwap",
+        "rvol",
+        "intraday_halt_status",
+        "ema9",
+        "ema20",
+        "ema50",
+        "sma200",
+        "golden_cross_ema9_ema20",
+        "golden_cross_timeframe",
+        "macd",
+        "macd_signal",
+        "macd_histogram",
+        "dmi_plus",
+        "dmi_minus",
+        "adx",
+        "mfi14",
+        "stochastic_k",
+        "stochastic_d",
+        "obv",
+        "obv_signal",
+        "data_coverage_status"
+      ],
+      "properties": {
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchange_quote_timestamp_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quote_is_realtime_confirmed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "quote_delay_seconds": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "previous_close": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bid": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ask": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "intraday_volume": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "average_20day_volume": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "intraday_dollar_volume": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "float_shares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "market_cap": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "market_cap_asof": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vwap": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rvol": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "intraday_halt_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ema9": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ema20": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ema50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sma200": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "golden_cross_ema9_ema20": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "golden_cross_timeframe": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "macd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "macd_signal": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "macd_histogram": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dmi_plus": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dmi_minus": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "adx": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mfi14": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stochastic_k": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stochastic_d": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "obv": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "obv_signal": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "data_coverage_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "derived": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "new_shares_ratio_current_outstanding_pct",
+        "max_potential_dilution_post_issuance_pct",
+        "estimated_atm_max_shares_at_current_price",
+        "atm_max_shares_is_illustrative",
+        "financing_gross_to_market_cap_pct",
+        "cash_runway_months",
+        "warrant_exercise_to_market_ratio",
+        "discount_to_market_pct",
+        "days_to_catalyst",
+        "contract_to_revenue_ratio",
+        "quote_age_seconds",
+        "calculation_basis_asof",
+        "calculation_invalid_reason"
+      ],
+      "properties": {
+        "new_shares_ratio_current_outstanding_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max_potential_dilution_post_issuance_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "estimated_atm_max_shares_at_current_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "atm_max_shares_is_illustrative": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "financing_gross_to_market_cap_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cash_runway_months": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "warrant_exercise_to_market_ratio": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "discount_to_market_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "days_to_catalyst": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "contract_to_revenue_ratio": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quote_age_seconds": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "calculation_basis_asof": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "calculation_invalid_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facts_positive",
+        "facts_negative",
+        "uncertainty_items",
+        "classification",
+        "materiality",
+        "urgency",
+        "confidence",
+        "near_term_price_pressure",
+        "dilution_risk",
+        "liquidity_risk",
+        "financing_risk",
+        "legal_regulatory_risk",
+        "catalyst_type",
+        "catalyst_date",
+        "trade_eligibility",
+        "no_trade_reasons",
+        "entry_price",
+        "stop_loss_price",
+        "take_profit_price",
+        "reward_risk_ratio",
+        "price_level_basis",
+        "event_rationale",
+        "competing_interpretations"
+      ],
+      "properties": {
+        "facts_positive": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "facts_negative": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "uncertainty_items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "classification": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "POSITIVE",
+                "NEGATIVE",
+                "MIXED",
+                "NEUTRAL",
+                "UNKNOWN"
+              ]
+            }
+          ]
+        },
+        "materiality": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "UNKNOWN"
+              ]
+            }
+          ]
+        },
+        "urgency": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "IMMEDIATE",
+                "SHORT_TERM",
+                "LONG_TERM",
+                "NONE",
+                "UNKNOWN"
+              ]
+            }
+          ]
+        },
+        "confidence": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+                "UNKNOWN"
+              ]
+            }
+          ]
+        },
+        "near_term_price_pressure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dilution_risk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "liquidity_risk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "financing_risk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "legal_regulatory_risk": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "catalyst_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "catalyst_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trade_eligibility": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "NOT_EVALUATED",
+                "NO_TRADE",
+                "REVIEW_REQUIRED",
+                "WATCH_ONLY",
+                "ENTRY_CONDITIONS_MET"
+              ]
+            }
+          ]
+        },
+        "no_trade_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entry_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "stop_loss_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "take_profit_price": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reward_risk_ratio": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "price_level_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "event_rationale": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "competing_interpretations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "json_pointer",
+          "source_accession",
+          "source_document_url",
+          "exhibit_number",
+          "section_or_page",
+          "exact_excerpt",
+          "source_value_raw",
+          "as_of_date",
+          "methodology",
+          "derived_from_json_pointers",
+          "verification_status"
+        ],
+        "properties": {
+          "json_pointer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_accession": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_document_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exhibit_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section_or_page": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exact_excerpt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_value_raw": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "as_of_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "methodology": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "derived_from_json_pointers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verification_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "VERIFIED",
+                  "CALCULATED",
+                  "CONFLICTING",
+                  "UNVERIFIED"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "null_reasons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "json_pointer",
+          "reason",
+          "checked_documents",
+          "explanation"
+        ],
+        "properties": {
+          "json_pointer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "enum": [
+                  "NOT_DISCLOSED",
+                  "NOT_APPLICABLE",
+                  "DOCUMENT_UNAVAILABLE",
+                  "NOT_YET_VERIFIED",
+                  "CONFLICTING_DISCLOSURES",
+                  "OUTSIDE_SEC_SCOPE",
+                  "NOT_COMPUTABLE",
+                  "STALE_AS_OF"
+                ]
+              }
+            ]
+          },
+          "checked_documents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "explanation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "severity",
+          "message",
+          "related_json_pointers"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "severity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "related_json_pointers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "derived_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_name",
+          "value",
+          "unit",
+          "formula",
+          "component_paths",
+          "valid_asof",
+          "computable",
+          "noncomputable_reason"
+        ],
+        "properties": {
+          "metric_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "component_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "valid_asof": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "computable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "noncomputable_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_valid",
+        "all_material_claims_sourced",
+        "all_material_exhibits_reviewed",
+        "fresh_market_quote_verified",
+        "timestamps_consistent",
+        "corporate_actions_adjusted",
+        "contradictory_values_detected",
+        "contradictions_resolved",
+        "missing_critical_fields",
+        "has_unverified_material_claims",
+        "financial_data_staleness_flag",
+        "analysis_risk_label",
+        "final_quality_gate_passed",
+        "validation_errors"
+      ],
+      "properties": {
+        "schema_valid": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "all_material_claims_sourced": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "all_material_exhibits_reviewed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "fresh_market_quote_verified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "timestamps_consistent": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "corporate_actions_adjusted": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "contradictory_values_detected": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "contradictions_resolved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "missing_critical_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "has_unverified_material_claims": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "financial_data_staleness_flag": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "analysis_risk_label": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH",
+                "UNKNOWN"
+              ]
+            }
+          ]
+        },
+        "final_quality_gate_passed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "validation_errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

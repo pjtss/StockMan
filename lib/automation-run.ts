@@ -3,15 +3,21 @@ import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { describeError } from "@/lib/error-diagnostics";
 import { readRequestTrace } from "@/lib/request-trace";
 import { notifyAutomationCompletion } from "@/lib/automation-completion-discord";
+import { getAutomationRunResultStatus } from "@/lib/automation-run-result-status";
 
 const SUMMARY_MAX_DEPTH = 4;
 const SUMMARY_MAX_STRING_LENGTH = 2_000;
 const SUMMARY_MAX_ARRAY_SAMPLE = 3;
 
-function extractDebugItems(result: Record<string, unknown>) {
+export function extractDebugItems(result: Record<string, unknown>) {
   if (Array.isArray(result.debugItems)) return result.debugItems;
   const candidates = ["results", "qualified", "items", "rows"].flatMap((key) => Array.isArray(result[key]) ? result[key] : []);
-  return candidates.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => ({
+  const failures = Array.isArray(result.failureSamples) ? result.failureSamples : [];
+  const failureItems = failures.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => ({ ...item, status: item.status ?? "FAILED" }));
+  return [...candidates, ...failureItems].filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => {
+    const errorMessage = item.errorMessage ?? item.error ?? null;
+    const errorCode = item.errorCode ?? (typeof errorMessage === "string" ? errorMessage.match(/^([A-Z][A-Z0-9_]+)/)?.[1] : null);
+    return {
     market: item.market ?? null,
     code: item.code ?? item.ticker ?? null,
     timeframe: item.timeframe ?? result.timeframe ?? null,
@@ -20,23 +26,27 @@ function extractDebugItems(result: Record<string, unknown>) {
     startedAt: item.startedAt ?? null,
     completedAt: item.completedAt ?? null,
     durationMs: item.durationMs ?? null,
-    errorCategory: item.errorCategory ?? null,
-    errorCode: item.errorCode ?? null,
-    errorMessage: item.errorMessage ?? null,
+    errorCategory: item.errorCategory ?? (errorCode ? "PROCESSING" : null),
+    errorCode: errorCode ?? null,
+    errorMessage,
     metadata: compactAutomationSummary(item),
-  }));
+    };
+  });
 }
 
 /** Keep automation_runs useful for diagnosis without persisting full scanner payloads. */
-export function compactAutomationSummary(value: unknown, depth = 0): unknown {
+export function compactAutomationSummary(value: unknown, depth = 0, key = ""): unknown {
   if (value == null || typeof value === "number" || typeof value === "boolean") return value;
   if (typeof value === "string") return value.length > SUMMARY_MAX_STRING_LENGTH ? `${value.slice(0, SUMMARY_MAX_STRING_LENGTH)}…` : value;
   if (depth >= SUMMARY_MAX_DEPTH) return "[depth-limited]";
   if (Array.isArray(value)) {
+    // Per-market totals are a small bounded set and are required to diagnose
+    // partial fundamentals refreshes; do not collapse them to a sample.
+    if (key === "markets") return value.map((item) => compactAutomationSummary(item, depth + 1));
     return { count: value.length, sample: value.slice(0, SUMMARY_MAX_ARRAY_SAMPLE).map((item) => compactAutomationSummary(item, depth + 1)) };
   }
   if (typeof value === "object") {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, compactAutomationSummary(item, depth + 1)]));
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([childKey, item]) => [childKey, compactAutomationSummary(item, depth + 1, childKey)]));
   }
   return String(value);
 }

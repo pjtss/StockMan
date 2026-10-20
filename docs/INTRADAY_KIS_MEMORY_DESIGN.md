@@ -11,6 +11,10 @@
 
 현재 운영 서버는 단일 모놀리식 OCI VM의 Next.js 프로세스와 PostgreSQL을 사용한다. 서버를 수평 분산하지 않는 전제이므로 Redis는 도입하지 않고, TOP 상승률 스냅샷·후보 우선순위·VWAP 누적 상태 같은 휘발성 상태는 동일 프로세스 메모리에서 관리한다. 확정 탐지 이벤트, 호출 로그, 중복 방지 상태는 PostgreSQL에 저장한다.
 
+### 거래대금 관측 저장과 DB 장애 복구
+
+탐지의 rolling window 계산은 메모리에서 유지하고, KIS 원본 관측·분 거래대금·시총 대비 비율은 `intraday_turnover_observations`에 분 버킷 단위로 batch upsert한다. DB write 장애 중에는 `IntradayTurnoverWriteBuffer`가 자연 키(시장/종목/세션/분)로 최신값을 합쳐 최대 9,000행, 최대 30분간 보관하고 1–30초 지수 backoff로 재시도한다. 영속 저장 후에만 buffer에서 제거한다. 상한/TTL을 넘긴 손실은 worker를 `DEGRADED`로 표시하고 로그에 남긴다. 버퍼는 단일 모놀리식 프로세스 안의 일시 복구 장치일 뿐 영속 큐나 재시작 복구 수단이 아니다.
+
 ## 책임 분리
 
 ```text
@@ -194,7 +198,7 @@ DB에는 최종적으로 재현·감사할 가치가 있는 이벤트만 저장�
 - worker tick 기본값: 10초
 - TOP 100 갱신: 30~60초 TTL이 만료된 거래소만 갱신
 - 후보 상세: priority와 `nextCheckAt`에 따라 차등 실행
-- KIS 동시 요청: 전역 semaphore로 제한하며, 요청 시작 속도는 전역 10 TPS token bucket을 반드시 통과
+- KIS 동시 요청: 단일 프로세스 전역 in-flight 최대 10건, 대기 최대 512건; 요청 시작은 전역 rolling 1초 창당 최대 10회 및 적응형 최소 간격을 적용. 포화 시 신규 호출은 fail-fast 처리
 - KIS 호출 예산 초과: 낮은 priority 후보부터 다음 tick으로 이월
 - 동일 worker 재진입: 이전 tick이 끝나지 않았으면 건너뜀
 - SIGTERM/SIGINT: 새 KIS 요청을 받지 않고 in-flight 요청 완료 후 종료
@@ -211,7 +215,7 @@ worker는 프로세스 수명주기와 함께 시작·종료하며, 시작 실�
   - 최근 1초 실제 호출량
 ```
 
-여기서 10 TPS는 KIS 공식 제한 18 TPS보다 낮게 잡은 고정 운영 안전 한도다. 관리자 설정값이 10보다 높아도 실제 throttle은 10 TPS에서 멈추며, endpoint별 bucket과 전역 bucket 모두 이 상한을 적용한다. rate limit 응답이 발생하면 backoff 중인 요청은 호출 예산에서 제외하지 않고, 재시도도 동일한 전역 10 TPS 예산을 다시 소비한다.
+여기서 10 TPS는 KIS 공식 제한 18 TPS보다 낮게 잡은 고정 운영 안전 한도다. 관리자 설정값이 10보다 높아도 실제 throttle은 rolling 1초 10회 상한을 넘지 않는다. 요청 시작 예약과 응답 대기는 분리하고, in-flight 10건과 waiter 512건을 상한으로 두어 느린 응답이 처리량을 직렬화하지 않으면서도 요청 대기 메모리가 무한 증가하지 않게 한다. 포화 시 추가 호출은 명시적 `KIS_REQUEST_QUEUE_FULL` 오류로 실패시킨다. rate limit 응답이 발생하면 backoff 중인 요청은 호출 예산을 점유하지 않고, 재시도는 새 전역 요청 슬롯을 다시 받아야 한다.
 
 예산이 부족하면 다음 순서로 보류한다.
 
@@ -981,3 +985,14 @@ kis_rate_limit_events
 - 관리자 화면은 DB 집계값과 현재 메모리값을 합산하지 않고 `source`별로 구분해 표시한다.
 
 이 정책으로 탐지 판단 경로의 지연을 DB 관측 기록이 유발하지 않도록 하면서, SLO 계산에 필요한 통계와 핵심 감사 이벤트는 보존한다.
+# Durable KIS turnover observations
+
+The live rolling window remains in process memory for low-latency detection. Each successful instrument observation is also persisted to `intraday_turnover_observations` with the KIS source fields, derived minute value, its `minute_trading_value_source` (`KIS_CUMULATIVE_DELTA` or `PRICE_VOLUME_FALLBACK`), market cap, rolling value, ratio, exchange-local session date, and minute bucket. The provenance column prevents downstream reports from presenting a price×volume estimate as a provider-supplied turnover value. The primary key `(market, code, session_date, bucket_at)` makes repeated polling of the same minute idempotent. Raw KIS point payload is retained as JSONB for audit/recalculation; it contains market data only.
+
+Persistence is batched after candidate polling to avoid one database round trip per symbol. Failed KIS HTTP responses and successful responses with no valid positive-price minute points are excluded rather than persisted as synthetic zero-turnover observations. If persistence fails, the worker reports `DEGRADED` and retains the error instead of silently claiming a healthy tick. Minute observations are not used to reconstruct the in-memory rolling window across process restarts in this change; restart recovery remains a separately testable follow-up.
+
+## Recent 10-minute turnover window
+
+The in-memory turnover ring buffer now retains at most ten one-minute KIS candle values per eligible observed symbol. Repeated polls within one minute replace that minute bucket rather than adding it twice; session changes and TOP100 exits clear the corresponding memory. Windows from 1 through 10 minutes are exposed through the public read-only `GET /api/kis/intraday-mvp` response and `/intraday` UI. A duration is reported as a numeric amount only when every contiguous one-minute bucket for that full interval is present; otherwise the response reports `tradingValue: null`, observed sample count, and `complete: false`, avoiding partial data being mislabeled as a full 10-minute amount. USD amount and market-cap ratio are both shown when complete.
+
+This is an observation-retention/display extension only: the configurable alert qualification remains the existing 1- or 5-minute policy and its threshold is unchanged. KIS minute requests remain restricted to the existing global priority focus pool (currently at most 30 eligible common stocks across NAS/AMS/NYS), not all 100 symbols per exchange; widening coverage would require a separate request-budget decision under the global 10 TPS ceiling. The memory is process-local and is lost on restart; durable minute observations may exist in PostgreSQL but are deliberately not replayed into the live ring buffer.

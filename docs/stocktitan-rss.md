@@ -39,5 +39,6 @@ StockTitan RSS
 - `source=STOCKTITAN`으로 원문 출처를 보존한다.
 - `source + externalId`로 중복을 방지한다.
 - 기존 RSS 분류·번역 fallback·Discord rate limit·알림 상태 저장을 재사용한다.
+- StockTitan Discord 알림은 출처·등락률·거래대금 줄을 표시하지 않는다. 기사 제목 링크는 유지하고 Discord webhook의 `SUPPRESS_EMBEDS` message flag를 설정해 링크 미리보기 embed가 본문 아래에 생성되지 않도록 한다. 기존에 대기 중인 StockTitan Discord 재시도 payload도 재전송 직전에 해당 줄을 제거하고 embed 억제 flag를 적용한다. 다른 RSS 출처의 형식은 그대로 유지한다. [Discord Execute Webhook 공식 문서](https://discord.com/developers/docs/resources/webhook#execute-webhook)
 - Discord `408/425/429/5xx` 또는 네트워크 오류는 `discord_delivery_queue`에 등록하고 OCI의 `discord-delivery-retry` 작업에서 재전송한다. 재전송 성공·실패 결과는 원본 `market_rss_articles` 행에도 반영한다.
 - StockTitan 페이지 HTML을 직접 요청하거나 스크래핑하지 않는다.

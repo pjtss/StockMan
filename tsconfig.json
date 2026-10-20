@@ -29,11 +29,19 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".next-dev/types/**/*.ts",
-    ".next/types/**/*.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "instrumentation.ts",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "middleware.ts",
+    "netlify/**/*.ts",
     "next-env.d.ts",
+    "next.config.ts",
+    "scripts/**/*.ts",
+    "scripts/**/*.tsx",
     ".next-deploy-verify/types/**/*.ts"
   ],
   "exclude": [

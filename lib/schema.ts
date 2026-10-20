@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART ë° SEC ê³µì ì´ë ¥ ìí°í°
@@ -169,6 +169,7 @@ export const marketRssArticles = pgTable(
     link: text("link").notNull().default(""),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     translatedTitle: text("translated_title"),
+    translationCandidateTitle: text("translation_candidate_title"),
     translatedSummary: text("translated_summary"),
     translatedContent: text("translated_content"),
     translationProvider: text("translation_provider"),
@@ -177,6 +178,7 @@ export const marketRssArticles = pgTable(
     translationCharCount: integer("translation_char_count").notNull().default(0),
     translationSkippedReason: text("translation_skipped_reason"),
     translationTranslatedAt: timestamp("translation_translated_at", { withTimezone: true }),
+    translationAttemptedAt: timestamp("translation_attempted_at", { withTimezone: true }),
     category: text("category").notNull().default("GENERAL"),
     priority: integer("priority").notNull().default(20),
     notifyEligible: boolean("notify_eligible").notNull().default(true),
@@ -300,8 +302,8 @@ export const usSpecialInstrumentUniverse = makeUsUniverseTable("us_special_instr
 export const usInstrumentUniverse = makeUsUniverseTable("us_instrument_universe", "us_instrument_universe_market_code_unique", "us_instrument_universe_enabled_idx");
 
 export const instrumentUniverseSyncRuns = pgTable("instrument_universe_sync_runs", { id: bigserial("id", { mode: "number" }).primaryKey(), scope: text("scope").notNull(), sourceDirectory: text("source_directory").notNull(), status: text("status").notNull(), sourceCount: integer("source_count").notNull().default(0), insertedCount: integer("inserted_count").notNull().default(0), updatedCount: integer("updated_count").notNull().default(0), deactivatedCount: integer("deactivated_count").notNull().default(0), excludedCount: integer("excluded_count").notNull().default(0), errorCount: integer("error_count").notNull().default(0), errorSummary: text("error_summary"), startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(), completedAt: timestamp("completed_at", { withTimezone: true }) });
-export const instrumentFundamentalSnapshots = pgTable("instrument_fundamental_snapshots", { id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), name: text("name").notNull().default(""), price: doublePrecision("price"), changeRate: doublePrecision("change_rate"), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), sharesOutstanding: doublePrecision("shares_outstanding"), freeFloatShares: doublePrecision("free_float_shares"), freeFloatPercent: doublePrecision("free_float_percent"), currency: text("currency"), source: text("source").notNull(), rawPayload: text("raw_payload").notNull().default(""), observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow() }, (table) => [uniqueIndex("instrument_fundamental_snapshots_market_code_unique").on(table.market, table.code), index("instrument_fundamental_snapshots_fetched_idx").on(table.fetchedAt)]);
-export const instrumentFundamentalHistory = pgTable("instrument_fundamental_history", { id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), name: text("name").notNull().default(""), price: doublePrecision("price"), changeRate: doublePrecision("change_rate"), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), sharesOutstanding: doublePrecision("shares_outstanding"), currency: text("currency"), source: text("source").notNull(), rawPayload: text("raw_payload").notNull().default(""), observedAt: timestamp("observed_at", { withTimezone: true }).notNull(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull() }, (table) => [uniqueIndex("instrument_fundamental_history_market_code_observed_unique").on(table.market, table.code, table.observedAt), index("instrument_fundamental_history_lookup_idx").on(table.market, table.code, table.observedAt)]);
+export const instrumentFundamentalSnapshots = pgTable("instrument_fundamental_snapshots", { id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), name: text("name").notNull().default(""), price: doublePrecision("price"), changeRate: doublePrecision("change_rate"), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), listedShares: doublePrecision("listed_shares"), currency: text("currency"), source: text("source").notNull(), rawPayload: text("raw_payload").notNull().default(""), observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow() }, (table) => [uniqueIndex("instrument_fundamental_snapshots_market_code_unique").on(table.market, table.code), index("instrument_fundamental_snapshots_fetched_idx").on(table.fetchedAt)]);
+export const instrumentFundamentalHistory = pgTable("instrument_fundamental_history", { id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), name: text("name").notNull().default(""), price: doublePrecision("price"), changeRate: doublePrecision("change_rate"), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), marketCap: doublePrecision("market_cap"), listedShares: doublePrecision("listed_shares"), currency: text("currency"), source: text("source").notNull(), rawPayload: text("raw_payload").notNull().default(""), observedAt: timestamp("observed_at", { withTimezone: true }).notNull(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull() }, (table) => [uniqueIndex("instrument_fundamental_history_market_code_observed_unique").on(table.market, table.code, table.observedAt), index("instrument_fundamental_history_lookup_idx").on(table.market, table.code, table.observedAt)]);
 
 export const investmentCalendarEvents = pgTable("investment_calendar_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -481,8 +483,36 @@ export const secFilingDocuments = pgTable("sec_filing_documents", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+  });
+
+export const secCodexAnalysisQueue = pgTable("sec_codex_analysis_queue", {
+  accession: text("accession").primaryKey(),
+  status: text("status").notNull().default("PENDING"),
+  attempts: integer("attempts").notNull().default(0),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
+  result: jsonb("result"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("sec_codex_analysis_queue_status_idx").on(table.status, table.updatedAt)]);
 
 export const secXbrlSnapshots = pgTable("sec_xbrl_snapshots", {
   cik: text("cik").primaryKey(), payload: jsonb("payload").notNull(), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const secStockRisks = pgTable("sec_stock_risks", {
+  market: text("market").notNull(),
+  ticker: text("ticker").notNull(),
+  companyName: text("company_name").notNull(),
+  risk: jsonb("risk").notNull().default(sql`'{"schemaVersion":2,"items":[]}'::jsonb`),
+  marketCapUsd: doublePrecision("market_cap_usd"),
+  marketCapObservedAt: timestamp("market_cap_observed_at", { withTimezone: true }),
+  secCik: text("sec_cik"),
+  sourceAccessions: text("source_accessions").array().notNull().default(sql`'{}'::text[]`),
+  sourceUrls: text("source_urls").array().notNull().default(sql`'{}'::text[]`),
+  riskAsOf: date("risk_as_of"),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by").notNull().default("LOCAL_API"),
+}, (table) => [primaryKey({ columns: [table.market, table.ticker], name: "sec_stock_risks_pkey" }), index("sec_stock_risks_ticker_idx").on(table.ticker)]);

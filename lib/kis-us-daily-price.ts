@@ -109,7 +109,7 @@ export async function fetchUsDailyPrice(request: UsDailyPriceRequest): Promise<U
   if (!token) return null;
   let result = await once(token);
   if (isKisTokenExpiredResponse(result.response.status, result.parsed)) {
-    token = await refreshAccessToken();
+    token = await refreshAccessToken(token);
     if (!token) return null;
     result = await once(token);
   }

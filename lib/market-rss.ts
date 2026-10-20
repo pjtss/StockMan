@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { decodeXML } from "entities";
 
 export type MarketRssItem = { id: string; title: string; link: string; summary: string; content?: string; publishedAt: string | null; source: string; raw?: unknown };
 export type MarketRssFeed = {
@@ -13,7 +14,11 @@ export type MarketRssFeed = {
 };
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", trimValues: true, processEntities: false });
-const text = (value: unknown) => typeof value === "string" ? value.trim() : value && typeof value === "object" && "#text" in value ? String((value as Record<string, unknown>)["#text"]).trim() : "";
+const text = (value: unknown) => typeof value === "string"
+  ? decodeXML(value).trim()
+  : value && typeof value === "object" && "#text" in value
+    ? decodeXML(String((value as Record<string, unknown>)["#text"])).trim()
+    : "";
 const array = <T>(value: T | T[] | undefined) => value == null ? [] : Array.isArray(value) ? value : [value];
 
 export function parseMarketRss(xml: string, source: string, url: string): MarketRssFeed {
@@ -25,7 +30,11 @@ export function parseMarketRss(xml: string, source: string, url: string): Market
     if (!raw || typeof raw !== "object") return [];
     const item = raw as Record<string, unknown>;
     const linkValue = item.link;
-    const link = typeof linkValue === "string" ? linkValue : linkValue && typeof linkValue === "object" ? String((linkValue as Record<string, unknown>).href || "") : "";
+    const link = typeof linkValue === "string"
+      ? decodeXML(linkValue.trim())
+      : linkValue && typeof linkValue === "object"
+        ? decodeXML(String((linkValue as Record<string, unknown>).href || "").trim())
+        : "";
     const title = text(item.title);
     if (!title) return [];
     const publishedAt = text(item.pubDate || item.published || item.updated) || null;

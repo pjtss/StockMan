@@ -1,9 +1,6 @@
-import { eq, sql } from "drizzle-orm";
-import { claimDueDiscordDeliveries, markDiscordDeliveryRetry, markDiscordDeliverySent } from "@/lib/discord-delivery-queue";
+import { claimDueDiscordDeliveries, getMarketRssDeliveryArticleSnapshot, markDiscordDeliverySending, markDiscordDeliverySuperseded, persistDiscordDeliveryOutcome } from "@/lib/discord-delivery-queue";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
-import { getDb } from "@/lib/db";
-import { marketRssArticles } from "@/lib/schema";
-import { parseMarketRssDeliveryArticleId } from "@/lib/discord-delivery-policy";
+import { isRetryableDiscordError, parseMarketRssDeliveryArticleId, withDiscordWaitParameter } from "@/lib/discord-delivery-policy";
 import { toTextWebhookPayload } from "@/lib/discord-text";
 import { DISCORD_SUPPRESS_EMBEDS_FLAG, simplifyMarketRssDiscordMessage } from "@/lib/market-rss-discord-message";
 
@@ -18,22 +15,20 @@ async function webhookFor(channelKey: string) {
   return target ? loadFeatureDiscordWebhook(target.module, target.env) : "";
 }
 
-async function markMarketRssDelivery(articleId: number, status: "SENT" | "FAILED", error?: string) {
-  const db = getDb();
-  await db.update(marketRssArticles).set({
-    notificationStatus: status,
-    notificationAttempts: sql`${marketRssArticles.notificationAttempts} + 1`,
-    ...(status === "SENT" ? { notifiedAt: new Date(), lastError: null } : { lastError: error || "Discord delivery failed" }),
-    updatedAt: new Date(),
-  }).where(eq(marketRssArticles.id, articleId));
-}
-
 export async function retryDiscordDeliveries(limit = 50) {
-  const deliveries = await claimDueDiscordDeliveries(limit);
-  const results = { claimed: deliveries.length, sent: 0, failed: 0, recovered: 0, repeatedFailure: 0, attempts: 0 };
+  const claim = await claimDueDiscordDeliveries(limit);
+  const deliveries = claim.deliveries;
+  const results = { claimed: deliveries.length, staleRecovered: claim.staleRecovered, uncertain: claim.uncertain, superseded: 0, sent: 0, failed: 0, permanentFailed: 0, persistenceFailed: 0, recovered: 0, repeatedFailure: 0, attempts: 0 };
   for (const delivery of deliveries) {
-    const webhook = await webhookFor(delivery.channelKey);
+    const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
+    const payload = delivery.payload as Record<string, unknown>;
+    const storedSnapshot = payload._marketRssSnapshot;
+    let expectedStatus: "PROCESSING" | "SENDING" = "PROCESSING";
+    let expectedUpdatedAt = delivery.updatedAt;
+    let sendError: unknown = null;
+    let sendFailed = false;
     try {
+      const webhook = await webhookFor(delivery.channelKey);
       if (!webhook) throw new Error(`webhook_missing:${delivery.channelKey}`);
       const payload: Record<string, unknown> = toTextWebhookPayload(delivery.payload as Record<string, unknown>);
       if (delivery.channelKey === "MARKET_RSS" && typeof payload.content === "string") {
@@ -58,21 +53,17 @@ export async function retryDiscordDeliveries(limit = 50) {
       results.sent += 1;
       results.attempts += delivery.attempts + 1;
       if (delivery.attempts > 0) results.recovered += 1;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await markDiscordDeliveryRetry(delivery.id, message, delivery.attempts + 1);
-      const articleId = delivery.channelKey === "MARKET_RSS" ? parseMarketRssDeliveryArticleId(delivery.externalId) : null;
-      if (articleId) await markMarketRssDelivery(articleId, "FAILED", message);
-      results.failed += 1;
-      results.attempts += delivery.attempts + 1;
-      if (delivery.attempts + 1 >= 5) results.repeatedFailure += 1;
+    } catch {
+      // Discord accepted the message; leave SENDING for uncertainty quarantine
+      // rather than automatically resending a possible duplicate.
+      results.persistenceFailed++;
     }
   }
-  if (deliveries.length > 0) {
+  if (deliveries.length > 0 || results.uncertain > 0) {
     const debugWebhook = await loadFeatureDiscordDebugWebhook("discord-delivery-retry");
     if (debugWebhook) {
-      const status = results.repeatedFailure > 0 ? "CRITICAL" : results.recovered > 0 ? "RECOVERED" : results.failed > 0 ? "WARNING" : "INFO";
-      const content = [`🛠️ **Discord 재전송 통계 · ${status}**`, `대상: ${results.claimed}건`, `최종 성공: ${results.sent}건`, `재시도 후 복구: ${results.recovered}건`, `실패 유지: ${results.failed}건`, `5회 이상 반복 실패: ${results.repeatedFailure}건`, `총 시도 횟수: ${results.attempts}회`, `확인 시각: ${new Date().toISOString()}`].join("\n");
+      const status = results.repeatedFailure > 0 || results.permanentFailed > 0 || results.persistenceFailed > 0 || results.uncertain > 0 ? "CRITICAL" : results.recovered > 0 ? "RECOVERED" : results.failed > 0 ? "WARNING" : "INFO";
+      const content = [`🛠️ **Discord 재전송 통계 · ${status}**`, `대상: ${results.claimed}건`, `최종 성공: ${results.sent}건`, `재시도 후 복구: ${results.recovered}건`, `변경된 RSS payload 폐기: ${results.superseded}건`, `재시도 대기: ${results.failed - results.permanentFailed}건`, `영구 오류 종료: ${results.permanentFailed}건`, `미확정 격리: ${results.uncertain}건`, `stale 선전송 작업 복구: ${results.staleRecovered}건`, `DB 상태 기록 실패: ${results.persistenceFailed}건`, `5회 이상 반복 실패: ${results.repeatedFailure}건`, `총 시도 횟수: ${results.attempts}회`, `확인 시각: ${new Date().toISOString()}`].join("\n");
       try { await fetch(`${debugWebhook}${debugWebhook.includes("?") ? "&" : "?"}wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "STOCKMAN DEBUG", content, allowed_mentions: { parse: [] } }) }); } catch { /* debug delivery must never fail the retry job */ }
     }
   }

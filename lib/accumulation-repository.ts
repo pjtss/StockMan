@@ -5,7 +5,7 @@ import type { AccumulationInstrument } from "./accumulation-scan";
 
 export type AccumulationDbRow = {
   market: string; code: string; name: string; market_cap: number | string | null;
-  shares_outstanding: number | string | null; fundamental_updated_at: Date | string | null;
+  listed_shares: number | string | null; fundamental_updated_at: Date | string | null;
   candle_date: string | null; candle_time: Date | string | null; fetched_at: Date | string | null;
   open: number | string | null; high: number | string | null; low: number | string | null;
   close: number | string | null; volume: number | string | null;
@@ -35,7 +35,7 @@ export function groupAccumulationRows(rows: AccumulationDbRow[]): AccumulationIn
     let instrument = groups.get(key);
     if (!instrument) {
       instrument = { market: row.market, code: row.code, name: row.name,
-        marketCap: nullablePositive(row.market_cap), sharesOutstanding: nullablePositive(row.shares_outstanding),
+        marketCap: nullablePositive(row.market_cap), listedShares: nullablePositive(row.listed_shares),
         fundamentalUpdatedAt: timestamp(row.fundamental_updated_at), candles: [] };
       groups.set(key, instrument);
     }
@@ -50,9 +50,9 @@ export function groupAccumulationRows(rows: AccumulationDbRow[]): AccumulationIn
 /** One SELECT snapshot, no fetch providers or writes. Values remain parameterized. */
 export async function loadAccumulationInstruments(region: AccumulationRegion, asOf: Date): Promise<AccumulationInstrument[]> {
   const config = tables[region];
-  const sql = "WITH eligible AS (SELECT u.market,u.code,u.name,f.market_cap,f.shares_outstanding,f.fetched_at AS fundamental_updated_at "
+  const sql = "WITH eligible AS (SELECT u.market,u.code,u.name,f.market_cap,f.listed_shares,f.fetched_at AS fundamental_updated_at "
     + "FROM " + config.universe + " u "
-    + "LEFT JOIN LATERAL (SELECT market_cap,shares_outstanding,fetched_at FROM instrument_fundamental_snapshots f "
+    + "LEFT JOIN LATERAL (SELECT market_cap,listed_shares,fetched_at FROM instrument_fundamental_snapshots f "
     + "WHERE f.market=u.market AND f.code=u.code AND f.observed_at < (to_date($2, 'YYYYMMDD') + INTERVAL '1 day') "
     + "ORDER BY f.observed_at DESC NULLS LAST,f.fetched_at DESC NULLS LAST LIMIT 1) f ON true "
     + "WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1::text[]) "
@@ -60,7 +60,7 @@ export async function loadAccumulationInstruments(region: AccumulationRegion, as
     + "ROW_NUMBER() OVER (PARTITION BY c.market,c.code ORDER BY c.candle_date DESC) AS row_number FROM " + config.candles + " c "
     + "JOIN eligible e ON e.market=c.market AND e.code=c.code "
     + "WHERE c.timeframe='D' AND c.candle_date <= $2) "
-    + "SELECT e.market,e.code,e.name,e.market_cap,e.shares_outstanding,e.fundamental_updated_at, "
+    + "SELECT e.market,e.code,e.name,e.market_cap,e.listed_shares,e.fundamental_updated_at, "
     + "c.candle_date,c.candle_time,c.fetched_at,c.open,c.high,c.low,c.close,c.volume FROM eligible e "
     + "LEFT JOIN ranked_candles c ON c.market=e.market AND c.code=e.code AND c.row_number <= $3 "
     + "ORDER BY e.market,e.code,c.candle_date";

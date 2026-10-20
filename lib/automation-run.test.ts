@@ -59,9 +59,37 @@ describe("automation run summary compaction", () => {
     });
   });
 
+  it("preserves every bounded market aggregate for fundamentals diagnostics", () => {
+    const markets = ["KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"].map((market) => ({ market, instrumentCount: 100, failureCount: 1 }));
+    expect(compactAutomationSummary({ markets })).toEqual({ markets });
+  });
+
   it("limits oversized strings", () => {
     const value = compactAutomationSummary({ raw: "x".repeat(2_100) }) as { raw: string };
     expect(value.raw.length).toBe(2_001);
     expect(value.raw.endsWith("…")).toBe(true);
+  });
+
+  it("persists per-instrument failure samples as debug items with a stable error code", () => {
+    expect(extractDebugItems({ failureSamples: [
+      { market: "NAS", code: "AMRO", error: "KIS_EMPTY_OR_INVALID_PRICE (http=200, rt_cd=0)" },
+    ] })).toEqual([{
+      market: "NAS",
+      code: "AMRO",
+      timeframe: null,
+      status: "FAILED",
+      attemptCount: 0,
+      startedAt: null,
+      completedAt: null,
+      durationMs: null,
+      errorCategory: "PROCESSING",
+      errorCode: "KIS_EMPTY_OR_INVALID_PRICE",
+      errorMessage: "KIS_EMPTY_OR_INVALID_PRICE (http=200, rt_cd=0)",
+      metadata: { market: "NAS", code: "AMRO", error: "KIS_EMPTY_OR_INVALID_PRICE (http=200, rt_cd=0)", status: "FAILED" },
+    }]);
+  });
+
+  it("does not create debug items from aggregate failures without instrument identity", () => {
+    expect(extractDebugItems({ failureSamples: [{ error: "temporary upstream failure" }] })).toEqual([]);
   });
 });

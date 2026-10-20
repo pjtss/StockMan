@@ -1,6 +1,23 @@
 import { getPool } from "./db";
 
-export const CALENDAR_EVENT_TYPES = ["IPO", "EARNINGS", "EX_DIVIDEND", "DIVIDEND_PAYMENT", "SHAREHOLDER_MEETING", "LOCKUP_EXPIRY"] as const;
+export const CALENDAR_EVENT_TYPES = [
+  "IPO",
+  "EARNINGS",
+  "GUIDANCE",
+  "FDA_DECISION",
+  "FDA_ADCOM",
+  "CLINICAL_READOUT",
+  "SEC_FILING",
+  "OFFERING",
+  "WARRANT",
+  "MERGER",
+  "REVERSE_SPLIT",
+  "EXCHANGE_COMPLIANCE",
+  "EX_DIVIDEND",
+  "DIVIDEND_PAYMENT",
+  "SHAREHOLDER_MEETING",
+  "LOCKUP_EXPIRY",
+] as const;
 export type CalendarEventType = typeof CALENDAR_EVENT_TYPES[number];
 
 export type InvestmentCalendarEvent = {

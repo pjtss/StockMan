@@ -83,7 +83,7 @@ type UsTopRisingChartResponse = {
 
 ### 4.1 전용 화면
 
-`/scanners/us/top-rising` 또는 `/us-top-rising` 중 하나를 정식 경로로 선택한다. 기존 `/scanners/us`가 비활성 안내 화면이므로, 기존 경로를 무단으로 재활성화하지 않고 별도 경로를 우선한다.
+`/us-top-rising`을 정식 경로로 사용한다. 기존 비활성 안내 경로 `/scanners/us`는 폐기했으며 새 차트 진입점으로 사용하지 않는다.
 
 화면 구성:
 
@@ -154,7 +154,7 @@ type UsTopRisingChartResponse = {
 npm test -- --run
 npm run typecheck
 npm run build
-scripts/dev-server.mjs로 로컬 실행 후 /scanners/us/top-rising 확인
+scripts/dev-server.mjs로 로컬 실행 후 /us-top-rising 확인
 운영 API에 관리자/운영 인증 정책에 맞는 방식으로 JSON·Content-Type·응답시간 확인
 ```
 

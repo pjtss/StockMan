@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const dedicatedRssScheduler = request.headers.get("x-rss-scheduler") === "1";
     if (!dedicatedRssScheduler && !isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("market-rss", "outside_schedule"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" }); }
     const sources = normalizeMarketRssSources(settings.featureSettings?.marketRss?.enabledSources);
-    const result = await withAutomationRun("market-rss", async () => {
+    const result = await withAutomationLock("market-rss-pipeline", () => withAutomationRun("market-rss", async () => {
       const ingested = await ingestMarketRssArticles({ sources });
       const translated = await translatePendingMarketRssArticles(Number(process.env.RSS_TRANSLATION_BATCH_SIZE || 50));
       const bullish = await syncMarketRssBullishArticles();

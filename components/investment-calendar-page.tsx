@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 type Item = { id:number; market:string; code:string|null; companyName:string; eventType:string; eventDate:string; eventEndDate:string|null; title:string; description:string; source:string; sourceUrl:string|null };
-const types = [["ALL","전체 일정"],["IPO","신규 상장"],["EARNINGS","실적 발표"],["EX_DIVIDEND","배당락"],["DIVIDEND_PAYMENT","배당 지급"],["SHAREHOLDER_MEETING","주주총회"],["LOCKUP_EXPIRY","보호예수 해제"]];
+const types = [["ALL","전체 일정"],["FDA_DECISION","FDA 결정"],["FDA_ADCOM","FDA 자문위"],["CLINICAL_READOUT","임상 결과"],["EARNINGS","실적 발표"],["GUIDANCE","가이던스"],["SEC_FILING","SEC 공시"],["OFFERING","증자·자금조달"],["WARRANT","워런트"],["MERGER","합병"],["REVERSE_SPLIT","역분할"],["EXCHANGE_COMPLIANCE","거래소 요건"],["IPO","신규 상장"],["EX_DIVIDEND","배당락"],["DIVIDEND_PAYMENT","배당 지급"],["SHAREHOLDER_MEETING","주주총회"],["LOCKUP_EXPIRY","보호예수 해제"]];
 const labels: Record<string,string> = Object.fromEntries(types);
 export function InvestmentCalendarPage() {
   const today = new Date().toISOString().slice(0,10); const [from,setFrom]=useState(today); const [to,setTo]=useState(new Date(Date.now()+45*86400000).toISOString().slice(0,10)); const [type,setType]=useState("ALL"); const [market,setMarket]=useState("ALL"); const [items,setItems]=useState<Item[]>([]); const [status,setStatus]=useState("");

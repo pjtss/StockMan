@@ -78,10 +78,10 @@ async function syncMarket(kind, universeTable) {
           saved += 1;
         }
         for (const item of fundamentalsPayload.items) {
-          await client.query(`INSERT INTO instrument_fundamental_snapshots (market, code, name, price, change_rate, open, high, low, volume, trading_value, market_cap, shares_outstanding, free_float_shares, free_float_percent, currency, source, raw_payload, observed_at, fetched_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'OPERATING_DB_API','{}',COALESCE($16,NOW()),COALESCE($17,NOW()))
-            ON CONFLICT (market, code) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, change_rate=EXCLUDED.change_rate, open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, volume=EXCLUDED.volume, trading_value=EXCLUDED.trading_value, market_cap=EXCLUDED.market_cap, shares_outstanding=EXCLUDED.shares_outstanding, free_float_shares=EXCLUDED.free_float_shares, free_float_percent=EXCLUDED.free_float_percent, currency=EXCLUDED.currency, source=EXCLUDED.source, observed_at=EXCLUDED.observed_at, fetched_at=EXCLUDED.fetched_at`,
-            [item.market, item.code, item.name ?? "", item.price, item.changeRate, item.open, item.high, item.low, item.volume, item.tradingValue, item.marketCap, item.sharesOutstanding, item.freeFloatShares, item.freeFloatPercent, item.currency, item.observedAt, item.fetchedAt]);
+          await client.query(`INSERT INTO instrument_fundamental_snapshots (market, code, name, price, change_rate, open, high, low, volume, trading_value, market_cap, listed_shares, currency, source, raw_payload, observed_at, fetched_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'OPERATING_DB_API','{}',COALESCE($14,NOW()),COALESCE($15,NOW()))
+            ON CONFLICT (market, code) DO UPDATE SET name=EXCLUDED.name, price=EXCLUDED.price, change_rate=EXCLUDED.change_rate, open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, volume=EXCLUDED.volume, trading_value=EXCLUDED.trading_value, market_cap=EXCLUDED.market_cap, listed_shares=EXCLUDED.listed_shares, currency=EXCLUDED.currency, source=EXCLUDED.source, observed_at=EXCLUDED.observed_at, fetched_at=EXCLUDED.fetched_at`,
+            [item.market, item.code, item.name ?? "", item.price, item.changeRate, item.open, item.high, item.low, item.volume, item.tradingValue, item.marketCap, item.listedShares, item.currency, item.observedAt, item.fetchedAt]);
         }
         await client.query("COMMIT");
       } catch (error) {

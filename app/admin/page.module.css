@@ -520,6 +520,71 @@
   font-size: 13px;
 }
 
+.translationFallbackPanel {
+  margin: 8px 0 14px;
+  padding: 12px;
+  border: 1px solid rgba(130, 150, 175, 0.16);
+  border-radius: 8px;
+  background: rgba(5, 11, 18, 0.38);
+}
+
+.translationFallbackFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.translationFallbackButton,
+.translationFallbackActive {
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.translationFallbackActive {
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+  background: var(--primary);
+  font-weight: 800;
+}
+
+.translationFallbackList {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.translationFallbackArticle {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--background);
+  overflow-wrap: anywhere;
+}
+
+.translationFallbackArticle > span,
+.translationFallbackArticle > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.translationFallbackArticle > a {
+  width: fit-content;
+  color: var(--primary);
+  font-size: 12px;
+}
+
 .controlStack,
 .eventList {
   display: grid;

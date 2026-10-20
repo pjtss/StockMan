@@ -15,8 +15,7 @@ export async function GET(request: Request) {
       SELECT u.code, u.name, u.market, u.standard_code AS "standardCode",
              f.price, f.change_rate AS "changeRate", f.open, f.high, f.low,
              f.volume, f.trading_value AS "tradingValue", f.market_cap AS "marketCap",
-             f.shares_outstanding AS "sharesOutstanding", f.free_float_shares AS "freeFloatShares",
-             f.free_float_percent AS "freeFloatPercent", f.currency, f.source,
+             f.listed_shares AS "listedShares", f.currency, f.source,
              f.observed_at AS "observedAt", f.fetched_at AS "fetchedAt",
              f.raw_payload AS "rawPayload",
              d.data AS daily, w.data AS weekly, m.data AS monthly

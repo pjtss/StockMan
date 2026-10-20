@@ -8,6 +8,7 @@ import { isWithinSchedule } from "@/lib/schedule-time";
 import { resolveSecEdgarRuntimeConfig } from "@/lib/sec-edgar-config";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { loadSecSmallcapTickerTargets } from "@/lib/sec-smallcap-universe";
 
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -16,13 +17,18 @@ export async function POST(request: Request) {
     if (!settings.enabled) { await recordSkippedAutomationRun("sec-realtime", "disabled"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "disabled" }); }
     if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("sec-realtime", "outside_schedule"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" }); }
     const result = await withAutomationRun("sec-realtime", async () => {
-      const { ciks, syncXbrl, discordBatch } = resolveSecEdgarRuntimeConfig(settings.featureSettings);
+      const runtime = resolveSecEdgarRuntimeConfig(settings.featureSettings);
+      const analysisRetries = await retryFailedSecCodexAnalyses();
+      const smallcapTargets = runtime.smallcapUniverse ? await loadSecSmallcapTickerTargets() : [];
+      const ciks = runtime.smallcapUniverse ? [...new Set(smallcapTargets.map((target) => target.cik))] : runtime.ciks;
+      const { syncXbrl, discordBatch } = runtime;
       const results = [];
       for (const cik of ciks) {
         try {
           const submissions = await syncSecCompany(cik);
           const facts = syncXbrl ? await syncSecCompanyFacts(cik) : null;
-          results.push({ cik, ok: submissions.ok && (facts == null || facts.ok), submissions, facts });
+          const documents = submissions.ok ? await collectMissingSecCompanyDocuments(cik) : null;
+          results.push({ cik, ok: submissions.ok && (facts == null || facts.ok) && (documents == null || documents.failed.length === 0), submissions, facts, documents });
         } catch (error) {
           const diagnostics = describeError(error);
           results.push({ cik, ok: false, ...diagnostics });
@@ -45,7 +51,7 @@ export async function POST(request: Request) {
         const body = [`🚨 **SEC EDGAR 공시 이벤트**`, `Form ${filing.form} · ${filing.cik}`, `분류 ${event.category} · ${event.direction} · 점수 ${event.score}`, event.matchedTerms.length ? `근거 ${event.matchedTerms.join(", ")}` : "", financing?.detected ? `자금조달 ${financing.amountUsd ?? "금액 확인 불가"} · 희석위험 ${financing.dilutionRisk}` : "", insider?.detected ? `내부자 ${insider.action}` : "", filing.filingUrl].filter(Boolean).join("\n");
         try { const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }); if (!response.ok) throw new Error(`Discord HTTP ${response.status}`); await markSecEventDiscord(event.accession, "SENT"); sent++; } catch (error) { await markSecEventDiscord(event.accession, "FAILED", error instanceof Error ? error.message : String(error)); }
       }
-      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, syncXbrl, discordBatch, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook) };
+      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, smallcapUniverse: runtime.smallcapUniverse, syncXbrl, discordBatch, analysisRetries, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook) };
     });
     return NextResponse.json(result);
   } catch (error) {

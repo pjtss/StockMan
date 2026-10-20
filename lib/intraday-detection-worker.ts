@@ -11,7 +11,9 @@ import { isDomesticScannerOpen, isUsScannerOpen } from "@/lib/scanner-hours";
 import { scoreIntradayCandidate } from "@/lib/intraday-candidate-priority";
 import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
 import { sendIntradayMvpAlerts, type IntradayMvpAlert } from "@/lib/discord-intraday-mvp";
-import { minuteTradingValue } from "@/lib/intraday-turnover";
+import { filterValidIntradayPoints, isSuccessfulMinuteQuoteResponse, minuteTradingValue } from "@/lib/intraday-turnover";
+import { saveIntradayTurnoverObservations, type IntradayTurnoverObservation } from "@/lib/intraday-turnover-repository";
+import { intradayTurnoverWriteBuffer } from "@/lib/intraday-turnover-write-buffer";
 
 export type IntradayWorkerStatus = "STOPPED" | "RUNNING" | "WARMING_UP" | "STOPPING" | "DEGRADED";
 export type IntradayWorkerSnapshot = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number; lastAlertAt: number | null; lastAlertResult: "sent" | "webhook_not_configured" | "send_failed" | "no_qualified_items" | null; alertCount: number };
@@ -67,21 +69,30 @@ export async function runIntradayTick(now = Date.now()) {
       let failedCount = 0;
       const transitions: IntradayTransition[] = [];
       const alerts: IntradayMvpAlert[] = [];
+      const persistedTurnover: IntradayTurnoverObservation[] = [];
+      let persistenceError: string | null = null;
       await Promise.all(due.map(async (candidate) => {
         try {
           const isUs = ["NAS", "AMS", "NYS"].includes(candidate.market);
           if (isUs ? !usOpen : !domesticOpen) { intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now); return; }
           const result = isUs ? await fetchUsMinuteTurnover({ code: candidate.code, market: candidate.market as "NAS" | "AMS" | "NYS" }) : null;
+          if (isUs && !isSuccessfulMinuteQuoteResponse(result)) throw new Error(`KIS_US_MINUTE_HTTP_${result?.status ?? "NO_RESPONSE"}`);
           const points = isUs ? (result?.points ?? []) : await fetchKrMinuteCandles(candidate.code, 120, candidate.market);
-          const valid = orderIntradayPoints(points.filter((point) => Number(point.price) > 0 && Number(point.volume ?? 0) >= 0) as any[]);
+          const valid = orderIntradayPoints(filterValidIntradayPoints(points) as any[]);
+          if (valid.length === 0) throw new Error("NO_VALID_MINUTE_POINTS");
           const latest = valid.at(-1) as any;
           const volume = valid.reduce((sum, point) => sum + Number(point.volume ?? 0), 0);
           const tradingValue = valid.reduce((sum, point) => sum + Number(point.price ?? 0) * Number(point.volume ?? 0), 0);
           const vwap = volume > 0 ? tradingValue / volume : null;
-          const sourceObservedAt = latest?.time ? (isUs ? Date.parse(String(latest.time)) : Date.parse(`${latest.date}T${String(latest.time).padStart(6, "0").replace(/(\d{2})(\d{2})(\d{2})/, "$1:$2:$3") }+09:00`)) : null;
+          const sourceObservedAt = isUs
+            ? latest?.observedAt == null ? Number.NaN : Number(latest.observedAt)
+            : latest?.time
+              ? Date.parse(`${latest.date}T${String(latest.time).padStart(6, "0").replace(/(\d{2})(\d{2})(\d{2})/, "$1:$2:$3")}+09:00`)
+              : Number.NaN;
+          if (!Number.isFinite(sourceObservedAt)) throw new Error("MINUTE_SOURCE_TIME_MISSING");
           const sessionDate = intradaySessionDate(candidate.market, now);
-          const quality = evaluateIntradayQuality({ sourceObservedAt: Number.isFinite(sourceObservedAt) ? sourceObservedAt : null, receivedAt: Date.now(), sessionId: sessionDate, currentPrice: latest?.price ?? null, volume, tradingValue, vwap, aboveVwap: latest?.price != null && vwap != null ? Number(latest.price) >= vwap : null }, candidate.consecutiveObservations ?? 0, now);
-          intradayMemoryState.updateVwap(candidate.market, candidate.code, sessionDate, volume, tradingValue, sourceObservedAt || now);
+          const quality = evaluateIntradayQuality({ sourceObservedAt, receivedAt: Date.now(), sessionId: sessionDate, currentPrice: latest?.price ?? null, volume, tradingValue, vwap, aboveVwap: latest?.price != null && vwap != null ? Number(latest.price) >= vwap : null }, candidate.consecutiveObservations ?? 0, now);
+          intradayMemoryState.updateVwap(candidate.market, candidate.code, sessionDate, volume, tradingValue, sourceObservedAt);
           const latestPrice = Number(latest?.price ?? latest?.close ?? 0);
           const latestVolume = Number(latest?.volume);
           // Only an incremental minute volume is valid for the five-minute
@@ -89,25 +100,64 @@ export async function runIntradayTick(now = Date.now()) {
           // used as a fallback because summing them creates false positives.
           const latestBar = minuteTradingValue({ price: latestPrice, volume: latestVolume, cumulativeTradingValue: latest?.cumulativeTradingValue }, valid.length > 1 ? { price: Number(valid.at(-2)?.price ?? valid.at(-2)?.close ?? 0), volume: Number(valid.at(-2)?.volume), cumulativeTradingValue: valid.at(-2)?.cumulativeTradingValue } : undefined);
           const latestBarValue = latestBar.value;
-          const latestObservedAt = Number.isFinite(sourceObservedAt) && sourceObservedAt ? sourceObservedAt : now;
+          const latestObservedAt = sourceObservedAt;
           const minuteBucket = Math.floor(latestObservedAt / 60_000) * 60_000;
           const turnover = intradayMemoryState.recordRollingTurnover(candidate.market, candidate.code, sessionDate, minuteBucket, Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0, candidate.marketCap ?? 0, policy.windowMs, policy.threshold);
+          persistedTurnover.push({
+            market: candidate.market,
+            code: candidate.code,
+            sessionDate,
+            bucketAt: new Date(minuteBucket),
+            observedAt: new Date(now),
+            currency: isUs ? "USD" : "KRW",
+            price: Number.isFinite(latestPrice) && latestPrice > 0 ? latestPrice : null,
+            volume: Number.isFinite(latestVolume) && latestVolume >= 0 ? latestVolume : null,
+            sourceTradingValue: Number.isFinite(Number(latest?.cumulativeTradingValue ?? latest?.amount)) ? Number(latest?.cumulativeTradingValue ?? latest?.amount) : null,
+            minuteTradingValue: Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0,
+            minuteTradingValueSource: latestBar.source,
+            marketCap: candidate.marketCap ?? null,
+            rollingTradingValue: turnover.tradingValue,
+            turnoverRatio: turnover.ratio,
+            sourcePayload: latest?.raw ?? {},
+          });
           // The MVP contract is the five completed minute buckets and the
           // turnover-to-market-cap threshold. A fresh observation may still be
           // marked WARMING_UP by the auxiliary VWAP quality gate; that state
           // must not suppress the primary turnover alert. Only stale or
           // degraded source data may block a qualified turnover event.
-          const finalState = turnover.qualified && !["STALE", "DEGRADED"].includes(quality.state) ? "QUALIFIED" : quality.state;
+          const freshTimestamp = quality.dataAgeSeconds != null && quality.dataAgeSeconds <= 60;
+          const finalState = turnover.qualified && freshTimestamp && !["STALE", "DEGRADED"].includes(quality.state) ? "QUALIFIED" : quality.state;
           const transition = intradayMemoryState.recordQuality(candidate.market, candidate.code, finalState, now, quality.dataAgeSeconds ?? undefined);
           if (transition?.previousState !== finalState) transitions.push({ tickId, market: candidate.market, code: candidate.code, fromState: transition?.previousState, toState: finalState, observedAt: new Date(now), dedupeKey: `${candidate.market}:${candidate.code}:${finalState}:${new Date(now).toISOString().slice(0, 16)}` });
           if (finalState === "QUALIFIED" && transition?.previousState !== "QUALIFIED" && turnover.ratio != null && candidate.marketCap) alerts.push({ market: candidate.market, code: candidate.code, marketCap: candidate.marketCap, rollingTradingValue: turnover.tradingValue, ratioPercent: turnover.ratio * 100, windowMinutes: policy.windowMinutes, observedAt: new Date(now).toISOString() });
           intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now);
         } catch { failedCount += 1; intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now); }
       }));
+      const droppedBeforeEnqueue = intradayTurnoverWriteBuffer.snapshot().evictedCount;
+      intradayTurnoverWriteBuffer.enqueue(persistedTurnover, now);
+      if (intradayTurnoverWriteBuffer.shouldRetry(now)) {
+        const batch = intradayTurnoverWriteBuffer.batch(now);
+        try {
+          await saveIntradayTurnoverObservations(batch);
+          intradayTurnoverWriteBuffer.acknowledge(batch);
+        } catch (error) {
+          failedCount += 1;
+          const delay = intradayTurnoverWriteBuffer.markFailure(now);
+          persistenceError = error instanceof Error ? `turnover_persistence:${error.message}` : "turnover_persistence:failed";
+          console.error("[Intraday] turnover observations could not be persisted; queued for retry", { error: persistenceError, pendingCount: intradayTurnoverWriteBuffer.snapshot().pendingCount, retryDelayMs: delay });
+        }
+      }
+      const bufferSnapshot = intradayTurnoverWriteBuffer.snapshot();
+      if (!persistenceError && bufferSnapshot.evictedCount > droppedBeforeEnqueue) {
+        persistenceError = "turnover_persistence:buffer_evicted";
+        console.error("[Intraday] pending turnover observations expired or exceeded the memory bound", { droppedCount: bufferSnapshot.evictedCount - droppedBeforeEnqueue, pendingCount: bufferSnapshot.pendingCount });
+      } else if (!persistenceError && bufferSnapshot.pendingCount > 0) {
+        persistenceError = "turnover_persistence:retry_pending";
+      }
       runtime.lastTickAt = now;
       runtime.tickCount += 1;
-      runtime.status = "RUNNING";
-      runtime.lastError = null;
+      runtime.status = persistenceError ? "DEGRADED" : "RUNNING";
+      runtime.lastError = persistenceError;
       await recordIntradayTick({ runId: workerRunId, tickId, workerStatus: runtime.status, plannedCount: scopes.scopes.length + domestic.length, executedCount: due.length - failedCount, deferredCount: Math.max(0, scopes.scopes.length + domestic.length - due.length), throttledCount: 0, failedCount, queueDepth: intradayMemoryState.dueCandidates(now).length, observedAt: new Date(now), durationMs: Date.now() - started });
       await recordIntradayTransitions(transitions);
       if (alerts.length) {

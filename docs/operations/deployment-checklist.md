@@ -30,6 +30,7 @@
 
 - [ ] GitHub Actions `Deploy OCI` 성공 확인
 - [ ] 운영 health endpoint와 핵심 변경 경로 확인
+- [ ] `stockman-rss.timer`가 active이며 `stockman-rss.service` 최근 실행과 `market-rss` 자동화 run이 갱신됐는지 확인
 - [ ] Flyway 적용 버전 확인
 - [ ] 실패 시 원인·영향·수정·검증 결과를 `docs/ERROR_HANDLING.md`에 기록한다.
 

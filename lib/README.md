@@ -10,4 +10,4 @@
 - `*-repository.ts`: DB 읽기·쓰기 경계
 - `*.test.ts`: 해당 모듈의 단위 테스트
 
-새 모듈은 위 책임 중 하나에 속해야 하며, 서로 다른 책임을 하나의 파일에 합치지 않습니다. 상세 경계는 [`../docs/architecture/code-structure.md`](../docs/architecture/code-structure.md)를 따릅니다.
+새 모듈은 위 책임 중 하나에 속해야 하며, 서로 다른 책임을 하나의 파일에 합치지 않습니다. 디렉터리 배치는 [`../docs/architecture/code-structure.md`](../docs/architecture/code-structure.md), 책임·의존성·분리 기준은 [`../docs/architecture/system-module-catalog.md`](../docs/architecture/system-module-catalog.md)를 따릅니다.

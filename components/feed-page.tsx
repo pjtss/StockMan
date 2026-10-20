@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GLOBAL_POLLING_INTERVAL, PAGE_SIZE } from "@/lib/constants";
 import { formatTime, getJudgmentStatus, paginateItems, sortByPublishedAtDesc } from "@/lib/utils";
-import type { DartItem, DartJudgment, SecItem, SecSentiment } from "@/lib/types";
+import type { DartItem, DartJudgment } from "@/lib/types";
 import { PageNavigation } from "./page-navigation";
 import { getWatchlist, toggleWatchlist } from "@/lib/watchlist";
 import { CompanyTimeline } from "./company-timeline";
@@ -13,17 +13,11 @@ import { useFeedData } from "./use-feed-data";
 
 type ViewMode = "latest" | "grouped";
 
-type FeedPageProps =
-  | {
-      type: "dart";
-      title: string;
-      description: string;
-    }
-  | {
-      type: "sec";
-      title: string;
-      description: string;
-    };
+type FeedPageProps = {
+  type: "dart";
+  title: string;
+  description: string;
+};
 
 function judgmentClass(value: string): string {
   if (value === "최강호재") return styles.strongGood;
@@ -118,90 +112,8 @@ function DartTable({ items, watchlist, onToggleWatchlist, onShowTimeline }: { it
   );
 }
 
-function SecSections({ items, watchlist, onToggleWatchlist, onShowTimeline }: { items: SecItem[]; watchlist: string[]; onToggleWatchlist: (company: string) => void; onShowTimeline: (company: string) => void }) {
-  const orders: SecSentiment[] = ["호재가능"];
-
-  return (
-    <div className={styles.groupList}>
-      {orders.map((sentiment) => {
-        const sectionItems = items.filter((item) => item.sentiment === sentiment);
-        if (sectionItems.length === 0) {
-          return null;
-        }
-
-        return (
-          <section key={sentiment} className={styles.groupSection}>
-            <div className={styles.groupHeader}>
-              <h2>{sentiment}</h2>
-              <span>{sectionItems.length}건</span>
-            </div>
-            <SecTable items={sectionItems} watchlist={watchlist} onToggleWatchlist={onToggleWatchlist} onShowTimeline={onShowTimeline} />
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-function SecTable({ items, watchlist, onToggleWatchlist, onShowTimeline }: { items: SecItem[]; watchlist: string[]; onToggleWatchlist: (company: string) => void; onShowTimeline: (company: string) => void }) {
-  return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>즐겨찾기</th>
-            <th>등급</th>
-            <th>폼</th>
-            <th>회사명</th>
-            <th>공시 제목</th>
-            <th>공시 시각</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const isWatched = watchlist.includes(item.company);
-            return (
-              <tr key={item.accession || item.link} className={isWatched ? styles.watchlistRow : ""}>
-                <td>
-                  <button
-                    type="button"
-                    className={`${styles.starButton} ${isWatched ? styles.starActive : ""}`}
-                    onClick={() => onToggleWatchlist(item.company)}
-                  >
-                    {isWatched ? "★" : "☆"}
-                  </button>
-                </td>
-                <td>
-                  <span className={`${styles.badge} ${judgmentClass(item.sentiment)}`}>{item.sentiment}</span>
-                </td>
-                <td>{item.formType}</td>
-                <td>
-                  <span 
-                    className={styles.companyLink} 
-                    onClick={() => onShowTimeline(item.company)}
-                    style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    {item.company}
-                  </span>
-                  {isWatched && <span className={styles.watchlistBadge}>관심</span>}
-                </td>
-                <td>
-                  <a href={item.link} target="_blank" rel="noreferrer">
-                    {item.title}
-                  </a>
-                </td>
-                <td>{formatTime(item.publishedAt)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function FeedPage(props: FeedPageProps) {
-  const { loading, error, dartData, secData } = useFeedData(props.type);
+  const { loading, error, dartData } = useFeedData(props.type);
   const [viewMode, setViewMode] = useState<ViewMode>("latest");
   const [page, setPage] = useState(1);
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -220,16 +132,14 @@ export function FeedPage(props: FeedPageProps) {
   }, [props.type, viewMode]);
 
   const rawDartItems = dartData?.items ?? [];
-  const rawSecItems = secData?.items ?? [];
   const currentPage = page;
 
-  const count = props.type === "dart" ? rawDartItems.length : rawSecItems.length;
+  const count = rawDartItems.length;
   const totalPages = Math.ceil(count / PAGE_SIZE);
-  const fetchedAt = props.type === "dart" ? dartData?.fetchedAt : secData?.fetchedAt;
+  const fetchedAt = dartData?.fetchedAt;
 
   // Always sort the complete feed before pagination so every page is newest-first.
   const dartItems = paginateItems(sortByPublishedAtDesc(rawDartItems), currentPage, PAGE_SIZE);
-  const secItems = paginateItems(sortByPublishedAtDesc(rawSecItems), currentPage, PAGE_SIZE);
 
   return (
     <main className={styles.page}>
@@ -237,7 +147,7 @@ export function FeedPage(props: FeedPageProps) {
 
       <section className={styles.hero}>
         <div>
-          <p className={styles.kicker}>{props.type === "dart" ? "KOREA DISCLOSURES" : "U.S. FILINGS"}</p>
+          <p className={styles.kicker}>KOREA DISCLOSURES</p>
           <div className={styles.heroMain}>
           <p className={styles.heroDescription}>{props.description}</p>
           <h1 className={styles.heroTitle}>{props.title}</h1>
@@ -274,44 +184,26 @@ export function FeedPage(props: FeedPageProps) {
             </button>
           </div>
         </div>
-        {props.type === "dart" ? (
-          viewMode === "grouped" ? (
-            <DartSections
-              items={rawDartItems}
-              watchlist={watchlist}
-              onToggleWatchlist={handleToggleWatchlist}
-              onShowTimeline={setSelectedCompany}
-            />
-          ) : (
-            <DartTable
-              items={dartItems}
-              watchlist={watchlist}
-              onToggleWatchlist={handleToggleWatchlist}
-              onShowTimeline={setSelectedCompany}
-            />
-          )
+        {viewMode === "grouped" ? (
+          <DartSections
+            items={rawDartItems}
+            watchlist={watchlist}
+            onToggleWatchlist={handleToggleWatchlist}
+            onShowTimeline={setSelectedCompany}
+          />
         ) : (
-          viewMode === "grouped" ? (
-            <SecSections
-              items={rawSecItems}
-              watchlist={watchlist}
-              onToggleWatchlist={handleToggleWatchlist}
-              onShowTimeline={setSelectedCompany}
-            />
-          ) : (
-            <SecTable
-              items={secItems}
-              watchlist={watchlist}
-              onToggleWatchlist={handleToggleWatchlist}
-              onShowTimeline={setSelectedCompany}
-            />
-          )
+          <DartTable
+            items={dartItems}
+            watchlist={watchlist}
+            onToggleWatchlist={handleToggleWatchlist}
+            onShowTimeline={setSelectedCompany}
+          />
         )}
         
         {selectedCompany && (
           <CompanyTimeline
             company={selectedCompany}
-            items={props.type === "dart" ? rawDartItems : rawSecItems}
+            items={rawDartItems}
             onClose={() => setSelectedCompany(null)}
           />
         )}

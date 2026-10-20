@@ -75,6 +75,7 @@ export async function saveFeatureModuleSettings(key: FeatureModuleKey, settings:
   const minuteScheduledModules: FeatureModuleKey[] = ["us-daily-indicators", "us-obv", "us-daily-cache", "us-daily-open-cache", "us-daily-breakout", "us-bollinger-band", "us-bollinger-middle-lower", "kr-bollinger-band", "kr-bollinger-middle-lower", "kr-daily-cache"];
   const minimumIntervalSeconds = minuteScheduledModules.includes(key) ? 60 : 5;
   if (settings.intervalSeconds !== undefined && (!Number.isInteger(settings.intervalSeconds) || settings.intervalSeconds < minimumIntervalSeconds)) throw new Error("INVALID_INTERVAL");
+  if (key === "instrument-fundamentals" && settings.intervalSeconds !== undefined && settings.intervalSeconds !== 86_400) throw new Error("INVALID_INTERVAL");
   if (key === "us-daily-indicators") {
     const evaluation = settings.featureSettings?.evaluation;
     const validateInteger = (name: string, value: unknown, min: number, max: number) => {

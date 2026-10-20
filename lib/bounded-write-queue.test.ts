@@ -50,6 +50,25 @@ describe("BoundedWriteQueue", () => {
     expect(thirdDone).toBe(true);
   });
 
+  it("reports time waiting before a queued writer starts", async () => {
+    let release!: () => void;
+    let calls = 0;
+    const queueWaits: number[] = [];
+    const queue = new BoundedWriteQueue<number>(async () => {
+      calls += 1;
+      if (calls === 1) await new Promise<void>(resolve => { release = resolve; });
+    }, 1, 2, waitMs => queueWaits.push(waitMs));
+
+    const first = queue.enqueue(1);
+    const second = queue.enqueue(2);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    release();
+    await Promise.all([first, second]);
+
+    expect(queueWaits).toHaveLength(2);
+    expect(queueWaits[1]).toBeGreaterThan(queueWaits[0]);
+  });
+
   it("rejects new work after close", async () => {
     const queue = new BoundedWriteQueue<number>(async () => undefined);
     await queue.close();

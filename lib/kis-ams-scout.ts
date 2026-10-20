@@ -94,7 +94,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
   let refreshAttempt: Promise<string | null> | null = null;
   const refreshTokenOnce = async () => {
     if (!refreshAttempt) {
-      refreshAttempt = refreshAccessToken();
+      refreshAttempt = refreshAccessToken(activeToken!);
     }
     const freshToken = await refreshAttempt;
     if (freshToken) {

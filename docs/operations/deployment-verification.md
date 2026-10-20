@@ -19,7 +19,7 @@
 
 브라우저 검증은 `scripts/charts-browser-smoke.mjs`가 담당한다. Playwright 라이브러리는 프로젝트 개발 의존성이며 브라우저 바이너리는 별도 다운로드하지 않고 설치된 Google Chrome 채널을 사용한다. 따라서 로컬 및 CI runner는 Chrome을 설치해야 하고, runner 이미지가 바뀌면 공식 이미지 사양을 재검증한다.
 
-검증 중 하나라도 실패하면 패키징·업로드·활성화 단계로 진행하지 않는다. 실행 검증은 `scripts/verify-deploy.mjs`가 담당하며, OCI GitHub Actions도 이 모듈을 호출한다. 패키징과 서버 활성화는 배포 환경에 종속된 별도 단계로 유지한다.
+빠른 게이트 실패 시 빌드·전체 테스트 전에 중단한다. 빌드는 전체 테스트 전에 수행해 테스트 worker의 자원 점유와 Next.js 빌드 간 간섭을 피한다. Runtime smoke는 배포 artifact의 응답 가능성과 HTML/JSON content delivery를 검사하되 KIS·DB 의존 business API를 호출하지 않아 검증 도중 운영 외부 요청이나 장시간 대기를 유발하지 않는다. 도메인별 동작은 단위·통합 테스트에서 검증한다. 어느 단계든 실패하면 패키징·업로드·활성화 단계로 진행하지 않는다. 실행 검증은 `scripts/verify-deploy.mjs`가 담당하며, OCI GitHub Actions도 이 모듈을 호출한다. 패키징과 서버 활성화는 배포 환경에 종속된 별도 단계로 유지한다.
 
 ## 운영 원칙
 

@@ -1,6 +1,7 @@
-import type { FeatureModuleKey } from "@/lib/feature-modules";
+import { getFeatureModule, type FeatureModuleKey } from "@/lib/feature-modules";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { loadFeatureDiscordDebugWebhook } from "@/lib/discord-config";
+import { getMarketRssTranslationReasonDisplay } from "@/lib/market-rss-translation-reason";
 
 const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-daily-cache",
@@ -10,6 +11,7 @@ const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "kr-bollinger-middle-lower",
   "us-bollinger-band",
   "us-bollinger-middle-lower",
+  "market-rss",
 ]);
 
 function asNumber(value: unknown) {
@@ -23,7 +25,7 @@ function compact(value: unknown): string {
 }
 
 function resultSummary(summary: Record<string, unknown>) {
-  const preferred = ["instrumentCount", "successCount", "failureCount", "savedCandleCount", "processedCount", "sent", "skipped", "reason", "intervalSeconds", "elapsedSeconds", "latestRunStatus"];
+  const preferred = ["instrumentCount", "successCount", "failureCount", "partialFailureCount", "translationFailureCount", "counterDataInvalid", "savedCandleCount", "processedCount", "sent", "skipped", "reason", "intervalSeconds", "elapsedSeconds", "latestRunStatus"];
   const selected = Object.fromEntries(preferred.filter((key) => key in summary).map((key) => [key, summary[key]]));
   if (Object.keys(selected).length) return compact(selected);
   return compact(summary.counts ?? summary.result ?? { ok: true });
@@ -31,6 +33,22 @@ function resultSummary(summary: Record<string, unknown>) {
 
 function followupSummary(summary: Record<string, unknown>) {
   const lines: string[] = [];
+  if (summary.counterDataInvalid === true) lines.push("RSS 수집·번역 집계 카운터 오류 · 실제 실패 건수 확인 필요");
+  const translated = summary.translated as Record<string, unknown> | undefined;
+  if (translated && typeof translated === "object") {
+    const reasons = translated.fallbackReasons && typeof translated.fallbackReasons === "object"
+      ? translated.fallbackReasons as Record<string, unknown>
+      : {};
+    const activeReasons = Object.entries(reasons)
+      .filter(([, count]) => typeof count === "number" && count > 0);
+    const reasonSummary = activeReasons
+      .slice(0, 4)
+      .map(([reason, count]) => `${getMarketRssTranslationReasonDisplay(reason).shortLabel} ${count}건`);
+    if (reasonSummary.length) {
+      const omittedReasonCount = activeReasons.length - reasonSummary.length;
+      lines.push(`RSS 번역 fallback: ${reasonSummary.join(" · ")}${omittedReasonCount > 0 ? ` · 외 ${omittedReasonCount}종 생략` : ""}`);
+    }
+  }
   const bollinger = summary.bollingerCache as Record<string, unknown> | undefined;
   if (bollinger) {
     if (bollinger.skipped === true) lines.push(`볼린저밴드: 건너뜀(${compact(bollinger.reason)})`);
@@ -81,6 +99,9 @@ async function postCompletionWebhook(url: string, body: string) {
 
 export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, status: "SUCCESS" | "PARTIAL" | "FAILED" | "SKIPPED", summary: Record<string, unknown>, errorMessage?: string) {
   if (!COMPLETION_MODULES.has(moduleKey)) return { sent: false, skipped: true, reason: "module_not_supported" };
+  // RSS runs frequently; report actionable translation/ingest degradation,
+  // but suppress routine green completion messages to avoid Discord spam.
+  if (moduleKey === "market-rss" && status === "SUCCESS") return { sent: false, skipped: true, reason: "success_notifications_suppressed" };
   let configured = false;
   let webhook = "";
   try {
@@ -104,16 +125,10 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
   // delivered to Discord to avoid cron-driven notification spam.
 
   const durationMs = asNumber((summary.observability as Record<string, unknown> | undefined)?.durationMs);
-  const label = moduleKey === "kr-daily-cache"
-    ? "국내 일봉 캐시"
-    : moduleKey === "us-daily-cache"
-      ? "해외 일봉 캐시"
-      : moduleKey === "us-daily-open-cache"
-        ? "해외 일봉 시가 캐시"
-        : "해외 일봉 시가 캐시";
+  const label = getFeatureModule(moduleKey)?.label ?? moduleKey;
   const lines = [
     `${status === "SUCCESS" ? "✅" : status === "PARTIAL" ? "⚠️" : status === "SKIPPED" ? "⏭️" : "❌"} ${label} 자동화 완료`,
-    `상태: ${status === "SUCCESS" ? "성공" : status === "PARTIAL" ? "부분 완료(일부 종목 데이터 미수신)" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
+    `상태: ${status === "SUCCESS" ? "성공" : status === "PARTIAL" ? moduleKey === "market-rss" ? "부분 완료(RSS 수집/번역 일부 실패)" : "부분 완료(일부 종목 데이터 미수신)" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
     durationMs == null ? null : `소요 시간: ${(durationMs / 1000).toFixed(2)}초`,
     `결과: ${resultSummary(summary)}`,
     ...followupSummary(summary),

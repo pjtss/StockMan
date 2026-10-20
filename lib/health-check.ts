@@ -1,11 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getPool } from "@/lib/db";
-import { inspectDatabaseSchema } from "@/lib/schema-health";
+import { inspectDatabaseSchema, type SchemaHealth } from "@/lib/schema-health";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { FEATURE_MODULES, type FeatureModuleKey } from "@/lib/feature-modules";
+import { getMarketRssTranslationConfiguration } from "@/lib/market-rss-translation-configuration";
+import nextPackage from "next/package.json";
 
 type BuildInfo = { version?: string; commit?: string; builtAt?: string };
+
+export function getRuntimeVersions() {
+  return { node: process.version, next: nextPackage.version };
+}
 
 function summarizeAutomationMetrics(value: unknown) {
   if (!value || typeof value !== "object") return {};
@@ -19,6 +25,23 @@ export function getAutomationCoverage(registered: readonly string[], observed: r
   const expected = [...registered];
   const actual = expected.filter((moduleKey) => observedSet.has(moduleKey));
   return { expected, observed: actual, neverRun: expected.filter((moduleKey) => !observedSet.has(moduleKey)) };
+}
+
+export function summarizeDatabaseHealth(schema: SchemaHealth) {
+  return {
+    ok: schema.connectionOk && schema.schemaReady,
+    connected: schema.connectionOk,
+    schemaReady: schema.schemaReady,
+    flywayVersion: schema.flywayVersion,
+    checkedTables: schema.checkedTables,
+    missingTables: schema.missingTables,
+    operationalTables: schema.operationalTables,
+    missingOperationalTables: schema.missingOperationalTables,
+    missingOperationalColumns: schema.missingOperationalColumns,
+    retiredTablesPresent: schema.retiredTablesPresent,
+    latencyMs: schema.latencyMs,
+    error: schema.error,
+  };
 }
 
 function buildInfo(): BuildInfo {
@@ -42,20 +65,13 @@ function buildInfo(): BuildInfo {
 
 export async function getHealthSnapshot() {
   const startedAt = Date.now();
+  const runtimeVersions = getRuntimeVersions();
   const schema = await inspectDatabaseSchema();
-  const database = {
-    ok: schema.connectionOk && schema.schemaReady,
-    connected: schema.connectionOk,
-    schemaReady: schema.schemaReady,
-    flywayVersion: schema.flywayVersion,
-    checkedTables: schema.checkedTables,
-    missingTables: schema.missingTables,
-    latencyMs: schema.latencyMs,
-    error: schema.error,
-  };
+  const database = summarizeDatabaseHealth(schema);
 
   const requiredEnv = ["DATABASE_URL", "CRON_SECRET"];
   const optionalIntegrations = ["KIS_APPKEY", "KIS_APPSECRET", "ALPACA_API_KEY", "ALPACA_API_SECRET", "US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_WATCHLIST_DISCORD_WEBHOOK_URL", "US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "NEWS_RADAR_DISCORD_WEBHOOK_URL", "MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL", "SEC_USER_AGENT", "ADMIN_DASHBOARD_PASSWORD"];
+  const rssTranslation = getMarketRssTranslationConfiguration(true, Boolean(process.env.GOOGLE_TRANSLATION_API_KEY?.trim()));
   const checks = { database: database.ok, databaseConnection: database.connected, schema: database.schemaReady, flyway: database.schemaReady && Boolean(database.flywayVersion), requiredEnv: requiredEnv.every((key) => Boolean(process.env[key]?.trim())) };
   let automation: Record<string, { status: string; startedAt: string | null; finishedAt: string | null; error: string | null; metrics: Record<string, unknown> }> = {};
   let automationHistoryAvailable = false;
@@ -122,12 +138,13 @@ export async function getHealthSnapshot() {
     status: Object.values(checks).every(Boolean) ? "ok" : "degraded",
     checkedAt: new Date().toISOString(),
     responseTimeMs: Date.now() - startedAt,
-    service: { name: "stockman", version: buildInfo().version, commit: buildInfo().commit, builtAt: buildInfo().builtAt, node: process.version, next: "15.5.15", uptimeSeconds: Math.floor(process.uptime()) },
+    service: { name: "stockman", version: buildInfo().version, commit: buildInfo().commit, builtAt: buildInfo().builtAt, ...runtimeVersions, uptimeSeconds: Math.floor(process.uptime()) },
     database,
     automation,
     automationHistoryAvailable,
     automationCoverage,
     cacheAutomation,
+    rssTranslation,
     checks,
     environment: Object.fromEntries(optionalIntegrations.map((key) => [key, Boolean(process.env[key]?.trim())])),
   };

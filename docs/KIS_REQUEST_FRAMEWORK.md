@@ -6,10 +6,12 @@
 
 - `buildKisAuthorization`으로 DB 액세스 토큰을 `Bearer` 헤더에 구성한다.
 - `KIS_APPKEY`, `KIS_APPSECRET`, `tr_id`, `custtype` 헤더를 공통 생성한다.
-- `lib/kis-request-throttle.ts`를 통해 전역 TPS 18 기준으로 직렬 제한한다.
-- 일시적 오류와 KIS rate-limit 응답은 기존 공통 재시도 정책을 적용한다.
+- `lib/kis-request-throttle.ts`를 통해 단일 프로세스 전체 데이터 호출을 rolling 1초 최대 10회로 제한한다. 이는 공식 제한 18 TPS보다 낮게 둔 프로젝트의 고정 안전 상한이다.
+- 일시적 오류와 KIS rate-limit 응답은 공통 재시도 정책을 적용한다. HTTP 429, upstream 5xx, fetch network rejection은 해당 호출뿐 아니라 프로세스 내 대기 호출에도 전역 cooldown 및 adaptive interval 증가를 적용해 동시 재시도 burst를 줄인다. rate-limit 관측 callback은 실제 rate-limit 응답에서만 호출한다. 네트워크 rejection도 실제 시도 횟수 callback에 포함하고 KIS rate-limit 이벤트로 오분류하지 않는다.
+- 이 제한기는 프로세스 로컬이다. 별도 로컬·운영 프로세스나 다중 인스턴스 사이의 호출량은 합산·조율되지 않는다.
 - 요청별 기본 타임아웃은 15초이며, 호출부에서 `timeoutMs`로 조정할 수 있다.
 - HTTP 응답, 원문 문자열, JSON 파싱 결과를 함께 반환해 오류를 수치화하고 재현할 수 있다.
+- `debug_kis_calls.attempt_count`는 최종 응답 또는 재시도 소진 오류까지의 실제 HTTP 시도 수를 기록한다. `/admin/kis-calls`는 논리 요청 수와 재시도 포함 HTTP 시도 수를 분리해 표시하며 날짜·시간·기능별 집계도 같은 기준을 제공한다. 네트워크 예외도 실제 HTTP 시도로 계산하며 throttle 대기/큐 거절은 HTTP 시도에 포함하지 않는다. 요청이 보내지지 않은 경우는 `LOCAL_QUEUE_REJECTED`/`LOCAL_THROTTLE` 및 0회로 구분한다.
 
 ## DB 적재 성능 정책
 
