@@ -20,7 +20,9 @@ describe("CloudTranslationClient", () => {
     expect(result).toMatchObject({ translatedText: "안녕하세요", source: "en", target: "ko", provider: "google-cloud-translation", fallback: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain("/language/translate/v2?key=test-key");
+    expect(String(url)).toContain("/language/translate/v2");
+    expect(String(url)).not.toContain("key=");
+    expect(init.headers).toMatchObject({ "x-goog-api-key": "test-key" });
     expect(init.body).toContain('"q":"Hello"');
   });
 

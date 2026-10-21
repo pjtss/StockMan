@@ -302,7 +302,7 @@ describe("AdminStockTitanRss translation detail", () => {
     }), { status: 200, headers: { "content-type": "application/json" } })));
     render(<AdminStockTitanRss />);
 
-    expect(await screen.findByText("Google 번역 요청 1건 · 입력 37자")).toBeInTheDocument();
+    expect(await screen.findByText("번역 provider 요청 1건 (Azure 0건) · 입력 37자")).toBeInTheDocument();
     expect(screen.getByText("Google 일일 한도 1건")).toBeInTheDocument();
     expect(screen.getByText(/원문 fallback · Google 일일 번역 한도 도달 · Google 일일 한도/)).toBeInTheDocument();
     const cards = await screen.findAllByRole("heading", { name: "삼성전자 실적 증가" });
@@ -312,7 +312,7 @@ describe("AdminStockTitanRss translation detail", () => {
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "닫기" }));
     const quotaCard = screen.getByText(/원문 fallback · 월간 한도 도달/).closest("article");
     fireEvent.click(within(quotaCard!).getByRole("button", { name: "전체 디버깅 보기" }));
-    expect(screen.getByRole("dialog")).toHaveTextContent("Google 번역 API 호출 없음");
+    expect(screen.getByRole("dialog")).toHaveTextContent("번역 provider API 호출 없음");
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "닫기" }));
     fireEvent.click(within(screen.getByRole("heading", { name: "Provider daily quota reached" }).closest("article")!).getByRole("button", { name: "전체 디버깅 보기" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("Google 일일 한도 확인 1회");

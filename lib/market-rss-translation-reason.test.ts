@@ -6,7 +6,9 @@ describe("market RSS translation fallback reason catalog", () => {
     const reasons = [
       "cloud_translation_not_configured",
       "monthly_character_limit_reached",
+      "hourly_character_limit_reached",
       "provider_daily_quota_exceeded",
+      "provider_free_quota_exceeded",
       "protected_token_mismatch",
       "translation_numeric_hallucination",
       "target_language_not_detected",

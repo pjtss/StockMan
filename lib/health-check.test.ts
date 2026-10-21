@@ -68,14 +68,14 @@ describe("health runtime metadata", () => {
 
     const missingKey = await getHealthSnapshot();
 
-    expect(missingKey.rssTranslation).toEqual({ requested: true, configured: false, status: "API_KEY_MISSING", provider: null });
+    expect(missingKey.rssTranslation).toMatchObject({ requested: true, configured: false, status: "API_KEY_MISSING", provider: null });
     expect(missingKey.status).toBe("ok");
 
     vi.stubEnv("GOOGLE_TRANSLATION_API_KEY", "health-check-translation-secret");
     schemaMock.inspect.mockResolvedValueOnce(healthySchema);
     const configured = await getHealthSnapshot();
 
-    expect(configured.rssTranslation).toEqual({ requested: true, configured: true, status: "READY", provider: "Google Cloud Translation Basic v2" });
+    expect(configured.rssTranslation).toMatchObject({ requested: true, configured: true, status: "READY", provider: "Google Cloud Translation Basic v2 (Azure F0 미설정)", primary: "google-cloud-translation" });
     expect(JSON.stringify(configured)).not.toContain("health-check-translation-secret");
   });
 });

@@ -35,6 +35,8 @@ async function runSuite(checks: CheckName[]) {
       kisConfigured: Boolean(process.env.KIS_APPKEY && process.env.KIS_APPSECRET),
       googleTranslationApiKeyConfigured: Boolean(process.env.GOOGLE_TRANSLATION_API_KEY?.trim()),
       googleTranslationAuthMode: process.env.GOOGLE_TRANSLATION_API_KEY?.trim() ? "api-key" : "not-configured",
+      azureTranslatorF0Configured: Boolean(process.env.AZURE_TRANSLATOR_API_KEY?.trim() && process.env.AZURE_TRANSLATOR_ENDPOINT?.trim() && process.env.AZURE_TRANSLATOR_FREE_TIER_CONFIRMED?.trim() === "F0"),
+      azureTranslatorRegionConfigured: Boolean(process.env.AZURE_TRANSLATOR_REGION?.trim()),
       discordConfigured: Boolean(process.env.DISCORD_WEBHOOK_URL || process.env.MARKET_RSS_DISCORD_WEBHOOK_URL || process.env.SEC_DISCORD_WEBHOOK_URL),
       cronSecretConfigured: Boolean(process.env.CRON_SECRET),
     };

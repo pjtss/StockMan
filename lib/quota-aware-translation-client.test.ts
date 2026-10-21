@@ -38,8 +38,8 @@ describe("quota-aware translation client", () => {
     const tracked = createQuotaAwareTranslationClient(provider, onUsage, deps);
 
     await expect(tracked.client.translate("hello")).resolves.toMatchObject({ fallback: true, fallbackReason: "monthly_character_limit_reached", requestOrigin: "QUOTA_FALLBACK" });
-    expect(deps.reserve).toHaveBeenCalledWith(5, "2026-09");
-    expect(onUsage).toHaveBeenCalledWith(300_000, "2026-09", true);
+    expect(deps.reserve).toHaveBeenCalledWith(5, "2026-09", 300_000, "google-cloud-translation", Number.MAX_SAFE_INTEGER);
+    expect(onUsage).toHaveBeenCalledWith(300_000, "2026-09", true, "google-cloud-translation", undefined);
     expect(provider.translate).not.toHaveBeenCalled();
     expect(tracked.getMetrics()).toMatchObject({ quotaFallbacks: 1, apiCalls: 0, reservedCharacters: 0, translatedCharacters: 0 });
   });
@@ -50,9 +50,9 @@ describe("quota-aware translation client", () => {
     const tracked = createQuotaAwareTranslationClient(provider, undefined, deps);
 
     await expect(tracked.client.translate("hello")).resolves.toMatchObject({ translatedText: "ko:hello", requestOrigin: "PROVIDER" });
-    expect(deps.reserve).toHaveBeenCalledWith(5, "2026-09");
+    expect(deps.reserve).toHaveBeenCalledWith(5, "2026-09", 300_000, "google-cloud-translation", Number.MAX_SAFE_INTEGER);
     expect(deps.saveCache).toHaveBeenCalledWith("hello", "ko:hello", "google-cloud-translation", "en", "ko");
-    expect(deps.recordTranslated).toHaveBeenCalledWith(5, "2026-09");
+    expect(deps.recordTranslated).toHaveBeenCalledWith(5, "2026-09", "google-cloud-translation");
     expect(tracked.getMetrics()).toMatchObject({ apiCalls: 1, translatedCharacters: 5, reservedCharacters: 5 });
   });
 
@@ -65,7 +65,7 @@ describe("quota-aware translation client", () => {
 
     expect(deps.loadCache).toHaveBeenCalledWith("<p>Hello</p>", "google-cloud-translation:html", "ko");
     expect(deps.saveCache).toHaveBeenCalledWith("<p>Hello</p>", "ko:<p>Hello</p>", "google-cloud-translation:html", "en", "ko");
-    expect(provider.translate).toHaveBeenCalledWith("<p>Hello</p>", "en", "ko", "html");
+    expect(provider.translate).toHaveBeenCalledWith("<p>Hello</p>", "en", "ko", "html", expect.objectContaining({ beforeRequest: expect.any(Function) }));
   });
 
   it("keeps a valid provider result when the optional cache write fails", async () => {
@@ -73,7 +73,7 @@ describe("quota-aware translation client", () => {
     const tracked = createQuotaAwareTranslationClient(translated("hello"), undefined, deps);
 
     await expect(tracked.client.translate("hello")).resolves.toMatchObject({ translatedText: "ko:hello", requestOrigin: "PROVIDER" });
-    expect(deps.recordTranslated).toHaveBeenCalledWith(5, "2026-09");
+    expect(deps.recordTranslated).toHaveBeenCalledWith(5, "2026-09", "google-cloud-translation");
     expect(tracked.getMetrics()).toMatchObject({ apiCalls: 1, cacheWriteFailures: 1, usageRecordFailures: 0, reservedCharacters: 5 });
   });
 
@@ -86,7 +86,7 @@ describe("quota-aware translation client", () => {
     expect(tracked.getMetrics()).toMatchObject({ apiCalls: 1, usageRecordFailures: 1, reservedCharacters: 5, translatedCharacters: 0 });
   });
 
-  it("releases reserved characters when the provider fails", async () => {
+  it("retains reservations when provider outcome is uncertain", async () => {
     const deps = dependencies();
     const provider: TranslationClient = { translate: vi.fn(async () => { throw new Error("HTTP 503"); }) };
     const tracked = createQuotaAwareTranslationClient(provider, undefined, deps);
@@ -94,21 +94,21 @@ describe("quota-aware translation client", () => {
     const pending = tracked.client.translate("hello");
     await expect(pending).rejects.toThrow("HTTP 503");
     await expect(pending).rejects.toMatchObject({ stage: "provider_request" });
-    expect(deps.release).toHaveBeenCalledWith(5, "2026-09");
-    expect(tracked.getMetrics()).toMatchObject({ apiFailures: 1, reservedCharacters: 0 });
+    expect(deps.release).not.toHaveBeenCalled();
+    expect(tracked.getMetrics()).toMatchObject({ apiFailures: 1, reservedCharacters: 5 });
   });
 
-  it("reports reservation-release failure without hiding the provider failure", async () => {
-    const deps = dependencies({ release: vi.fn(async () => { throw new Error("database unavailable"); }) });
-    const provider: TranslationClient = { translate: vi.fn(async () => { throw new Error("HTTP 503"); }) };
+  it("reserves every retry before provider dispatch", async () => {
+    const deps = dependencies();
+    const provider: TranslationClient = { translate: vi.fn(async (_text, _source, _target, _format, options) => {
+      await options?.beforeRequest?.();
+      await options?.beforeRequest?.();
+      return { translatedText: "번역", source: "en", target: "ko", provider: "google-cloud-translation", fallback: false };
+    }) };
     const tracked = createQuotaAwareTranslationClient(provider, undefined, deps);
-
-    await expect(tracked.client.translate("hello")).rejects.toMatchObject({
-      stage: "provider_request",
-      message: "HTTP 503 (quota reservation release also failed)",
-      cleanupError: expect.objectContaining({ message: "database unavailable" }),
-    });
-    expect(tracked.getMetrics()).toMatchObject({ apiFailures: 1, reservationReleaseFailures: 1, reservedCharacters: 5 });
+    await tracked.client.translate("hello");
+    expect(deps.reserve).toHaveBeenCalledTimes(2);
+    expect(tracked.getMetrics()).toMatchObject({ apiCalls: 2, reservedCharacters: 10 });
   });
 
   it("identifies cache and reservation failures without claiming a provider request", async () => {
@@ -182,9 +182,9 @@ describe("quota-aware translation client", () => {
 
     await tracked.client.translate("🚀a");
 
-    expect(deps.reserve).toHaveBeenCalledWith(2, "2026-09");
+    expect(deps.reserve).toHaveBeenCalledWith(2, "2026-09", 300_000, "google-cloud-translation", Number.MAX_SAFE_INTEGER);
     expect(deps.saveCache).toHaveBeenCalledWith("🚀a", "ko:🚀a", "google-cloud-translation", "en", "ko");
-    expect(deps.recordTranslated).toHaveBeenCalledWith(2, "2026-09");
+    expect(deps.recordTranslated).toHaveBeenCalledWith(2, "2026-09", "google-cloud-translation");
     expect(tracked.getMetrics()).toMatchObject({ reservedCharacters: 2, translatedCharacters: 2 });
   });
 
@@ -202,9 +202,9 @@ describe("quota-aware translation client", () => {
 
     await tracked.client.translate("hello");
 
-    expect(deps.reserve).toHaveBeenCalledWith(5, "2026-09");
-    expect(deps.recordTranslated).toHaveBeenCalledWith(5, "2026-09");
-    expect(onUsage).toHaveBeenCalledWith(5, "2026-09", false);
+    expect(deps.reserve).toHaveBeenCalledWith(5, "2026-09", 300_000, "google-cloud-translation", Number.MAX_SAFE_INTEGER);
+    expect(deps.recordTranslated).toHaveBeenCalledWith(5, "2026-09", "google-cloud-translation");
+    expect(onUsage).toHaveBeenCalledWith(5, "2026-09", false, "google-cloud-translation");
   });
 
   it("defers cache writes until the caller approves a validated provider result", async () => {

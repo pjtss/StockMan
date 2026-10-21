@@ -15,7 +15,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("market RSS translation", () => {
-  it("passes XML-decoded RSS headline and summary into the translation request and restores a readable headline", async () => {
+  it("sends only the XML-decoded RSS headline to the provider and restores a readable translation", async () => {
     const feed = parseMarketRss('<rss><channel><item><guid>company-story</guid><title>AT&amp;T raises 20% outlook</title><link>https://example.com/story</link><description>AT&amp;T expects growth &amp; stronger revenue.</description></item></channel></rss>', "TEST", "https://example.com/feed");
     const source = feed.items[0];
     const translate = vi.fn(async () => ({
@@ -30,7 +30,8 @@ describe("market RSS translation", () => {
 
     expect(source.title).toBe("AT&T raises 20% outlook");
     expect(source.summary).toBe("AT&T expects growth & stronger revenue.");
-    expect(translate).toHaveBeenCalledWith(expect.stringContaining("AT&amp;T raises ZX0Q outlook"), "auto", "ko", "html");
+    expect(translate).toHaveBeenCalledWith("AT&T raises ZX0Q outlook", "auto", "ko", "text");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
     expect(result).toMatchObject({ translatedTitle: "AT&T 전망 20% 상향", translationFallback: false });
     expect(result.summary).toBe(source.summary);
   });
@@ -106,7 +107,7 @@ describe("market RSS translation", () => {
     const result = await translateMarketRssItem(source, client(translate));
 
     expect(translate).toHaveBeenCalledTimes(1);
-    expect(translate).toHaveBeenCalledWith(expect.any(String), "auto", "ko", "html");
+    expect(translate).toHaveBeenCalledWith(expect.any(String), "auto", "ko", "text");
     expect(result.translationNotRequired).toBeUndefined();
   });
 
@@ -119,23 +120,24 @@ describe("market RSS translation", () => {
       const result = await translateMarketRssItem(source, client(translate));
 
       expect(translate).toHaveBeenCalledOnce();
-      expect(translate).toHaveBeenCalledWith(expect.any(String), "auto", "ko", "html");
+      expect(translate).toHaveBeenCalledWith(expect.any(String), "auto", "ko", "text");
       expect(result).toMatchObject({ translatedTitle: "삼성전자 주가 상승", translationFallback: false });
       expect(result.translationNotRequired).toBeUndefined();
     },
   );
 
-  it("returns only the translated headline while preserving the original summary", async () => {
+  it("translates only the headline while preserving the original summary", async () => {
     const translate = vi.fn(async () => ({ translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}제목 번역 완료${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}Long summary 번역</p></div>`, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
     const result = await translateMarketRssItem(item("1"), client(translate));
 
     expect(translate).toHaveBeenCalledTimes(1);
-    expect(translate).toHaveBeenCalledWith(expect.stringContaining(`${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}Title one${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}Long summary 1`), "auto", "ko", "html");
+    expect(translate).toHaveBeenCalledWith("Title one", "auto", "ko", "text");
+    expect(translate.mock.calls[0][0]).not.toContain("Long summary 1");
     expect(result.translatedTitle).toBe("제목 번역 완료");
     expect(result.translatedSummary).toBe("Long summary 1");
   });
 
-  it("uses a bounded, cleaned RSS summary as translation context but returns only the translated headline", async () => {
+  it("does not include summary content in the provider request", async () => {
     const source = { ...item("context"), title: "I've Held Nvidia for 3 Years", summary: "<p>I bought shares in the company and still own them.</p>" };
     const translate = vi.fn(async (text: string) => ({
       translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}엔비디아 주식을 ${[...text.matchAll(/ZX\d+Q/g)].map(([marker]) => marker).join(" ")}년 보유${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}회사 주식을 매수해 아직 보유 중</p></div>`,
@@ -147,7 +149,8 @@ describe("market RSS translation", () => {
 
     const result = await translateMarketRssItem(source, client(translate));
 
-    expect(translate).toHaveBeenCalledWith(expect.stringContaining(`${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}I bought shares in the company and still own them.`), "auto", "ko", "html");
+    expect(translate).toHaveBeenCalledWith("I've Held Nvidia stock for ZX0Q Years", "auto", "ko", "text");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
     expect(result.translatedTitle).toBe("엔비디아 주식을 3년 보유");
     expect(result.translatedSummary).toBe(source.summary);
     expect(result.translationFallback).toBe(false);
@@ -395,17 +398,13 @@ describe("market RSS translation", () => {
     expect(result).toMatchObject({ translatedTitle: source.title, translationFallback: true, translationFallbackReason: "translation_output_incomplete", translationCandidateTitle: "매출 증가" });
   });
 
-  it("falls back instead of storing the summary when translated HTML loses its paragraph structure", async () => {
+  it("accepts a valid plain-text title translation without requiring an HTML wrapper", async () => {
     const source = { ...item("malformed-html"), title: "Nvidia revenue rises", summary: "Company outlook improves" };
     const translate = vi.fn(async () => ({ translatedText: "엔비디아 매출이 증가하고 전망이 개선됐다", source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
 
     const result = await translateMarketRssItem(source, client(translate));
 
-    expect(result).toMatchObject({
-      translatedTitle: source.title,
-      translationFallback: true,
-      translationFallbackReason: "translation_response_unparseable",
-    });
+    expect(result).toMatchObject({ translatedTitle: "엔비디아 매출이 증가하고 전망이 개선됐다", translationFallback: false });
   });
 
   it("does not cache malformed provider output and retries the provider on the next attempt", async () => {
@@ -430,7 +429,7 @@ describe("market RSS translation", () => {
     const tracked = createQuotaAwareTranslationClient(provider, undefined, dependencies, { deferCacheWriteUntilValidated: true });
 
     const first = await translateMarketRssItem(source, tracked.client);
-    expect(first).toMatchObject({ translatedTitle: source.title, translationFallback: true, translationFallbackReason: "translation_response_unparseable" });
+    expect(first).toMatchObject({ translatedTitle: source.title, translationFallback: true, translationFallbackReason: "target_language_not_detected" });
     expect(dependencies.saveCache).not.toHaveBeenCalled();
 
     const second = await translateMarketRssItem(source, tracked.client);
@@ -439,7 +438,7 @@ describe("market RSS translation", () => {
     expect(dependencies.saveCache).toHaveBeenCalledOnce();
   });
 
-  it("does not reuse a title translation cache entry when only RSS context changes", async () => {
+  it("uses the same provider cache key when only the excluded summary changes", async () => {
     const source = { ...item("changed-context"), title: "Nvidia revenue rises", summary: "Company forecasts growth" };
     const provider: TranslationClient = {
       translate: vi.fn(async () => ({
@@ -466,7 +465,7 @@ describe("market RSS translation", () => {
 
     expect(provider.translate).toHaveBeenCalledTimes(2);
     expect(dependencies.loadCache).toHaveBeenCalledTimes(2);
-    expect(dependencies.loadCache.mock.calls[0][0]).not.toBe(dependencies.loadCache.mock.calls[1][0]);
+    expect(dependencies.loadCache.mock.calls[0][0]).toBe(dependencies.loadCache.mock.calls[1][0]);
     expect(dependencies.saveCache).toHaveBeenCalledTimes(2);
   });
 
@@ -490,7 +489,7 @@ describe("market RSS translation", () => {
     const first = await translateMarketRssItem(source, tracked.client);
     expect(first).toMatchObject({ translatedTitle: "엔비디아 매출 상승", translationFallback: false });
     expect(first).toMatchObject({ requestOrigin: "PROVIDER", translationProviderAttempts: 1 });
-    expect(dependencies.deleteCache).toHaveBeenCalledWith(expect.any(String), "google-cloud-translation:html", "ko");
+    expect(dependencies.deleteCache).toHaveBeenCalledWith("Nvidia revenue rises", "google-cloud-translation", "ko");
 
     const second = await translateMarketRssItem(source, tracked.client);
     expect(second).toMatchObject({ translatedTitle: "엔비디아 매출 상승", translationFallback: false });
@@ -552,7 +551,7 @@ describe("market RSS translation", () => {
     expect(result).toMatchObject({
       translatedTitle: source.title,
       translationFallback: true,
-      translationFallbackReason: "translation_response_unparseable",
+      translationFallbackReason: "target_language_not_detected",
       requestOrigin: "PROVIDER",
       translationProviderAttempts: 1,
     });
@@ -675,17 +674,18 @@ describe("market RSS translation", () => {
     expect(result.translationFallback).toBe(false);
   });
 
-  it("supplies financial context to the translator while retaining the untouched source headline", async () => {
+  it("translates the complete headline without using the summary as extra context", async () => {
     const translate = vi.fn(async (text: string) => ({ translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}엔비디아 주식을 거의 ${[...text.matchAll(/ZX\d+Q/g)].map(([marker]) => marker).join(" ")}년 보유했다. 지금도 매수할까?${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}Investor owns shares</p></div>`, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
     const source = { ...item("8"), title: "I've Held Nvidia for Nearly 3 Years. Here's Whether I'd Still Buy Today." };
     const result = await translateMarketRssItem(source, client(translate));
-    expect(translate.mock.calls[0][0]).toContain('<p id="market-rss-headline">I&#39;ve Held Nvidia stock for Nearly ZX0Q Years.');
-    expect(translate.mock.calls[0][0].length).toBe(prepareMarketRssTranslationInput(source.title, source.summary).text.length);
+    expect(translate.mock.calls[0][0]).toContain("I've Held Nvidia stock for Nearly ZX0Q Years.");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(translate.mock.calls[0][0].length).toBe(prepareMarketRssTranslationInput(source.title).text.length);
     expect(result.title).toBe(source.title);
     expect(result.translatedTitle).toBe("엔비디아 주식을 거의 3년 보유했다. 지금도 매수할까?");
   });
 
-  it("passes risk-off commodity selling context through the shared provider path", async () => {
+  it("translates the full commodity headline without sending the summary", async () => {
     const translate = vi.fn(async (text: string) => ({
       translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}위험회피 심리로 옥수수 가격에 매도 압력 ${[...text.matchAll(/ZX\d+Q/g)].map(([marker]) => marker).join(" ")}${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}Commodity market summary</p></div>`,
       source: "en" as const,
@@ -696,7 +696,8 @@ describe("market RSS translation", () => {
     const source = { ...item("risk-off-corn"), title: "Corn Face Risk Off Pressure on Wednesday's Correction" };
     const result = await translateMarketRssItem(source, client(translate));
 
-    expect(translate.mock.calls[0][0]).toContain('<p id="market-rss-headline">Corn prices face selling pressure from risk-off sentiment');
+    expect(translate.mock.calls[0][0]).toContain("Corn prices face selling pressure from risk-off sentiment on Wednesday's Correction");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
     expect(result.title).toBe(source.title);
     expect(result.translatedTitle).toContain("위험회피 심리로 옥수수 가격에 매도 압력");
     expect(result.translationFallback).toBe(false);
@@ -712,9 +713,9 @@ describe("market RSS translation", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const source = { ...item("9"), title: "Corn Pulling Back on Wednesday: 18% Decline" };
-    const result = await translateMarketRssItem(source);
+    const result = await translateMarketRssItem(source, new CloudTranslationClient("test-translation-key"));
 
-    expect(requestedText).toBe(prepareMarketRssTranslationInput(source.title, source.summary).text);
+    expect(requestedText).toBe(prepareMarketRssTranslationInput(source.title).text);
     expect(result.translatedTitle).toContain("옥수수 가격 하락");
     expect(result.translatedTitle).toContain("18");
     expect(result.translationFallback).toBe(false);

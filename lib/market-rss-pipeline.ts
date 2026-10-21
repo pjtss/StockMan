@@ -4,7 +4,6 @@ import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
 import { fetchAllDomesticRss } from "./domestic-rss-sources";
 import { MARKET_RSS_TRANSLATION_CONCURRENCY, translateMarketRssItem } from "./translate-market-rss-item";
-import { CloudTranslationClient } from "./cloud-translation-client";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
@@ -18,7 +17,8 @@ import { buildMarketRssTranslationPersistence } from "./market-rss-translation-p
 import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notification-message";
 import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";
 import { toTextWebhookPayload } from "./discord-text";
-import { createQuotaAwareTranslationClient } from "./quota-aware-translation-client";
+import { createMarketRssTranslationClient } from "./market-rss-translation-client";
+import { AZURE_TRANSLATION_MONTHLY_LIMIT, AZURE_TRANSLATION_PROVIDER, TRANSLATION_LIMIT } from "./translation-cache";
 import { claimTranslationLimitAlert, claimTranslationThresholdAlert, releaseTranslationLimitAlert, releaseTranslationThresholdAlert } from "./translation-cache";
 import { sendClaimedTranslationUsageAlert } from "./translation-usage-alert";
 import { buildMarketRssNotificationClaimCondition, buildMarketRssNotificationRateWindowCondition, buildMarketRssNotificationTranslationGate } from "./market-rss-notification-translation-gate";
@@ -136,7 +136,8 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
 
 export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
-  const client = CloudTranslationClient.fromEnvironment();
+  const providerSet = createMarketRssTranslationClient({ deferCacheWriteUntilValidated: true });
+  const client = providerSet.client;
   const retryCriteria = getMarketRssTranslationRetryCriteria(Boolean(client));
   const candidates = buildMarketRssTranslationCandidateCondition(retryCriteria);
   const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
@@ -158,14 +159,16 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   }
   const thresholdAlertsByMonth = new Map<string, Set<number>>();
   const limitReachedMonths = new Set<string>();
-  const tracked = createQuotaAwareTranslationClient(client, async (used, month, quotaExceeded) => {
-    if (quotaExceeded) limitReachedMonths.add(month);
-    const monthThresholds = thresholdAlertsByMonth.get(month) || new Set<number>();
+  const tracked = createMarketRssTranslationClient({ deferCacheWriteUntilValidated: true }, async (used, month, quotaExceeded, provider, reason) => {
+    if (quotaExceeded && reason === "monthly_character_limit_reached") limitReachedMonths.add(`${provider}:${month}`);
+    if (reason === "hourly_character_limit_reached") return;
+    const key = `${provider}:${month}`;
+    const monthThresholds = thresholdAlertsByMonth.get(key) || new Set<number>();
     for (let threshold = 100000; threshold <= used; threshold += 100000) {
       monthThresholds.add(threshold);
     }
-    if (monthThresholds.size) thresholdAlertsByMonth.set(month, monthThresholds);
-  }, undefined, { deferCacheWriteUntilValidated: true });
+    if (monthThresholds.size) thresholdAlertsByMonth.set(key, monthThresholds);
+  });
   const cachedClient = tracked.client;
   let translated = 0;
   let notRequired = 0;
@@ -175,7 +178,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   await mapWithConcurrency(rows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
     let result: Awaited<ReturnType<typeof translateMarketRssItem>>;
     try {
-      result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient);
+      result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient ?? undefined);
     } catch (error) {
       failed++;
       const failedAt = new Date();
@@ -204,14 +207,17 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   if (limitReached) {
     const webhook = await loadFeatureDiscordDebugWebhook("market-rss", ["STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL"]);
     if (webhook) {
-      for (const month of [...limitReachedMonths].sort()) {
+      for (const key of [...limitReachedMonths].sort()) {
+        const [provider, month] = key.split(":");
+        const providerLabel = provider === AZURE_TRANSLATION_PROVIDER ? "Azure Translator F0" : "Google Cloud Translation";
+        const providerLimit = provider === AZURE_TRANSLATION_PROVIDER ? AZURE_TRANSLATION_MONTHLY_LIMIT : TRANSLATION_LIMIT;
         const sent = await sendClaimedTranslationUsageAlert(
-          () => claimTranslationLimitAlert(month),
+          () => claimTranslationLimitAlert(month, provider),
           async () => {
-            const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `⚠️ Cloud Translation 번역 중지\n사유: ${month} 월간 공백 포함 문자 한도(${(300000).toLocaleString()}자) 도달\n대상: StockTitan RSS`, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }).catch(() => null);
+            const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `⚠️ ${providerLabel} 번역 중지\n사유: ${month} 앱 내부 월간 입력문자 상한(${providerLimit.toLocaleString()}자) 도달\n대상: StockTitan RSS`, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }).catch(() => null);
             return Boolean(response?.ok);
           },
-          () => releaseTranslationLimitAlert(month),
+          () => releaseTranslationLimitAlert(month, provider),
         );
         if (sent) limitAlertSent = true;
       }
@@ -221,15 +227,17 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   const thresholdAlerts = new Set([...thresholdAlertsByMonth.values()].flatMap((monthThresholds) => [...monthThresholds]));
   const thresholdWebhook = thresholdAlerts.size ? await loadFeatureDiscordDebugWebhook("market-rss", ["STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL"]) : null;
   if (thresholdWebhook) {
-    for (const [month, monthThresholds] of [...thresholdAlertsByMonth].sort(([left], [right]) => left.localeCompare(right))) {
+    for (const [key, monthThresholds] of [...thresholdAlertsByMonth].sort(([left], [right]) => left.localeCompare(right))) {
+      const [provider, month] = key.split(":");
       for (const threshold of [...monthThresholds].sort((a, b) => a - b)) {
         const sent = await sendClaimedTranslationUsageAlert(
-          () => claimTranslationThresholdAlert(threshold, month),
+          () => claimTranslationThresholdAlert(threshold, month, provider),
           async () => {
-            const response = await fetch(withDiscordWaitParameter(thresholdWebhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `ℹ️ Cloud Translation 누적 사용량 알림\n기준 월: ${month} · 누적 번역량 ${threshold.toLocaleString()}자 이상\n대상: StockTitan RSS`, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }).catch(() => null);
+            const providerLabel = provider === AZURE_TRANSLATION_PROVIDER ? "Azure Translator F0" : "Google Cloud Translation";
+            const response = await fetch(withDiscordWaitParameter(thresholdWebhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: `ℹ️ ${providerLabel} 누적 사용량 알림\n기준 월: ${month} · 누적 번역량 ${threshold.toLocaleString()}자 이상\n대상: StockTitan RSS`, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }).catch(() => null);
             return Boolean(response?.ok);
           },
-          () => releaseTranslationThresholdAlert(threshold, month),
+          () => releaseTranslationThresholdAlert(threshold, month, provider),
         );
         if (sent) thresholdAlertSent++;
       }

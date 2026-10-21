@@ -268,7 +268,8 @@ export function AdminStockTitanRss() {
     return (article.translationStatus === "FAILED" || retryableFallback) && Number(article.translationAttempts || 0) >= MARKET_RSS_TRANSLATION_MAX_ATTEMPTS;
   }).length;
   const retryReadyCount = articles.filter((article) => matchesMarketRssTranslationFilter(article, "RETRY_READY", now)).length;
-  const providerRequestCount = articles.filter((article) => article.translationProvider === "google-cloud-translation").length;
+  const providerRequestCount = articles.filter((article) => article.translationProvider === "google-cloud-translation" || article.translationProvider === "azure-translator").length;
+  const azureRequestCount = articles.filter((article) => article.translationProvider === "azure-translator").length;
   const providerCharacterCount = articles.reduce((total, article) => total + Math.max(0, Number(article.translationCharCount) || 0), 0);
   const uncertainNotificationCount = articles.filter((article) => article.notificationStatus === "UNCERTAIN").length;
 
@@ -360,7 +361,7 @@ export function AdminStockTitanRss() {
         <span>알림 대상 {articles.filter((article) => article.notifyEligible).length}건</span>
         <span role="status" aria-label="Discord 전송 미확정 건수">전송 미확정 {uncertainNotificationCount}건</span>
         <span>번역 fallback {articles.filter((article) => article.translationFallback).length}건</span>
-        <span>Google 번역 요청 {providerRequestCount}건 · 입력 {providerCharacterCount.toLocaleString()}자</span>
+        <span>번역 provider 요청 {providerRequestCount}건 (Azure {azureRequestCount}건) · 입력 {providerCharacterCount.toLocaleString()}자</span>
         <span>월간 한도 {monthlyQuotaFallbacks}건</span>
         <span>Google 일일 한도 {providerDailyQuotaFallbacks}건</span>
         <span>자동 재시도 종료 {exhaustedRetries}건</span>
@@ -469,7 +470,9 @@ export function AdminStockTitanRss() {
               <p className={styles.retryInfo}>
                 {selected.translationProvider === "google-cloud-translation"
                   ? `Google 번역 요청 · 입력 ${Math.max(0, Number(selected.translationCharCount) || 0).toLocaleString()}자`
-                  : "Google 번역 API 호출 없음 · 내부 상태 처리 또는 아직 호출 전"}
+                  : selected.translationProvider === "azure-translator"
+                    ? `Azure Translator 요청 · 입력 ${Math.max(0, Number(selected.translationCharCount) || 0).toLocaleString()}자`
+                    : "번역 provider API 호출 없음 · 내부 상태 처리 또는 아직 호출 전"}
               </p>
               {(selected.translationAttemptedAt || Number(selected.translationAttempts) > 0 || selected.translationStatus === "FAILED" || selected.translationFallback) && (
                 <p className={styles.retryInfo}>

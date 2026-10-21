@@ -4,8 +4,7 @@ import { fetchAllMarketRss, fetchMarketRssSource, MARKET_RSS_SOURCES, type Marke
 import { translateMarketRssItems } from "@/lib/translate-market-rss-item";
 import { previewMarketRssResults } from "@/lib/market-rss-preview";
 import { describeError } from "@/lib/error-diagnostics";
-import { CloudTranslationClient } from "@/lib/cloud-translation-client";
-import { createQuotaAwareTranslationClient } from "@/lib/quota-aware-translation-client";
+import { createMarketRssTranslationClient } from "@/lib/market-rss-translation-client";
 import type { TranslationClient } from "@/lib/translation-types";
 import { getMarketRssTranslationConfiguration } from "@/lib/market-rss-translation-configuration";
 
@@ -23,10 +22,10 @@ export async function GET(request: Request) {
   if (translate && source !== "STOCKTITAN") return NextResponse.json({ ok: false, error: "번역 테스트는 STOCKTITAN 기사 제목만 지원합니다.", allowedSource: "STOCKTITAN", translatedField: "title" }, { status: 400 });
   if (source && !MARKET_RSS_SOURCES.includes(source as MarketRssSource)) return NextResponse.json({ error: "지원하지 않는 RSS source", sources: MARKET_RSS_SOURCES }, { status: 400 });
   try {
-    const providerClient = translate ? CloudTranslationClient.fromEnvironment() : null;
-    const translationConfiguration = getMarketRssTranslationConfiguration(translate, Boolean(providerClient));
-    const tracked = providerClient ? createQuotaAwareTranslationClient(providerClient, undefined, undefined, { deferCacheWriteUntilValidated: true }) : null;
-    const translationClient = tracked?.client;
+    const providerSet = translate ? createMarketRssTranslationClient({ deferCacheWriteUntilValidated: true }) : null;
+    const translationConfiguration = getMarketRssTranslationConfiguration(translate, Boolean(providerSet?.client), providerSet?.configured);
+    const tracked = providerSet?.client ? providerSet : null;
+    const translationClient = tracked?.client ?? undefined;
     if (!source) {
       const result = await fetchAllMarketRss();
       if (mode === "FETCH_ONLY" && !translate) return NextResponse.json({ ...result, mode });

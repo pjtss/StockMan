@@ -29,6 +29,37 @@
 ### 커밋·푸시·배포
 - 미실행: verifier 전체 재실행과 배포 대기 중.
 
+## [2026-10-21] RSS 번역 Azure F0 우선·Google 대체 및 무료 한도 보호
+
+### 목표
+- StockTitan RSS 제목 번역에 Azure Translator F0를 우선 사용하고, 설정되지 않았거나 실패하면 Google Cloud Translation으로 대체한다.
+- provider별 월간·rolling 1시간 사용량을 실제 외부 요청 전에 예약해 무료 한도 초과 위험을 방지한다.
+
+### 반영
+- Azure F0 전용 설정을 확인한 경우에만 Azure 번역을 활성화하고, 월/시간 상한은 공식 quota보다 낮게 적용한다. Google Cloud Translation은 다음 공급자로 유지한다.
+- provider별 quota ledger와 rolling-hour reservation을 추가하고 매 재시도마다 요청 전에 예약한다. PostgreSQL advisory transaction lock을 월간 및 시간당 예약 완료까지 유지해 동시 요청 간 시간당 사용량 예약 누락 경쟁조건을 방지한다.
+- 번역 요청 입력은 기존 요구대로 RSS 제목만 사용한다. Google API key는 query parameter가 아닌 `x-goog-api-key` 요청 헤더로 전달한다.
+- 관리자 설정/디버깅/health 응답과 운영 문서에 공급자별 구성·사용량 상태를 표시하되 자격증명 값은 노출하지 않는다.
+- Azure 및 Google 양쪽 무료 quota는 동일 cloud 계정의 다른 시스템 사용량과 격리되지 않는다. Azure F0를 실제로 쓰려면 전용 리소스 및 `AZURE_TRANSLATOR_API_KEY`, `AZURE_TRANSLATOR_ENDPOINT`, `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0` 설정이 필요하다. 현재 로컬 환경은 Google 키만 확인되어 Azure 실호출은 검증하지 않았다.
+
+### 검증
+- `npm.cmd run typecheck`: 통과.
+- `npx.cmd vitest run lib/translation-cache.test.ts lib/market-rss-translation-retry.test.ts lib/market-rss-translation-reason.test.ts lib/translate-market-rss-item.test.ts lib/azure-translation-client.test.ts lib/market-rss-translation-client.test.ts components/admin-stocktitan-rss.test.tsx`: 7개 파일, 135개 테스트 통과.
+- `npm.cmd run deploy:verify`: 통과. Production build 성공(Windows에서 node_modules Junction standalone trace 경고는 있었으나 standalone 서버 실행 확인), `/charts` HTTP 200 및 Chrome desktop/mobile hydration, 정적 청크 11개, 주요 API smoke 통과. 전체 suite 292 파일(1,417 passed, 3 skipped), typecheck, docs/migration(최신 V159), verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron 검증 모두 통과.
+- 검증 중 Vitest가 불완전 설치물 `node_modules.install-partial`을 테스트로 인식하는 환경 문제를 발견해 해당 dependency-recovery 디렉터리를 테스트 탐색에서 제외했다. 실제 테스트 소스는 계속 전체 실행 대상으로 유지한다.
+
+### 다음 개선
+- 전용 Azure F0 리소스/키/endpoint를 운영 환경에 등록한 뒤 관리자 진단으로 설정 확인 및 실제 번역 요청 성공을 확인한다. 현재 미등록이므로 배포 뒤에도 Google이 유일한 활성 provider다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-21-001
+- 성과 판정: PARTIAL
+- 근거: provider fallback과 DB quota guard, 자동화 테스트는 구현했다. Azure live credential 미설정으로 운영 Azure 연결과 provider 간 실전 fallback은 아직 검증되지 않았다.
+
+### 커밋·푸시·배포
+- 완료: 기능 commit `765fd803`을 `https://github.com/pjtss/StockMan.git`의 `oci` 브랜치에 push했다. GitHub Actions [Deploy OCI #39556583937](https://github.com/pjtss/StockMan/actions/runs/39556583937)가 verify, package, upload, activation 전 단계를 success로 완료했고 운영 `/api/health`는 `status=ok`를 반환했다.
+- 부분 완료: Azure F0 자격증명 미설정으로 운영 Azure 실호출은 활성화되지 않았다. 설정 전까지 Google Cloud Translation이 작동하며, Azure 설정 후 별도 실호출 검증이 남아 있다.
+
 ## [2026-10-21] $1 이하 후보 SEC 티커 매핑 오류 재대조
 
 - **목적/범위**: 기존 후보표의 SEC 미매핑 68개를 SEC 공식 `company_tickers_exchange.json`과 다시 대조하고 DEI/GAAP/락업/float 상태를 명확히 기록했다.

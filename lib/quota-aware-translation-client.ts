@@ -10,9 +10,9 @@ import {
 } from "./translation-cache";
 import { TranslationClientOperationError, type TranslationClient, type TranslationFormat, type TranslationLanguage, type TranslationResult, type TranslationSourceLanguage } from "./translation-types";
 
-const PROVIDER = "google-cloud-translation";
+import { GOOGLE_TRANSLATION_PROVIDER, TRANSLATION_LIMIT } from "./translation-cache";
 
-type Dependencies = {
+export type TranslationQuotaDependencies = {
   loadCache: typeof loadTranslationCache;
   deleteCache: typeof deleteTranslationCache;
   saveCache: typeof saveTranslationCache;
@@ -38,8 +38,8 @@ export type QuotaAwareTranslationMetrics = {
 
 export function createQuotaAwareTranslationClient(
   providerClient: TranslationClient,
-  onUsage?: (usedCharacters: number, usageMonth: string, quotaExceeded: boolean) => Promise<void>,
-  dependencies: Dependencies = {
+  onUsage?: (usedCharacters: number, usageMonth: string, quotaExceeded: boolean, provider: string, reason?: string) => Promise<void>,
+  dependencies: TranslationQuotaDependencies = {
     loadCache: loadTranslationCache,
     deleteCache: deleteTranslationCache,
     saveCache: saveTranslationCache,
@@ -49,7 +49,11 @@ export function createQuotaAwareTranslationClient(
     getUsageMonth: () => new Date().toISOString().slice(0, 7),
   },
   options: { deferCacheWriteUntilValidated?: boolean } = {},
+  quota: { provider?: string; monthlyLimit?: number; hourlyLimit?: number } = {},
 ) {
+  const provider = quota.provider ?? GOOGLE_TRANSLATION_PROVIDER;
+  const monthlyLimit = quota.monthlyLimit ?? TRANSLATION_LIMIT;
+  const hourlyLimit = quota.hourlyLimit ?? Number.MAX_SAFE_INTEGER;
   const metrics: QuotaAwareTranslationMetrics = {
     cacheHits: 0,
     apiCalls: 0,
@@ -74,7 +78,7 @@ export function createQuotaAwareTranslationClient(
     return { previous, release };
   };
   const requestKey = (text: string, source: TranslationSourceLanguage, target: TranslationLanguage, format: TranslationFormat) => `${source}\u0000${target}\u0000${format}\u0000${text}`;
-  const cacheProvider = (format: TranslationFormat) => format === "html" ? `${PROVIDER}:html` : PROVIDER;
+  const cacheProvider = (format: TranslationFormat) => format === "html" ? `${provider}:html` : provider;
   const translateOnce = async (text: string, source: TranslationSourceLanguage, target: TranslationLanguage, format: TranslationFormat, reservationTurn: ReturnType<typeof enqueueReservationTurn>): Promise<TranslationResult> => {
     const resultSource: TranslationLanguage = source === "auto" ? "en" : source;
     const characterCount = countTranslationCharacters(text);
@@ -93,16 +97,16 @@ export function createQuotaAwareTranslationClient(
     if (cached) {
       metrics.cacheHits++;
       reservationTurn.release();
-      return { translatedText: cached.translatedText, source: resultSource, target, provider: PROVIDER, fallback: false, requestOrigin: "CACHE" };
+      return { translatedText: cached.translatedText, source: resultSource, target, provider, fallback: false, requestOrigin: "CACHE" };
     }
 
     // Pin the reservation month once. Translation can cross UTC midnight and
     // must still be recorded/released against the row originally reserved.
     let usageMonth: string;
-    let reservation: Awaited<ReturnType<Dependencies["reserve"]>>;
+    let reservation: Awaited<ReturnType<TranslationQuotaDependencies["reserve"]>>;
     try {
       usageMonth = dependencies.getUsageMonth();
-      reservation = await dependencies.reserve(characterCount, usageMonth);
+      reservation = await dependencies.reserve(characterCount, usageMonth, monthlyLimit, provider, hourlyLimit);
     } catch (error) {
       throw new TranslationClientOperationError("quota_reservation", error);
     } finally {
@@ -110,32 +114,46 @@ export function createQuotaAwareTranslationClient(
     }
     if (!reservation.allowed) {
       metrics.quotaFallbacks++;
-      await onUsage?.(reservation.used, usageMonth, true);
-      return { translatedText: text, source: resultSource, target, provider: PROVIDER, fallback: true, fallbackReason: "monthly_character_limit_reached", requestOrigin: "QUOTA_FALLBACK" };
+      await onUsage?.(reservation.used, usageMonth, true, provider, reservation.reason);
+      return { translatedText: text, source: resultSource, target, provider, fallback: true, fallbackReason: reservation.reason ?? "monthly_character_limit_reached", requestOrigin: "QUOTA_FALLBACK" };
     }
 
     metrics.apiCalls++;
     metrics.reservedCharacters += characterCount;
     let result: TranslationResult;
+    let requestCount = 1;
     try {
-      result = await providerClient.translate(text, source, target, format);
+      let firstRequest = true;
+      result = await providerClient.translate(text, source, target, format, { beforeRequest: async () => {
+        if (firstRequest) { firstRequest = false; return; }
+        const nextMonth = dependencies.getUsageMonth();
+        const next = await dependencies.reserve(characterCount, nextMonth, monthlyLimit, provider, hourlyLimit);
+        if (!next.allowed) {
+          await onUsage?.(next.used, nextMonth, true, provider, next.reason);
+          throw Object.assign(new Error(next.reason ?? "monthly_character_limit_reached"), { code: "TRANSLATION_QUOTA_EXCEEDED" });
+        }
+        requestCount++;
+        metrics.apiCalls++;
+        metrics.reservedCharacters += characterCount;
+        await onUsage?.(next.used, nextMonth, false, provider);
+      } });
+      (result as TranslationResult & { providerAttemptCount?: number }).providerAttemptCount = requestCount;
     } catch (error) {
       metrics.apiFailures++;
-      let cleanupError: unknown;
-      try {
-        await dependencies.release(characterCount, usageMonth);
-        metrics.reservedCharacters -= characterCount;
-      } catch (releaseError) {
-        cleanupError = releaseError;
-        metrics.reservationReleaseFailures++;
+      if ((error as { code?: string })?.code === "TRANSLATION_QUOTA_EXCEEDED") {
+        metrics.quotaFallbacks++;
+        return { translatedText: text, source: resultSource, target, provider, fallback: true, fallbackReason: (error as Error).message, requestOrigin: "QUOTA_FALLBACK" };
       }
-      throw new TranslationClientOperationError("provider_request", error, cleanupError);
+      // A timeout or HTTP error can occur after the provider has consumed input.
+      // Keep reservations conservatively; releasing here risks crossing the free cap on retry.
+      throw new TranslationClientOperationError("provider_request", error, undefined, provider, requestCount);
     }
 
     if (!result.fallback) {
       try {
-        await dependencies.recordTranslated(characterCount, usageMonth);
-        metrics.translatedCharacters += characterCount;
+        const translatedCount = characterCount * ((result as TranslationResult & { providerAttemptCount?: number }).providerAttemptCount ?? 1);
+        await dependencies.recordTranslated(translatedCount, usageMonth, provider);
+        metrics.translatedCharacters += translatedCount;
       } catch {
         // The reservation remains charged against the quota boundary even
         // when the secondary translated-character counter is unavailable.
@@ -153,7 +171,7 @@ export function createQuotaAwareTranslationClient(
           metrics.cacheWriteFailures++;
         }
       }
-      await onUsage?.(reservation.used, usageMonth, false);
+      await onUsage?.(reservation.used, usageMonth, false, provider);
     }
     return { ...result, requestOrigin: "PROVIDER" };
   };

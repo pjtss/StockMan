@@ -20,6 +20,8 @@ export function getMarketRssTranslationAttemptLabel(article: {
 }) {
   if (article.translationSkippedReason === "monthly_character_limit_reached") return "한도 확인";
   if (article.translationSkippedReason === "provider_daily_quota_exceeded") return "Google 일일 한도 확인";
+  if (article.translationSkippedReason === "provider_free_quota_exceeded") return "Azure F0 무료량 확인";
+  if (article.translationProvider === "azure-translator") return "Azure Translator API 요청";
   if (article.translationProvider === "google-cloud-translation") return "Google 번역 API 요청";
   if (article.translationSkippedReason === "already_in_target_language") return "번역 불필요 판정";
   if (article.translationSkippedReason === "cloud_translation_not_configured") return "번역 설정 확인";
