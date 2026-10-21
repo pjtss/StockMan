@@ -15,7 +15,7 @@
 - `npm.cmd run typecheck`: 통과.
 - `npx.cmd vitest run lib/translation-cache.test.ts lib/market-rss-translation-retry.test.ts lib/market-rss-translation-reason.test.ts lib/translate-market-rss-item.test.ts lib/azure-translation-client.test.ts lib/market-rss-translation-client.test.ts components/admin-stocktitan-rss.test.tsx`: 7개 파일, 135개 테스트 통과.
 - `npm.cmd run deploy:verify`: 통과. Production build 성공(Windows에서 node_modules Junction standalone trace 경고는 있었으나 standalone 서버 실행 확인), `/charts` HTTP 200 및 Chrome desktop/mobile hydration, 정적 청크 11개, 주요 API smoke 통과. 전체 suite 292 파일(1,417 passed, 3 skipped), typecheck, docs/migration(최신 V159), verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron 검증 모두 통과.
-- 검증 중 Vitest가 불완전 설치물 `node_modules.install-partial`을 테스트로 인식하는 환경 문제를 발견했다. 테스트 실행을 방해하지 않도록 임시 Vitest exclude를 사용해 검증한 뒤 원복했으며, 이 환경 보정은 제품 변경에 포함하지 않는다.
+- 검증 중 Vitest가 불완전 설치물 `node_modules.install-partial`을 테스트로 인식하는 환경 문제를 발견해 해당 dependency-recovery 디렉터리를 테스트 탐색에서 제외했다. 실제 테스트 소스는 계속 전체 실행 대상으로 유지한다.
 
 ### 다음 개선
 - 전용 Azure F0 리소스/키/endpoint를 운영 환경에 등록한 뒤 관리자 진단으로 설정 확인 및 실제 번역 요청 성공을 확인한다. 현재 미등록이므로 배포 뒤에도 Google이 유일한 활성 provider다.
@@ -26,7 +26,8 @@
 - 근거: provider fallback과 DB quota guard, 자동화 테스트는 구현했다. Azure live credential 미설정으로 운영 Azure 연결과 provider 간 실전 fallback은 아직 검증되지 않았다.
 
 ### 커밋·푸시·배포
-- 대기: 검증 완료. 커밋, push 및 운영 배포를 진행한다.
+- 완료: 기능 commit `765fd803`을 `https://github.com/pjtss/StockMan.git`의 `oci` 브랜치에 push했다. GitHub Actions [Deploy OCI #39556583937](https://github.com/pjtss/StockMan/actions/runs/39556583937)가 verify, package, upload, activation 전 단계를 success로 완료했고 운영 `/api/health`는 `status=ok`를 반환했다.
+- 부분 완료: Azure F0 자격증명 미설정으로 운영 Azure 실호출은 활성화되지 않았다. 설정 전까지 Google Cloud Translation이 작동하며, Azure 설정 후 별도 실호출 검증이 남아 있다.
 
 ## [2026-10-20] V157 이후 운영 필수 RSS 컬럼 forward migration 복구
 
