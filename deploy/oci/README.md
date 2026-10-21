@@ -113,10 +113,10 @@ journalctl -u stockman-rss.service -n 50 --no-pager
 RSS timer는 5분마다 `/api/cron/market-rss`를 전용 scheduler 헤더와 함께 호출합니다. 운영 freshness를 조사할 때는 timer의 `Active` 상태만으로 성공을 판단하지 말고, `stockman-rss.service` journal의 HTTP/application 응답과 `/api/debug/automation-runs?module=market-rss&limit=20`의 마지막 실행을 함께 확인합니다. `market-rss` 실행이 오래됐으면 번역 provider부터 단정하지 말고 timer 활성화, 서비스 응답, 실행 로그 순으로 확인합니다.
 ## RSS 제목 번역 설정
 
-현재 RSS 번역은 LibreTranslate를 사용하지 않는다. Google Cloud Translation Basic v2 REST API를 사용하므로 운영 환경변수 파일 `/etc/stockman/stockman.env`에 `GOOGLE_TRANSLATION_API_KEY`를 설정한다. 이 값은 필수 앱 시작 설정은 아니지만, 빠져 있으면 RSS 번역이 생략되고 알림에는 원문 fallback이 표시된다. 설정 후 웹 앱 프로세스를 재시작해 환경을 다시 읽힌다.
+현재 RSS 번역은 Azure Translator F0를 우선 사용하고 Google Cloud Translation Basic v2를 fallback으로 사용한다. Azure를 활성화할 때 운영 환경변수 파일 `/etc/stockman/stockman.env`에 `AZURE_TRANSLATOR_API_KEY`, `AZURE_TRANSLATOR_ENDPOINT`, `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0`를 설정한다. 지역/멀티서비스 resource에서 요구되는 경우 `AZURE_TRANSLATOR_REGION`도 설정한다. F0 확인값이 정확히 `F0`가 아니면 Azure 요청은 실행되지 않아 S1 종량제 resource 오설정을 차단한다. `GOOGLE_TRANSLATION_API_KEY`는 예비 provider이며 기본 설정에서 Azure를 사용할 수 없을 때 번역에 사용한다. 둘 다 미설정이면 RSS는 계속 수집되고 제목은 원문으로 표시된다. 환경변수 변경 후 웹 앱 프로세스를 재시작한다. 키 값은 로그나 debug 응답에 공개하지 않는다.
 
 ```bash
 sudo systemctl restart stockman.service
 ```
 
-Basic v2 API key 인증은 [Google 공식 인증 안내](https://docs.cloud.google.com/translate/docs/authentication)와 [translate API 문서](https://docs.cloud.google.com/translate/docs/reference/rest/v2/translate)를 따른다. `TRANSLATION_PROVIDER`, `LIBRETRANSLATE_URL`, `LIBRETRANSLATE_API_KEY`는 현재 RSS 번역의 유효한 설정이 아니다. 저장소의 `libretranslate.compose.yml`과 설치 스크립트는 미사용 레거시이므로 새로 설치하거나 실행하지 않는다.
+Azure F0 한도 보호와 공식 문서 URL은 [`docs/rss-translation-design.md`](../../docs/rss-translation-design.md)를 참고한다. Azure와 Google 모두 앱 내부 provider별 DB quota를 사용하며, 관리자 미리보기도 quota를 우회하지 않는다. Google API key는 HTTPS body 외 URL query가 아닌 `x-goog-api-key` header로 전달한다. `TRANSLATION_PROVIDER`, `LIBRETRANSLATE_URL`, `LIBRETRANSLATE_API_KEY`는 현재 RSS 번역의 유효한 설정이 아니다. 저장소의 `libretranslate.compose.yml`과 설치 스크립트는 미사용 레거시이므로 새로 설치하거나 실행하지 않는다.

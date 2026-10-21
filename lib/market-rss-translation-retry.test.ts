@@ -38,6 +38,7 @@ describe("market RSS translation retry criteria", () => {
       retrySkippedWithBackoffReasons: [],
       monthlyQuotaRetryBefore: null,
       providerDailyQuotaRetryBefore: null,
+      hourlyQuotaRetryBefore: null,
     });
   });
 
@@ -105,7 +106,8 @@ describe("market RSS translation retry criteria", () => {
       providerDailyQuotaRetryBefore: null,
     })!);
     expect(immediate.params).toContain("cloud_translation_not_configured");
-    expect(immediate.sql).not.toContain('"translation_attempted_at"');
+    expect(immediate.sql).toContain('"translation_attempted_at"');
+    expect(immediate.params).toContain("hourly_character_limit_reached");
 
     const delayed = new PgDialect().sqlToQuery(buildMarketRssTranslationRetryCondition({
       ...base,
@@ -132,7 +134,7 @@ describe("market RSS translation retry criteria", () => {
       translationSkippedReason: "translation_api_error",
       translationError: "HTTP 503",
       translationProvider: "google-cloud-translation",
-      translationCharCount: countTranslationCharacters(prepareMarketRssTranslationInput("Original headline", "Summary").text),
+      translationCharCount: countTranslationCharacters(prepareMarketRssTranslationInput("Original headline").text),
       translationProviderAttempts: 1,
       translationAttempts: 2,
       translationStatus: "FAILED",

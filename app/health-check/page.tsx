@@ -58,8 +58,8 @@ export default async function HealthCheckPage() {
       <article>
         <h2>필수 설정</h2>
         <Check label="필수 환경변수" ok={health.checks.requiredEnv} />
-        {health.rssTranslation && <Check label="RSS 제목 번역 (Google Cloud Translation)" ok={health.rssTranslation.configured} />}
-        {health.rssTranslation && !health.rssTranslation.configured && <p className="healthMuted">GOOGLE_TRANSLATION_API_KEY 미설정 · RSS 수집은 계속되며 제목은 원문 fallback으로 표시됩니다.</p>}
+        {health.rssTranslation && <Check label={`RSS 제목 번역 (${health.rssTranslation.provider ?? "provider 미설정"})`} ok={health.rssTranslation.configured} />}
+        {health.rssTranslation && !health.rssTranslation.configured && <p className="healthMuted">Azure F0 및 Google 번역 provider 미설정 · RSS 수집은 계속되며 제목은 원문 fallback으로 표시됩니다.</p>}
         {Object.entries(health.environment ?? {}).map(([key, present]) => <div className="healthEnv" key={key}><span>{key}</span><b>{present ? "설정됨" : "미설정"}</b></div>)}
       </article>
     </section>

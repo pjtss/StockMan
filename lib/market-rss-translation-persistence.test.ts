@@ -42,7 +42,7 @@ describe("market RSS translation persistence mapping", () => {
     const update = buildMarketRssTranslationPersistence(row, translated, processedAt);
 
     expect(update.translationProvider).toBe("google-cloud-translation");
-    expect(update.translationCharCount).toBe(countTranslationCharacters(prepareMarketRssTranslationInput(row.title, translated.summary).text));
+    expect(update.translationCharCount).toBe(countTranslationCharacters(prepareMarketRssTranslationInput(row.title).text));
     expect(update.translationSkippedReason).toBeNull();
     expect(update.translationTranslatedAt).toBe(processedAt);
     expect(update.translationAttempts).toBe(3);
@@ -165,7 +165,7 @@ describe("market RSS translation persistence mapping", () => {
   });
 
   it("multiplies persisted character usage by the provider recovery attempts", () => {
-    const inputCharacters = countTranslationCharacters(prepareMarketRssTranslationInput(row.title, "원문 요약").text);
+    const inputCharacters = countTranslationCharacters(prepareMarketRssTranslationInput(row.title).text);
     const update = buildMarketRssTranslationPersistence(row, item({
       translatedTitle: "삼성전자 실적",
       requestOrigin: "PROVIDER",

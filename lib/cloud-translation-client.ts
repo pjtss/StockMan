@@ -1,4 +1,4 @@
-import type { TranslationClient, TranslationFormat, TranslationLanguage, TranslationResult, TranslationSourceLanguage } from "./translation-types";
+import type { TranslationClient, TranslationFormat, TranslationLanguage, TranslationRequestOptions, TranslationResult, TranslationSourceLanguage } from "./translation-types";
 
 type TranslationHttpError = Error & { status?: number; retryAfter?: string | null; providerReason?: string };
 
@@ -48,19 +48,19 @@ export class CloudTranslationClient implements TranslationClient {
     const apiKey = process.env.GOOGLE_TRANSLATION_API_KEY?.trim();
     return apiKey ? new CloudTranslationClient(apiKey) : null;
   }
-  async translate(text: string, source: TranslationSourceLanguage = "en", target: TranslationLanguage = "ko", format: TranslationFormat = "text"): Promise<TranslationResult> {
+  async translate(text: string, source: TranslationSourceLanguage = "en", target: TranslationLanguage = "ko", format: TranslationFormat = "text", options?: TranslationRequestOptions): Promise<TranslationResult> {
     const requestedSource: TranslationLanguage = source === "auto" ? "en" : source;
     if (!text.trim()) return { translatedText: "", source: requestedSource, target, provider: "google-cloud-translation", fallback: false };
     const url = new URL("https://translation.googleapis.com/language/translate/v2");
-    url.searchParams.set("key", this.apiKey);
     const attempts = getPositiveIntegerEnv("CLOUD_TRANSLATION_RETRIES", 3);
     // Node timers clamp values above 2^31-1 to 1 ms; reject them instead of
     // accidentally turning a huge timeout configuration into an immediate one.
     const timeoutMs = getPositiveIntegerEnv("CLOUD_TRANSLATION_TIMEOUT_MS", 15_000, 2_147_483_647);
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
+        await options?.beforeRequest?.();
         const requestBody = { q: text, ...(source === "auto" ? {} : { source }), target, format };
-        const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(requestBody), signal: AbortSignal.timeout(timeoutMs) });
+        const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey }, body: JSON.stringify(requestBody), signal: AbortSignal.timeout(timeoutMs) });
         if (!response.ok) {
           const providerReason = await parseProviderError(response);
           const error = Object.assign(new Error(`Cloud Translation HTTP ${response.status}${providerReason ? ` (${providerReason})` : ""}`), {

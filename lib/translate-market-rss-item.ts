@@ -3,15 +3,15 @@ import type { TranslationClient } from "./translation-types";
 import { restoreMarketRssTranslationTokens } from "./market-rss-translation-protection";
 import { extractMarketRssTranslatedHeadline, prepareMarketRssTranslationInput } from "./market-rss-translation-input";
 import { isMarketRssTranslationHeadlineComplete, isMarketRssTranslationKoreanEnough } from "./market-rss-translation-quality";
-import { CloudTranslationClient } from "./cloud-translation-client";
+import { createMarketRssTranslationClient } from "./market-rss-translation-client";
 import { mapWithConcurrency } from "./map-with-concurrency";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
-export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProviderAttempts?: number };
+export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
 export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false): Promise<TranslatedMarketRssItem> {
   const protectedHeadline = prepareMarketRssTranslationInput(item.title);
-  const preparedInput = prepareMarketRssTranslationInput(item.title, item.summary);
+  const preparedInput = protectedHeadline;
   const translatableText = protectedHeadline.text.replace(/ZX\d+Q/g, "");
   // Skip only titles whose remaining letters are all Hangul. Checking only
   // Latin letters would incorrectly skip mixed Korean/CJK/Cyrillic headlines.
@@ -26,9 +26,9 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   if (!translatableText.replace(/<[^>]*>/g, " ").replace(/[\s\p{P}\p{S}\p{N}]/gu, "").trim()) {
     return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "translation_input_empty" };
   }
-  const selectedClient: TranslationClient | null = client ?? CloudTranslationClient.fromEnvironment();
+  const selectedClient: TranslationClient | null = client ?? createMarketRssTranslationClient({ deferCacheWriteUntilValidated: true }).client;
   if (!selectedClient) return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "cloud_translation_not_configured" };
-  // RSS feeds can contain mixed-language headlines, so let Cloud Translation
+  // RSS feeds can contain mixed-language headlines, so let the selected provider
   // detect the source instead of forcing English for every publisher.
   let title = await selectedClient.translate(preparedInput.text, "auto", "ko", preparedInput.format);
   const invalidateCachedResponse = async () => {
@@ -50,7 +50,8 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
       translationFallback: true,
       translationFallbackReason: cacheInvalidated ? translationFallbackReason : "translation_cache_invalidation_failed",
       requestOrigin: title.requestOrigin,
-      translationProviderAttempts: title.requestOrigin === "PROVIDER" ? 1 : 0,
+      translationProvider: title.provider,
+      translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0,
     };
   };
   // Quota-aware clients return the original input with an explicit fallback
@@ -65,21 +66,19 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
       translationFallback: true,
       ...(title.fallbackReason ? { translationFallbackReason: title.fallbackReason } : {}),
       requestOrigin: title.requestOrigin,
-      translationProviderAttempts: title.requestOrigin === "PROVIDER" ? 1 : 0,
+      translationProvider: title.provider,
+      translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0,
     };
   }
   const normalizedProviderText = title.translatedText.normalize("NFC");
-  const providerHeadline = preparedInput.titlePrefix
-    ? extractMarketRssTranslatedHeadline(normalizedProviderText)
-    : normalizedProviderText;
+  const hasProviderMarkup = /<\/?[a-z][^>]*>/i.test(normalizedProviderText);
+  const providerHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
   const restoredText = restoreMarketRssTranslationTokens(normalizedProviderText, preparedInput.placeholders);
   if (!restoredText.ok) {
     const fallback = await validationFallback("protected_token_mismatch");
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
-  const translatedHeadline = preparedInput.titlePrefix
-    ? extractMarketRssTranslatedHeadline(restoredText.text)
-    : restoredText.text;
+  const translatedHeadline = extractMarketRssTranslatedHeadline(restoredText.text) ?? (hasProviderMarkup ? null : restoredText.text);
   if (!translatedHeadline) {
     const fallback = await validationFallback("translation_response_unparseable");
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
@@ -118,7 +117,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   // The summary is sent only as bounded context to disambiguate the headline;
   // only the translated headline is persisted as translated output. Keep the
   // original summary/body available to callers without translating them.
-  return { ...item, translatedTitle: translatedHeadline, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason, requestOrigin: title.requestOrigin, translationProviderAttempts: title.requestOrigin === "PROVIDER" ? 1 : 0 };
+  return { ...item, translatedTitle: translatedHeadline, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason, requestOrigin: title.requestOrigin, translationProvider: title.provider, translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0 };
 }
 
 export async function translateMarketRssItems(items: MarketRssItem[], client?: TranslationClient) {

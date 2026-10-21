@@ -12,6 +12,7 @@ export function getMarketRssTranslationRetryCriteria(clientConfigured: boolean, 
     ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     : null;
   const providerDailyQuotaRetryBefore = clientConfigured ? getPacificQuotaDayStart(now) : null;
+  const hourlyQuotaRetryBefore = clientConfigured ? new Date(now.getTime() - 60 * 60_000) : null;
   return {
     failedBeforeAttempt: MARKET_RSS_TRANSLATION_MAX_ATTEMPTS,
     failureRetryBefore,
@@ -19,6 +20,7 @@ export function getMarketRssTranslationRetryCriteria(clientConfigured: boolean, 
     retrySkippedWithBackoffReasons: clientConfigured ? [...MARKET_RSS_TRANSLATION_RETRYABLE_SKIPPED_REASONS] : [],
     monthlyQuotaRetryBefore,
     providerDailyQuotaRetryBefore,
+    hourlyQuotaRetryBefore,
   };
 }
 
@@ -49,13 +51,18 @@ export function buildMarketRssTranslationRetryCondition(criteria: ReturnType<typ
   );
   if (criteria.monthlyQuotaRetryBefore) skippedRetryConditions.push(and(
     eq(marketRssArticles.translationStatus, "SKIPPED"),
-    eq(marketRssArticles.translationSkippedReason, "monthly_character_limit_reached"),
+    or(eq(marketRssArticles.translationSkippedReason, "monthly_character_limit_reached"), eq(marketRssArticles.translationSkippedReason, "provider_free_quota_exceeded")),
     lt(marketRssArticles.translationAttemptedAt, criteria.monthlyQuotaRetryBefore),
   ));
   if (criteria.providerDailyQuotaRetryBefore) skippedRetryConditions.push(and(
     eq(marketRssArticles.translationStatus, "SKIPPED"),
     eq(marketRssArticles.translationSkippedReason, "provider_daily_quota_exceeded"),
     lt(marketRssArticles.translationAttemptedAt, criteria.providerDailyQuotaRetryBefore),
+  ));
+  if (criteria.hourlyQuotaRetryBefore) skippedRetryConditions.push(and(
+    eq(marketRssArticles.translationStatus, "SKIPPED"),
+    eq(marketRssArticles.translationSkippedReason, "hourly_character_limit_reached"),
+    lt(marketRssArticles.translationAttemptedAt, criteria.hourlyQuotaRetryBefore),
   ));
   return or(
     eq(marketRssArticles.translationStatus, "PENDING"),
@@ -111,6 +118,7 @@ export function makeMarketRssTranslationFailureFallback(row: {
     ? String(providerError.providerReason)
     : "";
   const providerDailyQuotaExceeded = !preparationFailed && providerReason === "dailyLimitExceeded";
+  const providerFreeQuotaExceeded = !preparationFailed && providerReason.includes("403001");
   const providerAttempts = error instanceof TranslationClientOperationError
     ? error.providerAttempts
     : providerRequestAttempted ? 1 : 0;
@@ -119,10 +127,10 @@ export function makeMarketRssTranslationFailureFallback(row: {
     translatedSummary: row.summary,
     translationTranslatedAt: null,
     translationFallback: true,
-    translationSkippedReason: preparationFailed ? "translation_preparation_error" : providerDailyQuotaExceeded ? "provider_daily_quota_exceeded" : "translation_api_error",
+    translationSkippedReason: preparationFailed ? "translation_preparation_error" : providerDailyQuotaExceeded ? "provider_daily_quota_exceeded" : providerFreeQuotaExceeded ? "provider_free_quota_exceeded" : "translation_api_error",
     translationError: sanitizeMarketRssTranslationError(error),
-    translationProvider: providerRequestAttempted ? "google-cloud-translation" : null,
-    translationCharCount: providerAttempts > 0 ? countTranslationCharacters(prepareMarketRssTranslationInput(row.title, row.summary).text) * providerAttempts : 0,
+    translationProvider: providerRequestAttempted ? (error instanceof TranslationClientOperationError ? error.provider ?? "google-cloud-translation" : "google-cloud-translation") : null,
+    translationCharCount: providerAttempts > 0 ? countTranslationCharacters(prepareMarketRssTranslationInput(row.title).text, error instanceof TranslationClientOperationError ? error.provider ?? undefined : undefined) * providerAttempts : 0,
     translationProviderAttempts: providerAttempts,
     translationAttempts: row.translationAttempts + 1,
     translationStatus: providerDailyQuotaExceeded ? "SKIPPED" as const : "FAILED" as const,

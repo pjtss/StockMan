@@ -12,13 +12,13 @@
 
 ## 배포 설정
 
-현재 런타임 구현은 Google Cloud Translation Basic v2 REST API이며 `GOOGLE_TRANSLATION_API_KEY`로 인증한다. 공식 요청 주소는 `POST https://translation.googleapis.com/language/translate/v2`이고, JSON의 `q`에 제목 텍스트를 전달하며 source `en`, target `ko`, format `text`를 지정한다. 키가 설정되지 않으면 운영 번역은 provider 호출 없이 fallback 상태로 기록한다.
+현재 런타임은 Azure Translator F0를 primary로 사용하고, F0 사용량 한도 또는 오류 시 Google Cloud Translation Basic v2를 fallback으로 사용한다. Azure 키·endpoint와 명시적인 `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0`가 없으면 Azure 호출을 fail-closed하며, Google 키가 있을 때만 fallback을 사용한다. Google API key는 `x-goog-api-key` header로 보낸다. 두 경로 모두 cron과 관리자 미리보기가 동일한 provider별 DB quota를 적용한다.
 
 ## 캐시와 사용량 제한
 
-운영 cron은 제목 원문 해시·대상 언어·provider로 기존 캐시를 조회한다. 캐시 미스일 때만 해당 제목 글자 수를 월별 한도 예약에 반영한 뒤 외부 API를 호출한다. 성공 시 번역문을 저장하고 사용량을 확정한다. 월 한도는 300,000자이며, 실제 API 호출 글자 수와 `translation_char_count` 모두 제목 길이 기준이다.
+운영 cron은 제목 원문 해시·대상 언어·provider로 캐시를 조회한다. 캐시 미스 시 DB에서 provider별 월·rolling-hour 한도를 각 outbound 재시도마다 먼저 예약하며 DB 예약이 실패하면 호출하지 않는다. Azure 앱 내부 한도는 월/rolling 60분 각각 1,800,000자, Google은 월/rolling 60분 각각 300,000자다. 불확실한 timeout/HTTP 실패 예약은 provider가 이미 입력을 처리했을 가능성 때문에 반환하지 않는다. `translation_char_count`는 실제 사용 provider를 기준으로 기록한다.
 
-관리자 미리보기는 저장 번역 캐시나 운영 사용량 예약 경로를 사용하지 않고 현재 feed 제목을 provider에 직접 보낸다. 따라서 실제 번역 사용량이 발생할 수 있다.
+관리자 미리보기는 운영과 같은 provider별 cache/quota client를 사용하므로 provider usage는 발생할 수 있지만 앱 상한을 우회하지 않는다.
 
 ## 저장 및 상태
 

@@ -5,6 +5,7 @@ import { inspectDatabaseSchema, type SchemaHealth } from "@/lib/schema-health";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { FEATURE_MODULES, type FeatureModuleKey } from "@/lib/feature-modules";
 import { getMarketRssTranslationConfiguration } from "@/lib/market-rss-translation-configuration";
+import { getMarketRssTranslationProviders } from "@/lib/market-rss-translation-client";
 import nextPackage from "next/package.json";
 
 type BuildInfo = { version?: string; commit?: string; builtAt?: string };
@@ -71,7 +72,8 @@ export async function getHealthSnapshot() {
 
   const requiredEnv = ["DATABASE_URL", "CRON_SECRET"];
   const optionalIntegrations = ["KIS_APPKEY", "KIS_APPSECRET", "ALPACA_API_KEY", "ALPACA_API_SECRET", "US_TURNOVER_RATIO_NEW_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_INCREASE_DISCORD_WEBHOOK_URL", "US_TURNOVER_RATIO_WATCHLIST_DISCORD_WEBHOOK_URL", "US_DAILY_INDICATORS_DISCORD_WEBHOOK_URL", "NEWS_RADAR_DISCORD_WEBHOOK_URL", "MARKET_RSS_DISCORD_WEBHOOK_URL", "SEC_DISCORD_WEBHOOK_URL", "AUTOMATION_COMPLETION_DISCORD_WEBHOOK_URL", "SEC_USER_AGENT", "ADMIN_DASHBOARD_PASSWORD"];
-  const rssTranslation = getMarketRssTranslationConfiguration(true, Boolean(process.env.GOOGLE_TRANSLATION_API_KEY?.trim()));
+  const providersConfigured = getMarketRssTranslationProviders();
+  const rssTranslation = getMarketRssTranslationConfiguration(true, Boolean(providersConfigured.azure || providersConfigured.google), { azure: Boolean(providersConfigured.azure), google: Boolean(providersConfigured.google), primary: providersConfigured.azure ? "azure-translator" : providersConfigured.google ? "google-cloud-translation" : null });
   const checks = { database: database.ok, databaseConnection: database.connected, schema: database.schemaReady, flyway: database.schemaReady && Boolean(database.flywayVersion), requiredEnv: requiredEnv.every((key) => Boolean(process.env[key]?.trim())) };
   let automation: Record<string, { status: string; startedAt: string | null; finishedAt: string | null; error: string | null; metrics: Record<string, unknown> }> = {};
   let automationHistoryAvailable = false;
