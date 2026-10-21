@@ -1,3 +1,31 @@
+## [2026-10-21] RSS 번역 무료량 공식 기준과 실제 앱 상한 문서 정합성
+
+### 목표
+- Azure F0와 Google Cloud Translation Basic 무료 제공량을 공급자 공식 가격·제한 문서와 재대조한다.
+- 설계 문서의 앱별 제한 수치가 실제 상수와 일치하도록 해 운영자가 무료 범위를 잘못 이해하지 않게 한다.
+
+### 반영
+- 2026-10-21 공식 문서 확인: Azure Translator F0는 표준 번역/Custom Translator 학습 합산 월 2,000,000자 무료, 서비스 제한은 시간당 2,000,000자·요청당 50,000자다.
+- Google Cloud Translation Basic의 첫 500,000자 무료 표기는 고정 무료 quota가 아니라 월 최대 $10 credit을 Basic/Advanced가 공유하는 구조다. NMT 기본 단가 기준으로 월 500,000자에 해당하며 잔액 이월이 없다.
+- 확인 결과 실제 코드는 Google 월 300,000자·rolling 60분 100,000자였으나 설계 표와 아키텍처 문서에 시간당 상한이 300,000자로 잘못 기재되어 이를 100,000자로 수정했다. Azure 상한은 월/rolling 60분 각각 1,800,000자로 유지한다.
+- 운영 환경 Azure key/endpoint/F0 설정 여부는 공개 health endpoint가 노출하지 않으며 현재 로컬 `.env.local`에는 Azure 설정이 없고 Google key만 존재한다. 운영 Azure 활성 여부는 비밀을 출력하지 않는 인증된 운영 진단 확인 전에는 미확인으로 둔다.
+
+### 검증
+- 공식 출처: Azure 가격표 https://azure.microsoft.com/en-us/pricing/details/translator/ ; Azure 서비스 한도 https://learn.microsoft.com/en-us/azure/ai-services/Translator/service-limits ; Google 가격표 https://cloud.google.com/products/translate/pricing .
+- 코드 대조: `lib/translation-cache.ts`의 Azure/Google monthly/hourly 상수와 두 설계 문서의 제한값을 직접 비교했다.
+- `npm.cmd run deploy:verify`: 통과. 전체 테스트 292개 파일(1,417 passed, 3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron, production build 및 standalone/Chrome desktop·mobile/API smoke가 모두 통과했다.
+
+### 다음 개선
+- 운영 인증 진단에서 Azure F0 configured 상태를 확인하고, 실제 Azure 설정이 없는 경우 사용자 Azure 리소스의 endpoint/key/F0 확인값을 받아 설정한 뒤 Azure 실호출과 Google fallback을 양쪽 모두 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-21-004
+- 성과 판정: PARTIAL
+- 근거: 공식 사용량/과금 모델과 앱 내부 상한 차이는 바로잡았다. Azure는 현재 로컬 설정이 없고 운영 구성은 공개 상태로 입증되지 않아 Azure 1순위 실호출은 미검증이다.
+
+### 커밋·푸시·배포
+- 대기: 검증 완료. 공식 상한 정정 문서와 이 작업 로그를 커밋·push한 뒤 Deploy OCI workflow를 통해 반영한다.
+
 ## [2026-10-21] 삭제된 미국 뉴스 관리자 API 테스트 정리 및 배포 검증
 
 ### 목표

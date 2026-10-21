@@ -24,10 +24,12 @@ Google 예비 provider는 `GOOGLE_TRANSLATION_API_KEY`를 사용한다. API key�
 
 | provider | 공식 무료 기준 | 애플리케이션 보호 상한 |
 |---|---|---|
-| Azure Translator F0 | 월 2,000,000자, 시간당 2,000,000자, 요청당 50,000자 | 월 1,800,000자, 이동 60분 1,800,000자, 요청 50,000자 |
-| Google Cloud Translation Basic | 월 첫 500,000자에 매월 $10 credit 적용(Basic/Advanced 공유) | 월 300,000자. 이동 60분 상한 300,000자 |
+| Azure Translator F0 | 월 2,000,000자(표준 번역과 Custom Translator 학습 합산), 시간당 2,000,000자, 요청당 50,000자 | 월 1,800,000자, 이동 60분 1,800,000자, 요청 50,000자 |
+| Google Cloud Translation Basic | 월 첫 500,000자 비용에 최대 월 $10 credit 적용(Basic/Advanced 공유, 이월 없음) | 월 300,000자. 이동 60분 상한 100,000자 |
 
 모든 provider 시도는 `translation_usage_monthly(provider, usage_month)` 및 `translation_usage_reservations`에서 원자적으로 예약한다. DB transaction advisory lock으로 월/rolling-hour 합계를 확인한 뒤 예약한다. 실제 provider가 외부에서 공유되면 앱 원장만으로 그 사용량을 알 수 없으므로 전용 프로젝트/resource를 사용해야 한다. Google의 비용 credit은 자동 사용량 차단이 아니며 Cloud Billing budget 알림도 hard cap이 아니다. 따라서 DB 사전 제한을 유일한 앱 호출 경로로 강제한다.
+
+Google 공식 가격표의 500,000자는 별도 API 무료 quota가 아니라 월 최대 $10 credit을 Basic/Advanced가 함께 소비하는 구조다. Basic text translation의 기본 단가는 1M input characters당 $20이므로 $10 credit 기준 500,000자에 해당한다. 본 앱은 공유 프로젝트 사용량 및 금액 변동에 대비해 월 300,000자만 허용한다. Azure F0의 무료 월 2M자와 시간당 2M자는 별도 제한이며, 무료량 비교로는 명목상 Google 월 500,000자의 4배다. 앱 제한은 각각의 공식 무료 한도보다 낮게 잡아도 다른 서비스가 같은 resource/project를 사용한 분량까지 막을 수는 없다.
 
 Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제다. 앱은 월/시간 예산을 무료 제공량보다 10% 낮게 설정하며, 관리자 미리보기 역시 cron과 같은 quota-aware client를 사용한다.
 
@@ -56,3 +58,4 @@ Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제
 - Google Cloud Translation quotas and counting: https://docs.cloud.google.com/translate/quotas
 - Google API key security (`x-goog-api-key`): https://docs.cloud.google.com/docs/authentication/api-keys-best-practices
 - Cloud Billing budgets are alerts, not automatic caps: https://docs.cloud.google.com/billing/docs/how-to/budgets
+- 공식 요금/제한 수치 재확인: 2026-10-21. Google rolling-hour 100,000자는 공식 무료 제공량이 아니라 본 애플리케이션의 보수적 제한이다.

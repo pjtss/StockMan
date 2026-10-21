@@ -16,7 +16,7 @@
 
 ## 캐시와 사용량 제한
 
-운영 cron은 제목 원문 해시·대상 언어·provider로 캐시를 조회한다. 캐시 미스 시 DB에서 provider별 월·rolling-hour 한도를 각 outbound 재시도마다 먼저 예약하며 DB 예약이 실패하면 호출하지 않는다. Azure 앱 내부 한도는 월/rolling 60분 각각 1,800,000자, Google은 월/rolling 60분 각각 300,000자다. 불확실한 timeout/HTTP 실패 예약은 provider가 이미 입력을 처리했을 가능성 때문에 반환하지 않는다. `translation_char_count`는 실제 사용 provider를 기준으로 기록한다.
+운영 cron은 제목 원문 해시·대상 언어·provider로 캐시를 조회한다. 캐시 미스 시 DB에서 provider별 월·rolling-hour 한도를 각 outbound 재시도마다 먼저 예약하며 DB 예약이 실패하면 호출하지 않는다. Azure 앱 내부 한도는 월/rolling 60분 각각 1,800,000자, Google은 월 300,000자·rolling 60분 100,000자다. Google 시간당 제한은 공식 provider 무료량이 아닌 앱 보호값이다. 불확실한 timeout/HTTP 실패 예약은 provider가 이미 입력을 처리했을 가능성 때문에 반환하지 않는다. `translation_char_count`는 실제 사용 provider를 기준으로 기록한다.
 
 관리자 미리보기는 운영과 같은 provider별 cache/quota client를 사용하므로 provider usage는 발생할 수 있지만 앱 상한을 우회하지 않는다.
 
