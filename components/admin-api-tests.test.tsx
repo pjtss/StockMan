@@ -24,6 +24,14 @@ afterEach(() => {
 });
 
 describe("AdminApiTests RSS fallback filtering", () => {
+  it("does not expose manual tests whose admin API routes were retired", () => {
+    render(<AdminApiTests />);
+
+    expect(screen.queryByText("해외 뉴스 속보 레이더")).not.toBeInTheDocument();
+    expect(screen.queryByText("미국 티커 기간별 뉴스")).not.toBeInTheDocument();
+    expect(screen.queryByText("해외 뉴스 처리 이력")).not.toBeInTheDocument();
+  });
+
   it("surfaces quota reservation release failures in translation usage diagnostics", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(responseBody), { status: 200, headers: { "content-type": "application/json" } })));
     render(<AdminApiTests />);

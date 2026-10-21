@@ -111,3 +111,11 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 - 제거된 localStorage key `rss_custom_keywords`, `rss_stock_alerts`, `market_sentiment_history`의 값은 이미 사용자 브라우저에 저장돼 있을 수 있다. 제거된 UI/runtime가 이를 읽지 않으며, 브라우저 저장소를 조회하거나 값을 지우는 변경은 하지 않았다.
 - `us-daily-indicators`는 삭제하지 않았다. 관리자 기능·route가 남아 있고, production read-only 조회(2026-10-20 15:46:58Z)에서 누적 2,696회 실행과 마지막 2026-08-19 `SKIPPED / outside_schedule`을 재확인했다. 현재 코드 기본 설정은 disabled이고 OCI 예약 호출은 없으나, 과거 실제 사용과 수동 관리자 경로가 있으므로 비활성/예약 연결 문제로 계속 분류한다.
 - 남은 한계: 외부에서 과거 localStorage를 직접 읽는 브라우저 소비자 여부와 운영 DB의 현재 effective `us-daily-indicators` 설정은 확인하지 않았다. 해당 데이터는 건드리지 않았다.- 제거 변경은 commit `45ad28bd`로 `origin/oci`에 push됐고 Deploy OCI run `39452342209`가 성공했다. 운영 health는 2026-10-20 15:59:21Z `ok`를 반환했다. 제거된 코드가 포함된 tree에서 전체 배포 검증도 통과했다.
+
+## 2026-10-21 추가 정적 연결 검사
+
+- 범위: 현재 checkout `0e2bb99c`에서 tracked `app`, `components`, `lib`, `scripts`의 페이지·API·관리자 수동 테스트 호출 관계를 읽기 전용으로 조사했다. 기존 보고서의 다섯 제거 모듈 및 `us-daily-indicators` 예약 누락을 제외하고 추가 후보를 찾았다.
+- 새 후보: `components/admin-api-tests.tsx`의 `us_news_radar`, `us_news_ticker`, `us_news_radar_events` 세 항목은 각각 `/api/admin/us-news-radar-test`, `/api/admin/us-news-ticker-test`, `/api/admin/us-news-radar-events`를 호출하도록 되어 있으나, 해당 세 route 파일이 현재 저장소에 없다. 실행 로직은 `fetch(test.endpoint...)`를 그대로 호출하므로 해당 관리 테스트는 404가 예상된다. 같은 저장소에는 실제 기능 route `/api/stock/us/news-radar`와 `/api/stock/us/news`가 있으나 이들은 관리자 테스트 endpoint와 권한·응답 계약이 같다고 확인되지 않아 임의로 대체할 수 없다. 이 항목은 기능 미사용 확정이 아니라 **오래된 관리자 테스트 항목/route 불일치**로 분류한다.
+- 교차 확인: `daily-ma9`도 통합 route `/api/admin/daily-ma9-test?market=KR|US`는 있으나 관리자 테스트 목록은 오래된 `/api/admin/kr-daily-ma9-test`, `/api/admin/us-daily-ma9-test`를 가리킨다. 다만 두 market route 파일도 현재 존재하므로 이 둘은 미사용이나 깨진 endpoint로 분류하지 않았다.
+- API 검색만으로 호출자가 안 잡힌 `/api/admin/daily-candle-cache-debug`, `/api/admin/database-status`는 관리자 진단 API이므로 외부/운영 호출 여부를 알 수 없어 미사용으로 보지 않았다. 테스트 목록 endpoint를 route 존재 여부와 대조한 검사에서 추가 누락은 위 세 건뿐이었다.
+- 제품 코드, DB, 운영 배포를 변경하지 않았다. 정적 조사라 빌드·테스트·실행은 수행하지 않았다. 관리자가 이 세 테스트를 실제 사용하는지, route가 외부에서 제공되는지는 저장소 검사만으로 확정할 수 없다.

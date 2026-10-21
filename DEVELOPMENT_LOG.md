@@ -1,3 +1,201 @@
+## [2026-10-21] 삭제된 미국 뉴스 관리자 API 테스트 정리 및 배포 검증
+
+### 목표
+삭제된 관리자 API를 계속 호출하는 수동 테스트 항목을 제거하고, 변경을 빌드·테스트·실행 검증 후 배포 가능한 상태로 만든다.
+
+### 반영
+- 근거: commit `764c7615`에서 `/api/admin/us-news-radar-test`, `/api/admin/us-news-ticker-test`, `/api/admin/us-news-radar-events`가 제거됐지만 관리자 UI 항목이 남아 있었다.
+- `components/admin-api-tests.tsx`에서 stale 테스트 3개와 전용 처리 결과 렌더를 제거했다. 실제 사용자 뉴스 기능 route는 보존했다.
+- `components/admin-api-tests.test.tsx`에 세 항목이 UI에 나타나지 않는 검사를 추가했다.
+- `docs/operations/unused-feature-candidates-20261020.md`에 추가 조사 및 정리 근거를 적었다.
+- Next build가 자동 변경한 `next-env.d.ts`는 기존 `.next-deploy-verify/types/routes.d.ts` 참조로 복구했고, `tsconfig.json`의 빌드 전 사용자 변경 한 줄은 보존했다.
+
+### 검증
+- 관리자 컴포넌트 Vitest: 1파일 5개 통과.
+- `npx.cmd tsc --noEmit --incremental false`: 통과.
+- `npm.cmd run build`: 통과.
+- 로컬 실행: `/admin/api-tests` HTTP 200, 삭제한 라벨 미노출, 삭제된 admin route HTTP 404.
+- 전체 `npm.cmd run deploy:verify`: dependency audit 0 취약점, production build 통과, standalone `/charts` 및 Chrome desktop/mobile, API smoke 통과, Vitest 290파일 1,412 통과·2 skip, 격리 타입검사 통과. 최초 전체 검증은 최신 로그 계약과 개선 과제 ID 중복으로 문서 게이트에서 실패했다. 항목을 최신-first 계약에 맞춰 보완하고 ID를 고유하게 변경했다.
+- `/api/health` 로컬 degraded는 DB 부재에 의한 것이며 변경 기능의 검증과 무관하다.
+
+### 다음 개선
+- deploy verifier를 다시 실행해 모든 후속 게이트를 통과시킨 뒤 배포 결과와 commit SHA를 기록한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-21-003
+성과 판정: IMPROVED
+근거: 제거된 route 참조 3개와 결과 렌더를 없애고 회귀 테스트를 추가했다. 테스트·타입·빌드·실행 검증이 통과했다.
+
+### 커밋·푸시·배포
+- 미실행: verifier 전체 재실행과 배포 대기 중.
+
+## [2026-10-21] $1 이하 후보 SEC 티커 매핑 오류 재대조
+
+- **목적/범위**: 기존 후보표의 SEC 미매핑 68개를 SEC 공식 `company_tickers_exchange.json`과 다시 대조하고 DEI/GAAP/락업/float 상태를 명확히 기록했다.
+- **확인 결과**: 68개 모두 SEC 목록에서 티커가 유일하게 검색되고 제출자명이 프로젝트 발행사명과 연결됐다. 자동매칭이 빠진 원인은 프로젝트 코드 `AMS`가 SEC `NYSE` 표기와 다르게 매핑된 점이다. 487개 전체 고유 CIK 식별, 거래소 코드 불일치 68개, 진짜 SEC 티커 미매핑 0개. 추가 CompanyConcept 조회 오류 0개.
+- **갱신 수치**: DEI shares 415개, US-GAAP shares 388개, `EntityPublicFloat` USD 가치 298개. DEI/GAAP가 모두 존재하는 후보 중 230개가 불일치한다. `EntityPublicFloat`은 비계열 보유분 시장가치이며 유통주식 수가 아니다. 락업 계약 원문 및 float 주식 수는 아직 전 기업 수작업 검토 전이므로 모두 미검토로 둔다.
+- **변경 파일**: `scratch/fetch-under1-sec-facts.mjs`, `scratch/render-under1-report.mjs`, `scratch/us-under1-sec-facts-20261021.json`, `docs/operations/us-common-stocks-under-1-20261020.md`, `.csv`, `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: SEC 공식 티커 목록의 68개 티커가 각각 유일함을 확인하고, SEC facts fetch에서 오류 0, report generator 출력 요약에서 487 후보/487 CIK·행수 일치 여부를 확인했다. 제품 테스트·빌드·실행은 요청 범위가 문서 및 읽기 전용 조사라 수행하지 않았다. API는 GET-only였고 DB write/refresh는 없었다.
+- **남은 위험/다음 개선**: SEC company_tickers_exchange는 현재 거래소 상장·증권 종류의 충분한 검증 자료가 아니다. 68개 거래소 표기 차이를 SEC filing으로 검증하고, DEI/GAAP 230개 차이를 최신 원문에서 대조해야 한다. 이후 후보별 lock-up 계약/waiver/resale 효력 및 명시된 float shares 수량을 SEC 원문에서 검토한다. 미검토는 0주/미공개로 해석하지 않는다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] SEC 락업 표적 원문 검토와 후보표 반영
+
+- **목적/범위**: 활성 목표에 남은 락업/유통주 항목을 개선하기 위해 후보 487개와 로컬 SEC offering/registration scan을 교차하고, 확인된 SEC 원문 조항을 재검증했다.
+- **근본 데이터 구분**: SEC lock-up 약정은 이미 잠긴 주식의 숫자를 자동으로 제공하지 않는다. issuer의 신주 발행 제한과 임원·이사의 기존 주식 처분 제한은 다른 항목이다. `EntityPublicFloat`은 USD 시장가치이므로 float share count로 대체하지 않는다. 내부자 소유·resale registration·warrant 수량도 락업 수량으로 계산하지 않는다.
+- **확인 사실**: LTRN의 2026-09-30 8-K는 registered direct offering 종결일을 2026-09-30으로 명시하고, 같은 날 424B5는 임원·이사 90일 처분제한(관례적 예외 포함)과 회사의 60일 신주 발행제한을 설명한다. 90일 약정 대상 주식 수는 해당 검토 공시에서 확인되지 않으며 회사의 신주 발행제한은 기존 주식 락업과 분리했다. LGO의 2026-09-29 424B5에서 issuer·임원·이사의 60일 조항을 찾았지만 종결일과 주수 미확인; 2026-10-08 RW는 등록신고서 철회만 확인하고 락업 종료 근거로 사용하지 않았다. TGE의 2026-05-13 POS AM에는 AMTD Lock-up Obligations 참조가 있으나 실제 제한조건/주수 검토 전 확정하지 않았다.
+- **검토 범위 제한**: SEC 원문 전체 487개사가 아니라 로컬 offering/registration scan의 후보 언급을 표적 검토했다. 나머지 484개는 계약 부재가 아니라 계약 여부 미검토다. float shares 수는 회사별 공시 원문 검토 미완료다.
+- **변경 파일**: `scratch/us-under1-sec-lockup-review-20261021.json`, `scratch/render-under1-report.mjs`, `docs/operations/us-common-stocks-under-1-20261020.md`, `.csv`, `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: SEC 원문 HTTP 200 및 핵심 close date / 기간 문구 대조, report generator 재실행(487행), CSV BOM 및 488행(헤더 포함)을 확인했다. SEC 조회는 read-only GET; 제품 빌드/테스트 불필요한 문서·데이터 조사로 실행하지 않았다.
+- **재발 감지/다음 개선**: 다음 갱신은 미검토 484개 및 TGE 원계약을 순차 심사하고, 문서별 filing date, lock-up 당사자, 증권 클래스, 정확한 수량, 시작·만료일, 예외·waiver, resale registration 발효를 구조화한다. float 수량은 filing에 명시된 숫자만 기입한다. 숫자 미기재와 검토 미완료 상태를 별도 필드로 유지한다.
+- **남은 위험**: 표적 문서 검색은 SEC 공시에서 조항이 없다는 증명이 아니며, LGO 효력 시점과 LTRN 제한 대상 주식 수량도 미확정이다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 487개 후보 SEC 제출/원문 스캔 및 float 수량 추출
+
+- **목적/범위**: 기존 표적검색에서 벗어나 487개 SEC CIK의 최근 12개월 제출이력 및 SEC 공시 원문을 읽기 전용으로 조회해 락업/float 수량 근거와 검색 범위를 넓혔다.
+- **수집/검색**: SEC submissions API에서 487/487개 발행사 처리, 최근 12개월 filings 24,685건을 확보했고 SEC 요청 오류 0. 최신 연차보고서와 S-1/S-3/F-1/F-3/424B/POS AM 및 증권거래 관련 8-K/6-K primary document 4,725건을 SEC Archives에서 읽었다. 원문 조회 오류 0. lock-up 용어 포함 filing 1,208건/345개사, public-float/비계열 용어 포함 filing 1,548건/447개사. 이 수치는 문자열 검색 hit이며 확정 lock-up 건수가 아니다.
+- **정량 결과**: 원문에서 기준일이 확인되는 `shares held by non-affiliates` 값을 65개사에서 추출했다. 이를 행별 SEC 비계열 보유주수로 표시하고 접수일·기준일·양식·직접 링크를 함께 제공한다. 이는 제한 없는 즉시 거래가능 주수와 동일하다고 보장되지 않는다. 나머지 422개는 선택 스캔에서 기준일이 분명한 수량을 찾지 못했으며 공시 부재 판정이 아니다.
+- **락업 추가 확인**: 기존 LTRN/LGO/TGE 검토 외에도 검색 후보에서 SKYX(25,000,000주, 12개월 단계별 해제), IFBD(3,471,828주를 증권법/락업 합산 제한으로 보고하나 lock-up만의 수량 아님), RAIN(5,548,625주, 2년 약정 표시), GCDT 등 수치 후보를 발견했다. 다른 사례는 만료일·발효일·waiver·최신 주주상태 검증 전에 확정치로 옮기지 않는다. SKYX 이외의 현재 효력/집계는 개별 후속 원문 확인이 남았다.
+- **변경 파일**: `scratch/audit-under1-sec-submissions.mjs`, `scratch/scan-under1-sec-filing-text.mjs`, `scratch/extract-under1-float-share-candidates.mjs`, `scratch/select-under1-float-share-facts.mjs`, 관련 SEC 조회 JSON 중간자료, 후보 보고서/CSV, SEC 설계안, `DEVELOPMENT_LOG.md`.
+- **검증**: 487 CIK/24,685 filing의 completeness 및 4,725/4,725 원문 fetch 처리, HTTP 오류 0, 65개 float 추출 후보와 동일 as-of-date 내 충돌 0을 대조했다. 보고서 생성 및 CSV UTF-8 BOM/487행 확인은 후속 재생성 단계에서 수행한다. SEC 요청은 GET-only; 운영 DB write 없음. 제품 빌드/테스트는 문서/SEC 자료 조사 범위라 미실행.
+- **재발 감지/다음 개선**: 선택공시 검색에서 누락될 수 있는 Exhibit standalone 문서, 이전 12개월 계약, 422개 float 미발견 및 345개 lock-up 검색 hit를 우선순위화해 개별 계약 당사자·수량·기간·waiver·후속 release를 확인한다. SEC 비계열 보유주수와 계약상 거래제한 수량을 서로 차감하거나 중복합산하지 않는다.
+- **남은 위험**: 원문 스캔은 주요 filing 폼/선택문서 범위이며 각 accession의 모든 EX-10/EX-99 attachment를 전부 독립 검사한 것은 아니다. 검색 hit는 boilerplate와 과거 계약이 포함될 수 있고, hit 부재는 lock-up/float 부재를 입증하지 않는다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 락업 수량/잔여 트랜치 SEC 원문 검증 보강
+
+- **목적/범위**: 최근 12개월 원문 검색에서 발견한 수치 후보를 대조하여 SEC filing에 명시된 lock-up 수량, 시작일, 해제 스케줄, 현재 잔량 검증수준을 구분했다.
+- **확정/조건부 사실**: SKYX는 2026-10-13 merger closing에 25,000,000주를 발행, 12/15/18/21개월에 25%씩 해제하는 SEC 공시가 있어 2026-10-21 기준 25,000,000주가 제한기간 중이다. WCT는 2025-06-23 CEO에게 부여된 fully vested 5,000,000 Class A shares가 3년 lock-up이라고 2026-08-28 Form 424B4에 기재한다. AMSS는 2026-05-20 direct listing 기준 1,245,557주의 staged schedule에서 2026-10-21은 Day 141 후/Day 170 전이며, 남은 30% tranche의 integer share count는 공시가 따로 적지 않는다. RAIN은 2026-05-04 filing에서 5,548,625주가 2024-12-31자 2년 계약 대상이라 보고하지만 현재 waiver/release 잔량은 확인되지 않아 as-reported 수량으로 구분했다. GCDT 600,000주/183일 약정은 2026-01-14 IPO로부터 2026-07-16 만료다. LTRN/LGO는 조항은 있으나 계약 주수가 미공개 또는 현재 효력 불명; TGE는 원계약 참조만 확인.
+- **자료 구분**: IFBD 3,471,828주는 SEC 원문상 증권법 또는 lock-up 제한을 합산한 값이라 순수 lock-up 수량으로 취급하지 않는다. RAIN의 2026-09-23 8-K는 새로 제안된 business combination의 장래 lock-up을 기술하며 closing 전이므로 현재 잔량 근거로 계산하지 않았다.
+- **변경 파일**: `scratch/us-under1-sec-lockup-review-20261021.json`, `scratch/render-under1-report.mjs`, 후보 보고서/CSV, SEC 설계안, `DEVELOPMENT_LOG.md`.
+- **검증**: SKYX closing date/25m schedule, WCT 5m/3-year grant, AMSS May20 listing / staged schedule, RAIN reported amount/dated agreement, GCDT IPO/183 days를 각 SEC 원문과 대조했다. SEC API read-only GET만 사용했다.
+- **남은 위험/다음 개선**: WCT 및 RAIN의 계약 waiver/release 여부, AMSS released share integer allocation, 그리고 나머지 479개사의 filing/exhibit review는 완료되지 않았다. 보고서에서 `current`와 `as-reported`를 별도 표시하고 나머지를 미검토로 유지한다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 미국 보통주 $1 이하 문서 출력 검증
+
+- **목적/범위**: 종가 후보 보고서와 SEC-only 설계 문서의 생성 결과를 검증하고 오래된 기준시점·검색범위 표현을 보정했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-1-20261020.md`, `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: Markdown 후보 전체 표와 CSV 모두 487개 데이터 행; CSV UTF-8 BOM 및 Markdown 한글 텍스트 확인. 대표 lock-up 상태는 SKYX/WCT active as disclosed, AMSS staged remainder quantity not stated, RAIN current remainder unconfirmed, GCDT cited clause expired로 확인했다. `git diff --check` 통과(기존 로그 파일의 LF→CRLF 경고만 출력). 제품 코드·DB 변경 없음; 빌드·테스트·실행은 요청되지 않아 하지 않았다.
+- **남은 위험/다음 개선**: 487개 전체의 활성 상장·보통주 적격성 검증, 모든 SEC 계약 Exhibit의 lock-up 전수 검토, 422개 비계열 보유주수 미발견 행의 원문 추가 검색, 21개 OHLC 이상치의 split/기업행사 대조가 남아 있어 문서는 완전한 미국시장 전수 목록이나 전수 float/lock-up 검증으로 해석할 수 없다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] HODO lock-up 후속 기업행사 검토 추가
+
+- **목적/범위**: SEC 원문 scan hit에서 기존 8개 표적 대상 밖의 구체적 lock-up 후보를 추가 확인했다.
+- **근거/결과**: HODO 2026-04-22 Form 10-K/A는 Artemis stock consideration 937,500주가 lock-up 대상이었고, 2025-12-31까지 312,500주가 해제됐으며 계약 개정으로 추가 234,375주가 해제됐다고 보고한다. 이후 2026-05-29 1대8 reverse split 및 2026-06-30 merger가 확인되므로 이 과거 수량을 2026-10-21 현재 lock-up 잔량으로 단정하지 않는다. 2026-08-14 10-Q, 2026-09-14 8-K/A 및 2026-09-18 S-3를 읽었으나 현 잔여 lock-up 주수를 SEC 자료에서 재구성하지 못해 `현재 효력/주수 미확인`으로 표기했다.
+- **변경 파일**: `scratch/us-under1-sec-lockup-review-20261021.json`, 해당 후보 보고서/CSV, SEC 설계안, `DEVELOPMENT_LOG.md`.
+- **검증**: SEC Archives 원문 4건에 read-only GET으로 접근해 lock-up 해제 사실, 후속 split/merger, 현 주수 미확인 경계를 대조했다. 제품 코드/DB 변경 없음. 빌드·테스트 미실행.
+- **남은 위험/다음 개선**: HODO merger 후 Artemis/EVEMeta 대상 제한의 주식 교환·계약 승계는 Exhibit 및 SEC ownership/resale filing에서 추가 대조가 필요하다. 전체 487개 중 478개 lock-up 검토는 미완료다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] IVDA 180일 SEC lock-up 조항 상태 반영
+
+- **목적/범위**: 숫자/기간이 SEC 원문에 잡힌 추가 후보 IVDA의 lock-up 적용 대상, 기간, 수량 공개 여부를 확인했다.
+- **근거/결과**: 2026-02-11 Form 424B4는 회사·이사·임원·5% 이상 주주의 보통주 처분을 prospectus date부터 180일 제한한다고 기재하고 Placement Agent의 조기 면제/해제 권한도 명시한다. 해당 기간은 2026-08-10 종료된다. 대상별 수량은 공시에서 확인되지 않으므로 숫자를 추정하지 않고, 이 조항의 만료를 다른 계약의 부재로 확대하지 않았다.
+- **변경 파일**: `scratch/us-under1-sec-lockup-review-20261021.json`, `scratch/render-under1-report.mjs`, 후보 보고서/CSV, SEC 설계안, `DEVELOPMENT_LOG.md`.
+- **검증**: SEC 원문 read-only GET에서 180일, covered persons, waiver 권한, post-offering shares 구절을 확인하고 renderer를 재실행했다. 기존 후보 행수 487 유지 확인. 제품 코드/DB 변경 없음; 빌드·테스트 미실행.
+- **남은 위험/다음 개선**: IVDA의 개별 대상자별 제한 주수 및 다른 lock-up 계약 여부는 미확인이다. 나머지 477개사 lock-up 전수 검토와 422개 float 미발견사 확인은 계속 필요하다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] GCL 12개월 Sponsor lock-up 만료 검증 추가
+
+- **목적/범위**: 2026년 resale prospectus의 GCL 83,456,793주 Sponsor/Epicsoft 보유 lock-up 후보에 대해 종결일과 만료일을 후속 SEC 공시로 확인했다.
+- **근거/결과**: 2026-05-18 Form 424B3는 Sponsor/Epicsoft의 합산 실질보유 83,456,793주가 business combination closing 후 12개월 제한 만료 뒤 재매각 가능하다고 적는다. 2026-07-31 Form 20-F의 사업결합 종결일은 2025-02-13이므로 해당 12개월 조항 만료일은 2026-02-13이다. 83,456,793주는 prospectus 기준 보유량으로, 현재 잠김 주수로 표시하지 않았다.
+- **변경 파일**: `scratch/us-under1-sec-lockup-review-20261021.json`, `scratch/render-under1-report.mjs`, 후보 보고서/CSV, SEC 설계안, `DEVELOPMENT_LOG.md`.
+- **검증**: 두 SEC 원문 read-only GET에서 수량/lock-up 조건과 closing date를 각각 대조했다. renderer 재실행 결과 후보 487개, SEC CIK 487개, DEI facts 415개, GAAP facts 388개, public-float values 298개, SEC 요청 오류 0개. 문서·CSV 행수 기존 487개 유지, `git diff --check` 통과. 빌드·테스트 없음.
+- **남은 위험/다음 개선**: 83,456,793주의 이후 소유량 변화 및 다른 제한 계약은 별도 확인이 필요하다. 남은 476개 후보의 lock-up, 422개 float 수량 미발견 상태, SEC 상장/보통주 적격성 원문검토는 미완료다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] MLSS 임원 보유주식 lock-up 후속 공시 대조
+
+- **목적/범위**: 2026-06-25 SEC Form 8-K의 Osser 부부 lock-up 약정과 2026-08-13 10-Q의 beneficial ownership을 대조해 현재 제한 수량의 공시 여부를 판정했다.
+- **근거/결과**: 8-K는 Osser 및 배우자 주식의 transfer restriction이 2027-04-20까지라고 하며, restrictive legend가 이미 제거된 363,339주는 제외한다고 명시한다. 10-Q는 2026-06-30 현재 Osser beneficial ownership 2,844,028주를 보고한다. 회사는 이 보유량을 전부 잠김으로 명시하지 않고 배우자 보유량/면제 수량과의 정확한 잔액 대사를 제공하지 않아, 2,844,028 또는 차감치로 현재 lock-up 주수를 만들지 않았다.
+- **변경 파일**: `scratch/us-under1-sec-lockup-review-20261021.json`, `scratch/render-under1-report.mjs`, 후보 보고서/CSV, SEC 설계안, `DEVELOPMENT_LOG.md`.
+- **검증**: 8-K와 10-Q primary document를 SEC Archives read-only GET으로 확인하고 renderer 재실행. 후보 487개, Markdown 표와 CSV 각각 487행, `git diff --check` 통과. 제품 코드·DB 변경 없음.
+- **남은 위험/다음 개선**: Form 4/13D 등으로 Osser/배우자 지분 변동과 제한계약의 실제 대상 수량을 맞추는 검토가 남아 있다. 나머지 475개 후보도 lock-up 전수 검토 미완료다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 미국 보통주 $1 이하 종가 후보와 SEC 사실 필드 첫 스냅샷
+
+- **목적/범위**: 사용자가 가격·최근 30일 고저가에 한해 quote source를 허용하고, 기업 사실은 SEC-only로 유지하도록 범위를 확정했다. 프로젝트 활성 USD `COMMON_STOCK` 5,444개를 읽기 전용으로 조회해 2026-10-20 종가 기준 $1 이하 후보와 SEC XBRL facts를 문서/CSV로 기록했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-1-20261020.md`, `.csv`, `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`. `scratch/`에는 SEC facts 및 API 추출/렌더링 중간 자료를 생성했다. 제품 코드와 DB는 변경하지 않았다.
+- **가격 스캔**: 저장된 project common universe 5,444개(마스터 `last_seen_at` 2026-09-25)를 기준으로 운영 read-only GET `instrument-fundamentals` 및 `daily-candles`를 사용했다. 2026-10-20 종가 ≤ USD 1 후보 487개. 2026-09-21~10-20 30 calendar day OHLC의 최소 거래봉 수 조건(18개) 487/487 통과, 30일 데이터 요청 오류 0.
+- **SEC 사실**: SEC 공식 ticker/exchange mapping 419개 매칭, 68개 미매칭. SEC CompanyConcept DEI 발행주식수 352개, US-GAAP 336개, DEI `EntityPublicFloat` USD 금액 250개를 concept별로 기록했다. DEI와 GAAP 수량이 다른 후보 204개. SEC HTTP 오류 0. Public float 금액은 총 시가총액으로 오인하지 않도록 분리했다.
+- **명시한 미확인 범위**: SEC가 직접 공시한 현재 총 시가총액은 확인되지 않아 전 행에 확인 불가로 기록했다. lock-up 계약/float 수량은 기업별 원문 수작업 검토 전이므로 미검토로 두었고 0주나 미공개로 단정하지 않았다. 21개는 30일 고가/종가 비율이 10배 이상으로 split/기업행사 원문 대조가 필요하다. 마스터가 9/25 기준이어서 최신 신규 상장·활성 상태 완전성은 미확인이다.
+- **검증**: API 후보 수와 CSV 행수 일치(487행+header), 30일 봉 개수, SEC CIK 매칭·fact 커버리지 및 report/CSV 출력 요약을 대조했다. SEC API 호출은 프로젝트 `SEC_USER_AGENT`를 사용한 read-only GET, 가격 API는 인증 read-only GET으로 한정했다. 테스트/빌드 실행 없음(문서·데이터 산출 작업).
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] Google 우선·Azure F0 RSS 번역 fallback 및 무료 한도 보호 설계
+
+### 목표
+- 개선 과제 ID: CI-2026-10-21-002
+- Google Cloud Translation을 1순위로 유지하고 Azure AI Translator 무료 F0를 fallback 후보로 쓰며, 앱이 무료 할당량을 넘는 번역 호출을 차단하는 구조를 설계한다.
+- 요청 범위는 설계 문서화다. 제품 코드, DB schema, 환경변수, 클라우드 자원은 변경하지 않는다.
+
+### 반영
+- `docs/rss-translation-design.md`를 공식 문서 기반으로 확장했다: 현 구현 기준선, Google/Azure 요금·쿼터를 고려한 낮은 앱 cap, provider 우선순위/fallback, 원자적 DB 예산 원장, rolling-hour 보호, 관리자 관측, 보안, 단계별 구현·검증 게이트를 기록했다.
+- 현 코드에서 Google 월 앱 cap 300,000자와 provider별 단일 원장 구조를 확인했다. Azure 도입 시 공급자별 원장 키로 분리하고 기존 사용량은 Google에 귀속하는 migration이 필요하다.
+- 코드가 제목 외에 요약 문맥을 요청 payload에 포함하는 반면 기존 설계는 제목만이라고 서술하는 입력 범위 불일치를 발견했다. 구현 시 요약을 provider에 전송하지 않도록 수정하거나 실제 payload 전체를 쿼터 계산에 넣어야 한다고 명시했다.
+- Google REST API 키의 query-string 전달 대신 공식 권고 header 사용을 설계에 포함했다.
+
+### 검증
+- 프로젝트 구현 `lib/cloud-translation-client.ts`, `lib/translate-market-rss-item.ts`, `lib/quota-aware-translation-client.ts`, `lib/translation-cache.ts`, `db/migration/V102__stocktitan_translation_cache.sql`과 기존 RSS 번역 설계를 대조했다.
+- Google 공식 요금/쿼터와 API-key 보안 문서, Microsoft 공식 F0 요금·서비스 한도·REST/API 인증 문서를 확인했다. 확인 시점은 2026-10-21이며 공급자 정책은 배포 전 재확인이 필요하다.
+- 문서 변경만 수행했으며 API 실호출·제품 테스트·빌드는 실행하지 않았다. Git 작업 트리에 기존 사용자 변경사항이 다수 있어 수정/정리하지 않았다. 문서 자동 검사 `npm.cmd run docs:check`는 첫 실행에서 task ID/outcome 형식 규약 실패를 감지했다. 필드 형식을 checker가 요구하는 형태로 수정한 뒤 재실행한다.
+- 성과 판정: UNMEASURED — 설계 완성; 동작 구현·사용량 실측 전.
+- **근거:** 현행 앱 한도 300,000자/월, Google 공식 월 첫 500,000자 크레딧, Azure F0 월 2,000,000자 및 시간당 제한을 문서에 대조 기록했다.
+
+### 다음 개선
+- Azure F0 리소스 생성·tier 확인 및 비밀 변수 준비 후 provider별 원자 예약 migration, 호출 orchestrator, mock 기반 quota/fallback 테스트를 구현한다.
+- 제목 전용 전송 범위 불일치를 먼저 회귀 테스트로 고정한 뒤 전체 `npm.cmd run deploy:verify` 및 실제 runtime smoke를 성공시키고 배포한다.
+
+### 개선 과제
+- Google Cloud/API 소비를 다른 시스템과 공유할 경우 앱 자체 원장만으로 프로젝트 전체 무료 잔여량을 완전 보증할 수 없으므로 전용 리소스와 콘솔 대조가 필요하다.
+- Azure 무료 tier 여부는 API key만으로 확인할 수 없으며, F0 미확인·원장 불가 시 자동 호출하지 않는 fail-closed 구현이 필요하다.
+
+### 커밋·푸시·배포
+- 미실행 — 요청이 설계 단계이며 제품 코드/실행 artifact 변경 없음. 설계 문서만으로 배포할 수 없고 실제 provider 구현 및 배포 검증은 다음 단계다.
+
+## [2026-10-21] 기존 RVOL·시총 후보 중 국내 익일 단타 관찰 후보 추출
+
+- **목적/범위**: 직전 추출한 국내 RVOL≥2 후보 83개에서 다음 거래일 단타 관찰 후보를 프로젝트의 공식 일봉 단타 신호 기준으로 선별했다.
+- **판정**: 완료 일봉 기준 종가>EMA9>EMA20, 양봉, 최신 거래량/직전 20봉 평균≥1, 최근 3봉 OBV·ADL 기울기 상승을 모두 요구했다. 마지막 공통 거래일은 2026-10-20이며 2026-10-21 완성봉은 로컬 DB에 없었다.
+- **결과**: 전체 조건 통과 11개: 300080, 065450, 148930, 176750, 011330, 078520, 134380, 012280, 373200, 142280, 016090. RVOL 내림차순 결과를 별도 보고서에 기록했다. 이는 다음 거래일 시가 확인 전 관찰 후보이며 수익을 보장하지 않는다.
+- **남은 데이터 한계**: 직전 5,000억 이하 필터에 사용한 운영 시총 스냅샷이 2026-08-28 기준이다. 따라서 선별 결과의 현재 시총 조건은 확인되지 않았다. 2026-10-21 완료 일봉도 부재해 내일 판단에는 하루 지연이 있을 수 있다.
+- **변경 파일**: `docs/operations/kr-daytrade-watchlist-20261020.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: 로컬 DB에서 기존 후보 83개의 공식 활성 보통주 상태와 최근 140개 일봉을 읽어 프로젝트 `evaluateDayTradeSignal` 계약과 동일한 계산을 적용했다. 통과 11개 전부 기준일 20261020, 실패 조건이 없는지 여섯 신호 조건을 확인했다. 테스트는 실행하지 않았고 DB는 읽기 전용으로 사용했다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 국내 최신 거래일 RVOL 2 이상·시총 5,000억 이하 후보 추출
+
+- **목적/범위**: 국내 활성 공식 보통주 중 최신 거래일 RVOL 2 이상 및 시총 5,000억 원 이하 후보를 로컬 일봉·기본정보 스냅샷으로 추출했다.
+- **기준**: 최신 거래일 거래량 ÷ 직전 20개 양(+) 거래량 일봉의 평균. 2026-10-20 거래일만 포함하고, 공식 `COMMON_STOCK`·거래정지·청산·관리 종목 필터를 적용했다. 프로젝트 기본 정책에 따라 시총 300억 원 이하는 제외하고, 5,000억 원 상한은 포함했다.
+- **결과 및 데이터 한계**: RVOL 조건을 충족한 후보 83개. 시총 스냅샷 `observed_at`은 운영 API 확인 결과 2026-08-28로 최신 거래일보다 오래됐다. 따라서 결과 파일은 이를 명시하며, 시총 상한 조건은 해당 스냅샷 기준 후보이지 2026-10-20 현재 시총 검증 결과가 아니다. 현재 시총 기준 완전성을 확인하려면 최신 KIS 시총 갱신이 필요하다.
+- **변경 파일**: `docs/operations/kr-rvol-2-marketcap-5000b-20261020.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: 로컬 DB의 KOSPI·KOSDAQ 양 시장 최신 양(+) 거래량 일봉이 20261020인지 확인하고, 공식 eligibility 및 거래량 이력 20개 충족으로 직접 SQL 산출했다. 총 83건을 보고서에 기록했다. 별도 테스트는 실행하지 않았다.
+- **커밋·푸시·배포**: 수행하지 않음. DB를 변경하지 않았다.
+
+## [2026-10-21] 운영 국내 보통주 시총 1조 원 이하 일봉 로컬 DB 갱신
+
+- **목적/범위**: 운영 서버의 국내 활성 `COMMON_STOCK` 중 운영 기본정보 API가 확인한 시가총액 1조 원 이하(상한 포함) 종목의 일봉 최대 120개를 로컬 PostgreSQL에 동기화했다. 시총/분류 미확인 종목은 fail-closed로 제외했다.
+- **확인 대상**: `scripts/sync-daily-cache-async.mjs`, `.env.local`의 운영 API 및 localhost DB 설정(자격증명은 출력하지 않음), 국내 유니버스·기본정보·일봉 원본/요약 테이블.
+- **실행 결과**: 활성 국내 `COMMON_STOCK` 2,307개에서 운영 기본정보 API 확인 후 2,002개를 대상으로 선정하고, 305개는 시총 응답 부재/상한 초과 등으로 제외했다. KOSDAQ 1,476개와 KOSPI 526개에서 401배치, 운영 HTTP 2,428회로 78,078개 일봉을 UPSERT했다. fetch/save 동시성은 각각 1로 제한했다. 배치 실패 0, fallback 실패 0, DB 저장 검증 불일치 0이다. 대상 2,002개 모두 원본 일봉 최신 날짜가 2026-10-20임을 로컬 DB에서 확인했다. 최신 요약 테이블은 거래량 0인 봉을 제외하는 기존 정의 때문에 9개 종목에서 이전 날짜를 가리켰지만, 원본 테이블에는 해당 2026-10-20 봉이 저장되어 있으며 원본-요약 OHLCV 불일치는 0이다.
+- **실행 경로 및 이슈**: 단일 종목 사전 점검의 첫 저장은 로컬 `instrument_fundamental_snapshots`에 스크립트가 참조하는 `listed_shares` 컬럼이 없어 트랜잭션 rollback됐다(캔들 변경 없음). 재시도와 전체 갱신은 스크립트 지원 옵션 `--skip-fundamentals=true`를 사용해 기본정보 스냅샷 전체 갱신을 생략하고 캔들 적재를 완료했다. 캡 필터에 필요한 운영 시총 조회는 유지됐다.
+- **변경 파일**: `DEVELOPMENT_LOG.md` 작업 기록만 추가. 제품 코드 변경 없음.
+- **검증**: 단일 종목 동일 경로 사전 검증 성공(39봉 저장). 전체 결과 `ok=true`, 78,078 수신/저장. 사후 DB 집계에서 KOSDAQ 1,476/1,476, KOSPI 526/526 대상 모두 원본 최신 거래일 `20261020`; 원본과 최신 요약 OHLCV mismatch 0.
+- **커밋·푸시·배포**: 수행하지 않음. 운영 서버는 GET 원천으로만 사용했고 로컬 DB만 갱신했다.
+
+## [2026-10-21] StockTitan 최근 3시간 호재 및 시총 재조회
+
+- **목적/범위**: StockTitan 원본 RSS 최근 3시간 항목을 Codex가 직접 검토하고, 근거 있는 호재 티커들의 최신 시가총액을 조회했다.
+- **확인 대상**: `https://www.stocktitan.net/rss` 및 활성 `COMMON_STOCK` 종목 마스터; COSM·SAFX KIS 해외주식 현재가상세 (`HHDFS76200200`) 강제 조회.
+- **결과**: RSS 46개 항목(기준 2026-10-21 02:42 KST) 검토. COSM 9개월 잠정 매출 $54.3M(+19%), 2026년 매출 $90M 초과 전망 재확인; SAFX Paramount 시설 인수 계약(종결 전) 및 재가동 ~$30M 투자 계획을 선별. KIS HTTP 200/`rt_cd=0`, COSM 시총 $34,567,779, SAFX $84,679,038. SAFX 1.7B주 발행한도 및 향후 희석 위험을 SEC 근거로 함께 보고.
+- **변경 파일**: `DEVELOPMENT_LOG.md` 조사 기록만 추가; 제품 코드 및 운영 데이터 수정 없음.
+- **검증**: 프로젝트 RSS adapter 원본 GET, 활성 보통주 마스터의 read-only 확인, 프로젝트 KIS price-detail 모듈에서 캐시를 우회한 read-only 강제 시세 조회. SEC EDGAR 공시에서 SAFX 주식 승인·발행주식 수 대조.
+- **커밋·푸시·배포**: 수행하지 않음.
+
 ## [2026-10-20] V157 이후 운영 필수 RSS 컬럼 forward migration 복구
 
 ### 목표
@@ -5986,3 +6184,63 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **보존/남은 위험**: `us-daily-indicators`는 과거 운영 run 2,696회, 관리자 경로 및 실행 route가 남아 있어 삭제하지 않았다. 현재 OCI scheduler 연결 누락과 기본 disabled 상태는 별도 유지보수 항목이다. 옛 localStorage 데이터는 브라우저에 남아 있을 수 있으나 강제 제거하지 않았다. 외부 소비자 및 production effective setting은 확인 불가다.
 - **검증**: `npm.cmd run deploy:verify` 통과. 의존성 audit 0 vulnerabilities, production build, standalone runtime 및 Chrome desktop/mobile browser·API smoke 통과, 290 test files (1,411 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 routes), OCI cron (22 shared endpoints + isolated fundamentals timer) 통과.
 - **커밋·푸시·배포**: `45ad28bd` (확인된 미사용 보조 모듈 제거)를 `origin/oci`에 push했다. Deploy OCI run `39452342209` 성공을 공개 Actions 페이지에서 확인했고, 운영 health는 2026-10-20 15:59:21Z `ok` (319ms)였다.
+## [2026-10-21] 미국 보통주 $1 이하 SEC 전용 리스트 설계
+
+- **목적/범위**: 현재가 $1 이하 미국 보통주 조사 요구에 대해 SEC 공시만을 출처로 하는 문서 관리 설계안을 작성했다. 사용자가 설계 단계라고 명시했으므로 종목별 실데이터 수집이나 제품 기능 구현은 하지 않았다.
+- **확인 대상**: 기존 `docs/operations/us-smallcap-sec-shares.md`, `docs/operations/us-smallcap-shares-public-api.md` 및 SEC 원천·기준일 검증 문서.
+- **결과**: SEC 공시는 실시간 시세 및 최근 30일 일별 고가/저가 데이터 공급원이 아니므로 SEC-only 규칙 아래서 현재가 필터를 확정할 수 없음을 데이터 계약에 반영했다. 발행주수·유효 lock-up·float 정의, 표의 필드, 공시 근거 감사, 보류/미확인 규칙 및 급등주 단타용 SEC 공시 분석 추가항목을 설계했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: 기존 프로젝트 SEC 주식수 정책 문서와 새 설계의 기준일·클래스 합산·미확인 처리 원칙을 대조했다. 테스트/빌드 실행 없음(문서 작업). 제품 코드와 DB 변경 없음.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 미국 보통주 $1 이하 SEC 전용 설계 범위 감사
+
+- **목적/범위**: 기존 설계 문서가 사용자 요구의 실제 목록 부분과 SEC-only 제약을 명확히 표현하는지 현재 프로젝트 자료와 대조했다.
+- **확인 대상**: `docs/operations/us-common-stocks-under-1-sec-design.md`, SEC ticker/company mapping 기반 검토 자료, SEC 발행주식수 운영 문서 및 기존 가격 스냅샷 보고서의 출처 경계.
+- **결과**: SEC ticker 매핑만으로 현재 활성 거래소 보통주 전수 universe를 증명할 수 없고, SEC는 실시간 가격/최근 30일 OHLC 공급원이 아니라는 제한을 문서에 명시했다. 따라서 SEC-only 기준 가격 필터를 검증한 개별 종목은 현재 0개이며, 이를 시장에 해당 종목이 없다는 뜻과 구분했다. 가격 조건이 확인되지 않은 티커를 통과 목록처럼 제시하지 않는 데이터 상태 표를 추가했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: 프로젝트 내 기존 SEC 자료 및 SEC-only 주식수 정책과 설계 규칙을 대조했다. 실제 발행사별 락업 계약 검토와 종목별 가격 검증은 수행하지 않았다. 테스트/빌드 없음(문서 설계 작업); 제품 코드·DB 변경 없음.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 관리자 수동 API 테스트의 누락 route 추가 탐지
+
+- **목적/범위**: 현재 checkout `0e2bb99c`의 관리자 API 테스트 목록과 실제 API route 파일을 대조해 추가 미사용/고아 후보를 조사했다.
+- **확인 결과**: `components/admin-api-tests.tsx`의 미국 뉴스 레이더·티커 뉴스·레이더 처리 이력 3개 항목이 각각 `/api/admin/us-news-radar-test`, `/api/admin/us-news-ticker-test`, `/api/admin/us-news-radar-events`를 호출하지만 현재 해당 route 파일은 없다. UI는 지정 endpoint를 직접 fetch하므로 이 세 관리 테스트는 현재 코드 기준 404가 예상된다. 같은 저장소의 `/api/stock/us/news-radar`, `/api/stock/us/news`는 실제 뉴스 기능 route이나 권한/응답 계약이 다르다고 확인되지 않아 자동 대체 대상으로 취급하지 않았다.
+- **분류**: 기능 미사용 확정이 아니라 관리자 테스트 목록과 backend route 간 stale reference/연결 결함 후보다. 별도 통합 `/api/admin/daily-ma9-test?market=...`와 과거 경로를 비교해 유사 불일치가 있으나 과거 KR/US 경로 파일이 현재도 존재하므로 이번 미사용 후보에 넣지 않았다.
+- **변경 파일**: `docs/operations/unused-feature-candidates-20261020.md`, `DEVELOPMENT_LOG.md`. 코드, DB, 운영 배포 변경 없음.
+- **검증**: tracked source에서 API route 목록과 관리자 `TESTS` endpoint를 대조하고 세 경로의 파일 부재 및 fetch 사용을 확인했다. 조사 범위가 정적 read-only 연결 검사이므로 빌드·테스트·실행은 하지 않았다.
+- **남은 위험/다음 개선**: UI를 통한 실제 404 호출은 실행하지 않았다. 해당 항목은 관리자 수동 기능이므로 실사용 여부 및 외부 배포 차이는 저장소만으로 검증되지 않았다. route 복구 또는 테스트 항목 비활성/제거는 사용자 요구 범위를 넘으므로 수행하지 않았다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 삭제된 미국 뉴스 관리자 API 테스트의 잔존 참조 정리
+
+- **목적/범위**: 추가 미사용 코드 조사에서 확인한 관리자 API 테스트 UI의 제거된 endpoint 참조를 정리했다.
+- **근본 원인/증거**: commit `764c7615`에서 `/api/admin/us-news-radar-test`, `/api/admin/us-news-ticker-test`, `/api/admin/us-news-radar-events` route가 삭제됐지만 `components/admin-api-tests.tsx`에 세 테스트 항목과 레이더 결과 렌더 분기가 남았다. 테스트 실행 시 stale endpoint를 직접 호출하는 상태였다.
+- **변경 파일**: `components/admin-api-tests.tsx`에서 세 오래된 항목과 전용 렌더 분기를 제거했다. `components/admin-api-tests.test.tsx`에 제거된 기능 항목이 UI에 다시 노출되지 않는 회귀 검사를 추가했다. `docs/operations/unused-feature-candidates-20261020.md` 및 본 로그에 조사·정리 근거를 기록했다.
+- **검증**: 관리자 API 테스트 컴포넌트 Vitest 실행, typecheck, production build를 수행한다. 제품 실행 smoke는 빌드 후 확인한다.
+- **남은 위험/다음 개선**: `/api/stock/us/news-radar` 및 `/api/stock/us/news`는 별도의 실제 뉴스 기능 route이며 보존했다. 과거 관리자 UI 항목은 해당 사용자 확인 기능이 route 삭제와 함께 의도적으로 종료됐다는 commit 이력에 근거해 제거했다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 미사용 테스트 코드 재탐색
+
+- **목적/범위**: Vitest 대상 테스트 중 제품 코드나 검증 대상과의 연결이 끊긴 테스트가 남아 있는지 조사하고, 안전성이 확인되는 항목만 제거한다.
+- **확인 대상**: `vitest.config.ts` 기준 테스트 파일 290개, 테스트 파일과 같은 이름의 제품 파일이 없는 항목, 기존 `docs/operations/unused-feature-candidates-20261020.md`의 고아 모듈 조사 결과.
+- **조사 결과**: 동일 이름 제품 파일이 없는 테스트 9개를 개별 확인했다. 이들은 경로 테스트(문의 상세/댓글 API), 여러 모듈을 묶는 SEC Company Facts 및 SEC AI pipeline 테스트, 공유 API 오류 경계 감사, 리뷰 fixture 데이터 검증, DB 통합 테스트, health query resilience/concurrency 테스트이며 각각 현재 라우트·모듈·fixture·DB 계약을 검사한다. 이름이 일치하지 않는다는 이유만으로 삭제하지 않았다. `components/admin-api-tests.test.tsx`도 `/admin/api-tests`의 실제 관리자 화면을 검증한다. 기존 조사에서 고아로 확인된 `keywords`, `sentiment`, `sectors`, `market-rss-discord-message` 전용 테스트는 현재 트리에 이미 없고, `stock-alerts`에는 애초 별도 테스트가 없었다.
+- **변경 파일**: `DEVELOPMENT_LOG.md` 작업 기록 추가. 이번 재조사에서 테스트 코드 삭제 없음.
+- **검증**: Vitest 설정의 현재 테스트 파일 수(290)와 관련 소스·라우트·fixture·호출 경로를 정적 검색했다. 테스트/빌드/실행은 수행하지 않았다. 작업 트리에 이미 존재한 다른 수정은 보존했다.
+- **남은 위험/다음 개선**: 정적 저장소 참조로는 외부에서 직접 호출하는 경로를 완전히 배제할 수 없다. 추가 삭제는 구체적인 고아 증거가 확인될 때만 진행한다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+- **실제 검증 결과 보충**: 관리자 API 테스트 컴포넌트 테스트 1파일 5개 통과, `npx.cmd tsc --noEmit --incremental false` 통과, `npm.cmd run build` 통과. 로컬 `next start`에서 `/admin/api-tests` HTTP 200 및 제거된 테스트 라벨 부재, 제거된 `/api/admin/us-news-radar-test` HTTP 404 확인. `/api/health`는 로컬 DB 부재로 `degraded`였으며 기능과 무관한 환경 상태다. Next build가 `tsconfig.json`을 자동 수정했으나 빌드 전 사용자 변경인 `.next-deploy-verify/types` 한 줄만 보존해 자동 변경을 되돌렸다. `git diff --check` 통과. 커밋·푸시·배포는 하지 않았다.
+
+
+
+## [2026-10-21] 미국 보통주 시총 $100M 미만·RVOL 2 이상 후보
+
+- **목적/범위**: 최신 완료 미국 거래일(2026-10-20) 기준으로 시총 $100M 미만 미국 보통주 중 20일 평균 대비 RVOL 2 이상을 읽기 전용으로 선별하고 결과 문서화.
+- **확인/결과**: 프로젝트 정책·관련 저장 스크립트 확인 후 공개 스크리너 및 종목별 종가 페이지, SEC 원문을 대조했다. HOST(30.71×, $79.8M), WORX(9.36×, $328.6K), SPHL(5.88×, $5.5M)을 문서에 수록했다. HUIZ는 ADS라 제외했고, SAFX/HCAI는 최신 데이터 시점 미충족으로 제외했다.
+- **검증 및 한계**: SEC에서 HOST Class A common stock, WORX common stock, SPHL Class A ordinary shares를 확인했다. 공개 unusual-volume 스크리너 기본 기준이 RVOL 3 이상이므로 2.0~2.99 구간을 전수 검색하지 못해 완전한 전체 목록으로 보장할 수 없다. 로컬 `.env.local` PostgreSQL 주소 `localhost:5432` 연결 거부로 프로젝트 DB 대조는 불가했다. 상세 한계/출처는 `docs/operations/us-common-stocks-under-100m-rvol2-20261020.md`에 기록했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-100m-rvol2-20261020.md`, `DEVELOPMENT_LOG.md`.
+- **제품 코드/DB**: 변경 없음. 외부 페이지 GET만 수행.
+- **빌드·테스트·실행**: 조사/보고서 작업으로 미실행.
+- **커밋·푸시·배포**: 수행하지 않음.

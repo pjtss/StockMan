@@ -99,27 +99,6 @@ const TESTS: ApiTestDefinition[] = [
   { key: "us_daily_cache", label: "미국 전체 일봉 데이터 갱신", description: "KIS에서 이전 일봉을 받아 DB에 저장하는 별도 갱신 기능", endpoint: "/api/admin/us-daily-cache-test", query: "" },
   { key: "us_daily_open_cache", label: "미국 당일 시가 DB 갱신", description: "현재 미국 시장일의 캔들만 KIS에서 조회해 DB에 UPSERT", endpoint: "/api/admin/us-daily-open-cache-test", query: "" },
   {
-    key: "us_news_radar",
-    label: "해외 뉴스 속보 레이더",
-    description: "KIS 속보·미국 티커 검증 결과 확인",
-    endpoint: "/api/admin/us-news-radar-test",
-    query: "",
-  },
-  {
-    key: "us_news_ticker",
-    label: "미국 티커 기간별 뉴스",
-    description: "KIS news-title 원본을 티커·오늘/3일/7일/1개월 기준으로 조회",
-    endpoint: "/api/admin/us-news-ticker-test",
-    query: "ticker=AAPL&period=7d",
-  },
-  {
-    key: "us_news_radar_events",
-    label: "해외 뉴스 처리 이력",
-    description: "검증·Discord 전송·실패 상태와 재시도 횟수",
-    endpoint: "/api/admin/us-news-radar-events",
-    query: "",
-  },
-  {
     key: "market_rss",
     label: "시장 RSS 번역 테스트",
     description: "StockTitan RSS 제목만 번역해 확인",
@@ -368,12 +347,6 @@ export function AdminApiTests() {
             <div className={styles.resultHeader}>
               <span>필터링 흐름</span>
               <strong>{String((result.debug as any).sourceCount ?? 0)}개 TOP 100 → price-detail {String((result.debug as any).priceDetailSuccessCount ?? 0)}건 성공 → 최종 {Array.isArray((result as any).filtered) ? (result as any).filtered.length : 0}개</strong>
-            </div>
-          )}
-          {Boolean(activeTest.key === "us_news_radar" && Array.isArray(result.stages)) && (
-            <div className={styles.resultHeader}>
-              <span>처리 단계</span>
-              <strong>{(result.stages as Array<{ name: string; count: number }>).map((stage) => `${stage.name}: ${stage.count}`).join(" → ")}</strong>
             </div>
           )}
           {Boolean(activeTest.key === "market_rss" && result.translationUsage && typeof result.translationUsage === "object") && (() => {
