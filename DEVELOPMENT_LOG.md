@@ -6303,3 +6303,13 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **제품 코드/DB**: 변경 없음. 외부 페이지 GET만 수행.
 - **빌드·테스트·실행**: 조사/보고서 작업으로 미실행.
 - **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 운영 번역 provider 설정 상태 재검증
+
+- **목적/범위**: Azure Translator F0 우선·Google Cloud Translation fallback 구현의 운영 활성화 여부를 확인하기 위해 production 관리자 디버그 API의 `environment` 검사만 인증된 GET으로 조회했다. 자격증명 값은 응답·로그에 출력하지 않았다.
+- **결과**: `/api/admin/debug-suite?checks=environment`에서 `googleTranslationApiKeyConfigured=true`, `azureTranslatorF0Configured=false`, `azureTranslatorRegionConfigured=false`를 확인했다. 따라서 현재 운영은 Google provider를 사용하며 Azure 우선 순서는 Azure F0 설정이 등록될 때까지 실제 활성화되지 않는다.
+- **근본 원인/필요 조치**: 코드 배포만으로 provider credentials가 생기지 않는다. 운영 secret store에 `AZURE_TRANSLATOR_API_KEY`, `AZURE_TRANSLATOR_ENDPOINT`, `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0`를 설정하고 해당 Azure 리소스가 실제 F0인지 확인해야 한다. 리소스가 region 헤더를 요구하는 경우에만 `AZURE_TRANSLATOR_REGION`도 설정한다. 설정 후 environment debug와 실제 번역 요청으로 Azure primary 및 Google fallback을 검증해야 한다.
+- **변경/데이터 영향**: 운영 디버그 API read-only 조회만 수행. 코드, 설정, DB, 번역 데이터 변경 없음.
+- **검증**: 운영 디버그 응답 `ok=true`; Google/Azure 구성 여부 세 필드만 확인. Production health는 `status=ok`. Azure 실호출은 설정이 없어 미수행이다.
+- **추가 환경 확인**: 로컬 `.env.local`에서도 Azure key, endpoint, region, F0 확인값이 모두 누락되어 있음을 값 비노출 방식으로 확인했다. OCI 운영 설정 위치와 재시작 절차는 `deploy/oci/README.md`의 환경 설정 안내를 기준으로 하며, 이 저장소의 배포 workflow에는 Azure secret 주입 단계가 없다.
+- **커밋·푸시·배포**: 이번 점검은 제품 변경이나 새 배포를 만들지 않았다. 번역 provider 구현은 commit `97fefb7f`에 이미 반영·배포되어 있다.
