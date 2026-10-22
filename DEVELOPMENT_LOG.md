@@ -6313,3 +6313,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **검증**: 운영 디버그 응답 `ok=true`; Google/Azure 구성 여부 세 필드만 확인. Production health는 `status=ok`. Azure 실호출은 설정이 없어 미수행이다.
 - **추가 환경 확인**: 로컬 `.env.local`에서도 Azure key, endpoint, region, F0 확인값이 모두 누락되어 있음을 값 비노출 방식으로 확인했다. OCI 운영 설정 위치와 재시작 절차는 `deploy/oci/README.md`의 환경 설정 안내를 기준으로 하며, 이 저장소의 배포 workflow에는 Azure secret 주입 단계가 없다.
 - **커밋·푸시·배포**: 이번 점검은 제품 변경이나 새 배포를 만들지 않았다. 번역 provider 구현은 commit `97fefb7f`에 이미 반영·배포되어 있다.
+- **2026-10-22 운영 검증 후속**: Azure F0 설정이 운영 디버그에서 활성화된 뒤 실제 100개 StockTitan 제목 preview를 시험했으나 모두 `translation_api_error`로 원문 유지, provider 호출량 0으로 관측됐다. DB schema/Flyway 159 및 번역 캐시/원장 테이블은 존재하고 Google 원장 사용량은 월 앱 상한에 근접해 있었다. 기존 test route는 개별 실패 단계를 숨겼다. 관리자 PREVIEW에 `limit=1` 및 자격증명 마스킹을 적용한 stage/provider/error 진단을 추가하고, FETCH_ONLY가 quota 추적 client를 실제 번역 함수에 전달하도록 수정했다. 관련 route 및 batch 테스트, 전체 배포 검증으로 확인한 뒤 운영 단일 항목 preview로 구체 실패 원인을 판별한다.

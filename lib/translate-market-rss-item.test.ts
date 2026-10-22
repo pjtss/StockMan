@@ -855,10 +855,12 @@ describe("market RSS translation", () => {
       if (text.includes("Title one")) throw new Error("provider unavailable");
       return { translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}제목 번역 완료${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}Long summary 번역</p></div>`, source: "en" as const, target: "ko" as const, provider: "test", fallback: false };
     });
+    const onItemError = vi.fn();
 
-    const results = await translateMarketRssItems([item("1"), item("2")], client(translate));
+    const results = await translateMarketRssItems([item("1"), item("2")], client(translate), onItemError);
 
     expect(results[0]).toMatchObject({ translatedTitle: "Title one", translationFallback: true, translationFallbackReason: "translation_api_error" });
     expect(results[1]).toMatchObject({ translatedTitle: "제목 번역 완료", translationFallback: false });
+    expect(onItemError).toHaveBeenCalledWith(item("1"), expect.any(Error));
   });
 });

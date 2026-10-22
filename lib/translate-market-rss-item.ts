@@ -9,6 +9,7 @@ import { mapWithConcurrency } from "./map-with-concurrency";
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
+export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
 export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false): Promise<TranslatedMarketRssItem> {
   const protectedHeadline = prepareMarketRssTranslationInput(item.title);
   const preparedInput = protectedHeadline;
@@ -120,13 +121,14 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   return { ...item, translatedTitle: translatedHeadline, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason, requestOrigin: title.requestOrigin, translationProvider: title.provider, translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0 };
 }
 
-export async function translateMarketRssItems(items: MarketRssItem[], client?: TranslationClient) {
+export async function translateMarketRssItems(items: MarketRssItem[], client?: TranslationClient, onItemError?: MarketRssTranslationItemErrorHandler) {
   // 외부 번역 API의 과부하를 막기 위해 동시성을 제한하되, 항목별 네트워크
   // 대기시간이 전체 배치에 직렬로 누적되지 않도록 bounded worker를 사용한다.
   return mapWithConcurrency(items, MARKET_RSS_TRANSLATION_CONCURRENCY, async (item) => {
     try {
       return await translateMarketRssItem(item, client);
-    } catch {
+    } catch (error) {
+      onItemError?.(item, error);
       return {
         ...item,
         translatedTitle: item.title,

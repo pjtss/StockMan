@@ -41,6 +41,10 @@ Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제
 - 캐시 키는 원문 hash + 대상 언어 + provider로 구분해 Azure/Google 번역 품질 결과를 혼합하지 않는다.
 - 기존 월 원장은 `google-cloud-translation`으로 유지한다. V159에서 provider 복합키와 rolling reservation 테이블을 추가한다.
 
+## 운영 번역 검증
+
+관리자 전용 `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true&mode=PREVIEW`는 실제 RSS 제목 번역을 시험한다. `limit=1`을 지정하면 첫 항목만 처리해 provider 호출과 무료량 사용을 최소화한다. `diagnostics=true`는 이 PREVIEW 경로에서만 허용되며 항목 ID, 실패 단계, provider, 마스킹된 오류 요약을 반환한다. 번역 key·endpoint 값은 응답하지 않는다. `FETCH_ONLY`도 추적용 quota-aware client를 실제 번역 함수에 전달해 provider 호출량 통계가 실제 요청과 일치해야 한다.
+
 ## 검증·디버깅
 
 - `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true`는 실제 provider 요청을 할 수 있지만 운영 quota 원장을 똑같이 적용한다.
