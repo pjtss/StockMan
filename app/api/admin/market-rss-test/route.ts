@@ -47,7 +47,11 @@ export async function GET(request: Request) {
       const operationError = error instanceof TranslationClientOperationError ? error : null;
       translationDiagnostics.push({ itemId: item.id, stage: operationError?.stage ?? "unknown", provider: operationError?.provider ?? null, message: sanitizeMarketRssTranslationError(error) });
     } : undefined;
-    const [preview] = await previewMarketRssResults([{ source, ok: true, feed: limitedFeed }], translate, translationClient, onItemError);
+    const onProviderFallback = includeDiagnostics ? (item: { id: string }, result: { provider: string; providerFallbackError?: string }) => {
+      if (!result.providerFallbackError) return;
+      translationDiagnostics.push({ itemId: item.id, stage: "provider_fallback", provider: result.provider, message: sanitizeMarketRssTranslationError(result.providerFallbackError) });
+    } : undefined;
+    const [preview] = await previewMarketRssResults([{ source, ok: true, feed: limitedFeed }], translate, translationClient, onItemError, onProviderFallback);
     return NextResponse.json({ ...preview, fetchedAt: new Date().toISOString(), mode, translate, translationConfiguration, ...(tracked ? { translationUsage: tracked.getMetrics() } : {}), ...(includeDiagnostics ? { translationDiagnostics } : {}) });
   } catch (error) {
     const diagnostics = describeError(error);

@@ -51,6 +51,7 @@ Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제
 - `/health-check` 및 관리자 debug suite는 Azure F0/Google 구성 여부와 선택 순서만 반환하며 key/endpoint 값은 노출하지 않는다.
 - 회귀 테스트는 Azure primary, F0 확인 없는 fail-closed, Google fallback, provider별 quota, retry 별도 예약, 제목 외 필드 미전송, API key 헤더를 검증한다.
 - quota 예약 SQL은 provider/월/요청 문자 수/상한 매개변수 타입을 각각 `text`/`bigint`로 명시하고 upsert 증가량은 `EXCLUDED.reserved_characters`를 사용한다. PostgreSQL 매개변수 타입 추론 충돌은 provider API를 호출하기 전에 `quota_reservation` 단계에서 실패하므로, 예약 성공 회귀 테스트와 단일 항목 운영 PREVIEW로 확인한다.
+- Azure primary 요청 자체가 실패하고 Google fallback도 quota로 차단되면, 관리자 `diagnostics=true` 응답에 `provider_fallback` 단계와 Azure의 마스킹된 오류 원인을 포함한다. 이 내부 진단은 public article DTO/DB에 복사하지 않으며, 영어 `API key`와 구분자 변형도 값 마스킹 테스트에 포함한다.
 - DB 원장은 외부에서 같은 Azure/Google 계정을 공유하는 사용량을 추적할 수 없으므로 프로젝트/resource 분리와 provider portal 사용량 확인은 운영 책임이다.
 
 ## 공식 문서

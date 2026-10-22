@@ -41,6 +41,7 @@ export function createMarketRssTranslationClient(options: { deferCacheWriteUntil
           ...result,
           ...(azureAttempts ? { provider: AZURE_TRANSLATION_PROVIDER, providerAttemptCount: azureAttempts, requestOrigin: "PROVIDER" as const } : {}),
           fallbackReason: result.fallbackReason ?? "all_translation_provider_quotas_reached",
+          ...(azureFailure ? { providerFallbackError: azureFailure instanceof Error ? azureFailure.message : String(azureFailure) } : {}),
         };
         return result;
       }

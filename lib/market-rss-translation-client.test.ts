@@ -35,6 +35,27 @@ describe("market RSS translation provider order", () => {
     expect(fetchMock.mock.calls[1][1].headers).toMatchObject({ "x-goog-api-key": "google-key" });
   });
 
+  it("preserves the Azure failure reason for admin diagnostics when Google quota blocks fallback", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_API_KEY", "azure-key"); vi.stubEnv("AZURE_TRANSLATOR_ENDPOINT", "https://azure.test"); vi.stubEnv("AZURE_TRANSLATOR_FREE_TIER_CONFIRMED", "F0");
+    vi.stubEnv("GOOGLE_TRANSLATION_API_KEY", "google-key");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "401000", message: "Invalid subscription key" } }), { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const quota = deps();
+    quota.reserve.mockImplementation(async (_count: number, _month: string, _limit: number, provider: string) => provider === "google-cloud-translation"
+      ? { allowed: false, used: 300_000, limitReached: true, reason: "monthly_character_limit_reached" }
+      : { allowed: true, used: 8, limitReached: false });
+
+    const result = await createMarketRssTranslationClient({}, undefined, quota).client!.translate("Headline");
+
+    expect(result).toMatchObject({
+      fallback: true,
+      fallbackReason: "monthly_character_limit_reached",
+      provider: "azure-translator",
+      providerFallbackError: "Azure Translator HTTP 401 (401000 Invalid subscription key)",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("keeps Google as fallback-only when Azure F0 confirmation is absent", async () => {
     vi.stubEnv("AZURE_TRANSLATOR_API_KEY", "azure-key"); vi.stubEnv("AZURE_TRANSLATOR_ENDPOINT", "https://azure.test"); vi.stubEnv("AZURE_TRANSLATOR_FREE_TIER_CONFIRMED", "S1");
     vi.stubEnv("GOOGLE_TRANSLATION_API_KEY", "google-key");

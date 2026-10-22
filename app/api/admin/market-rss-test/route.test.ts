@@ -62,19 +62,24 @@ describe("market RSS translation test API scope", () => {
   });
 
   it("limits translated preview items and enables diagnostics only for a bounded preview", async () => {
-    state.previewMarketRssResults.mockImplementation(async (results: Array<{ feed: typeof feed }>, translate: boolean, client: unknown, onItemError?: (item: typeof feed.items[number], error: unknown) => void) => {
+    state.previewMarketRssResults.mockImplementation(async (results: Array<{ feed: typeof feed }>, translate: boolean, client: unknown, onItemError?: (item: typeof feed.items[number], error: unknown) => void, onProviderFallback?: (item: typeof feed.items[number], result: { provider: string; providerFallbackError?: string }) => void) => {
       expect(results[0].feed.items).toHaveLength(1);
       expect(translate).toBe(true);
       expect(client).toBe(state.translationClient);
       expect(onItemError).toBeTypeOf("function");
+      expect(onProviderFallback).toBeTypeOf("function");
       onItemError?.(feed.items[0], new TranslationClientOperationError("provider_request", new Error("api_key=should-not-leak"), undefined, "azure-translator", 1));
+      onProviderFallback?.(feed.items[0], { provider: "azure-translator", providerFallbackError: "Azure API key=should-not-leak was rejected" });
       return [{ source: "STOCKTITAN", ok: true, feed: { ...feed, items: [] } }];
     });
     const response = await GET(new Request("http://localhost/api/admin/market-rss-test?source=STOCKTITAN&translate=true&mode=PREVIEW&limit=1&diagnostics=true"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.translationDiagnostics).toMatchObject([{ itemId: "1", stage: "provider_request", provider: "azure-translator" }]);
+    expect(body.translationDiagnostics).toMatchObject([
+      { itemId: "1", stage: "provider_request", provider: "azure-translator" },
+      { itemId: "1", stage: "provider_fallback", provider: "azure-translator" },
+    ]);
     expect(JSON.stringify(body.translationDiagnostics)).not.toContain("should-not-leak");
     expect(state.previewMarketRssResults).toHaveBeenCalledOnce();
   });

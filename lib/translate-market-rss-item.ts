@@ -1,5 +1,5 @@
 import type { MarketRssItem } from "./market-rss";
-import type { TranslationClient } from "./translation-types";
+import type { TranslationClient, TranslationResult } from "./translation-types";
 import { restoreMarketRssTranslationTokens } from "./market-rss-translation-protection";
 import { extractMarketRssTranslatedHeadline, prepareMarketRssTranslationInput } from "./market-rss-translation-input";
 import { isMarketRssTranslationHeadlineComplete, isMarketRssTranslationKoreanEnough } from "./market-rss-translation-quality";
@@ -10,7 +10,8 @@ export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
 export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
-export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false): Promise<TranslatedMarketRssItem> {
+export type MarketRssTranslationFallbackHandler = (item: MarketRssItem, result: TranslationResult) => void;
+export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false, onProviderFallback?: MarketRssTranslationFallbackHandler): Promise<TranslatedMarketRssItem> {
   const protectedHeadline = prepareMarketRssTranslationInput(item.title);
   const preparedInput = protectedHeadline;
   const translatableText = protectedHeadline.text.replace(/ZX\d+Q/g, "");
@@ -59,6 +60,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   // reason when no provider translation was attempted. Do not reinterpret
   // that intentional fallback as a missing Korean provider response.
   if (title.fallback) {
+    if (title.providerFallbackError) onProviderFallback?.(item, title);
     return {
       ...item,
       translatedTitle: item.title,
@@ -121,12 +123,12 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   return { ...item, translatedTitle: translatedHeadline, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason, requestOrigin: title.requestOrigin, translationProvider: title.provider, translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0 };
 }
 
-export async function translateMarketRssItems(items: MarketRssItem[], client?: TranslationClient, onItemError?: MarketRssTranslationItemErrorHandler) {
+export async function translateMarketRssItems(items: MarketRssItem[], client?: TranslationClient, onItemError?: MarketRssTranslationItemErrorHandler, onProviderFallback?: MarketRssTranslationFallbackHandler) {
   // 외부 번역 API의 과부하를 막기 위해 동시성을 제한하되, 항목별 네트워크
   // 대기시간이 전체 배치에 직렬로 누적되지 않도록 bounded worker를 사용한다.
   return mapWithConcurrency(items, MARKET_RSS_TRANSLATION_CONCURRENCY, async (item) => {
     try {
-      return await translateMarketRssItem(item, client);
+      return await translateMarketRssItem(item, client, false, onProviderFallback);
     } catch (error) {
       onItemError?.(item, error);
       return {

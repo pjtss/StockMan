@@ -99,7 +99,7 @@ export function sanitizeMarketRssTranslationError(error: unknown) {
       }
     })
     .replace(/(\bauthorization\s*[:=]\s*)(?:bearer\s+)?("[^"]*"|'[^']*'|[^\s,;)}]+)/gi, "$1[redacted]")
-    .replace(/((?:api[_-]?key|access[_-]?token|token|secret|password|passwd|pwd)\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;)}]+)/gi, "$1[redacted]")
+    .replace(/((?:api[\s_-]?key|access[_-]?token|token|secret|password|passwd|pwd)\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;)}]+)/gi, "$1[redacted]")
     .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
     .replace(/[\u0000-\u001f\u007f]+/g, " ")
     .replace(/\s+/g, " ")

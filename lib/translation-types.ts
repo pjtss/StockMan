@@ -9,6 +9,8 @@ export type TranslationResult = {
   provider: string;
   fallback: boolean;
   fallbackReason?: string;
+  /** Internal admin-preview diagnostic; do not copy into public article fields. */
+  providerFallbackError?: string;
   requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK";
   providerAttemptCount?: number;
 };
