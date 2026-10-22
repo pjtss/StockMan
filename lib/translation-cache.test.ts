@@ -70,7 +70,34 @@ describe("translation cache", () => {
       limitReached: true,
       reason: "monthly_character_limit_reached",
     });
-    expect(dbMocks.clientQuery.mock.calls[4][0]).toContain("SELECT $1,$2,$3,NOW() WHERE $3 <= $4");
+    expect(dbMocks.clientQuery.mock.calls[4][0]).toContain("SELECT $1::text AS provider,$2::text AS usage_month,$3::bigint AS character_count,$4::bigint AS quota_limit");
+    expect(dbMocks.clientQuery.mock.calls[4][0]).toContain("EXCLUDED.reserved_characters <= (SELECT quota_limit FROM request)");
+  });
+
+  it("reserves provider quota using explicitly typed PostgreSQL parameters", async () => {
+    dbMocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ used: "0" }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ reserved: 120 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(reserveTranslationCharacters(120, "2026-10", 1_800_000, "azure-translator", 1_800_000)).resolves.toEqual({
+      allowed: true,
+      used: 120,
+      limitReached: false,
+    });
+    const reservationQuery = dbMocks.clientQuery.mock.calls[4];
+    expect(reservationQuery[0]).toContain("$3::bigint AS character_count");
+    expect(reservationQuery[0]).toContain("$4::bigint AS quota_limit");
+    expect(reservationQuery[1]).toEqual(["azure-translator", "2026-10", 120, 1_800_000]);
+    expect(dbMocks.clientQuery).toHaveBeenNthCalledWith(6,
+      "INSERT INTO translation_usage_reservations(provider,character_count) VALUES ($1,$2)",
+      ["azure-translator", 120],
+    );
+    expect(dbMocks.release).toHaveBeenCalledOnce();
   });
 
   it("treats a missing monthly reservation row as a failed release instead of silent success", async () => {

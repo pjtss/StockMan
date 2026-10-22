@@ -40,7 +40,7 @@ export async function reserveTranslationCharacters(characterCount: number, month
       await client.query("COMMIT");
       return { allowed: false, used: hourlyUsed, limitReached: true, reason: "hourly_character_limit_reached" as const };
     }
-    const result = await client.query<{ reserved: number }>("INSERT INTO translation_usage_monthly (provider,usage_month,reserved_characters,updated_at) SELECT $1,$2,$3,NOW() WHERE $3 <= $4 ON CONFLICT (provider,usage_month) DO UPDATE SET reserved_characters=translation_usage_monthly.reserved_characters+$3,updated_at=NOW() WHERE translation_usage_monthly.reserved_characters+$3 <= $4 RETURNING reserved_characters AS reserved", [provider, month, characterCount, limit]);
+    const result = await client.query<{ reserved: number }>("WITH request AS (SELECT $1::text AS provider,$2::text AS usage_month,$3::bigint AS character_count,$4::bigint AS quota_limit) INSERT INTO translation_usage_monthly (provider,usage_month,reserved_characters,updated_at) SELECT provider,usage_month,character_count,NOW() FROM request WHERE character_count <= quota_limit ON CONFLICT (provider,usage_month) DO UPDATE SET reserved_characters=translation_usage_monthly.reserved_characters+EXCLUDED.reserved_characters,updated_at=NOW() WHERE translation_usage_monthly.reserved_characters+EXCLUDED.reserved_characters <= (SELECT quota_limit FROM request) RETURNING reserved_characters AS reserved", [provider, month, characterCount, limit]);
     const allowed = result.rowCount === 1;
     if (allowed) {
       // Keep the provider advisory transaction lock until both monthly and rolling-hour

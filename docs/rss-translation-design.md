@@ -50,6 +50,7 @@ Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제
 - `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true`는 실제 provider 요청을 할 수 있지만 운영 quota 원장을 똑같이 적용한다.
 - `/health-check` 및 관리자 debug suite는 Azure F0/Google 구성 여부와 선택 순서만 반환하며 key/endpoint 값은 노출하지 않는다.
 - 회귀 테스트는 Azure primary, F0 확인 없는 fail-closed, Google fallback, provider별 quota, retry 별도 예약, 제목 외 필드 미전송, API key 헤더를 검증한다.
+- quota 예약 SQL은 provider/월/요청 문자 수/상한 매개변수 타입을 각각 `text`/`bigint`로 명시하고 upsert 증가량은 `EXCLUDED.reserved_characters`를 사용한다. PostgreSQL 매개변수 타입 추론 충돌은 provider API를 호출하기 전에 `quota_reservation` 단계에서 실패하므로, 예약 성공 회귀 테스트와 단일 항목 운영 PREVIEW로 확인한다.
 - DB 원장은 외부에서 같은 Azure/Google 계정을 공유하는 사용량을 추적할 수 없으므로 프로젝트/resource 분리와 provider portal 사용량 확인은 운영 책임이다.
 
 ## 공식 문서

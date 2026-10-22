@@ -14,6 +14,7 @@
 - [ ] DB 스키마 변경이 있으면 기존 운영 버전과 충돌하지 않는 새 버전을 사용한다.
 - [ ] 운영 Flyway 버전보다 낮은 migration에만 있는 필수 테이블/컬럼은 현재 운영 floor 이후의 forward repair migration으로 다시 보장한다. `npm run docs:check`가 운영 floor 기반 컬럼 회귀를 검사한다.
 - [ ] 변경 기능에 회귀 테스트가 있는지 확인한다.
+- [ ] 번역 quota 예약 SQL은 매개변수 타입을 명시하고 `translation-cache.test.ts`의 예약 성공 회귀 테스트를 통과한다.
 
 ## 자동 게이트
 
