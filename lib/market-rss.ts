@@ -1,4 +1,4 @@
-import { XMLParser } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { decodeXML } from "entities";
 
 export type MarketRssItem = { id: string; title: string; link: string; summary: string; content?: string; publishedAt: string | null; source: string; raw?: unknown };
@@ -22,9 +22,19 @@ const text = (value: unknown) => typeof value === "string"
 const array = <T>(value: T | T[] | undefined) => value == null ? [] : Array.isArray(value) ? value : [value];
 
 export function parseMarketRss(xml: string, source: string, url: string): MarketRssFeed {
+  const validation = XMLValidator.validate(xml);
+  if (validation !== true) {
+    throw new Error(`${source} RSS 응답이 올바른 XML이 아닙니다.`);
+  }
   const root = parser.parse(xml) as Record<string, unknown>;
   const channel = (root.rss as Record<string, unknown> | undefined)?.channel as Record<string, unknown> | undefined;
   const atom = root.feed as Record<string, unknown> | undefined;
+  if (!channel && !atom) {
+    throw new Error(`${source} 응답이 RSS 또는 Atom feed가 아닙니다.`);
+  }
+  if (root.rss && !channel) {
+    throw new Error(`${source} RSS 응답에 channel이 없습니다.`);
+  }
   const entries = channel ? array(channel.item) : array(atom?.entry);
   const items = entries.flatMap((raw, index) => {
     if (!raw || typeof raw !== "object") return [];

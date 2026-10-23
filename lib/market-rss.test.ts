@@ -7,6 +7,26 @@ describe("market RSS", () => {
     expect(parseMarketRss(`<feed><entry><id>b</id><title>Beta</title><link href="https://example.com/b"/><updated>2026-01-02T00:00:00Z</updated></entry></feed>`, "TEST", "https://example.com").items[0]).toMatchObject({ id: "b", title: "Beta", link: "https://example.com/b" });
   });
 
+  it("rejects HTML and malformed XML instead of treating them as a successful empty feed", () => {
+    expect(() => parseMarketRss("<html><body>GlobeNewswire</body></html>", "GLOBENEWSWIRE", "https://example.com"))
+      .toThrow(/RSS 또는 Atom feed가 아닙니다/);
+    expect(() => parseMarketRss("<rss><channel>", "TEST", "https://example.com"))
+      .toThrow(/올바른 XML이 아닙니다/);
+  });
+
+  it("rejects an HTTP 200 HTML response from a feed endpoint", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html><body>site</body></html>", {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    })));
+    try {
+      await expect(fetchMarketRss("GLOBENEWSWIRE", "https://example.com"))
+        .rejects.toThrow(/RSS 또는 Atom feed가 아닙니다/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("decodes only XML-standard references in extracted headline, context, ID, and link while preserving raw payload text", () => {
     const xml = '<rss><channel><item><guid>AT&amp;T&#x2D;Q3</guid><title>AT&amp;T&#160;Q3 &amp; outlook</title><link>https://example.com/story?a=1&amp;b=2</link><description><![CDATA[Revenue &amp; outlook]]></description></item></channel></rss>';
     const parsed = parseMarketRss(xml, "TEST", "https://example.com/feed");
