@@ -1,6 +1,12 @@
 import type { TranslationClient, TranslationFormat, TranslationLanguage, TranslationRequestOptions, TranslationResult, TranslationSourceLanguage } from "./translation-types";
 
-type AzureError = Error & { status?: number; retryAfter?: string | null; providerReason?: string };
+type AzureError = Error & {
+  status?: number;
+  retryAfter?: string | null;
+  providerReason?: string;
+  providerCode?: string | null;
+  requestId?: string | null;
+};
 const PROVIDER = "azure-translator";
 
 export function getAzureTranslatorEndpointDiagnostics(endpoint = process.env.AZURE_TRANSLATOR_ENDPOINT?.trim() || "") {
@@ -61,8 +67,20 @@ export class AzureTranslationClient implements TranslationClient {
         });
         if (!response.ok) {
           let providerReason = "";
-          try { const body = await response.json() as { error?: { code?: string; message?: string } }; providerReason = `${body.error?.code ?? ""} ${body.error?.message ?? ""}`.trim(); } catch { /* diagnostic body is optional */ }
-          const error = Object.assign(new Error(`Azure Translator HTTP ${response.status}${providerReason ? ` (${providerReason})` : ""}`), { status: response.status, retryAfter: response.headers.get("retry-after"), providerReason }) as AzureError;
+          let providerCode: string | null = null;
+          try {
+            const body = await response.json() as { error?: { code?: string | number; message?: string } };
+            providerCode = body.error?.code == null ? null : String(body.error.code).slice(0, 80);
+            providerReason = `${providerCode ?? ""} ${body.error?.message ?? ""}`.trim();
+          } catch { /* diagnostic body is optional */ }
+          const requestId = response.headers.get("x-requestid") || response.headers.get("x-ms-request-id") || response.headers.get("x-correlation-id");
+          const error = Object.assign(new Error(`Azure Translator HTTP ${response.status}${providerReason ? ` (${providerReason})` : ""}`), {
+            status: response.status,
+            retryAfter: response.headers.get("retry-after"),
+            providerReason,
+            providerCode,
+            requestId: requestId && /^[\w.:-]{1,128}$/.test(requestId) ? requestId : null,
+          }) as AzureError;
           if ((response.status !== 429 && response.status < 500) || attempt === attempts) throw error;
           await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt, error.retryAfter ?? null)));
           continue;

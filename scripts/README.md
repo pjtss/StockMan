@@ -1,5 +1,7 @@
 # 운영·개발 스크립트
 
+- 관리자 화면 `/admin/modules/instrument-universe`에서 **전체 국내 보통주 표준산업분류 코드 갱신**을 제공한다. 운영 API가 관리하는 활성 `COMMON_STOCK` 목록을 기준으로 KIS 주식기본조회(`CTPF1002R`, `/uapi/domestic-stock/v1/quotations/search-stock-info`)를 종목별 호출하고 `std_idst_clsf_cd`/`std_idst_clsf_cd_name`을 10종목 단위 트랜잭션으로 저장한다. 전체 대상 수 변경, KIS 응답 오류, 코드/표준코드 검증 실패 시 해당 묶음은 저장하지 않는다. 관리자 세션이 필요한 POST API이며 GET 진행상태 API는 관리자 세션 또는 `DAILY_CACHE_READ_API_KEY`를 사용한다.
+
 - `local-rss-bullish-report.mjs`: `--prepare`는 운영 RSS API를 GET해 임시 JSON을 만든다. Codex가 `--input <JSON> --batch-offset <0-based>`로 8개씩 읽어 직접 분석하고, `--record-results-base64`로 결과를 임시 JSON에 누적한 뒤 `--analysis <JSON>`로 렌더하면 HTML을 Downloads에 저장한다. POSITIVE이며 명확한 ticker symbol인 카드만 수록한다. API key/외부 LLM 호출은 없다. 기존 HTML은 `--filter-existing-positive-known-ticker --date YYYY-MM-DD`로 로컬 필터링할 수 있다. `npm.cmd run report:rss-bullish -- --help`로 사용법을 확인한다.
 - `local-rss-llm-agent.mjs`: Codex 매분 예약 회차가 `--prepare [limit]`으로 신규 RSS revision을 가져와 직접 분석하고, 구조화 JSON을 PowerShell stdin pipe로 `--save-stdin`에 전달해 운영 DB에 기록한다 (`--save-base64`도 지원). `--deliver`는 승인된 전용 Discord URL로 PENDING만 claim 후 한 번 전달하며 timeout은 자동 재전송하지 않는다. `--status`는 저장된 전송 상태를 조회한다. 서버 V141 migration/API/token과 로컬 token/webhook 설정이 먼저 필요하며 Codex 예약 작업이 모델 분석을 맡는다.
 - `lib/local-rss-watch/feed-source.mjs`: 모듈 1. StockTitan·SEC EDGAR 원본 호스트 제한, HTTPS GET, SEC User-Agent, 응답 타입/크기/timeout 검사, 공통 RSS/Atom 파싱을 맡는다. `feed-source.test.ts`에서 두 포맷과 거절 조건을 고정 검증한다.

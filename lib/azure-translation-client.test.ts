@@ -43,6 +43,17 @@ describe("Azure Translator F0 client", () => {
     expect(beforeRequest).toHaveBeenCalledTimes(2);
   });
 
+  it("preserves safe Azure error code and request ID for diagnostics", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: "401001", message: "Invalid subscription key" } }), {
+      status: 401,
+      headers: { "x-requestid": "request-123", "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(new AzureTranslationClient("secret-key", "https://example.test").translate("Test", "en", "ko"))
+      .rejects.toMatchObject({ status: 401, providerCode: "401001", requestId: "request-123" });
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("secret-key");
+  });
+
   it("rejects inputs above Azure's documented request ceiling before calling fetch", async () => {
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     await expect(new AzureTranslationClient("key", "https://example.test").translate("x".repeat(50_001))).rejects.toThrow("50,000-character");

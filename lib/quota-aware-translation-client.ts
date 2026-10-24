@@ -34,7 +34,63 @@ export type QuotaAwareTranslationMetrics = {
   cacheInvalidations: number;
   cacheInvalidationFailures: number;
   reservationReleaseFailures: number;
+  lastFailure: TranslationProviderFailureDiagnostic | null;
 };
+
+export type TranslationProviderFailureDiagnostic = {
+  provider: string;
+  category: "http" | "timeout" | "network" | "provider_response" | "unknown";
+  httpStatus: number | null;
+  providerCode: string | null;
+  providerMessage: string | null;
+  requestId: string | null;
+  retryAfter: string | null;
+  attempts: number;
+};
+
+function safeProviderMessage(error: unknown) {
+  const value = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (!value) return null;
+  return value
+    .replace(/https?:\/\/[^\s"'<>]+/gi, (rawUrl) => {
+      try {
+        const url = new URL(rawUrl);
+        url.username = "";
+        url.password = "";
+        for (const key of [...url.searchParams.keys()]) if (/key|token|secret|auth|credential|pass|pwd/i.test(key)) url.searchParams.set(key, "[redacted]");
+        return url.toString();
+      } catch { return "[redacted URL]"; }
+    })
+    .replace(/(\bauthorization\s*[:=]\s*)(?:bearer\s+)?("[^"]*"|'[^']*'|[^\s,;)}]+)/gi, "$1[redacted]")
+    .replace(/(ocp-apim-subscription-key\s*[:=]\s*)[^\s,;)}]+/gi, "$1[redacted]")
+    .replace(/((?:api[_-]?key|access[_-]?token|token|secret|password|passwd|pwd)\s*[=:]\s*)\S+/gi, "$1[redacted]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240) || null;
+}
+
+function describeProviderFailure(error: unknown, provider: string, attempts: number): TranslationProviderFailureDiagnostic {
+  const details = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const statusValue = Number(details.status);
+  const httpStatus = Number.isInteger(statusValue) && statusValue >= 100 && statusValue <= 599 ? statusValue : null;
+  const providerCode = typeof details.providerCode === "string" || typeof details.providerCode === "number"
+    ? String(details.providerCode).slice(0, 80)
+    : null;
+  const requestId = typeof details.requestId === "string" && /^[\w.:-]{1,128}$/.test(details.requestId) ? details.requestId : null;
+  const retryAfter = typeof details.retryAfter === "string" && /^\d{1,6}$/.test(details.retryAfter) ? details.retryAfter : null;
+  const name = error instanceof Error ? error.name : "";
+  const code = typeof details.code === "string" ? details.code : "";
+  const category: TranslationProviderFailureDiagnostic["category"] = httpStatus !== null
+    ? "http"
+    : /timeout/i.test(name) || /timeout|timed out|abort/i.test(error instanceof Error ? error.message : "")
+      ? "timeout"
+      : /fetch|network|connect|dns|socket/i.test(code) || /fetch failed|network|connect|dns|socket/i.test(error instanceof Error ? error.message : "")
+        ? "network"
+        : providerCode ? "provider_response" : "unknown";
+  return { provider, category, httpStatus, providerCode, providerMessage: safeProviderMessage(error), requestId, retryAfter, attempts };
+}
 
 export function createQuotaAwareTranslationClient(
   providerClient: TranslationClient,
@@ -66,6 +122,7 @@ export function createQuotaAwareTranslationClient(
     cacheInvalidations: 0,
     cacheInvalidationFailures: 0,
     reservationReleaseFailures: 0,
+    lastFailure: null,
   };
 
   const inFlight = new Map<string, Promise<TranslationResult>>();
@@ -81,7 +138,7 @@ export function createQuotaAwareTranslationClient(
   const cacheProvider = (format: TranslationFormat) => format === "html" ? `${provider}:html` : provider;
   const translateOnce = async (text: string, source: TranslationSourceLanguage, target: TranslationLanguage, format: TranslationFormat, reservationTurn: ReturnType<typeof enqueueReservationTurn>): Promise<TranslationResult> => {
     const resultSource: TranslationLanguage = source === "auto" ? "en" : source;
-    const characterCount = countTranslationCharacters(text);
+    const characterCount = countTranslationCharacters(text, provider);
     let cached: CachedTranslation | null;
     try {
       cached = await dependencies.loadCache(text, cacheProvider(format), target);
@@ -140,6 +197,7 @@ export function createQuotaAwareTranslationClient(
       (result as TranslationResult & { providerAttemptCount?: number }).providerAttemptCount = requestCount;
     } catch (error) {
       metrics.apiFailures++;
+      metrics.lastFailure = describeProviderFailure(error, provider, requestCount);
       if ((error as { code?: string })?.code === "TRANSLATION_QUOTA_EXCEEDED") {
         metrics.quotaFallbacks++;
         return { translatedText: text, source: resultSource, target, provider, fallback: true, fallbackReason: (error as Error).message, requestOrigin: "QUOTA_FALLBACK" };

@@ -44,6 +44,23 @@ describe("quota-aware translation client", () => {
     expect(tracked.getMetrics()).toMatchObject({ quotaFallbacks: 1, apiCalls: 0, reservedCharacters: 0, translatedCharacters: 0 });
   });
 
+  it("retains sanitized provider error diagnostics for the operations summary", async () => {
+    const provider: TranslationClient = {
+      translate: vi.fn(async () => { throw Object.assign(new Error("Azure Translator HTTP 401 (401001 Invalid key) Authorization: Bearer secret-value"), {
+        status: 401, providerCode: "401001", requestId: "azure-request-1", retryAfter: null,
+      }); }),
+    };
+    const tracked = createQuotaAwareTranslationClient(provider, undefined, dependencies(), {}, { provider: "azure-translator", monthlyLimit: 1_800_000, hourlyLimit: 1_800_000 });
+
+    await expect(tracked.client.translate("hello")).rejects.toMatchObject({ stage: "provider_request", provider: "azure-translator" });
+    expect(tracked.getMetrics().lastFailure).toEqual({
+      provider: "azure-translator", category: "http", httpStatus: 401, providerCode: "401001",
+      providerMessage: "Azure Translator HTTP 401 (401001 Invalid key) Authorization: [redacted]",
+      requestId: "azure-request-1", retryAfter: null, attempts: 1,
+    });
+    expect(JSON.stringify(tracked.getMetrics())).not.toContain("secret-value");
+  });
+
   it("records, caches, and accounts successful provider translations", async () => {
     const deps = dependencies();
     const provider = translated("hello");

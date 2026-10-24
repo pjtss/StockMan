@@ -33,3 +33,21 @@ GET /api/debug/market-rss-translations?hours=24&source=ALL&status=ALL&limit=50&o
 - 테스트는 관리자 인증, 기간·페이지·필터 검증, 집계 및 필터 적용, 오류 마스킹, DB 장애 시 비밀정보 비노출을 보장한다.
 - 조회 구간은 기사 생성 시각 기준이다. 오래된 기사의 최근 재번역 시도까지 찾으려면 `hours`를 늘린다.
 - 실행 중인 운영서버의 DB 연결이나 응답은 배포 후 운영 URL에서 직접 호출해 확인해야 한다. 로컬 테스트만으로 운영 DB 상태를 증명하지 않는다.
+
+## Azure Translator 운영 진단 API
+
+기존 cron 진단은 Azure 설정 유무와 호출 횟수만 보여주고 공급자 오류 코드를 보존하지 않아, 키·리소스 인증 실패와 네트워크 오류를 구별할 수 없었다. 다음 API는 관리자 세션 또는 `x-cron-secret`/Bearer cron 인증이 필요하며 환경변수 원문은 응답하지 않는다.
+
+```text
+GET  /api/admin/azure-translator-debug
+POST /api/admin/azure-translator-debug
+```
+
+- `GET`은 Azure/Google 설정 여부, endpoint host/path 형태, 현재 UTC 월의 앱 내부 사용량 및 rolling-hour 예약량을 읽기 전용으로 반환한다. endpoint query는 반환하지 않는다. endpoint path가 이미 `/translate`로 끝나는지도 표시한다.
+- `POST`는 짧고 매번 달라지는 고정 진단 문구 1건을 Azure에 실제 전송한다. Google fallback은 호출하지 않는다. 운영 DB의 quota ledger를 통해 예약·사용량을 기록하고, 입력 문구는 deferred cache로 인해 번역 캐시에 쓰지 않는다. 공급자 quota 및 앱 제한은 우회하지 않는다.
+- 성공은 provider/목표 언어/번역 여부 및 번역 결과를 반환한다. 실패는 단계, HTTP 상태, Azure provider code/message, request ID, retry-after, 재시도 횟수를 반환한다. 키·Authorization·응답 원문 전체는 반환하지 않는다.
+- 관리자 페이지 브라우저 세션이 있으면 `GET` 후 `POST`를 호출한다. cron 인증으로 호출할 때는 secret을 URL이나 콘솔 인수에 넣지 말고 `x-cron-secret` 헤더로 전달한다.
+- `automation_runs.summary.translated.translationUsage.azure.lastFailure`에는 번역 batch에서 마지막 Azure 실패의 안전한 상태/코드/요청 ID가 포함된다. `/api/admin/debug-suite?checks=rss`로 다음 cron 실행 후 확인한다.
+- HTTP 429 `not_sent_due_to_application_quota`는 provider 요청 이전에 앱 quota에서 차단된 것이다. HTTP 502 응답의 `providerFailure`에서 Azure HTTP status/code를 확인한다.
+
+`POST`는 실제 provider 호출이므로 운영 번역 quota를 사용한다. 설정 확인만 필요하면 `GET`만 호출한다. 운영 호출 결과는 배포 후 운영 도메인에서 확인해야 한다.
