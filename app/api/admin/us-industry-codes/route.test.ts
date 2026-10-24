@@ -59,4 +59,24 @@ describe("admin KIS U.S. industry code API", () => {
     expect(response.status).toBe(200);
     expect(mocks.sync).toHaveBeenCalledWith({ NAS: expect.any(Buffer), NYS: expect.any(Buffer), AMS: expect.any(Buffer) });
   });
+
+  it("returns only safe database identifiers when the transactional sync fails", async () => {
+    mocks.admin = true;
+    const error = Object.assign(new Error('column "source_file" does not exist; private connection detail must not be returned'), {
+      code: "42703",
+      column: "source_file",
+      usIndustrySyncStage: "update_NAS",
+    });
+    mocks.sync.mockRejectedValueOnce(error);
+    const entries = ["NASMST.COD", "NYSMST.COD", "AMSMST.COD"].map((name) => [name, { name, size: 4, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }]);
+    const request = {
+      headers: new Headers({ "content-type": "multipart/form-data; boundary=unit-test" }),
+      formData: async () => ({ entries: () => entries[Symbol.iterator]() }),
+    } as unknown as Request;
+    const response = await POST(request);
+    const payload = await response.json();
+    expect(response.status).toBe(500);
+    expect(payload).toMatchObject({ error: "US_INDUSTRY_SYNC_FAILED", diagnostic: { stage: "update_NAS", errorCode: "SCHEMA_COLUMN_MISSING", databaseCode: "42703", column: "source_file" } });
+    expect(JSON.stringify(payload)).not.toContain("private connection detail");
+  });
 });

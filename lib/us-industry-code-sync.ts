@@ -52,11 +52,14 @@ export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
 /** Update only the existing common-stock partition, in one transaction per market. */
 export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffer>>) {
   const prepared = buildKisUsIndustryRows(files);
+  let stage = "database_connect";
   const client = await getPool().connect();
   try {
+    stage = "begin_transaction";
     await client.query("BEGIN");
     const persistedCounts: Record<Market, number> = { NAS: 0, NYS: 0, AMS: 0 };
     for (const market of Object.keys(KIS_US_MASTER_FILES) as Market[]) {
+      stage = `update_${market}`;
       const marketRows = prepared.rows.filter((row) => row.market === market);
       const result = await client.query(
         `UPDATE us_common_stock_universe AS u
@@ -73,6 +76,7 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
       );
       persistedCounts[market] = result.rowCount ?? 0;
     }
+    stage = "verify_database_coverage";
     const coverage = await client.query(`
       SELECT market, COUNT(*)::int AS active_common_count,
         COUNT(*) FILTER (WHERE industry_code ~ '^[0-9]{3}$' AND industry_code <> '000')::int AS classified_count,
@@ -81,11 +85,13 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
       WHERE enabled = TRUE AND instrument_type = 'COMMON_STOCK' AND market IN ('NAS','NYS','AMS')
       GROUP BY market ORDER BY market
     `);
+    stage = "commit_transaction";
     await client.query("COMMIT");
     const unmatchedCounts = Object.fromEntries((Object.keys(KIS_US_MASTER_FILES) as Market[]).map((market) => [market, Math.max(0, prepared.eligibleCounts[market] - persistedCounts[market])])) as Record<Market, number>;
     return { ok: true, source: "KIS_US_MASTER_ICOD", ...prepared, persistedCounts, unmatchedCounts, dbCoverage: coverage.rows };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
+    if (error && typeof error === "object") Object.assign(error, { usIndustrySyncStage: stage });
     throw error;
   } finally {
     client.release();

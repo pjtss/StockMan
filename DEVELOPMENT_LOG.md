@@ -31,9 +31,11 @@
 ### 운영 배포 및 DB 검증 상태 (2026-10-24 continuation)
 - 최신 공식 KIS 마스터 NAS/NYS/AMS를 다시 다운로드하여 파서의 현재 원본 형식 통과를 로컬에서 확인했다. 다운로드 파일은 임시 경로에 두며 저장소에는 추가하지 않았다.
 - 운영 API `GET /api/admin/us-industry-codes`가 404를 반환해 신규 코드가 아직 운영 배포되지 않은 것을 확인했다.
-- GitHub Deploy OCI workflow는 `workflow_dispatch`를 지원하지만 현재 실행환경에는 GitHub CLI, GitHub Actions 연결 도구, GitHub credential이 확인되지 않아 수동 workflow 실행을 시작할 수 없었다. 따라서 운영 관리자 인증과 DB 업로드/coverage 검증은 미실행이며, 운영 DB 저장 완료를 주장하지 않는다.
-- `.env.local`은 해당 운영 배포 권한을 제공하지 않으며, 비밀값을 출력하거나 관리자 API 인증 우회에 사용하지 않았다. 이전 작업의 전체 `deploy:verify` 성공 기록은 로컬 코드 검증 증거일 뿐 운영 DB 반영 증거가 아니다.
-- **다음 조치/완료 기준**: GitHub Actions 실행 권한으로 이 커밋을 운영 배포한 뒤, 관리자 인증 GET에서 NAS/NYS/AMS별 활성 `COMMON_STOCK` 분모 및 ICOD coverage를 기록하고, 동일한 세 KIS 원본을 API로 업로드한다. 응답의 persisted/unmatched/unclassified 수를 저장 후 GET coverage와 대조해야 완료로 판정한다. KIS가 `000`을 제공한 종목은 공식 원천상 미분류로 보고 임의 코드를 채우지 않는다.
+- **초기 차단과 해소**: 처음에는 CLI/Actions 도구를 찾지 못해 멈췄지만, 뒤이어 Git credential manager가 푸시 인증을 제공함을 확인하고 같은 인증을 메모리에서만 사용해 `workflow_dispatch`를 실행했다. 코드 commit `3942ffd3`의 Deploy OCI run `40085691588`은 전체 성공했다. 자격증명 문자열은 출력하지 않았다.
+- `.env.local`의 관리자 암호로 운영 관리자 로그인은 성공했다. 로컬 DB 주소 연결은 운영 DB 증거가 아니므로 사용하지 않았다. 전체 로컬 `deploy:verify`도 별도로 수행했으며 이는 운영 DB 반영 증거와 구분한다.
+- **완료 기준**: 관리자 인증 GET에서 NAS/NYS/AMS별 활성 `COMMON_STOCK` 분모 및 ICOD coverage를 확인하고, 세 KIS 원본 업로드의 persisted/unmatched/unclassified 수를 저장 후 GET 결과와 대조한다. KIS가 `000`을 제공한 종목은 공식 원천상 미분류로 보고 임의 코드를 채우지 않는다.
+- **운영 후속 검증**: Deploy OCI Actions run `40085691588`이 성공했고 새 운영 route가 401(미인증), 200(관리자 인증)으로 응답했다. 운영 DB 기준 활성 COMMON_STOCK은 NAS 3,949, NYS 2,480, AMS 275이며 업로드 전 비미분류 코드는 각 0건이었다. KIS 마스터 3개 실제 업로드는 HTTP 500 `US_INDUSTRY_SYNC_FAILED`로 롤백됐다. 운영 스키마에서 `industry_code`와 `source_file` 컬럼은 확인했고 관리자 health probe는 DB 연결·운영 컬럼 검사를 통과했으나, 실패 SQLSTATE/단계가 응답에 노출되지 않아 원인은 아직 미확정이다.
+- **개선**: 재시도 때 원인을 직접 판별할 수 있도록 관리자 전용 동기화 오류 응답에 단계, PostgreSQL SQLSTATE 및 테이블/컬럼/제약조건 식별자만 포함하고 원문 메시지는 반환하지 않도록 보강했다. 테스트에서 민감 원문 미노출과 schema diagnostic을 고정했다. 현재 diagnostics 보강분은 로컬 전체 배포 검증 통과 후 별도 commit/push/운영 배포해야 한다.
 
 ### 다음 개선
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.

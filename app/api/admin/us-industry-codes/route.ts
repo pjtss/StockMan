@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-auth";
+import { describeError, safeErrorMetadata } from "@/lib/error-diagnostics";
 import { KIS_US_MASTER_FILES, syncKisUsIndustryCodes } from "@/lib/us-industry-code-sync";
 
 export const runtime = "nodejs";
@@ -46,8 +47,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ...result, synchronizedAt: new Date().toISOString() });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
-    console.error("[us-industry-codes] sync failed", message.slice(0, 240));
+    const safe = safeErrorMetadata(error);
+    const details = describeError(error);
+    const stage = error && typeof error === "object" && "usIndustrySyncStage" in error && typeof error.usIndustrySyncStage === "string"
+      ? error.usIndustrySyncStage
+      : "request_validation_or_upload";
     const isInputError = message.startsWith("KIS_MASTER_");
-    return NextResponse.json({ ok: false, error: isInputError ? message : "US_INDUSTRY_SYNC_FAILED" }, { status: isInputError ? 400 : 500 });
+    console.error("[us-industry-codes] sync failed", JSON.stringify({ stage, ...safe }));
+    const diagnostic = isInputError ? undefined : {
+      stage,
+      ...safe,
+      ...(details.table ? { table: details.table } : {}),
+      ...(details.column ? { column: details.column } : {}),
+      ...(details.constraint ? { constraint: details.constraint } : {}),
+    };
+    return NextResponse.json({ ok: false, error: isInputError ? message : "US_INDUSTRY_SYNC_FAILED", ...(diagnostic ? { diagnostic } : {}) }, { status: isInputError ? 400 : 500 });
   }
 }
