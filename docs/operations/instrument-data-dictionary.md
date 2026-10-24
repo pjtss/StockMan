@@ -50,6 +50,8 @@
 | `market_cap_scale` | 원천 시총 규모 구간 코드 | 원천 코드 |
 | `industry_large_code`, `industry_medium_code`, `industry_small_code` | KIS 종목 마스터의 지수 업종 분류 코드. 표준산업분류와 별도 원천 필드 | 원천 코드 |
 | `standard_industry_code`, `standard_industry_name` | KIS 주식기본조회(`CTPF1002R`)의 표준산업분류코드(`std_idst_clsf_cd`)와 분류명 | `032604`, `통신 및 방송 장비 제조업` |
+
+운영 국내 보통주 유니버스가 비어 있으면 `/api/admin/domestic-universe-import`에 KIS 공식 `kospi_code.mst`, `kosdaq_code.mst` 두 파일을 관리자 세션으로 올려 국내 시장만 구성한다. 이 경로는 미국 유니버스나 누락된 기존 종목을 갱신/비활성화하지 않는다. 이후 `/api/admin/domestic-industry-sync`가 활성 `COMMON_STOCK`만 대상으로 KIS `CTPF1002R` 응답을 검증하고 산업분류 컬럼을 저장한다.
 | `etp_product_class_code` | ETP 상품 분류 코드 | 빈 문자열 또는 코드 |
 | `preferred_class_code` | 우선주 분류 코드 | 빈 문자열 또는 코드 |
 | `trading_halt_code` | 거래정지 상태 코드 | 정상 상태 코드 |

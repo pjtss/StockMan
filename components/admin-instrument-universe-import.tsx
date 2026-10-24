@@ -3,9 +3,11 @@
 import { useState } from "react";
 
 const requiredFiles = ["kospi_code.mst", "kosdaq_code.mst", "NASMST.COD", "NYSMST.COD", "AMSMST.COD"];
+const domesticMasterFiles = ["kospi_code.mst", "kosdaq_code.mst"];
 
 export function AdminInstrumentUniverseImport() {
   const [files, setFiles] = useState<File[]>([]);
+  const [domesticFiles, setDomesticFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const [industryProgress, setIndustryProgress] = useState<{ processed: number; total: number } | null>(null);
@@ -66,6 +68,23 @@ export function AdminInstrumentUniverseImport() {
     }
   }
 
+  async function importDomesticMasters() {
+    const form = new FormData();
+    domesticFiles.forEach((file) => form.append("files", file, file.name));
+    setBusy(true);
+    setResult(null);
+    try {
+      const response = await fetch("/api/admin/domestic-universe-import", { method: "POST", body: form });
+      const payload = await response.json();
+      if (!response.ok || payload.ok !== true) throw new Error(payload.error || `국내 마스터 적재 실패 (HTTP ${response.status})`);
+      setResult(payload);
+    } catch (error) {
+      setResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const names = new Set(files.map((file) => file.name));
   const complete = requiredFiles.every((name) => names.has(name));
   return <section style={{ display: "grid", gap: 16, maxWidth: 900 }}>
@@ -76,6 +95,15 @@ export function AdminInstrumentUniverseImport() {
       <ul>{requiredFiles.map((name) => <li key={name}>{names.has(name) ? "✅" : "⬜"} {name}</li>)}</ul>
       <button type="button" onClick={() => void submit()} disabled={!complete || busy} style={{ padding: "10px 16px", borderRadius: 8, cursor: complete && !busy ? "pointer" : "not-allowed" }}>
         {busy ? "적재 중..." : "전체 유니버스 적재"}
+      </button>
+    </div>
+    <div style={{ padding: 20, border: "1px solid var(--border, #dbe3ee)", borderRadius: 14 }}>
+      <h2 style={{ marginTop: 0 }}>국내 KIS 종목 마스터만 적재</h2>
+      <p>공식 KIS 종목 마스터 ZIP을 받아 압축을 풀고 두 파일을 선택해 국내 유니버스만 준비합니다. 미국 유니버스는 변경하지 않습니다. <a href="https://new.real.download.dws.co.kr/common/master/kospi_code.mst.zip">KOSPI 마스터</a> · <a href="https://new.real.download.dws.co.kr/common/master/kosdaq_code.mst.zip">KOSDAQ 마스터</a></p>
+      <input type="file" multiple accept=".mst" onChange={(event) => setDomesticFiles(Array.from(event.target.files ?? []))} />
+      <ul>{domesticMasterFiles.map((name) => <li key={name}>{domesticFiles.some((file) => file.name.toLowerCase() === name) ? "✅" : "⬜"} {name}</li>)}</ul>
+      <button type="button" onClick={() => void importDomesticMasters()} disabled={busy || domesticMasterFiles.some((name) => !domesticFiles.some((file) => file.name.toLowerCase() === name))} style={{ padding: "10px 16px", borderRadius: 8 }}>
+        {busy ? "국내 종목 마스터 적재 중..." : "국내 종목 마스터만 적재"}
       </button>
     </div>
     <div style={{ padding: 20, border: "1px solid var(--border, #dbe3ee)", borderRadius: 14 }}>

@@ -239,3 +239,67 @@ export async function importInstrumentMasters(sourceDirectory: string) {
   } catch (error) { await db.update(instrumentUniverseSyncRuns).set({ status: "FAILED", errorCount: 1, errorSummary: error instanceof Error ? error.message : String(error), completedAt: new Date() }).where(eq(instrumentUniverseSyncRuns.id, runId)); throw error; }
   finally { instrumentMasterImportInProgress = false; }
 }
+
+/** Import only the official KIS KOSPI and KOSDAQ masters. This path intentionally
+ * leaves the overseas universe untouched and does not age absent rows: it is
+ * safe to bootstrap the domestic universe independently. */
+export async function importDomesticInstrumentMasters(files: Array<{ name: string; buffer: Buffer }>) {
+  const db = getDb();
+  if (!db) throw new Error("DATABASE_URL 환경변수가 설정되지 않았습니다.");
+  if (instrumentMasterImportInProgress) throw new Error("INSTRUMENT_MASTER_IMPORT_ALREADY_RUNNING");
+  instrumentMasterImportInProgress = true;
+  let runId: number | undefined;
+  const startedAt = new Date();
+  try {
+    const expected = ["kospi_code.mst", "kosdaq_code.mst"] as const;
+    const byName = new Map(files.map((file) => [file.name.toLowerCase(), file]));
+    if (files.length !== expected.length || expected.some((name) => !byName.has(name))) {
+      throw new Error(`DOMESTIC_MASTER_FILES_REQUIRED:${expected.join(",")}`);
+    }
+    const rows: KrRow[] = [
+      ...parseDomestic(byName.get("kospi_code.mst")!.buffer, "KOSPI", "kospi_code.mst"),
+      ...parseDomestic(byName.get("kosdaq_code.mst")!.buffer, "KOSDAQ", "kosdaq_code.mst"),
+    ];
+    const counts = { KOSPI: rows.filter((row) => row.market === "KOSPI").length, KOSDAQ: rows.filter((row) => row.market === "KOSDAQ").length };
+    if (counts.KOSPI < 100 || counts.KOSDAQ < 100) throw new Error("DOMESTIC_MASTER_INCOMPLETE");
+    const uniqueRows = [...new Map(rows.map((row) => [`${row.market}:${row.code}`, row])).values()];
+    const run = await db.insert(instrumentUniverseSyncRuns).values({ scope: "KR", sourceDirectory: "KIS_DOMESTIC_MASTER_UPLOAD", status: "RUNNING", sourceCount: uniqueRows.length }).returning({ id: instrumentUniverseSyncRuns.id });
+    runId = run[0]?.id;
+
+    let commonCount = 0;
+    let specialCount = 0;
+    await db.transaction(async (tx) => {
+      for (const market of ["KOSPI", "KOSDAQ"] as const) {
+        const marketRows = uniqueRows.filter((row) => row.market === market);
+        for (let offset = 0; offset < marketRows.length; offset += 250) {
+        const batch = marketRows.slice(offset, offset + 250).map((row) => {
+          const classification = classifyKr(row);
+          const enabledCommon = classification.instrumentType === "COMMON_STOCK" && !classification.isSuspended && !["Y", "1"].includes(row.managedIssueCode);
+          return { ...row, ...classification, enabled: true, lastSeenAt: startedAt, updatedAt: startedAt, enabledCommon };
+        });
+        const common = batch.filter((row) => row.enabledCommon).map(({ enabledCommon: _enabledCommon, ...row }) => row);
+        const special = batch.filter((row) => !row.enabledCommon).map(({ enabledCommon: _enabledCommon, ...row }) => row);
+        const upsert = async (table: typeof krCommonStockUniverse | typeof krSpecialInstrumentUniverse, values: typeof common) => {
+          if (!values.length) return;
+          await tx.insert(table).values(values).onConflictDoUpdate({ target: [table.market, table.code], set: {
+            standardCode: sql`excluded.standard_code`, name: sql`excluded.name`, instrumentType: sql`excluded.instrument_type`, securityGroupCode: sql`excluded.security_group_code`, marketCapScale: sql`excluded.market_cap_scale`, industryLargeCode: sql`excluded.industry_large_code`, industryMediumCode: sql`excluded.industry_medium_code`, industrySmallCode: sql`excluded.industry_small_code`, etpProductClassCode: sql`excluded.etp_product_class_code`, preferredClassCode: sql`excluded.preferred_class_code`, tradingHaltCode: sql`excluded.trading_halt_code`, liquidationCode: sql`excluded.liquidation_code`, managedIssueCode: sql`excluded.managed_issue_code`, isEtp: sql`excluded.is_etp`, isWarrant: sql`excluded.is_warrant`, isPreferred: sql`excluded.is_preferred`, isSuspended: sql`excluded.is_suspended`, enabled: true, rawPayload: sql`excluded.raw_payload`, sourceFile: sql`excluded.source_file`, missingRuns: 0, lastSeenAt: startedAt, updatedAt: startedAt,
+          } });
+        };
+        await upsert(krCommonStockUniverse, common);
+        await upsert(krSpecialInstrumentUniverse, special);
+        if (market && common.length) await tx.update(krSpecialInstrumentUniverse).set({ enabled: false, updatedAt: startedAt }).where(and(eq(krSpecialInstrumentUniverse.market, market), inArray(krSpecialInstrumentUniverse.code, common.map((row) => row.code))));
+        if (market && special.length) await tx.update(krCommonStockUniverse).set({ enabled: false, updatedAt: startedAt }).where(and(eq(krCommonStockUniverse.market, market), inArray(krCommonStockUniverse.code, special.map((row) => row.code))));
+        commonCount += common.length;
+        specialCount += special.length;
+        }
+      }
+    });
+    if (runId) await db.update(instrumentUniverseSyncRuns).set({ status: "COMPLETED", insertedCount: commonCount + specialCount, updatedCount: 0, excludedCount: specialCount, completedAt: new Date() }).where(eq(instrumentUniverseSyncRuns.id, runId));
+    return { ok: true, runId, sourceCount: uniqueRows.length, marketCounts: counts, commonStockCount: commonCount, specialInstrumentCount: specialCount, overseasUpdated: false };
+  } catch (error) {
+    if (runId) await db.update(instrumentUniverseSyncRuns).set({ status: "FAILED", errorCount: 1, errorSummary: error instanceof Error ? error.message.slice(0, 1000) : "unknown error", completedAt: new Date() }).where(eq(instrumentUniverseSyncRuns.id, runId));
+    throw error;
+  } finally {
+    instrumentMasterImportInProgress = false;
+  }
+}
