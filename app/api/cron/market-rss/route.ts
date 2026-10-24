@@ -7,7 +7,6 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
-import { syncMarketRssBullishArticles } from "@/lib/market-rss-bullish-repository";
 import { getMarketRssBatchSize } from "@/lib/market-rss-batch-size";
 import { getMarketRssCronStatus } from "@/lib/market-rss-cron-status";
 import type { MarketRssSource } from "@/lib/market-rss-sources";
@@ -61,7 +60,9 @@ export async function POST(request: Request) {
         webhookConfigured: notificationRuns.every((batch) => batch.webhookConfigured),
       };
       const backlogRemaining = batch.attempted >= translationBatchSize || deliveries.attempted >= notificationBatchSize;
-      const bullish = await syncMarketRssBullishArticles();
+      // The separate Bullish RSS mirror performs a full-table scan and must
+      // not hold the time-bounded Discord notification timer open.
+      const bullish = { skipped: true, reason: "deferred_from_notification_cron" };
       const outcome = getMarketRssCronStatus(ingested.ingestFailureCount, translated);
       const deliveryIncomplete = !notified.webhookConfigured || notified.sent < notified.attempted;
       return { ok: true, mode: "COMMIT", ...outcome, backlogRemaining, degraded: outcome.degraded || deliveryIncomplete || backlogRemaining, deliveryIncomplete, sources, ingested, translated, notified, bullish };

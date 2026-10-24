@@ -44,13 +44,43 @@
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.
 
 ### 개선 과제
-- 개선 과제 ID: CI-2026-10-24-006
+- 개선 과제 ID: CI-2026-10-24-007
 - 성과 판정: PARTIAL
 - 근거: KIS 오프셋 파싱, industry_code upsert, KIS 전용 트랜잭션 동기화 API와 KIS 최신 원본 parser 테스트까지 구현했다. 운영 DB 실제 반영과 coverage 증명은 아직 미완료다.
 - 다음 개선: 배포 API 인증 후 KIS 최신 원본을 업로드하고 거래소별 DB coverage와 미매칭을 확인한다.
 
 ### 커밋·푸시·배포
 - 커밋 `0f7ddab5` 생성 완료(작업 브랜치 `codex/kis-industry-20261024`). push 및 운영 API 배포/적재는 아직 완료되지 않았다.
+## [2026-10-24] RSS 알림 cron에서 Bullish RSS 전체 재색인 분리
+
+### 목표
+- 제목 번역·Discord 발송을 3건으로 제한했는데도 운영 cron이 240초 이상 끝나지 않았다. 원인은 알림 이후 실행하는 Bullish RSS sync가 매분 전체 `market_rss_articles` 73,115행을 500행씩 keyset 순회하며 각 기사별 DB write를 수행하는 구조였다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: bounded notification cron에서 full-table Bullish RSS 재색인을 제외하고 응답에는 분리 상태를 표시한다.
+- `app/api/cron/market-rss/route.test.ts`: 알림 cron이 별도 Bullish mirror 전체 scan을 호출하지 않는지 검증한다.
+- `deploy/oci/README.md`: bounded 알림과 Bullish mirror sync 분리 동작을 운영 설명에 기록한다.
+
+### 검증
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API 관측(2026-10-24 12:42 UTC): 3건 상한 cron도 241초 `RUNNING`이었고 두 출처 translation status가 12:39:55 이후 변하지 않았다. 코드 추적으로 cron 뒤의 무제한 `syncMarketRssBullishArticles()` 전체 행 순회를 확인했다.
+- RSS 제목 입력만 provider 번역 요청에 넘기며 summary/content의 원문 보존·전송 gate는 유지한다.
+
+### 다음 개선
+- 전체 검증 후 `oci`로 배포하고 새 3건 cron이 180초 이내 완료되는지와 `notified.sent`, `backlogRemaining`을 확인한다.
+- 별도 Bullish RSS mirror를 위한 무제한 순회는 요청성 실행에 적합하지 않다. 이후 독립적인 지속 cursor/background job을 설계해 누락 없이 재색인하고 이 endpoint를 계속 fresh하게 유지한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-006
+성과 판정: PARTIAL
+근거: 운영 duration 측정과 호출 경로 추적으로 alert cron 병목이 별도 Bullish 전체 재색인임을 찾고 알림 경로에서 분리했으며 전체 deploy:verify가 통과했다. 재배포 및 실제 Discord 수신은 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 통과 후 RSS 변경만 커밋·push하고 OCI 배포를 확인한다.
+
 ## [2026-10-24] RSS OCI cron 단위 재조정
 
 ### 목표
@@ -6532,7 +6562,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **원본 대조**: KIS 공식 NAS/NYS/AMS 마스터(2026-10-23 데이터, 2026-10-24 19:01 KST 다운로드)를 프로젝트와 동일한 필드/상품 제외 기준으로 전수 파싱. 5,358 KIS 보통주 후보 중 실제 3자리 비영 업종코드 2,634, 공식 `000` 2,724.
 - **로컬 DB read-only 비교**: `BEGIN READ ONLY` + `statement_timeout`으로 활성 COMMON_STOCK 5,444행 확인. 유효 `industry_code`는 0행, 미분류 5,444행. KIS와 5,310행 매칭했으며 매칭값 5,310건 모두 DB 공란으로 원본과 불일치(2,634건은 KIS에 비영 코드가 있으나 로컬 DB 공란). KIS 후보 중 DB 활성 universe 누락 48건(AMS12/NAS32/NYS4), 반대로 DB 활성 종목 중 최신 KIS 후보와 불일치 134건(AMS7/NAS46/NYS81). 이번 검증에서는 DB를 변경하지 않았다.
 - **운영 route 확인**: 로그인 후 현재 운영 `/api/admin/us-industry-codes`가 404 `text/html`이어서 최신 운영 DB 업종코드 및 저장 후 감사 결과는 확인할 수 없었다. 이전 작업의 운영 적재 수치는 역사적 결과로 구분하며 현 상태의 성공으로 간주하지 않는다.
-- **검증**: `origin/oci` 통합 전 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 이후 최신 RSS 기록과 ID가 중복임을 추가 통합 검증에서 발견했고, KIS ID를 `CI-2026-10-24-006`으로 변경했다. 앞선 `/charts` 30초 timeout은 재현되지 않았다.
+- **검증**: `origin/oci` 통합 전 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 이후 최신 RSS 기록과 ID가 중복임을 추가 통합 검증에서 발견했고, KIS ID를 `CI-2026-10-24-007`로 변경했다. 앞선 `/charts` 30초 timeout은 재현되지 않았다.
 - **남은 위험/후속**: 로컬 DB 업종코드 미적재와 KIS-universe 48/134개 불일치가 남아 있다. 운영 진단 route가 현재 404이므로 운영 최신값도 검증 불가. 다음 실행은 활성 보통주 분모 차이를 종목별로 분류하고, 명시 승인 후 로컬/운영 적재 및 read-after-write 감사가 가능하도록 최신 배포 경로를 먼저 복구해야 한다. `000` 값은 공식 미분류로 유지하고 임의 보정하지 않는다.
 - **커밋·푸시·배포**: 통합 검증 및 KIS 원본 대조가 통과해 로컬 merge를 마무리한 뒤 원격 브랜치 push와 OCI 배포 workflow를 진행한다. 운영 진단 route가 현재 404인 원인을 배포 후 다시 확인하고, KIS 원본 재적재 및 DB read-after-write 검증 전까지 목표 완료로 보고하지 않는다.
 
@@ -6550,6 +6580,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ## [2026-10-24] KIS 진단 변경과 최신 OCI RSS 커밋 통합
 
 - 최신 `origin/oci`의 RSS cron 변경 4개 파일을 보존해 KIS 작업 브랜치에 병합했다. `DEVELOPMENT_LOG.md`의 양쪽 작업 기록을 모두 유지했다.
-- 통합 후 전체 테스트는 296 files passed/1 skipped, 1,436 passed/3 skipped였다. `docs:check`에서 KIS/RSS 개선 ID 중복 `CI-2026-10-24-004`가 발견되어 KIS 항목을 `CI-2026-10-24-006`으로 고유화했다.
+- 통합 후 전체 테스트는 296 files passed/1 skipped, 1,436 passed/3 skipped였다. `docs:check`에서 KIS/RSS 개선 ID 중복을 두 차례 발견하여 KIS 항목을 현재 `CI-2026-10-24-007`로 고유화했다.
 - 수정된 통합 트리에서 `npm.cmd run deploy:verify`를 재실행해 통과했다: 빌드, standalone `/charts`·desktop/mobile Chrome 및 API smoke, 296 test files passed/1 skipped(1,436 passed/3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth(179 routes), cron check.
 - 경쟁하던 OCI run #1108 (`6e3e0ac5`)는 success로 완료됐다. 진단 코드의 통합 커밋은 그 뒤 별도로 푸시·배포해야 하며, 이를 통해 동시 실행 취소를 방지한다.
