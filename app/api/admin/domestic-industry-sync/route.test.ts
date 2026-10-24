@@ -61,7 +61,7 @@ describe("domestic standard industry sync API", () => {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ offset: 0, expectedTotal: 1, batchSize: 1 }),
     }));
     expect(response.status).toBe(502);
-    expect(await response.json()).toMatchObject({ ok: false, error: "KIS_STOCK_INFO_INVALID", failedCode: "005930" });
+    expect(await response.json()).toMatchObject({ ok: false, error: "KIS_STOCK_INFO_INVALID", failedCode: "005930", checks: { industryCode: false } });
     expect(state.clientQuery).not.toHaveBeenCalled();
   });
 
