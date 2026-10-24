@@ -5,6 +5,8 @@ import path from "node:path";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { importInstrumentMasters } from "@/lib/instrument-universe-import";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
     if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });

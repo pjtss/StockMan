@@ -6347,3 +6347,25 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **커밋·푸시·배포**: 이번 점검은 제품 변경이나 새 배포를 만들지 않았다. 번역 provider 구현은 commit `97fefb7f`에 이미 반영·배포되어 있다.
 - **2026-10-22 운영 오류 원인 수정**: 신규 단일 항목 진단에서 공급자 요청 전 `quota_reservation` 단계의 PostgreSQL 오류 `inconsistent types deduced for parameter $3`를 확인했다. 월별 원장 upsert에서 positional parameter 타입이 추론 문맥마다 달라지던 구문을 `text`/`bigint` 명시 CTE와 `EXCLUDED.reserved_characters` 기반 upsert로 변경했다. DB 스키마 변경은 없다. `translation-cache.test.ts`에 Azure quota 예약 성공 회귀 테스트를 추가하고, 배포 후 동일한 단일 항목 PREVIEW에서 Azure 호출 및 번역 성공 여부를 검증한다. 재발 감지는 타입 명시 SQL 회귀 테스트와 preview 진단의 `quota_reservation` 오류 단계로 수행한다.
 - **2026-10-22 Azure provider 오류 진단 후속**: quota 예약 SQL 수정 후 운영에서 Azure 요청 1회가 실제 발생했으나 Azure 실패가 Google fallback의 월간 상한 응답에 가려졌다. composite client가 Azure 실패 원인을 내부 `TranslationResult` 필드로 전달하고, 관리자 preview 진단 callback에서만 마스킹해 노출하도록 개선했다. 번역 항목 객체·DB에는 이 오류 원인을 추가하지 않는다. `API key` 공백 표기를 포함한 민감값 마스킹과 Azure 실패+Google quota 차단 경로를 회귀 테스트로 고정한다. 배포 뒤 단일 운영 preview로 Azure 응답 코드/원인을 확인하고, 그 결과에 따라 endpoint·region·credential 중 해당 원인만 수정한다.
+## [2026-10-24] 국내 보통주 KIS 표준산업분류 코드 운영 DB 적재 API
+
+### 목적·범위
+- 운영 DB에 직접 접속하지 않고, 운영 서버 관리자 API가 KIS Open API 주식기본조회(CTPF1002R)로 활성 국내 COMMON_STOCK 종목의 표준산업분류 코드와 명칭을 조회·저장하도록 한다.
+
+### 변경
+- `V160__kr_common_stock_standard_industry.sql`에 보통주 및 특수상품 유니버스 표준산업분류 코드/명칭 컬럼을 추가했다.
+- `/api/admin/domestic-industry-sync`를 추가했다. 관리자 전용 POST는 페이지별 KIS 응답 검증 후 트랜잭션 저장하고, GET은 관리자 세션 또는 읽기 전용 API 키로 집계 상태만 반환한다.
+- 운영 유니버스 관리 화면에 10종목 단위 진행·재시도 가능한 갱신 버튼을 추가했다. 산업분류 확인이 불가능한 종목은 임의 추정하지 않고 중단한다.
+- 데이터 사전과 스크립트 안내를 갱신했다.
+
+### 검증
+- 삼성전자(005930) KIS 실 API 단건 확인: `std_idst_clsf_cd=032604`, `통신 및 방송 장비 제조업`.
+- `npx tsc --noEmit --pretty false`: 통과.
+- 대상 Vitest 2개 파일 9건: 통과.
+- `npm run docs:check`: 통과 (V160 포함 160개 migration).
+- `npm run build`: 통과. 클린 분리 작업 복사본은 Windows junction 추적 단계에서 EPERM 경고가 있었으나 빌드 종료 코드는 0; 본 작업 워크스페이스에서도 빌드 통과.
+- `npm run start -- -p 3101`: 로컬 `/health-check` 200, 미인증 산업분류 API는 의도대로 401.
+- 운영 DB 직접 접속/조회·쓰기, 운영 배포와 전체 종목 데이터 반영은 아직 수행하지 않았다.
+
+### 커밋·푸시·배포
+- 아직 미실행. 운영 DB 작업은 운영 API 배포와 관리자 인증 후 진행한다.
