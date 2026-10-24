@@ -19,10 +19,10 @@ describe("domestic standard industry sync API", () => {
   });
 
   it("returns aggregate coverage from the operating universe status query", async () => {
-    state.query.mockResolvedValue({ rows: [{ total: 4123, completed: 1, missing: 4122 }] });
+    state.query.mockResolvedValue({ rows: [{ total: 4123, completed: 1, missing: 4122, missing_name: 1 }] });
     const response = await GET(new Request("https://example.test/api/admin/domestic-industry-sync"));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ total: 4123, completed: 1, missing: 4122 });
+    expect(await response.json()).toMatchObject({ total: 4123, completed: 1, missing: 4122, missing_name: 1 });
     expect(state.query.mock.calls[0][0]).toContain("instrument_type = 'COMMON_STOCK'");
   });
 
@@ -51,6 +51,19 @@ describe("domestic standard industry sync API", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ok: true, processed: 1, nextOffset: 1, total: 1 });
     expect(state.fetchInfo).toHaveBeenCalledWith("test-token", "0001A0");
+  });
+
+  it("persists a valid KIS industry code when KIS omits its classification name", async () => {
+    state.query.mockResolvedValue({ rowCount: 1, rows: [{ market: "KOSDAQ", code: "003310", standard_code: "KR7003310000" }] });
+    state.fetchInfo.mockResolvedValue({ ok: true, msgCd: "KIOK0530", rows: [{ std_pdno: "KR7003310000", std_idst_clsf_cd: "031009", std_idst_clsf_cd_name: "" }] });
+    state.clientQuery.mockResolvedValue({ rowCount: 1 });
+
+    const response = await POST(new Request("https://example.test/api/admin/domestic-industry-sync", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ offset: 0, expectedTotal: 1, batchSize: 1 }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, processed: 1 });
+    expect(state.clientQuery.mock.calls.some(([sql, values]) => String(sql).includes("standard_industry_code") && values?.[2] === "031009" && values?.[3] === "")).toBe(true);
   });
 
   it("does not write a batch when KIS returns an invalid industry code", async () => {

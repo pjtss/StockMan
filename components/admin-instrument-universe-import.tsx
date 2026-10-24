@@ -108,7 +108,7 @@ export function AdminInstrumentUniverseImport() {
     </div>
     <div style={{ padding: 20, border: "1px solid var(--border, #dbe3ee)", borderRadius: 14 }}>
       <h2 style={{ marginTop: 0 }}>국내 보통주 표준산업분류 코드 조회·저장</h2>
-      <p>운영 서버의 활성 COMMON_STOCK 목록을 기준으로 KIS 주식기본조회 API를 호출해 표준산업분류코드와 분류명을 저장합니다. 10종목씩 처리하며, API 오류가 나면 해당 묶음은 저장하지 않고 중단합니다.</p>
+      <p>운영 서버의 활성 COMMON_STOCK 목록을 기준으로 KIS 주식기본조회 API를 호출해 표준산업분류코드를 저장합니다. KIS가 분류명을 제공하면 함께 저장하며, 분류명 없이 유효한 코드를 제공한 종목은 코드를 저장하고 이름은 비워 둡니다. 10종목씩 처리하며 코드·종목 식별 검증이나 API 오류가 나면 해당 묶음은 저장하지 않고 중단합니다.</p>
       <button type="button" onClick={() => void syncDomesticIndustryCodes()} disabled={busy} style={{ padding: "10px 16px", borderRadius: 8 }}>
         {busy ? "KIS 조회·저장 중..." : "전체 국내 보통주 업종 코드 갱신"}
       </button>
