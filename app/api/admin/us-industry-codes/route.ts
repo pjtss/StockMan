@@ -11,8 +11,8 @@ export async function GET() {
     if (!(await requireAdminSession())) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
     const result = await getPool().query(`
       SELECT market, COUNT(*)::int AS active_common_count,
-        COUNT(*) FILTER (WHERE industry_code ~ '^[0-9]{3}$' AND industry_code <> '000')::int AS classified_count,
-        COUNT(*) FILTER (WHERE industry_code IS NULL OR industry_code !~ '^[0-9]{3}$' OR industry_code = '000')::int AS unclassified_count
+        COUNT(*) FILTER (WHERE industry_code ~ '^[0-9]{1,4}$' AND industry_code !~ '^0+$')::int AS classified_count,
+        COUNT(*) FILTER (WHERE industry_code IS NULL OR industry_code !~ '^[0-9]{1,4}$' OR industry_code ~ '^0+$')::int AS unclassified_count
       FROM us_common_stock_universe
       WHERE enabled = TRUE AND instrument_type = 'COMMON_STOCK' AND market IN ('NAS','NYS','AMS')
       GROUP BY market ORDER BY market

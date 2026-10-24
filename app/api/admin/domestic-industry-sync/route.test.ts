@@ -40,6 +40,19 @@ describe("domestic standard industry sync API", () => {
     expect(state.clientQuery.mock.calls.some(([sql]) => String(sql).includes("standard_industry_code"))).toBe(true);
   });
 
+  it("accepts official six-character alphanumeric KRX issue codes", async () => {
+    state.query.mockResolvedValue({ rowCount: 1, rows: [{ market: "KOSDAQ", code: "0001A0", standard_code: "KR70001A0001" }] });
+    state.fetchInfo.mockResolvedValue({ ok: true, msgCd: "KIOK0530", rows: [{ std_pdno: "KR70001A0001", std_idst_clsf_cd: "032604", std_idst_clsf_cd_name: "산업용 가스 제조업" }] });
+    state.clientQuery.mockResolvedValue({ rowCount: 1 });
+
+    const response = await POST(new Request("https://example.test/api/admin/domestic-industry-sync", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ offset: 0, expectedTotal: 1, batchSize: 1 }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, processed: 1, nextOffset: 1, total: 1 });
+    expect(state.fetchInfo).toHaveBeenCalledWith("test-token", "0001A0");
+  });
+
   it("does not write a batch when KIS returns an invalid industry code", async () => {
     state.query.mockResolvedValue({ rowCount: 1, rows: [{ market: "KOSPI", code: "005930", standard_code: "KR7005930003" }] });
     state.fetchInfo.mockResolvedValue({ ok: true, msgCd: "KIOK0530", rows: [{ std_pdno: "KR7005930003", std_idst_clsf_cd: "", std_idst_clsf_cd_name: "" }] });

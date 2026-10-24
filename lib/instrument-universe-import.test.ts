@@ -73,7 +73,7 @@ describe("KIS instrument master parsers", () => {
     expect(result.eligibleCounts.NAS).toBeGreaterThan(0);
     expect(result.eligibleCounts.NYS).toBeGreaterThan(0);
     expect(result.eligibleCounts.AMS).toBeGreaterThan(0);
-    expect(result.rows.every((row) => row.industryCode === "000" || /^\d{3}$/.test(row.industryCode))).toBe(true);
+    expect(result.rows.every((row) => row.industryCode === "000" || /^\d{1,4}$/.test(row.industryCode))).toBe(true);
     expect(result.rows.some((row) => row.code === "AAAP")).toBe(false);
     expect(result.rows.some((row) => row.code === "AAPL" && row.industryCode === "730")).toBe(true);
   });

@@ -11,6 +11,12 @@ export const KIS_US_MASTER_FILES = {
 type Market = keyof typeof KIS_US_MASTER_FILES;
 type IndustryRow = { market: Market; code: string; industryCode: string; sourceFile: string };
 
+/** KIS mastcode.icod is a four-character numeric field; all-zero values mean unclassified. */
+export function isValidKisUsIndustryCode(value: string | null | undefined): value is string {
+  const code = value?.trim() ?? "";
+  return /^\d{1,4}$/.test(code) && !/^0+$/.test(code);
+}
+
 /** Parse only KIS-master-confirmed active U.S. common stocks. No name-based fallback. */
 export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
   const rows: IndustryRow[] = [];
@@ -39,7 +45,7 @@ export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
       if (classifyUs(row).instrumentType !== "COMMON_STOCK") continue;
       eligibleCounts[market] += 1;
       const industryCode = row.industryCode.trim();
-      if (!/^\d{3}$/.test(industryCode) || industryCode === "000") {
+      if (!isValidKisUsIndustryCode(industryCode)) {
         unclassifiedCounts[market] += 1;
       }
       rows.push({ market, code: row.code, industryCode, sourceFile: fileName });
@@ -133,8 +139,8 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
     stage = "verify_database_coverage";
     const coverage = await client.query(`
       SELECT market, COUNT(*)::int AS active_common_count,
-        COUNT(*) FILTER (WHERE industry_code ~ '^[0-9]{3}$' AND industry_code <> '000')::int AS classified_count,
-        COUNT(*) FILTER (WHERE industry_code IS NULL OR industry_code !~ '^[0-9]{3}$' OR industry_code = '000')::int AS unclassified_count
+        COUNT(*) FILTER (WHERE industry_code ~ '^[0-9]{1,4}$' AND industry_code !~ '^0+$')::int AS classified_count,
+        COUNT(*) FILTER (WHERE industry_code IS NULL OR industry_code !~ '^[0-9]{1,4}$' OR industry_code ~ '^0+$')::int AS unclassified_count
       FROM us_common_stock_universe
       WHERE enabled = TRUE AND instrument_type = 'COMMON_STOCK' AND market IN ('NAS','NYS','AMS')
       GROUP BY market ORDER BY market

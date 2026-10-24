@@ -6,7 +6,7 @@ vi.mock("@/lib/db", () => ({
   getPool: () => ({ connect: async () => ({ query: mocks.query, release: mocks.release }) }),
 }));
 
-import { syncKisUsIndustryCodes } from "@/lib/us-industry-code-sync";
+import { isValidKisUsIndustryCode, syncKisUsIndustryCodes } from "@/lib/us-industry-code-sync";
 
 function master(market: "NAS" | "NYS" | "AMS", ticker: string, industryCode: string) {
   const fields = Array.from({ length: 24 }, () => "");
@@ -28,6 +28,16 @@ describe("KIS U.S. industry code database sync", () => {
     mocks.release.mockReset();
   });
 
+  it("validates KIS's four-character icod field without treating all-zero sentinels as sectors", () => {
+    expect(isValidKisUsIndustryCode("730")).toBe(true);
+    expect(isValidKisUsIndustryCode("1234")).toBe(true);
+    expect(isValidKisUsIndustryCode("000")).toBe(false);
+    expect(isValidKisUsIndustryCode("0000")).toBe(false);
+    expect(isValidKisUsIndustryCode("12A4")).toBe(false);
+    expect(isValidKisUsIndustryCode("12345")).toBe(false);
+    expect(isValidKisUsIndustryCode(null)).toBe(false);
+  });
+
   it("serializes the exact snake_case keys expected by PostgreSQL recordset columns", async () => {
     mocks.query.mockImplementation(async (query: string, values?: unknown[]) => {
       if (query.includes("jsonb_to_recordset")) {
@@ -38,7 +48,7 @@ describe("KIS U.S. industry code database sync", () => {
         expect(payload[0]).toMatchObject({
           market: expect.stringMatching(/^(NAS|NYS|AMS)$/),
           code: expect.stringMatching(/^[NYA]TEST$/),
-          industry_code: expect.stringMatching(/^(730|720|710)$/),
+          industry_code: expect.stringMatching(/^(730|720|710|1234)$/),
           source_file: expect.stringMatching(/^(NAS|NYS|AMS)MST\.COD$/),
         });
         expect(Object.keys(payload[0]).sort()).toEqual(["code", "industry_code", "market", "source_file"]);
@@ -50,7 +60,7 @@ describe("KIS U.S. industry code database sync", () => {
     });
 
     const result = await syncKisUsIndustryCodes({
-      NAS: master("NAS", "NTEST", "730"),
+      NAS: master("NAS", "NTEST", "1234"),
       NYS: master("NYS", "YTEST", "720"),
       AMS: master("AMS", "ATEST", "710"),
     });

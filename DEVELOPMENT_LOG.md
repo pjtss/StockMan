@@ -51,6 +51,36 @@
 
 ### 커밋·푸시·배포
 - 커밋 `0f7ddab5` 생성 완료(작업 브랜치 `codex/kis-industry-20261024`). push 및 운영 API 배포/적재는 아직 완료되지 않았다.
+## [2026-10-24] GlobeNewswire 운영 homepage override 자동 복구
+
+### 목표
+- 새 bounded alert cron에서 GlobeNewswire fetch가 실패했다. 운영 `/api/admin/debug-suite?checks=rss`에서 `GLOBENEWSWIRE` snapshot URL이 RSS가 아닌 `https://rss.globenewswire.com/` homepage로 확인됐다.
+
+### 반영
+- `lib/globenewswire-rss.ts`: 알려진 GlobeNewswire 도메인 homepage root override를 거부하고 공식 Public Companies RSS endpoint로 자동 복구한다. 정상적인 명시 RSS endpoint override는 유지한다.
+- `lib/globenewswire-rss.test.ts`: 세 homepage root URL의 fallback과 정상 RSS endpoint override 유지 회귀 테스트를 추가한다.
+- `docs/operations/globenewswire-rss-recovery.md`: root override 자동 복구 정책과 배포 후 snapshot 확인을 기록한다.
+
+### 검증
+- `npm.cmd exec vitest run -- lib/globenewswire-rss.test.ts app/api/cron/market-rss/route.test.ts --reporter=dot`: 2개 파일, 8개 테스트 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 296개 테스트 파일(295 통과·1 skip; 1,433 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API 관측(2026-10-24 12:58 UTC): 새 9e93b225 run은 7.8초에 완료하고 Discord 3건을 전송했다(`notified.sent=3`, `attempted=3`, webhook configured). GlobeNewswire는 source fetch 실패했고 latest snapshot URL이 `https://rss.globenewswire.com/`로 확인됐다. 별도 run 339548은 26.7초에 Discord 1건 전송했으나 GlobeNewswire 역시 fetch 실패였다.
+- SEC/StockTitan의 제목만 provider 번역하고 본문·요약은 원문 그대로 유지한다. 검증 실패 제목은 번역 gate에서 발송을 보류한다.
+
+### 다음 개선
+- 전체 검증 및 OCI 재배포 후 GlobeNewswire snapshot URL이 공식 feed로 바뀌고 count>0인지, source별 Discord 전송이 발생하는지 확인한다.
+- feed가 유효한 빈 결과를 반환하면 발송 기사가 없는 것으로 해석하고, fetch/XML 오류라면 source snapshot의 오류 사유를 운영 진단에 노출해 계속 감시한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-008
+성과 판정: PARTIAL
+근거: 운영 snapshot으로 오래된 홈페이지 override를 근본 원인으로 특정하고 자동 fallback을 추가했으며 현재 revision의 전체 deploy:verify가 통과했다. 재배포 후 GlobeNewswire 실제 수신은 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 검증·push·배포 및 GlobeNewswire fetch/Discord 수신 확인 전.
+
 ## [2026-10-24] RSS 알림 cron에서 Bullish RSS 전체 재색인 분리
 
 ### 목표
@@ -6594,3 +6624,49 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 전체 차이 목록을 조회 가능하게 만든 진단 코드/최신 OCI RSS 변경 통합 커밋 `77afbacc`를 push했다. run #1111 (`40096039714`)은 success로 완료됐다. 바로 전 run #1109, #1107은 더 최신 `oci` push가 배포를 시작해 취소됐으며, 최신 `oci`를 통합한 뒤 #1111에서 정상 배포했다.
 - **완료 범위**: 운영과 매칭된 5,268개 KIS 공식 보통주의 산업코드 저장·동일성 검증 완료. **미완료**: universe 간 90+1,436건 차이의 종목별 등록/활성/상품 유형 조사. 보통주 전용 원칙상 이 불일치는 별도 종목 universe 정비 승인 없이 자동 변경하지 않는다.
 - **재발 방지**: 앞으로 성공은 HTTP 200만으로 판정하지 않고 API `ok`, 거래소별 matched/missing/mismatch, 독립 GET, 공식 `000` 보존을 모두 확인한다. 전체 universe 차이는 전체 코드 목록으로 진단하며, 미등록 편입·비활성화는 별도 작업으로 분리한다.
+
+## [2026-10-24] 국내 KIS 산업분류 동기화 시 영숫자 종목코드 지원
+
+### 목적 및 범위
+- 운영 종목 마스터를 KIS 공식 KOSPI·KOSDAQ 종목 마스터 파일로 준비하고, 운영 API를 통해 활성 국내 보통주의 KIS 표준산업분류 코드를 저장한다.
+- 운영 DB 직접 접속은 하지 않고 운영 API만 사용한다.
+
+### 확인 및 변경
+- 운영 API의 국내 전용 마스터 적재 결과: 원본 4,056건(KOSPI 2,583, KOSDAQ 1,825), 국내 보통주 2,358건, 특별상품 1,698건, 해외 유니버스 변경 없음.
+- 업종 동기화 최초 묶음은 `0001A0`에서 중단되어 DB 저장 전 롤백/미실행 상태임을 확인했다. 이 종목은 KIS 공식 마스터의 KOSDAQ 보통주이며, KRX 종목코드가 영숫자 6자리일 수 있다.
+- `app/api/admin/domestic-industry-sync/route.ts`의 종목 코드 검증을 영숫자 6자리로 확장하고, 산업분류 코드는 기존처럼 숫자 6자리 검증을 유지한다. `route.test.ts`에 `0001A0` 회귀 사례를 추가했다.
+
+### 검증 및 운영 상태
+- 영숫자 코드 허용 수정은 로컬 회귀 테스트와 전체 배포 게이트를 통과하고 운영 배포한 뒤, `0001A0`을 포함한 첫 묶음으로 재확인한다.
+- 현재 운영 API 업종 현황은 2,358건 중 0건 완료, 2,358건 미완료다. 동기화는 아직 완료되지 않았다.
+- 커밋·푸시·배포는 수정 검증 완료 후 수행한다.
+
+### 재발 감지 및 남은 위험
+- 운영 API의 `missing` 집계가 0인지 마지막에 확인한다. 처리 중 KIS 오류가 발생하면 해당 묶음에서 멈추며, 부분 커밋 없이 실패 코드를 기록하고 원인을 확인한 뒤 재개한다.
+- KIS 공식 마스터에서 신규 영숫자 종목코드가 추가될 수 있으므로 6자리 종목코드 검증은 영문 대문자를 허용하되, 응답의 표준코드와 숫자 6자리 산업분류 코드는 계속 검증한다.
+## [2026-10-24] KIS 해외 업종코드 필드 폭 검증 수정
+
+### 목적/범위
+- KIS 공식 `mastcode.icod` 4자 필드 정의와 맞지 않던 3자리 고정 검증을 수정해 정상적인 최대 4자리 숫자 분류값을 미분류로 오판하지 않도록 한다. 공식 분류 원천은 KIS만 유지한다.
+
+### 반영
+- `lib/us-industry-code-sync.ts`에 `isValidKisUsIndustryCode()`를 추가해 동기화 후보와 coverage 집계를 1~4자리 숫자 및 all-zero sentinel 규칙으로 통일했다.
+- 운영 GET coverage SQL도 같은 규칙으로 변경했다. 4자리 값의 SQL payload round-trip과 `0000`·비숫자·초과길이 거부 회귀 테스트를 추가했다.
+- KIS 현재 원본 샘플에는 3자리 코드와 `000`만 관측됐다. 4자리 지원은 공식 헤더 폭에 기반한 방어 변경이며, 기존 운영 미매칭 90건/DB 전용 1,436건은 별도 조사 대상이다.
+
+### 검증
+- 수정 직후 대상 테스트 12개 통과.
+- `origin/oci` 최신 커밋 통합 후 `npm.cmd run deploy:verify`: 빌드·standalone 실행 및 API/browser smoke 통과, 전체 297개 파일 통과/1 skip·1,442 테스트 통과/3 skip, typecheck 통과. 이후 `docs:check`가 KIS와 RSS 작업 ID 중복을 발견해 실패했다. KIS/RSS 작업 ID를 각각 고유화하고 재검증한다.
+- Windows 빌드에서 node_modules junction symlink `EPERM` 경고가 있었으나 산출물 실행 smoke는 성공했다.
+
+### 다음 개선
+- 작업 ID 중복을 해소한 뒤 `npm.cmd run deploy:verify` 전체를 다시 실행하고 운영 배포·KIS 원본 재적재를 수행한다.
+- 배포 후 운영 API의 market별 matched/missing/mismatch와 독립 GET coverage를 대조하며, 90건/1,436건 종목 상태 차이도 원천 필드 기준으로 분류한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-24-009
+- 성과 판정: PARTIAL
+- 근거: KIS `icod` 공식 폭에 맞춘 코드/진단 검증과 회귀 테스트는 수정했지만, 최신 코드 배포 및 전체 운영 DB 동일성은 미검증이다.
+
+### 커밋·푸시·배포
+- 미실행: ID 충돌 수정 뒤 전체 게이트를 다시 통과하고 KIS 운영 적재를 검증한 후 수행한다.
