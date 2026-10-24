@@ -28,6 +28,13 @@
 - KIS 3개 해외 마스터 전용 트랜잭션 sync 모듈과 관리자 진단/업로드 API를 추가했다. 미리 검증되지 않은 입력은 DB에 반영하지 않는다.
 - KIS 원본 regression/route tests 및 KIS 전용 설계 문서를 갱신했다.
 
+### 운영 배포 및 DB 검증 상태 (2026-10-24 continuation)
+- 최신 공식 KIS 마스터 NAS/NYS/AMS를 다시 다운로드하여 파서의 현재 원본 형식 통과를 로컬에서 확인했다. 다운로드 파일은 임시 경로에 두며 저장소에는 추가하지 않았다.
+- 운영 API `GET /api/admin/us-industry-codes`가 404를 반환해 신규 코드가 아직 운영 배포되지 않은 것을 확인했다.
+- GitHub Deploy OCI workflow는 `workflow_dispatch`를 지원하지만 현재 실행환경에는 GitHub CLI, GitHub Actions 연결 도구, GitHub credential이 확인되지 않아 수동 workflow 실행을 시작할 수 없었다. 따라서 운영 관리자 인증과 DB 업로드/coverage 검증은 미실행이며, 운영 DB 저장 완료를 주장하지 않는다.
+- `.env.local`은 해당 운영 배포 권한을 제공하지 않으며, 비밀값을 출력하거나 관리자 API 인증 우회에 사용하지 않았다. 이전 작업의 전체 `deploy:verify` 성공 기록은 로컬 코드 검증 증거일 뿐 운영 DB 반영 증거가 아니다.
+- **다음 조치/완료 기준**: GitHub Actions 실행 권한으로 이 커밋을 운영 배포한 뒤, 관리자 인증 GET에서 NAS/NYS/AMS별 활성 `COMMON_STOCK` 분모 및 ICOD coverage를 기록하고, 동일한 세 KIS 원본을 API로 업로드한다. 응답의 persisted/unmatched/unclassified 수를 저장 후 GET coverage와 대조해야 완료로 판정한다. KIS가 `000`을 제공한 종목은 공식 원천상 미분류로 보고 임의 코드를 채우지 않는다.
+
 ### 다음 개선
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.
 
