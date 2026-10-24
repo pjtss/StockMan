@@ -38,6 +38,7 @@
 - **진단 경로 배포**: 관리자 전용 동기화 오류 응답에 단계, PostgreSQL SQLSTATE 및 테이블/컬럼/제약조건 식별자만 포함하고 원문 메시지는 반환하지 않도록 보강했다. 민감 원문 미노출 회귀 테스트를 추가하고 전체 검증 후 commit/push했으며, Deploy OCI run `40086976112` 성공 뒤 운영에서 아래 실제 원인을 확보했다.
 - **운영 직접 디버깅 결과**: 진단 코드 배포 후 재시도 응답은 `stage=update_NAS`, SQLSTATE `23502` (`DATABASE_NOT_NULL_VIOLATION`)이었다. 원인은 DB 스키마가 아니라 내부 camelCase `{ industryCode, sourceFile }` 객체를 SQL의 snake_case `jsonb_to_recordset(... industry_code, source_file)`에 그대로 직렬화한 키 불일치다. 이 때문에 두 SQL 값이 NULL이 되어 NOT NULL 위반이 발생했고 트랜잭션 전체가 롤백됐다.
 - **수정/재발 방지**: DB payload 직렬화 직전에 `industry_code`/`source_file`로 명시 변환하고, NAS/NYS/AMS 모두에 대해 snake_case payload 키와 BEGIN→UPDATE×3→coverage→COMMIT 순서를 검증하는 회귀 테스트를 추가했다. 이 수정 이후 같은 최신 KIS 원본으로 운영 재적재와 GET coverage 대조를 다시 완료해야 한다.
+- **운영 수정 반영**: Deploy OCI run `40088175657` 성공 뒤 같은 KIS 공식 원본 재적재가 HTTP 200으로 완료됐다. 저장 건수는 NAS 3,176 / NYS 1,855 / AMS 237, `000` 외 분류코드는 NAS 1,354 / NYS 1,186 / AMS 94이며, 인증 GET coverage가 동일 값으로 확인됐다. 후보 중 기존 활성 DB COMMON_STOCK에 매칭되지 않은 NAS 64 / NYS 9 / AMS 17건은 자동 신규 등록하지 않았다. 전체 원본 행을 응답에 펼쳐 반환하는 불필요한 응답 크기도 함께 제거하고, write-after-read 값 불일치 시 전체 롤백 및 미매칭 ticker 샘플 제한 반환을 추가 검증한다.
 
 ### 다음 개선
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.

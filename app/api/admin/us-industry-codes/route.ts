@@ -57,6 +57,9 @@ export async function POST(request: Request) {
     const diagnostic = isInputError ? undefined : {
       stage,
       ...safe,
+      ...(error && typeof error === "object" && "usIndustrySyncFailure" in error && typeof error.usIndustrySyncFailure === "string"
+        ? { failure: error.usIndustrySyncFailure }
+        : {}),
       ...(details.table ? { table: details.table } : {}),
       ...(details.column ? { column: details.column } : {}),
       ...(details.constraint ? { constraint: details.constraint } : {}),
