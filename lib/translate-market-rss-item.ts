@@ -9,6 +9,41 @@ import { AZURE_TRANSLATION_PROVIDER } from "./translation-cache";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
+const ENGLISH_NUMBER_WORD_VALUES: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9,
+  tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16,
+  seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20, thirtieth: 30, fortieth: 40,
+  fiftieth: 50, sixtieth: 60, seventieth: 70, eightieth: 80, ninetieth: 90,
+};
+
+function getAllowedSpelledNumberValues(sourceTitle: string) {
+  const words = sourceTitle.toLocaleLowerCase("en").match(/[a-z]+/g) || [];
+  const allowed = new Set<number>();
+  const allowedMonthNumbers = new Set<number>();
+  for (let index = 0; index < words.length; index++) {
+    const value = ENGLISH_NUMBER_WORD_VALUES[words[index]];
+    const month = ENGLISH_MONTH_NUMBER_VALUES[words[index]];
+    if (value !== undefined) allowed.add(value);
+    if (month !== undefined) allowedMonthNumbers.add(month);
+    if (value === undefined) continue;
+    const next = ENGLISH_NUMBER_WORD_VALUES[words[index + 1]];
+    // Translators commonly render spelled ordinals and compound numbers as
+    // Arabic digits (for example, “third quarter” as “3분기”).
+    if (value >= 20 && value < 100 && next !== undefined && next > 0 && next < 10) {
+      allowed.add(value + next);
+    }
+  }
+  return { numbers: allowed, months: allowedMonthNumbers };
+}
+
+const ENGLISH_MONTH_NUMBER_VALUES: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
 export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
 export type MarketRssTranslationFallbackHandler = (item: MarketRssItem, result: TranslationResult) => void;
@@ -102,17 +137,26 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     const fallback = await validationFallback("translation_response_unparseable");
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
-  // Every ASCII numeral in the source headline is protected as a placeholder.
-  // Any numeral returned outside those placeholders was not present in the
-  // headline and could fabricate a price, percentage, year, or financial value.
+  // Arabic numerals already present in the source are protected as placeholders.
+  // A translator may also render an English number word as a numeral, such as
+  // “third quarter” → “3분기”; allow only values found in the source words.
   const unprotectedHeadlineDigits = (providerHeadline || "")
     .replace(/ZX\d+Q/g, "")
     .replace(/&#(?:x[\da-f]+|\d+);/gi, "");
+  const allowedSpelledNumbers = getAllowedSpelledNumberValues(item.title);
+  const unprotectedNumerals = unprotectedHeadlineDigits.match(/\d+/g) || [];
+  const inventedNumeral = unprotectedNumerals.some((value) => {
+    const numericValue = Number(value);
+    if (allowedSpelledNumbers.numbers.has(numericValue)) return false;
+    const monthSuffix = new RegExp(`(?:^|\\D)${value}\\s*월`, "u");
+    return !allowedSpelledNumbers.months.has(numericValue) || !monthSuffix.test(unprotectedHeadlineDigits);
+  });
   const providerHeadlineWithSigns = (providerHeadline || "")
     .replace(/&#(?:43|x2b);/gi, "+")
     .replace(/&#(?:45|x2d);/gi, "-");
   const unprotectedFinancialSign = /[+\-−﹣－]ZX\d+Q|ZX\d+Q[+\-−﹣－]/i.test(providerHeadlineWithSigns);
-  if (/[0-9]/.test(unprotectedHeadlineDigits) || unprotectedFinancialSign) {
+  const signedUnprotectedNumeral = /[+\-−﹣－]\s*\d/.test(unprotectedHeadlineDigits);
+  if (inventedNumeral || unprotectedFinancialSign || signedUnprotectedNumeral) {
     const fallback = await validationFallback("translation_numeric_hallucination", translatedHeadline);
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
