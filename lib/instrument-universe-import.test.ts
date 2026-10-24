@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { classifyKr, classifyUs, INSTRUMENT_MASTER_MISSING_GRACE_RUNS, KR_MASTER_OFFSETS, nextMissingMasterState, parseDomestic, parseOverseas } from "@/lib/instrument-universe-import";
+import { classifyKr, classifyUs, INSTRUMENT_MASTER_MISSING_GRACE_RUNS, KR_MASTER_OFFSETS, nextMissingMasterState, parseDomestic, parseOverseas, US_MASTER_FIELDS } from "@/lib/instrument-universe-import";
+import { buildKisUsIndustryRows } from "@/lib/us-industry-code-sync";
 
 const masterDir = path.join(process.cwd(), "docs", "references", "kis-instrument-masters", "2026-08-18");
+const usMasterDir = process.env.KIS_US_MASTER_FIXTURE_DIR || masterDir;
 
 describe("KIS instrument master parsers", () => {
   it("tolerates one complete-master omission and disables only after the second consecutive omission", () => {
@@ -50,11 +52,30 @@ describe("KIS instrument master parsers", () => {
     expect(spac && classifyKr(spac).instrumentType).toBe("EXCLUDED_PRODUCT");
   });
   it("parses overseas tab masters and preserves market mapping", async () => {
-    const buffer = await readFile(path.join(masterDir, "NASMST.COD"));
+    const buffer = await readFile(path.join(usMasterDir, "NASMST.COD"));
     const rows = parseOverseas(buffer, "NAS", "NASMST.COD");
     expect(rows.length).toBeGreaterThan(4000);
     expect(rows[0]).toMatchObject({ market: "NAS", code: "AAAP", currency: "USD" });
     expect(rows.some((row) => row.isEtf)).toBe(true);
+    expect(US_MASTER_FIELDS).toMatchObject({ isDr: 17, industryCode: 19, etpType: 22 });
+    for (const [ticker, industryCode] of [["AAPL", "730"], ["MSFT", "720"], ["NVDA", "710"], ["TSLA", "310"], ["AAAP", "000"]]) {
+      expect(rows.find((row) => row.code === ticker), `${ticker} should be in the KIS NAS fixture`).toMatchObject({ industryCode });
+    }
+    expect(rows.find((row) => row.code === "AAAP")).toMatchObject({ securityType: "3", etpType: "001", isDr: false, isEtf: true });
+  });
+
+  it("builds KIS-only common-stock industry updates for all three U.S. exchanges", async () => {
+    const files = Object.fromEntries(await Promise.all(([
+      ["NAS", "NASMST.COD"], ["NYS", "NYSMST.COD"], ["AMS", "AMSMST.COD"],
+    ] as const).map(async ([market, file]) => [market, await readFile(path.join(usMasterDir, file))]))) as Parameters<typeof buildKisUsIndustryRows>[0];
+    const result = buildKisUsIndustryRows(files);
+    expect(result.rows.length).toBeGreaterThan(2000);
+    expect(result.eligibleCounts.NAS).toBeGreaterThan(0);
+    expect(result.eligibleCounts.NYS).toBeGreaterThan(0);
+    expect(result.eligibleCounts.AMS).toBeGreaterThan(0);
+    expect(result.rows.every((row) => row.industryCode === "000" || /^\d{3}$/.test(row.industryCode))).toBe(true);
+    expect(result.rows.some((row) => row.code === "AAAP")).toBe(false);
+    expect(result.rows.some((row) => row.code === "AAPL" && row.industryCode === "730")).toBe(true);
   });
 
   it("excludes KIS abbreviated SPAC units, preferred issues, warrants, and rights from common stocks", () => {

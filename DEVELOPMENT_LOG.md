@@ -1,3 +1,45 @@
+## [2026-10-24] 미국 보통주 KIS 산업분류 코드 파싱·운영 동기화
+
+### 목표
+- KIS 공식 마스터만 산업분류 출처로 사용하고, 미국 보통주 산업분류 코드를 운영 DB까지 안전하게 동기화한다.
+
+### 조사 결과
+- KIS 마스터 헤더 순서와 보관 원본을 대조해 `parseOverseas()`의 필드 오프셋 오류를 확인했다. 원본 `icod`는 `f[19]`인데 현재 `industry_code`는 `f[23]`에서 읽는다. 또한 `isdr`는 `f[17]`, `etyp`은 `f[22]`이나 현재 `f[20]`, `f[24]`를 읽는다.
+- 2026-08-18 원본의 실제 종목 예시에서 AAPL `730`, MSFT `720`, NVDA `710`, TSLA `310`을 확인했다. 따라서 “KIS 원본에 미국 업종 코드가 전부 없다”는 직전 결론을 정정한다.
+- 메인 해외 마스터 재적재의 conflict update에 `industryCode`가 없어 기존 행의 정정값도 갱신되지 않는 문제를 확인했다.
+- 산업코드 동기화 API를 추가해 KIS NAS/NYS/AMS 원본 3개가 모두 검증된 후 기존 활성 보통주 행의 산업코드만 하나의 트랜잭션으로 갱신하도록 했다. 관리자 GET은 시장별 coverage를 보여주고 POST는 원본 multipart 업로드를 받는다.
+- KIS 필드 오프셋 및 전체 적재 upsert를 교정했다. 산업분류 원천은 KIS만 사용한다.
+- 구현·운영 흐름을 [`docs/architecture/us-industry-classification-data-design.md`](docs/architecture/us-industry-classification-data-design.md)에 기록했다.
+
+### 검증
+- 보관된 KIS NAS/NYS/AMS 원본 12,725행을 확인했다. 올바른 ICOD 열에서 `000`이 아닌 코드는 NAS 1,405건, NYS 1,309건, AMS 105건이었다.
+- KIS 공식 다운로드 원본 NAS/NYS/AMS를 실시간으로 내려받아 파서 회귀 테스트에 제공했다. 파일은 각각 5,272행, 2,839행, 4,780행이며 현재 KIS 원본 형식 및 AAPL/MSFT/NVDA/TSLA 산업코드 샘플 검증을 통과했다.
+- 최신 KIS 파일 fixture를 포함한 parser·관리자 API 회귀 14개 통과. 최종 `npm.cmd run deploy:verify` 통과: build, standalone runtime smoke, desktop/mobile Chrome hydration, 전체 292개 test files(1,431 passed, 3 skipped), typecheck, docs/migration, auth/KIS/cron gates.
+- `.env.local` 기반 로컬 DB read-only 연결은 `localhost:5433` 연결 거부로 실패했다. 개발 서버 admin login은 `scripts/dev-server.mjs`가 `ADMIN_DASHBOARD_PASSWORD`를 제거하는 설계여서 500으로 확인됐고, 보호된 진단 경로는 401로 fail-closed 동작했다.
+- KIS 최신 원본은 내려받아 파싱 검증했으나 운영 DB 적재는 새 API 배포 후 진행해야 한다.
+
+### 남은 개선 및 재발 방지
+- KIS 전용 동기화 API를 운영에 배포한 다음 `.env.local` 인증값으로 운영 admin login을 시도하고, 인증 성공 시 KIS 원본 3개를 업로드한다.
+- 운영 DB에서 거래소별 활성 보통주 분모·분류/미분류 수와 API의 원본 후보·반영·미매칭 수를 대조한다. 인증 실패/불일치/코드 파싱 오류 시 성공 보고 금지.
+- API 전후 운영 집계가 일치하지 않거나 시장별 source count가 0이면 성공으로 간주하지 않고 원본/DB 샘플을 대조한다.
+
+### 반영
+- `parseOverseas()`의 KIS 오프셋을 바로잡고 미국 common/special master upsert에서 `industry_code`를 갱신하도록 수정했다.
+- KIS 3개 해외 마스터 전용 트랜잭션 sync 모듈과 관리자 진단/업로드 API를 추가했다. 미리 검증되지 않은 입력은 DB에 반영하지 않는다.
+- KIS 원본 regression/route tests 및 KIS 전용 설계 문서를 갱신했다.
+
+### 다음 개선
+- 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-24-003
+- 성과 판정: PARTIAL
+- 근거: KIS 오프셋 파싱, industry_code upsert, KIS 전용 트랜잭션 동기화 API와 KIS 최신 원본 parser 테스트까지 구현했다. 운영 DB 실제 반영과 coverage 증명은 아직 미완료다.
+- 다음 개선: 배포 API 인증 후 KIS 최신 원본을 업로드하고 거래소별 DB coverage와 미매칭을 확인한다.
+
+### 커밋·푸시·배포
+- 커밋 `0f7ddab5` 생성 완료(작업 브랜치 `codex/kis-industry-20261024`). push 및 운영 API 배포/적재는 아직 완료되지 않았다.
+
 ## [2026-10-24] Azure Text Translation endpoint 경로 정규화
 
 ### 목표
