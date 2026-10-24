@@ -3,9 +3,35 @@ import type { TranslationClient, TranslationFormat, TranslationLanguage, Transla
 type AzureError = Error & { status?: number; retryAfter?: string | null; providerReason?: string };
 const PROVIDER = "azure-translator";
 
+export function getAzureTranslatorEndpointDiagnostics(endpoint = process.env.AZURE_TRANSLATOR_ENDPOINT?.trim() || "") {
+  if (!endpoint) return null;
+  try {
+    const url = new URL(endpoint);
+    return {
+      host: url.host,
+      path: url.pathname,
+      queryPresent: Boolean(url.search),
+      pathAlreadyContainsTranslate: /(?:^|\/)translate\/?$/i.test(url.pathname),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function retryDelay(attempt: number, header: string | null) {
   const seconds = Number(header);
   return Number.isFinite(seconds) && seconds >= 0 ? Math.min(30_000, seconds * 1000) : Math.min(8_000, 500 * 2 ** (attempt - 1));
+}
+
+function buildTranslateUrl(endpoint: string, target: TranslationLanguage, source: TranslationSourceLanguage, format: TranslationFormat) {
+  const url = new URL(endpoint);
+  url.pathname = url.pathname.replace(/\/+$/, "");
+  if (!/(?:^|\/)translate$/i.test(url.pathname)) url.pathname = `${url.pathname}/translate`;
+  url.searchParams.set("api-version", "3.0");
+  url.searchParams.set("to", target);
+  if (source !== "auto") url.searchParams.set("from", source);
+  if (format === "html") url.searchParams.set("textType", "html");
+  return url;
 }
 
 export class AzureTranslationClient implements TranslationClient {
@@ -21,11 +47,7 @@ export class AzureTranslationClient implements TranslationClient {
   }
 
   async translate(text: string, source: TranslationSourceLanguage = "auto", target: TranslationLanguage = "ko", _format: TranslationFormat = "text", options?: TranslationRequestOptions): Promise<TranslationResult> {
-    const url = new URL(`${this.endpoint}/translate`);
-    url.searchParams.set("api-version", "3.0");
-    url.searchParams.set("to", target);
-    if (source !== "auto") url.searchParams.set("from", source);
-    if (_format === "html") url.searchParams.set("textType", "html");
+    const url = buildTranslateUrl(this.endpoint, target, source, _format);
     if (text.length > 50_000) throw new Error("Azure Translator request exceeds the documented 50,000-character request limit");
     const attempts = 3;
     for (let attempt = 1; attempt <= attempts; attempt++) {

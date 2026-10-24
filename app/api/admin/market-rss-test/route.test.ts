@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   requireAdminSession: vi.fn(),
@@ -22,6 +22,8 @@ vi.mock("@/lib/market-rss-translation-client", () => ({ createMarketRssTranslati
 
 import { GET } from "./route";
 import { TranslationClientOperationError } from "@/lib/translation-types";
+
+afterEach(() => vi.unstubAllEnvs());
 
 const feed = {
   source: "STOCKTITAN",
@@ -82,6 +84,21 @@ describe("market RSS translation test API scope", () => {
     ]);
     expect(JSON.stringify(body.translationDiagnostics)).not.toContain("should-not-leak");
     expect(state.previewMarketRssResults).toHaveBeenCalledOnce();
+  });
+
+  it("reports only the safe Azure Text endpoint shape in authenticated diagnostics", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_ENDPOINT", "https://example.cognitiveservices.azure.com/translator/text/v3.0/translate?subscription-key=must-not-leak");
+    const response = await GET(new Request("http://localhost/api/admin/market-rss-test?source=STOCKTITAN&translate=true&mode=PREVIEW&limit=1&diagnostics=true"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.azureEndpoint).toEqual({
+      host: "example.cognitiveservices.azure.com",
+      path: "/translator/text/v3.0/translate",
+      queryPresent: true,
+      pathAlreadyContainsTranslate: true,
+    });
+    expect(JSON.stringify(body.azureEndpoint)).not.toContain("must-not-leak");
   });
 
   it("rejects invalid preview limits and diagnostic use outside translated preview", async () => {

@@ -1,3 +1,32 @@
+## [2026-10-24] Azure Text Translation endpoint 경로 정규화
+
+### 목표
+Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해도 앱이 `/translate` 경로를 중복으로 붙이지 않도록 보완한다.
+
+### 반영
+- `AZURE_TRANSLATOR_ENDPOINT`의 마지막 path segment가 이미 `/translate`이면 유지하고, base endpoint이면 `/translate`를 추가하도록 URL을 정규화했다.
+- Azure 번역 클라이언트 회귀 테스트와 StockTitan 번역 운영 문서에 Key 1/Key 2, Text Translation endpoint, Document Translation endpoint의 구분을 기록했다.
+- 관리자 RSS 미리보기의 bounded `diagnostics=true` 응답에 Azure endpoint의 secret-free host/path shape를 추가해 운영 endpoint가 base URL인지 `/translate` 완성 URL인지 확인할 수 있게 했다.
+
+### 검증
+- `npm.cmd exec vitest run -- lib/azure-translation-client.test.ts app/api/admin/market-rss-test/route.test.ts --reporter=dot`: Azure endpoint 회귀 테스트 및 관리자 진단 API 테스트 통과.
+- `npm.cmd run docs:check`: 통과.
+- 최종 `npm.cmd run deploy:verify`: 통과. dependency audit 0 취약점, production build, standalone `/charts` HTTP 200 및 desktop/mobile Chrome hydration, API smoke, 전체 292개 테스트 파일(1,426 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron 게이트 통과.
+- Windows 격리 worktree의 임시 dependency junction으로 인해 standalone tracing 시 EPERM 경고가 있었으나 서버 기동, 브라우저 및 API smoke가 통과했다. OCI workflow는 Linux checkout에서 별도 빌드하므로 이 로컬 junction 경고는 운영 환경의 배포 오류로 간주하지 않는다.
+- 운영 배포 전이므로 이 런타임의 Azure provider 요청은 미실행이다. 수정 전 운영 로그는 최근 Azure 호출 3회 실패를 보였으나 HTTP/provider 응답 상세를 저장하지 않아 endpoint 원인 여부는 미확정이다.
+- 수정 전 확인된 운영 Azure 호출은 최근 실행 3회 실패했으나 HTTP/provider 응답 상세는 저장하지 않아 endpoint가 원인인지 아직 확정할 수 없다. 새 경로는 배포 후 관리자 preview에서 실호출해 확인한다.
+
+### 다음 개선
+- 배포 후 관리자 RSS preview의 `diagnostics=true` 응답에서 endpoint 형식과 Azure provider 오류를 확인한다. 원인이 별도 Key/Region mismatch이면 자격증명 값 대신 리소스 종류·지역 설정을 맞춘다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-002
+성과 판정: PARTIAL
+근거: 포털 Text Translation endpoint 경로 중복이라는 코드 결함을 예방하도록 보완했지만 운영 실호출 전이라 실제 장애 원인 확정은 남아 있다.
+
+### 커밋·푸시·배포
+- 미실행: 커밋·푸시·배포 전이다. 검증은 모두 통과했으며 최신 `origin/oci` 기준 격리 worktree에서 이번 관련 6개 파일만 커밋·push한다. 기존 checkout의 unrelated 사용자 변경은 포함하지 않는다.
+
 ## [2026-10-21] RSS 번역 무료량 공식 기준과 실제 앱 상한 문서 정합성
 
 ### 목표

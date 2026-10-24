@@ -9,6 +9,7 @@ import type { TranslationClient } from "@/lib/translation-types";
 import { getMarketRssTranslationConfiguration } from "@/lib/market-rss-translation-configuration";
 import { TranslationClientOperationError } from "@/lib/translation-types";
 import { sanitizeMarketRssTranslationError } from "@/lib/market-rss-translation-retry";
+import { getAzureTranslatorEndpointDiagnostics } from "@/lib/azure-translation-client";
 
 const withTranslation = async (feed: Awaited<ReturnType<typeof fetchMarketRssSource>>, translate: boolean, client?: TranslationClient) =>
   translate ? { ...feed, items: await translateMarketRssItems(feed.items, client) } : feed;
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
       translationDiagnostics.push({ itemId: item.id, stage: "provider_fallback", provider: result.provider, message: sanitizeMarketRssTranslationError(result.providerFallbackError) });
     } : undefined;
     const [preview] = await previewMarketRssResults([{ source, ok: true, feed: limitedFeed }], translate, translationClient, onItemError, onProviderFallback);
-    return NextResponse.json({ ...preview, fetchedAt: new Date().toISOString(), mode, translate, translationConfiguration, ...(tracked ? { translationUsage: tracked.getMetrics() } : {}), ...(includeDiagnostics ? { translationDiagnostics } : {}) });
+    return NextResponse.json({ ...preview, fetchedAt: new Date().toISOString(), mode, translate, translationConfiguration, ...(tracked ? { translationUsage: tracked.getMetrics() } : {}), ...(includeDiagnostics ? { translationDiagnostics, azureEndpoint: getAzureTranslatorEndpointDiagnostics() } : {}) });
   } catch (error) {
     const diagnostics = describeError(error);
     return NextResponse.json({ fetchedAt: new Date().toISOString(), source: source || null, mode, ok: false, stage: mode === "PREVIEW" && translate ? "translation" : "fetch", ...diagnostics }, { status: 502 });
