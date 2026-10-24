@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   isSchemaError: vi.fn(),
   recordSkipped: vi.fn(),
   withAutomationLock: vi.fn(),
-  getBatchSize: vi.fn(),
   getCronStatus: vi.fn(),
   order: [] as string[],
 }));
@@ -32,7 +31,6 @@ vi.mock("@/lib/error-diagnostics", () => ({ describeError: mocks.describeError, 
 vi.mock("@/lib/automation-run-repository", () => ({ recordSkippedAutomationRun: mocks.recordSkipped }));
 vi.mock("@/lib/market-rss-bullish-repository", () => ({ syncMarketRssBullishArticles: mocks.bullish }));
 vi.mock("@/lib/automation-lock", () => ({ withAutomationLock: mocks.withAutomationLock }));
-vi.mock("@/lib/market-rss-batch-size", () => ({ getMarketRssBatchSize: mocks.getBatchSize }));
 vi.mock("@/lib/market-rss-cron-status", () => ({ getMarketRssCronStatus: mocks.getCronStatus }));
 
 import { POST } from "./route";
@@ -42,8 +40,8 @@ describe("market-rss cron route", () => {
     vi.clearAllMocks();
     mocks.order.length = 0;
     process.env.CRON_SECRET = "test-secret";
-    process.env.RSS_TRANSLATION_BATCH_SIZE = "";
-    process.env.RSS_NOTIFICATION_BATCH_SIZE = "";
+    process.env.RSS_TRANSLATION_BATCH_SIZE = "3";
+    process.env.RSS_NOTIFICATION_BATCH_SIZE = "3";
     mocks.loadSettings.mockResolvedValue({ enabled: true, featureSettings: { marketRss: { enabledSources: ["STOCKTITAN"] } } });
     mocks.isWithinSchedule.mockReturnValue(true);
     mocks.withAutomationLock.mockImplementation(async (_key: string, run: () => Promise<unknown>) => run());
@@ -52,7 +50,6 @@ describe("market-rss cron route", () => {
     mocks.translate.mockImplementation(async () => { mocks.order.push("translate"); return { attempted: 3, translated: 2, notRequired: 0, fallback: 1, failed: 0, fallbackReasons: { test: 1 }, translationUsage: null, limitReached: false, limitAlertSent: false, thresholdAlerts: [], thresholdAlertSent: 0 }; });
     mocks.bullish.mockImplementation(async () => { mocks.order.push("bullish"); return { processed: 3 }; });
     mocks.notify.mockImplementation(async () => { mocks.order.push("notify"); return { attempted: 3, sent: 3, queueEnqueueFailed: 0, skipped: false, batchLimit: 1_000, webhookConfigured: true }; });
-    mocks.getBatchSize.mockImplementation((configured: string, fallback: number) => Number(configured) || fallback);
     mocks.getCronStatus.mockReturnValue({ degraded: true, partialFailureCount: 1, ingestFailureCount: 0, translationFailureCount: 1 });
   });
 
@@ -75,14 +72,14 @@ describe("market-rss cron route", () => {
     expect(mocks.order).toEqual(["ingest", "translate", "notify"]);
     expect(mocks.bullish).not.toHaveBeenCalled();
     expect(mocks.ingest).toHaveBeenCalledWith({ sources: ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"] });
-    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 50, 50);
-    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 50, 50);
+    expect(mocks.translate).toHaveBeenCalledWith(20);
+    expect(mocks.notify).toHaveBeenCalledWith(20);
     expect(mocks.getCronStatus).toHaveBeenCalledWith(0, expect.objectContaining({ attempted: 3, translated: 2, fallback: 1, failed: 0 }));
   });
 
   it("ends after one bounded batch and reports that the next timer tick must continue the backlog", async () => {
-    mocks.translate.mockResolvedValueOnce({ attempted: 50, translated: 50, notRequired: 0, fallback: 0, failed: 0, fallbackReasons: {}, translationUsage: null, limitReached: false, limitAlertSent: false, thresholdAlerts: [], thresholdAlertSent: 0 });
-    mocks.notify.mockResolvedValueOnce({ attempted: 50, sent: 50, queueEnqueueFailed: 0, skipped: false, batchLimit: 50, webhookConfigured: true });
+    mocks.translate.mockResolvedValueOnce({ attempted: 20, translated: 20, notRequired: 0, fallback: 0, failed: 0, fallbackReasons: {}, translationUsage: null, limitReached: false, limitAlertSent: false, thresholdAlerts: [], thresholdAlertSent: 0 });
+    mocks.notify.mockResolvedValueOnce({ attempted: 20, sent: 20, queueEnqueueFailed: 0, skipped: false, batchLimit: 20, webhookConfigured: true });
 
     const response = await POST(new Request("http://localhost/api/cron/market-rss", {
       method: "POST",
@@ -90,7 +87,7 @@ describe("market-rss cron route", () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ backlogRemaining: true, degraded: true, notified: { sent: 50 } });
+    expect(await response.json()).toMatchObject({ backlogRemaining: true, degraded: true, notified: { sent: 20 } });
     expect(mocks.translate).toHaveBeenCalledTimes(1);
     expect(mocks.notify).toHaveBeenCalledTimes(1);
   });

@@ -1,3 +1,36 @@
+## [2026-10-25] RSS batch 설정 실행 프로세스 경계 수정
+
+### 목표
+- 새 배포 `84f7dc79` 이후에도 운영 RSS run이 회당 세 건만 처리해, 번역·알림 batch 설정이 실제 앱에 적용되지 않은 점을 수정한다.
+
+### 근본 원인
+- `stockman-rss.service`는 `scripts/oci-rss-cron.sh`로 HTTP 요청만 보낸다. batch 환경변수는 이미 떠 있는 `stockman.service` 앱 프로세스가 읽으므로 RSS oneshot service의 `Environment=`는 API route 동작에 영향을 주지 않았다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: 번역·알림 크기를 앱 route에서 실행당 20건으로 고정한다.
+- `app/api/cron/market-rss/route.test.ts`: 앱 환경에 batch 값 `3`이 있어도 두 pipeline 호출이 `20`을 받는지 검증한다.
+- `scripts/check-oci-cron.mjs`, `deploy/oci/README.md`, `docs/ERROR_HANDLING.md`: 앱 route가 배치 크기를 소유한다는 설정 경계를 기록하고 검사한다. RSS oneshot unit의 영향 없는 환경 설정은 제거한다.
+
+### 검증
+- GitHub Actions run `40108162312` 성공 및 운영 `/health-check`에서 배포 SHA `84f7dc79`를 확인했다. 그 뒤 `15:48:53Z` RSS run은 여전히 `attempted=3`, `translated=0`, `notified.sent=0`이어서 batch 설정 적용 실패를 재현했다.
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/translate-market-rss-item.test.ts lib/market-rss-translation-client.test.ts` 재실행에서 3개 파일 84개 테스트 통과했다. `npm.cmd run cron:check`와 `npm.cmd run docs:check`도 통과했다. 첫 실행은 route 테스트 mock 잔여 참조 때문에 실패했으며 수정 후 재실행 통과했다.
+- route 테스트는 앱 RSS batch 환경변수를 `3`으로 설정해도 번역·알림 함수에 `20`을 전달하는 것을 확인했다. 최신 `origin/oci` 통합 tree의 `npm.cmd run deploy:verify` 통과(297개 파일 통과, 1개 skip; 1,450 tests 통과, 3개 skip), build, typecheck, standalone runtime smoke, Chrome desktop/mobile hydration, docs/migration 및 cron 검사 통과했다.
+- 새 route 고정 batch의 fast-forward push, 재배포 및 실제 attempted 20·backlog 진행은 아직 확인하지 않았다.
+
+### 남은 위험
+- 번역 품질 및 Google 월 한도 초과로 일부 제목은 계속 보류될 수 있다. 번역되지 않은 원문은 Discord로 우회 전송하지 않는다.
+
+### 다음 개선
+- `deploy:verify`와 회귀 테스트를 통과한 뒤 RSS route 변경을 fast-forward 배포하고, 실제 운영 run에서 attempted 20 및 translated·Discord sent 증가를 확인한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-013
+성과 판정: PARTIAL
+근거: 배치 설정이 앱 환경에 적용되지 않는 실행 경계를 운영 로그로 재현했으며 route 수준 변경은 반영했지만, 새 revision 배포와 backlog 처리는 미완료다.
+
+### 커밋·푸시·배포
+- 미실행: 최신 route 변경 전체 검증, 한국어 상세 커밋, fast-forward push, 운영 재배포.
+
 ## [2026-10-25] RSS 숫자 변환 검증 오탐과 운영 batch override 수정
 
 ### 목표

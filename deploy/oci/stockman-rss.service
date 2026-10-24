@@ -8,8 +8,6 @@ Type=oneshot
 User=stockman
 WorkingDirectory=/opt/stockman/current
 EnvironmentFile=/etc/stockman/stockman.env
-Environment=RSS_TRANSLATION_BATCH_SIZE=20
-Environment=RSS_NOTIFICATION_BATCH_SIZE=20
 ExecStart=/opt/stockman/current/scripts/oci-rss-cron.sh
 TimeoutStartSec=240s
 TimeoutStopSec=30s

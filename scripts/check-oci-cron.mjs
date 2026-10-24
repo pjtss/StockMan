@@ -22,7 +22,6 @@ const activation = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"),
 const workflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
 const automationRuns = fs.readFileSync(path.resolve("lib/automation-run-repository.ts"), "utf8");
 const rssTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-rss.timer"), "utf8");
-const rssService = fs.readFileSync(path.resolve("deploy/oci/stockman-rss.service"), "utf8");
 const rssRoute = fs.readFileSync(path.resolve("app/api/cron/market-rss/route.ts"), "utf8");
 const rssDiscordPolicy = fs.readFileSync(path.resolve("lib/market-rss-discord-policy.ts"), "utf8");
 const rssTranslationGate = fs.readFileSync(path.resolve("lib/market-rss-notification-translation-gate.ts"), "utf8");
@@ -65,8 +64,8 @@ if (!automationRuns.includes("FUNDAMENTALS_STALE_RUN_AFTER_SECONDS = 5 * 60 * 60
 if (!/OnUnitActiveSec=1min/.test(rssTimer) || !/Persistent=true/.test(rssTimer)) {
   throw new Error("RSS timer must poll every minute and catch up after downtime");
 }
-if (!/EnvironmentFile=\/etc\/stockman\/stockman\.env\r?\nEnvironment=RSS_TRANSLATION_BATCH_SIZE=20\r?\nEnvironment=RSS_NOTIFICATION_BATCH_SIZE=20/.test(rssService)) {
-  throw new Error("RSS service must override stale batch settings and process 20 translation and notification candidates per timer run");
+if (!/const MARKET_RSS_BATCH_SIZE = 20/.test(rssRoute)) {
+  throw new Error("RSS application route must bound each translation and notification batch at 20 candidates");
 }
 for (const source of ['"GLOBENEWSWIRE"', '"STOCKTITAN"', '"SEC_EDGAR"']) {
   if (!rssRoute.includes(source)) throw new Error(`RSS cron is missing required source ${source}`);
