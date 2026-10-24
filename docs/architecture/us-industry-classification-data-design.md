@@ -95,7 +95,12 @@ KIS Developers는 종목정보 마스터를 주문·시세조회 가능한 전�
 - 운영 집계만으로 90개 KIS 후보 미매칭과 1,436개 활성 DB 단독 행의 유형을 확인할 수 없던 것이 후속 조사 차단점이었다.
 - 관리자 보호 `/api/admin/us-industry-codes?mode=audit`에 세 KIS 마스터 업로드를 받아 원본 전체 행을 현재 KIS 분류 함수로 라벨링하고 공통/특수 instrument table과 read-only 조인하는 경로를 추가했다.
 - 결과에는 거래소별 후보·미분류·매칭·누락·코드 불일치와 종목별 KIS security type/DR/ETP/분류 제외 사유, DB common/special 상태, 원본·저장 업종코드가 포함된다. `BEGIN READ ONLY` 트랜잭션이며 저장 경로와 분리한다.
-- 대상 Vitest 3개 파일 19개 테스트 통과. 전체 배포 검증 및 운영 read-only 감사는 아직 수행 전이므로, 현재 6,704개 전체의 분류 완료로 판단하지 않는다.
+- 대상 Vitest 3개 파일 19개 테스트 통과. 커밋 `2bb1c946f285907036feed9750d21e5fc14e8b6e` 운영 배포 및 `npm.cmd run deploy:verify` 완료 후 `.env.local` 관리자 인증으로 새 read-only 감사 API를 실제 호출했다. 감사 응답 `databaseWritePerformed:false`를 확인했다.
+- 운영 감사 결과는 NAS/NYS/AMS 순으로 KIS 후보 3,240/1,864/254(총 5,358), 매칭 활성 보통주 3,176/1,855/237(총 5,268), KIS 후보이나 활성 common에 없는 종목 64/9/17(총 90), KIS 후보가 아닌 활성 DB common 773/625/38(총 1,436), KIS 원본과 저장 코드 불일치 0건이다. 앞선 독립 GET의 유효 코드 2,634건도 원본의 비영 `icod` 수와 일치한다.
+- 1,436개 DB 단독 활성 행의 KIS 필드 기반 분류는 NAS: `SPAC` 400, `DERIVATIVE` 216, `DEBT_SECURITY` 43, `DR` 14, `NOT_IN_KIS_MASTER` 100; NYS: 73/387/57/70/38; AMS: 2/21/4/1/10이다. 합계 `SPAC` 475, `DERIVATIVE` 624, `DEBT_SECURITY` 104, `DR` 85, `NOT_IN_KIS_MASTER` 148이다. 이들은 현재 DB에서 `COMMON_STOCK`로 활성화돼 있어 공통주 universe 정합성 위험이 확인됐다.
+- KIS 공식 후보 5,358개 중 2,724개의 원본 업종코드가 `000`이므로 KIS 자체 미분류다. 별도 집계로 90개 KIS 후보 미등록 행 전부 원본 코드가 `000`(유효 코드 0, 미분류 90)임을 확인했다. 따라서 이 90개에도 현재 얻을 수 있는 섹터 코드는 없다. 원본 `000`을 다른 데이터나 회사명 추정으로 덮지 않는다.
+- **완료 범위**: KIS가 분류한 2,634개 유효 코드의 저장값 동일성 검증 완료(매칭 집합의 mismatch 0). **미완료**: 90개 공식 common 후보의 universe 편입, 1,436개 DB 단독 행의 상태/partition 정비, KIS 원본 `000` 2,724개의 미분류 해소 여부. 이번 감사는 읽기 전용이며 이 항목들을 수정하지 않았다.
+- **다음 단계**: KIS 공식 master에서 확인된 common 후보의 안전한 universe upsert와 KIS가 SPAC/파생/채무/DR로 명확히 분류한 현재 common 활성행의 special partition 전환을 별도 설계·검증한다. `NOT_IN_KIS_MASTER` 148건은 부적격으로 단정하지 말고 KIS 공식 상태/필드 추가 확인 전까지 별도 unresolved로 유지한다. `icod=000`은 공식 분류값 추가가 확인되지 않으면 계속 미분류로 둔다.
 
 ## 공식·프로젝트 참고자료
 
