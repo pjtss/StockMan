@@ -1,3 +1,33 @@
+## [2026-10-24] GlobeNewswire 운영 homepage override 자동 복구
+
+### 목표
+- 새 bounded alert cron에서 GlobeNewswire fetch가 실패했다. 운영 `/api/admin/debug-suite?checks=rss`에서 `GLOBENEWSWIRE` snapshot URL이 RSS가 아닌 `https://rss.globenewswire.com/` homepage로 확인됐다.
+
+### 반영
+- `lib/globenewswire-rss.ts`: 알려진 GlobeNewswire 도메인 homepage root override를 거부하고 공식 Public Companies RSS endpoint로 자동 복구한다. 정상적인 명시 RSS endpoint override는 유지한다.
+- `lib/globenewswire-rss.test.ts`: 세 homepage root URL의 fallback과 정상 RSS endpoint override 유지 회귀 테스트를 추가한다.
+- `docs/operations/globenewswire-rss-recovery.md`: root override 자동 복구 정책과 배포 후 snapshot 확인을 기록한다.
+
+### 검증
+- `npm.cmd exec vitest run -- lib/globenewswire-rss.test.ts app/api/cron/market-rss/route.test.ts --reporter=dot`: 2개 파일, 8개 테스트 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 296개 테스트 파일(295 통과·1 skip; 1,433 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API 관측(2026-10-24 12:58 UTC): 새 9e93b225 run은 7.8초에 완료하고 Discord 3건을 전송했다(`notified.sent=3`, `attempted=3`, webhook configured). GlobeNewswire는 source fetch 실패했고 latest snapshot URL이 `https://rss.globenewswire.com/`로 확인됐다. 별도 run 339548은 26.7초에 Discord 1건 전송했으나 GlobeNewswire 역시 fetch 실패였다.
+- SEC/StockTitan의 제목만 provider 번역하고 본문·요약은 원문 그대로 유지한다. 검증 실패 제목은 번역 gate에서 발송을 보류한다.
+
+### 다음 개선
+- 전체 검증 및 OCI 재배포 후 GlobeNewswire snapshot URL이 공식 feed로 바뀌고 count>0인지, source별 Discord 전송이 발생하는지 확인한다.
+- feed가 유효한 빈 결과를 반환하면 발송 기사가 없는 것으로 해석하고, fetch/XML 오류라면 source snapshot의 오류 사유를 운영 진단에 노출해 계속 감시한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-007
+성과 판정: PARTIAL
+근거: 운영 snapshot으로 오래된 홈페이지 override를 근본 원인으로 특정하고 자동 fallback을 추가했으며 현재 revision의 전체 deploy:verify가 통과했다. 재배포 후 GlobeNewswire 실제 수신은 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 검증·push·배포 및 GlobeNewswire fetch/Discord 수신 확인 전.
+
 ## [2026-10-24] RSS 알림 cron에서 Bullish RSS 전체 재색인 분리
 
 ### 목표

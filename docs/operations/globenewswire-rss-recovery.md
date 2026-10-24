@@ -7,7 +7,7 @@
 ## 수정
 
 - GlobeNewswire 공식 Public Companies RSS URL을 기본값으로 사용한다.
-- `GLOBENEWSWIRE_RSS_URL` 명시적 재정의는 유지한다. 운영 환경에서 이 변수를 설정했다면 값이 홈페이지가 아닌 공식 RSS/Atom endpoint인지 확인한다.
+- 정상적인 `GLOBENEWSWIRE_RSS_URL` RSS/Atom 재정의는 유지한다. 다만 `globenewswire.com`, `www.globenewswire.com`, `rss.globenewswire.com`의 홈페이지 루트가 설정되면 이를 무시하고 공식 Public Companies RSS endpoint를 사용한다.
 - 공통 파서는 XML 문법과 RSS `<rss><channel>` 또는 Atom `<feed>` root를 검증한다. HTML 200, 잘못된 XML, 지원하지 않는 root, channel 없는 RSS는 수집 실패로 처리한다. 유효한 빈 RSS/Atom은 허용한다.
 
 ## 검증
@@ -21,7 +21,7 @@
 1. 운영 `/api/admin/debug-suite?checks=rss` 결과에서 최신 `GLOBENEWSWIRE` snapshot URL이 공식 피드 주소인지 확인한다.
 2. 최근 `market-rss` run의 해당 source 결과가 `FETCH_FAILED`가 아닌지, `count`가 0보다 큰지 확인한다.
 3. `market_rss_articles`에서 `source='GLOBENEWSWIRE'` 행의 최신 `created_at` 및 `published_at`이 업데이트되는지 확인한다.
-4. 운영 URL이 계속 홈페이지 루트라면 운영 `GLOBENEWSWIRE_RSS_URL` override를 점검한다.
+4. 최신 source snapshot URL이 홈페이지 루트가 아니라 공식 feed 또는 검증된 RSS/Atom endpoint인지 확인한다. 홈페이지 루트 override는 앱에서 자동으로 공식 feed로 대체한다.
 
 ## 재발 방지
 
