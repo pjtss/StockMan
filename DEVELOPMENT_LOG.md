@@ -51,6 +51,35 @@
 
 ### 커밋·푸시·배포
 - 커밋 `0f7ddab5` 생성 완료(작업 브랜치 `codex/kis-industry-20261024`). push 및 운영 API 배포/적재는 아직 완료되지 않았다.
+## [2026-10-24] GlobeNewswire RSS 호스트 403 복구
+
+### 목표
+- RSS-only fallback을 배포했으나 운영 `/api/debug/automation-runs?module=market-rss`에서 GLOBENEWSWIRE가 계속 `FETCH_FAILED`였다. 실행 중인 `www.globenewswire.com/RssFeed/...` URL은 로컬 네트워크 재현에서도 403이었다.
+
+### 반영
+- `lib/globenewswire-rss.ts`: Public Companies feed 기본 호스트를 동일한 공식 RSS 경로를 제공하며 HTTP 200을 반환하는 `rss.globenewswire.com`으로 변경했다. 홈페이지 root fallback과 정상 custom feed override는 유지한다.
+- `lib/globenewswire-rss.test.ts`: root fallback이 RSS host의 feed URL을 선택하는지 검증한다.
+- `docs/operations/globenewswire-rss-recovery.md`: 403 재현, 새 host의 HTTP 응답, 배포 후 검증 절차를 기록한다.
+
+### 검증
+- 공식 GlobeNewswire RSS feed 목록의 Public Companies 경로를 기준으로 host를 비교했다. `www.globenewswire.com` RSS·Atom URL은 HTTP 403, 같은 RSS 경로의 `rss.globenewswire.com`은 HTTP 200, `application/rss+xml`, 47,689 bytes를 반환했다.
+- `npm.cmd exec vitest run -- lib/globenewswire-rss.test.ts --reporter=dot`: 1개 파일, 4개 테스트 통과. `npm.cmd run docs:check`: 통과.
+- `npm.cmd run deploy:verify`: 의존성 감사 취약점 0, 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 296개 테스트 파일(295 통과·1 skip; 1,434 통과·3 skip), typecheck, docs/migrations, verify-scope, KIS boundary, Bearer auth(178 routes), OCI cron 검사 통과. Windows junction standalone trace EPERM 경고는 있었으나 모든 runtime/browser/API smoke가 통과했다.
+- 앞선 배포 commit `9d737083`의 OCI workflow는 성공했으며 운영 `/health-check`가 해당 commit을 반환했다. 다만 그 cron의 GlobeNewswire 수집은 계속 실패했고 이 항목은 새 host 변경 후 재배포가 필요하다.
+- StockTitan·SEC cron 실행과 Discord 전송은 운영 요약에서 관측됐지만, GlobeNewswire 성공 및 과거 backlog 전체 발송은 아직 확인되지 않았다. 번역 provider 검증이 실패한 제목은 전송 gate에서 보류되어 재시도된다.
+
+### 다음 개선
+- `npm.cmd run deploy:verify` 및 `npm.cmd run docs:check` 후 새 RSS 변경을 배포한다. 배포된 run에서 GLOBENEWSWIRE `STORED`와 count>0, translated title 및 Discord `SENT`를 확인한다.
+- 번역 오류·provider 응답 품질·공급자 가용성이 backlog 완료를 지연할 수 있으므로 실패 사유와 backlog를 모니터링한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-008
+성과 판정: PARTIAL
+근거: 403을 재현하고 RSS host를 수정했으며 전체 deploy:verify가 통과했다. 현재 revision의 배포와 GlobeNewswire 실제 발송은 미완료다.
+
+### 커밋·푸시·배포
+- 미실행: 새 RSS host 변경의 한국어 상세 커밋·push 및 OCI 배포. 앞선 RSS-only deployment branch workflow는 새 `oci` 실행과 같은 concurrency group을 공유해 취소됐고, 뒤이어 원격 `oci`의 최신 descendant `9d737083` 배포가 성공했다.
+
 ## [2026-10-24] GlobeNewswire 운영 homepage override 자동 복구
 
 ### 목표
@@ -74,7 +103,7 @@
 - feed가 유효한 빈 결과를 반환하면 발송 기사가 없는 것으로 해석하고, fetch/XML 오류라면 source snapshot의 오류 사유를 운영 진단에 노출해 계속 감시한다.
 
 ### 개선 과제
-개선 과제 ID: CI-2026-10-24-008
+개선 과제 ID: CI-2026-10-24-010
 성과 판정: PARTIAL
 근거: 운영 snapshot으로 오래된 홈페이지 override를 근본 원인으로 특정하고 자동 fallback을 추가했으며 현재 revision의 전체 deploy:verify가 통과했다. 재배포 후 GlobeNewswire 실제 수신은 미확인이다.
 
