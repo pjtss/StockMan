@@ -6838,3 +6838,29 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 개선 과제 ID: CI-2026-10-24-012
 - 성과 판정: IN_PROGRESS
 - 코드 변경은 현재 로컬 작업 트리에만 있으며 아직 커밋·푸시·배포하지 않았다. 전체 검증 후 `oci` 반영 및 운영 read-only 감사로 이어간다.
+## [2026-10-25] KIS 미국 보통주 산업코드·유니버스 원자적 동기화 보강
+
+### 목표
+- KIS 공식 NAS/NYS/AMS 마스터에서 확인되는 미국 보통주 전체의 `icod`를 운영 DB에 저장하고 원본과 대조한다. 산업분류 출처는 KIS만 사용하며 SEC 데이터는 사용하지 않는다.
+
+### 발견 및 변경
+- 운영 read-only 감사에서 KIS common 후보 90개가 활성 common 테이블에 없고, 반대로 활성 common 1,436개가 최신 KIS 후보에 없음을 재확인했다. 단순 `industry_code` UPDATE로는 두 차이가 해소되지 않아 동기화 성공을 전체 종목 저장 성공으로 볼 수 없었다.
+- `lib/us-industry-code-sync.ts`: 원본 common 전체 upsert, 원본 특수상품을 special partition에 upsert, KIS 후보 밖의 활성 common 비활성화를 하나의 트랜잭션 및 advisory lock으로 묶었다. 사후 common 누락·산업코드 불일치·DB 단독 활성 common·special 누락이 남으면 전체 rollback하도록 했다.
+- `lib/instrument-universe-import.ts`: KIS `stis`/`etyp`을 반영해 지수·ETP·비주식·알 수 없는 security type을 공통주로 오인하지 않도록 fail-closed 분류를 보강했다.
+- `lib/instrument-universe-import.test.ts`: common/special 분리 및 인덱스·ETP·미확인 유형에 대한 회귀검사를 추가했다.
+- `docs/architecture/us-industry-classification-data-design.md`, `docs/ERROR_HANDLING.md`: 정합성 기준, 000 보존, 비활성 데이터 보존, 트랜잭션 rollback 및 재발검증을 문서화했다.
+
+### 검증
+- 대상 테스트: `npm.cmd test -- --run lib/instrument-universe-import.test.ts app/api/admin/us-industry-codes/route.test.ts` 통과(2개 파일, 17개 테스트).
+- 사용자 기본 프로젝트 `.env.local`을 우선 로드해 KIS 공식 OAuth를 실제 호출했다(HTTP 200, 86,400초 만료). 토큰과 자격증명은 출력하지 않았다. 공식 KIS 다운로드 호스트에서 NAS/NYS/AMS ZIP을 모두 HTTP 200으로 받아 현재 파서 테스트에 사용했으며, 3개 테스트 파일 20개 테스트가 통과했다.
+- 1차 `deploy:verify`는 기존 SQL mock이 새로운 INSERT 트랜잭션 경로를 모사하지 못해 동기화 테스트 1건이 실패했다. mock을 실제 전체 upsert·검증 호출 순서로 수정하고 대상 20개 테스트를 재실행해 통과시켰다. 후속 `deploy:verify`는 build, standalone runtime smoke, Chrome 데스크톱·모바일 hydration, typecheck, docs/migration 및 audit 게이트와 전체 테스트(297개 파일 통과, 1개 skip; 1,451 tests 통과, 3개 skip)를 모두 통과했다.
+
+### 남은 위험 및 다음 단계
+- KIS 원본 `icod=000`은 공식적으로 미분류이며 이 코드에서 업종을 추정하지 않는다.
+- KIS 최신 공식 마스터 3개를 확보하고 전체 검증을 통과한 뒤에만 운영 저장 API를 호출한다. 운영 응답과 별도 read-only 감사 모두에서 KIS candidate coverage 완전 일치, code mismatch 0, 활성 common 외부 행 0을 확인한다.
+- 세 게이트(빌드·테스트·실행) 및 `npm.cmd run deploy:verify`가 성공하기 전에는 커밋/푸시하지 않는다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-015
+성과 판정: IN_PROGRESS
+근거: 동기화 경로와 파서 분류를 보강하고 대상 테스트는 통과했다. 전체 배포 검증, 운영 KIS 업로드 및 저장 후 감사를 완료하기 전까지 성공으로 판정하지 않는다.

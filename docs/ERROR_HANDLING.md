@@ -1,5 +1,13 @@
 # 오류 상황 및 해결 방법
 
+## 2026-10-25 KIS 미국 업종 동기화의 운영 universe 미정합
+
+- **증상**: KIS 업종 UPDATE 결과의 코드 불일치는 0이지만, KIS 보통주 후보 일부가 저장되지 않고 KIS 원본과 무관한 활성 `COMMON_STOCK` 행이 남아 전체 보통주 업종 저장을 보장할 수 없었다.
+- **근본 원인**: 기존 동기화가 양쪽 테이블 교집합에만 `industry_code`를 UPDATE했으며 KIS 후보를 신규 반영하거나 잘못 활성화된 common·특수상품 partition을 함께 정합화하지 않았다.
+- **해결 위치**: `lib/us-industry-code-sync.ts`의 KIS full sync에서 NAS/NYS/AMS 전체 후보 및 특수행 upsert, 외부 활성 common 비활성화, 사후검증을 단일 transaction/advisory lock으로 묶는다. `lib/instrument-universe-import.ts`는 KIS 비주식·ETP·알 수 없는 유형을 fail-closed 처리한다.
+- **재발 자동 감지**: 업로드 사후에 `missingCount=0`, `mismatchCount=0`, `activeDatabaseOnlyCount=0`, special source missing `0`을 transaction 안에서 강제하고, 운영 `mode=audit` read-only 결과로 다시 대조한다. KIS 원본 코드 `000`은 미분류로 보존한다.
+- **영향 및 남은 위험**: KIS 마스터 밖 기존 common 행은 삭제하지 않고 비활성화해 이력을 보존한다. KIS 원본 `000`에는 유효 분류 코드가 없으므로 실제 분류 커버리지는 원천 품질에 제한된다. 전체 검증 및 운영 재대조가 성공하기 전에는 완료로 보고하지 않는다.
+
 ## 2026-10-25 RSS 제목 숫자 번역과 backlog 배치 설정
 
 - **증상**: 운영 RSS가 Azure로 제목을 한국어 번역했지만 `Third Quarter`를 `3분기`로 바꾼 숫자를 미번역 숫자로 오인해 `translation_numeric_hallucination`으로 차단했다. 동시에 RSS timer 실행은 회당 세 건만 시도해 과거 대기열이 느리게 진행됐다.

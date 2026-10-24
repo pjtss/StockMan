@@ -76,22 +76,37 @@ describe("KIS U.S. industry code database sync", () => {
 
   it("serializes the exact snake_case keys expected by PostgreSQL recordset columns", async () => {
     mocks.query.mockImplementation(async (query: string, values?: unknown[]) => {
-      if (query.includes("jsonb_to_recordset")) {
-        if (query.trimStart().startsWith("UPDATE")) return { rowCount: 1, rows: [] };
-        if (!query.includes("COUNT(*) FILTER")) return { rowCount: 0, rows: [] };
+      if (query === "BEGIN" || query === "COMMIT" || query.includes("pg_advisory_xact_lock")) return { rowCount: 0, rows: [] };
+      if (query.includes("INSERT INTO us_common_stock_universe")) {
         const payload = JSON.parse(String(values?.[0]));
         expect(payload).toHaveLength(1);
         expect(payload[0]).toMatchObject({
           market: expect.stringMatching(/^(NAS|NYS|AMS)$/),
           code: expect.stringMatching(/^[NYA]TEST$/),
-          industry_code: expect.stringMatching(/^(730|720|710|1234)$/),
+          industry_code: expect.stringMatching(/^(1234|720|710)$/),
           source_file: expect.stringMatching(/^(NAS|NYS|AMS)MST\.COD$/),
+          security_type: "2",
+          instrument_type: "COMMON_STOCK",
         });
-        expect(Object.keys(payload[0]).sort()).toEqual(["code", "industry_code", "market", "source_file"]);
-        if (query.includes("COUNT(*) FILTER")) return { rowCount: 1, rows: [{ matched_count: 1, missing_count: 0, mismatch_count: 0, unmatched_codes: [] }] };
+        expect(Object.keys(payload[0]).sort()).toEqual([
+          "code", "country_code", "currency", "english_name", "etp_type", "industry_code", "instrument_type",
+          "is_derivative", "is_dr", "is_etf", "is_inverse", "is_leveraged", "is_warrant", "market",
+          "name", "raw_payload", "realtime_symbol", "security_type", "source_file",
+        ].sort());
+        return { rowCount: 1, rows: [] };
+      }
+      if (query.includes("SET enabled = FALSE")) return { rowCount: 0, rows: [] };
+      if (query.includes("COUNT(*) FILTER")) return { rowCount: 1, rows: [{ matched_count: 1, missing_count: 0, mismatch_count: 0, unmatched_codes: [] }] };
+      if (query.includes("SELECT u.code")) return { rowCount: 0, rows: [] };
+      if (query.includes("AS src(code text)")) return { rowCount: 1, rows: [{ missing_count: 0 }] };
+      if (query.includes("COUNT(*)")) return { rowCount: 3, rows: [
+        { market: "NAS", active_common_count: 1, classified_count: 1, unclassified_count: 0 },
+        { market: "NYS", active_common_count: 1, classified_count: 1, unclassified_count: 0 },
+        { market: "AMS", active_common_count: 1, classified_count: 1, unclassified_count: 0 },
+      ] };
+      if (query.includes("jsonb_to_recordset")) {
         return { rowCount: 0, rows: [] };
       }
-      if (query.includes("COUNT(*)")) return { rowCount: 1, rows: [{ market: "NAS", active_common_count: 1, classified_count: 1, unclassified_count: 0 }] };
       return { rowCount: 0, rows: [] };
     });
 
@@ -108,8 +123,13 @@ describe("KIS U.S. industry code database sync", () => {
       NYS: { matchedCount: 1, missingCount: 0, mismatchCount: 0, unmatchedCodes: [], activeDatabaseOnlyCount: 0, activeDatabaseOnlyCodes: [] },
       AMS: { matchedCount: 1, missingCount: 0, mismatchCount: 0, unmatchedCodes: [], activeDatabaseOnlyCount: 0, activeDatabaseOnlyCodes: [] },
     });
-    expect(result).not.toHaveProperty("rows");
-    expect(mocks.query.mock.calls.map(([query]) => query.trim().split(/\s+/)[0])).toEqual(["BEGIN", "UPDATE", "SELECT", "SELECT", "UPDATE", "SELECT", "SELECT", "UPDATE", "SELECT", "SELECT", "SELECT", "COMMIT"]);
+    expect(result).toMatchObject({ reconciled: true, specialPersistedCounts: { NAS: 0, NYS: 0, AMS: 0 }, deactivatedCounts: { NAS: 0, NYS: 0, AMS: 0 } });
+    const queries = mocks.query.mock.calls.map(([query]) => String(query));
+    expect(queries[0]).toBe("BEGIN");
+    expect(queries.at(-1)).toBe("COMMIT");
+    expect(queries.some((query) => query.includes("pg_advisory_xact_lock"))).toBe(true);
+    expect(queries.filter((query) => query.includes("INSERT INTO us_common_stock_universe"))).toHaveLength(3);
+    expect(queries.filter((query) => query.includes("SET enabled = FALSE"))).toHaveLength(6);
     expect(mocks.release).toHaveBeenCalledOnce();
   });
 });

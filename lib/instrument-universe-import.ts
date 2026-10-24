@@ -88,6 +88,7 @@ export function classifyKr(row: KrRow) {
 
 export function classifyUs(row: Pick<UsRow, "code" | "name" | "englishName" | "securityType" | "etpType" | "isEtf" | "isLeveraged" | "isInverse" | "isWarrant" | "isDerivative" | "isDr">) {
   const descriptor = `${row.name} ${row.englishName}`;
+  const hasEtpType = row.etpType.trim().length > 0;
   // Require acquisition-specific words rather than matching the substring
   // "spac" in ordinary names such as AEROSPACE or SPACEMOBILE.
   const isSpac = /(?:\bSPAC\b|\bACQ\b|\bACQUISITIONS?\b|\bBLANK\s*CHECK\b|ACQUISITIONS?(?:\s+CORP(?:ORATION)?\b)|스팩|기업인수목적|애퀴지션)/i.test(descriptor);
@@ -104,9 +105,12 @@ export function classifyUs(row: Pick<UsRow, "code" | "name" | "englishName" | "s
   const instrumentType = isDebtSecurity ? "DEBT_SECURITY"
     : isSpac ? "SPAC"
     : isDerivative ? "DERIVATIVE"
-      : row.isEtf ? "ETF"
+      : row.isEtf || row.securityType === "3" ? "ETF"
         : row.isDr ? "DR"
-          : "COMMON_STOCK";
+          : hasEtpType ? "ETP"
+            : row.securityType === "2" ? "COMMON_STOCK"
+            : row.securityType === "1" ? "INDEX"
+              : "NON_COMMON_SECURITY";
 
   return { instrumentType, isWarrant, isDerivative, isDebtSecurity };
 }

@@ -74,6 +74,9 @@ describe("KIS instrument master parsers", () => {
     expect(result.eligibleCounts.NYS).toBeGreaterThan(0);
     expect(result.eligibleCounts.AMS).toBeGreaterThan(0);
     expect(result.rows.every((row) => row.industryCode === "000" || /^\d{1,4}$/.test(row.industryCode))).toBe(true);
+    expect(result.commonUniverseRows).toHaveLength(result.rows.length);
+    expect(result.specialUniverseRows.length).toBeGreaterThan(0);
+    expect(result.commonUniverseRows.every((row) => row.instrumentType === "COMMON_STOCK" && row.securityType === "2" && !row.isDr && !row.etpType)).toBe(true);
     expect(result.rows.some((row) => row.code === "AAAP")).toBe(false);
     expect(result.rows.some((row) => row.code === "AAPL" && row.industryCode === "730")).toBe(true);
   });
@@ -139,5 +142,13 @@ describe("KIS instrument master parsers", () => {
     const base = { code: "TEST", name: "테스트", englishName: "TEST INC", securityType: "2", etpType: "", isEtf: false, isWarrant: false, isDerivative: false, isDr: false };
     expect(classifyUs({ ...base, isLeveraged: true })).toMatchObject({ instrumentType: "DERIVATIVE", isDerivative: true });
     expect(classifyUs({ ...base, isLeveraged: false, isInverse: true })).toMatchObject({ instrumentType: "DERIVATIVE", isDerivative: true });
+  });
+
+  it("fails closed for KIS index, ETP, warrant, and unknown security types", () => {
+    const base = { code: "TEST", name: "테스트", englishName: "TEST INC", etpType: "", isEtf: false, isLeveraged: false, isInverse: false, isWarrant: false, isDerivative: false, isDr: false };
+    expect(classifyUs({ ...base, securityType: "1" })).toMatchObject({ instrumentType: "INDEX" });
+    expect(classifyUs({ ...base, securityType: "3" })).toMatchObject({ instrumentType: "ETF" });
+    expect(classifyUs({ ...base, securityType: "2", etpType: "007" })).toMatchObject({ instrumentType: "ETP" });
+    expect(classifyUs({ ...base, securityType: "" })).toMatchObject({ instrumentType: "NON_COMMON_SECURITY" });
   });
 });
