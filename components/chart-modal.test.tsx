@@ -80,7 +80,7 @@ describe("ChartModal", () => {
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("삼성전자")).toBeInTheDocument();
-    expect(screen.getByText(/EMA 9/)).toBeInTheDocument();
+    expect(await screen.findByText(/EMA 9/)).toBeInTheDocument();
     expect(screen.getByText(/EMA 20/)).toBeInTheDocument();
     expect(screen.getByText(/EMA 60/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "닫기" })).toBeInTheDocument();

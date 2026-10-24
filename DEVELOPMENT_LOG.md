@@ -6687,17 +6687,42 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증
 - 수정 직후 대상 테스트 12개 통과.
-- `origin/oci` 최신 커밋 통합 후 `npm.cmd run deploy:verify`: 빌드·standalone 실행 및 API/browser smoke 통과, 전체 297개 파일 통과/1 skip·1,442 테스트 통과/3 skip, typecheck 통과. 이후 `docs:check`가 KIS와 RSS 작업 ID 중복을 발견해 실패했다. KIS/RSS 작업 ID를 각각 고유화하고 재검증한다.
+- `origin/oci` 최신 커밋 통합 후 `npm.cmd run deploy:verify` 최종 통과: 프로덕션 빌드, standalone 실행과 `/charts` desktop/mobile hydration/API smoke, 전체 Vitest, typecheck, docs/migrations, verify-scope·KIS 경계·Bearer auth·cron 검사를 완료했다. 병합 중 확인한 중복 개선 ID는 고유화한 뒤 docs 검사를 통과했다.
 - Windows 빌드에서 node_modules junction symlink `EPERM` 경고가 있었으나 산출물 실행 smoke는 성공했다.
 
 ### 다음 개선
-- 작업 ID 중복을 해소한 뒤 `npm.cmd run deploy:verify` 전체를 다시 실행하고 운영 배포·KIS 원본 재적재를 수행한다.
-- 배포 후 운영 API의 market별 matched/missing/mismatch와 독립 GET coverage를 대조하며, 90건/1,436건 종목 상태 차이도 원천 필드 기준으로 분류한다.
+- 운영 DB 활성 보통주와 최신 KIS 공식 보통주 후보의 차이 90건/1,436건을 종목 유형·활성 상태 원천 필드로 대조한다.
+- KIS `icod=000` 미분류와 KIS 후보 파일에 없는 DB 행은 추정값으로 덮지 않고 공식 원천 필드로만 판정한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-24-009
 - 성과 판정: PARTIAL
-- 근거: KIS `icod` 공식 폭에 맞춘 코드/진단 검증과 회귀 테스트는 수정했지만, 최신 코드 배포 및 전체 운영 DB 동일성은 미검증이다.
+- 근거: KIS `icod` 공식 폭 수정, 배포와 최신 마스터 동기화는 완료했고 매칭 5,268건의 코드 불일치가 0임을 검증했다. 다만 KIS 공식 미분류 2,724건과 KIS/활성 DB universe 양방향 차이 90/1,436건 때문에 전체 활성 보통주 coverage 동일성은 미완료다.
 
 ### 커밋·푸시·배포
-- 미실행: ID 충돌 수정 뒤 전체 게이트를 다시 통과하고 KIS 운영 적재를 검증한 후 수행한다.
+- 커밋 `bacc578c4577890a9a65352fcc59ee296346592c`를 `oci`에 push했고 Deploy OCI run `40102846417` 성공을 확인했다.
+- 운영 관리자 로그인·진단 API 200, KIS 공식 마스터 동기화 POST 200 및 독립 GET coverage 일치를 확인했다. credentials/access token은 저장하지 않았다.
+- 운영 결과와 universe 불일치 위험의 자세한 기준은 `docs/architecture/us-industry-classification-data-design.md`의 2026-10-24 최신 배포 후 재검증 절을 따른다.
+
+## [2026-10-24] KIS 미국 보통주 업종 universe 차이 read-only 감사 경로
+
+### 목적/범위
+- 운영에서 KIS 후보 90개 미매칭과 활성 DB 보통주 1,436개가 KIS 후보와 일치하지 않는 원인을 종목 단위로 확인한다.
+- 원인은 KIS 원본의 보안유형/DR/ETP/파생 필드, 프로젝트 common classifier, common/special DB 파티션 상태 및 저장 업종코드 비교로 좁힌다.
+- 감사 요청에서는 운영 DB 값을 변경하지 않는다. KIS 단독 공식 분류 코드 원칙 유지; SEC/외부 분류 원천 미사용.
+
+### 구현
+- `lib/us-industry-code-sync.ts`: 전체 KIS 원본 행에 공통 후보 여부와 제외사유를 부여하고, `BEGIN READ ONLY` read-only 감사 함수를 구현했다. KIS source rows를 active common 및 special universe와 조인하여 두 쪽의 discrepancy row를 만든다.
+- `app/api/admin/us-industry-codes/route.ts`: 관리자 인증 및 NAS/NYS/AMS 파일 검증을 거친 `?mode=audit` 분기를 추가했다. 일반 POST 동기화 경로와 분리하고 감사 응답에 `databaseWritePerformed:false`를 반환한다.
+- 단위/라우트 테스트에서 읽기 전용 트랜잭션, source/data partition 조인, sync 함수 미호출, 인증 필수 동작을 고정한다.
+- 전체 배포 게이트에서 기존 chart modal 테스트가 비동기 데이터 도착 전에 EMA 라벨을 동기 조회하는 race를 재현했다. 제품 코드는 변경하지 않고 테스트 assertion을 `findByText`로 바꿔 실제 UI 데이터 완료를 기다리도록 안정화했다.
+
+### 검증 및 남은 상태
+- 관련 테스트 3개 파일 19개 통과. 전체 게이트 중 chart modal async assertion race도 재현해 테스트만 대기형 assertion으로 수정했다. 이 수정 후 전체 검증을 처음부터 다시 실행한다.
+- `npm.cmd run docs:check`, `git diff --check`를 통과했다. 전체 `deploy:verify`, commit/push, 운영 배포, 새 read-only 운영 감사는 아직 미실행이다.
+- 운영 universe 차이의 원인과 KIS 미분류 `000`은 아직 해결되지 않았다. 감사 결과에 따라 유효 COMMON_STOCK 누락 행만 KIS 원본으로 추가/수정하고, 제외 상품은 common universe에서 제거할 별도 결정·변경·검증을 수행해야 한다. 완료 판단은 모든 활성 common rows가 KIS 원본 후보와 대조되거나 공식 부적격 사유로 격리되고, 남은 KIS `000`이 원본상 미분류임을 확인한 뒤에만 가능하다.
+
+### 개선 과제 및 배포
+- 개선 과제 ID: CI-2026-10-24-011
+- 성과 판정: IN_PROGRESS
+- 코드 변경은 현재 로컬 작업 트리에만 있으며 아직 커밋·푸시·배포하지 않았다. 전체 검증 후 `oci` 반영 및 운영 read-only 감사로 이어간다.

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { describeError, safeErrorMetadata } from "@/lib/error-diagnostics";
-import { KIS_US_MASTER_FILES, syncKisUsIndustryCodes } from "@/lib/us-industry-code-sync";
+import { auditKisUsIndustryUniverse, KIS_US_MASTER_FILES, syncKisUsIndustryCodes } from "@/lib/us-industry-code-sync";
 
 export const runtime = "nodejs";
 
@@ -43,6 +43,11 @@ export async function POST(request: Request) {
       NYS: files.get(KIS_US_MASTER_FILES.NYS),
       AMS: files.get(KIS_US_MASTER_FILES.AMS),
     };
+    const mode = new URL(request.url).searchParams.get("mode");
+    if (mode === "audit") {
+      const result = await auditKisUsIndustryUniverse(byMarket);
+      return NextResponse.json({ ...result, auditedAt: new Date().toISOString() }, { headers: { "cache-control": "no-store" } });
+    }
     const result = await syncKisUsIndustryCodes(byMarket);
     return NextResponse.json({ ...result, synchronizedAt: new Date().toISOString() });
   } catch (error) {

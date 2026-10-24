@@ -10,6 +10,18 @@ export const KIS_US_MASTER_FILES = {
 
 type Market = keyof typeof KIS_US_MASTER_FILES;
 type IndustryRow = { market: Market; code: string; industryCode: string; sourceFile: string };
+type AuditSourceRow = {
+  market: Market;
+  code: string;
+  industry_code: string;
+  source_file: string;
+  is_common_candidate: boolean;
+  exclusion_reason: string;
+  security_type: string;
+  is_dr: boolean;
+  etp_type: string;
+  instrument_type: string;
+};
 
 /** KIS mastcode.icod is a four-character numeric field; all-zero values mean unclassified. */
 export function isValidKisUsIndustryCode(value: string | null | undefined): value is string {
@@ -23,6 +35,7 @@ export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
   const sourceCounts: Record<Market, number> = { NAS: 0, NYS: 0, AMS: 0 };
   const eligibleCounts: Record<Market, number> = { NAS: 0, NYS: 0, AMS: 0 };
   const unclassifiedCounts: Record<Market, number> = { NAS: 0, NYS: 0, AMS: 0 };
+  const auditRows: AuditSourceRow[] = [];
 
   for (const market of Object.keys(KIS_US_MASTER_FILES) as Market[]) {
     const fileName = KIS_US_MASTER_FILES[market];
@@ -40,11 +53,23 @@ export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
     for (const row of parsed) {
       if (seen.has(row.code)) throw new Error(`KIS_MASTER_DUPLICATE_TICKER:${market}:${row.code}`);
       seen.add(row.code);
-      if (row.securityType !== "2") continue;
-      if (row.isDr || row.etpType.trim() || row.isEtf || row.isWarrant || row.isDerivative) continue;
-      if (classifyUs(row).instrumentType !== "COMMON_STOCK") continue;
-      eligibleCounts[market] += 1;
       const industryCode = row.industryCode.trim();
+      const classification = classifyUs(row);
+      const exclusionReason = row.securityType !== "2" ? `SECURITY_TYPE_${row.securityType || "UNKNOWN"}`
+        : row.isDr ? "DR"
+          : row.isEtf || row.etpType.trim() ? "ETP"
+            : row.isWarrant ? "WARRANT"
+              : row.isDerivative || classification.instrumentType !== "COMMON_STOCK" ? classification.instrumentType
+                : "";
+      const isCommonCandidate = exclusionReason === "";
+      auditRows.push({
+        market, code: row.code, industry_code: industryCode, source_file: fileName,
+        is_common_candidate: isCommonCandidate, exclusion_reason: exclusionReason,
+        security_type: row.securityType, is_dr: row.isDr, etp_type: row.etpType.trim(),
+        instrument_type: classification.instrumentType,
+      });
+      if (!isCommonCandidate) continue;
+      eligibleCounts[market] += 1;
       if (!isValidKisUsIndustryCode(industryCode)) {
         unclassifiedCounts[market] += 1;
       }
@@ -53,7 +78,85 @@ export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
     if (eligibleCounts[market] === 0) throw new Error(`KIS_MASTER_NO_COMMON_STOCKS:${fileName}`);
   }
 
-  return { rows, sourceCounts, eligibleCounts, unclassifiedCounts };
+  return { rows, auditRows, sourceCounts, eligibleCounts, unclassifiedCounts };
+}
+
+/** Read-only, row-level audit. It never updates either universe partition or industry codes. */
+export async function auditKisUsIndustryUniverse(files: Partial<Record<Market, Buffer>>) {
+  const prepared = buildKisUsIndustryRows(files);
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN READ ONLY");
+    const query = await client.query(
+      `WITH audit_source AS (
+         SELECT * FROM jsonb_to_recordset($1::jsonb) AS src(
+           market text, code text, industry_code text, source_file text,
+           is_common_candidate boolean, exclusion_reason text, security_type text,
+           is_dr boolean, etp_type text, instrument_type text
+         )
+       ), audit_result AS (
+         SELECT src.market, src.code, src.is_common_candidate, src.exclusion_reason,
+                src.security_type AS kis_security_type, src.is_dr AS kis_is_dr,
+                src.etp_type AS kis_etp_type, src.instrument_type AS kis_instrument_type,
+                src.industry_code AS kis_industry_code, src.source_file AS kis_source_file,
+                c.enabled AS common_enabled, c.instrument_type AS common_instrument_type,
+                c.industry_code AS database_industry_code, c.name AS database_name,
+                c.english_name AS database_english_name,
+                s.enabled AS special_enabled, s.instrument_type AS special_instrument_type
+         FROM audit_source AS src
+         LEFT JOIN us_common_stock_universe AS c ON c.market = src.market AND c.code = src.code
+         LEFT JOIN us_special_instrument_universe AS s ON s.market = src.market AND s.code = src.code
+         WHERE src.is_common_candidate = TRUE
+            OR (c.enabled = TRUE AND c.instrument_type = 'COMMON_STOCK')
+         UNION ALL
+         SELECT c.market, c.code, FALSE, 'NOT_IN_KIS_MASTER',
+                NULL, NULL, NULL, NULL, NULL, NULL,
+                TRUE, c.instrument_type, c.industry_code, c.name, c.english_name,
+                s.enabled, s.instrument_type
+         FROM us_common_stock_universe AS c
+         LEFT JOIN us_special_instrument_universe AS s ON s.market = c.market AND s.code = c.code
+         WHERE c.market IN ('NAS','NYS','AMS') AND c.enabled = TRUE AND c.instrument_type = 'COMMON_STOCK'
+           AND NOT EXISTS (SELECT 1 FROM audit_source AS src WHERE src.market = c.market AND src.code = c.code)
+       )
+       SELECT * FROM audit_result ORDER BY market, code`,
+      [JSON.stringify(prepared.auditRows)],
+    );
+    const rows = query.rows;
+    const marketSummary = Object.fromEntries((Object.keys(KIS_US_MASTER_FILES) as Market[]).map((market) => {
+      const scoped = rows.filter((row) => row.market === market);
+      const candidates = scoped.filter((row) => row.is_common_candidate === true);
+      const matched = candidates.filter((row) => row.common_enabled === true && row.common_instrument_type === "COMMON_STOCK");
+      const activeDbOnly = scoped.filter((row) => row.common_enabled === true && row.common_instrument_type === "COMMON_STOCK" && row.is_common_candidate !== true);
+      const sourceOnly = candidates.filter((row) => !(row.common_enabled === true && row.common_instrument_type === "COMMON_STOCK"));
+      return [market, {
+        sourceCount: prepared.sourceCounts[market],
+        commonCandidateCount: prepared.eligibleCounts[market],
+        candidateUnclassifiedCount: prepared.unclassifiedCounts[market],
+        matchedActiveCommonCount: matched.length,
+        candidateMissingActiveCommonCount: sourceOnly.length,
+        activeCommonOutsideKisCandidatesCount: activeDbOnly.length,
+        industryMismatchCount: matched.filter((row) => row.database_industry_code !== row.kis_industry_code).length,
+        databaseOnlyReasons: Object.fromEntries([...new Set(activeDbOnly.map((row) => String(row.exclusion_reason)))].sort().map((reason) => [reason, activeDbOnly.filter((row) => row.exclusion_reason === reason).length])),
+      }];
+    }));
+    await client.query("COMMIT");
+    return {
+      ok: true,
+      mode: "READ_ONLY_KIS_UNIVERSE_AUDIT",
+      source: "KIS_US_MASTER_ICOD",
+      sourceCounts: prepared.sourceCounts,
+      eligibleCounts: prepared.eligibleCounts,
+      unclassifiedCounts: prepared.unclassifiedCounts,
+      marketSummary,
+      discrepancyRows: rows.filter((row) => row.is_common_candidate !== true || !(row.common_enabled === true && row.common_instrument_type === "COMMON_STOCK")),
+      databaseWritePerformed: false,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** Update only the existing common-stock partition, in one transaction per market. */
@@ -147,7 +250,7 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
     `);
     stage = "commit_transaction";
     await client.query("COMMIT");
-    const { rows: _rows, ...summary } = prepared;
+    const { rows: _rows, auditRows: _auditRows, ...summary } = prepared;
     const unmatchedCounts = Object.fromEntries((Object.keys(KIS_US_MASTER_FILES) as Market[]).map((market) => [market, validationCounts[market].missingCount])) as Record<Market, number>;
     return { ok: true, source: "KIS_US_MASTER_ICOD", ...summary, persistedCounts, unmatchedCounts, validationCounts, dbCoverage: coverage.rows };
   } catch (error) {

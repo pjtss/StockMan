@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   admin: false,
   query: vi.fn(),
+  audit: vi.fn(),
   sync: vi.fn(),
 }));
 
@@ -10,7 +11,7 @@ vi.mock("@/lib/admin-auth", () => ({ requireAdminSession: vi.fn(async () => mock
 vi.mock("@/lib/db", () => ({ getPool: () => ({ query: mocks.query }) }));
 vi.mock("@/lib/us-industry-code-sync", async () => {
   const actual = await vi.importActual<typeof import("@/lib/us-industry-code-sync")>("@/lib/us-industry-code-sync");
-  return { ...actual, syncKisUsIndustryCodes: mocks.sync };
+  return { ...actual, auditKisUsIndustryUniverse: mocks.audit, syncKisUsIndustryCodes: mocks.sync };
 });
 
 import { GET, POST } from "./route";
@@ -19,6 +20,7 @@ describe("admin KIS U.S. industry code API", () => {
   beforeEach(() => {
     mocks.admin = false;
     mocks.query.mockReset();
+    mocks.audit.mockReset();
     mocks.sync.mockReset();
   });
 
@@ -26,6 +28,7 @@ describe("admin KIS U.S. industry code API", () => {
     expect((await GET()).status).toBe(401);
     expect((await POST(new Request("http://localhost/api/admin/us-industry-codes", { method: "POST" }))).status).toBe(401);
     expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
     expect(mocks.sync).not.toHaveBeenCalled();
   });
 
@@ -50,6 +53,7 @@ describe("admin KIS U.S. industry code API", () => {
     mocks.sync.mockResolvedValueOnce({ ok: true, source: "KIS_US_MASTER_ICOD", persistedCounts: { NAS: 1, NYS: 1, AMS: 1 } });
     const entries = ["NASMST.COD", "NYSMST.COD", "AMSMST.COD"].map((name) => [name, { name, size: 4, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }]);
     const request = {
+      url: "http://localhost/api/admin/us-industry-codes",
       headers: new Headers({ "content-type": "multipart/form-data; boundary=unit-test" }),
       formData: async () => ({ entries: () => entries[Symbol.iterator]() }),
     } as unknown as Request;
@@ -58,6 +62,22 @@ describe("admin KIS U.S. industry code API", () => {
     expect(payload).toMatchObject({ ok: true, source: "KIS_US_MASTER_ICOD" });
     expect(response.status).toBe(200);
     expect(mocks.sync).toHaveBeenCalledWith({ NAS: expect.any(Buffer), NYS: expect.any(Buffer), AMS: expect.any(Buffer) });
+  });
+
+  it("runs a read-only source audit when mode=audit without calling the synchronizer", async () => {
+    mocks.admin = true;
+    mocks.audit.mockResolvedValueOnce({ ok: true, mode: "READ_ONLY_KIS_UNIVERSE_AUDIT", databaseWritePerformed: false, discrepancyRows: [] });
+    const entries = ["NASMST.COD", "NYSMST.COD", "AMSMST.COD"].map((name) => [name, { name, size: 4, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }]);
+    const request = {
+      url: "http://localhost/api/admin/us-industry-codes?mode=audit",
+      headers: new Headers({ "content-type": "multipart/form-data; boundary=unit-test" }),
+      formData: async () => ({ entries: () => entries[Symbol.iterator]() }),
+    } as unknown as Request;
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ mode: "READ_ONLY_KIS_UNIVERSE_AUDIT", databaseWritePerformed: false });
+    expect(mocks.audit).toHaveBeenCalledWith({ NAS: expect.any(Buffer), NYS: expect.any(Buffer), AMS: expect.any(Buffer) });
+    expect(mocks.sync).not.toHaveBeenCalled();
   });
 
   it("returns only safe database identifiers when the transactional sync fails", async () => {
@@ -70,6 +90,7 @@ describe("admin KIS U.S. industry code API", () => {
     mocks.sync.mockRejectedValueOnce(error);
     const entries = ["NASMST.COD", "NYSMST.COD", "AMSMST.COD"].map((name) => [name, { name, size: 4, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }]);
     const request = {
+      url: "http://localhost/api/admin/us-industry-codes",
       headers: new Headers({ "content-type": "multipart/form-data; boundary=unit-test" }),
       formData: async () => ({ entries: () => entries[Symbol.iterator]() }),
     } as unknown as Request;
