@@ -1,3 +1,33 @@
+## [2026-10-24] RSS 알림 cron에서 Bullish RSS 전체 재색인 분리
+
+### 목표
+- 제목 번역·Discord 발송을 3건으로 제한했는데도 운영 cron이 240초 이상 끝나지 않았다. 원인은 알림 이후 실행하는 Bullish RSS sync가 매분 전체 `market_rss_articles` 73,115행을 500행씩 keyset 순회하며 각 기사별 DB write를 수행하는 구조였다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: bounded notification cron에서 full-table Bullish RSS 재색인을 제외하고 응답에는 분리 상태를 표시한다.
+- `app/api/cron/market-rss/route.test.ts`: 알림 cron이 별도 Bullish mirror 전체 scan을 호출하지 않는지 검증한다.
+- `deploy/oci/README.md`: bounded 알림과 Bullish mirror sync 분리 동작을 운영 설명에 기록한다.
+
+### 검증
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API 관측(2026-10-24 12:42 UTC): 3건 상한 cron도 241초 `RUNNING`이었고 두 출처 translation status가 12:39:55 이후 변하지 않았다. 코드 추적으로 cron 뒤의 무제한 `syncMarketRssBullishArticles()` 전체 행 순회를 확인했다.
+- RSS 제목 입력만 provider 번역 요청에 넘기며 summary/content의 원문 보존·전송 gate는 유지한다.
+
+### 다음 개선
+- 전체 검증 후 `oci`로 배포하고 새 3건 cron이 180초 이내 완료되는지와 `notified.sent`, `backlogRemaining`을 확인한다.
+- 별도 Bullish RSS mirror를 위한 무제한 순회는 요청성 실행에 적합하지 않다. 이후 독립적인 지속 cursor/background job을 설계해 누락 없이 재색인하고 이 endpoint를 계속 fresh하게 유지한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-006
+성과 판정: PARTIAL
+근거: 운영 duration 측정과 호출 경로 추적으로 alert cron 병목이 별도 Bullish 전체 재색인임을 찾고 알림 경로에서 분리했으며 전체 deploy:verify가 통과했다. 재배포 및 실제 Discord 수신은 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 통과 후 RSS 변경만 커밋·push하고 OCI 배포를 확인한다.
+
 ## [2026-10-24] RSS OCI cron 단위 재조정
 
 ### 목표

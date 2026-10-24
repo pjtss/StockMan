@@ -56,7 +56,7 @@ describe("market-rss cron route", () => {
     mocks.getCronStatus.mockReturnValue({ degraded: true, partialFailureCount: 1, ingestFailureCount: 0, translationFailureCount: 1 });
   });
 
-  it("runs ingest, translation, bullish sync, and notification in order and preserves fallback as PARTIAL", async () => {
+  it("runs ingest, bounded translation, and notification without blocking on the separate bullish mirror", async () => {
     const response = await POST(new Request("http://localhost/api/cron/market-rss", {
       method: "POST",
       headers: { "x-cron-secret": "test-secret" },
@@ -70,8 +70,10 @@ describe("market-rss cron route", () => {
       ingested: { ingestFailureCount: 0 },
       translated: { fallback: 1 },
       notified: { sent: 3 },
+      bullish: { skipped: true, reason: "deferred_from_notification_cron" },
     });
-    expect(mocks.order).toEqual(["ingest", "translate", "notify", "bullish"]);
+    expect(mocks.order).toEqual(["ingest", "translate", "notify"]);
+    expect(mocks.bullish).not.toHaveBeenCalled();
     expect(mocks.ingest).toHaveBeenCalledWith({ sources: ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"] });
     expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 3, 3);
     expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 3, 3);
