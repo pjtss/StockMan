@@ -60,10 +60,10 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
     stage = "begin_transaction";
     await client.query("BEGIN");
     const persistedCounts: Record<Market, number> = { NAS: 0, NYS: 0, AMS: 0 };
-    const validationCounts: Record<Market, { matchedCount: number; missingCount: number; mismatchCount: number; unmatchedCodeSample: string[] }> = {
-      NAS: { matchedCount: 0, missingCount: 0, mismatchCount: 0, unmatchedCodeSample: [] },
-      NYS: { matchedCount: 0, missingCount: 0, mismatchCount: 0, unmatchedCodeSample: [] },
-      AMS: { matchedCount: 0, missingCount: 0, mismatchCount: 0, unmatchedCodeSample: [] },
+    const validationCounts: Record<Market, { matchedCount: number; missingCount: number; mismatchCount: number; unmatchedCodes: string[]; activeDatabaseOnlyCount: number; activeDatabaseOnlyCodes: string[] }> = {
+      NAS: { matchedCount: 0, missingCount: 0, mismatchCount: 0, unmatchedCodes: [], activeDatabaseOnlyCount: 0, activeDatabaseOnlyCodes: [] },
+      NYS: { matchedCount: 0, missingCount: 0, mismatchCount: 0, unmatchedCodes: [], activeDatabaseOnlyCount: 0, activeDatabaseOnlyCodes: [] },
+      AMS: { matchedCount: 0, missingCount: 0, mismatchCount: 0, unmatchedCodes: [], activeDatabaseOnlyCount: 0, activeDatabaseOnlyCodes: [] },
     };
     for (const market of Object.keys(KIS_US_MASTER_FILES) as Market[]) {
       stage = `update_${market}`;
@@ -93,7 +93,7 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
            COUNT(*) FILTER (WHERE u.code IS NOT NULL)::int AS matched_count,
            COUNT(*) FILTER (WHERE u.code IS NULL)::int AS missing_count,
            COUNT(*) FILTER (WHERE u.code IS NOT NULL AND u.industry_code IS DISTINCT FROM src.industry_code)::int AS mismatch_count,
-           COALESCE((ARRAY_AGG(src.code ORDER BY src.code) FILTER (WHERE u.code IS NULL))[1:10], ARRAY[]::text[]) AS unmatched_code_sample
+           COALESCE(ARRAY_AGG(src.code ORDER BY src.code) FILTER (WHERE u.code IS NULL), ARRAY[]::text[]) AS unmatched_codes
          FROM jsonb_to_recordset($1::jsonb)
            AS src(market text, code text, industry_code text, source_file text)
          LEFT JOIN us_common_stock_universe AS u
@@ -106,8 +106,24 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
         matchedCount: Number(values.matched_count ?? 0),
         missingCount: Number(values.missing_count ?? 0),
         mismatchCount: Number(values.mismatch_count ?? 0),
-        unmatchedCodeSample: Array.isArray(values.unmatched_code_sample) ? values.unmatched_code_sample : [],
+        unmatchedCodes: Array.isArray(values.unmatched_codes) ? values.unmatched_codes : [],
+        activeDatabaseOnlyCount: 0,
+        activeDatabaseOnlyCodes: [],
       };
+      stage = `verify_${market}_active_database_only`;
+      const activeDatabaseOnly = await client.query(
+        `SELECT u.code
+         FROM us_common_stock_universe AS u
+         WHERE u.market = $1 AND u.enabled = TRUE AND u.instrument_type = 'COMMON_STOCK'
+           AND NOT EXISTS (
+             SELECT 1 FROM jsonb_to_recordset($2::jsonb) AS src(market text, code text, industry_code text, source_file text)
+             WHERE src.market = u.market AND src.code = u.code
+           )
+         ORDER BY u.code`,
+        [market, JSON.stringify(marketRows)],
+      );
+      validationCounts[market].activeDatabaseOnlyCount = activeDatabaseOnly.rowCount ?? activeDatabaseOnly.rows.length;
+      validationCounts[market].activeDatabaseOnlyCodes = activeDatabaseOnly.rows.map((row) => String(row.code));
       if (validationCounts[market].mismatchCount > 0) {
         const error = new Error(`KIS industry source value mismatch for ${market}`);
         Object.assign(error, { usIndustrySyncFailure: "KIS_SOURCE_VALUE_MISMATCH" });

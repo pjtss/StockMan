@@ -6467,7 +6467,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 - **목적/범위**: 앞선 미국 KIS 업종코드 동기화 작업의 Flyway V160 불일치를 해결하고, 최신 KIS 원본으로 운영 DB 저장 후 read-after-write 비교를 재검증한다.
 - **원인/대응**: 동기화 코드를 포함한 작업 브랜치가 운영 `oci`에 이미 적용된 `V160__kr_common_stock_standard_industry.sql`보다 앞선 커밋에서 분기되어 배포 활성화 단계에서 migration 160 미해결 오류가 발생했다. DB에 `flyway repair`는 실행하지 않았다. `origin/oci`를 병합해 이력과 스키마 정의를 정렬했다.
-- **변경 대상**: `docs/architecture/us-industry-classification-data-design.md`, `DEVELOPMENT_LOG.md`; 기존 동기화 코드 및 후검증 로직은 보존했다.
+- **변경 대상**: `lib/us-industry-code-sync.ts`, `lib/us-industry-code-sync.test.ts`, `docs/architecture/us-industry-classification-data-design.md`, `DEVELOPMENT_LOG.md`. 운영 업로드 시 동기화 코드 및 후검증을 수행했다.
 - **인증 확인**: `.env.local`의 KIS `KIS_APPKEY`/`KIS_APPSECRET`로 공식 OAuth 토큰 발급 성공(토큰값 미출력·미저장, 만료시간 24시간). 같은 파일의 `ADMIN_DASHBOARD_PASSWORD`로 운영 로그인 HTTP 200.
 - **원본 대조**: KIS 공식 NAS/NYS/AMS 마스터(2026-10-23 데이터, 2026-10-24 19:01 KST 다운로드)를 프로젝트와 동일한 필드/상품 제외 기준으로 전수 파싱. 5,358 KIS 보통주 후보 중 실제 3자리 비영 업종코드 2,634, 공식 `000` 2,724.
 - **로컬 DB read-only 비교**: `BEGIN READ ONLY` + `statement_timeout`으로 활성 COMMON_STOCK 5,444행 확인. 유효 `industry_code`는 0행, 미분류 5,444행. KIS와 5,310행 매칭했으며 매칭값 5,310건 모두 DB 공란으로 원본과 불일치(2,634건은 KIS에 비영 코드가 있으나 로컬 DB 공란). KIS 후보 중 DB 활성 universe 누락 48건(AMS12/NAS32/NYS4), 반대로 DB 활성 종목 중 최신 KIS 후보와 불일치 134건(AMS7/NAS46/NYS81). 이번 검증에서는 DB를 변경하지 않았다.
@@ -6475,3 +6475,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **검증**: 최신 `oci` 통합 트리에서 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 문서 개선과제 ID 중복으로 첫 통합 검증은 docs gate에서 실패했으며 KIS ID를 `CI-2026-10-24-004`로 고유화한 후 전체 게이트 통과. 앞선 `/charts` 30초 timeout도 재현되지 않았다.
 - **남은 위험/후속**: 로컬 DB 업종코드 미적재와 KIS-universe 48/134개 불일치가 남아 있다. 운영 진단 route가 현재 404이므로 운영 최신값도 검증 불가. 다음 실행은 활성 보통주 분모 차이를 종목별로 분류하고, 명시 승인 후 로컬/운영 적재 및 read-after-write 감사가 가능하도록 최신 배포 경로를 먼저 복구해야 한다. `000` 값은 공식 미분류로 유지하고 임의 보정하지 않는다.
 - **커밋·푸시·배포**: 통합 검증 및 KIS 원본 대조가 통과해 로컬 merge를 마무리한 뒤 원격 브랜치 push와 OCI 배포 workflow를 진행한다. 운영 진단 route가 현재 404인 원인을 배포 후 다시 확인하고, KIS 원본 재적재 및 DB read-after-write 검증 전까지 목표 완료로 보고하지 않는다.
+
+## [2026-10-24] KIS 미국 업종 운영 반영 확인 및 전수 차이 진단 확장
+
+- **목적/범위**: `.env.local` 인증으로 최신 KIS NAS/NYS/AMS 마스터의 미국 보통주 산업코드를 운영 DB에 반영하고, 모든 후보의 코드 동일성 및 양방향 universe 누락을 확인한다.
+- **인증/원본**: `.env.local`의 KIS 앱키/시크릿으로 KIS OAuth 발급 성공(토큰 비노출). 공식 KIS 마스터(데이터 기준 2026-10-23)를 사용했다. `.env.local`의 관리자 비밀번호로 운영 로그인 HTTP 200, 운영 진단 GET HTTP 200을 확인했다.
+- **운영 적재**: 최초 PowerShell multipart 요청은 HTTP 500으로 실패했으나 DB 저장 성공으로 오인하지 않았다. 표준 `curl -F` multipart로 재호출하여 2026-10-24T12:11:28.704Z에 API `ok=true`를 확인했다. KIS 보통주 후보 NAS 3,240/NYS 1,864/AMS 254 중 활성 운영 DB에 저장된 행은 NAS 3,176/NYS 1,855/AMS 237이다. 운영 DB read-after-write 검증은 매칭 5,268, 산업코드 불일치 0, 미매칭 90(NAS64/NYS9/AMS17)이다. 원본 `000`은 공식 미분류로 저장되며 코드 추정/보완은 하지 않았다.
+- **현재 운영 집계**: 활성 DB COMMON_STOCK는 NAS 3,949, NYS 2,480, AMS 275이다. 이 중 비영 코드로 분류된 수는 NAS 1,354/NYS 1,186/AMS 94이며 공식 `000` 또는 결측은 NAS 2,595/NYS 1,294/AMS 181이다. 동기화된 KIS 후보의 비영 코드 수와 일치한다.
+- **발견된 진단 한계와 변경**: 운영 API는 이전에 미매칭 티커 10개만 노출해 전체 차이를 끝까지 설명하기 어려웠다. 동기화 검증 응답을 전체 미매칭 코드 및 KIS 원본에는 없지만 DB에서 활성 보통주인 코드/건수까지 반환하도록 확장하고 단위 테스트를 갱신했다. 이는 진단만 수행하며 미등록 종목을 자동 편입하거나 DB 단독 종목을 삭제·비활성화하지 않는다.
+- **검증 및 배포 상태**: 진단 보강 후 최초 전체 게이트에서 테스트 fixture의 query 분기 오류 1건을 발견·수정했고, 해당 테스트 단독 통과 후 `npm.cmd run deploy:verify`가 최종 통과했다(296개 파일 통과/1 skip, 1,435 tests 통과/3 skip, typecheck·docs·감사·빌드·standalone runtime/browser smoke 모두 통과). Windows standalone 빌드의 기존 node_modules junction symlink EPERM 경고는 있었지만 산출물 실행과 모든 smoke가 성공했다. 신규 진단 필드의 OCI 배포 및 최종 차이 원인 확인은 아직 남았다.
+- **재발 방지/후속**: 업로드 API는 동기화 성공 응답과 read-after-write 검증을 함께 확인하고, 500·비JSON·연결 오류는 쓰기 성공으로 판단하지 않는다. 진단 응답의 `unmatchedCodes`와 `activeDatabaseOnlyCodes`를 사용해 각 티커가 비활성/타입 불일치/부재 중 무엇인지 분류한다. `000`을 임의 분류하지 않는다.
+- **커밋·푸시·배포**: 최종 전체 게이트는 통과했으며, 현재 변경분 커밋·푸시·OCI 배포는 미실행.
