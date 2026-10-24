@@ -13,11 +13,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `npm.cmd run docs:check`: 통과.
 - 최종 `npm.cmd run deploy:verify`: 통과. dependency audit 0 취약점, production build, standalone `/charts` HTTP 200 및 desktop/mobile Chrome hydration, API smoke, 전체 292개 테스트 파일(1,426 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron 게이트 통과.
 - Windows 격리 worktree의 임시 dependency junction으로 인해 standalone tracing 시 EPERM 경고가 있었으나 서버 기동, 브라우저 및 API smoke가 통과했다. OCI workflow는 Linux checkout에서 별도 빌드하므로 이 로컬 junction 경고는 운영 환경의 배포 오류로 간주하지 않는다.
-- 운영 배포 전이므로 이 런타임의 Azure provider 요청은 미실행이다. 수정 전 운영 로그는 최근 Azure 호출 3회 실패를 보였으나 HTTP/provider 응답 상세를 저장하지 않아 endpoint 원인 여부는 미확정이다.
-- 수정 전 확인된 운영 Azure 호출은 최근 실행 3회 실패했으나 HTTP/provider 응답 상세는 저장하지 않아 endpoint가 원인인지 아직 확정할 수 없다. 새 경로는 배포 후 관리자 preview에서 실호출해 확인한다.
+- 배포 후 운영 관리자 미리보기 `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true&mode=PREVIEW&limit=1&diagnostics=true`를 인증해 1회 실호출했다. 응답은 HTTP 200, Azure endpoint host/path는 `api.cognitive.microsofttranslator.com` 및 `/`였고 query 값은 없었다. 따라서 운영 설정은 정상적인 글로벌 Text Translation base endpoint이며 `/translate` 중복은 없었다.
+- 해당 요청에서 Azure 호출 1회, 실패 0회, 성공 처리 문자 73자로 기록됐고 Google fallback 호출은 0회였다. 다만 번역 후보에 원문 제목에 없는 숫자가 있어 품질 검증기가 `translation_numeric_hallucination`으로 후보를 거부하고 원문 제목을 유지했다. 이 검증은 번역기가 원문에 없는 가격·연도·비율을 만들어내는 것을 막는 안전장치이므로 이번 작업에서는 우회하지 않았다.
+- 이 실호출로 현재 운영 Azure key/endpoint 조합이 최소 한 건에서 인증 및 API 호출에 성공함을 확인했지만, 기존 cron의 과거 3회 실패 원인은 당시 응답 상세가 없어서 소급 확정하지 못했다. 운영에서 실패가 재발하면 `diagnostics=true` preview 및 번역 진단 API의 timestamp/provider/status를 대조한다.
+- Deploy OCI workflow `40056164962`는 commit `518db55c`에 대해 완료 및 성공했다. 배포 뒤 preview에서 실제 Azure 호출을 확인했다.
 
 ### 다음 개선
-- 배포 후 관리자 RSS preview의 `diagnostics=true` 응답에서 endpoint 형식과 Azure provider 오류를 확인한다. 원인이 별도 Key/Region mismatch이면 자격증명 값 대신 리소스 종류·지역 설정을 맞춘다.
+- `translation_numeric_hallucination`으로 반복 거부되는 실제 항목이 있으면 원문 숫자 토큰 보호·공급자 후보·요약 문맥을 비밀/개인정보 없이 개별 대조한다. 검증기는 숫자 환각 방지용이므로 실제 오탐을 재현하는 회귀 fixture 없이는 완화하지 않는다.
+- 과거 cron의 3회 실패와 동일한 오류가 재발할 때 provider 응답 상태/오류코드가 누락되지 않는지 확인한다. 인증 성공 요청 한 건은 모든 시간대/요청의 안정성을 보장하지 않는다.
 
 ### 개선 과제
 개선 과제 ID: CI-2026-10-24-002
