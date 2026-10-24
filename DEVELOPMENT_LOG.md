@@ -1,3 +1,35 @@
+## [2026-10-24] RSS 과거 대기분의 제한 시간 내 연속 처리
+
+### 목표
+- 배포 뒤 운영 확인에서 세 출처의 기존 대기 기사가 남아 있었고, cron 단일 실행이 10분 이상 `RUNNING`에 머물렀다. 기존 cron은 번역 및 전송 대상이 고갈될 때까지 요청 한 번 안에서 무한 배치 루프를 돌려 OCI의 180초 HTTP 제한과 충돌할 수 있었다.
+- 최신 기사를 먼저 고르는 정렬은 새 기사가 계속 들어오는 동안 과거 backlog 처리를 지연시킬 수 있었다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: 호출당 번역 최대 50건, Discord 최대 50건으로 제한하고 남은 backlog를 `backlogRemaining`에 표시해 다음 1분 timer가 이어가도록 변경한다.
+- `lib/market-rss-pipeline.ts`: 번역·알림 후보를 생성시각 오름차순으로 처리해 오래된 대기분부터 drain한다. Discord 대상은 기존처럼 제목 번역 완료 또는 이미 한국어인 제목만 허용한다.
+- `app/api/cron/market-rss/route.test.ts`: 단일 bounded batch 종료 및 backlog 표시 회귀 테스트 추가.
+- `deploy/oci/README.md`: timer별 처리 단위와 제목 전용 번역 규칙을 운영 설명에 반영한다.
+
+### 검증
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사를 확인했다.
+- `npm.cmd run docs:check`: 표준 개선 로그 섹션 보완 후 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었지만 standalone 실행과 브라우저/API smoke는 통과했다.
+- 운영 API read-only 확인(2026-10-24 12:05 UTC): 30일 기사 행 73,115건 중 `PENDING` 61,771건, `SKIPPED` 9,742건, `TRANSLATED` 1,602건. 허용 출처 중 StockTitan과 SEC만 기사 행이 있었고 GlobeNewswire는 0건이었다. 이 상태 집계는 Discord `SENT` 증거가 아니므로 실제 발송으로 간주하지 않는다.
+- 원문 기사 제목만 번역 provider에 전달하고 summary/content는 그대로 유지한다. 번역 성공 전 알림 gate를 통과하지 못하게 한다.
+
+### 다음 개선
+- cron 회귀 테스트는 요청당 한 번의 제한 배치만 수행하고 배치가 꽉 찼으면 `backlogRemaining=true`를 반환하는지 확인한다. 운영 감시는 분당 run duration, `backlogRemaining`, 출처별 translation status 및 `notified.sent`를 대조한다.
+- 번역 공급자 오류·quota, 제목 품질 검증 실패, Discord 장애/제한, 원본 피드의 최대 제공 범위는 외부 의존성이다. 정책상 검증되지 않은 원문 제목은 발송하지 않으며 실패 항목은 재시도 상태로 남을 수 있다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-004
+성과 판정: IMPROVED
+근거: 제한 시간 충돌과 오래된 backlog 기아 원인을 수정하고 bounded batch 회귀 테스트 및 전체 deploy:verify를 통과시켰다. OCI 재배포와 과거 backlog Discord 실수신은 아직 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증 후 RSS 변경만 커밋·push하고 OCI 배포/운영 전송을 확인한다.
+
 ## [2026-10-24] RSS 세 출처 제목만 한국어 번역한 뒤 전체 기사 Discord 알림
 
 ### 목표

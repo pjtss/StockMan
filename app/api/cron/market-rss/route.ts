@@ -27,25 +27,16 @@ export async function POST(request: Request) {
     const sources: MarketRssSource[] = ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"];
     const result = await withAutomationLock("market-rss-pipeline", () => withAutomationRun("market-rss", async () => {
       const ingested = await ingestMarketRssArticles({ sources });
-      const translationBatchSize = getMarketRssBatchSize(process.env.RSS_TRANSLATION_BATCH_SIZE, 50);
-      const notificationBatchSize = getMarketRssBatchSize(process.env.RSS_NOTIFICATION_BATCH_SIZE, 1_000);
+      // Keep each one-minute OCI timer invocation bounded. The oldest-first
+      // selectors continue the backlog on the next timer tick.
+      const translationBatchSize = getMarketRssBatchSize(process.env.RSS_TRANSLATION_BATCH_SIZE, 50, 50);
+      const notificationBatchSize = getMarketRssBatchSize(process.env.RSS_NOTIFICATION_BATCH_SIZE, 50, 50);
       const translationRuns: Awaited<ReturnType<typeof translatePendingMarketRssArticles>>[] = [];
       const notificationRuns: Awaited<ReturnType<typeof notifyPendingMarketRssArticles>>[] = [];
-      let notificationQueueFailed = false;
-      while (true) {
-        const batch = await translatePendingMarketRssArticles(translationBatchSize);
-        translationRuns.push(batch);
-        while (true) {
-          const deliveries = await notifyPendingMarketRssArticles(notificationBatchSize);
-          notificationRuns.push(deliveries);
-          if ((deliveries.queueEnqueueFailed ?? 0) > 0) {
-            notificationQueueFailed = true;
-            break;
-          }
-          if (deliveries.attempted < notificationBatchSize || deliveries.attempted === 0) break;
-        }
-        if (notificationQueueFailed || batch.attempted < translationBatchSize || batch.attempted === 0) break;
-      }
+      const batch = await translatePendingMarketRssArticles(translationBatchSize);
+      translationRuns.push(batch);
+      const deliveries = await notifyPendingMarketRssArticles(notificationBatchSize);
+      notificationRuns.push(deliveries);
       const translated = {
         attempted: translationRuns.reduce((sum, batch) => sum + batch.attempted, 0),
         translated: translationRuns.reduce((sum, batch) => sum + batch.translated, 0),
@@ -69,10 +60,11 @@ export async function POST(request: Request) {
         skipped: notificationRuns.length > 0 && notificationRuns.every((batch) => batch.skipped),
         webhookConfigured: notificationRuns.every((batch) => batch.webhookConfigured),
       };
+      const backlogRemaining = batch.attempted >= translationBatchSize || deliveries.attempted >= notificationBatchSize;
       const bullish = await syncMarketRssBullishArticles();
       const outcome = getMarketRssCronStatus(ingested.ingestFailureCount, translated);
       const deliveryIncomplete = !notified.webhookConfigured || notified.sent < notified.attempted;
-      return { ok: true, mode: "COMMIT", ...outcome, degraded: outcome.degraded || deliveryIncomplete, deliveryIncomplete, sources, ingested, translated, notified, bullish };
+      return { ok: true, mode: "COMMIT", ...outcome, backlogRemaining, degraded: outcome.degraded || deliveryIncomplete || backlogRemaining, deliveryIncomplete, sources, ingested, translated, notified, bullish };
     }));
     if (result === null) {
       await recordSkippedAutomationRun("market-rss", "already_running", { lockKey: "market-rss-pipeline" });
