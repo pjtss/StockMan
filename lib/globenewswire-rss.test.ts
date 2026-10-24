@@ -25,6 +25,7 @@ describe("GlobeNewswire RSS endpoint selection", () => {
       const source = await import("./globenewswire-rss");
 
       expect(source.GLOBENEWSWIRE_RSS_URL).toBe(source.OFFICIAL_GLOBENEWSWIRE_RSS_URL);
+      expect(source.OFFICIAL_GLOBENEWSWIRE_RSS_URL).toMatch(/^https:\/\/rss\.globenewswire\.com\/RssFeed\//);
     },
   );
 
