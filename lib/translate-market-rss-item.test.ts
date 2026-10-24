@@ -42,6 +42,39 @@ describe("market RSS translation", () => {
     expect(result.translatedContent).toBe(source.content);
   });
 
+  it("retries an Azure title that fails Korean validation with the configured Google provider", async () => {
+    const source = { ...item("quality-fallback"), title: "Nvidia Announces Strong Revenue Growth and Improved Outlook" };
+    const primaryTranslate = vi.fn(async () => ({
+      translatedText: "Nvidia update",
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "azure-translator",
+      fallback: false,
+      requestOrigin: "PROVIDER" as const,
+    }));
+    const fallbackTranslate = vi.fn(async () => ({
+      translatedText: "엔비디아가 매출 성장세를 이어가며 전망도 개선",
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "google-cloud-translation",
+      fallback: false,
+      requestOrigin: "PROVIDER" as const,
+    }));
+    const provider: TranslationClient = { translate: primaryTranslate, translateFallbackProvider: fallbackTranslate };
+
+    const result = await translateMarketRssItem(source, provider);
+
+    expect(primaryTranslate).toHaveBeenCalledOnce();
+    expect(fallbackTranslate).toHaveBeenCalledOnce();
+    expect(fallbackTranslate.mock.calls[0][0]).toBe(prepareMarketRssTranslationInput(source.title).text);
+    expect(result).toMatchObject({
+      translatedTitle: "엔비디아가 매출 성장세를 이어가며 전망도 개선",
+      translationFallback: false,
+      translationProvider: "google-cloud-translation",
+      translatedSummary: source.summary,
+    });
+  });
+
   it("preserves locale-formatted currency from RSS XML through provider translation and restoration", async () => {
     const feed = parseMarketRss('<rss><channel><item><guid>locale-currency</guid><title>Revenue reached 1&#x202F;234,56&#160;€</title></item></channel></rss>', "TEST", "https://example.com/feed");
     const source = feed.items[0];

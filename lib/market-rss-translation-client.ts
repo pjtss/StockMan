@@ -47,6 +47,14 @@ export function createMarketRssTranslationClient(options: { deferCacheWriteUntil
       }
       return { translatedText: text, source, target, provider: AZURE_TRANSLATION_PROVIDER, fallback: true, fallbackReason: azureFailure ? "translation_api_error" : "translation_provider_unavailable", ...(azureAttempts ? { providerAttemptCount: azureAttempts, requestOrigin: "PROVIDER" as const } : { requestOrigin: "QUOTA_FALLBACK" as const }) } satisfies TranslationResult;
     },
+    ...(azure && google ? {
+      translateFallbackProvider: async (text: string, source: TranslationSourceLanguage = "en", target: TranslationLanguage = "ko", format: TranslationFormat = "text", options?: Parameters<TranslationClient["translate"]>[4]) => {
+        const key = requestKey(text, source, target, format);
+        const result = await google.client.translate(text, source, target, format, options);
+        if (!result.fallback) routes.set(key, google.client);
+        return { ...result, providerAttemptCount: result.providerAttemptCount ?? (result.requestOrigin === "PROVIDER" ? 1 : 0) };
+      },
+    } : {}),
     ...(options.deferCacheWriteUntilValidated ? {
       commitCache: async (text: string, source: TranslationSourceLanguage = "en", target: TranslationLanguage = "ko", format: TranslationFormat = "text") => {
         const key = requestKey(text, source, target, format); const route = routes.get(key); routes.delete(key); await route?.commitCache?.(text, source, target, format);

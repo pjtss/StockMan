@@ -39,6 +39,8 @@ export class TranslationClientOperationError extends Error {
 }
 export interface TranslationClient {
   translate(text: string, source?: TranslationSourceLanguage, target?: TranslationLanguage, format?: TranslationFormat, options?: TranslationRequestOptions): Promise<TranslationResult>;
+  /** Try a distinct configured provider after domain validation rejects a provider result. */
+  translateFallbackProvider?(text: string, source?: TranslationSourceLanguage, target?: TranslationLanguage, format?: TranslationFormat, options?: TranslationRequestOptions): Promise<TranslationResult>;
   /** Commit a deferred cache write only after domain-level response validation succeeds. */
   commitCache?(text: string, source?: TranslationSourceLanguage, target?: TranslationLanguage, format?: TranslationFormat): Promise<void>;
   /** Remove an existing cache entry that failed domain-level response validation. */

@@ -1,3 +1,33 @@
+## [2026-10-24] RSS 제목 검증 fallback 및 backlog 처리량 복구
+
+### 목표
+- RSS host 수정 배포 후 운영 cron이 세 출처를 정상 수집했으나, Azure 번역 결과가 `translation_output_incomplete` 또는 `translation_numeric_hallucination` 검증에 실패하면서 최근 실행의 제목 번역·Discord 발송이 0건이었다. Google 번역 키도 설정되어 있었지만 provider 선택기는 Azure의 품질 실패를 quota/API 실패와 구분하지 않아 Google 재시도를 수행하지 않았다.
+- 과거 대기 기사는 cron당 최대 3건만 시도해 처리 시간이 과도하게 길어질 수 있었다.
+
+### 반영
+- `lib/market-rss-translation-client.ts`, `lib/translation-types.ts`: 서로 다른 provider 결과가 제목 검증에 실패하면 Google 번역을 fallback으로 한 번 호출할 수 있게 했다. 정상적인 API/할당량 fallback 동작은 유지한다.
+- `lib/translate-market-rss-item.ts`: Azure 결과가 제목 검증을 통과하지 못하는 경우에만 Google fallback을 한 번 시도하고, fallback 결과도 기존 한국어·완전성·숫자 검증을 다시 통과해야 저장·전송한다. provider 입력은 계속 제목으로 한정한다.
+- `app/api/cron/market-rss/route.ts`: 번역·Discord 처리 한도를 각각 최대 50건으로 조정하고 남은 backlog를 다음 timer가 이어 처리한다. full-table Bullish mirror scan은 실행 경로에 포함하지 않는다.
+- `deploy/oci/README.md` 및 관련 회귀 테스트를 새 fallback과 batch 기준에 맞췄다.
+
+### 검증
+- 운영 `85d679e8` 배포 확인 뒤 `/api/debug/automation-runs`에서 세 출처가 GlobeNewswire 20건, StockTitan 100건, SEC 100건 저장된 것을 확인했다. 이어진 실행들에서는 번역 fallback 3건, `notified.sent=0`이 반복되어 backlog 전송 완료로 판단하지 않았다.
+- `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-client.test.ts app/api/cron/market-rss/route.test.ts --reporter=dot`: 3개 파일, 82개 테스트 통과. `npm.cmd run docs:check`: 통과.
+- `npm.cmd run deploy:verify`: dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 테스트 296개 파일(295 통과·1 skip; 1,437 통과·3 skip), typecheck, docs/migrations, verify-scope, KIS boundary, Bearer auth(178 routes), OCI cron 검사 통과. 첫 검증의 Chrome page navigation timeout은 재실행에서 재현되지 않았다. Windows junction standalone trace EPERM 경고는 있었으나 smoke는 모두 통과했다.
+- Google fallback 결과도 기존 제목 한국어·완전성·숫자 검증을 다시 통과해야 알림에 사용된다. summary/content는 provider에 전달하지 않는다.
+
+### 다음 개선
+- 커밋·push·배포하고, cron 실행 시간이 180초 미만인지, Google fallback 성공률과 backlog 감소, 세 출처별 Discord `SENT` 결과를 확인한다.
+- 번역 provider 출력 또는 할당량이 불안정하면 검증 실패 항목은 전송되지 않고 재시도 대기 상태로 남는다. 50건 batch가 시간 제한에 접근하면 운영 duration에 근거해 batch를 조정한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-011
+성과 판정: PARTIAL
+근거: 운영에서 GlobeNewswire 피드 수집을 복구했으나 제목 번역 품질 fallback이 없어 새 기사 발송이 막힌 것을 확인했다. 보조 provider fallback과 backlog batch 상향은 전체 deploy:verify를 통과했지만 새 revision 배포 및 운영 발송은 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 새 번역 fallback 및 backlog batch 변경의 한국어 상세 커밋·push, 운영 배포 및 실수신 확인.
+
 ## [2026-10-24] 미국 보통주 KIS 산업분류 코드 파싱·운영 동기화
 
 ### 목표
