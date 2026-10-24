@@ -35,6 +35,25 @@ describe("market RSS translation provider order", () => {
     expect(fetchMock.mock.calls[1][1].headers).toMatchObject({ "x-goog-api-key": "google-key" });
   });
 
+  it("can explicitly retry with Google after an Azure result fails headline validation", async () => {
+    vi.stubEnv("AZURE_TRANSLATOR_API_KEY", "azure-key"); vi.stubEnv("AZURE_TRANSLATOR_ENDPOINT", "https://azure.test"); vi.stubEnv("AZURE_TRANSLATOR_FREE_TIER_CONFIRMED", "F0");
+    vi.stubEnv("GOOGLE_TRANSLATION_API_KEY", "google-key");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ translations: [{ text: "Azure text" }] }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { translations: [{ translatedText: "Google 한국어 제목" }] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const quota = deps();
+    const result = createMarketRssTranslationClient({}, undefined, quota);
+
+    const primary = await result.client!.translate("Headline");
+    const fallback = await result.client!.translateFallbackProvider!("Headline");
+
+    expect(primary.provider).toBe("azure-translator");
+    expect(fallback).toMatchObject({ provider: "google-cloud-translation", translatedText: "Google 한국어 제목", fallback: false });
+    expect(quota.reserve.mock.calls.map((call: unknown[]) => call[3])).toEqual(["azure-translator", "google-cloud-translation"]);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("translation.googleapis.com");
+  });
+
   it("preserves the Azure failure reason for admin diagnostics when Google quota blocks fallback", async () => {
     vi.stubEnv("AZURE_TRANSLATOR_API_KEY", "azure-key"); vi.stubEnv("AZURE_TRANSLATOR_ENDPOINT", "https://azure.test"); vi.stubEnv("AZURE_TRANSLATOR_FREE_TIER_CONFIRMED", "F0");
     vi.stubEnv("GOOGLE_TRANSLATION_API_KEY", "google-key");

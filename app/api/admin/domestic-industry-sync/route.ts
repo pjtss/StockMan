@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     const result = await getPool().query(`
       SELECT COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE standard_industry_code <> '')::int AS completed,
-        COUNT(*) FILTER (WHERE standard_industry_code = '')::int AS missing
+        COUNT(*) FILTER (WHERE standard_industry_code = '')::int AS missing,
+        COUNT(*) FILTER (WHERE standard_industry_code <> '' AND standard_industry_name = '')::int AS missing_name
       FROM kr_common_stock_universe
       WHERE enabled = TRUE AND instrument_type = 'COMMON_STOCK'
     `);
@@ -72,11 +73,14 @@ export async function POST(request: Request) {
         tickerFormat: /^[0-9A-Z]{6}$/.test(target.code),
         kisResponse: response.ok,
         industryCode: /^\d{6}$/.test(industryCode),
-        industryName: Boolean(industryName),
+        industryNamePresent: Boolean(industryName),
         standardCode: Boolean(standardCode),
         standardCodeMatch: !target.standard_code || target.standard_code === standardCode,
       };
-      if (Object.values(checks).some((valid) => !valid)) {
+      // KIS may return a valid standard industry code while omitting its name.
+      // The requested code remains authoritative; persist the name as empty rather than
+      // discarding an otherwise valid common-stock classification.
+      if (!checks.tickerFormat || !checks.kisResponse || !checks.industryCode || !checks.standardCode || !checks.standardCodeMatch) {
         return NextResponse.json({ ok: false, error: "KIS_STOCK_INFO_INVALID", failedCode: target.code, providerCode: response.msgCd, checks }, { status: 502 });
       }
       values.push({ market: target.market, code: target.code, industryCode, industryName });

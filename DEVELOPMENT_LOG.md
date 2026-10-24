@@ -1,3 +1,33 @@
+## [2026-10-24] RSS 제목 검증 fallback 및 backlog 처리량 복구
+
+### 목표
+- RSS host 수정 배포 후 운영 cron이 세 출처를 정상 수집했으나, Azure 번역 결과가 `translation_output_incomplete` 또는 `translation_numeric_hallucination` 검증에 실패하면서 최근 실행의 제목 번역·Discord 발송이 0건이었다. Google 번역 키도 설정되어 있었지만 provider 선택기는 Azure의 품질 실패를 quota/API 실패와 구분하지 않아 Google 재시도를 수행하지 않았다.
+- 과거 대기 기사는 cron당 최대 3건만 시도해 처리 시간이 과도하게 길어질 수 있었다.
+
+### 반영
+- `lib/market-rss-translation-client.ts`, `lib/translation-types.ts`: 서로 다른 provider 결과가 제목 검증에 실패하면 Google 번역을 fallback으로 한 번 호출할 수 있게 했다. 정상적인 API/할당량 fallback 동작은 유지한다.
+- `lib/translate-market-rss-item.ts`: Azure 결과가 제목 검증을 통과하지 못하는 경우에만 Google fallback을 한 번 시도하고, fallback 결과도 기존 한국어·완전성·숫자 검증을 다시 통과해야 저장·전송한다. provider 입력은 계속 제목으로 한정한다.
+- `app/api/cron/market-rss/route.ts`: 번역·Discord 처리 한도를 각각 최대 50건으로 조정하고 남은 backlog를 다음 timer가 이어 처리한다. full-table Bullish mirror scan은 실행 경로에 포함하지 않는다.
+- `deploy/oci/README.md` 및 관련 회귀 테스트를 새 fallback과 batch 기준에 맞췄다.
+
+### 검증
+- 운영 `85d679e8` 배포 확인 뒤 `/api/debug/automation-runs`에서 세 출처가 GlobeNewswire 20건, StockTitan 100건, SEC 100건 저장된 것을 확인했다. 이어진 실행들에서는 번역 fallback 3건, `notified.sent=0`이 반복되어 backlog 전송 완료로 판단하지 않았다.
+- `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-client.test.ts app/api/cron/market-rss/route.test.ts --reporter=dot`: 3개 파일, 82개 테스트 통과. `npm.cmd run docs:check`: 통과.
+- `npm.cmd run deploy:verify`: dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 테스트 296개 파일(295 통과·1 skip; 1,437 통과·3 skip), typecheck, docs/migrations, verify-scope, KIS boundary, Bearer auth(178 routes), OCI cron 검사 통과. 첫 검증의 Chrome page navigation timeout은 재실행에서 재현되지 않았다. Windows junction standalone trace EPERM 경고는 있었으나 smoke는 모두 통과했다.
+- Google fallback 결과도 기존 제목 한국어·완전성·숫자 검증을 다시 통과해야 알림에 사용된다. summary/content는 provider에 전달하지 않는다.
+
+### 다음 개선
+- 커밋·push·배포하고, cron 실행 시간이 180초 미만인지, Google fallback 성공률과 backlog 감소, 세 출처별 Discord `SENT` 결과를 확인한다.
+- 번역 provider 출력 또는 할당량이 불안정하면 검증 실패 항목은 전송되지 않고 재시도 대기 상태로 남는다. 50건 batch가 시간 제한에 접근하면 운영 duration에 근거해 batch를 조정한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-011
+성과 판정: PARTIAL
+근거: 운영에서 GlobeNewswire 피드 수집을 복구했으나 제목 번역 품질 fallback이 없어 새 기사 발송이 막힌 것을 확인했다. 보조 provider fallback과 backlog batch 상향은 전체 deploy:verify를 통과했지만 새 revision 배포 및 운영 발송은 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 새 번역 fallback 및 backlog batch 변경의 한국어 상세 커밋·push, 운영 배포 및 실수신 확인.
+
 ## [2026-10-24] 미국 보통주 KIS 산업분류 코드 파싱·운영 동기화
 
 ### 목표
@@ -6666,9 +6696,10 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `app/api/admin/domestic-industry-sync/route.ts`의 종목 코드 검증을 영숫자 6자리로 확장하고, 산업분류 코드는 기존처럼 숫자 6자리 검증을 유지한다. `route.test.ts`에 `0001A0` 회귀 사례를 추가했다.
 - 영숫자 코드 허용 수정 배포 뒤에도 `0001A0` 요청이 유효성 오류로 반환되어, 실제 거부 조건을 좁히기 위해 코드 형식·KIS 성공·산업코드·분류명·표준코드 존재/일치 여부의 진단 boolean을 오류 응답에 추가한다. 실패 묶음은 저장되지 않았다.
 - 운영 진단에서 `tickerFormat=true`, `kisResponse=true`인데 `industryCode`, `industryName`, `standardCode`가 모두 false임을 확인했다. KIS 응답은 성공했으나 공통 응답 파서가 단일 객체 형태의 `output`을 `rows`로 옮기지 않는 경로가 원인으로 판단되어, 단일 `output` 객체를 한 행으로 정규화하고 KIS 기본조회 응답 회귀 테스트를 추가한다.
+- 파서 배포 후 첫 20종목은 저장됐지만 `003310`의 공식 KIS 응답은 성공(`rt_cd=0`)하고 표준산업분류 코드 `031009`를 포함한 반면 `std_idst_clsf_cd_name`은 빈 문자열이었다. 코드는 유효하므로 분류명 부재만으로 코드를 버리지 않도록 운영 API 검증을 수정하고, 미입력 명칭 수를 운영 상태 응답에서 별도로 제공해 코드 커버리지와 명칭 커버리지를 구분한다.
 
 ### 검증 및 운영 상태
-- 영숫자 코드 허용 수정은 로컬 회귀 테스트와 전체 배포 게이트를 통과해 운영 배포했으나 첫 묶음에서 계속 거부됐다. 추가 진단 변경을 배포한 뒤 `0001A0` 포함 묶음으로 원인을 확인하고 재시도한다.
+- `be3ffc65`의 파서 수정을 포함한 운영 배포 `#1118` 성공 뒤 `0001A0` 첫 10개와 다음 10개를 운영 API로 저장했다. KIS 응답은 003310에서 코드만 제공하고 이름은 누락해 중단되어, 코드 저장은 계속하되 누락 이름 수를 노출하는 보완을 배포하고 나머지 대상을 이어서 처리한다.
 - 현재 운영 API 업종 현황은 2,358건 중 0건 완료, 2,358건 미완료다. 동기화는 아직 완료되지 않았다.
 - 커밋·푸시·배포는 수정 검증 완료 후 수행한다.
 
@@ -6723,6 +6754,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 운영 universe 차이의 원인과 KIS 미분류 `000`은 아직 해결되지 않았다. 감사 결과에 따라 유효 COMMON_STOCK 누락 행만 KIS 원본으로 추가/수정하고, 제외 상품은 common universe에서 제거할 별도 결정·변경·검증을 수행해야 한다. 완료 판단은 모든 활성 common rows가 KIS 원본 후보와 대조되거나 공식 부적격 사유로 격리되고, 남은 KIS `000`이 원본상 미분류임을 확인한 뒤에만 가능하다.
 
 ### 개선 과제 및 배포
-- 개선 과제 ID: CI-2026-10-24-011
+- 개선 과제 ID: CI-2026-10-24-012
 - 성과 판정: IN_PROGRESS
 - 코드 변경은 현재 로컬 작업 트리에만 있으며 아직 커밋·푸시·배포하지 않았다. 전체 검증 후 `oci` 반영 및 운영 read-only 감사로 이어간다.

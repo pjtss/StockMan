@@ -5,13 +5,14 @@ import { extractMarketRssTranslatedHeadline, prepareMarketRssTranslationInput } 
 import { isMarketRssTranslationHeadlineComplete, isMarketRssTranslationKoreanEnough } from "./market-rss-translation-quality";
 import { createMarketRssTranslationClient } from "./market-rss-translation-client";
 import { mapWithConcurrency } from "./map-with-concurrency";
+import { AZURE_TRANSLATION_PROVIDER } from "./translation-cache";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
 export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
 export type MarketRssTranslationFallbackHandler = (item: MarketRssItem, result: TranslationResult) => void;
-export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false, onProviderFallback?: MarketRssTranslationFallbackHandler): Promise<TranslatedMarketRssItem> {
+export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false, onProviderFallback?: MarketRssTranslationFallbackHandler, providerFallbackAttempted = false, prefetchedTranslation?: TranslationResult): Promise<TranslatedMarketRssItem> {
   const protectedHeadline = prepareMarketRssTranslationInput(item.title);
   const preparedInput = protectedHeadline;
   const translatableText = protectedHeadline.text.replace(/ZX\d+Q/g, "");
@@ -32,7 +33,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   if (!selectedClient) return { ...item, translatedTitle: item.title, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: true, translationFallbackReason: "cloud_translation_not_configured" };
   // RSS feeds can contain mixed-language headlines, so let the selected provider
   // detect the source instead of forcing English for every publisher.
-  let title = await selectedClient.translate(preparedInput.text, "auto", "ko", preparedInput.format);
+  let title = prefetchedTranslation ?? await selectedClient.translate(preparedInput.text, "auto", "ko", preparedInput.format);
   const invalidateCachedResponse = async () => {
     if (title.requestOrigin === "CACHE") {
       // A cache-origin response is safe to retry only after confirmed removal.
@@ -43,6 +44,21 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const validationFallback = async (translationFallbackReason: string, translationCandidateTitle?: string) => {
     const cacheInvalidated = await invalidateCachedResponse();
     if (cacheInvalidated && title.requestOrigin === "CACHE" && !cacheRecoveryAttempt) return null;
+    if (!providerFallbackAttempted && title.provider === AZURE_TRANSLATION_PROVIDER && title.requestOrigin === "PROVIDER" && selectedClient.translateFallbackProvider) {
+      try {
+        const fallbackTitle = await selectedClient.translateFallbackProvider(preparedInput.text, "auto", "ko", preparedInput.format);
+        if (!fallbackTitle.fallback) {
+          const fallbackClient: TranslationClient = {
+            translate: async () => fallbackTitle,
+            ...(selectedClient.commitCache ? { commitCache: (...args) => selectedClient.commitCache!(...args) } : {}),
+            ...(selectedClient.invalidateCache ? { invalidateCache: (...args) => selectedClient.invalidateCache!(...args) } : {}),
+          };
+          return await translateMarketRssItem(item, fallbackClient, false, onProviderFallback, true, fallbackTitle);
+        }
+      } catch {
+        // Preserve the primary validation failure if the alternate provider is unavailable.
+      }
+    }
     return {
       ...item,
       translatedTitle: item.title,
