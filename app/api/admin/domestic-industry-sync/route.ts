@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       const industryCode = String(item?.std_idst_clsf_cd ?? "").trim();
       const industryName = String(item?.std_idst_clsf_cd_name ?? "").trim();
       const standardCode = String(item?.std_pdno ?? "").trim();
-      if (!response.ok || !/^\d{6}$/.test(industryCode) || !industryName || (target.standard_code && standardCode && target.standard_code !== standardCode)) {
+      if (!/^\d{6}$/.test(target.code) || !response.ok || !/^\d{6}$/.test(industryCode) || !industryName || !standardCode || (target.standard_code && target.standard_code !== standardCode)) {
         return NextResponse.json({ ok: false, error: "KIS_STOCK_INFO_INVALID", failedCode: target.code, providerCode: response.msgCd }, { status: 502 });
       }
       values.push({ market: target.market, code: target.code, industryCode, industryName });
