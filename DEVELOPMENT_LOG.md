@@ -1,3 +1,33 @@
+## [2026-10-24] RSS OCI cron 단위 재조정
+
+### 목표
+- 배포한 50건 제한 run이 268초 후에도 `RUNNING`으로 남았다. RSS 수집 timeout, 번역 provider retry, 티커별 KIS 시장 순차 조회 시간을 합하면 한 run 50건은 OCI 제한 안에 끝나지 않을 수 있다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: 번역 및 Discord 발송 각각 최대 3건으로 제한한다. 원격 환경의 batch 크기 설정도 3을 초과하지 못하게 hard cap을 둔다.
+- `app/api/cron/market-rss/route.test.ts`: 요청당 3건 처리 및 남은 backlog 표시를 회귀 검증한다.
+- `deploy/oci/README.md`: timer 실행 단위를 3건으로 명시한다.
+
+### 검증
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API read-only 관측(2026-10-24 12:22 UTC): 새 버전의 첫 run이 268초 `RUNNING` 상태로 남았으며 Discord 전송 완료 summary를 확인하지 못했다. 이 측정으로 50건 cap이 충분하지 않음을 판단했다.
+- 기존 코드와 변경안 모두 provider에 전달하는 값은 제목뿐이며 summary/content는 원문 그대로 보존한다.
+
+### 다음 개선
+- `deploy:verify` 통과 후 `oci` 배포 workflow를 확인하고, 새 3건 run의 duration·backlogRemaining·notified.sent를 운영 API에서 검증한다. 3건도 180초에 근접하면 번역과 Discord 발송 단계를 별도 timer 실행으로 분리한다.
+- provider quota/오류, 검증 실패 기사, Discord 및 KIS 응답 지연은 backlog 완료 속도에 영향을 준다. 제목 번역이 검증되지 않은 기사는 발송하지 않는다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-005
+성과 판정: PARTIAL
+근거: 50건 제한이 268초 `RUNNING`으로 남은 운영 측정에 따라 hard cap 3으로 더 낮췄고, 해당 revision의 전체 deploy:verify가 통과했다. 재배포 후 운영 3건 run과 Discord 실수신은 아직 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 현재 revision의 전체 검증 후 별도 한국어 커밋으로 push하고 운영 결과를 확인한다.
+
 ## [2026-10-24] RSS 과거 대기분의 제한 시간 내 연속 처리
 
 ### 목표

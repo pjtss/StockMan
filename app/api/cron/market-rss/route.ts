@@ -29,8 +29,8 @@ export async function POST(request: Request) {
       const ingested = await ingestMarketRssArticles({ sources });
       // Keep each one-minute OCI timer invocation bounded. The oldest-first
       // selectors continue the backlog on the next timer tick.
-      const translationBatchSize = getMarketRssBatchSize(process.env.RSS_TRANSLATION_BATCH_SIZE, 50, 50);
-      const notificationBatchSize = getMarketRssBatchSize(process.env.RSS_NOTIFICATION_BATCH_SIZE, 50, 50);
+      const translationBatchSize = getMarketRssBatchSize(process.env.RSS_TRANSLATION_BATCH_SIZE, 3, 3);
+      const notificationBatchSize = getMarketRssBatchSize(process.env.RSS_NOTIFICATION_BATCH_SIZE, 3, 3);
       const translationRuns: Awaited<ReturnType<typeof translatePendingMarketRssArticles>>[] = [];
       const notificationRuns: Awaited<ReturnType<typeof notifyPendingMarketRssArticles>>[] = [];
       const batch = await translatePendingMarketRssArticles(translationBatchSize);

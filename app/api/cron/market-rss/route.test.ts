@@ -73,14 +73,14 @@ describe("market-rss cron route", () => {
     });
     expect(mocks.order).toEqual(["ingest", "translate", "notify", "bullish"]);
     expect(mocks.ingest).toHaveBeenCalledWith({ sources: ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"] });
-    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 50, 50);
-    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 50, 50);
+    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 3, 3);
+    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 3, 3);
     expect(mocks.getCronStatus).toHaveBeenCalledWith(0, expect.objectContaining({ attempted: 3, translated: 2, fallback: 1, failed: 0 }));
   });
 
   it("ends after one bounded batch and reports that the next timer tick must continue the backlog", async () => {
-    mocks.translate.mockResolvedValueOnce({ attempted: 50, translated: 50, notRequired: 0, fallback: 0, failed: 0, fallbackReasons: {}, translationUsage: null, limitReached: false, limitAlertSent: false, thresholdAlerts: [], thresholdAlertSent: 0 });
-    mocks.notify.mockResolvedValueOnce({ attempted: 50, sent: 50, queueEnqueueFailed: 0, skipped: false, batchLimit: 50, webhookConfigured: true });
+    mocks.translate.mockResolvedValueOnce({ attempted: 3, translated: 3, notRequired: 0, fallback: 0, failed: 0, fallbackReasons: {}, translationUsage: null, limitReached: false, limitAlertSent: false, thresholdAlerts: [], thresholdAlertSent: 0 });
+    mocks.notify.mockResolvedValueOnce({ attempted: 3, sent: 3, queueEnqueueFailed: 0, skipped: false, batchLimit: 3, webhookConfigured: true });
 
     const response = await POST(new Request("http://localhost/api/cron/market-rss", {
       method: "POST",
@@ -88,7 +88,7 @@ describe("market-rss cron route", () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ backlogRemaining: true, degraded: true, notified: { sent: 50 } });
+    expect(await response.json()).toMatchObject({ backlogRemaining: true, degraded: true, notified: { sent: 3 } });
     expect(mocks.translate).toHaveBeenCalledTimes(1);
     expect(mocks.notify).toHaveBeenCalledTimes(1);
   });
