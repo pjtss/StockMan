@@ -1,3 +1,37 @@
+## [2026-10-24] RSS 세 출처 제목만 한국어 번역한 뒤 전체 기사 Discord 알림
+
+### 목표
+GlobeNewswire, StockTitan, SEC RSS 기사를 필터링하지 않고 모두 처리하며, Discord 전송 전 제목만 한국어 번역 완료된 기사만 통과시킨다. 요약과 본문은 번역기에 전달하거나 번역하지 않고 원문 그대로 유지한다.
+
+### 반영
+- cron 수집 범위를 GLOBENEWSWIRE, STOCKTITAN, SEC_EDGAR로 고정하고, SEC Latest Filings URL에서 특정 제출 유형 필터를 제거했다.
+- 기존 호재 분류·매핑·기사 나이 조건을 Discord 대상 선정에서 제거해 세 출처의 전체 기사가 번역 후 알림 대기열에 들어가도록 했다.
+- 한국어 제목 또는 검증 완료된 한국어 번역 상태만 알림 게이트를 통과하게 했고, 번역·전송 batch를 계속 비워 전체 처리량 제한에 걸려 기사를 남기지 않게 했다.
+- 프로바이더 호출이 원 제목에서 만든 보호 입력만 받는다는 회귀 검증을 추가하고, summary/content 및 translatedSummary/translatedContent가 원문 그대로 반환되는지 확인했다.
+- 번역 제공자 실패로 최대 시도 횟수에 도달한 기사도 backoff 후 다시 시도하도록 했고, Discord 429 Retry-After 대응을 보강했다.
+- 관리자 번역 미리보기, OCI timer·cron 검사, 운영 문서를 세 출처 및 제목 전용 번역 정책과 일치시켰다.
+
+### 검증
+- RSS 타깃 테스트: 7개 파일, 109개 테스트 통과.
+- `npm.cmd run deploy:verify`: 최신 origin 기준 의존성 감사(취약점 0), 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 테스트(295개 파일 중 294 통과·1 skip; 1,428 통과·3 skip), typecheck, 문서·migration(160), verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사까지 통과.
+- 개선 과제 기록 항목을 보완하기 전 첫 docs:check는 실패했으며, 수정 뒤 전체 deploy:verify가 통과했다.
+- Windows worktree의 `node_modules` junction 때문에 Next standalone trace에서 EPERM 경고가 있었으나 standalone server와 browser/API smoke는 모두 성공했다. 운영 배포는 OCI Linux workflow에서 독립 checkout/build한다.
+- 이 시점에는 원격 push 및 운영 Discord 실제 수신 확인 전이다. workflow 성공 후 운영 cron 결과와 각 출처의 전송 기록을 확인한다.
+
+### 근본 원인 및 재발 방지
+이전 경로는 일부 소스/분류/연령 기준을 유지하고 StockTitan만 전체 전달했으며, 번역 결과 게이트와 retry 고갈 처리도 전체 기사 유입을 보장하지 못했다. 세 출처 고정 목록, 기사별 한국어 번역 게이트, 무필터 알림 대상, 제목 전용 provider 입력 테스트, retry 재선정 테스트 및 OCI cron 구조 게이트로 재발을 감지한다.
+
+### 다음 개선
+- RSS 공급자 응답 범위, 번역 제공자 가용성·할당량, 운영 Webhook 및 Discord 제한은 외부 의존성이다. 가능한 모든 기사를 알림 대상으로 삼되 외부 장애 중 전송 성공을 보장하기는 어렵다.
+- 배포 뒤 운영에서 SEC·StockTitan·GlobeNewswire 각각의 번역 완료와 Discord 전송 성공 상태를 확인한다. 하나라도 미확인이라면 해당 출처의 수집·번역·전송 단계별 진단을 보강한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-003
+성과 판정: IMPROVED
+근거: 세 RSS 출처에 대해 제목만 번역하고 모든 기사를 Discord 알림 대상으로 삼도록 수집·번역 게이트·재시도·배치를 일치시켰으며, 제목 전용 입력 회귀 테스트와 전체 배포 검증으로 변경을 확인했다. 운영 배포 및 실제 Discord 수신은 아직 확인 전이다.
+
+### 커밋·푸시·배포
+- 미실행: 최신 `origin/oci` 기반 격리 worktree에서 이번 RSS 관련 파일만 커밋·push하여 OCI 자동 배포를 요청한다. 다른 checkout의 미커밋 변경은 포함하지 않는다.
 ## [2026-10-24] Azure Text Translation endpoint 경로 정규화
 
 ### 목표

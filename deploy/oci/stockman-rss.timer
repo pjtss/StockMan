@@ -1,9 +1,9 @@
 [Unit]
-Description=Run Stockman RSS ingestion every five minutes
+Description=Run Stockman RSS ingestion every minute
 
 [Timer]
 OnBootSec=1min
-OnUnitActiveSec=5min
+OnUnitActiveSec=1min
 AccuracySec=1s
 Persistent=true
 

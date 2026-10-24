@@ -42,15 +42,15 @@ describe("market RSS translation test API scope", () => {
     state.previewMarketRssResults.mockResolvedValue([]);
   });
 
-  it("defaults an unqualified translation request to StockTitan only", async () => {
+  it("defaults an unqualified translation request to all three alert sources", async () => {
     const response = await GET(new Request("http://localhost/api/admin/market-rss-test?translate=true"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.source).toBe("STOCKTITAN");
-    expect(state.fetchMarketRssSource).toHaveBeenCalledWith("STOCKTITAN");
-    expect(state.translateMarketRssItems).toHaveBeenCalledWith(feed.items, state.translationClient);
-    expect(state.fetchAllMarketRss).not.toHaveBeenCalled();
+    expect(body.results).toEqual([]);
+    expect(state.fetchAllMarketRss).toHaveBeenCalledWith(["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]);
+    expect(state.previewMarketRssResults).toHaveBeenCalledWith([], true, state.translationClient, undefined, undefined);
+    expect(state.fetchMarketRssSource).not.toHaveBeenCalled();
   });
 
   it("rejects translation requests for other sources before fetching them", async () => {
@@ -58,9 +58,18 @@ describe("market RSS translation test API scope", () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toMatchObject({ allowedSource: "STOCKTITAN", translatedField: "title" });
+    expect(body).toMatchObject({ allowedSources: ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"], translatedField: "title" });
     expect(state.fetchMarketRssSource).not.toHaveBeenCalled();
     expect(state.translateMarketRssItems).not.toHaveBeenCalled();
+  });
+
+  it.each(["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"])("allows translated title preview for %s", async (source) => {
+    state.fetchMarketRssSource.mockResolvedValue({ ...feed, source, items: feed.items.map((item) => ({ ...item, source })) });
+    const response = await GET(new Request(`http://localhost/api/admin/market-rss-test?source=${source}&translate=true`));
+
+    expect(response.status).toBe(200);
+    expect(state.fetchMarketRssSource).toHaveBeenCalledWith(source);
+    expect(state.translateMarketRssItems).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ source })]), state.translationClient);
   });
 
   it("limits translated preview items and enables diagnostics only for a bounded preview", async () => {

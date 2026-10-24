@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { discordDeliveryQueue } from "@/lib/schema";
 import { marketRssArticles } from "@/lib/schema";
 import { sql } from "drizzle-orm";
+import { getDiscordRetryDelayMs } from "@/lib/discord-delivery-policy";
 
 export async function enqueueDiscordDelivery(input: { externalId: string; channelKey: string; payload: Record<string, unknown> }) {
   const db = getDb();
@@ -138,7 +139,7 @@ export async function persistDiscordDeliveryOutcome(input: {
     updatedAt: now,
     ...(input.status === "SENT" ? { sentAt: now } : {}),
     ...(input.status === "PENDING" ? {
-      nextAttemptAt: new Date(now.getTime() + Math.min(3600, 2 ** Math.min(input.attempts, 10)) * 1000),
+      nextAttemptAt: new Date(now.getTime() + getDiscordRetryDelayMs(input.attempts, input.error)),
     } : {}),
   };
   await db.transaction(async (tx) => {

@@ -3,10 +3,12 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { buildMarketRssNotificationClaimCondition, buildMarketRssNotificationRateWindowCondition, buildMarketRssNotificationTranslationGate } from "./market-rss-notification-translation-gate";
 
 describe("market RSS notification translation gate", () => {
-  it("excludes rows that have not reached any translation outcome yet", () => {
+  it("allows only validated Korean translations and titles already in Korean", () => {
     const query = new PgDialect().sqlToQuery(buildMarketRssNotificationTranslationGate());
-    expect(query.sql).toContain('"market_rss_articles"."translation_status" <> $1');
-    expect(query.params).toEqual(["PENDING"]);
+    expect(query.sql).toContain('"market_rss_articles"."translation_status" =');
+    expect(query.sql).toContain('"market_rss_articles"."translation_skipped_reason" =');
+    expect(query.params).toContain("TRANSLATED");
+    expect(query.params).toContain("already_in_target_language");
   });
 
   it("claims only the unchanged source and translation snapshot used to build the payload", () => {

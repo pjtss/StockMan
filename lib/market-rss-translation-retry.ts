@@ -1,4 +1,4 @@
-import { and, eq, lte, lt, or } from "drizzle-orm";
+import { and, eq, gte, lte, lt, or } from "drizzle-orm";
 import { marketRssArticles } from "./schema";
 import { MARKET_RSS_TRANSLATION_MAX_ATTEMPTS, MARKET_RSS_TRANSLATION_RETRY_DELAYS_MS, MARKET_RSS_TRANSLATION_RETRYABLE_SKIPPED_REASONS } from "./market-rss-translation-retry-constants";
 import { prepareMarketRssTranslationInput } from "./market-rss-translation-input";
@@ -16,6 +16,7 @@ export function getMarketRssTranslationRetryCriteria(clientConfigured: boolean, 
   return {
     failedBeforeAttempt: MARKET_RSS_TRANSLATION_MAX_ATTEMPTS,
     failureRetryBefore,
+    exhaustedFailureRetryBefore: new Date(now.getTime() - MARKET_RSS_TRANSLATION_RETRY_DELAYS_MS.at(-1)!),
     retrySkippedImmediatelyReasons: clientConfigured ? ["cloud_translation_not_configured"] : [],
     retrySkippedWithBackoffReasons: clientConfigured ? [...MARKET_RSS_TRANSLATION_RETRYABLE_SKIPPED_REASONS] : [],
     monthlyQuotaRetryBefore,
@@ -49,6 +50,21 @@ export function buildMarketRssTranslationRetryCondition(criteria: ReturnType<typ
       lte(marketRssArticles.translationAttemptedAt, retryBefore),
     ),
   );
+  // Keep failed translations eligible after the short initial retry schedule
+  // so a temporary provider outage cannot permanently strand an article.
+  const exhaustedFailureRetryConditions = [
+    and(
+      eq(marketRssArticles.translationStatus, "FAILED"),
+      gte(marketRssArticles.translationAttempts, criteria.failedBeforeAttempt),
+      lte(marketRssArticles.translationAttemptedAt, criteria.exhaustedFailureRetryBefore),
+    ),
+    ...criteria.retrySkippedWithBackoffReasons.map((reason) => and(
+      eq(marketRssArticles.translationStatus, "SKIPPED"),
+      eq(marketRssArticles.translationSkippedReason, reason),
+      gte(marketRssArticles.translationAttempts, criteria.failedBeforeAttempt),
+      lte(marketRssArticles.translationAttemptedAt, criteria.exhaustedFailureRetryBefore),
+    )),
+  ];
   if (criteria.monthlyQuotaRetryBefore) skippedRetryConditions.push(and(
     eq(marketRssArticles.translationStatus, "SKIPPED"),
     or(eq(marketRssArticles.translationSkippedReason, "monthly_character_limit_reached"), eq(marketRssArticles.translationSkippedReason, "provider_free_quota_exceeded")),
@@ -67,6 +83,7 @@ export function buildMarketRssTranslationRetryCondition(criteria: ReturnType<typ
   return or(
     eq(marketRssArticles.translationStatus, "PENDING"),
     ...failedRetryConditions,
+    ...exhaustedFailureRetryConditions,
     ...skippedRetryConditions,
     ...skippedRetryWithBackoffConditions,
   );

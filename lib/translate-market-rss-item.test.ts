@@ -18,6 +18,7 @@ describe("market RSS translation", () => {
   it("sends only the XML-decoded RSS headline to the provider and restores a readable translation", async () => {
     const feed = parseMarketRss('<rss><channel><item><guid>company-story</guid><title>AT&amp;T raises 20% outlook</title><link>https://example.com/story</link><description>AT&amp;T expects growth &amp; stronger revenue.</description></item></channel></rss>', "TEST", "https://example.com/feed");
     const source = feed.items[0];
+    source.content = "Full article body: AT&amp;T business details.";
     const translate = vi.fn(async () => ({
       translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}AT&amp;T 전망 ZX0Q 상향${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}AT&amp;T 매출 성장</p></div>`,
       source: "en" as const,
@@ -31,9 +32,14 @@ describe("market RSS translation", () => {
     expect(source.title).toBe("AT&T raises 20% outlook");
     expect(source.summary).toBe("AT&T expects growth & stronger revenue.");
     expect(translate).toHaveBeenCalledWith("AT&T raises ZX0Q outlook", "auto", "ko", "text");
+    expect(translate).toHaveBeenCalledTimes(1);
     expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(translate.mock.calls[0][0]).not.toContain(source.content);
     expect(result).toMatchObject({ translatedTitle: "AT&T 전망 20% 상향", translationFallback: false });
     expect(result.summary).toBe(source.summary);
+    expect(result.content).toBe(source.content);
+    expect(result.translatedSummary).toBe(source.summary);
+    expect(result.translatedContent).toBe(source.content);
   });
 
   it("preserves locale-formatted currency from RSS XML through provider translation and restoration", async () => {
