@@ -44,14 +44,74 @@
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.
 
 ### 개선 과제
-- 개선 과제 ID: CI-2026-10-24-004
+- 개선 과제 ID: CI-2026-10-24-006
 - 성과 판정: PARTIAL
 - 근거: KIS 오프셋 파싱, industry_code upsert, KIS 전용 트랜잭션 동기화 API와 KIS 최신 원본 parser 테스트까지 구현했다. 운영 DB 실제 반영과 coverage 증명은 아직 미완료다.
 - 다음 개선: 배포 API 인증 후 KIS 최신 원본을 업로드하고 거래소별 DB coverage와 미매칭을 확인한다.
 
 ### 커밋·푸시·배포
 - 커밋 `0f7ddab5` 생성 완료(작업 브랜치 `codex/kis-industry-20261024`). push 및 운영 API 배포/적재는 아직 완료되지 않았다.
+## [2026-10-24] RSS OCI cron 단위 재조정
 
+### 목표
+- 배포한 50건 제한 run이 268초 후에도 `RUNNING`으로 남았다. RSS 수집 timeout, 번역 provider retry, 티커별 KIS 시장 순차 조회 시간을 합하면 한 run 50건은 OCI 제한 안에 끝나지 않을 수 있다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: 번역 및 Discord 발송 각각 최대 3건으로 제한한다. 원격 환경의 batch 크기 설정도 3을 초과하지 못하게 hard cap을 둔다.
+- `app/api/cron/market-rss/route.test.ts`: 요청당 3건 처리 및 남은 backlog 표시를 회귀 검증한다.
+- `deploy/oci/README.md`: timer 실행 단위를 3건으로 명시한다.
+
+### 검증
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API read-only 관측(2026-10-24 12:22 UTC): 새 버전의 첫 run이 268초 `RUNNING` 상태로 남았으며 Discord 전송 완료 summary를 확인하지 못했다. 이 측정으로 50건 cap이 충분하지 않음을 판단했다.
+- 기존 코드와 변경안 모두 provider에 전달하는 값은 제목뿐이며 summary/content는 원문 그대로 보존한다.
+
+### 다음 개선
+- `deploy:verify` 통과 후 `oci` 배포 workflow를 확인하고, 새 3건 run의 duration·backlogRemaining·notified.sent를 운영 API에서 검증한다. 3건도 180초에 근접하면 번역과 Discord 발송 단계를 별도 timer 실행으로 분리한다.
+- provider quota/오류, 검증 실패 기사, Discord 및 KIS 응답 지연은 backlog 완료 속도에 영향을 준다. 제목 번역이 검증되지 않은 기사는 발송하지 않는다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-005
+성과 판정: PARTIAL
+근거: 50건 제한이 268초 `RUNNING`으로 남은 운영 측정에 따라 hard cap 3으로 더 낮췄고, 해당 revision의 전체 deploy:verify가 통과했다. 재배포 후 운영 3건 run과 Discord 실수신은 아직 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 현재 revision의 전체 검증 후 별도 한국어 커밋으로 push하고 운영 결과를 확인한다.
+
+## [2026-10-24] RSS 과거 대기분의 제한 시간 내 연속 처리
+
+### 목표
+- 배포 뒤 운영 확인에서 세 출처의 기존 대기 기사가 남아 있었고, cron 단일 실행이 10분 이상 `RUNNING`에 머물렀다. 기존 cron은 번역 및 전송 대상이 고갈될 때까지 요청 한 번 안에서 무한 배치 루프를 돌려 OCI의 180초 HTTP 제한과 충돌할 수 있었다.
+- 최신 기사를 먼저 고르는 정렬은 새 기사가 계속 들어오는 동안 과거 backlog 처리를 지연시킬 수 있었다.
+
+### 반영
+- `app/api/cron/market-rss/route.ts`: 호출당 번역 최대 50건, Discord 최대 50건으로 제한하고 남은 backlog를 `backlogRemaining`에 표시해 다음 1분 timer가 이어가도록 변경한다.
+- `lib/market-rss-pipeline.ts`: 번역·알림 후보를 생성시각 오름차순으로 처리해 오래된 대기분부터 drain한다. Discord 대상은 기존처럼 제목 번역 완료 또는 이미 한국어인 제목만 허용한다.
+- `app/api/cron/market-rss/route.test.ts`: 단일 bounded batch 종료 및 backlog 표시 회귀 테스트 추가.
+- `deploy/oci/README.md`: timer별 처리 단위와 제목 전용 번역 규칙을 운영 설명에 반영한다.
+
+### 검증
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사를 확인했다.
+- `npm.cmd run docs:check`: 표준 개선 로그 섹션 보완 후 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었지만 standalone 실행과 브라우저/API smoke는 통과했다.
+- 운영 API read-only 확인(2026-10-24 12:05 UTC): 30일 기사 행 73,115건 중 `PENDING` 61,771건, `SKIPPED` 9,742건, `TRANSLATED` 1,602건. 허용 출처 중 StockTitan과 SEC만 기사 행이 있었고 GlobeNewswire는 0건이었다. 이 상태 집계는 Discord `SENT` 증거가 아니므로 실제 발송으로 간주하지 않는다.
+- 원문 기사 제목만 번역 provider에 전달하고 summary/content는 그대로 유지한다. 번역 성공 전 알림 gate를 통과하지 못하게 한다.
+
+### 다음 개선
+- cron 회귀 테스트는 요청당 한 번의 제한 배치만 수행하고 배치가 꽉 찼으면 `backlogRemaining=true`를 반환하는지 확인한다. 운영 감시는 분당 run duration, `backlogRemaining`, 출처별 translation status 및 `notified.sent`를 대조한다.
+- 번역 공급자 오류·quota, 제목 품질 검증 실패, Discord 장애/제한, 원본 피드의 최대 제공 범위는 외부 의존성이다. 정책상 검증되지 않은 원문 제목은 발송하지 않으며 실패 항목은 재시도 상태로 남을 수 있다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-004
+성과 판정: IMPROVED
+근거: 제한 시간 충돌과 오래된 backlog 기아 원인을 수정하고 bounded batch 회귀 테스트 및 전체 deploy:verify를 통과시켰다. OCI 재배포와 과거 backlog Discord 실수신은 아직 미확인이다.
+
+### 커밋·푸시·배포
+- 미실행: 전체 검증 후 RSS 변경만 커밋·push하고 OCI 배포/운영 전송을 확인한다.
 ## [2026-10-24] RSS 세 출처 제목만 한국어 번역한 뒤 전체 기사 Discord 알림
 
 ### 목표
@@ -6472,7 +6532,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **원본 대조**: KIS 공식 NAS/NYS/AMS 마스터(2026-10-23 데이터, 2026-10-24 19:01 KST 다운로드)를 프로젝트와 동일한 필드/상품 제외 기준으로 전수 파싱. 5,358 KIS 보통주 후보 중 실제 3자리 비영 업종코드 2,634, 공식 `000` 2,724.
 - **로컬 DB read-only 비교**: `BEGIN READ ONLY` + `statement_timeout`으로 활성 COMMON_STOCK 5,444행 확인. 유효 `industry_code`는 0행, 미분류 5,444행. KIS와 5,310행 매칭했으며 매칭값 5,310건 모두 DB 공란으로 원본과 불일치(2,634건은 KIS에 비영 코드가 있으나 로컬 DB 공란). KIS 후보 중 DB 활성 universe 누락 48건(AMS12/NAS32/NYS4), 반대로 DB 활성 종목 중 최신 KIS 후보와 불일치 134건(AMS7/NAS46/NYS81). 이번 검증에서는 DB를 변경하지 않았다.
 - **운영 route 확인**: 로그인 후 현재 운영 `/api/admin/us-industry-codes`가 404 `text/html`이어서 최신 운영 DB 업종코드 및 저장 후 감사 결과는 확인할 수 없었다. 이전 작업의 운영 적재 수치는 역사적 결과로 구분하며 현 상태의 성공으로 간주하지 않는다.
-- **검증**: 최신 `oci` 통합 트리에서 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 문서 개선과제 ID 중복으로 첫 통합 검증은 docs gate에서 실패했으며 KIS ID를 `CI-2026-10-24-004`로 고유화한 후 전체 게이트 통과. 앞선 `/charts` 30초 timeout도 재현되지 않았다.
+- **검증**: `origin/oci` 통합 전 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 이후 최신 RSS 기록과 ID가 중복임을 추가 통합 검증에서 발견했고, KIS ID를 `CI-2026-10-24-006`으로 변경했다. 앞선 `/charts` 30초 timeout은 재현되지 않았다.
 - **남은 위험/후속**: 로컬 DB 업종코드 미적재와 KIS-universe 48/134개 불일치가 남아 있다. 운영 진단 route가 현재 404이므로 운영 최신값도 검증 불가. 다음 실행은 활성 보통주 분모 차이를 종목별로 분류하고, 명시 승인 후 로컬/운영 적재 및 read-after-write 감사가 가능하도록 최신 배포 경로를 먼저 복구해야 한다. `000` 값은 공식 미분류로 유지하고 임의 보정하지 않는다.
 - **커밋·푸시·배포**: 통합 검증 및 KIS 원본 대조가 통과해 로컬 merge를 마무리한 뒤 원격 브랜치 push와 OCI 배포 workflow를 진행한다. 운영 진단 route가 현재 404인 원인을 배포 후 다시 확인하고, KIS 원본 재적재 및 DB read-after-write 검증 전까지 목표 완료로 보고하지 않는다.
 
@@ -6485,4 +6545,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **발견된 진단 한계와 변경**: 운영 API는 이전에 미매칭 티커 10개만 노출해 전체 차이를 끝까지 설명하기 어려웠다. 동기화 검증 응답을 전체 미매칭 코드 및 KIS 원본에는 없지만 DB에서 활성 보통주인 코드/건수까지 반환하도록 확장하고 단위 테스트를 갱신했다. 이는 진단만 수행하며 미등록 종목을 자동 편입하거나 DB 단독 종목을 삭제·비활성화하지 않는다.
 - **검증 및 배포 상태**: 진단 보강 후 최초 전체 게이트에서 테스트 fixture의 query 분기 오류 1건을 발견·수정했고, 해당 테스트 단독 통과 후 `npm.cmd run deploy:verify`가 최종 통과했다(296개 파일 통과/1 skip, 1,435 tests 통과/3 skip, typecheck·docs·감사·빌드·standalone runtime/browser smoke 모두 통과). Windows standalone 빌드의 기존 node_modules junction symlink EPERM 경고는 있었지만 산출물 실행과 모든 smoke가 성공했다. 신규 진단 필드의 OCI 배포 및 최종 차이 원인 확인은 아직 남았다.
 - **재발 방지/후속**: 업로드 API는 동기화 성공 응답과 read-after-write 검증을 함께 확인하고, 500·비JSON·연결 오류는 쓰기 성공으로 판단하지 않는다. 진단 응답의 `unmatchedCodes`와 `activeDatabaseOnlyCodes`를 사용해 각 티커가 비활성/타입 불일치/부재 중 무엇인지 분류한다. `000`을 임의 분류하지 않는다.
-- **커밋·푸시·배포**: 최종 전체 게이트는 통과했으며, 현재 변경분 커밋·푸시·OCI 배포는 미실행.
+- **커밋·푸시·배포**: 진단 변경 커밋 `cc0803b7`은 작업 브랜치로 push했다. 첫 workflow run `40093935845`는 새 `oci` 배포 run `40094159820`과 겹쳐 Activate release에서 취소됐다. 최신 `origin/oci`의 RSS cron 변경을 통합 중이며, 통합 트리 검증 후 재배포한다. 아직 신규 진단 필드의 OCI 배포 및 최종 차이 원인 확인은 미완료다.
+
+## [2026-10-24] KIS 진단 변경과 최신 OCI RSS 커밋 통합
+
+- 최신 `origin/oci`의 RSS cron 변경 4개 파일을 보존해 KIS 작업 브랜치에 병합했다. `DEVELOPMENT_LOG.md`의 양쪽 작업 기록을 모두 유지했다.
+- 통합 후 전체 테스트는 296 files passed/1 skipped, 1,436 passed/3 skipped였다. `docs:check`에서 KIS/RSS 개선 ID 중복 `CI-2026-10-24-004`가 발견되어 KIS 항목을 `CI-2026-10-24-006`으로 고유화했다.
+- 수정된 통합 트리에서 `npm.cmd run deploy:verify`를 재실행해 통과했다: 빌드, standalone `/charts`·desktop/mobile Chrome 및 API smoke, 296 test files passed/1 skipped(1,436 passed/3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth(179 routes), cron check.
+- 경쟁하던 OCI run #1108 (`6e3e0ac5`)는 success로 완료됐다. 진단 코드의 통합 커밋은 그 뒤 별도로 푸시·배포해야 하며, 이를 통해 동시 실행 취소를 방지한다.

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
@@ -131,7 +131,9 @@ export async function translatePendingMarketRssArticles(limit = 10) {
     buildMarketRssTranslationRetryCondition(retryCriteria),
     inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
   );
-  const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(desc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
+  // Drain historical backlog first so a continuous stream of new articles
+  // cannot starve older pending titles and notifications.
+  const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
   if (!client) {
     let notRequired = 0;
     let fallback = 0;
@@ -254,7 +256,7 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
     inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
     eq(marketRssArticles.notificationStatus, "PENDING"),
     buildMarketRssNotificationTranslationGate(),
-  )).orderBy(desc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
+  )).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
   let sent = 0;
   let queueEnqueueFailed = 0;
   for (const row of rows) {
