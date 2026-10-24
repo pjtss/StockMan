@@ -6583,3 +6583,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 통합 후 전체 테스트는 296 files passed/1 skipped, 1,436 passed/3 skipped였다. `docs:check`에서 KIS/RSS 개선 ID 중복을 두 차례 발견하여 KIS 항목을 현재 `CI-2026-10-24-007`로 고유화했다.
 - 수정된 통합 트리에서 `npm.cmd run deploy:verify`를 재실행해 통과했다: 빌드, standalone `/charts`·desktop/mobile Chrome 및 API smoke, 296 test files passed/1 skipped(1,436 passed/3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth(179 routes), cron check.
 - 경쟁하던 OCI run #1108 (`6e3e0ac5`)는 success로 완료됐다. 진단 코드의 통합 커밋은 그 뒤 별도로 푸시·배포해야 하며, 이를 통해 동시 실행 취소를 방지한다.
+
+## [2026-10-24] 최신 KIS 미국 업종 전수 적재·운영 재검증 결과
+
+- `.env.local`의 KIS OAuth 자격증명 및 관리자 로그인 비밀번호를 사용해 인증했다. 값과 토큰은 출력하지 않았다.
+- KIS 공식 마스터(데이터 기준 2026-10-23) NAS/NYS/AMS 12,891행에서 common-filter 후보 5,358건을 생성했다. 거래소별 후보 NAS 3,240/NYS 1,864/AMS 254, 비영 업종코드 2,634건, 원본 `000` 2,724건이다.
+- 최신 운영 동기화 route는 최초 PowerShell multipart 호출 500 이후 표준 `curl -F` 요청에서 정상 처리됐다. 2026-10-24T13:05:17Z 마지막 응답은 `ok=true`이며 5,268건 저장, read-after-write `mismatch=0`, 미매칭 90건(NAS64/NYS9/AMS17)이다.
+- 별도 인증 GET에서 활성 DB COMMON_STOCK 총 6,704행(NAS3,949/NYS2,480/AMS275), 유효 분류 코드 2,634행, `000` 또는 결측 4,070행을 확인했다. KIS 후보와 매칭된 5,268행에서는 분류 2,634/공식 `000` 2,634로 원본과 일치한다.
+- 반대 방향으로 최신 KIS 후보에 없는 활성 DB COMMON_STOCK가 1,436행(NAS773/NYS625/AMS38)이다. 이 행들은 유형이 확인되기 전까지 KIS 산업코드를 임의로 부여하지 않았다. KIS 후보 90행 역시 현재 활성 COMMON_STOCK에 존재하지 않아 자동 편입하지 않았다.
+- 전체 차이 목록을 조회 가능하게 만든 진단 코드/최신 OCI RSS 변경 통합 커밋 `77afbacc`를 push했다. run #1111 (`40096039714`)은 success로 완료됐다. 바로 전 run #1109, #1107은 더 최신 `oci` push가 배포를 시작해 취소됐으며, 최신 `oci`를 통합한 뒤 #1111에서 정상 배포했다.
+- **완료 범위**: 운영과 매칭된 5,268개 KIS 공식 보통주의 산업코드 저장·동일성 검증 완료. **미완료**: universe 간 90+1,436건 차이의 종목별 등록/활성/상품 유형 조사. 보통주 전용 원칙상 이 불일치는 별도 종목 universe 정비 승인 없이 자동 변경하지 않는다.
+- **재발 방지**: 앞으로 성공은 HTTP 200만으로 판정하지 않고 API `ok`, 거래소별 matched/missing/mismatch, 독립 GET, 공식 `000` 보존을 모두 확인한다. 전체 universe 차이는 전체 코드 목록으로 진단하며, 미등록 편입·비활성화는 별도 작업으로 분리한다.
