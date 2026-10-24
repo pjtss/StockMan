@@ -1,5 +1,14 @@
 # 오류 상황 및 해결 방법
 
+## 2026-10-25 RSS 제목 숫자 번역과 backlog 배치 설정
+
+- **증상**: 운영 RSS가 Azure로 제목을 한국어 번역했지만 `Third Quarter`를 `3분기`로 바꾼 숫자를 미번역 숫자로 오인해 `translation_numeric_hallucination`으로 차단했다. 동시에 RSS timer 실행은 회당 세 건만 시도해 과거 대기열이 느리게 진행됐다.
+- **근본 원인**: 숫자 무결성 검사는 아라비아 숫자가 원문에 없으면 모두 환각으로 간주했으며, 운영의 `/etc/stockman/stockman.env`에 남은 작은 배치 override가 앱 기본값 50을 덮어썼다.
+- **해결 위치**: `lib/translate-market-rss-item.ts`는 원문에 있는 영어 기수·서수 단어에 대응하는 숫자 변환만 허용하고, 원문과 무관한 숫자 및 새 금융 부호는 계속 차단한다. `deploy/oci/stockman-rss.service`는 환경파일 뒤에 회당 번역·알림 크기 20을 지정해 오래된 override를 덮어쓴다.
+- **재발 자동 감지**: `lib/translate-market-rss-item.test.ts`는 `Third Quarter` → `3분기`를 허용하고 출처에 없는 숫자를 계속 거부한다. `scripts/check-oci-cron.mjs`는 RSS timer 서비스 배치 설정을 검사한다. 배포 후 최근 실행에서 `translated`·`notified.sent` 증가와 `backlogRemaining` 감소를 확인한다.
+- **영향 범위와 남은 위험**: 이번 원인으로 차단된 제목은 한국어 번역 검증 통과 전까지 Discord에 전송되지 않았다. Google 앱 월 한도는 300,000자 중 299,992자가 예약되어 fallback이 사실상 중단됐으며, Azure 사용 가능량은 진단 당시 약 1,518,453자였다. 불완전 번역 등 다른 품질 실패는 여전히 보류된다. 30일 운영 조회에서는 GlobeNewswire 20건, StockTitan 2,174건, SEC 3,028건의 PENDING이 확인됐으며, 30일보다 오래된 항목 수는 별도 집계되지 않았다.
+- **다음 개선**: 새 배포 후 세 출처의 실제 제목 번역 및 Discord 수신을 관찰하고, 30일을 넘은 backlog까지 완전히 소진됐는지 운영 상태에서 확인한다. 번역 서비스 한도는 사용자 승인 없이 높이지 않는다.
+
 ## 2026-10-20 RSS Discord 알림 출처 허용 목록 적용
 
 - **증상**: Newsis 등 SEC·StockTitan 이외 RSS도 공통 시장 RSS Discord webhook 알림을 받을 수 있었다.

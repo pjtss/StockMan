@@ -390,6 +390,42 @@ describe("market RSS translation", () => {
     });
   });
 
+  it("accepts Arabic digits that faithfully translate spelled-out title numbers", async () => {
+    const source = { ...item("spelled-ordinal"), title: "Hawaiian Electric Industries to Announce Third Quarter 2026 Results November 6 | HE Stock News", summary: "Company outlook improves" };
+    const translate = vi.fn(async (text: string) => {
+      const markers = [...text.matchAll(/ZX\d+Q/g)].map(([marker]) => marker);
+      return {
+        translatedText: `하와이 전기 산업, 3분기 ${markers[0]} 실적 발표 11월 ${markers[1]} | HE 주식 뉴스`,
+        source: "en" as const,
+        target: "ko" as const,
+        provider: "test",
+        fallback: false,
+      };
+    });
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({
+      translatedTitle: "하와이 전기 산업, 3분기 2026 실적 발표 11월 6 | HE 주식 뉴스",
+      translatedSummary: source.summary,
+      translationFallback: false,
+    });
+  });
+
+  it("rejects a financial sign invented beside a spelled-out source number", async () => {
+    const source = { ...item("invented-ordinal-sign"), title: "Third Quarter Outlook Improves", summary: "Company outlook improves" };
+    const translate = vi.fn(async () => ({ translatedText: "-3분기 전망 개선", source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({
+      translatedTitle: source.title,
+      translatedSummary: source.summary,
+      translationFallback: true,
+      translationFallbackReason: "translation_numeric_hallucination",
+    });
+  });
+
   it("does not treat digits inside a numeric HTML entity as a fabricated claim", async () => {
     const source = { ...item("numeric-html-entity"), title: "Nvidia outlook improves", summary: "" };
     const translate = vi.fn(async () => ({

@@ -1,3 +1,37 @@
+## [2026-10-25] RSS 숫자 변환 검증 오탐과 운영 batch override 수정
+
+### 목표
+- 2026-10-24 배포 이후 운영 RSS cron이 제목 번역 오류로 계속 발송을 보류하고 매 실행 세 건만 처리하는 문제를 확인했다.
+
+### 근본 원인
+- 영어 서수 `Third`를 Azure가 `3`으로 자연스럽게 번역했지만 숫자 검사가 원문에 아라비아 숫자가 없다는 이유만으로 환각으로 판단했다. 실제 운영 제목 `Hawaiian Electric ... Third Quarter 2026 ... November 6`을 제목만 전달해 재현했으며 Azure 결과 `3분기 ...` 자체는 한국어·완전성 검증을 통과했지만 숫자 오탐으로 fallback됐다.
+- OCI의 `/etc/stockman/stockman.env` batch 값이 코드 기본값 50을 덮어써 production run `attempted=3`을 유지했다. 세 대상 출처의 30일 운영 조회에서 PENDING 5,222건을 확인했다.
+
+### 반영
+- `lib/translate-market-rss-item.ts`: 원문에 포함된 영어 기수·서수 값에 대응하는 번역 숫자는 허용하고, 출처에 없는 숫자 및 새 금융 부호는 계속 거부한다.
+- `lib/translate-market-rss-item.test.ts`: `Third Quarter` → `3분기` 회귀 사례를 추가한다. summary는 원문 그대로인지 함께 확인한다.
+- `deploy/oci/stockman-rss.service`: 환경파일보다 뒤에 `Environment=`로 번역·알림을 실행당 20건으로 고정해 과거 작은 override를 무효화한다.
+- `scripts/check-oci-cron.mjs`, `deploy/oci/README.md`, `docs/ERROR_HANDLING.md`: batch 설정과 원인·탐지·위험을 문서 및 자동 검사에 연결한다.
+
+### 검증
+- 이전 배포 `afd7a2bdce83b8f8b86292893c4c5601ea99862c`은 GitHub Actions run `40104609209` 성공 및 운영 `/health-check` 정확한 SHA로 확인했다.
+- 운영 run `15:03–15:06Z`는 회당 3건 시도, 번역 성공 0건, Discord 전송 0건, `backlogRemaining=true`였다. Google 월 예약량은 299,992/300,000자, Azure 월 잔여량은 1,518,453자였다.
+- 대표 숫자 포함 제목만 provider에 전달해 `3분기`·`11월` 출력에 대한 오탐을 재현하고 회귀 테스트로 수정했다. 대상 3개 테스트 파일 84개 통과, 최신 `origin/oci` 통합 tree의 최종 `npm.cmd run deploy:verify` 통과(297개 파일 통과, 1개 skip; 1,450 tests 통과, 3개 skip), build, typecheck, standalone runtime smoke, desktop/mobile Chrome hydration, `npm.cmd run docs:check`, `npm.cmd run cron:check`, `git diff --check` 통과. 첫 전체 실행의 KIS rate-limit 테스트는 59초가 반환돼 고정 기대값 60과 달랐고, 단독 재실행 및 후속 전체 검증에서 통과했다. Windows `node_modules` junction의 standalone trace EPERM 경고가 있었으나 smoke와 나머지 검증은 통과했다.
+
+### 남은 위험
+- 다른 번역 품질 실패는 여전히 전송을 보류한다. Google 사용 한도는 비용 승인 없이 높이지 않는다.
+
+### 다음 개선
+- 전체 `npm.cmd run deploy:verify`를 통과시킨 뒤 fast-forward push·자동 배포하고, 세 출처의 제목 번역·Discord `SENT` 증가와 backlog 감소를 확인한다. 30일보다 오래된 대기 건까지 소진됐는지 운영 상태에서 확인한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-012
+성과 판정: PARTIAL
+근거: 실제 숫자 변환 오탐을 재현해 수정했고 전체 배포 검증을 통과했으나, 새 revision 배포와 운영 backlog 발송은 아직 완료되지 않았다.
+
+### 커밋·푸시·배포
+- 미실행: 변경 검증 후 한국어 상세 커밋, fast-forward push, 운영 자동 배포.
+
 ## [2026-10-24] RSS 제목 검증 fallback 및 backlog 처리량 복구
 
 ### 목표
