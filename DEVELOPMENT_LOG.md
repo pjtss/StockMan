@@ -35,7 +35,9 @@
 - `.env.local`의 관리자 암호로 운영 관리자 로그인은 성공했다. 로컬 DB 주소 연결은 운영 DB 증거가 아니므로 사용하지 않았다. 전체 로컬 `deploy:verify`도 별도로 수행했으며 이는 운영 DB 반영 증거와 구분한다.
 - **완료 기준**: 관리자 인증 GET에서 NAS/NYS/AMS별 활성 `COMMON_STOCK` 분모 및 ICOD coverage를 확인하고, 세 KIS 원본 업로드의 persisted/unmatched/unclassified 수를 저장 후 GET 결과와 대조한다. KIS가 `000`을 제공한 종목은 공식 원천상 미분류로 보고 임의 코드를 채우지 않는다.
 - **운영 후속 검증**: Deploy OCI Actions run `40085691588`이 성공했고 새 운영 route가 401(미인증), 200(관리자 인증)으로 응답했다. 운영 DB 기준 활성 COMMON_STOCK은 NAS 3,949, NYS 2,480, AMS 275이며 업로드 전 비미분류 코드는 각 0건이었다. KIS 마스터 3개 실제 업로드는 HTTP 500 `US_INDUSTRY_SYNC_FAILED`로 롤백됐다. 운영 스키마에서 `industry_code`와 `source_file` 컬럼은 확인했고 관리자 health probe는 DB 연결·운영 컬럼 검사를 통과했으나, 실패 SQLSTATE/단계가 응답에 노출되지 않아 원인은 아직 미확정이다.
-- **개선**: 재시도 때 원인을 직접 판별할 수 있도록 관리자 전용 동기화 오류 응답에 단계, PostgreSQL SQLSTATE 및 테이블/컬럼/제약조건 식별자만 포함하고 원문 메시지는 반환하지 않도록 보강했다. 테스트에서 민감 원문 미노출과 schema diagnostic을 고정했다. 현재 diagnostics 보강분은 로컬 전체 배포 검증 통과 후 별도 commit/push/운영 배포해야 한다.
+- **진단 경로 배포**: 관리자 전용 동기화 오류 응답에 단계, PostgreSQL SQLSTATE 및 테이블/컬럼/제약조건 식별자만 포함하고 원문 메시지는 반환하지 않도록 보강했다. 민감 원문 미노출 회귀 테스트를 추가하고 전체 검증 후 commit/push했으며, Deploy OCI run `40086976112` 성공 뒤 운영에서 아래 실제 원인을 확보했다.
+- **운영 직접 디버깅 결과**: 진단 코드 배포 후 재시도 응답은 `stage=update_NAS`, SQLSTATE `23502` (`DATABASE_NOT_NULL_VIOLATION`)이었다. 원인은 DB 스키마가 아니라 내부 camelCase `{ industryCode, sourceFile }` 객체를 SQL의 snake_case `jsonb_to_recordset(... industry_code, source_file)`에 그대로 직렬화한 키 불일치다. 이 때문에 두 SQL 값이 NULL이 되어 NOT NULL 위반이 발생했고 트랜잭션 전체가 롤백됐다.
+- **수정/재발 방지**: DB payload 직렬화 직전에 `industry_code`/`source_file`로 명시 변환하고, NAS/NYS/AMS 모두에 대해 snake_case payload 키와 BEGIN→UPDATE×3→coverage→COMMIT 순서를 검증하는 회귀 테스트를 추가했다. 이 수정 이후 같은 최신 KIS 원본으로 운영 재적재와 GET coverage 대조를 다시 완료해야 한다.
 
 ### 다음 개선
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.

@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { getPool } from "@/lib/db";
 import { classifyUs, parseOverseas } from "@/lib/instrument-universe-import";
 
@@ -53,14 +54,20 @@ export function buildKisUsIndustryRows(files: Partial<Record<Market, Buffer>>) {
 export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffer>>) {
   const prepared = buildKisUsIndustryRows(files);
   let stage = "database_connect";
-  const client = await getPool().connect();
+  let client: PoolClient | undefined;
   try {
+    client = await getPool().connect();
     stage = "begin_transaction";
     await client.query("BEGIN");
     const persistedCounts: Record<Market, number> = { NAS: 0, NYS: 0, AMS: 0 };
     for (const market of Object.keys(KIS_US_MASTER_FILES) as Market[]) {
       stage = `update_${market}`;
-      const marketRows = prepared.rows.filter((row) => row.market === market);
+      const marketRows = prepared.rows.filter((row) => row.market === market).map((row) => ({
+        market: row.market,
+        code: row.code,
+        industry_code: row.industryCode,
+        source_file: row.sourceFile,
+      }));
       const result = await client.query(
         `UPDATE us_common_stock_universe AS u
          SET industry_code = src.industry_code,
@@ -90,10 +97,10 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
     const unmatchedCounts = Object.fromEntries((Object.keys(KIS_US_MASTER_FILES) as Market[]).map((market) => [market, Math.max(0, prepared.eligibleCounts[market] - persistedCounts[market])])) as Record<Market, number>;
     return { ok: true, source: "KIS_US_MASTER_ICOD", ...prepared, persistedCounts, unmatchedCounts, dbCoverage: coverage.rows };
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => undefined);
+    await client?.query("ROLLBACK").catch(() => undefined);
     if (error && typeof error === "object") Object.assign(error, { usIndustrySyncStage: stage });
     throw error;
   } finally {
-    client.release();
+    client?.release();
   }
 }
