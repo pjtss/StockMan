@@ -35,6 +35,16 @@ describe("KIS investor flow", () => {
     expect(result.rows).toEqual([{ expected_price: "100" }]);
   });
 
+  it("parses the single-object output returned by KIS stock basic information", async () => {
+    vi.mocked(kisRequest).mockResolvedValueOnce({
+      response: new Response(null, { status: 200 }),
+      parsed: { rt_cd: "0", output: { std_pdno: "KR70001A0001", std_idst_clsf_cd: "032604", std_idst_clsf_cd_name: "산업용 가스 제조업" } },
+    } as never);
+    const result = await fetchDomesticStockInfo("token", "0001A0");
+    expect(result.ok).toBe(true);
+    expect(result.rows).toEqual([{ std_pdno: "KR70001A0001", std_idst_clsf_cd: "032604", std_idst_clsf_cd_name: "산업용 가스 제조업" }]);
+  });
+
   it("uses official endpoint and transaction id for detection and finance APIs", async () => {
     vi.mocked(kisRequest).mockClear();
     vi.mocked(kisRequest).mockResolvedValue({ response: new Response(null, { status: 200 }), parsed: { rt_cd: "0", output: [] } } as never);
