@@ -20,8 +20,9 @@ StockTitan RSS
 - 기본 피드: `https://www.stocktitan.net/rss`
 - 선택 환경변수: `STOCKTITAN_RSS_URL`
 - 기존 `MARKET_RSS_DISCORD_WEBHOOK_URL`, 번역·알림 배치 설정을 그대로 사용한다.
-- Google Cloud Translation 요청 대상은 `source=STOCKTITAN`인 RSS 기사의 `title` 필드만이다. `summary`·`content` 및 다른 RSS 출처의 제목은 외부 번역 API로 보내지 않는다.
-- 운영 cron은 StockTitan 행만 번역 대상으로 고르고, 공통 번역 함수도 다른 출처를 거부한다. 관리자 API에서 `translate=true`이고 `source`를 생략하면 StockTitan으로 한정하며, 다른 출처를 지정하면 HTTP 400으로 거부한다.
+- Discord 알림 대상은 GlobeNewswire, StockTitan, SEC 세 출처에서 수집한 모든 기사다. 분류, 티커 연결, 발행 시각에 따른 제외 조건은 적용하지 않는다.
+- SEC 피드는 `8-K` 유형이나 환경변수 조건을 지정하지 않고 Latest Filings 전체 유형을 읽는다. [SEC RSS 공식 안내](https://www.sec.gov/files/about/secrss.shtml)
+- Discord 전송 전에 모든 기사 제목을 한국어로 검증한다. 이미 한국어인 제목은 그대로 통과하며, 번역 provider 오류·미설정·한도 초과 등으로 한국어 번역이 확인되지 않으면 원문 알림을 보내지 않고 번역 재시도 대상으로 남긴다. 외부 번역 입력은 기존 원칙대로 제목만이다.
 - StockTitan Discord 알림은 기존 형식으로 유지한다. 다른 시장 RSS Discord 알림은 제목과 발행 시각만 표시하고 출처·번역 상태·티커 등 추가 항목과 링크 미리보기 임베드를 억제한다.
 - 대기 중인 재전송 알림에도 같은 형식을 적용해 이전 형식의 티커·출처·등락률 줄과 링크 임베드가 다시 나타나지 않도록 한다.
 
@@ -37,7 +38,10 @@ StockTitan RSS
 ## 운영 원칙
 
 - `source=STOCKTITAN`으로 원문 출처를 보존한다.
-- RSS Discord 알림 허용 출처는 `SEC_EDGAR`와 `STOCKTITAN`뿐이다. Newsis를 포함한 국내 RSS 및 그 밖의 RSS는 수집·열람 데이터로 유지하되 Discord 알림은 건너뛴다. 이미 대기 중인 비허용 출처의 Discord 재시도도 전송하지 않는다.
+- RSS cron은 매분 GlobeNewswire, StockTitan, SEC를 수집한다. 같은 실행에서 번역 대기 배치를 끝까지 처리한 뒤 번역 완료된 미전송 PENDING 항목을 발송한다. provider가 일시 실패하면 재시도하며 번역되지 않은 원문은 보내지 않는다.
+- 배치 처리에 앱 자체 분당 발송 상한은 두지 않는다. Discord의 동적 rate limit은 HTTP 응답에 따라 durable retry queue로 재시도한다.
+- 기존 정책에서 세 출처의 `source_not_allowed_for_discord` 또는 `backlog_or_stale_article` 사유로 `SKIPPED` 된 기사는 자동으로 `PENDING` 복구 후 번역 게이트를 다시 확인한다. 번역 실패나 다른 사유의 SKIPPED 상태는 그대로 둔다.
+- cron 응답은 webhook 미설정 또는 직접 발송분 중 미전송이 남으면 `deliveryIncomplete=true` 및 `degraded=true`로 표시한다.
 - `source + externalId`로 중복을 방지한다.
 - 기존 RSS 분류·번역 fallback·Discord rate limit·알림 상태 저장을 재사용한다.
 - StockTitan Discord 알림은 출처·등락률·거래대금 줄을 표시하지 않는다. 기사 제목 링크는 유지하고 Discord webhook의 `SUPPRESS_EMBEDS` message flag를 설정해 링크 미리보기 embed가 본문 아래에 생성되지 않도록 한다. 기존에 대기 중인 StockTitan Discord 재시도 payload도 재전송 직전에 해당 줄을 제거하고 embed 억제 flag를 적용한다. 다른 RSS 출처의 형식은 그대로 유지한다. [Discord Execute Webhook 공식 문서](https://discord.com/developers/docs/resources/webhook#execute-webhook)

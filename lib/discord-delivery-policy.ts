@@ -6,11 +6,28 @@ export function isRetryableDiscordError(error: unknown) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-export function getMarketRssDiscordPerMinuteLimit(raw = process.env.RSS_DISCORD_PER_MINUTE) {
-  const value = raw?.trim();
-  if (!value) return 5;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 5;
+export async function createDiscordHttpError(response: Response) {
+  let retryAfterSeconds: number | undefined;
+  const headerValue = response.headers.get("retry-after") || response.headers.get("x-ratelimit-reset-after");
+  if (headerValue) {
+    const parsed = Number(headerValue);
+    if (Number.isFinite(parsed) && parsed >= 0) retryAfterSeconds = parsed;
+  }
+  if (retryAfterSeconds === undefined && response.status === 429) {
+    const body = await response.clone().json().catch(() => null) as { retry_after?: unknown } | null;
+    const parsed = Number(body?.retry_after);
+    if (Number.isFinite(parsed) && parsed >= 0) retryAfterSeconds = parsed;
+  }
+  const message = `Discord HTTP ${response.status}${retryAfterSeconds === undefined ? "" : ` retry_after=${retryAfterSeconds}`}`;
+  return Object.assign(new Error(message), { status: response.status, retryAfterSeconds });
+}
+
+export function getDiscordRetryDelayMs(attempts: number, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/\bretry_after=(\d+(?:\.\d+)?)/i);
+  const seconds = match ? Number(match[1]) : Number.NaN;
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(24 * 60 * 60_000, Math.ceil(seconds * 1_000));
+  return Math.min(3_600_000, 2 ** Math.min(Math.max(1, attempts), 10) * 1_000);
 }
 
 export function buildMarketRssQueueEnqueueFailureState(attempts: number, error: unknown) {

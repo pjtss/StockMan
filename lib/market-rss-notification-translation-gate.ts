@@ -1,13 +1,16 @@
-import { and, eq, gte, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or } from "drizzle-orm";
 import { marketRssArticles } from "./schema";
 
 function matchSnapshot<T>(column: Parameters<typeof eq>[0], value: T | null) {
   return value === null ? isNull(column) : eq(column, value as never);
 }
 
-/** Hold initial notifications until this cron run records a translation outcome. */
+/** Send only validated Korean translations (or titles already entirely Korean). */
 export function buildMarketRssNotificationTranslationGate() {
-  return ne(marketRssArticles.translationStatus, "PENDING");
+  return or(
+    eq(marketRssArticles.translationStatus, "TRANSLATED"),
+    and(eq(marketRssArticles.translationStatus, "SKIPPED"), eq(marketRssArticles.translationSkippedReason, "already_in_target_language")),
+  );
 }
 
 /** Claim only the exact source/translation snapshot that produced the notification payload. */

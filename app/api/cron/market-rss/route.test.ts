@@ -46,13 +46,12 @@ describe("market-rss cron route", () => {
     process.env.RSS_NOTIFICATION_BATCH_SIZE = "";
     mocks.loadSettings.mockResolvedValue({ enabled: true, featureSettings: { marketRss: { enabledSources: ["STOCKTITAN"] } } });
     mocks.isWithinSchedule.mockReturnValue(true);
-    mocks.normalizeSources.mockReturnValue(["STOCKTITAN"]);
     mocks.withAutomationLock.mockImplementation(async (_key: string, run: () => Promise<unknown>) => run());
     mocks.withAutomationRun.mockImplementation(async (_key: string, run: () => Promise<unknown>) => run());
     mocks.ingest.mockImplementation(async () => { mocks.order.push("ingest"); return { ingestFailureCount: 0 }; });
-    mocks.translate.mockImplementation(async () => { mocks.order.push("translate"); return { attempted: 3, translated: 2, fallback: 1, failed: 0 }; });
+    mocks.translate.mockImplementation(async () => { mocks.order.push("translate"); return { attempted: 3, translated: 2, notRequired: 0, fallback: 1, failed: 0, fallbackReasons: { test: 1 }, translationUsage: null, limitReached: false, limitAlertSent: false, thresholdAlerts: [], thresholdAlertSent: 0 }; });
     mocks.bullish.mockImplementation(async () => { mocks.order.push("bullish"); return { processed: 3 }; });
-    mocks.notify.mockImplementation(async () => { mocks.order.push("notify"); return { attempted: 3, sent: 3 }; });
+    mocks.notify.mockImplementation(async () => { mocks.order.push("notify"); return { attempted: 3, sent: 3, queueEnqueueFailed: 0, skipped: false, batchLimit: 1_000, webhookConfigured: true }; });
     mocks.getBatchSize.mockImplementation((configured: string, fallback: number) => Number(configured) || fallback);
     mocks.getCronStatus.mockReturnValue({ degraded: true, partialFailureCount: 1, ingestFailureCount: 0, translationFailureCount: 1 });
   });
@@ -72,10 +71,11 @@ describe("market-rss cron route", () => {
       translated: { fallback: 1 },
       notified: { sent: 3 },
     });
-    expect(mocks.order).toEqual(["ingest", "translate", "bullish", "notify"]);
-    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 50, 100);
-    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 10, 100);
-    expect(mocks.getCronStatus).toHaveBeenCalledWith(0, { attempted: 3, translated: 2, fallback: 1, failed: 0 });
+    expect(mocks.order).toEqual(["ingest", "translate", "notify", "bullish"]);
+    expect(mocks.ingest).toHaveBeenCalledWith({ sources: ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"] });
+    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(1, "", 50);
+    expect(mocks.getBatchSize).toHaveBeenNthCalledWith(2, "", 1_000);
+    expect(mocks.getCronStatus).toHaveBeenCalledWith(0, expect.objectContaining({ attempted: 3, translated: 2, fallback: 1, failed: 0 }));
   });
 
   it("rejects unauthorized requests before reading settings or starting work", async () => {

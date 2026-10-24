@@ -1,6 +1,6 @@
 # 미국 보통주 산업분류 코드 KIS 전용 수집·저장 설계
 
-상태: 파서 수정·동기화 API 구현 완료; 로컬 검증 완료, 운영 배포·DB 적재 미검증
+상태: KIS 파서·동기화 API 구현; 2026-10-24 로컬 DB 전수 대조에서 업종코드 미적재 확인, 현재 운영 진단 API는 404라 운영 최신 상태 재확인 필요
 기준일: 2026-10-24
 
 ## 범위와 원칙
@@ -59,6 +59,11 @@ KIS Developers는 종목정보 마스터를 주문·시세조회 가능한 전�
 - 활성 `COMMON_STOCK` 기준 KIS 코드 반영: NAS 3,176행, NYS 1,855행, AMS 237행. 공식 코드가 `000`이 아닌 저장 건수는 NAS 1,354, NYS 1,186, AMS 94이며, 업로드 후 DB GET coverage와 정확히 일치한다.
 - KIS 공식 마스터에서 common 후보로 판정된 행 중 현재 활성 DB common 행과 매칭되지 않은 수는 NAS 64, NYS 9, AMS 17이다. 이 항목은 비활성/미수록 상태를 확인하지 않고 새 universe 종목으로 자동 등록하지 않았다. 다음 검증에서 샘플 티커와 DB special/disabled 상태를 확인해야 한다.
 - KIS 원본 `000`은 공식 미분류 값이므로 그대로 저장했으며 추정 코드로 채우지 않는다. 전체 활성 DB common rows가 모두 분류된 것은 아니며, KIS가 `000`을 제공하거나 KIS 원본과 현재 활성 common 대상이 일치하지 않는 행은 미분류로 남는다.
+- 2026-10-24 후속 운영 검증: V160이 이미 운영에 적용된 상태에서 V160을 포함하지 않은 오래된 배포 기준으로 시도한 첫 workflow는 Flyway `Detected applied migration not resolved locally: 160`으로 활성화 단계에서 중단됐다. 데이터베이스에 `flyway repair`를 실행하지 않았고, 기준 브랜치 `oci`의 V160 이력을 작업 브랜치에 병합해 정합성을 복구했다. 작업 중 `oci`에 추가된 RSS 커밋도 포함해 통합 검증했다. 개선 과제 ID 중복으로 문서 게이트가 한 번 실패해 KIS 항목 ID를 고유하게 수정했고, 최종 `npm.cmd run deploy:verify`가 통과했다(빌드, standalone runtime/browser smoke, 296개 테스트 파일 중 296 통과·1 skip, 1,435 tests passed·3 skipped, typecheck, 문서 및 감사 게이트). 최신 운영 재배포와 KIS 마스터 재적재·read-after-write 집계는 아직 수행 전이다.
+- 2026-10-24 `.env.local` 인증 및 전체 로컬 DB 대조: KIS `KIS_APPKEY`/`KIS_APPSECRET`로 공식 OAuth 토큰 발급 성공(토큰값은 출력·저장하지 않음). KIS Developers 종목정보 페이지에 명시된 NAS/NYS/AMS 마스터 파일을 사용했다. 원본은 2026-10-23 파일(2026-10-24 19:01 KST 다운로드본)이며, 공식 안내는 종목정보 마스터가 매일 업데이트된다고 설명한다. KIS 마스터 파서·보통주 필터 결과 후보 5,358건(NAS 3,240, NYS 1,864, AMS 254) 중 유효 비영(非零) `icod`는 2,634건(NAS 1,354, NYS 1,186, AMS 94), 공식 `000` 미분류는 2,724건(NAS 1,886, NYS 678, AMS 160)이었다.
+- `.env.local`의 로컬 PostgreSQL을 `BEGIN READ ONLY` 및 statement timeout으로 조회했다. 활성 COMMON_STOCK는 5,444건(AMS 249/NAS 3,254/NYS 1,941)이며, 세 시장 모두 `industry_code` 유효 코드 0건·미분류 5,444건이다. KIS 후보와 티커 조인 시 5,310건 매칭되고, 48건은 KIS 후보이나 활성 DB에 없다(AMS 12/NAS 32/NYS 4). 매칭된 5,310건은 KIS 원본값과 저장값이 전부 불일치(로컬 저장값 공란); 그중 KIS가 비영 코드를 제공한 2,634건도 로컬 DB에 공란으로 남아 있다. KIS의 `000` 2,676 매칭 건도 원본값 대신 공란이다. 반대로 DB 활성 COMMON_STOCK 중 134건(AMS 7/NAS 46/NYS 81)은 최신 KIS 보통주 후보에 포함되지 않았다. 로컬 DB에는 쓰기를 수행하지 않았다.
+- 운영 서버에서는 `.env.local`의 `ADMIN_DASHBOARD_PASSWORD`로 관리자 로그인 200을 확인했으나, `/api/admin/us-industry-codes`는 현재 404 `text/html`을 반환했다. 따라서 앞서 저장했던 운영 적재 수치는 과거 관측으로만 남기며, 현 운영 DB의 최신 전체 업종코드 상태는 이번에 확인할 수 없었다. 운영 서버에 진단 route가 배포된 후 재조회해야 한다.
+- 최신 `oci` 통합 트리에서 `npm.cmd run deploy:verify` 최종 실행이 통과했다(296개 테스트 파일 통과·1 skip, 1,435 tests 통과·3 skip, 빌드/runtime smoke/typecheck/docs/audit 모두 통과). 그 앞선 검증 중 한 번은 문서 개선 과제 ID 중복으로 실패했고, KIS ID를 `CI-2026-10-24-004`로 고유화한 뒤 문서 게이트 및 전체 통합 검증이 통과했다. 더 이전 실행의 `/charts` 30초 타임아웃은 재현되지 않았고 최종 실행은 `/charts` 200 및 desktop/mobile hydration을 통과했다.
 
 ## 공식·프로젝트 참고자료
 

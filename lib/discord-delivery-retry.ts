@@ -1,6 +1,6 @@
 import { claimDueDiscordDeliveries, getMarketRssDeliveryArticleSnapshot, markDiscordDeliverySending, markDiscordDeliverySkipped, markDiscordDeliverySuperseded, persistDiscordDeliveryOutcome } from "@/lib/discord-delivery-queue";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "@/lib/discord-config";
-import { isRetryableDiscordError, parseMarketRssDeliveryArticleId, withDiscordWaitParameter } from "@/lib/discord-delivery-policy";
+import { createDiscordHttpError, isRetryableDiscordError, parseMarketRssDeliveryArticleId, withDiscordWaitParameter } from "@/lib/discord-delivery-policy";
 import { toTextWebhookPayload } from "@/lib/discord-text";
 import { isMarketRssNotificationSnapshot, matchesMarketRssNotificationSnapshot } from "@/lib/market-rss-notification-snapshot";
 import { DISCORD_SUPPRESS_EMBEDS_FLAG } from "@/lib/market-rss-notification-message";
@@ -71,7 +71,7 @@ export async function retryDiscordDeliveries(limit = 50) {
         webhookPayload.flags = Number(webhookPayload.flags || 0) | DISCORD_SUPPRESS_EMBEDS_FLAG;
       }
       const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(webhookPayload)), signal: AbortSignal.timeout(8_000) });
-      if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
+      if (!response.ok) throw await createDiscordHttpError(response);
     } catch (error) {
       sendFailed = true;
       sendError = error;

@@ -21,6 +21,11 @@ const nginx = fs.readFileSync(path.resolve("deploy/oci/nginx-stockman.conf"), "u
 const activation = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
 const workflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
 const automationRuns = fs.readFileSync(path.resolve("lib/automation-run-repository.ts"), "utf8");
+const rssTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-rss.timer"), "utf8");
+const rssRoute = fs.readFileSync(path.resolve("app/api/cron/market-rss/route.ts"), "utf8");
+const rssDiscordPolicy = fs.readFileSync(path.resolve("lib/market-rss-discord-policy.ts"), "utf8");
+const rssTranslationGate = fs.readFileSync(path.resolve("lib/market-rss-notification-translation-gate.ts"), "utf8");
+const secRssSource = fs.readFileSync(path.resolve("lib/sec-edgar-rss.ts"), "utf8");
 
 if (source.includes("/api/cron/instrument-fundamentals")) {
   throw new Error("Instrument fundamentals must not run inline in the shared five-minute cron pipeline");
@@ -55,6 +60,24 @@ for (const required of ["oci-fundamentals-cron.sh", "stockman-fundamentals.servi
 }
 if (!automationRuns.includes("FUNDAMENTALS_STALE_RUN_AFTER_SECONDS = 5 * 60 * 60") || !automationRuns.includes("module_key = 'instrument-fundamentals'")) {
   throw new Error("Long-running fundamentals executions must have a stale/active-run threshold above the service timeout");
+}
+if (!/OnUnitActiveSec=1min/.test(rssTimer) || !/Persistent=true/.test(rssTimer)) {
+  throw new Error("RSS timer must poll every minute and catch up after downtime");
+}
+for (const source of ['"GLOBENEWSWIRE"', '"STOCKTITAN"', '"SEC_EDGAR"']) {
+  if (!rssRoute.includes(source)) throw new Error(`RSS cron is missing required source ${source}`);
+}
+if (!rssDiscordPolicy.includes('["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]')) {
+  throw new Error("RSS Discord delivery and retries must be scoped to GlobeNewswire, StockTitan, and SEC");
+}
+if (!rssTranslationGate.includes('eq(marketRssArticles.translationStatus, "TRANSLATED")') || !rssTranslationGate.includes('"already_in_target_language"')) {
+  throw new Error("RSS Discord delivery must require a validated Korean translation or an already-Korean title");
+}
+if (!secRssSource.includes("action=getcurrent&count=100&output=atom") || /type=8-K/.test(secRssSource)) {
+  throw new Error("SEC RSS must read Latest Filings without filtering by form type");
+}
+if (!rssRoute.includes("notifyPendingMarketRssArticles(notificationBatchSize)") || !rssRoute.includes("translatePendingMarketRssArticles(translationBatchSize)")) {
+  throw new Error("RSS cron must process translation batches and send their translated articles during the same run");
 }
 if (!fs.readFileSync(path.resolve("app/api/cron/instrument-fundamentals/route.ts"), "utf8").includes("MAX_FUNDAMENTALS_RUNNING_SECONDS = 5 * 60 * 60")) {
   throw new Error("Cron route duplicate-run guard must cover the full dedicated service lifetime");

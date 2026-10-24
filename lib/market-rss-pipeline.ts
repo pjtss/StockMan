@@ -1,18 +1,17 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
-import { fetchAllDomesticRss } from "./domestic-rss-sources";
 import { MARKET_RSS_TRANSLATION_CONCURRENCY, translateMarketRssItem } from "./translate-market-rss-item";
 import { classifyMarketRssItem } from "./market-rss-classifier";
 import { resolveSingleMarketNewsReaction } from "./market-news-market-reaction";
 import { extractSecCik, resolvePreferredSecCompanyTickers } from "./sec-company-ticker";
 import { loadFeatureDiscordDebugWebhook, loadFeatureDiscordWebhook } from "./discord-config";
 import { enqueueDiscordDelivery } from "./discord-delivery-queue";
-import { buildMarketRssQueueEnqueueFailureState, getMarketRssDiscordPerMinuteLimit, isRetryableDiscordError, marketRssDeliveryExternalId, withDiscordWaitParameter } from "./discord-delivery-policy";
+import { buildMarketRssQueueEnqueueFailureState, createDiscordHttpError, isRetryableDiscordError, marketRssDeliveryExternalId, withDiscordWaitParameter } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import { dedupeMarketRssItems } from "./market-rss-dedupe";
-import { buildMarketRssTranslationCandidateCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
+import { buildMarketRssTranslationRetryCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
 import { buildMarketRssTranslationPersistence } from "./market-rss-translation-persistence";
 import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notification-message";
 import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";
@@ -21,7 +20,7 @@ import { createMarketRssTranslationClient } from "./market-rss-translation-clien
 import { AZURE_TRANSLATION_MONTHLY_LIMIT, AZURE_TRANSLATION_PROVIDER, TRANSLATION_LIMIT } from "./translation-cache";
 import { claimTranslationLimitAlert, claimTranslationThresholdAlert, releaseTranslationLimitAlert, releaseTranslationThresholdAlert } from "./translation-cache";
 import { sendClaimedTranslationUsageAlert } from "./translation-usage-alert";
-import { buildMarketRssNotificationClaimCondition, buildMarketRssNotificationRateWindowCondition, buildMarketRssNotificationTranslationGate } from "./market-rss-notification-translation-gate";
+import { buildMarketRssNotificationClaimCondition, buildMarketRssNotificationTranslationGate } from "./market-rss-notification-translation-gate";
 import { createMarketRssNotificationSnapshot } from "./market-rss-notification-snapshot";
 import { runMarketRssIngestSource } from "./market-rss-ingest-outcome";
 import { buildMarketRssLinkUpsertValue, buildMarketRssTranslationUpsertReset } from "./market-rss-translation-upsert";
@@ -30,15 +29,10 @@ import { countMarketRssTranslationFallbackReasons } from "./market-rss-translati
 import { TranslationClientOperationError } from "./translation-types";
 import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy";
 
-const articleAgeLimitMs = () => Number(process.env.RSS_MAX_ARTICLE_AGE_MINUTES || 15) * 60_000;
-
 export async function ingestMarketRssArticles(options?: { sources?: MarketRssSource[] }) {
   const db = getDb();
-  const [fetched, domesticFetched] = await Promise.all([
-    fetchAllMarketRss(options?.sources),
-    fetchAllDomesticRss(),
-  ]);
-  const allResults = [...fetched.results, ...domesticFetched.results];
+  const fetched = await fetchAllMarketRss(options?.sources);
+  const allResults = fetched.results;
   const secItems = allResults.find((result) => result.ok && result.source === "SEC_EDGAR");
   const secCiks = secItems?.ok ? secItems.feed.items.map((item) => extractSecCik(item.title)).filter(Boolean) : [];
   let secTickerMap = new Map<string, string>();
@@ -57,15 +51,9 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       const values = items.map((item) => {
         const classification = classifyMarketRssItem(item);
         const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
-        // SEC filings without a preferred common-share mapping (for example
-        // trusts, units and warrants) cannot produce a useful stock alert.
-        // Keep the filing for diagnostics, but suppress the notification.
-        // StockTitan is an explicit publisher feed requested for full delivery:
-        // every item is notification-eligible, while other sources keep their
-        // classifier and SEC ticker safeguards.
-        const notifyEligible = item.source === "STOCKTITAN" || (classification.notifyEligible && (item.source !== "SEC_EDGAR" || Boolean(mappedTicker)));
+        const notifyEligible = true;
         const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
-        const isBacklog = item.source === "STOCKTITAN" ? false : Boolean(publishedAt && Date.now() - publishedAt.getTime() > articleAgeLimitMs());
+        const isBacklog = false;
         return {
           source: item.source,
           externalId: item.id,
@@ -139,8 +127,11 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   const providerSet = createMarketRssTranslationClient({ deferCacheWriteUntilValidated: true });
   const client = providerSet.client;
   const retryCriteria = getMarketRssTranslationRetryCriteria(Boolean(client));
-  const candidates = buildMarketRssTranslationCandidateCondition(retryCriteria);
-  const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.createdAt)).limit(limit);
+  const candidates = and(
+    buildMarketRssTranslationRetryCondition(retryCriteria),
+    inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
+  );
+  const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(desc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
   if (!client) {
     let notRequired = 0;
     let fallback = 0;
@@ -251,20 +242,22 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   if (!webhook) return { attempted: 0, sent: 0, skipped: true, reason: "webhook_not_configured" };
   const db = getDb();
   const now = Date.now();
-  const staleCutoff = new Date(now - articleAgeLimitMs());
   const staleLeaseCutoff = new Date(now - 10 * 60_000);
   await db.update(marketRssArticles).set({ notificationStatus: "PENDING", lastError: "stale_processing_recovered", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PROCESSING"), lt(marketRssArticles.updatedAt, staleLeaseCutoff)));
   await db.update(marketRssArticles).set({ notificationStatus: "UNCERTAIN", lastError: "stale_sending_outcome_unknown", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "SENDING"), lt(marketRssArticles.updatedAt, staleLeaseCutoff)));
-  await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "source_not_allowed_for_discord", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), notInArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES])));
-  await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "backlog_or_stale_article", updatedAt: new Date() }).where(and(eq(marketRssArticles.notificationStatus, "PENDING"), ne(marketRssArticles.source, "STOCKTITAN"), or(eq(marketRssArticles.isBacklog, true), lt(marketRssArticles.publishedAt, staleCutoff))));
-  const rows = await db.select().from(marketRssArticles).where(and(inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]), eq(marketRssArticles.notificationStatus, "PENDING"), eq(marketRssArticles.notifyEligible, true), buildMarketRssNotificationTranslationGate(), or(eq(marketRssArticles.source, "STOCKTITAN"), eq(marketRssArticles.isBacklog, false)), or(eq(marketRssArticles.source, "STOCKTITAN"), or(isNull(marketRssArticles.publishedAt), gte(marketRssArticles.publishedAt, staleCutoff))))).orderBy(desc(marketRssArticles.priority), asc(marketRssArticles.publishedAt)).limit(limit);
-  const perMinuteLimit = getMarketRssDiscordPerMinuteLimit();
-  const recent = await db.select({ count: sql<number>`count(*)` }).from(marketRssArticles).where(buildMarketRssNotificationRateWindowCondition(new Date(now - 60_000)));
-  let remaining = Math.max(0, perMinuteLimit - Number(recent[0]?.count || 0));
+  await db.update(marketRssArticles).set({ notificationStatus: "PENDING", lastError: null, updatedAt: new Date() }).where(and(
+    inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
+    eq(marketRssArticles.notificationStatus, "SKIPPED"),
+    inArray(marketRssArticles.lastError, ["source_not_allowed_for_discord", "backlog_or_stale_article"]),
+  ));
+  const rows = await db.select().from(marketRssArticles).where(and(
+    inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
+    eq(marketRssArticles.notificationStatus, "PENDING"),
+    buildMarketRssNotificationTranslationGate(),
+  )).orderBy(desc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
   let sent = 0;
   let queueEnqueueFailed = 0;
   for (const row of rows) {
-    if (remaining <= 0) break;
     const reaction = row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
     const notificationPayload = buildMarketRssDiscordNotificationPayload(row, reaction);
     const delivery = await deliverMarketRssDiscordNotification({ notificationAttempts: row.notificationAttempts, payload: notificationPayload }, {
@@ -278,8 +271,13 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
         return updated.length === 1;
       },
       send: async (payload) => {
-        const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(payload)), signal: AbortSignal.timeout(8_000) });
-        if (!response.ok) throw new Error(`Discord HTTP ${response.status}`);
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const response = await fetch(withDiscordWaitParameter(webhook), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(toTextWebhookPayload(payload)), signal: AbortSignal.timeout(8_000) });
+          if (response.ok) return;
+          const error = await createDiscordHttpError(response);
+          if (response.status !== 429 || attempt === 3 || error.retryAfterSeconds === undefined) throw error;
+          await new Promise((resolve) => setTimeout(resolve, Math.ceil(error.retryAfterSeconds! * 1_000)));
+        }
       },
       markFailed: async (attempt, error) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -306,9 +304,8 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       },
     });
     if (!delivery.claimedForSend) continue;
-    remaining--;
     if (delivery.sent) sent++;
     if (delivery.queueEnqueueFailed) queueEnqueueFailed++;
   }
-  return { attempted: rows.length, sent, queueEnqueueFailed, skipped: false, perMinuteLimit, remainingAfterSend: remaining, webhookConfigured: true };
+  return { attempted: rows.length, sent, queueEnqueueFailed, skipped: false, batchLimit: limit, webhookConfigured: true };
 }

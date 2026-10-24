@@ -34,6 +34,7 @@ describe("market RSS translation retry criteria", () => {
     expect(getMarketRssTranslationRetryCriteria(false, new Date("2026-10-01T00:00:00.000Z"))).toEqual({
       failedBeforeAttempt: 3,
       failureRetryBefore: [new Date("2026-09-30T23:59:00.000Z"), new Date("2026-09-30T23:55:00.000Z")],
+      exhaustedFailureRetryBefore: new Date("2026-09-30T23:55:00.000Z"),
       retrySkippedImmediatelyReasons: [],
       retrySkippedWithBackoffReasons: [],
       monthlyQuotaRetryBefore: null,

@@ -44,7 +44,7 @@
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.
 
 ### 개선 과제
-- 개선 과제 ID: CI-2026-10-24-003
+- 개선 과제 ID: CI-2026-10-24-004
 - 성과 판정: PARTIAL
 - 근거: KIS 오프셋 파싱, industry_code upsert, KIS 전용 트랜잭션 동기화 API와 KIS 최신 원본 parser 테스트까지 구현했다. 운영 DB 실제 반영과 coverage 증명은 아직 미완료다.
 - 다음 개선: 배포 API 인증 후 KIS 최신 원본을 업로드하고 거래소별 DB coverage와 미매칭을 확인한다.
@@ -52,6 +52,40 @@
 ### 커밋·푸시·배포
 - 커밋 `0f7ddab5` 생성 완료(작업 브랜치 `codex/kis-industry-20261024`). push 및 운영 API 배포/적재는 아직 완료되지 않았다.
 
+## [2026-10-24] RSS 세 출처 제목만 한국어 번역한 뒤 전체 기사 Discord 알림
+
+### 목표
+GlobeNewswire, StockTitan, SEC RSS 기사를 필터링하지 않고 모두 처리하며, Discord 전송 전 제목만 한국어 번역 완료된 기사만 통과시킨다. 요약과 본문은 번역기에 전달하거나 번역하지 않고 원문 그대로 유지한다.
+
+### 반영
+- cron 수집 범위를 GLOBENEWSWIRE, STOCKTITAN, SEC_EDGAR로 고정하고, SEC Latest Filings URL에서 특정 제출 유형 필터를 제거했다.
+- 기존 호재 분류·매핑·기사 나이 조건을 Discord 대상 선정에서 제거해 세 출처의 전체 기사가 번역 후 알림 대기열에 들어가도록 했다.
+- 한국어 제목 또는 검증 완료된 한국어 번역 상태만 알림 게이트를 통과하게 했고, 번역·전송 batch를 계속 비워 전체 처리량 제한에 걸려 기사를 남기지 않게 했다.
+- 프로바이더 호출이 원 제목에서 만든 보호 입력만 받는다는 회귀 검증을 추가하고, summary/content 및 translatedSummary/translatedContent가 원문 그대로 반환되는지 확인했다.
+- 번역 제공자 실패로 최대 시도 횟수에 도달한 기사도 backoff 후 다시 시도하도록 했고, Discord 429 Retry-After 대응을 보강했다.
+- 관리자 번역 미리보기, OCI timer·cron 검사, 운영 문서를 세 출처 및 제목 전용 번역 정책과 일치시켰다.
+
+### 검증
+- RSS 타깃 테스트: 7개 파일, 109개 테스트 통과.
+- `npm.cmd run deploy:verify`: 최신 origin 기준 의존성 감사(취약점 0), 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 테스트(295개 파일 중 294 통과·1 skip; 1,428 통과·3 skip), typecheck, 문서·migration(160), verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사까지 통과.
+- 개선 과제 기록 항목을 보완하기 전 첫 docs:check는 실패했으며, 수정 뒤 전체 deploy:verify가 통과했다.
+- Windows worktree의 `node_modules` junction 때문에 Next standalone trace에서 EPERM 경고가 있었으나 standalone server와 browser/API smoke는 모두 성공했다. 운영 배포는 OCI Linux workflow에서 독립 checkout/build한다.
+- 이 시점에는 원격 push 및 운영 Discord 실제 수신 확인 전이다. workflow 성공 후 운영 cron 결과와 각 출처의 전송 기록을 확인한다.
+
+### 근본 원인 및 재발 방지
+이전 경로는 일부 소스/분류/연령 기준을 유지하고 StockTitan만 전체 전달했으며, 번역 결과 게이트와 retry 고갈 처리도 전체 기사 유입을 보장하지 못했다. 세 출처 고정 목록, 기사별 한국어 번역 게이트, 무필터 알림 대상, 제목 전용 provider 입력 테스트, retry 재선정 테스트 및 OCI cron 구조 게이트로 재발을 감지한다.
+
+### 다음 개선
+- RSS 공급자 응답 범위, 번역 제공자 가용성·할당량, 운영 Webhook 및 Discord 제한은 외부 의존성이다. 가능한 모든 기사를 알림 대상으로 삼되 외부 장애 중 전송 성공을 보장하기는 어렵다.
+- 배포 뒤 운영에서 SEC·StockTitan·GlobeNewswire 각각의 번역 완료와 Discord 전송 성공 상태를 확인한다. 하나라도 미확인이라면 해당 출처의 수집·번역·전송 단계별 진단을 보강한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-24-003
+성과 판정: IMPROVED
+근거: 세 RSS 출처에 대해 제목만 번역하고 모든 기사를 Discord 알림 대상으로 삼도록 수집·번역 게이트·재시도·배치를 일치시켰으며, 제목 전용 입력 회귀 테스트와 전체 배포 검증으로 변경을 확인했다. 운영 배포 및 실제 Discord 수신은 아직 확인 전이다.
+
+### 커밋·푸시·배포
+- 미실행: 최신 `origin/oci` 기반 격리 worktree에서 이번 RSS 관련 파일만 커밋·push하여 OCI 자동 배포를 요청한다. 다른 checkout의 미커밋 변경은 포함하지 않는다.
 ## [2026-10-24] Azure Text Translation endpoint 경로 정규화
 
 ### 목표
@@ -6429,3 +6463,15 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 국내 한정 관리자 API `/api/admin/domestic-universe-import`와 화면을 추가했다. 공식 KIS KOSPI/KOSDAQ 마스터 2개만 검증·적재하고 미국 테이블은 건드리지 않으며, 누락 기존 행의 비활성화도 하지 않는다. 기존 KIS 상품 분류 규칙을 재사용하고 두 시장 각 100행 이상이어야 처리한다.
 - KIS 공식 배포 호스트에서 2026-10-23 갱신 마스터 2개를 확보했다. 현재 파서 기준 총 KOSPI 2,583행, KOSDAQ 1,825행이며, 활성 조건 분류 결과는 각각 760, 1,598 보통주다. 이는 파서 산출이며 운영 DB 적재 전 수치다.
 - 16개 관련 테스트, TypeScript, 문서/migration 검사, diff 검사 통과. 운영 반영은 국내 한정 API 배포와 관리자 세션 확보 후 진행한다.
+## [2026-10-24] 미국 보통주 KIS 업종코드 운영 적재 재검증 및 Flyway 기준 정렬
+
+- **목적/범위**: 앞선 미국 KIS 업종코드 동기화 작업의 Flyway V160 불일치를 해결하고, 최신 KIS 원본으로 운영 DB 저장 후 read-after-write 비교를 재검증한다.
+- **원인/대응**: 동기화 코드를 포함한 작업 브랜치가 운영 `oci`에 이미 적용된 `V160__kr_common_stock_standard_industry.sql`보다 앞선 커밋에서 분기되어 배포 활성화 단계에서 migration 160 미해결 오류가 발생했다. DB에 `flyway repair`는 실행하지 않았다. `origin/oci`를 병합해 이력과 스키마 정의를 정렬했다.
+- **변경 대상**: `docs/architecture/us-industry-classification-data-design.md`, `DEVELOPMENT_LOG.md`; 기존 동기화 코드 및 후검증 로직은 보존했다.
+- **인증 확인**: `.env.local`의 KIS `KIS_APPKEY`/`KIS_APPSECRET`로 공식 OAuth 토큰 발급 성공(토큰값 미출력·미저장, 만료시간 24시간). 같은 파일의 `ADMIN_DASHBOARD_PASSWORD`로 운영 로그인 HTTP 200.
+- **원본 대조**: KIS 공식 NAS/NYS/AMS 마스터(2026-10-23 데이터, 2026-10-24 19:01 KST 다운로드)를 프로젝트와 동일한 필드/상품 제외 기준으로 전수 파싱. 5,358 KIS 보통주 후보 중 실제 3자리 비영 업종코드 2,634, 공식 `000` 2,724.
+- **로컬 DB read-only 비교**: `BEGIN READ ONLY` + `statement_timeout`으로 활성 COMMON_STOCK 5,444행 확인. 유효 `industry_code`는 0행, 미분류 5,444행. KIS와 5,310행 매칭했으며 매칭값 5,310건 모두 DB 공란으로 원본과 불일치(2,634건은 KIS에 비영 코드가 있으나 로컬 DB 공란). KIS 후보 중 DB 활성 universe 누락 48건(AMS12/NAS32/NYS4), 반대로 DB 활성 종목 중 최신 KIS 후보와 불일치 134건(AMS7/NAS46/NYS81). 이번 검증에서는 DB를 변경하지 않았다.
+- **운영 route 확인**: 로그인 후 현재 운영 `/api/admin/us-industry-codes`가 404 `text/html`이어서 최신 운영 DB 업종코드 및 저장 후 감사 결과는 확인할 수 없었다. 이전 작업의 운영 적재 수치는 역사적 결과로 구분하며 현 상태의 성공으로 간주하지 않는다.
+- **검증**: 최신 `oci` 통합 트리에서 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 문서 개선과제 ID 중복으로 첫 통합 검증은 docs gate에서 실패했으며 KIS ID를 `CI-2026-10-24-004`로 고유화한 후 전체 게이트 통과. 앞선 `/charts` 30초 timeout도 재현되지 않았다.
+- **남은 위험/후속**: 로컬 DB 업종코드 미적재와 KIS-universe 48/134개 불일치가 남아 있다. 운영 진단 route가 현재 404이므로 운영 최신값도 검증 불가. 다음 실행은 활성 보통주 분모 차이를 종목별로 분류하고, 명시 승인 후 로컬/운영 적재 및 read-after-write 감사가 가능하도록 최신 배포 경로를 먼저 복구해야 한다. `000` 값은 공식 미분류로 유지하고 임의 보정하지 않는다.
+- **커밋·푸시·배포**: 통합 검증 및 KIS 원본 대조가 통과해 로컬 merge를 마무리한 뒤 원격 브랜치 push와 OCI 배포 workflow를 진행한다. 운영 진단 route가 현재 404인 원인을 배포 후 다시 확인하고, KIS 원본 재적재 및 DB read-after-write 검증 전까지 목표 완료로 보고하지 않는다.

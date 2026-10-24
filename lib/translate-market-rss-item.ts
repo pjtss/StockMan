@@ -117,9 +117,8 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   } catch {
     // Cache writes are optional and must not invalidate a validated translation.
   }
-  // The summary is sent only as bounded context to disambiguate the headline;
-  // only the translated headline is persisted as translated output. Keep the
-  // original summary/body available to callers without translating them.
+  // The provider receives only the prepared title above. Summary and body are
+  // carried through unchanged and are never submitted for translation.
   return { ...item, translatedTitle: translatedHeadline, translatedSummary: item.summary, ...(item.content ? { translatedContent: item.content } : {}), translationFallback: title.fallback, translationFallbackReason: title.fallbackReason, requestOrigin: title.requestOrigin, translationProvider: title.provider, translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0 };
 }
 
