@@ -6857,10 +6857,18 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 남은 위험 및 다음 단계
 - KIS 원본 `icod=000`은 공식적으로 미분류이며 이 코드에서 업종을 추정하지 않는다.
-- KIS 최신 공식 마스터 3개를 확보하고 전체 검증을 통과한 뒤에만 운영 저장 API를 호출한다. 운영 응답과 별도 read-only 감사 모두에서 KIS candidate coverage 완전 일치, code mismatch 0, 활성 common 외부 행 0을 확인한다.
-- 세 게이트(빌드·테스트·실행) 및 `npm.cmd run deploy:verify`가 성공하기 전에는 커밋/푸시하지 않는다.
+- 운영 KIS 후보 5,358개 중 유효 코드 2,634개(49.15%)가 분류되어 있고 2,724개(50.85%)는 공식 `000`이다. 더 많은 공식 분류값 제공 전까지 이는 해결되지 않는 공급원 커버리지 한계다.
+- KIS 마스터에 없는 148개 이전 DB 행은 새 KIS common 후보임을 검증할 수 없어 비활성 상태로 보존했다. 향후 KIS 원본에서 재확인될 경우에만 다시 편입한다.
+- 성공 기준: 후속 마스터 동기화 뒤 read-only 감사에서 누락·코드 불일치·KIS 후보 외 활성 common이 모두 0인지 반복 확인하고, 최신 공식 마스터 기준 eligible counts 변화도 문서화한다.
 
 ### 개선 과제
 개선 과제 ID: CI-2026-10-25-015
-성과 판정: IN_PROGRESS
-근거: 동기화 경로와 파서 분류를 보강하고 대상 테스트는 통과했다. 전체 배포 검증, 운영 KIS 업로드 및 저장 후 감사를 완료하기 전까지 성공으로 판정하지 않는다.
+성과 판정: COMPLETE_WITH_SOURCE_LIMIT
+근거: `deploy:verify` 통과 후 커밋 `f84c842faebfc0314d959cf2460e148309370c8c`을 `oci`로 push했고 Deploy OCI run `40111254986` 성공을 확인했다. `.env.local` 관리자 인증, 공식 KIS NAS/NYS/AMS 원본 사전 read-only audit, 전체 sync, 별도 GET 및 재업로드 read-only audit가 모두 HTTP 200이었다. 저장 후보는 3,240/1,864/254, 활성 common 외부 행·누락·코드 불일치 모두 0, 유효 업종 2,634, KIS 공식 미분류 `000` 2,724다.
+
+### 운영 저장·재검증 (2026-10-25)
+- `.env.local`에서 관리자 비밀번호만 메모리로 읽어 운영 관리자 세션을 만들었다. 인증 성공은 HTTP 200이며 비밀번호·쿠키·KIS 토큰은 로그에 노출하지 않았다.
+- 저장 전 운영 read-only audit에서 `databaseWritePerformed=false`; 시장별 KIS common 후보 NAS/NYS/AMS 3,240/1,864/254, 기존 활성 common 누락 64/9/17, 후보 밖 활성 common 773/625/38, 코드 mismatch 모두 0이었다.
+- 공식 KIS 마스터 full sync는 `reconciled=true`로 성공했다. common upsert 3,240/1,864/254, 특수 instrument upsert 2,032/975/4,526, 기존 후보 외 활성 common 비활성화 773/625/38이다. 모든 변화는 하나의 transaction에서 검증 후 commit됐고, 148개 KIS 미수록 행도 삭제하지 않고 fail-closed 비활성화했다.
+- 분리된 관리자 GET은 활성 common 3,240/1,864/254, 분류 1,354/1,186/94, 미분류 1,886/678/160을 반환했다. 새 원본을 올린 read-only audit에서 매칭 3,240/1,864/254, 누락 0, 후보 밖 활성 common 0, 코드 mismatch 0, `databaseWritePerformed=false`를 재확인했다.
+- 따라서 “모든 KIS 확인 보통주 행이 DB에 저장됐는가”는 YES다. “모든 종목에 유효 섹터가 있는가”는 NO: 유효 코드는 2,634/5,358이며, 나머지 2,724개는 KIS 공식 원본 자체가 `000`으로 미분류한다. 임의로 값을 보정하지 않았다.

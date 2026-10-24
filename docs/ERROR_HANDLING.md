@@ -6,7 +6,8 @@
 - **근본 원인**: 기존 동기화가 양쪽 테이블 교집합에만 `industry_code`를 UPDATE했으며 KIS 후보를 신규 반영하거나 잘못 활성화된 common·특수상품 partition을 함께 정합화하지 않았다.
 - **해결 위치**: `lib/us-industry-code-sync.ts`의 KIS full sync에서 NAS/NYS/AMS 전체 후보 및 특수행 upsert, 외부 활성 common 비활성화, 사후검증을 단일 transaction/advisory lock으로 묶는다. `lib/instrument-universe-import.ts`는 KIS 비주식·ETP·알 수 없는 유형을 fail-closed 처리한다.
 - **재발 자동 감지**: 업로드 사후에 `missingCount=0`, `mismatchCount=0`, `activeDatabaseOnlyCount=0`, special source missing `0`을 transaction 안에서 강제하고, 운영 `mode=audit` read-only 결과로 다시 대조한다. KIS 원본 코드 `000`은 미분류로 보존한다.
-- **영향 및 남은 위험**: KIS 마스터 밖 기존 common 행은 삭제하지 않고 비활성화해 이력을 보존한다. KIS 원본 `000`에는 유효 분류 코드가 없으므로 실제 분류 커버리지는 원천 품질에 제한된다. 전체 검증 및 운영 재대조가 성공하기 전에는 완료로 보고하지 않는다.
+- **운영 검증 결과(2026-10-25)**: 배포 `f84c842f` 후 `.env.local` 관리자 인증으로 공식 마스터를 업로드했다. KIS 후보 common 5,358건 upsert, special 7,533건 upsert, 이전 후보 외 활성 common 1,436건 비활성화 후 독립 read-only audit에서 후보 누락·후보 외 활성 common·업종 코드 불일치가 모두 0이었다.
+- **영향 및 남은 위험**: 이전 common 행은 삭제하지 않고 비활성화해 이력을 보존한다. 후보 밖 148행은 KIS 마스터에서 확인할 수 없어 원인 미확정 상태로 비활성 유지한다. KIS 원본 `000` 2,724건은 유효 업종 코드가 아니며 이름이나 외부 공급자로 보정하지 않는다. KIS 마스터의 분류 범위 변경은 다음 full sync 때 동일한 전수 검증 기준으로 감지한다.
 
 ## 2026-10-25 RSS 제목 숫자 번역과 backlog 배치 설정
 
