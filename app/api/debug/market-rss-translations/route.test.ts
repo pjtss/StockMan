@@ -18,15 +18,18 @@ describe("RSS translation diagnostics API", () => {
       .mockResolvedValueOnce({ rows: [{ status: "PENDING", count: 1 }] })
       .mockResolvedValueOnce({ rows: [{ count: 1 }] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }] });
+      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }] })
+      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", reason: "protected_token_mismatch", count: 2 }] });
     const response = await GET(new Request("http://localhost/api/debug/market-rss-translations"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.summary.byStatus).toEqual({ PENDING: 1 });
     expect(body.lifetimeBySource).toEqual([{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }]);
-    expect(state.query).toHaveBeenCalledTimes(4);
+    expect(body.lifetimeSkippedReasonsBySource).toEqual([{ source: "STOCKTITAN", reason: "protected_token_mismatch", count: 2 }]);
+    expect(state.query).toHaveBeenCalledTimes(5);
     expect(state.query.mock.calls[3][1]).toEqual([["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]);
+    expect(state.query.mock.calls[4][1]).toEqual([["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]);
   });
 
   it("returns bounded translation state, status counts and applies filters", async () => {
@@ -34,7 +37,8 @@ describe("RSS translation diagnostics API", () => {
       .mockResolvedValueOnce({ rows: [{ status: "TRANSLATED", count: 4 }, { status: "FAILED", count: 2 }] })
       .mockResolvedValueOnce({ rows: [{ count: 2 }] })
       .mockResolvedValueOnce({ rows: [{ id: 8, translation_error: null, translated_title: "번역 제목" }] })
-      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }] });
+      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }] })
+      .mockResolvedValueOnce({ rows: [] });
 
     const response = await GET(new Request("http://localhost/api/debug/market-rss-translations?hours=48&source=STOCKTITAN&status=FAILED&limit=10&offset=0"));
     const body = await response.json();
@@ -44,8 +48,8 @@ describe("RSS translation diagnostics API", () => {
     expect(body.summary).toMatchObject({ totalInWindow: 6, filteredTotal: 2, byStatus: { TRANSLATED: 4, FAILED: 2 } });
     expect(body.items).toHaveLength(1);
     expect(body.lifetimeBySource).toEqual([{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }]);
-    expect(state.query).toHaveBeenCalledTimes(4);
-    expect(state.query.mock.calls.map((call) => call[1])).toEqual([[48, "STOCKTITAN"], [48, "STOCKTITAN", "FAILED"], [48, "STOCKTITAN", "FAILED", 10, 0], [["STOCKTITAN"]]]);
+    expect(state.query).toHaveBeenCalledTimes(5);
+    expect(state.query.mock.calls.map((call) => call[1])).toEqual([[48, "STOCKTITAN"], [48, "STOCKTITAN", "FAILED"], [48, "STOCKTITAN", "FAILED", 10, 0], [["STOCKTITAN"]], [["STOCKTITAN"]]]);
   });
 
   it("rejects invalid source, status and out-of-range query bounds", async () => {
@@ -61,6 +65,7 @@ describe("RSS translation diagnostics API", () => {
       .mockResolvedValueOnce({ rows: [{ status: "FAILED", count: 1 }] })
       .mockResolvedValueOnce({ rows: [{ count: 1 }] })
       .mockResolvedValueOnce({ rows: [{ id: 9, translation_error: "https://translate.example/?key=AIzaSyDUMMY012345678901234567890123456789 failed; token=secret" }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
     const body = await (await GET(new Request("http://localhost/api/debug/market-rss-translations"))).json();
     expect(JSON.stringify(body)).not.toContain("AIzaSyDUMMY");

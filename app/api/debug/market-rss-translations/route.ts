@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   const status = statusParam === "ALL" ? null : statusParam;
   try {
     const pool = getPool();
-    const [summaryResult, totalResult, rowsResult, lifetimeResult] = await Promise.all([
+    const [summaryResult, totalResult, rowsResult, lifetimeResult, lifetimeSkipReasonsResult] = await Promise.all([
       pool.query<{ status: string; count: number }>(
         `SELECT translation_status AS status, COUNT(*)::int AS count
          FROM market_rss_articles
@@ -105,6 +105,26 @@ export async function GET(request: Request) {
          GROUP BY source ORDER BY source`,
         [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
       ),
+      pool.query(
+        `SELECT source,
+                CASE
+                  WHEN translation_skipped_reason IN (
+                    'already_in_target_language', 'monthly_character_limit_reached',
+                    'hourly_character_limit_reached', 'provider_free_quota_exceeded',
+                    'provider_daily_quota_exceeded', 'cloud_translation_not_configured',
+                    'protected_token_mismatch', 'translation_numeric_hallucination',
+                    'target_language_not_detected', 'translation_output_incomplete',
+                    'translation_response_unparseable', 'translation_cache_invalidation_failed',
+                    'translation_input_empty', 'translation_api_error'
+                  ) THEN translation_skipped_reason
+                  ELSE 'other'
+                END AS reason,
+                COUNT(*)::int AS count
+         FROM market_rss_articles
+         WHERE source = ANY($1::text[]) AND translation_status = 'SKIPPED'
+         GROUP BY source, reason ORDER BY source, reason`,
+        [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
+      ),
     ]);
 
     const items = rowsResult.rows.map((row) => ({
@@ -123,6 +143,7 @@ export async function GET(request: Request) {
         byStatus,
       },
       lifetimeBySource: lifetimeResult.rows,
+      lifetimeSkippedReasonsBySource: lifetimeSkipReasonsResult.rows,
       pagination: { limit, offset, returned: items.length, hasMore: offset + items.length < total },
       items,
     });

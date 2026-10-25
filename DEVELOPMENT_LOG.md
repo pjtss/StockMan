@@ -7058,3 +7058,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - route 테스트, 전체 deploy verification 및 배포 전.
 - 운영 `.env.local`의 cron secret은 현재 작업본에 없어 이전 인증 관리자 endpoint를 조회할 수 없었다. 새 공개 진단 GET은 본인 증명 민감값을 노출하지 않으며 범위 상수로 제한되어 배포 후 전체 backlog 상태를 확인할 예정이다.
 - 커밋·푸시·배포 안 함. RSS 목표는 `IN_PROGRESS`.
+
+### 운영 관측 후속
+- 새 API `lifetimeBySource`는 운영에서 정상 응답해 총 저장 행·번역·발송 집계를 제공했다. GlobeNewswire는 25/25 발송됐고, SEC는 5,700 notification pending·3 uncertain, StockTitan은 2,185 translation pending·328 failed·9,931 skipped 및 2,297 notification pending·2 uncertain이었다.
+- SEC/StockTitan의 오래된 행 세부는 기존 720시간 상세 제한 때문에 확인되지 않는다. 전체 backlog 원인을 파악하도록 기사 내용/오류 메시지 대신 안전 whitelist reason-code count만 반환하는 `lifetimeSkippedReasonsBySource`를 추가한다. 검증·재배포 전.
