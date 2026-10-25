@@ -15,8 +15,9 @@
 ### 검증
 - 운영 read-only 표본(720시간 범위): GlobeNewswire 25개 중 6개에서 임상 단계/괄호 등 legacy 품질 패턴이 보였고, 여기에는 `Phase 2`의 `2 상기`, `Phase 3`와 `VIKTORIA-1`의 혼합, `Phase 2/3`와 `COMPANION-002`의 혼합이 포함됐다. 이 샘플은 새 SHA 배포 전 저장된 번역이다.
 - `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/market-rss-translation-protection.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 160개 테스트 통과.
-- 전체 배포 검증은 아직 실행 전이다. 새 provider 출력은 월간 quota에 막혀 검증 불가이며, 실제 provider 출력이 의미상 완벽하다고 주장하지 않는다.
-- 운영 최신 집계 2026-10-25 12:27Z: SEC notification pending 3,099, StockTitan 2,299, GlobeNewswire 3; StockTitan translation pending 806 및 quota-skipped 10,585. 운영 SHA `1c18cd497e2736e7c923362bbcd7f63f97705b02`.
+- `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,517 tests passed/3 skipped; build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 모두 성공.
+- GitHub Actions run `40193652992` success 및 운영 `/health-check` HTTP 200, 새 SHA `6316c4ff82a15f5260d1ec6bbbad59bf9e56eedb` 확인. 새 provider 출력은 월간 quota에 막혀 검증 불가이며, 실제 provider 출력이 의미상 완벽하다고 주장하지 않는다.
+- 운영 최신 집계 2026-10-25 12:41Z: SEC notification pending 2,859, StockTitan 2,299, GlobeNewswire 3; StockTitan translation pending 546 및 quota-skipped 10,845. 이 SHA에서 새 provider 번역이 성공한 샘플은 아직 없다.
 
 ### 재발 감지·남은 위험
 - 입력 정규화와 보호 token 테스트는 언어별 phase 표기를 보장하지 않는다. 인식하지 못하는 새 언어 표기나 provider의 token 재배치는 실제 provider 품질 표본으로 계속 확인해야 한다.
@@ -31,7 +32,7 @@
 근거: 운영에서 확인한 Phase syntax 및 ID 혼합 오류에 표적 회귀를 추가하고 160개 테스트를 통과했으나, provider quota로 실제 신규 번역 확인과 과거 backlog 소진은 남았다.
 
 ### 커밋·푸시·배포
-- 미실행. 표적 테스트만 통과했으며 전체 `npm.cmd run deploy:verify` 후 RSS 전용 분리 배포 예정.
+- RSS 전용 코드 커밋 `6316c4ff` push 및 운영 배포 완료. 실제 새 provider 번역 품질 검증은 quota reset 뒤에 남아 있다.
 
 ## [2026-10-25] RSS 제목 번역 개선 운영 배포 확인
 
