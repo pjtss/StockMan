@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   const status = statusParam === "ALL" ? null : statusParam;
   try {
     const pool = getPool();
-    const [summaryResult, totalResult, rowsResult, lifetimeResult, lifetimeSkipReasonsResult] = await Promise.all([
+    const [summaryResult, totalResult, rowsResult, lifetimeResult, lifetimeSkipReasonsResult, sentGateViolationsResult] = await Promise.all([
       pool.query<{ status: string; count: number }>(
         `SELECT translation_status AS status, COUNT(*)::int AS count
          FROM market_rss_articles
@@ -132,6 +132,31 @@ export async function GET(request: Request) {
          GROUP BY source, provider, reason ORDER BY source, provider, reason`,
         [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
       ),
+      pool.query(
+        `SELECT source, translation_status AS translation_status,
+                CASE
+                  WHEN translation_skipped_reason IN (
+                    'already_in_target_language', 'monthly_character_limit_reached',
+                    'hourly_character_limit_reached', 'provider_free_quota_exceeded',
+                    'provider_daily_quota_exceeded', 'cloud_translation_not_configured',
+                    'protected_token_mismatch', 'translation_numeric_hallucination',
+                    'target_language_not_detected', 'translation_output_incomplete',
+                    'translation_response_unparseable', 'translation_cache_invalidation_failed',
+                    'translation_input_empty', 'translation_api_error'
+                  ) THEN translation_skipped_reason
+                  WHEN translation_skipped_reason IS NULL THEN 'no_skip_reason'
+                  ELSE 'other'
+                END AS reason,
+                COUNT(*)::int AS count
+         FROM market_rss_articles
+         WHERE source = ANY($1::text[]) AND notification_status = 'SENT'
+           AND NOT (
+             translation_status = 'TRANSLATED'
+             OR (translation_status = 'SKIPPED' AND translation_skipped_reason = 'already_in_target_language')
+           )
+         GROUP BY source, translation_status, reason ORDER BY source, translation_status, reason`,
+        [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
+      ),
     ]);
 
     const items = rowsResult.rows.map((row) => ({
@@ -151,6 +176,7 @@ export async function GET(request: Request) {
       },
       lifetimeBySource: lifetimeResult.rows,
       lifetimeSkippedReasonsBySource: lifetimeSkipReasonsResult.rows,
+      sentGateViolationsBySource: sentGateViolationsResult.rows,
       pagination: { limit, offset, returned: items.length, hasMore: offset + items.length < total },
       items,
     });
