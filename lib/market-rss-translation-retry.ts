@@ -89,13 +89,9 @@ export function buildMarketRssTranslationRetryCondition(criteria: ReturnType<typ
   );
 }
 
-/** Select only retry-eligible translations that can produce a user notification. */
+/** Select every retry-eligible RSS article for translation; the notification gate controls sending. */
 export function buildMarketRssTranslationCandidateCondition(criteria: ReturnType<typeof getMarketRssTranslationRetryCriteria>) {
-  return and(
-    buildMarketRssTranslationRetryCondition(criteria),
-    eq(marketRssArticles.notifyEligible, true),
-    eq(marketRssArticles.isBacklog, false),
-  );
+  return buildMarketRssTranslationRetryCondition(criteria);
 }
 
 export function sanitizeMarketRssTranslationError(error: unknown) {

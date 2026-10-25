@@ -83,14 +83,12 @@ describe("market RSS translation retry criteria", () => {
       .toContain(getPacificQuotaDayStart(new Date("2026-10-18T12:00:00.000Z")).toISOString());
   });
 
-  it("limits provider translation candidates to notification-eligible non-backlog rows", () => {
+  it("includes historical backlog and non-notify-eligible rows in translation candidates", () => {
     const criteria = getMarketRssTranslationRetryCriteria(true, new Date("2026-10-18T12:00:00.000Z"));
     const query = new PgDialect().sqlToQuery(buildMarketRssTranslationCandidateCondition(criteria));
 
-    expect(query.sql).toContain('"market_rss_articles"."notify_eligible" =');
-    expect(query.sql).toContain('"market_rss_articles"."is_backlog" =');
-    expect(query.params).toContain(true);
-    expect(query.params).toContain(false);
+    expect(query.sql).not.toContain('"market_rss_articles"."notify_eligible"');
+    expect(query.sql).not.toContain('"market_rss_articles"."is_backlog"');
     expect(query.params).toContain("PENDING");
     expect(query.params).toContain("FAILED");
     expect(query.params).toContain("SKIPPED");

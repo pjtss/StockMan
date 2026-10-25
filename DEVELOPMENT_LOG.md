@@ -7212,3 +7212,30 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `d71e59e2`가 운영 활성화된 뒤 StockTitan의 9,606 skipped 중 8,281은 Google 내부 월 cap, 1,203은 Azure 월 cap, 40은 protected token mismatch, 81은 numeric hallucination, 1은 incomplete output이었다. Google cap 증액은 비용 크레딧의 billing account 공유 여부를 확인할 수 없어 사용자 선택을 기다린다. `SENT`와 translation status 불일치 여부도 전체 저장 행에서 검증할 수 있도록 `sent_without_validated_translation` 및 `sentGateViolationsBySource` aggregate를 추가했다. API 테스트 4건 및 전체 `npm.cmd run deploy:verify` 통과: 302개 테스트 파일 중 301개 통과·1개 skip, 1,499 tests 통과·3개 skip; build, typecheck, docs/migration, scope/KIS/auth/cron, standalone·Chrome desktop/mobile smoke 포함. 이제 커밋·푸시·배포 전.
 - 후속 aggregate 결과: GlobeNewswire sent_without_validated_translation=0, SEC=313, StockTitan=9,795. Discord delivery queue schema에는 webhook message id가 없어 기존 message edit는 자동 복구 경로로 쓸 수 없다. 원인별 cross-tab sentGateViolationsBySource를 추가해 violation들의 현재 translation status/skip reason을 구분한다. 중복 재전송은 별도 authorization 없이 수행하지 않는다. 변경 및 전체 검증 완료, 다음 커밋·배포 대기.
 - `sentGateViolationsBySource` 운영 분해에서 StockTitan 9,159 SENT 행의 현재 번역 상태는 `SKIPPED/monthly_character_limit_reached`, SEC는 238 동일 상태, 75 fallback/legacy, StockTitan 243 fallback/legacy·194 failed 등이었다. 지표는 전송 당시 상태가 아니라 현재 DB 상태를 비교한다. 코드 원인 검토에서 RSS upsert가 title뿐 아니라 summary 변경에도 번역 상태를 초기화하는 것을 발견했다. provider 입력은 title만이므로 summary 변동은 번역 무효화 사유가 아니다. title 변경 때만 번역 상태를 reset하도록 수정하고 회귀를 추가했다. targeted upsert test 3건 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 테스트 파일 중 301개 통과·1개 skip, 1,499 tests 통과·3개 skip; build, typecheck, docs/migration, scope/KIS/auth/cron, standalone·Chrome desktop/mobile smoke 포함. 이미 SENT된 행은 중복 재발송하지 않는다. 이제 커밋·푸시·배포 전.
+## [2026-10-25] 과거 RSS 기사 번역 대기 조건 제거
+
+### 목표
+- 사용자가 승인한 세 출처의 전체 기사 알림과 과거 대기 기사 발송이 번역 선택 단계의 backlog 제외 조건에 막히지 않게 한다.
+
+### 근본 원인 및 수정
+- `buildMarketRssTranslationCandidateCondition()`이 재시도 가능 상태 외에 `notify_eligible=true`와 `is_backlog=false`를 요구했다. 이 때문에 과거 backlog 기사나 향후 분류상 알림 제외 상태인 피드 항목은 번역 단계에서 영구적으로 선택되지 않아, 번역 통과를 요구하는 Discord 게이트에도 도달하지 못할 수 있었다.
+- `lib/market-rss-translation-retry.ts`에서 후보 조건을 재시도 상태로만 제한했다. provider 번역은 모든 적격 RSS 행에서 수행하고, Discord 발송은 별도 `TRANSLATED` 또는 이미 한국어인 제목 게이트로 계속 보호한다.
+- `lib/market-rss-translation-retry.test.ts`가 backlog/notify eligibility 조건을 SQL에서 제외하는지 검사하도록 회귀를 변경했다.
+
+### 검증
+- `npm.cmd exec vitest run -- lib/market-rss-translation-retry.test.ts lib/market-rss-notification-translation-gate.test.ts --reporter=dot`: 2개 파일 15개 테스트 통과.
+- 코드상 source queue는 `GLOBENEWSWIRE`, `STOCKTITAN`, `SEC_EDGAR` 각 하나씩 생성하고 공정 교차 선택한다. provider 결과 검증 실패 또는 quota fallback 제목은 Discord SQL gate가 전송하지 않는다.
+- 운영 health endpoint는 2026-10-25 13:02Z HTTP 200/status `ok`를 반환했으나 배포 SHA는 노출하지 않는다. 현재 작업 환경에 GitHub CLI 및 운영 RSS 진단 토큰이 없어 이번 코드 버전 배포 완료와 최신 기사 번역 표본은 아직 검증하지 못했다.
+- `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,518 tests passed/3 skipped; dependency audit, build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 성공.
+
+### 재발 감지·남은 위험
+- provider quota 잔여량은 운영 API의 인증된 사용량 snapshot으로 별도 확인해야 한다. 월/일 quota가 소진되면 안전한 translation gate가 유지되므로 기사는 계속 대기할 수 있다.
+- 운영 배포 완료와 실제 provider 표본·세 출처 queue 감소 확인은 남아 있다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-019
+성과 판정: PARTIAL
+근거: 과거 기사 번역 선택에서 backlog/분류 제외를 제거하고 전체 검증을 통과했으나, 운영 배포·provider 결과 확인이 남았다.
+
+### 커밋·푸시·배포
+- 전체 검증 완료 후 커밋·푸시 및 OCI 자동 배포를 시작한다. 운영 실행 SHA와 provider 표본은 확인 대기.
