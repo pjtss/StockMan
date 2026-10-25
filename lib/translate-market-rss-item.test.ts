@@ -100,6 +100,39 @@ describe("market RSS translation", () => {
     expect(result.translatedContent).toBe(source.content);
   });
 
+  it("holds a truncated title and preserves the source summary", async () => {
+    const source: MarketRssItem = {
+      ...item("truncated-parenthetical"),
+      source: "STOCKTITAN",
+      title: "Libtayo Longer-Term Data Show Survival Benefit in High-Risk Carcinoma (CSCC)",
+      summary: "Original article summary must remain unchanged",
+      content: "Original article body must remain unchanged",
+    };
+    const protectedAcronym = prepareMarketRssTranslationInput(source.title).placeholders[0].marker;
+    const translate = vi.fn(async () => ({
+      translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}Libtayo 장기 데이터는 고위험 암종에서 생존 이점을 보여줍니다 (${protectedAcronym}${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}요약 원문</p></div>`,
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "azure-translator",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({
+      translatedTitle: source.title,
+      translationFallback: true,
+      translationFallbackReason: "translation_output_incomplete",
+      translationCandidateTitle: "Libtayo 장기 데이터는 고위험 암종에서 생존 이점을 보여줍니다 (CSCC",
+    });
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(translate.mock.calls[0][0]).toBe(prepareMarketRssTranslationInput(source.title).text);
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(translate.mock.calls[0][0]).not.toContain(source.content);
+    expect(result.translatedSummary).toBe(source.summary);
+    expect(result.translatedContent).toBe(source.content);
+  });
+
   it("retries an Azure title that fails Korean validation with the configured Google provider", async () => {
     const source = { ...item("quality-fallback"), title: "Nvidia Announces Strong Revenue Growth and Improved Outlook" };
     const primaryTranslate = vi.fn(async () => ({

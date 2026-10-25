@@ -9,14 +9,16 @@
 ### 반영
 - `lib/market-rss-translation-quality.mjs`: ASCII 및 전각 괄호·대괄호·중괄호가 모두 짝을 이루는지 완전성 검사에 추가했다. 불균형 결과는 기존 `translation_output_incomplete` fallback 및 다른 provider 재시도 경로를 따른다.
 - `lib/market-rss-translation-quality.test.ts`: 운영 표본 형태의 괄호 잘림 거부와 정상 ASCII/전각 짝 괄호 통과 회귀 사례를 추가했다.
+- `lib/translate-market-rss-item.test.ts`: 번역기 응답에서 보호된 `CSCC` 토큰을 복원한 뒤 닫는 괄호가 없으면 원문 제목으로 fallback되고, 요약·본문 원문은 유지되는 end-to-end 회귀 테스트를 추가했다.
 - `docs/architecture/stocktitan-translation.md`: 신규 구조 검사의 범위와 의미 정확성은 별도 표본 검토가 필요한 한계를 기록했다.
 
 ### 검증
 - 배포 `c7278d40` 이후 운영 `/health-check`에서 동일 SHA가 서빙됨을 확인했다. read-only RSS 진단 시점 `2026-10-25 10:55:35Z`: GlobeNewswire 25건 전부 translated/sent, SEC 번역 대기 0·알림 대기 4,736, StockTitan 번역 대기 2,186·알림 대기 2,298이었다. 이는 잔여 backlog가 없어졌다는 증거가 아니다.
 - 운영 번역 표본에서는 괄호가 닫히지 않은 잘린 제목이 완전성 검사까지 통과할 수 있음을 확인했다. 이 항목은 기존 구현의 회귀 원인으로 잡아 검사 규칙을 보강했다.
 - `npm.cmd exec vitest run -- lib/market-rss-translation-quality.test.ts --reporter=dot`: 1개 파일, 12개 테스트 통과. `git diff --check` 통과.
+- end-to-end 테스트의 첫 실행은 모의 provider가 보호 토큰 `ZX0Q`를 돌려주지 않아 `protected_token_mismatch` 결과가 발생했다. mock이 보호 토큰을 보존하도록 고친 뒤 `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-quality.test.ts --reporter=dot`에서 2개 파일 111개 테스트 통과.
 - 첫 `npm.cmd run deploy:verify`는 개선 로그 필수 섹션 누락으로 `docs:check`에서 실패했다. DEVELOPMENT_LOG.md에 요구된 다음 개선·개선 과제 섹션을 보완했다.
-- 재실행한 `npm.cmd run deploy:verify` 통과: audit 취약점 0, 프로덕션 빌드·standalone runtime smoke·Chrome desktop/mobile hydration 통과, 전체 테스트 301개 통과/1개 skip(1,501 passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron 검사 통과. Windows `node_modules` junction trace `EPERM` 경고가 있었지만 fallback smoke는 통과했다.
+- `lib/translate-market-rss-item.test.ts` 추가 후 `npm.cmd run deploy:verify` 재실행 통과: audit 취약점 0, 프로덕션 빌드·standalone runtime smoke·Chrome desktop/mobile hydration 통과, 전체 테스트 301개 통과/1개 skip(1,502 passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron 검사 통과. Windows `node_modules` junction trace `EPERM` 경고가 있었지만 fallback smoke는 통과했다.
 - 커밋 `4cefb6ed`를 `oci`에 푸시했고 GitHub Actions run `40187578619` 성공을 확인했다. 운영 `/health-check`에서 정확한 SHA `4cefb6edc3dcc93fced0a837258df7f998acfd38`를 read-only 확인했다.
 - 배포 뒤 `2026-10-25 11:14Z` 운영 aggregate snapshot은 StockTitan 번역 대기 2,097건·알림 대기 2,301건이었다. GlobeNewswire는 번역 대기 0건이나 최근 신규 2건은 두 provider의 월간 문자 상한 때문에 SKIPPED라 번역 게이트가 전송을 보류했다. 따라서 새 구조 검사가 실 provider 응답에 발동하는 모습 및 전체 backlog 해소는 아직 확인하지 못했다.
 
@@ -33,7 +35,7 @@
 근거: 운영에서 실제로 발생한 닫히지 않은 괄호의 provider 응답을 품질 함수가 통과시키는 결함을 확인하고 구조 검사를 추가했다. 회귀 테스트 및 전체 배포 검증은 통과했으나, 의미 정확성 보장은 범위 밖이며 이번 수정의 운영 반영은 확인 전이다.
 
 ### 커밋·푸시·배포
-- 코드 커밋·`oci` 푸시·운영 배포 완료: `4cefb6ed`, GitHub Actions run `40187578619`, 운영 SHA 대조 완료. 이후 이 로그 상태 변경을 포함해 다시 커밋하기 전 필수 전체 검증을 실행한다.
+- 품질 검사 코드는 `4cefb6ed`로 `oci`에 푸시·배포 완료(GitHub Actions run `40187578619`, 운영 SHA 대조). end-to-end 회귀 테스트와 실행 결과 문서 보강은 별도 커밋 대기 중이다. 커밋 전 `npm.cmd run deploy:verify`가 통과했다.
 
 ## [2026-10-25] RSS batch 설정 실행 프로세스 경계 수정
 
