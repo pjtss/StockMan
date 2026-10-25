@@ -1,3 +1,39 @@
+## [2026-10-25] RSS 제목 번역 괄호 잘림 차단
+
+### 목표
+- 운영 RSS에서 확인한 한국어 제목이 잘린 채 `TRANSLATED`로 저장되는 결함을 줄이고, 제목 번역이 품질 검사를 통과하기 전에는 Discord 게이트에 도달하지 않게 한다.
+
+### 근본 원인
+- 현재 완전성 검사는 한국어 음절 최소량만 비교해 provider 출력의 닫히지 않은 괄호를 감지하지 못했다. 운영 GlobeNewswire 표본 `... carcinoma (CSCC)`가 `...(CSCC`로 저장된 사례를 read-only debug API에서 확인했다.
+
+### 반영
+- `lib/market-rss-translation-quality.mjs`: ASCII 및 전각 괄호·대괄호·중괄호가 모두 짝을 이루는지 완전성 검사에 추가했다. 불균형 결과는 기존 `translation_output_incomplete` fallback 및 다른 provider 재시도 경로를 따른다.
+- `lib/market-rss-translation-quality.test.ts`: 운영 표본 형태의 괄호 잘림 거부와 정상 ASCII/전각 짝 괄호 통과 회귀 사례를 추가했다.
+- `docs/architecture/stocktitan-translation.md`: 신규 구조 검사의 범위와 의미 정확성은 별도 표본 검토가 필요한 한계를 기록했다.
+
+### 검증
+- 배포 `c7278d40` 이후 운영 `/health-check`에서 동일 SHA가 서빙됨을 확인했다. read-only RSS 진단 시점 `2026-10-25 10:55:35Z`: GlobeNewswire 25건 전부 translated/sent, SEC 번역 대기 0·알림 대기 4,736, StockTitan 번역 대기 2,186·알림 대기 2,298이었다. 이는 잔여 backlog가 없어졌다는 증거가 아니다.
+- 운영 번역 표본에서는 괄호가 닫히지 않은 잘린 제목이 완전성 검사까지 통과할 수 있음을 확인했다. 이 항목은 기존 구현의 회귀 원인으로 잡아 검사 규칙을 보강했다.
+- `npm.cmd exec vitest run -- lib/market-rss-translation-quality.test.ts --reporter=dot`: 1개 파일, 12개 테스트 통과. `git diff --check` 통과.
+- 첫 `npm.cmd run deploy:verify`는 개선 로그 필수 섹션 누락으로 `docs:check`에서 실패했다. DEVELOPMENT_LOG.md에 요구된 다음 개선·개선 과제 섹션을 보완했다.
+- 재실행한 `npm.cmd run deploy:verify` 통과: audit 취약점 0, 프로덕션 빌드·standalone runtime smoke·Chrome desktop/mobile hydration 통과, 전체 테스트 301개 통과/1개 skip(1,501 passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron 검사 통과. Windows `node_modules` junction trace `EPERM` 경고가 있었지만 fallback smoke는 통과했다.
+- 검증 완료 후 RSS 변경만 커밋·`oci` 푸시하고 자동 배포 및 운영 SHA를 확인할 예정이다.
+
+### 재발 감지·남은 위험
+- 자동 회귀 테스트가 불균형 괄호/괄호쌍 제목을 검사한다. 이 구조 검사는 번역 의미의 정확성, 임상 단계 표현의 자연스러움, 누락된 괄호 외 텍스트 절단을 증명하지 않으며, 의미 보존 검증 개선과 운영 표본 점검이 계속 필요하다.
+- Google 내부 월 300,000자 제한이 운영 backlog 해소를 제한한다. 월 한도 조정에 관한 사용자 답변을 기다리는 동안 비용 영향이 있는 설정 변경은 보류한다.
+
+### 다음 개선
+- 운영에서 확보한 실제 오역·누락 제목 표본을 `translation_output_incomplete` 등 원인별로 분류하고, 임상 단계·날짜·기업 행동처럼 중요한 제목 사실을 보존하는 검증을 별도 회귀 테스트와 함께 설계한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-014
+성과 판정: PARTIAL
+근거: 운영에서 실제로 발생한 닫히지 않은 괄호의 provider 응답을 품질 함수가 통과시키는 결함을 확인하고 구조 검사를 추가했다. 회귀 테스트 및 전체 배포 검증은 통과했으나, 의미 정확성 보장은 범위 밖이며 이번 수정의 운영 반영은 확인 전이다.
+
+### 커밋·푸시·배포
+- 전체 `npm.cmd run deploy:verify` 완료. 커밋·`oci` 푸시·운영 배포 확인은 다음 단계다.
+
 ## [2026-10-25] RSS batch 설정 실행 프로세스 경계 수정
 
 ### 목표

@@ -52,4 +52,16 @@ describe("isMarketRssTranslationHeadlineComplete", () => {
   it("accepts concise Korean wording when it preserves substantial headline content", () => {
     expect(isMarketRssTranslationHeadlineComplete("Nvidia revenue growth outlook improves after quarterly earnings", "엔비디아 분기 실적 발표 후 매출 성장 전망 개선")).toBe(true);
   });
+
+  it("rejects a provider response truncated inside a parenthetical suffix", () => {
+    expect(isMarketRssTranslationHeadlineComplete(
+      "Libtayo longer-term data show survival benefit in high-risk carcinoma (CSCC)",
+      "Libtayo 장기 데이터는 고위험 암종에서 생존 이점을 보여줍니다 (CSCC",
+    )).toBe(false);
+  });
+
+  it("accepts balanced ASCII and full-width title delimiters", () => {
+    expect(isMarketRssTranslationHeadlineComplete("Nvidia revenue rises (NVDA)", "엔비디아 매출 증가 (NVDA)")).toBe(true);
+    expect(isMarketRssTranslationHeadlineComplete("Nvidia revenue rises （NVDA）", "엔비디아 매출 증가 （NVDA）")).toBe(true);
+  });
 });
