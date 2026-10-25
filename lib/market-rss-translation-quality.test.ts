@@ -9,6 +9,10 @@ describe("isMarketRssTranslationKoreanEnough", () => {
     expect(isMarketRssTranslationKoreanEnough("실적 증가 ZX0Q ZX1Q ZX2Q ZX3Q ZX4Q" )).toBe(true);
   });
 
+  it("accepts a mostly Korean title that retains several long issuer and partner names", () => {
+    expect(isMarketRssTranslationKoreanEnough("HeartCore, HeartCore Luvina Vietnam의 ZX0Q 지분 전략적 이전을 Luvina Software | ZX1Q 주식 뉴스")).toBe(true);
+  });
+
   it("rejects unchanged English and mostly untranslated output with a small Korean fragment", () => {
     expect(isMarketRssTranslationKoreanEnough("Global Markets Focus on Nvidia")).toBe(false);
     expect(isMarketRssTranslationKoreanEnough("Nvidia revenue rises sharply 상승")).toBe(false);
