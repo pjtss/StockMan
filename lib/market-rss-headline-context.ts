@@ -1,6 +1,6 @@
 const COMMODITY = "(?:corn|wheat|soybeans?|oats|rice|coffee|cocoa|sugar|cotton|crude oil|natural gas|gold|silver|copper)";
 const COMPANY_PRODUCT = /\b(?:hardware|devices?|shield|geforce|gpus?|graphics cards?|laptops?|consoles?)\b/i;
-const CLINICAL_PHASE_CONTEXT = /\b(?:clinical|oncology|cancer|carcinoma|tumou?r|patient|therapy|therapeutic|treatment|drug|biologic|immunotherapy|esmo|fda|nsclc|pmn|disease|dose|efficacy|safety|indication|medical|kidney|renal|prostate|breast|lung|krebs|lungenkrebs|karzinom|tumor|patienten|therapie|behandlung|immuntherapie|onkologie|erkrankung|wirksamkeit|verträglichkeit)\b/i;
+const CLINICAL_PHASE_CONTEXT = /\b(?:clinical|oncology|cancer|carcinoma|tumou?r|patient|therapy|therapeutic|treatment|drug|biologic|immunotherapy|esmo|fda|nsclc|pmn|disease|dose|efficacy|safety|indication|medical|kidney|renal|nephropathy|prostate|breast|lung|krebs|lungenkrebs|karzinom|tumor|patienten|therapie|behandlung|immuntherapie|onkologie|erkrankung|wirksamkeit|verträglichkeit)\b/i;
 
 function normalizeClinicalPhase(title: string) {
   if (!CLINICAL_PHASE_CONTEXT.test(title)) return title;
@@ -54,6 +54,15 @@ export function normalizeTranslatedMarketRssClinicalPhase(sourceTitle: string, t
       .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s*단계(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
       .replace(new RegExp(`단계\\s*${stagePattern}(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
       .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s+상(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`);
+    const romanStage = ({ "1": "I", "2": "II", "3": "III", "4": "IV" } as Record<string, string>)[stage];
+    if (romanStage) {
+      const roman = `(?<![\\p{L}\\p{N}])${romanStage}(?![\\p{L}\\p{N}])`;
+      const canonicalStage = /\binterim\b/i.test(normalizedSource) ? `중간 ${stage}상` : `${stage}상`;
+      normalized = normalized
+        .replace(new RegExp(`(?:중간|임시)\\s*단계\\s*${roman}`, "giu"), canonicalStage)
+        .replace(new RegExp(`${roman}\\s*(?:중간|임시)?\\s*단계(?![\\p{L}\\p{N}])`, "giu"), canonicalStage)
+        .replace(new RegExp(`(?:중간|임시)\\s*${roman}\\s*단계(?![\\p{L}\\p{N}])`, "giu"), canonicalStage);
+    }
   }
   return normalized;
 }

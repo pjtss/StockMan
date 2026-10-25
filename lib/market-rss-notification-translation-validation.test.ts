@@ -37,6 +37,13 @@ describe("stored RSS title validation before Discord delivery", () => {
     });
   });
 
+  it("normalizes a source-confirmed interim phase title before delivery", () => {
+    expect(validateStoredMarketRssTranslation(
+      "Roche presents interim phase III data showing reduced proteinuria in people with IgA nephropathy",
+      "로슈는 IgA 신병증 환자에서 단백질뇨 감소를 보여주는 중간 단계 III 데이터를 발표합니다",
+    )).toMatchObject({ ok: true, translatedTitle: "로슈는 IgA 신병증 환자에서 단백질뇨 감소를 보여주는 중간 3상 데이터를 발표합니다", changed: true });
+  });
+
   it("holds stored text that does not meet the Korean target-language floor", () => {
     expect(validateStoredMarketRssTranslation("Nvidia revenue rises sharply after earnings", "Nvidia update"))
       .toMatchObject({ ok: false, reason: "target_language_not_detected" });

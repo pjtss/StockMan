@@ -58,6 +58,13 @@ describe("market RSS headline context normalization", () => {
     expect(normalizeTranslatedMarketRssClinicalPhase(source, translated)).toBe(expected);
   });
 
+  it.each([
+    ["Roche presents interim phase III data in IgA nephropathy", "로슈는 IgA 신병증에서 중간 단계 III 데이터를 발표합니다", "로슈는 IgA 신병증에서 중간 3상 데이터를 발표합니다"],
+    ["Genentech presents interim Phase III data for IgA nephropathy", "제넨텍은 IgA 신병증에 대해 III 임시 단계 데이터를 발표합니다", "제넨텍은 IgA 신병증에 대해 중간 3상 데이터를 발표합니다"],
+  ])("normalizes Roman-numeral phases after source-confirmed interim context", (source, translated, expected) => {
+    expect(normalizeTranslatedMarketRssClinicalPhase(source, translated)).toBe(expected);
+  });
+
   it("does not rewrite a number that is not a clinical phase in the source title", () => {
     expect(normalizeTranslatedMarketRssClinicalPhase("Company enters Phase 2 of its global market expansion", "회사는 2 상기 시장 확장에 진입합니다"))
       .toBe("회사는 2 상기 시장 확장에 진입합니다");

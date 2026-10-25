@@ -11,10 +11,10 @@
 - `lib/market-rss-pipeline.ts`: translation worker가 `buildMarketRssTranslationCandidateCondition`을 사용하도록 바꿔 notification 상태 `PENDING`, `FAILED`, `SKIPPED`만 재번역 후보로 포함한다. SEC EDGAR, StockTitan, GlobeNewswire source allowlist와 과거 backlog 처리, 등급·키워드 필터 없음은 유지한다.
 - `lib/market-rss-translation-retry.test.ts`: candidate SQL regression에서 `SENT`와 `UNCERTAIN` 제외 및 `PENDING`, `FAILED`, `SKIPPED` 포함을 확인한다.
 - `app/api/debug/market-rss-translations/route.ts`: 항목별 `notification_status`와 `notified_at`을 진단에 추가해 오역·불완전 번역의 실제 전송 상태를 확인한다. 번역 입력과 진단 응답에는 제목 외 본문·요약을 추가하지 않는다.
-- `lib/market-rss-headline-context.ts`: 운영에서 확인된 pharmaceutical false friends(`encouraging`→`권장`, `oral session`→`구강 세션`, `advanced NSCLC`→`후기 NSCLC`)를 원문 제목이 해당 의미를 확인할 때에만 교정한다. 새 번역과 송신 직전 저장 제목 검증에서 같은 규칙을 적용한다.
+- `lib/market-rss-headline-context.ts`: 운영에서 확인된 pharmaceutical false friends(`encouraging`→`권장`, `oral session`→`구강 세션`, `advanced NSCLC`→`후기 NSCLC`)를 원문 제목이 해당 의미를 확인할 때에만 교정한다. 임상 문맥의 Roman numeral phase 오역(`단계 III`, `III 임시 단계`)도 원문상 interim/임상 단계가 확인되면 `중간 3상`으로 표준화한다. 새 번역과 송신 직전 저장 제목 검증에서 같은 규칙을 적용한다.
 
 ### 검증
-- 관련 테스트 4파일 128개 통과; 비어 있는 사람 검수 fixture 때문에 의미 사례 2개 skip. `git diff --check` 통과.
+- 관련 RSS 테스트 3파일 125개 통과; 전체 `npm.cmd run deploy:verify` 통과(테스트 302파일 통과, 1,532개 테스트 통과·3개 skip, 타입 검사·문서/감사 검사·빌드·런타임 smoke 포함). `git diff --check` 통과.
 - `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111개 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사.
 - 운영 read-only (2026-10-25 15:56Z): notification pending GNW 6, SEC 0, StockTitan 2,303; monthly quota skip GNW 6, SEC 238, StockTitan 11,395. provider quota가 초과라 재처리 실측은 남았다.
 - 문서 복원 커밋 63ddabe58eb0eff62c24c911eb02308213683f18의 OCI workflow 40211443629도 verify/package/SSH/upload/activate 모두 성공했고, 운영 /health-check가 같은 SHA, /api/health가 ok를 반환했다. 2026-10-25 16:30:46Z read-only 진단: 최근 24시간 기사 34건 중 TRANSLATED 5, SKIPPED 29; GNW notification pending 7, SEC pending 0, StockTitan pending 2,304. 사람 검수 semantic fixture는 여전히 0건이므로 자동 번역 의미 정확성은 검증되지 않았다.
