@@ -10,14 +10,15 @@
 - `lib/market-rss-headline-context.ts`: 임상 의미가 확인되는 경우 공백/하이픈 Phase 표기와 독일어 종양·치료 문맥을 `2상`, `2/3상`으로 정규화하고 `상-Study/Studie/Trial` 사이에 번역 구분 공백을 둔다. 비임상 Phase-2 market expansion 제목은 원문을 유지한다.
 - `lib/market-rss-headline-context.test.ts`: 독일어 `Phase-2-Studie`, 하이픈 임상 단계, 영어 비임상 경계를 검증한다.
 - `lib/market-rss-translation-tokens.mjs`, `lib/market-rss-translation-protection.test.ts`: VIKTORIA-1, COMPANION-002, COVID-19, CD-19 식별자 전체를 단일 보호 token으로 처리하는 회귀를 추가한다.
+- `lib/translate-market-rss-item.test.ts`: 독일어 clinical title의 provider 입력에서 `2상`과 `VIKTORIA-1`을 보호·복원하고 summary/body를 보내지 않는 통합 회귀를 추가한다.
 - `docs/architecture/stocktitan-translation.md`: 현재 보호 규칙은 token을 분리하지 않지만 provider가 token 위치를 옮길 수 있다는 한계를 명시한다.
 
 ### 검증
 - 운영 read-only 표본(720시간 범위): GlobeNewswire 25개 중 6개에서 임상 단계/괄호 등 legacy 품질 패턴이 보였고, 여기에는 `Phase 2`의 `2 상기`, `Phase 3`와 `VIKTORIA-1`의 혼합, `Phase 2/3`와 `COMPANION-002`의 혼합이 포함됐다. 이 샘플은 새 SHA 배포 전 저장된 번역이다.
-- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/market-rss-translation-protection.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 160개 테스트 통과.
-- `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,517 tests passed/3 skipped; build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 모두 성공.
+- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/market-rss-translation-protection.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 161개 테스트 통과.
+- 통합 회귀 추가 후 `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,518 tests passed/3 skipped; build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 성공.
 - GitHub Actions run `40193652992` success 및 운영 `/health-check` HTTP 200, 새 SHA `6316c4ff82a15f5260d1ec6bbbad59bf9e56eedb` 확인. 새 provider 출력은 월간 quota에 막혀 검증 불가이며, 실제 provider 출력이 의미상 완벽하다고 주장하지 않는다.
-- 운영 최신 집계 2026-10-25 12:41Z: SEC notification pending 2,859, StockTitan 2,299, GlobeNewswire 3; StockTitan translation pending 546 및 quota-skipped 10,845. 이 SHA에서 새 provider 번역이 성공한 샘플은 아직 없다.
+- 운영 최신 집계 2026-10-25 12:53Z: SEC notification pending 2,640, StockTitan 2,298, GlobeNewswire 3; StockTitan translation pending 326 및 quota-skipped 11,064. 운영 SHA `614363b2f660ecf11132364d99ef03e0becb046b`에서 새 provider 번역이 성공한 샘플은 아직 없다.
 
 ### 재발 감지·남은 위험
 - 입력 정규화와 보호 token 테스트는 언어별 phase 표기를 보장하지 않는다. 인식하지 못하는 새 언어 표기나 provider의 token 재배치는 실제 provider 품질 표본으로 계속 확인해야 한다.
@@ -29,10 +30,10 @@
 ### 개선 과제
 개선 과제 ID: CI-2026-10-25-018
 성과 판정: PARTIAL
-근거: 운영에서 확인한 Phase syntax 및 ID 혼합 오류에 표적 회귀를 추가하고 160개 테스트를 통과했으나, provider quota로 실제 신규 번역 확인과 과거 backlog 소진은 남았다.
+근거: 운영에서 확인한 Phase syntax 및 ID 혼합 오류에 표적 회귀를 추가하고 전체 검증을 통과했으나, 통합 테스트 변경의 commit 및 provider quota로 인한 실제 신규 번역 확인·과거 backlog 소진은 남았다.
 
 ### 커밋·푸시·배포
-- RSS 전용 코드 커밋 `6316c4ff` push 및 운영 배포 완료. 실제 새 provider 번역 품질 검증은 quota reset 뒤에 남아 있다.
+- RSS 전용 코드 커밋 `6316c4ff` push 및 운영 배포 완료. 추가 provider-input 통합 테스트와 운영 로그 변경은 `614363b2` 기준 전체 검증 완료, 별도 문서·테스트 커밋 예정이며, 실제 provider 번역 품질 검증은 quota reset 뒤에 남아 있다.
 
 ## [2026-10-25] RSS 제목 번역 개선 운영 배포 확인
 

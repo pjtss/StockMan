@@ -166,6 +166,40 @@ describe("market RSS translation", () => {
     });
   });
 
+  it("protects German clinical phase notation and a trial identifier in title-only provider input", async () => {
+    const source: MarketRssItem = {
+      ...item("german-clinical-phase"),
+      source: "GLOBENEWSWIRE",
+      title: "BioNTech präsentiert Phase-2-Studie mit Pumitamig bei Lungenkrebs aus dem VIKTORIA-1 Programm",
+      summary: "Original German clinical summary",
+      content: "Original German clinical body",
+    };
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    const stageMarker = prepared.placeholders.find(({ original }) => original === "2상")!.marker;
+    const trialMarker = prepared.placeholders.find(({ original }) => original === "VIKTORIA-1")!.marker;
+    const translate = vi.fn(async () => ({
+      translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}BioNTech는 ${trialMarker} 프로그램의 ${stageMarker} 임상 결과를 발표했습니다</p>`,
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "azure-translator",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(prepared.headlineText).toContain(stageMarker);
+    expect(prepared.headlineText).toContain(trialMarker);
+    expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", "html");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(translate.mock.calls[0][0]).not.toContain(source.content);
+    expect(result).toMatchObject({
+      translatedTitle: "BioNTech는 VIKTORIA-1 프로그램의 2상 임상 결과를 발표했습니다",
+      translatedSummary: source.summary,
+      translatedContent: source.content,
+      translationFallback: false,
+    });
+  });
+
   it("retries an Azure title that fails Korean validation with the configured Google provider", async () => {
     const source = { ...item("quality-fallback"), title: "Nvidia Announces Strong Revenue Growth and Improved Outlook" };
     const primaryTranslate = vi.fn(async () => ({
