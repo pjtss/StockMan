@@ -542,7 +542,7 @@ describe("market RSS translation", () => {
     ],
     [
       "Realtor.com's 2026 Hottest ZIP Codes in America: Peabody, Mass. Claims the Top Spot as Buyers Chase Space Near Major Metros | NWS Stock News",
-      "Realtor.com의 2026년 미국에서 가장 인기 있는 우편번호: 매사추세츠주 피바디가 주요 대도시 근처에서 공간을 찾는 구매자들 사이에서 최고 자리를 차지 | NWS 주식 뉴스",
+      "Realtor.com의 2026년 미국에서 가장 인기 있는 우편번호: 매사추세츠주 피바디가 주요 대도시 근처에서 공간을 찾는 구매자들 사이에서 1위 자리를 차지 | NWS 주식 뉴스",
     ],
     [
       "Results for the Quarter and Half Year Ended June 30, 2026",
@@ -577,6 +577,24 @@ describe("market RSS translation", () => {
     expect(result.translationFallback).toBe(false);
     expect(result.translatedTitle).toContain("분기");
     expect(result.translatedTitle).not.toContain("4분기");
+  });
+
+  it("preserves the source conference number when Annual is mistranslated as a first annual event", async () => {
+    const sourceTitle = "Hadron Energy to Participate in the H.C. Wainwright 28th Annual Global Investment Conference | HDRN Stock News";
+    const source = { ...item("ordinal-annual-conference"), source: "STOCKTITAN", title: sourceTitle };
+    const prepared = prepareMarketRssTranslationInput(sourceTitle);
+    const numberMarker = prepared.placeholders.find(({ original }) => original === "28")!.marker;
+    let providerTitle = `하드론 에너지가 H.C. 웨인라이트 ${numberMarker}제1회 글로벌 투자 컨퍼런스에 참가합니다 | HDRN 주식 뉴스`;
+    for (const placeholder of prepared.placeholders) providerTitle = providerTitle.replace(placeholder.original, placeholder.marker);
+    const translate = vi.fn(async () => ({ translatedText: providerTitle, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result.translationFallback).toBe(false);
+    expect(result.translatedTitle).toContain("제28회");
+    expect(result.translatedTitle).not.toContain("제1회");
+    expect(result.translatedSummary).toBe(source.summary);
+    expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", prepared.format);
   });
 
   it("translates ordinary English words in publisher all-caps titles while preserving the trailing ticker", async () => {
