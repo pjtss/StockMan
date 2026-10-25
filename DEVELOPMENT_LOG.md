@@ -7227,9 +7227,10 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 코드상 source queue는 `GLOBENEWSWIRE`, `STOCKTITAN`, `SEC_EDGAR` 각 하나씩 생성하고 공정 교차 선택한다. provider 결과 검증 실패 또는 quota fallback 제목은 Discord SQL gate가 전송하지 않는다.
 - 운영 health endpoint는 2026-10-25 13:02Z HTTP 200/status `ok`를 반환했으나 배포 SHA는 노출하지 않는다. 현재 작업 환경에 GitHub CLI 및 운영 RSS 진단 토큰이 없어 이번 코드 버전 배포 완료와 최신 기사 번역 표본은 아직 검증하지 못했다.
 - `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,518 tests passed/3 skipped; dependency audit, build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 성공.
+- 수정 push 후 운영 read-only aggregate `2026-10-25T13:12:19Z`: GlobeNewswire translation pending 0 / notification pending 4, SEC notification pending 2,301 / sent 6,701, StockTitan translation pending 23 / notification pending 2,298. 월간 quota skipped는 GlobeNewswire 4, SEC 238, StockTitan의 Google 7,714·Azure 1,203·provider 미상 2,368건이다. queue가 전부 해소됐다는 뜻은 아니다.
 
 ### 재발 감지·남은 위험
-- provider quota 잔여량은 운영 API의 인증된 사용량 snapshot으로 별도 확인해야 한다. 월/일 quota가 소진되면 안전한 translation gate가 유지되므로 기사는 계속 대기할 수 있다.
+- provider quota 잔여량은 운영 API의 인증된 사용량 snapshot으로 별도 확인해야 한다. 월/일 quota가 소진되면 안전한 translation gate가 유지되므로 기사는 계속 대기할 수 있다. legacy SENT 행은 이미 전송되어 번역을 소급 보장할 수 없다.
 - 운영 배포 완료와 실제 provider 표본·세 출처 queue 감소 확인은 남아 있다.
 
 ### 개선 과제
