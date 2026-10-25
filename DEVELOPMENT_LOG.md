@@ -1,3 +1,36 @@
+## [2026-10-25] RSS 제목 번역 개선 운영 배포 확인
+
+### 목표
+- 임상 단계 전체를 번역 순서에서 보호한 RSS 제목 변경을 운영에 반영하고 세 출처의 알림 큐 진행 상태를 read-only로 확인한다.
+
+### 반영
+- 앞선 RSS 전용 코드 커밋 `d5e98421`이 `oci`에 푸시되고 운영 SHA `d5e9842110997ca7f1d0daca248489618eefc9b2`로 활성화됐다. GitHub Actions run `40191460423`이 success로 완료됐다.
+- 운영 GET `/api/debug/market-rss-translations`를 읽기 전용으로 조회했다. 2026-10-25 12:10Z 기준 SENT는 GlobeNewswire 25, SEC 5,599, StockTitan 18,119이며 notification pending은 각각 2, 3,402, 2,298이다. SEC 큐는 12:08Z 조회의 3,439에서 감소해 자동 배출 중이다.
+- 월간 번역 한도에 걸린 StockTitan 10,286건과 PENDING 1,104건은 현재 번역·알림 완료가 아니다. retry 조건은 월 경계 이후 재시도를 허용한다. 과거 sent gate violation aggregate(SEC 313, StockTitan 9,335)는 기존 발송 기록의 진단 수치로, 이미 전송된 Discord 메시지를 되돌릴 수 없다.
+- 이번 관찰은 새 운영 기사에 대한 외부 provider 번역 샘플을 입증하지 않는다. 현재 quota skip이 실제 provider 요청을 막고 있어 provider 응답을 검증할 표본이 없다.
+
+### 검증
+- GitHub Actions run `40191460423`: Verify deployment, standalone packaging, SSH configuration, release upload, activate release 모두 success.
+- 운영 `/health-check` HTTP 200 및 SHA `d5e9842110997ca7f1d0daca248489618eefc9b2` 확인.
+- 표적 회귀 154개 통과 및 전체 `npm.cmd run deploy:verify` 통과(302개 test files: 301 passed/1 skipped; 1,511 tests passed/3 skipped).
+- 운영 DB aggregate 조회는 GET만 사용했으며 기사 본문/raw payload를 요청하지 않았다.
+
+### 재발 감지·남은 위험
+- cron은 기존 translation retry 조건으로 월간 한도 오류 행을 월 경계 뒤 다시 처리한다. 월 경계 이후에도 `translation_pending`, `notification_pending`, `SKIPPED`가 줄지 않는지 확인이 필요하다.
+- 집계상 legacy sent gate violation이 존재하나 이미 보낸 메시지의 수정·삭제는 하지 않았다. 신규 전송은 현행 제목 번역 게이트로 제한된다.
+- Provider quota와 backlog 처리 속도 때문에 모든 과거 기사의 번역·Discord 전송은 아직 끝나지 않았다.
+
+### 다음 개선
+- 월 한도 재설정 후 실제 새 provider 번역에서 한국어 제목의 임상 단계 위치 보존, summary/body 원문 유지, 세 출처 큐 소진을 확인한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-017
+성과 판정: PARTIAL
+근거: 새 코드 배포 및 운영 SHA를 확인했고 SEC 알림 대기량이 감소 중이나, 전체 과거 큐와 월간 한도 backlog는 남아 있다. 실 provider 신규 제목 품질 표본은 quota 때문에 확인하지 못했다.
+
+### 커밋·푸시·배포
+- RSS 코드 커밋·push·운영 배포 완료: `d5e98421`. 이번 운영 확인과 backlog 상태 기록은 후속 문서 변경으로 반영한다.
+
 ## [2026-10-25] RSS 임상 단계 제목 번역 보존
 
 ### 목표
