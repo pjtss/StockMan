@@ -19,6 +19,7 @@ const SPELLED_NUMBER_VALUES: Record<string, number> = {
   seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20, thirtieth: 30, fortieth: 40,
   fiftieth: 50, sixtieth: 60, seventieth: 70, eightieth: 80, ninetieth: 90,
   half: 0.5,
+  once: 1, twice: 2, thrice: 3,
   un: 1, une: 1, premier: 1, premiere: 1, première: 1,
   deux: 2, deuxieme: 2, deuxième: 2, seconde: 2,
   trois: 3, troisieme: 3, troisième: 3,
@@ -68,9 +69,17 @@ function describeProtectedTokenMismatch(translatedText: string, placeholders: Ar
 const MONTH_WORD_NUMBER_VALUES: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
   janvier: 1, février: 2, mars: 3, avril: 4, mai: 5, juin: 6,
   juillet: 7, août: 8, septembre: 9, octobre: 10, novembre: 11, décembre: 12,
 };
+
+function removeUnspecifiedQuarterOrdinal(sourceTitle: string, translatedTitle: string) {
+  if (!/\bquarter(?:ly)?\b/i.test(sourceTitle)) return translatedTitle;
+  const sourceHasOrdinal = /\b(?:first|second|third|fourth|[1-4](?:st|nd|rd|th))\s+quarter\b/i.test(sourceTitle)
+    || /\bQ[1-4]\b/i.test(sourceTitle);
+  return sourceHasOrdinal ? translatedTitle : translatedTitle.replace(/(?<!\d)[1-4]\s*분기\b/g, "분기");
+}
 
 function hasUnprotectedFinancialSign(providerHeadline: string, protectedSourceHeadline: string, placeholders: Array<{ marker: string; original: string }>) {
   const isFinancialSign = (value: string | undefined) => Boolean(value && /[+\-−﹣－]/u.test(value));
@@ -185,13 +194,15 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   }
   const normalizedProviderText = title.translatedText.normalize("NFC");
   const hasProviderMarkup = /<\/?[a-z][^>]*>/i.test(normalizedProviderText);
-  const providerHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
+  const rawProviderHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
+  const providerHeadline = rawProviderHeadline ? removeUnspecifiedQuarterOrdinal(item.title, rawProviderHeadline) : null;
   const restoredText = restoreMarketRssTranslationTokens(normalizedProviderText, preparedInput.placeholders);
   if (!restoredText.ok) {
     const fallback = await validationFallback("protected_token_mismatch", undefined, describeProtectedTokenMismatch(normalizedProviderText, preparedInput.placeholders));
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
-  const translatedHeadline = extractMarketRssTranslatedHeadline(restoredText.text) ?? (hasProviderMarkup ? null : restoredText.text);
+  const rawTranslatedHeadline = extractMarketRssTranslatedHeadline(restoredText.text) ?? (hasProviderMarkup ? null : restoredText.text);
+  const translatedHeadline = rawTranslatedHeadline ? removeUnspecifiedQuarterOrdinal(item.title, rawTranslatedHeadline) : null;
   if (!translatedHeadline) {
     const fallback = await validationFallback("translation_response_unparseable");
     return fallback ?? translateMarketRssItem(item, selectedClient, true);

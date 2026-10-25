@@ -506,6 +506,18 @@ describe("market RSS translation", () => {
       "Traitement de deuxième ligne ou plus",
       "2차 또는 그 이후 단계 치료",
     ],
+    [
+      "NioCorp to Host Webcast on Aug. 11 to Discuss Elk Creek Feasibility Study Results | NB Stock News",
+      "니오코프, 8월 11일 웹캐스트를 열어 엘크 크릭 타당성 조사 결과 논의 | NB 주식 뉴스",
+    ],
+    [
+      "Once-Weekly Therapy Announced",
+      "주 1회 치료 발표",
+    ],
+    [
+      "Results for the Quarter and Half Year Ended June 30, 2026",
+      "6월 종료 분기 및 반기 실적 30, 2026",
+    ],
   ])("accepts source-faithful localized numbers from actual RSS review samples", async (sourceTitle, translatedTitle) => {
     const source = { ...item("reviewed-number-title"), title: sourceTitle, summary: "Original summary must not be submitted" };
     const prepared = prepareMarketRssTranslationInput(sourceTitle);
