@@ -7023,6 +7023,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - token-index diagnostics 관련 103개 테스트와 전체 `npm.cmd run deploy:verify` 통과(302개 파일 중 301 pass·1 skip, tests 1,488 pass·3 skip; build, typecheck, standalone·Chrome smoke, docs/migration/security/cron gates 포함).
 - `4f3919a0` 배포 후 운영 run에서 translation fallback 19/20, protected-token mismatch 14건을 확인하고, 숫자 진단은 `Aug.`→8월, `Once-Weekly`→1회, 무번호 `Quarter`를 provider가 `4분기`로 확장한 사례를 확인했다. 월 약어 및 once/twice/thrice를 허용하고, 원문에 분기 번호가 없을 때만 번역 후보에서 삽입 숫자 `n분기`를 제거하는 수정과 세 실표본 회귀를 추가했다.
 - 위 표본 수정의 관련 회귀 92건 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 파일 중 301개 통과·1개 skip, 1,491개 테스트 통과·3개 skip; build/typecheck/standalone·Chrome smoke/docs·migration/security/cron gates 통과.
+- 사용자가 번역 범위를 제목으로만 제한하라고 재확인했다. `translateMarketRssItem`은 provider에 `prepareMarketRssTranslationInput(item.title)` 결과만 전달하며 summary/content는 원문 그대로 반환하고, Discord 본문은 번역 제목만 사용한다. `buildMarketRssNotificationTranslationGate`는 `TRANSLATED` 또는 원래 한국어(`already_in_target_language`)만 허용한다. 최근 run의 translation fallback 20건과 notification sent 20건을 같은 기사 묶음으로 간주해 무번역 전송으로 단정한 설명은 잘못된 해석이었다. 운영 전송 게이트와 코드 경로상 fallback 행은 전송 후보가 아니다.
+- 실패 표본 조회를 실제 `translation_attempted_at` 내림차순으로 정렬하고 token mismatch처럼 번역 후보가 비어 있을 수 있는 오류도 포함하도록 진단을 보완했다. 기존 `updated_at`은 RSS 재수집 upsert에 따라 갱신돼 실제 시도 시각을 나타내지 못했다. 관리자 진단 및 제목 번역·Discord 전송 게이트 테스트 97개 통과. 전체 verify와 이 진단 변경의 배포는 아직 수행 전이다.
 
 ### 남은 위험 및 후속
 - 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.

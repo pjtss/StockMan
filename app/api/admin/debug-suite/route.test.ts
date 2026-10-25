@@ -39,6 +39,7 @@ describe("admin RSS translation diagnostics", () => {
         reason: "translation_numeric_hallucination",
         translation_error: "translation_numeric_hallucination:unprotected=2026;financialSign=false;signedNumeral=false",
         attempts: 3,
+        attempted_at: new Date("2026-10-25T04:05:00.000Z"),
         updated_at: new Date("2026-10-25T04:00:00.000Z"),
       }] };
       if (query.includes("DISTINCT ON (source)")) return { rows: [] };
@@ -78,6 +79,7 @@ describe("admin RSS translation diagnostics", () => {
       reason: "translation_numeric_hallucination",
       diagnostic: "translation_numeric_hallucination:unprotected=2026;financialSign=false;signedNumeral=false",
       attempts: 3,
+      attemptedAt: new Date("2026-10-25T04:05:00.000Z").toISOString(),
       updatedAt: new Date("2026-10-25T04:00:00.000Z").toISOString(),
     }]);
     expect(body.result.rss.articleFlowBySource).toMatchObject([
@@ -85,11 +87,12 @@ describe("admin RSS translation diagnostics", () => {
       { source: "SEC_EDGAR", total: 5, deterministic_localized: 1, notification_pending: 2, sent: 3 },
       { source: "STOCKTITAN", total: 4, notification_pending: 1, sent: 3 },
     ]);
-    expect(String(sampleQuery?.[0])).toContain("translation_candidate_title IS NOT NULL");
+    expect(String(sampleQuery?.[0])).toContain("translation_candidate_title IS NOT NULL OR translation_skipped_reason = 'protected_token_mismatch'");
+    expect(String(sampleQuery?.[0])).toContain("ORDER BY translation_attempted_at DESC NULLS LAST");
     expect(String(sampleQuery?.[0])).toContain("LIMIT 20");
     expect(sampleQuery?.[1]).toEqual([
       ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"],
-      ["translation_numeric_hallucination", "translation_output_incomplete", "target_language_not_detected"],
+      ["protected_token_mismatch", "translation_numeric_hallucination", "translation_output_incomplete", "target_language_not_detected"],
     ]);
   });
 });

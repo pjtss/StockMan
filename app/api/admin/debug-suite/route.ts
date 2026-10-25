@@ -71,15 +71,16 @@ async function runSuite(checks: CheckName[]) {
         pool.query(`SELECT DISTINCT ON (source) source, status, item_count, fetched_at, url FROM market_rss_fetch_snapshots ORDER BY source, fetched_at DESC`),
         pool.query(`SELECT status, started_at, finished_at, duration_ms, summary, error_message FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 5`),
         pool.query(`SELECT id, source, title, translation_candidate_title AS candidate_title, translation_error,
-                           translation_skipped_reason AS reason, translation_attempts AS attempts, updated_at
+                           translation_skipped_reason AS reason, translation_attempts AS attempts,
+                           translation_attempted_at AS attempted_at, updated_at
                     FROM market_rss_articles
                     WHERE source = ANY($1::text[])
                       AND translation_status IN ('FAILED', 'SKIPPED')
-                      AND translation_candidate_title IS NOT NULL
                       AND translation_skipped_reason = ANY($2::text[])
-                    ORDER BY updated_at DESC, id DESC LIMIT 20`, [
+                      AND (translation_candidate_title IS NOT NULL OR translation_skipped_reason = 'protected_token_mismatch')
+                    ORDER BY translation_attempted_at DESC NULLS LAST, id DESC LIMIT 20`, [
           ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"],
-          ["translation_numeric_hallucination", "translation_output_incomplete", "target_language_not_detected"],
+          ["protected_token_mismatch", "translation_numeric_hallucination", "translation_output_incomplete", "target_language_not_detected"],
         ]),
         pool.query(`SELECT source, COUNT(*)::int AS total,
                            COUNT(*) FILTER (WHERE translation_status = 'PENDING')::int AS translation_pending,
@@ -116,6 +117,7 @@ async function runSuite(checks: CheckName[]) {
           reason: row.reason,
           diagnostic: String(row.translation_error || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || null,
           attempts: Number(row.attempts),
+          attemptedAt: row.attempted_at,
           updatedAt: row.updated_at,
         })),
         schedule: {
