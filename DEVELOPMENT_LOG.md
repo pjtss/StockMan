@@ -16,7 +16,7 @@
 - 전체 `npm.cmd run deploy:verify`: 최종 통과. dependency audit 0 vulnerabilities, Next production build, standalone HTTP/Chrome desktop·mobile/API smoke, Vitest 302개 파일(301 passed·1 skipped; 1,514 passed·3 skipped), typecheck, docs/migration, scope, KIS boundary, Bearer auth(180 routes), OCI cron 검증을 모두 통과했다. 첫 검증에서 DEVELOPMENT_LOG 최신 항목의 필수 문서 계약 누락을 발견해 양식을 보완한 뒤 재실행하여 전 게이트 성공을 확인했다.
 
 ### 다음 개선
-- 배포 뒤 운영 SHA와 다음 Google 월 한도 reset 이후 실제 새 제목 번역을 세 출처에서 표본 확인한다.
+- 다음 Google 월 한도 reset 이후 실제 신규 제목 번역을 세 출처에서 표본 확인하고 backlog가 번역 게이트를 통과해 Discord에서 수신되는지 확인한다. quota 미승인 상태에서는 cap을 바꾸지 않는다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-25-020
@@ -24,7 +24,8 @@
 - 근거: provider 입력 함수의 요약 인자를 제거했고 제목-only 회귀와 로컬 실행 검증이 통과했다. 실제 quota-blocked 운영 provider 결과 및 전체 backlog 수신 증거는 아직 없다.
 
 ### 커밋·푸시·배포
-- 미실행: 최종 전체 게이트는 통과했다. 기존 RSS 전용 배포 권한으로 커밋·푸시한 뒤 Deploy OCI 결과와 운영 SHA를 확인한다.
+- 완료: 커밋 `252159d91500d9ffd1bc57adafd81ee98b66a4ce`를 `origin/oci`에 push했다. Deploy OCI workflow `40203503857`가 전체 원격 검증, package, upload, activate를 성공 완료했고 운영 `/api/health`는 `ok`, `/health-check`는 같은 SHA를 반환했다.
+- 운영 RSS read-only 집계 `2026-10-25 14:49Z`: GlobeNewswire notification pending 5·quota skip 5, SEC pending 491·quota skip 238, StockTitan pending 2,299·quota skip 11,391. SEC validated-title backlog는 계속 Discord로 배출 중이다. provider 실사용 quota에 막힌 상태와 전체 backlog 미완료를 PARTIAL로 유지한다.
 
 ## [2026-10-25] RSS Discord 제목 번역 전송 게이트 검증 및 운영 배포
 
