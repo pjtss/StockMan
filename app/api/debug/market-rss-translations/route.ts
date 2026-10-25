@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "@/lib/market-rss-discord-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
   const status = statusParam === "ALL" ? null : statusParam;
   try {
     const pool = getPool();
-    const [summaryResult, totalResult, rowsResult] = await Promise.all([
+    const [summaryResult, totalResult, rowsResult, lifetimeResult] = await Promise.all([
       pool.query<{ status: string; count: number }>(
         `SELECT translation_status AS status, COUNT(*)::int AS count
          FROM market_rss_articles
@@ -87,6 +88,23 @@ export async function GET(request: Request) {
          ORDER BY created_at DESC, id DESC LIMIT $4 OFFSET $5`,
         [hours, source, status, limit, offset],
       ),
+      pool.query(
+        `SELECT source, COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE translation_status = 'PENDING')::int AS translation_pending,
+                COUNT(*) FILTER (WHERE translation_status = 'TRANSLATED')::int AS translated,
+                COUNT(*) FILTER (WHERE translation_status = 'FAILED')::int AS translation_failed,
+                COUNT(*) FILTER (WHERE translation_status = 'SKIPPED')::int AS translation_skipped,
+                COUNT(*) FILTER (WHERE notification_status = 'PENDING')::int AS notification_pending,
+                COUNT(*) FILTER (WHERE notification_status = 'SENT')::int AS sent,
+                COUNT(*) FILTER (WHERE notification_status = 'FAILED')::int AS notification_failed,
+                COUNT(*) FILTER (WHERE notification_status = 'SKIPPED')::int AS notification_skipped,
+                COUNT(*) FILTER (WHERE notification_status = 'UNCERTAIN')::int AS notification_uncertain,
+                COUNT(*) FILTER (WHERE notification_status IN ('PROCESSING', 'SENDING'))::int AS in_flight
+         FROM market_rss_articles
+         WHERE source = ANY($1::text[])
+         GROUP BY source ORDER BY source`,
+        [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
+      ),
     ]);
 
     const items = rowsResult.rows.map((row) => ({
@@ -104,6 +122,7 @@ export async function GET(request: Request) {
         filteredTotal: total,
         byStatus,
       },
+      lifetimeBySource: lifetimeResult.rows,
       pagination: { limit, offset, returned: items.length, hasMore: offset + items.length < total },
       items,
     });

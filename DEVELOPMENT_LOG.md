@@ -7036,6 +7036,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 후속 Actions 실행 `40179271384`가 성공하고 `/health-check`에서 `fdb0e367`을 확인했다. 새 운영 진단에서 번역 후보 `Top Spot`→`1위`가 source-supported number 검사에서 `unprotected=1`로 보류됨을 확인했다. 원문에 `top spot`이 있을 때에만 후보의 `1위`를 허용하도록 제한하고, `28th Annual`→`28제1회` 후보는 원문 회차 숫자를 `제28회`로 재배치하는 정규화를 추가했다. 두 실표본 회귀를 포함한 제목 번역/품질 테스트 107개 통과. 전체 `npm.cmd run deploy:verify`도 통과: 302개 테스트 파일 중 301개 통과·1개 skip, 테스트 1,498개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. 새 보완은 다음 배포와 운영 확인 대기 중이다.
 - `ffdef70d` Actions `40180016959`의 원격 deploy verification 및 activation 성공과 `/health-check` SHA를 확인했다. 새 버전이 가동된 뒤 기사 배치 20/20 번역, 20건 알림 회차가 관찰됐다. activation 경계의 실패 표본 `PD-L1-Positive`가 provider 응답에서 `PD-L -1`로 분리되어 금융 부호 오탐이 발생한 것을 확인해 `PD-L<n>` biomarker 코드를 보호 토큰으로 추가했다. mock provider가 해당 토큰을 원형 복원하고 요약은 그대로인 회귀를 추가했으며 제목 번역/품질 회귀 108개 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 테스트 파일 중 301개 통과·1개 skip, 테스트 1,499개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. 다음 OCI 배포와 실제 표본 재검증 대기 중이다.
 - `ffdef70d` 실행 중 자동 재시도된 `28th Annual ... on September 15th`가 `28`과 `9월`을 붙이고 `제1회`를 행사명에 덧붙이는 별도 provider 출력 변형을 확인했다. 연례 글로벌 투자 컨퍼런스에 원문 회차를 `제28회`로 옮기고, 출처 월/일을 유지하도록 정규화를 확장했으며 실제 제목형 회귀를 유지했다. 전체 `npm.cmd run deploy:verify` 통과: 302개 테스트 파일 중 301개 통과·1개 skip, 테스트 1,499개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. `PD-L1` 보호 토큰 변경의 push 이후 실제 배포 workflow 상태를 확인할 예정이며, 이번 날짜/회차 보완은 추가 배포 대기다.
+- OCI runtime은 `6ae771e9`를 반환한다. 그 이후 완료 회차는 번역 20/20, 알림 발송 20건이 관찰됐다. 직전 재시도 실패 상위 표본에서 28th-Annual 및 PD-L1 기사가 더 이상 나타나지 않았지만, 기사별 최종 상태를 직접 조회한 것은 아니므로 개별 해결 증거로 단정하지 않는다. 2026-10-25 09:44Z source별 상태는 GlobeNewswire 25/25 SENT, SEC 번역됨 8,692·번역 skip 238·기타 75·알림 pending 5,940·uncertain 3, StockTitan 번역됨 7,490·pending 2,185·failed 362·skipped 10,135·기타 243·알림 pending 2,297·uncertain 2다. 상태 수가 변하고 있지만 미해결 번역 및 과거 알림 backlog가 남아 `IN_PROGRESS`를 유지한다.
 
 ### 남은 위험 및 후속
 - 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.
@@ -7047,3 +7048,13 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 커밋 `3069a4b4`, `6595345c`, `80c4e48e`, `c37cfdea`, `4f3919a0` push 및 OCI 배포 완료. month/once/quarter 교정은 전체 검증 완료, commit/push/deploy 전이다. 번역 품질 오탐 개선과 전체 과거 대기 발송은 진행 중이다.
+## [2026-10-25] RSS lifetime backlog 진단 집계 추가
+
+### 목적 및 범위
+- RSS 번역·Discord 전체 backlog를 기간 제한 없이 read-only로 집계한다. 공개 `GET /api/debug/market-rss-translations`에 허용 출처별 전체 기사·번역·알림 상태 aggregate를 추가했고 제목, 본문, 링크는 lifetime 응답에 포함하지 않는다.
+- 변경 파일: `app/api/debug/market-rss-translations/route.ts`, 대응 route test, `docs/operations/market-rss-translation-debug-api.md`.
+
+### 검증 및 상태
+- route 테스트, 전체 deploy verification 및 배포 전.
+- 운영 `.env.local`의 cron secret은 현재 작업본에 없어 이전 인증 관리자 endpoint를 조회할 수 없었다. 새 공개 진단 GET은 본인 증명 민감값을 노출하지 않으며 범위 상수로 제한되어 배포 후 전체 backlog 상태를 확인할 예정이다.
+- 커밋·푸시·배포 안 함. RSS 목표는 `IN_PROGRESS`.

@@ -17,20 +17,24 @@ describe("RSS translation diagnostics API", () => {
     state.query
       .mockResolvedValueOnce({ rows: [{ status: "PENDING", count: 1 }] })
       .mockResolvedValueOnce({ rows: [{ count: 1 }] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }] });
     const response = await GET(new Request("http://localhost/api/debug/market-rss-translations"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.summary.byStatus).toEqual({ PENDING: 1 });
-    expect(state.query).toHaveBeenCalledTimes(3);
+    expect(body.lifetimeBySource).toEqual([{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }]);
+    expect(state.query).toHaveBeenCalledTimes(4);
+    expect(state.query.mock.calls[3][1]).toEqual([["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]);
   });
 
   it("returns bounded translation state, status counts and applies filters", async () => {
     state.query
       .mockResolvedValueOnce({ rows: [{ status: "TRANSLATED", count: 4 }, { status: "FAILED", count: 2 }] })
       .mockResolvedValueOnce({ rows: [{ count: 2 }] })
-      .mockResolvedValueOnce({ rows: [{ id: 8, translation_error: null, translated_title: "번역 제목" }] });
+      .mockResolvedValueOnce({ rows: [{ id: 8, translation_error: null, translated_title: "번역 제목" }] })
+      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }] });
 
     const response = await GET(new Request("http://localhost/api/debug/market-rss-translations?hours=48&source=STOCKTITAN&status=FAILED&limit=10&offset=0"));
     const body = await response.json();
@@ -39,8 +43,9 @@ describe("RSS translation diagnostics API", () => {
     expect(body.scope).toMatchObject({ createdWithinHours: 48, source: "STOCKTITAN", status: "FAILED" });
     expect(body.summary).toMatchObject({ totalInWindow: 6, filteredTotal: 2, byStatus: { TRANSLATED: 4, FAILED: 2 } });
     expect(body.items).toHaveLength(1);
-    expect(state.query).toHaveBeenCalledTimes(3);
-    expect(state.query.mock.calls.map((call) => call[1])).toEqual([[48, "STOCKTITAN"], [48, "STOCKTITAN", "FAILED"], [48, "STOCKTITAN", "FAILED", 10, 0]]);
+    expect(body.lifetimeBySource).toEqual([{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }]);
+    expect(state.query).toHaveBeenCalledTimes(4);
+    expect(state.query.mock.calls.map((call) => call[1])).toEqual([[48, "STOCKTITAN"], [48, "STOCKTITAN", "FAILED"], [48, "STOCKTITAN", "FAILED", 10, 0], [["STOCKTITAN"]]]);
   });
 
   it("rejects invalid source, status and out-of-range query bounds", async () => {
@@ -55,7 +60,8 @@ describe("RSS translation diagnostics API", () => {
     state.query
       .mockResolvedValueOnce({ rows: [{ status: "FAILED", count: 1 }] })
       .mockResolvedValueOnce({ rows: [{ count: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ id: 9, translation_error: "https://translate.example/?key=AIzaSyDUMMY012345678901234567890123456789 failed; token=secret" }] });
+      .mockResolvedValueOnce({ rows: [{ id: 9, translation_error: "https://translate.example/?key=AIzaSyDUMMY012345678901234567890123456789 failed; token=secret" }] })
+      .mockResolvedValueOnce({ rows: [] });
     const body = await (await GET(new Request("http://localhost/api/debug/market-rss-translations"))).json();
     expect(JSON.stringify(body)).not.toContain("AIzaSyDUMMY");
     expect(JSON.stringify(body)).not.toContain("token=secret");
