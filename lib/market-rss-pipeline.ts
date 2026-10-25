@@ -11,7 +11,7 @@ import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { buildMarketRssQueueEnqueueFailureState, createDiscordHttpError, isRetryableDiscordError, marketRssDeliveryExternalId, withDiscordWaitParameter } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import { dedupeMarketRssItems } from "./market-rss-dedupe";
-import { buildMarketRssTranslationRetryCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
+import { buildMarketRssTranslationCandidateCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
 import { buildMarketRssTranslationPersistence } from "./market-rss-translation-persistence";
 import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notification-message";
 import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";
@@ -168,7 +168,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   const client = providerSet.client;
   const retryCriteria = getMarketRssTranslationRetryCriteria(Boolean(client));
   const candidates = and(
-    buildMarketRssTranslationRetryCondition(retryCriteria),
+    buildMarketRssTranslationCandidateCondition(retryCriteria),
     inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
   );
   // Drain historical backlog first so a continuous stream of new articles
