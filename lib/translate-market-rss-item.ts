@@ -10,7 +10,7 @@ import { localizeSecFilingTitle } from "./market-rss-sec-filing-title";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
-const ENGLISH_NUMBER_WORD_VALUES: Record<string, number> = {
+const SPELLED_NUMBER_VALUES: Record<string, number> = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
   twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
@@ -18,19 +18,32 @@ const ENGLISH_NUMBER_WORD_VALUES: Record<string, number> = {
   tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16,
   seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20, thirtieth: 30, fortieth: 40,
   fiftieth: 50, sixtieth: 60, seventieth: 70, eightieth: 80, ninetieth: 90,
+  half: 0.5,
+  un: 1, une: 1, premier: 1, premiere: 1, première: 1,
+  deux: 2, deuxieme: 2, deuxième: 2, seconde: 2,
+  trois: 3, troisieme: 3, troisième: 3,
+  quatre: 4, quatrieme: 4, quatrième: 4,
+  cinq: 5, cinquieme: 5, cinquième: 5,
+  sixieme: 6, sixième: 6,
+  septieme: 7, septième: 7,
+  huit: 8, huitieme: 8, huitième: 8,
+  neuf: 9, neuvieme: 9, neuvième: 9,
+  dix: 10, dixieme: 10, dixième: 10,
+  onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16,
+  vingt: 20, trente: 30, quarante: 40, cinquante: 50, soixante: 60,
 };
 
 function getAllowedSpelledNumberValues(sourceTitle: string) {
-  const words = sourceTitle.toLocaleLowerCase("en").match(/[a-z]+/g) || [];
+  const words = sourceTitle.toLocaleLowerCase("en").match(/[\p{L}]+/gu) || [];
   const allowed = new Set<number>();
   const allowedMonthNumbers = new Set<number>();
   for (let index = 0; index < words.length; index++) {
-    const value = ENGLISH_NUMBER_WORD_VALUES[words[index]];
-    const month = ENGLISH_MONTH_NUMBER_VALUES[words[index]];
+    const value = SPELLED_NUMBER_VALUES[words[index]];
+    const month = MONTH_WORD_NUMBER_VALUES[words[index]];
     if (value !== undefined) allowed.add(value);
     if (month !== undefined) allowedMonthNumbers.add(month);
     if (value === undefined) continue;
-    const next = ENGLISH_NUMBER_WORD_VALUES[words[index + 1]];
+    const next = SPELLED_NUMBER_VALUES[words[index + 1]];
     // Translators commonly render spelled ordinals and compound numbers as
     // Arabic digits (for example, “third quarter” as “3분기”).
     if (value >= 20 && value < 100 && next !== undefined && next > 0 && next < 10) {
@@ -40,9 +53,11 @@ function getAllowedSpelledNumberValues(sourceTitle: string) {
   return { numbers: allowed, months: allowedMonthNumbers };
 }
 
-const ENGLISH_MONTH_NUMBER_VALUES: Record<string, number> = {
+const MONTH_WORD_NUMBER_VALUES: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  janvier: 1, février: 2, mars: 3, avril: 4, mai: 5, juin: 6,
+  juillet: 7, août: 8, septembre: 9, octobre: 10, novembre: 11, décembre: 12,
 };
 
 function hasUnprotectedFinancialSign(providerHeadline: string, protectedSourceHeadline: string, placeholders: Array<{ marker: string; original: string }>) {
@@ -170,15 +185,17 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
   // Arabic numerals already present in the source are protected as placeholders.
-  // A translator may also render an English number word as a numeral, such as
-  // “third quarter” → “3분기”; allow only values found in the source words.
+  // A translator may render a spelled number or ordinal as digits (including
+  // localized forms such as “deuxième” → “2차”); allow only source-supported values.
   const unprotectedHeadlineDigits = (providerHeadline || "")
     .replace(/ZX\d+Q/g, "")
     .replace(/&#(?:x[\da-f]+|\d+);/gi, "");
   const allowedSpelledNumbers = getAllowedSpelledNumberValues(item.title);
-  const unprotectedNumerals = unprotectedHeadlineDigits.match(/\d+/g) || [];
+  // Keep decimal fractions together (for example, “half a kilometre” → “0.5 km”).
+  const unprotectedNumerals = unprotectedHeadlineDigits.match(/\d+(?:[.,]\d+)?/g) || [];
   const inventedNumerals = unprotectedNumerals.filter((value) => {
-    const numericValue = Number(value);
+    const normalizedNumber = /,\d{3}$/.test(value) ? value.replace(/,/g, "") : value.replace(",", ".");
+    const numericValue = Number(normalizedNumber);
     if (allowedSpelledNumbers.numbers.has(numericValue)) return false;
     const monthSuffix = new RegExp(`(?:^|\\D)${value}\\s*월`, "u");
     return !allowedSpelledNumbers.months.has(numericValue) || !monthSuffix.test(unprotectedHeadlineDigits);
@@ -188,7 +205,9 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     .replace(/&#(?:43|x2b);/gi, "+")
     .replace(/&#(?:45|x2d);/gi, "-");
   const unprotectedFinancialSign = hasUnprotectedFinancialSign(providerHeadlineWithSigns, preparedInput.text, preparedInput.placeholders);
-  const signedUnprotectedNumeral = /[+\-−﹣－]\s*\d/.test(unprotectedHeadlineDigits);
+  // A spaced dash is common title punctuation (“statistics - July 2026”);
+  // financial signs must touch the unprotected numeric value to be treated as a claim.
+  const signedUnprotectedNumeral = /[+\-−﹣－]\d/.test(unprotectedHeadlineDigits);
   if (inventedNumeral || unprotectedFinancialSign || signedUnprotectedNumeral) {
     const details = `unprotected=${[...new Set(inventedNumerals)].slice(0, 10).join(",") || "none"};financialSign=${unprotectedFinancialSign};signedNumeral=${signedUnprotectedNumeral}`;
     const fallback = await validationFallback("translation_numeric_hallucination", translatedHeadline, details);

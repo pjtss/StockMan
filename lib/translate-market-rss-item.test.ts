@@ -494,7 +494,19 @@ describe("market RSS translation", () => {
       "Aberdeen Multi-Market Income Fund (MMT) Announces Upcoming 1-for-4 Reverse Stock Split | MMT Stock News",
       "애버딘 멀티마켓 인컴 펀드(MMT)가 곧 발표되는 1-for-4 역주식 분할 | MMT 주식 뉴스",
     ],
-  ])("accepts source-faithful financial digits and dates from an actual RSS review sample", async (sourceTitle, translatedTitle) => {
+    [
+      "Discovery Announces Continued Exploration Success at Borden, Extends Main Zone Over Half a Kilometre | DSVSF Stock News",
+      "디스커버리, 보든에서 탐사 성공 지속 발표, 주요 구간을 0.5km까지 연장 | DSVSF 주식 뉴스",
+    ],
+    [
+      "TMX Group Consolidated Trading Statistics - July 2026 | TMXXF Stock News",
+      "TMX 그룹 통합 거래 통계 - 7월 2026 | TMXXF 주식 뉴스",
+    ],
+    [
+      "Traitement de deuxième ligne ou plus",
+      "2차 또는 그 이후 단계 치료",
+    ],
+  ])("accepts source-faithful localized numbers from actual RSS review samples", async (sourceTitle, translatedTitle) => {
     const source = { ...item("reviewed-number-title"), title: sourceTitle, summary: "Original summary must not be submitted" };
     const prepared = prepareMarketRssTranslationInput(sourceTitle);
     let providerTitle = translatedTitle;
