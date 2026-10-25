@@ -6872,3 +6872,28 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 공식 KIS 마스터 full sync는 `reconciled=true`로 성공했다. common upsert 3,240/1,864/254, 특수 instrument upsert 2,032/975/4,526, 기존 후보 외 활성 common 비활성화 773/625/38이다. 모든 변화는 하나의 transaction에서 검증 후 commit됐고, 148개 KIS 미수록 행도 삭제하지 않고 fail-closed 비활성화했다.
 - 분리된 관리자 GET은 활성 common 3,240/1,864/254, 분류 1,354/1,186/94, 미분류 1,886/678/160을 반환했다. 새 원본을 올린 read-only audit에서 매칭 3,240/1,864/254, 누락 0, 후보 밖 활성 common 0, 코드 mismatch 0, `databaseWritePerformed=false`를 재확인했다.
 - 따라서 “모든 KIS 확인 보통주 행이 DB에 저장됐는가”는 YES다. “모든 종목에 유효 섹터가 있는가”는 NO: 유효 코드는 2,634/5,358이며, 나머지 2,724개는 KIS 공식 원본 자체가 `000`으로 미분류한다. 임의로 값을 보정하지 않았다.
+
+## [2026-10-25] SEC EDGAR SIC 결측 산업코드 보완 경로
+
+### 목표
+- KIS US 산업코드가 비었거나 all-zero인 활성 미국 COMMON_STOCK에 한해 SEC 공식 EDGAR SIC를 보조 저장하고 운영 API read-after-write로 확인한다.
+
+### 근본 원인
+- KIS 종목 마스터의 `icod=000`은 공식 미분류 값이므로 해당 종목의 산업 분류 정보를 제공하지 않는다. KIS 코드와 SEC SIC는 별개 taxonomy라 원천을 구별하지 않으면 값의 의미를 오인할 수 있다.
+
+### 반영
+- `app/api/admin/us-sec-sic-industry/route.ts`: 관리자 전용 진단 GET 및 최대 50개 커서형 SEC SIC 적재 POST를 추가한다. SEC 공식 ticker/exchange CIK 맵 및 Submissions API만 호출하고 활성/엄격한 COMMON_STOCK 조건과 유일 매핑·유효 SIC를 만족하는 결측만 기록한다. UPDATE RETURNING으로 저장 결과를 검증한다.
+- `lib/us-industry-code-sync.ts`: 원본 KIS `000` 재동기화가 기존 SEC SIC를 지우지 않게 하고 감사 비교를 보완한다.
+- `app/api/admin/us-sec-sic-industry/route.test.ts`, `lib/us-industry-code-sync.test.ts`: 관리자 제한, 배치 크기, SEC 조회·저장 readback, KIS 재동기화 보존을 검사한다.
+- `docs/architecture/us-industry-classification-data-design.md`: 출처 우선순위, fail-closed 규칙 및 운영 API를 기록한다.
+
+### 검증
+- 구현 검증: 타깃 3개 테스트 파일 13개 통과, 전체 298개 테스트 파일 1,455개 테스트 통과(3 skipped), typecheck/docs check/build 및 로컬 standalone API 인증 smoke 통과.
+- SEC 공식 문서와 실시간 API의 ticker-map/Submissions 응답을 확인했다. 운영 적재 및 production GET 대조 결과는 배포 후 추가 기록한다.
+
+### 남은 위험 및 다음 단계
+- SEC ticker map에서 유일하게 연결되지 않거나 SIC가 제공되지 않는 회사는 미분류로 남는다. SEC SIC는 KIS ICOD와 taxonomy가 달라 출처를 함께 읽어야 한다.
+- fast-forward 배포 후 관리자 운영 API로 전체 cursor 배치를 실행하고, API GET에서 저장 수와 잔여 미분류를 다시 확인한다.
+
+### 커밋·푸시·배포
+- 아직 실행하지 않음. 검증 완료 후 상세 한국어 커밋과 `oci` fast-forward 배포 예정.

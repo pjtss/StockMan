@@ -118,7 +118,7 @@ export async function auditKisUsIndustryUniverse(files: Partial<Record<Market, B
                 src.etp_type AS kis_etp_type, src.instrument_type AS kis_instrument_type,
                 src.industry_code AS kis_industry_code, src.source_file AS kis_source_file,
                 c.enabled AS common_enabled, c.instrument_type AS common_instrument_type,
-                c.industry_code AS database_industry_code, c.name AS database_name,
+                c.industry_code AS database_industry_code, c.source_file AS database_source_file, c.name AS database_name,
                 c.english_name AS database_english_name,
                 s.enabled AS special_enabled, s.instrument_type AS special_instrument_type
          FROM audit_source AS src
@@ -129,7 +129,7 @@ export async function auditKisUsIndustryUniverse(files: Partial<Record<Market, B
          UNION ALL
          SELECT c.market, c.code, FALSE, 'NOT_IN_KIS_MASTER',
                 NULL, NULL, NULL, NULL, NULL, NULL,
-                TRUE, c.instrument_type, c.industry_code, c.name, c.english_name,
+                TRUE, c.instrument_type, c.industry_code, c.source_file, c.name, c.english_name,
                 s.enabled, s.instrument_type
          FROM us_common_stock_universe AS c
          LEFT JOIN us_special_instrument_universe AS s ON s.market = c.market AND s.code = c.code
@@ -153,7 +153,8 @@ export async function auditKisUsIndustryUniverse(files: Partial<Record<Market, B
         matchedActiveCommonCount: matched.length,
         candidateMissingActiveCommonCount: sourceOnly.length,
         activeCommonOutsideKisCandidatesCount: activeDbOnly.length,
-        industryMismatchCount: matched.filter((row) => row.database_industry_code !== row.kis_industry_code).length,
+        industryMismatchCount: matched.filter((row) => row.database_industry_code !== row.kis_industry_code
+          && !(String(row.database_source_file ?? "").startsWith("SEC_EDGAR_SIC:") && /^0+$/.test(String(row.kis_industry_code ?? "")))).length,
         databaseOnlyReasons: Object.fromEntries([...new Set(activeDbOnly.map((row) => String(row.exclusion_reason)))].sort().map((reason) => [reason, activeDbOnly.filter((row) => row.exclusion_reason === reason).length])),
       }];
     }));
@@ -234,10 +235,17 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
                english_name = EXCLUDED.english_name, instrument_type = EXCLUDED.instrument_type,
                security_type = EXCLUDED.security_type, etp_type = EXCLUDED.etp_type,
                currency = EXCLUDED.currency, country_code = EXCLUDED.country_code,
-               industry_code = EXCLUDED.industry_code, is_etf = EXCLUDED.is_etf,
+               industry_code = CASE
+                 WHEN '${table}' = 'us_common_stock_universe' AND EXCLUDED.industry_code ~ '^0+$'
+                   AND us_common_stock_universe.source_file LIKE 'SEC_EDGAR_SIC:%'
+                 THEN us_common_stock_universe.industry_code ELSE EXCLUDED.industry_code END,
+               is_etf = EXCLUDED.is_etf,
                is_leveraged = EXCLUDED.is_leveraged, is_inverse = EXCLUDED.is_inverse,
                is_warrant = EXCLUDED.is_warrant, is_derivative = EXCLUDED.is_derivative,
-               is_dr = EXCLUDED.is_dr, source_file = EXCLUDED.source_file,
+               is_dr = EXCLUDED.is_dr, source_file = CASE
+                 WHEN '${table}' = 'us_common_stock_universe' AND EXCLUDED.industry_code ~ '^0+$'
+                   AND us_common_stock_universe.source_file LIKE 'SEC_EDGAR_SIC:%'
+                 THEN us_common_stock_universe.source_file ELSE EXCLUDED.source_file END,
                raw_payload = EXCLUDED.raw_payload, enabled = TRUE, missing_runs = 0,
                last_seen_at = NOW(), updated_at = NOW()`,
             [JSON.stringify(rows.slice(offset, offset + 400).map(payloadFor))],
@@ -278,7 +286,8 @@ export async function syncKisUsIndustryCodes(files: Partial<Record<Market, Buffe
         `SELECT
            COUNT(*) FILTER (WHERE u.code IS NOT NULL)::int AS matched_count,
            COUNT(*) FILTER (WHERE u.code IS NULL)::int AS missing_count,
-           COUNT(*) FILTER (WHERE u.code IS NOT NULL AND u.industry_code IS DISTINCT FROM src.industry_code)::int AS mismatch_count,
+           COUNT(*) FILTER (WHERE u.code IS NOT NULL AND u.industry_code IS DISTINCT FROM src.industry_code
+             AND NOT (src.industry_code ~ '^0+$' AND u.source_file LIKE 'SEC_EDGAR_SIC:%'))::int AS mismatch_count,
            COALESCE(ARRAY_AGG(src.code ORDER BY src.code) FILTER (WHERE u.code IS NULL), ARRAY[]::text[]) AS unmatched_codes
          FROM jsonb_to_recordset($1::jsonb)
            AS src(market text, code text, industry_code text, source_file text)

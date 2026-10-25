@@ -5,9 +5,11 @@
 
 ## 범위와 원칙
 
-- 공식 분류코드 원천은 한국투자증권(KIS)의 NAS/NYS/AMS 해외주식 마스터 `icod`만 사용한다.
-- SEC 등 다른 공급자 분류는 수집, 저장, 결측 보완에 사용하지 않는다.
-- KIS 원본의 빈 값·`000`은 미분류로 보존한다. 종목명으로 산업을 추정하지 않는다.
+- 우선 분류코드는 한국투자증권(KIS)의 NAS/NYS/AMS 해외주식 마스터 `icod`다.
+- 활성 미국 보통주에서 KIS `icod`가 비었거나 all-zero인 경우에만 SEC EDGAR Submissions의 `sic`/`sicDescription`을 보조 원천으로 사용한다. SEC SIC와 KIS ICOD는 서로 다른 분류 체계이므로 숫자 코드만으로 동일하다고 비교하거나 변환하지 않는다.
+- SEC 대체 코드는 `industry_code`에 넣고 `source_file`을 `SEC_EDGAR_SIC:<10자리 CIK>`로 기록해 출처를 구별한다. 기존 비영 KIS ICOD를 SEC 값으로 덮어쓰지 않는다. 뒤이은 KIS 재동기화도 원본 `icod=000`일 때 이미 저장된 SEC SIC를 보존하며, 유효한 KIS 코드가 새로 들어오면 KIS 코드로 대체한다.
+- SEC ticker/CIK/거래소 매핑이 유일하고 EDGAR SIC가 3~4자리 비영 숫자일 때만 저장한다. 모호한 티커, 누락 SIC, 잘못된 값, SEC 오류는 fail-closed로 미분류 상태를 유지한다.
+- KIS 원본의 빈 값·`000`은 SEC SIC 대체값이 성공할 때만 보조 코드로 채운다. 회사명만으로 산업을 추정하지 않는다.
 - KIS의 전체 마스터 common 후보를 `us_common_stock_universe`에 upsert한다. KIS 원본 후보 밖의 이전 활성 common 행은 삭제하지 않고 비활성화한다. 분류가 불확실한 행은 fail-closed로 활성 공통주에서 제외하고 이력을 보존한다.
 
 ## 조사에서 확인한 결함과 원본 근거
@@ -31,6 +33,7 @@ KIS 공식 헤더는 `icod` 필드 길이를 4로 정의한다. 기존 저장 �
 - `source_file`, `updated_at`을 함께 기록한다. 거래소별 원본 행 수, KIS 보통주 후보 수, 분류/미분류 수, DB 반영 행 수를 결과로 제공한다.
 - DB 반영 뒤 KIS 후보 원본과 활성 COMMON_STOCK 테이블을 다시 조인해 `matched`, `missing`, `industry_code mismatch`를 검증한다. mismatch가 하나라도 있으면 트랜잭션을 롤백한다. 진단 응답에는 미매칭 티커 전체와 KIS 후보에서 찾지 못한 활성 DB 보통주 목록/건수를 포함해 거래소별 universe 차이를 완전하게 추적한다.
 - `/api/admin/us-industry-codes?mode=audit`는 NAS/NYS/AMS 마스터를 같은 방식으로 검증한 뒤 DB에 `BEGIN READ ONLY`로 접속해 행 단위 KIS 후보/제외 사유와 common/special 파티션 상태·저장 코드 차이를 반환한다. 이 모드는 저장 동기화 함수를 호출하지 않으며 `databaseWritePerformed: false`로 보장한다.
+- `/api/admin/us-sec-sic-industry`는 관리자 세션을 요구한다. GET은 시장별 SEC SIC 보조 저장/잔여 미분류 수와 저장 예시를 제공한다. POST는 커서 기반 50종목 이하 배치로 활성 COMMON_STOCK의 결측 행만 처리하고, SEC 공식 `company_tickers_exchange.json`과 CIK별 `data.sec.gov/submissions/CIK##########.json`의 SIC를 조회한다. 각 배치는 `industry_code`와 `SEC_EDGAR_SIC:<CIK>`를 기록하고 같은 트랜잭션의 RETURNING 결과로 read-after-write를 검증한다. 장시간 작업은 `nextCursor`를 따라 호출을 반복한다.
 - PostgreSQL `jsonb_to_recordset`에 전달하는 객체 키는 SQL record 정의와 동일한 `industry_code`, `source_file` snake_case를 사용한다. 애플리케이션 내부 파서 모델의 camelCase 필드를 SQL payload로 보낼 때 명시 변환하며, 실제 쿼리 payload 키 계약을 단위 테스트로 검증한다.
 - 원본에 있지만 DB에 없는 KIS 보통주 수는 별도 불일치 지표로 검토한다. 산업코드 동기화 요청이 해당 종목을 자동 신규 편입시키지는 않는다.
 - KIS 원본에 없는 활성 DB 보통주도 별도 집계한다. 자동 비활성화·삭제하지 않으며, 종목 마스터 동기화 이력과 공식 분류 필드를 조사한 후 별도 절차로 처리한다.
@@ -114,7 +117,7 @@ KIS Developers는 종목정보 마스터를 주문·시세조회 가능한 전�
 - 하나의 PostgreSQL 트랜잭션 및 advisory lock 안에서 KIS 공식 common 후보 전체를 `us_common_stock_universe`에 upsert하고, 해당 원본의 `icod`를 그대로 저장한다. `000`은 공식 미분류값으로 저장하며 다른 출처나 종목명으로 채우지 않는다.
 - 같은 KIS 원본의 비보통주·ETF/ETP·DR·워런트 등은 `us_special_instrument_universe`에 upsert한다. common 후보가 아닌 기존 활성 common 행은 삭제하지 않고 비활성화한다. KIS 마스터에서 찾을 수 없는 148개 행 역시 미확인으로 남기되 fail-closed 원칙에 따라 활성 common에서만 제외하고 이력을 보존한다.
 - DB 사후검증은 common 후보 누락 0, 업종코드 불일치 0, KIS 원본 밖 활성 common 0, KIS 특수행 special 미수록 0을 모두 요구한다. 하나라도 어긋나면 NAS/NYS/AMS 전체 변경을 rollback한다.
-- 이 동기화는 SEC 등 보조 분류 데이터 및 `000` 대체를 전혀 호출하지 않는다.
+- KIS 동기화 경로는 SEC API를 호출하지 않는다. 별도 SEC 보완 API는 KIS 코드가 비었거나 `000`인 활성 common 행만 처리하며, KIS 원본 `000`을 가진 후속 마스터 동기화에서는 기존 SEC fallback을 보존한다.
 
 ### 분류코드 커버리지 해석
 
@@ -126,12 +129,15 @@ KIS Developers는 종목정보 마스터를 주문·시세조회 가능한 전�
 - `.env.local`의 관리자 인증을 통해 최신 KIS NAS/NYS/AMS 원본을 운영 API에 전달했다. 저장 전 `mode=audit`는 `databaseWritePerformed=false`였고, 원본 보통주 후보 5,358건에 대해 DB 누락 90건과 후보 외 활성 common 1,436건, 코드 불일치 0건을 확인했다.
 - 저장 API의 `reconciled=true`. common 저장 NAS/NYS/AMS 3,240/1,864/254; special 저장 2,032/975/4,526; 후보 밖 활성 common 비활성화 773/625/38. 활성 common 1,436행은 삭제하지 않고 disabled 처리해 이력을 보존했다.
 - 독립 GET 이후 원본 파일을 다시 올린 read-only 감사에서 `databaseWritePerformed=false`, 후보 매칭 3,240/1,864/254, 후보 누락 0, 후보 밖 활성 common 0, industry mismatch 0을 재확인했다. 활성 common 총 5,358개 중 유효 KIS 업종코드는 2,634개, KIS 원본 `000` 미분류는 2,724개다.
-- 결론: 현재 KIS 공식 마스터로 확인되는 전체 common 후보와 저장 universe는 완전히 일치한다. 단, 모든 종목의 유효 섹터 정보까지 확보된 것은 아니다. 공급자 원본이 `000`인 종목은 업종 미분류로 남겨 두며, 추정/SEC 대체값은 쓰지 않는다. KIS 마스터 밖 148개 과거 행은 확인 전까지 비활성 상태로 유지한다.
+- 당시 KIS-only 완료 범위: 현재 KIS 공식 마스터로 확인되는 전체 common 후보와 저장 universe는 완전히 일치했으나, KIS `000` 종목은 미분류였다. 이후 SEC SIC 보완 작업이 별도 fallback으로 추가되었다. KIS와 SEC 코드는 각기 다른 taxonomy이며, source_file로 원천을 구별한다. KIS 마스터 밖 148개 과거 행은 확인 전까지 비활성 상태로 유지한다.
 
 ## 공식·프로젝트 참고자료
 
 - [KIS Developers 종목정보 마스터 안내 및 다운로드](https://apiportal.koreainvestment.com/apiservice-category)
 - [KIS 공식 open-trading-api 샘플 저장소](https://github.com/koreainvestment/open-trading-api)
+- [SEC EDGAR Submissions API 안내](https://www.sec.gov/search-filings/edgar-application-programming-interfaces) — CIK별 JSON submissions metadata 제공
+- [SEC 공식 SIC 목록](https://www.sec.gov/search-filings/standard-industrial-classification-sic-code-list)
+- [SEC 공식 ticker/CIK/exchange JSON](https://www.sec.gov/files/company_tickers_exchange.json)
 - 프로젝트 헤더 정의: [`../references/kis-instrument-masters/header-definitions.md`](../references/kis-instrument-masters/header-definitions.md)
 - 확인용 보관 원본: [`../references/kis-instrument-masters/2026-08-18/`](../references/kis-instrument-masters/2026-08-18/)
-- 구현: [`../../lib/instrument-universe-import.ts`](../../lib/instrument-universe-import.ts), [`../../lib/us-industry-code-sync.ts`](../../lib/us-industry-code-sync.ts), [`../../app/api/admin/us-industry-codes/route.ts`](../../app/api/admin/us-industry-codes/route.ts)
+- 구현: [`../../lib/instrument-universe-import.ts`](../../lib/instrument-universe-import.ts), [`../../lib/us-industry-code-sync.ts`](../../lib/us-industry-code-sync.ts), [`../../app/api/admin/us-industry-codes/route.ts`](../../app/api/admin/us-industry-codes/route.ts), [`../../app/api/admin/us-sec-sic-industry/route.ts`](../../app/api/admin/us-sec-sic-industry/route.ts)

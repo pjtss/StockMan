@@ -78,6 +78,9 @@ describe("KIS U.S. industry code database sync", () => {
     mocks.query.mockImplementation(async (query: string, values?: unknown[]) => {
       if (query === "BEGIN" || query === "COMMIT" || query.includes("pg_advisory_xact_lock")) return { rowCount: 0, rows: [] };
       if (query.includes("INSERT INTO us_common_stock_universe")) {
+        expect(String(query)).toContain("EXCLUDED.industry_code ~ '^0+$'");
+        expect(String(query)).toContain("us_common_stock_universe.source_file LIKE 'SEC_EDGAR_SIC:%'");
+        expect(String(query)).toContain("THEN us_common_stock_universe.industry_code ELSE EXCLUDED.industry_code END");
         const payload = JSON.parse(String(values?.[0]));
         expect(payload).toHaveLength(1);
         expect(payload[0]).toMatchObject({
