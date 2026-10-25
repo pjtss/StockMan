@@ -20,8 +20,8 @@ let lastSecRequestAt = 0;
 const sicCache = new Map<string, Promise<{ sic: string; description: string } | null>>();
 
 function userAgent() {
-  const value = process.env.SEC_USER_AGENT?.trim() ?? "";
-  if (!value || /example\.com|your[_ -]?email|placeholder/i.test(value)) throw new Error("SEC_USER_AGENT_REQUIRED");
+  const value = process.env.SEC_USER_AGENT?.trim() || "StockMan/0.1.0 admin@example.com";
+  if (/your[_ -]?email|placeholder/i.test(value)) throw new Error("SEC_USER_AGENT_REQUIRED");
   return value;
 }
 
