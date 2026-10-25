@@ -6972,13 +6972,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 반영
 - `lib/market-rss-sec-filing-title.ts`, `lib/translate-market-rss-item.ts`: SEC의 엄격히 정형화된 `<form> - <issuer> (<10-digit CIK>) (Filer|Issuer)` 제목에 한해서만 `공시`, `제출자`/`발행인`을 한국어화한다. Form·법인명·CIK는 식별 정보로 보존하고 provider 호출을 하지 않는다. summary/content는 원문 값 그대로 유지한다.
+- 운영 실패 표본에서 추가 확인된 Form 4 `(Reporting)` 표기도 고정 역할어 `보고자`로 처리한다. 이름과 CIK는 보존한다.
 - `lib/market-rss-pipeline.ts`, `lib/market-rss-source-fairness.ts`: 번역·발송 각각 출처별 oldest-first 큐를 읽고 라운드로빈으로 합쳐 세 출처가 backlog를 함께 소진하게 한다.
 - `lib/market-rss-notification-message.ts`: 원문 제목 행을 제거해 알림에는 제목 하나만 표시한다. 출처·시각·티커 등 메타데이터는 기존 형식을 유지한다.
 - `app/api/admin/debug-suite/route.ts`: source별 번역 및 전송 상태에 기타/보류/불확실 상태 카운트를 추가해 운영 backlog 합계를 점검할 수 있게 한다.
 - 대응 테스트를 SEC 전용 현지화, 다른 출처 격리, 원문 제목 미노출, 운영 진단 합계에 추가한다.
 
 ### 검증
-- 실행 예정: 관련 회귀 테스트 및 `npm.cmd run deploy:verify`; 이후 최신 `origin/oci`를 재확인하고 변경 트리를 검증한 뒤 배포한다.
+- 최초 변경 검증: 관련 103개 회귀 테스트, build, 전체 300개 테스트 파일(1,463 pass/3 skip), typecheck, docs/migration, audits, OCI cron, standalone/runtime·Chrome hydration 통과. 운영 로그 확인으로 Form 4의 `Reporting` 역할 표기를 추가 발견해 보완 중이다.
 - 배포 후 운영 RSS 진단에서 세 출처의 pending 감소·SENT 증가와 최근 cron 실행을 확인한다. 각 출처의 과거 backlog 전체가 소진될 때까지 완료로 간주하지 않는다.
 
 ### 남은 위험

@@ -58,6 +58,21 @@ describe("market RSS translation", () => {
     expect(result.translationProvider).not.toBe("sec-filing-title-localization");
   });
 
+  it("localizes the SEC Form 4 reporting-person label while preserving the person's name and CIK", async () => {
+    const source: MarketRssItem = {
+      ...item("sec-reporting-person"),
+      source: "SEC_EDGAR",
+      title: "4 - MAIN TIMOTHY L (0001196744) (Reporting)",
+    };
+    const translate = vi.fn();
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result.translatedTitle).toBe("4 공시 - MAIN TIMOTHY L (0001196744) (보고자)");
+    expect(result.translatedSummary).toBe(source.summary);
+    expect(translate).not.toHaveBeenCalled();
+  });
+
   it("sends only the XML-decoded RSS headline to the provider and restores a readable translation", async () => {
     const feed = parseMarketRss('<rss><channel><item><guid>company-story</guid><title>AT&amp;T raises 20% outlook</title><link>https://example.com/story</link><description>AT&amp;T expects growth &amp; stronger revenue.</description></item></channel></rss>', "TEST", "https://example.com/feed");
     const source = feed.items[0];
