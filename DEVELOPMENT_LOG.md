@@ -6872,6 +6872,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 공식 KIS 마스터 full sync는 `reconciled=true`로 성공했다. common upsert 3,240/1,864/254, 특수 instrument upsert 2,032/975/4,526, 기존 후보 외 활성 common 비활성화 773/625/38이다. 모든 변화는 하나의 transaction에서 검증 후 commit됐고, 148개 KIS 미수록 행도 삭제하지 않고 fail-closed 비활성화했다.
 - 분리된 관리자 GET은 활성 common 3,240/1,864/254, 분류 1,354/1,186/94, 미분류 1,886/678/160을 반환했다. 새 원본을 올린 read-only audit에서 매칭 3,240/1,864/254, 누락 0, 후보 밖 활성 common 0, 코드 mismatch 0, `databaseWritePerformed=false`를 재확인했다.
 - 따라서 “모든 KIS 확인 보통주 행이 DB에 저장됐는가”는 YES다. “모든 종목에 유효 섹터가 있는가”는 NO: 유효 코드는 2,634/5,358이며, 나머지 2,724개는 KIS 공식 원본 자체가 `000`으로 미분류한다. 임의로 값을 보정하지 않았다.
+<<<<<<< HEAD
 
 ## [2026-10-25] SEC EDGAR SIC 결측 산업코드 보완 경로
 
@@ -6897,3 +6898,18 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 아직 실행하지 않음. 검증 완료 후 상세 한국어 커밋과 `oci` fast-forward 배포 예정.
+=======
+## [2026-10-25] RSS 번역 검증 실패 후보 운영 진단
+
+### 목표 및 범위
+- 운영 `market-rss` 실행에서 Azure 번역은 성공하지만 숫자 검증 단계에서 제목이 전량 fallback되는 현상을 판별하기 위해, 이미 관리자 세션 또는 cron secret 인증을 요구하는 `/api/admin/debug-suite?checks=rss` 응답에 최근 실패 번역 후보를 제한적으로 포함한다.
+
+### 변경
+- `app/api/admin/debug-suite/route.ts`: 세 RSS 허용 출처의 `translation_numeric_hallucination`, `translation_output_incomplete`, `target_language_not_detected` 실패 중 번역 후보가 저장된 최신 행 최대 20건을 조회한다. 원문/후보 제목을 각각 500자로 제한하고 제어문자를 정리한다. 공개 번역 상태 API는 수정하지 않는다.
+- `app/api/admin/debug-suite/route.test.ts`: 관리자 인증 차단, 범위·limit, 응답 제목 정리 테스트를 추가했다.
+
+### 검증 및 배포 상태
+- 대상 테스트 `npm.cmd test -- --run app/api/admin/debug-suite/route.test.ts`: 2개 통과.
+- `npm.cmd run deploy:verify`: 통과(의존성 audit, production build, standalone runtime/browser smoke, 테스트 파일 298 통과/1 skip, 테스트 1,453 통과/3 skip, typecheck, docs/migration, auth/KIS/cron 검증). Windows standalone trace에서 node_modules junction symlink `EPERM` 경고가 있었지만 빌드와 standalone 검증은 성공했다.
+- 커밋·푸시·운영 배포는 아직 하지 않았다. 운영 반영 후 이 진단 API로 숫자 검증 실패의 원문/후보 제목을 대조하고 실제 번역 검증 수정 및 재검증을 계속한다.
+>>>>>>> bfdd026d (RSS 번역 실패 후보 운영 진단 추가)

@@ -66,10 +66,21 @@ async function runSuite(checks: CheckName[]) {
   if (checks.includes("rss")) {
     try {
       const rssSettings = await loadFeatureModuleSettings("market-rss");
-      const [articles, snapshots, runs] = await Promise.all([
+      const [articles, snapshots, runs, translationFailureSamples] = await Promise.all([
         pool.query(`SELECT source, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at, MAX(created_at) AS latest_created_at FROM market_rss_articles GROUP BY source ORDER BY source`),
         pool.query(`SELECT DISTINCT ON (source) source, status, item_count, fetched_at, url FROM market_rss_fetch_snapshots ORDER BY source, fetched_at DESC`),
         pool.query(`SELECT status, started_at, finished_at, duration_ms, summary, error_message FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 5`),
+        pool.query(`SELECT id, source, title, translation_candidate_title AS candidate_title,
+                           translation_skipped_reason AS reason, translation_attempts AS attempts, updated_at
+                    FROM market_rss_articles
+                    WHERE source = ANY($1::text[])
+                      AND translation_status IN ('FAILED', 'SKIPPED')
+                      AND translation_candidate_title IS NOT NULL
+                      AND translation_skipped_reason = ANY($2::text[])
+                    ORDER BY updated_at DESC, id DESC LIMIT 20`, [
+          ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"],
+          ["translation_numeric_hallucination", "translation_output_incomplete", "target_language_not_detected"],
+        ]),
       ]);
       const now = new Date();
       result.rss = {
@@ -79,6 +90,15 @@ async function runSuite(checks: CheckName[]) {
         bySource: articles.rows,
         latestFetchBySource: snapshots.rows,
         recentRuns: runs.rows,
+        translationFailureSamples: translationFailureSamples.rows.map((row) => ({
+          articleId: String(row.id),
+          source: row.source,
+          title: String(row.title || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 500),
+          candidateTitle: String(row.candidate_title || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 500),
+          reason: row.reason,
+          attempts: Number(row.attempts),
+          updatedAt: row.updated_at,
+        })),
         schedule: {
           enabled: rssSettings.enabled,
           startTime: rssSettings.startTime,
