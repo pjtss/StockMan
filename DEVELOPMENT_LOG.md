@@ -1,3 +1,35 @@
+## [2026-10-26] 운영 오역 표본 기반 임상 단계 및 송신 전 재검증
+
+### 목표
+- 실제 운영 번역에서 제목의 임상 단계가 뒤집히거나 잘린 번역이 확인돼, 새 번역과 오래된 대기 제목 모두 잘못된 상태로 Discord에 나가지 않도록 개선한다.
+
+### 원인
+- provider가 임상 단계 보호 토큰을 옮기거나 `2 상기`, `-2상`, `상 1` 형태로 렌더링하면 기존 한국어 비율/완전성 검증만으로 의미 오류를 놓칠 수 있다. 또한 과거 코드로 저장된 `TRANSLATED` 행은 현재 번역 품질 검증을 거치지 않고 상태 메타데이터만으로 송신될 수 있었다.
+
+### 반영
+- `lib/market-rss-headline-context.ts`: 원문이 임상 단계를 분명히 나타내는 경우에만 번역 결과의 `상 1`, `2 상기`, `-2상`, `2단계` 아티팩트를 `1상`·`2상` 등으로 교정한다. 원문에 임상 단계 문맥이 없으면 숫자를 변경하지 않는다.
+- `lib/translate-market-rss-item.ts`: provider 응답의 하이픈이 보호된 임상 단계 토큰 앞에 붙은 경우 금융 부호 검사 전에 구분자를 정규화하고, 복원된 제목에도 같은 임상 단계 정규화를 적용한다.
+- `lib/market-rss-notification-translation-validation.ts`, `lib/market-rss-pipeline.ts`: Discord 송신 직전에 저장된 `TRANSLATED` 제목을 현재 한국어 수준·완전성 검사로 다시 확인한다. 잘린/불충분한 제목은 `FAILED`로 전환해 기존 provider 재시도 큐로 되돌리고, 정상화 가능한 임상 단계 표기는 DB에 교정한 뒤 송신한다.
+- `lib/market-rss-notification-translation-gate.ts`: 빈 번역 제목은 SQL 송신 후보에서 제외한다.
+- 운영 read-only 표본에서 StockTitan `ZW191` 제목의 `상 1`, GlobeNewswire phase 제목의 `2 상기`·`-2상`, GlobeNewswire Libtayo `(CSCC` 누락을 확인했다. 특히 Libtayo 표본은 새 송신 전 검증에서 `translation_output_incomplete`로 재시도 대상이 된다.
+- `scripts/README.md`: title-only provider 경로를 반영하고, 비어 있는 human-reviewed semantic fixture와 실제 검증 명령 연결 상태를 정확히 문서화했다. 현재 fixture `cases`는 0건이며 deploy gate는 의미 번역 정확성을 증명하지 않는다.
+
+### 검증
+- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/translate-market-rss-item.test.ts lib/market-rss-notification-translation-validation.test.ts lib/market-rss-notification-translation-gate.test.ts --reporter=dot`: 4개 파일 120개 테스트 통과.
+- `npm.cmd run docs:check`: 통과. `git diff --check`: 통과.
+- `npm.cmd run check:rss-translation-coverage`: 실패. 사람 검수 semantic fixture가 현재 0건이라 fixture coverage를 입증할 수 없다. 이 별도 검사는 `npm run deploy:verify`에 포함돼 있지 않다.
+
+### 다음 개선
+- `npm.cmd run deploy:verify` 통과(2026-10-26): dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 passed/1 skipped (1,524 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검증 통과. RSS 전용 변경을 기존 권한으로 push/deploy하고 invalid legacy 행의 재시도 전환 및 미발송 상태를 확인한다. 실제 신규 번역 의미 품질은 provider quota 복구 뒤 출처별 검수 표본으로 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-26-001
+- 성과 판정: PARTIAL
+- 근거: 운영 표본에서 반복되는 단계 표기를 고치고, 과거 불완전 번역이 송신을 통과하지 못하도록 재검증을 추가했다. 실제 provider 한도 초과가 지속되고 human-reviewed semantic fixture가 비어 있어 전체 backlog 송신·새 provider 번역 의미 품질은 아직 증명되지 않았다.
+
+### 커밋·푸시·배포
+- 미실행: 현재 단계 변경은 로컬 작업 트리에 있으며 전체 검증 후 기존 RSS 전용 권한으로 배포한다.
+
 ## [2026-10-25] RSS provider 입력을 제목 전용 API로 제한
 
 ### 목표

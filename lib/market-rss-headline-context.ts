@@ -38,3 +38,21 @@ export function normalizeMarketRssHeadlineContext(title: string) {
 
   return normalized;
 }
+
+/** Correct provider title artifacts only when the original headline clearly names a clinical phase. */
+export function normalizeTranslatedMarketRssClinicalPhase(sourceTitle: string, translatedTitle: string) {
+  const normalizedSource = normalizeMarketRssHeadlineContext(sourceTitle);
+  const stages = [...normalizedSource.matchAll(/(?<![\p{L}\p{N}])([1-4][a-c]?|[1-4]\s*\/\s*[1-4])상(?![\p{L}\p{N}])/giu)]
+    .map(([, stage]) => stage.replace(/\s+/g, ""));
+  let normalized = translatedTitle;
+  for (const stage of new Set(stages)) {
+    const stagePattern = stage.replace(/\//g, "\\s*\\/\\s*");
+    normalized = normalized
+      .replace(new RegExp(`상\\s*${stagePattern}(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
+      .replace(new RegExp(`(?:-|–|—)\\s*${stagePattern}\\s*상(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
+      .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s+상기(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
+      .replace(new RegExp(`단계\\s*${stagePattern}(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
+      .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s+상(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`);
+  }
+  return normalized;
+}

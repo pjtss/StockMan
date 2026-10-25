@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { marketRssArticles } from "./schema";
 
 function matchSnapshot<T>(column: Parameters<typeof eq>[0], value: T | null) {
@@ -13,6 +13,7 @@ export function buildMarketRssNotificationTranslationGate() {
       eq(marketRssArticles.translationFallback, false),
       eq(marketRssArticles.translationTargetLanguage, "ko"),
       isNotNull(marketRssArticles.translatedTitle),
+      sql`btrim(${marketRssArticles.translatedTitle}) <> ''`,
     ),
     and(
       eq(marketRssArticles.translationStatus, "SKIPPED"),

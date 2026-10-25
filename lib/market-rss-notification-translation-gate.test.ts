@@ -11,6 +11,7 @@ describe("market RSS notification translation gate", () => {
     expect(query.sql).toContain('"market_rss_articles"."translation_target_language" =');
     expect(query.sql).toContain('"market_rss_articles"."translated_title" = "market_rss_articles"."title"');
     expect(query.sql).toContain('"market_rss_articles"."translated_title" is not null');
+    expect(query.sql).toContain('btrim("market_rss_articles"."translated_title") <>');
     expect(query.params).toContain("TRANSLATED");
     expect(query.params).toContain("already_in_target_language");
     expect(query.params).toContain("ko");

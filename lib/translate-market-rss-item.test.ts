@@ -200,6 +200,28 @@ describe("market RSS translation", () => {
     });
   });
 
+  it("repairs a provider's stray separator before a protected clinical phase", async () => {
+    const source: MarketRssItem = {
+      ...item("clinical-phase-separator"),
+      source: "GLOBENEWSWIRE",
+      title: "BioNTech Reports Global Phase 2 Data for Pumitamig in Advanced NSCLC",
+    };
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    const stageMarker = prepared.placeholders.find(({ original }) => original === "2상")!.marker;
+    const nsclcMarker = prepared.placeholders.find(({ original }) => original === "NSCLC")!.marker;
+    const translate = vi.fn(async () => ({
+      translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}BioNTech는 글로벌 -${stageMarker} 데이터를 ${nsclcMarker}에서 발표했습니다</p>`,
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "azure-translator",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({ translatedTitle: "BioNTech는 글로벌 2상 데이터를 NSCLC에서 발표했습니다", translationFallback: false });
+  });
+
   it("retries an Azure title that fails Korean validation with the configured Google provider", async () => {
     const source = { ...item("quality-fallback"), title: "Nvidia Announces Strong Revenue Growth and Improved Outlook" };
     const primaryTranslate = vi.fn(async () => ({

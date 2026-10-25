@@ -30,6 +30,7 @@ import { TranslationClientOperationError } from "./translation-types";
 import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy";
 import { interleaveMarketRssSourceQueues } from "./market-rss-source-fairness";
 import { buildMarketRssSecFilingLocalizationAssignments, MARKET_RSS_SEC_FILING_TITLE_SQL_PATTERN } from "./market-rss-sec-filing-localization";
+import { buildStoredMarketRssTranslationRetryState, validateStoredMarketRssTranslation } from "./market-rss-notification-translation-validation";
 
 async function localizePendingSecFilingTitles(db: ReturnType<typeof getDb>, limit = 1_000) {
   const candidates = await db.select().from(marketRssArticles).where(and(
@@ -302,16 +303,33 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   let sent = 0;
   let queueEnqueueFailed = 0;
   for (const row of rows) {
-    const reaction = row.detectedTicker ? await resolveSingleMarketNewsReaction(row.detectedTicker) : null;
-    const notificationPayload = buildMarketRssDiscordNotificationPayload(row, reaction);
-    const delivery = await deliverMarketRssDiscordNotification({ notificationAttempts: row.notificationAttempts, payload: notificationPayload }, {
+    let notificationRow = row;
+    if (row.translationStatus === "TRANSLATED" && row.translatedTitle) {
+      const validation = validateStoredMarketRssTranslation(row.title, row.translatedTitle);
+      if (!validation.ok) {
+        const failedAt = new Date();
+        await db.update(marketRssArticles).set(buildStoredMarketRssTranslationRetryState(row, validation, failedAt))
+          .where(buildMarketRssNotificationClaimCondition(row));
+        continue;
+      }
+      if (validation.changed) {
+        const normalizedAt = new Date();
+        const normalized = await db.update(marketRssArticles).set({ translatedTitle: validation.translatedTitle, updatedAt: normalizedAt })
+          .where(buildMarketRssNotificationClaimCondition(row)).returning({ id: marketRssArticles.id });
+        if (normalized.length !== 1) continue;
+        notificationRow = { ...row, translatedTitle: validation.translatedTitle };
+      }
+    }
+    const reaction = notificationRow.detectedTicker ? await resolveSingleMarketNewsReaction(notificationRow.detectedTicker) : null;
+    const notificationPayload = buildMarketRssDiscordNotificationPayload(notificationRow, reaction);
+    const delivery = await deliverMarketRssDiscordNotification({ notificationAttempts: notificationRow.notificationAttempts, payload: notificationPayload }, {
       claimProcessing: async () => {
-        const claimed = await db.update(marketRssArticles).set({ notificationStatus: "PROCESSING", lastError: null, updatedAt: new Date() }).where(buildMarketRssNotificationClaimCondition(row)).returning({ id: marketRssArticles.id });
+        const claimed = await db.update(marketRssArticles).set({ notificationStatus: "PROCESSING", lastError: null, updatedAt: new Date() }).where(buildMarketRssNotificationClaimCondition(notificationRow)).returning({ id: marketRssArticles.id });
         return claimed.length === 1;
       },
       markSending: async () => {
         const sendingAt = new Date();
-        const updated = await db.update(marketRssArticles).set({ notificationStatus: "SENDING", notificationAttempts: row.notificationAttempts + 1, notifiedAt: sendingAt, updatedAt: sendingAt }).where(and(eq(marketRssArticles.id, row.id), eq(marketRssArticles.notificationStatus, "PROCESSING"))).returning({ id: marketRssArticles.id });
+        const updated = await db.update(marketRssArticles).set({ notificationStatus: "SENDING", notificationAttempts: notificationRow.notificationAttempts + 1, notifiedAt: sendingAt, updatedAt: sendingAt }).where(and(eq(marketRssArticles.id, notificationRow.id), eq(marketRssArticles.notificationStatus, "PROCESSING"))).returning({ id: marketRssArticles.id });
         return updated.length === 1;
       },
       send: async (payload) => {
@@ -325,26 +343,26 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
       },
       markFailed: async (attempt, error) => {
         const message = error instanceof Error ? error.message : String(error);
-        await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: attempt, lastError: message, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+        await db.update(marketRssArticles).set({ notificationStatus: "FAILED", notificationAttempts: attempt, lastError: message, updatedAt: new Date() }).where(eq(marketRssArticles.id, notificationRow.id));
       },
       isRetryable: isRetryableDiscordError,
       enqueue: async (payload, attempt) => {
         await enqueueDiscordDelivery({
-          externalId: marketRssDeliveryExternalId(row.id, attempt),
+          externalId: marketRssDeliveryExternalId(notificationRow.id, attempt),
           channelKey: "MARKET_RSS",
-          payload: { ...payload, _marketRssSnapshot: createMarketRssNotificationSnapshot(row) },
+          payload: { ...payload, _marketRssSnapshot: createMarketRssNotificationSnapshot(notificationRow) },
         });
       },
       markQueueEnqueueFailed: async (attempt, error) => {
         await db.update(marketRssArticles).set({
           ...buildMarketRssQueueEnqueueFailureState(attempt, error),
           updatedAt: new Date(),
-        }).where(eq(marketRssArticles.id, row.id));
+        }).where(eq(marketRssArticles.id, notificationRow.id));
       },
       markSent: async (attempt) => {
         // Persist outside the webhook catch. If Discord accepted the message but
         // this write fails, SENDING is retained and later quarantined; never auto-queue a possible duplicate.
-        await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: attempt, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, row.id));
+        await db.update(marketRssArticles).set({ notificationStatus: "SENT", notificationAttempts: attempt, notifiedAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(marketRssArticles.id, notificationRow.id));
       },
     });
     if (!delivery.claimedForSend) continue;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeMarketRssHeadlineContext } from "./market-rss-headline-context";
+import { normalizeMarketRssHeadlineContext, normalizeTranslatedMarketRssClinicalPhase } from "./market-rss-headline-context";
 
 describe("market RSS headline context normalization", () => {
   it("clarifies that holding a public company means holding its stock", () => {
@@ -45,5 +45,19 @@ describe("market RSS headline context normalization", () => {
       .toBe("Company announces Phase 2 study of its market expansion plan");
     expect(normalizeMarketRssHeadlineContext("Company announces Phase-2-Studie zur globalen Marktexpansion"))
       .toBe("Company announces Phase-2-Studie zur globalen Marktexpansion");
+  });
+
+  it.each([
+    ["Zymeworks Presents New Phase 1 Data for Folate Receptor Alpha-Targeting Antibody-Drug Conjugate ZW191 at ESMO Congress 2026", "Zymeworks, ESMO Congress에서 ZW191의 새로운 상 1 데이터를 발표하다", "Zymeworks, ESMO Congress에서 ZW191의 새로운 1상 데이터를 발표하다"],
+    ["BioNTech und Bristol Myers Squibb präsentieren Phase-2-Studie mit Pumitamig bei Lungenkrebs", "BioNTech와 Bristol Myers Squibb는 글로벌 -2상 연구에서 데이터를 발표합니다", "BioNTech와 Bristol Myers Squibb는 글로벌 2상 연구에서 데이터를 발표합니다"],
+    ["BioNTech and Bristol Myers Squibb Report Global Phase 2 Data for Pumitamig in Advanced NSCLC", "BioNTech는 글로벌 2 상기 데이터를 권장한다고 보고했습니다", "BioNTech는 글로벌 2상 데이터를 권장한다고 보고했습니다"],
+    ["Company presents Phase 2/3 study results in lung cancer", "회사는 상 2/3 연구 결과를 발표했습니다", "회사는 2/3상 연구 결과를 발표했습니다"],
+  ])("repairs common provider phase-order artifacts only when the source title identifies that phase", (source, translated, expected) => {
+    expect(normalizeTranslatedMarketRssClinicalPhase(source, translated)).toBe(expected);
+  });
+
+  it("does not rewrite a number that is not a clinical phase in the source title", () => {
+    expect(normalizeTranslatedMarketRssClinicalPhase("Company enters Phase 2 of its global market expansion", "회사는 2 상기 시장 확장에 진입합니다"))
+      .toBe("회사는 2 상기 시장 확장에 진입합니다");
   });
 });

@@ -7,6 +7,7 @@ import { createMarketRssTranslationClient } from "./market-rss-translation-clien
 import { mapWithConcurrency } from "./map-with-concurrency";
 import { AZURE_TRANSLATION_PROVIDER } from "./translation-cache";
 import { localizeSecFilingTitle } from "./market-rss-sec-filing-title";
+import { normalizeTranslatedMarketRssClinicalPhase } from "./market-rss-headline-context";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
@@ -219,11 +220,14 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
       translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0,
     };
   }
-  const normalizedProviderText = title.translatedText.normalize("NFC");
+  const normalizedProviderText = preparedInput.placeholders.reduce((text, { marker, original }) => {
+    if (!/^[1-4][a-c]?(?:\s*\/\s*[1-4])?상$/u.test(original)) return text;
+    return text.replace(new RegExp(`[-–—]\\s*${marker}(?![\\p{L}\\p{N}])`, "gu"), marker);
+  }, title.translatedText.normalize("NFC"));
   const hasProviderMarkup = /<\/?[a-z][^>]*>/i.test(normalizedProviderText);
   const rawProviderHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
   const providerHeadline = rawProviderHeadline
-    ? normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawProviderHeadline), preparedInput.placeholders)
+    ? normalizeTranslatedMarketRssClinicalPhase(item.title, normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawProviderHeadline), preparedInput.placeholders))
     : null;
   const restoredText = restoreMarketRssTranslationTokens(normalizedProviderText, preparedInput.placeholders);
   if (!restoredText.ok) {
@@ -239,7 +243,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     : null;
   const rawTranslatedHeadline = restoredHeadline?.ok ? restoredHeadline.text : null;
   const translatedHeadline = rawTranslatedHeadline
-    ? normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawTranslatedHeadline), preparedInput.placeholders)
+    ? normalizeTranslatedMarketRssClinicalPhase(item.title, normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawTranslatedHeadline), preparedInput.placeholders))
     : null;
   if (!translatedHeadline) {
     const fallback = await validationFallback("translation_response_unparseable");
