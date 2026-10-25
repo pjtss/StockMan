@@ -99,7 +99,14 @@ export async function GET(request: Request) {
                 COUNT(*) FILTER (WHERE notification_status = 'FAILED')::int AS notification_failed,
                 COUNT(*) FILTER (WHERE notification_status = 'SKIPPED')::int AS notification_skipped,
                 COUNT(*) FILTER (WHERE notification_status = 'UNCERTAIN')::int AS notification_uncertain,
-                COUNT(*) FILTER (WHERE notification_status IN ('PROCESSING', 'SENDING'))::int AS in_flight
+                COUNT(*) FILTER (WHERE notification_status IN ('PROCESSING', 'SENDING'))::int AS in_flight,
+                COUNT(*) FILTER (
+                  WHERE notification_status = 'SENT'
+                    AND NOT (
+                      translation_status = 'TRANSLATED'
+                      OR (translation_status = 'SKIPPED' AND translation_skipped_reason = 'already_in_target_language')
+                    )
+                )::int AS sent_without_validated_translation
          FROM market_rss_articles
          WHERE source = ANY($1::text[])
          GROUP BY source ORDER BY source`,

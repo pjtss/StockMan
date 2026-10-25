@@ -17,6 +17,7 @@ GET /api/debug/market-rss-translations?hours=24&source=ALL&status=ALL&limit=50&o
 - `limit`: 1–100, 기본 50. `offset`: 0–1,000,000, 기본 0.
 - 요약은 선택 출처 및 시간 범위의 모든 번역 상태별 건수이고, 항목 목록은 출처·상태 조건으로 페이지 처리된다.
 - `lifetimeBySource`는 GlobeNewswire·StockTitan·SEC EDGAR의 전체 저장 행에 대해 번역 및 Discord 전송 상태를 출처별로 집계한다. 이 집계는 `hours`와 무관하여 오래된 backfill을 포함하며 기사 제목·본문·링크는 반환하지 않는다.
+- `sent_without_validated_translation`은 전체 발송 완료 중 `TRANSLATED` 또는 `already_in_target_language`로 검증되지 않은 제목 상태 수다. 이를 통해 현행 및 과거 저장 상태에서 번역 게이트 위반 가능성을 확인한다.
 - `lifetimeSkippedReasonsBySource`는 전체 저장 행 중 `SKIPPED` 번역의 provider·사유 코드별 건수다. 알려진 안전한 코드만 원형으로 반환하고 나머지는 `other`로 묶으며 provider 오류 문장이나 기사 데이터는 반환하지 않는다.
 - 항목에는 기사 식별·제목·링크·번역 시도/완료 시각·provider·fallback·skip/error 사유·번역 제목 등 검수에 필요한 메타데이터를 반환한다. 원문 summary/content 및 `raw_payload`는 반환하지 않는다. 저장된 번역 오류 메시지는 자격증명 마스킹 후 제공한다.
 - `translation_char_count`는 현재 로직에서 StockTitan 원문 제목의 입력 길이만 기록한다. 코드 변경 전 행은 예전 계산식을 사용했을 수 있으므로 해당 필드를 과거 provider 사용량의 정밀한 증거로 간주하지 않는다.
