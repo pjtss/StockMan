@@ -61,7 +61,7 @@ function hasUnprotectedFinancialSign(providerHeadline: string, protectedSourceHe
   });
 }
 
-export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
+export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationFallbackDetails?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
 export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
 export type MarketRssTranslationFallbackHandler = (item: MarketRssItem, result: TranslationResult) => void;
 export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false, onProviderFallback?: MarketRssTranslationFallbackHandler, providerFallbackAttempted = false, prefetchedTranslation?: TranslationResult): Promise<TranslatedMarketRssItem> {
@@ -107,7 +107,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     }
     return true;
   };
-  const validationFallback = async (translationFallbackReason: string, translationCandidateTitle?: string) => {
+  const validationFallback = async (translationFallbackReason: string, translationCandidateTitle?: string, translationFallbackDetails?: string) => {
     const cacheInvalidated = await invalidateCachedResponse();
     if (cacheInvalidated && title.requestOrigin === "CACHE" && !cacheRecoveryAttempt) return null;
     if (!providerFallbackAttempted && title.provider === AZURE_TRANSLATION_PROVIDER && title.requestOrigin === "PROVIDER" && selectedClient.translateFallbackProvider) {
@@ -133,6 +133,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
       ...(translationCandidateTitle ? { translationCandidateTitle } : {}),
       translationFallback: true,
       translationFallbackReason: cacheInvalidated ? translationFallbackReason : "translation_cache_invalidation_failed",
+      ...(translationFallbackDetails ? { translationFallbackDetails } : {}),
       requestOrigin: title.requestOrigin,
       translationProvider: title.provider,
       translationProviderAttempts: title.requestOrigin === "PROVIDER" ? title.providerAttemptCount ?? 1 : 0,
@@ -176,19 +177,21 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     .replace(/&#(?:x[\da-f]+|\d+);/gi, "");
   const allowedSpelledNumbers = getAllowedSpelledNumberValues(item.title);
   const unprotectedNumerals = unprotectedHeadlineDigits.match(/\d+/g) || [];
-  const inventedNumeral = unprotectedNumerals.some((value) => {
+  const inventedNumerals = unprotectedNumerals.filter((value) => {
     const numericValue = Number(value);
     if (allowedSpelledNumbers.numbers.has(numericValue)) return false;
     const monthSuffix = new RegExp(`(?:^|\\D)${value}\\s*월`, "u");
     return !allowedSpelledNumbers.months.has(numericValue) || !monthSuffix.test(unprotectedHeadlineDigits);
   });
+  const inventedNumeral = inventedNumerals.length > 0;
   const providerHeadlineWithSigns = (providerHeadline || "")
     .replace(/&#(?:43|x2b);/gi, "+")
     .replace(/&#(?:45|x2d);/gi, "-");
   const unprotectedFinancialSign = hasUnprotectedFinancialSign(providerHeadlineWithSigns, preparedInput.text, preparedInput.placeholders);
   const signedUnprotectedNumeral = /[+\-−﹣－]\s*\d/.test(unprotectedHeadlineDigits);
   if (inventedNumeral || unprotectedFinancialSign || signedUnprotectedNumeral) {
-    const fallback = await validationFallback("translation_numeric_hallucination", translatedHeadline);
+    const details = `unprotected=${[...new Set(inventedNumerals)].slice(0, 10).join(",") || "none"};financialSign=${unprotectedFinancialSign};signedNumeral=${signedUnprotectedNumeral}`;
+    const fallback = await validationFallback("translation_numeric_hallucination", translatedHeadline, details);
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
   const hasSourceLettersToTranslate = /\p{L}/u.test(protectedHeadline.text.replace(/ZX\d+Q/g, "").replace(/[가-힣]/g, ""));

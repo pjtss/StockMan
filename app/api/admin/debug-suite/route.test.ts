@@ -37,6 +37,7 @@ describe("admin RSS translation diagnostics", () => {
         title: "Third Quarter 2026 results\nOriginal headline",
         candidate_title: "3분기 2026 결과\n번역 후보",
         reason: "translation_numeric_hallucination",
+        translation_error: "translation_numeric_hallucination:unprotected=2026;financialSign=false;signedNumeral=false",
         attempts: 3,
         updated_at: new Date("2026-10-25T04:00:00.000Z"),
       }] };
@@ -75,6 +76,7 @@ describe("admin RSS translation diagnostics", () => {
       title: "Third Quarter 2026 results Original headline",
       candidateTitle: "3분기 2026 결과 번역 후보",
       reason: "translation_numeric_hallucination",
+      diagnostic: "translation_numeric_hallucination:unprotected=2026;financialSign=false;signedNumeral=false",
       attempts: 3,
       updatedAt: new Date("2026-10-25T04:00:00.000Z").toISOString(),
     }]);

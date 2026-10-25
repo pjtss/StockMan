@@ -27,7 +27,9 @@ export function buildMarketRssTranslationPersistence(
     translationTranslatedAt: result.translationFallback || notRequired ? null : processedAt,
     translationAttemptedAt: processedAt,
     translationFallback: result.translationFallback,
-    translationError: result.translationFallbackReason || null,
+    translationError: result.translationFallbackReason
+      ? `${result.translationFallbackReason}${result.translationFallbackDetails ? `:${result.translationFallbackDetails}` : ""}`
+      : null,
     translationAttempts: row.translationAttempts + (result.translationFallbackReason === "cloud_translation_not_configured" || notRequired ? 0 : 1),
     translationStatus: result.translationFallback || notRequired ? "SKIPPED" : "TRANSLATED",
     updatedAt: processedAt,

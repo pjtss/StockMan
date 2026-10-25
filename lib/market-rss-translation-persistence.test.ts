@@ -84,6 +84,7 @@ describe("market RSS translation persistence mapping", () => {
     const update = buildMarketRssTranslationPersistence(row, item({
       translationFallback: true,
       translationFallbackReason: "translation_numeric_hallucination",
+      translationFallbackDetails: "unprotected=25;financialSign=false;signedNumeral=false",
       translationCandidateTitle: "삼성전자 매출 25% 증가",
       requestOrigin: "PROVIDER",
       translationProviderAttempts: 1,
@@ -93,7 +94,7 @@ describe("market RSS translation persistence mapping", () => {
       translatedTitle: row.title,
       translationCandidateTitle: "삼성전자 매출 25% 증가",
       translationSkippedReason: "translation_numeric_hallucination",
-      translationError: "translation_numeric_hallucination",
+      translationError: "translation_numeric_hallucination:unprotected=25;financialSign=false;signedNumeral=false",
       translationFallback: true,
       translationStatus: "SKIPPED",
       translationProvider: "google-cloud-translation",

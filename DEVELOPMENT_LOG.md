@@ -7014,13 +7014,17 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 운영 실패 표본에서 StockTitan 숫자 검증 오탐(`4분기`/날짜 숫자, SEC form `6-K`)과 보호 토큰 불일치가 계속 나타나 provider 번역 품질은 완벽하다고 볼 수 없다. 후속 수정과 운영 재검증 전에는 완료로 판정하지 않는다.
 - **후속 원인 수정**: 실제 실패 제목 `J-Star Holding ... Form 6-K`에서 보호 규칙이 문자로 시작하는 표기만 처리해 숫자로 시작하는 SEC 양식 코드 `6-K`를 독립 숫자처럼 provider에 노출했다. `6-K`/`8-K`/`10-Q`/`20-F` 계열과 S/F form, 424B 표기를 하나의 보호 토큰으로 보존하도록 수정하고, `1-for-4` 역분할 표기와 충돌하지 않는 테스트를 추가했다. 제목 번역 경로 fixture도 `6-K` 복원과 summary 원문 미변경을 검증한다.
 - 후속 회귀 128건 통과. 전체 `npm.cmd run deploy:verify` 재실행: 302개 테스트 파일 중 301개 통과·1개 skip, 1,485개 통과·3개 skip; 프로덕션 build, typecheck, standalone runtime/Chrome desktop·mobile hydration, 문서·migration·보안·cron 게이트 통과. Windows standalone 빌드의 기존 node_modules symlink `EPERM` 경고는 있었지만 검증 runner가 fallback 처리 후 성공했다.
+- `6595345c` OCI 배포 후 새 RSS cron 실행이 `Form 6-K` 후보를 또 `translation_numeric_hallucination`으로 보류했다. 동일한 입력·표시된 한국어 후보를 현행 번역 검증기로 재생한 회귀 테스트는 통과했지만 운영 DB에는 거부된 숫자·부호 값이 남지 않아 실행 간 판정 차이를 설명할 증거가 부족했다.
+- **후속 진단 보강**: 숫자 품질 gate가 거부한 unprotected 숫자 최대 10개, 금융 부호 불일치 여부, 부호 숫자 여부를 `translation_error`에 코드형 진단으로 기록하고 관리자 RSS 실패 표본 응답에만 반환하도록 했다. 원문/요약/본문이나 공급자 응답 원문은 추가 저장하지 않는다. 운영 후속 시 실제 숫자 검출과 표시 후보 간 불일치를 직접 구분한다.
+- 진단·재현 회귀 142건 통과; 전체 `deploy:verify`와 운영 반영은 다시 수행해야 한다.
 
 ### 남은 위험 및 후속
 - 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.
 - `translation_pending`, `notification_pending`, 실패/불확실 상태를 source별로 계속 관찰하고 DB에 저장된 과거 대기량 소진 여부를 확인한다.
 - 후속 `6-K` 보호 토큰 변경을 커밋·배포한 뒤, 실제 재시도에서 `translation_numeric_hallucination`이 사라지고 실패 건이 정상 한국어 제목으로 SENT 되는지 확인한다. 날짜/분기 오탐과 보호 토큰 불일치는 운영 실패 표본으로 계속 추적한다.
+- 진단 필드 배포 후 같은 6-K 기사에서 `unprotected` 값이 실제로 기록되는지 확인하고 원인별 오탐을 고친다. 진단 값 없이 같은 실패만 반복되면 runtime/build revision 및 queue writer 경계를 조사한다.
 - 개선 과제 ID: RSS-2026-10-25-TRANSLATION-QUALITY
 - 성과 판정: IN_PROGRESS
 
 ### 커밋·푸시·배포
-- 커밋 `3069a4b4` push 및 OCI 배포 완료. 후속 `6-K` 코드 변경은 전체 검증 완료, 아직 commit/push/deploy 전이다. 번역 품질 오탐 개선과 전체 과거 대기 발송은 진행 중이다.
+- 커밋 `3069a4b4`와 `6595345c` push 및 OCI 배포 완료. `6595345c` 후에도 6-K numeric fallback이 남아 원인 진단 보강은 아직 전체 검증 및 배포 전이다. 번역 품질 오탐 개선과 전체 과거 대기 발송은 진행 중이다.

@@ -70,7 +70,7 @@ async function runSuite(checks: CheckName[]) {
         pool.query(`SELECT source, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at, MAX(created_at) AS latest_created_at FROM market_rss_articles GROUP BY source ORDER BY source`),
         pool.query(`SELECT DISTINCT ON (source) source, status, item_count, fetched_at, url FROM market_rss_fetch_snapshots ORDER BY source, fetched_at DESC`),
         pool.query(`SELECT status, started_at, finished_at, duration_ms, summary, error_message FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 5`),
-        pool.query(`SELECT id, source, title, translation_candidate_title AS candidate_title,
+        pool.query(`SELECT id, source, title, translation_candidate_title AS candidate_title, translation_error,
                            translation_skipped_reason AS reason, translation_attempts AS attempts, updated_at
                     FROM market_rss_articles
                     WHERE source = ANY($1::text[])
@@ -114,6 +114,7 @@ async function runSuite(checks: CheckName[]) {
           title: String(row.title || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 500),
           candidateTitle: String(row.candidate_title || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 500),
           reason: row.reason,
+          diagnostic: String(row.translation_error || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || null,
           attempts: Number(row.attempts),
           updatedAt: row.updated_at,
         })),

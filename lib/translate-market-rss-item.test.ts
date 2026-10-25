@@ -446,6 +446,9 @@ describe("market RSS translation", () => {
       translationFallbackReason: "translation_numeric_hallucination",
       translationCandidateTitle: expect.stringContaining(inventedValue),
     });
+    if (inventedValue === "2026") {
+      expect(result.translationFallbackDetails).toBe("unprotected=2026;financialSign=false;signedNumeral=false");
+    }
   });
 
   it("accepts Arabic digits that faithfully translate spelled-out title numbers", async () => {
@@ -534,23 +537,25 @@ describe("market RSS translation", () => {
     };
     const prepared = prepareMarketRssTranslationInput(source.title);
     expect(prepared.placeholders.map(({ original }) => original)).toContain("6-K");
-    const translate = vi.fn(async (text: string) => ({
-      translatedText: text
-        .replace("Files", "제출")
-        .replace("Interim Financial Report", "중간 재무 보고서")
-        .replace("on Form", "양식")
-        .replace("Stock News", "주식 뉴스"),
+    const candidateTitle = "J-스타 홀딩 주식회사, 6-K 양식으로 중간 재무 보고서 제출 | YMAT 주식 뉴스";
+    const translate = vi.fn(async () => {
+      let translatedText = candidateTitle;
+      for (const { original, marker } of prepared.placeholders) {
+        translatedText = translatedText.replace(original, marker);
+      }
+      return {
+      translatedText,
       source: "en" as const,
       target: "ko" as const,
       provider: "test",
       fallback: false,
-    }));
+      };
+    });
 
     const result = await translateMarketRssItem(source, client(translate));
 
     expect(result).toMatchObject({ translationFallback: false, translatedSummary: source.summary });
-    expect(result.translatedTitle).toContain("양식 6-K");
-    expect(result.translatedTitle).toContain("YMAT 주식 뉴스");
+    expect(result.translatedTitle).toBe(candidateTitle);
     expect(translate.mock.calls[0][0]).not.toContain(source.summary);
   });
 
