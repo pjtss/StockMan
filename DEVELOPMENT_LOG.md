@@ -20,7 +20,7 @@
 - `npm.cmd run check:rss-translation-coverage`: 실패. 사람 검수 semantic fixture가 현재 0건이라 fixture coverage를 입증할 수 없다. 이 별도 검사는 `npm run deploy:verify`에 포함돼 있지 않다.
 
 ### 다음 개선
-- `npm.cmd run deploy:verify` 통과(2026-10-26): dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 passed/1 skipped (1,524 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검증 통과. RSS 전용 변경을 기존 권한으로 push/deploy하고 invalid legacy 행의 재시도 전환 및 미발송 상태를 확인한다. 실제 신규 번역 의미 품질은 provider quota 복구 뒤 출처별 검수 표본으로 확인한다.
+- `npm.cmd run deploy:verify` 통과(2026-10-26): dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 passed/1 skipped (1,524 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검증 통과. 실제 신규 provider 번역 의미 품질은 quota 복구 뒤 출처별 검수 표본으로 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-26-001
@@ -28,7 +28,7 @@
 - 근거: 운영 표본에서 반복되는 단계 표기를 고치고, 과거 불완전 번역이 송신을 통과하지 못하도록 재검증을 추가했다. 실제 provider 한도 초과가 지속되고 human-reviewed semantic fixture가 비어 있어 전체 backlog 송신·새 provider 번역 의미 품질은 아직 증명되지 않았다.
 
 ### 커밋·푸시·배포
-- 미실행: 현재 단계 변경은 로컬 작업 트리에 있으며 전체 검증 후 기존 RSS 전용 권한으로 배포한다.
+- 완료: `13af42b166f5eae94394ceed2ff7e87111990f05`를 `origin/oci`에 push했다. Deploy OCI workflow `40206173490`가 전체 검증·package·upload·activate에 성공했고 운영 `/health-check`는 SHA `13af42b166f5eae94394ceed2ff7e87111990f05`, `/api/health`는 `ok`를 반환했다. 활성화 중 잠시 502를 관찰했지만 workflow 성공 후 health가 정상화됐다. 배포 후 read-only RSS aggregate는 GlobeNewswire pending 5, SEC pending 0, StockTitan pending 2,299로 유지됐으며 quota skip은 각각 5, 238, 11,391이다. 과거 invalid 번역의 재시도/무발송 전환 및 실제 새 provider 결과는 운영 cron과 quota 제한으로 아직 확인되지 않았다.
 
 ## [2026-10-25] RSS provider 입력을 제목 전용 API로 제한
 
