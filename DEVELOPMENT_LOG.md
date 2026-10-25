@@ -6872,8 +6872,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 공식 KIS 마스터 full sync는 `reconciled=true`로 성공했다. common upsert 3,240/1,864/254, 특수 instrument upsert 2,032/975/4,526, 기존 후보 외 활성 common 비활성화 773/625/38이다. 모든 변화는 하나의 transaction에서 검증 후 commit됐고, 148개 KIS 미수록 행도 삭제하지 않고 fail-closed 비활성화했다.
 - 분리된 관리자 GET은 활성 common 3,240/1,864/254, 분류 1,354/1,186/94, 미분류 1,886/678/160을 반환했다. 새 원본을 올린 read-only audit에서 매칭 3,240/1,864/254, 누락 0, 후보 밖 활성 common 0, 코드 mismatch 0, `databaseWritePerformed=false`를 재확인했다.
 - 따라서 “모든 KIS 확인 보통주 행이 DB에 저장됐는가”는 YES다. “모든 종목에 유효 섹터가 있는가”는 NO: 유효 코드는 2,634/5,358이며, 나머지 2,724개는 KIS 공식 원본 자체가 `000`으로 미분류한다. 임의로 값을 보정하지 않았다.
-<<<<<<< HEAD
-
 ## [2026-10-25] SEC EDGAR SIC 결측 산업코드 보완 경로
 
 ### 목표
@@ -6898,7 +6896,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 아직 실행하지 않음. 검증 완료 후 상세 한국어 커밋과 `oci` fast-forward 배포 예정.
-=======
 ## [2026-10-25] RSS 번역 검증 실패 후보 운영 진단
 
 ### 목표 및 범위
@@ -6911,5 +6908,19 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 검증 및 배포 상태
 - 대상 테스트 `npm.cmd test -- --run app/api/admin/debug-suite/route.test.ts`: 2개 통과.
 - `npm.cmd run deploy:verify`: 통과(의존성 audit, production build, standalone runtime/browser smoke, 테스트 파일 298 통과/1 skip, 테스트 1,453 통과/3 skip, typecheck, docs/migration, auth/KIS/cron 검증). Windows standalone trace에서 node_modules junction symlink `EPERM` 경고가 있었지만 빌드와 standalone 검증은 성공했다.
-- 커밋·푸시·운영 배포는 아직 하지 않았다. 운영 반영 후 이 진단 API로 숫자 검증 실패의 원문/후보 제목을 대조하고 실제 번역 검증 수정 및 재검증을 계속한다.
->>>>>>> bfdd026d (RSS 번역 실패 후보 운영 진단 추가)
+- 진단 API는 commit `11acb396`로 `oci`에 푸시했고 Deploy OCI run `40164594617` 성공을 확인했다. 운영 인증 GET에서 최근 20건을 읽었으며 SEC `8-K - …` 제목의 보호 숫자 뒤 하이픈이 숫자 오탐의 원인임을 확인했다.
+
+## [2026-10-25] RSS SEC 문서명 대시 번역 오탐 수정
+
+### 원인과 영향
+- SEC EDGAR의 `8-K - …` 제목에서 `8`은 금융 숫자 보호 토큰 `ZX…Q`로 바뀐다. 숫자 검증기가 토큰 바로 뒤에 원문에도 존재하는 `-`를 추가 금융 부호로 간주해 정상 번역까지 `translation_numeric_hallucination`으로 fallback했다.
+- 운영 후보 제목 20건을 인증 진단 API에서 확인했다. 다수는 `8-K - …`였고 후보 번역은 accession/서식 숫자를 보존한 한국어 제목이었다. 운영 최근 실행은 20건 시도 중 성공 0, fallback 20, 알림 전송 0으로 backlog가 누적되고 있었다.
+
+### 수정 및 재발 방지
+- `lib/translate-market-rss-item.ts`: 보호 토큰 주변 부호를 검사할 때 provider 결과와 보호된 원문 제목의 같은 토큰 주변 문자를 대조한다. 원문에 이미 존재하는 하이픈은 허용하고 새로 추가된 +/- 계열 부호는 계속 거부한다.
+- `lib/translate-market-rss-item.test.ts`: `8-K - …` 및 `4 - …` 문서명 구분 대시를 통과시키고 기존 가짜 부호 차단 테스트를 유지한다. 숫자 hallucination 자체를 무조건 허용하지 않는다.
+- 범위 원칙: provider 입력은 RSS 제목만 사용한다. `summary`와 기사 본문은 계속 원문 그대로 반환하며, Discord 알림 gate는 검증된 한국어 제목이나 이미 한국어인 제목만 통과시킨다.
+
+### 검증 및 배포 상태
+- 타깃 번역 테스트 77개 통과. 전체 `deploy:verify`, commit, push, production 배포는 아직이며, 운영 수신 확인 후 결과를 추가 기록한다.
+- 과거 대기 큐는 oldest-first로 처리하고 한 cron 실행에서 번역 20건/전송 20건으로 제한되어 있다. 전체 운영 backlog 수량과 정상화 처리량은 수정 배포 후 계속 측정한다.

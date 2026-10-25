@@ -426,6 +426,26 @@ describe("market RSS translation", () => {
     });
   });
 
+  it.each([
+    ["8-K - Pathfinder Bancorp (0001609065) (Filer)", "Pathfinder Bancorp", "패스파인더 뱅코프", "Filer", "파일러"],
+    ["4 - Example Holdings (0001234567) (Issuer)", "Example Holdings", "예시 홀딩스", "Issuer", "발행자"],
+  ])("accepts a filing-title dash that was already present beside a protected number: %s", async (title, company, translatedCompany, role, translatedRole) => {
+    const source = { ...item("filing-title-dash"), title, summary: "" };
+    const translate = vi.fn(async (text: string) => ({
+      translatedText: text.replace(company, translatedCompany).replace(role, translatedRole),
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "test",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({ translationFallback: false, translatedSummary: "" });
+    expect(result.translatedTitle).toContain(translatedCompany);
+    expect(result.translatedTitle).toContain(translatedRole);
+  });
+
   it("does not treat digits inside a numeric HTML entity as a fabricated claim", async () => {
     const source = { ...item("numeric-html-entity"), title: "Nvidia outlook improves", summary: "" };
     const translate = vi.fn(async () => ({

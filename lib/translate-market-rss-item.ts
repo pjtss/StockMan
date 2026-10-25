@@ -44,6 +44,22 @@ const ENGLISH_MONTH_NUMBER_VALUES: Record<string, number> = {
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
 };
 
+function hasUnprotectedFinancialSign(providerHeadline: string, protectedSourceHeadline: string, placeholders: Array<{ marker: string; original: string }>) {
+  const isFinancialSign = (value: string | undefined) => Boolean(value && /[+\-−﹣－]/u.test(value));
+  return placeholders.some(({ marker }) => {
+    const providerIndex = providerHeadline.indexOf(marker);
+    const sourceIndex = protectedSourceHeadline.indexOf(marker);
+    if (providerIndex < 0 || sourceIndex < 0) return false;
+
+    const providerBefore = providerHeadline[providerIndex - 1];
+    const providerAfter = providerHeadline[providerIndex + marker.length];
+    const sourceBefore = protectedSourceHeadline[sourceIndex - 1];
+    const sourceAfter = protectedSourceHeadline[sourceIndex + marker.length];
+    return (isFinancialSign(providerBefore) && providerBefore !== sourceBefore)
+      || (isFinancialSign(providerAfter) && providerAfter !== sourceAfter);
+  });
+}
+
 export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string; translatedSummary: string; translatedContent?: string; translationCandidateTitle?: string; translationFallback: boolean; translationFallbackReason?: string; translationNotRequired?: boolean; requestOrigin?: "PROVIDER" | "CACHE" | "QUOTA_FALLBACK"; translationProvider?: string; translationProviderAttempts?: number };
 export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
 export type MarketRssTranslationFallbackHandler = (item: MarketRssItem, result: TranslationResult) => void;
@@ -154,7 +170,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const providerHeadlineWithSigns = (providerHeadline || "")
     .replace(/&#(?:43|x2b);/gi, "+")
     .replace(/&#(?:45|x2d);/gi, "-");
-  const unprotectedFinancialSign = /[+\-−﹣－]ZX\d+Q|ZX\d+Q[+\-−﹣－]/i.test(providerHeadlineWithSigns);
+  const unprotectedFinancialSign = hasUnprotectedFinancialSign(providerHeadlineWithSigns, preparedInput.text, preparedInput.placeholders);
   const signedUnprotectedNumeral = /[+\-−﹣－]\s*\d/.test(unprotectedHeadlineDigits);
   if (inventedNumeral || unprotectedFinancialSign || signedUnprotectedNumeral) {
     const fallback = await validationFallback("translation_numeric_hallucination", translatedHeadline);
