@@ -12,14 +12,11 @@ export function buildMarketRssLinkUpsertValue() {
   END`;
 }
 
-/** Clear translation state only when the source text/context used for translation changes. */
+/** Clear translation state only when the title submitted to the provider changes. */
 export function buildMarketRssTranslationUpsertReset() {
-  const sourceTextChanged = sql`(
-    ${marketRssArticles.title} IS DISTINCT FROM excluded.title
-    OR ${marketRssArticles.summary} IS DISTINCT FROM excluded.summary
-  )`;
+  const sourceTitleChanged = sql`${marketRssArticles.title} IS DISTINCT FROM excluded.title`;
   const resetIfChanged = (column: AnyColumn, emptyValue: string | null) =>
-    sql`CASE WHEN ${sourceTextChanged} THEN ${emptyValue} ELSE ${column} END`;
+    sql`CASE WHEN ${sourceTitleChanged} THEN ${emptyValue} ELSE ${column} END`;
 
   return {
     translatedTitle: resetIfChanged(marketRssArticles.translatedTitle, null),
@@ -27,13 +24,13 @@ export function buildMarketRssTranslationUpsertReset() {
     translatedSummary: resetIfChanged(marketRssArticles.translatedSummary, null),
     translatedContent: resetIfChanged(marketRssArticles.translatedContent, null),
     translationProvider: resetIfChanged(marketRssArticles.translationProvider, null),
-    translationCharCount: sql`CASE WHEN ${sourceTextChanged} THEN 0 ELSE ${marketRssArticles.translationCharCount} END`,
+    translationCharCount: sql`CASE WHEN ${sourceTitleChanged} THEN 0 ELSE ${marketRssArticles.translationCharCount} END`,
     translationSkippedReason: resetIfChanged(marketRssArticles.translationSkippedReason, null),
-    translationTranslatedAt: sql`CASE WHEN ${sourceTextChanged} THEN NULL ELSE ${marketRssArticles.translationTranslatedAt} END`,
-    translationAttemptedAt: sql`CASE WHEN ${sourceTextChanged} THEN NULL ELSE ${marketRssArticles.translationAttemptedAt} END`,
-    translationStatus: sql`CASE WHEN ${sourceTextChanged} THEN 'PENDING' ELSE ${marketRssArticles.translationStatus} END`,
-    translationFallback: sql`CASE WHEN ${sourceTextChanged} THEN FALSE ELSE ${marketRssArticles.translationFallback} END`,
-    translationAttempts: sql`CASE WHEN ${sourceTextChanged} THEN 0 ELSE ${marketRssArticles.translationAttempts} END`,
+    translationTranslatedAt: sql`CASE WHEN ${sourceTitleChanged} THEN NULL ELSE ${marketRssArticles.translationTranslatedAt} END`,
+    translationAttemptedAt: sql`CASE WHEN ${sourceTitleChanged} THEN NULL ELSE ${marketRssArticles.translationAttemptedAt} END`,
+    translationStatus: sql`CASE WHEN ${sourceTitleChanged} THEN 'PENDING' ELSE ${marketRssArticles.translationStatus} END`,
+    translationFallback: sql`CASE WHEN ${sourceTitleChanged} THEN FALSE ELSE ${marketRssArticles.translationFallback} END`,
+    translationAttempts: sql`CASE WHEN ${sourceTitleChanged} THEN 0 ELSE ${marketRssArticles.translationAttempts} END`,
     translationError: resetIfChanged(marketRssArticles.translationError, null),
   };
 }

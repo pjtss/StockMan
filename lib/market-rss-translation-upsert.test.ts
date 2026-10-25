@@ -13,25 +13,25 @@ describe("market RSS translation source refresh invalidation", () => {
     expect(query.sql).toContain('ELSE "market_rss_articles"."link" END');
   });
 
-  it("does not invalidate title translation for body or raw-payload-only refreshes", () => {
+  it("does not invalidate title translation for summary, body or raw-payload-only refreshes", () => {
     const dialect = new PgDialect();
     const reset = buildMarketRssTranslationUpsertReset();
     const query = dialect.sqlToQuery(reset.translationStatus).sql;
 
     expect(query).toContain('"title" IS DISTINCT FROM excluded.title');
-    expect(query).toContain('"summary" IS DISTINCT FROM excluded.summary');
+    expect(query).not.toContain('"summary" IS DISTINCT FROM excluded.summary');
     expect(query).not.toContain("excluded.content");
     expect(query).not.toContain("excluded.raw_payload");
   });
 
-  it("resets translated content and all attempt metadata only when title or summary changes", () => {
+  it("resets translated title and attempt metadata only when title changes", () => {
     const dialect = new PgDialect();
     const reset = buildMarketRssTranslationUpsertReset();
 
     for (const field of ["translatedTitle", "translationCandidateTitle", "translatedSummary", "translatedContent", "translationProvider", "translationCharCount", "translationSkippedReason", "translationTranslatedAt", "translationAttemptedAt", "translationStatus", "translationFallback", "translationAttempts", "translationError"] as const) {
       const query = dialect.sqlToQuery(reset[field]);
       expect(query.sql, field).toContain("IS DISTINCT FROM excluded.title");
-      expect(query.sql, field).toContain("IS DISTINCT FROM excluded.summary");
+      expect(query.sql, field).not.toContain("IS DISTINCT FROM excluded.summary");
       expect(query.sql, field).toContain("CASE WHEN");
     }
 

@@ -20,7 +20,7 @@ Azure Translator F0의 공식 무료 제공량은 월 2,000,000자다. RSS 앱�
 
 ## 저장 및 상태
 
-원문 제목은 `market_rss_articles.title`, 한국어 제목은 `translated_title`에 저장한다. `translated_summary`와 `translated_content`는 호환성을 위한 원문 보존 필드이며 번역 결과가 아니다. 번역 성공 상태는 `TRANSLATED`, 이미 한국어인 제목은 `SKIPPED/already_in_target_language`, provider 부재나 한도 초과는 별도 `SKIPPED`, 예외는 `FAILED`, 처리 전은 `PENDING`이다. Discord 전송 query는 `TRANSLATED` 또는 이미 한국어인 제목만 허용한다.
+원문 제목은 `market_rss_articles.title`, 한국어 제목은 `translated_title`에 저장한다. `translated_summary`와 `translated_content`는 호환성을 위한 원문 보존 필드이며 번역 결과가 아니다. RSS refresh 때 제목이 바뀐 경우에만 번역 결과·시도 상태를 초기화한다. summary/body/raw payload 변경은 제목 번역을 무효화하지 않는다. 번역 성공 상태는 `TRANSLATED`, 이미 한국어인 제목은 `SKIPPED/already_in_target_language`, provider 부재나 한도 초과는 별도 `SKIPPED`, 예외는 `FAILED`, 처리 전은 `PENDING`이다. Discord 전송 query는 `TRANSLATED` 또는 이미 한국어인 제목만 허용한다.
 
 ## 운영 주기 및 진단
 
