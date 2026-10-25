@@ -52,6 +52,8 @@ describe("market RSS headline context normalization", () => {
     ["BioNTech und Bristol Myers Squibb präsentieren Phase-2-Studie mit Pumitamig bei Lungenkrebs", "BioNTech와 Bristol Myers Squibb는 글로벌 -2상 연구에서 데이터를 발표합니다", "BioNTech와 Bristol Myers Squibb는 글로벌 2상 연구에서 데이터를 발표합니다"],
     ["BioNTech and Bristol Myers Squibb Report Global Phase 2 Data for Pumitamig in Advanced NSCLC", "BioNTech는 글로벌 2 상기 데이터를 권장한다고 보고했습니다", "BioNTech는 글로벌 2상 데이터를 권장한다고 보고했습니다"],
     ["Company presents Phase 2/3 study results in lung cancer", "회사는 상 2/3 연구 결과를 발표했습니다", "회사는 2/3상 연구 결과를 발표했습니다"],
+    ["Company reports Phase 1 clinical study results", "회사가 임상 1단계 연구 결과를 발표했습니다", "회사가 임상 1상 연구 결과를 발표했습니다"],
+    ["Company reports Phase 2b clinical study results", "회사가 임상 2b 단계 연구 결과를 발표했습니다", "회사가 임상 2b상 연구 결과를 발표했습니다"],
   ])("repairs common provider phase-order artifacts only when the source title identifies that phase", (source, translated, expected) => {
     expect(normalizeTranslatedMarketRssClinicalPhase(source, translated)).toBe(expected);
   });

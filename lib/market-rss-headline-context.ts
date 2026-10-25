@@ -48,9 +48,10 @@ export function normalizeTranslatedMarketRssClinicalPhase(sourceTitle: string, t
   for (const stage of new Set(stages)) {
     const stagePattern = stage.replace(/\//g, "\\s*\\/\\s*");
     normalized = normalized
-      .replace(new RegExp(`상\\s*${stagePattern}(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
+      .replace(new RegExp(`(?<![\\p{L}\\p{N}])상\\s*${stagePattern}(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
       .replace(new RegExp(`(?:-|–|—)\\s*${stagePattern}\\s*상(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
       .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s+상기(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
+      .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s*단계(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
       .replace(new RegExp(`단계\\s*${stagePattern}(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`)
       .replace(new RegExp(`(?<![\\p{L}\\p{N}])${stagePattern}\\s+상(?![\\p{L}\\p{N}])`, "giu"), `${stage}상`);
   }

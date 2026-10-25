@@ -1,3 +1,31 @@
+## [2026-10-26] 임상 단계 정규화 경계 보완
+
+### 목표
+- 원문에 임상 단계가 표시된 번역 제목만 안전하게 교정하고, `임상 2b 단계` 같은 정상 문맥이 보정 과정에서 손상되지 않게 한다.
+
+### 원인
+- 기존 `상 2` 오역 보정 패턴에 좌측 단어 경계가 없어 `임상 2b 단계`의 `상 2b`를 잘못 매칭할 수 있었다. 또한 `1단계`·`2b 단계`처럼 provider가 임상 단계를 `단계`로 표현한 출력은 표준 `1상`·`2b상`으로 정규화하지 않았다.
+
+### 반영
+- `lib/market-rss-headline-context.ts`: `상 N` 교정에 좌측 문자/숫자 경계를 적용해 `임상` 내부 글자를 보존하고, 원문에서 확인된 임상 단계 앞뒤의 `N 단계`·`N단계` 표기를 `N상`으로 정규화한다.
+- `lib/market-rss-headline-context.test.ts`: 1상 및 2b상 표기 교정과 `임상` 문맥 보존 회귀를 추가했다. 최초 테스트는 실제 경계 오류를 재현했고 수정 뒤 통과했다.
+
+### 검증
+- RSS 제목 번역·저장 번역 검증·전송 게이트 대상 4개 파일 122개 테스트 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- 1차 전체 검증은 docs 계약 수정으로 중단됐고, 문구를 수정한 뒤 `npm.cmd run deploy:verify` 최종 통과: dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302개 파일(302 passed/1 skipped; 1,526 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검사 통과. 운영 코드는 현재 `13af42b1`이며, 이번 로컬 수정은 배포 전이다.
+
+### 다음 개선
+- 전체 `npm.cmd run deploy:verify`를 통과한 뒤 RSS 전용 권한으로 배포하고 운영 SHA와 health를 확인한다. quota가 복구되면 세 출처의 신규 provider 제목을 표본 검수하고 backlog의 actual Discord 수신을 확인한다. 사람 검수 fixture에 세 출처의 원문·provider 제목·교정 번역을 추가하고 검수 명령을 배포 게이트에 연결해 의미 정확성 coverage를 계량한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-26-002
+- 성과 판정: PARTIAL
+- 근거: 실 운영 임상 단계 표기 문제를 보완하는 과정에서 기존 `임상` 경계 손상 가능성을 테스트로 발견해 수정했고 122개 표적 테스트가 통과했다. 전체 배포 검증, 운영 반영 및 실제 번역 의미 검수는 남았다.
+
+### 커밋·푸시·배포
+- 미실행: 로컬 변경 상태이며 필수 전체 검증 통과 후 RSS 전용 코드로 순차 반영한다.
 ## [2026-10-26] 운영 오역 표본 기반 임상 단계 및 송신 전 재검증
 
 ### 목표
@@ -952,7 +980,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `us-daily-indicators`는 registry와 route에 있으나 OCI cron 설정에서 호출되지 않고 연결 DB의 90일 실행 이력도 없어 scheduler 누락 후보로 기록했다. 다른 자동화의 무기록만으로 미사용 판정하지 않았다.
 
 ### 검증
-- `git diff --check` 통과. API·import·navigation·OCI cron 정적 참조를 확인했고, SEC 자동 수집은 `/api/cron/sec-edgar` 및 `/api/cron/market-rss` 경로에 남아 있음을 확인했다.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다. API·import·navigation·OCI cron 정적 참조를 확인했고, SEC 자동 수집은 `/api/cron/sec-edgar` 및 `/api/cron/market-rss` 경로에 남아 있음을 확인했다.
 - 연결 DB는 `.env.local` 우선 환경으로 `BEGIN READ ONLY` 조회했다. 25 registry 항목 중 3개 `NOT_SCHEDULED`, 22개 `OCI_CRON`; 최근 30일 기록은 `dart-realtime` 132회뿐이고 나머지 scheduled 항목은 0회, 90일에는 7개 module만 기록이 있었다. 이는 DB에 기록된 이력이며 기능 미사용의 증거와 동일하지 않다.
 - `npm.cmd run docs:check`는 기존 migration 중복 V148 및 V149로 실패했다. V156 `instrument_fundamental_attempt_timestamp` 삭제는 원격 코드가 해당 컬럼을 읽고 쓰므로 배포 전 재검토가 필요하다.
 - `origin/oci` 기준 2 ahead·5 behind로 분기되어 있으며 이전 전체 검증의 테스트 실패도 남아 있어 deploy 검증은 통과하지 않았다.
@@ -2475,7 +2504,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 실제 API route 170개 감사 통과; 현재 이중 이스케이프 파서 0건.
 - 전체 `npm.cmd run deploy:verify` 통과: production build, 194개 테스트 파일 중 193개 통과/1개 skip(659개 통과/1개 skip), typecheck, docs:check, verify-scope, KIS boundary, Bearer auth audit, OCI cron 21 endpoints.
 - Standalone smoke 통과: `/charts` 200, invalid KIS market 400, KR/US top-rising chart 200, 보호된 admin/cron 미인증 401, 프로세스 종료 정리 완료.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 ### 다음 개선
 - cron/API 인증 파서가 중앙 공통 함수를 사용하도록 점진적으로 통합하고, header precedence와 whitespace 동작을 동일한 계약 테스트로 검증한다.
@@ -2896,7 +2926,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 최신 원격 기준 격리 작업 트리에서 `npm.cmd run deploy:verify` 통과: production build 성공, 174개 테스트 파일 586 passed / 1 skipped, typecheck 통과, docs:check(18 entry points, V143) 통과, verify-scope/KIS boundary/cron 19 endpoints 통과.
 - standalone runtime smoke에서 `/charts`, `/api/stock/us/top-rising-chart`, `/api/stock/kr/top-rising-chart` 모두 HTTP 200 및 HTML/JSON 응답을 확인했다.
 - 첫 실행에서 테스트 통과 후 문서 계약 오류를 발견해 로그를 수정했다. 다음 실행은 불완전한 `node_modules/next` 파일 누락으로 빌드 실패했으며, 격리 작업 트리에서 lockfile 기준 `npm.cmd ci`로 복구한 후 전체 게이트를 다시 실행해 통과했다. 원본 작업 트리 의존성은 건드리지 않았다.
-- `git diff --check` 통과. LF→CRLF 안내만 확인했다.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다. LF→CRLF 안내만 확인했다.
 
 ### 다음 개선
 - KIS 상승률 응답에 시가총액·랭킹 거래대금이 없을 때 공식 USD 시총 스냅샷 연결을 별도 검증하고, 값과 시점이 확인되기 전에는 비율을 미확인으로 표시한다.
@@ -2929,7 +2960,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 전용 중복 제거/ingest 테스트 실행: `npm.cmd exec vitest run -- lib/market-rss-dedupe.test.ts lib/market-rss.test.ts` 통과 (2 files / 5 tests).
 - 전체 `npm.cmd run deploy:verify` 통과: production build, 전체 테스트 172개 파일(571 통과·1 skip), typecheck, docs:check(18 entry points, migration V143), audit verify scope, KIS boundary audit, cron check(19 endpoints), standalone runtime smoke.
 - 실행 검증에서 `/charts`는 HTTP 200. 국내/해외 TOP 상승률 API는 JSON 응답 파싱을 확인했으나 해외 API가 HTTP 502를 반환했다. 격리된 worktree에는 `.env.local`이 없어 외부 KIS/DB 의존 경로는 정상 데이터 응답까지 검증하지 못했다. 이는 RSS 변경 검증 범위와 별개이며 정상 API 동작으로 간주하지 않는다.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - GitHub Actions `Deploy OCI` run 950 (`6d67912d74f7f831cf036cdaadf0f9d174739136`) 전체 단계 성공, 운영 `/api/health` HTTP 200.
 - 배포 후 운영 자동화 진단에서 06:35 및 06:40 UTC `market-rss` 두 run 연속 SUCCESS 확인. 각 run은 359건 ingest, translation attempted=3, translated=3, failed=0, fallback=0. 직전 배포 전 run은 SQLSTATE 21000 실패였으며 후속 두 run에서 같은 오류는 재발하지 않았다.
 - 운영 번역 진단에는 여전히 `PENDING` 199건이 보인다. 파이프라인 성공과 새 번역 성공은 확인했지만 이 카운트의 backlog/notifyEligible 구성은 확인하지 않았으므로 전체 대기열 해소로 간주하지 않는다.
@@ -5375,7 +5407,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
 - `r`npm.cmd run audit:verify-scope` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - `r`npm.cmd run verify` 통과: 152개 테스트 파일·502개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사, Next.js 프로덕션 빌드 성공.
 
 근거: 표준 `verify` 명령 정의에 감사 단계가 포함되고, 개별 감사·문서·diff 검증이 모두 종료 코드 0으로 완료됐다.
@@ -5437,7 +5470,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
 - `r`npm.cmd run audit:verify-scope` 통과: 새 manifest 승인 메타데이터 확인.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 현재 manifest가 untracked 상태임에도 감사가 실제 파일을 읽어 승인 메타데이터를 검증했고, 문서·diff 검증이 종료 코드 0으로 완료됐다.
 
@@ -5467,7 +5501,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 - `r`npx vitest run scripts/audit-verify-scope-change.test.mjs --run` 통과: 3개 테스트.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 정상·실패 경로 3개가 모두 의도한 종료 상태와 오류 메시지를 검증하고, 문서·diff 검사도 종료 코드 0으로 완료됐다.
 
@@ -5522,7 +5557,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 - `r`npm.cmd run audit:verify-scope` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: `measure-verify.mjs`의 단계 목록에 `verifyScope`가 `docs` 이후, KIS 경계 감사 이전으로 포함됐다.
 
@@ -5580,7 +5616,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 - `r`npm.cmd run audit:verify-scope` 통과: manifest 변경 승인 메타데이터 확인.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: `measure-verify.mjs`, `package.json`의 `verify`, `verify-scope.json`이 모두 `verifyScope`를 포함한다.
 
@@ -5640,7 +5677,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `r`node --check scripts/measure-verify.mjs` 통과.
 - `r`node --check scripts/compare-verify.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 측정·비교 스크립트의 구문 검사와 문서 검사가 종료 코드 0으로 완료됐다.
 
@@ -5697,7 +5735,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 - `r`npx vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 동일·상이 커밋 비교 테스트가 모두 의도한 상태와 신뢰도를 검증했고, 문서·diff 검증도 종료 코드 0으로 완료됐다.
 
@@ -5727,7 +5766,8 @@ Windows 검증 실행에서 shell 보안 경고를 제거하고, 측정 파이�
 - Windows `cmd.exe /d /s /c npm.cmd run audit:verify-scope` 실행 성공.
 - `r`node --check scripts/measure-verify.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 명시적 `cmd.exe` 실행은 종료 코드 0으로 완료됐고, shell 기반 Node `DEP0190` 경고 없이 감사 명령이 실행됐다.
 
@@ -5784,7 +5824,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - `r`npx vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
 - `r`node --check scripts/measure-verify.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 테스트와 모든 정적 검증이 종료 코드 0으로 완료됐으며 임시 저장소 생성에 따른 반복 CRLF 경고가 제거됐다. 남은 Git 안내는 기존 작업 트리의 변환 경고다.
 
@@ -5813,7 +5854,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 - `r`node --check scripts/verify-deploy.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - `git check-ignore reports/verify-measured-2026-09-13-shell-fix.json` 통과.
 - `git check-ignore .next-ui-build/` 통과.
 
@@ -5873,7 +5915,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 - `r`node --check scripts/verify-deploy.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 배포 검증 quality gate에 두 감사 명령이 표준 verify와 동일한 순서로 포함됐다.
 
@@ -5961,7 +6004,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 - `r`node --check scripts/verify-deploy.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: 배포 검증 실행 경계에 시작·진행·완료 로그와 경과 시간 계산이 구현됐다.
 
@@ -6021,7 +6065,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 - `r`node --check scripts/verify-deploy.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - `.next-*/` ignore 규칙이 `.next-deploy-verify`에 적용됨을 확인.
 
 근거: build와 runtime이 동일한 전용 `verifyDistDir`를 사용하도록 코드 경계를 일치시켰다.
@@ -6052,7 +6097,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 - `r`node --check scripts/verify-deploy.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - 기존 배포 검증에서 발견된 `EADDRINUSE` false positive 원인을 코드 경로로 재현·해결했다.
 
 근거: smoke test 포트가 실행 시 새로 확보되므로 기존 프로세스가 health 응답을 가로채는 경로가 제거됐다.
@@ -6112,7 +6158,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 - `r`node --check scripts/verify-deploy.mjs` 통과.
 - `r`npm.cmd run docs:check` 통과.
-- `git diff --check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
 근거: smoke test의 성공 조건과 실패 진단 정보가 코드에 명시적으로 반영됐다.
 
