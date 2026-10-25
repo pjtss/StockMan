@@ -1,29 +1,31 @@
 ## [2026-10-26] 번역 retry worker를 미발송 기사로 제한
 
 ### 목표
-- 번역 quota 복구 후 제한된 문자를 실제 Discord 발송 대상인 과거 대기/미발송 기사에 우선 사용한다.
+- 번역 quota 복구 후 제한된 문자를 Discord 발송 대기 기사에 우선 사용한다.
 
 ### 원인
-- `translatePendingMarketRssArticles`가 retry-status 조건만 사용했고, 이미 `SENT`인 기사 상태를 걸러 주는 retry module의 전용 candidate 조건을 연결하지 않았다. 이 때문에 월 reset 뒤 과거에 이미 발송된 quota-skip 행도 번역 retry 대상이 될 수 있었다.
+- `translatePendingMarketRssArticles`가 retry-status 조건만 사용하고 notification 상태를 확인하지 않았다. 이미 `SENT`인 quota-skip 기사도 월 reset 뒤 번역 retry 대상으로 선택될 수 있었다.
+- 작업 로그를 갱신할 때 비고유 문구 치환이 반복된 과거 항목에도 적용되는 문서 손상을 만들었다. 부모 커밋의 원본 전체를 복원한 다음 새 작업 항목만 앞에 보존했다.
 
 ### 반영
-- `lib/market-rss-pipeline.ts`: translation worker가 `buildMarketRssTranslationCandidateCondition`을 사용하게 해 translation retry 조건에 notification 상태 `PENDING`, `FAILED`, `SKIPPED`를 함께 요구한다. source allowlist는 기존 SEC EDGAR, StockTitan, GlobeNewswire를 유지하고 등급·키워드 필터는 적용하지 않는다.
-- `lib/market-rss-translation-retry.test.ts`: candidate SQL이 `notify_eligible`/`is_backlog`로 필터링되지 않으면서 unsent 상태만 포함하고 `SENT`와 `UNCERTAIN`을 제외하는 기존 regression을 확인했다.
+- `lib/market-rss-pipeline.ts`: translation worker가 `buildMarketRssTranslationCandidateCondition`을 사용하도록 바꿔 notification 상태 `PENDING`, `FAILED`, `SKIPPED`만 재번역 후보로 포함한다. SEC EDGAR, StockTitan, GlobeNewswire source allowlist와 과거 backlog 처리, 등급·키워드 필터 없음은 유지한다.
+- `lib/market-rss-translation-retry.test.ts`: candidate SQL regression에서 `SENT`와 `UNCERTAIN` 제외 및 `PENDING`, `FAILED`, `SKIPPED` 포함을 확인한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 관련 테스트 4파일 128개 통과; 비어 있는 사람 검수 fixture 때문에 의미 사례 2개 skip. `git diff --check` 통과.
+- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111개 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사.
+- 운영 read-only (2026-10-25 15:56Z): notification pending GNW 6, SEC 0, StockTitan 2,303; monthly quota skip GNW 6, SEC 238, StockTitan 11,395. provider quota가 초과라 재처리 실측은 남았다.
+
 ### 다음 개선
-- `npm.cmd run deploy:verify`를 실행하고 RSS 전용 변경을 배포한다. 다음 UTC 월 quota reset 뒤 source별 `translation_skipped`, `notification_pending`, `sent`, `uncertain` 변화를 추적해 미발송 backlog가 translation worker에서 처리되는지 확인한다.
+- 코드 workflow `40210193279`가 성공하고 운영 SHA `cd55b5ef`, `/api/health` `ok`를 확인했다. 2026-10-25 16:18:11Z read-only 집계: GNW pending 0, sent 25, skipped 7; SEC pending 0, sent 8,692, skipped 238, uncertain 3; StockTitan pending 2,304, sent 8,788, skipped 11,396, uncertain 2. 모든 신규 skip은 `monthly_character_limit_reached`; 아직 대기한 backlog의 실제 Discord 수신은 확인되지 않았다. 다음 UTC quota reset 후 source별 pending, skipped, sent, uncertain와 제목 번역 표본·실제 Discord 수신을 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-26-003
 - 성과 판정: PARTIAL
-- 근거: 재시도 후보를 실제 미발송 기사로 제한하고 기존 SQL 회귀 128개가 통과했다. live provider quota가 현재 초과라 운영에서 새 번역과 Discord 수신 성공은 아직 확인되지 않았다.
+- 근거: 재시도 후보를 미발송 기사로 제한했고 전체 배포 검증을 통과했다. quota 제한으로 신규 번역 및 Discord 수신은 아직 검증되지 않았다.
 
 ### 커밋·푸시·배포
-- 미실행: worker code 및 이 로그 변경은 전체 검증과 배포 전이다.
+- 완료: RSS 코드 커밋 `cd55b5efe4537f04b5c1e0c1dac89ba83ddc1d91`을 `origin/oci`에 push했다. Deploy OCI workflow `40210193279`의 verify/package/SSH/upload/activate가 성공했고 운영 SHA는 `cd55b5ef`, `/api/health`는 `ok`다. 이어 과거 로그 손상을 복구한 문서 변경도 별도 검증 후 push한다.
 ## [2026-10-26] 임상 단계 정규화 경계 보완
 
 ### 목표
@@ -37,9 +39,11 @@
 - `lib/market-rss-headline-context.test.ts`: 1상 및 2b상 표기 교정과 `임상` 문맥 보존 회귀를 추가했다. 최초 테스트는 실제 경계 오류를 재현했고 수정 뒤 통과했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- RSS 제목 번역·저장 번역 검증·전송 게이트 대상 4개 파일 122개 테스트 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- 1차 전체 검증은 docs 계약 수정으로 중단됐고, 문구를 수정한 뒤 `npm.cmd run deploy:verify` 최종 통과: dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302개 파일(302 passed/1 skipped; 1,526 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검사 통과. 운영 read-only 사후 확인(2026-10-25 15:50Z): `/health-check` SHA `806064f46e215086566c46505fd8107699b98154`, `/api/health` `ok`; OCI workflow `40208437108` 성공. RSS 집계는 GlobeNewswire pending 6/quota skip 6, SEC pending 0/quota skip 238, StockTitan pending 2,302/quota skip 11,394이며 새 대기 기사도 `monthly_character_limit_reached`로 fallback 발송 없이 대기한다.
+
 ### 다음 개선
 - 번역 quota가 다시 허용되면 관리자 RSS 검수 CSV를 출처별로 내려받아 원문 제목·provider 결과·원문 요약을 대조하고 승인 사례를 semantic fixture로 가져온다. fixture를 CI gate에 연결한 뒤 다시 전체 검증하고, pending/failed/uncertain이 0이며 Discord에서 세 출처별 수신을 확인할 때까지 운영 aggregate를 추적한다.
 
@@ -67,9 +71,10 @@
 - `scripts/README.md`: title-only provider 경로를 반영하고, 비어 있는 human-reviewed semantic fixture와 실제 검증 명령 연결 상태를 정확히 문서화했다. 현재 fixture `cases`는 0건이며 deploy gate는 의미 번역 정확성을 증명하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/translate-market-rss-item.test.ts lib/market-rss-notification-translation-validation.test.ts lib/market-rss-notification-translation-gate.test.ts --reporter=dot`: 4개 파일 120개 테스트 통과.
+- `npm.cmd run docs:check`: 통과. `git diff --check`: 통과.
+- `npm.cmd run check:rss-translation-coverage`: 실패. 사람 검수 semantic fixture가 현재 0건이라 fixture coverage를 입증할 수 없다. 이 별도 검사는 `npm run deploy:verify`에 포함돼 있지 않다.
+
 ### 다음 개선
 - `npm.cmd run deploy:verify` 통과(2026-10-26): dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 passed/1 skipped (1,524 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검증 통과. 실제 신규 provider 번역 의미 품질은 quota 복구 뒤 출처별 검수 표본으로 확인한다.
 
@@ -95,9 +100,9 @@
 - `lib/market-rss-translation-review-fixtures.test.ts`: 품질 fixture 실행도 원제목만 provider 입력으로 사용하도록 수정했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 대상 테스트 `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-review-fixtures.test.ts --reporter=dot`: 2개 파일 통과, 98개 통과·2개 데이터 fixture skip(승인된 human-review 사례 없음).
+- 전체 `npm.cmd run deploy:verify`: 최종 통과. dependency audit 0 vulnerabilities, Next production build, standalone HTTP/Chrome desktop·mobile/API smoke, Vitest 302개 파일(301 passed·1 skipped; 1,514 passed·3 skipped), typecheck, docs/migration, scope, KIS boundary, Bearer auth(180 routes), OCI cron 검증을 모두 통과했다. 첫 검증에서 DEVELOPMENT_LOG 최신 항목의 필수 문서 계약 누락을 발견해 양식을 보완한 뒤 재실행하여 전 게이트 성공을 확인했다.
+
 ### 다음 개선
 - 다음 Google 월 한도 reset 이후 실제 신규 제목 번역을 세 출처에서 표본 확인하고 backlog가 번역 게이트를 통과해 Discord에서 수신되는지 확인한다. quota 미승인 상태에서는 cap을 바꾸지 않는다.
 
@@ -142,9 +147,16 @@
 - `docs/architecture/stocktitan-translation.md`: 현재 보호 규칙은 token을 분리하지 않지만 provider가 token 위치를 옮길 수 있다는 한계를 명시한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 운영 read-only 표본(720시간 범위): GlobeNewswire 25개 중 6개에서 임상 단계/괄호 등 legacy 품질 패턴이 보였고, 여기에는 `Phase 2`의 `2 상기`, `Phase 3`와 `VIKTORIA-1`의 혼합, `Phase 2/3`와 `COMPANION-002`의 혼합이 포함됐다. 이 샘플은 새 SHA 배포 전 저장된 번역이다.
+- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/market-rss-translation-protection.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 161개 테스트 통과.
+- 통합 회귀 추가 후 `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,518 tests passed/3 skipped; build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 성공.
+- GitHub Actions run `40193652992` success 및 운영 `/health-check` HTTP 200, 새 SHA `6316c4ff82a15f5260d1ec6bbbad59bf9e56eedb` 확인. 새 provider 출력은 월간 quota에 막혀 검증 불가이며, 실제 provider 출력이 의미상 완벽하다고 주장하지 않는다.
+- 운영 최신 집계 2026-10-25 12:53Z: SEC notification pending 2,640, StockTitan 2,298, GlobeNewswire 3; StockTitan translation pending 326 및 quota-skipped 11,064. 운영 SHA `614363b2f660ecf11132364d99ef03e0becb046b`에서 새 provider 번역이 성공한 샘플은 아직 없다.
+
+### 재발 감지·남은 위험
+- 입력 정규화와 보호 token 테스트는 언어별 phase 표기를 보장하지 않는다. 인식하지 못하는 새 언어 표기나 provider의 token 재배치는 실제 provider 품질 표본으로 계속 확인해야 한다.
+- provider quota로 새 출력 표본을 확인할 수 없으며 저장된 과거의 잘못된 번역은 이번 코드 변경으로 자동 재작성되지 않는다.
+
 ### 다음 개선
 - 월 quota reset 후 동일 clinical fixture를 실제 provider에 재시도해 title-only Korean 결과를 확인하고, 필요 시 잘못된 unsent legacy 번역을 검증 후 재처리한다.
 
@@ -168,9 +180,16 @@
 - 이번 관찰은 새 운영 기사에 대한 외부 provider 번역 샘플을 입증하지 않는다. 현재 quota skip이 실제 provider 요청을 막고 있어 provider 응답을 검증할 표본이 없다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- GitHub Actions run `40191460423`: Verify deployment, standalone packaging, SSH configuration, release upload, activate release 모두 success.
+- 운영 `/health-check` HTTP 200 및 SHA `d5e9842110997ca7f1d0daca248489618eefc9b2` 확인.
+- 표적 회귀 154개 통과 및 전체 `npm.cmd run deploy:verify` 통과(302개 test files: 301 passed/1 skipped; 1,511 tests passed/3 skipped).
+- 운영 DB aggregate 조회는 GET만 사용했으며 기사 본문/raw payload를 요청하지 않았다.
+
+### 재발 감지·남은 위험
+- cron은 기존 translation retry 조건으로 월간 한도 오류 행을 월 경계 뒤 다시 처리한다. 월 경계 이후에도 `translation_pending`, `notification_pending`, `SKIPPED`가 줄지 않는지 확인이 필요하다.
+- 집계상 legacy sent gate violation이 존재하나 이미 보낸 메시지의 수정·삭제는 하지 않았다. 신규 전송은 현행 제목 번역 게이트로 제한된다.
+- Provider quota와 backlog 처리 속도 때문에 모든 과거 기사의 번역·Discord 전송은 아직 끝나지 않았다.
+
 ### 다음 개선
 - 월 한도 재설정 후 실제 새 provider 번역에서 한국어 제목의 임상 단계 위치 보존, summary/body 원문 유지, 세 출처 큐 소진을 확인한다.
 
@@ -198,9 +217,16 @@
 - `docs/architecture/stocktitan-translation.md`: 제목 입력의 단계 정규화 경계를 문서화한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- lib/market-rss-translation-protection.test.ts lib/market-rss-headline-context.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 154개 테스트 통과.
+- `npm.cmd run docs:check`: 통과. 첫 실행은 중복 improvement task ID `CI-2026-10-25-015` 때문에 실패해 새 ID `016`으로 수정 후 통과했다.
+- 단계 marker 보호 포함 `npm.cmd run deploy:verify` 통과: dependency audit 0, build, standalone runtime smoke, desktop/mobile Chrome hydration, 전체 302개 test files(301 passed/1 skipped; 1,511 tests passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron gates. standalone 빌드 중 Windows node_modules junction EPERM 경고는 smoke fallback 성공으로 복구됐다.
+- production rollout과 실제 provider 결과 검증은 아직 전이다.
+
+### 재발 감지·남은 위험
+- 회귀 테스트가 임상 단계 표기 및 비임상 project phase 비변경을 자동 검사한다. 이 규칙은 임상 맥락 키워드를 기반으로 하므로, 새로운 적응증 약어·언어별 phase 표현은 누락될 수 있고 의미 전반의 번역 정확도를 증명하지 않는다.
+- 위치 보호는 번역 provider가 marker를 그대로 보존할 때만 작동한다. marker 손실·변조는 기존 품질 게이트에 의해 번역 미완료로 처리되며 Discord 전송을 보류한다.
+- 월간 provider 한도 소진으로 backlog와 실 provider 품질 표본 관찰은 계속 제한된다.
+
 ### 다음 개선
 - 변경을 전체 배포 검증과 운영 배포로 반영한 뒤 신규 임상 단계 제목의 한국어 출력·Discord 게이트·summary/body 원문 유지 상태를 확인하고, 남은 token/numeric 오류 표본을 보완한다.
 
@@ -227,9 +253,20 @@
 - `docs/architecture/stocktitan-translation.md`: 신규 구조 검사의 범위와 의미 정확성은 별도 표본 검토가 필요한 한계를 기록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 배포 `c7278d40` 이후 운영 `/health-check`에서 동일 SHA가 서빙됨을 확인했다. read-only RSS 진단 시점 `2026-10-25 10:55:35Z`: GlobeNewswire 25건 전부 translated/sent, SEC 번역 대기 0·알림 대기 4,736, StockTitan 번역 대기 2,186·알림 대기 2,298이었다. 이는 잔여 backlog가 없어졌다는 증거가 아니다.
+- 운영 번역 표본에서는 괄호가 닫히지 않은 잘린 제목이 완전성 검사까지 통과할 수 있음을 확인했다. 이 항목은 기존 구현의 회귀 원인으로 잡아 검사 규칙을 보강했다.
+- `npm.cmd exec vitest run -- lib/market-rss-translation-quality.test.ts --reporter=dot`: 1개 파일, 12개 테스트 통과. `git diff --check` 통과.
+- end-to-end 테스트의 첫 실행은 모의 provider가 보호 토큰 `ZX0Q`를 돌려주지 않아 `protected_token_mismatch` 결과가 발생했다. mock이 보호 토큰을 보존하도록 고친 뒤 `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-quality.test.ts --reporter=dot`에서 2개 파일 111개 테스트 통과.
+- 첫 `npm.cmd run deploy:verify`는 개선 로그 필수 섹션 누락으로 `docs:check`에서 실패했다. DEVELOPMENT_LOG.md에 요구된 다음 개선·개선 과제 섹션을 보완했다.
+- `lib/translate-market-rss-item.test.ts` 추가 후 `npm.cmd run deploy:verify` 재실행 통과: audit 취약점 0, 프로덕션 빌드·standalone runtime smoke·Chrome desktop/mobile hydration 통과, 전체 테스트 301개 통과/1개 skip(1,502 passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron 검사 통과. Windows `node_modules` junction trace `EPERM` 경고가 있었지만 fallback smoke는 통과했다.
+- 커밋 `4cefb6ed`를 `oci`에 푸시했고 GitHub Actions run `40187578619` 성공을 확인했다. 운영 `/health-check`에서 정확한 SHA `4cefb6edc3dcc93fced0a837258df7f998acfd38`를 read-only 확인했다.
+- 후속 end-to-end 회귀 테스트 커밋 `ef9f38cc`도 `oci`에 푸시했다. GitHub Actions run `40189112869` 성공 및 운영 `/health-check`의 정확한 SHA `ef9f38cca34509f25e3f7f32a1ed7d7abcbd5060`을 확인했다.
+- 배포 뒤 `2026-10-25 11:14Z` 운영 aggregate snapshot은 StockTitan 번역 대기 2,097건·알림 대기 2,301건이었다. GlobeNewswire는 번역 대기 0건이나 최근 신규 2건은 두 provider의 월간 문자 상한 때문에 SKIPPED라 번역 게이트가 전송을 보류했다. 따라서 새 구조 검사가 실 provider 응답에 발동하는 모습 및 전체 backlog 해소는 아직 확인하지 못했다.
+
+### 재발 감지·남은 위험
+- 자동 회귀 테스트가 불균형 괄호/괄호쌍 제목을 검사한다. 이 구조 검사는 번역 의미의 정확성, 임상 단계 표현의 자연스러움, 누락된 괄호 외 텍스트 절단을 증명하지 않으며, 의미 보존 검증 개선과 운영 표본 점검이 계속 필요하다.
+- Google 내부 월 300,000자 제한이 운영 backlog 해소를 제한한다. 월 한도 조정에 관한 사용자 답변을 기다리는 동안 비용 영향이 있는 설정 변경은 보류한다.
+
 ### 다음 개선
 - 운영에서 확보한 실제 오역·누락 제목 표본을 `translation_output_incomplete` 등 원인별로 분류하고, 임상 단계·날짜·기업 행동처럼 중요한 제목 사실을 보존하는 검증을 별도 회귀 테스트와 함께 설계한다.
 
@@ -255,9 +292,14 @@
 - `scripts/check-oci-cron.mjs`, `deploy/oci/README.md`, `docs/ERROR_HANDLING.md`: 앱 route가 배치 크기를 소유한다는 설정 경계를 기록하고 검사한다. RSS oneshot unit의 영향 없는 환경 설정은 제거한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- GitHub Actions run `40108162312` 성공 및 운영 `/health-check`에서 배포 SHA `84f7dc79`를 확인했다. 그 뒤 `15:48:53Z` RSS run은 여전히 `attempted=3`, `translated=0`, `notified.sent=0`이어서 batch 설정 적용 실패를 재현했다.
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/translate-market-rss-item.test.ts lib/market-rss-translation-client.test.ts` 재실행에서 3개 파일 84개 테스트 통과했다. `npm.cmd run cron:check`와 `npm.cmd run docs:check`도 통과했다. 첫 실행은 route 테스트 mock 잔여 참조 때문에 실패했으며 수정 후 재실행 통과했다.
+- route 테스트는 앱 RSS batch 환경변수를 `3`으로 설정해도 번역·알림 함수에 `20`을 전달하는 것을 확인했다. 최신 `origin/oci` 통합 tree의 `npm.cmd run deploy:verify` 통과(297개 파일 통과, 1개 skip; 1,450 tests 통과, 3개 skip), build, typecheck, standalone runtime smoke, Chrome desktop/mobile hydration, docs/migration 및 cron 검사 통과했다.
+- 새 route 고정 batch의 fast-forward push, 재배포 및 실제 attempted 20·backlog 진행은 아직 확인하지 않았다.
+
+### 남은 위험
+- 번역 품질 및 Google 월 한도 초과로 일부 제목은 계속 보류될 수 있다. 번역되지 않은 원문은 Discord로 우회 전송하지 않는다.
+
 ### 다음 개선
 - `deploy:verify`와 회귀 테스트를 통과한 뒤 RSS route 변경을 fast-forward 배포하고, 실제 운영 run에서 attempted 20 및 translated·Discord sent 증가를 확인한다.
 
@@ -285,9 +327,13 @@
 - `scripts/check-oci-cron.mjs`, `deploy/oci/README.md`, `docs/ERROR_HANDLING.md`: batch 설정과 원인·탐지·위험을 문서 및 자동 검사에 연결한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 이전 배포 `afd7a2bdce83b8f8b86292893c4c5601ea99862c`은 GitHub Actions run `40104609209` 성공 및 운영 `/health-check` 정확한 SHA로 확인했다.
+- 운영 run `15:03–15:06Z`는 회당 3건 시도, 번역 성공 0건, Discord 전송 0건, `backlogRemaining=true`였다. Google 월 예약량은 299,992/300,000자, Azure 월 잔여량은 1,518,453자였다.
+- 대표 숫자 포함 제목만 provider에 전달해 `3분기`·`11월` 출력에 대한 오탐을 재현하고 회귀 테스트로 수정했다. 대상 3개 테스트 파일 84개 통과, 최신 `origin/oci` 통합 tree의 최종 `npm.cmd run deploy:verify` 통과(297개 파일 통과, 1개 skip; 1,450 tests 통과, 3개 skip), build, typecheck, standalone runtime smoke, desktop/mobile Chrome hydration, `npm.cmd run docs:check`, `npm.cmd run cron:check`, `git diff --check` 통과. 첫 전체 실행의 KIS rate-limit 테스트는 59초가 반환돼 고정 기대값 60과 달랐고, 단독 재실행 및 후속 전체 검증에서 통과했다. Windows `node_modules` junction의 standalone trace EPERM 경고가 있었으나 smoke와 나머지 검증은 통과했다.
+
+### 남은 위험
+- 다른 번역 품질 실패는 여전히 전송을 보류한다. Google 사용 한도는 비용 승인 없이 높이지 않는다.
+
 ### 다음 개선
 - 전체 `npm.cmd run deploy:verify`를 통과시킨 뒤 fast-forward push·자동 배포하고, 세 출처의 제목 번역·Discord `SENT` 증가와 backlog 감소를 확인한다. 30일보다 오래된 대기 건까지 소진됐는지 운영 상태에서 확인한다.
 
@@ -312,9 +358,11 @@
 - `deploy/oci/README.md` 및 관련 회귀 테스트를 새 fallback과 batch 기준에 맞췄다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 운영 `85d679e8` 배포 확인 뒤 `/api/debug/automation-runs`에서 세 출처가 GlobeNewswire 20건, StockTitan 100건, SEC 100건 저장된 것을 확인했다. 이어진 실행들에서는 번역 fallback 3건, `notified.sent=0`이 반복되어 backlog 전송 완료로 판단하지 않았다.
+- `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-client.test.ts app/api/cron/market-rss/route.test.ts --reporter=dot`: 3개 파일, 82개 테스트 통과. `npm.cmd run docs:check`: 통과.
+- `npm.cmd run deploy:verify`: dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 테스트 296개 파일(295 통과·1 skip; 1,437 통과·3 skip), typecheck, docs/migrations, verify-scope, KIS boundary, Bearer auth(178 routes), OCI cron 검사 통과. 첫 검증의 Chrome page navigation timeout은 재실행에서 재현되지 않았다. Windows junction standalone trace EPERM 경고는 있었으나 smoke는 모두 통과했다.
+- Google fallback 결과도 기존 제목 한국어·완전성·숫자 검증을 다시 통과해야 알림에 사용된다. summary/content는 provider에 전달하지 않는다.
+
 ### 다음 개선
 - 커밋·push·배포하고, cron 실행 시간이 180초 미만인지, Google fallback 성공률과 backlog 감소, 세 출처별 Discord `SENT` 결과를 확인한다.
 - 번역 provider 출력 또는 할당량이 불안정하면 검증 실패 항목은 전송되지 않고 재시도 대기 상태로 남는다. 50건 batch가 시간 제한에 접근하면 운영 duration에 근거해 batch를 조정한다.
@@ -341,9 +389,34 @@
 - 구현·운영 흐름을 [`docs/architecture/us-industry-classification-data-design.md`](docs/architecture/us-industry-classification-data-design.md)에 기록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 보관된 KIS NAS/NYS/AMS 원본 12,725행을 확인했다. 올바른 ICOD 열에서 `000`이 아닌 코드는 NAS 1,405건, NYS 1,309건, AMS 105건이었다.
+- KIS 공식 다운로드 원본 NAS/NYS/AMS를 실시간으로 내려받아 파서 회귀 테스트에 제공했다. 파일은 각각 5,272행, 2,839행, 4,780행이며 현재 KIS 원본 형식 및 AAPL/MSFT/NVDA/TSLA 산업코드 샘플 검증을 통과했다.
+- 최신 KIS 파일 fixture를 포함한 parser·관리자 API 회귀 14개 통과. 최종 `npm.cmd run deploy:verify` 통과: build, standalone runtime smoke, desktop/mobile Chrome hydration, 전체 292개 test files(1,431 passed, 3 skipped), typecheck, docs/migration, auth/KIS/cron gates.
+- `.env.local` 기반 로컬 DB read-only 연결은 `localhost:5433` 연결 거부로 실패했다. 개발 서버 admin login은 `scripts/dev-server.mjs`가 `ADMIN_DASHBOARD_PASSWORD`를 제거하는 설계여서 500으로 확인됐고, 보호된 진단 경로는 401로 fail-closed 동작했다.
+- KIS 최신 원본은 내려받아 파싱 검증했으나 운영 DB 적재는 새 API 배포 후 진행해야 한다.
+
+### 남은 개선 및 재발 방지
+- KIS 전용 동기화 API를 운영에 배포한 다음 `.env.local` 인증값으로 운영 admin login을 시도하고, 인증 성공 시 KIS 원본 3개를 업로드한다.
+- 운영 DB에서 거래소별 활성 보통주 분모·분류/미분류 수와 API의 원본 후보·반영·미매칭 수를 대조한다. 인증 실패/불일치/코드 파싱 오류 시 성공 보고 금지.
+- API 전후 운영 집계가 일치하지 않거나 시장별 source count가 0이면 성공으로 간주하지 않고 원본/DB 샘플을 대조한다.
+
+### 반영
+- `parseOverseas()`의 KIS 오프셋을 바로잡고 미국 common/special master upsert에서 `industry_code`를 갱신하도록 수정했다.
+- KIS 3개 해외 마스터 전용 트랜잭션 sync 모듈과 관리자 진단/업로드 API를 추가했다. 미리 검증되지 않은 입력은 DB에 반영하지 않는다.
+- KIS 원본 regression/route tests 및 KIS 전용 설계 문서를 갱신했다.
+
+### 운영 배포 및 DB 검증 상태 (2026-10-24 continuation)
+- 최신 공식 KIS 마스터 NAS/NYS/AMS를 다시 다운로드하여 파서의 현재 원본 형식 통과를 로컬에서 확인했다. 다운로드 파일은 임시 경로에 두며 저장소에는 추가하지 않았다.
+- 운영 API `GET /api/admin/us-industry-codes`가 404를 반환해 신규 코드가 아직 운영 배포되지 않은 것을 확인했다.
+- **초기 차단과 해소**: 처음에는 CLI/Actions 도구를 찾지 못해 멈췄지만, 뒤이어 Git credential manager가 푸시 인증을 제공함을 확인하고 같은 인증을 메모리에서만 사용해 `workflow_dispatch`를 실행했다. 코드 commit `3942ffd3`의 Deploy OCI run `40085691588`은 전체 성공했다. 자격증명 문자열은 출력하지 않았다.
+- `.env.local`의 관리자 암호로 운영 관리자 로그인은 성공했다. 로컬 DB 주소 연결은 운영 DB 증거가 아니므로 사용하지 않았다. 전체 로컬 `deploy:verify`도 별도로 수행했으며 이는 운영 DB 반영 증거와 구분한다.
+- **완료 기준**: 관리자 인증 GET에서 NAS/NYS/AMS별 활성 `COMMON_STOCK` 분모 및 ICOD coverage를 확인하고, 세 KIS 원본 업로드의 persisted/unmatched/unclassified 수를 저장 후 GET 결과와 대조한다. KIS가 `000`을 제공한 종목은 공식 원천상 미분류로 보고 임의 코드를 채우지 않는다.
+- **운영 후속 검증**: Deploy OCI Actions run `40085691588`이 성공했고 새 운영 route가 401(미인증), 200(관리자 인증)으로 응답했다. 운영 DB 기준 활성 COMMON_STOCK은 NAS 3,949, NYS 2,480, AMS 275이며 업로드 전 비미분류 코드는 각 0건이었다. KIS 마스터 3개 실제 업로드는 HTTP 500 `US_INDUSTRY_SYNC_FAILED`로 롤백됐다. 운영 스키마에서 `industry_code`와 `source_file` 컬럼은 확인했고 관리자 health probe는 DB 연결·운영 컬럼 검사를 통과했으나, 실패 SQLSTATE/단계가 응답에 노출되지 않아 원인은 아직 미확정이다.
+- **진단 경로 배포**: 관리자 전용 동기화 오류 응답에 단계, PostgreSQL SQLSTATE 및 테이블/컬럼/제약조건 식별자만 포함하고 원문 메시지는 반환하지 않도록 보강했다. 민감 원문 미노출 회귀 테스트를 추가하고 전체 검증 후 commit/push했으며, Deploy OCI run `40086976112` 성공 뒤 운영에서 아래 실제 원인을 확보했다.
+- **운영 직접 디버깅 결과**: 진단 코드 배포 후 재시도 응답은 `stage=update_NAS`, SQLSTATE `23502` (`DATABASE_NOT_NULL_VIOLATION`)이었다. 원인은 DB 스키마가 아니라 내부 camelCase `{ industryCode, sourceFile }` 객체를 SQL의 snake_case `jsonb_to_recordset(... industry_code, source_file)`에 그대로 직렬화한 키 불일치다. 이 때문에 두 SQL 값이 NULL이 되어 NOT NULL 위반이 발생했고 트랜잭션 전체가 롤백됐다.
+- **수정/재발 방지**: DB payload 직렬화 직전에 `industry_code`/`source_file`로 명시 변환하고, NAS/NYS/AMS 모두에 대해 snake_case payload 키와 BEGIN→UPDATE×3→coverage→COMMIT 순서를 검증하는 회귀 테스트를 추가했다. 이 수정 이후 같은 최신 KIS 원본으로 운영 재적재와 GET coverage 대조를 다시 완료해야 한다.
+- **운영 수정 반영**: Deploy OCI run `40088175657` 성공 뒤 같은 KIS 공식 원본 재적재가 HTTP 200으로 완료됐다. 저장 건수는 NAS 3,176 / NYS 1,855 / AMS 237, `000` 외 분류코드는 NAS 1,354 / NYS 1,186 / AMS 94이며, 인증 GET coverage가 동일 값으로 확인됐다. 후보 중 기존 활성 DB COMMON_STOCK에 매칭되지 않은 NAS 64 / NYS 9 / AMS 17건은 자동 신규 등록하지 않았다. 전체 원본 행을 응답에 펼쳐 반환하는 불필요한 응답 크기도 함께 제거하고, write-after-read 값 불일치 시 전체 롤백 및 미매칭 ticker 샘플 제한 반환을 추가 검증한다.
+
 ### 다음 개선
 - 운영 배포 후 최신 KIS 원본을 업로드하고 전체 보통주 coverage를 실제 DB로 검증한다.
 
@@ -366,9 +439,12 @@
 - `docs/operations/globenewswire-rss-recovery.md`: 403 재현, 새 host의 HTTP 응답, 배포 후 검증 절차를 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 공식 GlobeNewswire RSS feed 목록의 Public Companies 경로를 기준으로 host를 비교했다. `www.globenewswire.com` RSS·Atom URL은 HTTP 403, 같은 RSS 경로의 `rss.globenewswire.com`은 HTTP 200, `application/rss+xml`, 47,689 bytes를 반환했다.
+- `npm.cmd exec vitest run -- lib/globenewswire-rss.test.ts --reporter=dot`: 1개 파일, 4개 테스트 통과. `npm.cmd run docs:check`: 통과.
+- `npm.cmd run deploy:verify`: 의존성 감사 취약점 0, 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 296개 테스트 파일(295 통과·1 skip; 1,434 통과·3 skip), typecheck, docs/migrations, verify-scope, KIS boundary, Bearer auth(178 routes), OCI cron 검사 통과. Windows junction standalone trace EPERM 경고는 있었으나 모든 runtime/browser/API smoke가 통과했다.
+- 앞선 배포 commit `9d737083`의 OCI workflow는 성공했으며 운영 `/health-check`가 해당 commit을 반환했다. 다만 그 cron의 GlobeNewswire 수집은 계속 실패했고 이 항목은 새 host 변경 후 재배포가 필요하다.
+- StockTitan·SEC cron 실행과 Discord 전송은 운영 요약에서 관측됐지만, GlobeNewswire 성공 및 과거 backlog 전체 발송은 아직 확인되지 않았다. 번역 provider 검증이 실패한 제목은 전송 gate에서 보류되어 재시도된다.
+
 ### 다음 개선
 - `npm.cmd run deploy:verify` 및 `npm.cmd run docs:check` 후 새 RSS 변경을 배포한다. 배포된 run에서 GLOBENEWSWIRE `STORED`와 count>0, translated title 및 Discord `SENT`를 확인한다.
 - 번역 오류·provider 응답 품질·공급자 가용성이 backlog 완료를 지연할 수 있으므로 실패 사유와 backlog를 모니터링한다.
@@ -392,9 +468,13 @@
 - `docs/operations/globenewswire-rss-recovery.md`: root override 자동 복구 정책과 배포 후 snapshot 확인을 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- lib/globenewswire-rss.test.ts app/api/cron/market-rss/route.test.ts --reporter=dot`: 2개 파일, 8개 테스트 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 296개 테스트 파일(295 통과·1 skip; 1,433 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API 관측(2026-10-24 12:58 UTC): 새 9e93b225 run은 7.8초에 완료하고 Discord 3건을 전송했다(`notified.sent=3`, `attempted=3`, webhook configured). GlobeNewswire는 source fetch 실패했고 latest snapshot URL이 `https://rss.globenewswire.com/`로 확인됐다. 별도 run 339548은 26.7초에 Discord 1건 전송했으나 GlobeNewswire 역시 fetch 실패였다.
+- SEC/StockTitan의 제목만 provider 번역하고 본문·요약은 원문 그대로 유지한다. 검증 실패 제목은 번역 gate에서 발송을 보류한다.
+
 ### 다음 개선
 - 전체 검증 및 OCI 재배포 후 GlobeNewswire snapshot URL이 공식 feed로 바뀌고 count>0인지, source별 Discord 전송이 발생하는지 확인한다.
 - feed가 유효한 빈 결과를 반환하면 발송 기사가 없는 것으로 해석하고, fetch/XML 오류라면 source snapshot의 오류 사유를 운영 진단에 노출해 계속 감시한다.
@@ -418,9 +498,13 @@
 - `deploy/oci/README.md`: bounded 알림과 Bullish mirror sync 분리 동작을 운영 설명에 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API 관측(2026-10-24 12:42 UTC): 3건 상한 cron도 241초 `RUNNING`이었고 두 출처 translation status가 12:39:55 이후 변하지 않았다. 코드 추적으로 cron 뒤의 무제한 `syncMarketRssBullishArticles()` 전체 행 순회를 확인했다.
+- RSS 제목 입력만 provider 번역 요청에 넘기며 summary/content의 원문 보존·전송 gate는 유지한다.
+
 ### 다음 개선
 - 전체 검증 후 `oci`로 배포하고 새 3건 cron이 180초 이내 완료되는지와 `notified.sent`, `backlogRemaining`을 확인한다.
 - 별도 Bullish RSS mirror를 위한 무제한 순회는 요청성 실행에 적합하지 않다. 이후 독립적인 지속 cursor/background job을 설계해 누락 없이 재색인하고 이 endpoint를 계속 fresh하게 유지한다.
@@ -444,9 +528,13 @@
 - `deploy/oci/README.md`: timer 실행 단위를 3건으로 명시한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 현재 코드 revision에서 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사.
+- `npm.cmd run docs:check`: 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었으나 standalone runtime/browser/API smoke는 통과했다.
+- 운영 API read-only 관측(2026-10-24 12:22 UTC): 새 버전의 첫 run이 268초 `RUNNING` 상태로 남았으며 Discord 전송 완료 summary를 확인하지 못했다. 이 측정으로 50건 cap이 충분하지 않음을 판단했다.
+- 기존 코드와 변경안 모두 provider에 전달하는 값은 제목뿐이며 summary/content는 원문 그대로 보존한다.
+
 ### 다음 개선
 - `deploy:verify` 통과 후 `oci` 배포 workflow를 확인하고, 새 3건 run의 duration·backlogRemaining·notified.sent를 운영 API에서 검증한다. 3건도 180초에 근접하면 번역과 Discord 발송 단계를 별도 timer 실행으로 분리한다.
 - provider quota/오류, 검증 실패 기사, Discord 및 KIS 응답 지연은 backlog 완료 속도에 영향을 준다. 제목 번역이 검증되지 않은 기사는 발송하지 않는다.
@@ -472,9 +560,13 @@
 - `deploy/oci/README.md`: timer별 처리 단위와 제목 전용 번역 규칙을 운영 설명에 반영한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- app/api/cron/market-rss/route.test.ts lib/market-rss-pipeline.test.ts --reporter=dot`: route 테스트 4개 통과.
+- `npm.cmd run deploy:verify`: 통과. dependency audit 취약점 0, 프로덕션 빌드, standalone `/charts` 200 및 desktop/mobile Chrome hydration, API smoke, 전체 295개 테스트 파일(294 통과·1 skip; 1,429 통과·3 skip), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사를 확인했다.
+- `npm.cmd run docs:check`: 표준 개선 로그 섹션 보완 후 통과.
+- Windows worktree의 `node_modules` junction으로 standalone trace EPERM 경고가 있었지만 standalone 실행과 브라우저/API smoke는 통과했다.
+- 운영 API read-only 확인(2026-10-24 12:05 UTC): 30일 기사 행 73,115건 중 `PENDING` 61,771건, `SKIPPED` 9,742건, `TRANSLATED` 1,602건. 허용 출처 중 StockTitan과 SEC만 기사 행이 있었고 GlobeNewswire는 0건이었다. 이 상태 집계는 Discord `SENT` 증거가 아니므로 실제 발송으로 간주하지 않는다.
+- 원문 기사 제목만 번역 provider에 전달하고 summary/content는 그대로 유지한다. 번역 성공 전 알림 gate를 통과하지 못하게 한다.
+
 ### 다음 개선
 - cron 회귀 테스트는 요청당 한 번의 제한 배치만 수행하고 배치가 꽉 찼으면 `backlogRemaining=true`를 반환하는지 확인한다. 운영 감시는 분당 run duration, `backlogRemaining`, 출처별 translation status 및 `notified.sent`를 대조한다.
 - 번역 공급자 오류·quota, 제목 품질 검증 실패, Discord 장애/제한, 원본 피드의 최대 제공 범위는 외부 의존성이다. 정책상 검증되지 않은 원문 제목은 발송하지 않으며 실패 항목은 재시도 상태로 남을 수 있다.
@@ -500,9 +592,15 @@ GlobeNewswire, StockTitan, SEC RSS 기사를 필터링하지 않고 모두 처�
 - 관리자 번역 미리보기, OCI timer·cron 검사, 운영 문서를 세 출처 및 제목 전용 번역 정책과 일치시켰다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- RSS 타깃 테스트: 7개 파일, 109개 테스트 통과.
+- `npm.cmd run deploy:verify`: 최신 origin 기준 의존성 감사(취약점 0), 프로덕션 빌드, standalone `/charts` HTTP 200, desktop/mobile Chrome hydration, API smoke, 전체 테스트(295개 파일 중 294 통과·1 skip; 1,428 통과·3 skip), typecheck, 문서·migration(160), verify-scope, KIS boundary, Bearer auth(178 API routes), OCI cron 구조 검사까지 통과.
+- 개선 과제 기록 항목을 보완하기 전 첫 docs:check는 실패했으며, 수정 뒤 전체 deploy:verify가 통과했다.
+- Windows worktree의 `node_modules` junction 때문에 Next standalone trace에서 EPERM 경고가 있었으나 standalone server와 browser/API smoke는 모두 성공했다. 운영 배포는 OCI Linux workflow에서 독립 checkout/build한다.
+- 이 시점에는 원격 push 및 운영 Discord 실제 수신 확인 전이다. workflow 성공 후 운영 cron 결과와 각 출처의 전송 기록을 확인한다.
+
+### 근본 원인 및 재발 방지
+이전 경로는 일부 소스/분류/연령 기준을 유지하고 StockTitan만 전체 전달했으며, 번역 결과 게이트와 retry 고갈 처리도 전체 기사 유입을 보장하지 못했다. 세 출처 고정 목록, 기사별 한국어 번역 게이트, 무필터 알림 대상, 제목 전용 provider 입력 테스트, retry 재선정 테스트 및 OCI cron 구조 게이트로 재발을 감지한다.
+
 ### 다음 개선
 - RSS 공급자 응답 범위, 번역 제공자 가용성·할당량, 운영 Webhook 및 Discord 제한은 외부 의존성이다. 가능한 모든 기사를 알림 대상으로 삼되 외부 장애 중 전송 성공을 보장하기는 어렵다.
 - 배포 뒤 운영에서 SEC·StockTitan·GlobeNewswire 각각의 번역 완료와 Discord 전송 성공 상태를 확인한다. 하나라도 미확인이라면 해당 출처의 수집·번역·전송 단계별 진단을 보강한다.
@@ -525,9 +623,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 관리자 RSS 미리보기의 bounded `diagnostics=true` 응답에 Azure endpoint의 secret-free host/path shape를 추가해 운영 endpoint가 base URL인지 `/translate` 완성 URL인지 확인할 수 있게 했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd exec vitest run -- lib/azure-translation-client.test.ts app/api/admin/market-rss-test/route.test.ts --reporter=dot`: Azure endpoint 회귀 테스트 및 관리자 진단 API 테스트 통과.
+- `npm.cmd run docs:check`: 통과.
+- 최종 `npm.cmd run deploy:verify`: 통과. dependency audit 0 취약점, production build, standalone `/charts` HTTP 200 및 desktop/mobile Chrome hydration, API smoke, 전체 292개 테스트 파일(1,426 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron 게이트 통과.
+- Windows 격리 worktree의 임시 dependency junction으로 인해 standalone tracing 시 EPERM 경고가 있었으나 서버 기동, 브라우저 및 API smoke가 통과했다. OCI workflow는 Linux checkout에서 별도 빌드하므로 이 로컬 junction 경고는 운영 환경의 배포 오류로 간주하지 않는다.
+- 배포 후 운영 관리자 미리보기 `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true&mode=PREVIEW&limit=1&diagnostics=true`를 인증해 1회 실호출했다. 응답은 HTTP 200, Azure endpoint host/path는 `api.cognitive.microsofttranslator.com` 및 `/`였고 query 값은 없었다. 따라서 운영 설정은 정상적인 글로벌 Text Translation base endpoint이며 `/translate` 중복은 없었다.
+- 해당 요청에서 Azure 호출 1회, 실패 0회, 성공 처리 문자 73자로 기록됐고 Google fallback 호출은 0회였다. 다만 번역 후보에 원문 제목에 없는 숫자가 있어 품질 검증기가 `translation_numeric_hallucination`으로 후보를 거부하고 원문 제목을 유지했다. 이 검증은 번역기가 원문에 없는 가격·연도·비율을 만들어내는 것을 막는 안전장치이므로 이번 작업에서는 우회하지 않았다.
+- 이 실호출로 현재 운영 Azure key/endpoint 조합이 최소 한 건에서 인증 및 API 호출에 성공함을 확인했지만, 기존 cron의 과거 3회 실패 원인은 당시 응답 상세가 없어서 소급 확정하지 못했다. 운영에서 실패가 재발하면 `diagnostics=true` preview 및 번역 진단 API의 timestamp/provider/status를 대조한다.
+- Deploy OCI workflow `40056164962`는 commit `518db55c`에 대해 완료 및 성공했다. 배포 뒤 preview에서 실제 Azure 호출을 확인했다.
+
 ### 다음 개선
 - `translation_numeric_hallucination`으로 반복 거부되는 실제 항목이 있으면 원문 숫자 토큰 보호·공급자 후보·요약 문맥을 비밀/개인정보 없이 개별 대조한다. 검증기는 숫자 환각 방지용이므로 실제 오탐을 재현하는 회귀 fixture 없이는 완화하지 않는다.
 - 과거 cron의 3회 실패와 동일한 오류가 재발할 때 provider 응답 상태/오류코드가 누락되지 않는지 확인한다. 인증 성공 요청 한 건은 모든 시간대/요청의 안정성을 보장하지 않는다.
@@ -553,9 +657,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 환경 Azure key/endpoint/F0 설정 여부는 공개 health endpoint가 노출하지 않으며 현재 로컬 `.env.local`에는 Azure 설정이 없고 Google key만 존재한다. 운영 Azure 활성 여부는 비밀을 출력하지 않는 인증된 운영 진단 확인 전에는 미확인으로 둔다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 공식 출처: Azure 가격표 https://azure.microsoft.com/en-us/pricing/details/translator/ ; Azure 서비스 한도 https://learn.microsoft.com/en-us/azure/ai-services/Translator/service-limits ; Google 가격표 https://cloud.google.com/products/translate/pricing .
+- 코드 대조: `lib/translation-cache.ts`의 Azure/Google monthly/hourly 상수와 두 설계 문서의 제한값을 직접 비교했다.
+- `npm.cmd run deploy:verify`: 통과. 전체 테스트 292개 파일(1,417 passed, 3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron, production build 및 standalone/Chrome desktop·mobile/API smoke가 모두 통과했다.
+
 ### 다음 개선
 - 운영 인증 진단에서 Azure F0 configured 상태를 확인하고, 실제 Azure 설정이 없는 경우 사용자 Azure 리소스의 endpoint/key/F0 확인값을 받아 설정한 뒤 Azure 실호출과 Google fallback을 양쪽 모두 검증한다.
 
@@ -580,9 +685,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Next build가 자동 변경한 `next-env.d.ts`는 기존 `.next-deploy-verify/types/routes.d.ts` 참조로 복구했고, `tsconfig.json`의 빌드 전 사용자 변경 한 줄은 보존했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 관리자 컴포넌트 Vitest: 1파일 5개 통과.
+- `npx.cmd tsc --noEmit --incremental false`: 통과.
+- `npm.cmd run build`: 통과.
+- 로컬 실행: `/admin/api-tests` HTTP 200, 삭제한 라벨 미노출, 삭제된 admin route HTTP 404.
+- 전체 `npm.cmd run deploy:verify`: dependency audit 0 취약점, production build 통과, standalone `/charts` 및 Chrome desktop/mobile, API smoke 통과, Vitest 290파일 1,412 통과·2 skip, 격리 타입검사 통과. 최초 전체 검증은 최신 로그 계약과 개선 과제 ID 중복으로 문서 게이트에서 실패했다. 항목을 최신-first 계약에 맞춰 보완하고 ID를 고유하게 변경했다.
+- `/api/health` 로컬 degraded는 DB 부재에 의한 것이며 변경 기능의 검증과 무관하다.
+
 ### 다음 개선
 - deploy verifier를 다시 실행해 모든 후속 게이트를 통과시킨 뒤 배포 결과와 commit SHA를 기록한다.
 
@@ -608,9 +717,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Azure 및 Google 양쪽 무료 quota는 동일 cloud 계정의 다른 시스템 사용량과 격리되지 않는다. Azure F0를 실제로 쓰려면 전용 리소스 및 `AZURE_TRANSLATOR_API_KEY`, `AZURE_TRANSLATOR_ENDPOINT`, `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0` 설정이 필요하다. 현재 로컬 환경은 Google 키만 확인되어 Azure 실호출은 검증하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run typecheck`: 통과.
+- `npx.cmd vitest run lib/translation-cache.test.ts lib/market-rss-translation-retry.test.ts lib/market-rss-translation-reason.test.ts lib/translate-market-rss-item.test.ts lib/azure-translation-client.test.ts lib/market-rss-translation-client.test.ts components/admin-stocktitan-rss.test.tsx`: 7개 파일, 135개 테스트 통과.
+- `npm.cmd run deploy:verify`: 통과. Production build 성공(Windows에서 node_modules Junction standalone trace 경고는 있었으나 standalone 서버 실행 확인), `/charts` HTTP 200 및 Chrome desktop/mobile hydration, 정적 청크 11개, 주요 API smoke 통과. 전체 suite 292 파일(1,417 passed, 3 skipped), typecheck, docs/migration(최신 V159), verify-scope, KIS boundary, Bearer auth(175 routes), OCI cron 검증 모두 통과.
+- 검증 중 Vitest가 불완전 설치물 `node_modules.install-partial`을 테스트로 인식하는 환경 문제를 발견해 해당 dependency-recovery 디렉터리를 테스트 탐색에서 제외했다. 실제 테스트 소스는 계속 전체 실행 대상으로 유지한다.
+
 ### 다음 개선
 - 전용 Azure F0 리소스/키/endpoint를 운영 환경에 등록한 뒤 관리자 진단으로 설정 확인 및 실제 번역 요청 성공을 확인한다. 현재 미등록이므로 배포 뒤에도 Google이 유일한 활성 provider다.
 
@@ -735,9 +846,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Google REST API 키의 query-string 전달 대신 공식 권고 header 사용을 설계에 포함했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 프로젝트 구현 `lib/cloud-translation-client.ts`, `lib/translate-market-rss-item.ts`, `lib/quota-aware-translation-client.ts`, `lib/translation-cache.ts`, `db/migration/V102__stocktitan_translation_cache.sql`과 기존 RSS 번역 설계를 대조했다.
+- Google 공식 요금/쿼터와 API-key 보안 문서, Microsoft 공식 F0 요금·서비스 한도·REST/API 인증 문서를 확인했다. 확인 시점은 2026-10-21이며 공급자 정책은 배포 전 재확인이 필요하다.
+- 문서 변경만 수행했으며 API 실호출·제품 테스트·빌드는 실행하지 않았다. Git 작업 트리에 기존 사용자 변경사항이 다수 있어 수정/정리하지 않았다. 문서 자동 검사 `npm.cmd run docs:check`는 첫 실행에서 task ID/outcome 형식 규약 실패를 감지했다. 필드 형식을 checker가 요구하는 형태로 수정한 뒤 재실행한다.
+- 성과 판정: UNMEASURED — 설계 완성; 동작 구현·사용량 실측 전.
+- **근거:** 현행 앱 한도 300,000자/월, Google 공식 월 첫 500,000자 크레딧, Azure F0 월 2,000,000자 및 시간당 제한을 문서에 대조 기록했다.
+
 ### 다음 개선
 - Azure F0 리소스 생성·tier 확인 및 비밀 변수 준비 후 provider별 원자 예약 migration, 호출 orchestrator, mock 기반 quota/fallback 테스트를 구현한다.
 - 제목 전용 전송 범위 불일치를 먼저 회귀 테스트로 고정한 뒤 전체 `npm.cmd run deploy:verify` 및 실제 runtime smoke를 성공시키고 배포한다.
@@ -800,9 +914,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 배포 체크리스트/runbook에 운영 floor 이후 forward migration 규칙을 연결하고, fundamentals 운영 기록에 실제 35건 재시도 결과와 남은 KIS 빈 필드 위험을 기록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npx.cmd vitest run scripts/operational-schema-migration-audit.test.ts --reporter=verbose`: 8 tests passed. 구버전 V137/V140만 있는 회귀 fixture는 실패하고 V158 forward fixture는 통과한다.
+- `npm.cmd run docs:check`: 158개 migration, V158 최신, 운영 관계 및 forward 필수 컬럼 검사 통과.
+- 운영 Cron API: 배포 전 V157 운영 DB에서 RSS translation 필수 컬럼 2개 누락과 `/api/health` degraded를 확인했다. 배포 후 Flyway V158, `schemaReady=true`, `missingOperationalColumns=[]`, `missingOperationalTables=[]`, `/api/health=200`, `/` 및 `/charts` HTTP 200을 확인했다.
+- 운영 fundamentals 재시도: 10:10 UTC에 35개 호출(성공 0, 실패 35), 11:15 UTC에 legacy 재시도 111개 호출(성공 1, 실패 110)했다. 두 번째 실행은 29.9초였고 1건 저장, 101건 `KIS_PRICE_INVALID`, 9건 `KIS_MARKET_CAP_MISSING_OR_INVALID`로 종료했다. 실패는 KIS HTTP 200/`rt_cd=0`이어도 가격 또는 시총 필드가 비어있는 응답이 주원인이다. 전체 실패는 145건이고, 직전 시도 35건은 다음날 재시도 시각으로 연기됐다. 실제 실행 이력과 `last_attempt_at` 기록을 대조했다.
+- 최종 통합 트리에서 `npm.cmd run deploy:verify` 통과: 의존성 audit 취약점 0건, production build, standalone HTTP/Chrome desktop·mobile 및 API smoke, Vitest 293개 파일(1,430 passed, 3 skipped), typecheck, docs/migration·KIS boundary·Bearer auth·OCI cron 검사를 통과했다.
+
 ### 다음 개선
 - KIS 가격·시총 필드 누락의 공식 API 응답 원인을 별도 확인한다. 유효하지 않은 응답을 성공으로 저장하거나 기존 캐시로 덮지 않는다. 현재 145 실패 및 다음 재시도 연기는 모니터링한다.
 
@@ -825,9 +942,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 미사용 기능 후보 및 DB scheduler 이력은 `docs/operations/unused-feature-candidates-20261020.md`에 기록했다. 후속 함수 단위 재조사에서 5개 후보의 현재 앱·운영 참조가 없음을 재확인하고, 세 localStorage 키(`rss_custom_keywords`, `rss_stock_alerts`, `market_sentiment_history`)의 read/write 참조가 writer 파일 외에 없음을 확인해 과거 브라우저 저장값의 orphan 가능성과 미확인 범위를 보고서에 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify`: 최신 실행 전체 통과. 의존성 audit 0건, production build, standalone·Chrome desktop/mobile·API smoke, Vitest 293개 파일(1,412 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth(175 API routes), OCI cron(22 shared endpoints + fundamentals timer).
+- `npx.cmd vitest run lib/kis-token.test.ts -t 'backs off token issuance' --reporter=verbose` 통과.
+- 운영 DB read-only 이력에서 V148·V149는 원격과 같은 설명으로 이미 적용되어 있었고 DB에는 SEC shares 1,057행, review 1,311행 및 enabled 설정이 남아 있었다. 파괴적 V149 부분을 제거하고 KIS shares 전환을 V157로 옮겨 기존 데이터와 기능 설정을 보존했다. 원격 `origin/oci`는 공통 기준보다 6커밋 앞서고 로컬은 2커밋 앞서 있다.
+- 로컬 변경을 원격 `oci` 6커밋과 통합해 `7ea1f960`을 생성했다. push 직전 `npm.cmd run deploy:verify` 전체 게이트를 재통과한 뒤 원격 반영 및 운영 배포를 완료했다.
+
 ### 다음 개선
 - 배포 완료: `7ea1f960`을 `oci`에 push하고 Deploy OCI workflow `39405249354` success를 확인했다. activation 성공 후 `/health-check`, `/`, `/charts` HTTP 200 응답을 확인했다.
 
@@ -852,9 +971,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 결과 Markdown·CSV·JSON과 `docs/README.md` 항목을 갱신했다. 조회 스크립트와 응답은 `.codex/` 임시 작업자료에 두었다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 455개 성공 응답은 모두 기준일 20261019와 직전 20개 봉을 포함했고, 최신 거래량이 VWAP 원본과 전부 일치했다.
+- 최종 JSON 87개와 CSV 데이터 행 87개, 중복 0개를 확인했다. 출력 전체에 RVOL ≥ 1, USD 100,000,000 이하, VWAP 편차 ±5% 이내를 검사했다. `git diff --check` 통과.
+- KIS 미응답 263개가 있으므로 결과는 해당 455개 판정 가능 범위에서의 통과 목록이며, 미응답 종목의 RVOL 상태는 미확인이다.
+
 ### 다음 개선
 - KIS가 EGW00201을 반환한 263개를 재조회할 수 있을 때 RVOL 범위를 완결하고, 캔들별 최신성 및 시총 스냅샷 시차를 검토한다.
 
@@ -871,9 +991,29 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 RVOL≥1 결과 CSV·JSON·Markdown을 새 최종 결과로 갱신했다. JSON에는 거래량 하한, 제외 건수, 시장별 수를 기록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 31개 전체에서 기준일 거래량 ≥100,000주, RVOL ≥1, USD 100,000,000 이하 시총, VWAP 편차 ±5% 이내를 확인했다. 최소 거래량 102,959주다.
+- 263개 KIS EGW00201 미응답은 앞선 판정과 동일하게 포함하지 않았다. CSV 31행과 JSON 31종목 일치를 확인한다.
+
+### 커밋·푸시·배포
+- 미실행. 결과 문서와 데이터만 갱신했다.
+
+## [2026-10-20] 현재 미사용 기능 후보 조사
+
+### 목표
+- 요청된 미사용 기능 확인을 위해 로컬 후보 커밋 `680f2a2d`의 삭제 67개 경로와 현재 checkout의 정적 runtime 도달성·자동화 실행 기록을 함께 조사했다. remote-tracking ref `012833ad`는 로컬보다 5커밋 앞서고 로컬 전용 커밋은 2개다.
+
+### 반영
+- `docs/operations/unused-feature-candidates-20261020.md`에 이미 비활성 안내 UI/API, 정적 runtime 후보, 외부 소비 확인이 필요한 동작 API, 운영 cron 및 실제 실행 이력을 구분해 기록했다. `docs/README.md`에서 연결했다.
+- AST import graph에서 955개 source 중 291개 entrypoint와 656개 도달 파일을 확인했다. `lib/keywords.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sectors.ts`, `lib/market-rss-discord-message.ts`는 app·운영 script 진입점에서 도달하지 않는 정적 후보이며 삭제 확정은 하지 않았다. 누적매집 fixture는 테스트 지원 코드로 구분했다.
+- `us-daily-indicators`는 registry와 route에 있으나 OCI cron 설정에서 호출되지 않고 연결 DB의 90일 실행 이력도 없어 scheduler 누락 후보로 기록했다. 다른 자동화의 무기록만으로 미사용 판정하지 않았다.
+
+### 검증
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다. API·import·navigation·OCI cron 정적 참조를 확인했고, SEC 자동 수집은 `/api/cron/sec-edgar` 및 `/api/cron/market-rss` 경로에 남아 있음을 확인했다.
+- 연결 DB는 `.env.local` 우선 환경으로 `BEGIN READ ONLY` 조회했다. 25 registry 항목 중 3개 `NOT_SCHEDULED`, 22개 `OCI_CRON`; 최근 30일 기록은 `dart-realtime` 132회뿐이고 나머지 scheduled 항목은 0회, 90일에는 7개 module만 기록이 있었다. 이는 DB에 기록된 이력이며 기능 미사용의 증거와 동일하지 않다.
+- `npm.cmd run docs:check`는 기존 migration 중복 V148 및 V149로 실패했다. V156 `instrument_fundamental_attempt_timestamp` 삭제는 원격 코드가 해당 컬럼을 읽고 쓰므로 배포 전 재검토가 필요하다.
+- `origin/oci` 기준 2 ahead·5 behind로 분기되어 있으며 이전 전체 검증의 테스트 실패도 남아 있어 deploy 검증은 통과하지 않았다.
+
 ### 다음 개선
 - 원격 최신 이력과 migration을 먼저 조정하고 전체 검증을 재실행한다. 외부 DART API 소비자 및 관리자 KIS 대체 여부를 확인한 뒤에만 삭제 범위를 확정한다.
 
@@ -898,9 +1038,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 진단 API는 `last_attempt_at`이 명시된 항목에서만 cache 근접도를 비교하며, 레거시는 `attemptTimeMissingCount`와 `cacheTimingUnknownCount`로 격리한다. mutable `updated_at`으로 추정하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/instrument-fundamental-progress.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 8개 테스트 통과.
+- `npm.cmd run docs:check`는 새 항목의 섹션 명칭과 전달 상태 문구를 자동 계약에 맞게 보완한 뒤 통과했다.
+- 원격 `oci`가 검증 도중 RSS 변경으로 전진해 해당 커밋을 rebase한 뒤 최종 상태에서 `npm.cmd run deploy:verify` 재통과: production build, standalone `/charts`·API smoke, Chrome desktop/mobile hydration, 815개 테스트 통과·1개 skip, typecheck, 문서·V156 migration 감사, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 문서 충돌 정리 뒤 첫 `deploy:verify`는 standalone 서버 TCP 준비가 3.8초에서 18초로 늘어난 실행에서 `/charts` 요청 timeout으로 실패했다. 응용 코드 오류 신호는 없었고, 동시에 여러 프로젝트의 Node 프로세스가 실행 중인 환경 자원 경합 가능성을 원인 후보로 분류했다. 동일 최종 트리로 재시도해 standalone 준비 3.4초, `/charts`·API smoke, desktop/mobile Chrome, 815개 테스트 통과·1개 skip, typecheck와 모든 audit를 통과했다.
+- 원격 `oci`가 다시 전진한 뒤 해당 RSS 커밋을 포함해 최종 재검증: `npm.cmd run deploy:verify` 통과, 818개 테스트 통과·1개 skip, production build 및 standalone/browser/API smoke와 전체 audit 성공.
+- 운영 배포 workflow `39376235654`가 커밋 `86ab175e`에서 성공. `/api/health`, `/`, `/charts` HTTP 200 확인. 인증된 read-only 운영 확인에서 Flyway `156` (`instrument fundamental attempt timestamp`) 적용 확인.
+- 배포 직후 진단은 최근 원장 6,704건 중 성공 6,558·실패 146, 재시도 대기 146·기한 도래 0을 보였다. 이 146건은 V156 이전 레거시이므로 `last_attempt_at` 146건 모두 미상으로 정확히 표시되고 cache timing도 미상으로 분리됐다. 다음 재시도 예정은 2026-10-20 19:05 KST이므로, 새 시각 기록과 provider 결과 검증은 해당 자동 재시도 이후 남아 있다.
+
 ### 다음 개선
 - V156 운영 적용 후 다음 예약 재시도 결과에서 `last_attempt_at`, cache fetchedAt, 오류 분포를 확인한다. KIS 요청을 수동으로 유도하거나 전체 종목 갱신하지 않는다.
 
@@ -924,9 +1069,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 테스트 UI 설명, `docs/stocktitan-rss.md`, `docs/architecture/stocktitan-translation.md`, `docs/rss-translation-design.md`, `docs/ERROR_HANDLING.md`를 현재 구현과 일치시킨다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `lib/translate-market-rss-item.test.ts`: 비 StockTitan 출처는 provider 호출이 없는지, StockTitan 기사에서는 제목만 전달되는지 검증한다.
+- `app/api/admin/market-rss-test/route.test.ts`: `translate=true`의 StockTitan 기본 범위와 다른 출처 거부를 검증한다.
+- 두 신규 회귀 테스트 포함 전체 테스트 813개 통과·1개 skip. `npm.cmd run deploy:verify` 통과: production build, standalone·Chrome desktop/mobile·API smoke, typecheck, 문서·migration, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+
 ### 다음 개선
 - 다음 월 사용량 경계 이후 진단 API에서 StockTitan 제목 번역이 정상 재개되는지 확인한다. 이번 달 과거 사용량은 보존한다.
 
@@ -950,9 +1096,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `docs/stocktitan-rss.md`: 운영 형식과 재전송 동작을 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 원격 `oci` 갱신 전 `npm.cmd run deploy:verify` 통과: production build, standalone API·페이지 smoke, Chrome desktop/mobile hydration, 테스트 797개 통과·1개 skip, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 감사, npm audit 취약점 0건.
+- 배포 기준 원격 커밋이 검증 중 두 차례 갱신되어 최신 원격 HEAD 기준으로 전체 게이트를 재실행했다.
+- 최종 최신 기준 `npm.cmd run deploy:verify` 통과: production build, standalone 및 Chrome desktop/mobile/API smoke, 테스트 804개 통과·1개 skip, typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 감사, npm audit 취약점 0건.
+- GitHub Deploy OCI workflow run `39359695006` 성공. Verify, standalone 패키징, SSH 업로드와 서버 활성화 단계 모두 성공했다.
+- Discord 메시지 실수신은 별도의 관리자 RSS 테스트 또는 예약 알림에서 확인한다.
+- 배포 운영 API `GET /api/debug/market-rss-translations?hours=24&source=STOCKTITAN` read-only 조회: StockTitan 654건 중 TRANSLATED 7건, SKIPPED 548건, PENDING 99건, FAILED 0건. 번역 완료 7건은 영문 제목에 대응하는 한국어 제목이 저장되어 있었다.
+- SKIPPED 548건은 전부 `monthly_character_limit_reached` 및 `translation_fallback=true`였고 `translated_title`은 원문과 같았다. 미번역 PENDING 99건은 시도 횟수 0이었다.
+- 근본 원인: 내부 월간 한도 300,000자가 소진되면 번역 래퍼가 원문을 fallback으로 반환한다. 알림 조회는 번역 상태 완료를 조건으로 확인하지 않고, 본문도 `translatedTitle || title`을 사용하므로 fallback 및 미번역 PENDING 행이 원문 제목으로 전송될 수 있다.
+
 ### 다음 개선
 - 사용량 한도 상향에 따른 비용과 미번역 시 알림 지연/제외 정책을 확정한 뒤, StockTitan 알림은 한국어 번역 완료 상태만 전송하도록 보호한다. 배포 후 RSS Discord 관리자 테스트에서 세 항목 및 링크 미리보기 부재도 확인한다.
 
@@ -976,9 +1128,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `docs/stocktitan-rss.md`와 본 개발 로그에 작업 범위 및 배포 결과를 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 통과: production build, standalone·Chrome desktop/mobile·API smoke, 테스트 804개 통과·1개 skip, typecheck, 문서·migration, verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 신규 StockTitan 본문은 티커 조건이 false이고, 일반 RSS 본문은 기존 티커 행을 유지하는 조건을 코드에서 확인했다. StockTitan 재시도는 외부 ID로 기사 원본을 확인해 티커를 제거하고 임베드 억제 플래그를 유지한다.
+
 ### 다음 개선
 - 없음.
 
@@ -1003,9 +1155,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 진단 재조회: 최근 job PARTIAL, 전체 6,704건 중 성공 6,558·실패 146, retry due 0. 실패 146건 모두 연결 캐시는 있으나 10분 내 근접 캐시는 0건이며 HTTP 200/`rt_cd=0`이고 저장된 `last`는 비어 있다. 이 캐시들은 오래된 값이므로 당시 실패 응답에 대한 증거가 아니며, 운영 원인을 특정할 수 없다. 추가 KIS 호출이나 전체 갱신은 실행하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/instrument-fundamentals.test.ts lib/kis-us-price-detail.test.ts`: 2개 파일, 18개 테스트 통과.
+- `npm.cmd run deploy:verify`: 최종 코드 기준 통과. dependency audit 0 취약점, production build, standalone `/charts` 200 및 11 JS chunk 확인, Chrome 데스크톱·모바일 hydration, API/auth smoke, 테스트 224개 파일 통과·1 skip(809 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS 경계, Bearer 인증, OCI cron 감사 완료.
+- 코드 push 후 Deploy OCI workflow `39370209950`이 성공했다. 운영 `GET /api/health`, `/`, `/charts`가 모두 HTTP 200이고 인증된 read-only 진단 API도 정상 응답했다.
+- 배포 직후 최근 원장은 PARTIAL, 대상 6,704·성공 6,558·실패 146·retry due 0이다. 캐시 근접 실패는 여전히 0건이다. 예정된 개별 재시도 전이므로 수정 코드의 운영 데이터 개선은 아직 측정되지 않았으며 전체 갱신이나 KIS 호출은 실행하지 않았다.
+
 ### 다음 개선
 - 다음 정기 재시도 이후 새로운 실패의 캐시 시각과 안전 필드 상태를 다시 대조한다. 신선한 데이터에서도 값이 비면 KIS 공식 가격상세 응답 규격과 거래소별 종목 지원 범위를 종목 표본으로 확인한다. Retry 시각 전에는 수동 대량 요청을 하지 않는다.
 
@@ -1030,9 +1184,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 문서에 진단 집계와 캐시 시각 해석의 한계를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run app/api/debug/instrument-fundamentals/route.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 7개 테스트 통과.
+- `npm.cmd run docs:check` 통과: 개발 로그 계약 및 150개 migration/V155/23개 운영 관계 확인.
+- `npm.cmd run typecheck` 통과.
+- 최신 no-job 응답 shape 보완 후 `npm.cmd run deploy:verify` 최종 통과: production build, standalone 서버 기동과 `/charts` HTTP 200, Chrome 데스크톱·모바일 hydration, API/인증 smoke, 223개 파일 804개 테스트 통과·1개 skip, typecheck, docs·migration·verify-scope·KIS 경계·Bearer 인증·OCI cron 감사, npm audit 0 취약점.
+- 신규 쿼리는 provider 요청 없이 최근 실패 최대 500건을 조회하도록 제한했다. 실제 운영 캐시 field-state 집계 확인은 배포 후 진행한다.
+
 ### 다음 개선
 - 운영 캐시 집계에서 실제 대체 alias 양수 사례가 나오면 해당 alias를 비어 있지 않은 값 우선으로 읽도록 파서를 수정하고, 기존 cache를 이용한 재현 테스트와 다음 예정 retry 실행 결과를 검증한다. 대체 alias가 관측되지 않는 경우에는 KIS 공식 응답의 거래소/종목 매핑과 미지원 종목 상태를 소량 표본으로 확인한다.
 
@@ -1056,9 +1213,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 문서에 endpoint와 read-only 응답 범위를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run app/api/debug/instrument-fundamentals/route.test.ts lib/instrument-fundamental-debug.test.ts`: 2개 파일, 7개 테스트 통과. 인증 없이 DB를 호출하지 않음, 관리자/cron 인증, 빈 원장, 오류코드/재시도 표현, DB 오류 비노출을 검증했다.
+- `npm.cmd run docs:check` 통과: 150개 마이그레이션, 최신 V155, 운영 관계 23개 확인.
+- `npm.cmd run typecheck` 통과.
+- 커밋 전 `npm.cmd run deploy:verify` 통과: production build, standalone 서버 기동 및 `/charts` HTTP 200, 데스크톱·모바일 Chrome hydration, API/인증 smoke, 223개 테스트 파일 통과·1개 skip(804 passed·1 skipped), 타입 검사, 문서·migration·verify scope·KIS 경계·Bearer 인증·OCI cron 검사, npm audit 취약점 0건.
+- 운영 배포 후 `GET /api/health`, `/`, `/charts` 모두 HTTP 200. 새 진단 API는 cron 인증 GET에서 200, 미인증 GET은 401로 확인.
+- 운영 원장 job 1 (2026-10-20 02:16 UTC): 대상 6,704, 저장 성공 6,558, 실패 146, 재시도 대기 146, due 0. 전체 오류 집계는 `KIS_PRICE_INVALID` 135건(NAS 97, NYS 28, AMS 10), `KIS_MARKET_CAP_MISSING_OR_INVALID` 11건(NAS 6, NYS 5)으로 총 실패 수와 일치했다. 모두 최대 5회 시도 상태이며 가장 이른 재시도는 2026-10-20 10:05:10 UTC(19:05:10 KST)이다.
+- 같은 job의 최신 automation run은 `SKIPPED/instrument_retry_backoff`, KIS 요청 0건, 누적 실패 146건이었다. 원장 전체분포와 이전 상세 partial 요약은 교차 확인되었으며, 실패 원문은 저장하지 않아 `KIS_PRICE_INVALID` 내부 원인(필드 누락/0/응답 형태)은 아직 구분되지 않는다.
+
 ### 다음 개선
 - 다음 예정 재시도 뒤 같은 ticker에서 KIS를 대량 호출하지 말고, 우선 1개씩 제한된 공식 price-detail 응답의 필드 존재 여부·양수 파싱 결과만 안전 메타데이터로 계측한다. `KIS_PRICE_INVALID`의 필드누락/0/비숫자 원인을 구분하고, 정상 응답이면 마스터의 거래소 코드/종목 매핑을 공식 자료와 교차 검증한다.
 
@@ -1082,9 +1244,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `docs/operations/instrument-fundamentals-refresh.md`: 운영자가 전체 집계 → 시장 분포 → 제한된 상세 샘플 순으로 확인하도록 관측 기준을 갱신했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 최종 `npm.cmd run deploy:verify` 통과: production build, standalone `/charts` 및 API smoke, Chrome 데스크톱·모바일 hydration, 222개 test file 중 221개 통과/1개 skip(797개 통과/1개 skip), typecheck, docs/migration audit(V155), verify-scope, KIS boundary, Bearer auth, OCI cron, npm audit 취약점 0건.
+- 첫 전체 게이트는 로그 계약 누락으로 docs 단계에서 차단됐고, 수정 후 다음 빌드에서 DB 콜백 제어흐름 타입 오류가 발견됐다. 두 원인을 각각 보완하고 회귀테스트·typecheck 후 최종 전체 게이트 성공까지 확인했다.
+- 전용 `lib/instrument-fundamentals.test.ts`: 13개 통과. DB batch 오류 시 항목별 실패 귀속 및 120건 분포/100건 샘플 제한 검증.
+- 운영 런타임 확인은 다음 실제 갱신 실행에서 새 `failureCodeCounts`와 `failureCodeCountsByMarket` 필드를 대조해야 한다.
+- 코드 배포 workflow run `39237883085` 성공. 운영 `/api/health` status=ok, `/`·`/charts` HTTP 200 확인.
+
 ### 다음 개선
 - 다음 운영 갱신 후 관리자 실행 이력에서 전체 오류 코드 합계가 `failureCount`와 일치하는지, 시장별 합계가 시장별 실패 건수와 일치하는지 검증한다. 특히 DB 저장 장애·중단 때의 귀속 결과를 확인한 뒤 KIS 업무 오류별 backoff 정책을 실측 근거로 조정한다.
 
@@ -1106,9 +1271,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `lib/instrument-fundamentals.test.ts`: HTTP 503, KIS 업무 코드, 비안전 메시지 코드, stale fallback, 가격/시총 누락의 분류와 실제 refresh 실패 요약을 회귀 테스트로 고정한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 Vitest 14개 통과. 전체 `deploy:verify`와 PostgreSQL 런타임 확인은 진행 예정이며, 성공 전에는 커밋·푸시·배포하지 않는다.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, standalone `/charts`·API smoke, desktop/mobile hydration, Vitest 795개 통과·1개 skip, typecheck, docs/migration audit(V155), verify-scope, KIS boundary, Bearer auth, OCI cron 구조, npm audit 취약점 0건.
+
 ### 다음 개선
 - 운영 재시도 이력에서 오류 코드별 발생 비율을 확인하고, 일시 장애와 영구적인 종목 데이터 결함에 대해 같은 backoff가 적절한지 측정한다.
 
@@ -1133,9 +1298,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 오래된 미완료 작업을 재개할 때 `created_at`도 갱신해 같은 요청 안의 14일 정리 대상이 작업을 cascade-delete하지 않도록 함께 수정했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 Vitest 18개 통과(재시도 대기 시 KIS 0회, 정상 미완료 회수 및 상태 SQL 포함).
+- 임시 PostgreSQL 16에서 V154·V155 적용 및 실패 상태/다음 재시각 쿼리 통과.
+- `npm.cmd run deploy:verify` 최종 재실행 통과: production build, standalone `/charts` 및 차트 API smoke, desktop/mobile hydration, 전체 Vitest 794개 통과·1개 skip, typecheck, docs/migration audit(V155), verify-scope, KIS boundary, Bearer auth, OCI cron 구조, npm audit 0 취약점.
+- 운영 점검 시 `progress.deferredRetryCount`, `progress.nextRetryAt`, 항목별 `attempt_count/next_attempt_at`을 확인한다. 실패 종목 호출이 다음 재시도 시각 전에 발생하면 회귀다.
+
 ### 다음 개선
 - 전체 게이트 재실행 후 새 마이그레이션이 운영에 적용되면 첫 재개 실행에서 `deferredRetryCount`와 실패 종목의 KIS 호출 간격을 대조한다.
 
@@ -1173,9 +1340,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 종료 이력은 새 작업 시작 시 14일 뒤 정리한다. 동일 지문의 미완료 작업은 다시 실행될 때 재개한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 통과: production build, standalone 서버 기동 및 `/charts` HTTP 200, 11개 Next static chunk, Chrome 데스크톱·모바일 hydration, 국내·해외 차트 API 및 인증 경계 smoke.
+- 전체 Vitest: 222개 파일 중 221개 통과·1개 skip, 793 passed·1 skipped. 진행 원장/재개, 자동화 결과 상태, 운영 스키마 migration audit를 포함한 전용 테스트 28개도 통과했다.
+- typecheck, docs/migration audit(V154·필수 운영 관계 23개), verify-scope, KIS boundary, Bearer auth, OCI cron 구조 게이트 통과. npm audit 취약점 0건.
+- 임시 PostgreSQL 16에 V154 적용 및 SUCCESS/FAILED 상태 변경 쿼리를 확인했다. 작업 상태 SQL은 실제 PostgreSQL에서 정상 실행됐고, 애플리케이션 회귀는 별도 mocked resume 테스트로 검증했다.
+- 임시 PostgreSQL 16 컨테이너에 V154를 적용하고 작업/항목 테이블 생성, SUCCESS 및 FAILED 원자 상태 SQL을 실행해 결과를 확인했다.
+- `npm.cmd run docs:check` 통과: 마이그레이션 149개, 최신 V154, 필수 운영 관계 23개 확인.
+- 전체 게이트 첫 회차에서 운영 스키마 migration audit의 고정 기대치가 신규 테이블 추가에 취약한 점을 확인했다. 총 개수 고정 검증을 제거하고 중복 부재, 신규 테이블의 명시적 포함, 전체 migration 관계 검증으로 바꿔 향후 테이블 추가 때 같은 수정 누락이 재발하지 않게 했다.
+
 ### 다음 개선
 - 운영에서 다음 예약 갱신 후 `progress.resumed` 및 실제 KIS 호출 감소량을 실행 이력으로 비교하고, 실패 종목의 재시도 간격이 KIS rate-limit 정책과 맞는지 관측한다.
 
@@ -1211,9 +1383,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 공식 출처: [Nginx proxy_read_timeout](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout).
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 통과: 빌드/타입검사, 전체 786개 테스트 통과·1 skip, 정적·보안·cron 구조 게이트, standalone HTTP smoke와 Chrome 데스크톱·모바일 hydration.
+- `docker run --rm --entrypoint nginx -v <설정파일>:/etc/nginx/conf.d/default.conf:ro nginx:1.24.0-alpine -t` 통과.
+
 ### 다음 개선
 - 배포 후 실제 Nginx 설정 검사와 전용 route의 client disconnect/error 로그를 확인해 timeout을 넘는 upstream 처리 여부를 측정한다. 종목별 재개 상태 추적은 개선 과제 CI-2026-10-18-006에서 구현한다.
 
@@ -1252,9 +1424,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 공식 근거: [systemd.service TimeoutStartSec](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#TimeoutStartSec=), [systemd.timer Persistent](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html#Persistent=).
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 통과: 프로덕션 빌드 및 타입검사, 221개 테스트 파일(785 통과·1 skip), 정적/보안 게이트, cron 구조 검증, standalone `/charts` HTTP 200 및 Chrome 데스크톱·모바일 hydration 검증.
+- Git Bash `bash -n`으로 공유/전용 cron runner 및 배포 activation 스크립트 문법 검증 통과.
+
 ### 다음 개선
 - 배포 후 전용 timer/service 활성화 여부와 다음 실제 전체 갱신 duration을 운영 API 및 journal에서 검증한다. 4시간 timeout 초과나 `AUTOMATION_RUN_STALE` 재발 여부를 확인한다.
 - 종목별 durable resume cursor는 남은 후속 개선이다. 현재 배치별 원자 저장으로 이미 반영된 배치는 보존되지만 실패 후 전체 종목을 다시 순회한다.
@@ -1298,9 +1470,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 근거: 누락 수치·stale 응답·비보통주 대상·부분 저장/실행 상태를 각각 회귀 테스트로 고정했고, 성공 건수를 실제 커밋된 배치만 집계하도록 변경했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 4개 테스트 파일: 24개 테스트 통과.
+- `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0건, Next production build, standalone 서버의 `/charts` HTTP 200, JS 청크 확인, desktop/mobile Chrome hydration, 핵심 API smoke 및 품질 게이트 전체 확인.
+- 전체 Vitest: 221개 파일 중 220개 통과·1개 skip, 785 passed·1 skipped.
+- typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 구조 검증 통과.
+- 배포 검증 과정에서 standalone 서버가 로컬 포트 56210으로 실제 기동되고 smoke 종료 후 정리됐다.
+- `git diff --check`: 통과.
+
 ### 다음 개선
 - 배포 후 운영 실행 이력에서 국내·해외별 실제 갱신 소요시간, 시총 누락률, PARTIAL/FAILED 비율을 확인한다. 전체 갱신이 cron 응답/서비스 제한시간에 접근하면, 재시도 가능한 durable cursor 또는 재개 작업 설계를 별도 검토한다.
 
@@ -1328,9 +1504,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: DB 캐시가 없고 KIS가 느리거나 무응답이면 해당 단일 KIS 호출은 기존 30초 timeout까지 대기할 수 있다. 재무 보조 쿼리 필터 추가 후에도 운영 차트 요청이 느리면 단계별 Server-Timing과 SQL 실행계획을 재확인한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run app/api/stock/chart/route.test.ts components/chart-modal.test.tsx`: 2개 파일, 15개 테스트 통과.
+- `npm.cmd run typecheck`: 통과.
+- 첫 구현 커밋 `36debb92`의 `npm.cmd run deploy:verify` 및 Deploy OCI run `39097027526`는 통과했으나, 운영 AAPL 일봉 직접 호출이 45초 timeout되어 추가 원인을 수정 중이다. 해당 배포 중 일시 502가 있었지만 workflow 성공 뒤 health는 200으로 복구됐다.
+- 거래소 필터를 재무 요약 쿼리까지 확장한 후 전용 테스트 15개, `npm.cmd run typecheck`, `npm.cmd run docs:check`, `git diff --check` 통과.
+- 수정본 `npm.cmd run deploy:verify`: 통과. 의존성 감사 0건, production build, standalone `/charts` HTTP 200·11개 JS 청크·Chrome desktop/mobile hydration, 핵심 API smoke, 전체 Vitest 218개 파일(763 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, cron 검사 확인.
+- 운영 배포: 커밋 `b960d522`의 Deploy OCI run `39098354489`가 성공했고 운영 `/api/health`와 `/charts` 모두 HTTP 200이다.
+- 실운영 AAPL 차트 API를 직접 호출해 HTTP 200, 총 1,629ms, `Server-Timing` 차트 911ms를 확인했다. 단계별 시간은 활성 종목 마스터 113ms, 원격 캐시 490ms, DB 캔들 192ms, 재무 요약 114ms다. 45초 timeout에서 정상 응답으로 회복했으며 153개 봉, 마지막 거래일 2026-10-16, 출처 `KIS_OVERSEAS_PRICE`, 재무 상태 `AVAILABLE`을 확인했다.
+- `git diff --check`: 통과.
+
 ### 다음 개선
 - 배포 후 해외 차트 API의 `Server-Timing`과 KIS timeout/빈 응답 비율을 확인하고, DB 캐시 미스 경로의 사용자 대기시간이 반복적으로 길면 관측값에 근거해 별도 응답시간 개선을 설계한다.
 
@@ -1362,9 +1544,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 외부 API의 45초 timeout이 특정 운영 지연 구간에서 skip을 늘릴 수 있다. 배포 후 skip 비율과 처리 시간을 관찰하고 필요 시 실제 분포에 근거해 설정을 조정한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 `npm.cmd test -- --run lib/sec-ai-pipeline.test.ts`: 6/6 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0건, Next production build, standalone `/charts` HTTP 200 및 desktop/mobile hydration, 국내·해외 chart API 200, 관리자/cron 비인증 API 401, Vitest 217개 파일(759 passed·1 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth, cron 검사 통과.
+- `git diff --check`: 통과.
+- 공식 근거: [OpenAI Responses API reference](https://developers.openai.com/api/reference/resources/responses/methods/create), [Node.js AbortSignal.timeout](https://nodejs.org/docs/latest/api/globals.html#static-method-abortsignaltimeoutdelay).
+
 ### 다음 개선
 - SEC AI 평가 요청의 timeout, 응답 크기, skip 원인을 개인정보·비밀키 없이 구조화 지표로 기록해 운영 설정을 관찰 데이터로 조정한다.
 
@@ -1397,9 +1581,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - SEC 공식 fair-access 기준에 따라 요청 간격 제한 정책을 유지하고 이번 변경은 SEC 호출률을 높이지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 `npm.cmd test -- --run lib/sec-raw-document.test.ts`: 4/4 통과. SEC URL 차단, timeout duration 전달, 헤더 길이 초과 및 chunk 스트림 길이 초과를 검증했다.
+- 전체 `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0건, Next production build 성공, standalone `/charts` HTTP 200 및 desktop/mobile hydration 성공, 관련 public API 200·관리자/cron 비인증 API 401, Vitest 217개 파일(756 pass/1 skip), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth 및 cron 체크 통과.
+- 참고: [SEC EDGAR fair access](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data), [Node.js AbortSignal.timeout](https://nodejs.org/docs/latest/api/globals.html#static-method-abortsignaltimeoutdelay).
+
 ### 다음 개선
 - SEC 원문 fetch timeout/byte cap 발생 건수와 body byte 분포를 구조화된 진단 지표로 축적해 기본 제한을 실제 운영 데이터에 기반해 조정한다.
 
@@ -1426,9 +1611,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 영향 경로는 개발 도구 의존성이며 `npm audit --omit=dev`는 변경 전에도 0건이었다. 운영 런타임 취약점으로 과장하지 않고, 미사용 개발 도구 제거로 공급망 경고도 해소했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 변경 전 `npm audit`: moderate 4건(동일 GHSA의 종속 패키지별 중복 항목); 변경 후 `npm ci` 및 전체 `npm audit`: 취약점 0건. `npm audit --omit=dev`도 0건이다.
+- 새 `audit:dependencies` 게이트는 `npm audit --audit-level=moderate`를 실행하고 현재 lockfile에서 0건으로 통과했다.
+- 검증 중 첫 실행은 `docs:check`가 본 로그의 필수 섹션 계약 누락을 찾아 실패했다. 로그 계약을 보완한 뒤 테스트 단독 실행과 최종 `npm.cmd run deploy:verify`를 다시 수행했다.
+- 최종 `deploy:verify` 게이트 통과: audit 0 취약점, production build 성공, standalone 서버 시작 5.9초 및 `/charts` HTTP 200, Chrome 데스크톱·모바일 hydration 성공, 국내·해외 차트 API 기대 응답, 관리자 API 401 보호, Vitest 216개 파일(752 pass/1 skip), 타입 검사, 문서·마이그레이션·KIS 경계·인증·cron 검사 통과.
+- 참고: [GitHub esbuild advisory](https://github.com/advisories/GHSA-67mh-4wv8-2f99), [Drizzle upstream issue](https://github.com/drizzle-team/drizzle-orm/issues/5145).
+
 ### 다음 개선
 - future dependency 추가에서 audit gate가 인터넷 기반 npm audit metadata에 접근할 수 있어야 한다. 네트워크 장애도 fail-closed로 검증 실패가 되며, 이 동작을 임의로 무시하지 않는다.
 - CI 로그가 같은 advisory로 인해 중복 집계되는 건수를 별도 요약하도록 개선할지 검토하되, 현재는 npm 원본 report를 그대로 보존한다.
@@ -1457,9 +1645,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: smoke는 `/charts` 첫 화면의 핵심 상태전환까지만 검증하고 차트 모달의 데이터 조회·렌더링 상호작용 전체를 다루지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 배포된 `/charts`에 `runChartsBrowserSmoke`를 직접 실행: desktop/mobile 모두 시장 버튼 전환 후 입력 안내 변경 확인.
+- `npm.cmd run docs:check`: 통과. 18개 entry point, 148개 migration, 21개 operational relation 확인.
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: 통과. production build, standalone `/charts` 및 11개 JavaScript chunk, desktop/mobile Chrome 상호작용 smoke, 핵심 API smoke, 테스트 216개 파일(215 passed·1 skipped; 746 tests passed·1 skipped), 타입·문서·검증 범위·KIS 경계·Bearer 인증·cron 게이트.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 단순 SSR 요소 표시에서 국내↔해외 버튼 이벤트를 통한 실제 client state 변화로 검증 강도를 높였다.
+
 ### 다음 개선
 - 브라우저 스모크에 차트 모달 열기·닫기 및 읽기 전용 차트 데이터 렌더링을 추가할 필요가 있는지, 테스트 비용과 API 부작용을 확인해 설계한다.
 
@@ -1482,9 +1676,16 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: Content-Type은 서버 선언만 검증하며 본문 코드의 실행·브라우저 hydration까지 검증하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run scripts/next-static-assets.test.ts`: 2개 통과.
+- 최초 `npm.cmd run docs:check`: 실패. 최신 로그의 검증란에 실행 가능한 검사 명령이 아직 없어 문서 계약이 이를 차단했다. 현재 이 항목에 명령 결과를 기록했으며 재실행한다.
+- 수정 후 `npm.cmd run docs:check`: 통과. 21개 operational relation과 148개 migration 확인.
+- 전체 `npm.cmd run deploy:verify`: 통과. production build, standalone 실행과 API smoke, 216개 테스트 파일(746 passed, 1 skipped), 타입·문서·인증·KIS 경계·cron 게이트 통과.
+- standalone `/charts`가 참조하는 11개 JavaScript 파일 전체가 HTTP 200·JavaScript content-type·비어 있지 않은 본문으로 응답함을 확인.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: `application/notjavascript`가 거부되고 등록된 미디어 유형 및 charset이 수용되는 회귀 테스트를 통과했다.
+
 ### 다음 개선
 - 핵심 페이지의 브라우저 hydration 검증을 위해 현재 CI에서 사용할 수 있는 브라우저 런타임 및 라이선스·운영 비용을 평가한다.
 
@@ -1508,9 +1709,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 이 smoke는 화면 렌더링/상호작용과 브라우저 내 hydration까지 검증하지 않는다. 향후 핵심 화면 브라우저 E2E를 별도 평가한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run scripts/next-static-assets.test.ts`: 2개 통과.
+- `npm.cmd run docs:check`: 통과. 21개 operational relation, 148개 migration 파일 확인.
+- 전체 `npm.cmd run deploy:verify`: 통과. production build, standalone 실행 및 API smoke, 216개 테스트 파일(746 passed, 1 skipped), 타입·문서·인증·KIS 경계·cron 검사를 확인.
+- standalone `/charts`: HTTP 200, 실제 HTML 참조 JavaScript 청크 11개 모두 HTTP 200·JavaScript content-type·비어 있지 않은 응답 본문 확인.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 기존에 전혀 요청하지 않던 `/charts`의 11개 JavaScript 청크가 standalone smoke에서 모두 정상 응답함을 실측했다.
+
 ### 다음 개선
 - `/charts` 주요 상호작용 및 hydration을 브라우저 E2E로 검증할 수 있는 기존 CI 실행 기반을 확인한다.
 
@@ -1535,9 +1742,16 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: relation DDL 감사는 조건부·동적 SQL과 실제 DB 적용 결과를 대체하지 않는다. 운영 health 및 Flyway 검증을 계속 병행한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run docs:check`: 21개 전체 operational relation을 해석해 migration 상태 검사 통과.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 7개 통과, core relation migration 누락을 음성 케이스에서 검출.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크, 215개 테스트 파일(744 passed, 1 skipped), 타입·문서·보안·cron 검사를 확인.
+- GitHub Actions Deploy OCI run `38863953972`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `79d1028503963ac361f83ba8f5631e31afa85949`, Flyway 153, 누락 operational relation 없음.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 이전에는 미검사 상태였던 core 스키마 8개도 migration 감사에 포함되고 누락 시 실패한다.
+
 ### 다음 개선
 - 필수 operational column의 `ADD/DROP/RENAME` 이력도 같은 방식으로 검증할지 검토한다.
 
@@ -1564,9 +1778,16 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 후속 발견: 이 시점의 감사는 `...CORE_SCHEMA_TABLES` spread를 펼치지 않아 직접 표기된 13개만 세었다. 이 누락은 CI-2026-10-16-029에서 바로잡는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run docs:check`: 13개 operational relation이 버전순 migration 적용 후 존재하고 있음을 확인.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 5개 통과 (최종 DROP, rename source, drop 후 view 대체 등).
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크, 215개 테스트 파일(742 passed, 1 skipped), 타입·문서·보안·cron 검사 통과.
+- GitHub Actions Deploy OCI run `38860665063`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `720dc34d29a67154374da5498b53e4cb8e4b911b`, Flyway 153, 누락 operational table 없음.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: CREATE 이력 존재 여부만 검사하던 기존 감사가 후속 DROP/RENAME과 호환 뷰 전환을 순서대로 검증한다.
+
 ### 다음 개선
 - ALTER TABLE DROP COLUMN과 필수 operational 컬럼 요구 목록 간 같은 시간순 검증을 추가할지 평가한다.
 
@@ -1592,9 +1813,16 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 후속 발견: 당시 성공 메시지의 13개는 배열의 직접 항목만 센 수였고, spread된 core relation 8개는 검사에서 누락됐다. CI-2026-10-16-029에서 전체 21개를 대상으로 수정한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run docs:check`: 13개 operational relation의 버전순 migration 상태 검사 성공.
+- `npm.cmd test -- --run scripts/operational-schema-migration-audit.test.ts`: 5개 통과. 저장소 전수검사, 누락 음성 케이스, schema-qualified/quoted DDL, DROP 후 VIEW 대체, 최종 DROP 및 RENAME 케이스를 확인.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 런타임 스모크, 전체 215개 테스트 파일(740 passed, 1 skipped), 타입 검사 및 기존 문서/보안/cron 게이트 성공.
+- GitHub Actions Deploy OCI run `38854348257`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `268a0dbaaa5611ea61ceb9fdcc06f027353dcaff`, Flyway 153, 누락 operational table 없음.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 13개 필수 operational relation 전체를 버전순 migration 결과에 대조하고, missing relation 음성 케이스를 테스트로 차단한다.
+
 ### 다음 개선
 - 조건부 DO 블록이나 동적 DDL은 정적 relation 감사 대상에서 제외될 수 있으므로, operational relation 수동 예외를 명시할 기준을 검토한다.
 
@@ -1621,9 +1849,20 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 이번 배포 및 API 검증으로 확인한 범위에서는 없음. 향후 operational table 추가 시 migration과 schema-health 테스트를 함께 갱신해야 한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- DB history before repair: V142 script/description mismatch, V148 prior script `V148__allow_us_smallcap_cap_at_limit.sql`; V148 실제 constraint 정의는 저장소 migration과 일치.
+- Flyway repair는 V142/V145/V148 metadata 정렬 작업을 보고했고, `migrate`는 147개 applied migration 검증 및 V149-V152 네 migration 성공. V153 적용 시 148개 migration validate 후 V153 성공.
+- `.env.local`을 주입한 프로젝트 `npm.cmd run dev`에서 `/api/health` HTTP 503을 재현; read-only schema inventory는 `debug_run_items`, `debug_kis_calls`만 누락으로 반환.
+- 집중 테스트 `npm.cmd test -- --run lib/schema-health.test.ts`: 4개 통과. `npm.cmd run docs:check`: 통과.
+- V153 후 동일한 dev server에서 `/api/health`: HTTP 200, `status=ok`.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드·standalone 스모크 테스트·전체 214개 테스트 파일(737 passed, 1 skipped)·타입·문서·보안/cron 검사 성공.
+- GitHub Actions Deploy OCI run `38852487119`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `ef2315f483dff2219559d50d69cdd8c0fdbd2090`, DB 연결 정상, Flyway 153, 누락 operational table 없음.
+- 운영 `/api/admin/database` read-only 확인: `debug_run_items`, `debug_kis_calls` 모두 존재.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 로컬 Flyway 이력이 정렬되고 149-153 migration 적용에 성공했으며, missing operational tables로 발생하던 `/api/health` 503이 200으로 회복됐다.
+
 ### 다음 개선
 - 적용 migration history와 operational table requirements를 자동 대조해 신규 필수 테이블이 보정 migration 및 health tests에서 누락되지 않도록 검사 자동화한다.
 
@@ -1649,9 +1888,18 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 당시 Flyway 이력 충돌로 V152까지 진행되지 않았으나, CI-2026-10-16-026에서 원본 대조 후 로컬 metadata를 정렬하고 V153까지 적용했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 로컬 DB 스키마 점검: `user_watchlist` 누락, 운영 `/api/admin/database` read-only 확인: `user_watchlist` 존재.
+- V152 SQL을 로컬 PostgreSQL 트랜잭션 안에서 2회 실행해 테이블/인덱스 생성과 재실행 안전성을 확인하고 `ROLLBACK`했다.
+- `npm.cmd test -- --run lib/schema-health.test.ts`: 3개 테스트 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone 실행 스모크 테스트, 전체 214개 테스트 파일(736 passed, 1 skipped), 타입 검사 및 문서/보안/cron 게이트 통과.
+- GitHub Actions Deploy OCI run `38849867658`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `c935d7daf2dd62a424eefcfd0b8c1a80bceb12a9`, DB 연결 정상, Flyway 152, 누락 operational table 없음.
+- 운영 `/api/admin/database` read-only 점검에서 `user_watchlist` 존재 확인.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 로컬에서 누락을 확인했고 V152 적용 후 운영 Flyway가 152로 올라갔으며, 운영 health에서 누락 테이블 경보가 사라지고 `user_watchlist`가 존재한다.
+
 ### 다음 개선
 - resolved operational store 누락 여부를 다른 기능 테이블에도 대조해 migration 보정 및 health 테스트 누락을 확인한다.
 
@@ -1678,9 +1926,19 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 당시 남은 위험: local DB는 V142 파일 누락 및 V148 description 불일치로 Flyway validation이 막혔다. 원본 및 실제 제약을 확인한 뒤 CI-2026-10-16-026에서 V142를 복구하고 로컬 metadata를 정렬했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/schema-health.test.ts`: 2개 테스트 통과.
+- Read-only DB 확인: localhost DB 연결, Flyway 148, `investment_calendar_events` 없음. `SELECT to_regclass('public.investment_calendar_events')`는 NULL이고 해당 테이블 조회는 PostgreSQL `42P01`.
+- Flyway `info`: V130은 `Ignored`, V149/V150/V151은 `Pending`; `migrate`는 applied V142 missing 및 V148 description 불일치 검증 오류로 중단되어 persistent DDL은 적용되지 않았다.
+- V151 SQL을 PostgreSQL 트랜잭션 안에서 2회 실행해 table/index 생성과 재실행 안전성을 확인하고 `ROLLBACK`으로 DB 상태를 원복했다.
+- `npm.cmd run deploy:verify`: 통과. 빌드, standalone 실행, `/charts` 및 주요 API 스모크 테스트, 전체 품질 게이트를 통과했다 (735 tests passed, 1 skipped).
+- GitHub Actions Deploy OCI run `38847831266`: Verify deployment, standalone package, upload release, activate release 모두 성공.
+- 운영 `/api/debug/health`: HTTP 200, commit `eea34c416cb123c7c4fbeed99980ad4bf4f1ffe6`, DB 연결 정상, Flyway 151, 누락 operational table 없음.
+- 운영 `/api/listings?from=2026-10-16&to=2026-10-16`: HTTP 200 JSON, `ok=true`.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 누락 테이블을 재현하고 재적용 가능한 migration 및 health 회귀 검사를 추가했지만, local Flyway validation 불일치로 지속 적용을 확인하지 못했다.
+
 ### 다음 개선
 - 적용 V142/V148 lineage의 원본 근거를 확인해 local migration history를 안전하게 정합화한 뒤 V151, `/api/health`, 상장 일정 API 및 신규 이벤트 upsert를 검증한다.
 
@@ -1708,9 +1966,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 날짜 범위 상한은 설정하지 않았다. 넓은 과거 범위 사용량과 DB query latency를 관찰하고, 인덱스 활용·상한 필요성을 실제 지표에 따라 판단한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 집중 테스트: 3개 파일, 14개 테스트 통과.
+- 타입 검사: `npm.cmd run typecheck -- --tsBuildInfoFile .next-deploy-verify/tsconfig.tsbuildinfo` 통과.
+- 전체 `npm.cmd run deploy:verify`: 성공. production build, standalone `/charts` 200, 차트 API 200, 보호 API/cron 401, 전체 214개 테스트 파일(734 통과·1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 불가능 날짜가 두 API에서 모두 DB 접근 전 400으로 거절되고, Gregorian leap day는 유효하게 처리됨을 확인했다.
+
 ### 다음 개선
 - 운영 투자 일정 테이블의 규모와 `event_date` 인덱스 실행 계획을 조사해 광범위 날짜 조회의 지연·스캔 행 수를 측정한다.
 
@@ -1735,9 +1998,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 날짜 문자열 형식 검증은 존재하지만 달력상 불가능한 날짜 검증은 이번 limit 문제 범위에 포함하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 집중 테스트: 3개 파일, 6개 테스트 통과.
+- `npm.cmd run typecheck -- --tsBuildInfoFile .next-deploy-verify/tsconfig.tsbuildinfo`: 통과.
+- `npm.cmd run deploy:verify`: 성공. production build, standalone `/charts` 200, chart API smoke 200, 인증 보호 API/cron 401, 전체 212개 테스트 파일(722 통과·1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: fractional limit이 route와 service 양쪽에서 정수 SQL bind 값으로 제한됨을 6개 테스트로 확인했다.
+
 ### 다음 개선
 - 상장 일정 `from`/`to` 입력의 불가능한 날짜 및 과도한 조회 기간을 점검해 무효 날짜의 DB 오류와 과도한 결과 조회를 방지한다.
 
@@ -1762,9 +2030,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 해당 네 API 외에 범위가 복잡한 관리 도구 route들은 별도 입력 정책이 있으므로 이 변경에 포함하지 않았다. 추가 SQL 숫자 입력 경로는 별도 점검 과제로 남긴다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 집중 테스트: 공통 parser 및 네 route 테스트 5개 파일, 12개 테스트 통과.
+- `npm.cmd run deploy:verify`: 성공. Next.js production build 통과, standalone `/charts` 200, 주요 차트 API 200, 인증 보호 API/cron 401 smoke 통과, 전체 210개 테스트 파일(718 통과·1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 네 API에서 fractional 입력이 정수로 정규화되어 SQL에 전달되는 회귀 테스트 10개 및 공통 파서 테스트 2개가 통과했다. 최초 전체 검증은 로그 계약 누락으로 docs:check에서 막혔으며, 계약을 맞춘 뒤 재실행한 전체 검증은 모든 단계가 통과했다.
+
 ### 다음 개선
 - `app/api/admin/database` 및 기타 숫자 query 입력 API의 SQL 바인딩 계약을 점검하고, 실제 정수 바인딩이 있는 경로만 동일 공통 파서를 적용한다.
 
@@ -1789,9 +2061,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 비정수 문자열을 400으로 거절하지 않고 clamp/default 처리하므로 입력 오류는 응답의 유효 기본값으로 바뀐다. 이 endpoint의 기존 관대한 bounds 동작과 일치한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run app/api/debug/kis-calls/route.test.ts`: 1개 파일, 4개 통과.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내·해외 chart API 200, 관리자·cron 보호 경로 401, 전체 테스트 205개 파일(710 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
+- 운영 검증: health의 service SHA `a8063a5a27e929ab47ab05f6cedbd0d05e7127b6`, DB 정상. 관리자 API `?days=3.5&limit=1.9`가 200 JSON으로 반환되고 `days=3`, 최근 1건을 확인했다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 소수·무효 문자열·범위 초과 query가 DB 정수 cast 실패 대신 확정된 정수 인자로 전달되는 것을 회귀 테스트에서 확인했다.
+
 ### 다음 개선
 - 동일한 숫자 query 파싱 패턴이 있는 debug API를 추가 검사하고, 공통 정수 query parser 재사용 여부를 판단한다.
 
@@ -1818,9 +2096,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 필수 KIS 호출량 API 자체의 실패는 계속 전체 데이터 오류로 나타난다. 이는 대시보드 핵심 데이터이므로 현재 동작을 유지한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- targeted test: `npm.cmd test -- --run components/admin-kis-calls.test.tsx lib/admin-optional-json.test.ts`, 2개 파일, 4개 통과.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`: 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내·해외 chart API 200, 관리자·cron 비인증 401, 전체 테스트 203개 파일(705 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
+- 운영 적용 후 관리자 로그인, `/admin/kis-calls` 200, health DB 정상과 서비스 SHA 일치를 확인했다. Approval metrics API도 60분·60개 버킷을 반환했다.
+
+### 개선 과제
+- 성과 판정: IMPROVED (보조 fetch 오류 격리의 회귀 테스트·typecheck 통과; 전체 게이트와 운영 반영은 다음 단계에서 확인).
+- 근거: 필수 요청 렌더링을 보조 실패에서 분리했고, helper 실패 경로와 React UI 렌더링을 포함한 4개 targeted 테스트가 통과했다.
+
 ### 다음 개선
 - 컴포넌트 단위 검증을 추가해 RATE LIMIT/Approval 중 하나의 fetch가 실패해도 필수 KIS 호출량 섹션은 계속 렌더링되는 것을 UI 상태까지 확인한다.
 
@@ -1846,9 +2130,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 한 차례 재시도에서도 `/charts`가 계속 느리면 smoke는 실패해야 한다. 해당 timeout을 무제한 늘려 회귀를 숨기지는 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run scripts/smoke-retry-policy.test.mjs lib/kis-realtime-approval-rate-limit.test.ts app/api/admin/kis-realtime-approval-metrics/route.test.ts app/api/kis/realtime/approval/route.test.ts`: 4개 파일, 13개 테스트 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드, standalone `/charts` 200, 국내/해외 차트 API 200, protected API 401, 전체 테스트 202개 파일(702 통과, 1 skip), typecheck/docs/scope/KIS boundary/Bearer auth/cron 검사 성공.
+- 이 실행에서는 `/charts`와 신규 관리자 metrics endpoint 401 smoke도 통과했다. GitHub Actions [Deploy OCI #38826970184](https://github.com/pjtss/StockMan/actions/runs/38826970184)가 성공했고, 운영 `/api/debug/health`에서 적용 SHA `6abdf02af231962daf409e3efd11abade84b5054`, DB 연결 성공을 확인했다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 총 deadline을 개별 timeout보다 길게 유지해 일시 지연 후 재시도할 수 있고, 새 standalone smoke와 전체 품질 게이트가 통과했다. 무제한 대기는 허용하지 않는다.
+
 ### 다음 개선
 - 새 timeout/retry 정책으로 전체 배포 검증을 통과시키고, 반복 timeout이면 `/charts` server render 및 주요 await 구간을 별도 계측한다.
 
@@ -1876,9 +2165,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 단일 프로세스 메모리 통계는 프로세스 재시작 때 초기화되며 여러 인스턴스 간 공유하지 않는다. 프로젝트 운영 전제인 단일 OCI 인스턴스에서만 전체 발생률로 해석한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/kis-realtime-approval-rate-limit.test.ts app/api/kis/realtime/approval/route.test.ts app/api/admin/kis-realtime-approval-metrics/route.test.ts`: 3개 파일, 10개 테스트 통과.
+- `npm.cmd run typecheck`, `npm.cmd run docs:check`, `npm.cmd run audit:kis-boundary`, `git diff --check`: 통과. 전체 배포 검증 및 runtime smoke는 CI-2026-10-16-018에서 통과했다. 운영 관리자 세션으로 새 메트릭 API가 60분·60개 버킷을 반환하고 IP 필드가 없음을 추가 확인했다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 분별 집계·PII 미포함·관리자 인증·DB 독립 API/UI를 회귀 테스트와 전체 배포 검증에서 확인했다. 운영 rate-limit 발생률은 배포 이후 수집해야 한다.
+
 ### 다음 개선
 - 운영 적용 후 실제 429 비율과 분별 요청량을 확인하고 NAT 영향이 관측되면 IP 한도 및 전역 한도를 조정한다.
 
@@ -1902,9 +2195,17 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 첫 전체 검증에서 KIS 모듈 registry에 새 rate-limit 모듈과 테스트 연결이 누락된 것을 audit가 탐지했다. `scripts/kis-module-registry.mjs` 및 `scripts/audit-kis-boundary.mjs`에 책임·대표 함수·테스트를 등록했고 audit 재실행이 통과했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- targeted tests: 2개 파일, 6개 통과. `npm.cmd run typecheck`, `npm.cmd run docs:check`, `npm.cmd run audit:kis-boundary`, `git diff --check` 통과.
+- 전체 `npm.cmd run deploy:verify`: 통과. 빌드 및 standalone `/charts` 200, 국내·해외 차트 API 200, 보호 API 401, 테스트 201개 파일(695개 통과, 1개 skip), 타입·문서·scope·KIS boundary·bearer auth·cron 게이트 성공.
+- 전체 검증 중 문서 계약과 KIS registry 누락을 각각 감지해 수정하고 재실행 통과했다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: rate-limit 테스트에서 client cap, global cap, 요청 제한 시 fetch 미호출, `Retry-After`가 검증됐다. GitHub Actions `Deploy OCI #999` 성공 후 운영 `/api/debug/health`에서 service SHA `5f1440ca6f3d97553adcc3a59bc18b1f76ee28ed`, DB 연결 및 Flyway V150 정상 확인.
+
+### 남은 위험
+- 남은 위험: 같은 공인 IP를 공유하는 사용자(회사·통신사 NAT)는 합산 제한에 걸릴 수 있고, 분산 IP 공격은 전역 제한에 영향을 줄 수 있다. 운영 429 비율을 관측해 임계값을 조정해야 한다.
+
 ### 다음 개선
 - 운영 로그/메트릭에 IP 원문 없이 제한 발생 횟수, client/global scope, retry-after 분포를 집계해 정책을 조정한다.
 
@@ -1931,9 +2232,17 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 프로세스 메모리 캐시는 사용자가 확정한 단일 인스턴스 배포 구조에 종속된다. 다중 인스턴스로 바뀌면 공유 저장소 또는 단일 발급 서비스로 재설계해야 한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/kis-realtime.test.ts app/api/kis/realtime/approval/route.test.ts`: 2개 파일, 12개 테스트 통과.
+- `npm.cmd run deploy:verify`: 통과. Next.js 빌드, standalone `/charts` 200과 국내/해외 차트 API smoke, 200개 테스트 파일(692개 통과, 1개 skip), typecheck, docs, verify-scope, KIS boundary, bearer-auth 및 cron 구조 게이트 성공.
+- `git diff --check`: 통과.
+- 기준선 호출량: 모달 WebSocket 연결 N회당 Approval 요청 N회. 변경 후 프로세스/환경/자격증명당 23시간 내 첫 요청 1회, 동시 첫 요청도 1회로 병합한다(정량값은 호출계약 테스트로 확인하며 운영 트래픽 비율은 아직 수집하지 않음).
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 호출계약 테스트에서 같은 키 2회 요청 및 동시 요청이 각각 KIS fetch 1회로 합쳐지고, 만료 전에 키를 갱신하며 실전/모의와 credential 변경을 격리함을 확인했다. 운영 반영 후 실트래픽 절감량은 관측해야 한다.
+- 완료 기준: 모듈·route 테스트와 deploy verification 통과, 운영 서비스 SHA 확인.
+- 운영 배포 완료: GitHub Actions `Deploy OCI #997` 성공 (run `38817560167`); `/api/debug/health`에서 `2026-10-16T07:37:03Z` 기준 service commit `2808bbafdd24352722ea8110bf947417e7f50713` 일치, DB 연결·스키마·Flyway health 정상.
+
 ### 다음 개선
 - 차트 realtime Approval 경로 공개 호출량과 client/IP별 WebSocket 연결 남용을 계측하고 제한 정책을 검토한다.
 
@@ -1959,9 +2268,17 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 이번 변경은 확인한 공개 경로에 한정했다. 공개 API 전수 목록의 인증·오류 응답 계약을 계속 감사한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/public-api-error-boundary.test.ts app/api/us/sec-risks/route.test.ts app/api/kis/detection-candidates/route.test.ts`: 4개 파일, 21개 테스트 통과.
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: 통과. Next.js 빌드와 standalone 실행/API smoke, 198개 테스트 파일(684개 통과, 1개 skip), typecheck, docs, verify-scope, KIS boundary, bearer-auth 및 cron 구조 게이트 통과.
+- 최종 문서 상태 반영 후 재실행한 `deploy:verify`는 빌드·typecheck·전체 테스트(684 passed, 1 skipped) 통과 후 `/charts` 스모크 단계에서 30초 타임아웃으로 종료했다. 동일 standalone 산출물을 별도 기동해 `.env.local` 주입 상태에서 `/charts` 응답 200, HTML 8,648자, 850ms를 확인했고 startup error는 없었다. 문서 검사는 수정 후 단독 재통과했다.
+- `git diff --check`: 통과.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: targeted 회귀 테스트에서 원문 오류 미노출, 미인증 SEC risk 쓰기 차단, 데이터베이스 장애 시 503 분류를 확인했고 전체 배포 검증도 통과했다. 운영 반영 검증은 남아 있다.
+- 완료 기준: 전체 게이트 통과 기록, standalone `/charts` 실행 응답 200, 운영 배포 후 서비스 SHA 일치.
+
 ### 다음 개선
 - `/api` route 전체 인벤토리에서 공개 쓰기 API·자유형 예외 응답을 자동 탐지하는 CI 감사 규칙을 확대한다.
 
@@ -1985,9 +2302,16 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 남은 위험: 이번 작업은 확인한 KIS·국내 스캔 경로만 수정했다. `/api`의 다른 공개 기능(뉴스, 캘린더, 상장 일정, 재무 내보내기, SEC 리스크 등)의 오류 메시지 반환은 별도 점검 대상이다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts app/api/kis/detection-candidates/route.test.ts app/api/kis/investor-flow/route.test.ts`: 3개 파일, 12개 테스트 통과.
+- `git diff --check`: 통과.
+- `npm.cmd run docs:check`: 필수 로그 섹션을 보완한 뒤 통과(문서 entry 18개, 최신 migration V150).
+- `npm.cmd run deploy:verify`: 30초 smoke 제한을 적용한 전체 검증 1회는 통과(빌드, standalone `/charts` 및 API smoke, 전체 테스트 196개 파일 통과/1개 skip·674개 통과/1개 skip, typecheck와 정적 게이트)했다. 이후 재실행에서 `/charts` smoke의 간헐적 시간 초과가 발생했다. 분리 worktree에서 원본 `.env.local`을 비밀 출력 없이 주입한 standalone 직접 요청은 200, 1.4초, HTML 8,648 bytes를 반환했고 프로세스 정리도 정상 종료했다. `docs:check`와 단독 typecheck도 마지막 문서 수정 후 통과했다. verifier 재현성은 후속 개선 대상으로 남긴다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 6개 KIS 및 4개 국내 스캔 라우트의 오류 응답이 안전 진단 코드로 제한되고, 공급자 자유형 메시지와 DB URL/token canary가 응답에 나타나지 않는 단위 테스트가 통과했다. 전체 검증 성공 1회와 독립 standalone 직접 실행에서 빌드·674개 전체 테스트·실행 성공이 확인됐다. 최신 로그 기준 `docs:check`와 typecheck도 통과했다.
+- 완료 기준: 오류 응답 secret-canary 회귀 테스트, 빌드·전체 테스트·standalone 실행, docs:check 통과. 배포 검증 `/charts`의 간헐 타임아웃은 다음 개선 항목으로 추적하며, 이번 기능 변경의 직접 standalone 응답은 200으로 검증했다. 커밋/푸시 및 운영 배포 확인은 남아 있다.
+
 ### 다음 개선
 - 배포 검증 `/charts` smoke의 간헐 30초 이상 지연 원인을 추적하고 계측·재현성을 보강한다. 이어 미점검 공개 경로(`/api/bullish-rss`, 캘린더, 상장 일정, 재무 내보내기, SEC 리스크)의 예외 메시지 반환도 확인한다.
 
@@ -2014,9 +2338,18 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 범위 한계: 이번에는 공통 KIS 통신 경계와 US TOP 상승률 경로를 수정했다. 다른 외부 연동의 로그·저장·API 응답은 다음 감사 항목이다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/kis-request-framework.test.ts app/api/stock/us/top-rising-chart/route.test.ts lib/us-top-rising-universe.test.ts`: 4개 파일, 20개 테스트 통과.
+- `npm.cmd run docs:check`: 통과(문서 entry 18개, migration 최신 V150).
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: 통과. production build 성공, standalone smoke(`/charts` 200, invalid KIS market 400, 국내·해외 top-rising chart API 200, 미인증 관리자·cron API 401), 테스트 196개 파일 통과/1개 skip(672개 통과/1개 skip), typecheck 및 docs/auth/KIS boundary/cron 게이트 통과.
+- OCI 배포 workflow `38805231990`: 성공, 대상 커밋 `bbb18273f721334881588bbd808634be3b779c89`.
+- 운영 관리자 health API: `status=ok`, 서비스 SHA `bbb18273f721334881588bbd808634be3b779c89`, 빌드 시각 `2026-10-16T05:50:46+09:00` 확인.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 공통 KIS 네트워크 로그와 rate-limit 이벤트에서 자유형 입력 제거 테스트가 통과했고, 공개 TOP 상승률 API의 DB/KIS 예외 메시지 비노출 회귀 테스트도 통과했다. 전체 빌드·테스트·standalone smoke가 성공했으며 운영 health API가 새 SHA와 `ok`를 확인했다.
+- 완료 기준: 전체 테스트·빌드·standalone smoke 통과, 커밋/배포 후 서비스 SHA 확인.
+
 ### 다음 개선
 - RSS·SEC·Discord·기타 외부 공급자 응답에서 자유형 오류 문자열이 저장되거나 API에 반사되는지 조사한다.
 
@@ -2035,9 +2368,24 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 회귀 테스트는 예시 DB URL 및 token 문자열이 안전 메타데이터에 들어가지 않음을 확인한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/error-diagnostics.test.ts lib/kis.test.ts`: 2개 파일, 11개 테스트 통과.
+- `npm.cmd run docs:check`: 통과(문서 entry 18개, migration 최신 V150). 최초 실행에서 로그 필수 계약 누락이 검출되어 성과/근거/검증 필드를 보완한 뒤 통과했다.
+- `git diff --check`: 통과.
+- KIS 파일의 직접 예외 로깅을 검색해 결과가 `safeErrorMetadata(...)` 호출만 남았음을 확인했다.
+- `npm.cmd run deploy:verify`: 통과. production build 성공, standalone runtime smoke(`/charts` 200, invalid KIS market 400, 국내·해외 top-rising chart API 200, 미인증 관리자·cron API 401), 테스트 195개 파일 통과/1개 skip(670개 통과/1개 skip), typecheck 및 문서·auth·KIS 경계·cron 게이트 통과.
+- 배포 workflow `38802490718`: 성공적으로 새 릴리스를 활성화했다.
+- 운영 관리자 health API: `status=ok`, 서비스 SHA `eaf9592622f56c81015bb705e20a27efd11fae7f`, 빌드 시각 `2026-10-16T05:17:06+09:00` 확인.
+
+### 근본 원인 및 재발 방지
+- 근본 원인: 로깅 시 분류된 진단 DTO가 아니라 원본 예외 객체를 직접 전달하는 관행.
+- 재발 감지: `lib/kis.ts`에서 catch 변수 또는 예외 객체를 직접 로깅하는 패턴을 정기 감사하고, 안전 메타데이터 helper 테스트에서 URL/토큰 제외 계약을 유지한다.
+- 범위 한계: 이번 변경은 국내 KIS 스캐너 공통 모듈만 다룬다. 해외 KIS 및 RSS/SEC/Discord 오류 반환·저장은 다음 점검 범위다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: 대상 스캐너 15개 예외 로그가 안전 메타데이터만 사용하도록 바뀌었고, 회귀 테스트에서 URL/token 제외를 확인했다. 전체 테스트·빌드·standalone smoke가 통과했으며 운영 health API에서 배포 SHA와 `ok`를 확인했다.
+- 완료 기준: 안전 로그 테스트, `deploy:verify`, standalone smoke, 배포 후 운영 커밋 확인.
+
 ### 다음 개선
 - 해외 KIS 및 외부 연동 오류 경로에서 원문 예외가 사용자 API 응답이나 로그에 노출되는지 조사한다.
 
@@ -2057,9 +2405,18 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 공식 기준: OWASP Logging Cheat Sheet의 access token, 인증 비밀번호, DB connection string, encryption key 등 로그 제외 권고를 반영했다(https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html).
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd test -- --run lib/kis-token.test.ts`: 8개 테스트 통과.
+- 신규 테스트는 응답 본문에 포함된 가짜 앱 시크릿·액세스 토큰이 warning 인자에 나타나지 않는지, DB 오류 원문이 출력되지 않는지 확인한다.
+- 전체 배포 검증과 운영 배포 전이다.
+
+### 남은 위험 및 다음 개선
+- 애플리케이션의 다른 외부 API 모듈에서도 자유 형식 응답·오류가 직접 로그에 전달되는지 별도 인벤토리화가 필요하다.
+- 기존 운영 로그의 보존·접근 정책과 이미 기록된 민감 문자열 여부는 OCI 로그 저장소에서 별도 확인해야 하며, 코드 변경만으로 과거 로그를 지우지는 않는다.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 토큰 발급 실패와 DB 오류를 포함하는 단위 테스트에서 로그 허용 목록과 비밀값 제외를 확인했지만, 전체 게이트 및 운영 배포 후 확인은 남아 있다.
+
 ### 다음 개선
 - 다른 공급자(KIS 시세·SEC·RSS·Discord) 오류 로그에서 원문 payload나 URL query credential을 직접 출력하는 경로를 대조한다.
 
@@ -2079,9 +2436,20 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `audit:bearer-auth`를 확장해 API route에서 직접 CRON_SECRET 인증을 새로 구현하면 실패하도록 했다. CRON_SECRET 설정 여부만 진단 응답으로 제공하는 `admin/market-debug`는 명시적 비인증 예외로 둔다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 집중 회귀 테스트: 3개 파일, 13개 테스트 통과.
+- 최종 `npm.cmd run deploy:verify` 통과: production build, standalone smoke(`/charts` 200, KR/US top-rising API 200, unauthenticated admin/cron 401), 테스트 195개 파일 통과/1개 skip(668개 통과/1개 skip), typecheck, docs, verify-scope, KIS boundary, auth audit, OCI cron(21 endpoints).
+- `npm.cmd run audit:bearer-auth`가 API route 170개를 검사했고, CRON_SECRET 인증 구현은 공통 helper 사용으로 통일됐다. 설정 상태만 진단하는 명시 예외는 1개다.
+- 최초 문서 검사는 `미실행` 설명에 포함된 단어를 배포 완료 상태로 오인해 실패했다. 상태 문구를 고친 뒤 최종 전체 검증에서 docs gate도 통과했다.
+
+### 남은 위험 및 다음 개선
+- 개별 비즈니스 라우트가 Cron 호출 후 수행하는 작업의 권한·중복실행 정책은 이번 인증 파서 변경 범위가 아니다.
+- 별도 키(`DAILY_CACHE_API_KEY`, 사용자 세션, webhook 서명 등)를 사용하는 공개·관리 API는 CRON_SECRET 계약과 별도 검토한다.
+
+### 개선 과제
+- 성과 판정: UNMEASURED
+- 근거: 공통 helper 적용, 집중·전체 테스트 및 local standalone 실행은 통과했지만 운영 배포 후 SHA/인증 확인은 아직 남아 있다.
+- 완료 기준: 전체 배포 검증 통과, OCI cron 헤더 호출 유지, 배포 후 commit SHA와 인증 응답 확인.
+
 ### 다음 개선
 - 관리자·공개 API의 별도 인증 체계와 민감정보 로그 노출을 인벤토리화하고 토큰 노출 회귀 테스트를 추가한다.
 
@@ -2101,9 +2469,20 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 회귀 테스트는 헤더 인증, Bearer 공백, 빈 사용자 정의 헤더 fallback, 미설정/오류 비밀값, query 거부 및 두 API 메서드(GET/POST) 동작을 고정한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 최종 재실행 통과: production build, standalone smoke(`/charts` 200, 국내·해외 top-rising API 200, unauthenticated admin/cron 401), 테스트 195개 파일 통과/1개 skip(666개 통과/1개 skip), typecheck, docs, verify-scope, KIS boundary, Bearer audit(170 routes), OCI cron(21 endpoints).
+- 최초 전체 검증은 최신 DEVELOPMENT_LOG 계약 누락으로 `docs:check`에서 실패했다. 로그 계약을 충족하도록 수정한 뒤 전체 검증을 처음부터 다시 실행해 통과했다.
+- 집중 테스트: 2개 파일, 9개 테스트 통과; `git diff --check` 통과.
+
+### 남은 위험 및 다음 개선
+- 다른 API 경로에도 legacy CRON_SECRET 파서가 남아 있어 인증 계약의 전면 통일은 미완료다. 이 변경은 URL query secret을 허용했던 두 엔드포인트만 다루며, 나머지 호출 경로는 별도 호출자 호환성 확인 후 순차 이전한다.
+- 배포 후 query credential 요청은 401, 기존 `scripts/oci-cron.sh` 헤더 요청은 정상 동작하는지 운영 스모크로 확인한다.
+- 쿼리 파라미터 자체를 애플리케이션 접근 로그에 기록하는 다른 API도 별도 점검한다.
+
+### 개선 과제
+- 성과 판정: IMPROVED
+- 근거: query parameter만 제공된 요청이 두 cron route에서 401로 거부되고, 내부 OCI의 기존 헤더 인증 방식은 route 테스트와 배포 검증에서 유지됨을 확인했다. 첫 문서 게이트 실패도 로그 계약 수정 후 전체 검증 재실행으로 해소했다. 운영 반영은 아직 미확인이다.
+- 완료 기준: 전체 배포 검증 통과, 호출 스크립트 호환성 검증, 운영 SHA 및 인증 스모크 확인.
+
 ### 다음 개선
 - 나머지 CRON_SECRET 보호 라우트의 인증 방식과 호출자를 인벤토리화하고, 공통 helper 이전을 단계별로 적용한다.
 
@@ -2122,9 +2501,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 단계 순서를 회귀 테스트로 고정해 runtime smoke가 테스트 suite 뒤로 이동하면 테스트가 실패한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 단계 순서 단위 테스트 및 전체 배포 검증은 커밋 전 실행 예정이다.
+- 이전 재시도에서도 build·659개 전체 테스트·typecheck·정적 감사는 통과했으나 runtime smoke가 반복 timeout되어 최종 성공으로 처리하지 않았다.
+- 수정 후 `npm.cmd run deploy:verify` 통과: production build, 195개 테스트 파일 중 194개 통과/1개 skip(660개 통과/1개 skip), typecheck, docs, verify-scope, KIS boundary, Bearer auth audit(170 routes), OCI cron 21 endpoints.
+- Runtime smoke가 테스트 suite 전에 통과: TCP 7,532ms, Next ready 10,968ms, `/charts` 200, KR/US top-rising 200, 예상한 invalid/unauthorized 400·401, 종료 정리 완료.
+
 ### 다음 개선
 - 이 순서 변경 후 CI와 로컬에서 `/charts`의 cold-start 응답 시간을 누적 기록해 15초 상한이 적정한지 실측한다.
 
@@ -2147,9 +2528,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `npm run audit:bearer-auth`를 `deploy:verify` 및 표준 `verify` 흐름에 연결하고 배포 체크리스트에도 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 감사 단위 테스트: 2/2 통과.
+- 실제 API route 170개 감사 통과; 현재 이중 이스케이프 파서 0건.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 194개 테스트 파일 중 193개 통과/1개 skip(659개 통과/1개 skip), typecheck, docs:check, verify-scope, KIS boundary, Bearer auth audit, OCI cron 21 endpoints.
+- Standalone smoke 통과: `/charts` 200, invalid KIS market 400, KR/US top-rising chart 200, 보호된 admin/cron 미인증 401, 프로세스 종료 정리 완료.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
 ### 다음 개선
 - cron/API 인증 파서가 중앙 공통 함수를 사용하도록 점진적으로 통합하고, header precedence와 whitespace 동작을 동일한 계약 테스트로 검증한다.
 
@@ -2172,9 +2557,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 재발 자동 감지: endpoint 테스트가 Bearer 인증으로 실제 POST 성공(200) 및 3개 probe 기록을 검증한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 Vitest: 1개 파일, 3개 테스트 통과.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 193개 테스트 파일 중 192개 통과/1개 skip(657개 통과/1개 skip), typecheck, docs:check, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- Standalone smoke 통과: `/charts` 200, invalid KIS market 400, KR/US top-rising chart 200, 보호된 admin/cron 미인증 401, 프로세스 종료 정리 완료.
+- 운영 API 사전 진단: 9개 probe 모두 성공, 전체 응답 63ms; health-probe-history 최근 기록에도 실패·경보 없음.
+- 배포 후 운영 Bearer 인증 검증: `POST /api/cron/health-probe-snapshot` 응답 `ok:true`, `recorded:3`; db_connection 12ms, automation_history_latest 3ms, health_schema 31ms 모두 성공.
+
 ### 다음 개선
 - 다른 cron endpoint의 Bearer 파서 변형을 정적 검사해 이중 이스케이프가 재발하지 않는지 일괄 점검한다.
 
@@ -2200,9 +2588,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Windows taskkill 완료 대기, taskkill 시작 실패 fallback, POSIX 강제 종료 승격에 대한 회귀 테스트를 추가한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npx.cmd vitest run scripts/child-process-lifecycle.test.mjs scripts/runtime-startup-signals.test.mjs` 6/6 통과, `node --check` 및 `git diff --check` 통과.
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 193개 테스트 파일/657개 테스트, typecheck, docs, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- standalone smoke: TCP 준비 5,456ms, Next ready 신호 관측 7,569ms, `/charts` 200, invalid KIS market 400, KR/US rising chart 200, admin/cron unauthenticated 401, standalone process cleanup 완료.
+- timeout 자체를 일부러 발생시키는 통합 smoke는 운영 검증 파이프라인을 지연시키므로 실행하지 않았다. OS별 종료 시나리오는 이식 가능한 fake-process 주입 테스트 4개로 검증했다.
+
 ### 다음 개선
 - CI에서 실제 명령 timeout이 발생하면 `timed-out process cleanup complete`가 출력되고, 해당 run의 자식 프로세스가 남지 않는지 확인한다.
 
@@ -2229,9 +2619,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 준비 상태 요약은 HTTP smoke 전체가 끝난 뒤에 출력해 진단 시점과 의미를 맞춘다. 실제 HTTP 요청 성공을 readiness 신호 대신으로 간주하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 첫 `npm.cmd run deploy:verify`는 새 개발 로그가 필수 템플릿을 따르지 않아 `docs:check`에서 실패했다. 로그를 프로젝트의 개선 과제 형식에 맞춘 뒤 재실행했다.
+- `node --check` 및 targeted tracker test 2/2 통과. 최종 `npm.cmd run deploy:verify` 성공: production build, 192 test files/653 tests, typecheck, docs, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- standalone runtime: TCP 준비 5,458ms, Next 준비 신호 최초 관측 7,326ms, `/charts` 200, invalid KIS market 400, KR/US rising APIs 200, 무인증 admin/cron 401, 프로세스 cleanup 완료.
+- 이전 실행에서 readiness가 false로 찍힌 현상은 TCP 연결 직후 상태를 읽은 경쟁 조건으로 설명된다. 과거 `/charts` AbortError 자체는 재현되지 않아 별도 근본 원인 미확정 상태를 유지한다.
+
 ### 다음 개선
 - 전체 검증에서 `nextReadyObservedMs`, `/charts` 및 API 응답, 프로세스 cleanup가 모두 확인되는지 검증한다.
 
@@ -2259,9 +2651,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 검증 대상을 cron 인증/부분 실패 기록, 경보 임계값, 관리자 메뉴 등록 및 OCI cron 등록으로 고정한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 성공: Next production build, 191개 테스트 파일에서 651 passed, TypeScript, docs(최신 migration V150), verify-scope, KIS boundary, OCI cron 21 endpoints 및 standalone HTTP smoke.
+- Standalone HTTP 결과: `/charts` 200, 유효하지 않은 KIS market 400, 국내/해외 TOP 상승 차트 API 200, 관리자 history API와 cron API는 자격증명 없이 각각 401.
+- 첫 smoke 실패를 조사하며 격리 worktree에 `.env.local`이 없음을 확인했다. 주 프로젝트 파일을 수정하지 않고 임시 하드링크로 환경만 연결했으며 SHA-256 일치를 확인했다. 기본 동적 포트에서 timeout이 재현됐으나 고정 포트 `3333`의 최종 전체 검증은 통과했다. 별도 수동 standalone 재현도 `/charts` 200을 반환했다.
+- 수동 standalone 프로세스가 `.next-deploy-verify`를 사용하는 동안 후속 빌드가 겹치는 것을 발견하고, 최종 전체 검증 전에 두 프로세스를 종료했다. 이 worktree의 `.env.local` 임시 링크는 검증 후 제거한다.
+- 배포 결과: `https://github.com/pjtss/StockMan/actions/runs/38771175760` 성공. 운영 admin 진단 API가 Flyway V150(`health probe history`)을 확인했고, 공개 `/api/health`는 `ok`/21ms였다.
+- 운영 검증: cron snapshot POST HTTP 200/`recorded: 3`; 관리자 history GET HTTP 200, 새 probe 행 6개, 경보 0개. 무인증 admin/cron 요청은 로컬 standalone에서 모두 401이었다.
+- 배포 결과 기록 후 재실행한 docs-only 게이트도 build·651 tests·typecheck·docs·scope/KIS/cron 검사까지 통과했으나 자동 runtime smoke가 `/charts` timeout으로 종료됐다. 동일 freshly-built standalone을 별도 실행해 `/charts` 200, admin 무인증 401, cron 무인증 401을 직접 확인했다. 자동 smoke timeout 원인은 아직 미확정으로 남긴다.
+- 격리 worktree의 `.env.local` 임시 링크와 테스트용 standalone 프로세스는 모두 제거/종료했다. 원본 환경 파일은 남아 있다.
+
 ### 다음 개선
 - 운영 표본 24시간이 쌓인 뒤 실제 평균/최대/연속 실패를 확인하고, 1초 기준이 유의미한지 재평가한다. 현재는 단일 스냅샷 slow alert이며 p95 및 복구 알림은 후속 과제다.
 - 자동 `deploy:verify` smoke의 간헐 timeout 원인을 분리하기 위해 실행기 로그와 포트·프로세스 종료 상태를 추가 관측한다.
@@ -2286,9 +2684,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - smoke 전에 TCP listener를 별도 대기해 bind 실패와 HTTP 응답 timeout을 분리하며, Windows tree-kill 종료를 기다리고 미종료 시 직접 종료 후 실패시킨다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `node --check scripts/verify-deploy.mjs` 통과. `npm.cmd run deploy:verify` 성공: build, 191개 테스트 파일/651 tests 통과, typecheck, docs, verify-scope, KIS boundary, OCI cron 21 endpoints.
+- standalone runtime: TCP listener 준비 5,419ms, `/charts` 200, invalid KIS market 400, KR/US rising chart 200, admin/cron unauthenticated 401. 자식 프로세스 종료 확인 후 게이트 성공.
+- 이번 실행은 통과했지만 이전 AbortError의 구체적 재현 원인은 확정되지 않았다. 새 TCP 단계 계측은 미기동과 라우트 지연을 다음 재발 때 구분하기 위한 방지책이며, 근본 원인 확정으로 간주하지 않는다.
+- 로컬 `.env.local`은 해시 검증된 임시 하드링크만 사용하고 검증 종료 후 제거한다. 환경 파일 값은 출력하지 않는다.
+
 ### 다음 개선
 - 결과에서 TCP 준비는 성공하지만 `/charts`만 지연되는 것으로 확인되면 route별 SSR/runtime dependency를 다음 단계로 추적한다. listener가 열리지 않으면 포트 충돌·bind·기동 오류 코드부터 조사한다.
 
@@ -2314,9 +2714,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 자동화 최신 조회와 마지막 성공 조회의 개별 실패를 주입하는 회귀 테스트를 추가해 나머지 데이터 보존을 확인한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 발견 근거: 실제 운영에서 캐시 이력 쿼리 timeout을 겪은 구조가 한 바깥 `try/catch`에 묶여 있어, `Promise.all` 한 곳의 rejection이 성공한 automation query 결과까지 버리는 것을 코드로 확인했다.
+- 장애 주입 데이터 테스트와 렌더 테스트: `npm.cmd test -- --run app/health-check/page.test.tsx lib/health-check-query-resilience.test.ts lib/health-check-query-concurrency.test.ts lib/health-check.test.ts` 4개 파일, 6개 테스트 통과. 타입 검사와 `git diff --check` 통과.
+- `scripts/dev-server.mjs` 실행에서 `/health-check` HTTP 200, 실제 빈 history는 `실행 이력 없음`으로 표시됐다. `/api/health`는 HTTP 503/degraded였으며 로컬 DB가 Flyway 148이고 필수 운영 테이블 `debug_run_items`, `debug_kis_calls`가 없어 발생한 기존 로컬 스키마 차이임을 read-only 조회로 확인했다. 로컬 DB에는 migration을 적용하지 않았다.
+- 최종 `npm.cmd run deploy:verify`: production build, 전체 646 tests passed/1 skipped, typecheck, docs, 범위/KIS/cron 감사와 standalone HTTP smoke 통과.
+- Deploy OCI workflow `38706334906` 성공 후 운영 `/health-check` HTTP 200, `/api/health` HTTP 200/status `ok`/48ms. 정상 운영 데이터에서 실패 표시 문구는 없고 빈 이력 표시도 노출되지 않았다.
+
 ### 다음 개선
 - 운영 DB query 지연이 재발할 때 admin diagnostics의 probe 시간과 health 페이지의 `이력 조회 실패` 상태를 대조해 원인을 기록한다. 정기 수집·경보는 별도 개선 과제로 추적한다.
 
@@ -2340,9 +2743,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 범위는 health query, 관리자 단계별 진단, 회귀 테스트, Flyway migration 및 운영/개발 문서다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 최초 적용 근거는 운영 `/api/admin/health-diagnostics`: automation_latest_by_module 51ms, cache_latest_by_module 1503ms/57014, cache_last_success_by_module 1510ms/57014, 설정 조회 8ms.
+- V149 적용 확인은 운영 `/api/admin/market-debug?market=ALL`: Flyway version 149, description `automation cache history partial indexes`.
+- 최종 운영 `/api/admin/health-diagnostics`: 전체 응답 355ms, automation_latest_by_module 94ms, cache_latest_by_module 22ms, cache_last_success_by_module 11ms, 나머지 probe 모두 성공. 공개 `/api/health` HTTP 200, status `ok`.
+- `npm.cmd run deploy:verify`: production build, 642 tests passed/1 skipped, typecheck, docs(143개 migration/V149), 범위/KIS/cron 검사 및 standalone `/charts`·차트 API smoke 통과. V149 SQL은 로컬 PostgreSQL transaction에서 실제 생성 확인 후 rollback했다.
+- Deploy OCI run `38700748463`(1차 query) 및 `38702097741`(V149) 모두 성공했다.
+
 ### 다음 개선
 - 다음 개선: 운영 진단 API 응답시간과 health probe를 주기적으로 추세화하고, 개별 DB probe가 1초를 넘거나 57014가 재발하면 관리자 관측 화면에서 바로 식별할 수 있도록 경보 임계값을 설계한다.
 
@@ -2369,9 +2775,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `scripts/kis-module-registry.mjs`, `scripts/audit-kis-boundary.mjs`, `docs/architecture/external-request-boundaries.md`: 새 KIS 모듈·endpoint·테스트의 경계 감사 연결을 등록해 다음 유사 API 추가 때도 빠진 등록을 자동 탐지한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 공식 문서 `docs/references/한국투자증권_오픈API_전체문서_20260727_030000.xlsx`의 `해외주식조건검색` 시트를 확인했다. 공식 API ID `v1_해외주식-015`, TR ID `HHDFS76410000`, endpoint, 입력 필드, `output2` 스키마, 최대 100건 및 다음 조회 미지원 사항을 대조했다.
+- 전용 Vitest: 24개 통과. `npm.cmd run typecheck`: 통과.
+- 첫 `npm.cmd run deploy:verify`에서 production build와 전체 Vitest(182개 파일, 628 통과·1 skip), typecheck, docs 및 범위 감사는 통과했다. KIS boundary audit가 신규 모듈 registry 누락을 검출해 등록과 감사 테스트 매핑을 보완했다.
+- PostgreSQL 실제 실행에서 Drizzle 템플릿의 배열 파라미터 표현이 `ANY(text[])`와 호환되지 않는 점을 발견했다. 드라이버 네이티브 바인딩으로 수정하고 회귀 테스트를 추가했다.
+- 완료 감사에서 `output2`의 잘못된 원소 타입과 거래소 코드 누락 행이 보수적으로 거부되지 않음을 찾아 수정했다. 객체 배열 shape를 엄격 검증하고, KIS가 `excd`를 생략하면 요청 거래소로 간주하지 않는다.
+- 추가 fail-closed 수정 후 최종 `npm.cmd run deploy:verify`: production build, 전체 Vitest(182개 파일, 629 통과·1 skip), typecheck, docs, 변경 범위 감사, KIS boundary audit, cron 검사와 standalone HTTP smoke 모두 통과.
+- 새 standalone 서버에서 `.env.local`의 로컬 DB 및 KIS 자격증명을 사용해 조건검색을 직접 실행했다. NAS 응답은 HTTP 200, KIS `rt_cd=0`, 원본 100건 중 활성 보통주 80건만 반환하고 20건을 제외했다. 조회 경로의 실제 DB 자격 확인도 통과했다. 스냅샷 저장은 로컬 DB에 기존 `kis_signal_snapshots` 테이블이 없어 실패했으나 검색 응답은 정상이며 `snapshot.stored=false`로 노출됐다. 로컬 DB에 마이그레이션을 임의 적용하지 않았다.
+
 ### 다음 개선
 - 배포 후 운영 API에서 NAS/NYS/AMS를 각각 호출해 KIS row 수, 보통주 제외 수, snapshot 저장 여부와 응답 시간을 확인한다. 로컬 스냅샷 저장을 확인하려면 운영에 이미 적용된 V119 이후의 DB migration을 로컬 DB에도 별도 승인 절차로 적용해야 한다.
 
@@ -2397,9 +2808,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `docs/operations/us-smallcap-shares-public-api.md`: 매개변수, 경계 포함 규칙, 데이터 기준과 호출 예시를 기록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 최초 API 버전은 커밋 `3a294c22`, Actions `38105461335`로 운영 배포 성공. 운영에서 reviewed 기준 1M 미만 결과가 0건임을 확인해 기본 주식수 필터 기준을 SEC 최신 원천값으로 바꾸고 reviewed 옵션을 별도 제공했다.
+- 최신 코드의 `npm.cmd run deploy:verify` 통과: build 성공, 전체 605 passed·1 skipped, typecheck/docs/scope/KIS/cron 통과, standalone `/charts` 및 국내/해외 차트 API HTTP 200.
+- 새 standalone 실행(준비 약 200ms)과 로컬 DB API read-only 검증: `sharesBasis=sec_latest`의 1M 미만 46건(435ms), `sharesBasis=reviewed` 12건(100ms), SEC 최신 수량 1M 미만+시총 USD 1천만~5천만 조합 5건(92ms). 잘못된 basis는 HTTP 400(5ms).
+- 후속 커밋 `c9a582e4`의 운영 배포 Actions `38106135640` 성공. 운영 무인증 조회는 `sec_latest` 1M 미만 45건(4,283ms), USD 1천만~5천만 복합 조건 3건(473ms), `reviewed` 기준 0건(590ms), 잘못된 기준은 HTTP 400(322ms)을 확인했다. 특정시점 SEC 수량과 최신 시총은 시장변동·공시 시차로 매 응답마다 결과가 바뀔 수 있다.
+- `next start`는 검증 스크립트의 별도 `.next-deploy-verify` 산출물을 찾지 못해 첫 시도에 실패했다. 검증 대상과 동일한 standalone `server.js`를 직접 시작해 API를 조회했고 환경 인증 값은 노출하지 않았다.
+
 ### 다음 개선
 - 배포 후 운영 API에서 1M 미만·시총 구간 조합을 실제 조회하고 결과 수, 응답시간, DB 실행계획을 확인해 filter index 필요 여부를 결정한다.
 
@@ -2423,9 +2837,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 회귀 테스트와 `docs/operations/us-smallcap-shares-public-api.md` 운영 문서를 추가했다. 이번 배포는 최신 `origin/oci` 기반 격리 worktree에서 API·테스트·문서·본 로그만 대상으로 한다. 기존 자동화/테이블 V144~V148은 배포 브랜치에 이미 존재한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run deploy:verify` 1차는 build, 전체 테스트(602 통과·1 skip), typecheck, docs:check, scope/KIS/cron 검사를 통과했으나 테스트 직후 standalone `/charts` smoke가 30초 제한을 초과했다. 잔류 프로세스를 종료한 뒤 같은 standalone 산출물을 직접 실행해 231ms 기동 및 `/charts` HTTP 200을 재현했다.
+- 자원 압박 해소 후 공식 `npm.cmd run deploy:verify` 재실행 성공: production build, 전체 테스트 180개 파일(602 통과·1 skip), 타입 검사, 문서·범위·KIS·OCI cron(V148까지), standalone `/charts`와 국내·미국 차트 API HTTP 200.
+- 1차 commit `aee52cc74402852cb802d094ceb3374b8d3e77a` 배포 run `38044246277` 성공. 운영 무인증 GET은 HTTP 200·실데이터·pagination을 반환했으나 첫 row의 공식 마스터 이름에 `(ADR)`가 명시됐는데 common-stock 플래그가 true인 분류 충돌을 확인했다.
+- 이 충돌을 fail-closed로 막도록 공개 API에 마스터 한글/영문명의 ADR·ADS·American Depositary·Depositary Receipt/Shares 제외 조건과 테스트를 추가했다. 관련 테스트 5개 통과 및 공식 전체 `npm.cmd run deploy:verify` 재통과(602 통과·1 skip, build/typecheck/docs/cron/standalone smoke 포함).
+- 후속 commit `49a2ea9e007cc0f85bd7da552e55a7f14ad33413` Deploy OCI run `38045036495` 성공. 운영 공개 목록 100건에서 ADR/ADS 표기 결과 0건, ticker `LGHL`은 빈 결과, 일반 ticker `SXTC`는 HTTP 200·1건·SEC 수량 958,077주를 반환했다.
+
 ### 다음 개선
 - SEC Company Facts 원시 수량과 검토 수량이 크게 다른 종목 및 시총 대비 발행주식수 불일치 사례를 데이터 감사 과제로 별도 추적한다. 종목 마스터에 depositary 타입 필드가 정식 제공되면 이름 표기 방어를 그 공식 타입 기준으로 대체한다.
 
@@ -2449,9 +2866,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 대상 판정 테스트를 경계값 포함 기준으로 갱신하고, 운영 문서에 fail-closed 조건을 명시한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 첫 docs:check는 최신 로그 필수 계약(개선 과제 ID·성과 판정·배포 상태 등) 누락으로 실패했으며, 계약을 보강해 해결했다.
+- 검증 중 KIS stale fallback이 fundamental 시각만 갱신할 수 있음을 확인해 마지막 KIS 성공 캐시 신선도 조건을 추가했다.
+- 최종 `npm run deploy:verify` 통과: production build, Vitest 179개 파일(597 통과·1 skip), typecheck, docs:check, verify-scope, KIS boundary, OCI cron(20 endpoints), standalone HTTP smoke 3개 경로 모두 성공.
+
 ### 다음 개선
 - OCI 첫 자동화 성공 실행에서 대상 수, 24시간 이전 시총으로 제외된 종목 수, 1억 달러 경계 종목을 확인한다.
 
@@ -2476,9 +2894,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 설명, SEC 검토 근거 문서와 로컬 전용 동기화·보고서 스크립트를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 로컬 Docker PostgreSQL 16에서 Flyway V146/V147 적용 성공. 기존 1,000행 모두 DEI 열로 보존됐고, US-GAAP 열은 첫 수집 전이라 0행, 두 값 모두 비어 있거나 0 이하인 행은 0건이다.
+- 원격 기반 worktree의 `npm run deploy:verify` 통과: production build, typecheck, 문서·배포 구조 검사, standalone smoke 성공. Vitest 179개 파일 중 597개 통과·1개 skip. `/charts`, 미국/국내 상승차트 API smoke는 HTTP 200이었다.
+- DB integration 테스트는 원격 기반 worktree에 `.env.local`이 없어 skip됐다. 별도 로컬 DB migration 및 row 보존 확인으로 migration 경로를 검증했다.
+
 ### 다음 개선
 - OCI 배포 후 첫 SEC 자동 실행 기록에서 성공·실패·미수집 fact 건수를 확인하고 두 concept별 최근 기준일을 점검한다.
 
@@ -2501,9 +2920,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `lib/rss-time-window.ts`에서 구간 검증·계산을 모듈화했다. 테스트 파일은 route validation, 시간 구간, 화면 동작을 각각 확인한다. RSS 수집/저장 주기는 변경하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 운영 GET 기준선: `/api/disclosures?hours=1`과 `hours=24`가 같은 날짜 조회 결과를 반환하고 `window`가 없어 아직 운영 미반영임을 확인했다.
+- `.env.local` 개발서버에서 `hours=1/24` HTTP 200 및 각각 정확한 1/24시간 window, `hours=25` HTTP 400, `/disclosures` HTTP 200을 확인했다. 선택 시간에 저장된 기사가 0건이라 실제 기사행을 통한 경계 비교는 불가했다.
+- `npm.cmd run test -- --maxWorkers=1 lib/rss-time-window.test.ts app/api/disclosures/route.test.ts components/daily-disclosures-page.test.tsx`: 3개 파일·5개 테스트 통과. `npm.cmd run typecheck`와 `npm.cmd run build` 통과(111개 정적 페이지).
+- 첫 standalone 빌드에서 `node_modules` junction 추적 경고를 확인해 worktree 의존성을 `npm.cmd ci`로 독립 설치했다. `deploy:verify` 최초 실행은 문서 계약 섹션 누락으로 실패해 로그를 보완했고, 재실행은 전체 통과했다: build 성공, 테스트 178파일(591 passed/1 skipped), typecheck/docs:check/verify-scope/KIS boundary/cron(19 endpoints) 통과, standalone runtime smoke 3개 경로 HTTP 200.
+- 분리 작업공간에서도 `.env.local` 우선 주입 개발 서버 실행: `/disclosures` HTTP 200, `hours=1/24` JSON HTTP 200이며 응답 window 폭이 각각 정확히 1/24시간, `hours=25` HTTP 400. 해당 구간의 DB 저장 RSS/공시는 0건이었다. 임시 `.env.local` hard link는 검증 후 제거했고 원본 환경 파일을 보존했다.
+
 ### 다음 개선
 - 운영 반영 후 `hours=1`과 `hours=24`를 운영에서 재조회해 window 길이·응답행 게시시각·기준시각을 함께 확인한다.
 
@@ -2529,9 +2951,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - UI/API/유니버스 회귀 테스트와 `docs/US_TOP_RISING_UI_DATA_QUALITY.md`를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 최신 원격 기준 격리 작업 트리에서 `npm.cmd run deploy:verify` 통과: production build 성공, 174개 테스트 파일 586 passed / 1 skipped, typecheck 통과, docs:check(18 entry points, V143) 통과, verify-scope/KIS boundary/cron 19 endpoints 통과.
+- standalone runtime smoke에서 `/charts`, `/api/stock/us/top-rising-chart`, `/api/stock/kr/top-rising-chart` 모두 HTTP 200 및 HTML/JSON 응답을 확인했다.
+- 첫 실행에서 테스트 통과 후 문서 계약 오류를 발견해 로그를 수정했다. 다음 실행은 불완전한 `node_modules/next` 파일 누락으로 빌드 실패했으며, 격리 작업 트리에서 lockfile 기준 `npm.cmd ci`로 복구한 후 전체 게이트를 다시 실행해 통과했다. 원본 작업 트리 의존성은 건드리지 않았다.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다. LF→CRLF 안내만 확인했다.
+
 ### 다음 개선
 - KIS 상승률 응답에 시가총액·랭킹 거래대금이 없을 때 공식 USD 시총 스냅샷 연결을 별도 검증하고, 값과 시점이 확인되기 전에는 비율을 미확인으로 표시한다.
 - 운영 워커에서 30개 집중 후보의 실제 분봉 coverage와 stale 비율을 관찰한다.
@@ -2560,9 +2985,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 원본 기준 `82541aee`에서 별도 정리된 `codex/rss-translation-debug` worktree에만 반영했다. 주 작업 디렉터리의 기존 변경사항은 포함하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전용 중복 제거/ingest 테스트 실행: `npm.cmd exec vitest run -- lib/market-rss-dedupe.test.ts lib/market-rss.test.ts` 통과 (2 files / 5 tests).
+- 전체 `npm.cmd run deploy:verify` 통과: production build, 전체 테스트 172개 파일(571 통과·1 skip), typecheck, docs:check(18 entry points, migration V143), audit verify scope, KIS boundary audit, cron check(19 endpoints), standalone runtime smoke.
+- 실행 검증에서 `/charts`는 HTTP 200. 국내/해외 TOP 상승률 API는 JSON 응답 파싱을 확인했으나 해외 API가 HTTP 502를 반환했다. 격리된 worktree에는 `.env.local`이 없어 외부 KIS/DB 의존 경로는 정상 데이터 응답까지 검증하지 못했다. 이는 RSS 변경 검증 범위와 별개이며 정상 API 동작으로 간주하지 않는다.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- GitHub Actions `Deploy OCI` run 950 (`6d67912d74f7f831cf036cdaadf0f9d174739136`) 전체 단계 성공, 운영 `/api/health` HTTP 200.
+- 배포 후 운영 자동화 진단에서 06:35 및 06:40 UTC `market-rss` 두 run 연속 SUCCESS 확인. 각 run은 359건 ingest, translation attempted=3, translated=3, failed=0, fallback=0. 직전 배포 전 run은 SQLSTATE 21000 실패였으며 후속 두 run에서 같은 오류는 재발하지 않았다.
+- 운영 번역 진단에는 여전히 `PENDING` 199건이 보인다. 파이프라인 성공과 새 번역 성공은 확인했지만 이 카운트의 backlog/notifyEligible 구성은 확인하지 않았으므로 전체 대기열 해소로 간주하지 않는다.
+
 ### 다음 개선 및 재발 자동감지
 - 운영 배포 후 automation summary의 source별 `duplicateCount`와 `market-rss` run status를 관찰한다. 같은 SQLSTATE `21000`이 재발하면 `docs/ERROR_HANDLING.md` 절차로 source/feed 입력을 조사한다.
 - 성공 run과 번역 상태(PENDING 감소, TRANSLATED 증가)가 확인되기 전까지 장애 해결로 간주하지 않는다.
@@ -2586,9 +3017,17 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 익명 조회, 필터, 입력 경계, 오류 마스킹 및 DB 실패 응답을 회귀 테스트로 고정하고 운영 API 런북을 문서 인덱스에 등록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- API 단위 테스트 4개 통과. `npm run deploy:verify` 통과: production build, 전체 테스트 568개 통과·1개 skip, 타입 검사, 문서/구조 게이트 및 standalone 실행 smoke 통과.
+- 로컬 DB가 실행되지 않아 로컬 API는 DB 연결 단계에서 503을 반환했다. 운영 익명 API 호출은 HTTP 200 JSON, 최근 1시간 13건 모두 `PENDING`, 표본 1건 반환을 확인했다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-02-001
+- 성과 판정: IMPROVED
+- 근거: 공개 디버깅 API를 제한된 페이지 크기와 기간, 필드 최소화, 비밀정보 마스킹 및 익명 경로 회귀 테스트와 함께 제공한다.
+
+### 남은 위험
+- 로그인 없이 RSS 기사 제목·링크와 번역 메타데이터가 공개된다. 본문과 raw payload는 제외했으며 페이지·기간 상한을 적용했지만, 운영 접근 로그에서 과도한 조회가 관찰되면 프록시 rate limit이나 네트워크 접근 제어를 추가해야 한다.
+
 ### 다음 개선
 - 배포 후 운영 URL을 익명 호출해 운영 DB의 상태별 건수와 항목 표본을 확인하고, 응답시간·조회량을 기준으로 DB 쿼리 비용을 점검한다.
 
@@ -2611,9 +3050,19 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 일반 경로를 열되 기존 권한 경계를 낮추지 않고 API route 단위 테스트로 익명 접근, 보통주 차단, 스냅샷 응답, rate limit을 자동 검사한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm run verify` 통과: 170 test files passed, 1 skipped; 564 tests passed, 1 skipped. 타입체크, docs contract, verify-scope, KIS boundary, cron 검사 및 Next.js production build 모두 통과했다.
+- 신규 API·rate-limit 및 기존 관리자 API 집중 테스트 통과: 3 files, 11 tests.
+- 이후 재검증에서 빌드가 worktree 안에 생긴 부분 `node_modules/next`를 우선 해석해 모듈 누락으로 실패했다. 부분 의존성 폴더는 삭제하지 않고 worktree 안 별도 경로에 보존한 뒤 `npm run build`를 다시 실행해 통과했다.
+- production build에 `/api/sec/company-facts`와 `/other`가 포함됨을 확인했다. 로컬 production server 실행 후 `/other` HTTP 200, 공개 API 입력 검증 HTTP 400, 동일 IP의 7번째 조회 HTTP 429 및 `Retry-After: 600`을 확인했다. 생성 client bundle에 공개 안내문과 새 API 경로가 포함됨도 확인했다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-26-115
+- 성과 판정: IMPROVED
+- 근거: 관리자 전용 경로를 보존하면서 일반 사용자용 제한된 공개 경로를 분리하고, 회귀 검사를 추가했다.
+
+### 남은 위험
+- rate limit은 단일 인스턴스 메모리 기반이다. 다중 인스턴스로 바뀌면 공유 저장소로 이전해야 한다.
+
 ### 다음 개선
 - 배포 후 운영에서 429 비율과 SEC upstream 오류율을 확인하고, 합산 요청량이 한도에 근접하면 제한값을 재조정한다.
 
@@ -2630,9 +3079,17 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - V136에서 로컬 분석 결과가 운영 원본 RSS 행 ID 없이도 저장되도록 `source_article_id`를 nullable로 변경했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `tsc --noEmit` 통과.
+- RSS 분류·등급 테스트 13개 통과.
+- `npm.cmd run docs:check` 통과: migrations 136개, latest V136.
+- production build에서 `/api/bullish-rss` 라우트 생성 확인.
+- `scripts/dev-server.mjs` 실행 후 인증 없는 POST가 HTTP 401로 차단됨을 확인했다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-23-004
+- 성과 판정: IMPROVED
+- 근거: 호재 분석 책임을 저장 API에서 분리하고, 로컬 분석 결과를 인증된 운영 POST로 전달할 수 있는 경계를 추가했다.
+
 ### 다음 개선
 - V136 배포 후 LLM이 직접 분석한 실제 RSS 후보를 POST하고 운영 GET 결과의 저장 건수와 내용을 확인한다.
 
@@ -2648,9 +3105,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `market_rss_bullish_articles` 스키마·저장소·API·cron 연계와 V135 마이그레이션을 포함했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `npm.cmd run typecheck`, `vitest`, `npm.cmd run docs:check`, `npm.cmd run build`와 standalone 실행 smoke를 수행한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-23-002
+- 성과 판정: IMPROVED
+- 근거: 기존 작업공간의 unrelated 변경과 분리해 배포 대상만 검증할 수 있도록 별도 worktree를 구성했다.
+
 ### 다음 개선
 - 배포 후 운영 API 상태 코드와 V135 테이블 조회 결과를 함께 확인한다.
 
@@ -2673,9 +3134,52 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - KIS 시장별 필드 의미가 변경될 수 있으므로 원본 필드와 계산 source를 디버깅 API에 추가해야 한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 단위 테스트·타입체크·프로덕션 빌드 후 커밋/배포한다.
+
+## [2026-09-22] 운영 RSS API 조회 및 로컬 호재 재분석
+
+### 목적
+- 운영 서버에 저장된 RSS를 공개 조회 API로 가져와 로컬 프로젝트의 호재 분류기로 재분석한다.
+
+### 확인 대상 및 방법
+- 운영 API: `GET https://stockman.r-e.kr/api/disclosures?date=2026-09-22&source=ALL&limit=500`
+- 운영 API 응답의 `items`를 로컬 `lib/market-rss-classifier.ts`의 `classifyMarketRssItem()`에 전달했다.
+- 운영 API의 `source=RSS`는 실제 저장 source명이 `STOCKTITAN`, `NASDAQ`, `SEC_EDGAR`, `NEWSIS` 등으로 분리되어 있어 0건을 반환하므로 `source=ALL`을 사용했다.
+
+### 결과
+- 조회 성공: 500건(페이지/limit 상한에 도달)
+- source별: STOCKTITAN 369건, NASDAQ 74건, SEC_EDGAR 43건, NEWSIS 5건, HANKYUNG 6건, MK 3건
+- 로컬 분류 결과: POSITIVE 91건
+- 분류 구성: STOCKTITAN ACTIONABLE 69건·FINANCING 11건, NASDAQ ACTIONABLE 13건·FINANCING 3건, SEC_EDGAR ACTIONABLE 5건, HANKYUNG ACTIONABLE 3건, NEWSIS ACTIONABLE 1건
+- 상위 후보 예시: SPCB(전자 모니터링 계약), JAGX(FDA fee waiver), SBH(다년 파트너십), TBLA(신규 제품 출시), AMGN(Phase 3 긍정 결과)
+
+### 해석 및 한계
+- 운영 저장 RSS를 로컬 호재 분류기로 재분석하는 경로는 동작한다.
+- `classifyMarketRssItem()`은 제목·요약의 키워드 기반 분류이므로 POSITIVE가 곧 투자 판단 또는 실제 주가 상승을 의미하지 않는다.
+- `/api/disclosures`는 현재 최대 500건만 반환하므로 전체 일자 분석에는 source별 조회 또는 페이지네이션 확장이 필요하다.
+- 운영 API 원문을 별도 파일로 저장하지 않았으며, 이번 결과는 2026-09-22 조회 시점의 분석 결과다.
+- 커밋·푸시·배포: 미실행.
+
+### 목표
+- 운영 RSS 원본을 제한 없이 내부 배치로 순회하고, 로컬 호재 분류 결과와 번역 상태를 별도 운영 DB 테이블에 저장한다.
+
+### 반영
+- `market_rss_bullish_articles` 스키마와 `V135__market_rss_bullish_articles.sql` 마이그레이션을 추가했다.
+- `syncMarketRssBullishArticles()`가 원본 RSS를 500건 단위 keyset으로 끝까지 순회해 중복 없이 upsert한다.
+- `/api/bullish-rss` 조회 API를 추가하고, market-rss cron에서 수집·번역 후 호재 결과 저장을 실행한다.
+- 원본의 번역 상태·번역 제목·fallback·오류를 별도 호재 테이블에 함께 저장한다.
+
+### 검증
+- `r`npm run typecheck` 통과.
+- `r`npx vitest run lib/market-rss-classifier.test.ts` 통과: 9개 테스트.
+- `r`npm run docs:check`는 최신 문서 항목 형식 보강 전 1회 실패했으며, 현재 항목에 필수 문서 계약을 반영했다.
+- `r`npm run build`를 2회 실행했으나 `r`next build` 시작 메시지 이후 2분 이상 출력·종료가 없어 중단했다. 배포와 운영 DB 마이그레이션은 실행하지 않았다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-22-005
+- 성과 판정: IMPROVED
+- 근거: 기존 원본 RSS 테이블과 Discord 전송을 변경하지 않고, 전체 순회·호재 materialization·번역 상태 저장 경계를 추가했다.
+
 ### 다음 개선
 - 운영 Flyway V135 적용 후 실제 cron 1회 실행으로 저장 건수·중복키·번역 상태를 검증하고, 대량 번역 한도에 따른 batch 운영값을 확정한다.
 
@@ -2692,9 +3196,57 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `C:\Users\dldbs\Downloads\operating-rss-bullish-analysis-2026-09-22.html`로 복사 완료.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 보고서에 API 경로, 분석 기준, 조회 건수, source별 집계, 주요 후보, 한계를 포함했다.
+- 산출물 크기 6,573 bytes 확인.
+- 커밋·푸시·배포: 미실행.
+
+## [2026-09-22] RSS 번역·Discord 전송 동작 검증
+
+### 목적
+- LibreTranslate는 사용하지 않는 운영 전제에서 RSS 번역 결과와 Discord 전송 결과의 차이를 확인한다.
+
+### 확인 대상
+- 운영 cron의 `ingestMarketRssArticles → translatePendingMarketRssArticles → notifyPendingMarketRssArticles` 순서.
+- `lib/translate-market-rss-item.ts`, `lib/market-rss-pipeline.ts`, 관리자 RSS 미리보기 경로.
+
+### 검증 결과
+- 운영 cron은 `GOOGLE_TRANSLATION_API_KEY`가 있을 때만 Google Cloud Translation 경로를 사용한다.
+- 번역 대상은 `r`notifyEligible=true`이고 `isBacklog=false`인 항목이며, 현재 제목만 번역하고 요약·본문은 원문을 유지한다.
+- 번역 성공 시 Discord 제목은 번역문이고 원문 제목을 함께 표시한다.
+- API 키 없음, 월간 문자 한도 초과, 번역 API fallback 또는 실패 시 Discord 전송 자체는 계속되며 제목은 원문으로 표시된다. 이 경우 데이터에 `translationFallback`/상태가 남는다.
+- `r`notifyEligible=false` 또는 backlog 항목은 번역 단계에서 제외된다.
+- 관리자 RSS 미리보기의 `translateMarketRssItems()` 기본 인자는 아직 `LibreTranslateClient`다. LibreTranslate를 사용하지 않는 운영 기준과 불일치하므로 관리자 미리보기 결과는 운영 Discord 결과 검증 근거로 사용할 수 없다.
+
+### 테스트
+- `r`npx vitest run lib/translate-market-rss-item.test.ts lib/cloud-translation-client.test.ts lib/libretranslate-client.test.ts` 통과: 3개 파일, 6개 테스트.
+
+### 결론 및 남은 위험
+- Discord에서 어떤 항목은 번역되고 어떤 항목은 원문인 현상은 현재 코드상 정상적인 fallback·대상 제외 결과일 수 있다. 다만 관리자 미리보기의 LibreTranslate 기본 경로는 별도 정리 대상이다.
+- 실제 운영 건별 판정에는 관리자 debug suite 또는 DB의 `translationStatus`, `translationFallback`, `translationError`, `r`notificationStatus` 값을 함께 확인해야 한다.
+- 추가 로컬 DB 확인: `.env.local`에는 `DATABASE_URL`만 존재하고 `GOOGLE_TRANSLATION_API_KEY`는 없었다. `market_rss_articles` 전체 집계는 ETODAY 38, HANKYUNG 50, KRX_KIND 100, MK 50, NASDAQ 15, NEWSIS 100, SEC_EDGAR 99, STOCKTITAN 100건이 모두 `translation_status=PENDING`이었다. 최근 7일 행은 없으므로 이 DB 결과만으로 운영 Discord 이력을 확정할 수는 없지만, 현재 로컬 실행 환경에서는 번역이 시작되지 않는 상태다.
+- **수정**: LibreTranslate를 사용하지 않는 운영 정책과 관리자 미리보기의 기본 동작을 일치시키기 위해 `lib/translate-market-rss-item.ts`에서 LibreTranslate import 및 기본 클라이언트를 제거했다. 이제 명시적 클라이언트가 없으면 Cloud Translation 환경 키를 사용하고, 키가 없으면 운영 cron과 동일하게 원문 fallback한다.
+- **재발 방지**: 번역 미리보기·운영 cron 모두 번역 공급자를 암묵적으로 LibreTranslate로 선택하지 않으며, 공급자 테스트는 명시적 테스트 클라이언트를 주입한다.
+- **검증**: 번역 관련 Vitest 2개 파일·5개 테스트 통과, `r`npm run typecheck` 통과.
+- 커밋·푸시·배포: 미실행.
+
+### 목표
+
+- RSS 번역 공급자와 Discord 전송 동작의 운영 기준을 문서화하고 미리보기와 운영 경로의 차이를 식별한다.
+
+### 반영
+
+- 제목 번역·fallback·알림 대상과 관리자 미리보기의 공급자 차이를 확인했다.
+
+### 검증
+
+- 번역 관련 테스트와 typecheck 결과를 확인했다.
+
+### 개선 과제
+
+- 개선 과제 ID: CI-2026-09-22-004
+- 성과 판정: IMPROVED
+- 근거: 운영 기준과 미리보기 경로의 불일치를 식별했고 후속 수정 대상을 명확히 했다.
+
 ### 다음 개선
 
 - 관리자 미리보기와 운영 cron의 번역 공급자 선택을 동일하게 유지하는 회귀 테스트를 추가한다.
@@ -2716,9 +3268,18 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영에서 `mvpQualified=true`인데 `WARMING_UP` 상태 때문에 Discord 알림이 차단되던 상태 불일치를 수정했다. 신선한 관측은 MVP 거래대금 조건을 우선하고 `STALE`·`DEGRADED`만 차단한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd test -- --run app/api/kis/intraday-mvp/route.test.ts lib/intraday-detection-worker.test.ts lib/intraday-memory-state.test.ts`: 3개 파일, 21개 테스트 통과.
+- `r`npm.cmd run typecheck`: 통과.
+- `r`npm.cmd run docs:check`: 통과.
+- 배포 전 production build와 운영 API에서 `RUNNING`, `tickCount>0`, `lastTickAt` 갱신을 확인한다.
+
+### 개선 과제
+- 운영 배포 후 장중 실제 tick·후보 평가·Discord 전송 결과를 직접 확인하고, webhook 미설정·KIS 실패·5샘플 미충족을 각각 구분해 대시보드에 기록한다.
+
+개선 과제 ID: CI-2026-09-22-002
+성과 판정: UNMEASURED
+근거: 로컬 단위 검증은 통과했으나 수정 반영 전 운영 응답이 `STOPPED/DISABLED`, `tickCount=0`이어서 운영 재검증 전이다.
+
 ### 다음 개선
 - 배포 후 운영 API를 장중에 재호출하여 워커가 실제로 tick하는지 확인한다. 현재 재검증 응답은 후보 108개·`worker=STOPPED`·`tickCount=0`·`reason=DISABLED`이며, API에 명시적 kill switch 상태를 노출해 다음 조치 대상을 확정한다.
 
@@ -2744,9 +3305,18 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 응답에 종목·봉 기준·최신 봉일·DB 갱신 시각·원천(`OPERATING_DB_CACHE`)을 포함한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run typecheck`: 통과.
+- `r`npm.cmd test -- --run`: 163개 테스트 파일, 541개 테스트 통과.
+- `r`npm.cmd run verify`: 문서 계약 형식 오류로 중단됨.
+
+### 개선 과제
+- 로컬 캐시 provider를 운영 API 호출 방식으로 전환한다.
+- 운영 배포 환경에 `DAILY_CACHE_READ_API_KEY`를 설정하고 인증·빈 캐시·stale 데이터 smoke 테스트를 추가한다.
+
+개선 과제 ID: CI-2026-09-22-001
+성과 판정: IMPROVED
+근거: 운영 DB 캐시 조회 API와 로컬 원격 캐시 provider를 추가하고 batch 조회 경계를 연결했다.
+
 ### 다음 개선
 - 운영 배포 후 인증된 단일·batch 일봉 API와 로컬 스캐너의 원격 캐시 사용 여부를 smoke 검증한다.
 
@@ -2763,9 +3333,17 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 서버 릴리스 정적 청크 보존 및 HTML 재검증 설정은 직전 수정에서 반영했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd test -- --run`: 158개 테스트 파일, 525개 테스트 통과.
+- `r`npm.cmd run typecheck`: 통과.
+- `r`npm.cmd run build`: 통과.
+
+### 개선 과제
+- 운영 브라우저에서 청크 오류 발생 시 복구 시도 횟수와 성공 여부를 오류 로그에서 분리 집계한다.
+
+개선 과제 ID: CI-2026-09-18-002
+성과 판정: IMPROVED
+근거: 기존 청크 오류를 감지하고 무한 재시도 없이 최신 HTML을 재요청하는 클라이언트 복구 경로를 추가했다.
+
 ### 다음 개선
 - 운영 smoke 검증에 메인 페이지의 정적 청크 응답과 자동 복구 신호 확인을 추가한다.
 
@@ -2783,9 +3361,35 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 재무·배당·기업행사·시세·수급 범위, 원천/파생 데이터 분리, 품질 메타데이터, 단계별 완료 기준을 문서화했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 설계 문서와 로그를 UTF-8 기준으로 저장했다.
+- 애플리케이션 코드·DB 스키마·배치·API는 변경하지 않았다.
+- 커밋·푸시·배포는 수행하지 않았다.
+
+## [2026-09-18] TOP100 장중 거래대금 정책 캐시·관리자 설정 완성
+
+### 목표
+- 국내·미국 상승률 TOP100 시총 대비 거래대금 탐지의 구간·임계값을 관리자 페이지에서 변경 가능하게 한다.
+- 단일 인스턴스 메모리 캐시로 매 틱 DB 조회를 제거하고, 설정 저장 직후 새 값을 반영한다.
+
+### 반영
+- `intraday-mvp` 기능 모듈, 관리자 설정 UI, 1분/5분 구간 및 비율 검증을 추가했다.
+- 정책은 10분간 메모리 캐시하고 관리자 저장 성공 시 즉시 무효화한다.
+- 워커·MVP API·intraday 디버깅 API가 공통 정책을 사용한다.
+- QUALIFIED 신규 전이 시 Discord 알림을 연결했다.
+
+### 검증
+- `r`npm.cmd test -- --run`: 158개 테스트 파일, 525개 테스트 통과.
+- `r`npm.cmd run typecheck`: 통과.
+- `r`npm.cmd run build`: 통과.
+- `r`npm.cmd run deploy:verify`: 문서 게이트에서 기존 최신 로그 형식 오류로 중단됨. 해당 형식 오류를 본 항목으로 보완 후 재실행한다.
+
+### 개선 과제
+- 배포 후 관리자에서 1분·1%와 5분·5%를 각각 저장하고 `/api/kis/intraday-mvp`의 criteria 반영을 확인한다.
+
+개선 과제 ID: CI-2026-09-18-001
+성과 판정: IMPROVED
+근거: 관리자 정책 경계·메모리 캐시·알림 연결 및 단위/빌드 검증을 추가했다.
+
 ### 다음 개선
 - 운영 smoke test에 intraday 정책 조회와 단일 인스턴스 캐시 무효화 검증을 추가한다.
 
@@ -2906,10 +3510,109 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 ### 목표
 - 동일 데이터에서 탐색된 유망 조건이 최근 구간에서도 재현되는지 확인해 과최적화 가능성을 점검한다.
 
+### 검증 방법 및 결과
+- 조건: 상승 중 EMA 95개 이상, 가격과 EMA ±1%, RVOL(SMA20) 1.0~1.2, 다음 거래일 시가 진입, 5거래일 +0.5% 익절/-1% 손절 선후 판정.
+- 종목별 최근 301봉을 과거 60% 학습 구간과 최근 40% 검증 구간으로 분리했다.
+- 학습 구간: 249건 판정, 131승, 52.61%.
+- 검증 구간: 770건 판정, 384승, 49.87%.
+
+### 결론
+- 탐색 구간의 50%대 승률이 최근 검증 구간에서는 50% 아래로 소폭 하락했다. 강한 재현성은 아직 확인되지 않았고, 조건을 고정 전략으로 채택하지 않는다.
+- 이 조건은 무작위 수준보다 크게 우월하다고 결론 내리기 어렵다. 다음 연구는 종목별 중복 신호를 줄이고, 시장 국면·유동성·거래비용을 반영한 기대값 검증으로 진행한다.
+
+## [2026-09-18] 상승 EMA 중첩과 RVOL 결합 검증
+
+### 목표
+- 상승 중인 EMA 중첩 점수에 RVOL(SMA20 기준) 구간을 결합해 손익 선후 승률이 50%를 넘는 조합이 있는지 확인한다.
+
+### 결과
+- 다음 거래일 시가 진입, 5거래일 내 +0.5% 익절/-1% 손절 선후 판정.
+- 상승 EMA 95개 이상 + RVOL 1.0~1.2: 1,019건 판정 중 515승, 50.54%.
+- 상승 EMA 90개 이상 + RVOL 1.0~1.2: 1,151건 중 577승, 50.13%.
+- 상승 EMA 95개 이상 + RVOL 2 이상: 364건 중 183승, 50.27%로 표본이 작다.
+- 상승 EMA 95개 이상 + RVOL 1.2~2.0: 1,085건 중 523승, 48.20%.
+
+### 해석 및 위험
+- 현재 탐색상 가장 균형적인 조합은 `상승 EMA 95개 이상 + RVOL 1.0~1.2`다. 거래량 급증보다 평소 대비 소폭 증가한 거래량에서 승률이 높았다.
+- 50% 초과는 동일 데이터에서 조건을 탐색한 결과이므로 과최적화 가능성이 있다. 기간·시장·종목군 분할 검증 없이는 최종 전략으로 확정하지 않는다.
+- 다음 단계는 이 조합을 시간순 학습/검증 구간으로 분리해 재현성을 확인한다.
+
+## [2026-09-18] 상승 기울기 EMA 중첩 점수 검증
+
+### 목표
+- 단순 중첩 대신 가격 ±1% 안에 있으면서 최근 3봉 동안 상승한 EMA의 개수를 세어 실제 손익 승률이 개선되는지 확인한다.
+
+### 결과
+- 해외 보통주 최근 301봉, EMA2~EMA365, 다음 거래일 시가 진입 후 5거래일 내 +0.5% 익절/-1% 손절 선후 판정.
+- 상승 EMA 1개 이상: 선후 승률 37.74%, 표본 755,034건.
+- 상승 EMA 10개 이상: 41.78%, 표본 279,786건.
+- 상승 EMA 50개 이상: 47.31%, 표본 31,529건.
+- 상승 EMA 75개 이상: 48.64%, 표본 13,564건.
+- 상승 EMA 95개 이상: 49.74%, 표본 7,360건.
+- 상승 EMA 98개 이상: 49.86%, 표본 6,765건. 상승 EMA 99~100개에서도 약 49.84%로 정점 부근이었다.
+
+### 결론 및 주의사항
+- 상승 중인 EMA가 많이 겹칠수록 단순 중첩보다 손익 선후 승률이 뚜렷하게 개선됐다. 단순 중첩 개수와 방향성 포함 중첩은 구분해야 한다.
+- 현재 최선은 약 98개 이상 상승 EMA 중첩이지만, 아직 50%를 넘지 않았고 해외 전체·기간 통합 백테스트 결과이므로 실전 우위로 확정할 수 없다.
+- 다음 단계는 이 점수에 RVOL 구간을 결합하고, 기간 분할 검증으로 특정 시기 편향을 확인한다.
+
+## [2026-09-18] 해외 2~365 EMA 중첩 반등 검증
+
+### 목표
+- 365일 이상 데이터가 있는 해외 일봉 캐시에 대해 여러 EMA가 가격 ±1% 구간에 겹칠수록 다음날 반등률이 높아지는지 확인한다.
+
+### 결과
+- 대상 5,308종목, 최대 1,200봉, 분석 구간은 각 종목 최근 301봉이며 EMA2~EMA365를 계산했다.
+- 다음날 고가가 신호 종가 대비 +0.5% 이상이면 반등으로 판정했다.
+- 중첩 EMA 1개 이상: 1,104,186건 중 75.44%.
+- 2개 이상: 965,842건 중 75.05%.
+- 5개 이상: 739,140건 중 74.39%.
+- 10개 이상: 529,429건 중 73.44%.
+- 30개 이상: 194,342건 중 70.15%.
+
+### 결론
+- 국내와 해외 모두 단순히 겹치는 이평선 개수가 많아질수록 다음날 +0.5% 도달률이 높아진다는 근거는 확인되지 않았다. 오히려 중첩 수가 늘수록 하락했다.
+- 다음 단계는 중첩 개수 대신 상승 중인 EMA만 세고, 가격이 다수 EMA를 하향 이탈 후 재돌파한 시점, RVOL, 손익 선후를 결합해 검증한다.
+- 검증 실행 성공. 커밋·푸시·배포 없음.
+
+## [2026-09-17] 1~365 EMA 중첩 반등률 기초 검증
+
+### 목표
+- 국내 보통주 일봉 캐시에서 종가가 각 EMA의 ±1% 이내인 이평선 개수를 세고, 단순 개수 및 장기선 가중치 점수와 다음 거래일 반등률의 관계를 확인한다.
+
+### 확인 대상 및 결과
+- 대상 2,353종목, 종목별 최대 보유 일봉 115개. 따라서 현재 국내 캐시로 EMA 365를 실제 산출할 수 없고, 최대 115일 범위까지만 유효하다.
+- 반등 정의: 다음 거래일 고가가 신호 종가 대비 +0.5% 이상 도달.
+- 단순 중첩 개수는 2개 이상에서 77.30%, 3개 이상에서 77.04%, 5개 이상에서 76.27%로 오히려 감소했다.
+- 장기 EMA에 `log(1+기간)` 가중치를 준 점수도 점수가 높아질수록 반등률이 개선되지 않았다.
+- EMA1은 종가와 항상 동일해 78.30%로 집계되는 구조적 기준선이므로 실전 신호에서 제외해야 한다.
+
+### 결론 및 다음 연구
+- “여러 이평선이 겹칠수록 반등 확률이 높다”는 가설은 현재 자료와 ±1%·다음날 고가 기준에서는 지지되지 않았다.
+- 단순 근접 개수보다 이평선의 방향, 가격이 이평선을 상향 회복했는지, RVOL과 손절 선후를 결합해 검증해야 한다.
+- 검증 실행 성공. 커밋·푸시·배포 없음.
+
+## [2026-09-17] 장중 탐지 관측 batch 저장 및 배포 검증 안정화
+
+### 목표
+- 장중 탐지의 DB 관측 저장 왕복과 대량 전이 SQL 크기를 줄이고, 배포 검증의 반복 교착·파일 잠금 오류를 예방한다.
+
+### 반영
+- 국내·해외 TOP 상승률 수집을 병렬화했다.
+- run/tick 관측 저장과 상태 전이 다건 저장을 batch SQL로 통합하고 500건 단위 chunking을 추가했다.
+- 검증 순서를 빌드 선행으로 변경하고 typecheck의 tsBuildInfoFile을 검증 전용 경로로 분리했다.
+- 관측 저장 및 chunking 회귀 테스트를 추가했다.
+
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run deploy:verify` 통과: 빌드, 테스트 157개 파일/523개, 타입체크, 문서·범위·KIS·cron 감사, runtime smoke 모두 성공.
+- `/charts` HTTP 200, 국내·해외 TOP 상승률 API JSON smoke 성공.
+- 관측 회귀 테스트 3개와 타입체크 통과.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-020
+- 성과 판정: IMPROVED
+- 근거: 관측 전이 batch/chunking과 검증 전용 상태 파일 분리 후 전체 배포 검증이 완료됐고, 테스트 수가 157개 파일/523개로 증가한 상태에서 모두 통과했다.
+
 ### 다음 개선
 - 운영 `intraday_detection_ticks`에서 관측 저장 전후의 DB latency와 tick duration p50/p95를 비교해 왕복 감소 효과를 확정한다.
 
@@ -2979,9 +3682,40 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 `intraday_detection_ticks`에서 변경 전후 동일 세션의 tick `durationMs` p50/p95와 시장별 응답 지연을 비교해 효과를 확정한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd test -- --run lib/intraday-detection-worker.test.ts` 통과(3 tests).
+- 전체 배포 전 검증을 시작해 테스트 156개 파일/520개 테스트와 타입체크·문서·감사 게이트까지 통과했다.
+- 관측 CTE 변경 후 worker 단위 테스트 3개와 타입체크를 통과했다.
+- 관측 회귀 테스트와 worker 테스트 4개를 통과했다.
+- 배치 전환 중 남아 있던 worker 타입 참조 오류를 즉시 수정했고, 최종 관측·worker 테스트 5개와 타입체크를 통과했다.
+- chunking 회귀 테스트 3개와 타입체크를 추가 통과했다.
+- 최종 전체 검증 중 공유 tsbuildinfo 잠금 오류를 재현했으며, 검증 전용 경로 분리로 수정했다. 수정 후 전체 게이트를 다시 실행한다.
+- 검증기의 기존 순서에서 산출물 경로 빌드는 출력 없이 장시간 지속됐지만, 별도 `NEXT_DIST_DIR=.next-build-check` 격리 빌드는 최적화 빌드와 107개 정적 페이지 생성을 성공했다.
+- 성공한 standalone 산출물을 `PORT=4173`으로 실행하고 `/charts`(HTTP 200, HTML 8,648 bytes), `/api/stock/kr/top-rising-chart`(HTTP 200, JSON)를 직접 확인했다.
+
+### 커밋·푸시·배포
+- 배포 상태: 미실행 (standalone 실행 검증됨, 전체 검증기의 장시간 빌드 교착으로 배포는 보류).
+
+
+## [2026-09-17] 헬스체크 스키마 점검 병렬화
+
+### 목표
+- 헬스체크가 스키마 검증 쿼리를 순차 대기해 응답시간을 늘리는 병목을 줄인다.
+
+### 반영
+- `lib/schema-health.ts`에서 연결·테이블·컬럼·폐기 테이블 조회를 병렬 실행하도록 변경했다.
+- Flyway 버전 조회는 테이블 목록 확인 이후에만 실행하는 의존성을 유지했다.
+
+### 검증
+- `r`npm.cmd run typecheck` 통과.
+- `r`npx.cmd vitest run lib/schema-health.test.ts app/api/health/route.test.ts` 통과.
+- 전체 `r`npm.cmd run deploy:verify`에서 테스트·빌드·실행 스모크를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-018
+- 성과 판정: IMPROVED
+- 근거: 추가 운영 5회 측정에서 외부 경과시간 p50 920ms, 최댓값 1,117ms, 애플리케이션 보고 지연 558~911ms, 전부 `200/ok`를 확인했다. 직전 p50 1,289ms 대비 약 29% 개선됐다.
+- 재발 감지: `/api/health`의 `responseTimeMs`와 외부 경과시간을 동일 조건으로 p50·p95 집계하고, 2초 초과 비율을 추적한다.
+
 ### 다음 개선
 - 운영 헬스체크의 DB 쿼리별 지연시간을 비밀정보 없이 단계별 계측한다.
 
@@ -2999,9 +3733,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 결과 필드와 오류 시 best-effort 동작은 유지했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run deploy:verify`에서 전체 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
+- 운영 전후 `/api/health` 응답시간을 비교 측정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-017
+- 성과 판정: UNMEASURED
+- 근거: 독립적인 설정 조회의 순차 대기를 제거했으나 운영 응답시간 개선폭은 재측정이 필요하다.
+- 재발 감지: `/api/health`의 `responseTimeMs`를 p50·p95로 수집하고 설정 조회 단계별 시간을 기록한다.
+
 ### 다음 개선
 - health 상태의 독립적인 DB 조회 3개도 병렬화하되, PostgreSQL 풀 포화 여부를 함께 측정한다.
 
@@ -3019,9 +3759,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 `QUALIFIED`, `NO_TOP100`, `OBSERVING` 상태는 유지했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx.cmd vitest run app/api/kis/intraday-mvp/route.test.ts`에서 기존 결과 계약 2건을 통과했다.
+- 전체 `r`npm.cmd run deploy:verify`에서 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-016
+- 성과 판정: IMPROVED
+- 근거: `worker=STOPPED`만으로 장애로 오판하던 상태를 세션·설정·장중 중지로 분리했다.
+- 재발 감지: API 계약 테스트와 운영 점검에서 `status.reason`이 허용된 상태 집합인지 확인한다.
+
 ### 다음 개선
 - 관리자 화면에서 시장별 세션 상태와 워커 상태를 함께 표시한다.
 
@@ -3039,9 +3785,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 충족 후보와 TOP100 부재 상태에 대한 회귀 테스트를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `app/api/kis/intraday-mvp/route.test.ts`에서 충족·후보 이탈 상태를 확인한다.
+- 전체 `r`npm.cmd run deploy:verify`로 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-015
+- 성과 판정: IMPROVED
+- 근거: `items=[]`만으로 실패를 추정하던 소비자가 워커·후보 상태를 구조화된 값으로 판정할 수 있다.
+- 재발 감지: API 계약 테스트에서 각 결과 상태에 `status.reason`이 존재하는지 확인한다.
+
 ### 다음 개선
 - 장중 세션 판정 결과를 `OUTSIDE_SESSION`으로 세분화해 `DISABLED_OR_STOPPED`와 구분한다.
 
@@ -3058,9 +3810,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `docs/INTRADAY_KIS_MEMORY_DESIGN.md`의 잘못된 `INTRADAY_WORKER_ENABLED` 표기를 실제 코드 조건인 `INTRADAY_DETECTION_ENABLED`로 수정했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `rg -n "INTRADAY_(WORKER|DETECTION)_ENABLED" instrumentation.ts docs/INTRADAY_KIS_MEMORY_DESIGN.md`로 실행 코드와 문서의 명칭을 대조한다.
+- `r`npm.cmd run docs:check`로 문서 계약과 마이그레이션 검사를 수행한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-014
+- 성과 판정: IMPROVED
+- 근거: 운영자가 문서만 보고 설정할 때 실제 기동 조건과 다른 환경변수를 사용할 가능성을 제거했다.
+- 재발 감지: CI에서 `instrumentation.ts`의 기동 플래그와 인트라데이 설계 문서의 플래그가 동일한지 문자열 감사한다.
+
 ### 다음 개선
 - 환경변수 계약을 단일 예시 파일과 자동 감사 스크립트로 통합한다.
 
@@ -3078,9 +3836,16 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 장외 정상 정지와 전송·파싱 오류를 구분하는 운영 판정 기준을 기록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `HTTP 200`, `Content-Type: application/json`, `ok=true`를 확인했다.
+- TOP100_RISING·5분·1분 샘플 5개·시총 대비 거래대금 5%·KIS 고정 시총 기준에서 후보 19개·추적 19개·충족 0개였다.
+- 확인 시각은 2026-09-17 22:16 KST이며 `worker=STOPPED`는 장 종료 후 상태와 일치한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-013
+- 성과 판정: IMPROVED
+- 근거: 운영 API가 HTML 오류가 아닌 JSON 계약으로 응답했고, `items=[]`를 워커 장외 상태와 함께 해석할 수 있게 됐다.
+- 재발 감지: 장중 점검 시 HTTP 상태·Content-Type·`ok`·`worker.status`·`lastTickAt`·후보/추적/충족 수를 필수 확인한다. 장중 `STOPPED` 또는 허용 지연 초과를 워커 장애로 분류한다.
+
 ### 다음 개선
 - 관리자 디버깅 화면에서 장중·장외 세션 판정과 워커 상태를 함께 표시한다.
 
@@ -3098,9 +3863,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 종료 루틴과 함께 부모-자식 수명주기를 일치시켜 잔류 Node 프로세스 가능성을 낮췄다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전체 `r`npm.cmd run deploy:verify`를 실행해 빌드와 런타임 스모크 종료까지 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-012
+- 성과 판정: UNMEASURED
+- 근거: 반복 검증에서 이전 Node 프로세스가 남은 상태와 빌드 장기 지연을 확인했고, detached 실행을 제거했다.
+- 재발 감지: 검증 종료 후 standalone 서버 PID가 남지 않는지 프로세스 수명주기를 확인한다.
+
 ### 다음 개선
 - 검증 스크립트에 종료 후 포트 해제 확인을 추가한다.
 
@@ -3118,9 +3888,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `app/api/stock/chart/route.test.ts`에 파라미터 없이도 원본 회사명이 유지되는 회귀 검증을 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 관련 차트 API 테스트와 전체 `r`npm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임을 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-011
+- 성과 판정: UNMEASURED
+- 근거: 코드상 기본값 `company=code`가 항상 덮어쓰기를 유발하는 경로를 확인했으며 회귀 테스트로 재발을 차단한다.
+- 재발 감지: 차트 응답에서 회사명이 입력 티커와 동일하게 덮어써지는 회귀 테스트를 유지한다.
+
 ### 다음 개선
 - 국내·해외 차트 모달의 회사명 표시를 실제 브라우저 화면에서 함께 검증하는 UI smoke를 추가한다.
 
@@ -3138,9 +3913,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 재시도 전체 시간 제한은 유지해 장애 시 빠르게 실패하고 원인을 출력하도록 했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 단독 `r`npm.cmd run build`는 정상 종료했다.
+- 수정 후 전체 `r`npm.cmd run deploy:verify`를 실행해 요청 타임아웃과 런타임 스모크 종료를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-010
+- 성과 판정: UNMEASURED
+- 근거: 이전 검증에서 외부 API 대기 때문에 8분 이상 지속된 현상을 재현했고, 요청별 타임아웃을 추가했다.
+- 재발 감지: 검증 프로세스별 소요시간과 마지막 오류를 출력한다.
+
 ### 다음 개선
 - 검증 대상 API별 허용 응답시간과 환경별 외부 의존성을 manifest로 관리한다.
 
@@ -3158,9 +3939,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 따라서 구조화된 API 오류는 계약 검증을 통과하고, HTML 404/504 응답은 계속 실패한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전체 `r`npm.cmd run deploy:verify`를 재실행해 로컬 5xx JSON 오탐 해소와 전체 품질 게이트를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-009
+- 성과 판정: UNMEASURED
+- 근거: 수정 전 로컬 smoke에서 HTTP 502·application/json·JSON body를 확인했고, 오류 원인은 검증기의 2xx 강제 조건이었다.
+- 재발 감지: 상태 코드와 content-type을 모두 로그로 남기고, HTML 응답은 실패 처리한다.
+
 ### 다음 개선
 - 별도 환경변수로 로컬 smoke에서 허용할 구조화 오류 상태를 명시해 계약을 더 세분화한다.
 
@@ -3179,9 +3965,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `/api/stock/us/top-rising-chart`, `/api/stock/kr/top-rising-chart`를 검증 대상으로 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전체 `r`npm.cmd run deploy:verify`로 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·HTML/JSON 런타임 스모크를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-008
+- 성과 판정: UNMEASURED
+- 근거: 기존 런타임 검증의 API 형식 공백을 코드 게이트로 보완했으며, 전체 게이트 실행 결과로 확정한다.
+- 재발 감지: 핵심 API 목록을 JSON 스모크 대상에 유지하고 새 API 추가 시 함께 등록한다.
+
 ### 다음 개선
 - 인증이 필요한 관리자 API는 테스트 전용 세션 주입 방식으로 별도 스모크한다.
 - API별 최소 응답 계약(`ok`, `items`) 검증을 추가한다.
@@ -3224,9 +4015,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 누락 시 패키징 단계에서 즉시 실패해 운영 서버까지 잘못된 릴리스가 전달되지 않도록 했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전체 `r`npm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
+- workflow 패키징 경로와 실제 migration 파일명을 정적 대조했다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-006
+- 성과 판정: UNMEASURED
+- 근거: tar 검증은 CI Linux 실행에서 최종 확인되며, 로컬 품질 게이트와 런타임 검증을 우선 수행한다.
+- 재발 감지: 패키지 생성 단계의 필수 파일 목록 검사를 유지한다.
+
 ### 다음 개선
 - 배포 후 health endpoint의 build-info 커밋과 배포 커밋을 자동 비교한다.
 - 필수 파일 목록을 별도 manifest로 관리해 workflow와 문서의 드리프트를 감지한다.
@@ -3246,9 +4043,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - tar 생성 경로를 동일 release directory 기준으로 변경해 stale/누락 산출물 배포를 방지한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 전체 `r`npm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
+- 배포 workflow의 패키징 경로와 검증 산출물 경로를 정적 대조한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-005
+- 성과 판정: UNMEASURED
+- 근거: CI 실제 실행 전에는 원격 활성화까지의 성공 여부를 단정할 수 없으며, 패키지 사전조건 검증을 추가했다.
+- 재발 감지: workflow에서 release directory의 `server.js` 사전검사와 검증 산출물 경로 대조를 유지한다.
+
 ### 다음 개선
 - CI에서 tar 내부 필수 파일 목록과 build-info 커밋을 직접 검증하는 패키지 검사 단계를 추가한다.
 - 배포 후 `/health-check`와 build-info의 커밋 일치 여부를 자동 확인한다.
@@ -3268,9 +4071,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 정상 응답 및 OpenDART 비즈니스 오류 코드 처리는 유지한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 관련 KIS 테스트를 실행하고 전체 `r`npm.cmd run deploy:verify`로 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-004
+- 성과 판정: UNMEASURED
+- 근거: 기존 회귀 테스트와 전체 게이트를 우선 확인하며, 외부 응답 본문별 신규 모킹 테스트는 다음 단계다.
+- 재발 감지: 파싱 실패 로그를 상태·content-type별로 집계한다.
+
 ### 다음 개선
 - KIS 토큰과 OpenDART에 HTML·빈 본문·잘못된 JSON 응답 회귀 테스트를 추가한다.
 - 프록시 5xx·타임아웃·비정상 content-type별 재시도 정책을 공통화한다.
@@ -3290,9 +4098,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 정상 JSON 및 기존 비즈니스 오류 처리 계약은 유지했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `lib/kis.test.ts` 5개 테스트 통과.
+- 전체 `r`npm.cmd run deploy:verify`에서 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-003
+- 성과 판정: UNMEASURED
+- 근거: 비정상 응답 회귀 케이스를 포함한 전용 테스트 보강은 다음 단계이며, 현재는 기존 계약과 전체 게이트를 우선 검증한다.
+- 재발 감지: `KIS-US-JSON-ERR` 이벤트를 관리자 KIS 호출 대시보드에서 집계한다.
+
 ### 다음 개선
 - HTML/빈 본문/잘못된 JSON 응답을 직접 모킹하는 해외 KIS 회귀 테스트를 추가한다.
 - 운영에서 상태·content-type별 오류율과 재시도 결과를 비교한다.
@@ -3311,9 +4125,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 결과 필드·필터 조건·EMA/볼린저 정의는 변경하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 관련 테스트 및 전체 `r`npm.cmd run deploy:verify`를 실행한다.
+- 기존 사용자 산출물과 임시 파일은 변경·커밋하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-002
+- 성과 판정: UNMEASURED
+- 근거: 기능 회귀와 배포 게이트를 우선 검증하고, 실제 후보 수별 p95 계측은 후속 과제로 남긴다.
+- 재발 감지: 스캔 루프 내부의 배열 `find` 반복을 정적 점검하고 응답시간을 후보 수와 함께 기록한다.
+
 ### 다음 개선
 - 국내·해외 스캐너 공통으로 데이터 매칭 Map 생성 비용과 스캔 총 시간을 계측한다.
 - 운영 샘플에서 후보 수별 p95를 비교해 추가 최적화 우선순위를 결정한다.
@@ -3334,9 +4154,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 후보 수가 증가해도 해당 병목이 재발하지 않도록 코드 리뷰 기준에 “반복 후보 매핑 내부 선형 검색 금지” 항목을 추가 대상으로 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 관련 Vitest와 전체 `deploy:verify` 게이트를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 검증을 확인한다.
+- 기존 사용자 생성 파일과 `tsconfig.tsbuildinfo`는 변경 범위에서 제외한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-17-001
+- 성과 판정: UNMEASURED
+- 근거: 정량 벤치마크는 전체 게이트 실행 결과에 기록하며, 실제 후보 수별 p95 측정은 후속 과제로 남긴다.
+- 재발 감지: 후보 매핑 코드 리뷰와 관련 API 성능 측정에서 배열 `find` 반복 여부를 점검한다.
+
 ### 다음 개선
 - 운영 로그의 후보 수·응답시간·Map 인덱싱 시간을 분리 계측해 후보 규모별 p95를 수집한다.
 - 이번 감사에서 확인되는 추가 재현 오류는 별도 원인·영향·회귀 검증 항목으로 기록한다.
@@ -3356,10 +4182,216 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 ### 반영
 - 재현 가능한 분석 스크립트 `scripts/analyze-kr-ema10-touch-rebound.cjs`를 추가했다.
 
+### 검증 결과
+- 분석 대상 기간: 2026-04-15 ~ 2026-09-16
+- 터치 발생 종목 수: 2,039개
+- 전체 터치 수: 44,405건
+- 반등 수: 13,968건
+- 반등 확률: 31.4559%
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+## [2026-09-17] 해외 EMA10·EMA20 골든크로스 후 2거래일 연속 상승 통계
+
+### 정의 및 검증
+- 해외 활성 보통주 일봉 캐시에서 EMA10이 EMA20을 상향 돌파한 이벤트를 집계했다.
+- 교차일 다음 두 거래일의 종가가 각각 직전 종가보다 높으면 성공으로 판정했다.
+- 전체 31,063건 중 6,568건 성공, 확률 21.1441%.
+- 시장별: AMS 229/1,450(15.7931%), NAS 3,543/17,536(20.2042%), NYS 2,796/12,077(23.1514%).
+- 동일 이벤트의 다음 거래일 상승: 14,467/31,588건, 확률 45.7990%.
+
+## [2026-09-17] 해외 EMA10 상단 완전 안착 후 다음날 상승 통계
+
+### 정의 및 검증
+- 일봉 저가가 EMA10보다 높은 경우를 EMA10 위 완전 안착으로 정의했다.
+- 안착일 다음 거래일 종가가 안착일 종가보다 높으면 상승으로 판정했다.
+- 전체 451,278건 중 214,192건 성공, 확률 47.4634%.
+- 시장별: AMS 6,523/15,499(42.0866%), NAS 111,200/238,157(46.6919%), NYS 96,469/197,622(48.8149%).
+
+## [2026-09-17] 해외 EMA10 상단 안착 후 다음날 EMA10 유지 통계
+
+### 정의 및 검증
+- 당일 저가가 EMA10보다 높은 사례 중 다음 거래일 저가도 다음 거래일 EMA10보다 높은 경우를 유지로 판정했다.
+- 전체 459,685건 중 329,702건 유지, 확률 71.7235%.
+- 시장별: AMS 10,484/15,684(66.8452%), NAS 170,194/242,053(70.3127%), NYS 149,024/201,948(73.7933%).
+- 안착일 RVOL(SMA20) 분포: <0.5 63,484건(13.6962%), 0.5~1 224,027건(48.3321%), 1~1.5 108,251건(23.3543%), 1.5~2 33,155건(7.1529%), 2~3 19,624건(4.2337%), 3 이상 14,975건(3.2307%). 구간별 EMA10 유지 확률은 각각 61.6266%, 70.0233%, 76.0085%, 79.0409%, 80.4830%, 81.4223%였다.
+- 유지 성공 사례의 다음 거래일 종가 수익률: 평균 +0.7924%, 중앙값 +0.3262%, 최저 -61.8868%, 최고 +3,717.7128%.
+
+## [2026-09-17] 해외 EMA150 ±2.5% 진입 후 EMA75 도달·EMA150 하회 통계
+
+### 정의 및 검증
+- 매수 이벤트는 종가가 EMA150의 ±2.5% 범위에 들어온 각 일봉으로 정의했다.
+- 이후 남은 캐시 이력에서 고가가 EMA75 이상 도달하면 EMA75 도달, EMA150 아래 종가가 연속 2거래일 이상이면 EMA150 하회로 판정했다.
+- 전체 매수 이벤트 169,673건 중 EMA75 도달 168,354건(99.2226%), EMA150 하회 2일 이상 164,993건(97.2418%).
+- 시장별 EMA75 도달: AMS 98.9992%, NAS 99.3030%, NYS 99.1647%.
+- 시장별 EMA150 하회 2일: AMS 99.0599%, NAS 96.8105%, NYS 97.5037%.
+
+### 10거래일 제한 추가 검증
+- 매수 후 완전한 10거래일 이력이 존재하는 사례만 분모에 포함했다.
+- 전체 236,882건 중 206,980건이 10거래일 내 EMA75에 도달해 확률은 87.3768%였다.
+- 시장별: AMS 88.0381%, NAS 88.3352%, NYS 86.4161%.
+- 도달 사례 상승폭: EMA75 최초 도달일까지 종가 기준 평균 +0.9772%, 중앙값 +0.6452%; 10거래일 내 최고가 기준 평균 +7.2530%, 중앙값 +4.8598%였다.
+- 매수 후 정확히 10거래일째 종가가 EMA150 아래인 사례는 124,439/254,865건으로 48.8255%였다.
+- 매수 후 10거래일 이내 EMA150 아래 종가가 한 번 이상 발생한 사례는 204,547/257,215건으로 79.5237%였다. 중간에 EMA150 위로 회복한 뒤 재하회한 경우도 포함했다.
+- 매수 후 10거래일 이내 +5% 도달: 고가 기준 113,271/261,611건(43.2975%), 종가 기준 86,522/261,611건(33.0728%).
+- 매수 후 10거래일 이내 +3% 도달: 고가 기준 164,376/264,144건(62.2297%), 종가 기준 129,895/264,144건(49.1758%).
+
+## [2026-09-17] 해외 최신 EMA150 ±2.5% 구간 종목 탐지
+
+### 정의 및 검증
+- 활성 보통주 중 일봉 캐시가 150개 이상인 종목을 대상으로 했다.
+- 2026-09-16 종가가 EMA150의 ±2.5% 이내인 종목을 추출했다.
+- 대상 2,487개, 조건 충족 337개.
+- 시총 1,000만 달러 미만을 제외한 대상은 2,327개였고 조건 충족은 337개로 동일했다.
+- 시총 1,000억 달러 이상으로 상향한 결과 대상 80개, 조건 충족 17개로 재추출했다.
+- 재검증 시 DB 최신 스냅샷 기준 대상 87개, 조건 충족 19개로 변경됐다. 추가 종목은 TXN, ASML이다.
+
+## [2026-09-17] 미국 최신 일봉 0.10달러 미만 보통주 탐지
+
+### 검증 결과
+- 시장 최신 캐시일: AMS/NAS/NYS 모두 2026-09-17.
+- 종목별 최신 캐시 종가 0.10달러 미만 활성 보통주: 3개.
+- 티커: CTNT(2026-09-17), RITR·UZX(각 2026-09-16).
+
+## [2026-09-17] 국내 일봉 캐시 갱신 현황 확인
+
+### 검증 결과
+- KOSDAQ: 활성 보통주 1,591개 전부 캐시 보유 및 최신일 2026-09-16 적용.
+- KOSPI: 활성 보통주 762개 전부 캐시 보유 및 최신일 2026-09-16 적용.
+- 전체 2,353개 중 캐시 누락 0개, 최신 거래일 적용 2,353개.
+
+## [2026-09-17] 국내 종목별 일봉 보유 개수 확인
+
+### 검증 결과
+- 활성 보통주 2,353개, 종목별 일봉 평균 113.01개, 최소 24개, 최대 115개.
+- 100~149개 보유 종목 2,228개, 60~99개 117개, 60개 미만 8개.
+- 150개 이상 보유 종목은 0개이며, 대부분 캐시 시작일은 2026-04-01이다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+## [2026-09-17] 해외 종목별 일봉 캐시 개수 확인
+
+### 검증 결과
+- 활성 보통주 5,308개 중 일봉 150개 초과 종목은 AMS 104/241, NAS 1,460/3,181, NYS 888/1,886이다.
+- 전체 150개 초과 종목은 2,452개(46.23%), 150개 이상은 2,454개(46.27%)다. 정확히 150개인 종목은 2개다.
+- 시장별 일봉 평균 개수: AMS 464.64개, NAS 521.66개, NYS 579.14개.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+## 2026-09-17 해외 일봉 캐시 최신화
+
+### 작업 목적 및 범위
+
+- 며칠간 중단된 해외 일봉 로컬 DB 캐시를 KIS 해외주식 일봉 API 기준으로 재수집했다.
+- DB 통합 해외 공통주식 유니버스(NAS·AMS·NYS)를 대상으로 일봉을 갱신하고, 실행에 포함된 주봉·월봉 보강 큐도 완료했다.
+
+### 확인 대상 및 결과
+
+- 실행 대상: 5,312종목, NAS 3,185·AMS 241·NYS 1,886종목.
+- 최종 실행 결과: 일봉 성공 5,312건, 전체 성공 14,465건, 실패 0건, 저장 캔들 1,277,295개.
+- DB 최종 일봉: NAS 20260916(3,228종목), AMS 20260916(247종목), NYS 20260916(1,900종목).
+- KIS HTTP 500/RATE_LIMITED는 재시도 후 모두 성공했으며, 선택적 디버그 테이블 부재 경고는 캐시 저장 결과에 영향을 주지 않았다.
+
+### 근본 원인 및 재발 감지
+
+- 중단 기간으로 인해 일봉·주봉·월봉 freshness 및 일봉 백필 대상이 동시에 발생했다. 실행기는 freshness 판정과 백필 목록을 기준으로 재수집했다.
+- 다음 실행에서 시장별 최신 거래일, 적용 종목 수, 실패 건수를 비교해 미적용 종목을 자동 식별한다. 진행 카운터는 여러 봉 주기를 합산하므로 유니버스 종목 수를 초과할 수 있다.
+
+### 남은 위험 및 다음 개선
+
+- 진행률 로그의 `totalCount`가 종목 수로 고정되어 여러 timeframe 처리 시 직관성이 떨어진다. 봉 주기별 total/progress를 분리 표시하는 개선이 필요하다.
+- `kis_rate_limit_events` 및 `debug_kis_calls` 테이블이 없어 선택적 이력 저장은 수행되지 않았다.
+
+### 검증 및 배포 상태
+
+- 실행 반환값 확인 및 로컬 PostgreSQL 시장별 최신 거래일 조회 완료.
+- 커밋·푸시·배포: 미실행.
+
+## 2026-09-18 미국 일봉 최신화 실행 점검
+
+- 목적: 현재 미국 로컬 DB 일봉 캐시를 최신 거래일 기준으로 갱신.
+- 확인 대상: `scripts/run-us-refresh.mjs`를 통해 `.env.local` 우선 환경으로 기존 미국 일봉 갱신기를 실행하고, `localhost:5433` PostgreSQL 연결을 점검.
+- 결과: DB 연결 `ECONNREFUSED`; Docker 데몬도 실행 중이 아니어서 `docker-compose.local.yml`의 PostgreSQL을 시작하지 못했다. 캐시 데이터는 변경되지 않았다.
+- 재발 감지: 갱신 전 DB 연결 확인 단계에서 포트 5433 연결 상태를 검사해야 한다.
+- 남은 위험/다음 조치: Docker Desktop 및 `stockman-postgres-local`을 먼저 기동한 뒤 동일 실행 명령을 재시도한다.
+- 커밋·푸시·배포: 미실행.
+
+## 2026-09-17 일회용 해외 일봉 1,200개 백필 기능
+
+### 작업 목적 및 범위
+
+- 해외 공통주식 종목별 일봉 이력을 최대 1,200개까지 확보할 수 있도록 일회용 백필 스크립트를 추가했다.
+- 기존 캐시 저장 함수와 KIS 조회 모듈을 재사용했으며, 정규 갱신 작업이나 스캐너의 기본 이력 길이는 변경하지 않았다.
+
+### 변경 파일 및 동작
+
+- `scripts/us-daily-1200-backfill.ts`: 응답의 가장 오래된 거래일을 다음 `BYMD`로 넘겨 페이지를 반복 조회하고, 중복 제거 후 최대 1,200개를 저장한다. 기본 동시성은 4이며 요청 횟수는 종목당 20회로 제한한다.
+- `scripts/run-us-daily-1200-backfill.mjs`: `.env.local` 값을 우선 주입한 뒤 일회용 스크립트를 실행하는 래퍼다. 자격증명 원문은 출력하지 않는다.
+
+### 검증 및 실행 방법
+
+- `r`npm.cmd run typecheck` 통과.
+- 실행 예: `r`node_modules/tsx/dist/cli.mjs scripts/run-us-daily-1200-backfill.mjs`.
+- 실행 전 `US_DAILY_BACKFILL_TARGET`로 목표 개수를 1~1,200 범위에서 조정할 수 있다.
+- 커밋·푸시·배포: 미실행.
+
+### 남은 위험 및 다음 개선
+
+- KIS 응답이 시장·종목별로 반환하는 실제 행 수에 따라 종목당 API 요청 수와 소요 시간이 달라진다. 실행 후 DB에서 종목별 보유 개수를 확인해야 한다.
+- 일회용 도구이므로 자동화 스케줄에는 연결하지 않았다.
+
+### 추가 검증
+- 동일 정의로 EMA20·EMA60을 추가 산출했다.
+- EMA20: 터치 26,314건, 반등 7,498건, 반등 확률 28.4943%
+- EMA60: 터치 7,040건, 반등 2,143건, 반등 확률 30.4403%
+
+### 시가총액 구간별 추가 검증
+- 구간: 300억~1,000억, 1,000억~1조, 1조~10조, 10조 이상.
+- 각 구간에 대해 EMA10·EMA20·EMA60 터치와 반등을 재집계했다.
+- 종목 단위 교집합: 세 EMA를 모두 터치한 1,338개 중 각 EMA에서 반등 실패가 모두 발생한 종목은 1,298개(97.0105%)였다.
+- 시총 구간별 교집합 결과: 300억~1,000억 423/441(95.9184%), 1,000억~1조 639/659(96.9651%), 1조~10조 179/180(99.4444%), 10조 이상 57/58(98.2759%).
+- EMA25·75·150·365 추가 집계: EMA25는 22,092건 중 6,383건(28.8928%), EMA75는 4,364건 중 1,353건(31.0037%)이었다. 현재 캐시의 유효 이력 길이가 부족해 EMA150·365는 산출 불가했다.
+
+## [2026-09-17] 해외 일봉 캐시 최신 거래일 현황 확인
+
+### 확인 대상
+- `us_common_stock_universe`의 활성 보통주와 `us_instrument_universe_candles`의 일봉 캐시.
+
+### 검증 결과
+- AMS: 241/241 캐시 보유, 최신 거래일 2026-09-16 적용 239개.
+- NAS: 3,181/3,181 캐시 보유, 최신 거래일 2026-09-16 적용 3,175개.
+- NYS: 1,886/1,886 캐시 보유, 최신 거래일 2026-09-16 적용 1,886개.
+- 전체: 5,308/5,308 캐시 보유, 최신 거래일 적용 5,300개, 미보유 0개.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행
+
+## [2026-09-14] OCI standalone 패키징 경로 오류 수정
+
+### 목표
+- standalone 패키징 단계에서 배포가 중단되지 않도록 필수 대상 디렉터리 생성을 보장한다.
+
+### 원인 및 영향
+- Next standalone 출력에 `public` 디렉터리가 자동 생성되지 않는 경우 복사 단계가 즉시 실패해 애플리케이션 활성화까지 진행되지 않았다.
+
+### 반영
+- 배포 workflow에서 `public`과 `.next` 대상 디렉터리를 복사 전에 생성하도록 수정했다.
+
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run deploy:verify`의 테스트 156개 파일·521개 테스트와 타입검사 통과. 문서 계약은 보완 후 재실행한다.
+
 ### 다음 개선
 - 배포 workflow에 standalone 아카이브 내부 필수 파일 존재 검사를 추가한다.
 
@@ -3386,9 +4418,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Docker PostgreSQL 통합 테스트 환경을 복구해 전체 검증을 재실행했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run verify` 통과.
+- 156개 테스트 파일·521개 테스트 통과.
+- 타입체크, 문서 검증, verify-scope, KIS boundary, OCI cron 검사 및 Next.js 프로덕션 빌드 통과.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-09-14-061
+- 성과 판정: IMPROVED
+- 근거: 로컬 DB 통합 테스트를 포함한 배포 전 자동 검증 게이트가 재현 가능하게 통과했다.
+
 ### 다음 개선
 - 배포 후 운영 서버에서 TOP100 MVP 관측 주기와 KIS 호출 지연을 디버깅 API로 확인하고, 기준 초과 시 자동 경고하도록 개선한다.
 
@@ -3415,9 +4453,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 종목별 롤링 버퍼가 장시간 실행에도 최근 5개 1분 버킷으로 제한되는 메모리 상한 회귀 테스트를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts lib/intraday-candidate-priority.test.ts app/api/kis/intraday-mvp/route.test.ts lib/kis-us-minute-turnover.test.ts --run` 통과: 5개 파일·22개 테스트.
+- `r`npm.cmd run typecheck` 통과.
+- 추가 stale 결과 회귀 검증: `r`npx vitest run app/api/kis/intraday-mvp/route.test.ts lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 3개 파일·17개 테스트.
+- Docker Desktop의 `stockman-postgres-local` 컨테이너 기동 후 전체 `r`npm.cmd test -- --run` 통과: 156개 파일·521개 테스트.
+- `r`npm.cmd run typecheck` 실행 완료.
+- `r`npm.cmd run docs:check` 실행 완료.
+- `r`npm.cmd run build` 통과: Next.js 프로덕션 빌드 성공.
+
 ### 다음 개선
 - 국내·해외 KIS 분봉 원천 payload fixture로 거래대금 필드와 후보 추적을 통합 검증한다.
 
@@ -3440,9 +4483,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 최신 봉 선택 회귀 테스트를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·13개 테스트.
+- `r`npm.cmd run typecheck` 통과.
+- `r`npm.cmd run docs:check` 통과.
+
 ### 다음 개선
 - 국내·해외 KIS 분봉 원천 payload fixture를 추가해 날짜·시간 필드별 정렬을 통합 검증한다.
 
@@ -3464,9 +4508,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `QUALIFIED` 전환이 `intraday_detection_transitions` 관측 로그에 누락되지 않도록 정리했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
+- `r`npm.cmd run typecheck` 통과.
+- `r`npm.cmd run docs:check` 통과.
+
 ### 다음 개선
 - 실제 KIS 응답 fixture를 사용한 확정 전환 통합 테스트를 추가한다.
 
@@ -3489,9 +4534,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `STALE`·`DEGRADED`·`WARMING_UP` 품질 상태에서는 5% 비율을 확정 탐지로 승격하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
+- `r`npm.cmd run typecheck` 통과.
+- `r`npm.cmd run docs:check` 통과.
+
 ### 다음 개선
 - 실제 국내·해외 KIS 응답 fixture를 이용해 최신 1분봉 거래대금 필드 매핑을 통합 검증한다.
 
@@ -3515,9 +4561,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 디버깅 스냅샷에 종목별 1분 거래대금 버킷을 노출한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·11개 테스트.
+- `r`npm.cmd run typecheck` 통과.
+- `r`npm.cmd run docs:check` 통과.
+
 ### 다음 개선
 - 운영 환경에서 실제 KIS 1분봉 시간 필드와 버킷 간격을 확인하는 통합 검증을 추가한다.
 
@@ -3542,9 +4589,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `intraday-detection-worker`가 매 tick의 최신 1분봉 거래대금만 rolling window에 넣도록 연결했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·8개 테스트.
+- `r`npm.cmd run typecheck` 통과.
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+
 ### 다음 개선
 - 남은 위험: KIS 원천 응답의 최신 1분봉 시간 필드가 누락되면 수신 시각을 버킷 키로 사용하므로 운영 로그에서 시간 품질을 계속 감시해야 한다.
 - 국내·해외 실응답을 각각 5분 연속 수집하는 통합 테스트와 MVP 확정 이벤트 전용 알림 연결은 다음 단계다.
@@ -3572,9 +4620,11 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 검증 빌드 산출물은 `.next-deploy-verify`에 격리하며, 임시 TypeScript 경로가 `tsconfig.json`에 남지 않도록 확인 절차를 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run deploy:verify`의 테스트 154개 파일·507개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사를 통과했다.
+- 격리 빌드 `NEXT_DIST_DIR=.next-deploy-isolated npm.cmd run build` 종료 코드 0 및 107개 페이지 생성 확인.
+- 빌드 후 `tsconfig.json`에서 임시 산출물 경로를 제거해 원래 설정을 유지했다.
+
 ### 다음 개선
 - CI에서 검증 명령의 종료 코드와 고아 프로세스 유무를 함께 수집한다.
 
@@ -3597,9 +4647,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - manifest 변경 diff에 승인 메타데이터가 함께 포함되는지 검사하는 명령을 등록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
+- `r`npm.cmd run audit:verify-scope` 통과: 현재 manifest 변경 없음.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - GitHub Actions에서 manifest 변경 PR에 이 감사를 자동 실행한다.
 
@@ -3621,9 +4672,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 비교 도구가 승인 메타데이터와 승인 단계 목록의 유효성을 먼저 검사하도록 강화했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - manifest 변경 diff에 승인 메타데이터 변경이 함께 있는지 자동 대조한다.
 
@@ -3645,9 +4696,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `compare:verify`가 manifest 미등록 단계를 `unapprovedStages`로 표시하고 실패 처리한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - manifest 변경 시 변경 사유와 승인자를 기록하는 검증을 추가한다.
 
@@ -3669,9 +4720,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 신규 단계의 기준값이 승인되기 전까지 비교 결과를 실패 처리한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 승인된 기준값을 별도 manifest로 관리하고 비교 도구가 자동으로 읽는다.
 
@@ -3693,9 +4744,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기준 단계 누락은 비교 실패로 처리하고, 신규 단계는 범위 변경으로 표시한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 신규 단계의 기준값 부재를 별도 승인 상태로 관리한다.
 
@@ -3717,9 +4768,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 환경이 다르면 신뢰도를 `LOW`로 표시하고 동일 환경 재측정을 권고한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 두 결과의 누락 단계와 신규 단계를 비교해 검증 범위 변경도 경고한다.
 
@@ -3741,9 +4792,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 차이가 있으면 성능 판정과 분리된 `ENVIRONMENT_MISMATCH` 상태와 차이 목록을 JSON으로 출력한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 환경 불일치 시 비교 신뢰도와 재측정 권고를 출력한다.
 
@@ -3765,9 +4816,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 민감정보와 명령 인자는 계속 저장하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/measure-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 비교 도구가 환경 메타데이터가 다른 결과를 경고하도록 개선한다.
 
@@ -3790,9 +4841,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `package.json`에 `compare:verify` 명령을 등록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 동일 환경이 아닌 실행 결과를 구분할 수 있도록 Node·OS·CPU 정보를 비식별 메타데이터로 추가한다.
 
@@ -3814,9 +4865,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 저장 결과에는 단계명·성공 여부·소요 시간만 포함하고 환경변수·명령 인자는 저장하지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`node --check scripts/measure-verify.mjs` 통과.
+- 기존 `r`npm.cmd run measure:verify` 전체 실행 통과 및 단계별 JSON 출력 확인.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 직전 결과 파일과 현재 결과를 비교해 단계별 회귀 임계치를 자동 판정한다.
 
@@ -3839,9 +4891,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `package.json`에 `measure:verify` 명령을 등록했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run verify` 통과: 테스트 152개 파일·502개 테스트, 타입체크, 문서, KIS 경계, cron, 빌드.
+- `r`npm.cmd run measure:verify` 통과: 전체 122,977ms, 테스트 64,508ms, 빌드 51,575ms 등 단계별 JSON 출력 확인.
+- Windows 실행기의 셸 경고를 발견해 명시적 셸 경로 사용으로 수정했다.
+
 ### 다음 개선
 - 측정 결과를 파일로 저장하고 직전 실행 대비 회귀 임계치를 자동 판정한다.
 
@@ -3863,9 +4916,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 전체 검증에서도 KIS 모듈·예외·테스트·경로·기능 registry가 검사되도록 보완했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run verify` 통과: 테스트 152개 파일·502개 테스트, 타입체크, 문서, KIS 경계, cron, Next 빌드.
+- 빌드에서 정적 페이지 107개 생성 확인.
+
 ### 다음 개선
 - 통합 검증 단계별 소요 시간을 기록해 병목 단계와 변동을 추적한다.
 
@@ -3887,9 +4940,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사 스크립트가 registry 함수가 실제 소스에 존재하는지 검사하도록 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 모듈·테스트·예외·경로·대표 함수 계약 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 대표 함수별 응답 계약 필드와 테스트 케이스를 registry에 연결한다.
 
@@ -3911,9 +4964,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사 스크립트가 registry 경로가 실제 소스에 존재하는지 검사하도록 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 모듈 registry, 테스트 연결, 예외 범위, 대표 API 경로 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - registry에 모듈별 대표 기능명과 API 응답 계약을 연결한다.
 
@@ -3935,9 +4988,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사가 등록된 모듈과 테스트 파일의 존재 여부를 함께 검증하도록 강화했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: registry, 예외 경계, 핵심 모듈 테스트 연결 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - registry에 모듈별 허용 API 경로 패턴을 추가하고 실제 소스와 대조한다.
 
@@ -3959,9 +5012,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사 스크립트가 실제 모듈과 registry의 양방향 일치를 검사하도록 강화했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 27개 KIS 모듈 registry 일치 및 요청 경계 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - registry에 모듈별 허용 API 경로와 대표 테스트 파일을 추가한다.
 
@@ -3983,9 +5036,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 예외 파일·목적·엔드포인트가 아키텍처 문서에 모두 기록되는지 검사한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 데이터 모듈 공통 경계 및 예외 엔드포인트 범위 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 일반 데이터 모듈도 허용된 KIS API 경로와 기능명을 구조화해 감사한다.
 
@@ -4007,9 +5060,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 예외 파일과 목적이 아키텍처 문서에 모두 기록되어야 감사가 통과하도록 강화했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 예외 파일 존재·목적 문서화·데이터 모듈 경계 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 예외별 허용 엔드포인트 패턴까지 구조화해 검증한다.
 
@@ -4031,9 +5084,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 토큰 발급·Approval 예외 파일명을 아키텍처 문서에 명시했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 예외 모듈 존재·문서 동기화 및 데이터 모듈 경계 검사.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 초기 실행에서 감사 스크립트의 기준 경로 변수 누락을 발견해 수정 후 재검증했다.
+
 ### 다음 개선
 - 예외 모듈별로 허용된 외부 호출 목적까지 구조화해 검증한다.
 
@@ -4056,9 +5110,9 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 토큰 발급·Approval을 제외한 KIS 모듈의 공통 throttle 경계 사용을 검사한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run audit:kis-boundary` 통과: 모든 KIS 데이터 모듈이 공통 경계를 사용한다.
+- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 직접 fetch가 추가된 파일을 diff 기준으로 더 빠르게 탐지한다.
 
@@ -4080,9 +5134,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `scripts/check-docs.mjs`가 해당 구조 문서와 핵심 계약 문구를 검사하도록 연결했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run docs:check` 통과: 외부 요청 경계 계약, 최신 기록 계약, ID 중복, 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - KIS 모듈별 공통 프레임워크 사용 여부를 정적 검사하는 감사 스크립트를 추가한다.
 
@@ -4104,9 +5157,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 완료 상태에는 커밋 식별자가 필요하도록 규칙을 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run docs:check` 통과: 배포 상태, 실행성 근거, 다음 개선, ID 중복, 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 완료 상태에서 푸시·배포 확인 URL 또는 배포 검증 결과까지 연결한다.
 
@@ -4128,9 +5180,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 다음 과제의 구체성 규칙을 반영했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm.cmd run docs:check` 통과: 다음 개선 내용, 실행성 근거, ID 중복, 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 다음 단계에서 개선 과제 상태와 실제 배포 상태의 불일치를 자동 탐지한다.
 
@@ -4148,10 +5199,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 검증 결과가 선언에 그치지 않고 실제 실행 명령 또는 측정값을 포함하도록 보장한다.
 
 ### 반영
-- `scripts/check-docs.mjs`가 최신 로그의 `### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `scripts/check-docs.mjs`가 최신 로그의 `### 검증` 구간에서 실행 가능한 검사 명령 또는 측정 결과를 찾도록 추가했다.
+- 지속 개선 문서에 검증 근거를 기록해야 한다는 규칙을 반영했다.
+
+### 검증
+- `r`npm.cmd run docs:check` 통과: 실행 명령 포함 여부, 최신 기록 계약, ID 중복, 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 검증 명령의 종료 코드와 결과 요약을 구조화해 자동 비교한다.
 
@@ -4173,9 +5226,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서의 성과 판정 규칙에 근거 필수 원칙을 반영했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm run docs:check` 통과: 최신 기록 계약, ID 중복, 성과 근거, 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 근거가 실제 검증 명령 또는 측정 수치와 연결되는지 자동 검사한다.
 
@@ -4197,9 +5249,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 ID 고유성 규칙을 반영했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm run docs:check` 통과: 최신 기록 계약, 전체 ID 중복, 필수 문서·Flyway 133개 검사.
+
 ### 다음 개선
 - 과거 성과 판정 변경 이력도 자동 검증한다.
 
@@ -4221,9 +5272,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 성과 판정은 `IMPROVED`, `UNCHANGED`, `REGRESSED`, `UNMEASURED`만 허용하도록 추가 검증했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm run docs:check` 통과: 최신 로그 값, 필수 문서, Flyway 133개 검사.
+
 ### 다음 개선
 - 과거 성과 판정 변경 이력도 검사한다.
 
@@ -4245,9 +5295,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 기록 계약과 배포 전 게이트를 연결했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm run docs:check`로 최신 기록 계약과 필수 문서·Flyway 검사를 확인한다.
+
 ### 다음 개선
 - 향후 개선 과제 ID와 전후 성능 수치까지 자동 검증 대상으로 확장한다.
 
@@ -4269,9 +5318,129 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 계약이 누락되면 `docs:check`가 실패해 배포 검증이 중단된다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `r`npm run docs:check` 통과: 문서 계약 및 Flyway 133개 검사.
+- 커밋·푸시·배포: 미실행.
+
+## [2026-09-13] 지속 개선 검토 주기 구체화
+
+### 목표
+- 개선 과제를 정기적으로 재평가하고 성과와 미해결 위험을 추적한다.
+
+### 반영
+- `docs/operations/improvement-review.md`에 배포 직후·일간·주간·월간 검토 주기와 우선순위 기준을 추가했다.
+- 개선 전후 수치 비교 및 `IMPROVED/UNCHANGED/REGRESSED/UNMEASURED` 판정 규칙을 추가했다.
+- 배포 체크리스트와 문서 인덱스에 검토 기준을 연결했다.
+- `scripts/check-docs.mjs`가 검토 기준 문서의 존재를 확인하도록 했다.
+
+### 검증
+- `r`npm run docs:check` 통과: 필수 문서 16개, Flyway 133개 확인.
+- 커밋·푸시·배포: 미실행.
+
+## [2026-09-13] 지속 개선 운영 루프 강화
+
+### 목표
+- 운영 결과가 개선 과제로 연결되고 반복 오류가 자동 검증으로 승격되는 구조를 만든다.
+
+### 반영
+- `docs/operations/continuous-improvement.md`에 개선 루프, 영역별 관찰 지표, 과제 템플릿, 회고 규칙을 추가했다.
+- `docs/README.md`와 배포 체크리스트에서 지속 개선 기준으로 연결했다.
+- `scripts/check-docs.mjs`가 지속 개선 운영 기준 문서의 존재를 검사하도록 했다.
+
+### 검증
+- `r`npm run docs:check` 통과: 필수 문서 15개, Flyway 133개 확인.
+- 커밋·푸시·배포: 미실행.
+
+## [2026-09-13] 전 작업 문서화 규칙 확정
+
+### 목표
+- 기획·개발·검증·배포·운영 개선의 모든 작업을 추적 가능하게 관리한다.
+
+### 반영
+- `AGENTS.md`에 사소한 조사·수정·검증을 포함한 전 작업 문서화 규칙을 추가했다.
+- 작업 목적, 범위, 변경/확인 대상, 검증 결과, 커밋·푸시·배포 여부를 기록하도록 표준화했다.
+- 문서화되지 않은 작업은 완료로 간주하지 않는 원칙을 명시했다.
+
+### 검증
+- 문서와 규칙의 UTF-8 저장 상태를 확인했다.
+- 본 변경은 커밋·푸시·배포하지 않았다.
+
+## [2026-05-11] UI/UX 고도화 및 실시간 시각화 개선 (Phase 1)
+
+### 1. 목표
+- 대시보드의 시각적 품질 향상 (프리미엄 디자인 적용)
+- 사용자 편의성 증대 (외부 차트 링크 연동)
+- 실시간성 강조 (애니메이션 효과)
+
+### 2. 주요 변경 사항
+- **디자인 시스템 업데이트**: `globals.css` 및 각 컴포넌트의 CSS 모듈 수정.
+- **차트 연동 기능**: DART 공시 항목에 네이버 증권 차트 바로가기 링크 추가.
+- **가독성 개선**: 카드 레이아웃 재배치 및 배지 디자인 고도화.
+
+### 3. 상세 내역
+- [x] `lib/utils.ts`: 종목명 기반 네이버 증권 링크 생성 유틸리티 추가.
+- [x] `components/rapid-dart-page.tsx`: 카드 디자인 수정 및 차트 버튼 추가.
+- [x] `components/rapid-dart-page.module.css`: 글래스모피즘 및 애니메이션 효과 적용.
+
+---
+
+## [2026-05-11] Phase 2 키워드 로직 고도화 상세 설계 완료
+
+### 1. 목표
+- 키워드 기반 분류의 정확도 향상 및 오판율 감소.
+- 복합적인 공시 맥락(정정, 제3자 배정 등)을 파악하기 위한 로직 수립.
+
+### 2. 주요 설계 내용
+- [x] 가중치(Scoring) 시스템 도입 설계.
+- [x] 정규표현식(Regex)을 활용한 패턴 매칭 전략 수립.
+- [x] `lib/scoring.ts` 모듈 구현 및 `lib/rss.ts` 연동 완료.
+- [x] 구형 키워드 상수 제거 및 로직 최적화.
+
+## [2026-05-11] 사용자 피드백에 따른 설계 변경
+
+### 1. 변경 사항
+- **Phase 3(알림 확장)** 및 **Phase 4(AI 분석)** 삭제 결정.
+- 프로젝트 범위를 대시보드 내실화와 데이터 정확도 향상으로 압축.
+- 향후 단계로 **Phase 3: OpenDART 심층 연동**을 배치.
+
+---
+
+## [2026-05-11] High-End 프리미엄 UI/UX 재설계 완료
+
+### 1. 목표
+- 사용자의 "멋지고, 화려하고, 완벽하게" 요구사항 충족.
+- 최첨단 금융 대시보드 느낌의 다크 테마 및 네온 포인트 적용.
+
+### 2. 주요 디자인 요소
+- **Global Dark Theme**: 깊은 네이비/블랙 배경과 고대비 텍스트.
+- **Glassmorphism**: 60% 이상의 요소에 블러 및 투명도 효과 적용.
+- **Neon Accents**: 호재 공시에 네온 그린 글로우 효과 적용.
+- **Live Monitoring**: 실시간 추적 상태를 나타내는 펄스 애니메이션 인디케이터 추가.
+- **Inter Font**: 가독성과 현대성을 위해 폰트 시스템 교체.
+
+---
+*Created by Antigravity AI*
+## 2026-09-13 — CI-2026-09-13-029
+
+### 목표
+
+검증 범위 승인 감사가 표준 전체 검증 흐름에서 자동으로 실행되도록 연결해, 배포 전 승인 메타데이터 누락을 방지한다.
+
+### 반영
+
+- `package.json`의 `verify` 흐름에 `audit:verify-scope`를 추가했다.
+- 검증 범위 manifest 변경 시 변경 사유·승인 주체·승인일을 검사하는 감사 단계를 전체 검증에 포함했다.
+
+### 검증
+
+- `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
+- `r`npm.cmd run audit:verify-scope` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- `r`npm.cmd run verify` 통과: 152개 테스트 파일·502개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사, Next.js 프로덕션 빌드 성공.
+
+근거: 표준 `verify` 명령 정의에 감사 단계가 포함되고, 개별 감사·문서·diff 검증이 모두 종료 코드 0으로 완료됐다.
+
 ### 다음 개선
 
 - 전체 `r`npm.cmd run verify`를 실행해 새 검증 단계가 기존 테스트·빌드 흐름과 함께 통과하는지 재확인한다.
@@ -4325,9 +5494,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 잘못된 JSON과 빈 승인 메타데이터를 명시적인 실패 사유로 출력한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
+- `r`npm.cmd run audit:verify-scope` 통과: 새 manifest 승인 메타데이터 확인.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 현재 manifest가 untracked 상태임에도 감사가 실제 파일을 읽어 승인 메타데이터를 검증했고, 문서·diff 검증이 종료 코드 0으로 완료됐다.
+
 ### 다음 개선
 
 - manifest 검증 로직을 단위 테스트로 고정해 정상·누락·잘못된 JSON·staged 변경 사례를 자동 회귀 검사한다.
@@ -4351,9 +5526,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 테스트 중 발견된 임시 저장소 디렉터리 생성 누락을 수정했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npx vitest run scripts/audit-verify-scope-change.test.mjs --run` 통과: 3개 테스트.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 정상·실패 경로 3개가 모두 의도한 종료 상태와 오류 메시지를 검증하고, 문서·diff 검사도 종료 코드 0으로 완료됐다.
+
 ### 다음 개선
 
 - 전체 `r`npm.cmd run verify`에 새 감사 단위 테스트가 포함되는지 확인하고, 테스트 실행 시간을 측정해 검증 파이프라인 비용을 기록한다.
@@ -4375,9 +5555,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 전체 검증 결과를 개선 로그의 재현 가능한 근거로 기록한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run verify` 통과.
+- 결과: 테스트 파일 153개·테스트 505개 통과, 타입체크 통과, 문서 18개 검사 통과, 검증 범위 감사 통과, KIS 경계 감사 통과, cron 18개 endpoint 검사 통과, Next.js 107개 정적 페이지 빌드 성공.
+
+근거: 표준 `verify` 명령이 종료 코드 0으로 완료됐으며 새 `audit-verify-scope` 단계와 새 단위 테스트가 모두 실행됐다.
+
 ### 다음 개선
 
 - 검증 단계별 소요 시간과 환경 정보를 CI artifact로 보존해 성능 회귀를 수치로 비교할 수 있도록 연결한다.
@@ -4399,9 +5582,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 승인 범위 감사가 표준 검증과 성능 측정·비교 결과에 모두 포함되도록 단계 목록을 정렬했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run audit:verify-scope` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: `measure-verify.mjs`의 단계 목록에 `verifyScope`가 `docs` 이후, KIS 경계 감사 이전으로 포함됐다.
+
 ### 다음 개선
 
 - `measure:verify --out`를 실행해 새 단계가 결과 JSON에 실제 기록되는지 확인하고, 비교 manifest와 단계 집합이 일치하는지 검증한다.
@@ -4424,9 +5612,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 측정 결과 파일을 후속 baseline 비교에 사용할 수 있도록 보존했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- 측정 명령 종료 코드 0.
+- 동일 로컬 환경: Node `v24.14.0`, Windows x64, CPU 8코어.
+- 총 소요 시간 `120105ms`.
+- 단계별: test `65361ms`, typecheck `3432ms`, docs `1019ms`, verifyScope `1019ms`, kisBoundary `986ms`, cron `985ms`, build `47303ms`.
+
+근거: `reports/verify-measured-2026-09-13.json`에 `ok: true`와 7개 단계의 상태·소요 시간이 저장됐다.
+
 ### 다음 개선
 
 - 동일 환경에서 baseline과 current 측정 JSON을 비교해 테스트·빌드 병목의 회귀 임계값을 적용하고, 비교 결과를 로그에 남긴다.
@@ -4448,9 +5641,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 측정 단계·표준 verify 단계·비교 승인 manifest의 단계 집합을 일치시켰다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run audit:verify-scope` 통과: manifest 변경 승인 메타데이터 확인.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: `measure-verify.mjs`, `package.json`의 `verify`, `verify-scope.json`이 모두 `verifyScope`를 포함한다.
+
 ### 다음 개선
 
 - 동일 환경에서 두 번의 측정 결과를 비교해 `scopeStatus: APPROVED`와 단계별 회귀 판정이 정상 동작하는지 확인한다.
@@ -4472,9 +5670,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 측정 결과를 baseline과 current로 비교했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run audit:verify-scope` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- `r`npm.cmd run compare:verify -- reports/verify-baseline-2026-09-13.json reports/verify-measured-2026-09-13.json 0.2` 통과.
+- 결과: `scopeStatus: APPROVED`, `environmentStatus: MATCH`, `confidence: HIGH`, 신규·누락·미승인 단계 0건, 전 단계 `OK`.
+
+근거: 비교 도구가 종료 코드 0으로 완료됐고 7개 단계 모두 baseline 대비 변화율 0, 회귀 없음으로 판정했다.
+
 ### 다음 개선
 
 - baseline 파일을 임의 복사하지 않고, 검증 결과의 커밋·환경·생성 시점을 함께 묶어 기준선 무결성을 확인하는 메타데이터 검사를 추가한다.
@@ -4498,9 +5701,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 연속 개선 운영 문서에 메타데이터와 비교 규칙을 명시했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/measure-verify.mjs` 통과.
+- `r`node --check scripts/compare-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 측정·비교 스크립트의 구문 검사와 문서 검사가 종료 코드 0으로 완료됐다.
+
 ### 다음 개선
 
 - 새 메타데이터가 포함된 측정 결과를 생성하고 동일 커밋·상이한 커밋 비교에서 신뢰도 판정이 의도대로 동작하는지 테스트한다.
@@ -4522,9 +5731,13 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 결과에는 측정 시점, Git HEAD, 작업 트리 변경 여부가 기록됐다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-metadata.json` 통과.
+- 결과: `ok: true`, 총 `118551ms`, 테스트 153개 파일·505개 테스트 통과, 타입체크·문서·KIS·cron·빌드 성공.
+- 결과 metadata: Git HEAD `48000fc037e20e05be1c56eeb761ce655d61e5fa`, `workingTreeDirty: true`.
+
+근거: `reports/verify-measured-2026-09-13-metadata.json`에 metadata와 7개 단계의 상태·소요 시간이 저장됐다.
+
 ### 다음 개선
 
 - 작업 트리가 깨끗한 기준선과 변경 중인 current 결과를 비교할 때 `CODE_MISMATCH` 및 신뢰도 저하가 정확히 표시되는지 회귀 테스트를 추가한다.
@@ -4547,9 +5760,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 코드가 달라도 단계별 성능 비교 결과가 가려지지 않는지 검증한다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npx vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 동일·상이 커밋 비교 테스트가 모두 의도한 상태와 신뢰도를 검증했고, 문서·diff 검증도 종료 코드 0으로 완료됐다.
+
 ### 다음 개선
 
 - 전체 검증 결과에서 반복되는 Git 작업 트리 경고와 하위 프로세스 경고를 분석해 검증 출력의 신호 대 잡음비를 개선한다.
@@ -4572,9 +5790,15 @@ Windows 검증 실행에서 shell 보안 경고를 제거하고, 측정 파이�
 - 테스트용 명령 실행으로 Windows 경로가 정상 작동함을 확인했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- Windows `cmd.exe /d /s /c npm.cmd run audit:verify-scope` 실행 성공.
+- `r`node --check scripts/measure-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 명시적 `cmd.exe` 실행은 종료 코드 0으로 완료됐고, shell 기반 Node `DEP0190` 경고 없이 감사 명령이 실행됐다.
+
 ### 다음 개선
 
 - `measure:verify` 전체 실행으로 변경된 Windows 하위 프로세스 경계에서 모든 검증 단계가 실제 통과하는지 확인한다.
@@ -4596,9 +5820,13 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - shell 기반 Node `DEP0190` 경고 없이 7개 검증 단계를 완료했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-shell-fix.json` 통과.
+- 결과: `ok: true`, 테스트 154개 파일·507개 테스트 통과, 타입체크·문서·verifyScope·KIS·cron·빌드 성공.
+- 총 소요 시간 `222333ms`, 테스트 `87430ms`, 빌드 `117223ms`.
+
+근거: 측정 JSON에 7개 단계가 모두 `passed`로 저장됐고 프로세스 종료 코드가 0이다.
+
 ### 다음 개선
 
 - 검증 출력에 반복되는 Git 줄바꿈 안내를 코드 변경 없이 줄일 수 있는 설정·실행 경계를 검토하고, 오류와 안내를 명확히 분리한다.
@@ -4620,9 +5848,15 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 애플리케이션 코드나 사용자의 전역 Git 설정은 변경하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npx vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
+- `r`node --check scripts/measure-verify.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 테스트와 모든 정적 검증이 종료 코드 0으로 완료됐으며 임시 저장소 생성에 따른 반복 CRLF 경고가 제거됐다. 남은 Git 안내는 기존 작업 트리의 변환 경고다.
+
 ### 다음 개선
 
 - 전체 측정 실행에서 테스트 출력과 작업 트리 경고를 재확인하고, 검증 스크립트가 경고를 실패로 오인하지 않는지 확인한다.
@@ -4645,9 +5879,16 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 배포 검증 경로의 `shell: true` 사용을 제거했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- `git check-ignore reports/verify-measured-2026-09-13-shell-fix.json` 통과.
+- `git check-ignore .next-ui-build/` 통과.
+
+근거: 배포 검증 스크립트 구문·문서·diff 검사가 종료 코드 0이고, 생성 산출물이 ignore 대상임을 Git이 확인했다.
+
 ### 다음 개선
 
 - Windows 배포 검증 경로에서 실제 production server smoke test까지 실행해 명시적 프로세스 호출 변경을 통합 검증한다.
@@ -4669,9 +5910,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 테스트 임시 저장소 경고가 최소화된 상태에서 배포 검증을 확인했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run deploy:verify` 통과.
+- 테스트 154개 파일·507개 테스트 통과.
+- 타입체크·문서 검사·cron 검사 통과.
+- Next.js 프로덕션 빌드 및 `http://localhost:3100/charts` smoke test 통과.
+
+근거: 배포 검증 스크립트가 `Deployment verification passed: quality gates, build, and runtime smoke test.`를 출력하고 종료 코드 0으로 완료됐다.
+
 ### 다음 개선
 
 - 배포 검증 스크립트에도 승인 범위 감사와 KIS 경계 감사를 포함해 `verify`와 배포 전 검증의 정책 범위를 완전히 일치시킨다.
@@ -4694,9 +5940,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 배포 검증은 테스트·타입·문서·승인 범위·KIS 경계·cron·빌드·실행 smoke test 순서로 진행된다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 배포 검증 quality gate에 두 감사 명령이 표준 verify와 동일한 순서로 포함됐다.
+
 ### 다음 개선
 
 - `r`npm.cmd run deploy:verify`를 재실행해 추가 감사 단계가 실제 배포 검증과 production smoke test를 통과하는지 확인한다.
@@ -4718,9 +5969,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 테스트·타입체크·문서·승인 범위 감사·KIS 경계 감사·cron 검사는 모두 통과했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run deploy:verify` 실행 중 quality gate 통과 확인.
+- 테스트 154개 파일·507개 테스트 통과.
+- production build가 장시간 출력 없이 실행되어 정상 완료를 증명할 수 없어 프로세스를 안전하게 중단했다.
+- 종료 코드 1; runtime smoke test까지 도달하지 못했다.
+
+근거: build 이후 완료 메시지와 `server.js` 산출물을 확인하지 못했으므로 배포 검증을 성공으로 기록하지 않았다.
+
 ### 다음 개선
 
 - stale Next/Node 프로세스와 `.next` 산출물 상태를 읽기 전용으로 진단한 뒤, 격리된 출력 디렉터리에서 production build hang 재현 여부를 확인한다.
@@ -4744,9 +6000,13 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - Next가 자동 추가한 `tsconfig.json`의 진단 경로를 원래 설정으로 복원했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `NEXT_DIST_DIR=.next-diagnose; npm.cmd run build` 통과.
+- 결과: 107개 정적 페이지 생성, standalone `server.js` 생성.
+- `tsconfig.json` diff 확인 후 자동 추가된 `.next-diagnose/types`만 제거.
+
+근거: 격리 build가 종료 코드 0으로 완료됐으므로 이전 실패는 기능 오류가 아니라 로컬 자원 상태에서 발생한 장시간 build로 판정한다. 원래 사용자 설정은 복원됐다.
+
 ### 다음 개선
 
 - 배포 검증에 build 단계별 timeout·진행 로그를 추가해 장시간 실행과 실제 hang을 자동으로 구분한다.
@@ -4769,9 +6029,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 정상적으로 느린 환경을 실패로 오판하지 않도록 강제 timeout은 추가하지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: 배포 검증 실행 경계에 시작·진행·완료 로그와 경과 시간 계산이 구현됐다.
+
 ### 다음 개선
 
 - 실제 `r`npm.cmd run deploy:verify`를 실행해 진행 로그가 quality gate·build·runtime 단계에 표시되는지 확인한다.
@@ -4794,9 +6059,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - build 단계에서 30초 간격 진행 로그가 출력되도록 확인했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- 테스트 154개 파일·507개 테스트 통과.
+- 다섯 개 quality gate 통과.
+- build가 360초 이상 진행 로그만 출력해 실제 완료를 증명할 수 없어 프로세스를 중단했다.
+- runtime smoke test에는 도달하지 못했다.
+
+근거: `[deploy-verify] still running: npm.cmd run build (...)` 로그가 반복되어 멈춘 단계와 경과 시간을 확인할 수 있었고, 종료 코드 1로 기록했다.
+
 ### 다음 개선
 
 - build 실행을 별도 프로세스 트리·캐시 상태와 함께 진단하고, 정상 완료 가능한 격리 build와 배포 검증 build의 차이를 비교한다.
@@ -4820,9 +6090,15 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 기존 `.next`와 사용자 개발 산출물은 삭제하거나 덮어쓰지 않는다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- `.next-*/` ignore 규칙이 `.next-deploy-verify`에 적용됨을 확인.
+
+근거: build와 runtime이 동일한 전용 `verifyDistDir`를 사용하도록 코드 경계를 일치시켰다.
+
 ### 다음 개선
 
 - `r`npm.cmd run deploy:verify`를 다시 실행해 전용 산출물 경계에서 build 완료와 `/charts` smoke test까지 확인한다.
@@ -4846,9 +6122,15 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 - 검증 중 Next가 자동 변경한 `tsconfig.json` 진단 경로를 원래 설정으로 복원했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+- 기존 배포 검증에서 발견된 `EADDRINUSE` false positive 원인을 코드 경로로 재현·해결했다.
+
+근거: smoke test 포트가 실행 시 새로 확보되므로 기존 프로세스가 health 응답을 가로채는 경로가 제거됐다.
+
 ### 다음 개선
 
 - `r`npm.cmd run deploy:verify`를 다시 실행해 동적 포트에서 production 서버 시작과 `/charts` 응답을 실제로 검증한다.
@@ -4872,9 +6154,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - Next 자동 변경으로 추가된 `tsconfig.json` 경로는 원래 설정으로 복원했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm.cmd run deploy:verify`에서 quality gate·build 통과.
+- 테스트 154개 파일·507개 테스트 통과.
+- production 서버 `http://localhost:56169` 시작 및 `/charts` smoke test 통과.
+- 배포 검증 성공 메시지 확인.
+
+근거: 동적 포트에서 새 서버가 `Ready` 상태가 된 뒤 `Deployment verification passed: quality gates, build, and runtime smoke test.`가 출력됐다.
+
 ### 다음 개선
 
 - smoke test가 실제 HTTP 응답 상태와 응답 본문 특성까지 검증하도록 최소한의 route assertion을 추가한다.
@@ -4896,9 +6183,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 실패 시 상태 코드·content-type·본문 길이를 오류 정보로 남긴다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`node --check scripts/verify-deploy.mjs` 통과.
+- `r`npm.cmd run docs:check` 통과.
+- git diff --check 통과.
+- 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
+
+근거: smoke test의 성공 조건과 실패 진단 정보가 코드에 명시적으로 반영됐다.
+
 ### 다음 개선
 
 - production 서버를 동적 포트로 실행하는 `r`npm.cmd run deploy:verify`를 재실행해 HTML 본문 검증까지 통합 확인한다.
@@ -5332,9 +6624,10 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 통합 공시 설계 문서에 API 계약을 갱신했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- 기준 production 브랜치에서 빌드·타입·전체 테스트·deploy verify를 실행한다.
+- 현재 운영 API는 기본 응답 `total=200`, `items=200`으로 이전 200건 기본값 상태임을 확인했다.
+- 로컬 실행 확인은 프로젝트 DB 환경변수가 없어 API 데이터 조회가 503으로 제한됐다.
+
 ### 다음 개선
 - 배포 후 운영 API에서 500건 초과일을 골라 `items.length === total`을 검증하고 응답 크기·시간을 기록한다.
 
@@ -5360,9 +6653,21 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 모바일 화면에서 카드가 2열에서 1열로 안전하게 전환되도록 전용 스타일을 추가했다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+
+- `r`npm run typecheck` 통과.
+- `r`npm run docs:check` 통과.
+- 운영 `GET /api/kis/intraday-mvp`에서 워커 `RUNNING`, `lastTickAt` 갱신, TOP100 후보 관측을 확인했다.
+- 배포 실행 `35731972698`이 성공했고 운영 `/intraday` HTTP 200 및 API JSON 응답을 확인했다. 배포 직후 API는 워커 `WARMING_UP`·`detectionEnabled=true`·`explicitKillSwitch=false`로 반환됐다.
+- Discord 알림 결과가 기존에는 워커 내부에서 소실되던 문제를 확인해 보강했다. 웹훅 원문은 노출하지 않고 전송 성공·미설정·실패 상태만 런타임에 기록한다.
+- 로컬 `NEXT_DIST_DIR=.next-local-final npm run build` 성공. 운영 API에서 5샘플을 충족한 `QUALIFIED` 후보 6개를 확인했으며, 배포 후 `lastAlertResult`로 전송 결과를 확인한다.
+- 추가 원인: 후보가 없는 tick이 `lastAlertResult`를 `r`no_qualified_items`로 덮어써 실제 알림 tick의 결과가 사라졌다. 알림이 발생한 tick에서만 전송 결과를 유지하도록 수정했다.
+
+### 개선 과제
+
+- 개선 과제 ID: CI-2026-09-22-003
+- 성과 판정: IMPROVED
+- 근거: 기존에는 최종 후보를 API에서만 확인할 수 있었으나 사용자 화면에서 후보·정상적인 후보 없음·워커 오류를 구분해 확인할 수 있다.
+
 ### 다음 개선
 
 - 후보 발생 시 사용자 알림 설정과 후보별 이력 조회를 추가 검토한다.
@@ -5562,9 +6867,233 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - StockTitan 신규 발송의 기존 형식은 건드리지 않았다.
 
 ### 검증
-- 대상 4파일 128개 통과, 사람 검수 fixture 미수집으로 semantic 사례 2개 skip. `git diff --check` 통과.
-- `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사 통과.
-- 운영 read-only 상태(2026-10-25 15:56Z): pending GNW 6, SEC 0, StockTitan 2,303. monthly quota skip GNW 6, SEC 238, StockTitan 11,395. 한도 복구 시 실제 quota 재처리는 아직 관찰되지 않았다. 코드 배포 전이다.
+- `lib/market-rss-discord-message.test.ts`에서 기존 메시지 정리, 제목·시간 유지, 임베드 억제 플래그를 검증한다.
+- 전체 빌드·테스트·실행 검증은 `npm.cmd run deploy:verify`로 수행한다.
+
+### 근본 원인 및 재발 방지
+- RSS 신규 전송은 공통 market RSS 파이프라인에서 만들지만, 실패 알림은 큐 payload를 별도 재시도기가 직접 보내므로 전송 경로 하나만 수정하면 과거 형식이 다시 노출될 수 있었다. 신규 발송과 재시도 양쪽에 동일한 필드 제한을 두고 회귀 테스트를 추가했다.
+- 남은 위험: 링크는 제목 텍스트에 연결된 Markdown으로 유지되므로 Discord 클라이언트 렌더링 결과가 텍스트 기반임을 확인해야 한다. 미리보기 임베드는 Discord 공식 `SUPPRESS_EMBEDS` 플래그로 차단한다.
+
+### 커밋·푸시·배포
+- 상태: 검증 및 배포 진행 중.
+
+## [2026-10-20] 미사용 기능 후보 조사 및 운영 상태 재확인
+
+- **목적/범위**: 저장소 내 미사용 후보를 정적 참조·라우트·cron·DB 설정 및 사용 흔적과 대조하고, 배포 후 상태와 남아 있던 KIS fundamentals 재시도 상태를 확인했다.
+- **조사 대상**: `docs/operations/unused-feature-candidates-20261020.md`, `scripts/oci-cron.sh`, feature registry/automation-run 기록, 로컬 코드 참조. 후보 파일은 삭제하지 않았다.
+- **운영 검증**: 로컬 HEAD와 `origin/oci`가 `e74613d885e4eb822f8823330191cccef6ca020c`로 일치. Actions run `39412187639` 배포 성공, `GET https://stockman.r-e.kr/api/health`에서 2026-10-20 11:12:17Z `ok`. 인증된 read-only automation debug GET에서 fundamentals 11:15:00Z 실행은 PARTIAL로 확인: 누적 6,559 성공·145 실패, 최신 시도 111건 중 저장 1·실패 110·미시도 0. 따라서 해당 자동화는 미사용이 아니며 KIS 가격/시가총액 응답 실패가 남아 있다.
+- **변경 파일**: 조사 보고서와 `DEVELOPMENT_LOG.md`만 기록 추가. 제품 코드·운영 데이터 수정 없음.
+- **검증**: 원격/로컬 SHA 대조, 배포 run 결과, 운영 health, 인증된 read-only automation 기록 확인. `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,431 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).
+- **커밋·푸시·배포**: 이전 커밋 배포는 완료. 이번 기록 변경분은 검증 완료; commit/push/deploy는 아래 절차로 수행.
+
+## [2026-10-20] 미사용 후보와 OCI cron 누락 경로 최신 재검증
+
+- **목적/범위**: 최신 HEAD에서 runtime reference 후보 및 OCI cron 호출 커버리지를 다시 검사하고, `us-daily-indicators` production automation 기록을 read-only로 확인했다.
+- **핵심 결과**: 실제 cron route 24개 중 `us-daily-indicators`만 OCI 공용/fundamentals/RSS 스크립트에서 직접 호출되지 않는다. feature registry는 `OCI_CRON`으로 표시하지만 코드 기본 설정은 disabled다. production API의 누적 실행은 2,696회(성공 268, 실패 1, skipped 2,427), 마지막은 2026-08-19 `SKIPPED / outside_schedule`. 과거 사용 이력이 있으므로 미사용 삭제 후보가 아니라 비활성/예약 누락 후보로 분류했다.
+- **데이터 출처 주의**: `.env.local` 연결 DB의 최근 90일 실행 0건 및 설정 `enabled` key 부재는 production debug API의 8월 기록과 다르다. 서로 다른 대상일 수 있으므로 현재 production 설정의 증거로 사용하지 않았다.
+- **변경 파일**: `docs/operations/unused-feature-candidates-20261020.md`, `DEVELOPMENT_LOG.md`. 제품 코드/DB/사용자 브라우저 데이터를 변경하지 않았다.
+- **검증**: 최신 HEAD와 remote SHA 일치 확인, route files 24개와 세 OCI scheduler script 비교, 주요 미사용 후보 import/키 사용 검색, production API read-only 및 `.env.local` DB `BEGIN READ ONLY` 조회. 후보 파일은 삭제하지 않았다. 전체 `npm.cmd run deploy:verify`도 통과했다.
+- **검증**: `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone + Chrome desktop/mobile + API smoke, 294 test files (1,431 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 API routes), OCI cron (22 shared endpoints + isolated fundamentals timer).
+
+### 최신 조사 기록의 통합 및 배포 완료
+- 문서 조사 변경 commit `05c9bb72`에 원격 동시 기록 `c884b255`를 merge해 통합 HEAD `83c25950b4904029e87d023c84ef0a29d99d00bc`를 만들었다. 전체 `npm.cmd run deploy:verify` 통과 후 `origin/oci`에 push했다.
+- GitHub Actions Deploy OCI run `39417086164` 전체 성공(Verify deployment, Package, Upload, Activate release 포함). 운영 `GET https://stockman.r-e.kr/api/health`는 2026-10-20 11:52:13Z `status=ok` (404ms)를 반환했다.
+- 제품 코드와 운영 데이터는 변경하지 않았다. 보고서/DEVELOPMENT_LOG만 갱신했다.
+
+## [2026-10-21] 확인된 미사용 보조 기능 코드 제거
+
+- **목적/범위**: 사용자가 미사용이 확실하면 삭제하라고 요청해, 과거 미사용 후보 5개의 현재 추적 소스 참조·관련 UI 이력·전용 테스트를 재점검하고 확정된 비연결 모듈만 제거했다.
+- **근거**: 커밋 `680f2a2d`에서 `keyword-manager`, `stock-alert-manager`, `market-sentiment`, `sector-map` UI가 제거됐다. 현재 tracked runtime `app/components/lib/scripts`에서 5개 라이브러리로 들어오는 import/call은 없고, 전용 테스트만 각 모듈을 import했다. Discord embed flag의 active consumer는 `market-rss-notification-message.ts`다.
+- **변경 파일**: 삭제 `lib/keywords.ts`, `lib/keywords.test.ts`, `lib/stock-alerts.ts`, `lib/sentiment.ts`, `lib/sentiment.test.ts`, `lib/sectors.ts`, `lib/sectors.test.ts`, `lib/market-rss-discord-message.ts`, `lib/market-rss-discord-message.test.ts`; 조사 기록 `docs/operations/unused-feature-candidates-20261020.md`.
+- **보존/남은 위험**: `us-daily-indicators`는 과거 운영 run 2,696회, 관리자 경로 및 실행 route가 남아 있어 삭제하지 않았다. 현재 OCI scheduler 연결 누락과 기본 disabled 상태는 별도 유지보수 항목이다. 옛 localStorage 데이터는 브라우저에 남아 있을 수 있으나 강제 제거하지 않았다. 외부 소비자 및 production effective setting은 확인 불가다.
+- **검증**: `npm.cmd run deploy:verify` 통과. 의존성 audit 0 vulnerabilities, production build, standalone runtime 및 Chrome desktop/mobile browser·API smoke 통과, 290 test files (1,411 passed, 2 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth (175 routes), OCI cron (22 shared endpoints + isolated fundamentals timer) 통과.
+- **커밋·푸시·배포**: `45ad28bd` (확인된 미사용 보조 모듈 제거)를 `origin/oci`에 push했다. Deploy OCI run `39452342209` 성공을 공개 Actions 페이지에서 확인했고, 운영 health는 2026-10-20 15:59:21Z `ok` (319ms)였다.
+## [2026-10-21] 미국 보통주 $1 이하 SEC 전용 리스트 설계
+
+- **목적/범위**: 현재가 $1 이하 미국 보통주 조사 요구에 대해 SEC 공시만을 출처로 하는 문서 관리 설계안을 작성했다. 사용자가 설계 단계라고 명시했으므로 종목별 실데이터 수집이나 제품 기능 구현은 하지 않았다.
+- **확인 대상**: 기존 `docs/operations/us-smallcap-sec-shares.md`, `docs/operations/us-smallcap-shares-public-api.md` 및 SEC 원천·기준일 검증 문서.
+- **결과**: SEC 공시는 실시간 시세 및 최근 30일 일별 고가/저가 데이터 공급원이 아니므로 SEC-only 규칙 아래서 현재가 필터를 확정할 수 없음을 데이터 계약에 반영했다. 발행주수·유효 lock-up·float 정의, 표의 필드, 공시 근거 감사, 보류/미확인 규칙 및 급등주 단타용 SEC 공시 분석 추가항목을 설계했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: 기존 프로젝트 SEC 주식수 정책 문서와 새 설계의 기준일·클래스 합산·미확인 처리 원칙을 대조했다. 테스트/빌드 실행 없음(문서 작업). 제품 코드와 DB 변경 없음.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 미국 보통주 $1 이하 SEC 전용 설계 범위 감사
+
+- **목적/범위**: 기존 설계 문서가 사용자 요구의 실제 목록 부분과 SEC-only 제약을 명확히 표현하는지 현재 프로젝트 자료와 대조했다.
+- **확인 대상**: `docs/operations/us-common-stocks-under-1-sec-design.md`, SEC ticker/company mapping 기반 검토 자료, SEC 발행주식수 운영 문서 및 기존 가격 스냅샷 보고서의 출처 경계.
+- **결과**: SEC ticker 매핑만으로 현재 활성 거래소 보통주 전수 universe를 증명할 수 없고, SEC는 실시간 가격/최근 30일 OHLC 공급원이 아니라는 제한을 문서에 명시했다. 따라서 SEC-only 기준 가격 필터를 검증한 개별 종목은 현재 0개이며, 이를 시장에 해당 종목이 없다는 뜻과 구분했다. 가격 조건이 확인되지 않은 티커를 통과 목록처럼 제시하지 않는 데이터 상태 표를 추가했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-1-sec-design.md`, `DEVELOPMENT_LOG.md`.
+- **검증**: 프로젝트 내 기존 SEC 자료 및 SEC-only 주식수 정책과 설계 규칙을 대조했다. 실제 발행사별 락업 계약 검토와 종목별 가격 검증은 수행하지 않았다. 테스트/빌드 없음(문서 설계 작업); 제품 코드·DB 변경 없음.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 관리자 수동 API 테스트의 누락 route 추가 탐지
+
+- **목적/범위**: 현재 checkout `0e2bb99c`의 관리자 API 테스트 목록과 실제 API route 파일을 대조해 추가 미사용/고아 후보를 조사했다.
+- **확인 결과**: `components/admin-api-tests.tsx`의 미국 뉴스 레이더·티커 뉴스·레이더 처리 이력 3개 항목이 각각 `/api/admin/us-news-radar-test`, `/api/admin/us-news-ticker-test`, `/api/admin/us-news-radar-events`를 호출하지만 현재 해당 route 파일은 없다. UI는 지정 endpoint를 직접 fetch하므로 이 세 관리 테스트는 현재 코드 기준 404가 예상된다. 같은 저장소의 `/api/stock/us/news-radar`, `/api/stock/us/news`는 실제 뉴스 기능 route이나 권한/응답 계약이 다르다고 확인되지 않아 자동 대체 대상으로 취급하지 않았다.
+- **분류**: 기능 미사용 확정이 아니라 관리자 테스트 목록과 backend route 간 stale reference/연결 결함 후보다. 별도 통합 `/api/admin/daily-ma9-test?market=...`와 과거 경로를 비교해 유사 불일치가 있으나 과거 KR/US 경로 파일이 현재도 존재하므로 이번 미사용 후보에 넣지 않았다.
+- **변경 파일**: `docs/operations/unused-feature-candidates-20261020.md`, `DEVELOPMENT_LOG.md`. 코드, DB, 운영 배포 변경 없음.
+- **검증**: tracked source에서 API route 목록과 관리자 `TESTS` endpoint를 대조하고 세 경로의 파일 부재 및 fetch 사용을 확인했다. 조사 범위가 정적 read-only 연결 검사이므로 빌드·테스트·실행은 하지 않았다.
+- **남은 위험/다음 개선**: UI를 통한 실제 404 호출은 실행하지 않았다. 해당 항목은 관리자 수동 기능이므로 실사용 여부 및 외부 배포 차이는 저장소만으로 검증되지 않았다. route 복구 또는 테스트 항목 비활성/제거는 사용자 요구 범위를 넘으므로 수행하지 않았다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 삭제된 미국 뉴스 관리자 API 테스트의 잔존 참조 정리
+
+- **목적/범위**: 추가 미사용 코드 조사에서 확인한 관리자 API 테스트 UI의 제거된 endpoint 참조를 정리했다.
+- **근본 원인/증거**: commit `764c7615`에서 `/api/admin/us-news-radar-test`, `/api/admin/us-news-ticker-test`, `/api/admin/us-news-radar-events` route가 삭제됐지만 `components/admin-api-tests.tsx`에 세 테스트 항목과 레이더 결과 렌더 분기가 남았다. 테스트 실행 시 stale endpoint를 직접 호출하는 상태였다.
+- **변경 파일**: `components/admin-api-tests.tsx`에서 세 오래된 항목과 전용 렌더 분기를 제거했다. `components/admin-api-tests.test.tsx`에 제거된 기능 항목이 UI에 다시 노출되지 않는 회귀 검사를 추가했다. `docs/operations/unused-feature-candidates-20261020.md` 및 본 로그에 조사·정리 근거를 기록했다.
+- **검증**: 관리자 API 테스트 컴포넌트 Vitest 실행, typecheck, production build를 수행한다. 제품 실행 smoke는 빌드 후 확인한다.
+- **남은 위험/다음 개선**: `/api/stock/us/news-radar` 및 `/api/stock/us/news`는 별도의 실제 뉴스 기능 route이며 보존했다. 과거 관리자 UI 항목은 해당 사용자 확인 기능이 route 삭제와 함께 의도적으로 종료됐다는 commit 이력에 근거해 제거했다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 미사용 테스트 코드 재탐색
+
+- **목적/범위**: Vitest 대상 테스트 중 제품 코드나 검증 대상과의 연결이 끊긴 테스트가 남아 있는지 조사하고, 안전성이 확인되는 항목만 제거한다.
+- **확인 대상**: `vitest.config.ts` 기준 테스트 파일 290개, 테스트 파일과 같은 이름의 제품 파일이 없는 항목, 기존 `docs/operations/unused-feature-candidates-20261020.md`의 고아 모듈 조사 결과.
+- **조사 결과**: 동일 이름 제품 파일이 없는 테스트 9개를 개별 확인했다. 이들은 경로 테스트(문의 상세/댓글 API), 여러 모듈을 묶는 SEC Company Facts 및 SEC AI pipeline 테스트, 공유 API 오류 경계 감사, 리뷰 fixture 데이터 검증, DB 통합 테스트, health query resilience/concurrency 테스트이며 각각 현재 라우트·모듈·fixture·DB 계약을 검사한다. 이름이 일치하지 않는다는 이유만으로 삭제하지 않았다. `components/admin-api-tests.test.tsx`도 `/admin/api-tests`의 실제 관리자 화면을 검증한다. 기존 조사에서 고아로 확인된 `keywords`, `sentiment`, `sectors`, `market-rss-discord-message` 전용 테스트는 현재 트리에 이미 없고, `stock-alerts`에는 애초 별도 테스트가 없었다.
+- **변경 파일**: `DEVELOPMENT_LOG.md` 작업 기록 추가. 이번 재조사에서 테스트 코드 삭제 없음.
+- **검증**: Vitest 설정의 현재 테스트 파일 수(290)와 관련 소스·라우트·fixture·호출 경로를 정적 검색했다. 테스트/빌드/실행은 수행하지 않았다. 작업 트리에 이미 존재한 다른 수정은 보존했다.
+- **남은 위험/다음 개선**: 정적 저장소 참조로는 외부에서 직접 호출하는 경로를 완전히 배제할 수 없다. 추가 삭제는 구체적인 고아 증거가 확인될 때만 진행한다.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+- **실제 검증 결과 보충**: 관리자 API 테스트 컴포넌트 테스트 1파일 5개 통과, `npx.cmd tsc --noEmit --incremental false` 통과, `npm.cmd run build` 통과. 로컬 `next start`에서 `/admin/api-tests` HTTP 200 및 제거된 테스트 라벨 부재, 제거된 `/api/admin/us-news-radar-test` HTTP 404 확인. `/api/health`는 로컬 DB 부재로 `degraded`였으며 기능과 무관한 환경 상태다. Next build가 `tsconfig.json`을 자동 수정했으나 빌드 전 사용자 변경인 `.next-deploy-verify/types` 한 줄만 보존해 자동 변경을 되돌렸다. `git diff --check` 통과. 커밋·푸시·배포는 하지 않았다.
+
+
+
+## [2026-10-21] 미국 보통주 시총 $100M 미만·RVOL 2 이상 후보
+
+- **목적/범위**: 최신 완료 미국 거래일(2026-10-20) 기준으로 시총 $100M 미만 미국 보통주 중 20일 평균 대비 RVOL 2 이상을 읽기 전용으로 선별하고 결과 문서화.
+- **확인/결과**: 프로젝트 정책·관련 저장 스크립트 확인 후 공개 스크리너 및 종목별 종가 페이지, SEC 원문을 대조했다. HOST(30.71×, $79.8M), WORX(9.36×, $328.6K), SPHL(5.88×, $5.5M)을 문서에 수록했다. HUIZ는 ADS라 제외했고, SAFX/HCAI는 최신 데이터 시점 미충족으로 제외했다.
+- **검증 및 한계**: SEC에서 HOST Class A common stock, WORX common stock, SPHL Class A ordinary shares를 확인했다. 공개 unusual-volume 스크리너 기본 기준이 RVOL 3 이상이므로 2.0~2.99 구간을 전수 검색하지 못해 완전한 전체 목록으로 보장할 수 없다. 로컬 `.env.local` PostgreSQL 주소 `localhost:5432` 연결 거부로 프로젝트 DB 대조는 불가했다. 상세 한계/출처는 `docs/operations/us-common-stocks-under-100m-rvol2-20261020.md`에 기록했다.
+- **변경 파일**: `docs/operations/us-common-stocks-under-100m-rvol2-20261020.md`, `DEVELOPMENT_LOG.md`.
+- **제품 코드/DB**: 변경 없음. 외부 페이지 GET만 수행.
+- **빌드·테스트·실행**: 조사/보고서 작업으로 미실행.
+- **커밋·푸시·배포**: 수행하지 않음.
+
+## [2026-10-21] 운영 번역 provider 설정 상태 재검증
+
+- **목적/범위**: Azure Translator F0 우선·Google Cloud Translation fallback 구현의 운영 활성화 여부를 확인하기 위해 production 관리자 디버그 API의 `environment` 검사만 인증된 GET으로 조회했다. 자격증명 값은 응답·로그에 출력하지 않았다.
+- **결과**: `/api/admin/debug-suite?checks=environment`에서 `googleTranslationApiKeyConfigured=true`, `azureTranslatorF0Configured=false`, `azureTranslatorRegionConfigured=false`를 확인했다. 따라서 현재 운영은 Google provider를 사용하며 Azure 우선 순서는 Azure F0 설정이 등록될 때까지 실제 활성화되지 않는다.
+- **근본 원인/필요 조치**: 코드 배포만으로 provider credentials가 생기지 않는다. 운영 secret store에 `AZURE_TRANSLATOR_API_KEY`, `AZURE_TRANSLATOR_ENDPOINT`, `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0`를 설정하고 해당 Azure 리소스가 실제 F0인지 확인해야 한다. 리소스가 region 헤더를 요구하는 경우에만 `AZURE_TRANSLATOR_REGION`도 설정한다. 설정 후 environment debug와 실제 번역 요청으로 Azure primary 및 Google fallback을 검증해야 한다.
+- **변경/데이터 영향**: 운영 디버그 API read-only 조회만 수행. 코드, 설정, DB, 번역 데이터 변경 없음.
+- **검증**: 운영 디버그 응답 `ok=true`; Google/Azure 구성 여부 세 필드만 확인. Production health는 `status=ok`. Azure 실호출은 설정이 없어 미수행이다.
+- **추가 환경 확인**: 로컬 `.env.local`에서도 Azure key, endpoint, region, F0 확인값이 모두 누락되어 있음을 값 비노출 방식으로 확인했다. OCI 운영 설정 위치와 재시작 절차는 `deploy/oci/README.md`의 환경 설정 안내를 기준으로 하며, 이 저장소의 배포 workflow에는 Azure secret 주입 단계가 없다.
+- **커밋·푸시·배포**: 이번 점검은 제품 변경이나 새 배포를 만들지 않았다. 번역 provider 구현은 commit `97fefb7f`에 이미 반영·배포되어 있다.
+- **2026-10-22 운영 오류 원인 수정**: 신규 단일 항목 진단에서 공급자 요청 전 `quota_reservation` 단계의 PostgreSQL 오류 `inconsistent types deduced for parameter $3`를 확인했다. 월별 원장 upsert에서 positional parameter 타입이 추론 문맥마다 달라지던 구문을 `text`/`bigint` 명시 CTE와 `EXCLUDED.reserved_characters` 기반 upsert로 변경했다. DB 스키마 변경은 없다. `translation-cache.test.ts`에 Azure quota 예약 성공 회귀 테스트를 추가하고, 배포 후 동일한 단일 항목 PREVIEW에서 Azure 호출 및 번역 성공 여부를 검증한다. 재발 감지는 타입 명시 SQL 회귀 테스트와 preview 진단의 `quota_reservation` 오류 단계로 수행한다.
+- **2026-10-22 Azure provider 오류 진단 후속**: quota 예약 SQL 수정 후 운영에서 Azure 요청 1회가 실제 발생했으나 Azure 실패가 Google fallback의 월간 상한 응답에 가려졌다. composite client가 Azure 실패 원인을 내부 `TranslationResult` 필드로 전달하고, 관리자 preview 진단 callback에서만 마스킹해 노출하도록 개선했다. 번역 항목 객체·DB에는 이 오류 원인을 추가하지 않는다. `API key` 공백 표기를 포함한 민감값 마스킹과 Azure 실패+Google quota 차단 경로를 회귀 테스트로 고정한다. 배포 뒤 단일 운영 preview로 Azure 응답 코드/원인을 확인하고, 그 결과에 따라 endpoint·region·credential 중 해당 원인만 수정한다.
+## [2026-10-24] 국내 보통주 KIS 표준산업분류 코드 운영 DB 적재 API
+
+### 목적·범위
+- 운영 DB에 직접 접속하지 않고, 운영 서버 관리자 API가 KIS Open API 주식기본조회(CTPF1002R)로 활성 국내 COMMON_STOCK 종목의 표준산업분류 코드와 명칭을 조회·저장하도록 한다.
+
+### 변경
+- `V160__kr_common_stock_standard_industry.sql`에 보통주 및 특수상품 유니버스 표준산업분류 코드/명칭 컬럼을 추가했다.
+- `/api/admin/domestic-industry-sync`를 추가했다. 관리자 전용 POST는 페이지별 KIS 응답 검증 후 트랜잭션 저장하고, GET은 관리자 세션 또는 읽기 전용 API 키로 집계 상태만 반환한다.
+- 운영 유니버스 관리 화면에 10종목 단위 진행·재시도 가능한 갱신 버튼을 추가했다. 산업분류 확인이 불가능한 종목은 임의 추정하지 않고 중단한다.
+- 데이터 사전과 스크립트 안내를 갱신했다.
+
+### 검증
+- 삼성전자(005930) KIS 실 API 단건 확인: `std_idst_clsf_cd=032604`, `통신 및 방송 장비 제조업`.
+- `npx tsc --noEmit --pretty false`: 통과.
+- 대상 Vitest 2개 파일 9건: 통과.
+- `npm run docs:check`: 통과 (V160 포함 160개 migration).
+- `npm run build`: 통과. 클린 분리 작업 복사본은 Windows junction 추적 단계에서 EPERM 경고가 있었으나 빌드 종료 코드는 0; 본 작업 워크스페이스에서도 빌드 통과.
+- `npm run start -- -p 3101`: 로컬 `/health-check` 200, 미인증 산업분류 API는 의도대로 401.
+- 운영 DB 직접 접속/조회·쓰기, 운영 배포와 전체 종목 데이터 반영은 아직 수행하지 않았다.
+
+### 커밋·푸시·배포
+- 아직 미실행. 운영 DB 작업은 운영 API 배포와 관리자 인증 후 진행한다.
+
+### 2026-10-24 — 국내 유니버스 미적재 상태 대응
+- 운영 상태 API로 활성 국내 COMMON_STOCK 건수가 0임을 확인했다. 직접 DB 연결은 하지 않았다. 기존 전역 마스터 업로더는 미국 3개 거래소까지 함께 갱신하므로 이번 국내 전용 목표에서 사용하지 않는다.
+- 국내 한정 관리자 API `/api/admin/domestic-universe-import`와 화면을 추가했다. 공식 KIS KOSPI/KOSDAQ 마스터 2개만 검증·적재하고 미국 테이블은 건드리지 않으며, 누락 기존 행의 비활성화도 하지 않는다. 기존 KIS 상품 분류 규칙을 재사용하고 두 시장 각 100행 이상이어야 처리한다.
+- KIS 공식 배포 호스트에서 2026-10-23 갱신 마스터 2개를 확보했다. 현재 파서 기준 총 KOSPI 2,583행, KOSDAQ 1,825행이며, 활성 조건 분류 결과는 각각 760, 1,598 보통주다. 이는 파서 산출이며 운영 DB 적재 전 수치다.
+- 16개 관련 테스트, TypeScript, 문서/migration 검사, diff 검사 통과. 운영 반영은 국내 한정 API 배포와 관리자 세션 확보 후 진행한다.
+## [2026-10-24] 미국 보통주 KIS 업종코드 운영 적재 재검증 및 Flyway 기준 정렬
+
+- **목적/범위**: 앞선 미국 KIS 업종코드 동기화 작업의 Flyway V160 불일치를 해결하고, 최신 KIS 원본으로 운영 DB 저장 후 read-after-write 비교를 재검증한다.
+- **원인/대응**: 동기화 코드를 포함한 작업 브랜치가 운영 `oci`에 이미 적용된 `V160__kr_common_stock_standard_industry.sql`보다 앞선 커밋에서 분기되어 배포 활성화 단계에서 migration 160 미해결 오류가 발생했다. DB에 `flyway repair`는 실행하지 않았다. `origin/oci`를 병합해 이력과 스키마 정의를 정렬했다.
+- **변경 대상**: `lib/us-industry-code-sync.ts`, `lib/us-industry-code-sync.test.ts`, `docs/architecture/us-industry-classification-data-design.md`, `DEVELOPMENT_LOG.md`. 운영 업로드 시 동기화 코드 및 후검증을 수행했다.
+- **인증 확인**: `.env.local`의 KIS `KIS_APPKEY`/`KIS_APPSECRET`로 공식 OAuth 토큰 발급 성공(토큰값 미출력·미저장, 만료시간 24시간). 같은 파일의 `ADMIN_DASHBOARD_PASSWORD`로 운영 로그인 HTTP 200.
+- **원본 대조**: KIS 공식 NAS/NYS/AMS 마스터(2026-10-23 데이터, 2026-10-24 19:01 KST 다운로드)를 프로젝트와 동일한 필드/상품 제외 기준으로 전수 파싱. 5,358 KIS 보통주 후보 중 실제 3자리 비영 업종코드 2,634, 공식 `000` 2,724.
+- **로컬 DB read-only 비교**: `BEGIN READ ONLY` + `statement_timeout`으로 활성 COMMON_STOCK 5,444행 확인. 유효 `industry_code`는 0행, 미분류 5,444행. KIS와 5,310행 매칭했으며 매칭값 5,310건 모두 DB 공란으로 원본과 불일치(2,634건은 KIS에 비영 코드가 있으나 로컬 DB 공란). KIS 후보 중 DB 활성 universe 누락 48건(AMS12/NAS32/NYS4), 반대로 DB 활성 종목 중 최신 KIS 후보와 불일치 134건(AMS7/NAS46/NYS81). 이번 검증에서는 DB를 변경하지 않았다.
+- **운영 route 확인**: 로그인 후 현재 운영 `/api/admin/us-industry-codes`가 404 `text/html`이어서 최신 운영 DB 업종코드 및 저장 후 감사 결과는 확인할 수 없었다. 이전 작업의 운영 적재 수치는 역사적 결과로 구분하며 현 상태의 성공으로 간주하지 않는다.
+- **검증**: `origin/oci` 통합 전 `npm.cmd run deploy:verify` 통과: 의존성 취약점 0, build 통과(standalone node_modules junction symlink EPERM 경고만 발생), `/charts` 200 및 desktop/mobile hydration, API smoke 통과; Vitest 296 files passed/1 skipped, 1,435 tests passed/3 skipped; typecheck, docs, verify-scope, KIS boundary, bearer-auth, cron checks 통과. 이후 최신 RSS 기록과 ID가 중복임을 추가 통합 검증에서 발견했고, KIS ID를 `CI-2026-10-24-007`로 변경했다. 앞선 `/charts` 30초 timeout은 재현되지 않았다.
+- **남은 위험/후속**: 로컬 DB 업종코드 미적재와 KIS-universe 48/134개 불일치가 남아 있다. 운영 진단 route가 현재 404이므로 운영 최신값도 검증 불가. 다음 실행은 활성 보통주 분모 차이를 종목별로 분류하고, 명시 승인 후 로컬/운영 적재 및 read-after-write 감사가 가능하도록 최신 배포 경로를 먼저 복구해야 한다. `000` 값은 공식 미분류로 유지하고 임의 보정하지 않는다.
+- **커밋·푸시·배포**: 통합 검증 및 KIS 원본 대조가 통과해 로컬 merge를 마무리한 뒤 원격 브랜치 push와 OCI 배포 workflow를 진행한다. 운영 진단 route가 현재 404인 원인을 배포 후 다시 확인하고, KIS 원본 재적재 및 DB read-after-write 검증 전까지 목표 완료로 보고하지 않는다.
+
+## [2026-10-24] KIS 미국 업종 운영 반영 확인 및 전수 차이 진단 확장
+
+- **목적/범위**: `.env.local` 인증으로 최신 KIS NAS/NYS/AMS 마스터의 미국 보통주 산업코드를 운영 DB에 반영하고, 모든 후보의 코드 동일성 및 양방향 universe 누락을 확인한다.
+- **인증/원본**: `.env.local`의 KIS 앱키/시크릿으로 KIS OAuth 발급 성공(토큰 비노출). 공식 KIS 마스터(데이터 기준 2026-10-23)를 사용했다. `.env.local`의 관리자 비밀번호로 운영 로그인 HTTP 200, 운영 진단 GET HTTP 200을 확인했다.
+- **운영 적재**: 최초 PowerShell multipart 요청은 HTTP 500으로 실패했으나 DB 저장 성공으로 오인하지 않았다. 표준 `curl -F` multipart로 재호출하여 2026-10-24T12:11:28.704Z에 API `ok=true`를 확인했다. KIS 보통주 후보 NAS 3,240/NYS 1,864/AMS 254 중 활성 운영 DB에 저장된 행은 NAS 3,176/NYS 1,855/AMS 237이다. 운영 DB read-after-write 검증은 매칭 5,268, 산업코드 불일치 0, 미매칭 90(NAS64/NYS9/AMS17)이다. 원본 `000`은 공식 미분류로 저장되며 코드 추정/보완은 하지 않았다.
+- **현재 운영 집계**: 활성 DB COMMON_STOCK는 NAS 3,949, NYS 2,480, AMS 275이다. 이 중 비영 코드로 분류된 수는 NAS 1,354/NYS 1,186/AMS 94이며 공식 `000` 또는 결측은 NAS 2,595/NYS 1,294/AMS 181이다. 동기화된 KIS 후보의 비영 코드 수와 일치한다.
+- **발견된 진단 한계와 변경**: 운영 API는 이전에 미매칭 티커 10개만 노출해 전체 차이를 끝까지 설명하기 어려웠다. 동기화 검증 응답을 전체 미매칭 코드 및 KIS 원본에는 없지만 DB에서 활성 보통주인 코드/건수까지 반환하도록 확장하고 단위 테스트를 갱신했다. 이는 진단만 수행하며 미등록 종목을 자동 편입하거나 DB 단독 종목을 삭제·비활성화하지 않는다.
+- **검증 및 배포 상태**: 진단 보강 후 최초 전체 게이트에서 테스트 fixture의 query 분기 오류 1건을 발견·수정했고, 해당 테스트 단독 통과 후 `npm.cmd run deploy:verify`가 최종 통과했다(296개 파일 통과/1 skip, 1,435 tests 통과/3 skip, typecheck·docs·감사·빌드·standalone runtime/browser smoke 모두 통과). Windows standalone 빌드의 기존 node_modules junction symlink EPERM 경고는 있었지만 산출물 실행과 모든 smoke가 성공했다. 신규 진단 필드의 OCI 배포 및 최종 차이 원인 확인은 아직 남았다.
+- **재발 방지/후속**: 업로드 API는 동기화 성공 응답과 read-after-write 검증을 함께 확인하고, 500·비JSON·연결 오류는 쓰기 성공으로 판단하지 않는다. 진단 응답의 `unmatchedCodes`와 `activeDatabaseOnlyCodes`를 사용해 각 티커가 비활성/타입 불일치/부재 중 무엇인지 분류한다. `000`을 임의 분류하지 않는다.
+- **커밋·푸시·배포**: 진단 변경 커밋 `cc0803b7`은 작업 브랜치로 push했다. 첫 workflow run `40093935845`는 새 `oci` 배포 run `40094159820`과 겹쳐 Activate release에서 취소됐다. 최신 `origin/oci`의 RSS cron 변경을 통합 중이며, 통합 트리 검증 후 재배포한다. 아직 신규 진단 필드의 OCI 배포 및 최종 차이 원인 확인은 미완료다.
+
+## [2026-10-24] KIS 진단 변경과 최신 OCI RSS 커밋 통합
+
+- 최신 `origin/oci`의 RSS cron 변경 4개 파일을 보존해 KIS 작업 브랜치에 병합했다. `DEVELOPMENT_LOG.md`의 양쪽 작업 기록을 모두 유지했다.
+- 통합 후 전체 테스트는 296 files passed/1 skipped, 1,436 passed/3 skipped였다. `docs:check`에서 KIS/RSS 개선 ID 중복을 두 차례 발견하여 KIS 항목을 현재 `CI-2026-10-24-007`로 고유화했다.
+- 수정된 통합 트리에서 `npm.cmd run deploy:verify`를 재실행해 통과했다: 빌드, standalone `/charts`·desktop/mobile Chrome 및 API smoke, 296 test files passed/1 skipped(1,436 passed/3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth(179 routes), cron check.
+- 경쟁하던 OCI run #1108 (`6e3e0ac5`)는 success로 완료됐다. 진단 코드의 통합 커밋은 그 뒤 별도로 푸시·배포해야 하며, 이를 통해 동시 실행 취소를 방지한다.
+
+## [2026-10-24] 최신 KIS 미국 업종 전수 적재·운영 재검증 결과
+
+- `.env.local`의 KIS OAuth 자격증명 및 관리자 로그인 비밀번호를 사용해 인증했다. 값과 토큰은 출력하지 않았다.
+- KIS 공식 마스터(데이터 기준 2026-10-23) NAS/NYS/AMS 12,891행에서 common-filter 후보 5,358건을 생성했다. 거래소별 후보 NAS 3,240/NYS 1,864/AMS 254, 비영 업종코드 2,634건, 원본 `000` 2,724건이다.
+- 최신 운영 동기화 route는 최초 PowerShell multipart 호출 500 이후 표준 `curl -F` 요청에서 정상 처리됐다. 2026-10-24T13:05:17Z 마지막 응답은 `ok=true`이며 5,268건 저장, read-after-write `mismatch=0`, 미매칭 90건(NAS64/NYS9/AMS17)이다.
+- 별도 인증 GET에서 활성 DB COMMON_STOCK 총 6,704행(NAS3,949/NYS2,480/AMS275), 유효 분류 코드 2,634행, `000` 또는 결측 4,070행을 확인했다. KIS 후보와 매칭된 5,268행에서는 분류 2,634/공식 `000` 2,634로 원본과 일치한다.
+- 반대 방향으로 최신 KIS 후보에 없는 활성 DB COMMON_STOCK가 1,436행(NAS773/NYS625/AMS38)이다. 이 행들은 유형이 확인되기 전까지 KIS 산업코드를 임의로 부여하지 않았다. KIS 후보 90행 역시 현재 활성 COMMON_STOCK에 존재하지 않아 자동 편입하지 않았다.
+- 전체 차이 목록을 조회 가능하게 만든 진단 코드/최신 OCI RSS 변경 통합 커밋 `77afbacc`를 push했다. run #1111 (`40096039714`)은 success로 완료됐다. 바로 전 run #1109, #1107은 더 최신 `oci` push가 배포를 시작해 취소됐으며, 최신 `oci`를 통합한 뒤 #1111에서 정상 배포했다.
+- **완료 범위**: 운영과 매칭된 5,268개 KIS 공식 보통주의 산업코드 저장·동일성 검증 완료. **미완료**: universe 간 90+1,436건 차이의 종목별 등록/활성/상품 유형 조사. 보통주 전용 원칙상 이 불일치는 별도 종목 universe 정비 승인 없이 자동 변경하지 않는다.
+- **재발 방지**: 앞으로 성공은 HTTP 200만으로 판정하지 않고 API `ok`, 거래소별 matched/missing/mismatch, 독립 GET, 공식 `000` 보존을 모두 확인한다. 전체 universe 차이는 전체 코드 목록으로 진단하며, 미등록 편입·비활성화는 별도 작업으로 분리한다.
+
+## [2026-10-24] 국내 KIS 산업분류 동기화 시 영숫자 종목코드 지원
+
+### 목적 및 범위
+- 운영 종목 마스터를 KIS 공식 KOSPI·KOSDAQ 종목 마스터 파일로 준비하고, 운영 API를 통해 활성 국내 보통주의 KIS 표준산업분류 코드를 저장한다.
+- 운영 DB 직접 접속은 하지 않고 운영 API만 사용한다.
+
+### 확인 및 변경
+- 운영 API의 국내 전용 마스터 적재 결과: 원본 4,056건(KOSPI 2,583, KOSDAQ 1,825), 국내 보통주 2,358건, 특별상품 1,698건, 해외 유니버스 변경 없음.
+- 업종 동기화 최초 묶음은 `0001A0`에서 중단되어 DB 저장 전 롤백/미실행 상태임을 확인했다. 이 종목은 KIS 공식 마스터의 KOSDAQ 보통주이며, KRX 종목코드가 영숫자 6자리일 수 있다.
+- `app/api/admin/domestic-industry-sync/route.ts`의 종목 코드 검증을 영숫자 6자리로 확장하고, 산업분류 코드는 기존처럼 숫자 6자리 검증을 유지한다. `route.test.ts`에 `0001A0` 회귀 사례를 추가했다.
+- 영숫자 코드 허용 수정 배포 뒤에도 `0001A0` 요청이 유효성 오류로 반환되어, 실제 거부 조건을 좁히기 위해 코드 형식·KIS 성공·산업코드·분류명·표준코드 존재/일치 여부의 진단 boolean을 오류 응답에 추가한다. 실패 묶음은 저장되지 않았다.
+- 운영 진단에서 `tickerFormat=true`, `kisResponse=true`인데 `industryCode`, `industryName`, `standardCode`가 모두 false임을 확인했다. KIS 응답은 성공했으나 공통 응답 파서가 단일 객체 형태의 `output`을 `rows`로 옮기지 않는 경로가 원인으로 판단되어, 단일 `output` 객체를 한 행으로 정규화하고 KIS 기본조회 응답 회귀 테스트를 추가한다.
+- 파서 배포 후 첫 20종목은 저장됐지만 `003310`의 공식 KIS 응답은 성공(`rt_cd=0`)하고 표준산업분류 코드 `031009`를 포함한 반면 `std_idst_clsf_cd_name`은 빈 문자열이었다. 코드는 유효하므로 분류명 부재만으로 코드를 버리지 않도록 운영 API 검증을 수정하고, 미입력 명칭 수를 운영 상태 응답에서 별도로 제공해 코드 커버리지와 명칭 커버리지를 구분한다.
+
+### 검증 및 운영 상태
+- `be3ffc65`의 파서 수정을 포함한 운영 배포 `#1118` 성공 뒤 `0001A0` 첫 10개와 다음 10개를 운영 API로 저장했다. KIS 응답은 003310에서 코드만 제공하고 이름은 누락해 중단되어, 코드 저장은 계속하되 누락 이름 수를 노출하는 보완을 배포하고 나머지 대상을 이어서 처리한다.
+
+### 2026-10-25 운영 전체 반영 완료
+- 관리자 로그인 후 국내 전용 운영 유니버스 API로 KIS 주식기본조회(CTPF1002R)를 호출해 2,358개 활성 `COMMON_STOCK`의 표준산업분류 코드를 저장했다. 운영 DB에는 직접 접속하지 않았다.
+- KIS가 성공 응답과 유효한 6자리 표준산업분류 코드를 제공했지만 분류명을 비운 18개는 코드를 저장하고 이름은 빈 값으로 유지했다. 운영 상태 API는 `total=2358`, `completed=2358`, `missing=0`, `missing_name=18`을 반환했다.
+- 마지막 API 묶음에서 일시 HTTP 502가 발생했으나 재요청한 offset 2340(10개)과 offset 2350(8개)이 모두 HTTP 200으로 저장됐고, 완료 상태를 재조회해 확인했다.
+- 배포 `#1120` 성공 뒤 전체 처리를 완료했다. 로컬 deploy:verify는 빌드, runtime smoke, 1,444개 테스트, typecheck, docs 및 보안/cron 감사 통과. 임시 마스터 파일 및 운영 API 보조 스크립트는 완료 후 삭제했다.
+- **남은 데이터 한계**: 18개 종목의 KIS 응답에는 표준산업분류명이 없어 이름을 임의 추정하지 않았다. 코드는 모두 저장됐다.
+- 현재 운영 API 업종 현황은 2,358건 중 0건 완료, 2,358건 미완료다. 동기화는 아직 완료되지 않았다.
+- 커밋·푸시·배포는 수정 검증 완료 후 수행한다.
+
+### 재발 감지 및 남은 위험
+- 운영 API의 `missing` 집계가 0인지 마지막에 확인한다. 처리 중 KIS 오류가 발생하면 해당 묶음에서 멈추며, 부분 커밋 없이 실패 코드를 기록하고 원인을 확인한 뒤 재개한다.
+- KIS 공식 마스터에서 신규 영숫자 종목코드가 추가될 수 있으므로 6자리 종목코드 검증은 영문 대문자를 허용하되, 응답의 표준코드와 숫자 6자리 산업분류 코드는 계속 검증한다.
+## [2026-10-24] KIS 해외 업종코드 필드 폭 검증 수정
+
+### 목적/범위
+- KIS 공식 `mastcode.icod` 4자 필드 정의와 맞지 않던 3자리 고정 검증을 수정해 정상적인 최대 4자리 숫자 분류값을 미분류로 오판하지 않도록 한다. 공식 분류 원천은 KIS만 유지한다.
+
+### 반영
+- `lib/us-industry-code-sync.ts`에 `isValidKisUsIndustryCode()`를 추가해 동기화 후보와 coverage 집계를 1~4자리 숫자 및 all-zero sentinel 규칙으로 통일했다.
+- 운영 GET coverage SQL도 같은 규칙으로 변경했다. 4자리 값의 SQL payload round-trip과 `0000`·비숫자·초과길이 거부 회귀 테스트를 추가했다.
+- KIS 현재 원본 샘플에는 3자리 코드와 `000`만 관측됐다. 4자리 지원은 공식 헤더 폭에 기반한 방어 변경이며, 기존 운영 미매칭 90건/DB 전용 1,436건은 별도 조사 대상이다.
+
+### 검증
+- 수정 직후 대상 테스트 12개 통과.
+- `origin/oci` 최신 커밋 통합 후 `npm.cmd run deploy:verify` 최종 통과: 프로덕션 빌드, standalone 실행과 `/charts` desktop/mobile hydration/API smoke, 전체 Vitest, typecheck, docs/migrations, verify-scope·KIS 경계·Bearer auth·cron 검사를 완료했다. 병합 중 확인한 중복 개선 ID는 고유화한 뒤 docs 검사를 통과했다.
+- Windows 빌드에서 node_modules junction symlink `EPERM` 경고가 있었으나 산출물 실행 smoke는 성공했다.
+
 ### 다음 개선
 - 운영 DB 활성 보통주와 최신 KIS 공식 보통주 후보의 차이 90건/1,436건을 종목 유형·활성 상태 원천 필드로 대조한다.
 - KIS `icod=000` 미분류와 KIS 후보 파일에 없는 DB 행은 추정값으로 덮지 않고 공식 원천 필드로만 판정한다.
