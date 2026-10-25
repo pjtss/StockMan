@@ -14,18 +14,18 @@
 - RSS 제목 번역·저장 번역 검증·전송 게이트 대상 4개 파일 122개 테스트 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
-- 1차 전체 검증은 docs 계약 수정으로 중단됐고, 문구를 수정한 뒤 `npm.cmd run deploy:verify` 최종 통과: dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302개 파일(302 passed/1 skipped; 1,526 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검사 통과. 운영 코드는 현재 `13af42b1`이며, 이번 로컬 수정은 배포 전이다.
+- 1차 전체 검증은 docs 계약 수정으로 중단됐고, 문구를 수정한 뒤 `npm.cmd run deploy:verify` 최종 통과: dependency audit 0 취약점, Next.js production build 111개 정적 페이지, standalone `/charts` HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302개 파일(302 passed/1 skipped; 1,526 passed/3 skipped), typecheck, docs/migration, scope/KIS/bearer/OCI cron 검사 통과. 운영 read-only 사후 확인(2026-10-25 15:50Z): `/health-check` SHA `806064f46e215086566c46505fd8107699b98154`, `/api/health` `ok`; OCI workflow `40208437108` 성공. RSS 집계는 GlobeNewswire pending 6/quota skip 6, SEC pending 0/quota skip 238, StockTitan pending 2,302/quota skip 11,394이며 새 대기 기사도 `monthly_character_limit_reached`로 fallback 발송 없이 대기한다.
 
 ### 다음 개선
-- 전체 `npm.cmd run deploy:verify`를 통과한 뒤 RSS 전용 권한으로 배포하고 운영 SHA와 health를 확인한다. quota가 복구되면 세 출처의 신규 provider 제목을 표본 검수하고 backlog의 actual Discord 수신을 확인한다. 사람 검수 fixture에 세 출처의 원문·provider 제목·교정 번역을 추가하고 검수 명령을 배포 게이트에 연결해 의미 정확성 coverage를 계량한다.
+- 번역 quota가 다시 허용되면 관리자 RSS 검수 CSV를 출처별로 내려받아 원문 제목·provider 결과·원문 요약을 대조하고 승인 사례를 semantic fixture로 가져온다. fixture를 CI gate에 연결한 뒤 다시 전체 검증하고, pending/failed/uncertain이 0이며 Discord에서 세 출처별 수신을 확인할 때까지 운영 aggregate를 추적한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-26-002
 - 성과 판정: PARTIAL
-- 근거: 실 운영 임상 단계 표기 문제를 보완하는 과정에서 기존 `임상` 경계 손상 가능성을 테스트로 발견해 수정했고 122개 표적 테스트가 통과했다. 전체 배포 검증, 운영 반영 및 실제 번역 의미 검수는 남았다.
+- 근거: 실 운영 임상 단계 표기 문제를 보완하는 과정에서 기존 `임상` 경계 손상 가능성을 테스트로 발견해 수정했고 122개 표적 테스트가 통과했다. 보정은 전체 배포 검증과 운영 반영을 완료했지만 quota 초과로 backlog 수신이 진행되지 않고, human-reviewed fixture가 없어 provider 번역의 의미 정확성 coverage가 입증되지 않았다.
 
 ### 커밋·푸시·배포
-- 미실행: 로컬 변경 상태이며 필수 전체 검증 통과 후 RSS 전용 코드로 순차 반영한다.
+- 완료: RSS 코드 커밋 `806064f46e215086566c46505fd8107699b98154`를 `origin/oci`에 push했다. Deploy OCI workflow `40208437108` 전체 검증·package·upload·activate 성공, 운영 `/health-check` 동일 SHA, `/api/health` `ok`를 확인했다. 사후 read-only 집계는 GlobeNewswire pending 6, SEC pending 0, StockTitan pending 2,302이며 quota 초과 기사는 번역 및 Discord 수신을 기다린다.
 ## [2026-10-26] 운영 오역 표본 기반 임상 단계 및 송신 전 재검증
 
 ### 목표
