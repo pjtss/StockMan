@@ -42,6 +42,11 @@ describe("admin RSS translation diagnostics", () => {
       }] };
       if (query.includes("DISTINCT ON (source)")) return { rows: [] };
       if (query.includes("automation_runs")) return { rows: [] };
+      if (query.includes("notification_pending")) return { rows: [
+        { source: "GLOBENEWSWIRE", total: 2, translation_pending: 2, translated: 0, translation_failed: 0, translation_skipped: 0, notification_pending: 2, sent: 0, notification_failed: 0, in_flight: 0 },
+        { source: "SEC_EDGAR", total: 5, translation_pending: 2, translated: 2, translation_failed: 0, translation_skipped: 1, notification_pending: 2, sent: 3, notification_failed: 0, in_flight: 0 },
+        { source: "STOCKTITAN", total: 4, translation_pending: 1, translated: 2, translation_failed: 0, translation_skipped: 1, notification_pending: 1, sent: 3, notification_failed: 0, in_flight: 0 },
+      ] };
       if (query.includes("GROUP BY source")) return { rows: [] };
       if (query.includes("COUNT(*)::text")) return { rows: [{ count: "1" }] };
       return { rows: [] };
@@ -73,6 +78,11 @@ describe("admin RSS translation diagnostics", () => {
       attempts: 3,
       updatedAt: new Date("2026-10-25T04:00:00.000Z").toISOString(),
     }]);
+    expect(body.result.rss.articleFlowBySource).toMatchObject([
+      { source: "GLOBENEWSWIRE", total: 2, notification_pending: 2, sent: 0 },
+      { source: "SEC_EDGAR", total: 5, notification_pending: 2, sent: 3 },
+      { source: "STOCKTITAN", total: 4, notification_pending: 1, sent: 3 },
+    ]);
     expect(String(sampleQuery?.[0])).toContain("translation_candidate_title IS NOT NULL");
     expect(String(sampleQuery?.[0])).toContain("LIMIT 20");
     expect(sampleQuery?.[1]).toEqual([

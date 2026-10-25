@@ -66,7 +66,7 @@ async function runSuite(checks: CheckName[]) {
   if (checks.includes("rss")) {
     try {
       const rssSettings = await loadFeatureModuleSettings("market-rss");
-      const [articles, snapshots, runs, translationFailureSamples] = await Promise.all([
+      const [articles, snapshots, runs, translationFailureSamples, articleFlowBySource] = await Promise.all([
         pool.query(`SELECT source, COUNT(*)::int AS count, MAX(published_at) AS latest_published_at, MAX(created_at) AS latest_created_at FROM market_rss_articles GROUP BY source ORDER BY source`),
         pool.query(`SELECT DISTINCT ON (source) source, status, item_count, fetched_at, url FROM market_rss_fetch_snapshots ORDER BY source, fetched_at DESC`),
         pool.query(`SELECT status, started_at, finished_at, duration_ms, summary, error_message FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 5`),
@@ -81,6 +81,18 @@ async function runSuite(checks: CheckName[]) {
           ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"],
           ["translation_numeric_hallucination", "translation_output_incomplete", "target_language_not_detected"],
         ]),
+        pool.query(`SELECT source, COUNT(*)::int AS total,
+                           COUNT(*) FILTER (WHERE translation_status = 'PENDING')::int AS translation_pending,
+                           COUNT(*) FILTER (WHERE translation_status = 'TRANSLATED')::int AS translated,
+                           COUNT(*) FILTER (WHERE translation_status = 'FAILED')::int AS translation_failed,
+                           COUNT(*) FILTER (WHERE translation_status = 'SKIPPED')::int AS translation_skipped,
+                           COUNT(*) FILTER (WHERE notification_status = 'PENDING')::int AS notification_pending,
+                           COUNT(*) FILTER (WHERE notification_status = 'SENT')::int AS sent,
+                           COUNT(*) FILTER (WHERE notification_status = 'FAILED')::int AS notification_failed,
+                           COUNT(*) FILTER (WHERE notification_status IN ('PROCESSING', 'SENDING'))::int AS in_flight
+                    FROM market_rss_articles
+                    WHERE source = ANY($1::text[])
+                    GROUP BY source ORDER BY source`, [["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]),
       ]);
       const now = new Date();
       result.rss = {
@@ -90,6 +102,7 @@ async function runSuite(checks: CheckName[]) {
         bySource: articles.rows,
         latestFetchBySource: snapshots.rows,
         recentRuns: runs.rows,
+        articleFlowBySource: articleFlowBySource.rows,
         translationFailureSamples: translationFailureSamples.rows.map((row) => ({
           articleId: String(row.id),
           source: row.source,

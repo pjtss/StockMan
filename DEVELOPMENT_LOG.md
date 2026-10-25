@@ -6924,6 +6924,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 검증 및 배포 상태
 - 타깃 번역 테스트 77개 통과. 전체 `deploy:verify`, commit, push, production 배포는 아직이며, 운영 수신 확인 후 결과를 추가 기록한다.
 - 과거 대기 큐는 oldest-first로 처리하고 한 cron 실행에서 번역 20건/전송 20건으로 제한되어 있다. 전체 운영 backlog 수량과 정상화 처리량은 수정 배포 후 계속 측정한다.
+- 번역 수정은 `1ea0f512`로 `oci`에 푸시했고, 최신 후속 HEAD `33bfcf94`의 Deploy OCI run에서 production 활성화까지 확인했다. 이후 운영 실행에서 번역 성공·Discord HTTP 전송 성공이 함께 발생했다. 이어서 세 출처별 상태와 전체 과거 backlog 추이를 인증 진단 API로 확인할 수 있도록 집계를 추가한다.
+- `/api/admin/debug-suite?checks=rss`에 세 출처별 전체 행 수, 번역 상태, 발송 대기·완료·실패·진행 상태 집계를 추가했다. 대상/limit이 고정된 SELECT 집계이며 RSS 진단 API의 기존 관리자/cron 인증을 유지한다. 타깃 테스트 79개와 전체 배포 검증을 통과했다.
 
 ## [2026-10-25] SEC SIC 보완 적재 및 거래소 코드 차이 대응
 
