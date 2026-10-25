@@ -24,6 +24,19 @@ describe("stored RSS title validation before Discord delivery", () => {
     });
   });
 
+  it("repairs source-confirmed pharmaceutical terms in an older stored translation before delivery", () => {
+    const result = validateStoredMarketRssTranslation(
+      "BioNTech and Bristol Myers Squibb Report Encouraging Global Phase 2 Data for Pumitamig in Advanced NSCLC After Progression on Immunotherapy Plus Chemotherapy",
+      "BioNTech와 Bristol Myers Squibb는 면역요법과 화학요법 진행 후 진행된 후기 NSCLC에서 푸미타믹의 글로벌 2 상기 데이터를 권장한다고 보고했습니다",
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      translatedTitle: "BioNTech와 Bristol Myers Squibb는 면역요법과 화학요법 진행 후 진행성 비소세포폐암에서 푸미타믹의 글로벌 2상 데이터를 고무적이라고 보고했습니다",
+      changed: true,
+    });
+  });
+
   it("holds stored text that does not meet the Korean target-language floor", () => {
     expect(validateStoredMarketRssTranslation("Nvidia revenue rises sharply after earnings", "Nvidia update"))
       .toMatchObject({ ok: false, reason: "target_language_not_detected" });

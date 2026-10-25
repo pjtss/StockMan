@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeMarketRssHeadlineContext, normalizeTranslatedMarketRssClinicalPhase } from "./market-rss-headline-context";
+import { normalizeMarketRssHeadlineContext, normalizeTranslatedMarketRssClinicalPhase, normalizeTranslatedMarketRssKnownPhrases } from "./market-rss-headline-context";
 
 describe("market RSS headline context normalization", () => {
   it("clarifies that holding a public company means holding its stock", () => {
@@ -61,5 +61,23 @@ describe("market RSS headline context normalization", () => {
   it("does not rewrite a number that is not a clinical phase in the source title", () => {
     expect(normalizeTranslatedMarketRssClinicalPhase("Company enters Phase 2 of its global market expansion", "회사는 2 상기 시장 확장에 진입합니다"))
       .toBe("회사는 2 상기 시장 확장에 진입합니다");
+  });
+
+  it("repairs production-observed pharmaceutical false friends only when the source confirms them", () => {
+    const source = "BioNTech and Bristol Myers Squibb Report Encouraging Global Phase 2 Data for Pumitamig in Advanced NSCLC After Progression on Immunotherapy Plus Chemotherapy";
+    const provider = "BioNTech와 Bristol Myers Squibb는 면역요법과 화학요법 진행 후 진행된 후기 NSCLC에서 푸미타믹의 글로벌 2 상기 데이터를 권장한다고 보고했습니다";
+    const phaseFixed = normalizeTranslatedMarketRssClinicalPhase(source, provider);
+
+    expect(normalizeTranslatedMarketRssKnownPhrases(source, phaseFixed))
+      .toBe("BioNTech와 Bristol Myers Squibb는 면역요법과 화학요법 진행 후 진행성 비소세포폐암에서 푸미타믹의 글로벌 2상 데이터를 고무적이라고 보고했습니다");
+    expect(normalizeTranslatedMarketRssKnownPhrases("Company recommends a session", "회사는 구강 세션을 권장합니다"))
+      .toBe("회사는 구강 세션을 권장합니다");
+  });
+
+  it("uses the standard Korean term for an oral conference session when present in the source", () => {
+    expect(normalizeTranslatedMarketRssKnownPhrases(
+      "Climb Bio Presents Initial Data at an Oral Session at ASN Kidney Week",
+      "Climb Bio가 ASN 신장 주간 구강 세션에서 초기 데이터를 발표하다",
+    )).toBe("Climb Bio가 ASN 신장 주간 구두 발표 세션에서 초기 데이터를 발표하다");
   });
 });

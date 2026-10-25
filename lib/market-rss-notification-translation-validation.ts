@@ -1,10 +1,13 @@
-import { normalizeTranslatedMarketRssClinicalPhase } from "./market-rss-headline-context";
+import { normalizeTranslatedMarketRssClinicalPhase, normalizeTranslatedMarketRssKnownPhrases } from "./market-rss-headline-context";
 import { isMarketRssTranslationHeadlineComplete, isMarketRssTranslationKoreanEnough } from "./market-rss-translation-quality";
 
 export type StoredMarketRssTranslationFailureReason = "target_language_not_detected" | "translation_output_incomplete";
 
 export function validateStoredMarketRssTranslation(sourceTitle: string, translatedTitle: string) {
-  const normalizedTitle = normalizeTranslatedMarketRssClinicalPhase(sourceTitle, translatedTitle);
+  const normalizedTitle = normalizeTranslatedMarketRssKnownPhrases(
+    sourceTitle,
+    normalizeTranslatedMarketRssClinicalPhase(sourceTitle, translatedTitle),
+  );
   if (!isMarketRssTranslationKoreanEnough(normalizedTitle)) {
     return { ok: false as const, translatedTitle: normalizedTitle, reason: "target_language_not_detected" as const };
   }

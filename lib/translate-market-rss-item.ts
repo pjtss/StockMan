@@ -7,7 +7,7 @@ import { createMarketRssTranslationClient } from "./market-rss-translation-clien
 import { mapWithConcurrency } from "./map-with-concurrency";
 import { AZURE_TRANSLATION_PROVIDER } from "./translation-cache";
 import { localizeSecFilingTitle } from "./market-rss-sec-filing-title";
-import { normalizeTranslatedMarketRssClinicalPhase } from "./market-rss-headline-context";
+import { normalizeTranslatedMarketRssClinicalPhase, normalizeTranslatedMarketRssKnownPhrases } from "./market-rss-headline-context";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
@@ -227,7 +227,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const hasProviderMarkup = /<\/?[a-z][^>]*>/i.test(normalizedProviderText);
   const rawProviderHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
   const providerHeadline = rawProviderHeadline
-    ? normalizeTranslatedMarketRssClinicalPhase(item.title, normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawProviderHeadline), preparedInput.placeholders))
+    ? normalizeTranslatedMarketRssKnownPhrases(item.title, normalizeTranslatedMarketRssClinicalPhase(item.title, normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawProviderHeadline), preparedInput.placeholders)))
     : null;
   const restoredText = restoreMarketRssTranslationTokens(normalizedProviderText, preparedInput.placeholders);
   if (!restoredText.ok) {
@@ -243,7 +243,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     : null;
   const rawTranslatedHeadline = restoredHeadline?.ok ? restoredHeadline.text : null;
   const translatedHeadline = rawTranslatedHeadline
-    ? normalizeTranslatedMarketRssClinicalPhase(item.title, normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawTranslatedHeadline), preparedInput.placeholders))
+    ? normalizeTranslatedMarketRssKnownPhrases(item.title, normalizeTranslatedMarketRssClinicalPhase(item.title, normalizeTranslatedAnnualOrdinal(item.title, removeUnspecifiedQuarterOrdinal(item.title, rawTranslatedHeadline), preparedInput.placeholders)))
     : null;
   if (!translatedHeadline) {
     const fallback = await validationFallback("translation_response_unparseable");

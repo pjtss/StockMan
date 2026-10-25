@@ -57,3 +57,23 @@ export function normalizeTranslatedMarketRssClinicalPhase(sourceTitle: string, t
   }
   return normalized;
 }
+
+/** Repair a few source-confirmed pharmaceutical terms that providers render as false friends. */
+export function normalizeTranslatedMarketRssKnownPhrases(sourceTitle: string, translatedTitle: string) {
+  let normalized = translatedTitle;
+  if (/\bencouraging\b/i.test(sourceTitle)) {
+    normalized = normalized
+      .replace(/권장한다고(?=\s*(?:보고|발표|전했습니다))/gu, "고무적이라고")
+      .replace(/권장하는(?=\s*(?:데이터|결과|소식))/gu, "고무적인")
+      .replace(/권장한(?=\s*(?:데이터|결과|소식))/gu, "고무적인");
+  }
+  if (/\boral\s+session\b/i.test(sourceTitle)) {
+    normalized = normalized.replace(/구강\s*세션/gu, "구두 발표 세션");
+  }
+  if (/\badvanced\s+(?:NSCLC|non[-\s]small[-\s]cell\s+lung\s+cancer)\b/i.test(sourceTitle)) {
+    normalized = normalized
+      .replace(/((?:면역요법|면역치료).{0,20}화학요법\s*진행\s*후)\s*진행된\s*(?:후기\s*)?NSCLC/gu, "$1 진행성 비소세포폐암")
+      .replace(/후기\s*(?:NSCLC|비소세포폐암)/gu, "진행성 비소세포폐암");
+  }
+  return normalized;
+}
