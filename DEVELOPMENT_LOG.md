@@ -7229,10 +7229,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,518 tests passed/3 skipped; dependency audit, build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 성공.
 - 수정 push 후 운영 read-only aggregate `2026-10-25T13:12:19Z`: GlobeNewswire translation pending 0 / notification pending 4, SEC notification pending 2,301 / sent 6,701, StockTitan translation pending 23 / notification pending 2,298. 월간 quota skipped는 GlobeNewswire 4, SEC 238, StockTitan의 Google 7,714·Azure 1,203·provider 미상 2,368건이다. queue가 전부 해소됐다는 뜻은 아니다.
 - 운영 read-only aggregate `2026-10-25T13:19:57Z`: GlobeNewswire translation pending 0 / notification pending 4, SEC notification pending 2,161 / sent 6,841, StockTitan translation pending 0 / notification pending 2,298. `13:20:20Z` 인증 GET quota snapshot은 Azure 1,899,962/1,900,000 reserved(38 remaining), Google 299,992/300,000(8 remaining)을 보고했다. `13:20:33Z`까지 13:05Z 이후 번역 성공 표본은 세 출처 모두 0건이다.
+- 이후 `2026-10-25T13:24Z` 잠시 운영 `/api/health`와 RSS diagnostics가 HTTP 502를 반환했다. Actions run `40197455407`(HEAD `0372ad89`)은 조회 시점까지 Verify deployment에서 실행 중이었다. `/api/health`는 13:27Z와 13:29Z에 다시 `ok`를 반환했다. 13:27:26Z aggregate에서 SEC notification pending 2,021 / sent 6,981, StockTitan notification pending 2,298, GlobeNewswire notification pending 4; quota와 13:05Z 이후 provider 성공 표본은 변하지 않았다.
 
 ### 재발 감지·남은 위험
 - provider quota는 사실상 소진 상태이며 월 한도 증액은 사용자 승인을 기다린다. 월/일 quota가 소진되면 안전한 translation gate가 유지되므로 기사는 계속 대기할 수 있다. legacy SENT 행은 이미 전송되어 번역을 소급 보장할 수 없다.
-- 운영 배포 완료와 실제 provider 표본·세 출처 queue 감소 확인은 남아 있다.
+- `df1056eb` code workflow run `40196217179`는 success였으며, 최신 docs-only Actions 검증 run은 관찰 시점에 계속 실행 중이었다. 실제 provider 성공 표본과 quota 대기분 처리 완료는 남아 있다.
 
 ### 개선 과제
 개선 과제 ID: CI-2026-10-25-019
@@ -7240,4 +7241,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 근거: 과거 기사 번역 선택에서 backlog/분류 제외를 제거하고 전체 검증을 통과했으나, 운영 배포·provider 결과 확인이 남았다.
 
 ### 커밋·푸시·배포
-- 전체 검증 통과 후 코드 수정 `df1056eb`와 운영 집계 기록 `cd9ad184`를 `oci`에 푸시했다. GitHub 배포 실행 상태와 운영 실행 SHA는 현재 조회 불가하며, provider 표본·queue 완료도 확인 대기.
+- 전체 검증 통과 후 코드 수정 `df1056eb`와 후속 운영 기록 `cd9ad184`, `0372ad89`를 `oci`에 푸시했다. 코드 run `40196217179`는 success이며, 0372ad89 docs-only run `40197455407`은 확인 시점에 실행 중. 운영 실행 SHA, provider 표본 및 quota 대기분 처리는 계속 확인한다.
