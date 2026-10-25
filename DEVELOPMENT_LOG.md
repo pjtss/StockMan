@@ -6924,3 +6924,24 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 검증 및 배포 상태
 - 타깃 번역 테스트 77개 통과. 전체 `deploy:verify`, commit, push, production 배포는 아직이며, 운영 수신 확인 후 결과를 추가 기록한다.
 - 과거 대기 큐는 oldest-first로 처리하고 한 cron 실행에서 번역 20건/전송 20건으로 제한되어 있다. 전체 운영 backlog 수량과 정상화 처리량은 수정 배포 후 계속 측정한다.
+
+## [2026-10-25] SEC SIC 보완 적재 및 거래소 코드 차이 대응
+
+### 목표와 범위
+- 운영 활성 미국 COMMON_STOCK 중 KIS 산업코드 결측 2,724개를 SEC EDGAR SIC로 보완하고 운영 API GET으로 DB 저장 상태를 재조회한다.
+
+### 운영 처리 및 관찰
+- 2026-10-25 UTC: 배포 run `40163642899` 성공 후 SEC 관리자 GET으로 초기 상태 확인: eligible 5,358개, KIS 유효 코드 2,634개, SEC SIC 0개, 미분류 2,724개(AMS 160, NAS 1,886, NYS 678).
+- 첫 운영 적재 API는 환경변수 `SEC_USER_AGENT` 누락으로 503 fail-closed. 프로젝트 공식 SEC 참조문서와 `.env.example`의 서비스 식별자 기본값 적용 후 배포.
+- 기본값 배포 API 기준 55개 cursor batch에서 대상 2,724개 중 2,495개 SEC SIC 저장, 229개 미해결(티커 미매핑 196, SEC SIC 미제공 33; 사전 1개 시험 포함). 각 저장은 API 트랜잭션 `UPDATE RETURNING`과 read-after-write 검증을 통과.
+- 운영 GET 재조회: SEC SIC 2,495개(AMS 0, NAS 1,853, NYS 642), 잔여 미분류 229개(AMS 160, NAS 33, NYS 36). 표본 코드와 `SEC_EDGAR_SIC:<CIK>` 출처 확인.
+- SEC 공식 `company_tickers_exchange.json` 대조 결과 일부 AMS universe ticker(예: ACCS)가 SEC 맵에는 NYSE로 표시되어 시장별 매핑에서 누락되는 거래소 코드 차이를 발견. 이를 개선하기 위해 동일 ticker가 공식 미국 거래소 전체에서 단일 CIK로만 확인되는 경우에 한해 교차거래소 fallback을 추가한다. 다중 CIK는 계속 제외한다. 최종 재적재 및 DB 재조회는 이 변경 배포 후 수행한다.
+
+### 검증과 변경 이력
+- 초기 코드: `8257dd98`; SEC 기본 User-Agent 수정: `c89323e7`; 현재 교차거래소 fallback 변경은 전체 `deploy:verify` 통과 후 커밋 예정.
+- 전체 299개 테스트 파일 1,459 tests 통과(3 skipped), build, standalone 실행 스모크/desktop·mobile hydration, typecheck, docs, verify-scope, KIS boundary, bearer auth, cron check 통과.
+- 운영 DB는 운영 관리자 API만 사용했다. 직접 DB 연결 또는 쿼리는 하지 않았다.
+
+### 남은 위험 및 다음 단계
+- 미해결 SEC ticker 또는 SIC가 남을 수 있다. 모든 코드는 SEC 원천의 SIC taxonomy이고 KIS ICOD와 의미 체계가 다르며 source_file로 구분한다.
+- 거래소 코드 fallback 변경을 `oci`에 배포한 뒤 잔여 대상에 다시 적용하고, 최종 시장별 API GET read-after-write 통계를 기록한다.

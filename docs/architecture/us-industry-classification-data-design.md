@@ -8,7 +8,7 @@
 - 우선 분류코드는 한국투자증권(KIS)의 NAS/NYS/AMS 해외주식 마스터 `icod`다.
 - 활성 미국 보통주에서 KIS `icod`가 비었거나 all-zero인 경우에만 SEC EDGAR Submissions의 `sic`/`sicDescription`을 보조 원천으로 사용한다. SEC SIC와 KIS ICOD는 서로 다른 분류 체계이므로 숫자 코드만으로 동일하다고 비교하거나 변환하지 않는다.
 - SEC 대체 코드는 `industry_code`에 넣고 `source_file`을 `SEC_EDGAR_SIC:<10자리 CIK>`로 기록해 출처를 구별한다. 기존 비영 KIS ICOD를 SEC 값으로 덮어쓰지 않는다. 뒤이은 KIS 재동기화도 원본 `icod=000`일 때 이미 저장된 SEC SIC를 보존하며, 유효한 KIS 코드가 새로 들어오면 KIS 코드로 대체한다.
-- SEC ticker/CIK/거래소 매핑이 유일하고 EDGAR SIC가 3~4자리 비영 숫자일 때만 저장한다. 모호한 티커, 누락 SIC, 잘못된 값, SEC 오류는 fail-closed로 미분류 상태를 유지한다.
+- SEC ticker/CIK 매핑이 유일하고 EDGAR SIC가 3~4자리 비영 숫자일 때만 저장한다. 운영 시장 기준 ticker 매핑을 우선하며, 해당 시장 매핑이 없으면 SEC 공식 미국 거래소 ticker 전체에서 CIK가 하나로 유일한 경우에만 교차거래소 fallback을 허용한다. 모호한 티커, 누락 SIC, 잘못된 값, SEC 오류는 fail-closed로 미분류 상태를 유지한다.
 - KIS 원본의 빈 값·`000`은 SEC SIC 대체값이 성공할 때만 보조 코드로 채운다. 회사명만으로 산업을 추정하지 않는다.
 - KIS의 전체 마스터 common 후보를 `us_common_stock_universe`에 upsert한다. KIS 원본 후보 밖의 이전 활성 common 행은 삭제하지 않고 비활성화한다. 분류가 불확실한 행은 fail-closed로 활성 공통주에서 제외하고 이력을 보존한다.
 

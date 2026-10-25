@@ -67,6 +67,10 @@ async function loadTickerMap() {
           const values = result.get(key) ?? new Set<string>();
           values.add(rawCik.padStart(10, "0"));
           result.set(key, values);
+          const anyMarketKey = `*:${ticker}`;
+          const anyMarketValues = result.get(anyMarketKey) ?? new Set<string>();
+          anyMarketValues.add(rawCik.padStart(10, "0"));
+          result.set(anyMarketKey, anyMarketValues);
         }
         return result;
       })
@@ -170,7 +174,8 @@ export async function POST(request: Request) {
     const unresolved: Array<{ market: string; code: string; reason: string }> = [];
     const cikForTarget = new Map<string, string>();
     for (const target of targets) {
-      const ciks = map.get(`${target.market}:${normalizeTicker(target.code)}`);
+      const ticker = normalizeTicker(target.code);
+      const ciks = map.get(`${target.market}:${ticker}`) ?? map.get(`*:${ticker}`);
       if (!ciks?.size) { unresolved.push({ market: target.market, code: target.code, reason: "SEC_TICKER_NOT_FOUND" }); continue; }
       if (ciks.size !== 1) { unresolved.push({ market: target.market, code: target.code, reason: "SEC_TICKER_AMBIGUOUS" }); continue; }
       cikForTarget.set(`${target.market}:${target.code}`, [...ciks][0]);
