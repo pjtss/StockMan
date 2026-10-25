@@ -7,8 +7,14 @@ describe("market RSS notification translation gate", () => {
     const query = new PgDialect().sqlToQuery(buildMarketRssNotificationTranslationGate());
     expect(query.sql).toContain('"market_rss_articles"."translation_status" =');
     expect(query.sql).toContain('"market_rss_articles"."translation_skipped_reason" =');
+    expect(query.sql).toContain('"market_rss_articles"."translation_fallback" =');
+    expect(query.sql).toContain('"market_rss_articles"."translation_target_language" =');
+    expect(query.sql).toContain('"market_rss_articles"."translated_title" = "market_rss_articles"."title"');
+    expect(query.sql).toContain('"market_rss_articles"."translated_title" is not null');
     expect(query.params).toContain("TRANSLATED");
     expect(query.params).toContain("already_in_target_language");
+    expect(query.params).toContain("ko");
+    expect(query.params).toContain(false);
   });
 
   it("claims only the unchanged source and translation snapshot used to build the payload", () => {

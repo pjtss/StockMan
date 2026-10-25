@@ -7246,3 +7246,71 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 전체 검증 통과 후 코드 수정 `df1056eb`, `5fc5a236`와 운영 기록을 `oci`에 푸시했다. code deploy runs `40196217179`, `40198529124` 모두 success; 마지막 SHA는 앱 health endpoint에서 공개하지 않아 서버 실행 SHA 직접 대조는 미확인이다.
+
+## [2026-10-25] RSS 제목 번역/전체 기사 경로 재검증
+
+### 목표와 범위
+- SEC EDGAR, StockTitan, GlobeNewswire 모든 기사의 제목만 한국어 번역한 뒤 Discord로 보내며, 카테고리/분류 필터 없이 과거 미발송 backlog도 포함한다.
+- provider 월간 상한은 별도 사용자 승인 없이 변경하지 않는다.
+
+### 확인 결과
+- 최신 `origin/oci` 기준 `translateMarketRssItem()`이 `prepareMarketRssTranslationInput(item.title)`만 호출하고 결과 텍스트만 `translate(..., "auto", "ko")`에 전달한다. 제목 번역 회귀에는 summary/content를 provider input 및 번역 결과에서 배제하는 assertion이 있다.
+- Discord 게이트는 검증된 `TRANSLATED` 또는 이미 한국어인 `SKIPPED/already_in_target_language`만 허용한다. source allowlist는 세 출처만 포함한다. retry/notify query에는 `notify_eligible`/`is_backlog` 필터가 없고 대기 과거 기사도 선택 대상이다.
+- `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-notification-translation-gate.test.ts lib/market-rss-notification-message.test.ts lib/market-rss-discord-policy.test.ts --reporter=dot`: 4개 파일, 101개 테스트 통과.
+- retry 테스트를 포함해 실행했을 때 112개 통과, 1개 실패. 로컬 기본 checkout(`998fb369`)의 retry 테스트는 원격 최신 `origin/oci`(`e508541e`)의 `exhaustedFailureRetryBefore` 반환 필드를 기대하지 않으며, 기본 checkout은 원격보다 95커밋 뒤처지고 대규모 미커밋 변경이 있어 수정하거나 혼합 배포하지 않았다.
+- isolated 최신 worktree에서 전체 `npm.cmd run deploy:verify`는 취약점 감사(0 vulnerabilities) 뒤 build에서 `next` 실행 파일을 찾지 못해 중단했다. `npm ci`는 Node 24 환경에서 두 번 정지/실패했고 의존성이 부분 설치되었다. 프로젝트 OCI CI는 Node 22를 사용한다.
+- 운영 URL, DB 진단 토큰, cron 인증값이 현재 셸에 없어 운영 read-only 집계·실제 신규 provider 번역·Discord 수신을 이번 턴에는 확인하지 못했다. quota는 변경하거나 provider 진단 호출하지 않았다.
+
+### 남은 위험과 다음 조치
+- 월 한도 소진에 따라 DB backlog가 남아 있을 가능성이 크다. 새 provider 성공 표본과 backlog 0 확인 전에는 완료로 판정하지 않는다.
+- 운영 호스트/진단 경로 및 Node 22 설치 실행 환경을 확보한 뒤 최신 OCI 운영 상태를 read-only 확인하고, 월 quota reset 후 세 출처별 제목 번역 표본과 Discord 수신을 관찰한다.
+- 장애/실패 회차와 backlog 변화는 `/api/debug/market-rss-translations` 및 automation run summary로 감지한다.
+
+### 커밋·푸시·배포
+- 이 기록은 기본 checkout의 RSS 외 변경을 섞지 않기 위해 isolated 최신 worktree에만 남긴다. 테스트 외 provider API·Discord 전송 없음. 커밋·푸시·배포하지 않음.
+### 2026-10-25 — RSS 최신 원격 상태 후속 감사
+- **목적·범위**: 이전 턴의 최신 원격 RSS 테스트/운영 상태 미확인을 다시 검증했다. 원격 `origin/oci`는 `e508541e`로 그대로였고, 원격 worktree의 목표 기록 외 코드 변경은 없다.
+- **검증**: 제목 전용 번역, 세 출처 allowlist, 번역 게이트 및 notification payload 테스트 4개 파일 101건 통과. retry 테스트 포함 시 112건 통과·1건 실패는 기본 checkout `998fb369`의 낡은 테스트 expectation과 원격 `e508541e` retry result 필드 불일치 때문으로 비교 확인했다. 기본 checkout은 95커밋 뒤처지고 RSS 외 미커밋 변경이 많아 수정/배포하지 않았다.
+- **설치 장애**: 최신 원격 worktree에서 기존 npm cache를 사용한 `npm ci`와 `npm ci --ignore-scripts`가 모두 212번째 cache-hit package 처리 후 정지했다. partial install에서 next/vitest 일부는 생겼으나 drizzle-orm 미설치라 전체 검증/해당 3 suite 실행 불가했다. Node 24.14.0, npm 11이며 OCI CI 설정은 Node 22다. 중단 후 npm 로그 마지막 처리 패키지는 `dom-accessibility-api`; 파일 생성 단계 진전 없음.
+- **운영 접근**: 호스트·DB read-only 진단 token·cron secret을 셸 환경에서 찾지 못해 운영 backlog/provider 결과/Discord 수신은 미확인이다. 공급자 호출·quota 변경 없이 유지했다.
+- **남은 위험/재발 감지**: provider quota 소진 상태와 이전 운영 backlog가 남아 있을 수 있다. 운영 `/api/debug/market-rss-translations`의 lifetime/status 집계, cron run 및 source별 새 validated translation 표본을 확인한다. 독립 CI 배포에서 verify/activation 상태 확인이 필요하다.
+- **커밋·푸시·배포**: 최신 isolated worktree의 `DEVELOPMENT_LOG.md`에만 이 메모를 기록했다. 코드 변경, commit, push, deploy는 없다.
+### 2026-10-25 — OCI 운영 RSS 실시간 backlog 재확인
+- 운영 host는 저장소 운영 이력의 `https://stockman.r-e.kr`로 확인했다. `GET /api/health`는 2026-10-25T13:58:56Z HTTP 200/status `ok`; 공개 RSS diagnostics는 13:59:42Z HTTP 200을 반환했다.
+- lifetime: GlobeNewswire 전체 29, translated 25, monthly-cap skipped 4, notification pending 4; SEC 9,005, translated 8,692, monthly-cap skipped 238, notification pending 1,481, sent 7,521, uncertain 3, legacy sent-without-current-translation 313; StockTitan 20,422, translated 8,788, monthly-cap skipped 11,391, notification pending 2,299, sent 18,121, uncertain 2, legacy sent-without-current-translation 9,335.
+- 30일 범위 diagnostics: 번역 pending 55,212, monthly-cap skipped 11,605, translated 4,600. Skip reason breakdown은 GNW provider null 4, SEC Azure 56 + Google 182, StockTitan Azure 1,203 + Google 7,714 + provider null 2,474로 전부 `monthly_character_limit_reached`다.
+- 24시간 신규 구간에는 25 skipped/5 translated가 있었다. 개별 StockTitan 최신 기사 1건은 `SKIPPED`, fallback 원문 제목 보존, reason `monthly_character_limit_reached`, attempted 1, notification PENDING으로 저장된 것을 직접 확인했다. 따라서 원문으로 Discord 우회 발송되지 않고 기사 대기 상태를 유지한다.
+- 인증된 automation-runs/debug-suite는 401이라 실행 상세는 확인 불가. 공개 diagnostics는 aggregate/read-only만 호출했다. provider/Discord 호출 및 quota 변경 없음.
+- **남은 위험**: 실제 번역 성공은 월 한도 사용 가능 시점까지 멈춰 있고 총 미발송 기사가 3,784건(3개 source notification pending 합계)이다. 과거 `SENT` 행 중 미번역 현재 상태는 이미 전송된 상태이므로 소급 수정 불가. 한도 증액 승인 없이는 다음 UTC 월 quota reset 이후 재처리 확인이 남는다.- **후속 read-only poll** (`2026-10-25T14:00:23Z`): 번역 상태 및 skip 집계는 앞선 13:59:42Z와 동일했다. SEC notification pending은 1,481→1,461로 감소(+20 SENT), StockTitan 2,299 및 GlobeNewswire 4는 정체했다. 즉 quota reset 전에도 이미 검증 번역된 SEC backlog의 전송은 진행 중이고, 신규 월 한도 skip 행은 번역/전송 대기다.
+- **reset 재처리 selector 검토**: monthly skip reason은 UTC 월 시작 전에 시도한 건에 대해 retry condition에 재포함되고, 후보 notification 상태는 `PENDING`/`FAILED`/`SKIPPED`; `SENT`/`UNCERTAIN`은 제외된다. 따라서 월 reset 후 기존 unsent 기사 재번역 대상으로 잡히는 SQL 조건을 확인했다. 운영 cron selector 실제 실행은 provider quota 전부 소진 상태여서 표본으로 관찰할 수 없다.
+## [2026-10-25] Discord RSS 한국어 번역 상태 게이트 강화
+
+### 목표 및 근본 원인
+- SEC EDGAR, StockTitan, GlobeNewswire RSS 기사에서 검증된 한국어 제목만 Discord로 발송한다.
+- 기존 SQL 게이트는 `translation_status=TRANSLATED` 또는 `SKIPPED/already_in_target_language`만 확인했다. 상태값 외 저장 불변식(`translation_fallback=false`, `translation_target_language=ko`, `translated_title` 존재)을 함께 강제하지 않아 데이터 불일치 시 원문/빈 제목이 발송 후보가 될 수 있었다.
+
+### 변경
+- `lib/market-rss-notification-translation-gate.ts`: 두 허용 상태 모두 fallback 아님, target language `ko`, translated title 비어 있지 않음(현재 DB guard는 NULL 차단)을 요구하도록 게이트를 강화했다. 이미 한국어로 처리된 제목은 저장 제목이 원문 title과 같은지도 요구한다.
+- `lib/market-rss-notification-translation-gate.test.ts`: SQL이 fallback/ko/non-null 및 이미 한국어 제목의 원문 일치 조건을 갖는지 assertion을 추가했다.
+- 본 변경은 provider에 원문 summary/content를 전달하지 않으며 RSS 분류/eligibility/backlog 필터를 추가하지 않는다.
+
+### 검증
+- 최신 원격 `e508541e` isolated worktree에서 번역 item, retry selector, notification gate/message, source policy 테스트 5개 파일 142/142 통과.
+- `node scripts/check-oci-cron.mjs`: 통과(22개 shared endpoint 및 isolated long-running fundamentals timer).
+- `node scripts/check-docs.mjs`: 통과(18개 진입점, migration 160개, V160).
+- `git diff --check`: 통과.
+- `npm.cmd run deploy:verify`: dependency audit 0 vulnerabilities 통과 후 build 시작 시 `next` binary unavailable로 실패. 독립 worktree의 `npm ci`가 중단되어 node_modules가 불완전하며 Node 24/npm11 환경(CI는 Node 22). `node node_modules/typescript/bin/tsc --noEmit`도 Next 모듈 부재 및 이에 따른 프로젝트 전체 타입 오류로 완료하지 못했다.
+- 실제 운영 provider 호출, quota 변경, Discord 전송 없음. 운영 진단은 quota 소진과 3,764 notification pending 확인을 유지한다. 사용자 월 한도 선택 답변은 아직 없음.
+
+### 재발 감지 및 남은 위험
+- 테스트가 전송 게이트의 저장 상태 불변식을 직접 검사한다. 운영 `/api/debug/market-rss-translations`의 pending/skip aggregate와 cron run을 계속 확인한다.
+- 전체 build/typecheck/런타임 검증을 마치기 전에는 이 변경을 commit/push/deploy하지 않는다. 실제 provider 성공 표본 및 backlog 0 확인도 목표 완료 전에 필요하다.
+
+### 커밋·푸시·배포
+- 코드 및 이 로그는 최신 remote worktree에서만 수정했으며 커밋·푸시·배포하지 않았다. 기본 checkout의 unrelated dirty changes를 건드리지 않았다.- **후속 검증** (`2026-10-25T14:04:07Z`): 새 142건 테스트 실행 재통과. 코드에서 notifier 후보가 `notificationStatus=PENDING`으로 제한되고 강화 번역 게이트가 적용되는 것을 확인했다. 기존 `SENT`/`SENDING` 건의 rate-window 집계 경로는 게이트와 분리돼 있다. 운영 health HTTP 200/status `ok`; current lifetime pending은 GNW 4, SEC 1,381, StockTitan 2,299 (합 3,684)이고 quota skip 수치는 이전과 동일하다. `git diff --check` 통과.
+### 2026-10-25 — 강화 게이트 전체 검증 결과 및 배포 준비
+- **검증환경 복구**: 현재 코드와 같은 `e508541e` commit의 다른 clean worktree에서 기존 `node_modules`만 복사해 불완전 설치를 복구했다. 코드, `.env.local`, 자격증명은 복사하지 않았다.
+- **전체 검증**: `npm.cmd run deploy:verify` 성공. dependency audit 0 vulnerabilities; Next.js 15.5.28 production build 성공(111 static pages); standalone HTTP smoke 및 Chrome desktop/mobile hydration 성공; 302개 테스트 파일 중 301 passed/1 skipped, 테스트 1,518 passed/3 skipped; typecheck, docs/migration, scope audit, KIS boundary, bearer auth, OCI cron 검사 모두 통과.
+- **대상 회귀**: RSS 번역/게이트/retry/message/source policy 5개 파일 142/142 통과.
+- **운영 read-only**: health `ok`; 2026-10-25 14:04Z 시점 미발송 pending GNW 4, SEC 1,381, StockTitan 2,299 (총 3,684). quota skip은 GNW 4, SEC 238, StockTitan 11,391이며 전체 reason `monthly_character_limit_reached`. 사용자 월 한도 선택 답변은 아직 확인되지 않았다. quota 증액이나 provider 호출은 하지 않았다.
+- **상태**: 강화된 번역 전송 게이트는 DB 상태/target/fallback/제목 정합성을 확인한다. 커밋·푸시 전 전체 필수 검증을 마쳤다. 실제 provider success 및 pending 0은 여전히 운영 quota reset 뒤 확인해야 한다.

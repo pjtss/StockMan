@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { marketRssArticles } from "./schema";
 
 function matchSnapshot<T>(column: Parameters<typeof eq>[0], value: T | null) {
@@ -8,8 +8,20 @@ function matchSnapshot<T>(column: Parameters<typeof eq>[0], value: T | null) {
 /** Send only validated Korean translations (or titles already entirely Korean). */
 export function buildMarketRssNotificationTranslationGate() {
   return or(
-    eq(marketRssArticles.translationStatus, "TRANSLATED"),
-    and(eq(marketRssArticles.translationStatus, "SKIPPED"), eq(marketRssArticles.translationSkippedReason, "already_in_target_language")),
+    and(
+      eq(marketRssArticles.translationStatus, "TRANSLATED"),
+      eq(marketRssArticles.translationFallback, false),
+      eq(marketRssArticles.translationTargetLanguage, "ko"),
+      isNotNull(marketRssArticles.translatedTitle),
+    ),
+    and(
+      eq(marketRssArticles.translationStatus, "SKIPPED"),
+      eq(marketRssArticles.translationSkippedReason, "already_in_target_language"),
+      eq(marketRssArticles.translationFallback, false),
+      eq(marketRssArticles.translationTargetLanguage, "ko"),
+      eq(marketRssArticles.translatedTitle, marketRssArticles.title),
+      isNotNull(marketRssArticles.translatedTitle),
+    ),
   );
 }
 
