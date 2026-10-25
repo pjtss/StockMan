@@ -1,3 +1,38 @@
+## [2026-10-25] RSS 임상 단계 제목 번역 보존
+
+### 목표
+- 운영에서 확인한 Phase 2 임상 결과 제목의 어색한 단계 표현을 줄이고, 제목의 임상 단계 숫자·문자를 원문과 일치시킨다.
+
+### 근본 원인
+- 번역 provider가 `Phase 2 data`를 자연스러운 한국어 임상 단계로 안정적으로 옮기지 못해 `2 상기 데이터`처럼 단계와 뒤 단어가 붙은 오역이 나왔다. 기존 숫자 검증은 새 숫자 생성을 막지만, 출처에 있는 숫자 2가 임상 단계 의미를 유지하는지는 검사하지 않았다.
+
+### 반영
+- `lib/market-rss-headline-context.ts`: 제목 자체에 임상·종양·치료 등 분명한 임상 맥락이 있을 때만 Phase 숫자/문자를 `2상`, `1b상`, `2/3상`으로 정규화한다. 일반 프로젝트 확장 단계나 단순 `Phase 2 study`는 변경하지 않는다.
+- `lib/market-rss-headline-context.test.ts`: 숫자·영문 단계·로마 숫자와 비임상 제목 경계를 검증한다.
+- `lib/translate-market-rss-item.test.ts`: 실제 제목 번역 입력에서 임상 단계 marker를 보호하고 결과에 `2상`을 복원하는지, summary/body는 공급자에 보내지 않고 원문 그대로 반환하는지 확인한다.
+- `docs/architecture/stocktitan-translation.md`: 제목 입력의 단계 정규화 경계를 문서화한다.
+
+### 검증
+- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 2개 파일 108개 테스트 통과.
+- `npm.cmd run docs:check`: 통과. 첫 실행은 중복 improvement task ID `CI-2026-10-25-015` 때문에 실패해 새 ID `016`으로 수정 후 통과했다.
+- 최종 `npm.cmd run deploy:verify` 통과: dependency audit 0, build, standalone runtime smoke, desktop/mobile browser hydration, 전체 302개 test files(301 passed/1 skipped; 1,507 tests passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron gates 통과. Windows node_modules junction EPERM 경고는 있었으나 standalone smoke fallback은 통과했다.
+- commit/push, production rollout과 실제 provider 결과 검증은 아직 전이다.
+
+### 재발 감지·남은 위험
+- 회귀 테스트가 임상 단계 표기 및 비임상 project phase 비변경을 자동 검사한다. 이 규칙은 임상 맥락 키워드를 기반으로 하므로, 새로운 적응증 약어·언어별 phase 표현은 누락될 수 있고 의미 전반의 번역 정확도를 증명하지 않는다.
+- 월간 provider 한도 소진으로 backlog와 실 provider 품질 표본 관찰은 계속 제한된다.
+
+### 다음 개선
+- 변경을 전체 배포 검증과 운영 배포로 반영한 뒤 신규 임상 단계 제목의 한국어 출력·Discord 게이트·summary/body 원문 유지 상태를 확인하고, 남은 token/numeric 오류 표본을 보완한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-016
+성과 판정: PARTIAL
+근거: 실제 운영에서 확인한 임상 단계 오역의 구체적인 입력 경로를 정규화하고 표적 테스트 108개 및 전체 배포 검증을 통과했다. 운영 배포 후 실제 provider 출력의 의미 보존 확인은 아직 남아 있다.
+
+### 커밋·푸시·배포
+- 전체 `npm.cmd run deploy:verify` 완료. commit/push/production deployment는 다음 단계다.
+
 ## [2026-10-25] RSS 제목 번역 괄호 잘림 차단
 
 ### 목표

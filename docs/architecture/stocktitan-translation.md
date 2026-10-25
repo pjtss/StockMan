@@ -7,7 +7,7 @@ GlobeNewswire, StockTitan, SEC EDGAR 기사 알림은 `title`만 한국어로 �
 ## 호출 경로
 
 - 운영 `POST /api/cron/market-rss`는 세 출처를 고정 수집하고, 같은 실행에서 제목 번역 배치를 처리한 뒤 번역 게이트를 통과한 행을 Discord로 보낸다. 실패 기사는 미번역 원문 알림으로 우회하지 않고 재시도 대상으로 남긴다.
-- 공통 함수 `translateMarketRssItem()`은 `prepareMarketRssTranslationInput(item.title)`만 호출한다. 공급자 요청은 해당 제목의 준비된 문자열 하나이며 요약·본문은 전달하지 않는다.
+- 공통 함수 `translateMarketRssItem()`은 `prepareMarketRssTranslationInput(item.title)`만 호출한다. 공급자 요청은 해당 제목의 준비된 문자열 하나이며 요약·본문은 전달하지 않는다. 제목에 임상 적응증 등 명확한 임상 맥락이 있을 때만 `Phase 2`, `Phase 1b`, `Phase II/III`를 각각 `2상`, `1b상`, `2/3상` 형태로 번역 입력에 정규화한다. 마케팅·프로젝트 단계는 건드리지 않는다.
 - 관리자 미리보기에서 번역 출처를 생략하면 세 출처를 조회하며, 개별 출처 지정도 GlobeNewswire·StockTitan·SEC만 허용한다. 미리보기는 저장하거나 Discord로 전송하지 않는다.
 
 ## 배포 설정

@@ -133,6 +133,39 @@ describe("market RSS translation", () => {
     expect(result.translatedContent).toBe(source.content);
   });
 
+  it("preserves clinical phase meaning in the Korean title and translates no summary or body", async () => {
+    const source: MarketRssItem = {
+      ...item("clinical-phase"),
+      source: "GLOBENEWSWIRE",
+      title: "BioNTech Reports Encouraging Phase 2 Data for Pumitamig in Advanced NSCLC",
+      summary: "Original clinical study summary",
+      content: "Original clinical study body",
+    };
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    const stageMarker = prepared.placeholders.find(({ original }) => original === "2")!.marker;
+    const acronymMarker = prepared.placeholders.find(({ original }) => original === "NSCLC")!.marker;
+    const translate = vi.fn(async () => ({
+      translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}BioNTech, 진행성 ${acronymMarker}에서 푸미타믹의 고무적인 ${stageMarker}상 데이터를 발표${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}원문 요약</p></div>`,
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "azure-translator",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(prepared.headlineText).toContain(`${stageMarker}상`);
+    expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", "html");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(translate.mock.calls[0][0]).not.toContain(source.content);
+    expect(result).toMatchObject({
+      translatedTitle: "BioNTech, 진행성 NSCLC에서 푸미타믹의 고무적인 2상 데이터를 발표",
+      translatedSummary: source.summary,
+      translatedContent: source.content,
+      translationFallback: false,
+    });
+  });
+
   it("retries an Azure title that fails Korean validation with the configured Google provider", async () => {
     const source = { ...item("quality-fallback"), title: "Nvidia Announces Strong Revenue Growth and Improved Outlook" };
     const primaryTranslate = vi.fn(async () => ({

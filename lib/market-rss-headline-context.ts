@@ -1,9 +1,22 @@
 const COMMODITY = "(?:corn|wheat|soybeans?|oats|rice|coffee|cocoa|sugar|cotton|crude oil|natural gas|gold|silver|copper)";
 const COMPANY_PRODUCT = /\b(?:hardware|devices?|shield|geforce|gpus?|graphics cards?|laptops?|consoles?)\b/i;
+const CLINICAL_PHASE_CONTEXT = /\b(?:clinical|oncology|cancer|carcinoma|tumou?r|patient|therapy|therapeutic|treatment|drug|biologic|immunotherapy|esmo|fda|nsclc|pmn|disease|dose|efficacy|safety|indication|medical|kidney|renal|prostate|breast|lung)\b/i;
+
+function normalizeClinicalPhase(title: string) {
+  if (!CLINICAL_PHASE_CONTEXT.test(title)) return title;
+  const stageValues: Record<string, string> = { i: "1", ii: "2", iii: "3", iv: "4" };
+  return title.replace(/\bphase\s+((?:[1-4][a-c]?|iv|iii|ii|i)(?:\s*\/\s*(?:[1-4][a-c]?|iv|iii|ii|i))?)\b/gi, (_match, rawStage: string) => {
+    const stage = rawStage.split("/").map((part) => {
+      const normalized = part.trim();
+      return stageValues[normalized.toLowerCase()] ?? normalized;
+    }).join("/");
+    return `${stage}상`;
+  });
+}
 
 /** Add narrowly targeted market context where common English headline shorthand is ambiguous. */
 export function normalizeMarketRssHeadlineContext(title: string) {
-  let normalized = title;
+  let normalized = normalizeClinicalPhase(title);
 
   const heldCompany = normalized.match(
     /\b(?:I've|I have|we've|we have)\s+held\s+([A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,2})(?=\s+(?:for|since|through|until|and|but|whether|how|what)\b)/i,

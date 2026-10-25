@@ -27,4 +27,19 @@ describe("market RSS headline context normalization", () => {
     expect(normalizeMarketRssHeadlineContext("Corn Face Risk Off Pressure on Wednesday's Correction"))
       .toBe("Corn prices face selling pressure from risk-off sentiment on Wednesday's Correction");
   });
+
+  it.each([
+    ["BioNTech reports global Phase 2 data for pumitamig in advanced NSCLC", "BioNTech reports global 2상 data for pumitamig in advanced NSCLC"],
+    ["AbCellera announces Phase 1b clinical trial results", "AbCellera announces 1b상 clinical trial results"],
+    ["Company presents Phase II/III study results in oncology", "Company presents 2/3상 study results in oncology"],
+  ])("localizes clinical phase notation without changing its stage: %s", (title, expected) => {
+    expect(normalizeMarketRssHeadlineContext(title)).toBe(expected);
+  });
+
+  it("leaves non-clinical project phases unchanged", () => {
+    expect(normalizeMarketRssHeadlineContext("Company enters Phase 2 of its global market expansion"))
+      .toBe("Company enters Phase 2 of its global market expansion");
+    expect(normalizeMarketRssHeadlineContext("Company announces Phase 2 study of its market expansion plan"))
+      .toBe("Company announces Phase 2 study of its market expansion plan");
+  });
 });
