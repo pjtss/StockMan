@@ -76,6 +76,7 @@ export async function GET(request: Request) {
       ),
       pool.query(
         `SELECT id, source, external_id, title, link, published_at, created_at, updated_at,
+                notification_status, notified_at,
                 translation_status, translation_fallback, translation_attempts,
                 translation_provider, translation_source_language, translation_target_language,
                 translation_char_count, translation_skipped_reason, translation_error,

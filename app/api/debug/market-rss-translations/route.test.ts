@@ -39,7 +39,7 @@ describe("RSS translation diagnostics API", () => {
     state.query
       .mockResolvedValueOnce({ rows: [{ status: "TRANSLATED", count: 4 }, { status: "FAILED", count: 2 }] })
       .mockResolvedValueOnce({ rows: [{ count: 2 }] })
-      .mockResolvedValueOnce({ rows: [{ id: 8, translation_error: null, translated_title: "번역 제목" }] })
+      .mockResolvedValueOnce({ rows: [{ id: 8, translation_error: null, translated_title: "번역 제목", notification_status: "PENDING", notified_at: null }] })
       .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
@@ -51,6 +51,8 @@ describe("RSS translation diagnostics API", () => {
     expect(body.scope).toMatchObject({ createdWithinHours: 48, source: "STOCKTITAN", status: "FAILED" });
     expect(body.summary).toMatchObject({ totalInWindow: 6, filteredTotal: 2, byStatus: { TRANSLATED: 4, FAILED: 2 } });
     expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({ notification_status: "PENDING", notified_at: null });
+    expect(state.query.mock.calls[2][0]).toContain("notification_status, notified_at");
     expect(body.lifetimeBySource).toEqual([{ source: "STOCKTITAN", total: 7, sent: 5, notification_pending: 2 }]);
     expect(state.query).toHaveBeenCalledTimes(6);
     expect(state.query.mock.calls.map((call) => call[1])).toEqual([[48, "STOCKTITAN"], [48, "STOCKTITAN", "FAILED"], [48, "STOCKTITAN", "FAILED", 10, 0], [["STOCKTITAN"]], [["STOCKTITAN"]], [["STOCKTITAN"]]]);
