@@ -84,6 +84,7 @@ async function runSuite(checks: CheckName[]) {
         pool.query(`SELECT source, COUNT(*)::int AS total,
                            COUNT(*) FILTER (WHERE translation_status = 'PENDING')::int AS translation_pending,
                            COUNT(*) FILTER (WHERE translation_status = 'TRANSLATED')::int AS translated,
+                           COUNT(*) FILTER (WHERE translation_status = 'TRANSLATED' AND translation_provider = 'sec-filing-title-localization')::int AS deterministic_localized,
                            COUNT(*) FILTER (WHERE translation_status = 'FAILED')::int AS translation_failed,
                            COUNT(*) FILTER (WHERE translation_status = 'SKIPPED')::int AS translation_skipped,
                            COUNT(*) FILTER (WHERE translation_status NOT IN ('PENDING', 'TRANSLATED', 'FAILED', 'SKIPPED'))::int AS translation_other,

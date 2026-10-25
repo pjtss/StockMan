@@ -6994,3 +6994,27 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 커밋 `7b8d7b79`, `84a418fa`를 순차 푸시했고 두 배포 모두 성공했다. 과거 대기 전량 발송은 계속 진행 중이다.
+## [2026-10-25] RSS 번역 오탐과 SEC 표준 제목 backlog 직접 처리
+
+### 목적 및 관찰
+- 사용자는 SEC EDGAR·StockTitan·GlobeNewswire의 기사 전체를 Discord로 발송하되 제목만 한국어 번역하기를 요청했다. 2026-10-25 운영 집계에서 pending 기사가 남아 있고, 실패 후보는 `METALS`, `FILES`, `REPORT` 같은 all-caps 일반 영어 단어를 보호 토큰으로 오인해 번역 입력에서 빠지는 점을 확인했다.
+- SEC Form 4 `Reporting` 표준 제목도 provider 재시도 대기 횟수·오래된 queue 위치에 따라 수분 이상 untranslated로 남을 수 있었다.
+
+### 변경
+- `lib/market-rss-translation-tokens.mjs`: RSS all-caps 제목에서 자주 쓰는 영어 동사·명사·시점 표현을 번역 입력에 남긴다. 단, `| ZIP Stock News` 같이 영어 단어와 같은 철자의 ticker 접미 및 괄호 속 symbol은 계속 보호한다.
+- `lib/market-rss-pipeline.ts`, `lib/market-rss-sec-filing-localization.ts`: SEC EDGAR의 엄격한 표준 form/CIK/role 제목을 provider와 독립적으로 선별해 매 실행 최대 1,000건 한국어 제목화한다. `translatedSummary`와 `translatedContent`는 각 행의 원문 summary/content를 그대로 저장하고 알림 전송 게이트를 통과시킨다. 비표준 제목은 자동 추정하지 않는다.
+- `app/api/admin/debug-suite/route.ts`: source별 `deterministic_localized` 집계를 추가해 운영에서 직접 현지화 증가 여부를 확인한다.
+- `lib/translate-market-rss-item.test.ts`, `lib/market-rss-translation-protection.test.ts`, `lib/market-rss-sec-filing-localization.test.ts`, 관리자 진단 테스트: 운영 실패 표본, ticker 충돌, SEC Form 4 역할, 제목 외 필드 보존을 검증한다.
+
+### 검증
+- 관련 회귀 테스트 126개 통과, `npm.cmd run typecheck -- --tsBuildInfoFile .next-deploy-verify/tsconfig.tsbuildinfo` 통과.
+- 전체 `deploy:verify`, 새 revision 운영 배포, 실제 source별 현지화·Discord 전송 증가 확인은 진행 중이다. 새 revision에서 직접 현지화 건수 증가와 실패 표본 재시도를 보지 않고 번역 완성으로 판정하지 않는다.
+
+### 남은 위험 및 후속
+- 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.
+- `translation_pending`, `notification_pending`, 실패/불확실 상태를 source별로 계속 관찰하고 DB에 저장된 과거 대기량 소진 여부를 확인한다.
+- 개선 과제 ID: RSS-2026-10-25-TRANSLATION-QUALITY
+- 성과 판정: IN_PROGRESS
+
+### 커밋·푸시·배포
+- 미실행: full deploy verification 후 이번 RSS 번역 개선만 커밋·푸시하고 OCI 운영 반영을 확인한다.

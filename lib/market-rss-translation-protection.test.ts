@@ -67,6 +67,21 @@ describe("market RSS translation token protection", () => {
     expect(masked.placeholders.map(({ original }) => original)).toContain("NVDA");
   });
 
+  it("leaves common all-caps publisher headline words available for translation", () => {
+    const masked = protectMarketRssTranslationTokens("DENARIUS METALS FILES TORAL PROJECT TECHNICAL REPORT ON SEDAR+");
+
+    expect(masked.text).toContain("METALS FILES");
+    expect(masked.text).toContain("PROJECT TECHNICAL REPORT ON");
+    expect(masked.placeholders.map(({ original }) => original)).toContain("SEDAR");
+  });
+
+  it("still protects a ticker whose spelling is an ordinary English word", () => {
+    const masked = protectMarketRssTranslationTokens("Top spot | ZIP Stock News");
+
+    expect(masked.text).toContain("Top spot");
+    expect(masked.placeholders.map(({ original }) => original)).toContain("ZIP");
+  });
+
   it("exposes the same complete protected-token inventory to the review importer", () => {
     const title = "NVDA sees $2.5B revenue in Q3, up 18% from 2025 with 40 bps margin";
     expect(extractMarketRssProtectedTokens(title)).toEqual(

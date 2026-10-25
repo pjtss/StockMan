@@ -450,10 +450,14 @@ describe("market RSS translation", () => {
 
   it("accepts Arabic digits that faithfully translate spelled-out title numbers", async () => {
     const source = { ...item("spelled-ordinal"), title: "Hawaiian Electric Industries to Announce Third Quarter 2026 Results November 6 | HE Stock News", summary: "Company outlook improves" };
-    const translate = vi.fn(async (text: string) => {
-      const markers = [...text.matchAll(/ZX\d+Q/g)].map(([marker]) => marker);
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    let translatedHeadline = "하와이 전기 산업, 3분기 2026 실적 발표 11월 6 | HE 주식 뉴스";
+    for (const placeholder of prepared.placeholders) {
+      translatedHeadline = translatedHeadline.replace(placeholder.original, placeholder.marker);
+    }
+    const translate = vi.fn(async () => {
       return {
-        translatedText: `하와이 전기 산업, 3분기 ${markers[0]} 실적 발표 11월 ${markers[1]} | HE 주식 뉴스`,
+        translatedText: translatedHeadline,
         source: "en" as const,
         target: "ko" as const,
         provider: "test",
@@ -468,6 +472,57 @@ describe("market RSS translation", () => {
       translatedSummary: source.summary,
       translationFallback: false,
     });
+  });
+
+  it.each([
+    [
+      "Hawaiian Electric Industries to Announce Third Quarter 2026 Results November 6 | HE Stock News",
+      "하와이 전기 산업, 3분기 2026 실적 발표 11월 6 | HE 주식 뉴스",
+    ],
+    [
+      "Elme Communities Announces Suspended NYSE Trading; Anticipates Trading Will Begin OTC Effective October 26, 2026 | ELME Stock News",
+      "엘메 커뮤니티, NYSE 거래 중단 발표; 거래 시작 예상 OTC 10월부터 26, 2026 | ELME 주식 뉴스",
+    ],
+    [
+      "The Eastern Company Announces Timing of Third Quarter 2026 Earnings Release and Conference Call | EML Stock News",
+      "이스턴 컴퍼니, 3분기 2026 실적 발표 및 컨퍼런스 콜 일정 발표 | EML 주식 뉴스",
+    ],
+    [
+      "Aberdeen Multi-Market Income Fund (MMT) Announces Upcoming 1-for-4 Reverse Stock Split | MMT Stock News",
+      "애버딘 멀티마켓 인컴 펀드(MMT)가 곧 발표되는 1-for-4 역주식 분할 | MMT 주식 뉴스",
+    ],
+  ])("accepts source-faithful financial digits and dates from an actual RSS review sample", async (sourceTitle, translatedTitle) => {
+    const source = { ...item("reviewed-number-title"), title: sourceTitle, summary: "Original summary must not be submitted" };
+    const prepared = prepareMarketRssTranslationInput(sourceTitle);
+    let providerTitle = translatedTitle;
+    for (const placeholder of prepared.placeholders) {
+      providerTitle = providerTitle.replace(placeholder.original, placeholder.marker);
+    }
+    const translate = vi.fn(async () => ({ translatedText: providerTitle, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", prepared.format);
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(result).toMatchObject({ translatedTitle, translatedSummary: source.summary, translationFallback: false });
+  });
+
+  it("translates ordinary English words in publisher all-caps titles while preserving the trailing ticker", async () => {
+    const source = { ...item("uppercase-publisher-title"), title: "DENARIUS METALS FILES TORAL PROJECT TECHNICAL REPORT ON SEDAR+ | DNRSF Stock News" };
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    const translate = vi.fn(async (text: string) => ({
+      translatedText: text.replace("DENARIUS", "데나리우스").replace("METALS", "메탈스").replace("FILES", "제출").replace("TORAL", "토랄").replace("PROJECT", "프로젝트").replace("TECHNICAL", "기술").replace("REPORT", "보고서").replace("ON", "의").replace("Stock", "주식"),
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "test",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({ translationFallback: false });
+    expect(result.translatedTitle).toContain("보고서");
+    expect(result.translatedTitle).toContain("DNRSF");
   });
 
   it("rejects a financial sign invented beside a spelled-out source number", async () => {

@@ -29,6 +29,43 @@ import { countMarketRssTranslationFallbackReasons } from "./market-rss-translati
 import { TranslationClientOperationError } from "./translation-types";
 import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy";
 import { interleaveMarketRssSourceQueues } from "./market-rss-source-fairness";
+import { buildMarketRssSecFilingLocalizationAssignments, MARKET_RSS_SEC_FILING_TITLE_SQL_PATTERN } from "./market-rss-sec-filing-localization";
+
+async function localizePendingSecFilingTitles(db: ReturnType<typeof getDb>, limit = 1_000) {
+  const candidates = await db.select().from(marketRssArticles).where(and(
+    eq(marketRssArticles.source, "SEC_EDGAR"),
+    inArray(marketRssArticles.translationStatus, ["PENDING", "FAILED", "SKIPPED"]),
+    inArray(marketRssArticles.notificationStatus, ["PENDING", "FAILED", "SKIPPED"]),
+    sql`${marketRssArticles.title} ~* ${MARKET_RSS_SEC_FILING_TITLE_SQL_PATTERN}`,
+  )).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
+  const localized = buildMarketRssSecFilingLocalizationAssignments(candidates);
+  if (!localized.length) return 0;
+
+  const now = new Date();
+  const caseValue = <T>(column: (typeof marketRssArticles)[keyof typeof marketRssArticles], value: (row: (typeof localized)[number]) => T) => sql`CASE ${marketRssArticles.id} ${sql.join(localized.map((row) => sql`WHEN ${row.id} THEN ${value(row)}`), sql` `)} ELSE ${column} END`;
+  const updated = await db.update(marketRssArticles).set({
+    translatedTitle: caseValue(marketRssArticles.translatedTitle, (row) => row.translatedTitle),
+    translationCandidateTitle: caseValue(marketRssArticles.translationCandidateTitle, () => null),
+    translatedSummary: caseValue(marketRssArticles.translatedSummary, (row) => row.summary),
+    translatedContent: sql`${marketRssArticles.content}`,
+    translationProvider: "sec-filing-title-localization",
+    translationCharCount: 0,
+    translationSkippedReason: null,
+    translationTranslatedAt: now,
+    translationAttemptedAt: now,
+    translationStatus: "TRANSLATED",
+    translationFallback: false,
+    translationAttempts: caseValue(marketRssArticles.translationAttempts, (row) => row.translationAttempts + 1),
+    translationError: null,
+    updatedAt: now,
+  }).where(and(
+    inArray(marketRssArticles.id, localized.map((row) => row.id)),
+    eq(marketRssArticles.source, "SEC_EDGAR"),
+    inArray(marketRssArticles.translationStatus, ["PENDING", "FAILED", "SKIPPED"]),
+    inArray(marketRssArticles.notificationStatus, ["PENDING", "FAILED", "SKIPPED"]),
+  )).returning({ id: marketRssArticles.id });
+  return updated.length;
+}
 
 export async function ingestMarketRssArticles(options?: { sources?: MarketRssSource[] }) {
   const db = getDb();
@@ -125,6 +162,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
 
 export async function translatePendingMarketRssArticles(limit = 10) {
   const db = getDb();
+  const deterministicallyLocalized = await localizePendingSecFilingTitles(db);
   const providerSet = createMarketRssTranslationClient({ deferCacheWriteUntilValidated: true });
   const client = providerSet.client;
   const retryCriteria = getMarketRssTranslationRetryCriteria(Boolean(client));
@@ -150,7 +188,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
         fallbackReasonCodes.push(result.translationFallbackReason);
       }
     });
-    return { attempted: fairRows.length, translated: 0, notRequired, fallback, failed: 0, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), skipped: fallback > 0, ...(fallback ? { reason: "cloud_translation_not_configured" } : {}) };
+    return { attempted: fairRows.length + deterministicallyLocalized, translated: deterministicallyLocalized, deterministicallyLocalized, notRequired, fallback, failed: 0, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), skipped: fallback > 0, ...(fallback ? { reason: "cloud_translation_not_configured" } : {}) };
   }
   const thresholdAlertsByMonth = new Map<string, Set<number>>();
   const limitReachedMonths = new Set<string>();
@@ -238,7 +276,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
       }
     }
   }
-  return { attempted: fairRows.length, translated, notRequired, fallback, failed, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), translationUsage: tracked.getMetrics(), limitReached, limitAlertSent, thresholdAlerts: [...thresholdAlerts].sort((a, b) => a - b), thresholdAlertSent };
+  return { attempted: fairRows.length + deterministicallyLocalized, translated: translated + deterministicallyLocalized, deterministicallyLocalized, notRequired, fallback, failed, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), translationUsage: tracked.getMetrics(), limitReached, limitAlertSent, thresholdAlerts: [...thresholdAlerts].sort((a, b) => a - b), thresholdAlertSent };
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {
