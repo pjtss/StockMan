@@ -39,6 +39,14 @@ describe("market RSS translation token protection", () => {
     expect(restoreMarketRssTranslationTokens(masked.text, masked.placeholders)).toEqual({ ok: true, text: source });
   });
 
+  it.each(["VIKTORIA-1", "COMPANION-002", "COVID-19", "CD-19"])("preserves clinical and named identifiers %s as one token", (identifier) => {
+    const source = `Results from ${identifier} study`;
+    const masked = protectMarketRssTranslationTokens(source);
+
+    expect(masked.placeholders.map(({ original }) => original)).toContain(identifier);
+    expect(restoreMarketRssTranslationTokens(masked.text, masked.placeholders)).toEqual({ ok: true, text: source });
+  });
+
   it("does not mistake a reverse split ratio for an SEC form identifier", () => {
     const masked = protectMarketRssTranslationTokens("Announces a 1-for-4 reverse stock split");
 

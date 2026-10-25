@@ -1,17 +1,18 @@
 const COMMODITY = "(?:corn|wheat|soybeans?|oats|rice|coffee|cocoa|sugar|cotton|crude oil|natural gas|gold|silver|copper)";
 const COMPANY_PRODUCT = /\b(?:hardware|devices?|shield|geforce|gpus?|graphics cards?|laptops?|consoles?)\b/i;
-const CLINICAL_PHASE_CONTEXT = /\b(?:clinical|oncology|cancer|carcinoma|tumou?r|patient|therapy|therapeutic|treatment|drug|biologic|immunotherapy|esmo|fda|nsclc|pmn|disease|dose|efficacy|safety|indication|medical|kidney|renal|prostate|breast|lung)\b/i;
+const CLINICAL_PHASE_CONTEXT = /\b(?:clinical|oncology|cancer|carcinoma|tumou?r|patient|therapy|therapeutic|treatment|drug|biologic|immunotherapy|esmo|fda|nsclc|pmn|disease|dose|efficacy|safety|indication|medical|kidney|renal|prostate|breast|lung|krebs|lungenkrebs|karzinom|tumor|patienten|therapie|behandlung|immuntherapie|onkologie|erkrankung|wirksamkeit|verträglichkeit)\b/i;
 
 function normalizeClinicalPhase(title: string) {
   if (!CLINICAL_PHASE_CONTEXT.test(title)) return title;
   const stageValues: Record<string, string> = { i: "1", ii: "2", iii: "3", iv: "4" };
-  return title.replace(/\bphase\s+((?:[1-4][a-c]?|iv|iii|ii|i)(?:\s*\/\s*(?:[1-4][a-c]?|iv|iii|ii|i))?)\b/gi, (_match, rawStage: string) => {
+  const normalized = title.replace(/\bphase[-\s]+((?:[1-4][a-c]?|iv|iii|ii|i)(?:\s*\/\s*(?:[1-4][a-c]?|iv|iii|ii|i))?)\b/gi, (_match, rawStage: string) => {
     const stage = rawStage.split("/").map((part) => {
       const normalized = part.trim();
       return stageValues[normalized.toLowerCase()] ?? normalized;
     }).join("/");
     return `${stage}상`;
   });
+  return normalized.replace(/((?:[1-4][a-c]?|[1-4]\s*\/\s*[1-4])상)-(?=(?:study|studie|trial)\b)/gi, "$1 ");
 }
 
 /** Add narrowly targeted market context where common English headline shorthand is ambiguous. */

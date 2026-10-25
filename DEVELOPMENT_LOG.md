@@ -1,3 +1,38 @@
+## [2026-10-25] 다국어 임상 단계·시험 식별자 제목 보호
+
+### 목표
+- 운영 번역 표본에서 확인된 `Phase-2` 파손과 시험 ID가 임상 단계로 합쳐지는 신규 제목 번역 오류를 줄인다.
+
+### 근본 원인
+- 임상 단계 정규화는 영어 공백 형식 `Phase 2`만 찾았고 임상 문맥 판정도 영어 키워드에만 의존했다. 따라서 독일어 `Phase-2-Studie ... Lungenkrebs`가 `Phase`와 `2`로 분리될 수 있었다. 보호 token 패턴은 VIKTORIA-1, COMPANION-002 같은 긴 대문자+숫자 ID를 전체 식별자로 인식하지 않아 숫자가 별도 임상 단계처럼 번역될 수 있었다.
+
+### 반영
+- `lib/market-rss-headline-context.ts`: 임상 의미가 확인되는 경우 공백/하이픈 Phase 표기와 독일어 종양·치료 문맥을 `2상`, `2/3상`으로 정규화하고 `상-Study/Studie/Trial` 사이에 번역 구분 공백을 둔다. 비임상 Phase-2 market expansion 제목은 원문을 유지한다.
+- `lib/market-rss-headline-context.test.ts`: 독일어 `Phase-2-Studie`, 하이픈 임상 단계, 영어 비임상 경계를 검증한다.
+- `lib/market-rss-translation-tokens.mjs`, `lib/market-rss-translation-protection.test.ts`: VIKTORIA-1, COMPANION-002, COVID-19, CD-19 식별자 전체를 단일 보호 token으로 처리하는 회귀를 추가한다.
+- `docs/architecture/stocktitan-translation.md`: 현재 보호 규칙은 token을 분리하지 않지만 provider가 token 위치를 옮길 수 있다는 한계를 명시한다.
+
+### 검증
+- 운영 read-only 표본(720시간 범위): GlobeNewswire 25개 중 6개에서 임상 단계/괄호 등 legacy 품질 패턴이 보였고, 여기에는 `Phase 2`의 `2 상기`, `Phase 3`와 `VIKTORIA-1`의 혼합, `Phase 2/3`와 `COMPANION-002`의 혼합이 포함됐다. 이 샘플은 새 SHA 배포 전 저장된 번역이다.
+- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/market-rss-translation-protection.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 160개 테스트 통과.
+- 전체 배포 검증은 아직 실행 전이다. 새 provider 출력은 월간 quota에 막혀 검증 불가이며, 실제 provider 출력이 의미상 완벽하다고 주장하지 않는다.
+- 운영 최신 집계 2026-10-25 12:27Z: SEC notification pending 3,099, StockTitan 2,299, GlobeNewswire 3; StockTitan translation pending 806 및 quota-skipped 10,585. 운영 SHA `1c18cd497e2736e7c923362bbcd7f63f97705b02`.
+
+### 재발 감지·남은 위험
+- 입력 정규화와 보호 token 테스트는 언어별 phase 표기를 보장하지 않는다. 인식하지 못하는 새 언어 표기나 provider의 token 재배치는 실제 provider 품질 표본으로 계속 확인해야 한다.
+- provider quota로 새 출력 표본을 확인할 수 없으며 저장된 과거의 잘못된 번역은 이번 코드 변경으로 자동 재작성되지 않는다.
+
+### 다음 개선
+- 월 quota reset 후 동일 clinical fixture를 실제 provider에 재시도해 title-only Korean 결과를 확인하고, 필요 시 잘못된 unsent legacy 번역을 검증 후 재처리한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-10-25-018
+성과 판정: PARTIAL
+근거: 운영에서 확인한 Phase syntax 및 ID 혼합 오류에 표적 회귀를 추가하고 160개 테스트를 통과했으나, provider quota로 실제 신규 번역 확인과 과거 backlog 소진은 남았다.
+
+### 커밋·푸시·배포
+- 미실행. 표적 테스트만 통과했으며 전체 `npm.cmd run deploy:verify` 후 RSS 전용 분리 배포 예정.
+
 ## [2026-10-25] RSS 제목 번역 개선 운영 배포 확인
 
 ### 목표

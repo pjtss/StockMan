@@ -32,6 +32,8 @@ describe("market RSS headline context normalization", () => {
     ["BioNTech reports global Phase 2 data for pumitamig in advanced NSCLC", "BioNTech reports global 2상 data for pumitamig in advanced NSCLC"],
     ["AbCellera announces Phase 1b clinical trial results", "AbCellera announces 1b상 clinical trial results"],
     ["Company presents Phase II/III study results in oncology", "Company presents 2/3상 study results in oncology"],
+    ["BioNTech Reports Global Phase-2-Studie for Pumitamig in Lungenkrebs", "BioNTech Reports Global 2상 Studie for Pumitamig in Lungenkrebs"],
+    ["Company reports Phase-2/3-study results in lung cancer", "Company reports 2/3상 study results in lung cancer"],
   ])("localizes clinical phase notation without changing its stage: %s", (title, expected) => {
     expect(normalizeMarketRssHeadlineContext(title)).toBe(expected);
   });
@@ -41,5 +43,7 @@ describe("market RSS headline context normalization", () => {
       .toBe("Company enters Phase 2 of its global market expansion");
     expect(normalizeMarketRssHeadlineContext("Company announces Phase 2 study of its market expansion plan"))
       .toBe("Company announces Phase 2 study of its market expansion plan");
+    expect(normalizeMarketRssHeadlineContext("Company announces Phase-2-Studie zur globalen Marktexpansion"))
+      .toBe("Company announces Phase-2-Studie zur globalen Marktexpansion");
   });
 });
