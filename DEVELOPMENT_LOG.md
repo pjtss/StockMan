@@ -6979,8 +6979,10 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 대응 테스트를 SEC 전용 현지화, 다른 출처 격리, 원문 제목 미노출, 운영 진단 합계에 추가한다.
 
 ### 검증
-- 최초 변경 검증: 관련 103개 회귀 테스트, build, 전체 300개 테스트 파일(1,463 pass/3 skip), typecheck, docs/migration, audits, OCI cron, standalone/runtime·Chrome hydration 통과. 운영 로그 확인으로 Form 4의 `Reporting` 역할 표기를 추가 발견해 보완 중이다.
-- 배포 후 운영 RSS 진단에서 세 출처의 pending 감소·SENT 증가와 최근 cron 실행을 확인한다. 각 출처의 과거 backlog 전체가 소진될 때까지 완료로 간주하지 않는다.
+- 최초 변경 검증: 관련 103개 회귀 테스트, build, 전체 300개 테스트 파일(1,463 pass/3 skip), typecheck, docs/migration, audits, OCI cron, standalone/runtime·Chrome hydration 통과. 운영 로그에서 Form 4의 `Reporting` 역할 표기를 추가 확인해 보완했다.
+- Form 4 보완 검증: 번역 테스트 80개 통과, 전체 300개 테스트 파일(1,464 pass/3 skip), build, typecheck, docs/migration, audits, OCI cron, standalone/runtime·Chrome hydration 통과.
+- Actions `40168335426`으로 `7b8d7b79` 배포 성공, 이어 Actions `40168933268`로 `84a418fa` 배포 성공.
+- 운영 진단(2026-10-25 06:30Z): GlobeNewswire 19/22 발송, 3건 한국어 번역 재시도 대기; SEC 992/9,005 발송 및 8,012 대기; StockTitan 17,108/20,410 발송 및 3,300 대기. 최근 cron에서 세 출처 처리 중이며 배치별 번역·발송이 증가한다. 이 시점에는 과거 대기 전체 소진은 미완료이므로 완료로 간주하지 않는다.
 
 ### 남은 위험
 - provider가 일반 기사 제목의 한국어 번역을 완성하지 못하면 fail-closed로 보류되므로 번역 장애가 이어지는 동안 전체 backlog 발송은 지연된다. 원문 우회 발송은 허용하지 않는다.
@@ -6991,4 +6993,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 다음 개선: 세 출처가 번역·발송 모두 진행하는지 운영 계측하고, backlog 전량 완료를 확인한다.
 
 ### 커밋·푸시·배포
-- 미실행: 변경 검증 후 커밋·푸시 및 OCI 배포 예정.
+- 커밋 `7b8d7b79`, `84a418fa`를 순차 푸시했고 두 배포 모두 성공했다. 과거 대기 전량 발송은 계속 진행 중이다.
