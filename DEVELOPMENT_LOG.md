@@ -6945,3 +6945,15 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 남은 위험 및 다음 단계
 - 미해결 SEC ticker 또는 SIC가 남을 수 있다. 모든 코드는 SEC 원천의 SIC taxonomy이고 KIS ICOD와 의미 체계가 다르며 source_file로 구분한다.
 - 거래소 코드 fallback 변경을 `oci`에 배포한 뒤 잔여 대상에 다시 적용하고, 최종 시장별 API GET read-after-write 통계를 기록한다.
+
+### 최종 적재 결과 (2026-10-25 UTC)
+- 교차거래소 fallback 포함 Deploy OCI run `40165825019` 성공. SEC SIC API 배치 재처리 후 관리자 GET에서 활성 COMMON_STOCK 5,358개를 재집계했다: 기존 KIS 유효 ICOD 2,634개, SEC SIC fallback 2,644개, 미분류 80개.
+- 시장별 GET 결과: AMS 254개 중 KIS 94 / SEC 149 / 미분류 11; NAS 3,240개 중 KIS 1,354 / SEC 1,853 / 미분류 33; NYS 1,864개 중 KIS 1,186 / SEC 642 / 미분류 36.
+- 독립 SEC API GET의 저장 샘플에서 AMS `ACCS` SIC `8742`, 출처 `SEC_EDGAR_SIC:0000843006` 등 실제 저장값을 확인했다. 저장값은 SEC SIC이며 KIS ICOD와 동일한 taxonomy로 해석하지 않는다.
+- 잔여 80개를 운영 API로 모두 재조회: SEC ticker/CIK 매핑 부재 47개(AMS 11, NAS 20, NYS 16), SEC Submissions SIC 미제공 33개(NAS 13, NYS 20). 해당 80개는 SEC 공식 소스에 유일한 CIK 또는 SIC가 없어 fail-closed로 그대로 미분류다.
+- 운영 DB 직접 조회 없이 관리자 로그인 API와 `/api/admin/us-sec-sic-industry` POST/GET만 사용했다. POST는 배치 트랜잭션의 `UPDATE RETURNING` 검증을 수행했고 최종 GET의 시장별 수치와 SEC 출처 샘플로 read-after-write를 독립 확인했다.
+
+### 완료 판정 및 후속
+- SEC 공식 원천에서 ticker/CIK/SIC가 확인되는 활성 보통주 결측은 모두 저장했다. 남은 80개는 SEC ticker 맵/회사 Submissions에서 필요한 식별정보가 제공되지 않아 SEC만으로 채울 수 없다. 종목명 추정이나 다른 분류 taxonomy의 임의 대입은 하지 않는다.
+- 재발 방지: SEC ticker map의 시장 코드 차이를 허용하되 ticker가 미국 거래소 전체에서 단일 CIK로 유일할 때만 fallback을 허용하며, 모호한 ticker·무 SIC는 fail-closed로 처리한다.
+- 배포 커밋: `33bfcf94`; 해당 코드 전체 `deploy:verify` 및 교차거래소 타깃 테스트 통과. 운영 기록 커밋은 별도 생성 예정.

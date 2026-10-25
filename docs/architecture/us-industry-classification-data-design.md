@@ -141,3 +141,11 @@ KIS Developers는 종목정보 마스터를 주문·시세조회 가능한 전�
 - 프로젝트 헤더 정의: [`../references/kis-instrument-masters/header-definitions.md`](../references/kis-instrument-masters/header-definitions.md)
 - 확인용 보관 원본: [`../references/kis-instrument-masters/2026-08-18/`](../references/kis-instrument-masters/2026-08-18/)
 - 구현: [`../../lib/instrument-universe-import.ts`](../../lib/instrument-universe-import.ts), [`../../lib/us-industry-code-sync.ts`](../../lib/us-industry-code-sync.ts), [`../../app/api/admin/us-industry-codes/route.ts`](../../app/api/admin/us-industry-codes/route.ts), [`../../app/api/admin/us-sec-sic-industry/route.ts`](../../app/api/admin/us-sec-sic-industry/route.ts)
+
+## 2026-10-25 SEC SIC 보완 적재 및 재조회
+
+- SEC 공식 ticker/CIK 및 Submissions SIC를 기준으로 활성 미국 보통주 결측에 보조 코드를 저장했다. KIS 유효 ICOD 2,634개는 보존하고, SEC SIC 2,644개는 `source_file=SEC_EDGAR_SIC:<CIK>`로 원천을 구별한다.
+- 독립 운영 API GET 기준 시장별 universe/classification: AMS 254 = KIS 94 + SEC 149 + 미분류 11; NAS 3,240 = KIS 1,354 + SEC 1,853 + 미분류 33; NYS 1,864 = KIS 1,186 + SEC 642 + 미분류 36.
+- 나머지 80개는 공식 SEC 매핑에서 CIK ticker가 유일하지 않거나 찾을 수 없음 47개, Submissions에 SIC가 없음 33개로 확인했다. 이름 기반 추정값을 넣지 않고 미분류를 유지한다.
+- 거래소 exact match가 실패해도 SEC 공식 미국 거래소 전체에서 같은 ticker에 유일 CIK가 있으면 fallback을 허용한다. 이는 운영 universe와 SEC map의 거래소 표기 차이를 보완하며, 여러 CIK로 연결되는 티커는 제외한다.
+- DB 직접 조회 없이 관리자 SEC API로 배치 적재와 별도 GET read-after-write를 완료했다. 전체 실행 및 잔여 사유는 [`../../DEVELOPMENT_LOG.md`](../../DEVELOPMENT_LOG.md)의 2026-10-25 SEC SIC 항목을 참조한다.
