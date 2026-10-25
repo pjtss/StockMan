@@ -525,6 +525,35 @@ describe("market RSS translation", () => {
     expect(result.translatedTitle).toContain("DNRSF");
   });
 
+  it("preserves SEC Form 6-K as a protected code while translating the headline", async () => {
+    const source = {
+      ...item("sec-form-6-k"),
+      source: "STOCKTITAN",
+      title: "J-Star Holding Co., Ltd. Files Interim Financial Report on Form 6-K | YMAT Stock News",
+      summary: "This summary must remain in the source language.",
+    };
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    expect(prepared.placeholders.map(({ original }) => original)).toContain("6-K");
+    const translate = vi.fn(async (text: string) => ({
+      translatedText: text
+        .replace("Files", "제출")
+        .replace("Interim Financial Report", "중간 재무 보고서")
+        .replace("on Form", "양식")
+        .replace("Stock News", "주식 뉴스"),
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "test",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result).toMatchObject({ translationFallback: false, translatedSummary: source.summary });
+    expect(result.translatedTitle).toContain("양식 6-K");
+    expect(result.translatedTitle).toContain("YMAT 주식 뉴스");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+  });
+
   it("rejects a financial sign invented beside a spelled-out source number", async () => {
     const source = { ...item("invented-ordinal-sign"), title: "Third Quarter Outlook Improves", summary: "Company outlook improves" };
     const translate = vi.fn(async () => ({ translatedText: "-3분기 전망 개선", source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));

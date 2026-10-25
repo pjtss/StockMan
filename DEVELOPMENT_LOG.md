@@ -7008,13 +7008,19 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증
 - 관련 회귀 테스트 126개 통과, `npm.cmd run typecheck -- --tsBuildInfoFile .next-deploy-verify/tsconfig.tsbuildinfo` 통과.
-- 전체 `deploy:verify`, 새 revision 운영 배포, 실제 source별 현지화·Discord 전송 증가 확인은 진행 중이다. 새 revision에서 직접 현지화 건수 증가와 실패 표본 재시도를 보지 않고 번역 완성으로 판정하지 않는다.
+- 전체 `npm.cmd run deploy:verify` 통과(302개 파일 중 301개 통과·1개 skip, 테스트 1,476개 통과·3개 skip). 커밋 `3069a4b4`를 `origin/oci`에 push했고 GitHub Actions 배포 run `40170644179` 성공 후 운영 `/health-check`에서 SHA 일치를 확인했다.
+- 인증된 read-only `GET /api/admin/debug-suite?checks=rss`에서 06:57Z 대비 06:59Z 사이 SEC `deterministic_localized`가 2,000→3,000, `translation_pending` 5,430→4,420, `notification_pending` 7,744→7,732로 변했고 실제 `notified.sent=20` run이 반복 확인됐다. StockTitan `notification_pending`도 3,206→3,198로 줄었다. 새 SEC direct-localization과 기존 대기 알림 경로가 운영에서 실행 중이다.
+- 최신 run은 `attempted=1,020`(직접 현지화 1,000 + provider 20), `translated=1,018`, `fallback=2`였다. 실패 상태는 전송 게이트를 통과하지 않아 무번역 원문 발송은 관찰되지 않았다. 단, GlobeNewswire는 총 22건 중 19건 SENT·3건 translation SKIPPED로 남고, SEC notification pending 7,732건과 StockTitan 3,198건이 남아 전체 과거 대기 발송은 미완료다.
+- 운영 실패 표본에서 StockTitan 숫자 검증 오탐(`4분기`/날짜 숫자, SEC form `6-K`)과 보호 토큰 불일치가 계속 나타나 provider 번역 품질은 완벽하다고 볼 수 없다. 후속 수정과 운영 재검증 전에는 완료로 판정하지 않는다.
+- **후속 원인 수정**: 실제 실패 제목 `J-Star Holding ... Form 6-K`에서 보호 규칙이 문자로 시작하는 표기만 처리해 숫자로 시작하는 SEC 양식 코드 `6-K`를 독립 숫자처럼 provider에 노출했다. `6-K`/`8-K`/`10-Q`/`20-F` 계열과 S/F form, 424B 표기를 하나의 보호 토큰으로 보존하도록 수정하고, `1-for-4` 역분할 표기와 충돌하지 않는 테스트를 추가했다. 제목 번역 경로 fixture도 `6-K` 복원과 summary 원문 미변경을 검증한다.
+- 후속 회귀 128건 통과. 전체 `npm.cmd run deploy:verify` 재실행: 302개 테스트 파일 중 301개 통과·1개 skip, 1,485개 통과·3개 skip; 프로덕션 build, typecheck, standalone runtime/Chrome desktop·mobile hydration, 문서·migration·보안·cron 게이트 통과. Windows standalone 빌드의 기존 node_modules symlink `EPERM` 경고는 있었지만 검증 runner가 fallback 처리 후 성공했다.
 
 ### 남은 위험 및 후속
 - 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.
 - `translation_pending`, `notification_pending`, 실패/불확실 상태를 source별로 계속 관찰하고 DB에 저장된 과거 대기량 소진 여부를 확인한다.
+- 후속 `6-K` 보호 토큰 변경을 커밋·배포한 뒤, 실제 재시도에서 `translation_numeric_hallucination`이 사라지고 실패 건이 정상 한국어 제목으로 SENT 되는지 확인한다. 날짜/분기 오탐과 보호 토큰 불일치는 운영 실패 표본으로 계속 추적한다.
 - 개선 과제 ID: RSS-2026-10-25-TRANSLATION-QUALITY
 - 성과 판정: IN_PROGRESS
 
 ### 커밋·푸시·배포
-- 미실행: full deploy verification 후 이번 RSS 번역 개선만 커밋·푸시하고 OCI 운영 반영을 확인한다.
+- 커밋 `3069a4b4` push 및 OCI 배포 완료. 후속 `6-K` 코드 변경은 전체 검증 완료, 아직 commit/push/deploy 전이다. 번역 품질 오탐 개선과 전체 과거 대기 발송은 진행 중이다.

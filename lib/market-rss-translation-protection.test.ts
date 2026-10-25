@@ -23,6 +23,22 @@ describe("market RSS translation token protection", () => {
     expect(restoreMarketRssTranslationTokens(`변동 없음 ${masked.text}`, masked.placeholders)).toMatchObject({ ok: true });
   });
 
+  it.each(["6-K", "8-K/A", "10-Q", "20-F", "S-1", "F-1", "424B5"])("preserves SEC form identifier %s as one token", (form) => {
+    const source = `Files a report on Form ${form} today.`;
+    const masked = protectMarketRssTranslationTokens(source);
+
+    expect(masked.placeholders.map(({ original }) => original)).toContain(form);
+    expect(restoreMarketRssTranslationTokens(masked.text, masked.placeholders)).toEqual({ ok: true, text: source });
+  });
+
+  it("does not mistake a reverse split ratio for an SEC form identifier", () => {
+    const masked = protectMarketRssTranslationTokens("Announces a 1-for-4 reverse stock split");
+
+    expect(masked.placeholders.map(({ original }) => original)).not.toContain("1-for");
+    expect(masked.placeholders.map(({ original }) => original)).toContain("1");
+    expect(masked.placeholders.map(({ original }) => original)).toContain("-4");
+  });
+
   it("keeps ASCII and Unicode signs attached to financial values", () => {
     const source = "Revenue changed −12%, then +8.5%, while profit fell -$2.4B and costs rose $-3.2M.";
     const masked = protectMarketRssTranslationTokens(source);
