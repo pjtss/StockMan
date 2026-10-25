@@ -19,7 +19,7 @@
 - 운영 read-only (2026-10-25 15:56Z): notification pending GNW 6, SEC 0, StockTitan 2,303; monthly quota skip GNW 6, SEC 238, StockTitan 11,395. provider quota가 초과라 재처리 실측은 남았다.
 - 문서 복원 커밋 63ddabe58eb0eff62c24c911eb02308213683f18의 OCI workflow 40211443629도 verify/package/SSH/upload/activate 모두 성공했고, 운영 /health-check가 같은 SHA, /api/health가 ok를 반환했다. 2026-10-25 16:30:46Z read-only 진단: 최근 24시간 기사 34건 중 TRANSLATED 5, SKIPPED 29; GNW notification pending 7, SEC pending 0, StockTitan pending 2,304. 사람 검수 semantic fixture는 여전히 0건이므로 자동 번역 의미 정확성은 검증되지 않았다.
 - 진단 API 회귀 1파일 4개 테스트 통과. `npm.cmd run deploy:verify`도 다시 통과(의존성 취약점 0, production build 111개 페이지, 브라우저/API smoke, 테스트 1,526 passed·3 skipped, typecheck/docs/정책 검사). RSS 진단 응답에서 새 기사별 `notification_status`·`notified_at`을 확인했다. 2026-10-25 16:57Z의 24시간 제목 표본 5건은 모두 `SENT`였고, 그중 GNW 4건은 괄호 누락 또는 임상 단계·핵심 의미 오역이 있었다. 이 항목들은 새 송신 검증 배포 전 발송된 legacy 사례이며, 새 quota 대기 기사들의 실제 번역/Discord 수신은 아직 확인되지 않았다.
-- 운영 provider 출력 회귀 3파일 122개 테스트 통과: 임상 단계와 `encouraging data`, `oral session`, `advanced NSCLC`의 원문 기반 교정을 새 번역 및 송신 직전 검증 양쪽에 적용한다.
+- 운영 provider 출력 회귀 3파일 122개 테스트 통과: 임상 단계와 `encouraging data`, `oral session`, `advanced NSCLC`의 원문 기반 교정을 새 번역 및 송신 직전 검증 양쪽에 적용한다. 전체 `npm.cmd run deploy:verify`도 통과: production build 111 pages, standalone/Chrome/API smoke, Vitest 302 files(1,529 passed·3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사.
 
 ### 다음 개선
 - 코드 workflow `40210193279`가 성공하고 운영 SHA `cd55b5ef`, `/api/health` `ok`를 확인했다. 2026-10-25 16:18:11Z read-only 집계: GNW pending 0, sent 25, skipped 7; SEC pending 0, sent 8,692, skipped 238, uncertain 3; StockTitan pending 2,304, sent 8,788, skipped 11,396, uncertain 2. 모든 신규 skip은 `monthly_character_limit_reached`; 아직 대기한 backlog의 실제 Discord 수신은 확인되지 않았다. 다음 UTC quota reset 후 source별 pending, skipped, sent, uncertain와 제목 번역 표본·실제 Discord 수신을 확인한다.
@@ -31,6 +31,7 @@
 
 ### 커밋·푸시·배포
 - 완료: RSS 코드 커밋 `cd55b5efe4537f04b5c1e0c1dac89ba83ddc1d91`을 `origin/oci`에 push했다. Deploy OCI workflow `40210193279`의 verify/package/SSH/upload/activate가 성공했고 운영 SHA는 `cd55b5ef`, `/api/health`는 `ok`다. 과거 로그 손상 복원 문서 커밋 `63ddabe58eb0eff62c24c911eb02308213683f18`도 별도 Deploy OCI workflow `40211443629` 성공으로 운영에 반영됐다. 진단 API 커밋 `e00c366d1e9db08322d41b9f9848f9eda3a08ea7`을 push했고 Deploy OCI workflow `40213560079`의 verify/package/SSH/upload/activate가 성공했다. 운영 /health-check는 같은 SHA, /api/health는 ok다.
+- 완료: source-confirmed pharmaceutical headline correction 커밋 `767cc9c7c9ea493e853e7f6e2c486c03f3cb87c3`을 push했다. Deploy OCI workflow `40215274420`이 성공했고 운영 /health-check가 같은 SHA, /api/health가 ok를 반환한다.
 ## [2026-10-26] 임상 단계 정규화 경계 보완
 
 ### 목표
