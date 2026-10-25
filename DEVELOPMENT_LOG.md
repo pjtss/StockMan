@@ -7019,14 +7019,16 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 진단 변경 `80c4e48e` 배포 및 `/health-check` SHA 확인 후 완전한 신규 cron 실행에서 숫자 검출 원인을 확인했다: `Half a Kilometre`→`0.5`를 `0`,`5`로 분리, 제목 구분 dash 뒤 `July`→`7`을 음수로 오인, 프랑스어 `deuxième`→`2`를 허용하지 못했다. 각각 decimal parsing/`half=0.5`, 공백 dash를 금융부호로 판정하지 않기, 프랑스어 수사·월 이름 허용으로 수정했다.
 - 실 운영 `07:29:07Z` 집계는 SEC sent 1,593 / notification pending 7,411, StockTitan sent 17,449 / notification pending 2,959, GlobeNewswire sent 19 / pending 3이었다. 07:28:36Z run은 notification 20건을 보냈지만 번역 20건 중 fallback 16건(보호 토큰 불일치 12 포함)으로 아직 번역 품질은 미완료다.
 - 숫자 검증 진단 및 세 실표본 회귀 145건 통과. 첫 전체 빌드는 수사 map의 영어·프랑스어 중복 키(second/six/seven)를 검출해 실패했고, 중복을 제거했다. 재실행한 전체 `npm.cmd run deploy:verify` 통과: 302개 테스트 파일 중 301개 통과·1개 skip, 1,488개 통과·3개 skip; build/typecheck/standalone·Chrome/runtime smoke/docs·migration/security/cron gate 모두 통과.
+- `c37cfdea` 배포 후에도 공급자 marker 변형이 주요 폴백 사유로 남아, 다음 변경에서는 expected/returned marker의 누락·중복·예상 외 index만 기록한다. marker 원문 값이나 기사 본문은 저장하지 않아 토큰 변형 양상을 확인한다.
+- token-index diagnostics 관련 103개 테스트와 전체 `npm.cmd run deploy:verify` 통과(302개 파일 중 301 pass·1 skip, tests 1,488 pass·3 skip; build, typecheck, standalone·Chrome smoke, docs/migration/security/cron gates 포함).
 
 ### 남은 위험 및 후속
 - 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.
 - `translation_pending`, `notification_pending`, 실패/불확실 상태를 source별로 계속 관찰하고 DB에 저장된 과거 대기량 소진 여부를 확인한다.
-- 이번 수사 표현 수정 배포 후 `unprotected=0,5`, `signedNumeral=true`, `unprotected=2` 표본이 오류 없이 한국어 번역되어 SENT 되는지 확인한다. 이후에도 남은 보호 토큰 불일치 12/20 fallback 원인을 별도로 개선한다.
+- 이번 수사 표현 수정 배포 후 `unprotected=0,5`, `signedNumeral=true`, `unprotected=2` 표본이 오류 없이 한국어 번역되어 SENT 되는지 확인한다. marker-index 진단을 배포한 뒤 누락/중복/예상 외 유형에 맞게 provider 보호 표현을 개선한다.
 - `6-K` 행의 진단은 배포 시각과 겹친 이전 실행 결과로 보이고 이후 실표본부터 진단 suffix가 기록됐다. 다음 재시도에서 실제 `6-K` 항목 진단과 상태를 확인한다.
 - 개선 과제 ID: RSS-2026-10-25-TRANSLATION-QUALITY
 - 성과 판정: IN_PROGRESS
 
 ### 커밋·푸시·배포
-- 커밋 `3069a4b4`, `6595345c`, `80c4e48e` push 및 OCI 배포 완료. 신규 수사 표현 수정은 전체 검증 완료, commit/push/deploy 전이다. 번역 품질 오탐 개선과 전체 과거 대기 발송은 진행 중이다.
+- 커밋 `3069a4b4`, `6595345c`, `80c4e48e`, `c37cfdea` push 및 OCI 배포 완료. token-index 진단 변경은 전체 검증 완료, commit/push/deploy 전이다. 번역 품질 오탐 개선과 전체 과거 대기 발송은 진행 중이다.

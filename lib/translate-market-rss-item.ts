@@ -53,6 +53,18 @@ function getAllowedSpelledNumberValues(sourceTitle: string) {
   return { numbers: allowed, months: allowedMonthNumbers };
 }
 
+function describeProtectedTokenMismatch(translatedText: string, placeholders: Array<{ marker: string }>) {
+  const expected = new Set(placeholders.map(({ marker }) => marker));
+  const returned = [...translatedText.matchAll(/ZX\d+Q/g)].map(([marker]) => marker);
+  const counts = new Map<string, number>();
+  for (const marker of returned) counts.set(marker, (counts.get(marker) ?? 0) + 1);
+  const indexes = (markers: string[]) => [...new Set(markers.map((marker) => marker.match(/^ZX(\d+)Q$/)?.[1]).filter((index): index is string => index !== undefined))].slice(0, 10).join(",") || "none";
+  const missing = placeholders.filter(({ marker }) => !counts.has(marker)).map(({ marker }) => marker);
+  const duplicated = [...counts].filter(([, count]) => count > 1).map(([marker]) => marker);
+  const unexpected = returned.filter((marker) => !expected.has(marker));
+  return `missing=${indexes(missing)};duplicate=${indexes(duplicated)};unexpected=${indexes(unexpected)}`;
+}
+
 const MONTH_WORD_NUMBER_VALUES: Record<string, number> = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
@@ -176,7 +188,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const providerHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
   const restoredText = restoreMarketRssTranslationTokens(normalizedProviderText, preparedInput.placeholders);
   if (!restoredText.ok) {
-    const fallback = await validationFallback("protected_token_mismatch");
+    const fallback = await validationFallback("protected_token_mismatch", undefined, describeProtectedTokenMismatch(normalizedProviderText, preparedInput.placeholders));
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
   const translatedHeadline = extractMarketRssTranslatedHeadline(restoredText.text) ?? (hasProviderMarkup ? null : restoredText.text);

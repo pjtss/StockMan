@@ -1000,6 +1000,7 @@ describe("market RSS translation", () => {
     expect(result.translatedTitle).toBe(source.title);
     expect(result.translationFallback).toBe(true);
     expect(result.translationFallbackReason).toBe("protected_token_mismatch");
+    expect(result.translationFallbackDetails).toBe("missing=0;duplicate=none;unexpected=none");
   });
 
   it("rejects a provider response with no Korean when the source contains translatable letters", async () => {
