@@ -426,6 +426,21 @@ describe("market RSS translation", () => {
     expect(result.translatedSummary).toBe(source.summary);
   });
 
+  it("protects the PD-L1 biomarker code so a hyphen cannot become an invented financial sign", async () => {
+    const source = { ...item("pd-l1-biomarker"), title: "Ivonescimab Monotherapy Demonstrates Benefit in PD-L1-Positive Advanced NSCLC | SMMT Stock News" };
+    const prepared = prepareMarketRssTranslationInput(source.title);
+    expect(prepared.placeholders.map(({ original }) => original)).toContain("PD-L1");
+    let providerTitle = "이보네시맙 단독요법이 PD-L1 양성 진행성 NSCLC 환자에서 이점을 보였습니다 | SMMT 주식 뉴스";
+    for (const placeholder of prepared.placeholders) providerTitle = providerTitle.replace(placeholder.original, placeholder.marker);
+    const translate = vi.fn(async () => ({ translatedText: providerTitle, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result.translationFallback).toBe(false);
+    expect(result.translatedTitle).toContain("PD-L1");
+    expect(result.translatedSummary).toBe(source.summary);
+  });
+
   it("decodes other valid HTML5 named entities and only one encoding layer", () => {
     const translatedHtml = '<p id="market-rss-headline">Caf&eacute; &amp; Cr&egrave;me &amp;nbsp; &madeup;</p><p id="market-rss-context">context</p>';
 
