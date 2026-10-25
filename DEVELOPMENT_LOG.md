@@ -7031,12 +7031,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 번역기, 보호 토큰, Azure/Google 요청 형식 통합 회귀 159개 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 파일 중 301개 통과·1개 skip, 테스트 1,493개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. 기존 Windows standalone node_modules symlink `EPERM`은 검증 스크립트 fallback으로 처리되어 전체 gate는 통과했다. 배포 후 실제 run에서 토큰 mismatch 감소와 세 출처 backlog 변화를 확인한다.
 - `e351cbd7` 배포 뒤 새 코드에서 시작된 완결 RSS cron run은 보호 토큰 오류 0건, 번역 20/20건, Discord 전송 20건으로 성공했다. 다음 run에서 HeartCore·Luvina·Vietnam·Software처럼 장문의 회사/파트너 고유명이 그대로 남은 채 주요 문구가 한국어인 후보가 `target_language_not_detected`로 보류된 것을 확인했다.
 - Korean 비율 판정의 하한을 25%에서 18%로 조정해 이 실제 표본처럼 복수의 긴 고유명사로 전체 문자 수가 증가한 제목을 허용하되, 완전한 영어 및 짧은 한국어 한 조각만 포함한 제목을 거부하는 회귀를 유지했다. 관련 품질·제목 번역 테스트 103개 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 파일 중 301개 통과·1개 skip, 테스트 1,494개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. Windows standalone symlink 경고는 verify fallback으로 처리됐다. 새 배포 후 해당 기사 재시도 성공, GlobeNewswire 완전 발송, SEC/StockTitan 과거 backlog 지속 진행 여부를 확인한다.
-- 다음 운영 run에서 “Secondary Offering”→“2차 공모”가 source-supported number gate에 걸리고, 무번호 `Quarter`가 provider 출력의 `4분기`를 제거하지 못하는 두 오탐을 추가 확인했다. 수사 map에 `primary=1`/`secondary=2`를 추가하고, 한국어 문자 뒤에 쓰인 ASCII `\b` 종료 경계가 Unicode regex에서 일치하지 않던 문제를 `[\p{L}\p{N}_]` 경계 검사로 수정했다. 관측 표본 재생·고유명사 후보 등 관련 회귀 105개 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 파일 중 301개 통과·1개 skip, 테스트 1,496개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. 이 변경의 배포·운영 확인은 미완료다.
+- 마지막 운영 관찰에서 출처 연도 `2026`과 `Hottest`처럼 의미상 연도를 표시하는 경우가 숫자 오탐으로 막히는 표본을 추가 확인했다. 원문에 있는 19xx/20xx 연도만 후보 내 같은 연도 숫자로 허용하고, 별도 시험 제목을 추가했다. 제목 번역·품질 회귀 106개 통과. 전체 `npm.cmd run deploy:verify` 통과: 302개 파일 중 301개 통과·1개 skip, 테스트 1,497개 통과·3개 skip; build/typecheck, standalone·Chrome desktop/mobile, docs/migration, scope/KIS/auth/OCI cron 검증 통과. standalone node_modules symlink EPERM은 기존 fallback으로 처리됐다. 수정은 커밋·배포 전이며 운영 확인도 미완료다.
 
 ### 남은 위험 및 후속
 - 일반 뉴스 제목의 번역 provider가 all-caps가 아닌 문장에서도 의미 번역을 완성하지 못하면 품질 gate가 fail-closed로 보류한다. provider 결과를 검증 없이 통과시키지 않는다.
 - `translation_pending`, `notification_pending`, 실패/불확실 상태를 source별로 계속 관찰하고 DB에 저장된 과거 대기량 소진 여부를 확인한다.
-- 숫자 교정 후 `unprotected=0,5`, `signedNumeral=true`, `unprotected=2`, `unprotected=8` 표본이 한국어 SENT 되는지 확인한다. marker-index 진단을 배포한 뒤 누락/중복/예상 외 유형에 맞게 provider 보호 표현을 개선한다.
+- 숫자 교정 후 `unprotected=0,5`, `signedNumeral=true`, `unprotected=2`, `unprotected=8`, source year `2026` 표본이 한국어 SENT 되는지 확인한다. marker-index 진단을 배포한 뒤 누락/중복/예상 외 유형에 맞게 provider 보호 표현을 개선한다.
 - `6-K` 행의 진단은 배포 시각과 겹친 이전 실행 결과로 보이고 이후 실표본부터 진단 suffix가 기록됐다. 다음 재시도에서 실제 `6-K` 항목 진단과 상태를 확인한다.
 - 개선 과제 ID: RSS-2026-10-25-TRANSLATION-QUALITY
 - 성과 판정: IN_PROGRESS

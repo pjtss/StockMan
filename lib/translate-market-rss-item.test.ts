@@ -541,6 +541,10 @@ describe("market RSS translation", () => {
       "앤더슨, 2차 공모 종료 및 인수인의 추가 주식 매입 옵션 전액 행사 발표 | ANDG 주식 뉴스",
     ],
     [
+      "Realtor.com's 2026 Hottest ZIP Codes in America: Peabody, Mass. Claims the Top Spot as Buyers Chase Space Near Major Metros | NWS Stock News",
+      "Realtor.com의 2026년 미국에서 가장 인기 있는 우편번호: 매사추세츠주 피바디가 주요 대도시 근처에서 공간을 찾는 구매자들 사이에서 최고 자리를 차지 | NWS 주식 뉴스",
+    ],
+    [
       "Results for the Quarter and Half Year Ended June 30, 2026",
       "6월 종료 분기 및 반기 실적 30, 2026",
     ],

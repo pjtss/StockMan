@@ -55,6 +55,10 @@ function getAllowedSpelledNumberValues(sourceTitle: string) {
   return { numbers: allowed, months: allowedMonthNumbers };
 }
 
+function getAllowedSourceYearValues(sourceTitle: string) {
+  return new Set((sourceTitle.match(/\b(?:19|20)\d{2}\b/g) || []).map(Number));
+}
+
 function describeProtectedTokenMismatch(translatedText: string, placeholders: Array<{ marker: string }>) {
   const expected = new Set(placeholders.map(({ marker }) => marker));
   const returned = [...translatedText.matchAll(/ZX\d+Q/g)].map(([marker]) => marker);
@@ -224,10 +228,12 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const allowedSpelledNumbers = getAllowedSpelledNumberValues(item.title);
   // Keep decimal fractions together (for example, “half a kilometre” → “0.5 km”).
   const unprotectedNumerals = unprotectedHeadlineDigits.match(/\d+(?:[.,]\d+)?/g) || [];
+  const allowedSourceYears = getAllowedSourceYearValues(item.title);
   const inventedNumerals = unprotectedNumerals.filter((value) => {
     const normalizedNumber = /,\d{3}$/.test(value) ? value.replace(/,/g, "") : value.replace(",", ".");
     const numericValue = Number(normalizedNumber);
     if (allowedSpelledNumbers.numbers.has(numericValue)) return false;
+    if (/^(?:19|20)\d{2}$/.test(value) && allowedSourceYears.has(numericValue)) return false;
     const monthSuffix = new RegExp(`(?:^|\\D)${value}\\s*월`, "u");
     return !allowedSpelledNumbers.months.has(numericValue) || !monthSuffix.test(unprotectedHeadlineDigits);
   });
