@@ -106,7 +106,7 @@ export async function GET(request: Request) {
         [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
       ),
       pool.query(
-        `SELECT source,
+        `SELECT source, translation_provider AS provider,
                 CASE
                   WHEN translation_skipped_reason IN (
                     'already_in_target_language', 'monthly_character_limit_reached',
@@ -122,7 +122,7 @@ export async function GET(request: Request) {
                 COUNT(*)::int AS count
          FROM market_rss_articles
          WHERE source = ANY($1::text[]) AND translation_status = 'SKIPPED'
-         GROUP BY source, reason ORDER BY source, reason`,
+         GROUP BY source, provider, reason ORDER BY source, provider, reason`,
         [source ? [source] : [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]],
       ),
     ]);

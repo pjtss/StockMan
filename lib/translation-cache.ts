@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import { getPool } from "./db";
 
 export const TRANSLATION_LIMIT = 300_000;
-export const AZURE_TRANSLATION_MONTHLY_LIMIT = 1_800_000;
+// Azure Translator F0 includes 2M characters/month. Keep a 100K safety margin
+// for counting/usage outside this application's reservation ledger.
+export const AZURE_TRANSLATION_MONTHLY_LIMIT = 1_900_000;
 export const AZURE_TRANSLATION_HOURLY_LIMIT = 1_800_000;
 export const GOOGLE_TRANSLATION_HOURLY_LIMIT = 100_000;
 export const AZURE_TRANSLATION_PROVIDER = "azure-translator";

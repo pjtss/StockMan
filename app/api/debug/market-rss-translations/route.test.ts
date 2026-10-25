@@ -19,14 +19,14 @@ describe("RSS translation diagnostics API", () => {
       .mockResolvedValueOnce({ rows: [{ count: 1 }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }] })
-      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", reason: "protected_token_mismatch", count: 2 }] });
+      .mockResolvedValueOnce({ rows: [{ source: "STOCKTITAN", provider: "azure-translator", reason: "protected_token_mismatch", count: 2 }] });
     const response = await GET(new Request("http://localhost/api/debug/market-rss-translations"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.summary.byStatus).toEqual({ PENDING: 1 });
     expect(body.lifetimeBySource).toEqual([{ source: "STOCKTITAN", total: 5, translated: 2, notification_pending: 3 }]);
-    expect(body.lifetimeSkippedReasonsBySource).toEqual([{ source: "STOCKTITAN", reason: "protected_token_mismatch", count: 2 }]);
+    expect(body.lifetimeSkippedReasonsBySource).toEqual([{ source: "STOCKTITAN", provider: "azure-translator", reason: "protected_token_mismatch", count: 2 }]);
     expect(state.query).toHaveBeenCalledTimes(5);
     expect(state.query.mock.calls[3][1]).toEqual([["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]);
     expect(state.query.mock.calls[4][1]).toEqual([["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]);

@@ -12,6 +12,8 @@ GlobeNewswire, StockTitan, SEC EDGAR 기사 알림은 `title`만 한국어로 �
 
 ## 배포 설정
 
+Azure Translator F0의 공식 무료 제공량은 월 2,000,000자다. RSS 앱은 외부 사용량에 대비해 100,000자 여유를 둔 1,900,000자 월 예약 상한을 사용하고, 시간당 상한은 1,800,000자로 별도 제한한다. 공식 기준: [Azure Translator pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/translator/), [service limits](https://learn.microsoft.com/en-us/azure/ai-services/Translator/service-limits).
+
 현재 런타임은 Azure Translator F0를 우선 사용하고, F0 사용량 한도 또는 오류 시 Google Cloud Translation Basic v2를 fallback으로 사용한다. Azure 키·endpoint와 `AZURE_TRANSLATOR_FREE_TIER_CONFIRMED=F0`가 없으면 Azure 호출을 하지 않는다. 필요 시 `AZURE_TRANSLATOR_REGION`도 설정한다. Google API key는 `x-goog-api-key` header로 보낸다. 두 provider가 미설정이거나 실패하면 번역 전 Discord 발송은 보류된다.
 
 `AZURE_TRANSLATOR_API_KEY`에는 Translator resource의 Key 1 또는 Key 2를 설정하고, 같은 resource의 `AZURE_TRANSLATOR_ENDPOINT` 및 필요 시 `AZURE_TRANSLATOR_REGION`과 짝지어야 한다. 앱은 Text Translation API만 사용한다. endpoint는 base URL 또는 `/translate`까지 포함한 Text Translation endpoint를 지원한다.
