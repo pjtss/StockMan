@@ -1,3 +1,47 @@
+## [2026-10-25] RSS provider 입력을 제목 전용 API로 제한
+
+### 목표
+- 번역 provider 입력에 RSS 기사 제목만 들어가도록 함수 계약에서 막고, 요약·본문을 번역하지 않는 회귀를 보장한다.
+
+### 원인
+- 운영 경로는 이미 `prepareMarketRssTranslationInput(item.title)`만 전달했지만, 입력 준비 함수 자체는 선택적 summary 인자를 받아 provider context를 생성할 수 있었다. 이런 공개 함수 모양은 향후 호출자가 summary/body를 실수로 전달해 번역하게 만들 수 있어 “제목만 번역” 요구를 타입 경계에서 보장하지 못했다.
+
+### 반영
+- `lib/market-rss-translation-input.ts`: 입력 준비 함수에서 summary 인자, summary 정리, context 조립을 제거했다. 요약을 넘기는 호출은 TypeScript에서 거부되며 준비된 provider text는 제목만 포함한다.
+- `lib/translate-market-rss-item.test.ts`: 긴 summary가 있는 기사도 provider 입력은 제목뿐이고 `translatedSummary`는 원문 그대로인 회귀를 추가했다. 이전 summary-context 입력 전용 테스트를 제거하고 provider가 추가 context 문단을 반환하더라도 headline만 추출되는 동작을 검증한다.
+- `lib/market-rss-translation-review-fixtures.test.ts`: 품질 fixture 실행도 원제목만 provider 입력으로 사용하도록 수정했다.
+
+### 검증
+- 대상 테스트 `npm.cmd exec vitest run -- lib/translate-market-rss-item.test.ts lib/market-rss-translation-review-fixtures.test.ts --reporter=dot`: 2개 파일 통과, 98개 통과·2개 데이터 fixture skip(승인된 human-review 사례 없음).
+- 전체 `npm.cmd run deploy:verify`: 최종 통과. dependency audit 0 vulnerabilities, Next production build, standalone HTTP/Chrome desktop·mobile/API smoke, Vitest 302개 파일(301 passed·1 skipped; 1,514 passed·3 skipped), typecheck, docs/migration, scope, KIS boundary, Bearer auth(180 routes), OCI cron 검증을 모두 통과했다. 첫 검증에서 DEVELOPMENT_LOG 최신 항목의 필수 문서 계약 누락을 발견해 양식을 보완한 뒤 재실행하여 전 게이트 성공을 확인했다.
+
+### 다음 개선
+- 배포 뒤 운영 SHA와 다음 Google 월 한도 reset 이후 실제 새 제목 번역을 세 출처에서 표본 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-25-020
+- 성과 판정: PARTIAL
+- 근거: provider 입력 함수의 요약 인자를 제거했고 제목-only 회귀와 로컬 실행 검증이 통과했다. 실제 quota-blocked 운영 provider 결과 및 전체 backlog 수신 증거는 아직 없다.
+
+### 커밋·푸시·배포
+- 미실행: 최종 전체 게이트는 통과했다. 기존 RSS 전용 배포 권한으로 커밋·푸시한 뒤 Deploy OCI 결과와 운영 SHA를 확인한다.
+
+## [2026-10-25] RSS Discord 제목 번역 전송 게이트 검증 및 운영 배포
+
+### 목표 및 범위
+- SEC EDGAR, StockTitan, GlobeNewswire에서 필터링 없이 수집한 기사는 Discord 전송 전에 제목만 한국어 번역 상태인지 강제한다. summary/body/content는 provider 입력에 포함하지 않는다.
+- 번역 실패·quota skip은 미번역 원문 발송으로 우회하지 않고 대기시킨다. 월간 provider 한도는 사용자 승인 없이 변경하지 않는다.
+
+### 변경 및 검증
+- `lib/market-rss-notification-translation-gate.ts`: `TRANSLATED` 행은 한국어 대상 언어, 비-fallback, non-empty translated title을 요구한다. 동일 언어 원제목 보존으로 SKIPPED된 행은 `already_in_target_language` 근거와 함께 동등성을 확인한다. 알림 PENDING 외 상태를 임의로 끌어오지 않는다.
+- `lib/market-rss-notification-translation-gate.test.ts`: 데이터베이스 eligibility 조건에 대한 회귀 검증을 보강했다. provider 입력은 `item.title`만 사용하며 본문/요약 번역 회귀 검증을 유지한다.
+- 최종 `npm.cmd run deploy:verify` 통과: dependency audit 0 취약점, production build 및 HTTP/browser/API smoke, 전체 302개 테스트 파일(301 pass·1 skipped; 1,518 tests pass·3 skipped), typecheck, docs/migrations, scope, KIS, auth, OCI cron 검증 통과.
+- 변경 커밋 `faa5a069fbbfa6b35826fe25ac8c3f273bd5997c`을 `origin/oci`에 push했다. GitHub Actions Deploy OCI run `40201501678` 성공, 운영 `/api/health` HTTP 200, `/health-check`가 정확한 SHA `faa5a069fbbfa6b35826fe25ac8c3f273bd5997c`를 반환했다.
+
+### 운영 상태 및 한계
+- 운영 read-only RSS 진단 `2026-10-25 14:23:04Z`: notification PENDING은 GlobeNewswire 4, SEC 1,021, StockTitan 2,299건이다. 번역 status SKIPPED는 각각 4, 238, 11,391건이며 모두 `monthly_character_limit_reached`다. 새 provider 번역과 전체 backlog Discord 수신은 월간 한도 때문에 아직 확인할 수 없다. 사용자 승인 없이 quota 또는 provider 예산은 높이지 않는다.
+- 현재 SENT지만 검증 번역이 없는 기존 이력은 SEC 313건, StockTitan 9,335건으로 집계된다. 과거 Discord 발송을 소급 취소할 수 없다. 이후 재발은 `/api/debug/market-rss-translations`의 `sentGateViolationsBySource` 및 source별 집계로 감지한다.
+
 ## [2026-10-25] 다국어 임상 단계·시험 식별자 제목 보호
 
 ### 목표

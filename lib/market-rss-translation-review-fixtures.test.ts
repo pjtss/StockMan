@@ -42,16 +42,13 @@ semanticCoverageSuite("human-reviewed market RSS semantic regression coverage", 
 
   it("checks reviewed expected-title plumbing through shared RSS input and fallback handling (not provider accuracy)", async () => {
     for (const entry of reviewFixture.cases) {
-      const prepared = prepareMarketRssTranslationInput(entry.originalTitle, entry.originalSummary || "");
+      const prepared = prepareMarketRssTranslationInput(entry.originalTitle);
       let providerHeadline = entry.expectedTitle;
       for (const token of prepared.placeholders) {
         providerHeadline = providerHeadline.replace(token.original, token.marker);
       }
-      const providerContext = prepared.hasContext
-        ? prepared.text.split(MARKET_RSS_TRANSLATION_CONTEXT_MARKER)[1]?.replace(/<\/p><\/div>$/, "") || ""
-        : "";
-      const providerOutput = prepared.hasContext
-        ? `<div>${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}${providerHeadline}${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}${providerContext}</p></div>`
+      const providerOutput = prepared.placeholders.length > 0
+        ? `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}${providerHeadline}</p>`
         : providerHeadline;
       const translate = vi.fn(async () => ({
         translatedText: providerOutput,

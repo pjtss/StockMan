@@ -353,31 +353,10 @@ describe("market RSS translation", () => {
     expect(result.translationFallback).toBe(false);
   });
 
-  it("bounds summary context and strips markup and control characters", () => {
-    const prepared = prepareMarketRssTranslationInput("Revenue rises", `<p>A\u0000B</p>${"x".repeat(600)}`);
-
-    expect(prepared.text).toMatch(/^<div><p id="market-rss-headline">Revenue rises<\/p><p id="market-rss-context">A B x{1,499}<\/p><\/div>$/);
-    expect(prepared.text).toContain('id="market-rss-headline"');
-    expect(prepared.text).not.toContain("\u0000");
-    expect(prepared.text.match(/x/g)).toHaveLength(497);
-    expect(prepared.hasContext).toBe(true);
-  });
-
-  it("truncates summary context by Unicode code point without splitting a supplementary character", () => {
-    const prepared = prepareMarketRssTranslationInput("Revenue rises", `${"x".repeat(499)}🚀tail`);
-    const context = prepared.text.split(MARKET_RSS_TRANSLATION_CONTEXT_MARKER)[1]?.replace(/<\/p><\/div>$/, "") || "";
-
-    expect(Array.from(context)).toHaveLength(500);
-    expect(context.endsWith("🚀")).toBe(true);
-    expect(context).not.toContain("tail");
-    expect(context).not.toContain("\uFFFD");
-  });
-
   it("removes lone surrogates from provider input while preserving valid supplementary characters", () => {
-    const prepared = prepareMarketRssTranslationInput(`Revenue${String.fromCharCode(0xd800)} rises 🚀`, `Outlook${String.fromCharCode(0xdc00)} improves 😀`);
+    const prepared = prepareMarketRssTranslationInput(`Revenue${String.fromCharCode(0xd800)} rises 🚀`);
 
     expect(prepared.text).toContain("🚀");
-    expect(prepared.text).toContain("😀");
     expect(Array.from(prepared.text).some((character) => {
       const codePoint = character.codePointAt(0)!;
       return codePoint >= 0xd800 && codePoint <= 0xdfff;
@@ -439,12 +418,6 @@ describe("market RSS translation", () => {
     expect(result.translationFallback).toBe(false);
   });
 
-  it("preserves comparison operators in the cleaned RSS summary context", () => {
-    const prepared = prepareMarketRssTranslationInput("Nvidia shares", "Shares traded < $100 and > $80; <b>record</b> improved.");
-
-    expect(prepared.text).toContain("Shares traded &lt; $100 and &gt; $80; record improved.");
-  });
-
   it("preserves locale grouping spaces through provider-input normalization and token restoration", async () => {
     const source = { ...item("locale-grouping"), title: "Revenue reached 1\u202f234,56\u00a0€", summary: "" };
     const translate = vi.fn(async (text: string) => ({
@@ -464,39 +437,29 @@ describe("market RSS translation", () => {
   });
 
   it("canonicalizes equivalent NFC and NFD titles and summaries to one provider input", () => {
-    const decomposed = prepareMarketRssTranslationInput("Cafe\u0301 revenue rises", "The cafe\u0301 outlook improves.");
-    const composed = prepareMarketRssTranslationInput("Café revenue rises", "The café outlook improves.");
+    const decomposed = prepareMarketRssTranslationInput("Cafe\u0301 revenue rises");
+    const composed = prepareMarketRssTranslationInput("Café revenue rises");
 
     expect(decomposed.text).toBe(composed.text);
     expect(decomposed.titleLength).toBe(composed.titleLength);
     expect(decomposed.text).toContain("Café revenue rises");
   });
 
-  it("excludes non-visible script, style, and comment text from translation context", () => {
-    const prepared = prepareMarketRssTranslationInput(
-      "Revenue rises",
-      "<p>Operating outlook improves&nbsp; 20%</p><!-- hidden editorial note --><script>inject misleading headline</script><style>.bad { color:red }</style><noscript>tracking fallback</noscript>",
-    );
+  it("prepares only the title as provider input regardless of item summary", async () => {
+    const source = { ...item("title-only-input"), title: "Nvidia revenue rises", summary: "A long outlook summary that must remain untranslated." };
+    const translate = vi.fn(async () => ({ translatedText: "엔비디아 매출 상승", source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
+    const result = await translateMarketRssItem(source, client(translate));
 
-    expect(prepared.text).toContain("Operating outlook improves 20%");
-    expect(prepared.text).not.toMatch(/editorial note|misleading headline|color:red|tracking fallback/);
-    expect(prepared.text).toContain('id="market-rss-context"');
+    expect(translate).toHaveBeenCalledWith("Nvidia revenue rises", "auto", "ko", "text");
+    expect(translate.mock.calls[0][0]).not.toContain(source.summary);
+    expect(result.translatedTitle).toBe("엔비디아 매출 상승");
+    expect(result.translatedSummary).toBe(source.summary);
   });
 
-  it("decodes valid HTML5 named and numeric entities in RSS context before HTML escaping", () => {
-    const prepared = prepareMarketRssTranslationInput("Shares rise", "Caf&eacute; &amp; Cr&egrave;me&nbsp;rose &mdash; the company&rsquo;s outlook improved&#x21;");
+  it("accepts a headline paragraph and drops any extra translated context paragraph", () => {
+    const translatedHtml = '<div><p id="market-rss-headline">실적&nbsp;상승 &mdash; 회사&rsquo;의 전망 개선</p><p id="market-rss-context">요약은 번역하지 않음</p></div>';
 
-    expect(prepared.text).toContain("Café &amp; Crème rose — the company’s outlook improved!");
-    expect(prepared.text).not.toContain("&amp;mdash;");
-    expect(prepared.text).not.toContain("&amp;rsquo;");
-  });
-
-  it("decodes summary entities once, preserves unknown entities, and drops invalid numeric scalars", () => {
-    const prepared = prepareMarketRssTranslationInput("Shares rise", "&amp;nbsp; &madeup; &#xD800; &#999999999;");
-
-    expect(prepared.text).toContain("&amp;nbsp; &amp;madeup;");
-    expect(prepared.text).not.toContain("&#xD800;");
-    expect(prepared.text).not.toContain("&#999999999;");
+    expect(extractMarketRssTranslatedHeadline(translatedHtml)).toBe("실적 상승 — 회사’의 전망 개선");
   });
 
   it("decodes common named HTML entities in the translated headline", () => {
