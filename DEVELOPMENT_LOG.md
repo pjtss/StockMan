@@ -7221,9 +7221,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `buildMarketRssTranslationCandidateCondition()`이 재시도 가능 상태 외에 `notify_eligible=true`와 `is_backlog=false`를 요구했다. 이 때문에 과거 backlog 기사나 향후 분류상 알림 제외 상태인 피드 항목은 번역 단계에서 영구적으로 선택되지 않아, 번역 통과를 요구하는 Discord 게이트에도 도달하지 못할 수 있었다.
 - `lib/market-rss-translation-retry.ts`에서 후보 조건을 재시도 상태로만 제한했다. provider 번역은 모든 적격 RSS 행에서 수행하고, Discord 발송은 별도 `TRANSLATED` 또는 이미 한국어인 제목 게이트로 계속 보호한다.
 - `lib/market-rss-translation-retry.test.ts`가 backlog/notify eligibility 조건을 SQL에서 제외하는지 검사하도록 회귀를 변경했다.
+- 운영 aggregate에서 `sent_without_validated_translation`은 SEC 313, StockTitan 9,335였고 이 legacy `SENT` 행도 monthly quota reset 후 번역 재시도 후보로 잡힐 수 있었다. 발송 결과가 이미 끝난 `SENT` 및 재전송을 피해야 하는 `UNCERTAIN` 행은 새 번역 후보에서 제외하고, `PENDING`/`FAILED`/`SKIPPED` 대기 행만 남기도록 후보를 추가 제한했다. `notify_eligible`과 backlog 상태에 따른 기사 필터는 유지하지 않았다.
 
 ### 검증
 - `npm.cmd exec vitest run -- lib/market-rss-translation-retry.test.ts lib/market-rss-notification-translation-gate.test.ts --reporter=dot`: 2개 파일 15개 테스트 통과.
+- 후보 SQL 회귀는 `notify_eligible`/`is_backlog` 필터가 없고 notification status는 `PENDING`, `FAILED`, `SKIPPED`로 제한됨을 확인한다. `SENT`와 `UNCERTAIN`은 quota를 쓰는 번역 대상에서 제외한다.
 - 코드상 source queue는 `GLOBENEWSWIRE`, `STOCKTITAN`, `SEC_EDGAR` 각 하나씩 생성하고 공정 교차 선택한다. provider 결과 검증 실패 또는 quota fallback 제목은 Discord SQL gate가 전송하지 않는다.
 - 운영 health endpoint는 2026-10-25 13:02Z HTTP 200/status `ok`를 반환했으나 배포 SHA는 노출하지 않는다. 현재 작업 환경에 GitHub CLI 및 운영 RSS 진단 토큰이 없어 이번 코드 버전 배포 완료와 최신 기사 번역 표본은 아직 검증하지 못했다.
 - `npm.cmd run deploy:verify` 통과: 302개 test files(301 passed/1 skipped), 1,518 tests passed/3 skipped; dependency audit, build, standalone HTTP/browser smoke, typecheck, docs/migration, scope/KIS/auth/OCI cron gates 성공.

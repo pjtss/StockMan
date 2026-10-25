@@ -83,15 +83,18 @@ describe("market RSS translation retry criteria", () => {
       .toContain(getPacificQuotaDayStart(new Date("2026-10-18T12:00:00.000Z")).toISOString());
   });
 
-  it("includes historical backlog and non-notify-eligible rows in translation candidates", () => {
+  it("includes historical unsent backlog regardless of notification eligibility and excludes already sent rows", () => {
     const criteria = getMarketRssTranslationRetryCriteria(true, new Date("2026-10-18T12:00:00.000Z"));
     const query = new PgDialect().sqlToQuery(buildMarketRssTranslationCandidateCondition(criteria));
 
     expect(query.sql).not.toContain('"market_rss_articles"."notify_eligible"');
     expect(query.sql).not.toContain('"market_rss_articles"."is_backlog"');
+    expect(query.sql).toContain('"market_rss_articles"."notification_status" in');
     expect(query.params).toContain("PENDING");
     expect(query.params).toContain("FAILED");
     expect(query.params).toContain("SKIPPED");
+    expect(query.params).not.toContain("SENT");
+    expect(query.params).not.toContain("UNCERTAIN");
   });
 
   it("does not add an attempt-time gate to restored configuration but gates validation retries by attempt time", () => {

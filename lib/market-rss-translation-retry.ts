@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, lt, or } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, lt, or } from "drizzle-orm";
 import { marketRssArticles } from "./schema";
 import { MARKET_RSS_TRANSLATION_MAX_ATTEMPTS, MARKET_RSS_TRANSLATION_RETRY_DELAYS_MS, MARKET_RSS_TRANSLATION_RETRYABLE_SKIPPED_REASONS } from "./market-rss-translation-retry-constants";
 import { prepareMarketRssTranslationInput } from "./market-rss-translation-input";
@@ -89,9 +89,12 @@ export function buildMarketRssTranslationRetryCondition(criteria: ReturnType<typ
   );
 }
 
-/** Select every retry-eligible RSS article for translation; the notification gate controls sending. */
+/** Translate retry-eligible, unsent RSS articles; the notification gate still controls sending. */
 export function buildMarketRssTranslationCandidateCondition(criteria: ReturnType<typeof getMarketRssTranslationRetryCriteria>) {
-  return buildMarketRssTranslationRetryCondition(criteria);
+  return and(
+    buildMarketRssTranslationRetryCondition(criteria),
+    inArray(marketRssArticles.notificationStatus, ["PENDING", "FAILED", "SKIPPED"]),
+  );
 }
 
 export function sanitizeMarketRssTranslationError(error: unknown) {
