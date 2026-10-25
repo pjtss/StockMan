@@ -537,6 +537,10 @@ describe("market RSS translation", () => {
       "주 1회 치료 발표",
     ],
     [
+      "Andersen Announces Closing of Secondary Offering and Full Exercise of the Underwriters’ Option to Purchase Additional Shares | ANDG Stock News",
+      "앤더슨, 2차 공모 종료 및 인수인의 추가 주식 매입 옵션 전액 행사 발표 | ANDG 주식 뉴스",
+    ],
+    [
       "Results for the Quarter and Half Year Ended June 30, 2026",
       "6월 종료 분기 및 반기 실적 30, 2026",
     ],
@@ -554,6 +558,21 @@ describe("market RSS translation", () => {
     expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", prepared.format);
     expect(translate.mock.calls[0][0]).not.toContain(source.summary);
     expect(result).toMatchObject({ translatedTitle, translatedSummary: source.summary, translationFallback: false });
+  });
+
+  it("does not invent a numbered quarter when the source only says quarter", async () => {
+    const sourceTitle = "Caledonia Mining Corporation PLC: Results for the Quarter and Half Year Ended June 30, 2026; Details of Management Conference Call; Dividend Declaration | CMCL Stock News";
+    const source = { ...item("unspecified-quarter"), title: sourceTitle };
+    const prepared = prepareMarketRssTranslationInput(sourceTitle);
+    let providerTitle = "칼레도니아 광산 공사 PLC: 30 6월 종료 4분기 및 반기 실적 2026; 경영 컨퍼런스 콜 세부 내용; 배당 선언 | CMCL 주식 뉴스";
+    for (const placeholder of prepared.placeholders) providerTitle = providerTitle.replace(placeholder.original, placeholder.marker);
+    const translate = vi.fn(async () => ({ translatedText: providerTitle, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result.translationFallback).toBe(false);
+    expect(result.translatedTitle).toContain("분기");
+    expect(result.translatedTitle).not.toContain("4분기");
   });
 
   it("translates ordinary English words in publisher all-caps titles while preserving the trailing ticker", async () => {

@@ -18,6 +18,7 @@ const SPELLED_NUMBER_VALUES: Record<string, number> = {
   tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16,
   seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20, thirtieth: 30, fortieth: 40,
   fiftieth: 50, sixtieth: 60, seventieth: 70, eightieth: 80, ninetieth: 90,
+  primary: 1, secondary: 2,
   half: 0.5,
   once: 1, twice: 2, thrice: 3,
   un: 1, une: 1, premier: 1, premiere: 1, première: 1,
@@ -78,7 +79,7 @@ function removeUnspecifiedQuarterOrdinal(sourceTitle: string, translatedTitle: s
   if (!/\bquarter(?:ly)?\b/i.test(sourceTitle)) return translatedTitle;
   const sourceHasOrdinal = /\b(?:first|second|third|fourth|[1-4](?:st|nd|rd|th))\s+quarter\b/i.test(sourceTitle)
     || /\bQ[1-4]\b/i.test(sourceTitle);
-  return sourceHasOrdinal ? translatedTitle : translatedTitle.replace(/(?<!\d)[1-4]\s*분기\b/g, "분기");
+  return sourceHasOrdinal ? translatedTitle : translatedTitle.replace(/(?<!\d)[1-4]\s*분기(?![\p{L}\p{N}_])/gu, "분기");
 }
 
 function hasUnprotectedFinancialSign(providerHeadline: string, protectedSourceHeadline: string, placeholders: Array<{ marker: string; original: string }>) {
