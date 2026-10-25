@@ -18,13 +18,13 @@ const article = {
 };
 
 describe("market RSS Discord notification message", () => {
-  it("shows translated title, source title and market reaction without duplicate labels", () => {
+  it("shows the translated title and market metadata without repeating the source title", () => {
     const body = buildMarketRssDiscordNotificationBody(article, {
       cik: "1", ticker: "TEST", exchange: "NASDAQ", market: "NAS", ok: true, rate: 2.5, tradingValue: 120000,
     });
 
     expect(body).toContain("매출 20% 증가");
-    expect(body).toContain("원문 제목: Revenue rises 20%");
+    expect(body).not.toContain("Revenue rises 20%");
     expect(body).toContain("티커: TEST · NASDAQ");
     expect(body).toContain("등락률: 2.5% · 거래대금: 120000달러");
     expect(body).not.toContain("fallback");
@@ -213,8 +213,9 @@ describe("market RSS Discord notification message", () => {
       translationFallback: false,
     }, null);
 
-    expect(body).toContain("**\\[가짜 링크\\]\\(https://phishing.example\\) \\*\\*매출 급증\\*\\***");
-    expect(body).toContain("원문 제목: \\[공식 속보\\]\\(https://phishing.example\\) @everyone");
+    expect(body).toContain("가짜 링크");
+    expect(body).not.toContain("공식 속보");
+    expect(body).not.toContain("@everyone");
     expect(body).toContain("출처: \\*\\*UNKNOWN\\*\\*");
     expect(body).not.toContain("](javascript:alert(1))");
   });
@@ -226,7 +227,7 @@ describe("market RSS Discord notification message", () => {
       translatedTitle: "@here 시장 속보",
     }, null);
 
-    expect(payload.content).toContain("@everyone");
+    expect(payload.content).not.toContain("@everyone");
     expect(payload.content).toContain("@here");
     expect(payload.allowed_mentions).toEqual({ parse: [] });
   });

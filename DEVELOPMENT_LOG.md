@@ -6959,3 +6959,35 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - SEC 공식 원천에서 ticker/CIK/SIC가 확인되는 활성 보통주 결측은 모두 저장했다. 남은 80개는 SEC ticker 맵/회사 Submissions에서 필요한 식별정보가 제공되지 않아 SEC만으로 채울 수 없다. 종목명 추정이나 다른 분류 taxonomy의 임의 대입은 하지 않는다.
 - 재발 방지: SEC ticker map의 시장 코드 차이를 허용하되 ticker가 미국 거래소 전체에서 단일 CIK로 유일할 때만 fallback을 허용하며, 모호한 ticker·무 SIC는 fail-closed로 처리한다.
 - 배포 커밋: `33bfcf94`; 해당 코드 전체 `deploy:verify` 및 교차거래소 타깃 테스트 통과. 운영 기록 커밋은 별도 생성 예정.
+## [2026-10-25] RSS 알림 제목 전용 한국어 및 전체 출처 backlog 진행
+
+### 목표
+- SEC EDGAR, StockTitan, GlobeNewswire의 모든 RSS 기사를 필터링 없이 Discord 알림 대상으로 유지하고, 알림 전 제목만 한국어로 확정한다. 요약·본문 등 나머지 기사 텍스트는 번역하거나 알림에 복제하지 않는다.
+- 사용자가 승인한 과거 대기 기사도 같은 규칙으로 발송한다.
+
+### 근본 원인
+- SEC의 고정 EDGAR 색인 제목은 번역 provider가 제출자 표기만 어설프게 번역하거나 회사명을 그대로 돌려 completeness 검사에서 반복 보류될 수 있었다.
+- 전역 오래된 순 정렬은 SEC의 큰 과거 대기열이 적은 GlobeNewswire 대기 항목을 뒤로 밀었다.
+- Discord 메시지는 번역 제목 외에 원문 제목도 함께 출력했다.
+
+### 반영
+- `lib/market-rss-sec-filing-title.ts`, `lib/translate-market-rss-item.ts`: SEC의 엄격히 정형화된 `<form> - <issuer> (<10-digit CIK>) (Filer|Issuer)` 제목에 한해서만 `공시`, `제출자`/`발행인`을 한국어화한다. Form·법인명·CIK는 식별 정보로 보존하고 provider 호출을 하지 않는다. summary/content는 원문 값 그대로 유지한다.
+- `lib/market-rss-pipeline.ts`, `lib/market-rss-source-fairness.ts`: 번역·발송 각각 출처별 oldest-first 큐를 읽고 라운드로빈으로 합쳐 세 출처가 backlog를 함께 소진하게 한다.
+- `lib/market-rss-notification-message.ts`: 원문 제목 행을 제거해 알림에는 제목 하나만 표시한다. 출처·시각·티커 등 메타데이터는 기존 형식을 유지한다.
+- `app/api/admin/debug-suite/route.ts`: source별 번역 및 전송 상태에 기타/보류/불확실 상태 카운트를 추가해 운영 backlog 합계를 점검할 수 있게 한다.
+- 대응 테스트를 SEC 전용 현지화, 다른 출처 격리, 원문 제목 미노출, 운영 진단 합계에 추가한다.
+
+### 검증
+- 실행 예정: 관련 회귀 테스트 및 `npm.cmd run deploy:verify`; 이후 최신 `origin/oci`를 재확인하고 변경 트리를 검증한 뒤 배포한다.
+- 배포 후 운영 RSS 진단에서 세 출처의 pending 감소·SENT 증가와 최근 cron 실행을 확인한다. 각 출처의 과거 backlog 전체가 소진될 때까지 완료로 간주하지 않는다.
+
+### 남은 위험
+- provider가 일반 기사 제목의 한국어 번역을 완성하지 못하면 fail-closed로 보류되므로 번역 장애가 이어지는 동안 전체 backlog 발송은 지연된다. 원문 우회 발송은 허용하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: RSS-2026-10-25-TITLE-ONLY-ALL-SOURCES
+- 성과 판정: IN_PROGRESS
+- 다음 개선: 세 출처가 번역·발송 모두 진행하는지 운영 계측하고, backlog 전량 완료를 확인한다.
+
+### 커밋·푸시·배포
+- 미실행: 변경 검증 후 커밋·푸시 및 OCI 배포 예정.

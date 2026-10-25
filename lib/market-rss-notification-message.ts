@@ -59,7 +59,6 @@ export function buildMarketRssDiscordNotificationBody(row: MarketRssNotification
   return [
     "🚨 **해외시장 RSS 속보**",
     titleLine,
-    !row.translationFallback && row.translatedTitle && !sameTitle ? `원문 제목: ${boundedDiscordText(row.title, 350)}` : "",
     row.publishedAt ? `발행: ${row.publishedAt.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}` : "",
     isStockTitan ? "" : `출처: ${boundedDiscordText(row.source, 80)}`,
     row.translationFallback ? `번역 상태: ${getMarketRssTranslationDisplay(row).label}` : "",

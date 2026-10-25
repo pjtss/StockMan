@@ -86,10 +86,14 @@ async function runSuite(checks: CheckName[]) {
                            COUNT(*) FILTER (WHERE translation_status = 'TRANSLATED')::int AS translated,
                            COUNT(*) FILTER (WHERE translation_status = 'FAILED')::int AS translation_failed,
                            COUNT(*) FILTER (WHERE translation_status = 'SKIPPED')::int AS translation_skipped,
+                           COUNT(*) FILTER (WHERE translation_status NOT IN ('PENDING', 'TRANSLATED', 'FAILED', 'SKIPPED'))::int AS translation_other,
                            COUNT(*) FILTER (WHERE notification_status = 'PENDING')::int AS notification_pending,
                            COUNT(*) FILTER (WHERE notification_status = 'SENT')::int AS sent,
                            COUNT(*) FILTER (WHERE notification_status = 'FAILED')::int AS notification_failed,
-                           COUNT(*) FILTER (WHERE notification_status IN ('PROCESSING', 'SENDING'))::int AS in_flight
+                           COUNT(*) FILTER (WHERE notification_status = 'SKIPPED')::int AS notification_skipped,
+                           COUNT(*) FILTER (WHERE notification_status = 'UNCERTAIN')::int AS notification_uncertain,
+                           COUNT(*) FILTER (WHERE notification_status IN ('PROCESSING', 'SENDING'))::int AS in_flight,
+                           COUNT(*) FILTER (WHERE notification_status NOT IN ('PENDING', 'SENT', 'FAILED', 'SKIPPED', 'UNCERTAIN', 'PROCESSING', 'SENDING'))::int AS notification_other
                     FROM market_rss_articles
                     WHERE source = ANY($1::text[])
                     GROUP BY source ORDER BY source`, [["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"]]),

@@ -43,9 +43,9 @@ describe("admin RSS translation diagnostics", () => {
       if (query.includes("DISTINCT ON (source)")) return { rows: [] };
       if (query.includes("automation_runs")) return { rows: [] };
       if (query.includes("notification_pending")) return { rows: [
-        { source: "GLOBENEWSWIRE", total: 2, translation_pending: 2, translated: 0, translation_failed: 0, translation_skipped: 0, notification_pending: 2, sent: 0, notification_failed: 0, in_flight: 0 },
-        { source: "SEC_EDGAR", total: 5, translation_pending: 2, translated: 2, translation_failed: 0, translation_skipped: 1, notification_pending: 2, sent: 3, notification_failed: 0, in_flight: 0 },
-        { source: "STOCKTITAN", total: 4, translation_pending: 1, translated: 2, translation_failed: 0, translation_skipped: 1, notification_pending: 1, sent: 3, notification_failed: 0, in_flight: 0 },
+        { source: "GLOBENEWSWIRE", total: 2, translation_pending: 2, translated: 0, translation_failed: 0, translation_skipped: 0, translation_other: 0, notification_pending: 2, sent: 0, notification_failed: 0, notification_skipped: 0, notification_uncertain: 0, notification_other: 0, in_flight: 0 },
+        { source: "SEC_EDGAR", total: 5, translation_pending: 2, translated: 2, translation_failed: 0, translation_skipped: 1, translation_other: 0, notification_pending: 2, sent: 3, notification_failed: 0, notification_skipped: 0, notification_uncertain: 0, notification_other: 0, in_flight: 0 },
+        { source: "STOCKTITAN", total: 4, translation_pending: 1, translated: 2, translation_failed: 0, translation_skipped: 1, translation_other: 0, notification_pending: 1, sent: 3, notification_failed: 0, notification_skipped: 0, notification_uncertain: 0, notification_other: 0, in_flight: 0 },
       ] };
       if (query.includes("GROUP BY source")) return { rows: [] };
       if (query.includes("COUNT(*)::text")) return { rows: [{ count: "1" }] };

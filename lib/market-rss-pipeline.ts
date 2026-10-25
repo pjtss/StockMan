@@ -28,6 +28,7 @@ import { mapWithConcurrency } from "./map-with-concurrency";
 import { countMarketRssTranslationFallbackReasons } from "./market-rss-translation-fallback-count";
 import { TranslationClientOperationError } from "./translation-types";
 import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy";
+import { interleaveMarketRssSourceQueues } from "./market-rss-source-fairness";
 
 export async function ingestMarketRssArticles(options?: { sources?: MarketRssSource[] }) {
   const db = getDb();
@@ -133,12 +134,13 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   );
   // Drain historical backlog first so a continuous stream of new articles
   // cannot starve older pending titles and notifications.
-  const rows = await db.select().from(marketRssArticles).where(candidates).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
+  const sourceQueues = await Promise.all(MARKET_RSS_DISCORD_ALLOWED_SOURCES.map((source) => db.select().from(marketRssArticles).where(and(candidates, eq(marketRssArticles.source, source))).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit)));
+  const fairRows = interleaveMarketRssSourceQueues(sourceQueues, limit);
   if (!client) {
     let notRequired = 0;
     let fallback = 0;
     const fallbackReasonCodes: Array<string | undefined> = [];
-    await mapWithConcurrency(rows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
+    await mapWithConcurrency(fairRows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
       const result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source });
       const processedAt = new Date();
       await db.update(marketRssArticles).set(buildMarketRssTranslationPersistence(row, result, processedAt)).where(eq(marketRssArticles.id, row.id));
@@ -148,7 +150,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
         fallbackReasonCodes.push(result.translationFallbackReason);
       }
     });
-    return { attempted: rows.length, translated: 0, notRequired, fallback, failed: 0, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), skipped: fallback > 0, ...(fallback ? { reason: "cloud_translation_not_configured" } : {}) };
+    return { attempted: fairRows.length, translated: 0, notRequired, fallback, failed: 0, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), skipped: fallback > 0, ...(fallback ? { reason: "cloud_translation_not_configured" } : {}) };
   }
   const thresholdAlertsByMonth = new Map<string, Set<number>>();
   const limitReachedMonths = new Set<string>();
@@ -168,7 +170,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
   let fallback = 0;
   let failed = 0;
   const fallbackReasonCodes: Array<string | undefined> = [];
-  await mapWithConcurrency(rows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
+  await mapWithConcurrency(fairRows, MARKET_RSS_TRANSLATION_CONCURRENCY, async (row) => {
     let result: Awaited<ReturnType<typeof translateMarketRssItem>>;
     try {
       result = await translateMarketRssItem({ id: row.externalId, title: row.title, summary: row.summary, content: (row as any).content || undefined, link: row.link, publishedAt: row.publishedAt?.toISOString() ?? null, source: row.source }, cachedClient ?? undefined);
@@ -236,7 +238,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
       }
     }
   }
-  return { attempted: rows.length, translated, notRequired, fallback, failed, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), translationUsage: tracked.getMetrics(), limitReached, limitAlertSent, thresholdAlerts: [...thresholdAlerts].sort((a, b) => a - b), thresholdAlertSent };
+  return { attempted: fairRows.length, translated, notRequired, fallback, failed, fallbackReasons: countMarketRssTranslationFallbackReasons(fallbackReasonCodes), translationUsage: tracked.getMetrics(), limitReached, limitAlertSent, thresholdAlerts: [...thresholdAlerts].sort((a, b) => a - b), thresholdAlertSent };
 }
 
 export async function notifyPendingMarketRssArticles(limit = 10) {
@@ -252,11 +254,13 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
     eq(marketRssArticles.notificationStatus, "SKIPPED"),
     inArray(marketRssArticles.lastError, ["source_not_allowed_for_discord", "backlog_or_stale_article"]),
   ));
-  const rows = await db.select().from(marketRssArticles).where(and(
+  const candidates = and(
     inArray(marketRssArticles.source, [...MARKET_RSS_DISCORD_ALLOWED_SOURCES]),
     eq(marketRssArticles.notificationStatus, "PENDING"),
     buildMarketRssNotificationTranslationGate(),
-  )).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit);
+  );
+  const sourceQueues = await Promise.all(MARKET_RSS_DISCORD_ALLOWED_SOURCES.map((source) => db.select().from(marketRssArticles).where(and(candidates, eq(marketRssArticles.source, source))).orderBy(asc(marketRssArticles.createdAt), desc(marketRssArticles.priority)).limit(limit)));
+  const rows = interleaveMarketRssSourceQueues(sourceQueues, limit);
   let sent = 0;
   let queueEnqueueFailed = 0;
   for (const row of rows) {

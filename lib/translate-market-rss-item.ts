@@ -6,6 +6,7 @@ import { isMarketRssTranslationHeadlineComplete, isMarketRssTranslationKoreanEno
 import { createMarketRssTranslationClient } from "./market-rss-translation-client";
 import { mapWithConcurrency } from "./map-with-concurrency";
 import { AZURE_TRANSLATION_PROVIDER } from "./translation-cache";
+import { localizeSecFilingTitle } from "./market-rss-sec-filing-title";
 
 export const MARKET_RSS_TRANSLATION_CONCURRENCY = 3;
 
@@ -64,6 +65,20 @@ export type TranslatedMarketRssItem = MarketRssItem & { translatedTitle: string;
 export type MarketRssTranslationItemErrorHandler = (item: MarketRssItem, error: unknown) => void;
 export type MarketRssTranslationFallbackHandler = (item: MarketRssItem, result: TranslationResult) => void;
 export async function translateMarketRssItem(item: MarketRssItem, client?: TranslationClient, cacheRecoveryAttempt = false, onProviderFallback?: MarketRssTranslationFallbackHandler, providerFallbackAttempted = false, prefetchedTranslation?: TranslationResult): Promise<TranslatedMarketRssItem> {
+  if (item.source === "SEC_EDGAR") {
+    const localizedFilingTitle = localizeSecFilingTitle(item.title);
+    if (localizedFilingTitle) {
+      return {
+        ...item,
+        translatedTitle: localizedFilingTitle,
+        translatedSummary: item.summary,
+        ...(item.content ? { translatedContent: item.content } : {}),
+        translationFallback: false,
+        translationProvider: "sec-filing-title-localization",
+        translationProviderAttempts: 0,
+      };
+    }
+  }
   const protectedHeadline = prepareMarketRssTranslationInput(item.title);
   const preparedInput = protectedHeadline;
   const translatableText = protectedHeadline.text.replace(/ZX\d+Q/g, "");

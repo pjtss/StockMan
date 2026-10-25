@@ -15,6 +15,49 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("market RSS translation", () => {
+  it("localizes only the standardized SEC filing title and leaves every other field unchanged", async () => {
+    const source: MarketRssItem = {
+      ...item("sec-filing"),
+      source: "SEC_EDGAR",
+      title: "8-K - Replimune Group, Inc. (0001737953) (Filer)",
+      summary: "Original SEC summary text",
+      content: "Original SEC filing body",
+    };
+    const translate = vi.fn();
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(result.translatedTitle).toBe("8-K 공시 - Replimune Group, Inc. (0001737953) (제출자)");
+    expect(result.title).toBe(source.title);
+    expect(result.summary).toBe(source.summary);
+    expect(result.content).toBe(source.content);
+    expect(result.translatedSummary).toBe(source.summary);
+    expect(result.translatedContent).toBe(source.content);
+    expect(result.translationFallback).toBe(false);
+    expect(result.translationProvider).toBe("sec-filing-title-localization");
+    expect(translate).not.toHaveBeenCalled();
+  });
+
+  it("does not apply SEC title localization to the other RSS sources", async () => {
+    const source: MarketRssItem = {
+      ...item("stocktitan-sec-shaped-title"),
+      source: "STOCKTITAN",
+      title: "8-K - Replimune Group, Inc. (0001737953) (Filer)",
+    };
+    const translate = vi.fn(async () => ({
+      translatedText: "8-K 공시 Replimune 제출자",
+      source: "en" as const,
+      target: "ko" as const,
+      provider: "test",
+      fallback: false,
+    }));
+
+    const result = await translateMarketRssItem(source, client(translate));
+
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(result.translationProvider).not.toBe("sec-filing-title-localization");
+  });
+
   it("sends only the XML-decoded RSS headline to the provider and restores a readable translation", async () => {
     const feed = parseMarketRss('<rss><channel><item><guid>company-story</guid><title>AT&amp;T raises 20% outlook</title><link>https://example.com/story</link><description>AT&amp;T expects growth &amp; stronger revenue.</description></item></channel></rss>', "TEST", "https://example.com/feed");
     const source = feed.items[0];
