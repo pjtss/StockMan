@@ -15,6 +15,7 @@
 - 관련 테스트 4파일 128개 통과; 비어 있는 사람 검수 fixture 때문에 의미 사례 2개 skip. `git diff --check` 통과.
 - `npm.cmd run deploy:verify` 통과: dependency audit 0, Next.js production build 111개 static pages, standalone HTTP 200 및 Chrome desktop/mobile hydration, API/auth smoke, 전체 테스트 302 파일 중 302 passed/1 skipped (1,526 tests passed/3 skipped), typecheck, docs/migrations, scope/KIS/bearer/OCI cron 검사.
 - 운영 read-only (2026-10-25 15:56Z): notification pending GNW 6, SEC 0, StockTitan 2,303; monthly quota skip GNW 6, SEC 238, StockTitan 11,395. provider quota가 초과라 재처리 실측은 남았다.
+- 문서 복원 커밋 63ddabe58eb0eff62c24c911eb02308213683f18의 OCI workflow 40211443629도 verify/package/SSH/upload/activate 모두 성공했고, 운영 /health-check가 같은 SHA, /api/health가 ok를 반환했다. 2026-10-25 16:30:46Z read-only 진단: 최근 24시간 기사 34건 중 TRANSLATED 5, SKIPPED 29; GNW notification pending 7, SEC pending 0, StockTitan pending 2,304. 사람 검수 semantic fixture는 여전히 0건이므로 자동 번역 의미 정확성은 검증되지 않았다.
 
 ### 다음 개선
 - 코드 workflow `40210193279`가 성공하고 운영 SHA `cd55b5ef`, `/api/health` `ok`를 확인했다. 2026-10-25 16:18:11Z read-only 집계: GNW pending 0, sent 25, skipped 7; SEC pending 0, sent 8,692, skipped 238, uncertain 3; StockTitan pending 2,304, sent 8,788, skipped 11,396, uncertain 2. 모든 신규 skip은 `monthly_character_limit_reached`; 아직 대기한 backlog의 실제 Discord 수신은 확인되지 않았다. 다음 UTC quota reset 후 source별 pending, skipped, sent, uncertain와 제목 번역 표본·실제 Discord 수신을 확인한다.
@@ -25,7 +26,7 @@
 - 근거: 재시도 후보를 미발송 기사로 제한했고 전체 배포 검증을 통과했다. quota 제한으로 신규 번역 및 Discord 수신은 아직 검증되지 않았다.
 
 ### 커밋·푸시·배포
-- 완료: RSS 코드 커밋 `cd55b5efe4537f04b5c1e0c1dac89ba83ddc1d91`을 `origin/oci`에 push했다. Deploy OCI workflow `40210193279`의 verify/package/SSH/upload/activate가 성공했고 운영 SHA는 `cd55b5ef`, `/api/health`는 `ok`다. 이어 과거 로그 손상을 복구한 문서 변경도 별도 검증 후 push한다.
+- 완료: RSS 코드 커밋 `cd55b5efe4537f04b5c1e0c1dac89ba83ddc1d91`을 `origin/oci`에 push했다. Deploy OCI workflow `40210193279`의 verify/package/SSH/upload/activate가 성공했고 운영 SHA는 `cd55b5ef`, `/api/health`는 `ok`다. 과거 로그 손상 복원 문서 커밋 `63ddabe58eb0eff62c24c911eb02308213683f18`도 별도 Deploy OCI workflow `40211443629` 성공으로 운영에 반영됐다.
 ## [2026-10-26] 임상 단계 정규화 경계 보완
 
 ### 목표
