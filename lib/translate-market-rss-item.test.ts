@@ -142,10 +142,10 @@ describe("market RSS translation", () => {
       content: "Original clinical study body",
     };
     const prepared = prepareMarketRssTranslationInput(source.title);
-    const stageMarker = prepared.placeholders.find(({ original }) => original === "2")!.marker;
+    const stageMarker = prepared.placeholders.find(({ original }) => original === "2상")!.marker;
     const acronymMarker = prepared.placeholders.find(({ original }) => original === "NSCLC")!.marker;
     const translate = vi.fn(async () => ({
-      translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}BioNTech, 진행성 ${acronymMarker}에서 푸미타믹의 고무적인 ${stageMarker}상 데이터를 발표${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}원문 요약</p></div>`,
+      translatedText: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}BioNTech, 진행성 ${acronymMarker}에서 푸미타믹의 고무적인 ${stageMarker} 데이터를 발표${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}원문 요약</p></div>`,
       source: "en" as const,
       target: "ko" as const,
       provider: "azure-translator",
@@ -154,7 +154,7 @@ describe("market RSS translation", () => {
 
     const result = await translateMarketRssItem(source, client(translate));
 
-    expect(prepared.headlineText).toContain(`${stageMarker}상`);
+    expect(prepared.headlineText).toContain(stageMarker);
     expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", "html");
     expect(translate.mock.calls[0][0]).not.toContain(source.summary);
     expect(translate.mock.calls[0][0]).not.toContain(source.content);

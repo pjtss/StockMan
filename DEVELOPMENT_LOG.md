@@ -10,16 +10,18 @@
 - `lib/market-rss-headline-context.ts`: 제목 자체에 임상·종양·치료 등 분명한 임상 맥락이 있을 때만 Phase 숫자/문자를 `2상`, `1b상`, `2/3상`으로 정규화한다. 일반 프로젝트 확장 단계나 단순 `Phase 2 study`는 변경하지 않는다.
 - `lib/market-rss-headline-context.test.ts`: 숫자·영문 단계·로마 숫자와 비임상 제목 경계를 검증한다.
 - `lib/translate-market-rss-item.test.ts`: 실제 제목 번역 입력에서 임상 단계 marker를 보호하고 결과에 `2상`을 복원하는지, summary/body는 공급자에 보내지 않고 원문 그대로 반환하는지 확인한다.
+- `lib/market-rss-translation-tokens.mjs`, `lib/market-rss-translation-protection.test.ts`: 정규화된 임상 단계 전체를 하나의 위치 보존 marker로 보호한다. `2상`, `1b상`, `2/3상` 및 조합형 단계의 복원을 검사한다.
 - `docs/architecture/stocktitan-translation.md`: 제목 입력의 단계 정규화 경계를 문서화한다.
 
 ### 검증
-- `npm.cmd exec vitest run -- lib/market-rss-headline-context.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 2개 파일 108개 테스트 통과.
+- `npm.cmd exec vitest run -- lib/market-rss-translation-protection.test.ts lib/market-rss-headline-context.test.ts lib/translate-market-rss-item.test.ts --reporter=dot`: 3개 파일 154개 테스트 통과.
 - `npm.cmd run docs:check`: 통과. 첫 실행은 중복 improvement task ID `CI-2026-10-25-015` 때문에 실패해 새 ID `016`으로 수정 후 통과했다.
-- 최종 `npm.cmd run deploy:verify` 통과: dependency audit 0, build, standalone runtime smoke, desktop/mobile browser hydration, 전체 302개 test files(301 passed/1 skipped; 1,507 tests passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron gates 통과. Windows node_modules junction EPERM 경고는 있었으나 standalone smoke fallback은 통과했다.
-- commit/push, production rollout과 실제 provider 결과 검증은 아직 전이다.
+- 단계 marker 보호 포함 `npm.cmd run deploy:verify` 통과: dependency audit 0, build, standalone runtime smoke, desktop/mobile Chrome hydration, 전체 302개 test files(301 passed/1 skipped; 1,511 tests passed/3 skipped), typecheck, docs/migration, scope/KIS/auth/OCI cron gates. standalone 빌드 중 Windows node_modules junction EPERM 경고는 smoke fallback 성공으로 복구됐다.
+- production rollout과 실제 provider 결과 검증은 아직 전이다.
 
 ### 재발 감지·남은 위험
 - 회귀 테스트가 임상 단계 표기 및 비임상 project phase 비변경을 자동 검사한다. 이 규칙은 임상 맥락 키워드를 기반으로 하므로, 새로운 적응증 약어·언어별 phase 표현은 누락될 수 있고 의미 전반의 번역 정확도를 증명하지 않는다.
+- 위치 보호는 번역 provider가 marker를 그대로 보존할 때만 작동한다. marker 손실·변조는 기존 품질 게이트에 의해 번역 미완료로 처리되며 Discord 전송을 보류한다.
 - 월간 provider 한도 소진으로 backlog와 실 provider 품질 표본 관찰은 계속 제한된다.
 
 ### 다음 개선
@@ -31,7 +33,7 @@
 근거: 실제 운영에서 확인한 임상 단계 오역의 구체적인 입력 경로를 정규화하고 표적 테스트 108개 및 전체 배포 검증을 통과했다. 운영 배포 후 실제 provider 출력의 의미 보존 확인은 아직 남아 있다.
 
 ### 커밋·푸시·배포
-- 전체 `npm.cmd run deploy:verify` 완료. commit/push/production deployment는 다음 단계다.
+- 전체 검증 완료. commit/push/production deployment 미실행; RSS 전용 변경만 분리해 진행한다.
 
 ## [2026-10-25] RSS 제목 번역 괄호 잘림 차단
 

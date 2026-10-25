@@ -15,6 +15,14 @@ describe("market RSS translation token protection", () => {
     expect(restored).toEqual({ ok: true, text: "엔비디아 NVDA sees $2.5B revenue in Q3, up 18% from 2025." });
   });
 
+  it.each(["2상", "1b상", "2/3상", "2b/3상"])("preserves the complete clinical stage %s as one positional token", (stage) => {
+    const source = `Clinical results from ${stage} study`;
+    const masked = protectMarketRssTranslationTokens(source);
+
+    expect(masked.placeholders.map(({ original }) => original)).toContain(stage);
+    expect(restoreMarketRssTranslationTokens(masked.text, masked.placeholders)).toEqual({ ok: true, text: source });
+  });
+
   it("preserves class-share and single-letter dollar-prefixed tickers", () => {
     const masked = protectMarketRssTranslationTokens("BRK.B and BF-B outperform; $C is unchanged.");
     expect(masked.placeholders.map(({ original }) => original)).toContain("BRK.B");
