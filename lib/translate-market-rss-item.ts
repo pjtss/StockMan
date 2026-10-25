@@ -87,13 +87,25 @@ function removeUnspecifiedQuarterOrdinal(sourceTitle: string, translatedTitle: s
 }
 
 function normalizeTranslatedAnnualOrdinal(sourceTitle: string, translatedTitle: string, placeholders: Array<{ marker: string; original: string }>) {
-  const ordinal = sourceTitle.match(/\b(\d+)(?:st|nd|rd|th)\s+annual\b/i)?.[1];
+  const ordinal = sourceTitle.match(/\b(\d+)(?:st|nd|rd|th)\s+annual\b[\s\S]*?\bglobal\s+investment\s+conference\b/i)?.[1];
   if (!ordinal) return translatedTitle;
   const numberMarker = placeholders.find(({ original }) => original === ordinal)?.marker;
+  const sourceMonth = sourceTitle.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?\b/i)?.[1];
+  const monthNumber = sourceMonth ? MONTH_WORD_NUMBER_VALUES[sourceMonth.toLocaleLowerCase("en")] : undefined;
   if (numberMarker && translatedTitle.includes(numberMarker)) {
-    return translatedTitle.replace(new RegExp(`${numberMarker}\\s*제\\s*1\\s*회`, "gu"), `제${numberMarker}회`);
+    let normalized = translatedTitle.replace(new RegExp(`${numberMarker}\\s*제\\s*1\\s*회`, "gu"), `제${numberMarker}회`);
+    if (monthNumber !== undefined) {
+      normalized = normalized.replace(new RegExp(`${numberMarker}(?=\\s*${monthNumber}\\s*월)`, "gu"), "");
+      normalized = normalized.replace(/제\s*1\s*회(?=[\s\p{L}]{0,24}글로벌\s*투자\s*컨퍼런스)/u, `제${numberMarker}회`);
+    }
+    return normalized;
   }
-  return translatedTitle.replace(new RegExp(`(?<!\\d)${ordinal}\\s*제\\s*1\\s*회`, "gu"), `제${ordinal}회`);
+  let normalized = translatedTitle.replace(new RegExp(`(?<!\\d)${ordinal}\\s*제\\s*1\\s*회`, "gu"), `제${ordinal}회`);
+  if (monthNumber !== undefined) {
+    normalized = normalized.replace(new RegExp(`(?<!\\d)${ordinal}(?=\\s*${monthNumber}\\s*월)`, "gu"), "");
+    normalized = normalized.replace(/제\s*1\s*회(?=[\s\p{L}]{0,24}글로벌\s*투자\s*컨퍼런스)/u, `제${ordinal}회`);
+  }
+  return normalized;
 }
 
 function hasUnprotectedFinancialSign(providerHeadline: string, protectedSourceHeadline: string, placeholders: Array<{ marker: string; original: string }>) {

@@ -595,18 +595,19 @@ describe("market RSS translation", () => {
   });
 
   it("preserves the source conference number when Annual is mistranslated as a first annual event", async () => {
-    const sourceTitle = "Hadron Energy to Participate in the H.C. Wainwright 28th Annual Global Investment Conference | HDRN Stock News";
+    const sourceTitle = "Elutia to Present at the H.C. Wainwright 28th Annual Global Investment Conference on September 15th | ELUT Stock News";
     const source = { ...item("ordinal-annual-conference"), source: "STOCKTITAN", title: sourceTitle };
     const prepared = prepareMarketRssTranslationInput(sourceTitle);
     const numberMarker = prepared.placeholders.find(({ original }) => original === "28")!.marker;
-    let providerTitle = `하드론 에너지가 H.C. 웨인라이트 ${numberMarker}제1회 글로벌 투자 컨퍼런스에 참가합니다 | HDRN 주식 뉴스`;
+    let providerTitle = `엘루티아가 H.C. 웨인라이트 ${numberMarker}9월 15일에 열리는 제1회 글로벌 투자 컨퍼런스 | ELUT 주식 뉴스`;
     for (const placeholder of prepared.placeholders) providerTitle = providerTitle.replace(placeholder.original, placeholder.marker);
     const translate = vi.fn(async () => ({ translatedText: providerTitle, source: "en" as const, target: "ko" as const, provider: "test", fallback: false }));
 
     const result = await translateMarketRssItem(source, client(translate));
 
     expect(result.translationFallback).toBe(false);
-    expect(result.translatedTitle).toContain("제28회");
+    expect(result.translatedTitle).toContain("9월 15일");
+    expect(result.translatedTitle).toContain("제28회 글로벌 투자 컨퍼런스");
     expect(result.translatedTitle).not.toContain("제1회");
     expect(result.translatedSummary).toBe(source.summary);
     expect(translate).toHaveBeenCalledWith(prepared.text, "auto", "ko", prepared.format);
