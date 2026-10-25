@@ -30,10 +30,13 @@ export function extractMarketRssTranslatedHeadline(translatedHtml: string) {
   const paragraphs = [...translatedHtml.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p\s*>/gi)];
   const headline = paragraphs.filter(([, attributes]) => /\bid\s*=\s*(["'])market-rss-headline\1/i.test(attributes));
   const context = paragraphs.filter(([, attributes]) => /\bid\s*=\s*(["'])market-rss-context\1/i.test(attributes));
-  if (paragraphs.length !== 2 || headline.length !== 1 || context.length !== 1) return null;
+  const validHeadlineOnly = paragraphs.length === 1 && headline.length === 1 && context.length === 0;
+  const validHeadlineWithContext = paragraphs.length === 2 && headline.length === 1 && context.length === 1;
+  if (!validHeadlineOnly && !validHeadlineWithContext) return null;
   const visibleText = headline[0][2]
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<\/?span\b[^>]*>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -83,6 +86,23 @@ export function prepareMarketRssTranslationInput(title: string, summary = "") {
   const normalizedTitle = normalizeMarketRssHeadlineContext(cleanTitle);
   const context = cleanSummary(summary);
   const protectedHeadline = protectMarketRssTranslationTokens(normalizedTitle);
+  if (!context && protectedHeadline.placeholders.length > 0) {
+    // Send protected financial values/tickers inside provider-supported HTML
+    // no-translate spans instead of bare ZXnQ strings. Plain-text translators
+    // were dropping or duplicating those marker-shaped tokens in real feeds.
+    const htmlHeadline = escapeHtml(protectedHeadline.text).replace(/ZX(\d+)Q/g, (_marker, index: string) =>
+      `<span class="notranslate" translate="no">ZX${index}Q</span>`,
+    );
+    return {
+      text: `${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}${htmlHeadline}</p>`,
+      headlineText: protectedHeadline.text,
+      placeholders: protectedHeadline.placeholders,
+      titlePrefix: MARKET_RSS_TRANSLATION_HEADLINE_MARKER,
+      titleLength: normalizedTitle.length,
+      hasContext: false,
+      format: "html" as const,
+    };
+  }
   const combined = context
     ? `<div>${MARKET_RSS_TRANSLATION_HEADLINE_MARKER}${escapeHtml(protectedHeadline.text)}${MARKET_RSS_TRANSLATION_CONTEXT_MARKER}${escapeHtml(context)}</p></div>`
     : protectedHeadline.text;
@@ -90,6 +110,7 @@ export function prepareMarketRssTranslationInput(title: string, summary = "") {
   const titlePrefix = context ? MARKET_RSS_TRANSLATION_HEADLINE_MARKER : "";
   return {
     text: combined,
+    headlineText: protectedHeadline.text,
     placeholders,
     titlePrefix,
     titleLength: normalizedTitle.length,

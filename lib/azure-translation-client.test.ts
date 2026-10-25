@@ -23,6 +23,17 @@ describe("Azure Translator F0 client", () => {
     expect(init.headers).toMatchObject({ "Ocp-Apim-Subscription-Key": "secret-key", "Ocp-Apim-Subscription-Region": "koreacentral" });
   });
 
+  it("uses Azure's documented HTML mode for protected no-translate title tokens", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ translations: [{ text: '<p>매출 <span class="notranslate" translate="no">ZX0Q</span></p>', to: "ko" }] }]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new AzureTranslationClient("secret-key", "https://region.cognitiveservices.azure.com");
+
+    const result = await client.translate('<p>Revenue <span class="notranslate" translate="no">ZX0Q</span></p>', "auto", "ko", "html");
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("textType=html");
+    expect(result.translatedText).toContain('translate="no"');
+  });
+
   it("accepts the full Text Translation endpoint without appending a duplicate translate path", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ translations: [{ text: "안녕하세요", to: "ko" }] }]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

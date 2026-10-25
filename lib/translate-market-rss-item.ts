@@ -117,7 +117,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   }
   const protectedHeadline = prepareMarketRssTranslationInput(item.title);
   const preparedInput = protectedHeadline;
-  const translatableText = protectedHeadline.text.replace(/ZX\d+Q/g, "");
+  const translatableText = protectedHeadline.headlineText.replace(/ZX\d+Q/g, "");
   // Skip only titles whose remaining letters are all Hangul. Checking only
   // Latin letters would incorrectly skip mixed Korean/CJK/Cyrillic headlines.
   const normalizedHeadlineForLanguage = translatableText.normalize("NFC");
@@ -201,7 +201,14 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     const fallback = await validationFallback("protected_token_mismatch", undefined, describeProtectedTokenMismatch(normalizedProviderText, preparedInput.placeholders));
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
-  const rawTranslatedHeadline = extractMarketRssTranslatedHeadline(restoredText.text) ?? (hasProviderMarkup ? null : restoredText.text);
+  // Extract/decode HTML while markers are still present, then restore source
+  // values. Decoding first prevents HTML normalization from changing locale
+  // whitespace or entities inside financial tokens.
+  const extractedProviderHeadline = extractMarketRssTranslatedHeadline(normalizedProviderText) ?? (hasProviderMarkup ? null : normalizedProviderText);
+  const restoredHeadline = extractedProviderHeadline
+    ? restoreMarketRssTranslationTokens(extractedProviderHeadline, preparedInput.placeholders)
+    : null;
+  const rawTranslatedHeadline = restoredHeadline?.ok ? restoredHeadline.text : null;
   const translatedHeadline = rawTranslatedHeadline ? removeUnspecifiedQuarterOrdinal(item.title, rawTranslatedHeadline) : null;
   if (!translatedHeadline) {
     const fallback = await validationFallback("translation_response_unparseable");
@@ -227,7 +234,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
   const providerHeadlineWithSigns = (providerHeadline || "")
     .replace(/&#(?:43|x2b);/gi, "+")
     .replace(/&#(?:45|x2d);/gi, "-");
-  const unprotectedFinancialSign = hasUnprotectedFinancialSign(providerHeadlineWithSigns, preparedInput.text, preparedInput.placeholders);
+  const unprotectedFinancialSign = hasUnprotectedFinancialSign(providerHeadlineWithSigns, preparedInput.headlineText, preparedInput.placeholders);
   // A spaced dash is common title punctuation (“statistics - July 2026”);
   // financial signs must touch the unprotected numeric value to be treated as a claim.
   const signedUnprotectedNumeral = /[+\-−﹣－]\d/.test(unprotectedHeadlineDigits);
@@ -236,7 +243,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     const fallback = await validationFallback("translation_numeric_hallucination", translatedHeadline, details);
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
-  const hasSourceLettersToTranslate = /\p{L}/u.test(protectedHeadline.text.replace(/ZX\d+Q/g, "").replace(/[가-힣]/g, ""));
+  const hasSourceLettersToTranslate = /\p{L}/u.test(protectedHeadline.headlineText.replace(/ZX\d+Q/g, "").replace(/[가-힣]/g, ""));
   if (hasSourceLettersToTranslate && (!providerHeadline || !isMarketRssTranslationKoreanEnough(providerHeadline))) {
     const normalizedCandidate = translatedHeadline.normalize("NFC").replace(/\s+/gu, " ").trim();
     const normalizedSource = item.title.normalize("NFC").replace(/\s+/gu, " ").trim();
@@ -244,7 +251,7 @@ export async function translateMarketRssItem(item: MarketRssItem, client?: Trans
     const fallback = await validationFallback("target_language_not_detected", candidate);
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
-  if (hasSourceLettersToTranslate && providerHeadline && !isMarketRssTranslationHeadlineComplete(protectedHeadline.text, providerHeadline)) {
+  if (hasSourceLettersToTranslate && providerHeadline && !isMarketRssTranslationHeadlineComplete(protectedHeadline.headlineText, providerHeadline)) {
     const fallback = await validationFallback("translation_output_incomplete", translatedHeadline);
     return fallback ?? translateMarketRssItem(item, selectedClient, true);
   }
