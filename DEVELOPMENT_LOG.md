@@ -7598,8 +7598,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 전체 Vitest 287개 파일, 1,499개 통과·2개 skip. docs/migration, verify-scope, KIS boundary, bearer-auth, OCI cron 검사 통과.
 - 데이터베이스 migration은 적용하지 않았다.
 
-### 다음 개선
-- 커밋 및 OCI 배포 workflow 실행 후 운영 `/api/health`와 build version을 확인한다.
-
 ### 커밋·푸시·배포
-- 미실행.
+- 커밋 `7e009872e42ca98aed2f2709a0ceec99406620cd`를 `origin/codex/market-news-deploy`에 push하고 Deploy OCI workflow `40350045288`을 실행했다. Verify, package, upload, activate 단계와 전체 workflow가 성공했다.
+- 운영 read-only 확인: 2026-10-26 15:38:32 UTC `GET https://stockman.r-e.kr/api/health`가 HTTP 200, `status=ok`를 반환했다. `/health-check`의 서비스 커밋은 `7e009872e42ca98aed2f2709a0ceec99406620cd`로 배포 대상과 일치했다.
+- 작업 로그에 실제 운영 결과를 기록하기 위해 이 문서만 추가 갱신한다. 갱신분은 필수 검증 통과 후 push하며, push로 시작되는 배포도 운영 health/build version까지 재확인한다.
