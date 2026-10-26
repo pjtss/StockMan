@@ -30,8 +30,8 @@ export async function GET() {
         WHERE ${ELIGIBLE_COMMON}
       ), latest AS (
         SELECT MAX(c.candle_date)::date AS latest_date
-        FROM us_instrument_universe_candles c
-        WHERE c.market IN ('NAS', 'NYS', 'AMS') AND c.timeframe = 'D' AND c.volume > 0
+        FROM us_latest_daily_candles c
+        WHERE c.market IN ('NAS', 'NYS', 'AMS') AND c.volume > 0
       ), period AS (
         SELECT latest_date, (latest_date - INTERVAL '1 month')::date AS start_date FROM latest
       ), candle_rows AS (
@@ -40,13 +40,10 @@ export async function GET() {
           c.candle_date::date AS date, c.trading_value, c.close, c.volume
         FROM eligible e
         CROSS JOIN period p
-        CROSS JOIN LATERAL (
-          SELECT candle_date, trading_value, close, volume
-          FROM us_instrument_universe_candles c
-          WHERE c.market = e.market AND c.code = e.code AND c.timeframe = 'D'
-            AND c.candle_date BETWEEN TO_CHAR(p.start_date, 'YYYYMMDD') AND TO_CHAR(p.latest_date, 'YYYYMMDD')
-            AND c.volume > 0 AND c.close > 0
-        ) c
+        JOIN us_instrument_universe_candles c
+          ON c.market = e.market AND c.code = e.code AND c.timeframe = 'D'
+          AND c.candle_date BETWEEN TO_CHAR(p.start_date, 'YYYYMMDD') AND TO_CHAR(p.latest_date, 'YYYYMMDD')
+          AND c.volume > 0 AND c.close > 0
       ), daily AS (
         SELECT date, classification_source, industry_code,
           COUNT(DISTINCT (market, code))::int AS ticker_count,

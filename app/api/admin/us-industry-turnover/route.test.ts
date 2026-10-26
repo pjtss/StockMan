@@ -40,7 +40,9 @@ describe("GET /api/admin/us-industry-turnover", () => {
     const sql = String(mocks.query.mock.calls[0][0]);
     expect(sql).toContain("u.instrument_type = 'COMMON_STOCK'");
     expect(sql).toContain("CASE WHEN u.source_file LIKE 'SEC_EDGAR_SIC:%' THEN 'SEC_SIC' ELSE 'KIS_ICOD' END");
-    expect(sql).toContain("CROSS JOIN LATERAL");
+    expect(sql).toContain("FROM us_latest_daily_candles c");
+    expect(sql).toContain("JOIN us_instrument_universe_candles c");
+    expect(sql).not.toContain("CROSS JOIN LATERAL");
     expect(sql).toContain("c.candle_date BETWEEN TO_CHAR(p.start_date, 'YYYYMMDD') AND TO_CHAR(p.latest_date, 'YYYYMMDD')");
     expect(sql).not.toContain("c.candle_date::date BETWEEN");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE)\b/i);
