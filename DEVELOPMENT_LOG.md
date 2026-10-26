@@ -7581,3 +7581,25 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **대상 회귀**: RSS 번역/게이트/retry/message/source policy 5개 파일 142/142 통과.
 - **운영 read-only**: health `ok`; 2026-10-25 14:04Z 시점 미발송 pending GNW 4, SEC 1,381, StockTitan 2,299 (총 3,684). quota skip은 GNW 4, SEC 238, StockTitan 11,391이며 전체 reason `monthly_character_limit_reached`. 사용자 월 한도 선택 답변은 아직 확인되지 않았다. quota 증액이나 provider 호출은 하지 않았다.
 - **상태**: 강화된 번역 전송 게이트는 DB 상태/target/fallback/제목 정합성을 확인한다. 커밋·푸시 전 전체 필수 검증을 마쳤다. 실제 provider success 및 pending 0은 여전히 운영 quota reset 뒤 확인해야 한다.
+
+## [2026-10-27] 해외 뉴스 제목 전용 개선 및 OCI 배포 준비
+
+### 목표
+- 최신 `origin/oci` 기준으로 해외 뉴스 탭의 제목 전용 개선을 적용하고, 정식 배포 검증 및 OCI 배포를 진행한다.
+
+### 반영
+- `/api/market-news`에 기본 1시간·1~24시간 기간, 미국 출처 allowlist, 종류/티커 필터, keyset 페이지네이션을 적용한다. 각 기사 항목은 원문/한국어 제목과 원문 링크만 반환한다.
+- `/market-news`에 제목만 표시하고 기간/출처/종류/티커 필터, 제목 언어 전환, URL 조건 보존 및 더 보기를 제공한다.
+- source registry, 반응형 스타일, 개선 기획 및 API 계약 문서를 갱신한다. 데이터베이스 migration은 추가하지 않는다.
+
+### 검증
+- 최초 전체 검증에서 기존 `components/market-news-page.test.tsx`가 삭제된 요약 UI를 기대해 1건 실패했다. 요구사항에 맞춰 제목 전용 응답, 원문 제목 전환, 1~24시간 칩 검증으로 기존 테스트를 갱신했고 해당 테스트를 통과했다.
+- `npm.cmd run deploy:verify` 통과: npm audit 취약점 0건, production build 및 타입 검사, standalone `/charts` HTTP 200·정적 JS 11개·Chrome 데스크톱/모바일 hydration, smoke API 응답 확인.
+- 전체 Vitest 287개 파일, 1,499개 통과·2개 skip. docs/migration, verify-scope, KIS boundary, bearer-auth, OCI cron 검사 통과.
+- 데이터베이스 migration은 적용하지 않았다.
+
+### 다음 개선
+- 커밋 및 OCI 배포 workflow 실행 후 운영 `/api/health`와 build version을 확인한다.
+
+### 커밋·푸시·배포
+- 미실행.
