@@ -12,10 +12,10 @@
 ### 검증
 - route 테스트 5개, TypeScript 검사, `git diff --check` 통과.
 - 전체 `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone 및 Chrome desktop/mobile smoke, 303개 테스트 파일 통과·1개 skip(1,538 tests pass·3 skip), typecheck, docs, verify-scope, KIS, bearer-auth 및 OCI cron 검사.
-- 200개 종목 페이지 기능은 로컬 검증 완료. 운영에는 아직 반영되지 않아 응답 시간과 실제 집계 수치는 미확인이다.
+- 200개 종목 페이지 기능은 로컬 검증 완료. 이전 운영 전체 집계 요청은 60초에서 504였다. 최신 `bf3b944f` 배포 workflow `40265409874`는 6분 이상 GitHub 공개 화면에서 running으로 남았고 health-check는 계속 `f6c541ba`를 보고해 운영 페이지 조회는 수행하지 않았다.
 
 ### 다음 개선
-- 최종 커밋을 `oci`에 배포하고 offset 페이지를 끝까지 읽어 응답시간·기준일 일관성·종목 커버리지와 KIS/SEC 분리 합계를 검증한다.
+- workflow `40265409874`의 종료/실패 또는 운영 `bf3b944f` 반영 여부를 확인한다. 반영 후 offset 페이지를 끝까지 읽어 응답시간·기준일 일관성·종목 커버리지와 KIS/SEC 분리 합계를 검증한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-26-007
