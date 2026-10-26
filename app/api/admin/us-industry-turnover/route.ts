@@ -15,12 +15,17 @@ const ELIGIBLE_COMMON = `
 `;
 
 /** Read-only one-month turnover aggregation by source taxonomy and stored industry code. */
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await requireAdminSession())) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   try {
+    const params = new URL(request.url).searchParams;
+    const requestedOffset = Number(params.get("offset") ?? "0");
+    const offset = Number.isInteger(requestedOffset) ? Math.max(0, Math.min(requestedOffset, 20_000)) : 0;
+    const includeCoverage = params.get("coverage") !== "false";
+    const limit = 200;
     const result = await getPool().query(`
       WITH eligible AS (
         SELECT u.market, u.code,
@@ -34,16 +39,30 @@ export async function GET() {
         WHERE c.market IN ('NAS', 'NYS', 'AMS') AND c.volume > 0
       ), period AS (
         SELECT latest_date, (latest_date - INTERVAL '1 month')::date AS start_date FROM latest
+      ), eligible_ranked AS (
+        SELECT e.*, ROW_NUMBER() OVER (ORDER BY e.market, e.code) AS row_number
+        FROM eligible e
       ), candle_rows AS (
         SELECT e.market, e.code, e.classification_source,
           COALESCE(e.industry_code, 'UNCLASSIFIED') AS industry_code,
           c.candle_date::date AS date, c.trading_value, c.close, c.volume
-        FROM eligible e
+        FROM eligible_ranked e
         CROSS JOIN period p
         JOIN us_instrument_universe_candles c
           ON c.market = e.market AND c.code = e.code AND c.timeframe = 'D'
           AND c.candle_date BETWEEN TO_CHAR(p.start_date, 'YYYYMMDD') AND TO_CHAR(p.latest_date, 'YYYYMMDD')
           AND c.volume > 0 AND c.close > 0
+        WHERE e.row_number > $1 AND e.row_number <= $1 + $2
+      ), candle_coverage AS (
+        SELECT $3::boolean AS requested, CASE WHEN $3::boolean THEN (
+        SELECT COUNT(DISTINCT (e.market, e.code))::int AS instrument_count
+        FROM eligible_ranked e
+        CROSS JOIN period p
+        JOIN us_instrument_universe_candles c
+          ON c.market = e.market AND c.code = e.code AND c.timeframe = 'D'
+          AND c.candle_date BETWEEN TO_CHAR(p.start_date, 'YYYYMMDD') AND TO_CHAR(p.latest_date, 'YYYYMMDD')
+          AND c.volume > 0 AND c.close > 0
+        ) ELSE NULL END AS instrument_count
       ), daily AS (
         SELECT date, classification_source, industry_code,
           COUNT(DISTINCT (market, code))::int AS ticker_count,
@@ -68,14 +87,18 @@ export async function GET() {
         'eligibleCommonCount', (SELECT COUNT(*)::int FROM eligible),
         'eligibleClassifiedCount', (SELECT COUNT(*)::int FROM eligible WHERE industry_code IS NOT NULL),
         'eligibleUnclassifiedCount', (SELECT COUNT(*)::int FROM eligible WHERE industry_code IS NULL),
-        'eligibleWithPeriodCandlesCount', (SELECT COUNT(DISTINCT (market, code))::int FROM candle_rows),
+        'offset', $1,
+        'limit', $2,
+        'nextOffset', CASE WHEN $1 + $2 < (SELECT COUNT(*) FROM eligible) THEN $1 + $2 ELSE NULL END,
+        'coverageIncluded', (SELECT requested FROM candle_coverage),
+        'eligibleWithPeriodCandlesCount', (SELECT instrument_count FROM candle_coverage),
         'summary', COALESCE((SELECT json_agg(to_jsonb(s) ORDER BY s.period_trading_value_usd DESC)
           FROM summary s), '[]'::json),
         'daily', COALESCE((SELECT json_agg(to_jsonb(d) ORDER BY d.date, d.classification_source, d.industry_code)
           FROM daily d), '[]'::json)
       ) AS report
       FROM period p
-    `);
+    `, [offset, limit, includeCoverage]);
     const report = result.rows[0]?.report;
     if (!report?.latestDate) {
       return NextResponse.json({ ok: false, error: "US_DAILY_CANDLES_UNAVAILABLE" }, { status: 503 });

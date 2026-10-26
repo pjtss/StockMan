@@ -5,10 +5,10 @@
 - **증상**: 배포된 `GET /api/admin/us-industry-turnover` 첫 운영 조회가 nginx `504 Gateway Time-out`으로 끝났다. 첫 쿼리 최적화 후에는 HTTP 200이었지만 `eligibleWithPeriodCandlesCount=0`으로 빈 표를 잘못 반환했다.
 - **근본 원인**: 운영 캔들 테이블의 `candle_date`는 TEXT의 `YYYYMMDD` 형식이다. 최초 쿼리의 `c.candle_date::date` 조건은 `(market, code, timeframe, candle_date)` 복합 인덱스 범위 탐색을 방해했고, 첫 최적화는 실제 `YYYYMMDD` 값에 ISO `YYYY-MM-DD` 경계를 비교해 모든 기간 캔들을 제외했다. 보통주별 최신일 탐색을 반복한 것도 첫 최적화 응답에 31초가 걸린 원인이었다.
 - **영향**: 조회 전부 읽기 전용이라 저장 변경은 없다. 첫 HTTP 200 응답은 5,163개 대상 종목 중 기간 캔들 0개 및 산업 그룹 0개를 반환했으며 거래대금 표로 사용하지 않았다.
-- **해결 위치**: `app/api/admin/us-industry-turnover/route.ts`에서 최신 날짜는 US 일봉 테이블의 최대값으로 얻고, 종목별 기간 캔들은 기존 복합 인덱스의 앞 열로 LATERAL 범위 조회한다. 날짜 경계는 `TO_CHAR(date, 'YYYYMMDD')`로 실제 저장 형식에 맞춘다.
-- **재발 자동 감지**: API 회귀 테스트가 LATERAL 기간 조회, `YYYYMMDD` 경계, 날짜 컬럼 형변환 부재, read-only SQL을 확인한다. 운영 API 결과는 `eligibleWithPeriodCandlesCount`, `summary`, `daily`가 함께 비어 있거나 비정상일 때 성공 보고로 소비하지 않는다. 운영에서는 응답시간 및 HTTP 504 비율을 관찰하고, 운영 DB 직접 접속 없이 API 응답을 기준으로 진단한다.
-- **검증 결과**: 최초 504와 31,273ms 빈 응답은 운영 관리자 API로 관측했다. 최종 수정본은 API 회귀 테스트 4개와 `npm run deploy:verify`(1,537 tests, build/runtime/browser smoke 포함)를 통과했다. 최종 버전은 배포 전이므로 운영 API 응답시간과 실제 결과는 재검증해야 한다.
-- **남은 위험 및 다음 개선**: 캔들 데이터량이 커서 조회가 여전히 느리면 월별·분류별 결과 분할 또는 서버 측 cursor pagination을 추가한다. `close × volume`은 `trading_value`가 없는 행의 대체 추정치로 표시한다.
+- **해결 위치**: `app/api/admin/us-industry-turnover/route.ts`에서 최신 날짜는 종목별 최신 일봉 요약 테이블에서 얻고, 전체 대상은 정렬된 200종목 페이지로 나누어 원본 기간 캔들과 조인한다. 첫 페이지에서만 전체 캔들 커버리지를 산출한다. 날짜 경계는 `TO_CHAR(date, 'YYYYMMDD')`로 실제 저장 형식에 맞춘다.
+- **재발 자동 감지**: API 회귀 테스트가 `YYYYMMDD` 범위, read-only SQL, 200개 상한과 offset 경계를 확인한다. 운영 페이지별 응답시간, 페이지 간 기준일/eligible 수 일치, 마지막 `nextOffset=null`, 기간 캔들 커버리지 및 원천별 합계를 확인하고, 운영 DB 직접 접속 없이 API 응답으로 진단한다.
+- **검증 결과**: 최초 504와 31,273ms 빈 응답은 운영 관리자 API로 관측했다. 전체 일괄 쿼리는 최적화 후에도 운영에서 504였다. 200개 종목 단위 offset 읽기로 다시 개선 중이며 route 회귀 테스트 5개와 전체 `npm run deploy:verify`(1,538 tests, build/runtime/browser smoke 포함)를 통과했다. 분할 버전은 배포 전이므로 운영 API 페이지별 응답 및 합계는 재검증해야 한다.
+- **남은 위험 및 다음 개선**: 단일 페이지가 504면 페이지 크기를 더 낮춰 재검증한다. 모든 페이지의 기준일·대상 수가 불일치하면 합산하지 않는다. `close × volume`은 `trading_value`가 없는 행의 대체 추정치로 표시한다.
 
 ## 2026-10-25 KIS 미국 업종 동기화의 운영 universe 미정합
 

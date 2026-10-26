@@ -1,3 +1,29 @@
+## [2026-10-26] 미국 산업별 거래대금 운영 API 작업 분할
+
+### 목표
+- 최신 운영 API 조회가 계속 504인 원인을 줄이고, 미국 보통주 산업별 월간 데이터를 운영 API만으로 완결 수집할 수 있게 한다.
+
+### 반영
+- `/api/admin/us-industry-turnover`에 관리자 세션 전용 `offset` 페이지 조회를 추가했다. 페이지는 최대 200종목이며 요청별로 기간 집계가 독립 실행된다.
+- 기준일은 최신 일봉 요약 테이블에서 읽고, 전체 캔들 커버리지는 첫 요청만 계산한다. 후속 페이지는 `coverage=false`로 전체 커버리지 계산을 생략한다.
+- 기간 및 eligible 총수가 페이지마다 동일한지, `nextOffset=null`로 끝나는지 확인한 뒤 페이지별 `summary`와 `daily`를 source+industry code 기준으로 합산하도록 운영 runbook을 갱신했다. 운영 DB 직접 조회나 데이터 쓰기는 없다.
+- ERROR_HANDLING에 반복 504, 쿼리 수정 이력과 재발 감지 절차를 업데이트했다.
+
+### 검증
+- route 테스트 5개, TypeScript 검사, `git diff --check` 통과.
+- 전체 `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone 및 Chrome desktop/mobile smoke, 303개 테스트 파일 통과·1개 skip(1,538 tests pass·3 skip), typecheck, docs, verify-scope, KIS, bearer-auth 및 OCI cron 검사.
+- 200개 종목 페이지 기능은 로컬 검증 완료. 운영에는 아직 반영되지 않아 응답 시간과 실제 집계 수치는 미확인이다.
+
+### 다음 개선
+- 최종 커밋을 `oci`에 배포하고 offset 페이지를 끝까지 읽어 응답시간·기준일 일관성·종목 커버리지와 KIS/SEC 분리 합계를 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-26-007
+- 성과 판정: UNMEASURED
+- 근거: 전체 검증은 통과했지만 운영 적용 및 수치 재수집 전이라 프록시 timeout 개선 효과는 미측정이다.
+
+### 커밋·푸시·배포
+- 미실행
 ## [2026-10-26] 미국 산업별 거래대금 집계 API 조회 정확도·속도 보완
 
 ### 목표

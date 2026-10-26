@@ -30,7 +30,7 @@ describe("GET /api/admin/us-industry-turnover", () => {
   });
 
   it("returns monthly and daily rows without merging KIS and SEC codes", async () => {
-    const response = await GET();
+    const response = await GET(new Request("https://local.test/api/admin/us-industry-turnover?offset=400"));
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.source).toBe("OPERATING_DB_READ_ONLY_AGGREGATION");
@@ -43,21 +43,35 @@ describe("GET /api/admin/us-industry-turnover", () => {
     expect(sql).toContain("FROM us_latest_daily_candles c");
     expect(sql).toContain("JOIN us_instrument_universe_candles c");
     expect(sql).not.toContain("CROSS JOIN LATERAL");
+    expect(sql).toContain("ROW_NUMBER() OVER (ORDER BY e.market, e.code)");
+    expect(sql).toContain("WHERE e.row_number > $1 AND e.row_number <= $1 + $2");
+    expect(sql).toContain("), candle_coverage AS (");
+    expect(sql).toContain("CASE WHEN $3::boolean THEN (");
     expect(sql).toContain("c.candle_date BETWEEN TO_CHAR(p.start_date, 'YYYYMMDD') AND TO_CHAR(p.latest_date, 'YYYYMMDD')");
     expect(sql).not.toContain("c.candle_date::date BETWEEN");
     expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE)\b/i);
+    expect(mocks.query.mock.calls[0][1]).toEqual([400, 200, true]);
+    await GET(new Request("https://local.test/api/admin/us-industry-turnover?offset=600&coverage=false"));
+    expect(mocks.query.mock.calls[1][1]).toEqual([600, 200, false]);
+  });
+
+  it("bounds invalid, fractional and oversized offsets", async () => {
+    await GET(new Request("https://local.test/api/admin/us-industry-turnover?offset=-1.5"));
+    expect(mocks.query.mock.calls[0][1]).toEqual([0, 200, true]);
+    await GET(new Request("https://local.test/api/admin/us-industry-turnover?offset=999999"));
+    expect(mocks.query.mock.calls[1][1]).toEqual([20_000, 200, true]);
   });
 
   it("reports unavailable candles instead of returning an empty success", async () => {
     mocks.query.mockResolvedValue({ rows: [{ report: { latestDate: null } }] });
-    const response = await GET();
+    const response = await GET(new Request("https://local.test/api/admin/us-industry-turnover"));
     expect(response.status).toBe(503);
     expect((await response.json()).error).toBe("US_DAILY_CANDLES_UNAVAILABLE");
   });
 
   it("does not expose database error details", async () => {
     mocks.query.mockRejectedValue(new Error("postgres://private-user:private-password@host/db"));
-    const response = await GET();
+    const response = await GET(new Request("https://local.test/api/admin/us-industry-turnover"));
     expect(response.status).toBe(503);
     expect(JSON.stringify(await response.json())).not.toContain("private-password");
   });
