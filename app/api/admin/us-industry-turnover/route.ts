@@ -29,10 +29,16 @@ export async function GET() {
         FROM us_common_stock_universe u
         WHERE ${ELIGIBLE_COMMON}
       ), latest AS (
-        SELECT MAX(c.candle_date)::date AS latest_date
-        FROM us_instrument_universe_candles c
-        JOIN eligible e ON e.market = c.market AND e.code = c.code
-        WHERE c.timeframe = 'D' AND c.volume > 0
+        SELECT MAX(last_candle.candle_date)::date AS latest_date
+        FROM eligible e
+        CROSS JOIN LATERAL (
+          SELECT c.candle_date
+          FROM us_instrument_universe_candles c
+          WHERE c.market = e.market AND c.code = e.code
+            AND c.timeframe = 'D' AND c.volume > 0
+          ORDER BY c.candle_date DESC
+          LIMIT 1
+        ) last_candle
       ), period AS (
         SELECT latest_date, (latest_date - INTERVAL '1 month')::date AS start_date FROM latest
       ), daily AS (
@@ -48,7 +54,7 @@ export async function GET() {
         JOIN eligible e ON e.market = c.market AND e.code = c.code
         CROSS JOIN period p
         WHERE c.timeframe = 'D'
-          AND c.candle_date::date BETWEEN p.start_date AND p.latest_date
+          AND c.candle_date BETWEEN p.start_date::text AND p.latest_date::text
           AND c.volume > 0 AND c.close > 0
         GROUP BY c.candle_date::date, e.classification_source, COALESCE(e.industry_code, 'UNCLASSIFIED')
       ), summary AS (
@@ -68,7 +74,7 @@ export async function GET() {
         'eligibleUnclassifiedCount', (SELECT COUNT(*)::int FROM eligible WHERE industry_code IS NULL),
         'eligibleWithPeriodCandlesCount', (SELECT COUNT(DISTINCT (e.market, e.code))::int
           FROM eligible e JOIN us_instrument_universe_candles c ON c.market = e.market AND c.code = e.code
-          WHERE c.timeframe = 'D' AND c.candle_date::date BETWEEN p.start_date AND p.latest_date
+          WHERE c.timeframe = 'D' AND c.candle_date BETWEEN p.start_date::text AND p.latest_date::text
             AND c.volume > 0 AND c.close > 0),
         'summary', COALESCE((SELECT json_agg(to_jsonb(s) ORDER BY s.period_trading_value_usd DESC)
           FROM summary s), '[]'::json),

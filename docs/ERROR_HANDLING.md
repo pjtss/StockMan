@@ -1,5 +1,15 @@
 # 오류 상황 및 해결 방법
 
+## 2026-10-26 미국 산업별 거래대금 관리자 집계 API 시간 초과
+
+- **증상**: 배포된 `GET /api/admin/us-industry-turnover` 첫 운영 조회가 nginx `504 Gateway Time-out`으로 끝났다.
+- **근본 원인**: 운영 캔들 테이블의 `candle_date`는 TEXT이며, 초기 집계가 `c.candle_date::date`로 전체 대상 일봉에 형변환을 적용했다. 이 표현식은 `(market, code, timeframe, candle_date)` 복합 인덱스의 날짜 범위 탐색을 방해했다. 최신 거래일 계산도 전체 대상 캔들과 universe 조인으로 구했다.
+- **영향**: 조회 요청만 시간 초과했고 테이블 변경은 없었다. 산업별 보고서는 아직 생성되지 않았다.
+- **해결 위치**: 관리자 API 최신일 계산을 보통주별 `LATERAL ... ORDER BY candle_date DESC LIMIT 1` 인덱스 조회로 바꾸고, 일봉 날짜 범위는 ISO 날짜 TEXT를 그대로 비교한다.
+- **재발 자동 감지**: API 회귀 테스트가 LATERAL 최신일 조회, 인덱스 호환 TEXT 범위 조건, 날짜 컬럼 형변환 부재를 확인한다. 운영에서는 전체 route 응답시간과 HTTP 504 비율을 관찰하고, 조회가 30초를 넘으면 같은 인덱스 경로와 실제 계획을 API 레벨 진단으로 확인한다. 운영 DB 직접 접속으로 조사하지 않는다.
+- **검증 결과**: 최적화 수정 후 API 회귀 테스트 4개와 `npm run deploy:verify`(1,536 tests, build/runtime/browser smoke 포함)는 통과했다. 최적화 버전은 아직 운영 배포 전이라 운영 API 응답시간은 재검증 대기다.
+- **남은 위험 및 다음 개선**: 운영 데이터량이 예상보다 크면 월별·분류별 결과를 분할 응답하거나 서버 측 cursor pagination을 추가한다. `close × volume`은 `trading_value`가 없는 행의 대체 추정치로 표시한다.
+
 ## 2026-10-25 KIS 미국 업종 동기화의 운영 universe 미정합
 
 - **증상**: KIS 업종 UPDATE 결과의 코드 불일치는 0이지만, KIS 보통주 후보 일부가 저장되지 않고 KIS 원본과 무관한 활성 `COMMON_STOCK` 행이 남아 전체 보통주 업종 저장을 보장할 수 없었다.
