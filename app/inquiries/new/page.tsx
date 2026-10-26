@@ -1,2 +1,0 @@
-import { PageNavigation } from "@/components/page-navigation"; import { InquiryForm } from "@/components/inquiry-form";
-export default function NewInquiryPage(){return <><PageNavigation current="inquiries"/><main className="page-shell inquiryPage"><section className="hero inquiryHero"><div className="kicker">COMMUNITY</div><h1>문의 작성</h1><p>궁금한 점이나 개선 의견을 남겨주세요.</p></section><InquiryForm/></main></>}

@@ -208,7 +208,7 @@ source client → raw parser → normalized item → classifier/grade
 | RSS 원본 | `market-rss*`, `stocktitan-rss.ts`, `domestic-rss-sources.ts`, `nasdaq-rss.ts` |
 | 정규화/등급 | `market-rss-classifier.ts`, `market-rss-grade.ts`, `market-rss-pipeline.ts` |
 | SEC | `sec-edgar-rss.ts`, `sec-edgar-client.ts`, `sec-document-parser.ts`, `sec-edgar-repository.ts` |
-| DART | `opendart.ts`, `dart-automation.ts`, `dart-calendar-sync.ts` |
+| DART | `opendart.ts`, `dart-automation.ts` |
 | 번역 | `cloud-translation-client.ts`, `translate-market-rss-item.ts`, `translation-cache.ts` |
 | 전달 | `discord-sec.ts`, `discord-dart.ts`, `push.ts` |
 

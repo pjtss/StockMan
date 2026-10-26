@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import styles from "@/app/admin/observability/observability.module.css";
 type Snapshot = { summary: { requests: number; users: number; errors: number }; users: Array<{ userKey: string; count: number; ip: string; country: string | null; region: string | null; city: string | null }>; recent: Array<{ id: number; method: string; path: string; statusCode: number | null; feature?: string; action?: string; resource?: string | null; result?: string | null; userKey: string; ip: string; userAgent: string; country: string | null; region: string | null; city: string | null; createdAt: string }> };
-const featureLabels: Record<string, string> = { auth: "인증", screener: "종목 추출", chart: "차트", watchlist: "관심종목", news: "뉴스·공시", community: "커뮤니티", notice: "공지", api: "기타" };
+const featureLabels: Record<string, string> = { auth: "인증", screener: "종목 추출", chart: "차트", watchlist: "관심종목", news: "뉴스·공시", api: "기타" };
 const actionLabels: Record<string, string> = { view: "조회", submit: "실행", copy_json: "JSON 복사", request: "요청" };
 export function UserActivityDashboard() {
   const [data, setData] = useState<Snapshot | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [selected, setSelected] = useState("");

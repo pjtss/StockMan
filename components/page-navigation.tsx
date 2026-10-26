@@ -10,18 +10,12 @@ type PageKey =
   | "watchlist"
   | "notifications"
   | "scanners-us"
-  | "scanners-kr"
   | "charts"
-  | "inquiries"
-  | "notices"
   | "market-news"
   | "disclosures"
   | "login"
   | "register"
-  | "notes"
-  | "investment-calendar"
   | "other"
-  | "intraday"
 
 export function PageNavigation({ current }: { current: PageKey }) {
   const [username, setUsername] = useState<string | null>(null);
@@ -46,35 +40,17 @@ export function PageNavigation({ current }: { current: PageKey }) {
         <Link aria-current={current === "charts" ? "page" : undefined} className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
           티커 차트
         </Link>
-        <Link aria-current={current === "intraday" ? "page" : undefined} className={current === "intraday" ? styles.navActive : styles.navLink} href="/intraday" prefetch={false}>
-          탐지 후보
-        </Link>
         <Link aria-current={current === "watchlist" ? "page" : undefined} className={current === "watchlist" ? styles.navActive : styles.navLink} href="/watchlist" prefetch={false}>
           관심종목
         </Link>
-        <Link aria-current={current === "notes" ? "page" : undefined} className={current === "notes" ? styles.navActive : styles.navLink} href="/notes" prefetch={false}>
-          메모장
-        </Link>
-        <Link aria-current={current === "inquiries" ? "page" : undefined} className={current === "inquiries" ? styles.navActive : styles.navLink} href="/inquiries" prefetch={false}>
-          문의
-        </Link>
-        <Link aria-current={current === "notices" ? "page" : undefined} className={current === "notices" ? styles.navActive : styles.navLink} href="/notices" prefetch={false}>
-          공지사항
-        </Link>
         <Link aria-current={current === "market-news" ? "page" : undefined} className={current === "market-news" ? styles.navActive : styles.navLink} href="/market-news" prefetch={false}>
           해외 뉴스
-        </Link>
-        <Link aria-current={current === "investment-calendar" ? "page" : undefined} className={current === "investment-calendar" ? styles.navActive : styles.navLink} href="/investment-calendar" prefetch={false}>
-          투자 일정
         </Link>
         <Link aria-current={current === "other" ? "page" : undefined} className={current === "other" ? styles.navActive : styles.navLink} href="/other" prefetch={false}>
           기타
         </Link>
         <Link aria-current={current === "scanners-us" ? "page" : undefined} className={current === "scanners-us" ? styles.navActive : styles.navLink} href="/us-top-rising" prefetch={false}>
           해외 상승률 TOP 100
-        </Link>
-        <Link aria-current={current === "scanners-kr" ? "page" : undefined} className={current === "scanners-kr" ? styles.navActive : styles.navLink} href="/kr-top-rising" prefetch={false}>
-          국내 상승률 TOP 100
         </Link>
         <Link aria-current={current === "disclosures" ? "page" : undefined} className={current === "disclosures" ? styles.navActive : styles.navLink} href="/disclosures" prefetch={false}>
           일별 공시

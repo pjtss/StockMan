@@ -1,5 +1,7 @@
 # 신규 종목 상장 일정 API
 
+> **폐기됨 (2026-10-26)**: `/api/listings` 및 투자 일정 API와 수집 경로를 제거했다. 아래 요청 예시는 더 이상 동작하는 API 안내가 아니며 과거 구현 기록으로만 보존한다.
+
 ## 현재 상태
 
 - 국내: `GET /api/listings`가 `investment_calendar_events`의 `event_type=IPO`, `market=KR` 데이터를 조회한다.

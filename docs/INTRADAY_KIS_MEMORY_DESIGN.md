@@ -1,5 +1,7 @@
 # 장중 KIS 수급 탐지 메모리 우선 설계
 
+> **UI 상태 (2026-10-26)**: 사용자용 `/intraday` 탐지 후보 페이지·컴포넌트·전용 테스트를 제거했다. 이 문서의 worker, KIS 호출, 메모리 상태, 관측 API 및 관리자 진단 관련 설계는 여전히 운영 중이다.
+
 > 문서 상태: `DESIGN_IN_PROGRESS`<br>
 > 최종 검토: 2026-09-12<br>
 > 운영 토폴로지: 단일 모놀리식 OCI 애플리케이션 + PostgreSQL<br>
@@ -993,6 +995,6 @@ Persistence is batched after candidate polling to avoid one database round trip 
 
 ## Recent 10-minute turnover window
 
-The in-memory turnover ring buffer now retains at most ten one-minute KIS candle values per eligible observed symbol. Repeated polls within one minute replace that minute bucket rather than adding it twice; session changes and TOP100 exits clear the corresponding memory. Windows from 1 through 10 minutes are exposed through the public read-only `GET /api/kis/intraday-mvp` response and `/intraday` UI. A duration is reported as a numeric amount only when every contiguous one-minute bucket for that full interval is present; otherwise the response reports `tradingValue: null`, observed sample count, and `complete: false`, avoiding partial data being mislabeled as a full 10-minute amount. USD amount and market-cap ratio are both shown when complete.
+The in-memory turnover ring buffer now retains at most ten one-minute KIS candle values per eligible observed symbol. Repeated polls within one minute replace that minute bucket rather than adding it twice; session changes and TOP100 exits clear the corresponding memory. Windows from 1 through 10 minutes are exposed through the public read-only `GET /api/kis/intraday-mvp` response. The former `/intraday` user interface was removed on 2026-10-26. A duration is reported as a numeric amount only when every contiguous one-minute bucket for that full interval is present; otherwise the response reports `tradingValue: null`, observed sample count, and `complete: false`, avoiding partial data being mislabeled as a full 10-minute amount. USD amount and market-cap ratio are both shown when complete.
 
 This is an observation-retention/display extension only: the configurable alert qualification remains the existing 1- or 5-minute policy and its threshold is unchanged. KIS minute requests remain restricted to the existing global priority focus pool (currently at most 30 eligible common stocks across NAS/AMS/NYS), not all 100 symbols per exchange; widening coverage would require a separate request-budget decision under the global 10 TPS ceiling. The memory is process-local and is lost on restart; durable minute observations may exist in PostgreSQL but are deliberately not replayed into the live ring buffer.

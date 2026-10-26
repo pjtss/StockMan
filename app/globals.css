@@ -78,25 +78,6 @@
 .healthGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }.healthGrid article { border: 1px solid var(--panel-border); border-radius: 14px; padding: 20px; background: var(--panel-bg); }.healthGrid h2 { margin-top: 0; font-size: 18px; }.healthGrid dl { display: grid; grid-template-columns: 1fr 1.5fr; gap: 9px; font-size: 14px; }.healthGrid dt { color: var(--groupHeader-span); }.healthGrid dd { margin: 0; overflow-wrap: anywhere; }.healthCheck, .healthEnv { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--panel-border); }.healthCheck strong, .healthEnv b { margin-left: auto; font-size: 12px; }.healthEnv { font-size: 12px; }.healthEnv b { color: #4ade80; }.healthDot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }.healthOk { background: #4ade80; box-shadow: 0 0 10px #4ade80; }.healthBad { background: #fb7185; box-shadow: 0 0 10px #fb7185; }.healthMuted { color: var(--groupHeader-span); font-size: 13px; }
 @media (max-width: 760px) { .healthGrid { grid-template-columns: 1fr; }.healthStatus { align-items: flex-start; flex-wrap: wrap; }.healthStatus small { width: 100%; margin-left: 19px; } }
 
-.investmentCalendarBoard { margin-top: 18px; }
-.calendarControls, .calendarFilters, .calendarChips { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
-.calendarControls label { color:var(--text-muted); font-size:12px; display:grid; gap:5px; }
-.calendarControls input, .calendarFilters select { min-height:38px; border:1px solid var(--border); border-radius:9px; background:var(--input); color:var(--foreground); padding:7px 10px; }
-.calendarFilters { justify-content:space-between; margin:22px 0; align-items:center; }
-.calendarFilterRight { display:flex; gap:8px; align-items:center; }.calendarExport { min-height:38px; border:1px solid var(--border); border-radius:9px; background:var(--glass); color:var(--text-secondary); padding:7px 12px; cursor:pointer; font-weight:700; }
-.calendarStats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:22px 0 4px; }.calendarStats div { border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:var(--glass); }.calendarStats small,.calendarStats strong { display:block; }.calendarStats small { color:var(--text-muted); font-size:12px; }.calendarStats strong { margin-top:5px; color:var(--card-foreground); font-size:22px; }
-.calendarChip { border:1px solid var(--border); border-radius:999px; background:var(--glass); color:var(--text-secondary); padding:8px 13px; cursor:pointer; }
-.calendarChip.active { background:var(--primary); color:var(--primary-foreground); border-color:var(--primary); font-weight:800; }
-.calendarTimeline { display:grid; gap:20px; }
-.calendarDay { display:grid; grid-template-columns:110px 1fr; gap:16px; }
-.calendarDay > time { color:var(--neon-blue); font-weight:800; padding-top:14px; }
-.calendarDay > div { display:grid; gap:10px; }
-.calendarEvent { display:grid; grid-template-columns:auto 1fr auto; gap:13px; align-items:start; padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface-elevated); }
-.calendarEvent strong { display:block; color:var(--card-foreground); }.calendarEvent p,.calendarEvent small { display:block; margin:5px 0 0; color:var(--text-muted); }.calendarEvent em { font-size:12px; color:var(--text-muted); font-style:normal; }.calendarEvent a { color:var(--neon-blue); }
-.calendarBadge { border-radius:7px; padding:5px 8px; background:rgba(41,163,255,.14); color:var(--neon-blue); font-size:12px; font-weight:800; white-space:nowrap; }.calendar-earnings { color:#fbbf24; background:rgba(251,191,36,.14); }.calendar-ex_dividend,.calendar-dividend_payment { color:#00e79b; background:rgba(0,231,155,.12); }.calendar-ipo { color:#c084fc; background:rgba(192,132,252,.14); }
-.calendarEmpty { padding:42px 16px; text-align:center; color:var(--text-muted); border:1px dashed var(--border); border-radius:14px; }
-@media (max-width:760px) { .calendarDay { grid-template-columns:1fr; gap:7px; }.calendarDay > time { padding-top:0; }.calendarEvent { grid-template-columns:auto 1fr; }.calendarEvent em { grid-column:2; }.calendarControls { width:100%; }.calendarControls label { flex:1; }.calendarControls input { width:100%; }.calendarStats { grid-template-columns:repeat(2,1fr); }.calendarFilterRight { width:100%; }.calendarFilterRight select,.calendarExport { flex:1; } }
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -145,23 +126,13 @@ a {
 }
 
 .chartsPage{padding-bottom:72px}.chartsHero{max-width:1040px;margin-inline:auto;padding-bottom:10px}.chartsHero p{max-width:680px}.chartsHeroMeta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.chartsHeroMeta span{padding:7px 11px;border:1px solid color-mix(in srgb,var(--primary) 22%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--primary) 7%,transparent);color:var(--text-secondary);font-size:12px;font-weight:800}.chartsPage .panel{max-width:1040px;margin:18px auto 0;padding:28px;border-color:color-mix(in srgb,var(--primary) 18%,var(--border));background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,var(--primary)),var(--card));}.chartsPage .results{max-width:1040px;margin-inline:auto}.chartsPage .scanBox{background:color-mix(in srgb,var(--glass) 75%,var(--background));}.chartsPage .scanFields select,.chartsPage .scanFields input,.chartsPage .input{transition:border-color .2s,box-shadow .2s}.chartsPage .scanFields select:focus,.chartsPage .scanFields input:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}
-.inquiryBoardHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.marketNewsBoard { margin-top: 18px; padding: 28px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); }
+.marketNewsBoardHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .disclosureControls { display: flex; align-items: flex-end; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }.disclosureControls label { display: grid; gap: 6px; color: var(--text-muted); font-size: 12px; font-weight: 800; }.disclosureControls input, .disclosureControls select { min-height: 42px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border)); border-radius: 11px; background: var(--card); color: var(--foreground); font: inherit; color-scheme: dark; }.disclosureControls input:focus, .disclosureControls select:focus { border-color: var(--primary); outline: 3px solid color-mix(in srgb, var(--primary) 20%, transparent); }.disclosureControls button { min-height: 42px; border: 0; cursor: pointer; }.disclosureStatus { margin: 0 0 14px; color: var(--primary); font-weight: 800; }.disclosureJsonHint { padding: 42px 20px; border: 1px dashed color-mix(in srgb, var(--primary) 30%, var(--border)); border-radius: 14px; color: var(--text-muted); text-align: center; }
-.inquiryBoardHead a, .inquiryForm button { padding: 10px 16px; border-radius: 10px; background: var(--primary); color: var(--primary-foreground); font-weight: 800; }
-.inquiryForm { display: grid; gap: 20px; }.inquiryFormIntro { padding-bottom: 4px; }.inquiryFormIntro span { display: block; margin-bottom: 5px; font-weight: 800; color: var(--foreground); }
-.inquiryForm label { display: grid; gap: 8px; color: var(--text-secondary); font-weight: 700; }
-.inquiryForm input, .inquiryForm textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--input); color: var(--foreground); font: inherit; }
-.inquiryForm input:focus, .inquiryForm textarea:focus, .inquiryInteraction textarea:focus { border-color: var(--primary); outline: 3px solid color-mix(in srgb, var(--primary) 20%, transparent); }.inquiryForm textarea { resize: vertical; min-height: 220px; }.inquiryFormActions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }.inquiryFormActions a, .inquiryBackLink { color: var(--text-muted); font-weight: 700; }.inquiryEmpty { padding: 52px 20px; text-align: center; color: var(--text-muted); }.inquiryEmpty span { display: block; margin-bottom: 12px; color: var(--primary); font-size: 28px; }.inquiryEmpty p { margin: 0 0 5px; color: var(--foreground); font-weight: 800; }.inquiryEmpty small { font-size: 13px; }
-.inquiryForm p { color: var(--destructive); }
-.inquiryList { display: grid; gap: 10px; }.inquiryRow { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--glass); }.inquiryRow:hover { border-color: var(--primary); transform: translateY(-1px); }.inquiryRow small, .inquiryRow span, .inquiryMeta { color: var(--text-muted); font-size: 12px; }.inquiryRowMain { display: grid; gap: 7px; min-width: 0; }.inquiryRowMain strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.inquiryStats { display: flex; align-items: center; gap: 12px; white-space: nowrap; }.inquiryContent { min-height: 180px; margin: 24px 0; padding: 24px 0; white-space: pre-wrap; line-height: 1.8; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }.inquiryDetailHeader h1 { margin: 8px 0 10px; }.inquiryBack { max-width: 860px; margin: 20px auto 0; }.inquiryBack a { color: var(--text-muted); font-size: 13px; font-weight: 700; }.inquiryDetail { margin-top: 14px; }.inquiryNotFound { text-align: center; line-height: 2; }
-.inquiryDetailHeader { padding-bottom: 4px; }.inquiryMeta { display: flex; flex-wrap: wrap; gap: 8px 14px; }.inquiryMeta span + span { position: relative; }.inquiryMeta span + span::before { content: "·"; position: absolute; left: -9px; color: var(--border); }.inquirySectionHeading { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--border); }.inquirySectionHeading h2, .inquiryComments h3 { margin: 0; font-size: 17px; }.inquirySectionHeading p { margin: 5px 0 0; color: var(--text-muted); font-size: 13px; }.inquiryComments { display: grid; gap: 0; }.inquiryComments h3 { padding-bottom: 8px; }.inquiryComments h3 span { color: var(--primary); }.inquiryCommentEmpty { margin: 0; padding: 18px 0; color: var(--text-muted); font-size: 13px; }.inquiryCommentForm { display: grid; gap: 9px; margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--glass); }.inquiryCommentFormFooter { display: flex; align-items: center; justify-content: space-between; gap: 10px; }.inquiryCommentFormFooter small { color: var(--text-muted); font-size: 11px; }.inquiryCommentForm button { background: var(--primary); color: var(--primary-foreground); }
-.inquiryAdminBar { display: flex; justify-content: space-between; gap: 10px; margin: 18px 0 -8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--primary) 8%, transparent); color: var(--text-muted); font-size: 12px; }.inquiryAdminBar strong { color: var(--primary); }.inquiryCommentHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }.inquiryCommentHead button { padding: 4px 8px; color: var(--destructive); background: transparent; border: 1px solid color-mix(in srgb, var(--destructive) 35%, var(--border)); border-radius: 6px; font-size: 11px; }
-.inquiryAdminBar button { padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--secondary); color: var(--foreground); font-size: 11px; font-weight: 800; }.inquiryNoticeBadge { display: inline-block; margin-right: 8px; padding: 4px 7px; border-radius: 6px; background: var(--primary); color: var(--primary-foreground); font-size: 11px; vertical-align: middle; }
-.inquiryInteraction { width: 100%; }.inquiryInteraction > .likeAction { margin-bottom: 22px; }.inquiryInteraction > .likeAction button { min-height: 38px; padding: 8px 14px; color: var(--primary); border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); background: color-mix(in srgb, var(--primary) 8%, var(--secondary)); }.inquiryComment { padding: 15px 0; }.inquiryComment p { margin: 7px 0 0; line-height: 1.65; overflow-wrap: anywhere; }.inquiryCommentForm textarea { display: block; min-height: 112px; box-sizing: border-box; resize: vertical; background: var(--input); color: var(--foreground); }.inquiryCommentFormFooter button { min-height: 38px; padding: 8px 14px; border-radius: 9px; }.inquiryBackLink { display: inline-block; margin-top: 10px; padding-top: 18px; border-top: 1px solid var(--border); }
-.likeAction { position: relative; display: flex; align-items: center; gap: 10px; width: fit-content; }.likeFeedback { position: absolute; left: calc(100% + 8px); bottom: 8px; color: var(--primary); font-weight: 900; white-space: nowrap; pointer-events: none; animation: likeFloat 900ms ease-out forwards; }
-@keyframes likeFloat { from { opacity: 0; transform: translateY(5px) scale(.86); } 20% { opacity: 1; } to { opacity: 0; transform: translateY(-28px) scale(1.05); } }
-@media (prefers-reduced-motion: reduce) { .likeFeedback { animation: none; opacity: 1; } }
-@media (max-width: 600px) { .inquiryRow { grid-template-columns: 1fr; }.inquiryStats { gap: 8px; }.inquiryBoard, .inquiryForm { padding: 20px; border-radius: 16px; }.inquiryFormActions { justify-content: stretch; }.inquiryFormActions > * { flex: 1; text-align: center; }.inquiryPrimaryAction { padding-inline: 12px; }.inquiryBoardHead { align-items: flex-start; }.inquiryDetailHeader h1 { font-size: 24px; }.disclosureToolbar, .disclosureControls { align-items: stretch; flex-direction: column; width: 100%; }.disclosureControls input, .disclosureControls select, .disclosureControls button { width: 100%; } }
+.marketNewsBoardHead select { min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--input); color: var(--foreground); }
+.marketNewsEmpty { padding: 52px 20px; text-align: center; color: var(--text-muted); }
+.marketNewsList { display: grid; gap: 10px; }.marketNewsRow { display: grid; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--glass); }.marketNewsRow:hover { border-color: var(--primary); transform: translateY(-1px); }.marketNewsRow small { color: var(--text-muted); font-size: 12px; }.marketNewsRowMain { display: grid; gap: 7px; min-width: 0; }.marketNewsRowMain strong { overflow-wrap: anywhere; }.marketNewsRowMain p { line-height: 1.6; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .marketNewsBoard { padding: 20px; border-radius: 16px; }.marketNewsBoardHead { align-items: flex-start; flex-direction: column; }.marketNewsBoardHead > *, .marketNewsBoardHead select { width: 100%; } }
 
 button {
   cursor: pointer;
@@ -216,8 +187,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 
 .page-shell .panel,
 .page-shell .results,
-.page-shell .inquiryBoard,
-.page-shell .inquiryForm {
+.page-shell .marketNewsBoard {
   min-width: 0;
   max-width: 100%;
 }
@@ -239,9 +209,9 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 
 @media (max-width: 600px) {
   .page-shell { width: 100%; min-width: 0; padding-inline: 12px; }
-  .page-shell > *, .hero, .panel, .results, .inquiryBoard, .inquiryForm { min-width: 0; max-width: 100%; }
+  .page-shell > *, .hero, .panel, .results, .marketNewsBoard { min-width: 0; max-width: 100%; }
   .hero { padding-block: 24px 18px; }
-  .hero h1, .inquiryHero h1 { font-size: clamp(28px, 9vw, 40px); line-height: 1.12; overflow-wrap: anywhere; }
+  .hero h1 { font-size: clamp(28px, 9vw, 40px); line-height: 1.12; overflow-wrap: anywhere; }
   .hero p { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
   .chartsHeroMeta { gap: 6px; margin-top: 14px; }
   .chartsHeroMeta span { padding: 6px 9px; }
@@ -256,16 +226,8 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .grid { grid-template-columns: 1fr; }
   .card { min-width: 0; }
   .card strong, .card small { overflow-wrap: anywhere; }
-  .inquiryBoardHead { flex-direction: column; gap: 12px; }
-  .inquiryBoardHead > *, .inquiryPrimaryAction { width: 100%; }
-  .inquiryBoardHead a, .inquiryPrimaryAction, .inquiryForm button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  .inquiryRow { padding: 15px; }
-  .inquiryRowMain strong { white-space: normal; overflow-wrap: anywhere; }
-  .inquiryStats { flex-wrap: wrap; white-space: normal; }
-  .inquiryDetailHeader h1 { font-size: clamp(24px, 7vw, 32px); overflow-wrap: anywhere; }
-  .inquiryContent { min-height: 140px; padding-block: 18px; overflow-wrap: anywhere; }
-  .inquiryCommentFormFooter { align-items: stretch; flex-direction: column; }
-  .inquiryCommentFormFooter button { width: 100%; min-height: 44px; }
+  .marketNewsBoard { padding: 16px; border-radius: 16px; }
+  .marketNewsRow { padding: 15px; }
   .disclosureControls input, .disclosureControls select, .disclosureControls button { min-height: 44px; }
   .otherExportCard { padding:20px 16px; border-radius:16px; }
   .otherExportActions, .otherExportCard button { width:100%; }
@@ -279,7 +241,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .page-shell { padding-inline: 10px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .hero { text-align: left; }
   .hero h1 { letter-spacing: -.045em; }
-  .panel, .results, .inquiryBoard, .inquiryForm { padding: 14px; border-radius: 14px; }
+  .panel, .results, .marketNewsBoard { padding: 14px; border-radius: 14px; }
   button, input, select, textarea { font-size: 16px; } /* avoids iOS input zoom */
   button, select { min-height: 44px; }
   textarea { max-width: 100%; }
@@ -298,10 +260,6 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   .healthPage header h1{font-size:clamp(28px,8vw,38px);letter-spacing:-.05em}
   .healthGrid article{padding:15px;border-radius:13px}
   .healthGrid dl{grid-template-columns:minmax(82px,.8fr) minmax(0,1.5fr);gap:8px;font-size:13px}
-  .calendarStats{gap:7px}
-  .calendarStats div{padding:10px;border-radius:11px}
-  .calendarStats strong{font-size:19px}
-  .calendarEvent{padding:13px;border-radius:12px}
 }
 
 html { overflow-x: clip; }

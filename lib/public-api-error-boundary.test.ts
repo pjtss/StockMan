@@ -4,8 +4,6 @@ import { describe, expect, it } from "vitest";
 
 const publicRoutes = [
   "app/api/bullish-rss/route.ts",
-  "app/api/listings/route.ts",
-  "app/api/investment-calendar/route.ts",
   "app/api/domestic-financial-export/route.ts",
   "app/api/stock/kr/top-rising-chart/route.ts",
   "app/api/scan/daytrade/route.ts",
