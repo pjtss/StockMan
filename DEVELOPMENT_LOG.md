@@ -78,7 +78,7 @@
 - 근거: 요청된 앱 코드·문서 상한과 quota 회귀 테스트를 반영했고 전체 빌드·테스트·타입·문서·standalone runtime/browser/API 게이트를 통과했다. 운영 반영은 커밋·배포 단계에서 확인한다.
 
 ### 커밋·푸시·배포
-- 로컬 RSS 전용 커밋 `fix(rss): Azure·Google 번역 월간 보호 한도 상향`을 생성했다. 최신 `origin/oci` 기준 전체 검증도 통과했으며 push 및 운영 배포 확인은 이어서 수행한다.
+- RSS 전용 커밋 `529bb1690ef4abb1dbb50f841f61377521853426`을 `origin/oci`에 push했다. Deploy OCI run `40260973591`은 verify/package/upload에 성공했고 activate 단계도 성공 처리됐으나, 후속 커밋 `e52d36ce` 배포가 시작되며 run 결론은 cancelled로 기록됐다. 운영 `/health-check`는 quota 변경 커밋을 포함하는 후속 SHA `e52d36cef3e907d4a253c987b9e15a9bf2f51ccf`를 표시했고 `/api/health`는 `ok`를 반환했다(2026-10-26 02:59:52Z). 따라서 현재 운영 release가 요청한 상한 코드를 포함함을 확인했다.
 
 
 ## [2026-10-26] 번역 retry worker를 미발송 기사로 제한
