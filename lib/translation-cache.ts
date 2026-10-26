@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
 import { getPool } from "./db";
 
-export const TRANSLATION_LIMIT = 300_000;
-// Azure Translator F0 includes 2M characters/month. Keep a 100K safety margin
+// Google Cloud Translation Basic's first 500K characters/month are covered by
+// up to a shared $10 credit. Keep a 50K margin for usage outside this app.
+export const GOOGLE_TRANSLATION_MONTHLY_LIMIT = 450_000;
+// Azure Translator F0 includes 2M characters/month. Keep a 50K safety margin
 // for counting/usage outside this application's reservation ledger.
-export const AZURE_TRANSLATION_MONTHLY_LIMIT = 1_900_000;
+export const AZURE_TRANSLATION_MONTHLY_LIMIT = 1_950_000;
 export const AZURE_TRANSLATION_HOURLY_LIMIT = 1_800_000;
 export const GOOGLE_TRANSLATION_HOURLY_LIMIT = 100_000;
 export const AZURE_TRANSLATION_PROVIDER = "azure-translator";
@@ -29,7 +31,7 @@ export async function deleteTranslationCache(sourceText: string, provider: strin
   await getPool().query("DELETE FROM market_rss_translation_cache WHERE source_hash=$1 AND target_language=$2 AND provider=$3", [translationHash(sourceText), targetLanguage, provider]);
 }
 
-export async function reserveTranslationCharacters(characterCount: number, month = new Date().toISOString().slice(0, 7), limit = TRANSLATION_LIMIT, provider = GOOGLE_TRANSLATION_PROVIDER, hourlyLimit = Number.MAX_SAFE_INTEGER) {
+export async function reserveTranslationCharacters(characterCount: number, month = new Date().toISOString().slice(0, 7), limit = GOOGLE_TRANSLATION_MONTHLY_LIMIT, provider = GOOGLE_TRANSLATION_PROVIDER, hourlyLimit = Number.MAX_SAFE_INTEGER) {
   if (characterCount <= 0) return { allowed: true, used: 0, limitReached: false };
   const client = await getPool().connect();
   try {

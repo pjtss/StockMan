@@ -10,7 +10,7 @@ import {
 } from "./translation-cache";
 import { TranslationClientOperationError, type TranslationClient, type TranslationFormat, type TranslationLanguage, type TranslationResult, type TranslationSourceLanguage } from "./translation-types";
 
-import { GOOGLE_TRANSLATION_PROVIDER, TRANSLATION_LIMIT } from "./translation-cache";
+import { GOOGLE_TRANSLATION_MONTHLY_LIMIT, GOOGLE_TRANSLATION_PROVIDER } from "./translation-cache";
 
 export type TranslationQuotaDependencies = {
   loadCache: typeof loadTranslationCache;
@@ -108,7 +108,7 @@ export function createQuotaAwareTranslationClient(
   quota: { provider?: string; monthlyLimit?: number; hourlyLimit?: number } = {},
 ) {
   const provider = quota.provider ?? GOOGLE_TRANSLATION_PROVIDER;
-  const monthlyLimit = quota.monthlyLimit ?? TRANSLATION_LIMIT;
+  const monthlyLimit = quota.monthlyLimit ?? GOOGLE_TRANSLATION_MONTHLY_LIMIT;
   const hourlyLimit = quota.hourlyLimit ?? Number.MAX_SAFE_INTEGER;
   const metrics: QuotaAwareTranslationMetrics = {
     cacheHits: 0,

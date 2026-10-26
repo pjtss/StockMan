@@ -17,7 +17,7 @@ describe("market RSS translation provider order", () => {
     const quota = deps(); const result = await createMarketRssTranslationClient({}, undefined, quota).client!.translate("Headline");
     expect(result).toMatchObject({ translatedText: "번역", provider: "azure-translator" });
     expect(String(fetchMock.mock.calls[0][0])).toContain("azure.test");
-    expect(quota.reserve).toHaveBeenCalledWith(8, "2026-10", 1_900_000, "azure-translator", 1_800_000);
+    expect(quota.reserve).toHaveBeenCalledWith(8, "2026-10", 1_950_000, "azure-translator", 1_800_000);
   });
 
   it("falls back to Google after Azure F0 free-quota response while preserving each provider ledger", async () => {
@@ -61,7 +61,7 @@ describe("market RSS translation provider order", () => {
     vi.stubGlobal("fetch", fetchMock);
     const quota = deps();
     quota.reserve.mockImplementation(async (_count: number, _month: string, _limit: number, provider: string) => provider === "google-cloud-translation"
-      ? { allowed: false, used: 300_000, limitReached: true, reason: "monthly_character_limit_reached" }
+      ? { allowed: false, used: 450_000, limitReached: true, reason: "monthly_character_limit_reached" }
       : { allowed: true, used: 8, limitReached: false });
 
     const result = await createMarketRssTranslationClient({}, undefined, quota).client!.translate("Headline");

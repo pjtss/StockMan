@@ -31,6 +31,23 @@ describe("translation cache", () => {
     expect(countTranslationCharacters("𠮷", "azure-translator")).toBe(2);
   });
 
+  it("uses the approved 450,000-character default monthly Google reservation cap", async () => {
+    dbMocks.clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ used: "0" }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ reserved: 120 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await reserveTranslationCharacters(120, "2026-10");
+
+    expect(dbMocks.clientQuery.mock.calls[4][1]).toEqual([
+      "google-cloud-translation", "2026-10", 120, 450_000,
+    ]);
+  });
+
   it("reports actual reserved usage after a reservation is denied instead of pretending the cap was reached", async () => {
     dbMocks.clientQuery
       .mockResolvedValueOnce({ rows: [] })

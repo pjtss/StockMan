@@ -1,6 +1,6 @@
 import { AzureTranslationClient } from "./azure-translation-client";
 import { CloudTranslationClient } from "./cloud-translation-client";
-import { AZURE_TRANSLATION_HOURLY_LIMIT, AZURE_TRANSLATION_MONTHLY_LIMIT, AZURE_TRANSLATION_PROVIDER, GOOGLE_TRANSLATION_HOURLY_LIMIT, GOOGLE_TRANSLATION_PROVIDER, TRANSLATION_LIMIT } from "./translation-cache";
+import { AZURE_TRANSLATION_HOURLY_LIMIT, AZURE_TRANSLATION_MONTHLY_LIMIT, AZURE_TRANSLATION_PROVIDER, GOOGLE_TRANSLATION_HOURLY_LIMIT, GOOGLE_TRANSLATION_MONTHLY_LIMIT, GOOGLE_TRANSLATION_PROVIDER } from "./translation-cache";
 import { createQuotaAwareTranslationClient, type TranslationQuotaDependencies } from "./quota-aware-translation-client";
 import type { TranslationClient, TranslationFormat, TranslationLanguage, TranslationResult, TranslationSourceLanguage } from "./translation-types";
 import { TranslationClientOperationError } from "./translation-types";
@@ -16,7 +16,7 @@ export function getMarketRssTranslationProviders() {
 export function createMarketRssTranslationClient(options: { deferCacheWriteUntilValidated?: boolean } = {}, onUsage?: (used: number, month: string, quotaExceeded: boolean, provider: string, reason?: string) => Promise<void>, dependencies?: TranslationQuotaDependencies) {
   const configured = getMarketRssTranslationProviders();
   const azure = configured.azure ? createQuotaAwareTranslationClient(configured.azure, onUsage, dependencies, options, { provider: AZURE_TRANSLATION_PROVIDER, monthlyLimit: AZURE_TRANSLATION_MONTHLY_LIMIT, hourlyLimit: AZURE_TRANSLATION_HOURLY_LIMIT }) : null;
-  const google = configured.google ? createQuotaAwareTranslationClient(configured.google, onUsage, dependencies, options, { provider: GOOGLE_TRANSLATION_PROVIDER, monthlyLimit: TRANSLATION_LIMIT, hourlyLimit: GOOGLE_TRANSLATION_HOURLY_LIMIT }) : null;
+  const google = configured.google ? createQuotaAwareTranslationClient(configured.google, onUsage, dependencies, options, { provider: GOOGLE_TRANSLATION_PROVIDER, monthlyLimit: GOOGLE_TRANSLATION_MONTHLY_LIMIT, hourlyLimit: GOOGLE_TRANSLATION_HOURLY_LIMIT }) : null;
   const routes = new Map<string, TranslationClient>();
   const client: TranslationClient | null = azure || google ? {
     translate: async (text, source = "en", target = "ko", format = "text") => {

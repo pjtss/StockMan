@@ -23,6 +23,34 @@
 
 ### 커밋·푸시·배포
 - 미실행
+## [2026-10-26] RSS 번역 provider 월 예약 한도 상향
+
+### 목표
+- 사용자가 요청한 앱 내부 월 예약 상한 Azure 1,950,000자, Google 450,000자를 반영한다.
+
+### 원인
+- Azure 1,900,000자 및 Google 300,000자 기존 보호 상한이 운영 예약량에 도달해 새 RSS 제목 번역을 차단했다.
+
+### 반영
+- `lib/translation-cache.ts`: Azure 월 상한을 1,950,000자, Google 월 상한을 450,000자로 조정하고 Google provider 명시 상수로 사용한다. Azure 시간당 1,800,000자와 Google 시간당 100,000자는 유지한다.
+- Provider 선택, 제목만 번역, 한국어 번역 검증 게이트, 미발송 기사 재시도 정책은 유지한다. 관리자 quota 진단과 한도 알림은 공통 상수에서 새 수치를 표시한다.
+- `docs/rss-translation-design.md`, `docs/architecture/stocktitan-translation.md`: 새 상한과 여유량을 기록한다. Google의 월 $10 credit은 Basic/Advanced 및 동일 project의 사용량과 공유되어, 다른 앱 사용량이 있으면 비용이 발생할 수 있음을 명시한다.
+
+### 검증
+- 관련 테스트 4파일 37개 통과(`translation-cache`, provider routing, quota-aware client, Azure diagnostics). `npm.cmd run docs:check`(18 entry points, migration V160) 및 `git diff --check` 통과.
+- 최초 전체 검증 세 차례는 standalone `/charts`가 기본 30초 per-request timeout에 걸렸다. 같은 standalone 서버를 직접 호출했을 때도 HTTP 200 응답이 약 27초 걸리는 느린 Windows 실행 환경으로 확인했다. `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000`로 검증만 재실행해 전체 `npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build 111 pages, standalone `/charts` 200·11 static chunks, Chrome desktop/mobile hydration, 6 API/auth smoke, 최신 `origin/oci` 통합 트리에서 Vitest 303 files passed/1 skipped(1,537 passed/3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, bearer-auth(181 routes), OCI cron 검사. 검증 스크립트는 제품 변경으로 수정하지 않았다.
+
+### 다음 개선
+- 배포 후 `/api/admin/azure-translator-debug`에서 Azure 1,950,000 및 Google 450,000 한도를 확인하고, 새 월 예약분과 재개된 미발송 RSS backlog의 번역·Discord 수신 상태를 점검한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-26-005
+- 성과 판정: IMPROVED
+- 근거: 요청된 앱 코드·문서 상한과 quota 회귀 테스트를 반영했고 전체 빌드·테스트·타입·문서·standalone runtime/browser/API 게이트를 통과했다. 운영 반영은 커밋·배포 단계에서 확인한다.
+
+### 커밋·푸시·배포
+- 로컬 RSS 전용 커밋 `fix(rss): Azure·Google 번역 월간 보호 한도 상향`을 생성했다. 최신 `origin/oci` 기준 전체 검증도 통과했으며 push 및 운영 배포 확인은 이어서 수행한다.
+
 
 ## [2026-10-26] 번역 retry worker를 미발송 기사로 제한
 

@@ -17,7 +17,7 @@ import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notificat
 import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";
 import { toTextWebhookPayload } from "./discord-text";
 import { createMarketRssTranslationClient } from "./market-rss-translation-client";
-import { AZURE_TRANSLATION_MONTHLY_LIMIT, AZURE_TRANSLATION_PROVIDER, TRANSLATION_LIMIT } from "./translation-cache";
+import { AZURE_TRANSLATION_MONTHLY_LIMIT, AZURE_TRANSLATION_PROVIDER, GOOGLE_TRANSLATION_MONTHLY_LIMIT } from "./translation-cache";
 import { claimTranslationLimitAlert, claimTranslationThresholdAlert, releaseTranslationLimitAlert, releaseTranslationThresholdAlert } from "./translation-cache";
 import { sendClaimedTranslationUsageAlert } from "./translation-usage-alert";
 import { buildMarketRssNotificationClaimCondition, buildMarketRssNotificationTranslationGate } from "./market-rss-notification-translation-gate";
@@ -244,7 +244,7 @@ export async function translatePendingMarketRssArticles(limit = 10) {
       for (const key of [...limitReachedMonths].sort()) {
         const [provider, month] = key.split(":");
         const providerLabel = provider === AZURE_TRANSLATION_PROVIDER ? "Azure Translator F0" : "Google Cloud Translation";
-        const providerLimit = provider === AZURE_TRANSLATION_PROVIDER ? AZURE_TRANSLATION_MONTHLY_LIMIT : TRANSLATION_LIMIT;
+        const providerLimit = provider === AZURE_TRANSLATION_PROVIDER ? AZURE_TRANSLATION_MONTHLY_LIMIT : GOOGLE_TRANSLATION_MONTHLY_LIMIT;
         const sent = await sendClaimedTranslationUsageAlert(
           () => claimTranslationLimitAlert(month, provider),
           async () => {

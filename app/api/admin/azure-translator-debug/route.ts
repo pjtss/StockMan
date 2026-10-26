@@ -9,8 +9,8 @@ import {
   AZURE_TRANSLATION_MONTHLY_LIMIT,
   AZURE_TRANSLATION_PROVIDER,
   GOOGLE_TRANSLATION_HOURLY_LIMIT,
+  GOOGLE_TRANSLATION_MONTHLY_LIMIT,
   GOOGLE_TRANSLATION_PROVIDER,
-  TRANSLATION_LIMIT,
 } from "@/lib/translation-cache";
 import { TranslationClientOperationError } from "@/lib/translation-types";
 
@@ -53,7 +53,7 @@ async function getQuotaSnapshot() {
   const pool = getPool();
   const providers = [
     { provider: AZURE_TRANSLATION_PROVIDER, monthlyLimit: AZURE_TRANSLATION_MONTHLY_LIMIT, hourlyLimit: AZURE_TRANSLATION_HOURLY_LIMIT },
-    { provider: GOOGLE_TRANSLATION_PROVIDER, monthlyLimit: TRANSLATION_LIMIT, hourlyLimit: GOOGLE_TRANSLATION_HOURLY_LIMIT },
+    { provider: GOOGLE_TRANSLATION_PROVIDER, monthlyLimit: GOOGLE_TRANSLATION_MONTHLY_LIMIT, hourlyLimit: GOOGLE_TRANSLATION_HOURLY_LIMIT },
   ];
   const rows = await Promise.all(providers.map(async (limits) => {
     const [monthly, hourly] = await Promise.all([
