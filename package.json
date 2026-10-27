@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:rss-translation-coverage": "node scripts/check-market-rss-translation-coverage.mjs",
+    "backfill:market-rss-normalized-summary": "node --experimental-strip-types scripts/backfill-market-rss-normalized-summary.mts",
     "docs:check": "node scripts/check-docs.mjs",
     "audit:dependencies": "npm audit --audit-level=moderate",
     "audit:kis-boundary": "node scripts/audit-kis-boundary.mjs",

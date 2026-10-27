@@ -40,12 +40,14 @@ export const REQUIRED_OPERATIONAL_COLUMNS = [
   ["us_common_stock_universe", "daily_active"],
   ["market_rss_articles", "translation_attempted_at"],
   ["market_rss_articles", "translation_candidate_title"],
+  ["market_rss_articles", "normalized_summary"],
 ] as const;
 
 /** Columns introduced below the production Flyway floor need a forward-edge repair migration. */
 export const FORWARD_REQUIRED_OPERATIONAL_COLUMNS = [
   ["market_rss_articles", "translation_attempted_at"],
   ["market_rss_articles", "translation_candidate_title"],
+  ["market_rss_articles", "normalized_summary"],
 ] as const;
 
 export type SchemaHealth = {

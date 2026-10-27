@@ -158,6 +158,7 @@ export const marketRssArticles = pgTable(
     externalId: text("external_id").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
+    normalizedSummary: text("normalized_summary").notNull().default(""),
     content: text("content").notNull().default(""),
     rawPayload: text("raw_payload"),
     sourceSnapshotId: bigint("source_snapshot_id", { mode: "number" }),

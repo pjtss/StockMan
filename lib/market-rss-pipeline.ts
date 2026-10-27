@@ -31,6 +31,7 @@ import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy"
 import { interleaveMarketRssSourceQueues } from "./market-rss-source-fairness";
 import { buildMarketRssSecFilingLocalizationAssignments, MARKET_RSS_SEC_FILING_TITLE_SQL_PATTERN } from "./market-rss-sec-filing-localization";
 import { buildStoredMarketRssTranslationRetryState, validateStoredMarketRssTranslation } from "./market-rss-notification-translation-validation";
+import { extractMarketRssCoreSummary } from "./market-rss-summary";
 
 async function localizePendingSecFilingTitles(db: ReturnType<typeof getDb>, limit = 1_000) {
   const candidates = await db.select().from(marketRssArticles).where(and(
@@ -98,6 +99,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
           externalId: item.id,
           title: item.title,
           summary: item.summary,
+          normalizedSummary: item.normalizedSummary ?? extractMarketRssCoreSummary(item.summary, item.title),
           content: item.content ?? "",
           rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
           sourceSnapshotId,
@@ -116,7 +118,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       });
       if (values.length === 0) return { duplicateCount, inserted: 0 };
       const rows = await db.insert(marketRssArticles).values(values).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
-        title: sql`excluded.title`, summary: sql`excluded.summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
+        title: sql`excluded.title`, summary: sql`excluded.summary`, normalizedSummary: sql`excluded.normalized_summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         ...buildMarketRssTranslationUpsertReset(),
         link: buildMarketRssLinkUpsertValue(),
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,

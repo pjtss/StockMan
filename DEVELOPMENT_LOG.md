@@ -1,3 +1,30 @@
+## [2026-10-27] 미국 RSS 정규화 컬럼 운영 배포 준비
+
+### 목표
+- 미국 RSS 5개 출처에서 추출한 태그 제거 텍스트를 `market_rss_articles.normalized_summary`에 저장하는 변경을 OCI 배포 브랜치에 안전하게 반영한다.
+
+### 반영
+- 원격 `oci` V160 기준의 분리된 작업 트리에 V161 migration, parser 정규화기, ingest/upsert 저장, schema readiness 검사 및 localhost 전용 backfill 도구만 반영했다. 다른 기존 미커밋 사용자 변경은 배포 작업에서 제외했다.
+- 정확한 대상별 실피드 검증 결과는 `docs/operations/market-rss-normalized-summary-validation-20261027.md`에 갱신했다.
+
+### 검증
+- `npm.cmd run deploy:verify`: 통과. dependency audit 취약점 0건, production build/typecheck, standalone `/charts` HTTP 200, JS 청크 11개, Chrome 데스크톱·모바일 hydration, 관련 API smoke 통과.
+- 전체 Vitest: 289개 파일 중 288개 통과·1개 skip, 1,508개 통과·3개 skip.
+- docs, verify-scope, KIS boundary, bearer-auth(169 routes), OCI cron 구조 검사 통과.
+- 배포 대상 코드 실피드 검증: 미국 출처 5개, 949개 항목, 전 항목 정규화 생성, HTML/엔티티 잔존 0건. GlobeNewswire(20)와 Nasdaq(15)은 제공량 전부 확인.
+- 원격 운영 health 확인은 실제 OCI 배포 workflow 성공 후 진행한다.
+
+### 다음 개선
+- 원격 `oci`에 이 검증된 변경을 push한 뒤 Deploy OCI workflow 결과와 운영 `/api/health`의 commit 및 Flyway V161 반영을 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-27-008
+- 성과 판정: UNMEASURED
+- 근거: 배포 전 전체 게이트와 실제 RSS 품질은 확인했으나 운영 release와 schema 적용은 push 후 검증해야 한다.
+
+### 커밋·푸시·배포
+- 미실행 (배포 전 검증 완료, 원격 `oci` push 대기).
+
 ## [2026-10-26] 미국 산업별 거래대금 운영 API 작업 분할
 
 ### 목표

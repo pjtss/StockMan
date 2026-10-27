@@ -1,7 +1,8 @@
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { decodeXML } from "entities";
+import { extractMarketRssCoreSummary } from "./market-rss-summary";
 
-export type MarketRssItem = { id: string; title: string; link: string; summary: string; content?: string; publishedAt: string | null; source: string; raw?: unknown };
+export type MarketRssItem = { id: string; title: string; link: string; summary: string; normalizedSummary?: string; content?: string; publishedAt: string | null; source: string; raw?: unknown };
 export type MarketRssFeed = {
   source: string;
   url: string;
@@ -50,7 +51,8 @@ export function parseMarketRss(xml: string, source: string, url: string): Market
     const publishedAt = text(item.pubDate || item.published || item.updated) || null;
     const id = text(item.guid || item.id) || `${source}:${publishedAt || "unknown"}:${index}`;
     const content = text(item.content);
-    return [{ id, title, link, summary: text(item.description || item.summary || content), ...(content ? { content } : {}), publishedAt, source, raw }];
+    const summary = text(item.description || item.summary || content);
+    return [{ id, title, link, summary, normalizedSummary: extractMarketRssCoreSummary(summary, title), ...(content ? { content } : {}), publishedAt, source, raw }];
   });
   return { source, url, fetchedAt: new Date().toISOString(), items };
 }
