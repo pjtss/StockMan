@@ -7581,3 +7581,23 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **대상 회귀**: RSS 번역/게이트/retry/message/source policy 5개 파일 142/142 통과.
 - **운영 read-only**: health `ok`; 2026-10-25 14:04Z 시점 미발송 pending GNW 4, SEC 1,381, StockTitan 2,299 (총 3,684). quota skip은 GNW 4, SEC 238, StockTitan 11,391이며 전체 reason `monthly_character_limit_reached`. 사용자 월 한도 선택 답변은 아직 확인되지 않았다. quota 증액이나 provider 호출은 하지 않았다.
 - **상태**: 강화된 번역 전송 게이트는 DB 상태/target/fallback/제목 정합성을 확인한다. 커밋·푸시 전 전체 필수 검증을 마쳤다. 실제 provider success 및 pending 0은 여전히 운영 quota reset 뒤 확인해야 한다.
+
+## [2026-10-27] 일별공시 미국 RSS 일괄 JSON 복사
+
+### 목표
+- 현재 일별공시 조회 조건에서 미국 RSS 출처만 한 번에 JSON으로 복사한다.
+
+### 반영
+- 화면의 미국 RSS JSON 복사 기능에서 SEC EDGAR, Nasdaq, Nasdaq Trader, StockTitan, GlobeNewswire 다섯 출처만 포함하고 원본 응답 항목을 보존한다.
+- 복사 회귀 테스트와 설계 문서를 갱신했다.
+
+### 검증
+- 배포 전 `npm run deploy:verify` 전체 검증을 수행한다.
+- 커밋·푸시·배포는 검증 완료 후 진행한다.
+
+### 배포 검증 완료
+- `npm.cmd run deploy:verify` 통과: 의존성 취약점 0건, production build 및 타입 검사 성공.
+- 전체 Vitest: 287개 파일 통과, 1,500개 테스트 통과, 2개 skip.
+- 문서/migration, verify-scope, KIS 경계, bearer 인증, OCI cron 검사 통과.
+- standalone smoke: `/charts` HTTP 200, 데스크톱·모바일 Chrome hydration 성공, 주요 API 기대 상태 검증 성공.
+- 검증 후 기능 관련 4개 파일만 커밋·push해 OCI 배포 workflow를 실행한다.

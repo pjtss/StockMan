@@ -92,6 +92,7 @@ type DailyDisclosureItem = {
 
 - 화면에는 목록을 표시하지 않고 선택 조건의 전체 응답 JSON을 복사한다.
 - `전체 JSON 복사` 버튼을 제공한다.
+- `미국 RSS JSON 복사` 버튼은 현재 조회 조건에 포함된 항목 중 `SEC_EDGAR`, `NASDAQ`, `NASDAQ_TRADER`, `STOCKTITAN`, `GLOBENEWSWIRE` 출처만 한 번에 복사한다.
 - 복사 형식은 `{ date, source, total, items }` JSON이며 `items`의 모든 응답 필드를 보존한다.
 - `navigator.clipboard.writeText`를 우선 사용하고, 권한이 없거나 비보안 컨텍스트인 경우 선택 영역 기반 fallback을 사용한다.
 - 복사 성공·실패를 버튼 상태와 접근성 라이브 영역으로 알린다. 원문 HTML은 복사하지 않고 태그를 제거한 텍스트만 복사한다.
