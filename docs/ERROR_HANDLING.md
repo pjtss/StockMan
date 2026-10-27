@@ -1,5 +1,15 @@
 # 오류 상황 및 해결 방법
 
+## 2026-10-27 RSS 정규화 컬럼 추가 후 운영 health 오탐
+
+- **증상**: RSS 정규화 V161 배포 workflow는 성공했지만 공개 `/api/health`가 `degraded`를 반환했다.
+- **근본 원인**: `normalized_summary`를 `REQUIRED_OPERATIONAL_COLUMNS`에 추가하면서 `inspectDatabaseSchema()`의 information_schema 조회는 네 개 컬럼 쌍만 하드코딩한 채 남아 있었다. 실제 DB에 새 컬럼이 있어도 검사 결과의 available 목록에 들어오지 않아 schema readiness가 false가 됐다.
+- **영향 범위**: readiness/health 보고가 잘못 degraded가 되며 실제 RSS ingest의 저장 컬럼과 Flyway migration에는 문제가 없었다. 사용자는 운영 health 상태를 신뢰할 수 없었다.
+- **해결 위치**: `lib/schema-health.ts`에서 필수 컬럼 목록을 `unnest($1::text[], $2::text[])` 입력으로 직접 조회하도록 바꿔 스키마 요구 목록과 조회 조건을 단일 기준으로 연결했다.
+- **재발 자동 감지**: `lib/schema-health.test.ts`는 조회 파라미터에 `normalized_summary`가 포함되고 모든 필수 컬럼이 조회되면 readiness가 true가 되는지 확인한다. 배포 검증은 전체 테스트, typecheck, build/runtime smoke를 포함한다.
+- **검증 결과**: `npm run deploy:verify` 재실행 후 운영 health 200 및 V161 확인 대기.
+- **남은 위험 및 다음 개선**: 수정 배포 완료 뒤 `/api/health`를 재조회한다. 이 공개 API는 상세 migration 번호를 숨기므로, HTTP 200은 전체 schema readiness 확인으로 쓰고 구체 Flyway 버전은 workflow migration 성공 로그 또는 인증된 health 진단으로 별도 확인한다.
+
 ## 2026-10-26 미국 산업별 거래대금 관리자 집계 API 조회 오류
 
 - **증상**: 배포된 `GET /api/admin/us-industry-turnover` 첫 운영 조회가 nginx `504 Gateway Time-out`으로 끝났다. 첫 쿼리 최적화 후에는 HTTP 200이었지만 `eligibleWithPeriodCandlesCount=0`으로 빈 표를 잘못 반환했다.

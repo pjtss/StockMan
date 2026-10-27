@@ -1,3 +1,32 @@
+## [2026-10-27] RSS schema readiness 누락 컬럼 조회 회귀 수정
+
+### 목표
+- V161 배포 뒤 `/api/health`가 `degraded`를 반환한 원인을 바로잡고, 정규화 필수 컬럼을 실제 readiness 조회가 인식하게 한다.
+
+### 근본 원인 및 영향
+- `REQUIRED_OPERATIONAL_COLUMNS`에 새 `normalized_summary` 컬럼을 넣었지만 `inspectDatabaseSchema()` 쿼리의 필수 컬럼 조건은 네 쌍으로 고정돼 있어 새 컬럼이 확인 결과에 나타나지 않았다.
+- OCI release 및 Flyway workflow는 성공했지만, 컬럼이 실제 존재해도 schema readiness가 false가 되어 공개 health가 HTTP 503/degraded로 관측됐다.
+
+### 반영
+- 필수 테이블/컬럼 목록에서 두 text array를 만들어 `unnest` 조인으로 실제 컬럼 조회에 전달한다.
+- 회귀 테스트는 normalized_summary 조회 파라미터와 readiness true를 확인한다. 원인 및 재발 감지는 `docs/ERROR_HANDLING.md`에 기록했다.
+
+### 검증
+- 수정 전 운영 health: HTTP 503, `degraded`.
+- `npm.cmd exec -- vitest run lib/schema-health.test.ts`: 5개 테스트 통과. `npm.cmd run docs:check`는 문서 검증 계약상 실행명령이 필요해 보완 후 전체 배포 게이트에서 재검증한다.
+- 수정 후 배포 게이트 및 운영 health 재확인은 push 뒤 진행한다.
+
+### 다음 개선
+- 수정 커밋을 원격 `oci`에 push하고 Deploy OCI workflow 완료 및 운영 health 200을 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-27-009
+- 성과 판정: UNMEASURED
+- 근거: 원인을 특정하고 검사 로직과 회귀 테스트를 추가했지만 수정본의 운영 반영 및 health 정상화 전이다.
+
+### 커밋·푸시·배포
+- 미실행 (배포 전 전체 검증 후 push 예정).
+
 ## [2026-10-27] 미국 RSS 정규화 컬럼 운영 배포 준비
 
 ### 목표

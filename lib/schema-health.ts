@@ -89,8 +89,8 @@ export async function inspectDatabaseSchema(pool = getPool()): Promise<SchemaHea
         [OPERATIONAL_SCHEMA_TABLES],
       ),
       pool.query<{ table_name: string; column_name: string }>(
-        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (($1, $2), ($3, $4), ($5, $6), ($7, $8))",
-        ["kr_common_stock_universe", "daily_active", "us_common_stock_universe", "daily_active", "market_rss_articles", "translation_attempted_at", "market_rss_articles", "translation_candidate_title"],
+        "SELECT columns.table_name, columns.column_name FROM information_schema.columns AS columns JOIN unnest($1::text[], $2::text[]) AS required(table_name, column_name) USING (table_name, column_name) WHERE columns.table_schema = 'public'",
+        [REQUIRED_OPERATIONAL_COLUMNS.map(([table]) => table), REQUIRED_OPERATIONAL_COLUMNS.map(([, column]) => column)],
       ),
       pool.query<{ table_name: string }>(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
