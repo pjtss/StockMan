@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { isMarketNewsSource, MARKET_NEWS_SOURCES, type MarketNewsKind, type MarketNewsSource } from "@/lib/market-news-contract";
+import { getMarketNewsKoreanTitle } from "@/lib/market-news-korean-title";
 import { marketRssArticles } from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
@@ -121,6 +122,7 @@ export async function GET(request: Request) {
       title: marketRssArticles.title,
       translatedTitle: marketRssArticles.translatedTitle,
       translationStatus: marketRssArticles.translationStatus,
+      translationSkippedReason: marketRssArticles.translationSkippedReason,
       translationFallback: marketRssArticles.translationFallback,
       link: marketRssArticles.link,
       publishedAt: marketRssArticles.publishedAt,
@@ -147,7 +149,7 @@ export async function GET(request: Request) {
     const items = pageRows.map((row) => ({
       title: {
         original: row.title,
-        ko: row.translationStatus === "TRANSLATED" && !row.translationFallback ? row.translatedTitle : null,
+        ko: getMarketNewsKoreanTitle(row),
       },
       link: row.link,
     }));

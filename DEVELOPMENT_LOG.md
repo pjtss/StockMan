@@ -7601,4 +7601,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 커밋·푸시·배포
 - 커밋 `7e009872e42ca98aed2f2709a0ceec99406620cd`를 `origin/codex/market-news-deploy`에 push하고 Deploy OCI workflow `40350045288`을 실행했다. Verify, package, upload, activate 단계와 전체 workflow가 성공했다.
 - 운영 read-only 확인: 2026-10-26 15:38:32 UTC `GET https://stockman.r-e.kr/api/health`가 HTTP 200, `status=ok`를 반환했다. `/health-check`의 서비스 커밋은 `7e009872e42ca98aed2f2709a0ceec99406620cd`로 배포 대상과 일치했다.
-- 작업 로그에 실제 운영 결과를 기록하기 위해 이 문서만 추가 갱신한다. 갱신분은 필수 검증 통과 후 push하며, push로 시작되는 배포도 운영 health/build version까지 재확인한다.
+- 운영 결과 기록 커밋 `4932e590ba34499cbde878aac5332e77a889d50f`의 Deploy OCI workflow `40352638810`도 전체 성공했다. 운영 `GET /api/health`는 2026-10-26 15:52:11 UTC HTTP 200, `status=ok`; `/health-check`의 서비스 커밋은 `4932e590ba34499cbde878aac5332e77a889d50f`로 일치했다.
+
+## [2026-10-27] 해외 뉴스 한국어 제목 전환 진단
+
+- **확인 범위**: 배포된 `/api/market-news?hours=24&pageSize=50`, 현재 API/UI 구현, `components/market-news-page.test.tsx`.
+- **관찰 결과**: 운영 API 50건 중 38건은 유효한 한국어 제목을 반환했고 12건은 `title.ko`가 비어 있었다. 예를 들어 `SCHEDULE 13D/A` 항목은 원문만 제공됐다.
+- **근본 원인**: API는 DB의 `translationStatus === "TRANSLATED"`이고 `translationFallback`이 false일 때만 한국어 제목을 노출한다. 나머지는 `ko: null`이다. UI는 한국어 보기에서도 `ko`가 없으면 원문 제목을 그대로 표시하므로, 그 항목에서는 전환 버튼이 눌려도 제목이 변하지 않는다. 현재 화면은 저장된 제목만 읽으며 on-demand 번역은 하지 않는다.
+- **검증**: `npm.cmd test -- --run components/market-news-page.test.tsx` 통과(1개). 기존 테스트는 유효한 한국어 제목 전환은 검증하지만 `ko: null`일 때 원문으로 조용히 대체되는 동작은 다루지 않는다.
+- **수정**: `SKIPPED/already_in_target_language`이면서 fallback이 아닌 저장 제목을 한국어 제목으로 반환한다. 기존 API는 `TRANSLATED`만 허용해 이미 한국어로 들어온 원문 제목까지 숨기고 있었다. 번역 quota/API 실패의 원문 fallback은 한국어 제목으로 취급하지 않는다.
+- **검증**: `npm.cmd run deploy:verify` 통과. npm audit 취약점 0건, production build, standalone 런타임 smoke 및 Chrome desktop/mobile hydration, 전체 Vitest 288개 파일 1,506개 통과·2개 skip, typecheck, docs/migration 및 저장소 audit 통과. 별도 표적 테스트 2개 파일 8개 통과; `git diff --check` 통과. 최근 운영 source별 표본에서는 SEC 50건 중 5건, StockTitan/GlobeNewswire 각 50건 전체가 한국어 제목 미제공 상태였으며 provider 월간 quota 소진 사유도 확인됐다. 이 수정은 이미 한국어인 원문 제목 표시를 바로잡지만, quota로 번역되지 못한 영어 기사의 번역까지 보장하지 않는다.
+- **커밋·배포**: 아직 미실행.
