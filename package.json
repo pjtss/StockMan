@@ -24,7 +24,9 @@
     "typecheck": "tsc --noEmit",
     "deploy:verify": "node scripts/verify-deploy.mjs",
     "sync:daily-cache": "node --env-file=.env.local scripts/sync-daily-cache-from-remote.mjs",
-    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:verify-scope && npm run audit:kis-boundary && npm run audit:bearer-auth && npm run cron:check && npm run build"
+    "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:api-surface && npm run audit:verify-scope && npm run audit:kis-boundary && npm run audit:bearer-auth && npm run cron:check && npm run build",
+    "audit:api-surface": "node scripts/api-surface.mjs check",
+    "docs:api:generate": "node scripts/api-surface.mjs write"
   },
   "dependencies": {
     "@netlify/functions": "^5.2.0",

@@ -17,6 +17,8 @@
 
 ## 시작점
 
+- 외부 읽기 API 매뉴얼·OpenAPI·AI discovery: [`api/README.md`](./api/README.md) · [배포 매뉴얼](../public/api-reference.md) · [OpenAPI JSON](../public/openapi.json) · [llms.txt](../public/llms.txt)
+
 - 기업 분석 전체 인덱스: [`company-analysis/`](./company-analysis/README.md)
 - 대한민국 기업 분석: [`company-analysis/kr/`](./company-analysis/kr/README.md)
 - 미국 기업 분석: [`company-analysis/us/`](./company-analysis/us/README.md)

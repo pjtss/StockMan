@@ -41,6 +41,8 @@ OCI에는 다음 항목을 배포합니다.
 - `public` -> `.next/standalone/public`
 - `scripts/oci-cron.sh`
 
+`public`에는 외부 API discovery 파일(`/openapi.json`, `/api-reference.md`, `/llms.txt`)이 포함된다. 배포 smoke verification은 standalone에서 세 파일이 HTTP 200으로 제공되고 OpenAPI 공개 경로가 유지되는지 확인한다.
+
 1GB 인스턴스에서 `next build`를 반복 실행하지 않고, 빌드된 standalone 결과만 배포합니다.
 
 ## 2. 환경변수

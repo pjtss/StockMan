@@ -1,3 +1,38 @@
+## [2026-10-28] 외부 AI용 읽기 API 문서와 OpenAPI 배포
+
+### 목표
+- 기존 전체 API를 접근 권한별로 정리하고 외부 AI가 안전한 조회 API를 발견·호출할 수 있도록 상세 매뉴얼과 OpenAPI를 제공한다.
+
+### 반영
+- `scripts/api-surface.mjs`: 원격 `oci`의 app/api 169개 실제 route 파일에서 method/path/접근 분류/소스 경로를 생성하고 drift를 검사한다. 스냅샷 저장이나 realtime 승인 티켓을 발급하는 일부 GET, signed-link, user/admin/debug/cron/internal/write route는 외부 API 명세에서 차단한다.
+- `docs/api/route-inventory.json`: 원격 `oci` 기준 169개 전체 route inventory.
+- `public/openapi.json`: OpenAPI 3.1.1, 외부 읽기 GET 35개, 실제 query parameter 이름, 주요 제약·응답 스키마, 서비스 Bearer 보안 정의를 제공한다.
+- `public/api-reference.md`, `public/llms.txt`, `docs/api/README.md`: AI discovery, 호출·페이지네이션·인증·오류·데이터 최신성·민감 경로 제외 규칙을 문서화한다. KIS/SEC/DART 데이터를 임의 추정하지 않도록 근거·빈 결과·시각 필드 처리 방법을 포함했다.
+- `scripts/verify-deploy.mjs`: standalone에서 OpenAPI·매뉴얼·llms.txt가 HTTP로 제공되고 공개 operation이 유지되는지 smoke 검증한다. Next.js standalone의 public 포함 동작은 공식 문서를 근거로 실제 배포 package 방식에 맞췄다.
+- `package.json`, `scripts/check-docs.mjs`, `docs/README.md`, `app/README.md`, `deploy/oci/README.md`, `Development.md`: 생성·감사·검증 명령과 문서 인덱스를 연결했다.
+
+### 검증
+- `npm run docs:api:generate`: 169개 route 인벤토리, 35개 외부 GET operation 생성.
+- `npm run audit:api-surface`: 169 route inventory와 공개 OpenAPI 경로·method·query metadata 일치 통과.
+- `npm run docs:check`: 필수 문서 24개, migration 161개, 운영 schema 검사 통과.
+- `node --check scripts/verify-deploy.mjs`, 변경 범위 `git diff --check` 통과.
+- `npm run deploy:verify`: 의존성 감사(취약점 0), production build, standalone에서 문서 3개 HTTP smoke, `/charts` 데스크톱·모바일 Chrome hydration, 11개 JS chunk 및 보호 대상 API smoke를 통과했다.
+- 전체 테스트: 288개 파일 통과, 1개 skip; 1,510개 테스트 통과, 3개 skip.
+- typecheck, 필수 문서·migration·schema 검사, verify 범위·KIS 경계·Bearer 인증·OCI cron 감사 통과.
+- 실제 운영 확인 전 주소 검사에서 `https://stockman.r-e.kr/openapi.json`, `/api-reference.md`, `/llms.txt`는 모두 404였고 `/api/health`는 200이었다. 원격 최신 `oci` 기준 별도 worktree에서 검증해 기존 로컬 작업 변경을 배포 후보에서 제외했다.
+
+### 다음 개선
+- OpenAPI의 generic 응답으로 남은 공개 route를 운영 DTO 예시와 세부 응답 schema로 순차 보강한다.
+- 기존 무인증 read endpoint에 공통 외부 rate limit·운영 key 발급 정책이 필요한지 별도 설계하고 적용 전 호환성 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-28-001
+- 성과 판정: PARTIAL
+- 근거: 원격 최신 route 소스를 기준으로 169개 inventory와 35개 공개 읽기 API 명세를 만들고 전체 배포 검증이 통과했다. 운영 공개 여부는 push 후 운영 URL에서 확인한다. route별 응답 DTO 세분화 및 공통 외부 rate limit 설계가 후속 개선으로 남는다.
+
+### 커밋·푸시·배포
+- 미실행 (원격 최신 `oci` 기준 검증 통과, push 및 GitHub Actions `Deploy OCI` 대기). 배포 후 운영 URL 응답과 workflow 결과를 기록한다.
+
 ## [2026-10-27] RSS schema readiness 누락 컬럼 조회 회귀 수정
 
 ### 목표

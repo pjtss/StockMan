@@ -1,0 +1,1384 @@
+{
+  "generatedFrom": "app/api/**/route.ts",
+  "routes": [
+    {
+      "path": "/api/admin/azure-translator-debug",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/azure-translator-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/daily-candle-cache-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/daily-candle-cache-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/daily-ma9-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/daily-ma9-test/route.ts"
+    },
+    {
+      "path": "/api/admin/daily-rss",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/daily-rss/route.ts"
+    },
+    {
+      "path": "/api/admin/database",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/database/route.ts"
+    },
+    {
+      "path": "/api/admin/database-status",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/database-status/route.ts"
+    },
+    {
+      "path": "/api/admin/debug-suite",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/debug-suite/route.ts"
+    },
+    {
+      "path": "/api/admin/domestic-industry-sync",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/domestic-industry-sync/route.ts"
+    },
+    {
+      "path": "/api/admin/domestic-universe-import",
+      "methods": [
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/domestic-universe-import/route.ts"
+    },
+    {
+      "path": "/api/admin/feature-modules",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/feature-modules/route.ts"
+    },
+    {
+      "path": "/api/admin/feature-modules/{key}",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/feature-modules/[key]/route.ts"
+    },
+    {
+      "path": "/api/admin/feature-modules/{key}/runs",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/feature-modules/[key]/runs/route.ts"
+    },
+    {
+      "path": "/api/admin/health-diagnostics",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/health-diagnostics/route.ts"
+    },
+    {
+      "path": "/api/admin/health-probe-history",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/health-probe-history/route.ts"
+    },
+    {
+      "path": "/api/admin/instrument-fundamentals-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/instrument-fundamentals-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/instrument-universe-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/instrument-universe-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/instrument-universe-import",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/instrument-universe-import/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-api-config",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-api-config/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-env-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-env-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-rate-limits",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-rate-limits/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-realtime-approval-metrics",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-realtime-approval-metrics/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-token-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-token-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-us-price-detail-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-us-price-detail-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-us-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-us-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kis-us-trade-trend-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kis-us-trade-trend-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kr-bollinger-band-test",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kr-bollinger-band-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kr-bollinger-middle-lower-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kr-bollinger-middle-lower-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kr-daily-cache-test",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kr-daily-cache-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kr-daily-ma9-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kr-daily-ma9-test/route.ts"
+    },
+    {
+      "path": "/api/admin/kr-minute-candles",
+      "methods": [
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/kr-minute-candles/route.ts"
+    },
+    {
+      "path": "/api/admin/kr-minute-refresh",
+      "methods": [
+        "POST"
+      ],
+      "access": "internal-or-operator",
+      "source": "app/api/admin/kr-minute-refresh/route.ts"
+    },
+    {
+      "path": "/api/admin/login",
+      "methods": [
+        "POST"
+      ],
+      "access": "internal-or-operator",
+      "source": "app/api/admin/login/route.ts"
+    },
+    {
+      "path": "/api/admin/logout",
+      "methods": [
+        "POST"
+      ],
+      "access": "internal-or-operator",
+      "source": "app/api/admin/logout/route.ts"
+    },
+    {
+      "path": "/api/admin/market-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/market-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/market-rss-signal-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/market-rss-signal-test/route.ts"
+    },
+    {
+      "path": "/api/admin/market-rss-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/market-rss-test/route.ts"
+    },
+    {
+      "path": "/api/admin/screener-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/screener-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/sec-company-facts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/sec-company-facts/route.ts"
+    },
+    {
+      "path": "/api/admin/sec-discord",
+      "methods": [
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/sec-discord/route.ts"
+    },
+    {
+      "path": "/api/admin/sec-edgar-debug",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/sec-edgar-debug/route.ts"
+    },
+    {
+      "path": "/api/admin/sec-edgar-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/sec-edgar-test/route.ts"
+    },
+    {
+      "path": "/api/admin/sec-raw-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/sec-raw-test/route.ts"
+    },
+    {
+      "path": "/api/admin/stocktitan-rss",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/stocktitan-rss/route.ts"
+    },
+    {
+      "path": "/api/admin/us-adl-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-adl-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-bollinger-band-test",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-bollinger-band-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-bollinger-middle-lower-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-bollinger-middle-lower-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-breaking-news-forwarder-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-breaking-news-forwarder-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-breakout-test",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-breakout-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-cache-test",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-cache-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-indicators-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-indicators-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-ma9-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-ma9-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-obv-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-obv-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-open-cache-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-open-cache-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-daily-trend-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-daily-trend-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-dmi-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-dmi-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-industry-codes",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-industry-codes/route.ts"
+    },
+    {
+      "path": "/api/admin/us-industry-turnover",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-industry-turnover/route.ts"
+    },
+    {
+      "path": "/api/admin/us-macd-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-macd-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-mfi-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-mfi-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-minute-bollinger-band-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-minute-bollinger-band-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-minute-candles",
+      "methods": [
+        "POST"
+      ],
+      "access": "internal-or-operator",
+      "source": "app/api/admin/us-minute-candles/route.ts"
+    },
+    {
+      "path": "/api/admin/us-minute-obv-adl-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-minute-obv-adl-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-sec-sic-industry",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-sec-sic-industry/route.ts"
+    },
+    {
+      "path": "/api/admin/us-turnover-ratio-test",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-turnover-ratio-test/route.ts"
+    },
+    {
+      "path": "/api/admin/us-turnover-settings",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/us-turnover-settings/route.ts"
+    },
+    {
+      "path": "/api/admin/user-activity",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/user-activity/route.ts"
+    },
+    {
+      "path": "/api/auth/login",
+      "methods": [
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/auth/login/route.ts"
+    },
+    {
+      "path": "/api/auth/logout",
+      "methods": [
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/auth/logout/route.ts"
+    },
+    {
+      "path": "/api/auth/me",
+      "methods": [
+        "GET"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/auth/me/route.ts"
+    },
+    {
+      "path": "/api/auth/register",
+      "methods": [
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/auth/register/route.ts"
+    },
+    {
+      "path": "/api/automation-settings",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/automation-settings/route.ts"
+    },
+    {
+      "path": "/api/bullish-rss",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/bullish-rss/route.ts"
+    },
+    {
+      "path": "/api/client-errors",
+      "methods": [
+        "POST"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/client-errors/route.ts"
+    },
+    {
+      "path": "/api/cron/discord-delivery-retry",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/discord-delivery-retry/route.ts"
+    },
+    {
+      "path": "/api/cron/health-probe-snapshot",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/health-probe-snapshot/route.ts"
+    },
+    {
+      "path": "/api/cron/instrument-fundamentals",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/instrument-fundamentals/route.ts"
+    },
+    {
+      "path": "/api/cron/kr-bollinger-band",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/kr-bollinger-band/route.ts"
+    },
+    {
+      "path": "/api/cron/kr-bollinger-middle-lower",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/kr-bollinger-middle-lower/route.ts"
+    },
+    {
+      "path": "/api/cron/kr-daily-cache",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/kr-daily-cache/route.ts"
+    },
+    {
+      "path": "/api/cron/kr-golden-cross",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/kr-golden-cross/route.ts"
+    },
+    {
+      "path": "/api/cron/market-rss",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/market-rss/route.ts"
+    },
+    {
+      "path": "/api/cron/sec-company-facts",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/sec-company-facts/route.ts"
+    },
+    {
+      "path": "/api/cron/sec-edgar",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/sec-edgar/route.ts"
+    },
+    {
+      "path": "/api/cron/sec-smallcap-share-facts",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/sec-smallcap-share-facts/route.ts"
+    },
+    {
+      "path": "/api/cron/sync-filings",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/sync-filings/route.ts"
+    },
+    {
+      "path": "/api/cron/us-bollinger-band",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-bollinger-band/route.ts"
+    },
+    {
+      "path": "/api/cron/us-bollinger-middle-lower",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-bollinger-middle-lower/route.ts"
+    },
+    {
+      "path": "/api/cron/us-breaking-news-forwarder",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-breaking-news-forwarder/route.ts"
+    },
+    {
+      "path": "/api/cron/us-daily-breakout",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-daily-breakout/route.ts"
+    },
+    {
+      "path": "/api/cron/us-daily-cache",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-daily-cache/route.ts"
+    },
+    {
+      "path": "/api/cron/us-daily-indicators",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-daily-indicators/route.ts"
+    },
+    {
+      "path": "/api/cron/us-daily-open-cache",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-daily-open-cache/route.ts"
+    },
+    {
+      "path": "/api/cron/us-golden-cross",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-golden-cross/route.ts"
+    },
+    {
+      "path": "/api/cron/us-minute-bollinger-band",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-minute-bollinger-band/route.ts"
+    },
+    {
+      "path": "/api/cron/us-minute-obv-adl",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-minute-obv-adl/route.ts"
+    },
+    {
+      "path": "/api/dart",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/dart/route.ts"
+    },
+    {
+      "path": "/api/dart/contract",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/dart/contract/route.ts"
+    },
+    {
+      "path": "/api/dart/history",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/dart/history/route.ts"
+    },
+    {
+      "path": "/api/dart/ranking",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/dart/ranking/route.ts"
+    },
+    {
+      "path": "/api/debug/automation-runs",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/automation-runs/route.ts"
+    },
+    {
+      "path": "/api/debug/daily-golden-cross-cache",
+      "methods": [
+        "GET"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/debug/daily-golden-cross-cache/route.ts"
+    },
+    {
+      "path": "/api/debug/errors",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/errors/route.ts"
+    },
+    {
+      "path": "/api/debug/health",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/health/route.ts"
+    },
+    {
+      "path": "/api/debug/instrument-fundamentals",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/instrument-fundamentals/route.ts"
+    },
+    {
+      "path": "/api/debug/intraday-flow",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/intraday-flow/route.ts"
+    },
+    {
+      "path": "/api/debug/kis-calls",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/kis-calls/route.ts"
+    },
+    {
+      "path": "/api/debug/kis-us-log",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/kis-us-log/route.ts"
+    },
+    {
+      "path": "/api/debug/market-rss-translations",
+      "methods": [
+        "GET"
+      ],
+      "access": "internal-or-operator",
+      "source": "app/api/debug/market-rss-translations/route.ts"
+    },
+    {
+      "path": "/api/debug/runs",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/debug/runs/route.ts"
+    },
+    {
+      "path": "/api/disclosures",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/disclosures/route.ts"
+    },
+    {
+      "path": "/api/discord/interactions",
+      "methods": [
+        "POST"
+      ],
+      "access": "provider-webhook",
+      "source": "app/api/discord/interactions/route.ts"
+    },
+    {
+      "path": "/api/domestic-financial-export",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/domestic-financial-export/route.ts"
+    },
+    {
+      "path": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/health/route.ts"
+    },
+    {
+      "path": "/api/internal/request-log",
+      "methods": [
+        "POST"
+      ],
+      "access": "internal-secret",
+      "source": "app/api/internal/request-log/route.ts"
+    },
+    {
+      "path": "/api/kis/detection-candidates",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/detection-candidates/route.ts"
+    },
+    {
+      "path": "/api/kis/detection-scan",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/detection-scan/route.ts"
+    },
+    {
+      "path": "/api/kis/financial-ratios",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/financial-ratios/route.ts"
+    },
+    {
+      "path": "/api/kis/intraday-mvp",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/kis/intraday-mvp/route.ts"
+    },
+    {
+      "path": "/api/kis/investment-opinion",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/investment-opinion/route.ts"
+    },
+    {
+      "path": "/api/kis/investor-flow",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/kis/investor-flow/route.ts"
+    },
+    {
+      "path": "/api/kis/market-flow",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/market-flow/route.ts"
+    },
+    {
+      "path": "/api/kis/market-funds",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/market-funds/route.ts"
+    },
+    {
+      "path": "/api/kis/market-investor-flow",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/market-investor-flow/route.ts"
+    },
+    {
+      "path": "/api/kis/program-flow",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/program-flow/route.ts"
+    },
+    {
+      "path": "/api/kis/realtime/approval",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/realtime/approval/route.ts"
+    },
+    {
+      "path": "/api/kis/realtime/events",
+      "methods": [
+        "POST"
+      ],
+      "access": "write-or-action",
+      "source": "app/api/kis/realtime/events/route.ts"
+    },
+    {
+      "path": "/api/kis/us-industry",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/us-industry/route.ts"
+    },
+    {
+      "path": "/api/kis/us-ranking",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/us-ranking/route.ts"
+    },
+    {
+      "path": "/api/kis/us-search",
+      "methods": [
+        "GET"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/kis/us-search/route.ts"
+    },
+    {
+      "path": "/api/local-rss-agent",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "write-or-action",
+      "source": "app/api/local-rss-agent/route.ts"
+    },
+    {
+      "path": "/api/local/kis/us-trade-trend",
+      "methods": [
+        "GET"
+      ],
+      "access": "internal-or-operator",
+      "source": "app/api/local/kis/us-trade-trend/route.ts"
+    },
+    {
+      "path": "/api/market-news",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/market-news/route.ts"
+    },
+    {
+      "path": "/api/public/daily-candles",
+      "methods": [
+        "GET"
+      ],
+      "access": "service-bearer",
+      "source": "app/api/public/daily-candles/route.ts"
+    },
+    {
+      "path": "/api/public/instrument-fundamentals",
+      "methods": [
+        "GET"
+      ],
+      "access": "service-bearer",
+      "source": "app/api/public/instrument-fundamentals/route.ts"
+    },
+    {
+      "path": "/api/public/market-intelligence",
+      "methods": [
+        "GET"
+      ],
+      "access": "service-bearer",
+      "source": "app/api/public/market-intelligence/route.ts"
+    },
+    {
+      "path": "/api/public/us-smallcap-shares",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/us-smallcap-shares/route.ts"
+    },
+    {
+      "path": "/api/push/subscribe",
+      "methods": [
+        "GET",
+        "PATCH",
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/push/subscribe/route.ts"
+    },
+    {
+      "path": "/api/push/test",
+      "methods": [
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/push/test/route.ts"
+    },
+    {
+      "path": "/api/scan/daytrade",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/daytrade/route.ts"
+    },
+    {
+      "path": "/api/scan/kr-accumulation",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/kr-accumulation/route.ts"
+    },
+    {
+      "path": "/api/scan/kr-bollinger-rebound-ema9-rvol-avg",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/kr-bollinger-rebound-ema9-rvol-avg/route.ts"
+    },
+    {
+      "path": "/api/scan/kr-bollinger-rebound-rvol",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/kr-bollinger-rebound-rvol/route.ts"
+    },
+    {
+      "path": "/api/scan/kr-ema9-rvol",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/kr-ema9-rvol/route.ts"
+    },
+    {
+      "path": "/api/scan/kr-ema9-touch-rvol",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/kr-ema9-touch-rvol/route.ts"
+    },
+    {
+      "path": "/api/scan/multi-timeframe-bb-pullback",
+      "methods": [
+        "GET"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/scan/multi-timeframe-bb-pullback/route.ts"
+    },
+    {
+      "path": "/api/scan/multi-timeframe-bb-pullback/html",
+      "methods": [
+        "GET"
+      ],
+      "access": "signed-link",
+      "source": "app/api/scan/multi-timeframe-bb-pullback/html/route.ts"
+    },
+    {
+      "path": "/api/scan/multi-timeframe-bb-rebound",
+      "methods": [
+        "GET"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/scan/multi-timeframe-bb-rebound/route.ts"
+    },
+    {
+      "path": "/api/scan/multi-timeframe-recommendations",
+      "methods": [
+        "GET"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/scan/multi-timeframe-recommendations/route.ts"
+    },
+    {
+      "path": "/api/scan/technical-entry-analysis",
+      "methods": [
+        "GET"
+      ],
+      "access": "admin-session",
+      "source": "app/api/scan/technical-entry-analysis/route.ts"
+    },
+    {
+      "path": "/api/scan/us-accumulation",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/us-accumulation/route.ts"
+    },
+    {
+      "path": "/api/scan/us-daily-sideways-obv-adl",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/us-daily-sideways-obv-adl/route.ts"
+    },
+    {
+      "path": "/api/screener/run",
+      "methods": [
+        "POST"
+      ],
+      "access": "read-with-side-effect",
+      "source": "app/api/screener/run/route.ts"
+    },
+    {
+      "path": "/api/sec/company-facts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "access": "write-or-action",
+      "source": "app/api/sec/company-facts/route.ts"
+    },
+    {
+      "path": "/api/stock/chart",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/chart/route.ts"
+    },
+    {
+      "path": "/api/stock/kr/top-rising-chart",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/kr/top-rising-chart/route.ts"
+    },
+    {
+      "path": "/api/stock/lookup",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/lookup/route.ts"
+    },
+    {
+      "path": "/api/stock/news",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/news/route.ts"
+    },
+    {
+      "path": "/api/stock/us/ams-scout",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/ams-scout/route.ts"
+    },
+    {
+      "path": "/api/stock/us/dmi",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/dmi/route.ts"
+    },
+    {
+      "path": "/api/stock/us/macd",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/macd/route.ts"
+    },
+    {
+      "path": "/api/stock/us/mfi-oversold",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/mfi-oversold/route.ts"
+    },
+    {
+      "path": "/api/stock/us/news",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/news/route.ts"
+    },
+    {
+      "path": "/api/stock/us/news-radar",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/news-radar/route.ts"
+    },
+    {
+      "path": "/api/stock/us/top-rising",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/top-rising/route.ts"
+    },
+    {
+      "path": "/api/stock/us/top-rising-chart",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/stock/us/top-rising-chart/route.ts"
+    },
+    {
+      "path": "/api/telegram/webhook",
+      "methods": [
+        "POST"
+      ],
+      "access": "provider-webhook",
+      "source": "app/api/telegram/webhook/route.ts"
+    },
+    {
+      "path": "/api/us/sec-risks",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "access": "admin-session",
+      "source": "app/api/us/sec-risks/route.ts"
+    },
+    {
+      "path": "/api/user-activity",
+      "methods": [
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/user-activity/route.ts"
+    },
+    {
+      "path": "/api/watchlist",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "access": "user-session-or-user-data",
+      "source": "app/api/watchlist/route.ts"
+    }
+  ]
+}

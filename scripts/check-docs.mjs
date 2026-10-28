@@ -17,6 +17,12 @@ const required = [
   "docs/operations/continuous-improvement.md",
   "docs/operations/improvement-review.md",
   "docs/references/README.md",
+  "docs/api/README.md",
+  "docs/api/route-inventory.json",
+  "scripts/api-surface.mjs",
+  "public/api-reference.md",
+  "public/openapi.json",
+  "public/llms.txt",
   "app/README.md",
   "lib/README.md",
   "db/README.md",
@@ -35,6 +41,9 @@ const contracts = {
   "docs/operations/continuous-improvement.md": ["운영 지표 수집", "개선 과제 템플릿", "자동 감지", "남은 위험"],
   "docs/operations/improvement-review.md": ["검토 주기", "우선순위", "성과 판정", "미해결 위험"],
   "docs/architecture/external-request-boundaries.md": ["withKisRequestThrottle", "토큰 발급", "rate limit", "회귀 테스트"],
+  "docs/api/README.md": ["OpenAPI 3.1.1", "service-bearer", "signed-link", "npm run audit:api-surface", "응답 DTO"],
+  "public/api-reference.md": ["OpenAPI Specification 3.1.1", "Retry-After", "DAILY_CACHE_READ_API_KEY", "read-with-side-effect", "외부 AI 호출 절차"],
+  "public/llms.txt": ["/openapi.json", "/api-reference.md", "Do not call"],
 };
 const contractFailures = Object.entries(contracts).flatMap(([file, phrases]) => {
   const content = readFileSync(join(root, file), "utf8");

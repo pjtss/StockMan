@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createConnection, createServer } from "node:net";
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { readLocalEnvFile } from "./local-env.mjs";
 import { stopChildProcess, waitForProcessExit } from "./child-process-lifecycle.mjs";
 import { createRuntimeStartupSignalTracker } from "./runtime-startup-signals.mjs";
@@ -193,6 +194,14 @@ async function verifyRuntime() {
   const staticTarget = `${verifyDistDir}/standalone/.next/static`;
   const publicStaticTarget = `${verifyDistDir}/standalone/public/_next/static`;
   if (!existsSync(staticSource)) throw new Error(`Standalone package smoke failed: missing ${staticSource}`);
+  const standaloneRoot = `${verifyDistDir}/standalone`;
+  const publicDocs = ["openapi.json", "api-reference.md", "llms.txt"];
+  mkdirSync(join(standaloneRoot, "public"), { recursive: true });
+  for (const name of publicDocs) {
+    const source = join(process.cwd(), "public", name);
+    if (!existsSync(source)) throw new Error(`Standalone API documentation smoke failed: missing ${source}`);
+    cpSync(source, join(standaloneRoot, "public", name));
+  }
   // Copy into fresh targets. Copying a directory onto an already-created
   // directory is platform-dependent and can produce static/static nesting.
   rmSync(staticTarget, { recursive: true, force: true });
@@ -227,6 +236,18 @@ async function verifyRuntime() {
   try {
     runtimeDiagnostics.tcpReadyMs = await waitForTcpListener(port, child);
     console.log(`[deploy-verify] standalone TCP ready: port=${port}, elapsedMs=${runtimeDiagnostics.tcpReadyMs}`);
+    const openApiResponse = await fetch(`http://127.0.0.1:${port}/openapi.json`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+    if (!openApiResponse.ok) throw new Error(`Standalone OpenAPI smoke failed: HTTP ${openApiResponse.status}`);
+    const openApi = await openApiResponse.json();
+    if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]) {
+      throw new Error("Standalone OpenAPI smoke failed: specification version or expected public paths are missing.");
+    }
+    for (const [path, marker] of [["/api-reference.md", "StockMan 외부 읽기 전용 API 매뉴얼"], ["/llms.txt", "StockMan API"]]) {
+      const response = await fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+      const body = await response.text();
+      if (!response.ok || !body.includes(marker)) throw new Error(`Standalone API documentation smoke failed for ${path}: HTTP ${response.status}`);
+    }
+    console.log(`[deploy-verify] public API docs ok: ${Object.keys(openApi.paths).length} read operations`);
     await Promise.race([
       (async () => {
         const charts = await waitForHealth(`http://127.0.0.1:${port}/charts`);
