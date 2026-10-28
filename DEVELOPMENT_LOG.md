@@ -53,7 +53,8 @@
 - `npm run deploy:verify`: 의존성 감사(취약점 0), production build, standalone에서 문서 3개 HTTP smoke, `/charts` 데스크톱·모바일 Chrome hydration, 11개 JS chunk 및 보호 대상 API smoke를 통과했다.
 - 전체 테스트: 288개 파일 통과, 1개 skip; 1,510개 테스트 통과, 3개 skip.
 - typecheck, 필수 문서·migration·schema 검사, verify 범위·KIS 경계·Bearer 인증·OCI cron 감사 통과.
-- 실제 운영 확인 전 주소 검사에서 `https://stockman.r-e.kr/openapi.json`, `/api-reference.md`, `/llms.txt`는 모두 404였고 `/api/health`는 200이었다. 원격 최신 `oci` 기준 별도 worktree에서 검증해 기존 로컬 작업 변경을 배포 후보에서 제외했다.
+- 원격 `oci` 배포 후 cache-busting GET으로 `/openapi.json` 200(OpenAPI 3.1.1, 35 paths/35 read-only operations), `/api-reference.md` 200(한글 문서 marker 확인), `/llms.txt` 200(discovery 링크 확인), `/api/health` 200(`status=ok`)을 확인했다.
+- 최초 API 커밋의 Deploy OCI 실행은 후속 커밋 push에 따른 concurrency 취소가 발생했다. API 커밋을 포함하는 원격 후속 SHA `4f8af46071a67d253b04082d74631676b0df52ff`의 Deploy OCI workflow run `40623330028`이 전체 검증·패키징·SSH 업로드·활성화를 성공했고 위 운영 URL 응답을 제공한다.
 
 ### 다음 개선
 - OpenAPI의 generic 응답으로 남은 공개 route를 운영 DTO 예시와 세부 응답 schema로 순차 보강한다.
@@ -61,11 +62,11 @@
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-28-001
-- 성과 판정: PARTIAL
-- 근거: 원격 최신 route 소스를 기준으로 169개 inventory와 35개 공개 읽기 API 명세를 만들고 전체 배포 검증이 통과했다. 운영 공개 여부는 push 후 운영 URL에서 확인한다. route별 응답 DTO 세분화 및 공통 외부 rate limit 설계가 후속 개선으로 남는다.
+- 성과 판정: IMPROVED
+- 근거: 원격 최신 route 소스를 기준으로 169개 inventory와 35개 공개 읽기 API 명세를 만들고 전체 배포 검증 및 운영 URL 확인을 마쳤다. route별 응답 DTO 세분화 및 공통 외부 rate limit 설계는 별도 후속 개선이다.
 
 ### 커밋·푸시·배포
-- 미실행 (원격 최신 `oci` 기준 검증 통과, push 및 GitHub Actions `Deploy OCI` 대기). 배포 후 운영 URL 응답과 workflow 결과를 기록한다.
+- 완료: 커밋 `8bbffe5a2f5ca2e10869d2758d8bb6aa52bcd8c2`를 원격 `oci`에 push했다. 후속 SHA `4f8af46071a67d253b04082d74631676b0df52ff`의 Deploy OCI run `40623330028` 성공 및 도메인 공개 응답을 확인했다.
 
 ## [2026-10-27] RSS schema readiness 누락 컬럼 조회 회귀 수정
 
