@@ -1,5 +1,15 @@
 # 오류 상황 및 해결 방법
 
+## 2026-10-28 종목 뉴스 요약에 RSS HTML 태그 노출
+
+- **증상**: 종목 뉴스 요약에 `<b>` 등의 HTML 태그가 문자 그대로 보였다.
+- **근본 원인**: V161에서 정규화 요약 컬럼을 도입했지만 `/api/stock/news`는 raw `summary`만 조회해 반환했다. 차트 모달은 반환 요약을 표시하므로 SEC 피드의 HTML 메타데이터가 UI까지 전달됐다.
+- **영향 범위**: `/api/stock/news`를 사용하는 종목 뉴스 소비자. 운영 GET으로 10개 티커를 조회해 6건의 SEC 요약에서 태그를 재현했다.
+- **해결 위치**: API는 `normalized_summary`를 우선 사용하고, 과거 레코드에는 기존 `extractMarketRssCoreSummary`로 조회 시 정규화한다. 정규화 컬럼이 손상돼도 같은 경로로 안전하게 정리하고 DB 전용 필드는 응답에서 제외한다.
+- **재발 자동 감지**: `app/api/stock/news/route.test.ts`에서 정규화 우선, 과거 SEC 메타데이터 fallback, 손상된 정규화 값 제거를 확인한다. 각 사례의 직렬화 응답에 HTML 태그가 없고 `normalizedSummary` 속성이 노출되지 않아야 한다. `npm run deploy:verify`에 테스트/build/runtime smoke를 포함한다.
+- **검증 결과**: 운영 재현 6/10개 티커(10개 티커 샘플에서 6건), 수정 API 회귀 테스트 3건 통과. 전체 배포 게이트 및 배포 후 운영 재검증 대기.
+- **남은 위험 및 다음 개선**: 사용자 입력/출처별 특수한 태그 없는 메타데이터 변형은 계속 유입될 수 있으므로 운영 GET 표본 및 회귀 테스트로 감지한다. 기존 DB 행은 직접 수정하지 않으며 read-time fallback으로 보호한다.
+
 ## 2026-10-27 RSS 정규화 컬럼 추가 후 운영 health 오탐
 
 - **증상**: RSS 정규화 V161 배포 workflow는 성공했지만 공개 `/api/health`가 `degraded`를 반환했다.
