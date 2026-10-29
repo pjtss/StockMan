@@ -1978,6 +1978,303 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/scan/us-obv-divergence": {
+      "get": {
+        "tags": [
+          "scan"
+        ],
+        "operationId": "getScanUsObvDivergence",
+        "summary": "미국 보통주 일봉 OBV 강세 다이버전스 후보",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/us-obv-divergence/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "minDollarVolume20d",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "quality",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "HIGH",
+                "STANDARD",
+                "REVIEW"
+              ],
+              "default": "ALL"
+            }
+          },
+          {
+            "name": "signalType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "BOTH",
+                "PIVOT",
+                "TREND"
+              ],
+              "default": "ALL"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "priority",
+                "liquidity",
+                "obv",
+                "priceDrop"
+              ],
+              "default": "priority"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "schemaVersion",
+                    "algoVersion",
+                    "generatedAtUtc",
+                    "asOfEtDate",
+                    "scanStatus",
+                    "tradeEligibility",
+                    "universe",
+                    "parameters",
+                    "items",
+                    "pagination"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "schemaVersion": {
+                      "const": "us-obv-divergence.v4"
+                    },
+                    "algoVersion": {
+                      "const": "4.0.0"
+                    },
+                    "generatedAtUtc": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "asOfEtDate": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "market": {
+                      "const": "US"
+                    },
+                    "securityClass": {
+                      "const": "ACTIVE_COMMON_STOCK_FROM_STOCKMAN_OFFICIAL_MASTER"
+                    },
+                    "marketCapLimitUsd": {
+                      "type": "null"
+                    },
+                    "timeframe": {
+                      "const": "D"
+                    },
+                    "scanStatus": {
+                      "type": "string",
+                      "enum": [
+                        "COMPLETE",
+                        "PARTIAL"
+                      ]
+                    },
+                    "tradeEligibility": {
+                      "const": "WATCH_ONLY"
+                    },
+                    "universe": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "filters": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "required": [
+                        "page",
+                        "pageSize",
+                        "totalItems",
+                        "totalPages"
+                      ],
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "pageSize": {
+                          "type": "integer"
+                        },
+                        "totalItems": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "required": [
+                          "ticker",
+                          "market",
+                          "candleDate",
+                          "candleMetadata",
+                          "signalType",
+                          "signalQuality"
+                        ],
+                        "properties": {
+                          "ticker": {
+                            "type": "string"
+                          },
+                          "market": {
+                            "type": "string",
+                            "enum": [
+                              "NAS",
+                              "NYS",
+                              "AMS"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "candleDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "close": {
+                            "type": "number"
+                          },
+                          "signalType": {
+                            "type": "string",
+                            "enum": [
+                              "TREND",
+                              "PIVOT",
+                              "BOTH"
+                            ]
+                          },
+                          "signalQuality": {
+                            "type": "string",
+                            "enum": [
+                              "HIGH",
+                              "STANDARD",
+                              "REVIEW"
+                            ]
+                          },
+                          "price20dPct": {
+                            "type": "number"
+                          },
+                          "obv20dAvgVolumeMultiple": {
+                            "type": "number"
+                          },
+                          "candleMetadata": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "candleDate",
+                                "dataUpdatedAtUtc"
+                              ],
+                              "properties": {
+                                "candleDate": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "dataUpdatedAtUtc": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "format": "date-time"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/scan/us-obv-divergence/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/stock/chart": {
       "get": {
         "tags": [

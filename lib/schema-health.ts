@@ -21,6 +21,7 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "us_special_instrument_universe",
   "kr_instrument_universe_candles",
   "us_instrument_universe_candles",
+  "us_obv_divergence_snapshot",
   "instrument_fundamental_snapshots",
   "instrument_fundamental_refresh_jobs",
   "instrument_fundamental_refresh_items",

@@ -5,6 +5,12 @@ const file = path.resolve("scripts/oci-cron.sh");
 const source = fs.readFileSync(file, "utf8");
 const matches = [...source.matchAll(/run_cron_endpoint\s+"([^"]+)"\s+(\d+)\s+"([^"]+)"/g)];
 if (matches.length === 0) throw new Error("No cron endpoints were found");
+const obvSnapshotCall = 'run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"';
+if (!source.includes(obvSnapshotCall)
+  || source.indexOf(obvSnapshotCall) < source.indexOf('run_cron_endpoint "us-daily-cache"')
+  || !source.includes('US_OBV_REFRESH_MINUTES >= 18 * 60 + 10')) {
+  throw new Error("US OBV divergence refresh must follow the US daily cache and run on weekdays after the New York settlement window");
+}
 
 const labels = new Set();
 for (const [, label, timeout, endpoint] of matches) {

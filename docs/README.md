@@ -28,6 +28,8 @@
 - 미국 보통주 시총 USD 5억 이하 중 최근 10거래일 저가 대비 최신 종가 반등 목록 (2026-10-16): [`operations/us-common-stock-10day-low-rebound-20261016.md`](./operations/us-common-stock-10day-low-rebound-20261016.md)
 
 - 현재 시스템 기준서: [`architecture/current-system-reference.md`](./architecture/current-system-reference.md)
+- 설계 문서 관리 기준과 재사용 템플릿: [`architecture/design-management.md`](./architecture/design-management.md) · [`architecture/design-template.md`](./architecture/design-template.md)
+- 미국 보통주 OBV 다이버전스 API: [`설계·운영 개선 과제`](./architecture/us-obv-divergence-api-design.md)
 - 미국 상승률 TOP100 UI 데이터 품질·부분 응답·원천 시각·누락 방지 계약: [`US_TOP_RISING_UI_DATA_QUALITY.md`](./US_TOP_RISING_UI_DATA_QUALITY.md)
 
 - 상세 시스템 모듈 카탈로그·SRP 책임 지도: [`architecture/system-module-catalog.md`](./architecture/system-module-catalog.md)

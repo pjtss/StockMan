@@ -82,6 +82,12 @@ run_cron_endpoint "sec-smallcap-share-facts" 900 "/api/cron/sec-smallcap-share-f
 run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
 
 run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
+US_OBV_REFRESH_WEEKDAY="$(TZ=America/New_York date +%u)"
+US_OBV_REFRESH_HHMM="$(TZ=America/New_York date +%H%M)"
+US_OBV_REFRESH_MINUTES=$((10#${US_OBV_REFRESH_HHMM:0:2} * 60 + 10#${US_OBV_REFRESH_HHMM:2:2}))
+if (( US_OBV_REFRESH_WEEKDAY <= 5 && US_OBV_REFRESH_MINUTES >= 18 * 60 + 10 )); then
+  run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"
+fi
 run_cron_endpoint "us-bollinger-band" 180 "/api/cron/us-bollinger-band"
 run_cron_endpoint "us-bollinger-middle-lower" 180 "/api/cron/us-bollinger-middle-lower"
 run_cron_endpoint "us-golden-cross" 180 "/api/cron/us-golden-cross"

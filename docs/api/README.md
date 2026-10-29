@@ -23,6 +23,8 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
 `scripts/api-surface.mjs`는 `app/api/**/route.ts`의 exported HTTP methods, path, 제한적 인증/side-effect 표식을 읽어 inventory와 public GET OpenAPI operation을 만든다.
 
+미국 OBV 다이버전스 공개 `GET /api/scan/us-obv-divergence`는 사전 계산 DB 스냅샷만 읽는다. 계산·쓰기 작업은 `POST /api/cron/us-obv-divergence-snapshot`에서 cron secret으로 보호하고 외부 OpenAPI에는 GET만 노출한다. 응답·query 계약은 [`public/api-reference.md`](../../public/api-reference.md)의 OBV 항목과 API surface generator의 응답 schema를 함께 갱신한다.
+
     npm run docs:api:generate
     npm run audit:api-surface
 

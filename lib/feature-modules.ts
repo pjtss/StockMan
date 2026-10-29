@@ -53,6 +53,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "kr-daily-cache", label: "국내 일봉 캐시 갱신", description: "KIS 국내 유니버스·일봉·시세 지표 DB 갱신", settingsPath: "/admin/modules/kr-daily-cache", scheduler: "OCI_CRON" },
   { key: "us-breaking-news-forwarder", label: "해외 속보 Discord 전달", description: "KIS 해외 속보 원문을 별도 Discord 채널로 전달", settingsPath: "/admin/modules/us-breaking-news-forwarder", scheduler: "OCI_CRON" },
   { key: "us-daily-cache", label: "일봉 캐시 갱신", description: "미국 일봉 데이터 DB 갱신", settingsPath: "/admin/modules/us-daily-cache", scheduler: "OCI_CRON" },
+  { key: "us-obv-divergence-snapshot", label: "미국 OBV 다이버전스 스냅샷", description: "공식 활성 미국 보통주 저장 일봉에서 OBV 다이버전스 후보를 계산하고 공개 읽기 API 스냅샷을 갱신", settingsPath: "/admin/modules/us-obv-divergence-snapshot", scheduler: "OCI_CRON" },
   { key: "us-daily-open-cache", label: "당일 시가 갱신", description: "미국 현재 세션 시가를 DB에 1시간마다 갱신", settingsPath: "/admin/modules/us-daily-open-cache", scheduler: "OCI_CRON" },
   { key: "us-daily-breakout", label: "일봉 돌파 자동화", description: "최근 고가 돌파 후보 탐지·알림", settingsPath: "/admin/modules/us-daily-breakout", scheduler: "OCI_CRON" },
   { key: "discord-delivery-retry", label: "Discord 재전송", description: "실패한 Discord 알림 재전송", settingsPath: "/admin/modules/discord-delivery-retry", scheduler: "OCI_CRON" },

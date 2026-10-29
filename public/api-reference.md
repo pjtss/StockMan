@@ -114,6 +114,23 @@ IP당 분당 30회, 프로세스 전체 분당 600회 고정 창 제한이 적�
 
 주요 400 코드: INVALID_TICKER, INVALID_MARKET, INVALID_LIMIT, INVALID_MARKET_CAP_RANGE, INVALID_SHARES_RANGE, INVALID_SHARES_BASIS, INVALID_CURSOR, CURSOR_NOT_ALLOWED_WITH_TICKER, CURSOR_FILTER_MISMATCH. 저장소 장애는 503 US_SMALLCAP_SHARES_UNAVAILABLE.
 
+### 미국 보통주 OBV 다이버전스 — GET /api/scan/us-obv-divergence
+
+KIS 공식 활성 `COMMON_STOCK` 마스터와 저장된 완료 일봉으로 사전 계산한 스냅샷을 읽는다. 이 공개 GET은 외부 API를 호출하거나 데이터를 계산·저장하지 않는다. 인증 없이 호출하며 `tradeEligibility=WATCH_ONLY`를 유지한다.
+
+| Query | 형식/기본 | 규칙 |
+|---|---|---|
+| page | 정수, 1 | 1~100000 |
+| pageSize | 정수, 50 | 1~100 |
+| signalType | 문자열, ALL | ALL, BOTH, PIVOT, TREND |
+| quality | 문자열, ALL | ALL, HIGH, STANDARD, REVIEW |
+| sort | 문자열, priority | priority, liquidity, obv, priceDrop |
+| minDollarVolume20d | 숫자, 0 | 음수 불가. 결과 표시만 필터링한다. |
+
+응답에는 알고리즘 버전, 미국 동부 기준 기준일, 생성 시각, COMPLETE/PARTIAL 상태, 공식 보통주 분모·coverage·제외 사유, 계산 파라미터, 경고, 페이지 정보와 후보를 포함한다. 각 후보는 계산에 사용한 봉의 거래일과 갱신 시각을 `candleMetadata`로 제공한다. 시가총액 제한은 없고 `marketCapUsd`는 null이다. 액면변경·배당 조정은 독립 검증되지 않았다.
+
+400 `INVALID_QUERY`, 503 `SNAPSHOT_NOT_READY`, `STALE_SNAPSHOT`, `INVALID_SNAPSHOT`, `SNAPSHOT_UNAVAILABLE`을 반환한다. 실제 데이터가 준비되기 전 예시 응답은 만들지 않는다.
+
 ## 나머지 공개 GET 경로
 
 다음 GET도 discovery OpenAPI에 포함한다. 각 operation의 query 이름/제약, 응답 유형, 소스 파일은 /openapi.json에서 확인한다. 스캐너별 데이터 최신성·시장 universe·응답 DTO가 다르므로 구조가 같다고 가정하지 않는다.
@@ -123,7 +140,7 @@ IP당 분당 30회, 프로세스 전체 분당 600회 고정 창 제한이 적�
 - 운영 캐시: /api/public/daily-candles, /api/public/instrument-fundamentals, /api/public/market-intelligence, /api/public/us-smallcap-shares
 - KIS 수급: /api/kis/investor-flow, /api/kis/intraday-mvp
 - 국내 탐지: /api/scan/daytrade, /api/scan/kr-accumulation, /api/scan/kr-bollinger-rebound-ema9-rvol-avg, /api/scan/kr-bollinger-rebound-rvol, /api/scan/kr-ema9-rvol, /api/scan/kr-ema9-touch-rvol
-- 미국 탐지: /api/scan/us-accumulation, /api/scan/us-daily-sideways-obv-adl, /api/stock/us/ams-scout, /api/stock/us/dmi, /api/stock/us/macd, /api/stock/us/mfi-oversold
+- 미국 탐지: /api/scan/us-accumulation, /api/scan/us-daily-sideways-obv-adl, /api/scan/us-obv-divergence, /api/stock/us/ams-scout, /api/stock/us/dmi, /api/stock/us/macd, /api/stock/us/mfi-oversold
 - 종목·시장: /api/stock/chart, /api/stock/kr/top-rising-chart, /api/stock/lookup, /api/stock/us/top-rising, /api/stock/us/top-rising-chart
 - 레거시: /api/automation-settings는 Deprecation=true로 표시된다. 새 연동에서 이 endpoint에 의존하지 않는다.
 

@@ -239,7 +239,8 @@ async function verifyRuntime() {
     const openApiResponse = await fetch(`http://127.0.0.1:${port}/openapi.json`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
     if (!openApiResponse.ok) throw new Error(`Standalone OpenAPI smoke failed: HTTP ${openApiResponse.status}`);
     const openApi = await openApiResponse.json();
-    if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]) {
+    if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]
+      || !openApi.paths?.["/api/scan/us-obv-divergence"]?.get) {
       throw new Error("Standalone OpenAPI smoke failed: specification version or expected public paths are missing.");
     }
     for (const [path, marker] of [["/api-reference.md", "StockMan 외부 읽기 전용 API 매뉴얼"], ["/llms.txt", "StockMan API"]]) {
@@ -254,6 +255,8 @@ async function verifyRuntime() {
         await verifyNextStaticScripts(`http://127.0.0.1:${port}`, charts.html);
         await runChartsBrowserSmoke(`http://127.0.0.1:${port}`);
         await waitForJson(`http://127.0.0.1:${port}/api/kis/us-search?market=INVALID`, 30_000, 400);
+        await waitForJson(`http://127.0.0.1:${port}/api/scan/us-obv-divergence?page=0`, 30_000, 400);
+        await waitForJson(`http://127.0.0.1:${port}/api/cron/us-obv-divergence-snapshot`, 30_000, 401, { method: "POST" });
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/admin/health-probe-history`, 30_000, 401);

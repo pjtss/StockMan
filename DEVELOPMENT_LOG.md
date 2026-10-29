@@ -1,3 +1,35 @@
+## [2026-10-29] 미국 보통주 OBV 다이버전스 공개 API 배포
+
+### 목표
+- 프로젝트 공식 활성 COMMON_STOCK·저장 일봉 구조에 맞춰 OBV 다이버전스 API를 구현하고, 최신 원격 `oci` 기준에서 검증·배포한다.
+
+### 반영
+- 설계 관리 기준·템플릿과 API 구현·운영 개선 설계서를 추가했다.
+- v4 계산, 활성 유니버스/coverage 검증, advisory lock·원자적 DB 스냅샷, CRON_SECRET 보호 갱신 POST, 무인증 read-only GET, V162 migration을 구현했다.
+- OCI cron은 미국 일봉 갱신 이후 뉴욕 18:10부터 실행하며 API 실행 간격 제한으로 30분 주기를 적용한다. API inventory/OpenAPI, 상세 매뉴얼, schema health, 기능 모듈 설정도 연결했다.
+- 최신 원격 `oci`는 로컬 이전 브랜치와 128 commit 차이가 있어 최신 원격 기준 독립 worktree에 기능 변경만 반영했다. 다른 작업 트리 변경은 release에 포함하지 않는다.
+
+### 검증
+- `npm ci --no-audit --no-fund`: 197 packages 설치.
+- `npm.cmd run docs:api:generate`, `npm.cmd run audit:api-surface`: route inventory 171개, 외부 공개 GET 36개로 생성·감사 통과.
+- `npm.cmd run cron:check`, `npm.cmd run docs:check`: 통과.
+- `npm.cmd run deploy:verify`: dependency audit 0 vulnerabilities, production build/typecheck, 전체 1,519개 테스트, standalone HTTP·브라우저 smoke 통과. OBV 공개 GET query 검증 400 및 보호된 cron 무인증 401 smoke 포함.
+- Localhost Flyway read-only audit는 history latest V161, V162 스냅샷 미존재 및 오래된 기록 누락을 확인했다. OCI activate는 `outOfOrder` 없이 `*:ignored`를 사용하며 Flyway 문서상 해당 패턴은 Ignored 상태를 validate/repair에서 무시한다. 이전 버전 누락 migration을 수동 실행하거나 schema history를 변경하지 않았다. 배포 뒤 운영 Flyway version과 health를 확인한다.
+- 로컬/운영 DB 직접 변경은 없음. 실제 운영 상태와 migration 적용은 push 후 GitHub Actions/OCI 결과로 확인한다.
+- 배포 검증을 통과했으나 push 전이므로 release 작업은 아직 시작하지 않았다.
+
+### 다음 개선
+- [ ] 배포 성공 후 `/api/health`의 Flyway V162/schemaReady와 미국장 이후 OBV cron 실행·공개 GET 스냅샷 최신성을 운영에서 확인한다.
+- [ ] 실제 운영 coverage와 주식분할·배당 보정 품질을 관측해 threshold 및 algorithm policy를 재평가한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-29-003
+- 성과 판정: PARTIAL
+- 근거: 최신 원격 기반 전체 배포 검증이 통과했다. CI push/OCI 배포와 운영 스냅샷 확인은 아직 대기 중이다.
+
+### 커밋·푸시·배포
+- 미실행.
+
 ## [2026-10-28] 주식 뉴스 API 요약 HTML 태그 노출 수정
 
 ### 목표

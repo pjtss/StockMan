@@ -782,6 +782,14 @@
       "source": "app/api/cron/us-minute-obv-adl/route.ts"
     },
     {
+      "path": "/api/cron/us-obv-divergence-snapshot",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-obv-divergence-snapshot/route.ts"
+    },
+    {
       "path": "/api/dart",
       "methods": [
         "GET"
@@ -1231,6 +1239,14 @@
       ],
       "access": "public-read-candidate",
       "source": "app/api/scan/us-daily-sideways-obv-adl/route.ts"
+    },
+    {
+      "path": "/api/scan/us-obv-divergence",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/scan/us-obv-divergence/route.ts"
     },
     {
       "path": "/api/screener/run",

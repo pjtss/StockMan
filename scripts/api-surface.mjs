@@ -75,6 +75,14 @@ function queryParameters(source, path) {
       to: { type: "string", format: "date", description: "UTC 기준 종료 날짜(미포함)." },
       limit: { type: "integer", minimum: 1, maximum: 100, default: 50 },
     },
+    "/api/scan/us-obv-divergence": {
+      page: { type: "integer", minimum: 1, maximum: 100000, default: 1 },
+      pageSize: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+      signalType: { type: "string", enum: ["ALL", "BOTH", "PIVOT", "TREND"], default: "ALL" },
+      quality: { type: "string", enum: ["ALL", "HIGH", "STANDARD", "REVIEW"], default: "ALL" },
+      sort: { type: "string", enum: ["priority", "liquidity", "obv", "priceDrop"], default: "priority" },
+      minDollarVolume20d: { type: "number", minimum: 0, default: 0 },
+    },
     "/api/public/us-smallcap-shares": {
       ticker: { type: "string", pattern: "^[A-Z][A-Z0-9./-]{0,14}$" },
       market: { type: "string", enum: ["NAS", "NASDAQ", "NYS", "NYSE", "AMS", "AMEX"] },
@@ -146,6 +154,29 @@ function responseSchema(path) {
     "/api/public/market-intelligence": { type: "object", properties: { ok: { const: true }, query: { type: "object" }, asOf: { type: "string", format: "date-time" }, instrument: { type: ["object", "null"], additionalProperties: true }, fundamental: { type: ["object", "null"], additionalProperties: true }, rssArticles: { type: "array", items: { type: "object", additionalProperties: true } }, bullishArticles: { type: "array", items: { type: "object", additionalProperties: true } }, secEvents: { type: "array", items: { type: "object", additionalProperties: true } } } },
     "/api/public/us-smallcap-shares": { type: "object", properties: { ok: { const: true }, source: { const: "SEC_COMPANY_FACTS_AND_STOCKMAN_DB" }, checkedAt: { type: "string", format: "date-time" }, criteria: { type: "object", additionalProperties: true }, filters: { type: "object", additionalProperties: true }, items: { type: "array", items: { type: "object", properties: { market: { type: "string" }, ticker: { type: "string" }, companyName: { type: ["string", "null"] }, currency: { const: "USD" }, marketCapUsd: {}, priceUsd: {}, fundamentalsFetchedAt: {}, sharesOutstanding: { type: ["object", "null"], additionalProperties: true }, facts: { type: "object", additionalProperties: true }, reviewedSharesOutstanding: { type: "object", additionalProperties: true }, secCompanyFacts: { type: "object", additionalProperties: true } } } }, pagination: { type: "object", properties: { returnedCount: { type: "integer" }, hasMore: { type: "boolean" }, nextCursor: { type: ["string", "null"] } } } } },
   };
+  if (path === "/api/scan/us-obv-divergence") return {
+    type: "object",
+    required: ["ok", "schemaVersion", "algoVersion", "generatedAtUtc", "asOfEtDate", "scanStatus", "tradeEligibility", "universe", "parameters", "items", "pagination"],
+    properties: {
+      ok: { const: true }, schemaVersion: { const: "us-obv-divergence.v4" }, algoVersion: { const: "4.0.0" },
+      generatedAtUtc: { type: "string", format: "date-time" }, asOfEtDate: { type: "string", format: "date" },
+      market: { const: "US" }, securityClass: { const: "ACTIVE_COMMON_STOCK_FROM_STOCKMAN_OFFICIAL_MASTER" },
+      marketCapLimitUsd: { type: "null" }, timeframe: { const: "D" },
+      scanStatus: { type: "string", enum: ["COMPLETE", "PARTIAL"] }, tradeEligibility: { const: "WATCH_ONLY" },
+      universe: { type: "object", additionalProperties: true }, parameters: { type: "object", additionalProperties: true },
+      warnings: { type: "array", items: { type: "string" } }, filters: { type: "object", additionalProperties: true },
+      pagination: { type: "object", required: ["page", "pageSize", "totalItems", "totalPages"], properties: { page: { type: "integer" }, pageSize: { type: "integer" }, totalItems: { type: "integer" }, totalPages: { type: "integer" } } },
+      items: { type: "array", items: { type: "object", additionalProperties: true, required: ["ticker", "market", "candleDate", "candleMetadata", "signalType", "signalQuality"], properties: {
+        ticker: { type: "string" }, market: { type: "string", enum: ["NAS", "NYS", "AMS"] }, name: { type: "string" },
+        candleDate: { type: "string", format: "date" }, close: { type: "number" },
+        signalType: { type: "string", enum: ["TREND", "PIVOT", "BOTH"] }, signalQuality: { type: "string", enum: ["HIGH", "STANDARD", "REVIEW"] },
+        price20dPct: { type: "number" }, obv20dAvgVolumeMultiple: { type: "number" },
+        candleMetadata: { type: "array", items: { type: "object", required: ["candleDate", "dataUpdatedAtUtc"], properties: {
+          candleDate: { type: "string", format: "date" }, dataUpdatedAtUtc: { type: ["string", "null"], format: "date-time" },
+        } } },
+      } } },
+    },
+  };
   return schemas[path] ?? generic;
 }
 
@@ -175,6 +206,7 @@ async function makeOpenApi(allRoutes) {
     "/api/scan/kr-ema9-touch-rvol": "국내 EMA9 터치·RVOL 후보",
     "/api/scan/us-accumulation": "미국 매집 후보 조회",
     "/api/scan/us-daily-sideways-obv-adl": "미국 횡보 OBV·ADL 후보",
+    "/api/scan/us-obv-divergence": "미국 보통주 일봉 OBV 강세 다이버전스 후보",
     "/api/stock/chart": "종목 OHLCV 차트·지표 조회",
     "/api/stock/kr/top-rising-chart": "국내 상승률 상위 종목 조회",
     "/api/stock/lookup": "종목 코드의 회사명 조회",
