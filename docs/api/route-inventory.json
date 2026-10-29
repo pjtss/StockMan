@@ -1083,7 +1083,7 @@
       "methods": [
         "GET"
       ],
-      "access": "service-bearer",
+      "access": "public-read-candidate",
       "source": "app/api/public/daily-candles/route.ts"
     },
     {
@@ -1091,7 +1091,7 @@
       "methods": [
         "GET"
       ],
-      "access": "service-bearer",
+      "access": "public-read-candidate",
       "source": "app/api/public/instrument-fundamentals/route.ts"
     },
     {
@@ -1099,7 +1099,7 @@
       "methods": [
         "GET"
       ],
-      "access": "service-bearer",
+      "access": "public-read-candidate",
       "source": "app/api/public/market-intelligence/route.ts"
     },
     {

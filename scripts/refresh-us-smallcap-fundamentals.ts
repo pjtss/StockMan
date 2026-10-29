@@ -31,7 +31,6 @@ if (!["localhost", "127.0.0.1", "::1"].includes(database.hostname)) throw new Er
 const pool = new pg.Pool({ connectionString: databaseUrl });
 const localEnv = readLocalEnvFile();
 const operatingApiBase = localEnv.DAILY_CACHE_API_URL || process.env.DAILY_CACHE_API_URL || process.env.PUBLIC_BASE_URL || process.env.RSS_BULLISH_REPORT_API_BASE_URL;
-const operatingReadKey = localEnv.DAILY_CACHE_READ_API_KEY || process.env.DAILY_CACHE_READ_API_KEY || "";
 
 async function main() {
   const lockClient = await pool.connect();
@@ -101,13 +100,13 @@ async function main() {
 
     const operatingSnapshots = new Map<string, any>();
     if (targetedCodes.length) {
-      if (!operatingApiBase || !operatingReadKey) throw new Error("Targeted refresh requires DAILY_CACHE_API_URL and DAILY_CACHE_READ_API_KEY in .env.local");
+      if (!operatingApiBase) throw new Error("Targeted refresh requires an operating API base URL in .env.local");
       for (const market of [...new Set(instruments.map((item) => item.market))]) {
         const codes = instruments.filter((item) => item.market === market).map((item) => item.code);
         const url = new URL("/api/public/instrument-fundamentals", operatingApiBase);
         url.searchParams.set("market", market);
         url.searchParams.set("codes", codes.join(","));
-        const response = await fetch(url, { headers: { authorization: `Bearer ${operatingReadKey}` }, signal: AbortSignal.timeout(20_000) });
+        const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
         const payload = await response.json() as any;
         if (!response.ok || payload?.ok !== true || !Array.isArray(payload.items)) throw new Error(`Operating snapshot GET failed: HTTP ${response.status}`);
         for (const item of payload.items) operatingSnapshots.set(`${item.market}:${item.code}`, item);

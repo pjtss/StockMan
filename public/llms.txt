@@ -5,9 +5,9 @@ StockMan is a stock-market monitoring and disclosure application. Its external A
 - Read the detailed API manual: /api-reference.md
 - Read the machine-readable OpenAPI 3.1.1 specification: /openapi.json
 - API root: /api
-- Use only documented GET operations classified public-read-candidate or service-bearer.
+- Use only documented read-only GET operations. Every documented operation is available without authentication.
 - Do not call administrator, debug, cron, internal, user-session, webhook, or write/action routes.
 - Do not assume every GET is side-effect free; follow the access classification in OpenAPI.
 - Preserve x-request-id, HTTP status, response source, and data timestamps.
 - Treat empty arrays and null as truthful empty data; never fabricate missing market or filing data.
-- Share keys only through Authorization: Bearer when the operator supplied DAILY_CACHE_READ_API_KEY. Never put credentials in URLs or logs.
+- Do not send credentials or authentication headers to documented read-only operations.

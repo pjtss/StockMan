@@ -7,21 +7,7 @@ const MARKETS = new Set(["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"]);
 const TIMEFRAMES = new Set(["D", "W", "M"]);
 const marketPredicate = "(($1 = 'KR' AND market IN ('KOSPI', 'KOSDAQ')) OR ($1 = 'US' AND market IN ('NAS', 'NYS', 'AMS')) OR market = $1)";
 
-function authorized(request: Request) {
-  const expected = process.env.DAILY_CACHE_READ_API_KEY?.trim();
-  // Keep authenticated deployments protected, while allowing explicitly
-  // keyless read-only deployments to expose the bounded candle cache API.
-  if (!expected) return true;
-  const supplied = request.headers.get("x-daily-cache-key")?.trim()
-    || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  return Boolean(expected && supplied && supplied === expected);
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
-  }
-
   const params = new URL(request.url).searchParams;
   const market = (params.get("market") ?? "").trim().toUpperCase();
   const code = (params.get("code") ?? "").trim().toUpperCase();

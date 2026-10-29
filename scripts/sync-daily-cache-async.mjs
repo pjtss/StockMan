@@ -47,9 +47,6 @@ if (usMarketCapUnder !== null && (!Number.isFinite(usMarketCapUnder) || usMarket
 
 const pool = new Pool({ connectionString: process.env.LOCAL_DATABASE_URL });
 const apiBase = new URL("/api/public/daily-candles", process.env.DAILY_CACHE_API_URL);
-const auth = process.env.DAILY_CACHE_READ_API_KEY?.trim()
-  ? { authorization: `Bearer ${process.env.DAILY_CACHE_READ_API_KEY.trim()}` }
-  : {};
 
 async function fetchJson(url) {
   const startedAt = performance.now();
@@ -57,7 +54,7 @@ async function fetchJson(url) {
   try {
     let response;
     try {
-      response = await fetch(url, { headers: auth, signal: AbortSignal.timeout(30_000) });
+      response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     } catch (error) {
       const cause = error?.cause?.code || error?.cause?.message || error?.message || "unknown";
       throw new Error(`운영 API 네트워크 오류: ${url.pathname} ${cause}`);

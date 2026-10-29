@@ -11,8 +11,8 @@ const limit = Math.min(Math.max(Number(args.get("limit") || 120), 1), 300);
 const batchSize = Math.min(Math.max(Number(args.get("batch") || 100), 1), 100);
 const skipFundamentals = args.get("skip-fundamentals") === "true";
 
-if (!process.env.LOCAL_DATABASE_URL || !process.env.DAILY_CACHE_API_URL || !process.env.DAILY_CACHE_READ_API_KEY) {
-  throw new Error("LOCAL_DATABASE_URL, DAILY_CACHE_API_URL, DAILY_CACHE_READ_API_KEY가 모두 필요합니다.");
+if (!process.env.LOCAL_DATABASE_URL || !process.env.DAILY_CACHE_API_URL) {
+  throw new Error("LOCAL_DATABASE_URL과 DAILY_CACHE_API_URL이 필요합니다.");
 }
 if (!["D", "W", "M"].includes(timeframe)) throw new Error("timeframe은 D, W, M 중 하나여야 합니다.");
 if (!["ALL", "KR", "US"].includes(requestedMarket)) throw new Error("market은 ALL, KR, US 중 하나여야 합니다.");
@@ -38,7 +38,7 @@ async function syncMarket(kind, universeTable) {
       url.searchParams.set("codes", codes.join(","));
       url.searchParams.set("timeframe", timeframe);
       url.searchParams.set("limit", String(limit));
-      const response = await fetch(url, { headers: { authorization: `Bearer ${process.env.DAILY_CACHE_READ_API_KEY}` } });
+      const response = await fetch(url);
       if (!response.ok) throw new Error(`운영 API 실패: ${response.status} ${market}`);
       const payload = await response.json();
       if (!payload.ok || !Array.isArray(payload.items)) throw new Error(`운영 API 응답 형식 오류: ${market}`);
@@ -63,7 +63,7 @@ async function syncMarket(kind, universeTable) {
       const fundamentalsUrl = new URL("/api/public/instrument-fundamentals", process.env.DAILY_CACHE_API_URL);
       fundamentalsUrl.searchParams.set("market", market);
       fundamentalsUrl.searchParams.set("codes", codes.join(","));
-      const fundamentalsResponse = await fetch(fundamentalsUrl, { headers: { authorization: `Bearer ${process.env.DAILY_CACHE_READ_API_KEY}` } });
+      const fundamentalsResponse = await fetch(fundamentalsUrl);
       if (!fundamentalsResponse.ok) throw new Error(`운영 기본정보 API 실패: ${fundamentalsResponse.status} ${market}`);
       const fundamentalsPayload = await fundamentalsResponse.json();
       if (!fundamentalsPayload.ok || !Array.isArray(fundamentalsPayload.items)) throw new Error(`운영 기본정보 API 응답 형식 오류: ${market}`);

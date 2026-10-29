@@ -3,14 +3,7 @@ import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-function authorized(request: Request) {
-  const expected = process.env.DAILY_CACHE_READ_API_KEY?.trim();
-  const supplied = request.headers.get("x-daily-cache-key")?.trim() || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  return Boolean(expected && supplied && supplied === expected);
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const params = new URL(request.url).searchParams;
   const market = (params.get("market") ?? "").trim().toUpperCase();
   const codes = (params.get("codes") ?? "").split(",").map((value) => value.trim().toUpperCase()).filter(Boolean);

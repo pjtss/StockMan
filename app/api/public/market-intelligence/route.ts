@@ -3,12 +3,6 @@ import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-function authorized(request: Request) {
-  const expected = process.env.DAILY_CACHE_READ_API_KEY?.trim();
-  const supplied = request.headers.get("x-daily-cache-key")?.trim() || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-  return Boolean(expected && supplied && supplied === expected);
-}
-
 function isoDate(value: string | null) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -16,7 +10,6 @@ function isoDate(value: string | null) {
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   const params = new URL(request.url).searchParams;
   const ticker = (params.get("ticker") ?? "").trim().toUpperCase();
   const from = isoDate(params.get("from"));

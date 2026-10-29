@@ -13,8 +13,7 @@ export async function loadRemoteDailyCandles(input: {
   limit?: number;
 }): Promise<{ candles: OHLCVCandle[]; updatedAt: string | null } | null> {
   const baseUrl = process.env.DAILY_CACHE_API_URL?.trim();
-  const apiKey = process.env.DAILY_CACHE_READ_API_KEY?.trim();
-  if (!baseUrl || !apiKey) return null;
+  if (!baseUrl) return null;
 
   const url = new URL("/api/public/daily-candles", baseUrl);
   url.searchParams.set("market", input.market.trim().toUpperCase());
@@ -23,7 +22,6 @@ export async function loadRemoteDailyCandles(input: {
   url.searchParams.set("limit", String(Math.min(Math.max(input.limit ?? 120, 1), 300)));
 
   const response = await fetch(url, {
-    headers: { authorization: `Bearer ${apiKey}` },
     cache: "no-store",
     // This is only the fast cache path; the chart API fallback handles a slow or empty cache read.
     signal: AbortSignal.timeout(750),
@@ -36,8 +34,7 @@ export async function loadRemoteDailyCandles(input: {
 
 export async function loadRemoteDailyCandlesBulk(items: Array<{ market: string; code: string }>, limit: number, timeframe: "D" | "W" | "M") {
   const baseUrl = process.env.DAILY_CACHE_API_URL?.trim();
-  const apiKey = process.env.DAILY_CACHE_READ_API_KEY?.trim();
-  if (!baseUrl || !apiKey || !items.length) return null;
+  if (!baseUrl || !items.length) return null;
   const grouped = new Map<string, OHLCVCandle[]>();
   const byMarket = new Map<string, string[]>();
   for (const item of items) {
@@ -53,7 +50,7 @@ export async function loadRemoteDailyCandlesBulk(items: Array<{ market: string; 
     url.searchParams.set("codes", codes.join(","));
     url.searchParams.set("timeframe", timeframe);
     url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 300)));
-    const response = await fetch(url, { headers: { authorization: `Bearer ${apiKey}` }, cache: "no-store", signal: AbortSignal.timeout(20_000) });
+    const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
     if (!response.ok) return null;
     const payload = await response.json() as { ok: boolean; items?: Array<{ code: string; candles?: OHLCVCandle[] }> };
     if (!payload.ok || !Array.isArray(payload.items)) return null;

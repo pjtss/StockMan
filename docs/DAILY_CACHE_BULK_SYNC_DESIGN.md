@@ -6,15 +6,13 @@
 
 ## 구성
 
-### `.env.local` 자동 구성 및 선택적 API 인증
+### `.env.local` 자동 구성 및 무인증 읽기 API
 
 - 동기화 스크립트는 실행 시 프로젝트 `.env.local`을 읽는다. 로컬 PostgreSQL은 `DATABASE_URL`을 사용하고, 운영 URL은 `DAILY_CACHE_API_URL`, `PUBLIC_BASE_URL`, `RSS_BULLISH_REPORT_API_BASE_URL` 순으로 찾는다. 별도 셸 환경변수 설정은 필요하지 않다.
-- `DAILY_CACHE_READ_API_KEY`가 `.env.local`에 있으면 Bearer 인증을 보낸다. 값이 없어도 스크립트는 인증 헤더 없이 조회를 시도한다.
-- 운영 서버에서 키 없이 읽으려면 배포 환경에서 `DAILY_CACHE_READ_API_KEY`를 설정하지 않아야 한다. 키가 설정된 배포는 기존처럼 인증을 계속 요구한다. 이 API는 일봉 읽기 전용이며 market/codes/limit 검증과 종목별 최대 300봉 제한을 유지한다.
+- 캔들·기본정보 API는 인증 없이 조회한다. API 주소만 있으면 되며, 운영 환경의 인증 키 설정 여부와 무관하게 같은 공개 읽기 계약을 유지한다.
 
 1. 운영 `GET /api/public/daily-candles`
-   - `Authorization: Bearer <DAILY_CACHE_READ_API_KEY>`를 요구한다.
-   - 시장·종목 목록·기간·봉 개수를 받아 종목별 최근 봉을 반환한다.
+   - 인증 헤더 없이 시장·종목 목록·기간·봉 개수를 받아 종목별 최근 봉을 반환한다.
    - 다종목 조회는 `unnest(codes) + LATERAL LIMIT`으로 종목별 인덱스를 사용한다. 윈도 함수로 전체 시장 캔들 테이블을 먼저 스캔하지 않는다.
 2. 로컬 `scripts/sync-daily-cache-async.mjs`
    - 로컬 universe에서 `enabled=true`, `daily_active=true`, `instrument_type='COMMON_STOCK'`만 읽는다.
@@ -28,7 +26,6 @@
 $cfg = Get-Content .env.local | ConvertFrom-StringData
 $env:LOCAL_DATABASE_URL = $cfg.DATABASE_URL.Trim('"')
 $env:DAILY_CACHE_API_URL = $cfg.DAILY_CACHE_API_URL.Trim('"')
-$env:DAILY_CACHE_READ_API_KEY = $cfg.DAILY_CACHE_READ_API_KEY.Trim('"')
 node scripts/sync-daily-cache-async.mjs --market=ALL --timeframe=D --limit=120 --batch=10 --fetch-workers=2 --save-workers=2 --queue=10 --skip-fundamentals=true
 ```
 
@@ -50,7 +47,7 @@ node scripts/sync-daily-cache-async.mjs --market=ALL --timeframe=D --limit=120 -
 ## 현재 검증 및 남은 작업
 
 - 2026-10-02 로컬 스크립트 실행: 미국 활성 보통주 유니버스 5,343종목, limit=120, 537 운영 API 요청, 저장 584,334봉, 저장 검증 불일치 0. 성공 배치 495/535, 실패 40배치. 종목별 봉이 없는 경우 배치 전체를 실패 처리하므로 운영 캐시에서 하나 이상의 종목이 누락된 실패 배치의 나머지 종목도 이번 실행에는 적재하지 않았다. 결과 `ok=false`; AMS 203/243, NAS 2,900/3,210, NYS 1,840/1,890 보유. 시장별 최신 날짜 2026-10-01.
-- 2026-10-02 키 없는 운영 GET smoke check는 HTTP 401을 반환했다. 소스 변경만으로 기존 운영 인스턴스 동작은 바뀌지 않는다. API 키 없는 접근은 수정사항 배포와 운영 `DAILY_CACHE_READ_API_KEY` 설정 제거 후 가능하다. 미배포 상태.
+- 2026-10-02 당시 키 없는 운영 GET smoke check는 HTTP 401을 반환했다. 2026-10-29 소스에서 public daily-candles 인증 검사를 제거했으나, 소스 변경만으로 기존 운영 인스턴스 동작은 바뀌지 않는다. 새 무인증 동작은 이 변경의 운영 배포 후 확인해야 한다.
 - `scripts/sync-daily-cache-async.mjs --only-unrefreshed=true`는 미국 보통주 중 최신 일봉 요약의 `fetched_at`이 최근 30분보다 오래됐거나 요약이 없는 종목만 재조회한다. 미국 응답에서 특정 종목의 봉이 비어 있으면 그 종목은 실패로 세되 같은 API 배치의 정상 종목들은 계속 UPSERT한다. 국내 시장의 chart fallback·누락 실패 동작은 그대로 유지한다.
 - 2026-10-02 누락 복구 실행에서 401개 잔여 종목을 41 API 요청으로 조회해 358종목의 42,399봉을 추가 저장했다. 비어 있는 43종목은 미수신으로 남았다. 최근 실행 기준 DB 확인: AMS 238종목/28,060봉, NAS 3,177종목/374,225봉, NYS 1,885종목/224,331봉, 최신 거래일 2026-10-01. DB 갱신 검증 불일치 0.
 

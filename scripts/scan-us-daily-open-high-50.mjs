@@ -10,7 +10,6 @@ const args = new Map(process.argv.slice(2).filter((value) => value.startsWith("-
 }));
 
 const apiBase = process.env.DAILY_CACHE_API_URL;
-const apiKey = process.env.DAILY_CACHE_READ_API_KEY;
 const databaseUrl = process.env.LOCAL_DATABASE_URL || process.env.DATABASE_URL;
 const limit = Math.min(Math.max(Number(args.get("limit") || 70), 1), 300);
 const batchSize = Math.min(Math.max(Number(args.get("batch") || 100), 1), 100);
@@ -18,12 +17,11 @@ const concurrency = Math.min(Math.max(Number(args.get("concurrency") || 10), 1),
 const requestsPerSecond = 10;
 const maxMarketCapUsd = Number(args.get("max-market-cap") || 50_000_000);
 
-if (!apiBase || !apiKey || !databaseUrl) {
-  throw new Error("DAILY_CACHE_API_URL, DAILY_CACHE_READ_API_KEY, LOCAL_DATABASE_URL 또는 DATABASE_URL이 필요합니다.");
+if (!apiBase || !databaseUrl) {
+  throw new Error("DAILY_CACHE_API_URL, LOCAL_DATABASE_URL 또는 DATABASE_URL이 필요합니다.");
 }
 
 const pool = new Pool({ connectionString: databaseUrl });
-const headers = { authorization: `Bearer ${apiKey}` };
 const requestTimes = [];
 let rateQueue = Promise.resolve();
 
@@ -49,7 +47,7 @@ async function getJson(path, params) {
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
   for (let attempt = 1; attempt <= 4; attempt++) {
     await waitForRateSlot();
-    const response = await fetch(url, { headers });
+    const response = await fetch(url);
     const payload = await response.json().catch(() => null);
     if (response.ok && payload?.ok) return payload;
     if (attempt < 4 && (response.status === 429 || response.status >= 500)) {

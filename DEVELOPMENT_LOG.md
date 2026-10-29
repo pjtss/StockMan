@@ -7727,3 +7727,23 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 문서/migration, verify-scope, KIS 경계, bearer 인증, OCI cron 검사 통과.
 - standalone smoke: `/charts` HTTP 200, 데스크톱·모바일 Chrome hydration 성공, 주요 API 기대 상태 검증 성공.
 - 검증 후 기능 관련 4개 파일만 커밋·push해 OCI 배포 workflow를 실행한다.
+
+## [2026-10-29] 외부 종목·시장 읽기 API 무인증 공개
+
+### 목표 및 원인
+- 운영 서버의 종목·시장 데이터 읽기 API를 Web ChatGPT 등 외부 소비자가 인증 없이 조회할 수 있게 한다. 기존 세 캐시 API는 `DAILY_CACHE_READ_API_KEY`가 운영환경에 설정되면 401을 반환했고 OpenAPI도 Bearer를 요구했다.
+- KIS 자체 API 인증을 변경하지 않았다. KIS Developers는 앱키·앱시크릿과 OAuth 접근 토큰을 사용한다([공식 API 포털](https://apiportal.koreainvestment.com/)). 이번 변경은 이미 수집된 시장 데이터를 제공하는 StockMan 읽기 전용 API 경계에만 적용했다.
+
+### 반영
+- `/api/public/daily-candles`, `/api/public/instrument-fundamentals`, `/api/public/market-intelligence`의 요청자 키 검사를 제거했다. 일반 공개 OpenAPI의 35개 GET은 모두 인증 없이 호출하도록 `security: []`를 명시하고 Bearer security scheme을 제거했다.
+- `scripts/api-surface.mjs`에 미래의 공개 GET 인증 회귀 감지를 추가했다. 공개 후보 route에서 요청자 인증 검사가 발견되거나 GET에 service-bearer가 붙으면 생성과 audit이 실패한다. 쓰기·관리자·사용자 데이터·내부 진단·GET 부수효과 경로는 계속 외부 명세에서 제외한다.
+- 캔들 API를 소비하는 앱 클라이언트·동기화 스크립트·운영 절차서에서 읽기 키 의존을 제거하고, `AGENTS.md`, `public/api-reference.md`, `public/llms.txt`, API 설계 문서를 갱신했다. 다운로드 전달용 `stockman-readonly-api.env`에는 API 주소만 남겼다.
+
+### 검증 및 한계
+- `npm run audit:api-surface`, `npm run docs:check`, JavaScript syntax 검증 통과. OpenAPI 35개 GET 중 security 설정이 없는 항목 35개, security scheme 0개, 401 응답 선언 0개.
+- `npm run deploy:verify` 통과: dependency audit 0건, production build, standalone/runtime smoke, 290개 test files 중 289개 통과·1개 skip, 1,511개 테스트 통과·3개 skip, typecheck, docs/migration, KIS 경계, bearer auth, OCI cron 검사 통과.
+- 배포 전 운영 서버 무인증 `/api/public/daily-candles`는 HTTP 401 `UNAUTHORIZED`였고 운영 `/openapi.json`에는 기존 Bearer schemes가 있었다. push 후 workflow 완료와 운영 무인증 요청을 다시 확인한다.
+- 인증 없는 공개이므로 호출량 증가·남용은 운영 지표로 관찰해야 한다. 공통 IP rate limit은 이번 범위에서 추가하지 않았다.
+
+### Git 및 배포
+- 이 기록 시점 기준 커밋·푸시·배포는 아직 수행하지 않았다. 검증된 변경만 `oci` 브랜치에 반영해 OCI workflow로 배포한다.

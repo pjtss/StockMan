@@ -9,6 +9,7 @@ const openApiPath = join(root, "public", "openapi.json");
 const methodsPattern = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=/g;
 const excludedPath = /\/(?:admin|debug|cron|internal|local)(?:\/|$)/i;
 const userPath = /\/(?:auth|watchlist|user-activity|push)(?:\/|$)/i;
+const requestAuthenticationPattern = /(?:headers\.get\(["'](?:authorization|x-api-key|x-daily-cache-key|cookie)["']\)|cookies\s*\(\s*\)|getServerSession|requireAdminSession|isCronRequestAuthorized|DAILY_CACHE_READ_API_KEY|REQUEST_LOG_SECRET|verifyBbExportToken|(?:is)?authorized\s*\(|requireApiAuth\s*\(|requireAuth\s*\(|verifyApiKey\s*\(|validateApiKey\s*\()/i;
 
 async function routeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -188,24 +189,20 @@ async function makeOpenApi(allRoutes) {
     "/api/stock/us/top-rising-chart": "미국 상승률 상위 종목 조회",
   };
   for (const route of allRoutes) {
-    if (!route.methods.includes("GET") || !["public-read-candidate", "service-bearer"].includes(route.access)) continue;
+    if (!route.methods.includes("GET") || route.access !== "public-read-candidate") continue;
     const source = route.source;
     const summary = summaries[route.path] ?? titleFromPath(route.path);
     const pathItem = paths[route.path] ?? {};
-    const security = route.access !== "service-bearer" ? []
-      : route.path === "/api/public/daily-candles" ? [{ DailyCacheReadKey: [] }, { DailyCacheKeyHeader: [] }, {}]
-        : [{ DailyCacheReadKey: [] }, { DailyCacheKeyHeader: [] }];
     pathItem.get = {
       tags: [route.path.split("/")[2] ?? "general"],
       operationId: `get${route.path.replace(/^\/api\//, "").split(/[\/{}-]/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("")}`,
       summary,
-      description: `${route.path === "/api/automation-settings" ? "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. " : ""}읽기 전용 GET endpoint. ${route.access === "service-bearer" ? "DAILY_CACHE_READ_API_KEY 인증이 필요합니다(일봉 API는 서버 키 설정 시). " : ""}Query field와 검증 규칙은 ${source}의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.`,
+      description: `${route.path === "/api/automation-settings" ? "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. " : ""}인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 ${source}의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.`,
       parameters: queryParameters(await readFile(join(root, source), "utf8"), route.path),
-      security,
+      security: [],
       responses: {
         "200": { description: "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.", content: { "application/json": { schema: responseSchema(route.path) } } },
         "400": { description: "입력값 검증 실패(해당 endpoint에 한함)." },
-        "401": { description: "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)." },
         "429": { description: "요청 제한 초과(해당 endpoint에 한함)." },
         "500": { description: "서버 내부 오류." },
         "502": { description: "상위 데이터 제공자 오류(해당 endpoint에 한함)." },
@@ -229,30 +226,38 @@ async function makeOpenApi(allRoutes) {
     security: [],
     tags: [...new Set(Object.keys(paths).map((path) => path.split("/")[2] ?? "general"))].sort().map((name) => ({ name })),
     paths,
-    components: { securitySchemes: {
-      DailyCacheReadKey: { type: "http", scheme: "bearer", description: "DAILY_CACHE_READ_API_KEY 환경변수와 같은 값을 Authorization: Bearer로 전달합니다." },
-      DailyCacheKeyHeader: { type: "apiKey", in: "header", name: "x-daily-cache-key", description: "Authorization: Bearer 대신 사용할 수 있는 기존 호환 헤더." },
-    } },
     externalDocs: { description: "상세 호출 매뉴얼 및 전체 권한별 route 인벤토리", url: "/api-reference.md" },
   };
 }
 
 const routes = [];
+const routePolicyFailures = [];
 for (const file of await routeFiles(apiRoot)) {
   const source = await readFile(file, "utf8");
   const methods = [...source.matchAll(methodsPattern)].map((match) => match[1] ?? match[2]);
   if (!methods.length) continue;
   const path = routePath(file);
+  const access = accessFor(path, source, methods);
+  if (methods.includes("GET") && access === "public-read-candidate" && requestAuthenticationPattern.test(source)) {
+    routePolicyFailures.push(`Externally readable GET must not inspect caller authentication: ${path}`);
+  }
+  if (methods.includes("GET") && access === "service-bearer") {
+    routePolicyFailures.push(`Externally readable GET must not require bearer authentication: ${path}`);
+  }
   routes.push({
     path,
     methods: [...new Set(methods)].sort(),
-    access: accessFor(path, source, methods),
+    access,
     source: relative(root, file).split(sep).join("/"),
   });
 }
 routes.sort((a, b) => a.path.localeCompare(b.path, "en"));
 
 const mode = process.argv[2] ?? "check";
+if (routePolicyFailures.length) {
+  console.error(routePolicyFailures.join("\n"));
+  process.exit(1);
+}
 if (mode === "write") {
   await Promise.all([
     mkdir(join(root, "docs", "api"), { recursive: true }),
@@ -267,7 +272,7 @@ if (mode === "write") {
   process.exit(0);
 }
 
-const failures = [];
+const failures = [...routePolicyFailures];
 let inventory;
 let openApi;
 try {
@@ -294,10 +299,11 @@ for (const [path, pathItem] of Object.entries(openApi.paths ?? {})) {
     const upperMethod = method.toUpperCase();
     if (!route.methods.includes(upperMethod)) failures.push(`OpenAPI method ${upperMethod} is not implemented by ${path}`);
     if (upperMethod !== "GET") failures.push(`External OpenAPI only documents read-only GET operations: ${upperMethod} ${path}`);
-    if (route.access !== "public-read-candidate" && route.access !== "service-bearer") failures.push(`OpenAPI exposes a restricted route (${route.access}): ${upperMethod} ${path}`);
+    if (route.access !== "public-read-candidate") failures.push(`OpenAPI exposes a restricted route (${route.access}): ${upperMethod} ${path}`);
+    if (upperMethod === "GET" && Array.isArray(pathItem.security) && pathItem.security.length > 0) failures.push(`External read-only GET must not declare authentication: ${path}`);
   }
 }
-const expectedPublicPaths = routes.filter((route) => route.methods.includes("GET") && ["public-read-candidate", "service-bearer"].includes(route.access)).map((route) => route.path).sort();
+const expectedPublicPaths = routes.filter((route) => route.methods.includes("GET") && route.access === "public-read-candidate").map((route) => route.path).sort();
 const documentedPaths = Object.keys(openApi.paths ?? {}).sort();
 if (JSON.stringify(expectedPublicPaths) !== JSON.stringify(documentedPaths)) failures.push("OpenAPI public GET paths do not match the current route inventory; regenerate and review access classifications.");
 const expectedOpenApi = await makeOpenApi(routes);

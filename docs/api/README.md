@@ -15,9 +15,9 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
 외부 AI 공개 범위는 읽기 API로 제한한다. GET method는 무변경을 보증하지 않으므로 라우트 본문에서 확인된 snapshot write 및 KIS realtime ticket 발급 route를 `read-with-side-effect`로 따로 분류한다. URL query에 서명 토큰을 싣는 다운로드 경로는 `signed-link`로 분류해 외부 AI 명세에서 제외한다. 로그인·개인정보, 관리자, debug, cron, internal, webhook, 쓰기/작업 실행 route는 public OpenAPI에 넣지 않는다. 경로/메서드 전체는 운영·개발자가 발견할 수 있게 inventory에 유지한다.
 
-기존 서비스 키 보호 경계는 변경하지 않았다. `DAILY_CACHE_READ_API_KEY`가 설정된 운영은 현재 route 구현을 따른다. 프로젝트에 범용 외부 API key 발급·계정·quota 기능은 없다. 별도 key 배포 정책이 정해지기 전까지 문서된 공개 read GET과 기존 키 보호 endpoint만 사용한다.
+외부 공개 OpenAPI에 포함되는 모든 읽기 전용 GET은 무인증이어야 한다. 사용자·관리자 정보, 내부 진단, 쓰기·작업 실행 및 GET 부수효과가 있는 route는 공개 명세에서 제외한다. API surface 감사는 외부 GET의 Bearer 인증과 공개 후보 route의 요청자 인증 확인을 실패 처리한다.
 
-인벤토리의 `service-bearer`는 서버 Bearer key가 필요한 route다. 단, `/api/public/daily-candles`는 서버가 키를 설정한 운영에서만 이를 요구한다.
+인벤토리의 `service-bearer`는 내부·운영 전용 분류로만 남길 수 있으며 외부 읽기 전용 GET 명세에 포함할 수 없다.
 
 ## 생성·감사
 

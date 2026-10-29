@@ -56,7 +56,7 @@
         ],
         "operationId": "getAutomationSettings",
         "summary": "레거시 자동화 주기 설정(사용 중단)",
-        "description": "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/automation-settings/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. 인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/automation-settings/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -73,9 +73,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -102,7 +99,7 @@
         ],
         "operationId": "getDart",
         "summary": "현재 DART 피드 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -119,9 +116,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -147,7 +141,7 @@
         ],
         "operationId": "getDartContract",
         "summary": "DART 접수번호의 계약 상세 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/contract/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/contract/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "rceptNo",
@@ -181,9 +175,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -208,7 +199,7 @@
         ],
         "operationId": "getDartHistory",
         "summary": "회사 공시 이력 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/history/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/history/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "company",
@@ -254,9 +245,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -281,7 +269,7 @@
         ],
         "operationId": "getDartRanking",
         "summary": "DART 점수순 상위 공시 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/ranking/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/dart/ranking/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -311,9 +299,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -338,7 +323,7 @@
         ],
         "operationId": "getDisclosures",
         "summary": "RSS·공시 통합 피드 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/disclosures/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/disclosures/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "date",
@@ -516,9 +501,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -543,7 +525,7 @@
         ],
         "operationId": "getDomesticFinancialExport",
         "summary": "국내 보통주 재무 및 봉 데이터 내보내기",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/domestic-financial-export/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/domestic-financial-export/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "format",
@@ -575,9 +557,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -602,7 +581,7 @@
         ],
         "operationId": "getHealth",
         "summary": "공개 서비스 상태 확인",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/health/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/health/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -644,9 +623,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -671,7 +647,7 @@
         ],
         "operationId": "getKisIntradayMvp",
         "summary": "국내 장중 탐지 요약 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/kis/intraday-mvp/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/kis/intraday-mvp/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -688,9 +664,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -716,7 +689,7 @@
         ],
         "operationId": "getKisInvestorFlow",
         "summary": "국내 종목 수급 데이터 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/kis/investor-flow/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/kis/investor-flow/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "code",
@@ -767,9 +740,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -794,7 +764,7 @@
         ],
         "operationId": "getMarketNews",
         "summary": "미국 뉴스와 SEC filing 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/market-news/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/market-news/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "limit",
@@ -952,9 +922,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -979,7 +946,7 @@
         ],
         "operationId": "getPublicDailyCandles",
         "summary": "운영 저장 일·주·월봉 조회",
-        "description": "읽기 전용 GET endpoint. DAILY_CACHE_READ_API_KEY 인증이 필요합니다(일봉 API는 서버 키 설정 시). Query field와 검증 규칙은 app/api/public/daily-candles/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/daily-candles/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "code",
@@ -1044,15 +1011,7 @@
             }
           }
         ],
-        "security": [
-          {
-            "DailyCacheReadKey": []
-          },
-          {
-            "DailyCacheKeyHeader": []
-          },
-          {}
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
@@ -1206,9 +1165,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -1223,7 +1179,7 @@
           }
         },
         "x-code-path": "app/api/public/daily-candles/route.ts",
-        "x-access-classification": "service-bearer"
+        "x-access-classification": "public-read-candidate"
       }
     },
     "/api/public/instrument-fundamentals": {
@@ -1233,7 +1189,7 @@
         ],
         "operationId": "getPublicInstrumentFundamentals",
         "summary": "종목 기본정보 스냅샷 조회",
-        "description": "읽기 전용 GET endpoint. DAILY_CACHE_READ_API_KEY 인증이 필요합니다(일봉 API는 서버 키 설정 시). Query field와 검증 규칙은 app/api/public/instrument-fundamentals/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/instrument-fundamentals/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "codes",
@@ -1266,14 +1222,7 @@
             }
           }
         ],
-        "security": [
-          {
-            "DailyCacheReadKey": []
-          },
-          {
-            "DailyCacheKeyHeader": []
-          }
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
@@ -1336,9 +1285,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -1353,7 +1299,7 @@
           }
         },
         "x-code-path": "app/api/public/instrument-fundamentals/route.ts",
-        "x-access-classification": "service-bearer"
+        "x-access-classification": "public-read-candidate"
       }
     },
     "/api/public/market-intelligence": {
@@ -1363,7 +1309,7 @@
         ],
         "operationId": "getPublicMarketIntelligence",
         "summary": "티커 통합 시장·공시 정보 조회",
-        "description": "읽기 전용 GET endpoint. DAILY_CACHE_READ_API_KEY 인증이 필요합니다(일봉 API는 서버 키 설정 시). Query field와 검증 규칙은 app/api/public/market-intelligence/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/market-intelligence/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "from",
@@ -1409,14 +1355,7 @@
             "description": "UTC 기준 종료 날짜(미포함)."
           }
         ],
-        "security": [
-          {
-            "DailyCacheReadKey": []
-          },
-          {
-            "DailyCacheKeyHeader": []
-          }
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
@@ -1478,9 +1417,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -1495,7 +1431,7 @@
           }
         },
         "x-code-path": "app/api/public/market-intelligence/route.ts",
-        "x-access-classification": "service-bearer"
+        "x-access-classification": "public-read-candidate"
       }
     },
     "/api/public/us-smallcap-shares": {
@@ -1505,7 +1441,7 @@
         ],
         "operationId": "getPublicUsSmallcapShares",
         "summary": "미국 보통주 시총·발행주식 수 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/us-smallcap-shares/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/us-smallcap-shares/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "cursor",
@@ -1664,9 +1600,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -1691,7 +1624,7 @@
         ],
         "operationId": "getScanDaytrade",
         "summary": "일봉 기반 단타 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/daytrade/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/daytrade/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "limit",
@@ -1734,9 +1667,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -1761,7 +1691,7 @@
         ],
         "operationId": "getScanKrAccumulation",
         "summary": "국내 매집 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-accumulation/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-accumulation/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1778,9 +1708,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -1806,7 +1733,7 @@
         ],
         "operationId": "getScanKrBollingerReboundEma9RvolAvg",
         "summary": "국내 EMA9·RVOL 볼린저 반등 후보",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-bollinger-rebound-ema9-rvol-avg/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-bollinger-rebound-ema9-rvol-avg/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1823,9 +1750,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -1851,7 +1775,7 @@
         ],
         "operationId": "getScanKrBollingerReboundRvol",
         "summary": "국내 RVOL 볼린저 반등 후보",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-bollinger-rebound-rvol/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-bollinger-rebound-rvol/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1868,9 +1792,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -1896,7 +1817,7 @@
         ],
         "operationId": "getScanKrEma9Rvol",
         "summary": "국내 EMA9·RVOL 후보",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-ema9-rvol/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-ema9-rvol/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1913,9 +1834,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -1941,7 +1859,7 @@
         ],
         "operationId": "getScanKrEma9TouchRvol",
         "summary": "국내 EMA9 터치·RVOL 후보",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-ema9-touch-rvol/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/kr-ema9-touch-rvol/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -1958,9 +1876,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -1986,7 +1901,7 @@
         ],
         "operationId": "getScanUsAccumulation",
         "summary": "미국 매집 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/us-accumulation/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/us-accumulation/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2003,9 +1918,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -2031,7 +1943,7 @@
         ],
         "operationId": "getScanUsDailySidewaysObvAdl",
         "summary": "미국 횡보 OBV·ADL 후보",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/us-daily-sideways-obv-adl/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/scan/us-daily-sideways-obv-adl/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2048,9 +1960,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -2076,7 +1985,7 @@
         ],
         "operationId": "getStockChart",
         "summary": "종목 OHLCV 차트·지표 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/chart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/chart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "code",
@@ -2157,9 +2066,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2184,7 +2090,7 @@
         ],
         "operationId": "getStockKrTopRisingChart",
         "summary": "국내 상승률 상위 종목 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/kr/top-rising-chart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/kr/top-rising-chart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2201,9 +2107,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -2229,7 +2132,7 @@
         ],
         "operationId": "getStockLookup",
         "summary": "종목 코드의 회사명 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/lookup/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/lookup/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "codes",
@@ -2281,9 +2184,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2308,7 +2208,7 @@
         ],
         "operationId": "getStockNews",
         "summary": "티커 뉴스 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/news/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/news/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "ticker",
@@ -2337,9 +2237,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2364,7 +2261,7 @@
         ],
         "operationId": "getStockUsAmsScout",
         "summary": "미국 AMEX Scout 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/ams-scout/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/ams-scout/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2381,9 +2278,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -2409,7 +2303,7 @@
         ],
         "operationId": "getStockUsDmi",
         "summary": "미국 DMI 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/dmi/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/dmi/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2426,9 +2320,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -2454,7 +2345,7 @@
         ],
         "operationId": "getStockUsMacd",
         "summary": "미국 MACD 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/macd/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/macd/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2471,9 +2362,6 @@
           },
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
           },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
@@ -2499,7 +2387,7 @@
         ],
         "operationId": "getStockUsMfiOversold",
         "summary": "미국 MFI 과매도 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/mfi-oversold/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/mfi-oversold/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "period",
@@ -2538,9 +2426,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2565,7 +2450,7 @@
         ],
         "operationId": "getStockUsNews",
         "summary": "미국 티커 뉴스 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/news/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/news/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "exchange",
@@ -2622,9 +2507,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2649,7 +2531,7 @@
         ],
         "operationId": "getStockUsNewsRadar",
         "summary": "미국 뉴스 촉매 후보 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/news-radar/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/news-radar/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "date",
@@ -2685,9 +2567,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2712,7 +2591,7 @@
         ],
         "operationId": "getStockUsTopRising",
         "summary": "KIS 미국 상승률 순위 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/top-rising/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/top-rising/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
             "name": "excd",
@@ -2764,9 +2643,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2791,7 +2667,7 @@
         ],
         "operationId": "getStockUsTopRisingChart",
         "summary": "미국 상승률 상위 종목 조회",
-        "description": "읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/top-rising-chart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/stock/us/top-rising-chart/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [],
         "security": [],
         "responses": {
@@ -2809,9 +2685,6 @@
           "400": {
             "description": "입력값 검증 실패(해당 endpoint에 한함)."
           },
-          "401": {
-            "description": "인증 정보가 없거나 유효하지 않음(인증 설정이 필요한 endpoint에 한함)."
-          },
           "429": {
             "description": "요청 제한 초과(해당 endpoint에 한함)."
           },
@@ -2827,21 +2700,6 @@
         },
         "x-code-path": "app/api/stock/us/top-rising-chart/route.ts",
         "x-access-classification": "public-read-candidate"
-      }
-    }
-  },
-  "components": {
-    "securitySchemes": {
-      "DailyCacheReadKey": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "DAILY_CACHE_READ_API_KEY 환경변수와 같은 값을 Authorization: Bearer로 전달합니다."
-      },
-      "DailyCacheKeyHeader": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-daily-cache-key",
-        "description": "Authorization: Bearer 대신 사용할 수 있는 기존 호환 헤더."
       }
     }
   },
