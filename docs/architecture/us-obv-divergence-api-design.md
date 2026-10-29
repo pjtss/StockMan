@@ -1,8 +1,8 @@
 # 미국 보통주 OBV 강세 다이버전스 API
 
-> 상태: 로컬 구현 완료 · 회귀 테스트 및 API/문서 감사 통과 · 설계 버전: 1.1 · 갱신일: 2026-10-29
+> 상태: OCI 배포 완료 · 검증/운영 상태는 아래 변경 기록 참조 · 설계 버전: 1.2 · 갱신일: 2026-10-29
 >
-> Downloads의 README와 Python 엔진/refresh 스크립트를 프로젝트 기준에 맞춰 통합한다. `stockman-readonly-api.env`의 값은 저장하거나 출력하지 않는다. 실제 운영 DB migration 적용과 배포는 별도다.
+> Downloads의 README와 Python 엔진/refresh 스크립트를 프로젝트 기준에 맞춰 통합했다. `stockman-readonly-api.env`의 값은 저장하거나 출력하지 않는다. 운영 배포는 성공했으나 최초 cron snapshot과 migration 버전 직접 확인은 남아 있다.
 
 ## 목적
 
@@ -83,7 +83,8 @@ GET /api/scan/us-obv-divergence (무인증, 읽기만)
 - v4 알고리즘의 테스트 케이스는 첨부 Python 테스트 묶음에 언급됐지만 사용자 파일 목록에는 포함되지 않았다. 현재 TypeScript 회귀 테스트로 핵심 신호·경계값을 직접 검증하고 수식 차이가 없는지 검토해야 한다.
 - 1,500 최소 모집단과 70% coverage threshold는 실제 미국 유니버스·캔들 통계를 기준으로 조정할 과제다.
 - KIS 일봉의 split/dividend adjustment 보장은 이 작업으로 확인되지 않았다. 결과는 WATCH_ONLY를 유지한다.
-- 실제 OCI migration 결과, cron runtime, snapshot 가용성과 공개 GET의 최신성은 배포 후 확인한다. 로컬 DB는 audit 대상으로만 읽었고 실제 데이터베이스 변경은 하지 않았다. 배포하지 않은 상태를 운영 완료로 표시하지 않는다.
+- 2026-10-29 OCI 배포 run `40834281299` 성공. 운영 `GET /api/health`는 200 `status=ok`; 공개 OBV GET은 무인증 HTTP 503 `SNAPSHOT_NOT_READY`였다. 첫 미국장 cron 전의 상태라 snapshot 생성 및 최신성은 다음 장후에 확인한다. health 응답에 migration version이 없어 V162 적용 버전은 직접 확인하지 못했다.
+- 로컬 DB audit 외에 데이터베이스를 직접 변경하지 않았다. 배포 후 운영 조회는 read-only GET으로 제한했다.
 
 ## 공식 근거
 

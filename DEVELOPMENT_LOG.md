@@ -14,21 +14,24 @@
 - `npm.cmd run docs:api:generate`, `npm.cmd run audit:api-surface`: route inventory 171개, 외부 공개 GET 36개로 생성·감사 통과.
 - `npm.cmd run cron:check`, `npm.cmd run docs:check`: 통과.
 - `npm.cmd run deploy:verify`: dependency audit 0 vulnerabilities, production build/typecheck, 전체 1,519개 테스트, standalone HTTP·브라우저 smoke 통과. OBV 공개 GET query 검증 400 및 보호된 cron 무인증 401 smoke 포함.
-- Localhost Flyway read-only audit는 history latest V161, V162 스냅샷 미존재 및 오래된 기록 누락을 확인했다. OCI activate는 `outOfOrder` 없이 `*:ignored`를 사용하며 Flyway 문서상 해당 패턴은 Ignored 상태를 validate/repair에서 무시한다. 이전 버전 누락 migration을 수동 실행하거나 schema history를 변경하지 않았다. 배포 뒤 운영 Flyway version과 health를 확인한다.
-- 로컬/운영 DB 직접 변경은 없음. 실제 운영 상태와 migration 적용은 push 후 GitHub Actions/OCI 결과로 확인한다.
-- 배포 검증을 통과했으나 push 전이므로 release 작업은 아직 시작하지 않았다.
+- Localhost Flyway read-only audit는 history latest V161, V162 스냅샷 미존재 및 오래된 기록 누락을 확인했다. OCI activate는 `outOfOrder` 없이 `*:ignored`를 사용하며 Flyway 문서상 해당 패턴은 Ignored 상태를 validate/repair에서 무시한다. 이전 버전 누락 migration을 수동 실행하거나 schema history를 변경하지 않았다.
+- GitHub Actions run [40834281299](https://github.com/pjtss/StockMan/actions/runs/40834281299)은 commit `87a0f21ad8707315f4dd7861b7625062789333dd` 기준 Verify, Package, Upload, Activate 모두 성공했다.
+- 배포 후 운영 `GET /api/health`는 HTTP 200 `status=ok`를 반환했다. 공개 `GET /api/scan/us-obv-divergence`는 인증 없이 도달해 HTTP 503 `SNAPSHOT_NOT_READY`를 반환했다. 첫 미국장 cron이 실행되기 전이라 정상 스냅샷 가용성은 아직 미확인이다. health 응답은 migration version을 노출하지 않아 V162 적용 버전을 직접 확인하지 못했다.
+- 운영 DB 직접 변경은 없음. 운영 API 검증은 read-only GET만 수행했다.
 
 ### 다음 개선
-- [ ] 배포 성공 후 `/api/health`의 Flyway V162/schemaReady와 미국장 이후 OBV cron 실행·공개 GET 스냅샷 최신성을 운영에서 확인한다.
+- [ ] health 응답에 Flyway migration 버전이 없어 V162 직접 확인이 불가능하다. 미국장 이후 cron 실행과 공개 GET snapshot 가용성을 확인하고, 다음 개선에서 안전한 migration 상태 확인 경로를 검토한다.
 - [ ] 실제 운영 coverage와 주식분할·배당 보정 품질을 관측해 threshold 및 algorithm policy를 재평가한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-29-003
 - 성과 판정: PARTIAL
-- 근거: 최신 원격 기반 전체 배포 검증이 통과했다. CI push/OCI 배포와 운영 스냅샷 확인은 아직 대기 중이다.
+- 근거: commit `87a0f21ad8707315f4dd7861b7625062789333dd`의 검증 및 OCI 배포가 성공했고 운영 health가 정상이다. 첫 자동 갱신 전이라 snapshot 미준비 상태이며 V162 버전 직접 관측도 불가하다.
 
 ### 커밋·푸시·배포
-- 미실행.
+- 배포 완료: OCI 배포 run `40834281299` 및 운영 health 확인 성공.
+- Commit `87a0f21ad8707315f4dd7861b7625062789333dd`; push `origin/oci` 성공.
+- OCI 배포 run `40834281299` 성공. 후속 운영 확인은 read-only GET으로 수행.
 
 ## [2026-10-28] 주식 뉴스 API 요약 HTML 태그 노출 수정
 
