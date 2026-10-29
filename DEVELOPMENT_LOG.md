@@ -7747,3 +7747,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### Git 및 배포
 - 이 기록 시점 기준 커밋·푸시·배포는 아직 수행하지 않았다. 검증된 변경만 `oci` 브랜치에 반영해 OCI workflow로 배포한다.
+
+### 운영 배포 완료 (2026-10-29)
+- `fab3c2db`를 `origin/oci`에 push했다. GitHub Actions `Deploy OCI` run `40823443130`이 성공으로 완료되어 운영 릴리스가 활성화됐다.
+- 배포 후 운영 API에 Authorization/API-key 헤더 없이 GET 확인: `/api/public/daily-candles`, `/api/public/instrument-fundamentals`, `/api/public/market-intelligence` 모두 HTTP 200.
+- 운영 `/openapi.json`은 읽기 GET 35개, 인증이 선언된 operation 0개, security scheme 0개이며 세 캐시 API의 401 응답 선언도 없다.
