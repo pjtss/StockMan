@@ -44,7 +44,8 @@ jobs:
           set -euo pipefail
           release_dir=.next-deploy-verify/standalone
           test -f "$release_dir/server.js"
-          mkdir -p "$release_dir/public/_next/static" "$release_dir/.next/static" "$release_dir/scripts" "$release_dir/deploy/oci" "$release_dir/db/migration"
+          test -f "$release_dir/node_modules/pg/package.json"
+          mkdir -p "$release_dir/public/_next/static" "$release_dir/.next/static" "$release_dir/scripts" "$release_dir/deploy/oci" "$release_dir/db/migration" "$release_dir/data"
           # Next standalone does not include hashed client assets by itself.
           # Without this copy, HTML returns 200 while every app chunk returns 404.
           cp -r .next-deploy-verify/static/. "$release_dir/.next/static/"
@@ -56,6 +57,9 @@ jobs:
           cp scripts/oci-fundamentals-cron.sh "$release_dir/scripts/oci-fundamentals-cron.sh"
           cp scripts/oci-rss-cron.sh "$release_dir/scripts/oci-rss-cron.sh"
           cp scripts/register-discord-commands.mjs "$release_dir/scripts/register-discord-commands.mjs"
+          cp scripts/import-market-impact-events.mjs "$release_dir/scripts/import-market-impact-events.mjs"
+          cp scripts/local-env.mjs "$release_dir/scripts/local-env.mjs"
+          cp data/market-impact-events.json "$release_dir/data/market-impact-events.json"
           cp deploy/oci/nginx-stockman.conf "$release_dir/deploy/oci/nginx-stockman.conf"
           cp deploy/oci/stockman-cron.service "$release_dir/deploy/oci/stockman-cron.service"
           cp deploy/oci/stockman-cron.timer "$release_dir/deploy/oci/stockman-cron.timer"
@@ -70,6 +74,9 @@ jobs:
           tar -tzf stockman-oci.tar.gz | grep -Fx './build-info.json'
           test "$(tar -tzf stockman-oci.tar.gz | grep -c '/.next/static/chunks/.*\.js$')" -gt 0
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-cron.sh'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/import-market-impact-events.mjs'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/local-env.mjs'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './data/market-impact-events.json'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-fundamentals-cron.sh'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.service'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.timer'

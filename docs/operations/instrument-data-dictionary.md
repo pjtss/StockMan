@@ -224,6 +224,17 @@
 | `risk_as_of`, `source_updated_at` | 위험 기준일·원천 업데이트 시각 | `2026-10-23`, ISO timestamp |
 | `updated_at`, `updated_by` | 로컬 변경 시각·작성 주체 | ISO timestamp, `LOCAL_API` |
 
+### `market_impact_events`
+
+| 필드명 | 정보와 의미 | 예시값 |
+|---|---|---|
+| `event_id`, `event_date`, `market`, `ticker`, `company_name` | 안정 이벤트 ID·기준일·KR/US·공식 보통주 티커·회사명 | `DART:...`, `2026-10-29`, `KR`, `034730`, `SK` |
+| `event_type`, `status`, `direction`, `impact_horizon`, `confidence` | 사건 유형·사실/일정 상태·잠재 방향·영향 기간·근거 신뢰도 | `STRATEGIC_RESTRUCTURING`, `REPORTED`, `MIXED`, `LONG_TERM`, `HIGH` |
+| `title`, `summary`, `rationale` | 사실 요약과 잠재 영향 해석 | 문자열 |
+| `source_type`, `source_id`, `source_url`, `published_at` | 공시 출처·접수/accn 식별자·원문 URL·확인된 공시 시각 | `DART`, 접수번호, URL, ISO timestamp |
+| `evidence`, `risks`, `limitations`, `raw_event` | 원문 인용/위치·반대 근거·한계·JSON 원본 이벤트 | JSONB |
+| `updated_at` | 마지막 upsert 시각 | ISO timestamp |
+
 ## 5. 뉴스·공시 기사
 
 ### `market_rss_articles`

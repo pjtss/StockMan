@@ -47,6 +47,7 @@
 - 전체 전달 생명주기: [`development/delivery-lifecycle.md`](./development/delivery-lifecycle.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
 - RSS 번역 상태 공개 검수 API: [`operations/market-rss-translation-debug-api.md`](./operations/market-rss-translation-debug-api.md)
+- 공시 기반 일별 주가 영향 이벤트 JSON·DB·API: [`architecture/market-impact-events-design.md`](./architecture/market-impact-events-design.md)
 - 해외 뉴스 탭 10초 자동 갱신: [`operations/market-news-auto-refresh.md`](./operations/market-news-auto-refresh.md)
 - 지속 개선 운영 기준: [`operations/continuous-improvement.md`](./operations/continuous-improvement.md)
 - 지속 개선 검토 주기: [`operations/improvement-review.md`](./operations/improvement-review.md)

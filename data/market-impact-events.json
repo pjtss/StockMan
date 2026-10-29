@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "market-impact-events.v1",
+  "markets": {
+    "KR": [
+      {
+        "eventId": "DART:20261029000607:STRATEGIC_RESTRUCTURING",
+        "eventDate": "2026-10-29",
+        "ticker": "034730",
+        "companyName": "SK",
+        "eventType": "STRATEGIC_RESTRUCTURING",
+        "status": "REPORTED",
+        "direction": "MIXED",
+        "impactHorizon": "LONG_TERM",
+        "title": "SK, SK시그넷 완전자회사화 후 매각 추진을 위한 소규모 주식교환 결정",
+        "summary": "SK는 자회사 SK시그넷의 비핵심사업 지분 매각에 앞서 SK시그넷을 완전자회사로 편입하는 현금교부형 소규모 주식교환을 결정했다. 공시된 주식교환 예정일은 2027-01-05이며, SK시그넷 주주에게 주당 8,200원을 현금 교부하는 조건이다. 이후 매각 및 합병은 후속 계약·결의가 필요한 계획이다.",
+        "rationale": "비핵심사업 매각 및 그룹 자본배분 재편은 SK의 장기 포트폴리오에 영향을 줄 수 있다. 다만 발행사는 주식교환 자체가 양사의 재무구조에 직접 미치는 중요한 영향은 없다고 공시했고, 후속 매각·유상증자·합병의 조건과 일정은 확정되지 않아 잠재 방향을 MIXED로 기록한다.",
+        "confidence": "HIGH",
+        "sourceType": "DART",
+        "sourceId": "20261029000607",
+        "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261029000607",
+        "evidence": [
+          {
+            "quote": "비핵심사업으로 분류하였습니다.",
+            "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261029000607",
+            "locator": "6. 교환·이전 목적"
+          },
+          {
+            "quote": "재무구조에 직접적으로 미치는 중요한 영향 및 효과는 없습니다.",
+            "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261029000607",
+            "locator": "7. 교환·이전의 중요영향 및 효과 (2)"
+          },
+          {
+            "quote": "SK(주) : SK시그넷(주) = 1 : 0.0160430",
+            "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261029000607",
+            "locator": "3. 교환·이전 비율"
+          }
+        ],
+        "risks": [
+          "SK시그넷 지분 매각 계약은 2027년 1분기 체결 계획으로 공시됐으며, 구체적인 매각 조건·일정과 거래 종결은 확정되지 않았다.",
+          "SK시그넷의 250억원 제3자배정 우선주 유상증자는 향후 실시 예정으로 기재됐지만 발행조건·이사회 결의 시점·납입일정은 미확정이다.",
+          "후속 흡수합병은 검토 단계이며 조건·시기·방식이 미정이다."
+        ],
+        "limitations": [
+          "공시는 주식교환 자체의 직접 재무 영향이 없다고 밝혔다. 장기 주가 반응이나 후속 매각 가치·수익은 이 공시만으로 산정할 수 없다.",
+          "접수일은 2026-10-29로 확인했으나 공개 API에서 접수 시각은 확인되지 않아 시각을 기록하지 않았다."
+        ],
+        "keyDates": [
+          { "date": "2026-11-30", "status": "CONFIRMED_SCHEDULED", "description": "주주총회 예정일" },
+          { "date": "2027-01-05", "status": "CONFIRMED_SCHEDULED", "description": "주식교환 예정일" },
+          { "date": "2027-Q1", "status": "ESTIMATED", "description": "SK시그넷 지분 매각계약 체결 계획 시기; 거래 확정일 아님" }
+        ],
+        "eventDetails": {
+          "exchangeRatio": "SK:SK Signet = 1:0.0160430",
+          "cashConsiderationKrwPerTargetShare": 8200,
+          "targetOrdinarySharesAsOfFiling": 22780385,
+          "targetPreferredSharesAsOfFiling": 17396465,
+          "targetEquityAsOfLastFiscalYearKrw": 26900536152,
+          "issuerDirectFinancialImpactDisclosed": "NONE_MATERIAL"
+        }
+      }
+    ],
+    "US": []
+  }
+}

@@ -1103,6 +1103,14 @@
       "source": "app/api/public/instrument-fundamentals/route.ts"
     },
     {
+      "path": "/api/public/market-impact-events",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/market-impact-events/route.ts"
+    },
+    {
       "path": "/api/public/market-intelligence",
       "methods": [
         "GET"

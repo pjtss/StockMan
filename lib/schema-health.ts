@@ -30,6 +30,7 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "debug_run_items",
   "debug_kis_calls",
   "kis_rate_limit_events",
+  "market_impact_events",
   "user_watchlist",
 ] as const;
 

@@ -68,6 +68,11 @@ timeout --signal=TERM --kill-after=30s 600s docker run --rm --network host \
   -ignoreMigrationPatterns="*:ignored" \
   -connectRetries=3 \
   migrate
+if [ -f "$TEMP_PATH/data/market-impact-events.json" ]; then
+  stage="market-impact-events-import"
+  runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
+    node "$TEMP_PATH/scripts/import-market-impact-events.mjs" "$TEMP_PATH/data/market-impact-events.json"
+fi
 rm -f "$RELEASE"
 stage="activate-files"
 rm -rf "$DEPLOY_PATH.previous"

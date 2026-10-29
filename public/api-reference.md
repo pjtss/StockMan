@@ -108,6 +108,10 @@ market 필수: KR, US, KOSPI, KOSDAQ, NAS, NYS, AMS. code 단일 값 또는 code
 
 인증 없이 조회한다. 선택 query는 ticker, from, to, limit(기본 50, 최대 100). 날짜는 YYYY-MM-DD이며 from 포함·to 미포함. 성공 DTO는 {ok, query, asOf, instrument, fundamental, rssArticles, bullishArticles, secEvents}. asOf를 원천별 fetched_at, observed_at, published_at과 혼동하지 않는다. 오류: 400 INVALID_DATE, 503 MARKET_INTELLIGENCE_UNAVAILABLE.
 
+### 공시 기반 일별 주가 영향 이벤트 — GET /api/public/market-impact-events
+
+단일 관리 JSON의 `markets.KR`·`markets.US` 이벤트를 운영 DB에서 읽는다. 인증 없이 호출할 수 있으며 읽기 전용이다. Query: `date`(YYYY-MM-DD), `from`·`to`(포함 날짜 범위), `market`(KR/US), `ticker`, `limit`(기본 100, 최대 500). `date`는 `from`·`to`와 함께 사용할 수 없다. 응답 item에는 이벤트 방향·영향 기간·신뢰도, 공시 원문 근거, 위험 및 한계가 포함된다. 방향은 주가 예측이 아니다. 오류: 400 `INVALID_QUERY`, 503 `MARKET_IMPACT_EVENTS_UNAVAILABLE`.
+
 ### 미국 소형주 주식 수 — GET /api/public/us-smallcap-shares
 
 IP당 분당 30회, 프로세스 전체 분당 600회 고정 창 제한이 적용되며 운영 인스턴스별 메모리 제한이다. 기본 시총 상한 USD 100,000,000, limit 기본 100·최대 100. query: ticker, market, minMarketCapUsd, maxMarketCapUsd, minShares, maxSharesExclusive, sharesBasis(sec_latest|reviewed), cursor. ticker와 cursor는 함께 쓸 수 없다. reviewed는 1년 이내 VERIFIED 값만 사용하며 유효한 검토가 없으면 주식 수는 null이다. 반환 item은 market, ticker, companyName, marketCapUsd, priceUsd, fundamentalsFetchedAt, sharesOutstanding, facts, reviewedSharesOutstanding, secCompanyFacts를 가진다. SEC fact의 filing date/accession과 reviewed freshness를 종목별로 확인한다. 429면 Retry-After 준수.
@@ -137,7 +141,7 @@ KIS 공식 활성 `COMMON_STOCK` 마스터와 저장된 완료 일봉으로 사�
 
 - DART: /api/dart, /api/dart/ranking, /api/dart/history, /api/dart/contract
 - 공시·뉴스: /api/disclosures, /api/market-news, /api/stock/news, /api/stock/us/news, /api/stock/us/news-radar
-- 운영 캐시: /api/public/daily-candles, /api/public/instrument-fundamentals, /api/public/market-intelligence, /api/public/us-smallcap-shares
+- 운영 캐시: /api/public/daily-candles, /api/public/instrument-fundamentals, /api/public/market-intelligence, /api/public/market-impact-events, /api/public/us-smallcap-shares
 - KIS 수급: /api/kis/investor-flow, /api/kis/intraday-mvp
 - 국내 탐지: /api/scan/daytrade, /api/scan/kr-accumulation, /api/scan/kr-bollinger-rebound-ema9-rvol-avg, /api/scan/kr-bollinger-rebound-rvol, /api/scan/kr-ema9-rvol, /api/scan/kr-ema9-touch-rvol
 - 미국 탐지: /api/scan/us-accumulation, /api/scan/us-daily-sideways-obv-adl, /api/scan/us-obv-divergence, /api/stock/us/ams-scout, /api/stock/us/dmi, /api/stock/us/macd, /api/stock/us/mfi-oversold

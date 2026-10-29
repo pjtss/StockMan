@@ -8,6 +8,11 @@ describe("schema-health", () => {
     expect(getMissingSchemaTables([], OPERATIONAL_SCHEMA_TABLES)).toEqual(expect.arrayContaining(["debug_kis_calls", "kis_rate_limit_events"]));
   });
 
+  it("requires market impact event storage for operational readiness", () => {
+    expect(OPERATIONAL_SCHEMA_TABLES).toContain("market_impact_events");
+    expect(getMissingSchemaTables([], OPERATIONAL_SCHEMA_TABLES)).toContain("market_impact_events");
+  });
+
   it("reports missing core tables", () => {
     expect(getMissingSchemaTables(["automation_runs"])).toContain("market_rss_articles");
     expect(getMissingSchemaTables([...CORE_SCHEMA_TABLES])).toEqual([]);

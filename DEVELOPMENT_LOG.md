@@ -1,3 +1,27 @@
+# [2026-10-30] 공시 영향 이벤트 JSON·DB·공개 API 운영 배포
+
+### 목적 및 범위
+- 국내·미국 공시를 단일 JSON의 별도 배열로 보관하고, 원문 분석 이벤트를 운영 PostgreSQL과 공개 읽기 API에서 조회하게 한다.
+
+### 반영
+- `data/market-impact-events.json`: `markets.KR`/`markets.US`로 분리. DART 원문 확인과 공식 종목 마스터 검증을 마친 SK 이벤트 1건을 KR에 보관하고 US는 검증 이벤트가 없어 빈 배열로 둔다.
+- `db/migration/V163__market_impact_events.sql`, `app/api/public/market-impact-events/route.ts`: 이벤트 테이블과 날짜·시장·티커 필터 공개 GET을 추가한다.
+- `scripts/import-market-impact-events.mjs`: JSON 계약을 검증하고 시장별 활성 COMMON_STOCK 마스터 확인 뒤 eventId 기준 트랜잭션 upsert한다.
+- `lib/schema-health.ts` 및 회귀 테스트: `market_impact_events`를 필수 운영 테이블로 등록해 migration 누락을 readiness에서 감지한다.
+- `.github/workflows/deploy-oci.yml`, `deploy/oci/stockman-activate`: release에 JSON·importer·환경 로더를 포함한다. Flyway 성공 후 데이터 upsert까지 성공해야 release 전환을 진행한다.
+- OpenAPI, API 참조, route inventory, 데이터 사전, DB README 및 설계 문서를 갱신한다.
+
+### 검증 및 운영 결과
+- 운영 `/api/health` GET은 200/`status=ok`; 새 API 경로는 기존 운영 릴리스에서 404다.
+- 로컬 read-only importer dry-run은 이벤트 1건을 파싱하고 `034730` 활성 KR COMMON_STOCK 마스터를 확인했다. DB 쓰기는 없었다.
+- `node scripts/api-surface.mjs write`, `node scripts/api-surface.mjs check`, `node scripts/check-docs.mjs`, importer 문법 검증 통과.
+- 첫 `deploy:verify` 실행은 Windows standalone smoke의 요청 시간 제한으로 중단됐다. 수동 standalone에서 OpenAPI·문서·`/charts`·이벤트 API 400 응답을 확인했고, smoke 요청 한도를 60초로 늘린 재실행에서 전체 검증에 성공했다.
+- 최종 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm run deploy:verify` 통과: npm audit 취약점 0건, production build, standalone 및 OpenAPI 37개 공개 GET, API 가이드, `/charts`와 11개 JS chunk, Chrome 데스크톱/모바일 hydration, 새 endpoint 잘못된 query 400 smoke, 전체 Vitest 292 파일(1520 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 검사.
+- Git Bash `bash -n deploy/oci/stockman-activate` 통과. V163은 추가 전용 테이블/인덱스 migration이며 importer 성공 전에는 새 release를 활성화하지 않는다.
+
+### 커밋·푸시·배포
+- 코드 변경은 최신 원격 `oci` 기준의 별도 관리 worktree에서만 준비했다. 사전 검증은 통과했고, 이 기록 시점에는 push와 운영 배포를 실행 대기 중이다.
+
 ## [2026-10-29] 미국 보통주 OBV 다이버전스 공개 API 배포
 
 ### 목표

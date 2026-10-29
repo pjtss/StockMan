@@ -240,6 +240,7 @@ async function verifyRuntime() {
     if (!openApiResponse.ok) throw new Error(`Standalone OpenAPI smoke failed: HTTP ${openApiResponse.status}`);
     const openApi = await openApiResponse.json();
     if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]
+      || !openApi.paths?.["/api/public/market-impact-events"]?.get
       || !openApi.paths?.["/api/scan/us-obv-divergence"]?.get) {
       throw new Error("Standalone OpenAPI smoke failed: specification version or expected public paths are missing.");
     }
@@ -256,6 +257,7 @@ async function verifyRuntime() {
         await runChartsBrowserSmoke(`http://127.0.0.1:${port}`);
         await waitForJson(`http://127.0.0.1:${port}/api/kis/us-search?market=INVALID`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/scan/us-obv-divergence?page=0`, 30_000, 400);
+        await waitForJson(`http://127.0.0.1:${port}/api/public/market-impact-events?market=INVALID`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/cron/us-obv-divergence-snapshot`, 30_000, 401, { method: "POST" });
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);

@@ -1302,6 +1302,263 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/public/market-impact-events": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicMarketImpactEvents",
+        "summary": "공시 기반 일별 주가 영향 이벤트 조회",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/market-impact-events/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "단일 이벤트 날짜. from/to와 함께 사용할 수 없습니다."
+            },
+            "description": "단일 이벤트 날짜. from/to와 함께 사용할 수 없습니다."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "포함 시작일. to와 함께 사용합니다."
+            },
+            "description": "포함 시작일. to와 함께 사용합니다."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "market",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "KR",
+                "US"
+              ]
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9._-]{1,32}$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "포함 종료일. from과 함께 사용합니다."
+            },
+            "description": "포함 종료일. from과 함께 사용합니다."
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "schemaVersion",
+                    "query",
+                    "asOf",
+                    "items"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "schemaVersion": {
+                      "const": "market-impact-events.v1"
+                    },
+                    "query": {
+                      "type": "object"
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "eventId",
+                          "eventDate",
+                          "market",
+                          "ticker",
+                          "eventType",
+                          "status",
+                          "direction",
+                          "impactHorizon",
+                          "title",
+                          "sourceUrl"
+                        ],
+                        "properties": {
+                          "eventId": {
+                            "type": "string"
+                          },
+                          "eventDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "market": {
+                            "type": "string",
+                            "enum": [
+                              "KR",
+                              "US"
+                            ]
+                          },
+                          "ticker": {
+                            "type": "string"
+                          },
+                          "companyName": {
+                            "type": "string"
+                          },
+                          "eventType": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "REPORTED",
+                              "CONFIRMED_SCHEDULED",
+                              "ESTIMATED",
+                              "COMPLETED",
+                              "CANCELLED"
+                            ]
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "POSITIVE",
+                              "NEGATIVE",
+                              "MIXED",
+                              "UNCERTAIN"
+                            ]
+                          },
+                          "impactHorizon": {
+                            "type": "string",
+                            "enum": [
+                              "INTRADAY",
+                              "SHORT_TERM",
+                              "LONG_TERM",
+                              "UNKNOWN"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "rationale": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "string",
+                            "enum": [
+                              "HIGH",
+                              "MEDIUM",
+                              "LOW"
+                            ]
+                          },
+                          "sourceType": {
+                            "type": "string"
+                          },
+                          "sourceId": {
+                            "type": "string"
+                          },
+                          "sourceUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "publishedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "evidence": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": true
+                            }
+                          },
+                          "risks": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "limitations": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/market-impact-events/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/public/market-intelligence": {
       "get": {
         "tags": [
