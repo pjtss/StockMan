@@ -18,9 +18,12 @@
 - 첫 `deploy:verify` 실행은 Windows standalone smoke의 요청 시간 제한으로 중단됐다. 수동 standalone에서 OpenAPI·문서·`/charts`·이벤트 API 400 응답을 확인했고, smoke 요청 한도를 60초로 늘린 재실행에서 전체 검증에 성공했다.
 - 최종 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm run deploy:verify` 통과: npm audit 취약점 0건, production build, standalone 및 OpenAPI 37개 공개 GET, API 가이드, `/charts`와 11개 JS chunk, Chrome 데스크톱/모바일 hydration, 새 endpoint 잘못된 query 400 smoke, 전체 Vitest 292 파일(1520 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth, OCI cron 검사.
 - Git Bash `bash -n deploy/oci/stockman-activate` 통과. V163은 추가 전용 테이블/인덱스 migration이며 importer 성공 전에는 새 release를 활성화하지 않는다.
+- `e496be7c` push 후 GitHub Actions Deploy OCI run `40916565323` 성공. 운영 `/api/health`는 200/`ok`; 무인증 KR 이벤트 GET은 1건, US GET은 0건으로 응답해 V163 및 JSON 적재를 확인했다.
+- 실응답 검수에서 PostgreSQL DATE가 Node 직렬화로 `YYYY-MM-DDT00:00:00.000Z` timestamp가 된 계약 불일치를 발견했다. SQL `TO_CHAR`로 API 날짜 문자열을 보존하고 2개 회귀 테스트를 추가했다.
+- 날짜 수정 후 전체 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm run deploy:verify` 재통과: 전체 Vitest 293 파일(1522 passed·3 skipped), dependency audit 취약점 0건, production build, typecheck, standalone·Chrome desktop/mobile smoke, 새 endpoint OpenAPI/query smoke, 전체 docs/security/cron 검사.
 
 ### 커밋·푸시·배포
-- 코드 변경은 최신 원격 `oci` 기준의 별도 관리 worktree에서만 준비했다. 사전 검증은 통과했고, 이 기록 시점에는 push와 운영 배포를 실행 대기 중이다.
+- 구현은 최신 원격 `oci` 기반 별도 관리 worktree에서 진행했다. 기능 배포 `e496be7c` / run `40916565323`은 성공했다. 날짜 형식 수정 검증도 통과했으며 후속 push 및 운영 확인을 진행한다.
 
 ## [2026-10-29] 미국 보통주 OBV 다이버전스 공개 API 배포
 
