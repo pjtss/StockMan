@@ -25,6 +25,8 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
 미국 OBV 다이버전스 공개 `GET /api/scan/us-obv-divergence`는 사전 계산 DB 스냅샷만 읽는다. 계산·쓰기 작업은 `POST /api/cron/us-obv-divergence-snapshot`에서 cron secret으로 보호하고 외부 OpenAPI에는 GET만 노출한다. 응답·query 계약은 [`public/api-reference.md`](../../public/api-reference.md)의 OBV 항목과 API surface generator의 응답 schema를 함께 갱신한다.
 
+공시 영향 이벤트의 분석·JSON 작성 계약은 무인증 `GET /api/public/market-impact-events/guide`에서 구조화 JSON으로 제공한다. `data/market-impact-event-guide.json`을 해당 응답의 단일 원본으로 관리하고, `guideVersion`과 `schemaVersion`을 분리해 안내 콘텐츠 변경과 응답 구조 변경을 구분한다. 이벤트 조회 API와 guide API는 모두 무인증 읽기 전용이며, 저장은 관리 JSON 변경 후 기존 배포 importer 경로로 운영 DB에 upsert한다.
+
     npm run docs:api:generate
     npm run audit:api-surface
 

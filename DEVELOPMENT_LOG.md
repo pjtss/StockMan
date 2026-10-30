@@ -1,3 +1,34 @@
+## [2026-10-30] 공시 이벤트 작성 가이드 무인증 API 추가 및 운영 배포
+
+### 목표
+- ChatGPT 웹 등 소비자가 국내·미국 공시 분석 기준과 이벤트 JSON 계약을 API로 조회하고, 기존 이벤트 JSON/운영 DB 흐름에 맞는 변경안을 만들 수 있도록 버전형 가이드 GET을 제공한다.
+
+### 반영
+- `data/market-impact-event-guide.json`을 가이드 응답의 단일 원본으로 추가했다. 이벤트 스키마, 시장별 원문·종목 검증 기준, 상태·방향 enum, 분석 절차, 운영 반영 경로, Draft 2020-12 JSON Schema, ChatGPT 프롬프트를 포함한다.
+- `GET /api/public/market-impact-events/guide`를 무인증·읽기 전용 정적 route로 추가했다. `guideVersion`과 응답 `schemaVersion`을 분리해 이후 호환 가능한 안내 수정과 구조 변경을 구분한다. 가이드 endpoint는 파일/DB를 변경하지 않는다.
+- API surface generator, OpenAPI, route inventory, `/api-reference.md`, `/llms.txt`, API·이벤트 설계 문서 및 본 개선 로그를 갱신했다.
+- 관련 회귀 테스트를 추가해 국내·미국 분리, 가이드 버전 및 JSON Schema 응답을 확인한다.
+
+### 검증
+- `npm.cmd run docs:api:generate`: route 173개 및 공개 GET 38개 생성.
+- `npm.cmd run audit:api-surface`, `npm.cmd run docs:check`, `git diff --check`: 통과.
+- `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: npm audit 0 vulnerabilities, production build, standalone/OpenAPI 38개 공개 GET 및 기존 Chrome desktop/mobile smoke 통과. 신규 route는 build output에서 static route로 생성됐다.
+- 전체 Vitest: 295개 파일 중 294개 통과·1개 skip, 1,523개 통과·3개 skip. guide route 회귀 테스트에서 무인증 응답, 가이드·스키마 버전, KR/US 경로, JSON Schema 및 cache policy를 확인했다.
+- typecheck, docs:check(24 entry points·163 migrations), verify-scope, KIS boundary, Bearer auth(173 routes), OCI cron(21 shared endpoints), API surface(173 route files·38 public GET) 모두 통과.
+- `git diff --check`: 통과. 운영 배포·무인증 HTTP 조회는 배포 후 실행 예정이다.
+
+### 다음 개선
+- [ ] 배포 후 guide endpoint를 인증 헤더 없이 조회하고 응답의 guide/schema 버전, KR/US 경로, JSON Schema 및 프롬프트 필드를 확인한다.
+- [ ] 이벤트 계약 필드가 바뀔 때 가이드 JSON, importer, DB/API 응답 계약, 예시 데이터 및 API 문서를 함께 갱신하는 절차를 유지한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-30-002
+- 성과 판정: UNMEASURED
+- 근거: 코드·문서 반영과 정적 계약 감사는 통과했다. 전체 배포 검증과 운영 배포 후 API 확인은 아직 완료 전이다.
+
+### 커밋·푸시·배포
+- 진행 중: 전체 배포 검증은 통과했다. 커밋·푸시와 운영 배포 후 API 확인은 미완료.
+
 ## [2026-10-30] SEC 기반 미국 이벤트 일정 추가
 
 ### 목표

@@ -29,11 +29,13 @@ SEC/DART 등 공시를 Codex가 직접 분석해 주가에 영향을 줄 가능�
 3. Flyway `V163`으로 `market_impact_events` 테이블을 배포한다.
 4. OCI release archive는 관리 JSON과 importer를 포함한다. 활성화 스크립트가 migration 성공 후 `DATABASE_URL`로 importer를 실행해 국내·미국 배열을 각각 검증하고 ID 기준으로 upsert한다. 각 ticker는 시장별 공식 마스터의 활성 `COMMON_STOCK`이어야 하며 조회 실패/미분류는 fail-closed다. 검증 또는 적재가 실패하면 release 전환을 중단하고 기존 앱 release를 유지한다. 파일에서 빠진 과거 행은 삭제하지 않는다.
 5. `GET /api/public/market-impact-events`에서 운영 DB를 조회한다. 지원 query는 `date`, `from`, `to`, `market`, `ticker`, `limit`이며 읽기 전용·무인증이다.
+6. 분석 담당자나 ChatGPT 웹은 `GET /api/public/market-impact-events/guide`에서 버전이 있는 작성 지침, JSON Schema, 시장별 근거 정책, JSON 갱신 절차를 조회한다. 이 API는 정적 가이드만 반환하고 파일·DB를 쓰지 않는다. 실제 수정은 관리 JSON에 반영한 다음 저장소 배포 절차로 운영 DB에 upsert한다.
 
 ## 검증과 한계
 
 - Migration, JSON importer, route는 배포 전에 각각 검증한다. deploy workflow는 V163 적용 후 원본 JSON의 upsert 완료를 release 전환 조건으로 삼는다.
 - API surface 생성 후 OpenAPI와 route inventory를 동기화해야 한다.
+- 가이드 원본은 [`../../data/market-impact-event-guide.json`](../../data/market-impact-event-guide.json)이다. 이벤트 계약·enum 변경 시 importer, 이벤트 조회 API, guide의 `eventContract`·`jsonSchema`, API 매뉴얼과 함께 변경한다. 가이드 구조의 비호환 변경은 새 `schemaVersion`, 호환 가능한 지침 개정은 `guideVersion` 증가로 표시한다.
 - 단일 JSON 파일은 동시 편집 충돌이 가능하므로 갱신 때 최신 파일을 pull하고 eventId 중복을 확인한다.
 - 이벤트 발생 사실과 실제 주가 반응의 인과관계는 이 데이터 계약만으로 입증되지 않는다.
 
@@ -42,4 +44,6 @@ SEC/DART 등 공시를 Codex가 직접 분석해 주가에 영향을 줄 가능�
 - DART: [공시검색 개발가이드](https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001), [공시서류 원본 파일 개발가이드](https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019003)
 - SEC: [EDGAR developer resources and data APIs](https://www.sec.gov/about/developer-resources)
 - OpenAPI: [OpenAPI Specification 3.1.1](https://spec.openapis.org/oas/v3.1.1.html)
+- JSON Schema: [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12)
+- Next.js: [Next.js 15 Route Handlers](https://nextjs.org/docs/15/app/getting-started/route-handlers-and-middleware)
 - 내부 입력·분석: [`sec-ticker-disclosure-analysis-design.md`](./sec-ticker-disclosure-analysis-design.md), [`../operations/us-market-event-analysis-standard.md`](../operations/us-market-event-analysis-standard.md)

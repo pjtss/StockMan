@@ -4,10 +4,13 @@ StockMan is a stock-market monitoring and disclosure application. Its external A
 
 - Read the detailed API manual: /api-reference.md
 - Read the machine-readable OpenAPI 3.1.1 specification: /openapi.json
+- Read the Korean filing-event analysis and JSON update guide: /api/public/market-impact-events/guide
+- Read stored filing-impact events by date and market: /api/public/market-impact-events
 - API root: /api
 - Use only documented read-only GET operations. Every documented operation is available without authentication.
 - Do not call administrator, debug, cron, internal, user-session, webhook, or write/action routes.
 - Do not assume every GET is side-effect free; follow the access classification in OpenAPI.
 - Preserve x-request-id, HTTP status, response source, and data timestamps.
 - Treat empty arrays and null as truthful empty data; never fabricate missing market or filing data.
+- For filing-event analysis, fetch the guide endpoint first, inspect existing events, and return a proposed JSON change with official source evidence; the guide endpoint does not write files or the operating database.
 - Do not send credentials or authentication headers to documented read-only operations.

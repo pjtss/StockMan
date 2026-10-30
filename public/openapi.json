@@ -1559,6 +1559,138 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/public/market-impact-events/guide": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicMarketImpactEventsGuide",
+        "summary": "공시 영향 이벤트 분석·JSON 갱신 가이드 조회",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/market-impact-events/guide/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "guideVersion",
+                    "schemaVersion",
+                    "updatedAt",
+                    "locale",
+                    "sourceOfTruth",
+                    "compatibility",
+                    "marketSeparation",
+                    "eventContract",
+                    "analysisWorkflow",
+                    "jsonSchema",
+                    "chatgptPromptTemplate"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "guideVersion": {
+                      "type": "string",
+                      "description": "안내 콘텐츠 semver."
+                    },
+                    "schemaVersion": {
+                      "const": "market-impact-event-guide.v1"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "locale": {
+                      "const": "ko-KR"
+                    },
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "sourceOfTruth": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "compatibility": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "marketSeparation": {
+                      "type": "object",
+                      "required": [
+                        "KR",
+                        "US"
+                      ],
+                      "properties": {
+                        "KR": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "US": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    },
+                    "eventContract": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "analysisWorkflow": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "instruction"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "instruction": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "jsonSchema": {
+                      "type": "object",
+                      "description": "market-impact-events.v1 JSON Schema (Draft 2020-12).",
+                      "additionalProperties": true
+                    },
+                    "chatgptPromptTemplate": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/market-impact-events/guide/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/public/market-intelligence": {
       "get": {
         "tags": [
