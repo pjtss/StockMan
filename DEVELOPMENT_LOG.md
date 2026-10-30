@@ -30,7 +30,7 @@
 - 근거: 전체 검증, Deploy OCI run `41019153797`, 운영 health와 무인증 guide/event GET을 확인했다. guide 응답은 두 시장 분리 경로와 JSON Schema·프롬프트를 제공하고 OpenAPI에서 인증 없이 발견된다.
 
 ### 커밋·푸시·배포
-- 완료: 구현 커밋 `a2d4a8f5`를 `origin/oci`에 push했다. Deploy OCI run `41019153797` 성공 및 운영 health·guide/event 무인증 GET 확인을 마쳤다. 이 운영 결과를 기록한 후속 커밋은 현재 반영 중이다.
+- 완료: 구현 커밋 `a2d4a8f5`를 `origin/oci`에 push했고 Deploy OCI run `41019153797` 성공과 운영 health·guide/event 무인증 GET을 확인했다. 운영 확인 결과를 기록한 후속 커밋 `8d5e9a27`도 push했으며 동일 코드의 Deploy OCI run `41020731267`이 성공했다.
 
 ## [2026-10-30] SEC 기반 미국 이벤트 일정 추가
 
