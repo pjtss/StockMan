@@ -1,0 +1,1991 @@
+{
+  "schemaVersion": "stockman-document-catalog.v1",
+  "entrypoint": "/llms.txt",
+  "searchEndpoint": "/api/public/document-catalog",
+  "apiManual": "/api/public/api-manual",
+  "fullCatalog": "/document-catalog.json",
+  "documentationIndex": "/manuals/README.md",
+  "usage": {
+    "strategy": "Read this small catalog first. Select documents by task, then fetch only their URLs. Do not load every document by default.",
+    "documentQuery": "GET /api/public/document-catalog?q=keyword&category=operations&limit=10",
+    "apiQuery": "GET /api/public/api-manual?q=keyword&category=screeners&limit=10",
+    "responseFields": [
+      "id",
+      "title",
+      "category",
+      "format",
+      "description",
+      "url",
+      "related",
+      "relatedPaths",
+      "sourcePath"
+    ],
+    "pagination": "Use cursor from the previous response to fetch the next page. Search q and category are preserved in the cursor scope."
+  },
+  "categories": [
+    {
+      "id": "architecture",
+      "title": "아키텍처·기능 설계",
+      "description": "시스템 구조, 모듈 책임과 기능별 설계"
+    },
+    {
+      "id": "development",
+      "title": "개발 규칙",
+      "description": "구현·테스트·마이그레이션 및 전달 기준"
+    },
+    {
+      "id": "operations",
+      "title": "운영·장애 대응",
+      "description": "배포·스케줄·데이터 갱신·분석 runbook"
+    },
+    {
+      "id": "api",
+      "title": "API 문서",
+      "description": "API 호출 계약과 외부 공식 문서"
+    },
+    {
+      "id": "reference",
+      "title": "공식 자료·참고",
+      "description": "KIS, SEC, DART 등 원문 및 출처 기록"
+    },
+    {
+      "id": "company-analysis",
+      "title": "기업 분석",
+      "description": "기업별 분석과 티커·사건 인덱스"
+    },
+    {
+      "id": "project-guide",
+      "title": "프로젝트 안내·현황",
+      "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
+    }
+  ],
+  "documentCount": 122,
+  "documents": [
+    {
+      "id": "api-kis-us-condition-search",
+      "title": "KIS 해외주식 조건검색 API",
+      "category": "api",
+      "format": "md",
+      "description": "KIS 조건검색은 거래소별 최대 100건이며 다음 페이지 조회를 지원하지 않는다. 조건검색 특성상 해당 거래일에 거래량이나 시세가 형성되지 않은 종목은 결과에 나오지 않을 수 있다. KIS 응답의 output1은 조회 건수 요약이고 output2만 종목 행이다. output2가 객체 배열이 아니거나 객체가 아닌 원소가 섞이면 잘못된 응답 구조로 처리한다.",
+      "url": "/manuals/api/KIS_US_CONDITION_SEARCH.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/api/KIS_US_CONDITION_SEARCH.md",
+      "related": []
+    },
+    {
+      "id": "api-readme",
+      "title": "외부 API 문서 구조와 유지 기준",
+      "category": "api",
+      "format": "md",
+      "description": "Next.js public/ 파일은 동일 경로에서 정적으로 제공한다. OpenAPI servers는 / 상대 경로를 쓰므로 로컬·스테이징·운영 도메인에 주소를 하드코딩하지 않는다. 실제 프로젝트 계약은 각 operation의 x-code-path와 현재 app/api//route.ts 구현이다.",
+      "url": "/manuals/api/README.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/api/README.md",
+      "related": []
+    },
+    {
+      "id": "architecture-code-structure",
+      "title": "코드 구조",
+      "category": "architecture",
+      "format": "md",
+      "description": "app/                 Next.js App Router 화면·HTTP 라우트",
+      "url": "/manuals/architecture/code-structure.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/code-structure.md",
+      "related": []
+    },
+    {
+      "id": "architecture-current-system-reference",
+      "title": "StockMan 현재 시스템 기준서",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 현재 구현 기준 (2026-09-19)",
+      "url": "/manuals/architecture/current-system-reference.md",
+      "relatedPaths": [
+        "docs/architecture/system-module-catalog.md",
+        "docs/architecture/project-architecture.md",
+        "docs/architecture/code-structure.md",
+        "docs/architecture/documentation-and-srp.md",
+        "docs/architecture/database-schema.md",
+        "docs/KIS_REQUEST_FRAMEWORK.md",
+        "docs/operations/runbook.md",
+        "docs/ERROR_HANDLING.md"
+      ],
+      "sourcePath": "docs/architecture/current-system-reference.md",
+      "related": [
+        {
+          "title": "StockMan 시스템 모듈 카탈로그",
+          "url": "/manuals/architecture/system-module-catalog.md",
+          "sourcePath": "docs/architecture/system-module-catalog.md"
+        },
+        {
+          "title": "StockMan 프로젝트 구조 및 운영 기준",
+          "url": "/manuals/architecture/project-architecture.md",
+          "sourcePath": "docs/architecture/project-architecture.md"
+        },
+        {
+          "title": "코드 구조",
+          "url": "/manuals/architecture/code-structure.md",
+          "sourcePath": "docs/architecture/code-structure.md"
+        },
+        {
+          "title": "문서 관리·SRP 검증 기준",
+          "url": "/manuals/architecture/documentation-and-srp.md",
+          "sourcePath": "docs/architecture/documentation-and-srp.md"
+        },
+        {
+          "title": "데이터베이스 구조",
+          "url": "/manuals/architecture/database-schema.md",
+          "sourcePath": "docs/architecture/database-schema.md"
+        },
+        {
+          "title": "KIS Open API 요청 프레임워크",
+          "url": "/manuals/KIS_REQUEST_FRAMEWORK.md",
+          "sourcePath": "docs/KIS_REQUEST_FRAMEWORK.md"
+        },
+        {
+          "title": "운영 런북",
+          "url": "/manuals/operations/runbook.md",
+          "sourcePath": "docs/operations/runbook.md"
+        },
+        {
+          "title": "오류 상황 및 해결 방법",
+          "url": "/manuals/ERROR_HANDLING.md",
+          "sourcePath": "docs/ERROR_HANDLING.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-daily-disclosure-feed-design",
+      "title": "일별 공시·RSS 통합 조회 설계안",
+      "category": "architecture",
+      "format": "md",
+      "description": "사용자가 지정한 기준일의 공시·RSS를 발행/접수 시각 내림차순으로 확인한다.",
+      "url": "/manuals/architecture/daily-disclosure-feed-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/daily-disclosure-feed-design.md",
+      "related": []
+    },
+    {
+      "id": "architecture-database-schema",
+      "title": "데이터베이스 구조",
+      "category": "architecture",
+      "format": "md",
+      "description": "이 문서는 현재 코드의 $1와 db/migration/을 기준으로 관리한다. 실제 DB 변경은 기존 마이그레이션을 수정하지 않고 새 Flyway 마이그레이션으로 추가한다.",
+      "url": "/manuals/architecture/database-schema.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/database-schema.md",
+      "related": []
+    },
+    {
+      "id": "architecture-design-management",
+      "title": "설계 문서 관리 기준",
+      "category": "architecture",
+      "format": "md",
+      "description": "기능 제안이 늘어날 때 설계의 현재 상태, 결정 근거, 미확인 전제, 후속 개선을 잃지 않도록 공통 생명주기와 문서 책임을 정의한다. 새 기능의 요구사항과 상태를 알리는 기준점은 기능별 설계서이며, 이 문서는 설계 문서의 작성·갱신 방법만 관리한다.",
+      "url": "/manuals/architecture/design-management.md",
+      "relatedPaths": [
+        "docs/architecture/us-obv-divergence-api-design.md",
+        "docs/README.md"
+      ],
+      "sourcePath": "docs/architecture/design-management.md",
+      "related": [
+        {
+          "title": "미국 보통주 OBV 강세 다이버전스 API",
+          "url": "/manuals/architecture/us-obv-divergence-api-design.md",
+          "sourcePath": "docs/architecture/us-obv-divergence-api-design.md"
+        },
+        {
+          "title": "StockMan 문서 인덱스",
+          "url": "/manuals/README.md",
+          "sourcePath": "docs/README.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-documentation-and-srp",
+      "title": "문서 관리·SRP 검증 기준",
+      "category": "architecture",
+      "format": "md",
+      "description": "이 문서는 프로젝트 문서가 어디에 있어야 하는지와 코드의 단일 책임 경계가 실제로 지켜지는지 검증하는 기준이다. 설계 문서만 존재하는 상태를 구현 완료로 간주하지 않으며, 코드·테스트·운영 절차가 함께 확인되어야 한다.",
+      "url": "/manuals/architecture/documentation-and-srp.md",
+      "relatedPaths": [
+        "docs/architecture/current-system-reference.md",
+        "docs/architecture/system-module-catalog.md"
+      ],
+      "sourcePath": "docs/architecture/documentation-and-srp.md",
+      "related": [
+        {
+          "title": "StockMan 현재 시스템 기준서",
+          "url": "/manuals/architecture/current-system-reference.md",
+          "sourcePath": "docs/architecture/current-system-reference.md"
+        },
+        {
+          "title": "StockMan 시스템 모듈 카탈로그",
+          "url": "/manuals/architecture/system-module-catalog.md",
+          "sourcePath": "docs/architecture/system-module-catalog.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-external-request-boundaries",
+      "title": "외부 요청 경계",
+      "category": "architecture",
+      "format": "md",
+      "description": "외부 API 호출이 기능 모듈마다 흩어져 rate limit, timeout, 응답 파싱, 관측 로직이 누락되는 것을 방지한다.",
+      "url": "/manuals/architecture/external-request-boundaries.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/external-request-boundaries.md",
+      "related": []
+    },
+    {
+      "id": "architecture-feature-inventory",
+      "title": "기능 인벤토리 및 제품 평가",
+      "category": "architecture",
+      "format": "md",
+      "description": "StockMan은 이미 수집·캐시·탐지·알림·관리자 디버깅까지 갖춘 운영형 시스템이다. 현재 병목은 지표 부족이 아니라 데이터 최신성, 공통 필터 일관성, 중복 알림, 실패 원인 가시성이다. 따라서 신규 지표보다 아래 운영 기준을 우선한다.",
+      "url": "/manuals/architecture/feature-inventory.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/feature-inventory.md",
+      "related": []
+    },
+    {
+      "id": "architecture-instrument-universe-sync",
+      "title": "국내·해외 전체 종목 통합 유니버스 동기화 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 운영 기준 · 국내·해외 유니버스 분리 운영",
+      "url": "/manuals/architecture/instrument-universe-sync.md",
+      "relatedPaths": [
+        "docs/references/README.md"
+      ],
+      "sourcePath": "docs/architecture/instrument-universe-sync.md",
+      "related": [
+        {
+          "title": "공식 API 참조 문서",
+          "url": "/manuals/references/README.md",
+          "sourcePath": "docs/references/README.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-ip-geolocation",
+      "title": "IP 기반 지역 추론 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "요청 로그의 IP에서 국가·지역·도시·시간대·ASN을 대략 추정해 관리자 화면에서 확인한다. IP 위치는 실제 주소나 사용자의 정확한 위치가 아니며, 조회 실패 시 unknown으로 저장한다.",
+      "url": "/manuals/architecture/ip-geolocation.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/ip-geolocation.md",
+      "related": []
+    },
+    {
+      "id": "architecture-listed-shares-source-policy",
+      "title": "종목 상장주수 출처 정책",
+      "category": "architecture",
+      "format": "md",
+      "description": "앱에서 종목의 발행주수·상장주수 값이 필요하면 KIS 상세시세만 사용한다. 여러 출처의 값은 합산·대체·fallback하지 않는다.",
+      "url": "/manuals/architecture/listed-shares-source-policy.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/listed-shares-source-policy.md",
+      "related": []
+    },
+    {
+      "id": "architecture-local-us-rss-llm-alert-design",
+      "title": "로컬 Codex 기반 미국 RSS·공시 급등주 분석 구조",
+      "category": "architecture",
+      "format": "md",
+      "description": "flowchart LR",
+      "url": "/manuals/architecture/local-us-rss-llm-alert-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/local-us-rss-llm-alert-design.md",
+      "related": []
+    },
+    {
+      "id": "architecture-market-event-calendar-design",
+      "title": "미국 급등주 사전 이벤트 캘린더 구조",
+      "category": "architecture",
+      "format": "md",
+      "description": "FDA·실적·SEC·기업행사·희석·거래소 이벤트를 동일한 일정 계약으로 저장하고, 예정일 전에 확인한 뒤 실제 발표와 가격·거래량 반응을 Codex 분석에 연결한다.",
+      "url": "/manuals/architecture/market-event-calendar-design.md",
+      "relatedPaths": [
+        "docs/operations/fda-approval-calendar.md"
+      ],
+      "sourcePath": "docs/architecture/market-event-calendar-design.md",
+      "related": [
+        {
+          "title": "FDA 승인 일정 운영 문서",
+          "url": "/manuals/operations/fda-approval-calendar.md",
+          "sourcePath": "docs/operations/fda-approval-calendar.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-market-impact-events-design",
+      "title": "공시 기반 일별 주가 영향 이벤트",
+      "category": "architecture",
+      "format": "md",
+      "description": "SEC/DART 등 공시를 Codex가 직접 분석해 주가에 영향을 줄 가능성이 있는 사건을 날짜별 이벤트로 기록한다. 주가 방향이나 수익을 보장하지 않으며, 공시 원문으로 확인되는 사실과 Codex의 영향 해석을 분리한다.",
+      "url": "/manuals/architecture/market-impact-events-design.md",
+      "relatedPaths": [
+        "docs/architecture/sec-ticker-disclosure-analysis-design.md",
+        "docs/operations/us-market-event-analysis-standard.md"
+      ],
+      "sourcePath": "docs/architecture/market-impact-events-design.md",
+      "related": [
+        {
+          "title": "SEC Ticker 공시 수집·Codex 분석 설계",
+          "url": "/manuals/architecture/sec-ticker-disclosure-analysis-design.md",
+          "sourcePath": "docs/architecture/sec-ticker-disclosure-analysis-design.md"
+        },
+        {
+          "title": "미국장 이벤트 분석 표준",
+          "url": "/manuals/operations/us-market-event-analysis-standard.md",
+          "sourcePath": "docs/operations/us-market-event-analysis-standard.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-periodic-candle-cache",
+      "title": "국내·해외 일·주·월봉 캐시 운영 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 구현 완료·운영 중  ",
+      "url": "/manuals/architecture/periodic-candle-cache.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/periodic-candle-cache.md",
+      "related": []
+    },
+    {
+      "id": "architecture-project-architecture",
+      "title": "StockMan 프로젝트 구조 및 운영 기준",
+      "category": "architecture",
+      "format": "md",
+      "description": "국내·해외 주식의 실제 시장 데이터를 수집하고, 공통 적격성 필터와 기술적·수급·공시 신호를 결합해 관찰 후보를 Discord로 전달한다.",
+      "url": "/manuals/architecture/project-architecture.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/project-architecture.md",
+      "related": []
+    },
+    {
+      "id": "architecture-remote-daily-cache-async-sync",
+      "title": "운영 일봉 API 조회·로컬 DB 저장 분리 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "운영 서버의 일봉 batch API 조회와 로컬 PostgreSQL 저장을 한 루프에서 순차 처리하지 않는다. API 응답을 제한된 큐에 넣고, 별도 저장 워커가 비동기로 upsert한다.",
+      "url": "/manuals/architecture/remote-daily-cache-async-sync.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/remote-daily-cache-async-sync.md",
+      "related": []
+    },
+    {
+      "id": "architecture-sec-ticker-disclosure-analysis-design",
+      "title": "SEC Ticker 공시 수집·Codex 분석 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "사용자가 지정한 여러 TICKER의 SEC EDGAR 공시를 수집하고, 실제 FORM 본문을 Codex가 직접 분석한다. 수집기는 투자 판단을 하지 않으며, 분석기는 SEC 네트워크 수집을 수행하지 않는다.",
+      "url": "/manuals/architecture/sec-ticker-disclosure-analysis-design.md",
+      "relatedPaths": [
+        "docs/operations/sec-filing-detail-summary-standard.md"
+      ],
+      "sourcePath": "docs/architecture/sec-ticker-disclosure-analysis-design.md",
+      "related": [
+        {
+          "title": "SEC 공시 상세 요약 표준",
+          "url": "/manuals/operations/sec-filing-detail-summary-standard.md",
+          "sourcePath": "docs/operations/sec-filing-detail-summary-standard.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-stocktitan-translation",
+      "title": "RSS Discord 알림 제목 번역",
+      "category": "architecture",
+      "format": "md",
+      "description": "GlobeNewswire, StockTitan, SEC EDGAR 기사 알림은 title만 한국어로 번역한다. summary, content, rawPayload는 번역 provider에 보내지 않고 원문 그대로 보존한다. 제목 번역이 검증되기 전에는 원문 알림을 보내지 않는다. 이미 한국어인 제목은 번역 불필요 상태로 확인한 뒤 전송한다.",
+      "url": "/manuals/architecture/stocktitan-translation.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/stocktitan-translation.md",
+      "related": []
+    },
+    {
+      "id": "architecture-system-module-catalog",
+      "title": "StockMan 시스템 모듈 카탈로그",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 현재 구현 기준 (2026-09-19)",
+      "url": "/manuals/architecture/system-module-catalog.md",
+      "relatedPaths": [
+        "docs/architecture/current-system-reference.md"
+      ],
+      "sourcePath": "docs/architecture/system-module-catalog.md",
+      "related": [
+        {
+          "title": "StockMan 현재 시스템 기준서",
+          "url": "/manuals/architecture/current-system-reference.md",
+          "sourcePath": "docs/architecture/current-system-reference.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-technical-entry-analysis",
+      "title": "기술적 상승 진입 후보 분석 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 운영 기준 정리 및 단계적 적용",
+      "url": "/manuals/architecture/technical-entry-analysis.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/technical-entry-analysis.md",
+      "related": []
+    },
+    {
+      "id": "architecture-unified-disclosure-rss-ingestion-design",
+      "title": "국내 공시·RSS 통합 수집 및 분석용 JSON 설계안",
+      "category": "architecture",
+      "format": "md",
+      "description": "각 출처의 원본 응답을 보존하면서, 동일한 표준 스키마로 정규화하여 PostgreSQL에 저장한다.",
+      "url": "/manuals/architecture/unified-disclosure-rss-ingestion-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/unified-disclosure-rss-ingestion-design.md",
+      "related": []
+    },
+    {
+      "id": "architecture-us-industry-classification-data-design",
+      "title": "미국 보통주 산업분류 코드 KIS 전용 수집·저장 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 2026-10-25 전체 KIS 후보 동기화 및 운영 read-after-write 전수 검증 완료; KIS 원본 000의 공식 미분류 한계는 잔존",
+      "url": "/manuals/architecture/us-industry-classification-data-design.md",
+      "relatedPaths": [
+        "docs/references/kis-instrument-masters/header-definitions.md"
+      ],
+      "sourcePath": "docs/architecture/us-industry-classification-data-design.md",
+      "related": [
+        {
+          "title": "KIS 종목 마스터 헤더 정의",
+          "url": "/manuals/references/kis-instrument-masters/header-definitions.md",
+          "sourcePath": "docs/references/kis-instrument-masters/header-definitions.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-us-market-rss-user-api-design",
+      "title": "미국 RSS 사용자 조회 API 설계안",
+      "category": "architecture",
+      "format": "md",
+      "description": "1. 사용자 RSS 조회는 위에 명시한 미국 5개 출처만 허용한다. 출처 미지정은 미국 출처 전체로 처리한다.",
+      "url": "/manuals/architecture/us-market-rss-user-api-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/us-market-rss-user-api-design.md",
+      "related": []
+    },
+    {
+      "id": "architecture-us-obv-divergence-api-design",
+      "title": "미국 보통주 OBV 강세 다이버전스 API",
+      "category": "architecture",
+      "format": "md",
+      "description": "미국 활성 보통주 중 최신 USD fundamentals 시가총액이 양수·1억 달러 이하인 종목의 완료 일봉으로 v4 OBV 강세 다이버전스를 계산한다. 공개 GET은 사전 계산 결과만 제공하고, webhook 요청은 별도 보호 API에서 read-only 즉석 계산을 수행한다.",
+      "url": "/manuals/architecture/us-obv-divergence-api-design.md",
+      "relatedPaths": [
+        "docs/architecture/instrument-universe-sync.md",
+        "docs/api/README.md",
+        "docs/architecture/database-schema.md"
+      ],
+      "sourcePath": "docs/architecture/us-obv-divergence-api-design.md",
+      "related": [
+        {
+          "title": "국내·해외 전체 종목 통합 유니버스 동기화 설계",
+          "url": "/manuals/architecture/instrument-universe-sync.md",
+          "sourcePath": "docs/architecture/instrument-universe-sync.md"
+        },
+        {
+          "title": "외부 API 문서 구조와 유지 기준",
+          "url": "/manuals/api/README.md",
+          "sourcePath": "docs/api/README.md"
+        },
+        {
+          "title": "데이터베이스 구조",
+          "url": "/manuals/architecture/database-schema.md",
+          "sourcePath": "docs/architecture/database-schema.md"
+        }
+      ]
+    },
+    {
+      "id": "architecture-us-trade-trend-module-design",
+      "title": "해외주식 체결추이 모듈화 설계",
+      "category": "architecture",
+      "format": "md",
+      "description": "상태: 로컬 수동 조회 경로 1차 구현 (2026-10-19)",
+      "url": "/manuals/architecture/us-trade-trend-module-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/architecture/us-trade-trend-module-design.md",
+      "related": []
+    },
+    {
+      "id": "company-analysis-kr-readme",
+      "title": "대한민국 기업 분석 문서",
+      "category": "company-analysis",
+      "format": "md",
+      "description": "대한민국 주식시장 상장 기업의 공시·사업·재무·임상·희석 위험 분석 결과를 관리한다. 미국 및 대한민국 외 국가의 종목은 이 보관소의 대상이 아니다.",
+      "url": "/manuals/company-analysis/kr/README.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/company-analysis/kr/README.md",
+      "related": []
+    },
+    {
+      "id": "company-analysis-readme",
+      "title": "기업 분석 문서 인덱스",
+      "category": "company-analysis",
+      "format": "md",
+      "description": "대한민국 국내 주식과 미국 주식 기업의 공시·사업·재무·임상·희석 위험 분석 결과를 이 폴더 아래에서 관리한다. 그 외 국가의 주식은 분석 대상이 아니므로 별도 보관소를 두지 않는다.",
+      "url": "/manuals/company-analysis/README.md",
+      "relatedPaths": [
+        "docs/company-analysis/kr/README.md",
+        "docs/company-analysis/us/README.md"
+      ],
+      "sourcePath": "docs/company-analysis/README.md",
+      "related": [
+        {
+          "title": "대한민국 기업 분석 문서",
+          "url": "/manuals/company-analysis/kr/README.md",
+          "sourcePath": "docs/company-analysis/kr/README.md"
+        },
+        {
+          "title": "미국 기업 분석 문서",
+          "url": "/manuals/company-analysis/us/README.md",
+          "sourcePath": "docs/company-analysis/us/README.md"
+        }
+      ]
+    },
+    {
+      "id": "company-analysis-us-readme",
+      "title": "미국 기업 분석 문서",
+      "category": "company-analysis",
+      "format": "md",
+      "description": "미국 거래소 상장 기업과 SEC 공시를 중심으로 한 분석 결과를 모은다. 외국 기업이 미국 거래소에 상장되어 있거나 분석 근거가 SEC 제출서류인 경우도 이 범위에 포함한다.",
+      "url": "/manuals/company-analysis/us/README.md",
+      "relatedPaths": [
+        "docs/company-analysis/us/us-2026-dilution-verified-findings.md",
+        "docs/operations/sec-edgar-analysis-records.md",
+        "docs/operations/us-2026-dilution-review-request.md",
+        "docs/operations/us-market-event-analysis-standard.md"
+      ],
+      "sourcePath": "docs/company-analysis/us/README.md",
+      "related": [
+        {
+          "title": "미국 보통주 2026년 희석·자금조달 위험 — 원문 검토 결과",
+          "url": "/manuals/company-analysis/us/us-2026-dilution-verified-findings.md",
+          "sourcePath": "docs/company-analysis/us/us-2026-dilution-verified-findings.md"
+        },
+        {
+          "title": "SEC EDGAR 공시 분석 기록 관리",
+          "url": "/manuals/operations/sec-edgar-analysis-records.md",
+          "sourcePath": "docs/operations/sec-edgar-analysis-records.md"
+        },
+        {
+          "title": "미국 보통주 2026년 자금조달·희석 위험 조사 — 진행 기록",
+          "url": "/manuals/operations/us-2026-dilution-review-request.md",
+          "sourcePath": "docs/operations/us-2026-dilution-review-request.md"
+        },
+        {
+          "title": "미국장 이벤트 분석 표준",
+          "url": "/manuals/operations/us-market-event-analysis-standard.md",
+          "sourcePath": "docs/operations/us-market-event-analysis-standard.md"
+        }
+      ]
+    },
+    {
+      "id": "company-analysis-us-us-2026-dilution-verified-findings",
+      "title": "미국 보통주 2026년 희석·자금조달 위험 — 원문 검토 결과",
+      "category": "company-analysis",
+      "format": "md",
+      "description": "2026-10-08 Form F-3는 7월·8월·9월 note transactions를 한데 모아 resale 등록 물량과 조건을 정리한다.",
+      "url": "/manuals/company-analysis/us/us-2026-dilution-verified-findings.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/company-analysis/us/us-2026-dilution-verified-findings.md",
+      "related": []
+    },
+    {
+      "id": "development-conventions",
+      "title": "개발·문서화 규칙",
+      "category": "development",
+      "format": "md",
+      "description": "npx tsc --noEmit",
+      "url": "/manuals/development/conventions.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/development/conventions.md",
+      "related": []
+    },
+    {
+      "id": "development-delivery-lifecycle",
+      "title": "기획·개발·테스트·배포·개선 생명주기",
+      "category": "development",
+      "format": "md",
+      "description": "모든 변경은 기획의 수용 기준에서 시작해 코드·테스트·배포 검증·운영 관찰·개선 반영으로 닫힌다. 문서는 과거를 저장하는 곳이 아니라 다음 작업의 입력과 자동 검증 기준을 갱신하는 운영 도구다. 테스트나 빌드가 통과했다는 사실만으로 운영 완료로 표시하지 않는다.",
+      "url": "/manuals/development/delivery-lifecycle.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/development/delivery-lifecycle.md",
+      "related": []
+    },
+    {
+      "id": "operations-continuous-improvement",
+      "title": "지속 개선 운영 기준",
+      "category": "operations",
+      "format": "md",
+      "description": "상태가 완료로 끝나는 기능은 없다. 배포된 기능은 항상 운영 관찰 대상이며, 관찰 결과는 개선 백로그의 입력이 된다.",
+      "url": "/manuals/operations/continuous-improvement.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/continuous-improvement.md",
+      "related": []
+    },
+    {
+      "id": "operations-deployment-checklist",
+      "title": "배포 전 체크리스트",
+      "category": "operations",
+      "format": "md",
+      "description": "배포는 아래 순서를 모두 통과한 경우에만 진행한다. 체크리스트는 사람이 읽는 운영 기준이고, 자동 검증은 npm run deploy:verify가 담당한다.",
+      "url": "/manuals/operations/deployment-checklist.md",
+      "relatedPaths": [
+        "docs/development/delivery-lifecycle.md",
+        "docs/operations/continuous-improvement.md",
+        "docs/operations/improvement-review.md"
+      ],
+      "sourcePath": "docs/operations/deployment-checklist.md",
+      "related": [
+        {
+          "title": "기획·개발·테스트·배포·개선 생명주기",
+          "url": "/manuals/development/delivery-lifecycle.md",
+          "sourcePath": "docs/development/delivery-lifecycle.md"
+        },
+        {
+          "title": "지속 개선 운영 기준",
+          "url": "/manuals/operations/continuous-improvement.md",
+          "sourcePath": "docs/operations/continuous-improvement.md"
+        },
+        {
+          "title": "지속 개선 검토 운영",
+          "url": "/manuals/operations/improvement-review.md",
+          "sourcePath": "docs/operations/improvement-review.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-deployment-verification",
+      "title": "배포 검증 표준",
+      "category": "operations",
+      "format": "md",
+      "description": "모든 배포 경로는 실제 배포 전에 동일한 npm run deploy:verify 게이트를 통과해야 한다.",
+      "url": "/manuals/operations/deployment-verification.md",
+      "relatedPaths": [
+        "docs/operations/deployment-checklist.md"
+      ],
+      "sourcePath": "docs/operations/deployment-verification.md",
+      "related": [
+        {
+          "title": "배포 전 체크리스트",
+          "url": "/manuals/operations/deployment-checklist.md",
+          "sourcePath": "docs/operations/deployment-checklist.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-fda-approval-calendar",
+      "title": "FDA 승인 일정 운영 문서",
+      "category": "operations",
+      "format": "md",
+      "description": "이 문서는 미국 FDA의 의약품·생물의약품 허가 심사 목표일(PDUFA)과 FDA가 공지한 승인 결과를 지속적으로 기록·갱신하는 운영 기준이다. 의료기기 승인과 자문위원회 일정은 약물 PDUFA와 혼합하지 않고 별도 구분한다. 이 문서는 투자 판단이나 승인 확률을 제공하지 않는다.",
+      "url": "/manuals/operations/fda-approval-calendar.md",
+      "relatedPaths": [
+        "docs/architecture/market-event-calendar-design.md",
+        "docs/operations/us-market-event-analysis-standard.md"
+      ],
+      "sourcePath": "docs/operations/fda-approval-calendar.md",
+      "related": [
+        {
+          "title": "미국 급등주 사전 이벤트 캘린더 구조",
+          "url": "/manuals/architecture/market-event-calendar-design.md",
+          "sourcePath": "docs/architecture/market-event-calendar-design.md"
+        },
+        {
+          "title": "미국장 이벤트 분석 표준",
+          "url": "/manuals/operations/us-market-event-analysis-standard.md",
+          "sourcePath": "docs/operations/us-market-event-analysis-standard.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-globenewswire-rss-recovery",
+      "title": "GlobeNewswire RSS 수집 복구",
+      "category": "operations",
+      "format": "md",
+      "description": "운영 설정에서 GLOBENEWSWIRE는 활성화되어 있었지만, 기본 URL https://rss.globenewswire.com/은 RSS가 아닌 HTML 홈페이지를 반환했다. 공통 파서는 HTTP 200만 확인했기 때문에 HTML을 빈 피드로 취급했고, 수집 결과가 STORED/0건으로 기록되어 장애가 감춰졌다.",
+      "url": "/manuals/operations/globenewswire-rss-recovery.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/globenewswire-rss-recovery.md",
+      "related": []
+    },
+    {
+      "id": "operations-improvement-review",
+      "title": "지속 개선 검토 운영",
+      "category": "operations",
+      "format": "md",
+      "description": "각 과제는 영향도와 발생 가능성을 각각 1~5로 평가하고, 위험도 = 영향도 × 가능성으로 정렬한다. 보안·데이터 손상·잘못된 투자 데이터는 점수와 관계없이 최우선이다.",
+      "url": "/manuals/operations/improvement-review.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/improvement-review.md",
+      "related": []
+    },
+    {
+      "id": "operations-instrument-data-dictionary",
+      "title": "종목 데이터 테이블 필드 사전",
+      "category": "operations",
+      "format": "md",
+      "description": "세 테이블은 아래 동일 필드를 사용한다. 첫 테이블은 국내 보통주, 두 번째는 특수상품 분리 보관, 세 번째는 호환·전체 유니버스 역할이다.",
+      "url": "/manuals/operations/instrument-data-dictionary.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/instrument-data-dictionary.md",
+      "related": []
+    },
+    {
+      "id": "operations-instrument-fundamentals-debug-api",
+      "title": "종목 기본정보·시가총액 자동화 디버깅 API",
+      "category": "operations",
+      "format": "md",
+      "description": "종목 상장주수의 단일 출처 및 응답 필드는 $1을 따른다.",
+      "url": "/manuals/operations/instrument-fundamentals-debug-api.md",
+      "relatedPaths": [
+        "docs/architecture/listed-shares-source-policy.md"
+      ],
+      "sourcePath": "docs/operations/instrument-fundamentals-debug-api.md",
+      "related": [
+        {
+          "title": "종목 상장주수 출처 정책",
+          "url": "/manuals/architecture/listed-shares-source-policy.md",
+          "sourcePath": "docs/architecture/listed-shares-source-policy.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-instrument-fundamentals-refresh",
+      "title": "종목 재무·시가총액 스냅샷 갱신 운영 기준",
+      "category": "operations",
+      "format": "md",
+      "description": "기능 활성화·예약시각 확인",
+      "url": "/manuals/operations/instrument-fundamentals-refresh.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/instrument-fundamentals-refresh.md",
+      "related": []
+    },
+    {
+      "id": "operations-llm-rss-bullish-report-runbook",
+      "title": "LLM 직접 RSS 호재 분석 보고서 운영 런북",
+      "category": "operations",
+      "format": "md",
+      "description": "flowchart LR",
+      "url": "/manuals/operations/llm-rss-bullish-report-runbook.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/llm-rss-bullish-report-runbook.md",
+      "related": []
+    },
+    {
+      "id": "operations-market-api-debugging",
+      "title": "국내·해외 시장 API 운영 디버깅",
+      "category": "operations",
+      "format": "md",
+      "description": "관리자 세션으로 로그인한 상태에서 다음 API를 사용한다.",
+      "url": "/manuals/operations/market-api-debugging.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/market-api-debugging.md",
+      "related": []
+    },
+    {
+      "id": "operations-market-news-auto-refresh",
+      "title": "해외 뉴스 탭 자동 갱신",
+      "category": "operations",
+      "format": "md",
+      "description": "해외 뉴스 탭 자동 갱신 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/market-news-auto-refresh.md)",
+      "url": "/manuals/operations/market-news-auto-refresh.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/market-news-auto-refresh.md",
+      "related": []
+    },
+    {
+      "id": "operations-market-rss-translation-debug-api",
+      "title": "RSS 번역 상태 검수 API",
+      "category": "operations",
+      "format": "md",
+      "description": "운영 애플리케이션에 설정된 PostgreSQL의 marketrssarticles에서 저장된 번역 상태를 읽기 전용으로 확인한다. 로그인 없이 호출할 수 있다. 이 API는 번역 재시도·수정·재전송을 수행하지 않는다.",
+      "url": "/manuals/operations/market-rss-translation-debug-api.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/market-rss-translation-debug-api.md",
+      "related": []
+    },
+    {
+      "id": "operations-runbook",
+      "title": "운영 런북",
+      "category": "operations",
+      "format": "md",
+      "description": "1. GitHub Actions Deploy OCI가 성공인지 확인합니다.",
+      "url": "/manuals/operations/runbook.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/runbook.md",
+      "related": []
+    },
+    {
+      "id": "operations-sec-edgar-analysis-records",
+      "title": "SEC EDGAR 공시 분석 기록 관리",
+      "category": "operations",
+      "format": "md",
+      "description": "SEC 공시를 원문 filing 단위로 분석 문서화하고, 종목별 누적 이력과 날짜별 시장 요약을 일관되게 탐색한다. 공시 원문과 동일한 분석을 여러 인덱스에 복제하지 않는다.",
+      "url": "/manuals/operations/sec-edgar-analysis-records.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/sec-edgar-analysis-records.md",
+      "related": []
+    },
+    {
+      "id": "operations-sec-filing-detail-summary-standard",
+      "title": "SEC 공시 상세 요약 표준",
+      "category": "operations",
+      "format": "md",
+      "description": "SEC EDGAR 공시를 상세 요약할 때마다 이 문서의 절차와 첨부된 v1 산출물 계약을 적용한다. 이 기준은 SEC 원문에 근거한 사실 추출, 거래·희석 구조 확인, 위험과 촉매의 균형 잡힌 해석, 재현 가능한 한국어 요약을 위한 것이다. 공시 제출만으로 거래 완료, 현금 유입, 주가 방향을 단정하지 않는다.",
+      "url": "/manuals/operations/sec-filing-detail-summary-standard.md",
+      "relatedPaths": [
+        "docs/architecture/sec-ticker-disclosure-analysis-design.md",
+        "docs/sec-edgar-official-reference.md"
+      ],
+      "sourcePath": "docs/operations/sec-filing-detail-summary-standard.md",
+      "related": [
+        {
+          "title": "SEC Ticker 공시 수집·Codex 분석 설계",
+          "url": "/manuals/architecture/sec-ticker-disclosure-analysis-design.md",
+          "sourcePath": "docs/architecture/sec-ticker-disclosure-analysis-design.md"
+        },
+        {
+          "title": "SEC EDGAR 공식 API 참고 문서",
+          "url": "/manuals/sec-edgar-official-reference.md",
+          "sourcePath": "docs/sec-edgar-official-reference.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-sec-ticker-company-analysis-dossier-standard",
+      "title": "티커별 SEC 기업 공시 분석 문서 기준",
+      "category": "operations",
+      "format": "md",
+      "description": "사용자가 티커를 말하면 회사 식별, 최근 SEC 공시, accession별 분석, 누적 기업 종합을 한 경로에서 찾아 보여준다. 이 구조는 특정 기업에 고정되지 않으며 미국 상장 티커별로 반복 적용한다.",
+      "url": "/manuals/operations/sec-ticker-company-analysis-dossier-standard.md",
+      "relatedPaths": [
+        "docs/operations/sec-filing-detail-summary-standard.md",
+        "docs/operations/sec-edgar-analysis-records.md"
+      ],
+      "sourcePath": "docs/operations/sec-ticker-company-analysis-dossier-standard.md",
+      "related": [
+        {
+          "title": "SEC 공시 상세 요약 표준",
+          "url": "/manuals/operations/sec-filing-detail-summary-standard.md",
+          "sourcePath": "docs/operations/sec-filing-detail-summary-standard.md"
+        },
+        {
+          "title": "SEC EDGAR 공시 분석 기록 관리",
+          "url": "/manuals/operations/sec-edgar-analysis-records.md",
+          "sourcePath": "docs/operations/sec-edgar-analysis-records.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-us-2026-dilution-review-request",
+      "title": "미국 보통주 2026년 자금조달·희석 위험 조사 — 진행 기록",
+      "category": "operations",
+      "format": "md",
+      "description": "SEC 공식 company ticker master 및 submissions API 확인 결과와 직접 연결되는 filing 색인은 $1에 생성했다. 388개 티커 중 386개를 현재 CIK/issuer에 매핑했고, RITR, SNYR는 ticker master에서 매핑하지 못했다. 2026-10-17 조회 기준 8,369개의 선택 Form 제출이 색인에 있고, 294개 ticker에 S-1/S-3/F-1/F-3/424B/EFFECT/POS AM 제출이 하나 이상 나타난다.",
+      "url": "/manuals/operations/us-2026-dilution-review-request.md",
+      "relatedPaths": [
+        "docs/operations/us-equity-dilution-risk-harness.md",
+        "docs/operations/sec-edgar-analysis-records.md"
+      ],
+      "sourcePath": "docs/operations/us-2026-dilution-review-request.md",
+      "related": [
+        {
+          "title": "미국 상장 종목 희석·자금조달 악재 조사 Harness",
+          "url": "/manuals/operations/us-equity-dilution-risk-harness.md",
+          "sourcePath": "docs/operations/us-equity-dilution-risk-harness.md"
+        },
+        {
+          "title": "SEC EDGAR 공시 분석 기록 관리",
+          "url": "/manuals/operations/sec-edgar-analysis-records.md",
+          "sourcePath": "docs/operations/sec-edgar-analysis-records.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-us-equity-dilution-risk-harness",
+      "title": "미국 상장 종목 희석·자금조달 악재 조사 Harness",
+      "category": "operations",
+      "format": "md",
+      "description": "워런트, 유상증자, ATM, 전환사채·전환우선주, 선불워런트, 주식매입계약, shelf 등록 등 미국 상장사의 자금조달 및 잠재 희석 위험을 공시 기준으로 반복 조사·검증·요약하기 위한 재사용 규칙이다.",
+      "url": "/manuals/operations/us-equity-dilution-risk-harness.md",
+      "relatedPaths": [
+        "docs/operations/us-sec-form-item-catalyst-risk-guide.md",
+        "docs/architecture/sec-ticker-disclosure-analysis-design.md"
+      ],
+      "sourcePath": "docs/operations/us-equity-dilution-risk-harness.md",
+      "related": [
+        {
+          "title": "미국 상장 종목 SEC 공시 FORM·ITEM별 급등 촉매와 리스크 가이드",
+          "url": "/manuals/operations/us-sec-form-item-catalyst-risk-guide.md",
+          "sourcePath": "docs/operations/us-sec-form-item-catalyst-risk-guide.md"
+        },
+        {
+          "title": "SEC Ticker 공시 수집·Codex 분석 설계",
+          "url": "/manuals/architecture/sec-ticker-disclosure-analysis-design.md",
+          "sourcePath": "docs/architecture/sec-ticker-disclosure-analysis-design.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-us-industry-turnover-report",
+      "title": "미국 보통주 산업별 거래대금 월간 집계",
+      "category": "operations",
+      "format": "md",
+      "description": "미국 보통주 산업별 거래대금 월간 집계 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/us-industry-turnover-report.md)",
+      "url": "/manuals/operations/us-industry-turnover-report.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-industry-turnover-report.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-market-event-analysis-standard",
+      "title": "미국장 이벤트 분석 표준",
+      "category": "operations",
+      "format": "md",
+      "description": "미국 상장 종목의 FDA·임상·역분할 등 급등 가능 이벤트를 사실과 추측 없이 검증하고, 사용자가 이벤트의 내용·시점·가격 영향 근거를 재검토할 수 있도록 일관된 분석 형식을 제공한다. 이 문서는 사용자 요청에 응답할 때 적용하며, 이벤트 일정만으로 매수·매도 결론을 만들지 않는다.",
+      "url": "/manuals/operations/us-market-event-analysis-standard.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-market-event-analysis-standard.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-market-october-2026-outlook",
+      "title": "2026년 10월 미국 주식시장 호재·악재 점검",
+      "category": "operations",
+      "format": "md",
+      "description": "10월에는 9월 CPI·PPI, 3분기 실적, 10월 FOMC, 3분기 GDP/PCE가 차례로 나온다. 시장의 주된 분기점은 물가가 둔화하는 가운데 성장·고용이 버티는지다. 이 조합이면 금리 부담 완화와 이익 기대가 함께 지지받을 수 있다. 반대로 물가가 다시 강해지면 금리 인하 기대가 후퇴할 수 있고, 물가가 둔화해도 고용·소비가 급격히 약해지면 경기침체 우려가 커질 수 있다. 어느 이벤트의 결과도 현재 확정되지 않았으며, 방향과 주가 반응은 보장되지 않는다.",
+      "url": "/manuals/operations/us-market-october-2026-outlook.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-market-october-2026-outlook.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-sec-form-item-catalyst-risk-guide",
+      "title": "미국 상장 종목 SEC 공시 FORM·ITEM별 급등 촉매와 리스크 가이드",
+      "category": "operations",
+      "format": "md",
+      "description": "이 문서는 미국 상장 보통주에서 급등 촉매와 하락·희석 위험을 빠르게 찾기 위해 자주 보는 SEC EDGAR FORM과 ITEM을 정리한다. 모든 EDGAR 제출서류를 망라하는 목록이 아니라, 회사 사건·재무·자금조달·지배구조·내부자 거래 분석에 직접 도움이 되는 서식 중심 참고서다.",
+      "url": "/manuals/operations/us-sec-form-item-catalyst-risk-guide.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-sec-form-item-catalyst-risk-guide.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-small-cap-extraction",
+      "title": "미국 소형 시가총액 종목 추출 운영 절차",
+      "category": "operations",
+      "format": "md",
+      "description": "운영 요청에 따라 미국 상장 종목 중 최신 운영 시가총액이 USD 10,000,000 이하인 종목을 조회한다. 이 절차는 운영 서버의 공개 read-only API만 GET으로 호출하며 운영 DB 직접 접속, 갱신·저장 요청, 알림 전송은 하지 않는다.",
+      "url": "/manuals/operations/us-small-cap-extraction.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-small-cap-extraction.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-sec-shares-review-input",
+      "title": "미국 보통주 시가총액 1억 달러 이하 보고서",
+      "category": "operations",
+      "format": "md",
+      "description": "미국 보통주 시가총액 1억 달러 이하 보고서 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/us-smallcap-sec-shares-review-input.md)",
+      "url": "/manuals/operations/us-smallcap-sec-shares-review-input.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-sec-shares-review-input.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-sec-shares",
+      "title": "미국 보통주 시가총액 1억 달러 이하 보고서",
+      "category": "operations",
+      "format": "md",
+      "description": "미국 보통주 시가총액 1억 달러 이하 보고서 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/us-smallcap-sec-shares.md)",
+      "url": "/manuals/operations/us-smallcap-sec-shares.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-sec-shares.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-shares-public-api",
+      "title": "미국 소형 보통주 발행주식수 공개 API",
+      "category": "operations",
+      "format": "md",
+      "description": "인증 없이 미국 활성 보통주 중 현재 로컬 시총 스냅샷이 USD 100,000,000 이하인 종목의 SEC 발행주식수 사실을 조회한다. SEC를 매 요청마다 호출하지 않고 일일 자동화가 저장한 secsmallcapcommonstockshares 및 검토 테이블을 읽는다.",
+      "url": "/manuals/operations/us-smallcap-shares-public-api.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-shares-public-api.md",
+      "related": []
+    },
+    {
+      "id": "accumulation-v2",
+      "title": "매집 의심 탐지 v2.0.0",
+      "category": "project-guide",
+      "format": "md",
+      "description": "국내·해외 로컬/연결 DB의 일봉 OHLCV 캐시를 사용하는 설명 가능한 휴리스틱이다. 실제 기관·외인·특정 주체의 매집을 확인하거나 예측 성공률을 보증하지 않는다. 외부 시세 수집, DB 갱신, 자동 주문, 알림 발송은 수행하지 않는다.",
+      "url": "/manuals/ACCUMULATION_V2.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/ACCUMULATION_V2.md",
+      "related": []
+    },
+    {
+      "id": "admin-module-groups",
+      "title": "관리자 기능 모듈 그룹",
+      "category": "project-guide",
+      "format": "md",
+      "description": "관리자 /admin/modules는 기능을 한 목록에 평면적으로 나열하지 않고 다음 그룹으로 접어서 관리한다.",
+      "url": "/manuals/admin-module-groups.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/admin-module-groups.md",
+      "related": []
+    },
+    {
+      "id": "automation-observability",
+      "title": "자동화 공통 실행 진단 API",
+      "category": "project-guide",
+      "format": "md",
+      "description": "운영 도메인에서 모든 기능의 실행 통계, 실행 커버리지, 최근 실행, 실패 원인과 단계별 summary를 한 번에 확인한다. 관리자 세션 쿠키 또는 x-cron-secret 중 하나가 필요하다.",
+      "url": "/manuals/automation-observability.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/automation-observability.md",
+      "related": []
+    },
+    {
+      "id": "bollinger-band-operations",
+      "title": "국내·해외 볼린저밴드 탐지",
+      "category": "project-guide",
+      "format": "md",
+      "description": "국내·해외 유니버스를 대상으로 D(일봉), W(주봉), M(월봉)을 선택할 수 있다. 탐지는 KIS 원본을 직접 재조회하지 않고 각 시장의 DB 저장 캔들만 사용한다.",
+      "url": "/manuals/bollinger-band-operations.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/bollinger-band-operations.md",
+      "related": []
+    },
+    {
+      "id": "bollinger-rebound",
+      "title": "볼린저밴드 하단 이탈 후 재터치 탐지",
+      "category": "project-guide",
+      "format": "md",
+      "description": "1. 최근 봉을 제외한 설정 기간(reboundLookback, 기본 3봉) 안에 종가가 하단선보다 낮은 봉이 있어야 한다.",
+      "url": "/manuals/bollinger-rebound.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/bollinger-rebound.md",
+      "related": []
+    },
+    {
+      "id": "candle-refresh-design",
+      "title": "국내·해외 일·주·월봉 캐시 갱신 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "1. 유니버스에서 보통주·ACTIVE 종목을 조회한다.",
+      "url": "/manuals/CANDLE_REFRESH_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/CANDLE_REFRESH_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "charts-custom-screener-design",
+      "title": "`/charts` 사용자 직접 조건 추출 설계안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "1. 시장: 국내·해외·전체, 해외 거래소 선택",
+      "url": "/manuals/CHARTS_CUSTOM_SCREENER_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/CHARTS_CUSTOM_SCREENER_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "daily-cache-bulk-sync-design",
+      "title": "운영 API 기반 로컬 일봉 캐시 전체 동기화 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "운영 서버의 일봉 캐시를 원천으로 사용해 로컬 PostgreSQL의 국내·해외 보통주 일봉 캐시를 UPSERT한다. 운영 DB와 로컬 DB를 직접 공유하지 않고, 인증된 운영 API를 통해서만 데이터를 이동한다.",
+      "url": "/manuals/DAILY_CACHE_BULK_SYNC_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/DAILY_CACHE_BULK_SYNC_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "daily-to-weekly-upsert",
+      "title": "일봉 기반 주봉 캐시 갱신",
+      "category": "project-guide",
+      "format": "md",
+      "description": "국내·해외 보통주 유니버스의 KIS 일봉 캐시를 원천 데이터로 사용해 주봉을 로컬 DB에 UPSERT한다. 주봉을 종목별로 KIS에서 별도 조회하지 않아 API 호출량과 갱신 시간을 줄인다.",
+      "url": "/manuals/DAILY_TO_WEEKLY_UPSERT.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/DAILY_TO_WEEKLY_UPSERT.md",
+      "related": []
+    },
+    {
+      "id": "daily-golden-cross",
+      "title": "일봉 골든크로스 운영",
+      "category": "project-guide",
+      "format": "md",
+      "description": "국내·해외 보통주 일봉 캐시를 갱신한 뒤 9일 단순이동평균(SMA)이 20일 SMA를 상향 돌파한 종목을 탐지한다. 당일 포함 최신 저장 봉을 사용하며, 직전 봉에서 SMA9 <= SMA20, 최신 봉에서 SMA9 > SMA20인 경우만 적격으로 판정한다.",
+      "url": "/manuals/daily-golden-cross.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/daily-golden-cross.md",
+      "related": []
+    },
+    {
+      "id": "daytrade-detection-design",
+      "title": "단타 종목 탐지 로직과 지속 검증",
+      "category": "project-guide",
+      "format": "md",
+      "description": "단타 후보는 자동 매매나 수익 보장이 아니라, 실제 저장 데이터에서 다음 거래일 단기 움직임을 검증할 수 있는 후보로 정의한다. “수익 최대화”는 한 번의 백테스트에서 가장 높은 수익률을 고르는 뜻이 아니라, 거래비용·슬리피지·기간 분할을 포함해 재현성이 확인된 조건을 선택하는 뜻으로 관리한다.",
+      "url": "/manuals/DAYTRADE_DETECTION_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/DAYTRADE_DETECTION_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "debugging-architecture",
+      "title": "프로젝트 전체 디버깅 구조 설계안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "기능 실행부터 외부 API 호출, 응답 검증, DB 저장, 후속 계산, 화면 렌더링까지 하나의 실행 흐름으로 추적한다.",
+      "url": "/manuals/DEBUGGING_ARCHITECTURE.md",
+      "relatedPaths": [
+        "docs/CANDLE_REFRESH_DESIGN.md"
+      ],
+      "sourcePath": "docs/DEBUGGING_ARCHITECTURE.md",
+      "related": [
+        {
+          "title": "국내·해외 일·주·월봉 캐시 갱신 설계",
+          "url": "/manuals/CANDLE_REFRESH_DESIGN.md",
+          "sourcePath": "docs/CANDLE_REFRESH_DESIGN.md"
+        }
+      ]
+    },
+    {
+      "id": "discord-ticker-overview",
+      "title": "Discord `/ticker` 단일 종목 종합 조회",
+      "category": "project-guide",
+      "format": "md",
+      "description": "Discord에서 /ticker symbol:AAPL을 입력하면 현재가와 StockMan이 축적한 최근 체결강도 분석을 한 번에 확인한다. Discord 라우트는 요청과 응답 갱신만 담당하고, 데이터 조합은 lib/discord-ticker-overview.ts가 담당한다.",
+      "url": "/manuals/discord-ticker-overview.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/discord-ticker-overview.md",
+      "related": []
+    },
+    {
+      "id": "domestic-investment-export",
+      "title": "국내 기업 투자분석 JSON 내보내기 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "1. 원천(raw): DB에 저장된 KIS/OpenDART 원본 payload를 변경하지 않고 종목 식별자, 출처, 수집시각과 함께 보존한다.",
+      "url": "/manuals/DOMESTIC_INVESTMENT_EXPORT.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/DOMESTIC_INVESTMENT_EXPORT.md",
+      "related": []
+    },
+    {
+      "id": "dragon-threat-overlay",
+      "title": "드래곤 위협 연출 모듈",
+      "category": "project-guide",
+      "format": "md",
+      "description": "화면 중앙에서 거대한 드래곤이 등장해 입을 크게 벌리고 위협한 뒤 사라지는 캔버스 오버레이 모듈이다.",
+      "url": "/manuals/DRAGON_THREAT_OVERLAY.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/DRAGON_THREAT_OVERLAY.md",
+      "related": []
+    },
+    {
+      "id": "error-handling",
+      "title": "오류 상황 및 해결 방법",
+      "category": "project-guide",
+      "format": "md",
+      "description": "이 문서는 RSS 프로젝트에서 반복적으로 발생할 수 있는 오류와 확인 순서를 관리한다. 모든 진단은 실제 응답·로그·DB 상태를 기준으로 하며, 추정만으로 토큰이나 캐시를 삭제하지 않는다.",
+      "url": "/manuals/ERROR_HANDLING.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/ERROR_HANDLING.md",
+      "related": []
+    },
+    {
+      "id": "fireworks-overlay",
+      "title": "폭죽 애니메이션 모듈",
+      "category": "project-guide",
+      "format": "md",
+      "description": "성공·달성·축하 이벤트에서 필요할 때만 호출할 수 있는 독립형 화면 오버레이를 제공한다.",
+      "url": "/manuals/FIREWORKS_OVERLAY.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/FIREWORKS_OVERLAY.md",
+      "related": []
+    },
+    {
+      "id": "hansol-logistics-dividend-investment-design",
+      "title": "한솔로지스틱스 장기 배당투자 분석 설계안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "가격·거래량·재무·배당·기업행사·수급 데이터를 기준일별로 수집하고, 원천값과 파생지표를 분리해 장기 배당투자 판단 자료를 제공한다. 매수·매도 추천이나 수익 보장은 범위에 포함하지 않는다.",
+      "url": "/manuals/HANSOL_LOGISTICS_DIVIDEND_INVESTMENT_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/HANSOL_LOGISTICS_DIVIDEND_INVESTMENT_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "inquiry-board-design",
+      "title": "문의 게시판 및 요청 식별 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "누구나 문의글을 작성·조회하고 댓글과 좋아요를 남길 수 있는 최소 게시판이다. 제목과 내용만 작성 입력으로 받는다.",
+      "url": "/manuals/INQUIRY_BOARD_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/INQUIRY_BOARD_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "intraday-kis-memory-design",
+      "title": "장중 KIS 수급 탐지 메모리 우선 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "현재 운영 서버는 단일 모놀리식 OCI VM의 Next.js 프로세스와 PostgreSQL을 사용한다. 서버를 수평 분산하지 않는 전제이므로 Redis는 도입하지 않고, TOP 상승률 스냅샷·후보 우선순위·VWAP 누적 상태 같은 휘발성 상태는 동일 프로세스 메모리에서 관리한다. 확정 탐지 이벤트, 호출 로그, 중복 방지 상태는 PostgreSQL에 저장한다.",
+      "url": "/manuals/INTRADAY_KIS_MEMORY_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/INTRADAY_KIS_MEMORY_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "intraday-mvp-settings",
+      "title": "TOP100 장중 거래대금 탐지 설정",
+      "category": "project-guide",
+      "format": "md",
+      "description": "관리자 모듈 intraday-mvp에서 다음 조합을 선택한다.",
+      "url": "/manuals/INTRADAY_MVP_SETTINGS.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/INTRADAY_MVP_SETTINGS.md",
+      "related": []
+    },
+    {
+      "id": "investment-calendar",
+      "title": "투자 일정 캘린더",
+      "category": "project-guide",
+      "format": "md",
+      "description": "IPO, 실적 발표, 배당락일처럼 날짜가 핵심인 이벤트를 출처별 원문과 함께 하나의 정규화 테이블에 저장하고, 사용자가 시장·기간·일정 유형으로 빠르게 필터링한다.",
+      "url": "/manuals/INVESTMENT_CALENDAR.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/INVESTMENT_CALENDAR.md",
+      "related": []
+    },
+    {
+      "id": "kis-accumulation-design",
+      "title": "KIS Open API 기반 매집 의심 종목 탐지 설계안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "KIS Open API는 매집 여부를 직접 판정하지 않는다. 따라서 KIS를 원천 데이터·시세 분석 데이터 공급자로 사용하고, 매집 의심 판정은 로컬 PostgreSQL 캐시와 프로젝트 공통 v2 엔진에서 수행한다.",
+      "url": "/manuals/KIS_ACCUMULATION_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/KIS_ACCUMULATION_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "kis-db-performance-design",
+      "title": "KIS Open API → PostgreSQL 성능 최적화 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "1. 종목 수 × 주기 × 일·주·월·분봉 요청 수가 선형으로 증가한다.",
+      "url": "/manuals/KIS_DB_PERFORMANCE_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/KIS_DB_PERFORMANCE_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "kis-detection-api-catalog",
+      "title": "KIS 종목 탐지 API 카탈로그",
+      "category": "project-guide",
+      "format": "md",
+      "description": "이 문서는 KIS Developers 공식 API와 공식 GitHub 샘플을 기준으로, 종목 탐지에 사용할 수 있는 API를 데이터 원천·탐지 목적·현재 프로젝트 연결 상태로 관리한다.",
+      "url": "/manuals/KIS_DETECTION_API_CATALOG.md",
+      "relatedPaths": [
+        "docs/api/KIS_US_CONDITION_SEARCH.md"
+      ],
+      "sourcePath": "docs/KIS_DETECTION_API_CATALOG.md",
+      "related": [
+        {
+          "title": "KIS 해외주식 조건검색 API",
+          "url": "/manuals/api/KIS_US_CONDITION_SEARCH.md",
+          "sourcePath": "docs/api/KIS_US_CONDITION_SEARCH.md"
+        }
+      ]
+    },
+    {
+      "id": "kis-investor-program-flow-design",
+      "title": "KIS 외인·기관·프로그램 수급 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "KIS Open API는 국내 종목별 외국인·기관·개인 수급과 프로그램 매매를 제공한다. 단, 수급 주체의 개인 식별정보가 아니라 시장 집계값이다. 외국인·기관의 장중 값은 추정치이며, 확정값은 장 종료 후 제공된다.",
+      "url": "/manuals/KIS_INVESTOR_PROGRAM_FLOW_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/KIS_INVESTOR_PROGRAM_FLOW_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "kis-request-framework",
+      "title": "KIS Open API 요청 프레임워크",
+      "category": "project-guide",
+      "format": "md",
+      "description": "모든 KIS 데이터 API 호출은 lib/kis-request-framework.ts의 kisRequest를 통과한다.",
+      "url": "/manuals/KIS_REQUEST_FRAMEWORK.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/KIS_REQUEST_FRAMEWORK.md",
+      "related": []
+    },
+    {
+      "id": "kis-breaking-news-forwarder",
+      "title": "KIS 해외 속보 Discord 전달",
+      "category": "project-guide",
+      "format": "md",
+      "description": "KISBREAKINGNEWSDISCORDWEBHOOKURL=https://discord.com/api/webhooks/발급된웹훅URL",
+      "url": "/manuals/kis-breaking-news-forwarder.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/kis-breaking-news-forwarder.md",
+      "related": []
+    },
+    {
+      "id": "latest-daily-candle-cache-design",
+      "title": "종목별 최신 일봉 요약 캐시 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "대형 원본 캔들 테이블을 매번 집계하지 않고, 종목별 최신 정상 일봉 1개를 빠르게 조회한다.",
+      "url": "/manuals/LATEST_DAILY_CANDLE_CACHE_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/LATEST_DAILY_CANDLE_CACHE_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "listing-schedule-api",
+      "title": "신규 종목 상장 일정 API",
+      "category": "project-guide",
+      "format": "md",
+      "description": "GET /api/listings?market=KR&from=2026-09-01&to=2026-10-31&limit=200",
+      "url": "/manuals/LISTING_SCHEDULE_API.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/LISTING_SCHEDULE_API.md",
+      "related": []
+    },
+    {
+      "id": "mobile-ui-ux-design",
+      "title": "모바일 UI/UX 최적화 설계안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "390px 안팎의 모바일 화면에서도 주요 페이지가 가로로 잘리지 않고, 입력·탭·버튼을 손가락으로 조작하기 쉽도록 한다. 기존 데스크톱 레이아웃과 색상 토큰은 유지하며 모바일 구간에서만 밀도와 배치를 조정한다.",
+      "url": "/manuals/MOBILE_UI_UX_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/MOBILE_UI_UX_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "navigation-ui-ux-design",
+      "title": "네비게이션 바 UI/UX 설계 및 구현 기준",
+      "category": "project-guide",
+      "format": "md",
+      "description": "주요 기능으로 빠르게 이동하면서도 현재 위치를 명확히 인지할 수 있는 데스크톱·모바일 공통 네비게이션을 제공한다.",
+      "url": "/manuals/NAVIGATION_UI_UX_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/NAVIGATION_UI_UX_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "notice-board-design",
+      "title": "공지사항 분리 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "공지사항은 notices 전용 테이블과 전용 상세 페이지를 사용한다. 기존 문의의 공지 플래그 데이터는 최초 마이그레이션에서 이관하고, 이후 공지 lifecycle은 문의 도메인과 분리한다.",
+      "url": "/manuals/NOTICE_BOARD_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/NOTICE_BOARD_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "readme",
+      "title": "StockMan 문서 인덱스",
+      "category": "project-guide",
+      "format": "md",
+      "description": "이 프로젝트의 운영 기준 문서는 기능 코드와 분리해 docs/ 아래에서 관리합니다.",
+      "url": "/manuals/README.md",
+      "relatedPaths": [
+        "docs/company-analysis/README.md",
+        "docs/api/README.md",
+        "docs/company-analysis/kr/README.md",
+        "docs/company-analysis/us/README.md",
+        "docs/architecture/current-system-reference.md",
+        "docs/architecture/design-management.md",
+        "docs/architecture/us-obv-divergence-api-design.md",
+        "docs/US_TOP_RISING_UI_DATA_QUALITY.md",
+        "docs/architecture/system-module-catalog.md",
+        "docs/architecture/local-us-rss-llm-alert-design.md",
+        "docs/architecture/code-structure.md",
+        "docs/architecture/documentation-and-srp.md",
+        "docs/architecture/daily-disclosure-feed-design.md",
+        "docs/architecture/unified-disclosure-rss-ingestion-design.md",
+        "docs/architecture/database-schema.md",
+        "docs/architecture/project-architecture.md",
+        "docs/architecture/instrument-universe-sync.md",
+        "docs/architecture/us-industry-classification-data-design.md",
+        "docs/development/conventions.md",
+        "docs/development/delivery-lifecycle.md",
+        "docs/operations/runbook.md",
+        "docs/operations/market-rss-translation-debug-api.md",
+        "docs/architecture/market-impact-events-design.md",
+        "docs/operations/market-news-auto-refresh.md",
+        "docs/operations/continuous-improvement.md",
+        "docs/operations/improvement-review.md",
+        "docs/DEBUGGING_ARCHITECTURE.md",
+        "docs/CANDLE_REFRESH_DESIGN.md",
+        "docs/bollinger-band-operations.md",
+        "docs/admin-module-groups.md",
+        "docs/references/README.md",
+        "docs/references/kis-instrument-masters/README.md",
+        "docs/operations/us-sec-form-item-catalyst-risk-guide.md",
+        "docs/operations/us-equity-dilution-risk-harness.md",
+        "docs/operations/sec-ticker-company-analysis-dossier-standard.md",
+        "docs/operations/us-market-october-2026-outlook.md"
+      ],
+      "sourcePath": "docs/README.md",
+      "related": [
+        {
+          "title": "기업 분석 문서 인덱스",
+          "url": "/manuals/company-analysis/README.md",
+          "sourcePath": "docs/company-analysis/README.md"
+        },
+        {
+          "title": "외부 API 문서 구조와 유지 기준",
+          "url": "/manuals/api/README.md",
+          "sourcePath": "docs/api/README.md"
+        },
+        {
+          "title": "대한민국 기업 분석 문서",
+          "url": "/manuals/company-analysis/kr/README.md",
+          "sourcePath": "docs/company-analysis/kr/README.md"
+        },
+        {
+          "title": "미국 기업 분석 문서",
+          "url": "/manuals/company-analysis/us/README.md",
+          "sourcePath": "docs/company-analysis/us/README.md"
+        },
+        {
+          "title": "StockMan 현재 시스템 기준서",
+          "url": "/manuals/architecture/current-system-reference.md",
+          "sourcePath": "docs/architecture/current-system-reference.md"
+        },
+        {
+          "title": "설계 문서 관리 기준",
+          "url": "/manuals/architecture/design-management.md",
+          "sourcePath": "docs/architecture/design-management.md"
+        },
+        {
+          "title": "미국 보통주 OBV 강세 다이버전스 API",
+          "url": "/manuals/architecture/us-obv-divergence-api-design.md",
+          "sourcePath": "docs/architecture/us-obv-divergence-api-design.md"
+        },
+        {
+          "title": "미국 상승률 TOP100 UI 데이터 품질 및 누락 방지",
+          "url": "/manuals/US_TOP_RISING_UI_DATA_QUALITY.md",
+          "sourcePath": "docs/US_TOP_RISING_UI_DATA_QUALITY.md"
+        },
+        {
+          "title": "StockMan 시스템 모듈 카탈로그",
+          "url": "/manuals/architecture/system-module-catalog.md",
+          "sourcePath": "docs/architecture/system-module-catalog.md"
+        },
+        {
+          "title": "로컬 Codex 기반 미국 RSS·공시 급등주 분석 구조",
+          "url": "/manuals/architecture/local-us-rss-llm-alert-design.md",
+          "sourcePath": "docs/architecture/local-us-rss-llm-alert-design.md"
+        },
+        {
+          "title": "코드 구조",
+          "url": "/manuals/architecture/code-structure.md",
+          "sourcePath": "docs/architecture/code-structure.md"
+        },
+        {
+          "title": "문서 관리·SRP 검증 기준",
+          "url": "/manuals/architecture/documentation-and-srp.md",
+          "sourcePath": "docs/architecture/documentation-and-srp.md"
+        },
+        {
+          "title": "일별 공시·RSS 통합 조회 설계안",
+          "url": "/manuals/architecture/daily-disclosure-feed-design.md",
+          "sourcePath": "docs/architecture/daily-disclosure-feed-design.md"
+        },
+        {
+          "title": "국내 공시·RSS 통합 수집 및 분석용 JSON 설계안",
+          "url": "/manuals/architecture/unified-disclosure-rss-ingestion-design.md",
+          "sourcePath": "docs/architecture/unified-disclosure-rss-ingestion-design.md"
+        },
+        {
+          "title": "데이터베이스 구조",
+          "url": "/manuals/architecture/database-schema.md",
+          "sourcePath": "docs/architecture/database-schema.md"
+        },
+        {
+          "title": "StockMan 프로젝트 구조 및 운영 기준",
+          "url": "/manuals/architecture/project-architecture.md",
+          "sourcePath": "docs/architecture/project-architecture.md"
+        },
+        {
+          "title": "국내·해외 전체 종목 통합 유니버스 동기화 설계",
+          "url": "/manuals/architecture/instrument-universe-sync.md",
+          "sourcePath": "docs/architecture/instrument-universe-sync.md"
+        },
+        {
+          "title": "미국 보통주 산업분류 코드 KIS 전용 수집·저장 설계",
+          "url": "/manuals/architecture/us-industry-classification-data-design.md",
+          "sourcePath": "docs/architecture/us-industry-classification-data-design.md"
+        },
+        {
+          "title": "개발·문서화 규칙",
+          "url": "/manuals/development/conventions.md",
+          "sourcePath": "docs/development/conventions.md"
+        },
+        {
+          "title": "기획·개발·테스트·배포·개선 생명주기",
+          "url": "/manuals/development/delivery-lifecycle.md",
+          "sourcePath": "docs/development/delivery-lifecycle.md"
+        },
+        {
+          "title": "운영 런북",
+          "url": "/manuals/operations/runbook.md",
+          "sourcePath": "docs/operations/runbook.md"
+        },
+        {
+          "title": "RSS 번역 상태 검수 API",
+          "url": "/manuals/operations/market-rss-translation-debug-api.md",
+          "sourcePath": "docs/operations/market-rss-translation-debug-api.md"
+        },
+        {
+          "title": "공시 기반 일별 주가 영향 이벤트",
+          "url": "/manuals/architecture/market-impact-events-design.md",
+          "sourcePath": "docs/architecture/market-impact-events-design.md"
+        },
+        {
+          "title": "해외 뉴스 탭 자동 갱신",
+          "url": "/manuals/operations/market-news-auto-refresh.md",
+          "sourcePath": "docs/operations/market-news-auto-refresh.md"
+        },
+        {
+          "title": "지속 개선 운영 기준",
+          "url": "/manuals/operations/continuous-improvement.md",
+          "sourcePath": "docs/operations/continuous-improvement.md"
+        },
+        {
+          "title": "지속 개선 검토 운영",
+          "url": "/manuals/operations/improvement-review.md",
+          "sourcePath": "docs/operations/improvement-review.md"
+        },
+        {
+          "title": "프로젝트 전체 디버깅 구조 설계안",
+          "url": "/manuals/DEBUGGING_ARCHITECTURE.md",
+          "sourcePath": "docs/DEBUGGING_ARCHITECTURE.md"
+        },
+        {
+          "title": "국내·해외 일·주·월봉 캐시 갱신 설계",
+          "url": "/manuals/CANDLE_REFRESH_DESIGN.md",
+          "sourcePath": "docs/CANDLE_REFRESH_DESIGN.md"
+        },
+        {
+          "title": "국내·해외 볼린저밴드 탐지",
+          "url": "/manuals/bollinger-band-operations.md",
+          "sourcePath": "docs/bollinger-band-operations.md"
+        },
+        {
+          "title": "관리자 기능 모듈 그룹",
+          "url": "/manuals/admin-module-groups.md",
+          "sourcePath": "docs/admin-module-groups.md"
+        },
+        {
+          "title": "공식 API 참조 문서",
+          "url": "/manuals/references/README.md",
+          "sourcePath": "docs/references/README.md"
+        },
+        {
+          "title": "KIS 종목 마스터 원본 보관소",
+          "url": "/manuals/references/kis-instrument-masters/README.md",
+          "sourcePath": "docs/references/kis-instrument-masters/README.md"
+        },
+        {
+          "title": "미국 상장 종목 SEC 공시 FORM·ITEM별 급등 촉매와 리스크 가이드",
+          "url": "/manuals/operations/us-sec-form-item-catalyst-risk-guide.md",
+          "sourcePath": "docs/operations/us-sec-form-item-catalyst-risk-guide.md"
+        },
+        {
+          "title": "미국 상장 종목 희석·자금조달 악재 조사 Harness",
+          "url": "/manuals/operations/us-equity-dilution-risk-harness.md",
+          "sourcePath": "docs/operations/us-equity-dilution-risk-harness.md"
+        },
+        {
+          "title": "티커별 SEC 기업 공시 분석 문서 기준",
+          "url": "/manuals/operations/sec-ticker-company-analysis-dossier-standard.md",
+          "sourcePath": "docs/operations/sec-ticker-company-analysis-dossier-standard.md"
+        },
+        {
+          "title": "2026년 10월 미국 주식시장 호재·악재 점검",
+          "url": "/manuals/operations/us-market-october-2026-outlook.md",
+          "sourcePath": "docs/operations/us-market-october-2026-outlook.md"
+        }
+      ]
+    },
+    {
+      "id": "rss-translation-design",
+      "title": "RSS 제목 번역 provider·무료량 보호 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "StockTitan RSS의 title만 번역한다. summary, content, 원문 payload 및 다른 source는 번역 provider에 보내지 않는다. Google과 Azure 사용량은 DB 예약 원장으로 앱 전체 인스턴스에서 합산 제한한다.",
+      "url": "/manuals/rss-translation-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/rss-translation-design.md",
+      "related": []
+    },
+    {
+      "id": "screener-design",
+      "title": "통합 종목 추출기 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "유니버스 필터 → 시총 필터 → 필요한 봉만 로드 → 지표 1회 계산 → AND/OR 조건 평가 → 점수·정렬 → 표준 메타데이터 응답.",
+      "url": "/manuals/SCREENER_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/SCREENER_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "sec-risk-local-refresh-pipeline",
+      "title": "로컬 SEC 리스크 갱신 파이프라인 명세",
+      "category": "project-guide",
+      "format": "md",
+      "description": "CRON이나 예약 실행 없이, 사용자가 로컬에서 명시적으로 실행하는 SEC 리스크 갱신 작업을 안정적으로 수행하기 위한 운영 명세다.",
+      "url": "/manuals/SEC_RISK_LOCAL_REFRESH_PIPELINE.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/SEC_RISK_LOCAL_REFRESH_PIPELINE.md",
+      "related": []
+    },
+    {
+      "id": "sec-risk-management-design",
+      "title": "SEC 리스크 관리 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "현재 스캐너가 추출한 미국 보통주 중 현재 시가총액 5,000만 달러 이하 종목을 대상으로 SEC 공시를 근거로 리스크를 정리하고, 로컬 DB에서 필요할 때 수동 갱신·조회·부분 수정할 수 있는 저장소와 API를 제공한다.",
+      "url": "/manuals/SEC_RISK_MANAGEMENT_DESIGN.md",
+      "relatedPaths": [
+        "docs/sec-edgar-official-reference.md"
+      ],
+      "sourcePath": "docs/SEC_RISK_MANAGEMENT_DESIGN.md",
+      "related": [
+        {
+          "title": "SEC EDGAR 공식 API 참고 문서",
+          "url": "/manuals/sec-edgar-official-reference.md",
+          "sourcePath": "docs/sec-edgar-official-reference.md"
+        }
+      ]
+    },
+    {
+      "id": "sec-edgar-official-reference",
+      "title": "SEC EDGAR 공식 API 참고 문서",
+      "category": "project-guide",
+      "format": "md",
+      "description": "이 문서는 StockMan에서 SEC EDGAR 연동을 개발할 때 기준으로 삼는 공식 문서와 운영 규칙을 정리한 내부 참고 문서다. SEC 공식 문서의 내용이 코드나 이 문서보다 우선한다.",
+      "url": "/manuals/sec-edgar-official-reference.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/sec-edgar-official-reference.md",
+      "related": []
+    },
+    {
+      "id": "stocktitan-open-api",
+      "title": "StockTitan Open API 제공 현황",
+      "category": "project-guide",
+      "format": "md",
+      "description": "2026-10-06 확인 기준, StockTitan은 개발자용 공개 Open API를 제공하지 않는다고 공식 FAQ에서 밝힌다. 따라서 공개된 API 종류, REST 엔드포인트, 인증 방식, 응답 스키마 또는 개발자용 API 상품은 확인되지 않는다. StockTitan 데이터와 기능은 웹 인터페이스 및 모바일 최적화 PWA를 통해 제공된다.",
+      "url": "/manuals/stocktitan-open-api.md",
+      "relatedPaths": [
+        "docs/stocktitan-rss.md"
+      ],
+      "sourcePath": "docs/stocktitan-open-api.md",
+      "related": [
+        {
+          "title": "StockTitan RSS 구독 모듈",
+          "url": "/manuals/stocktitan-rss.md",
+          "sourcePath": "docs/stocktitan-rss.md"
+        }
+      ]
+    },
+    {
+      "id": "stocktitan-rss",
+      "title": "StockTitan RSS 구독 모듈",
+      "category": "project-guide",
+      "format": "md",
+      "description": "StockTitan이 제공하는 RSS 피드를 기존 StockMan 시장 RSS 파이프라인에 연결한다. 웹 페이지를 크롤링하지 않고 공식 RSS 응답만 사용한다.",
+      "url": "/manuals/stocktitan-rss.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/stocktitan-rss.md",
+      "related": []
+    },
+    {
+      "id": "top-rising-operational-checklist",
+      "title": "국내·해외 상승률 TOP 100 운영 검증 체크리스트",
+      "category": "project-guide",
+      "format": "md",
+      "description": "국내·해외 상승률 TOP 100이 KIS 원본 응답, 상품 필터, 메모리 스냅샷, 장외 마지막 정상 데이터 경로까지 실제 운영 환경에서 정상 동작하는지 반복 검증한다.",
+      "url": "/manuals/TOP_RISING_OPERATIONAL_CHECKLIST.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/TOP_RISING_OPERATIONAL_CHECKLIST.md",
+      "related": []
+    },
+    {
+      "id": "ui-design-system",
+      "title": "StockMan UI 디자인 시스템 개선안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "현재의 다크모드와 네온 그린 정체성은 유지하면서, 화면 간 정보 계층·상태 표현·모바일 사용성을 일관되게 만든다. 네온 효과는 주요 상태와 행동을 강조하는 용도로만 사용하고, 본문 가독성을 우선한다.",
+      "url": "/manuals/UI_DESIGN_SYSTEM.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/UI_DESIGN_SYSTEM.md",
+      "related": []
+    },
+    {
+      "id": "us-top-rising-focus-pool-design",
+      "title": "미국 상승률 TOP 100 집중 갱신 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "미국 NAS·AMS·NYS 상승률 TOP 100에서 ETF·레버리지·파생상품 등을 제외한 활성 보통주를 선별한 뒤, 우선순위가 높은 최대 30개만 분봉·VWAP·거래대금·OBV·ADL 고빈도 탐지 대상으로 사용한다.",
+      "url": "/manuals/US_TOP_RISING_FOCUS_POOL_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/US_TOP_RISING_FOCUS_POOL_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "us-top-rising-minute-chart-design",
+      "title": "미국 상승률 TOP 100 분봉 차트 설계안",
+      "category": "project-guide",
+      "format": "md",
+      "description": "미국 상승률 TOP 100 원본 결과에서 보통주만 선별해 목록으로 제공하고, 목록의 각 종목을 기존 ChartModal에서 1분봉 또는 5분봉으로 조회한다.",
+      "url": "/manuals/US_TOP_RISING_MINUTE_CHART_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/US_TOP_RISING_MINUTE_CHART_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "us-top-rising-ui-data-quality",
+      "title": "미국 상승률 TOP100 UI 데이터 품질 및 누락 방지",
+      "category": "project-guide",
+      "format": "md",
+      "description": "상태: 상승률 UI/API 구현 기준. 집중 탐지 후보 UI는 2026-10-26 제거됨.",
+      "url": "/manuals/US_TOP_RISING_UI_DATA_QUALITY.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/US_TOP_RISING_UI_DATA_QUALITY.md",
+      "related": []
+    },
+    {
+      "id": "us-trade-intensity-breakout-design",
+      "title": "미국 단일 종목 체결강도 기반 급등주 탐지 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "KIS 해외주식 체결추이 API(HHDFS76200300)의 vpow 체결강도를 단일 순간값이 아니라 시계열 검증 신호로 사용한다. 이 API는 해당 날짜 전체 체결내역이 아니라 호출 시점 기준 최근 체결추이를 반환하므로, 반복 수집과 구간 비교가 필수다.",
+      "url": "/manuals/us-trade-intensity-breakout-design.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/us-trade-intensity-breakout-design.md",
+      "related": []
+    },
+    {
+      "id": "user-auth-design",
+      "title": "일반 사용자 인증 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "관리자 인증 쿠키와 사용자 인증 쿠키는 별도이며, 일반 사용자에게 관리자 권한을 부여하지 않는다.",
+      "url": "/manuals/USER_AUTH_DESIGN.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/USER_AUTH_DESIGN.md",
+      "related": []
+    },
+    {
+      "id": "official-opendart-changelog",
+      "title": "OpenDART 문서 변경 이력",
+      "category": "reference",
+      "format": "md",
+      "description": "OpenDART 문서 변경 이력 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (official/opendart/changelog.md)",
+      "url": "/manuals/official/opendart/changelog.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/official/opendart/changelog.md",
+      "related": []
+    },
+    {
+      "id": "official-opendart-financial-statements",
+      "title": "OpenDART 재무제표 수집 명세",
+      "category": "reference",
+      "format": "md",
+      "description": "공식 기준: $1",
+      "url": "/manuals/official/opendart/financial-statements.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/official/opendart/financial-statements.md",
+      "related": []
+    },
+    {
+      "id": "official-opendart-readme",
+      "title": "OpenDART 공식 문서 기준",
+      "category": "reference",
+      "format": "md",
+      "description": "확인일: 2026-08-29",
+      "url": "/manuals/official/opendart/README.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/official/opendart/README.md",
+      "related": []
+    },
+    {
+      "id": "official-readme",
+      "title": "공식 데이터 문서 관리",
+      "category": "reference",
+      "format": "md",
+      "description": "이 디렉터리는 프로젝트가 연동하는 공식 데이터 제공자의 명세와 출처를 관리한다.",
+      "url": "/manuals/official/README.md",
+      "relatedPaths": [
+        "docs/official/opendart/README.md",
+        "docs/official/sec-edgar/README.md"
+      ],
+      "sourcePath": "docs/official/README.md",
+      "related": [
+        {
+          "title": "OpenDART 공식 문서 기준",
+          "url": "/manuals/official/opendart/README.md",
+          "sourcePath": "docs/official/opendart/README.md"
+        },
+        {
+          "title": "SEC EDGAR 공식 문서 기준",
+          "url": "/manuals/official/sec-edgar/README.md",
+          "sourcePath": "docs/official/sec-edgar/README.md"
+        }
+      ]
+    },
+    {
+      "id": "official-sec-edgar-changelog",
+      "title": "SEC EDGAR 문서 변경 이력",
+      "category": "reference",
+      "format": "md",
+      "description": "SEC EDGAR 문서 변경 이력 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (official/sec-edgar/changelog.md)",
+      "url": "/manuals/official/sec-edgar/changelog.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/official/sec-edgar/changelog.md",
+      "related": []
+    },
+    {
+      "id": "official-sec-edgar-companyfacts",
+      "title": "SEC Company Facts 저장 명세",
+      "category": "reference",
+      "format": "md",
+      "description": "공식 기준: $1",
+      "url": "/manuals/official/sec-edgar/companyfacts.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/official/sec-edgar/companyfacts.md",
+      "related": []
+    },
+    {
+      "id": "official-sec-edgar-readme",
+      "title": "SEC EDGAR 공식 문서 기준",
+      "category": "reference",
+      "format": "md",
+      "description": "확인일: 2026-08-29",
+      "url": "/manuals/official/sec-edgar/README.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/official/sec-edgar/README.md",
+      "related": []
+    },
+    {
+      "id": "references-kis-instrument-masters-header-definitions",
+      "title": "KIS 종목 마스터 헤더 정의",
+      "category": "reference",
+      "format": "md",
+      "description": "상태: 원본 헤더 기준 정리",
+      "url": "/manuals/references/kis-instrument-masters/header-definitions.md",
+      "relatedPaths": [
+        "docs/references/kis-instrument-masters/README.md",
+        "docs/architecture/instrument-universe-sync.md"
+      ],
+      "sourcePath": "docs/references/kis-instrument-masters/header-definitions.md",
+      "related": [
+        {
+          "title": "KIS 종목 마스터 원본 보관소",
+          "url": "/manuals/references/kis-instrument-masters/README.md",
+          "sourcePath": "docs/references/kis-instrument-masters/README.md"
+        },
+        {
+          "title": "국내·해외 전체 종목 통합 유니버스 동기화 설계",
+          "url": "/manuals/architecture/instrument-universe-sync.md",
+          "sourcePath": "docs/architecture/instrument-universe-sync.md"
+        }
+      ]
+    },
+    {
+      "id": "references-kis-instrument-masters-readme",
+      "title": "KIS 종목 마스터 원본 보관소",
+      "category": "reference",
+      "format": "md",
+      "description": "이 디렉터리는 KIS Developers에서 내려받은 종목 마스터 파일의 원본 추출본을 날짜별로 보관한다. 파일은 바이너리/고정폭 원본이므로 내용을 임의로 정규화하지 않는다.",
+      "url": "/manuals/references/kis-instrument-masters/README.md",
+      "relatedPaths": [
+        "docs/references/kis-instrument-masters/header-definitions.md"
+      ],
+      "sourcePath": "docs/references/kis-instrument-masters/README.md",
+      "related": [
+        {
+          "title": "KIS 종목 마스터 헤더 정의",
+          "url": "/manuals/references/kis-instrument-masters/header-definitions.md",
+          "sourcePath": "docs/references/kis-instrument-masters/header-definitions.md"
+        }
+      ]
+    },
+    {
+      "id": "references-readme",
+      "title": "공식 API 참조 문서",
+      "category": "reference",
+      "format": "md",
+      "description": "KIS Open API 관련 엔드포인트, trid, 요청 파라미터, 응답 필드, 실전·모의투자 구분을 변경하거나 새로 구현할 때 이 문서를 우선 참조한다. 문서와 현재 코드가 다르면 공식 문서 기준으로 확인한 뒤 호환성 영향을 검토한다.",
+      "url": "/manuals/references/README.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/references/README.md",
+      "related": []
+    },
+    {
+      "id": "references-sec-filing-detail-summary-v1-readme-sec-v1",
+      "title": "SEC EDGAR 공시 기반 결정적(Deterministic) 매매 분석 규격 v1.0.0",
+      "category": "reference",
+      "format": "md",
+      "description": "1. 발견: EDGAR 공식 최신 접수 검색/RSS(Atom)를 입력으로 받되, RSS 제목/요약만으로 분석을 끝내지 않습니다.",
+      "url": "/manuals/references/sec-filing-detail-summary/v1/README_SEC_v1.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/references/sec-filing-detail-summary/v1/README_SEC_v1.md",
+      "related": []
+    },
+    {
+      "id": "references-sec-filing-detail-summary-v1-sec-filing-extraction-prompt-v1",
+      "title": "SEC EDGAR 공시 정형 수집/매매 위험 분석 지시문 v1.0.0",
+      "category": "reference",
+      "format": "md",
+      "description": "당신은 SEC EDGAR 공식 공시 원문만 사용하여 데이터베이스에 저장할 수 있는 표준화된 분석 결과를 만드는 추출기입니다. 투자 호재·악재 해석 전에 정확한 원문 수치 확보와 인용을 우선합니다.",
+      "url": "/manuals/references/sec-filing-detail-summary/v1/sec_filing_extraction_prompt_v1.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/references/sec-filing-detail-summary/v1/sec_filing_extraction_prompt_v1.md",
+      "related": []
+    },
+    {
+      "id": "references-sec-filing-detail-summary-v1-sec-filing-schema-v1",
+      "title": "Sec filing schema v1",
+      "category": "reference",
+      "format": "json",
+      "description": "{",
+      "url": "/manuals/references/sec-filing-detail-summary/v1/sec_filing_schema_v1.json",
+      "relatedPaths": [],
+      "sourcePath": "docs/references/sec-filing-detail-summary/v1/sec_filing_schema_v1.json",
+      "related": []
+    }
+  ]
+}

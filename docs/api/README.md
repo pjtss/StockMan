@@ -4,6 +4,9 @@
 
 - 사용자·AI용 상세 한국어 매뉴얼: [`/api-reference.md`](../../public/api-reference.md)
 - AI discovery index: [`/llms.txt`](../../public/llms.txt)
+- 구조화 문서 카탈로그: `GET /api/public/document-catalog` 및 [`/document-catalog.json`](../../public/document-catalog.json)
+- Swagger식 공개 API 계약 검색: `GET /api/public/api-manual`
+- 카탈로그 문서 원문: `/manuals/...` (빌드 시 `docs/`에서 생성)
 - OpenAPI 3.1.1 JSON: [`/openapi.json`](../../public/openapi.json)
 - 전체 route method/access/source 인벤토리: [`route-inventory.json`](./route-inventory.json)
 
@@ -29,6 +32,8 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
     npm run docs:api:generate
     npm run audit:api-surface
+    npm run docs:catalog:generate
+    npm run docs:catalog:check
 
 생성 전후 다음을 검토한다.
 

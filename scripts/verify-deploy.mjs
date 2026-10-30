@@ -195,13 +195,16 @@ async function verifyRuntime() {
   const publicStaticTarget = `${verifyDistDir}/standalone/public/_next/static`;
   if (!existsSync(staticSource)) throw new Error(`Standalone package smoke failed: missing ${staticSource}`);
   const standaloneRoot = `${verifyDistDir}/standalone`;
-  const publicDocs = ["openapi.json", "api-reference.md", "llms.txt"];
+  const publicDocs = ["openapi.json", "api-reference.md", "llms.txt", "document-catalog.json"];
   mkdirSync(join(standaloneRoot, "public"), { recursive: true });
   for (const name of publicDocs) {
     const source = join(process.cwd(), "public", name);
     if (!existsSync(source)) throw new Error(`Standalone API documentation smoke failed: missing ${source}`);
     cpSync(source, join(standaloneRoot, "public", name));
   }
+  const manualsSource = join(process.cwd(), "public", "manuals");
+  if (!existsSync(manualsSource)) throw new Error(`Standalone documentation smoke failed: missing ${manualsSource}`);
+  cpSync(manualsSource, join(standaloneRoot, "public", "manuals"), { recursive: true });
   // Copy into fresh targets. Copying a directory onto an already-created
   // directory is platform-dependent and can produce static/static nesting.
   rmSync(staticTarget, { recursive: true, force: true });
@@ -241,13 +244,25 @@ async function verifyRuntime() {
     const openApi = await openApiResponse.json();
     if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]
       || !openApi.paths?.["/api/public/market-impact-events"]?.get
-      || !openApi.paths?.["/api/scan/us-obv-divergence"]?.get) {
+      || !openApi.paths?.["/api/scan/us-obv-divergence"]?.get
+      || !openApi.paths?.["/api/public/document-catalog"]?.get
+      || !openApi.paths?.["/api/public/api-manual"]?.get) {
       throw new Error("Standalone OpenAPI smoke failed: specification version or expected public paths are missing.");
     }
-    for (const [path, marker] of [["/api-reference.md", "StockMan 외부 읽기 전용 API 매뉴얼"], ["/llms.txt", "StockMan API"]]) {
+    for (const [path, marker] of [["/api-reference.md", "StockMan 외부 읽기 전용 API 매뉴얼"], ["/llms.txt", "StockMan API"], ["/document-catalog.json", "stockman-document-catalog.v1"], ["/manuals/README.md", "StockMan 문서 인덱스"]]) {
       const response = await fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
       const body = await response.text();
       if (!response.ok || !body.includes(marker)) throw new Error(`Standalone API documentation smoke failed for ${path}: HTTP ${response.status}`);
+    }
+    const catalogResponse = await fetch(`http://127.0.0.1:${port}/api/public/document-catalog?q=일봉&limit=5`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+    const catalogBody = await catalogResponse.json();
+    if (!catalogResponse.ok || catalogBody.ok !== true || !Array.isArray(catalogBody.items) || catalogBody.items.length > 5) {
+      throw new Error(`Standalone document catalog smoke failed: HTTP ${catalogResponse.status}`);
+    }
+    const apiManualResponse = await fetch(`http://127.0.0.1:${port}/api/public/api-manual?category=screeners&limit=5`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+    const apiManualBody = await apiManualResponse.json();
+    if (!apiManualResponse.ok || apiManualBody.ok !== true || !apiManualBody.items?.every((operation) => operation.method === "GET" && operation.authentication.required === false)) {
+      throw new Error(`Standalone public API manual smoke failed: HTTP ${apiManualResponse.status}`);
     }
     console.log(`[deploy-verify] public API docs ok: ${Object.keys(openApi.paths).length} read operations`);
     await Promise.race([

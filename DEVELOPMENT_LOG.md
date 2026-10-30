@@ -1,3 +1,29 @@
+## [2026-10-30] LLM 단일 매뉴얼의 라이브 문서·API 탐색
+
+### 목표
+- 다운로드 매뉴얼 하나만 LLM에 전달하면 매 작업에서 운영 서버의 최신 공개 API 계약 및 문서 카탈로그를 직접 찾아 읽을 수 있게 한다. 비공개·미문서화 내부 구조를 노출한다고 약속하지 않는다.
+
+### 반영
+- `GET /api/public/api-manual`: OpenAPI 공개 무인증 GET의 기능, 필수·선택 path/query/header 입력, 응답 schema, 인증 분류와 source 경로를 검색한다.
+- `GET /api/public/document-catalog` 및 `/document-catalog.json`: 문서 122개를 7개 범주로 탐색하고 `/manuals/...`에서 선택된 원문을 읽게 한다. 내부 route inventory는 공개 카탈로그에서 제외한다.
+- OpenAPI·문서 카탈로그 생성을 `docs:check` 및 `prebuild`에 연결하고 standalone smoke에서 검색 API와 문서 원문 제공을 확인한다.
+- `public/llms.txt`, API 레퍼런스와 프로젝트 문서 인덱스가 단일 live discovery 경로를 안내하도록 갱신한다. 다운로드 매뉴얼은 매 대화마다 이 링크를 조회하며, 미배포·비공개·미문서화 동작은 알 수 없다고 설명한다.
+
+### 검증
+- `npm.cmd run docs:check`: 통과. 176 route와 공개 GET 40개 OpenAPI, 문서 122개/7개 범주, 28개 entry points, migrations 163개/V163, 운영 관계 25개를 확인했다.
+- `npm.cmd run deploy:verify`: 통과. npm audit 취약점 0개, Next production build, standalone 문서/API·차트 및 응답 smoke, Chrome desktop/mobile hydration, 테스트 294 files (1,523 passed, 3 skipped), 격리 TypeScript 검사, API/cron/auth/scope 감사 통과.
+- `git diff --check`: 변경 파일 통과. 원격 배포 workflow 실행 및 운영 URL 확인은 push 이후 수행한다.
+
+### 다음 개선
+- [ ] 응답이 `generic-schema`로 표시된 API의 DTO를 실제 route 계약과 대조해 OpenAPI에 단계적으로 구체화한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-30-003
+- 성과 판정: UNMEASURED
+- 근거: 122개 문서와 공개 GET 40개 API를 위한 live discovery 경로를 구성했고 전체 deploy verifier를 통과했다. 운영 workflow와 URL 확인은 푸시 이후 남아 있다.
+
+### 커밋·푸시·배포
+- 아직 미실행.
 ## [2026-10-30] OBV 다이버전스 요청형 Discord Webhook 전달
 
 ### 목표

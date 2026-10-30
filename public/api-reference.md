@@ -4,6 +4,7 @@
 
 ## 빠른 시작
 
+- 최신 공개 API 기능·요청·응답 계약은 `GET /api/public/api-manual`에서 검색하고, 기능별 세부 문서는 `GET /api/public/document-catalog` 또는 `/document-catalog.json`에서 찾는다. 문서 원문은 `/manuals/...`에서 제공한다.
 - 배포 host의 /openapi.json에서 외부 읽기 API 경로와 query parameter를 받는다. 서버 URL은 상대 경로라 host를 하드코딩하지 않는다.
 - 이 매뉴얼은 /api-reference.md, AI용 시작 인덱스는 /llms.txt에 배포된다.
 - 경로는 현재 /api 아래에 있으며 URL major version prefix는 없다. OpenAPI info.version 1.0.0은 문서 버전이고 /api/v1을 의미하지 않는다. 호환성은 현행 코드·OpenAPI를 기준으로 다시 확인한다.
@@ -16,6 +17,14 @@
     curl -sS 'https://<배포 호스트>/api/market-news?hours=6&pageSize=20&kind=NEWS'
 
 응답의 x-request-id를 요청 추적에 보존한다. 이 값은 인증 토큰이 아니다.
+
+## 라이브 API·기능 문서 탐색
+
+`GET /api/public/api-manual`은 현재 `/openapi.json`에 등재된 무인증 외부 GET operation을 페이지 단위로 돌려준다. 각 항목은 method/path, 기능 설명, path/query/header 입력과 필수 여부, 응답 상태·schema, 인증 분류, `sourcePath` 및 `sourceUrl`을 포함한다. Query는 `q`(최대 120자), `tag`, `category`(`disclosure-news`, `market-data`, `screeners`, `market-events`, `system`), `limit`(1~100, 기본 20), `cursor`다. 응답의 `nextCursor`를 그대로 전달하고 `q`/`tag`/`category`를 유지한다. `detail=generic-schema`인 응답은 DTO가 OpenAPI에 구체적으로 적히지 않은 것이므로 연결된 기능 문서나 구현 경로에서 확인한다.
+
+`GET /api/public/document-catalog`은 프로젝트 기능 문서를 찾아준다. Query는 `q`(최대 120자), `category`(`architecture`, `development`, `operations`, `api`, `reference`, `company-analysis`, `project-guide`), `limit`(1~100, 기본 20), `cursor`다. 응답의 `items[].url`은 배포된 `/manuals/...` 원문 URL이고 `related[]`는 연관 문서 링크다. 다음 페이지에 `nextCursor`를 그대로 쓰고 `q`와 `category`를 유지한다. 두 탐색 API는 인증 없는 읽기 GET이며 잘못된 query는 HTTP 400이다.
+
+LLM은 각 작업에서 라이브 OpenAPI·메뉴얼·카탈로그를 다시 조회해야 한다. 이 경로는 배포되어 공개 문서에 반영된 내용만 제공하며 비공개 API나 문서화되지 않은 구현을 노출하지 않는다.
 
 ## 범위와 권한
 

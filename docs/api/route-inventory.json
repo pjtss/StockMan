@@ -1095,12 +1095,28 @@
       "source": "app/api/market-news/route.ts"
     },
     {
+      "path": "/api/public/api-manual",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/api-manual/route.ts"
+    },
+    {
       "path": "/api/public/daily-candles",
       "methods": [
         "GET"
       ],
       "access": "public-read-candidate",
       "source": "app/api/public/daily-candles/route.ts"
+    },
+    {
+      "path": "/api/public/document-catalog",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/document-catalog/route.ts"
     },
     {
       "path": "/api/public/instrument-fundamentals",

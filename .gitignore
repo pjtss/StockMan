@@ -24,3 +24,6 @@ free-float-inventory-*.csv
 # Local IDE metadata
 .idea/
 .vscode/
+
+# Generated public manual pages (rebuilt from docs during build)
+/public/manuals/

@@ -11,7 +11,6 @@
     "test:watch": "vitest",
     "check:rss-translation-coverage": "node scripts/check-market-rss-translation-coverage.mjs",
     "backfill:market-rss-normalized-summary": "node --experimental-strip-types scripts/backfill-market-rss-normalized-summary.mts",
-    "docs:check": "node scripts/check-docs.mjs",
     "audit:dependencies": "npm audit --audit-level=moderate",
     "audit:kis-boundary": "node scripts/audit-kis-boundary.mjs",
     "audit:bearer-auth": "node scripts/audit-bearer-auth.mjs",
@@ -26,7 +25,11 @@
     "sync:daily-cache": "node --env-file=.env.local scripts/sync-daily-cache-from-remote.mjs",
     "verify": "npm test -- --run && npm run typecheck && npm run docs:check && npm run audit:api-surface && npm run audit:verify-scope && npm run audit:kis-boundary && npm run audit:bearer-auth && npm run cron:check && npm run build",
     "audit:api-surface": "node scripts/api-surface.mjs check",
-    "docs:api:generate": "node scripts/api-surface.mjs write"
+    "docs:api:generate": "node scripts/api-surface.mjs write",
+    "prebuild": "npm run docs:api:generate && npm run docs:catalog:generate",
+    "docs:check": "npm run docs:api:generate && npm run audit:api-surface && npm run docs:catalog:generate && npm run docs:catalog:check && node scripts/check-docs.mjs",
+    "docs:catalog:generate": "node docs/api/document-catalog.mjs write",
+    "docs:catalog:check": "node docs/api/document-catalog.mjs check"
   },
   "dependencies": {
     "@netlify/functions": "^5.2.0",

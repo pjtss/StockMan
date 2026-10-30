@@ -3,6 +3,10 @@
 StockMan is a stock-market monitoring and disclosure application. Its external API documentation is generated from the current Next.js Route Handler surface.
 
 - Read the detailed API manual: /api-reference.md
+- Read the machine-readable document catalog: /document-catalog.json
+- Search functional manuals: /api/public/document-catalog?q=keyword&category=operations&limit=10
+- Look up Swagger-style API functions, inputs, and response schemas: /api/public/api-manual?q=keyword&category=screeners&limit=10
+- Read the documentation index: /manuals/README.md
 - Read the machine-readable OpenAPI 3.1.1 specification: /openapi.json
 - Read the Korean filing-event analysis and JSON update guide: /api/public/market-impact-events/guide
 - Read stored filing-impact events by date and market: /api/public/market-impact-events
@@ -14,3 +18,4 @@ StockMan is a stock-market monitoring and disclosure application. Its external A
 - Treat empty arrays and null as truthful empty data; never fabricate missing market or filing data.
 - For filing-event analysis, fetch the guide endpoint first, inspect existing events, and return a proposed JSON change with official source evidence; the guide endpoint does not write files or the operating database.
 - Do not send credentials or authentication headers to documented read-only operations.
+- Re-fetch these live documents for each task. They describe only deployed, public, documented behavior; private or undocumented implementation details are not discoverable here.

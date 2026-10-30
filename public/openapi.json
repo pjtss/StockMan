@@ -939,6 +939,99 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/public/api-manual": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicApiManual",
+        "summary": "Public / Api Manual API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/api-manual/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/api-manual/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/public/daily-candles": {
       "get": {
         "tags": [
@@ -1179,6 +1272,89 @@
           }
         },
         "x-code-path": "app/api/public/daily-candles/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
+    "/api/public/document-catalog": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicDocumentCatalog",
+        "summary": "Public / Document Catalog API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/document-catalog/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/document-catalog/route.ts",
         "x-access-classification": "public-read-candidate"
       }
     },

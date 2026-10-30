@@ -17,6 +17,7 @@
 
 ## 시작점
 
+- LLM 단일 discovery 경로: [문서 카탈로그](../public/document-catalog.json) · [기능 문서 검색 GET](../app/api/public/document-catalog/route.ts) · [Swagger식 API 메뉴얼 GET](../app/api/public/api-manual/route.ts) · [운영 문서 인덱스](../public/manuals/README.md) · [llms.txt](../public/llms.txt)
 - 외부 읽기 API 매뉴얼·OpenAPI·AI discovery: [`api/README.md`](./api/README.md) · [배포 매뉴얼](../public/api-reference.md) · [OpenAPI JSON](../public/openapi.json) · [llms.txt](../public/llms.txt)
 
 - 기업 분석 전체 인덱스: [`company-analysis/`](./company-analysis/README.md)
