@@ -14,6 +14,7 @@ describe("refreshUsObvDivergenceSnapshot", () => {
       if (query.includes("pg_try_advisory_xact_lock")) return { rows: [{ locked: true }] };
       if (query.includes("MAX(CASE")) return { rows: [{ latest_date: new Date("2026-10-29T00:00:00.000Z") }] };
       if (query.includes("FOR UPDATE")) return { rows: [] };
+      if (query.includes("official_count")) return { rows: [{ official_count: "1500", valid_us_market_cap_count: "1500", eligible_count: "1500" }] };
       if (query.includes("COUNT(*)::text")) return { rows: [{ count: "1500" }] };
       if (query.includes("LEFT JOIN LATERAL")) return { rows: [] };
       throw new Error(`Unexpected query: ${query}`);

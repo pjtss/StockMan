@@ -14,7 +14,7 @@ type SnapshotPayload = {
   algoVersion: string;
   generatedAtUtc: string;
   asOfEtDate: string;
-  marketCapLimitUsd: null;
+  marketCapLimitUsd: 100_000_000;
   scanStatus: "COMPLETE" | "PARTIAL";
   universe: Record<string, unknown>;
   parameters: Record<string, unknown>;

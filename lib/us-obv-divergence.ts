@@ -9,14 +9,18 @@ export type ObvCandle = {
   volume: number;
 };
 
-export type ObvInstrument = { market: string; code: string; name: string };
+export type ObvInstrument = {
+  market: string; code: string; name: string;
+  marketCapUsd?: number | null; marketCapObservedAtUtc?: string | null;
+};
 
 export type ObvCandidate = {
   ticker: string;
   market: string;
   name: string;
   exchange: string;
-  marketCapUsd: null;
+  marketCapUsd: number | null;
+  marketCapObservedAtUtc: string | null;
   candleDate: string;
   close: number;
   signalType: "TREND" | "PIVOT" | "BOTH";
@@ -218,7 +222,9 @@ export function evaluateUsObvDivergence(
   if (bars.some((bar) => bar.low === null)) dataIssues.push("PIVOT_UNAVAILABLE_MISSING_LOW");
   const candidate: ObvCandidate = {
     ticker: instrument.code, market: instrument.market, name: instrument.name, exchange: instrument.market,
-    marketCapUsd: null, candleDate: bars.at(-1)!.date, close: bars.at(-1)!.close, signalType,
+    marketCapUsd: instrument.marketCapUsd ?? null,
+    marketCapObservedAtUtc: instrument.marketCapObservedAtUtc ?? null,
+    candleDate: bars.at(-1)!.date, close: bars.at(-1)!.close, signalType,
     signalQuality: dataIssues.length ? "REVIEW" : signalType === "BOTH" ? "HIGH" : "STANDARD",
     priceBasis: "UNVERIFIED_CORPORATE_ACTION_ADJUSTMENT", price20dPct, obv20dAvgVolumeMultiple,
     priceRegressionSlopePerDay, obvSlopePerDay, obvPositiveDayConcentration, obvPositiveDays20d,

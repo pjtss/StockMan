@@ -1,3 +1,31 @@
+## [2026-10-30] OBV 다이버전스 요청형 Discord Webhook 전달
+
+### 목표
+- 미국 USD 시총 1억 달러 이하 공식 보통주를 다이버전스 모듈로 추출하고, 보호된 POST를 통해 티커 목록을 Discord incoming webhook으로 전송한다.
+
+### 반영
+- `lib/us-obv-divergence-scan.ts`: 최신 USD 시총 조건과 일봉 기반 공통 스캔을 구현하고, snapshot 경로와 즉석 요청 경로가 같은 계산 모듈을 공유한다.
+- `lib/discord-us-obv-divergence.ts`, `app/api/cron/us-obv-divergence-discord/route.ts`: 별도 format/delivery 계층과 CRON_SECRET 보호 POST를 구현했다. 결과 티커를 쉼표로 구분해 전송하며 mention parsing을 비활성화한다.
+- `docs/architecture/us-obv-divergence-api-design.md`, OpenAPI/API reference를 요청 경로와 USD $100M 기준에 맞췄다.
+
+### 검증
+- `npm.cmd run verify`: 294개 테스트 파일 통과(1,523 passed, 3 skipped), typecheck, docs:check, API surface(174 routes/38 public GET), verify-scope, KIS boundary, Bearer auth, OCI cron, production build 모두 통과.
+- `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: 의존성 취약점 0건, production build, standalone 서버 기동/종료, `/charts`·브라우저 hydration·정적 JS 11개·API/인증 smoke와 전체 quality gate 통과.
+- 로컬 DB `BEGIN READ ONLY` 실측: 일봉 기준 2026-10-26, 공식 COMMON_STOCK 5,216개, USD fundamentals 5,216개, $100M 이하 1,365개, 실제 평가 1,316개(96.41%), 후보 29개. 후보 전부 양수·$100M 이하 확인; 티커는 API/Discord 메시지에서 쉼표로 구분한다.
+- 로컬 feature/env 설정에는 Discord webhook이 없었다. 실제 Discord 발송은 하지 않았으며 운영 URL 설정과 배포 CI 결과는 아직 미확인이다.
+- 운영 Discord webhook으로 메시지를 보내지는 않는다.
+
+### 다음 개선
+- [ ] 운영 Webhook URL이 서버 feature 설정 또는 `US_OBV_DIVERGENCE_DISCORD_WEBHOOK_URL`에 등록된 뒤 승인된 실행으로 수신 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-30-004
+- 성과 판정: PARTIAL
+- 근거: 원격 최신 `oci` 기준으로 이번 스캔·Webhook 변경만 분리했고 full deploy verification 및 read-only DB 결과를 확인했다. CI 운영 배포와 운영 Webhook 수신 확인은 아직 남았다.
+
+### 커밋·푸시·배포
+- 미실행.
+
 ## [2026-10-30] 공시 이벤트 작성 가이드 무인증 API 추가 및 운영 배포
 
 ### 목표

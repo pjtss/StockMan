@@ -2500,7 +2500,7 @@
                       "const": "ACTIVE_COMMON_STOCK_FROM_STOCKMAN_OFFICIAL_MASTER"
                     },
                     "marketCapLimitUsd": {
-                      "type": "null"
+                      "const": 100000000
                     },
                     "timeframe": {
                       "const": "D"
@@ -2583,6 +2583,19 @@
                           },
                           "name": {
                             "type": "string"
+                          },
+                          "marketCapUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "marketCapObservedAtUtc": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
                           },
                           "candleDate": {
                             "type": "string",

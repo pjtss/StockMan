@@ -135,7 +135,7 @@ KIS 공식 활성 `COMMON_STOCK` 마스터와 저장된 완료 일봉으로 사�
 | sort | 문자열, priority | priority, liquidity, obv, priceDrop |
 | minDollarVolume20d | 숫자, 0 | 음수 불가. 결과 표시만 필터링한다. |
 
-응답에는 알고리즘 버전, 미국 동부 기준 기준일, 생성 시각, COMPLETE/PARTIAL 상태, 공식 보통주 분모·coverage·제외 사유, 계산 파라미터, 경고, 페이지 정보와 후보를 포함한다. 각 후보는 계산에 사용한 봉의 거래일과 갱신 시각을 `candleMetadata`로 제공한다. 시가총액 제한은 없고 `marketCapUsd`는 null이다. 액면변경·배당 조정은 독립 검증되지 않았다.
+대상은 최신 fundamentals 스냅샷에서 통화가 USD이고 양수 시가총액이 $100,000,000 이하인 활성 공식 미국 보통주다. 응답에는 알고리즘 버전, 미국 동부 기준 기준일, 생성 시각, COMPLETE/PARTIAL 상태, 공식 보통주 수·유효 USD 시총 수·시총 대상 수·캔들 coverage, 계산 파라미터, 경고, 페이지 정보와 후보를 포함한다. 각 후보는 실제 `marketCapUsd` 및 `marketCapObservedAtUtc`, 계산에 사용한 각 봉의 거래일과 갱신 시각을 `candleMetadata`로 제공한다. 시총은 최신 저장 스냅샷이며 실시간 값이 아니다. 액면변경·배당 조정은 독립 검증되지 않았다.
 
 400 `INVALID_QUERY`, 503 `SNAPSHOT_NOT_READY`, `STALE_SNAPSHOT`, `INVALID_SNAPSHOT`, `SNAPSHOT_UNAVAILABLE`을 반환한다. 실제 데이터가 준비되기 전 예시 응답은 만들지 않는다.
 

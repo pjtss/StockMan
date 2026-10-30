@@ -782,6 +782,14 @@
       "source": "app/api/cron/us-minute-obv-adl/route.ts"
     },
     {
+      "path": "/api/cron/us-obv-divergence-discord",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-obv-divergence-discord/route.ts"
+    },
+    {
       "path": "/api/cron/us-obv-divergence-snapshot",
       "methods": [
         "POST"
