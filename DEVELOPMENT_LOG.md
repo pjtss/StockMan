@@ -1,9 +1,7 @@
-# [2026-10-30] 공시 영향 이벤트 JSON·DB·공개 API 운영 배포
-
 ## [2026-10-30] SEC 기반 미국 이벤트 일정 추가
 
-### 목적 및 범위
-- 실제 SEC 제출 자료에서 향후 미국 상장사 실적 일정과 임상 결과 예상 시기를 확인해 단일 원본 JSON의 `markets.US`에 기록하고, 운영 DB/API까지 반영한다.
+### 목표
+- 실제 SEC 제출 자료에서 향후 미국 상장사 실적 일정과 임상 결과 예상 시기를 확인해 단일 원본 JSON의 `markets.US`에 기록하고 운영 DB/API까지 반영한다.
 
 ### 반영
 - `data/market-impact-events.json`의 US 배열에 Ero Copper(NYSE: ERO)와 IAMGOLD(NYSE: IAG)의 회사 확정 3분기 실적/콜 일정, Acumen Pharmaceuticals(NASDAQ: ABOS)의 회사 추정 ALTITUDE-AD 2상 결과 월을 추가했다.
@@ -12,10 +10,25 @@
 - ABOS는 회사가 공개한 “2026년 11월 중” 추정만 기록했다. `eventDate`는 SEC 접수일 2026-10-26이고 추정 창은 `keyDates`의 `2026-11`로 표현해 정확한 발표일을 만들어내지 않았다. 회사 공시의 542명 총 등록 수와 군별 N=180 표기 불일치, 78.6 million USD 현금·시장성 증권(2026-09-30 기준), 2027년 초까지 운영 지원 전망도 원문 한계·회사 전망으로 구분했다.
 - 세 티커 모두 `scripts/import-market-impact-events.mjs --dry-run`에서 활성 미국 `COMMON_STOCK` 마스터 확인을 통과했다. importer는 read-only dry-run이었으며 DB 쓰기는 배포 importer가 수행하도록 했다.
 
-### 검증 및 배포
+### 검증
 - SEC 원문에서 ERO/IAG 일정 및 ABOS Phase 2 주요 결과 예상월, 임상 설계·평가지표·등록수·재무 전망을 확인했다.
-- 전체 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify` 통과: npm audit 취약점 0건, production build, standalone·OpenAPI 37 read operations·Chrome desktop/mobile/API smoke, Vitest 294개 파일(1,522 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth 및 OCI cron 검사.
-- 커밋·푸시·배포: 진행 예정. 배포 workflow가 SEC 이벤트를 운영 DB에 upsert한 뒤 공개 API 조회로 결과를 확인한다.
+- `scripts/import-market-impact-events.mjs --dry-run`: KR/US 총 4개 이벤트 JSON 파싱 및 세 미국 티커의 활성 COMMON_STOCK 확인 통과, DB 쓰기 없음.
+- `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: npm audit 취약점 0건, production build, standalone·OpenAPI 37 read operations·Chrome desktop/mobile/API smoke, Vitest 294개 파일(1,522 passed·3 skipped), typecheck 및 각종 문서·보안·cron 검사 통과.
+- 최초 원격 run `40993699409`의 1·2차 시도는 빌드·smoke·Vitest·typecheck까지 통과했으나 `docs:check`가 새 최신 로그 항목의 표준 섹션 누락을 검출해 배포를 차단했다. 원인: 요구되는 목표·검증·후속 개선·개선 과제·판정 근거·정규화된 전달 상태 항목을 빠뜨렸다. 영향: 운영 activation은 시작되지 않아 운영 데이터/버전은 변경되지 않았다. 필요한 표준 섹션과 개선 ID를 넣고 문서 계약 및 전체 로컬 배포 게이트가 통과하는 것을 확인했다.
+- 로그 형식 수정 후 `npm.cmd run docs:check`: 문서 진입점 24개, migration 163개, 운영 관계 감사 통과.
+
+### 다음 개선
+- [ ] 배포 후 무인증 공개 API에서 ERO/IAG 확정 일자와 ABOS 월 단위 추정 상태, ET/KST·eventDate 문자열을 각각 조회해 확인한다. 다음 이벤트 반영 때도 회사 확정 일정과 추정 월을 동일 JSON에서 구분한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-30-001
+- 성과 판정: PARTIAL
+- 근거: SEC 일정 JSON과 공식 종목 마스터 검증, 로그 형식 수정 후 로컬 전체 배포 게이트는 통과했다. 수정 전 원격 run 2회는 자동 감사에서 로그 계약 위반을 검출해 activation 전에 중단됐다. 수정 커밋의 원격 배포와 운영 API 확인이 남아 있다.
+
+### 커밋·푸시·배포
+- 실패 후 수정 중: `cb297a44`의 원격 run `40993699409` 시도 1·2가 `docs:check`에서 실패했다. 로그 계약을 고쳤고 전체 로컬 검증은 통과했으며, 수정 커밋 push 후 새 OCI run과 운영 API 조회를 완료한다.
+
+## [2026-10-30] 공시 영향 이벤트 JSON·DB·공개 API 운영 배포
 
 ### 목적 및 범위
 - 국내·미국 공시를 단일 JSON의 별도 배열로 보관하고, 원문 분석 이벤트를 운영 PostgreSQL과 공개 읽기 API에서 조회하게 한다.
