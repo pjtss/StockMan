@@ -15,19 +15,22 @@
 - `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: npm audit 0 vulnerabilities, production build, standalone/OpenAPI 38개 공개 GET 및 기존 Chrome desktop/mobile smoke 통과. 신규 route는 build output에서 static route로 생성됐다.
 - 전체 Vitest: 295개 파일 중 294개 통과·1개 skip, 1,523개 통과·3개 skip. guide route 회귀 테스트에서 무인증 응답, 가이드·스키마 버전, KR/US 경로, JSON Schema 및 cache policy를 확인했다.
 - typecheck, docs:check(24 entry points·163 migrations), verify-scope, KIS boundary, Bearer auth(173 routes), OCI cron(21 shared endpoints), API surface(173 route files·38 public GET) 모두 통과.
-- `git diff --check`: 통과. 운영 배포·무인증 HTTP 조회는 배포 후 실행 예정이다.
+- `git diff --check`: 통과.
+- 운영 배포 run `41019153797` 성공: Verify, standalone package, SSH configure, release upload, OCI activation 전 단계 통과.
+- 배포 후 `https://stockman.r-e.kr/api/public/market-impact-events/guide` 무인증 GET은 HTTP 200, `guideVersion=1.0.0`, `schemaVersion=market-impact-event-guide.v1`, KR/US 경로, Draft 2020-12 schema, prompt 및 public cache 정책을 반환했다. `/openapi.json`에 해당 경로가 있고 operation security는 빈 배열이다.
+- 운영 `/api/health`는 `ok`; 기존 `GET /api/public/market-impact-events?market=KR&limit=1`도 인증 없이 `market-impact-events.v1` 응답을 반환했다.
 
 ### 다음 개선
-- [ ] 배포 후 guide endpoint를 인증 헤더 없이 조회하고 응답의 guide/schema 버전, KR/US 경로, JSON Schema 및 프롬프트 필드를 확인한다.
+- [x] 배포 후 guide endpoint를 인증 헤더 없이 조회하고 응답의 guide/schema 버전, KR/US 경로, JSON Schema 및 프롬프트 필드를 확인한다.
 - [ ] 이벤트 계약 필드가 바뀔 때 가이드 JSON, importer, DB/API 응답 계약, 예시 데이터 및 API 문서를 함께 갱신하는 절차를 유지한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-30-002
-- 성과 판정: UNMEASURED
-- 근거: 코드·문서 반영과 정적 계약 감사는 통과했다. 전체 배포 검증과 운영 배포 후 API 확인은 아직 완료 전이다.
+- 성과 판정: IMPROVED
+- 근거: 전체 검증, Deploy OCI run `41019153797`, 운영 health와 무인증 guide/event GET을 확인했다. guide 응답은 두 시장 분리 경로와 JSON Schema·프롬프트를 제공하고 OpenAPI에서 인증 없이 발견된다.
 
 ### 커밋·푸시·배포
-- 진행 중: 전체 배포 검증은 통과했다. 커밋·푸시와 운영 배포 후 API 확인은 미완료.
+- 완료: 구현 커밋 `a2d4a8f5`를 `origin/oci`에 push했다. Deploy OCI run `41019153797` 성공 및 운영 health·guide/event 무인증 GET 확인을 마쳤다. 이 운영 결과를 기록한 후속 커밋은 현재 반영 중이다.
 
 ## [2026-10-30] SEC 기반 미국 이벤트 일정 추가
 
