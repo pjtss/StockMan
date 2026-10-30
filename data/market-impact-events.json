@@ -59,6 +59,181 @@
         }
       }
     ],
-    "US": []
+    "US": [
+      {
+        "eventId": "SEC:0001171843-26-006339:ERO_Q3_2026_RESULTS",
+        "eventDate": "2026-11-02",
+        "ticker": "ERO",
+        "companyName": "Ero Copper Corp.",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Ero Copper 2026년 3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "Ero Copper는 2026년 3분기 운영·재무 실적을 2026-11-02 장 마감 후 발표하고, 2026-11-03 10:30 ET에 실적 설명 컨퍼런스콜을 개최한다고 SEC 제출 보도자료에서 공지했다. 컨퍼런스콜은 2026-11-04 00:30 KST다. 발표 시각은 정확히 공지되지 않았다.",
+        "rationale": "분기 운영성과와 재무 결과가 구리·금 사업의 실적, 현금흐름 및 전망을 새로 제공할 수 있어 단기 주가 변동 가능성이 있다. 공시만으로 결과의 방향이나 주가 반응은 알 수 없으므로 방향을 UNCERTAIN으로 둔다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC",
+        "sourceId": "0001171843-26-006339",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1853860/000117184326006339/exh_991.htm",
+        "evidence": [
+          {
+            "quote": "will publish its third quarter 2026 operating and financial results on Monday, November 2, 2026, after market close.",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1853860/000117184326006339/exh_991.htm",
+            "locator": "Exhibit 99.1, 첫 문단"
+          },
+          {
+            "quote": "Tuesday, November 3, 2026 at 10:30 a.m. Eastern Time.",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1853860/000117184326006339/exh_991.htm",
+            "locator": "Exhibit 99.1, 컨퍼런스콜 일정"
+          }
+        ],
+        "risks": [
+          "실적 발표는 장 마감 후로 공지됐으나 정확한 시각은 공시되지 않았다.",
+          "실적의 실제 결과와 회사의 향후 전망은 발표 전 확인되지 않았으며, 일정 공지만으로 주가 방향을 판단할 수 없다."
+        ],
+        "limitations": [
+          "공시는 Ero Copper의 NYSE 상장 티커가 ERO임을 확인하지만, 과거 가격 반응 표본은 이번 일정 JSON에서 분석하지 않았다.",
+          "11월의 ET는 EST(UTC-5)이며 컨퍼런스콜 시각은 KST(UTC+9)로 환산했다."
+        ],
+        "keyDates": [
+          { "date": "2026-11-02", "status": "CONFIRMED_SCHEDULED", "description": "2026년 3분기 운영·재무 실적 발표 예정, 장 마감 후(정확한 시각 미공개)" },
+          { "date": "2026-11-03", "status": "CONFIRMED_SCHEDULED", "description": "컨퍼런스콜 10:30 EST; 2026-11-04 00:30 KST" }
+        ],
+        "eventDetails": {
+          "who": "Ero Copper Corp. (NYSE: ERO)",
+          "what": "2026년 3분기 운영·재무 실적 발표와 컨퍼런스콜",
+          "when": "실적 발표 2026-11-02 장 마감 후(정확한 시각 미공개); 컨퍼런스콜 2026-11-03 10:30 EST / 2026-11-04 00:30 KST",
+          "where": "미국 NYSE 상장사; 회사 웹캐스트 및 전화 컨퍼런스콜",
+          "why": "분기 운영성과와 재무상태를 투자자에게 공개하는 정기 실적 일정",
+          "how": "SEC 제출 Exhibit 99.1에서 날짜와 컨퍼런스콜 시각 확인",
+          "disclosureDate": "2026-10-01",
+          "form": "6-K",
+          "session": "RESULTS_AFTER_MARKET_CLOSE; CONFERENCE_CALL_DURING_REGULAR_MARKET_HOURS",
+          "timezone": "America/New_York (EST, UTC-5); Asia/Seoul (KST, UTC+9)"
+        }
+      },
+      {
+        "eventId": "SEC:0001062993-26-005183:IAG_Q3_2026_RESULTS",
+        "eventDate": "2026-11-05",
+        "ticker": "IAG",
+        "companyName": "IAMGOLD Corporation",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "IAMGOLD 2026년 3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "IAMGOLD는 2026년 3분기 운영·재무 실적을 2026-11-05 장 마감 후 발표하고, 2026-11-06 08:30 ET에 경영진 컨퍼런스콜을 개최한다고 SEC 제출 자료에서 공지했다. 컨퍼런스콜은 같은 날 22:30 KST다. 실적 발표의 정확한 시각은 미공개다.",
+        "rationale": "금 생산·운영 성과와 재무 결과가 회사의 단기 실적 기대를 갱신할 수 있다. SEC 공시에는 아직 결과가 없고, 일정 자체는 방향성 근거가 아니므로 주가 방향을 UNCERTAIN으로 기록한다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC",
+        "sourceId": "0001062993-26-005183",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1203464/000106299326005183/exhibit99-1.pdf",
+        "evidence": [
+          {
+            "quote": "plans to release its third quarter 2026 operating and financial results after market hours on Thursday, November 5, 2026.",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1203464/000106299326005183/exhibit99-1.pdf",
+            "locator": "SEC 제출 자료, 1쪽 첫 문단"
+          },
+          {
+            "quote": "Friday, November 6, 2026, at 8:30 a.m. (Eastern Time).",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1203464/000106299326005183/exhibit99-1.pdf",
+            "locator": "SEC 제출 자료, 1쪽 첫 문단"
+          }
+        ],
+        "risks": [
+          "실적 발표는 장 마감 후 일정만 공지되었으며 정확한 발표 시각은 공시되지 않았다.",
+          "금 생산량, 비용, 실현 가격, 회사 전망 등 실적 결과는 아직 발표되지 않아 주가 영향 방향은 판단할 수 없다."
+        ],
+        "limitations": [
+          "SEC 제출 보도자료는 IAMGOLD가 NYSE에서 IAG로 거래됨을 확인한다. 과거 가격 반응 표본 분석은 포함하지 않았다.",
+          "11월의 ET는 EST(UTC-5)이며 컨퍼런스콜 시각은 KST(UTC+9)로 환산했다."
+        ],
+        "keyDates": [
+          { "date": "2026-11-05", "status": "CONFIRMED_SCHEDULED", "description": "2026년 3분기 운영·재무 실적 발표 예정, 장 마감 후(정확한 시각 미공개)" },
+          { "date": "2026-11-06", "status": "CONFIRMED_SCHEDULED", "description": "컨퍼런스콜 08:30 EST / 22:30 KST" }
+        ],
+        "eventDetails": {
+          "who": "IAMGOLD Corporation (NYSE: IAG)",
+          "what": "2026년 3분기 운영·재무 실적 발표와 경영진 컨퍼런스콜",
+          "when": "실적 발표 2026-11-05 장 마감 후(정확한 시각 미공개); 컨퍼런스콜 2026-11-06 08:30 EST / 22:30 KST",
+          "where": "미국 NYSE 상장사; 회사 웹캐스트 및 전화 컨퍼런스콜",
+          "why": "분기 운영성과와 재무상태를 투자자에게 공개하는 정기 실적 일정",
+          "how": "SEC 제출 PDF Exhibit 99.1에서 날짜와 컨퍼런스콜 시각 확인",
+          "disclosureDate": "2026-10-05",
+          "form": "6-K",
+          "session": "RESULTS_AFTER_MARKET_CLOSE; CONFERENCE_CALL_BEFORE_MARKET_OPEN",
+          "timezone": "America/New_York (EST, UTC-5); Asia/Seoul (KST, UTC+9)"
+        }
+      },
+      {
+        "eventId": "SEC:0001628280-26-067129:ABOS_ALTITUDE_AD_TOPLINE",
+        "eventDate": "2026-10-26",
+        "ticker": "ABOS",
+        "companyName": "Acumen Pharmaceuticals, Inc.",
+        "eventType": "CLINICAL_TRIAL_READOUT",
+        "status": "ESTIMATED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Acumen ALTITUDE-AD 2상 주요 결과 예상 시기",
+        "summary": "Acumen은 SEC Form 8-K 첨부자료에서 초기 알츠하이머병 대상 sabirnetug(ACU193) ALTITUDE-AD 2상 주요 결과를 2026년 11월 중 발표할 것으로 예상한다고 밝혔다. 정확한 날짜와 시각은 공지되지 않았다. 임상시험은 3개 군 총 542명 등록으로 기재됐으며, 회사가 설명한 주요 결과 항목은 1차 iADRS와 주요 2차 CDR-SB, 안전성(ARIA 포함), 바이오마커다.",
+        "rationale": "환자 대상 2상 임상 결과는 후보물질의 효능·안전성 해석과 후속 개발 경로에 영향을 줄 수 있는 직접 촉매다. 임상 결과가 아직 공개되지 않았고 성공 여부 및 이후 허가까지의 경로는 불확실하므로 방향을 UNCERTAIN으로 기록한다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC",
+        "sourceId": "0001628280-26-067129",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1576885/000162828026067129/abos-20261026xexx991.htm",
+        "evidence": [
+          {
+            "quote": "Expect to report topline results for ALTITUDE-AD ... in November 2026",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1576885/000162828026067129/abos-20261026xexx991.htm",
+            "locator": "Form 8-K Exhibit 99.1, 핵심 요약"
+          },
+          {
+            "quote": "The study has enrolled 542 individuals with early Alzheimer’s disease",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1576885/000162828026067129/abos-20261026xexx991.htm",
+            "locator": "Form 8-K Exhibit 99.1, About ALTITUDE-AD"
+          }
+        ],
+        "risks": [
+          "2상 결과가 기대에 미치지 못하거나 안전성 문제가 확인되면 개발 지연·중단 가능성이 있으며, 결과 발표만으로 허가 또는 상업화를 뜻하지 않는다.",
+          "회사는 현금·현금성 자산과 시장성 증권 78.6 million USD(2026-09-30 기준)가 현재 임상·운영을 2027년 초까지 지원할 것으로 예상한다고 공시했다. 이는 회사 전망이며, 추가 자금 조달 가능성과 희석 여부는 미확인이다."
+        ],
+        "limitations": [
+          "2026년 11월은 회사가 공시한 월 단위 예상 시기이며 확정 일정이 아니다. eventDate는 일정 예상 시기가 아니라 이를 공시한 SEC Form 8-K 접수일 2026-10-26이다.",
+          "공시 요약은 N=180 per arm이라고 병기하지만 3개 군과 총 등록 542명의 합계는 일치하지 않는다. 총 등록 수 542명과 군별 수치의 차이는 원문상 불일치로 남기며 임의 보정하지 않았다.",
+          "회사 자료상 FDA Fast Track 지정은 확인되지만 이 SEC 자료는 FDA 심사 목표일이나 승인 일정을 공지하지 않았다.",
+          "과거 주가 반응 표본은 분석하지 않았으며, 임상 결과의 방향과 주가 수익률은 확정할 수 없다."
+        ],
+        "keyDates": [
+          { "date": "2026-11", "status": "ESTIMATED", "description": "ALTITUDE-AD 2상 주요 결과 발표 예상 월; 정확한 날짜·시각 미공지." }
+        ],
+        "eventDetails": {
+          "who": "Acumen Pharmaceuticals, Inc. (NASDAQ: ABOS); sabirnetug (ACU193)",
+          "what": "초기 알츠하이머병 ALTITUDE-AD 2상 주요 결과 발표 예상",
+          "when": "2026년 11월 중(회사 예상, 날짜·시각 미확정); KST 환산 가능한 시각 미공개",
+          "where": "미국·캐나다·EU·영국의 다기관 시험; NASDAQ 상장사",
+          "why": "초기 알츠하이머병에서 후보물질의 효능과 안전성을 평가하는 임상 촉매",
+          "how": "3군 무작위 이중눈가림 위약대조, 35 mg/kg 및 50 mg/kg 정맥투여 4주 간격 대 위약, 18개월 평가기간",
+          "disclosureDate": "2026-10-26",
+          "form": "8-K",
+          "clinicalTrial": {
+            "name": "ALTITUDE-AD",
+            "nctId": "NCT06335173",
+            "asset": "sabirnetug (ACU193)",
+            "indication": "초기 알츠하이머병(경도인지장애 또는 경도 치매)",
+            "phase": "Phase 2",
+            "enrolledParticipants": 542,
+            "primaryEndpoint": "iADRS (Integrated Alzheimer’s Disease Rating Scale)",
+            "secondaryEndpoints": ["CDR-SB", "안전성 및 ARIA", "바이오마커"],
+            "companyDisclosedDoseArms": "35 mg/kg 및 50 mg/kg IV Q4W 대 위약; 18개월 이중눈가림 평가",
+            "fdaStatus": "FDA Fast Track 지정이 SEC 첨부 회사 자료에 기재됨; 목표일 미공개"
+          },
+          "cashAndMarketableSecuritiesUsdAsOf2026-09-30": 78600000,
+          "cashRunwayCompanyEstimate": "2027년 초까지 현재 임상·운영 활동 지원 예상",
+          "scheduleClassification": "COMPANY_ESTIMATED_MONTH",
+          "timezone": "발표 시각 미공개; KST 환산 불가"
+        }
+      }
+    ]
   }
 }

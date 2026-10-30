@@ -1,5 +1,22 @@
 # [2026-10-30] 공시 영향 이벤트 JSON·DB·공개 API 운영 배포
 
+## [2026-10-30] SEC 기반 미국 이벤트 일정 추가
+
+### 목적 및 범위
+- 실제 SEC 제출 자료에서 향후 미국 상장사 실적 일정과 임상 결과 예상 시기를 확인해 단일 원본 JSON의 `markets.US`에 기록하고, 운영 DB/API까지 반영한다.
+
+### 반영
+- `data/market-impact-events.json`의 US 배열에 Ero Copper(NYSE: ERO)와 IAMGOLD(NYSE: IAG)의 회사 확정 3분기 실적/콜 일정, Acumen Pharmaceuticals(NASDAQ: ABOS)의 회사 추정 ALTITUDE-AD 2상 결과 월을 추가했다.
+- 원문 SEC accession: ERO `0001171843-26-006339` (6-K, 2026-10-01), IAG `0001062993-26-005183` (6-K, 2026-10-05), ABOS `0001628280-26-067129` (8-K, 2026-10-26). 각 이벤트에 SEC 원문 링크, 짧은 직접 근거, 일정 상태, ET/KST, 사업·임상 맥락, 리스크와 미확인 정보를 기록했다.
+- ERO 11/3 10:30 ET 컨퍼런스콜은 11/4 00:30 KST이며 정규장 시간 중으로 구분했다. IAG 11/6 08:30 ET는 같은 날 22:30 KST다. 두 실적 발표는 장 마감 후 일정이며 정확한 시각은 미공개다.
+- ABOS는 회사가 공개한 “2026년 11월 중” 추정만 기록했다. `eventDate`는 SEC 접수일 2026-10-26이고 추정 창은 `keyDates`의 `2026-11`로 표현해 정확한 발표일을 만들어내지 않았다. 회사 공시의 542명 총 등록 수와 군별 N=180 표기 불일치, 78.6 million USD 현금·시장성 증권(2026-09-30 기준), 2027년 초까지 운영 지원 전망도 원문 한계·회사 전망으로 구분했다.
+- 세 티커 모두 `scripts/import-market-impact-events.mjs --dry-run`에서 활성 미국 `COMMON_STOCK` 마스터 확인을 통과했다. importer는 read-only dry-run이었으며 DB 쓰기는 배포 importer가 수행하도록 했다.
+
+### 검증 및 배포
+- SEC 원문에서 ERO/IAG 일정 및 ABOS Phase 2 주요 결과 예상월, 임상 설계·평가지표·등록수·재무 전망을 확인했다.
+- 전체 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify` 통과: npm audit 취약점 0건, production build, standalone·OpenAPI 37 read operations·Chrome desktop/mobile/API smoke, Vitest 294개 파일(1,522 passed·3 skipped), typecheck, docs/migration, verify-scope, KIS boundary, Bearer auth 및 OCI cron 검사.
+- 커밋·푸시·배포: 진행 예정. 배포 workflow가 SEC 이벤트를 운영 DB에 upsert한 뒤 공개 API 조회로 결과를 확인한다.
+
 ### 목적 및 범위
 - 국내·미국 공시를 단일 JSON의 별도 배열로 보관하고, 원문 분석 이벤트를 운영 PostgreSQL과 공개 읽기 API에서 조회하게 한다.
 
@@ -23,7 +40,8 @@
 - 날짜 수정 후 전체 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm run deploy:verify` 재통과: 전체 Vitest 293 파일(1522 passed·3 skipped), dependency audit 취약점 0건, production build, typecheck, standalone·Chrome desktop/mobile smoke, 새 endpoint OpenAPI/query smoke, 전체 docs/security/cron 검사.
 
 ### 커밋·푸시·배포
-- 구현은 최신 원격 `oci` 기반 별도 관리 worktree에서 진행했다. 기능 배포 `e496be7c` / run `40916565323`은 성공했다. 날짜 형식 수정 검증도 통과했으며 후속 push 및 운영 확인을 진행한다.
+- 구현은 최신 원격 `oci` 기반 별도 관리 worktree에서 진행했다. 기능 배포 `e496be7c` / run `40916565323`과 날짜 수정 `33448165` / run `40918694401` 모두 성공했다.
+- 최종 무인증 운영 확인: `/api/health` `ok`; `GET /api/public/market-impact-events?market=KR&date=2026-10-29&ticker=034730` HTTP 200, 이벤트 1건, `eventDate="2026-10-29"`; 같은 날짜 US 필터 HTTP 200, 0건. 조회 응답에 인증 헤더를 보내지 않았다.
 
 ## [2026-10-29] 미국 보통주 OBV 다이버전스 공개 API 배포
 
