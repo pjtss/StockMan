@@ -16,17 +16,20 @@
 - `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: npm audit 취약점 0건, production build, standalone·OpenAPI 37 read operations·Chrome desktop/mobile/API smoke, Vitest 294개 파일(1,522 passed·3 skipped), typecheck 및 각종 문서·보안·cron 검사 통과.
 - 최초 원격 run `40993699409`의 1·2차 시도는 빌드·smoke·Vitest·typecheck까지 통과했으나 `docs:check`가 새 최신 로그 항목의 표준 섹션 누락을 검출해 배포를 차단했다. 원인: 요구되는 목표·검증·후속 개선·개선 과제·판정 근거·정규화된 전달 상태 항목을 빠뜨렸다. 영향: 운영 activation은 시작되지 않아 운영 데이터/버전은 변경되지 않았다. 필요한 표준 섹션과 개선 ID를 넣고 문서 계약 및 전체 로컬 배포 게이트가 통과하는 것을 확인했다.
 - 로그 형식 수정 후 `npm.cmd run docs:check`: 문서 진입점 24개, migration 163개, 운영 관계 감사 통과.
+- 수정 커밋 `6da6d436`에서 전체 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone·OpenAPI·Chrome desktop/mobile/API smoke, 294개 테스트 파일(1,522 passed·3 skipped), typecheck, docs, scope, KIS, Bearer auth 및 OCI cron 검사.
+- Deploy OCI run `40995174364` 성공: Verify deployment, Package Next.js standalone, Configure SSH, Upload release, Activate release 모두 성공. OCI migration/import 및 release activation이 완료됐다.
+- 배포 후 무인증 GET 검증: `GET /api/health`는 `status=ok`; `/api/public/market-impact-events?market=US&ticker=ERO`는 1건 `2026-11-02` `CONFIRMED_SCHEDULED`, IAG는 1건 `2026-11-05` `CONFIRMED_SCHEDULED`, ABOS는 1건 `2026-10-26` `ESTIMATED`를 반환했다. 응답의 `eventDate`는 모두 `YYYY-MM-DD` 문자열이며 각 항목에 SEC accession과 SEC 원문 URL이 포함됐다.
 
 ### 다음 개선
 - [ ] 배포 후 무인증 공개 API에서 ERO/IAG 확정 일자와 ABOS 월 단위 추정 상태, ET/KST·eventDate 문자열을 각각 조회해 확인한다. 다음 이벤트 반영 때도 회사 확정 일정과 추정 월을 동일 JSON에서 구분한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-30-001
-- 성과 판정: PARTIAL
-- 근거: SEC 일정 JSON과 공식 종목 마스터 검증, 로그 형식 수정 후 로컬 전체 배포 게이트는 통과했다. 수정 전 원격 run 2회는 자동 감사에서 로그 계약 위반을 검출해 activation 전에 중단됐다. 수정 커밋의 원격 배포와 운영 API 확인이 남아 있다.
+- 성과 판정: IMPROVED
+- 근거: SEC 원문 기반 3개 일정과 공식 활성 COMMON_STOCK 검증을 완료했고, 로그 계약 수정 후 로컬 전체 게이트 및 원격 Deploy OCI 전체 단계가 성공했다. 운영 health 정상과 무인증 API에서 세 이벤트의 날짜·상태·SEC accession이 조회되는 것을 확인했다. 최초 두 run의 자동 차단은 로그 계약 누락이 원인이었으며 수정 후 해소됐다.
 
 ### 커밋·푸시·배포
-- 실패 후 수정 중: `cb297a44`의 원격 run `40993699409` 시도 1·2가 `docs:check`에서 실패했다. 로그 계약을 고쳤고 전체 로컬 검증은 통과했으며, 수정 커밋 push 후 새 OCI run과 운영 API 조회를 완료한다.
+- 완료: 일정 JSON 커밋 `cb297a44`, 로그 계약 보완 커밋 `6da6d436`를 `origin/oci`에 push했다. 수정 release의 Deploy OCI run `40995174364`가 성공했고 운영 health 및 3개 SEC 이벤트 무인증 GET 확인을 완료했다.
 
 ## [2026-10-30] 공시 영향 이벤트 JSON·DB·공개 API 운영 배포
 
