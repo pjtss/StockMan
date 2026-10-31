@@ -7992,6 +7992,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 남은 위험: 운영 DB에 해당 티커의 최신 스냅샷 또는 SEC facts가 없으면 API는 `PARTIAL`과 누락 항목을 반환한다. 데이터 수집·갱신은 이 공개 GET에서 실행하지 않는다.
 
 ### 커밋·푸시·배포
-- API 커밋 `09fea406`을 `oci`에 push했다. 첫 workflow는 activation 전 단계에서 실패했고 이전 release는 유지됐다. 패키징 누락 수정은 별도 한국어 커밋으로 재배포하며, workflow 성공 뒤 운영 health와 공개 API를 확인한다.
+- API 커밋 `09fea406` 및 OCI 패키징 수정 `053a90eb`을 `origin/oci`에 순차 push했다. 첫 workflow `41180014242`는 importer helper 누락으로 activation 전에 실패했고 이전 release가 유지됐다. 수정 workflow `41181213216`은 성공했다.
+- 배포 후 운영 `https://stockman.r-e.kr/api/health` 무인증 GET은 HTTP 200 `ok`, `/api/public/us-stock-metadata?ticker=AAPL` 무인증 GET은 HTTP 200을 반환했다. AAPL 활성 보통주 식별정보와 저장 시세가 포함됐고, SEC 식별정보/facts 미보유는 `PARTIAL`, 시세 24시간 초과는 `STALE`로 표시됐다.
+- 운영 `/api/public/api-manual?q=us-stock-metadata&limit=5` 무인증 GET은 HTTP 200이며 신규 GET operation, ticker 필수 입력, 응답 DTO 및 오류 응답 설명을 검색 결과에 포함했다.
+- 최종 커밋·푸시·배포는 완료했다. 마지막 기록 변경은 이 문서뿐이며 `docs:check`와 `git diff --check`로 확인한다.
 
 \n
