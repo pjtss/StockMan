@@ -18,11 +18,11 @@
 - 첫 `npm.cmd run deploy:verify`는 가이드 버전 상향 뒤 회귀 테스트가 이전 기대값 `1.0.0`을 유지해 실패했고 배포를 차단했다. 테스트 기대값을 `1.1.0`으로 동기화했다.
 - 최신 `origin/oci` 위에서 최종 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: 통과. dependency audit 0 vulnerabilities, production build, standalone/OpenAPI 40 read operations, Chrome desktop/mobile, 296개 테스트 파일 중 295개 통과·1개 skip, 1,526 passed·3 skipped, typecheck, docs, verify-scope, KIS, Bearer auth 및 OCI cron 감사 통과.
 - 첫 검증의 stale guideVersion 기대값은 `1.1.0`으로 수정 후 전체 재실행에서 통과했다.
-- V164 migration은 Deploy OCI run `41176748601`에서 운영 PostgreSQL 16.15에 성공 적용되어 schema version이 164가 됐다. activation은 importer 실행 시 배포 archive에서 `scripts/market-impact-event-identity.mjs`를 찾지 못해 실패했다. 원인은 OCI package step이 `import-market-impact-events.mjs`는 복사했지만 새 helper 파일을 복사하지 않은 누락이다. `.github/workflows/deploy-oci.yml`의 standalone archive 단계에 helper 복사 및 tar 내부 존재 검증을 추가했다. 후속 검증의 첫 전체 테스트는 900초 제한으로 timeout됐고 worker 2개 재시도도 20분간 결과가 없어 중단했다. 이어 최신 `origin/oci` 변경을 포함해 `$env:DEPLOY_VERIFY_COMMAND_TIMEOUT_MS=1800000`로 실행한 전체 `npm.cmd run deploy:verify`가 통과했다: dependency audit 취약점 0, production build, standalone·Chrome desktop/mobile·API smoke, 297개 테스트 파일(296 passed·1 skipped), 1,528 passed·3 skipped, typecheck, 177 route·41 public GET·123문서·V164 검사, verify-scope/KIS/auth/OCI cron 감사. 기존 서비스는 계속 정상 응답하지만 마지막 운영 확인 시 가이드 `1.0.0` 및 이벤트 4건에 `eventKey`가 없어 신규 앱 릴리스는 아직 활성화되지 않았다. V164는 이미 적용됐으므로 재시도는 migration을 반복 적용하지 않고 importer부터 진행한다. 수정 커밋을 `oci`에 푸시한 뒤 배포 및 운영 API를 재검증한다.
+- V164 migration은 Deploy OCI run `41176748601`에서 운영 PostgreSQL 16.15에 성공 적용되어 schema version이 164가 됐다. activation은 importer 실행 시 package에 `scripts/market-impact-event-identity.mjs`가 빠져 실패했다. `.github/workflows/deploy-oci.yml`에 helper 복사 및 tar 내부 존재 assertion을 추가한 수정(commit `053a90eb`)이 `oci`에 반영되어 Deploy OCI run `41181213216`이 성공했다. 최신 브랜치(run `41182285981`, SHA `c9e95bfe`)도 전체 verify·package·activation까지 성공했다. 로컬 최종 `npm.cmd run deploy:verify`도 통과: dependency audit 취약점 0, production build, standalone·Chrome desktop/mobile·API smoke, 297개 테스트 파일(296 passed·1 skipped), 1,528 passed·3 skipped, typecheck, 177 route·41 public GET·123문서·V164 검사, verify-scope/KIS/auth/OCI cron 감사. 운영 `/api/health` HTTP 200, `/health-check` Flyway V164, guide API 1.1.0을 확인했다. 이벤트 API는 4건 모두 eventKey `DEFAULT`를 반환했고 자연 키 4개가 모두 고유했다. helper 누락 없는 release archive로 importer가 수행되어 운영 기능을 확인했다. 다른 공시 접수번호로 표현된 동일 실질 사건은 자동 연결하지 않으므로 analyst review가 남은 위험이다.
 
 ### 다음 개선
 - [ ] 같은 실질 사건이 서로 다른 accession/접수번호로 별도 공시될 때 eventId/eventKey를 기존 사건과 연결하는 검토 절차를 후속 운영 지침에 보강한다.
-- [ ] 배포 후 Flyway V164 및 공개 API의 eventKey 반환, 중복 importer 차단을 확인한다.
+- [x] 배포 후 Flyway V164 및 공개 API의 eventKey 반환, 자연 키 중복 부재를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-10-31-001
