@@ -1592,6 +1592,7 @@
                           "market",
                           "ticker",
                           "eventType",
+                          "eventKey",
                           "status",
                           "direction",
                           "impactHorizon",
@@ -1620,6 +1621,9 @@
                             "type": "string"
                           },
                           "eventType": {
+                            "type": "string"
+                          },
+                          "eventKey": {
                             "type": "string"
                           },
                           "status": {

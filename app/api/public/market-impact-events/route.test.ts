@@ -10,14 +10,16 @@ describe("GET /api/public/market-impact-events", () => {
   beforeEach(() => queryMock.mockReset());
 
   it("returns an ISO date without converting the SQL DATE to a timestamp", async () => {
-    queryMock.mockResolvedValue({ rows: [{ eventId: "DART:1:TEST", eventDate: "2026-10-29", market: "KR", ticker: "034730" }] });
+    queryMock.mockResolvedValue({ rows: [{ eventId: "DART:1:TEST", eventDate: "2026-10-29", market: "KR", ticker: "034730", eventKey: "DEFAULT" }] });
 
     const response = await GET(new Request("https://example.test/api/public/market-impact-events?date=2026-10-29"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.items[0].eventDate).toBe("2026-10-29");
+    expect(body.items[0].eventKey).toBe("DEFAULT");
     expect(queryMock.mock.calls[0][0]).toContain("TO_CHAR(event_date, 'YYYY-MM-DD')");
+    expect(queryMock.mock.calls[0][0]).toContain('event_key AS "eventKey"');
   });
 
   it("rejects invalid market filters before querying the database", async () => {

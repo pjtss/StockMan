@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   try {
     const result = await getPool().query(
       `SELECT event_id AS "eventId", TO_CHAR(event_date, 'YYYY-MM-DD') AS "eventDate", market, ticker,
-        company_name AS "companyName", event_type AS "eventType", status, direction,
+        company_name AS "companyName", event_type AS "eventType", event_key AS "eventKey", status, direction,
         impact_horizon AS "impactHorizon", title, summary, rationale, confidence,
         source_type AS "sourceType", source_id AS "sourceId", source_url AS "sourceUrl",
         published_at AS "publishedAt", evidence, risks, limitations, updated_at AS "updatedAt"

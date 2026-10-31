@@ -30,6 +30,8 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
 공시 영향 이벤트의 분석·JSON 작성 계약은 무인증 `GET /api/public/market-impact-events/guide`에서 구조화 JSON으로 제공한다. `data/market-impact-event-guide.json`을 해당 응답의 단일 원본으로 관리하고, `guideVersion`과 `schemaVersion`을 분리해 안내 콘텐츠 변경과 응답 구조 변경을 구분한다. 이벤트 조회 API와 guide API는 모두 무인증 읽기 전용이며, 저장은 관리 JSON 변경 후 기존 배포 importer 경로로 운영 DB에 upsert한다.
 
+공시 영향 이벤트 중복 방지는 `eventId`와 별도의 자연 키 `(market, sourceType, sourceId, ticker, eventType, eventKey)`를 사용한다. importer는 입력 JSON 내 자연 키 중복 및 운영 DB의 다른 eventId와의 충돌을 쓰기 전에 거부하고, V164 unique index는 동시 importer 실행까지 막는다. 독립 사건 여러 개가 한 공시에 있으면 `eventKey`를 각각 명시한다.
+
     npm run docs:api:generate
     npm run audit:api-surface
     npm run docs:catalog:generate

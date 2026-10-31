@@ -5,7 +5,8 @@
 - `V141__local_rss_llm_analyses.sql`: Codex 직접 RSS 분석 revision 이력과 Discord 중복방지 전송 상태. 운영 반영은 배포 체크리스트와 health schema 검증을 거쳐야 합니다.
 - `V161__market_rss_normalized_summary.sql`: RSS 원문 요약과 원본 payload를 보존하면서 규칙 기반 정규화 텍스트를 `market_rss_articles.normalized_summary`에 저장합니다.
 - `V162__us_obv_divergence_snapshot.sql`: 미국 활성 COMMON_STOCK 일봉 OBV 다이버전스 결과를 검증 후 단일 JSONB 스냅샷으로 저장합니다. 공개 GET은 이 스냅샷만 읽고, 보호된 cron POST가 갱신합니다.
-- `V163__market_impact_events.sql`: 단일 관리 JSON에서 가져온 국내·미국 공시 영향 이벤트를 운영 API용 테이블에 저장합니다. OCI 배포는 migration 성공 후 같은 릴리스의 JSON을 활성 COMMON_STOCK 마스터 검증과 이벤트 ID 기준 upsert로 반영합니다.
+- `V163__market_impact_events.sql`: 단일 관리 JSON에서 가져온 국내·미국 공시 영향 이벤트를 운영 API용 테이블에 저장합니다. OCI 배포는 migration 성공 후 같은 릴리스의 JSON을 활성 COMMON_STOCK 마스터 검증과 eventId 기준 upsert로 반영합니다.
+- `V164__market_impact_event_identity.sql`: `event_key` 기본값 `DEFAULT`를 추가하고 `(market, source_type, source_id, ticker, event_type, event_key)` unique index로 동일 공시 이벤트의 다른 eventId 중복 삽입을 막습니다. 기존 행의 중복 identity를 발견하면 migration을 실패시켜 운영자가 명시적으로 정리하게 합니다.
 - V161 적용 뒤 로컬 기존 행은 `npm run backfill:market-rss-normalized-summary`로 dry-run 확인 후 `-- --apply`로 채울 수 있습니다. 이 스크립트는 `.env.local`의 localhost DB만 허용합니다.
 
 스키마 변경은 반드시 새 migration으로 추가하고, 기존 운영 migration은 수정하지 않습니다. 운영 적용 후 `/api/health`에서 `flywayVersion`, `schemaReady`, `missingTables`를 확인합니다.

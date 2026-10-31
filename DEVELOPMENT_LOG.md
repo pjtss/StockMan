@@ -1,3 +1,37 @@
+## [2026-10-31] 공시 이벤트 자연 키 중복 방지
+
+### 목표
+- 재분석으로 eventId 문자열만 다른 동일 공시 이벤트가 JSON/운영 DB에 중복 등록되는 경로를 막고, 한 공시의 복수 독립 사건은 명시적으로 구분한다.
+
+### 반영
+- 원인: 기존 PK와 importer 중복 검사는 `eventId`만 고유하게 보장해, 같은 공시·종목·이벤트 유형이 다른 eventId로 제출되면 DB에 중복 행이 생길 수 있었다.
+- `eventKey` 및 자연 키 `(market, sourceType, sourceId, ticker, eventType, eventKey)`를 추가한다. 기본 eventKey는 `DEFAULT`; 같은 filing에서 같은 유형의 서로 다른 사건에만 개별 eventKey를 준다.
+- V164 migration은 기존 `eventKey`를 `DEFAULT`로 채우고 사전 중복 검사 후 unique index를 추가한다. 충돌이 발견되면 migration을 중단해 release 전환을 막는다.
+- importer는 JSON 내부 중복 identity 및 운영 DB에 다른 eventId로 저장된 identity를 트랜잭션 쓰기 전에 거부한다. eventId upsert는 유지하며, DB unique index가 동시 importer 경합도 차단한다.
+- 공개 이벤트 API가 `eventKey`를 반환하고, 가이드 API를 1.1.0으로 갱신했다. 데이터 계약·API·DB·운영 문서와 식별 규칙 테스트를 함께 반영한다.
+
+### 검증
+- 현재 JSON 4건: eventId 및 자연 키 중복 없음.
+- 운영 공개 API `GET /api/public/market-impact-events?limit=500` 4건: 자연 키 중복 없음. 조회는 무인증·읽기 전용이었다.
+- `node scripts/import-market-impact-events.mjs --dry-run`: 관리 JSON 4건 파싱 및 KR/US 활성 COMMON_STOCK 마스터 검증 통과, DB 쓰기 없음.
+- 관련 identity/API 회귀 테스트: importer syntax, JSON duplicate audit와 unit/API regression 확인 통과. 최신 `origin/oci` 변경을 반영한 API surface는 176 route files·40 public GET, docs:check는 28 entry points·164 migrations 통과.
+- 첫 `npm.cmd run deploy:verify`는 가이드 버전 상향 뒤 회귀 테스트가 이전 기대값 `1.0.0`을 유지해 실패했고 배포를 차단했다. 테스트 기대값을 `1.1.0`으로 동기화했다.
+- 최신 `origin/oci` 위에서 최종 `DEPLOY_VERIFY_SMOKE_REQUEST_TIMEOUT_MS=60000 npm.cmd run deploy:verify`: 통과. dependency audit 0 vulnerabilities, production build, standalone/OpenAPI 40 read operations, Chrome desktop/mobile, 296개 테스트 파일 중 295개 통과·1개 skip, 1,526 passed·3 skipped, typecheck, docs, verify-scope, KIS, Bearer auth 및 OCI cron 감사 통과.
+- 첫 검증의 stale guideVersion 기대값은 `1.1.0`으로 수정 후 전체 재실행에서 통과했다.
+- V164 migration 파일명, 운영 컬럼 감사, event identity·eventKey OpenAPI/API 매뉴얼 계약 검사 통과. V164 운영 배포 및 운영 API의 eventKey/중복 차단 확인은 배포 후 실행 예정이다.
+
+### 다음 개선
+- [ ] 같은 실질 사건이 서로 다른 accession/접수번호로 별도 공시될 때 eventId/eventKey를 기존 사건과 연결하는 검토 절차를 후속 운영 지침에 보강한다.
+- [ ] 배포 후 Flyway V164 및 공개 API의 eventKey 반환, 중복 importer 차단을 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-31-001
+- 성과 판정: UNMEASURED
+- 근거: 저장소와 운영 API에서 현재 중복은 관찰되지 않았다. 새 자연 키 차단 로직은 코드·migration 검증을 통과했으며, 실제 운영 차단은 V164 배포 후 확인해야 성과를 판정할 수 있다.
+
+### 커밋·푸시·배포
+- 진행 중: 구현 및 배포 전 검증 단계. 커밋·푸시·운영 배포 미완료.
+
 ## [2026-10-30] LLM 단일 매뉴얼의 라이브 문서·API 탐색
 
 ### 목표

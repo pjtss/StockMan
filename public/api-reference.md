@@ -119,7 +119,7 @@ market 필수: KR, US, KOSPI, KOSDAQ, NAS, NYS, AMS. code 단일 값 또는 code
 
 ### 공시 기반 일별 주가 영향 이벤트 — GET /api/public/market-impact-events
 
-단일 관리 JSON의 `markets.KR`·`markets.US` 이벤트를 운영 DB에서 읽는다. 인증 없이 호출할 수 있으며 읽기 전용이다. Query: `date`(YYYY-MM-DD), `from`·`to`(포함 날짜 범위), `market`(KR/US), `ticker`, `limit`(기본 100, 최대 500). `date`는 `from`·`to`와 함께 사용할 수 없다. 응답 item에는 이벤트 방향·영향 기간·신뢰도, 공시 원문 근거, 위험 및 한계가 포함된다. 방향은 주가 예측이 아니다. 오류: 400 `INVALID_QUERY`, 503 `MARKET_IMPACT_EVENTS_UNAVAILABLE`.
+단일 관리 JSON의 `markets.KR`·`markets.US` 이벤트를 운영 DB에서 읽는다. 인증 없이 호출할 수 있으며 읽기 전용이다. Query: `date`(YYYY-MM-DD), `from`·`to`(포함 날짜 범위), `market`(KR/US), `ticker`, `limit`(기본 100, 최대 500). `date`는 `from`·`to`와 함께 사용할 수 없다. 응답 item에는 `eventId`와 중복 확인용 `eventKey`를 비롯해 이벤트 방향·영향 기간·신뢰도, 공시 원문 근거, 위험 및 한계가 포함된다. 같은 사건을 수정할 때는 기존 `eventId`를 유지한다. 방향은 주가 예측이 아니다. 오류: 400 `INVALID_QUERY`, 503 `MARKET_IMPACT_EVENTS_UNAVAILABLE`.
 
 ### 공시 영향 이벤트 작성 가이드 — GET /api/public/market-impact-events/guide
 

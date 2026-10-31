@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { loadLocalEnv } from "./local-env.mjs";
+import { findDuplicateMarketImpactEventIdentities } from "./market-impact-event-identity.mjs";
 
 loadLocalEnv();
 
@@ -12,8 +13,8 @@ if (payload.schemaVersion !== "market-impact-events.v1" || !payload.markets || !
 }
 
 const values = [
-  ...payload.markets.KR.map((event) => ({ ...event, market: "KR" })),
-  ...payload.markets.US.map((event) => ({ ...event, market: "US" })),
+  ...payload.markets.KR.map((event) => ({ ...event, market: "KR", eventKey: event.eventKey ?? "DEFAULT" })),
+  ...payload.markets.US.map((event) => ({ ...event, market: "US", eventKey: event.eventKey ?? "DEFAULT" })),
 ];
 const ids = new Set();
 const allowed = {
@@ -29,12 +30,20 @@ for (const [index, event] of values.entries()) {
   if (missing.length) throw new Error(`events[${index}] missing: ${missing.join(", ")}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(event.eventDate)) throw new Error(`events[${index}] has invalid eventDate`);
   if (!/^[A-Z0-9._-]{1,32}$/.test(event.ticker)) throw new Error(`events[${index}] has invalid ticker`);
+  if (!/^[A-Z][A-Z0-9_]{0,63}$/.test(event.sourceType)) throw new Error(`events[${index}] has invalid sourceType`);
+  if (!/^[A-Z][A-Z0-9_]{0,63}$/.test(event.eventType)) throw new Error(`events[${index}] has invalid eventType`);
+  if (!/^[A-Z0-9._-]{1,64}$/.test(event.eventKey)) throw new Error(`events[${index}] has invalid eventKey`);
   for (const [field, options] of Object.entries(allowed)) if (!options.has(event[field])) throw new Error(`events[${index}] has invalid ${field}`);
   if (!/^https:\/\//.test(event.sourceUrl)) throw new Error(`events[${index}] sourceUrl must use HTTPS`);
   if (event.publishedAt != null && (typeof event.publishedAt !== "string" || Number.isNaN(Date.parse(event.publishedAt)))) throw new Error(`events[${index}] has invalid publishedAt`);
   for (const field of ["evidence", "risks", "limitations"]) if (event[field] != null && !Array.isArray(event[field])) throw new Error(`events[${index}] ${field} must be an array`);
   if (ids.has(event.eventId)) throw new Error(`Duplicate eventId: ${event.eventId}`);
   ids.add(event.eventId);
+}
+const duplicateIdentities = findDuplicateMarketImpactEventIdentities(values);
+if (duplicateIdentities.length) {
+  const duplicate = duplicateIdentities[0];
+  throw new Error(`Duplicate market impact event identity at events[${duplicate.firstIndex}] and events[${duplicate.duplicateIndex}] (eventKey=${duplicate.eventKey}): ${duplicate.eventId} / ${duplicate.duplicateEventId}`);
 }
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -64,25 +73,38 @@ try {
   } else {
     await client.query("BEGIN");
     for (const event of values) {
+      const existingIdentity = await client.query(
+        `SELECT event_id AS "eventId" FROM market_impact_events
+         WHERE market = $1 AND source_type = $2 AND source_id = $3 AND ticker = $4
+           AND event_type = $5 AND event_key = $6 AND event_id <> $7
+         LIMIT 1`,
+        [event.market, event.sourceType, event.sourceId, event.ticker, event.eventType, event.eventKey, event.eventId],
+      );
+      if (existingIdentity.rows.length) {
+        throw new Error(`Duplicate market impact event identity already stored as ${existingIdentity.rows[0].eventId}; reuse that eventId or provide a distinct eventKey`);
+      }
+    }
+    for (const event of values) {
       await client.query(
       `INSERT INTO market_impact_events (
-        event_id, event_date, market, ticker, company_name, event_type, status, direction,
+        event_id, event_date, market, ticker, company_name, event_type, event_key, status, direction,
         impact_horizon, title, summary, rationale, confidence, source_type, source_id,
         source_url, published_at, evidence, risks, limitations, raw_event, updated_at
       ) VALUES (
-        $1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-        $16, $17::timestamptz, $18::jsonb, $19::jsonb, $20::jsonb, $21::jsonb, NOW()
+        $1, $2::date, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+        $17, $18::timestamptz, $19::jsonb, $20::jsonb, $21::jsonb, $22::jsonb, NOW()
       ) ON CONFLICT (event_id) DO UPDATE SET
         event_date = EXCLUDED.event_date, market = EXCLUDED.market, ticker = EXCLUDED.ticker,
-        company_name = EXCLUDED.company_name, event_type = EXCLUDED.event_type, status = EXCLUDED.status,
+        company_name = EXCLUDED.company_name, event_type = EXCLUDED.event_type, event_key = EXCLUDED.event_key,
+        status = EXCLUDED.status,
         direction = EXCLUDED.direction, impact_horizon = EXCLUDED.impact_horizon, title = EXCLUDED.title,
         summary = EXCLUDED.summary, rationale = EXCLUDED.rationale, confidence = EXCLUDED.confidence,
         source_type = EXCLUDED.source_type, source_id = EXCLUDED.source_id, source_url = EXCLUDED.source_url,
         published_at = EXCLUDED.published_at, evidence = EXCLUDED.evidence, risks = EXCLUDED.risks,
         limitations = EXCLUDED.limitations, raw_event = EXCLUDED.raw_event, updated_at = NOW()`,
         [event.eventId, event.eventDate, event.market, event.ticker, event.companyName, event.eventType,
-          event.status, event.direction, event.impactHorizon, event.title, event.summary, event.rationale,
-          event.confidence, event.sourceType, event.sourceId, event.sourceUrl, event.publishedAt ?? null,
+          event.eventKey, event.status, event.direction, event.impactHorizon, event.title, event.summary,
+          event.rationale, event.confidence, event.sourceType, event.sourceId, event.sourceUrl, event.publishedAt ?? null,
           JSON.stringify(event.evidence ?? []), JSON.stringify(event.risks ?? []),
           JSON.stringify(event.limitations ?? []), JSON.stringify(event)],
       );

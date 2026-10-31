@@ -1,7 +1,7 @@
 {
-  "guideVersion": "1.0.0",
+  "guideVersion": "1.1.0",
   "schemaVersion": "market-impact-event-guide.v1",
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-10-31",
   "locale": "ko-KR",
   "purpose": "국내·미국 공시 원문을 근거로 주가 영향 가능성이 있는 사실과 해석을 일별 이벤트 JSON에 기록하는 방법을 제공한다.",
   "sourceOfTruth": {
@@ -9,6 +9,12 @@
     "databaseRole": "API 조회용 운영 복제본. 원본 JSON을 대체하지 않는다.",
     "eventQueryApi": "/api/public/market-impact-events",
     "guideApi": "/api/public/market-impact-events/guide"
+  },
+  "eventIdentity": {
+    "naturalKeyFields": ["market", "sourceType", "sourceId", "ticker", "eventType", "eventKey"],
+    "defaultEventKey": "DEFAULT",
+    "rule": "eventId는 재분석·정정 시 유지하는 레코드 ID다. 같은 자연 키가 이미 있으면 새 eventId로 중복 등록하지 않고 기존 eventId를 사용한다. 같은 공시·종목·eventType에 별개의 독립 사건이 둘 이상 있을 때만 각각 안정적인 고유 eventKey를 부여한다.",
+    "enforcement": ["JSON importer 입력 중복 검사", "운영 DB unique index", "eventId primary key"]
   },
   "compatibility": {
     "schemaVersionPolicy": "호환 가능한 필드 추가는 같은 major 계약에서 진행한다. 필수 필드 제거·의미 변경·타입 변경은 새 major schemaVersion으로 발행한다.",
@@ -32,7 +38,7 @@
   "eventContract": {
     "schemaVersion": "market-impact-events.v1",
     "requiredFields": ["eventId", "eventDate", "ticker", "companyName", "eventType", "status", "direction", "impactHorizon", "title", "summary", "rationale", "confidence", "sourceType", "sourceId", "sourceUrl"],
-    "optionalFields": ["publishedAt", "evidence", "risks", "limitations", "keyDates", "eventDetails"],
+    "optionalFields": ["eventKey", "publishedAt", "evidence", "risks", "limitations", "keyDates", "eventDetails"],
     "enums": {
       "market": ["KR", "US"],
       "status": ["REPORTED", "CONFIRMED_SCHEDULED", "ESTIMATED", "COMPLETED", "CANCELLED"],
@@ -42,6 +48,7 @@
     },
     "fieldSemantics": {
       "eventId": "공시 원천 ID와 사건 구분값을 결합한 안정적인 고유 식별자. 정정은 기존 ID를 유지한다.",
+      "eventKey": "한 공시·종목·eventType에서 같은 성격의 독립 사건을 여러 개 기록할 때 구분하는 안정 키. 생략 시 DEFAULT를 사용하며 동일 자연 키의 중복 eventId는 허용되지 않는다.",
       "eventDate": "공시 접수일, 실제 사건일, 효력일을 구분해 기록하는 YYYY-MM-DD 날짜.",
       "status": "이미 발생한 사실, 회사 확정 일정, 추정 일정, 완료 및 취소를 구분한다.",
       "direction": "공시 근거에 대한 잠재 영향 분류이며 미래 주가를 예측하거나 보장하지 않는다.",
@@ -57,8 +64,8 @@
     { "id": "schedule", "instruction": "발표된 결과, 회사 확정 일정, 임상 등록 시스템의 추정일, 제3자 추정일을 status로 분리한다. 발표 시각을 확인할 수 없으면 미공개로 둔다." },
     { "id": "impact", "instruction": "direction과 impactHorizon의 근거 및 반대 요인을 기록한다. 일정만으로 호재로 판정하지 않고 희석·상장유지·규제·실행 위험을 포함한다." },
     { "id": "quant", "instruction": "공식 원문에서 확인 가능한 정량값만 기록한다. 주식수·임상 규모·현금·런웨이·가격·매출은 기준일과 단위를 함께 기록하고 미공개 수치는 추정하지 않는다." },
-    { "id": "validate", "instruction": "markets.KR/US 분리, 필수 필드·enum·중복 eventId·HTTPS 원문 URL을 검증하고 활성 COMMON_STOCK 여부를 운영 importer에서 확인한다." },
-    { "id": "update", "instruction": "기존 data/market-impact-events.json에 eventId 기준으로 추가·수정한다. 최신 파일을 먼저 반영하고 기존 이벤트를 임의 삭제하지 않는다. 변경분을 검토 가능한 저장소 변경으로 제출한 뒤 배포 흐름으로 운영 DB에 upsert한다." }
+    { "id": "validate", "instruction": "markets.KR/US 분리, 필수 필드·enum·중복 eventId·중복 자연 키·HTTPS 원문 URL을 검증하고 활성 COMMON_STOCK 여부를 운영 importer에서 확인한다. 자연 키는 market+sourceType+sourceId+ticker+eventType+eventKey이며 eventKey 생략 시 DEFAULT다." },
+    { "id": "update", "instruction": "기존 data/market-impact-events.json에서 eventId와 자연 키를 모두 확인한다. 같은 사건이면 기존 eventId와 eventKey를 유지해 수정한다. 한 공시의 같은 eventType에 독립 사건이 여러 개 있을 때만 각 eventKey를 다르게 부여한다. 최신 파일을 먼저 반영하고 기존 이벤트를 임의 삭제하지 않는다. 변경분을 검토 가능한 저장소 변경으로 제출한 뒤 배포 흐름으로 운영 DB에 upsert한다." }
   ],
   "jsonSchema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -86,7 +93,8 @@
           "eventDate": { "type": "string", "format": "date" },
           "ticker": { "type": "string", "pattern": "^[A-Z0-9._-]{1,32}$" },
           "companyName": { "type": "string", "minLength": 1 },
-          "eventType": { "type": "string", "minLength": 1 },
+          "eventType": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "eventKey": { "type": "string", "pattern": "^[A-Z0-9._-]{1,64}$", "description": "선택적 중복 구분 키. 생략 시 DEFAULT." },
           "status": { "enum": ["REPORTED", "CONFIRMED_SCHEDULED", "ESTIMATED", "COMPLETED", "CANCELLED"] },
           "direction": { "enum": ["POSITIVE", "NEGATIVE", "MIXED", "UNCERTAIN"] },
           "impactHorizon": { "enum": ["INTRADAY", "SHORT_TERM", "LONG_TERM", "UNKNOWN"] },
@@ -94,7 +102,7 @@
           "summary": { "type": "string", "minLength": 1 },
           "rationale": { "type": "string", "minLength": 1 },
           "confidence": { "enum": ["HIGH", "MEDIUM", "LOW"] },
-          "sourceType": { "type": "string", "minLength": 1 },
+          "sourceType": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
           "sourceId": { "type": "string", "minLength": 1 },
           "sourceUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
           "publishedAt": { "type": ["string", "null"], "format": "date-time" },
@@ -108,5 +116,5 @@
       }
     }
   },
-  "chatgptPromptTemplate": "아래 API 가이드를 먼저 읽고 그대로 따른다: GET /api/public/market-impact-events/guide. 공식 공시 원문을 직접 확인해 주가 영향 이벤트를 분석한다. 기존 이벤트 JSON은 GET /api/public/market-impact-events로 조회해 중복과 기존 eventId를 확인한다. 분석 결과는 data/market-impact-events.json의 schemaVersion=market-impact-events.v1 구조에 맞춰 markets.KR 또는 markets.US 배열의 추가/수정 JSON으로만 제시한다. 각 사실에 원문 URL과 evidence를 붙이고, 확정 일정과 추정 일정을 구분하며, 반대 근거·위험·한계를 기록한다. 확인되지 않은 수치·시각·날짜는 만들지 않는다. 주가 방향이나 수익을 보장하지 않는다. 파일이나 운영 서버를 직접 수정했다고 주장하지 말고, 제안한 JSON patch와 원문 근거를 함께 제시한다."
+  "chatgptPromptTemplate": "아래 API 가이드를 먼저 읽고 그대로 따른다: GET /api/public/market-impact-events/guide. 공식 공시 원문을 직접 확인해 주가 영향 이벤트를 분석한다. 기존 이벤트 JSON은 GET /api/public/market-impact-events로 조회해 eventId와 (market, sourceType, sourceId, ticker, eventType, eventKey) 자연 키의 중복을 확인한다. 같은 사건이면 기존 eventId와 eventKey를 유지해 수정하고, 같은 공시에서 같은 eventType의 별도 독립 사건을 기록할 때만 고유 eventKey를 사용한다. 분석 결과는 data/market-impact-events.json의 schemaVersion=market-impact-events.v1 구조에 맞춰 markets.KR 또는 markets.US 배열의 추가/수정 JSON으로만 제시한다. 각 사실에 원문 URL과 evidence를 붙이고, 확정 일정과 추정 일정을 구분하며, 반대 근거·위험·한계를 기록한다. 확인되지 않은 수치·시각·날짜는 만들지 않는다. 주가 방향이나 수익을 보장하지 않는다. 파일이나 운영 서버를 직접 수정했다고 주장하지 말고, 제안한 JSON patch와 원문 근거를 함께 제시한다."
 }
