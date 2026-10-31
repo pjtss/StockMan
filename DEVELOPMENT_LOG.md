@@ -29,7 +29,8 @@
 - 근거: 개별 keyDate 발생일을 직접 필터링하는 API를 추가했고 route 단위 테스트 3개 및 격리 PostgreSQL 실제 JSONB 조회에서 일정 6건을 확인했다. 최신 `origin/oci` 위에서 전체 테스트 1,536개와 production build를 통과했다.
 
 ### 커밋·푸시·배포
-- 사전 검증 완료. 최신 `origin/oci`를 기준으로 코드 반영, 커밋·푸시 및 OCI release workflow 실행이 남아 있다.
+- 완료: 커밋 `d283ede3034200c3920c41d6fe3504bf2a55ddde`를 `oci`에 push했고 GitHub Actions Deploy OCI run `41217945968`이 verify, package, upload, activate 모두 성공했다.
+- 배포 후 무인증 `/api/health`에서 `status=ok`, `/api/public/market-impact-event-occurrences?limit=1`에서 schema `market-impact-event-occurrences.v1`과 실제 KR 일정 `2027-01-05`를 확인했다. 동일 query의 cursor 다음 페이지도 서로 다른 occurrence를 반환했고 `/openapi.json`에 새 GET operation이 포함됐다.
 
 ## [2026-10-31] 공시 이벤트 일정 조회 API 개선
 
