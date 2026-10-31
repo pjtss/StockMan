@@ -7986,10 +7986,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm run deploy:verify`: 통과. npm audit 취약점 0개, production build, TypeScript, 296개 테스트 파일(1,528 passed, 3 skipped), API surface 177 routes/41 public GET, 문서 123개/7개 범주, scope/KIS/auth/cron 감사를 확인했다.
 - standalone smoke: OpenAPI에 신규 무인증 GET 및 필수 ticker가 있고 검색형 `/api/public/api-manual` 결과에도 해당 경로가 포함되는지 확인했다. 비정상 ticker는 DB 조회 전에 HTTP 400을 반환했다. `/charts`, 정적 청크 및 Chrome desktop/mobile 검사도 통과했다.
 - 전체 테스트의 첫 재실행에서 watchlist 회사명 조회 테스트가 비동기 이름 조회를 기본 짧은 대기 안에 받지 못해 1건 실패했다. 테스트는 두 시장 이름이 모두 표시될 때까지 최대 10초 기다리도록 조정했고, 해당 파일 4개 테스트와 전체 배포 검증을 통과했다.
+- 첫 OCI workflow run `41180014242`는 빌드·테스트·패키징 후 activation의 `market-impact-events-import` 단계에서 실패했다. 원인은 workflow가 importer를 복사하면서 정적 중복 검사 모듈 `scripts/market-impact-event-identity.mjs`를 standalone release에 복사하지 않은 것이다. activation은 import를 파일 교체 전에 실행하므로 새 릴리스로 전환되지 않았다.
+- 재발 방지로 OCI packaging에 해당 helper 복사를 추가하고 tarball 안에 helper가 있는지 검사하는 필수 게이트를 추가했다. 수정 후 `npm run deploy:verify`는 다시 통과했으며, tarball 포함 검사는 다음 OCI workflow에서 패키징 단계에 실행된다.
 - `git diff --check`: 변경 파일 공백 검사 완료.
 - 남은 위험: 운영 DB에 해당 티커의 최신 스냅샷 또는 SEC facts가 없으면 API는 `PARTIAL`과 누락 항목을 반환한다. 데이터 수집·갱신은 이 공개 GET에서 실행하지 않는다.
 
 ### 커밋·푸시·배포
-- 진행 중: 한국어 상세 커밋 및 `oci` 브랜치 push 후 OCI 배포 workflow와 운영 health/API 확인 예정.
+- API 커밋 `09fea406`을 `oci`에 push했다. 첫 workflow는 activation 전 단계에서 실패했고 이전 release는 유지됐다. 패키징 누락 수정은 별도 한국어 커밋으로 재배포하며, workflow 성공 뒤 운영 health와 공개 API를 확인한다.
 
 \n

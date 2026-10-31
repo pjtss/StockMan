@@ -58,6 +58,7 @@ jobs:
           cp scripts/oci-rss-cron.sh "$release_dir/scripts/oci-rss-cron.sh"
           cp scripts/register-discord-commands.mjs "$release_dir/scripts/register-discord-commands.mjs"
           cp scripts/import-market-impact-events.mjs "$release_dir/scripts/import-market-impact-events.mjs"
+          cp scripts/market-impact-event-identity.mjs "$release_dir/scripts/market-impact-event-identity.mjs"
           cp scripts/local-env.mjs "$release_dir/scripts/local-env.mjs"
           cp data/market-impact-events.json "$release_dir/data/market-impact-events.json"
           cp deploy/oci/nginx-stockman.conf "$release_dir/deploy/oci/nginx-stockman.conf"
@@ -75,6 +76,7 @@ jobs:
           test "$(tar -tzf stockman-oci.tar.gz | grep -c '/.next/static/chunks/.*\.js$')" -gt 0
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-cron.sh'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/import-market-impact-events.mjs'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/market-impact-event-identity.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/local-env.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './data/market-impact-events.json'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-fundamentals-cron.sh'
