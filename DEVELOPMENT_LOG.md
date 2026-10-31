@@ -1,3 +1,101 @@
+## [2026-10-31] 이벤트 occurrence 조회 API 추가
+
+### 목표
+- 대표 이벤트 날짜뿐 아니라 공시 JSON의 개별 `keyDates` 날짜를 직접 필터·페이지 조회할 수 있게 API 기능을 확장한다. UI는 추가하지 않는다.
+
+### 반영
+- 원인: 기존 `/api/public/market-impact-events`는 각 이벤트의 대표 `eventDate`로만 필터·정렬했고 `keyDates`는 응답 JSON의 중첩 배열로만 제공했다. 따라서 일정 발생일 캘린더 검색에서 날짜 조건과 페이지 단위를 일치시킬 수 없었다.
+- `GET /api/public/market-impact-event-occurrences`를 추가해 JSONB keyDates의 유효한 달력 날짜만 일정별 row로 반환한다. 일정 상태·시장·티커·eventType·날짜 범위 필터와 occurrence 단위 keyset cursor를 제공한다.
+- 중복 발생 날짜도 누락되지 않도록 `(occurrence_date DESC, event_id ASC, ordinal ASC)`를 정렬 키로 사용한다. Cursor에 마지막 발생일·eventId·배열 위치 및 전체 query scope를 저장해 안정적인 다음 페이지를 보장하고 scope 변경 커서는 거부한다.
+- 변경 파일: occurrence API route/test, `scripts/api-surface.mjs`, OpenAPI·route inventory 생성물, API reference/README, 이벤트 설계 문서, 본 개발 로그.
+
+### 검증
+- occurrence route 테스트 3개, 최신 `origin/oci` 위에서 일정 API regression 9개 통과. 첫 전체 테스트 병렬 실행은 1,497개 통과 후 worker startup timeout 4건으로 게이트 실패했으나, 최신 브랜치 재실행 `npm test -- --maxWorkers=2`는 298개 파일/1,536개 테스트 통과, skip 1개 파일/3개였다. timeout이 난 4개 파일도 `--maxWorkers=1`로 36개 테스트 재검증 통과.
+- 최신 브랜치 `npm run typecheck` 통과. 격리 PostgreSQL clone의 market_impact_events JSONB를 펼치는 실제 쿼리에서 유효 keyDate 6건 확인, 원본 DB 변경 없음.
+- `npm run docs:check` 첫 실행은 개발 로그 계약(개선 과제·판정·근거·다음 개선 항목 누락) 검증에서 실패해 이 구조를 보완했고 최종 검증에서 통과했다.
+- 최신 브랜치 API surface 검사 178 route files/42 public GET 통과. verify-scope, KIS boundary, Bearer auth, OCI cron audit, `docs:check` 및 `git diff --check` 통과.
+- `npm run deploy:verify`는 rebase 전 커밋에서 통과했고, rebase 후에는 전체 테스트 1,536개·typecheck·docs 및 최신 route 포함 production build가 각각 통과했다. rebase 후 standalone 브라우저 smoke는 OCI GitHub Actions에서 배포 전 재검증한다.
+
+### 남은 위험과 다음 항목
+- `keyDates`는 JSONB 배열이므로 일정 날짜 조회는 DB에서 배열을 펼친다. 데이터가 커지면 정규화된 occurrence 테이블과 GIN/일정 날짜 인덱스를 검토하되, 현재 이벤트 규모와 실제 실행계획 측정 없이 migration을 추가하지 않는다.
+- 배포 후 운영 endpoint에서 무인증 조회, 일정 날짜 필터, 두 페이지 경계와 health를 확인한다.
+
+### 다음 개선
+- [ ] 운영 일정 수가 증가하면 occurrence 쿼리의 운영 분포 실행계획과 p50/p95를 측정하고, JSONB 배열 확장 비용이 유의할 때만 정규화 저장소를 설계한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-31-004
+- 성과 판정: IMPROVED
+- 근거: 개별 keyDate 발생일을 직접 필터링하는 API를 추가했고 route 단위 테스트 3개 및 격리 PostgreSQL 실제 JSONB 조회에서 일정 6건을 확인했다. 최신 `origin/oci` 위에서 전체 테스트 1,536개와 production build를 통과했다.
+
+### 커밋·푸시·배포
+- 사전 검증 완료. 최신 `origin/oci`를 기준으로 코드 반영, 커밋·푸시 및 OCI release workflow 실행이 남아 있다.
+
+## [2026-10-31] 공시 이벤트 일정 조회 API 개선
+
+### 목표
+- 관리 JSON의 상세 일정과 분석 정보를 공개 조회 API에서 활용하고, 상태·유형별 탐색과 500건 초과 결과 페이지 처리를 지원한다. 범위는 API 전용이며 UI는 추가하지 않는다.
+
+### 반영
+- 원인: `keyDates`와 `eventDetails`는 DB `raw_event`에 보존됐지만 조회 API가 선택하지 않아 소비자가 받을 수 없었다. 목록은 최대 500건에서 끊기고 상태·이벤트 유형을 서버에서 필터링할 수 없었다.
+- 기존 `market-impact-events.v1` 응답 item에 `keyDates`와 `eventDetails`를 추가했다. JSON 값의 타입이 예상과 다르면 빈 배열·객체로 응답한다. DB 구조가 기존 `raw_event`를 사용하므로 새 migration은 필요하지 않다.
+- `status`와 `eventType` 필터를 추가하고, `(event_date DESC, published_at DESC NULLS LAST, event_id ASC)` keyset 페이지네이션과 `nextCursor`를 추가했다. 커서는 정렬 키의 timestamp 정밀도와 검색 조건·limit을 포함해 필터 변경 재사용을 거부한다.
+- OpenAPI query/response schema, API 수동 레퍼런스, API README, 이벤트 설계 문서, route regression 테스트를 함께 갱신했다. 사용자의 범위 지정에 따라 일정 UI·메뉴·홈 링크는 추가하지 않았다.
+
+### 검증
+- 이벤트 조회 route 회귀 테스트 6개 통과, `npm run typecheck` 통과.
+- 격리 PostgreSQL 복제본에서 실제 SQL로 상세 일정 JSON, `ESTIMATED`+`CLINICAL_TRIAL_READOUT` 필터, 커서 다음 페이지를 확인했다. 두 페이지의 eventId가 겹치지 않았고 상세 keyDates/eventDetails가 반환됐다. 원본 DB 쓰기 없음.
+- API surface 검사 통과(176 route files, 40 public GET), 문서 검사 통과(28 entry points, V165까지 165 migrations), `git diff --check` 통과.
+- UI 제거 후 API 전용 `npm run build`가 exit 0으로 완료됐다. 격리 worktree의 임시 `node_modules` junction 때문에 Next standalone trace에서 symlink 복사 `EPERM` 경고가 있었으나 빌드는 성공했다. Next가 자동 변경한 `tsconfig.json`, `next-env.d.ts`, `tsconfig.tsbuildinfo`는 원상 복구했다.
+
+### 남은 한계
+- `date/from/to`와 정렬은 대표 `eventDate` 기준이며, 각 `keyDates` 날짜를 독립 일정 occurrence로 필터링·정렬하지 않는다. 월·일·시각 표현이 혼재한 keyDates를 별도 캘린더 날짜로 다뤄야 할 때 occurrence 계약을 분리한다.
+- API 응답이 상세 JSON을 포함하므로 이벤트별 상세 데이터가 커지면 응답 바이트를 다시 측정한다.
+
+### 다음 개선
+- [ ] 월 단위/일 단위/시각 포함 keyDate의 의미를 합의한 뒤 필요 시 일정 occurrence API로 분리한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-31-003
+- 성과 판정: IMPROVED
+- 근거: 사용자가 필요로 한 API 경로에서 주요 일정 상세, 상태·유형 필터, 이어 읽기 기능을 제공하며 단위 테스트·타입·실제 복제 DB SQL 검증을 통과했다.
+
+### 커밋·푸시·배포
+- 미실행.
+
+## [2026-10-31] 공시 이벤트 조회 인덱스 성능 개선
+
+### 목표
+- 공시 이벤트 조회 API의 속도·메모리 사용을 실제 로컬 DB 환경으로 확인하고, 응답 계약과 필터 동작을 바꾸지 않으면서 병목을 줄인다.
+
+### 반영
+- 로컬 `.env.local`이 가리키는 loopback `stockman` DB를 read-only로 확인했다. DB 크기는 7,814,241,303 bytes, Flyway는 V161(104 success, failed 0)이었고 `market_impact_events` 테이블은 없었다.
+- 사용자가 승인한 격리 복제본을 PostgreSQL 16 컨테이너와 별도 볼륨으로 만들었다. 원본은 계속 read-only로 유지했다. 논리 백업을 복원한 복제 DB 크기는 5,058 MB였다. 복원은 물리 페이지를 재구성하므로 원본 DB 크기와 복제본 크기가 같지 않다.
+- 원인: 조회의 정렬은 `(event_date DESC, published_at DESC NULLS LAST, event_id)`인데 기존 인덱스는 `(event_date, market, ticker)`와 `(ticker, event_date)`에서 끝나, 전체 조회는 `LIMIT`이 있어도 후보 행을 incremental sort 했다.
+- V165는 전체 정렬 키 인덱스 하나를 추가한다. 기존 날짜·티커 인덱스는 선택도 높은 희소 필터 조회에 계속 사용하도록 유지한다. API route, 필터 의미, 결과 DTO와 상한은 변경하지 않는다.
+- 변경 파일: `db/migration/V165__market_impact_event_query_order.sql`, `docs/architecture/market-impact-events-design.md`, `docs/operations/runbook.md`, `DEVELOPMENT_LOG.md`.
+- 복제본에서 Flyway가 전체 165개 migration을 validate한 뒤 V162–V165를 적용했다. 현재 이벤트 JSON 4건을 기존 공식 보통주 마스터로 검증해 importer로 적재했다.
+- 확장 실험은 실제 `market_impact_events` 테이블에 합성 10,000행을 transaction 안에서만 추가해 수행하고 rollback했다. 복제본에는 관리 JSON 4건만 남겼다.
+
+### 검증
+- 원본 DB는 마지막까지 read-only였다. 복제본의 V161 history 상태와 복원된 데이터베이스를 기준으로 Flyway CLI 13.3.0이 전체 migration을 validate하고 V162–V165 네 migration을 성공 적용했다.
+- 4개 실제 이벤트로 API SQL을 5회 warm-up 후 20회 측정했다. V165 전/후 계획은 네 필터 모두 `Seq Scan + Sort`였으므로 이 소량 데이터에서는 인덱스 이점을 확인할 수 없다. 응답 envelope 크기는 전체 10,314 bytes, US 7,619, KR 2,876, ticker 2,880이었다. 중앙값/p95(ms)는 전체 0.102/0.111→0.070/0.103, US 0.087/0.091→0.072/0.096, KR 0.079/0.136→0.065/0.092, ticker 0.085/0.119→0.066/0.126이었다. 이 작은 차이는 유의한 성능 개선으로 간주하지 않는다.
+- 실제 API 테이블에서 총 10,004행(관리 JSON 4 + transaction 내 합성 10,000)으로 동일 SQL을 5회 warm-up 후 20회 측정했다. 모든 필터의 정렬된 event ID가 인덱스 전후 동일했다. 중앙값/p95(ms): 전체 1.476/1.559→0.570/0.632, US 1.725/2.291→0.745/0.822, KR 1.553/3.862→0.785/0.830, ticker 0.558/0.613→0.615/0.725. 전체·US·KR은 V165 index scan으로 정렬 단계를 제거했고, ticker 선택 조회는 기존 `market_impact_events_ticker_date_idx`를 계속 사용했다.
+- 10,004행 실험 응답 크기는 최대 LIMIT 500 기준 전체 295,885 bytes, US 293,757, KR 290,145, ticker 60,430이었다. transaction rollback 뒤 event count=4 및 V165 index 존재를 다시 확인했다. 합성 행 결과는 확장 시점 실행계획 검증이며 운영 p95로 간주하지 않는다.
+- 이전 임시 relation 기반 10,000행 측정은 반복 가능한 보조 실험으로 보존한다. 실제 clone 테이블 실험 결과를 주된 수치로 사용한다.
+
+### 다음 개선
+- [ ] 실제 운영/로컬 누적 이벤트 행 수가 수천 건 이상이 되면 production-like 분포로 계획과 API p50/p95를 재측정한다.
+- [ ] 운영 쓰기량이 늘어난 뒤 V165 인덱스의 쓰기 비용 및 실제 buffer read 비율을 확인하고 필요하면 기존 인덱스와 통합한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-10-31-002
+- 성과 판정: PARTIAL
+- 근거: 복제본 실제 API 테이블에서 10,000행 규모 쿼리의 전체·US·KR 정렬 단계를 제거했고 응답 순서를 보존했다. 실제 관리 JSON은 4건이라 현재 규모에서는 새 인덱스가 선택되지 않았다. 이 실험은 운영 트래픽 p95나 쓰기 비용을 대변하지 않는다.
+
+### 커밋·푸시·배포
+- 미실행.
+
 ## [2026-10-31] 공시 이벤트 자연 키 중복 방지
 
 ### 목표

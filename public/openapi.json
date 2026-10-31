@@ -1478,6 +1478,250 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/public/market-impact-event-occurrences": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicMarketImpactEventOccurrences",
+        "summary": "공시 이벤트의 개별 일정 발생일 조회",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/market-impact-event-occurrences/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "description": "이전 응답 nextCursor. 동일한 필터와 limit을 유지합니다."
+            },
+            "description": "이전 응답 nextCursor. 동일한 필터와 limit을 유지합니다."
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "일정 발생일 단일 날짜. from/to와 함께 사용할 수 없습니다."
+            },
+            "description": "일정 발생일 단일 날짜. from/to와 함께 사용할 수 없습니다."
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "일정 발생일 포함 시작일."
+            },
+            "description": "일정 발생일 포함 시작일."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "market",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "KR",
+                "US"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REPORTED",
+                "CONFIRMED_SCHEDULED",
+                "ESTIMATED",
+                "COMPLETED",
+                "CANCELLED"
+              ],
+              "description": "개별 keyDate 일정 상태."
+            },
+            "description": "개별 keyDate 일정 상태."
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z0-9._-]{1,32}$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "일정 발생일 포함 종료일."
+            },
+            "description": "일정 발생일 포함 종료일."
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "schemaVersion",
+                    "query",
+                    "asOf",
+                    "items",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "schemaVersion": {
+                      "const": "market-impact-event-occurrences.v1"
+                    },
+                    "query": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "eventId",
+                          "eventDate",
+                          "occurrenceDate",
+                          "ordinal",
+                          "keyDate",
+                          "market",
+                          "ticker",
+                          "eventType",
+                          "eventStatus"
+                        ],
+                        "additionalProperties": true,
+                        "properties": {
+                          "eventId": {
+                            "type": "string"
+                          },
+                          "eventDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "occurrenceDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "ordinal": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "keyDate": {
+                            "type": "object",
+                            "required": [
+                              "date",
+                              "status",
+                              "description"
+                            ],
+                            "additionalProperties": true
+                          },
+                          "market": {
+                            "type": "string",
+                            "enum": [
+                              "KR",
+                              "US"
+                            ]
+                          },
+                          "ticker": {
+                            "type": "string"
+                          },
+                          "companyName": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "eventType": {
+                            "type": "string"
+                          },
+                          "eventStatus": {
+                            "type": "string"
+                          },
+                          "sourceUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/market-impact-event-occurrences/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/public/market-impact-events": {
       "get": {
         "tags": [
@@ -1488,6 +1732,17 @@
         "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/public/market-impact-events/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "description": "이전 응답의 nextCursor. 동일한 필터와 limit로 전달합니다."
+            },
+            "description": "이전 응답의 nextCursor. 동일한 필터와 limit로 전달합니다."
+          },
+          {
             "name": "date",
             "in": "query",
             "required": false,
@@ -1497,6 +1752,15 @@
               "description": "단일 이벤트 날짜. from/to와 함께 사용할 수 없습니다."
             },
             "description": "단일 이벤트 날짜. from/to와 함께 사용할 수 없습니다."
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+            }
           },
           {
             "name": "from",
@@ -1529,6 +1793,21 @@
               "enum": [
                 "KR",
                 "US"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REPORTED",
+                "CONFIRMED_SCHEDULED",
+                "ESTIMATED",
+                "COMPLETED",
+                "CANCELLED"
               ]
             }
           },
@@ -1566,7 +1845,8 @@
                     "schemaVersion",
                     "query",
                     "asOf",
-                    "items"
+                    "items",
+                    "nextCursor"
                   ],
                   "properties": {
                     "ok": {
@@ -1576,11 +1856,81 @@
                       "const": "market-impact-events.v1"
                     },
                     "query": {
-                      "type": "object"
+                      "type": "object",
+                      "properties": {
+                        "date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date"
+                        },
+                        "from": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date"
+                        },
+                        "to": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date"
+                        },
+                        "market": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "KR",
+                            "US",
+                            null
+                          ]
+                        },
+                        "ticker": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "REPORTED",
+                            "CONFIRMED_SCHEDULED",
+                            "ESTIMATED",
+                            "COMPLETED",
+                            "CANCELLED",
+                            null
+                          ]
+                        },
+                        "eventType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
                     },
                     "asOf": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "다음 페이지가 없으면 null."
                     },
                     "items": {
                       "type": "array",
@@ -1597,7 +1947,9 @@
                           "direction",
                           "impactHorizon",
                           "title",
-                          "sourceUrl"
+                          "sourceUrl",
+                          "keyDates",
+                          "eventDetails"
                         ],
                         "properties": {
                           "eventId": {
@@ -1710,6 +2062,40 @@
                           "updatedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "keyDates": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "date",
+                                "status",
+                                "description"
+                              ],
+                              "properties": {
+                                "date": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "REPORTED",
+                                    "CONFIRMED_SCHEDULED",
+                                    "ESTIMATED",
+                                    "COMPLETED",
+                                    "CANCELLED"
+                                  ]
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": true
+                              }
+                            }
+                          },
+                          "eventDetails": {
+                            "type": "object",
+                            "additionalProperties": true
                           }
                         }
                       }

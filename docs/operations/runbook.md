@@ -24,6 +24,12 @@
 
 현재 로컬 DB의 알려진 상태(2026-09-26): `audit:flyway-local`은 기록 버전 V84, 저장소 최신 V140, pending 56개를 확인했습니다. V85/V89는 현재 source relation이 이미 view이고 split destination이 이미 존재해 structural precondition이 실패하며, SQL은 candle 행 삭제 및 relation drop/rename을 포함합니다. 요청 로그도 V133 필수 컬럼이 없습니다. 이 판정은 해당 로컬 DB 한 곳의 상태이며 운영 DB 상태로 일반화하지 않습니다.
 
+2026-10-31 공시 이벤트 성능 조사에서 원본 로컬 DB(`stockman`)는 read-only로 확인했다. DB 크기는 7,814,241,303 bytes, 성공 migration 104개·실패 0개·최신 V161이었고 `market_impact_events`는 없었다. history와 대상 relation만 확인한 점검이며 전체 source drift 감사는 아니다. 사용자가 승인한 별도 PostgreSQL 16 복제본에 논리 백업을 복원한 뒤 Flyway CLI 13.3.0으로 전체 165개 migration을 validate하고 V162–V165를 적용했다. 원본에는 migration·복구·쓰기 작업을 하지 않았다.
+
+복제본의 현재 이벤트 JSON은 4건이며, 활성 COMMON_STOCK 마스터 검증을 통과했다. API SQL 측정에서 이 4건은 V165 전후 모두 `Seq Scan + Sort`를 사용했다. 최대 응답 항목 500 기준 응답 envelope는 약 10.3KB였다. 1만 건의 합성 행을 복제본의 실제 `market_impact_events` 테이블에 transaction으로만 넣어 확장 실행계획을 확인했다. 전체·US·KR은 V165 정렬 인덱스를 사용했고 ticker 선택 조회는 기존 티커 인덱스를 사용했다. 네 필터의 정렬된 event ID가 동일했으며 rollback 후 JSON 4건과 V165 index만 남았음을 확인했다. 합성 결과는 운영 p95나 쓰기 비용을 보증하지 않는다.
+
+복제본은 별도 Docker volume/container에 보관하며 `127.0.0.1:5434`에만 바인딩한다. 운영 DB나 원본 로컬 DB의 migration 상태를 나타내지 않는다. V85/V89 구조 문제도 이 성능 복제 작업에서 해결하지 않았다.
+
 2026-10-20 운영에서 Flyway V157은 성공했지만 `/api/health`가 `market_rss_articles.translation_attempted_at` 및 `translation_candidate_title` 누락으로 degraded를 반환했다. 두 컬럼은 각각 V137/V140에만 정의되어 있었고, 운영 활성화 스크립트는 이미 최신 Flyway 버전보다 낮은 migration을 `*:ignored`로 처리한다. 따라서 “migration 파일이 저장소에 존재한다”는 사실만으로 기존 운영 스키마에 적용됐다고 가정할 수 없다. V158은 두 컬럼을 `ADD COLUMN IF NOT EXISTS`로 재보장하고 실패/월간 한도 건의 기존 시도 시각을 backfill한다. `scripts/check-docs.mjs`는 운영 floor V157 이후의 forward migration이 `FORWARD_REQUIRED_OPERATIONAL_COLUMNS`를 모두 다시 추가하는지 자동 검사한다. 운영 floor를 높이거나 신규 필수 컬럼을 추가할 때 이 호환성 목록과 검증 게이트도 함께 갱신한다.
 
 이 상태에서는 다음 작업을 하지 않습니다.

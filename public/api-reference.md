@@ -119,7 +119,11 @@ market 필수: KR, US, KOSPI, KOSDAQ, NAS, NYS, AMS. code 단일 값 또는 code
 
 ### 공시 기반 일별 주가 영향 이벤트 — GET /api/public/market-impact-events
 
-단일 관리 JSON의 `markets.KR`·`markets.US` 이벤트를 운영 DB에서 읽는다. 인증 없이 호출할 수 있으며 읽기 전용이다. Query: `date`(YYYY-MM-DD), `from`·`to`(포함 날짜 범위), `market`(KR/US), `ticker`, `limit`(기본 100, 최대 500). `date`는 `from`·`to`와 함께 사용할 수 없다. 응답 item에는 `eventId`와 중복 확인용 `eventKey`를 비롯해 이벤트 방향·영향 기간·신뢰도, 공시 원문 근거, 위험 및 한계가 포함된다. 같은 사건을 수정할 때는 기존 `eventId`를 유지한다. 방향은 주가 예측이 아니다. 오류: 400 `INVALID_QUERY`, 503 `MARKET_IMPACT_EVENTS_UNAVAILABLE`.
+단일 관리 JSON의 `markets.KR`·`markets.US` 이벤트를 운영 DB에서 읽는다. 인증 없이 호출할 수 있으며 읽기 전용이다. Query: `date`(YYYY-MM-DD), `from`·`to`(포함 날짜 범위), `market`(KR/US), `ticker`, `status`, `eventType`, `limit`(기본 100, 최대 500), `cursor`. `date`는 `from`·`to`와 함께 사용할 수 없다. `status`는 `REPORTED`, `CONFIRMED_SCHEDULED`, `ESTIMATED`, `COMPLETED`, `CANCELLED` 중 하나다. `eventType`은 대문자 영숫자/밑줄 형식이다. 다음 페이지 요청에는 동일한 필터와 limit을 유지하고 이전 응답의 `nextCursor`를 전달한다. 응답 item에는 중복 확인용 `eventId`·`eventKey`, 근거·위험·한계, 상세 일정 배열 `keyDates`, 육하원칙 상세 `eventDetails`가 포함된다. 날짜 필터와 정렬은 대표 `eventDate` 기준이다. 같은 사건을 수정할 때는 기존 `eventId`를 유지한다. 방향은 주가 예측이 아니다. 오류: 400 `INVALID_QUERY`, 503 `MARKET_IMPACT_EVENTS_UNAVAILABLE`.
+
+### 공시 이벤트 개별 일정 — GET /api/public/market-impact-event-occurrences
+
+이벤트의 `keyDates` 배열을 일정 발생일별 row로 펼쳐 조회한다. 인증 없는 읽기 전용 API다. Query: `date` 또는 `from`·`to`(포함 날짜), `market`(KR/US), `ticker`, `status`(개별 일정 상태), `eventType`, `limit`(기본 100, 최대 500), `cursor`. `date`와 범위는 함께 사용할 수 없다. 응답은 `occurrenceDate` 내림차순(최신 일정 먼저), eventId·ordinal 오름차순으로 정렬되며, 원본 일정 `keyDate`, 부모 이벤트 필드 및 일정 배열 내 위치 `ordinal`을 포함한다. 같은 날짜에 같은 이벤트의 여러 일정도 별도 row로 유지한다. 커서에는 발생일·eventId·ordinal과 필터가 들어가므로 다음 페이지에도 같은 query 조건을 전달한다. 유효한 `YYYY-MM-DD`가 아닌 `keyDates[].date` 값은 일정 검색 결과에서 제외된다. 오류: 400 `INVALID_QUERY`, 503 `MARKET_IMPACT_EVENT_OCCURRENCES_UNAVAILABLE`.
 
 ### 공시 영향 이벤트 작성 가이드 — GET /api/public/market-impact-events/guide
 
