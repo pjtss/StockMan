@@ -8009,5 +8009,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 배포 전 운영 무인증 `GET /api/sec/company-facts?cik=0001891856`로 저장 snapshot이 실제 존재함을 확인했다(마지막 fetch 2026-10-15). snapshot에는 매출, 영업이익, 순이익, 현금, 영업현금흐름 표준 태그가 있어, 결함은 데이터 부재가 아니라 마스터 CIK와 snapshot join 누락임을 확정했다.
 - `npm.cmd run deploy:verify` 통과: dependency audit 취약점 0, production build, standalone/OpenAPI/Chrome desktop·mobile smoke, 전체 Vitest 298파일(297 passed·1 skipped; 1,529 passed·3 skipped), TypeScript, docs/migration, API surface 177 routes/41 public GET, verify-scope/KIS/Bearer auth/OCI cron 감사.
 - regression test는 SEC SIC provenance CIK를 통한 Company Facts snapshot 연결, 회사 CIK·SEC명·SIC·대표 매출 fact 반환을 확인한다. 로컬 smoke는 잘못된 ticker 400을 확인했다. 운영 GENK 응답 검증과 배포는 커밋·푸시 후 진행한다.
+- 수정 커밋 `a6535bbe`의 OCI 배포 workflow `41183801560`은 성공했다. 운영 무인증 `GET /api/public/us-stock-metadata?ticker=GENK`은 HTTP 200으로 CIK `0001891856`, `GEN Restaurant Group, Inc.`, SIC `5812`, SEC Company Facts snapshot 및 재무 5개 지표를 반환했다. revenue `109,626,000 USD`, operating income `-12,360,000 USD`, net income `-1,922,000 USD`, cash `5,930,000 USD`, operating cash flow `-826,000 USD`; 모두 2026-06-30 종료기간·2026-08-10 제출 10-Q 기준이며 fetchedAt은 2026-10-15다. `dataQuality.status=COMPLETE`, `missingGroups=[]`; market quote는 관측시각 기준 90,757초로 `STALE`이며 신규 수집을 실행하지 않는다. 운영 `/api/health`도 HTTP 200 `ok`다.
 
 \n
