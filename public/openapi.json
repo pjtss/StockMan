@@ -2186,6 +2186,344 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/public/us-stock-metadata": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicUsStockMetadata",
+        "summary": "미국 보통주 티커 기본정보 조회",
+        "description": "인증 없는 읽기 전용 티커 조회입니다. 공식 활성 COMMON_STOCK 마스터에서 ticker를 검증하고 회사 식별정보, 캐시된 SEC Company Facts, 저장된 시세 스냅샷과 freshness를 반환합니다. 요청 중 외부 시세 조회나 DB 쓰기는 하지 않습니다.",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9.-]{0,14}$",
+              "description": "활성 미국 보통주 canonical ticker. 대소문자는 무시하며 점/하이픈은 변환하지 않습니다."
+            },
+            "description": "활성 미국 보통주 canonical ticker. 대소문자는 무시하며 점/하이픈은 변환하지 않습니다."
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "종목 식별·보통주 분류·회사 연결·저장 시세 스냅샷 및 데이터 신선도 반환.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "schemaVersion",
+                    "asOf",
+                    "ticker",
+                    "identity",
+                    "company",
+                    "financials",
+                    "marketSnapshot",
+                    "dataQuality"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "schemaVersion": {
+                      "const": "us-stock-metadata.v1"
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ticker": {
+                      "type": "string"
+                    },
+                    "identity": {
+                      "type": "object",
+                      "required": [
+                        "market",
+                        "ticker",
+                        "exchangeName",
+                        "instrumentType",
+                        "isCommonStock",
+                        "classification"
+                      ],
+                      "properties": {
+                        "market": {
+                          "type": "string",
+                          "enum": [
+                            "NAS",
+                            "NYS",
+                            "AMS"
+                          ]
+                        },
+                        "ticker": {
+                          "type": "string"
+                        },
+                        "realtimeSymbol": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "englishName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "exchangeName": {
+                          "type": "string"
+                        },
+                        "currency": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "countryCode": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "industryCode": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "instrumentType": {
+                          "const": "COMMON_STOCK"
+                        },
+                        "securityType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "etpType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isCommonStock": {
+                          "const": true
+                        },
+                        "classification": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    },
+                    "company": {
+                      "type": "object",
+                      "properties": {
+                        "cik": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "secName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sic": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sourceUpdatedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "financials": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "description": "캐시된 SEC Company Facts의 최신 standard-tag 재무 지표. 항목별 원 taxonomy, concept, 단위, 기간, filing 정보를 포함합니다.",
+                      "additionalProperties": true
+                    },
+                    "marketSnapshot": {
+                      "type": "object",
+                      "properties": {
+                        "price": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "changeRate": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "open": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "high": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "low": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "volume": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "tradingValue": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "marketCap": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "listedShares": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "currency": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "source": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "observedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "fetchedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "dataQuality": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "COMPLETE",
+                            "PARTIAL"
+                          ]
+                        },
+                        "missingGroups": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "marketDataFreshness": {
+                          "type": "string",
+                          "enum": [
+                            "MISSING",
+                            "UNKNOWN",
+                            "FRESH",
+                            "STALE"
+                          ]
+                        },
+                        "marketDataAgeSeconds": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "freshnessThresholdSeconds": {
+                          "const": 86400
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "404": {
+            "description": "미국 종목 마스터에서 ticker를 찾을 수 없음."
+          },
+          "409": {
+            "description": "ticker가 복수 거래소 종목과 일치함."
+          },
+          "422": {
+            "description": "활성 COMMON_STOCK이 아니거나 비보통주 분류가 확인됨."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/us-stock-metadata/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/scan/daytrade": {
       "get": {
         "tags": [

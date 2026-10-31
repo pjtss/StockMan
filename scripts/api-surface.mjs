@@ -69,6 +69,9 @@ function queryParameters(source, path) {
       market: { type: "string", enum: ["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NASDAQ", "NYS", "NYSE", "AMS", "AMEX"] },
       codes: { type: "string", description: "쉼표 구분 1~100개 종목 코드." },
     },
+    "/api/public/us-stock-metadata": {
+      ticker: { type: "string", pattern: "^[A-Z][A-Z0-9.-]{0,14}$", required: true, description: "활성 미국 보통주 canonical ticker. 대소문자는 무시하며 점/하이픈은 변환하지 않습니다." },
+    },
     "/api/public/market-intelligence": {
       ticker: { type: "string", description: "선택적 정확 티커 필터." },
       from: { type: "string", format: "date", description: "UTC 기준 시작 날짜(포함)." },
@@ -159,6 +162,17 @@ function responseSchema(path) {
     "/api/dart/history": { type: "array", items: { type: "object", properties: { title: { type: "string" }, judgment: { type: "string" }, publishedAt: { type: "string", format: "date-time" }, link: { type: "string" } } } },
     "/api/public/daily-candles": { oneOf: [{ type: "object", required: ["ok", "source", "market", "code", "timeframe", "candles", "metadata"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, code: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, candles: { type: "array", items: { type: "object", required: ["date", "open", "high", "low", "close", "volume"], properties: { date: { type: "string", format: "date" }, open: { type: "number" }, high: { type: "number" }, low: { type: "number" }, close: { type: "number" }, volume: { type: "number" } } } }, metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } } } }, { type: "object", required: ["ok", "source", "market", "timeframe", "items"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, items: { type: "array", items: { type: "object", properties: { code: { type: "string" }, candles: { type: "array", items: { type: "object", additionalProperties: true } } } } } } }] },
     "/api/public/instrument-fundamentals": { type: "object", properties: { ok: { const: true }, source: { const: "OPERATING_DB_FUNDAMENTAL_SNAPSHOT" }, market: { type: "string" }, items: { type: "array", items: { type: "object", properties: { market: { type: "string" }, code: { type: "string" }, name: { type: ["string", "null"] }, price: {}, changeRate: {}, open: {}, high: {}, low: {}, volume: {}, tradingValue: {}, marketCap: {}, listedShares: {}, currency: { type: "string" }, source: { type: "string" }, observedAt: {}, fetchedAt: {} } } } } },
+    "/api/public/us-stock-metadata": {
+      type: "object", required: ["ok", "schemaVersion", "asOf", "ticker", "identity", "company", "financials", "marketSnapshot", "dataQuality"],
+      properties: {
+        ok: { const: true }, schemaVersion: { const: "us-stock-metadata.v1" }, asOf: { type: "string", format: "date-time" }, ticker: { type: "string" },
+        identity: { type: "object", required: ["market", "ticker", "exchangeName", "instrumentType", "isCommonStock", "classification"], properties: { market: { type: "string", enum: ["NAS", "NYS", "AMS"] }, ticker: { type: "string" }, realtimeSymbol: { type: ["string", "null"] }, name: { type: ["string", "null"] }, englishName: { type: ["string", "null"] }, exchangeName: { type: "string" }, currency: { type: ["string", "null"] }, countryCode: { type: ["string", "null"] }, industryCode: { type: ["string", "null"] }, instrumentType: { const: "COMMON_STOCK" }, securityType: { type: ["string", "null"] }, etpType: { type: ["string", "null"] }, isCommonStock: { const: true }, classification: { type: "object", additionalProperties: true } } },
+        company: { type: "object", properties: { cik: { type: ["string", "null"] }, secName: { type: ["string", "null"] }, sic: { type: ["string", "null"] }, source: { type: ["string", "null"] }, sourceUpdatedAt: { type: ["string", "null"], format: "date-time" } } },
+        financials: { type: ["object", "null"], description: "캐시된 SEC Company Facts의 최신 standard-tag 재무 지표. 항목별 원 taxonomy, concept, 단위, 기간, filing 정보를 포함합니다.", additionalProperties: true },
+        marketSnapshot: { type: "object", properties: { price: { type: ["number", "null"] }, changeRate: { type: ["number", "null"] }, open: { type: ["number", "null"] }, high: { type: ["number", "null"] }, low: { type: ["number", "null"] }, volume: { type: ["number", "null"] }, tradingValue: { type: ["number", "null"] }, marketCap: { type: ["number", "null"] }, listedShares: { type: ["number", "null"] }, currency: { type: ["string", "null"] }, source: { type: ["string", "null"] }, observedAt: { type: ["string", "null"], format: "date-time" }, fetchedAt: { type: ["string", "null"], format: "date-time" } } },
+        dataQuality: { type: "object", properties: { status: { type: "string", enum: ["COMPLETE", "PARTIAL"] }, missingGroups: { type: "array", items: { type: "string" } }, marketDataFreshness: { type: "string", enum: ["MISSING", "UNKNOWN", "FRESH", "STALE"] }, marketDataAgeSeconds: { type: ["integer", "null"] }, freshnessThresholdSeconds: { const: 86400 } } },
+      },
+    },
     "/api/public/market-impact-events": { type: "object", required: ["ok", "schemaVersion", "query", "asOf", "items"], properties: { ok: { const: true }, schemaVersion: { const: "market-impact-events.v1" }, query: { type: "object" }, asOf: { type: "string", format: "date-time" }, items: { type: "array", items: { type: "object", required: ["eventId", "eventDate", "market", "ticker", "eventType", "eventKey", "status", "direction", "impactHorizon", "title", "sourceUrl"], properties: { eventId: { type: "string" }, eventDate: { type: "string", format: "date" }, market: { type: "string", enum: ["KR", "US"] }, ticker: { type: "string" }, companyName: { type: "string" }, eventType: { type: "string" }, eventKey: { type: "string" }, status: { type: "string", enum: ["REPORTED", "CONFIRMED_SCHEDULED", "ESTIMATED", "COMPLETED", "CANCELLED"] }, direction: { type: "string", enum: ["POSITIVE", "NEGATIVE", "MIXED", "UNCERTAIN"] }, impactHorizon: { type: "string", enum: ["INTRADAY", "SHORT_TERM", "LONG_TERM", "UNKNOWN"] }, title: { type: "string" }, summary: { type: "string" }, rationale: { type: "string" }, confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] }, sourceType: { type: "string" }, sourceId: { type: "string" }, sourceUrl: { type: "string", format: "uri" }, publishedAt: { type: ["string", "null"], format: "date-time" }, evidence: { type: "array", items: { type: "object", additionalProperties: true } }, risks: { type: "array", items: { type: "string" } }, limitations: { type: "array", items: { type: "string" } }, updatedAt: { type: "string", format: "date-time" } } } } } },
     "/api/public/market-impact-events/guide": { type: "object", required: ["ok", "guideVersion", "schemaVersion", "updatedAt", "locale", "sourceOfTruth", "compatibility", "marketSeparation", "eventContract", "analysisWorkflow", "jsonSchema", "chatgptPromptTemplate"], properties: { ok: { const: true }, guideVersion: { type: "string", description: "안내 콘텐츠 semver." }, schemaVersion: { const: "market-impact-event-guide.v1" }, updatedAt: { type: "string", format: "date" }, locale: { const: "ko-KR" }, purpose: { type: "string" }, sourceOfTruth: { type: "object", additionalProperties: true }, compatibility: { type: "object", additionalProperties: true }, marketSeparation: { type: "object", required: ["KR", "US"], properties: { KR: { type: "object", additionalProperties: true }, US: { type: "object", additionalProperties: true } } }, eventContract: { type: "object", additionalProperties: true }, analysisWorkflow: { type: "array", items: { type: "object", required: ["id", "instruction"], properties: { id: { type: "string" }, instruction: { type: "string" } } } }, jsonSchema: { type: "object", description: "market-impact-events.v1 JSON Schema (Draft 2020-12).", additionalProperties: true }, chatgptPromptTemplate: { type: "string" } } },
     "/api/public/market-intelligence": { type: "object", properties: { ok: { const: true }, query: { type: "object" }, asOf: { type: "string", format: "date-time" }, instrument: { type: ["object", "null"], additionalProperties: true }, fundamental: { type: ["object", "null"], additionalProperties: true }, rssArticles: { type: "array", items: { type: "object", additionalProperties: true } }, bullishArticles: { type: "array", items: { type: "object", additionalProperties: true } }, secEvents: { type: "array", items: { type: "object", additionalProperties: true } } } },
@@ -207,6 +221,7 @@ async function makeOpenApi(allRoutes) {
     "/api/market-news": "미국 뉴스와 SEC filing 조회",
     "/api/public/daily-candles": "운영 저장 일·주·월봉 조회",
     "/api/public/instrument-fundamentals": "종목 기본정보 스냅샷 조회",
+    "/api/public/us-stock-metadata": "미국 보통주 티커 기본정보 조회",
     "/api/public/market-impact-events": "공시 기반 일별 주가 영향 이벤트 조회",
     "/api/public/market-impact-events/guide": "공시 영향 이벤트 분석·JSON 갱신 가이드 조회",
     "/api/public/market-intelligence": "티커 통합 시장·공시 정보 조회",
@@ -242,16 +257,23 @@ async function makeOpenApi(allRoutes) {
       tags: [route.path.split("/")[2] ?? "general"],
       operationId: `get${route.path.replace(/^\/api\//, "").split(/[\/{}-]/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("")}`,
       summary,
-      description: `${route.path === "/api/automation-settings" ? "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. " : ""}인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 ${source}의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.`,
+      description: route.path === "/api/public/us-stock-metadata"
+        ? "인증 없는 읽기 전용 티커 조회입니다. 공식 활성 COMMON_STOCK 마스터에서 ticker를 검증하고 회사 식별정보, 캐시된 SEC Company Facts, 저장된 시세 스냅샷과 freshness를 반환합니다. 요청 중 외부 시세 조회나 DB 쓰기는 하지 않습니다."
+        : `${route.path === "/api/automation-settings" ? "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. " : ""}인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 ${source}의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.`,
       parameters: queryParameters(await readFile(join(root, source), "utf8"), route.path),
       security: [],
       responses: {
-        "200": { description: "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.", content: { "application/json": { schema: responseSchema(route.path) } } },
+        "200": { description: route.path === "/api/public/us-stock-metadata" ? "종목 식별·보통주 분류·회사 연결·저장 시세 스냅샷 및 데이터 신선도 반환." : "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.", content: { "application/json": { schema: responseSchema(route.path) } } },
         "400": { description: "입력값 검증 실패(해당 endpoint에 한함)." },
         "429": { description: "요청 제한 초과(해당 endpoint에 한함)." },
         "500": { description: "서버 내부 오류." },
         "502": { description: "상위 데이터 제공자 오류(해당 endpoint에 한함)." },
         "503": { description: "서비스 또는 데이터 저장소를 사용할 수 없음." },
+        ...(route.path === "/api/public/us-stock-metadata" ? {
+          "404": { description: "미국 종목 마스터에서 ticker를 찾을 수 없음." },
+          "409": { description: "ticker가 복수 거래소 종목과 일치함." },
+          "422": { description: "활성 COMMON_STOCK이 아니거나 비보통주 분류가 확인됨." },
+        } : {}),
       },
       "x-code-path": source,
       "x-access-classification": route.access,

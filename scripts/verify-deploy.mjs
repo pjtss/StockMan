@@ -244,10 +244,15 @@ async function verifyRuntime() {
     const openApi = await openApiResponse.json();
     if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]
       || !openApi.paths?.["/api/public/market-impact-events"]?.get
+      || !openApi.paths?.["/api/public/us-stock-metadata"]?.get
       || !openApi.paths?.["/api/scan/us-obv-divergence"]?.get
       || !openApi.paths?.["/api/public/document-catalog"]?.get
       || !openApi.paths?.["/api/public/api-manual"]?.get) {
       throw new Error("Standalone OpenAPI smoke failed: specification version or expected public paths are missing.");
+    }
+    const stockMetadataOperation = openApi.paths["/api/public/us-stock-metadata"].get;
+    if (stockMetadataOperation.security?.length || !stockMetadataOperation.parameters?.some((parameter) => parameter.name === "ticker" && parameter.required === true)) {
+      throw new Error("Standalone OpenAPI smoke failed: stock metadata must be an anonymous GET with a required ticker parameter.");
     }
     for (const [path, marker] of [["/api-reference.md", "StockMan 외부 읽기 전용 API 매뉴얼"], ["/llms.txt", "StockMan API"], ["/document-catalog.json", "stockman-document-catalog.v1"], ["/manuals/README.md", "StockMan 문서 인덱스"]]) {
       const response = await fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
@@ -264,6 +269,11 @@ async function verifyRuntime() {
     if (!apiManualResponse.ok || apiManualBody.ok !== true || !apiManualBody.items?.every((operation) => operation.method === "GET" && operation.authentication.required === false)) {
       throw new Error(`Standalone public API manual smoke failed: HTTP ${apiManualResponse.status}`);
     }
+    const stockMetadataManualResponse = await fetch(`http://127.0.0.1:${port}/api/public/api-manual?q=us-stock-metadata&limit=5`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+    const stockMetadataManualBody = await stockMetadataManualResponse.json();
+    if (!stockMetadataManualResponse.ok || stockMetadataManualBody.ok !== true || !stockMetadataManualBody.items?.some((operation) => operation.path === "/api/public/us-stock-metadata" && operation.authentication.required === false)) {
+      throw new Error(`Standalone stock metadata API manual smoke failed: HTTP ${stockMetadataManualResponse.status}`);
+    }
     console.log(`[deploy-verify] public API docs ok: ${Object.keys(openApi.paths).length} read operations`);
     await Promise.race([
       (async () => {
@@ -273,6 +283,7 @@ async function verifyRuntime() {
         await waitForJson(`http://127.0.0.1:${port}/api/kis/us-search?market=INVALID`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/scan/us-obv-divergence?page=0`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/public/market-impact-events?market=INVALID`, 30_000, 400);
+        await waitForJson(`http://127.0.0.1:${port}/api/public/us-stock-metadata?ticker=INVALID%21`, 30_000, 400);
         await waitForJson(`http://127.0.0.1:${port}/api/cron/us-obv-divergence-snapshot`, 30_000, 401, { method: "POST" });
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);

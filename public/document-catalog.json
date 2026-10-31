@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 122,
+  "documentCount": 123,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1169,6 +1169,17 @@
           "sourcePath": "docs/CANDLE_REFRESH_DESIGN.md"
         }
       ]
+    },
+    {
+      "id": "design-us-common-stock-metadata",
+      "title": "미국 보통주 티커 메타데이터 설계",
+      "category": "project-guide",
+      "format": "md",
+      "description": "티커 하나로 미국 활성 보통주를 식별하고, 운영 DB에 저장된 마스터·최신 시세·SEC 회사 식별·대표 재무 사실을 한 번에 확인하게 한다. GET /api/public/us-stock-metadata?ticker=...는 기존 uscommonstockuniverse, instrumentfundamentalsnapshots, seccompanies, secxbrlsnapshots만 읽는다. 요청 중 외부 API 호출이나 DB 쓰기는 하지 않는다.",
+      "url": "/manuals/design/us-common-stock-metadata.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/design/us-common-stock-metadata.md",
+      "related": []
     },
     {
       "id": "discord-ticker-overview",

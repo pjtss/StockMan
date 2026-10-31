@@ -31,8 +31,10 @@ describe("WatchlistWorkbench", () => {
   it("renders both markets with resolved company names", async () => {
     render(<WatchlistWorkbench />);
 
-    expect(await screen.findByText("삼성전자")).toBeInTheDocument();
-    expect(await screen.findByText("Apple Inc.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("삼성전자")).toBeInTheDocument();
+      expect(screen.getByText("Apple Inc.")).toBeInTheDocument();
+    }, { timeout: 10_000 });
     expect(screen.getByText("005930 · 국내")).toBeInTheDocument();
     expect(screen.getByText("AAPL · 해외")).toBeInTheDocument();
   });

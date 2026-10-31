@@ -1159,6 +1159,14 @@
       "source": "app/api/public/us-smallcap-shares/route.ts"
     },
     {
+      "path": "/api/public/us-stock-metadata",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/us-stock-metadata/route.ts"
+    },
+    {
       "path": "/api/push/subscribe",
       "methods": [
         "GET",

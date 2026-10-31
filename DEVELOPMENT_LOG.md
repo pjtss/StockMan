@@ -7970,3 +7970,26 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `fab3c2db`를 `origin/oci`에 push했다. GitHub Actions `Deploy OCI` run `40823443130`이 성공으로 완료되어 운영 릴리스가 활성화됐다.
 - 배포 후 운영 API에 Authorization/API-key 헤더 없이 GET 확인: `/api/public/daily-candles`, `/api/public/instrument-fundamentals`, `/api/public/market-intelligence` 모두 HTTP 200.
 - 운영 `/openapi.json`은 읽기 GET 35개, 인증이 선언된 operation 0개, security scheme 0개이며 세 캐시 API의 401 응답 선언도 없다.
+
+## [2026-10-31] 미국 보통주 종목 기본정보 공개 API
+
+### 목표
+- 운영 서버의 읽기 전용 API 한 번으로 활성 미국 보통주 티커의 식별정보, 최신 저장 시세, SEC 회사 식별정보와 캐시된 기본 재무정보를 확인한다.
+
+### 반영
+- `GET /api/public/us-stock-metadata?ticker={ticker}`를 추가한다. 호출자 인증 없이 동작하며, 공식 유니버스에서 활성 `COMMON_STOCK`이고 비보통주 분류가 아님을 확인한 종목만 반환한다. DB 조회만 수행하고 외부 호출이나 쓰기를 하지 않는다.
+- 시장 스냅샷 관측 시각 및 24시간 freshness 상태, 누락 데이터 그룹을 응답에 표시한다. SEC Company Facts에서는 표준 us-gaap/ifrs-full 개념의 최신 관측값과 taxonomy·concept·단위·기간·filing 출처를 함께 반환한다.
+- SEC 스냅샷 payload 조회를 연결하고, helper 단위 테스트를 추가한다. OpenAPI generator에 입력 규칙·응답 개요·오류 코드·무인증 분류를 추가해 route inventory, `/openapi.json`, `/api-reference.md`, `/api/public/api-manual` 및 문서 카탈로그가 함께 갱신되게 한다.
+- 상세 설계는 `docs/design/us-common-stock-metadata.md`에 기록한다.
+
+### 검증
+- `npm run deploy:verify`: 통과. npm audit 취약점 0개, production build, TypeScript, 296개 테스트 파일(1,528 passed, 3 skipped), API surface 177 routes/41 public GET, 문서 123개/7개 범주, scope/KIS/auth/cron 감사를 확인했다.
+- standalone smoke: OpenAPI에 신규 무인증 GET 및 필수 ticker가 있고 검색형 `/api/public/api-manual` 결과에도 해당 경로가 포함되는지 확인했다. 비정상 ticker는 DB 조회 전에 HTTP 400을 반환했다. `/charts`, 정적 청크 및 Chrome desktop/mobile 검사도 통과했다.
+- 전체 테스트의 첫 재실행에서 watchlist 회사명 조회 테스트가 비동기 이름 조회를 기본 짧은 대기 안에 받지 못해 1건 실패했다. 테스트는 두 시장 이름이 모두 표시될 때까지 최대 10초 기다리도록 조정했고, 해당 파일 4개 테스트와 전체 배포 검증을 통과했다.
+- `git diff --check`: 변경 파일 공백 검사 완료.
+- 남은 위험: 운영 DB에 해당 티커의 최신 스냅샷 또는 SEC facts가 없으면 API는 `PARTIAL`과 누락 항목을 반환한다. 데이터 수집·갱신은 이 공개 GET에서 실행하지 않는다.
+
+### 커밋·푸시·배포
+- 진행 중: 한국어 상세 커밋 및 `oci` 브랜치 push 후 OCI 배포 workflow와 운영 health/API 확인 예정.
+
+\n
