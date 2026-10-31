@@ -33,6 +33,7 @@ type MetadataRow = {
   cik: string | null;
   sec_name: string | null;
   sic: string | null;
+  sec_identity_source: string | null;
   sec_source_updated_at: Date | string | null;
   xbrl_payload: unknown;
   xbrl_fetched_at: Date | string | null;
@@ -66,8 +67,13 @@ export async function GET(request: Request) {
               u.currency, u.country_code, u.industry_code, u.is_etf, u.is_leveraged,
               u.is_inverse, u.is_warrant, u.is_derivative, u.is_dr, u.enabled, u.source_file,
               u.updated_at AS master_updated_at, u.last_seen_at AS master_last_seen_at,
-              sec.cik, sec.name AS sec_name, sec.sic,
-              sec.source_updated_at AS sec_source_updated_at,
+              COALESCE(sec.cik, sic_source.cik) AS cik,
+              COALESCE(sec.name, x.payload->>'entityName') AS sec_name,
+              COALESCE(sec.sic, CASE WHEN sic_source.cik IS NOT NULL THEN u.industry_code END) AS sic,
+              CASE WHEN sec.cik IS NOT NULL THEN 'SEC_COMPANY_TICKER_EXCHANGE_MASTER'
+                   WHEN sic_source.cik IS NOT NULL THEN 'SEC_EDGAR_SIC_SOURCE'
+                   ELSE NULL END AS sec_identity_source,
+              COALESCE(sec.source_updated_at, x.fetched_at) AS sec_source_updated_at,
               x.payload AS xbrl_payload, x.fetched_at AS xbrl_fetched_at,
               f.price, f.change_rate, f.open, f.high, f.low, f.volume, f.trading_value,
               f.market_cap, f.listed_shares, f.currency AS snapshot_currency,
@@ -85,7 +91,10 @@ export async function GET(request: Request) {
             ORDER BY c.updated_at DESC
             LIMIT 1
          ) sec ON TRUE
-         LEFT JOIN sec_xbrl_snapshots x ON x.cik = sec.cik
+         LEFT JOIN LATERAL (
+           SELECT substring(u.source_file FROM '^SEC_EDGAR_SIC:([0-9]{10})$') AS cik
+         ) sic_source ON TRUE
+         LEFT JOIN sec_xbrl_snapshots x ON x.cik = COALESCE(sec.cik, sic_source.cik)
         WHERE UPPER(u.code) = $1 AND u.market = ANY($2::text[])
         ORDER BY u.market`,
       [ticker, US_MARKETS],
@@ -170,8 +179,8 @@ export async function GET(request: Request) {
         cik: row.cik,
         secName: row.sec_name,
         sic: row.sic,
-        source: row.cik ? "SEC_COMPANY_TICKER_EXCHANGE_MASTER" : null,
-        sourceUpdatedAt: row.sec_source_updated_at,
+        source: row.sec_identity_source,
+        sourceUpdatedAt: row.sec_source_updated_at || (row.sec_identity_source === "SEC_EDGAR_SIC_SOURCE" ? row.master_updated_at : null),
       },
       financials: financialFacts ? {
         source: "SEC_COMPANY_FACTS",

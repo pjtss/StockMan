@@ -7997,4 +7997,17 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 운영 `/api/public/api-manual?q=us-stock-metadata&limit=5` 무인증 GET은 HTTP 200이며 신규 GET operation, ticker 필수 입력, 응답 DTO 및 오류 응답 설명을 검색 결과에 포함했다.
 - 최종 커밋·푸시·배포는 완료했다. 마지막 기록 변경은 이 문서뿐이며 `docs:check`와 `git diff --check`로 확인한다.
 
+## [2026-10-31] SEC SIC provenance 기반 CIK fallback
+
+### 원인 및 변경
+- 실제 운영 `/api/public/us-stock-metadata?ticker=GENK` 응답은 `identity.classification.source`에 `SEC_EDGAR_SIC:0001891856`를 반환하면서 `company.cik`과 `financials`가 null이었다. 라우트가 `sec_companies.tickers` 일치만으로 CIK를 찾고, 이 연결 실패 시 SEC SIC 동기화가 마스터에 기록한 CIK를 무시해 기존 Company Facts snapshot 연결도 놓쳤다.
+- SEC 공식 Company Facts API에서 CIK `0001891856`은 `GEN Restaurant Group, Inc.`로 확인됐고 us-gaap 개념 229개를 포함했다. 라우트는 SEC ticker/exchange 매핑을 우선하고, 매핑이 없는 경우 정확한 `SEC_EDGAR_SIC:<10자리 CIK>` 출처 형식에서만 CIK를 보완해 회사 및 저장 facts snapshot을 연결하도록 변경했다. 회사명은 SEC company map을 우선하며 없을 때 저장 Company Facts `entityName`을 사용한다. 공개 GET의 외부 호출·DB 쓰기 동작은 추가하지 않았다.
+- 상세 설계 문서에 fallback의 근거와 범위를 기록했다. 방지 체크리스트: CIK fallback은 보통주 적격성 판정에 사용하지 않고, 고정 provenance 형식과 10자리 CIK를 모두 확인하며, Company Facts는 기존 snapshot만 읽는다.
+
+### 검증 및 배포 상태
+- 근거 자료: [SEC EDGAR APIs](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), SEC Company Facts `https://data.sec.gov/api/xbrl/companyfacts/CIK0001891856.json` (2026-10-31 직접 확인; entity name과 taxonomy 개수 확인).
+- 배포 전 운영 무인증 `GET /api/sec/company-facts?cik=0001891856`로 저장 snapshot이 실제 존재함을 확인했다(마지막 fetch 2026-10-15). snapshot에는 매출, 영업이익, 순이익, 현금, 영업현금흐름 표준 태그가 있어, 결함은 데이터 부재가 아니라 마스터 CIK와 snapshot join 누락임을 확정했다.
+- `npm.cmd run deploy:verify` 통과: dependency audit 취약점 0, production build, standalone/OpenAPI/Chrome desktop·mobile smoke, 전체 Vitest 298파일(297 passed·1 skipped; 1,529 passed·3 skipped), TypeScript, docs/migration, API surface 177 routes/41 public GET, verify-scope/KIS/Bearer auth/OCI cron 감사.
+- regression test는 SEC SIC provenance CIK를 통한 Company Facts snapshot 연결, 회사 CIK·SEC명·SIC·대표 매출 fact 반환을 확인한다. 로컬 smoke는 잘못된 ticker 400을 확인했다. 운영 GENK 응답 검증과 배포는 커밋·푸시 후 진행한다.
+
 \n

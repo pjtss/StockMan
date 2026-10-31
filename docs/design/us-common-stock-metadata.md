@@ -11,7 +11,7 @@ SEC의 티커·CIK·거래소 매핑은 검색 편의 데이터이며 SEC가 정
 1. `ticker`를 trim/대문자화하고 길이·문자 집합을 검증한다. 점/대시 표기는 임의 변환하지 않는다.
 2. 미국 종목 마스터에서 canonical `code` 완전 일치 후보를 찾는다. `realtime_symbol`은 반환 정보로만 제공하고 검색 별칭으로 쓰지 않는다. 0건은 `INSTRUMENT_NOT_FOUND`, 복수 후보는 `AMBIGUOUS_TICKER`로 돌려보낸다.
 3. `enabled=true`, `instrument_type=COMMON_STOCK` 및 ETF/ETP·워런트·파생·DR·레버리지·인버스 플래그가 모두 확인되고 false인지 검사한다. 분류나 마스터를 확인할 수 없으면 fail-closed로 결과를 주지 않는다. 활성 보통주 마스터에 없지만 특수종목 마스터에서 확인된 코드는 422로 거부한다.
-4. 일치한 종목의 `market`, `code`, 이름을 내부 canonical key로 사용하고 SEC CIK를 연결한다. SEC 매핑은 보조 연결키이며 마스터 적격성을 대체하지 않는다.
+4. 일치한 종목의 `market`, `code`, 이름을 내부 canonical key로 사용하고 SEC CIK를 연결한다. SEC ticker/exchange 매핑을 우선 사용하며, 매핑이 없으면 공식 SEC SIC 동기화가 기록한 `SEC_EDGAR_SIC:<10자리 CIK>` provenance를 보조 연결키로 사용한다. 이 fallback은 식별정보·기존 Company Facts snapshot 연결에만 쓰며 마스터 적격성을 대체하지 않는다.
 
 ## 권장 응답 필드
 
@@ -90,7 +90,7 @@ SEC의 티커·CIK·거래소 매핑은 검색 편의 데이터이며 SEC가 정
 
 ### 1단계: 현재 데이터만으로 기본 프로필 및 저장 재무 사실 (구현)
 
-마스터의 이름·시장·통화·분류와 기존 스냅샷의 quote/시총/주식수 및 시각·출처를 묶는다. SEC CIK/SIC를 ticker-exchange 매핑으로 연결하고 저장된 Company Facts에서 대표 5개 사실을 뽑아 보고기간과 공시 추적 메타데이터를 유지한다. 동일 지표는 가장 늦은 `end` 기간을 선택하고, 기간이 같으면 가장 최근 `filed` 공시를 선택한다. 기간을 합산하거나 독립 분기값으로 변환하지 않는다. DB 테이블을 변경하지 않고 단일 공개 GET으로 조회한다. 티커가 마스터에서 유일하게 검증되지 않거나 활성 COMMON_STOCK이 아니면 데이터를 반환하지 않는다. API는 현재 DB snapshot을 읽으므로 실시간 시세를 새로 조회한다고 표현하지 않는다. 표준 태그가 없거나 SEC 캐시가 없으면 해당 값은 null이다.
+마스터의 이름·시장·통화·분류와 기존 스냅샷의 quote/시총/주식수 및 시각·출처를 묶는다. SEC CIK/SIC는 ticker-exchange 매핑을 우선 연결하고, SEC SIC 출처에 10자리 CIK가 기록된 경우 그 provenance로 보완한다. 저장된 Company Facts에서 대표 5개 사실을 뽑아 보고기간과 공시 추적 메타데이터를 유지한다. 동일 지표는 가장 늦은 `end` 기간을 선택하고, 기간이 같으면 가장 최근 `filed` 공시를 선택한다. 기간을 합산하거나 독립 분기값으로 변환하지 않는다. DB 테이블을 변경하지 않고 단일 공개 GET으로 조회한다. 티커가 마스터에서 유일하게 검증되지 않거나 활성 COMMON_STOCK이 아니면 데이터를 반환하지 않는다. API는 현재 DB snapshot을 읽으므로 실시간 시세를 새로 조회한다고 표현하지 않는다. 표준 태그가 없거나 SEC 캐시가 없으면 해당 값은 null이다.
 
 ### 2단계: 추가 재무 항목
 
