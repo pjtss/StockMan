@@ -5,8 +5,9 @@ import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/l
 import { withAutomationLock } from "@/lib/automation-lock";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { normalizeSecCiks } from "@/lib/sec-edgar-config";
-import { resolveSecCompanyTickers } from "@/lib/sec-company-ticker";
-import { filterActiveSecCommonStocks } from "@/lib/sec-company-facts-eligibility";
+import { loadSecCompanyTickerMaster } from "@/lib/sec-company-ticker";
+import { filterActiveSecCommonStocks, filterEnabledSecCommonStocks } from "@/lib/sec-company-facts-eligibility";
+import { syncSecCompanyTickerMaster } from "@/lib/sec-company-ticker-master-sync";
 import { getSecCompanyFactsScheduleDecision } from "@/lib/sec-company-facts-schedule";
 import { syncSecCompanyFacts } from "@/lib/sec-company-facts-sync";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
@@ -34,14 +35,16 @@ export async function POST(request: Request) {
 
       const configured = settings.featureSettings?.secCompanyFacts?.ciks;
       const ciks = normalizeSecCiks(configured?.length ? configured : process.env.SEC_SYNC_CIKS);
-      if (!ciks.length) return { skipped: true as const, reason: "no_configured_ciks" };
-
-      const secTickerRows = await resolveSecCompanyTickers(ciks);
-      const eligibleTickers = await filterActiveSecCommonStocks(secTickerRows);
-      const eligibleCiks = [...new Set(eligibleTickers.map((row) => row.cik))];
-      if (!eligibleCiks.length) return { skipped: true as const, reason: "no_active_common_stock_ciks", configuredCikCount: ciks.length, eligibleTickerCount: 0 };
 
       const result = await withAutomationRun("sec-company-facts", async () => {
+        const secTickerRows = await loadSecCompanyTickerMaster();
+        if (!secTickerRows.length) throw new Error("SEC company ticker/exchange master returned no rows");
+        const enabledCommonRows = await filterEnabledSecCommonStocks(secTickerRows);
+        const companyMasterSync = await syncSecCompanyTickerMaster(secTickerRows, enabledCommonRows);
+        const configuredCiks = new Set(ciks);
+        const factCandidateRows = ciks.length ? secTickerRows.filter((row) => configuredCiks.has(row.cik)) : [];
+        const eligibleTickers = factCandidateRows.length ? await filterActiveSecCommonStocks(factCandidateRows) : [];
+        const eligibleCiks = [...new Set(eligibleTickers.map((row) => row.cik))];
         const results = [];
         for (const cik of eligibleCiks) {
           try {
@@ -61,6 +64,9 @@ export async function POST(request: Request) {
           eligibleCikCount: eligibleCiks.length,
           eligibleCommonTickerCount: eligibleTickers.length,
           excludedNonCommonOrInactiveCikCount: ciks.length - eligibleCiks.length,
+          secCompanyMasterIssuerCount: companyMasterSync.issuerCount,
+          secCompanyMasterTickerCount: companyMasterSync.tickerCount,
+          secCompanyMasterSyncedAt: companyMasterSync.syncedAt,
           successCount: eligibleCiks.length - failureCount,
           results,
           timezone: "Asia/Seoul",

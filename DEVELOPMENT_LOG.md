@@ -8110,4 +8110,21 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - regression test는 SEC SIC provenance CIK를 통한 Company Facts snapshot 연결, 회사 CIK·SEC명·SIC·대표 매출 fact 반환을 확인한다. 로컬 smoke는 잘못된 ticker 400을 확인했다. 운영 GENK 응답 검증과 배포는 커밋·푸시 후 진행한다.
 - 수정 커밋 `a6535bbe`의 OCI 배포 workflow `41183801560`은 성공했다. 운영 무인증 `GET /api/public/us-stock-metadata?ticker=GENK`은 HTTP 200으로 CIK `0001891856`, `GEN Restaurant Group, Inc.`, SIC `5812`, SEC Company Facts snapshot 및 재무 5개 지표를 반환했다. revenue `109,626,000 USD`, operating income `-12,360,000 USD`, net income `-1,922,000 USD`, cash `5,930,000 USD`, operating cash flow `-826,000 USD`; 모두 2026-06-30 종료기간·2026-08-10 제출 10-Q 기준이며 fetchedAt은 2026-10-15다. `dataQuality.status=COMPLETE`, `missingGroups=[]`; market quote는 관측시각 기준 90,757초로 `STALE`이며 신규 수집을 실행하지 않는다. 운영 `/api/health`도 HTTP 200 `ok`다.
 
+## [2026-11-03] 보통주 API SEC 회사 식별 매핑 커버리지 개선
+
+### 발견한 문제와 원인
+- 운영 무인증 GET 표본에서 GENK는 앞선 CIK fallback 수정으로 식별·facts 5개가 연결됐지만 AAPL, NVDA, TSLA, BABA는 `company`와 `financials`가 비어 있었다. 각각 `/api/sec/company-facts?cik=...`도 HTTP 404여서 저장 snapshot이 없는 상태였다.
+- SEC 공식 `company_tickers_exchange.json`은 10,423행이며 네 ticker의 CIK·회사명이 모두 있었다. 기존 일일 Company Facts cron은 설정 CIK 목록만 처리했고, 목록이 비면 전체 job을 건너뛰어 `sec_companies`에 전체 종목 CIK/회사명 매핑을 만들지 않았다.
+
+### 변경
+- 일일 SEC cron은 공식 ticker/exchange master를 받아 enabled COMMON_STOCK가 KIS 미국 종목 마스터에서 확인된 issuer의 SEC 회사명, CIK, 전체 ticker/exchange 배열을 `sec_companies`에 갱신한다. 적격성에는 SEC ticker 텍스트 추정을 쓰지 않고 기존 fail-closed KIS 분류 게이트를 사용한다.
+- SEC Company Facts 본문 수집은 계속 명시 설정한 CIK만 호출한다. 공개 GET은 계속 DB 읽기만 수행하며 외부 요청이나 쓰기를 하지 않는다. SEC ticker master 프로세스 캐시를 12시간으로 제한해 장기 실행 서버가 갱신을 영구 보류하지 않도록 했고, 10,423 SEC 행을 검사하는 보통주 eligibility grouping을 O(n²)에서 O(n)으로 줄였다.
+- 기능 모듈 설명, 설계 문서, 운영 runbook과 이 로그를 갱신했다. 추가 schema/migration은 없다.
+
+### 검증·남은 범위
+- 대상 Vitest 3개 파일 9개 테스트 통과: cron은 facts CIK 설정이 비어도 회사 매핑을 갱신하고, facts 요청은 설정 CIK만 사용하며, 회사 매핑은 KIS enabled common stock 적격성으로 제한한다.
+- 배포 전 운영 표본: `/api/health` 200; GENK 기본정보는 `COMPLETE`; AAPL/NVDA/TSLA/BABA는 기존 `sec_companies` 및 Company Facts snapshot 부재로 `PARTIAL`. SEC Company Facts 수집은 이 변경에서도 설정 CIK만 대상이므로 네 종목 재무 facts의 자동 backfill은 포함하지 않는다.
+- 전체 `npm.cmd run deploy:verify` 통과: npm audit 취약점 0, production build/standalone 및 Chrome desktop/mobile smoke, 전체 Vitest 300파일(299 passed·1 skipped; 1,540 passed·3 skipped), TypeScript, docs/migration(API 178 routes/42 public GET, 123문서, V165), verify-scope/KIS/Bearer auth/OCI cron 감사.
+- 커밋·푸시·배포 및 배포 후 다음 일일 cron이 SEC 회사 매핑을 완료했는지, 이어서 무인증 AAPL/NVDA/TSLA/BABA GET에서 CIK·SEC 회사명이 나타나는지 확인이 남았다. Company Facts는 설정 대상이 아닌 한 계속 partial일 수 있다.
+
 \n

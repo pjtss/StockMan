@@ -34,7 +34,7 @@ export const FEATURE_MODULES: FeatureModuleDefinition[] = [
   { key: "instrument-fundamentals", label: "종목 기본정보 갱신", description: "국내·해외 유니버스의 현재가·거래량·거래대금·시가총액 기본정보를 하루 1회 저장", settingsPath: "/admin/modules/instrument-fundamentals", scheduler: "OCI_CRON" },
   { key: "dart-realtime", label: "DART 공시 자동화", description: "OpenDART 수집·평가·알림", settingsPath: "/admin/modules/dart-realtime", scheduler: "OCI_CRON" },
   { key: "sec-realtime", label: "SEC Submissions 자동화", description: "CIK 기반 SEC Submissions·Form/Item·XBRL 수집·알림", settingsPath: "/admin/modules/sec-realtime", scheduler: "OCI_CRON" },
-  { key: "sec-company-facts", label: "SEC Company Facts 일일 갱신", description: "설정한 CIK 목록의 SEC Company Facts 원본을 매일 08:00 KST에 수집·저장", settingsPath: "/admin/modules/sec-company-facts", scheduler: "OCI_CRON" },
+  { key: "sec-company-facts", label: "SEC 회사·재무정보 일일 갱신", description: "활성 미국 보통주 SEC 회사 매핑을 갱신하고 설정한 CIK의 Company Facts 원본을 매일 08:00 KST에 수집·저장", settingsPath: "/admin/modules/sec-company-facts", scheduler: "OCI_CRON" },
   { key: "sec-smallcap-share-facts", label: "SEC 보통주 주식수 fact 갱신", description: "미국 상장 보통주의 DEI·US-GAAP 주식수 fact와 공시 기준일을 별도 수집·저장", settingsPath: "/admin/modules/sec-smallcap-share-facts", scheduler: "OCI_CRON" },
   { key: "sec-edgar", label: "SEC EDGAR RSS 자동화", description: "SEC EDGAR RSS 수집·분류·알림", settingsPath: "/admin/modules/sec-edgar", scheduler: "OCI_CRON" },
   { key: "market-rss", label: "시장 RSS 통합", description: "SEC EDGAR·StockTitan·시장 RSS 수집·번역·알림", settingsPath: "/admin/modules/market-rss", scheduler: "OCI_CRON" },

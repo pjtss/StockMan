@@ -1,14 +1,15 @@
 const SEC_TICKER_URL = "https://www.sec.gov/files/company_tickers_exchange.json";
+const SEC_TICKER_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 export type SecTickerRow = { cik: string; name: string; ticker: string; exchange: string };
-let cache: Promise<SecTickerRow[]> | null = null;
+let cache: { promise: Promise<SecTickerRow[]>; expiresAt: number } | null = null;
 
 export function extractSecCik(title: string) {
   return title.match(/\((\d{10})\)/)?.[1] || "";
 }
 
 async function loadRows() {
-  if (!cache) {
-    cache = fetch(SEC_TICKER_URL, { headers: { "user-agent": process.env.SEC_USER_AGENT || "StockMan research admin@example.com" }, cache: "no-store" })
+  if (!cache || Date.now() >= cache.expiresAt) {
+    const promise = fetch(SEC_TICKER_URL, { headers: { "user-agent": process.env.SEC_USER_AGENT || "StockMan research admin@example.com" }, cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error(`SEC company ticker map failed: ${response.status}`);
         const body = await response.json() as { fields?: string[]; data?: unknown[][] };
@@ -16,9 +17,15 @@ async function loadRows() {
         const index = (name: string) => fields.indexOf(name);
         return (body.data || []).map((row) => ({ cik: String(row[index("cik")] || "").padStart(10, "0"), name: String(row[index("name")] || ""), ticker: String(row[index("ticker")] || "").toUpperCase(), exchange: String(row[index("exchange")] || "") })).filter((row) => row.cik && row.ticker);
       })
-      .catch((error) => { cache = null; throw error; });
+      .catch((error) => { if (cache?.promise === promise) cache = null; throw error; });
+    cache = { promise, expiresAt: Date.now() + SEC_TICKER_CACHE_TTL_MS };
   }
-  return cache;
+  return cache.promise;
+}
+
+/** Returns the cached official SEC ticker/exchange master for active-universe reconciliation. */
+export async function loadSecCompanyTickerMaster() {
+  return loadRows();
 }
 
 export async function resolveSecCompanyTickers(ciks: string[]) {

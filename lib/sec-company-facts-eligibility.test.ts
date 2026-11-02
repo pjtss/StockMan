@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { filterActiveSecCommonStocks } from "./sec-company-facts-eligibility";
+import { filterActiveSecCommonStocks, filterEnabledSecCommonStocks } from "./sec-company-facts-eligibility";
 
 const query = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/db", () => ({ getPool: () => ({ query }) }));
@@ -21,5 +21,13 @@ describe("SEC Company Facts active common-stock gate", () => {
     query.mockResolvedValueOnce({ rows: [] });
     await expect(filterActiveSecCommonStocks([{ cik: "0000000001", ticker: "ETF", name: "Example ETF Trust", exchange: "NASDAQ" }])).resolves.toEqual([]);
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it("includes enabled common stocks outside the scanner daily-active pool for company identity mapping", async () => {
+    query.mockResolvedValueOnce({ rows: [{ market: "NAS", code: "AAPL", name: "Apple Inc." }] });
+    await expect(filterEnabledSecCommonStocks([
+      { cik: "0000320193", ticker: "AAPL", name: "Apple Inc.", exchange: "NASDAQ" },
+    ])).resolves.toMatchObject([{ cik: "0000320193", ticker: "AAPL", market: "NAS", universeCode: "AAPL" }]);
+    expect(query.mock.calls[0][0]).not.toContain("daily_active = TRUE");
   });
 });

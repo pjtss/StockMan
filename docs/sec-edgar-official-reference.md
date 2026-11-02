@@ -93,6 +93,7 @@ Accept-Encoding: gzip, deflate
 
 - SEC EDGAR **RSS**는 `market-rss` 통합 파이프라인에서만 수집한다. `market_rss_articles`에 `source=SEC_EDGAR`로 저장되고 공통 분류·등급·번역·RSS Discord 전송을 따른다.
 - SEC EDGAR **Submissions/XBRL**은 `sec-realtime`의 `/api/cron/sec-edgar`에서 CIK 목록을 기준으로 수집한다. 결과는 `sec_companies`, `sec_submissions`, `sec_filing_events`, `sec_xbrl_snapshots`에 저장한다.
+- SEC `company_tickers_exchange.json`은 `/api/cron/sec-company-facts`가 하루 한 번 조회한다. KIS 미국 종목 마스터의 enabled COMMON_STOCK로 확인된 issuer만 `sec_companies`에 upsert해 공개 단건 메타데이터 API에서 CIK·회사명 매핑에 사용한다. 이 검색 매핑 파일은 SEC가 정확성·범위를 보장하지 않으므로 적격성 판정에는 사용하지 않는다. Company Facts payload 수집은 여전히 관리자 설정 CIK 목록으로 별도 제한한다.
 - 전체 공시 본문 수집은 회사별 전체 Submissions 이력을 accession별로 저장한 뒤 제출 인덱스/primary document 해석기를 통해 `sec_filing_documents.primary_text`에 실제 FORM 본문을 보존한다.
 - `sync-filings`는 DART 전용이며 SEC RSS 자동화를 호출하지 않는다. 따라서 같은 SEC RSS 공시를 두 자동화가 각각 Discord로 보내지 않도록 한다.
 - 관리자 설정은 `/admin/modules/market-rss`와 `/admin/modules/sec-realtime`, 원문·분류 테스트는 `/admin/api-tests`, 저장 결과는 `/admin/stocktitan-rss`, 실행 상태는 `/admin/observability`에서 확인한다.
