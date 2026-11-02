@@ -8136,7 +8136,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증 및 상태
 - 변경 파일: `app/api/sec/company-facts/route.ts`, 해당 route test, `docs/official/sec-edgar/companyfacts.md`, `docs/design/us-common-stock-metadata.md`, 본 로그 및 생성 API 문서/인벤토리.
-- route test 4개 통과. `docs:api:generate`가 178 route/42 public GET inventory·OpenAPI를 재생성했고 `audit:api-surface`가 통과했다. 전체 `npm.cmd run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone/OpenAPI/Chrome desktop·mobile smoke, 전체 Vitest 300파일(299 passed·1 skipped; 1,540 passed·3 skipped), TypeScript, docs/migration(V165), verify-scope/KIS/Bearer/OCI cron 감사. `git diff --check`도 통과. 커밋·푸시·배포 여부: 아직 없음.
+- route test 4개 통과. `docs:api:generate`가 178 route/42 public GET inventory·OpenAPI를 재생성했고 `audit:api-surface`가 통과했다. 전체 `npm.cmd run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone/OpenAPI/Chrome desktop·mobile smoke, 전체 Vitest 300파일(299 passed·1 skipped; 1,540 passed·3 skipped), TypeScript, docs/migration(V165), verify-scope/KIS/Bearer/OCI cron 감사. `git diff --check`도 통과.
+- 커밋 `6f16d7ec`를 `oci`에 푸시했고 OCI Actions run [41473847660](https://github.com/pjtss/StockMan/actions/runs/41473847660)이 성공해 운영 배포됐다. 배포 후 운영 health는 HTTP 200, 공개 무인증 API 매뉴얼 조회 및 AAPL 메타데이터 GET은 HTTP 200이었다. AAPL은 이 조회 시점에 CIK/company facts가 아직 비어 `PARTIAL`이었다. 수동 POST는 SEC fetch와 운영 DB 쓰기를 실행하므로 운영에서 호출하지 않았고, 따라서 해당 데이터의 즉시 갱신 동작은 실행 실증 전이다.
 - 남은 위험: SEC ticker/exchange 매핑의 정확성·범위는 SEC가 보장하지 않는다. 수동 요청은 검증된 한 issuer만 갱신하며, Company Facts가 SEC에 없거나 대표 표준 태그가 없으면 메타데이터 일부는 계속 PARTIAL일 수 있다.
 
 \n
