@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  tickerRows: [] as any[], cikRows: [] as any[], eligible: [] as any[],
+  tickerRows: [] as any[], cikRows: [] as any[], masterRows: [] as any[], eligible: [] as any[], enabled: [] as any[], masterSyncCalls: 0,
   syncResult: {} as any, snapshot: null as any, syncCalls: 0,
 }));
 vi.mock("@/lib/sec-company-ticker", () => ({
+  loadSecCompanyTickerMaster: vi.fn(async () => state.masterRows),
   resolveSecCikTickers: vi.fn(async () => state.cikRows),
   resolveSecTickerCandidates: vi.fn(async () => state.tickerRows),
   selectPreferredSecCompanyTicker: (rows: any[]) => rows[0] || null,
 }));
-vi.mock("@/lib/sec-company-facts-eligibility", () => ({ filterActiveSecCommonStocks: vi.fn(async () => state.eligible) }));
+vi.mock("@/lib/sec-company-facts-eligibility", () => ({ filterActiveSecCommonStocks: vi.fn(async () => state.eligible), filterEnabledSecCommonStocks: vi.fn(async () => state.enabled) }));
+vi.mock("@/lib/sec-company-ticker-master-sync", () => ({ syncSecCompanyTickerMaster: vi.fn(async () => { state.masterSyncCalls += 1; return { issuerCount: 1, tickerCount: 1, syncedAt: "2026-11-03T00:00:00.000Z" }; }) }));
 vi.mock("@/lib/sec-company-facts-persistence", () => ({ loadSecCompanyFactsSnapshot: vi.fn(async () => state.snapshot) }));
 vi.mock("@/lib/sec-company-facts-sync", () => ({ syncSecCompanyFacts: vi.fn(async () => { state.syncCalls += 1; return state.syncResult; }) }));
 
@@ -19,17 +21,20 @@ import { resetSecCompanyFactsPublicLimitsForTest } from "@/lib/sec-company-facts
 describe("public SEC Company Facts lookup", () => {
   beforeEach(() => {
     resetSecCompanyFactsPublicLimitsForTest();
-    state.tickerRows = []; state.cikRows = []; state.eligible = []; state.snapshot = null; state.syncCalls = 0;
+    state.tickerRows = []; state.cikRows = []; state.masterRows = []; state.eligible = []; state.enabled = []; state.masterSyncCalls = 0; state.snapshot = null; state.syncCalls = 0;
     state.syncResult = { ok: true, cik: "0000000001", entityName: "Example Inc.", factCount: 12, taxonomyCount: 2, fetchedAt: "2026-09-26T00:00:00.000Z", archivedId: 7 };
   });
 
   it("allows an unauthenticated active common-stock lookup and persists the facts", async () => {
     state.tickerRows = [{ cik: "0000000001", ticker: "EXM", name: "Example Inc.", exchange: "NASDAQ" }];
     state.eligible = [{ ...state.tickerRows[0], market: "NAS", universeCode: "EXM", universeName: "Example Inc." }];
+    state.masterRows = state.tickerRows;
+    state.enabled = state.eligible;
     const response = await POST(new Request("http://localhost/api/sec/company-facts", { method: "POST", headers: { "content-type": "application/json", "x-real-ip": "192.0.2.1" }, body: JSON.stringify({ query: "EXM" }) }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, cik: "0000000001", mapping: { ticker: "EXM", market: "NAS" } });
+    expect(await response.json()).toMatchObject({ ok: true, cik: "0000000001", mapping: { ticker: "EXM", market: "NAS" }, companyMaster: { issuerCount: 1, tickerCount: 1 } });
     expect(state.syncCalls).toBe(1);
+    expect(state.masterSyncCalls).toBe(1);
   });
 
   it("returns saved JSON publicly only after active common-stock verification", async () => {

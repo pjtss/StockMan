@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { resolveSecCikTickers, resolveSecTickerCandidates, selectPreferredSecCompanyTicker } from "@/lib/sec-company-ticker";
-import { filterActiveSecCommonStocks } from "@/lib/sec-company-facts-eligibility";
+import { loadSecCompanyTickerMaster, resolveSecCikTickers, resolveSecTickerCandidates, selectPreferredSecCompanyTicker } from "@/lib/sec-company-ticker";
+import { filterActiveSecCommonStocks, filterEnabledSecCommonStocks } from "@/lib/sec-company-facts-eligibility";
+import { syncSecCompanyTickerMaster } from "@/lib/sec-company-ticker-master-sync";
 import { loadSecCompanyFactsSnapshot } from "@/lib/sec-company-facts-persistence";
 import { syncSecCompanyFacts } from "@/lib/sec-company-facts-sync";
 import { normalizeSecCiks } from "@/lib/sec-edgar-config";
@@ -66,9 +67,18 @@ export async function POST(request: Request) {
     if (!mapping) return NextResponse.json({ ok: false, stage: "common_stock_eligibility", error: "활성 보통주 티커를 선택하지 못했습니다." }, { status: 422 });
     cik = mapping.cik;
 
+    // The manual refresh must make identity visible to the public metadata GET
+    // immediately; keep the write scoped to this verified issuer.
+    const secMasterRows = await loadSecCompanyTickerMaster();
+    const issuerRows = secMasterRows.filter((row) => row.cik === cik);
+    if (!issuerRows.length) return NextResponse.json({ ok: false, stage: "ticker_mapping", error: `SEC 회사 매핑을 찾을 수 없습니다: ${query}` }, { status: 404 });
+    const enabledIssuerRows = await filterEnabledSecCommonStocks(issuerRows);
+    if (!enabledIssuerRows.length) return NextResponse.json({ ok: false, stage: "common_stock_eligibility", error: "활성 보통주 발행사로 확인되지 않았습니다.", eligibility: { source: "us_common_stock_universe", activeOnly: false, failClosed: true } }, { status: 422 });
+    const companyMaster = await syncSecCompanyTickerMaster(issuerRows, enabledIssuerRows);
+
     const result = await syncSecCompanyFacts(cik);
-    if (!result.ok) return NextResponse.json({ ok: false, stage: "sec_fetch", query, cik, mapping, result }, { status: result.status >= 400 ? 502 : 503 });
-    return NextResponse.json({ ok: true, query, cik, mapping, result, checkedAt: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
+    if (!result.ok) return NextResponse.json({ ok: false, stage: "sec_fetch", query, cik, mapping, companyMaster, result }, { status: result.status >= 400 ? 502 : 503 });
+    return NextResponse.json({ ok: true, query, cik, mapping, companyMaster, result, checkedAt: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const diagnostics = describeError(error);
     return NextResponse.json({ ok: false, stage: isSchemaError(error) ? "database_persist" : "sec_fetch_or_ticker_mapping", query, cik, mapping, ...diagnostics }, { status: isSchemaError(error) ? 503 : 502 });

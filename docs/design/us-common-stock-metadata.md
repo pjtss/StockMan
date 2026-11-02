@@ -8,6 +8,8 @@ SEC의 티커·CIK·거래소 매핑은 검색 편의 데이터이며 SEC가 정
 
 SEC company ticker/exchange master는 일일 서버 cron에서 활성 공통주 마스터와 대조한 뒤 `sec_companies`에 저장한다. 이 동기화는 SEC CIK/name 조회 커버리지를 위한 내부 쓰기 작업이고 공개 GET에서는 실행하지 않는다. Company Facts 원본 동기화는 별도 설정 CIK만 계속 수집한다. SEC ticker master 미보장 범위와 KIS 활성 COMMON_STOCK 교차 검증을 함께 유지한다.
 
+`POST /api/sec/company-facts` 수동 갱신은 입력 티커/CIK를 활성 보통주로 검증한 뒤 해당 CIK의 SEC 전체 티커/거래소 매핑을 `sec_companies`에 즉시 저장하고 Company Facts 원본도 동기화한다. 이는 특정 발행사 한 곳에만 쓰며 전체 회사 마스터 갱신은 하지 않는다. 응답의 `companyMaster`에 갱신된 발행사·티커 수와 시각을 포함한다. 뒤이어 `GET /api/public/us-stock-metadata?ticker=...`를 호출하면 저장된 회사 식별과 Facts가 즉시 조회된다. 공개 GET은 계속 DB read-only다.
+
 ## 입력 및 식별 절차
 
 1. `ticker`를 trim/대문자화하고 길이·문자 집합을 검증한다. 점/대시 표기는 임의 변환하지 않는다.

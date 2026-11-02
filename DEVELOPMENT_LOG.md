@@ -8127,4 +8127,16 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 전체 `npm.cmd run deploy:verify` 통과: npm audit 취약점 0, production build/standalone 및 Chrome desktop/mobile smoke, 전체 Vitest 300파일(299 passed·1 skipped; 1,540 passed·3 skipped), TypeScript, docs/migration(API 178 routes/42 public GET, 123문서, V165), verify-scope/KIS/Bearer auth/OCI cron 감사.
 - 커밋·푸시·배포 및 배포 후 다음 일일 cron이 SEC 회사 매핑을 완료했는지, 이어서 무인증 AAPL/NVDA/TSLA/BABA GET에서 CIK·SEC 회사명이 나타나는지 확인이 남았다. Company Facts는 설정 대상이 아닌 한 계속 partial일 수 있다.
 
+## [2026-11-03] 수동 Company Facts 갱신과 종목 회사 매핑 즉시 반영
+
+### 목적 및 변경
+- 운영 일일 cron을 기다리지 않고 새 종목의 SEC 회사 CIK·회사명과 Facts를 공개 종목 메타데이터 GET에서 확인할 수 있게 수동 갱신 API를 연결한다.
+- 공개 `POST /api/sec/company-facts`는 입력 CIK/ticker를 기존 활성 보통주 게이트로 검증한 뒤, 해당 issuer의 공식 SEC 전체 ticker/exchange 행만 KIS enabled COMMON_STOCK와 다시 대조해 `sec_companies`에 저장하고 Company Facts를 갱신한다. 전체 마스터 bulk 갱신은 하지 않는다. 기존 공개 GET은 DB read-only 유지.
+- SEC 수동 API 매뉴얼과 미국 보통주 설계 문서에 갱신 범위와 후속 GET 사용법을 반영한다.
+
+### 검증 및 상태
+- 변경 파일: `app/api/sec/company-facts/route.ts`, 해당 route test, `docs/official/sec-edgar/companyfacts.md`, `docs/design/us-common-stock-metadata.md`, 본 로그 및 생성 API 문서/인벤토리.
+- route test 4개 통과. `docs:api:generate`가 178 route/42 public GET inventory·OpenAPI를 재생성했고 `audit:api-surface`가 통과했다. 전체 `npm.cmd run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone/OpenAPI/Chrome desktop·mobile smoke, 전체 Vitest 300파일(299 passed·1 skipped; 1,540 passed·3 skipped), TypeScript, docs/migration(V165), verify-scope/KIS/Bearer/OCI cron 감사. `git diff --check`도 통과. 커밋·푸시·배포 여부: 아직 없음.
+- 남은 위험: SEC ticker/exchange 매핑의 정확성·범위는 SEC가 보장하지 않는다. 수동 요청은 검증된 한 issuer만 갱신하며, Company Facts가 SEC에 없거나 대표 표준 태그가 없으면 메타데이터 일부는 계속 PARTIAL일 수 있다.
+
 \n
