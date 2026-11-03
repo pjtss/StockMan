@@ -101,8 +101,9 @@ type DailyDisclosureItem = {
 
 - **목적/범위**: 일별 공시 화면의 복사 동작을 URL 문자열만 줄바꿈으로 전달하도록 바꾸고, 버튼 이름과 회귀 테스트를 일치시켰다.
 - **변경 파일**: `components/daily-disclosures-page.tsx`, `components/daily-disclosures-page.test.tsx`, 본 설계 문서.
-- **검증 결과**: 배포용 worktree에서 전체 검증을 수행한다.
-- **빌드/실행**: 배포 체크리스트의 전체 자동 게이트 및 standalone smoke를 수행한다. **커밋/푸시/배포**: 사전 검증 성공 후 진행한다.
+- **검증 결과**: `npm run deploy:verify` 통과. 전체 테스트 299파일 통과·1파일 제외, 1,541개 통과·3개 제외; 타입검사, 문서/API/인증/KIS/cron 감사, production build, standalone `/charts`·API smoke 및 Chrome 데스크톱/모바일 hydration 검증 통과.
+- **배포 결과**: 커밋 `5a934c233c594c32ec7e6e5211623a92c3aa9b4e`를 `oci`에 push했다. GitHub Actions `Deploy OCI` 실행 `41552370280` 성공, 운영 `/api/health`는 `status=ok`, `/disclosures`는 HTTP 200이며 배포 JavaScript에서 `전체 링크 복사`·`미국 RSS 링크 복사` 문구를 확인했다.
+- **커밋/푸시/배포**: 수행 완료. 운영 health 응답은 현재 `status`와 요청 상태만 제공하므로 commit/build/Flyway 상세값은 이 endpoint에서 확인하지 않았다.
 
 ### 관리자·자동화
 
