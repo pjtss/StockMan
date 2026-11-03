@@ -97,6 +97,16 @@ type DailyDisclosureItem = {
 - `navigator.clipboard.writeText`를 우선 사용하고, 권한이 없거나 비보안 컨텍스트인 경우 선택 영역 기반 fallback을 사용한다.
 - 복사 성공·실패를 버튼 상태와 접근성 라이브 영역으로 알린다. 원문 HTML은 복사하지 않고 태그를 제거한 텍스트만 복사한다.
 
+### 2026-11-03 RSS 링크 필드 수정
+
+- **근본 원인**: `/api/disclosures`는 RSS 항목의 원문 주소를 `link` 필드로 반환하지만 복사 UI가 존재하지 않는 `url` 필드를 읽었다. 출처별 조회에는 항목이 있어도 복사 배열에서는 모든 URL이 걸러져 0건으로 표시됐다.
+- **수정/재발 방지**: 전체 링크 및 미국 RSS 링크 복사를 API 계약과 같이 `item.link`를 읽도록 수정하고 항목 타입에 `link`를 명시했다. 회귀 테스트 fixture도 운영 API와 동일한 `link` 형태만 사용한다.
+- **영향 범위**: 일별 공시 화면의 전체 링크 복사 및 미국 RSS 링크 복사. 조회·저장 API는 변경하지 않는다.
+- **운영 근거**: 운영 `/api/disclosures?hours=24&source=STOCKTITAN` read-only 조회에서 866건을 받았고 첫 항목은 `source=STOCKTITAN`, `link=https://...`를 포함하며 `url` 필드는 없었다.
+- **검증 결과**: 화면 회귀 테스트 1파일 4개 통과. `npm run deploy:verify` 통과: 전체 테스트 299파일 통과·1파일 제외, 1,541개 통과·3개 제외; 타입검사, 문서/API/인증/KIS/cron 감사, production build, standalone `/charts`·API smoke, Chrome 데스크톱·모바일 hydration 검증 통과.
+- **배포**: 검증된 변경을 `oci`에 push해 GitHub Actions `Deploy OCI`로 반영한다. 배포 run 및 운영 링크 복사 기능 재확인 결과를 별도 작업 기록에 남긴다.
+- **남은 위험**: API 응답에 빈 `link`가 있는 개별 항목은 복사하지 않는다.
+
 ### 2026-11-03 링크만 복사 배포
 
 - **목적/범위**: 일별 공시 화면의 복사 동작을 URL 문자열만 줄바꿈으로 전달하도록 바꾸고, 버튼 이름과 회귀 테스트를 일치시켰다.

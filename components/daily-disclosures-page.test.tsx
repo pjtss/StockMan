@@ -26,9 +26,9 @@ describe("DailyDisclosuresPage recent-hour filter", () => {
   });
 
   it("copies only original links from US RSS sources", async () => {
-    const usItem = { id: 1, source: "NASDAQ", title: "US story", url: "https://example.com/us" };
-    const domesticItem = { id: 2, source: "NEWSIS", title: "KR story", url: "https://example.com/kr" };
-    const dartItem = { id: 3, source: "DART", title: "Disclosure", url: "https://example.com/dart" };
+    const usItem = { id: 1, source: "NASDAQ", title: "US story", link: "https://example.com/us" };
+    const domesticItem = { id: 2, source: "NEWSIS", title: "KR story", link: "https://example.com/kr" };
+    const dartItem = { id: 3, source: "DART", title: "Disclosure", link: "https://example.com/dart" };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: [usItem, domesticItem, dartItem], total: 3 }) }));
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -44,8 +44,8 @@ describe("DailyDisclosuresPage recent-hour filter", () => {
 
   it("copies only newline-separated URLs for all selected disclosures", async () => {
     const rows = [
-      { id: 1, source: "NASDAQ", title: "Story", url: "https://example.com/story" },
-      { id: 2, source: "DART", title: "Filing", url: "https://example.com/filing" },
+      { id: 1, source: "NASDAQ", title: "Story", link: "https://example.com/story" },
+      { id: 2, source: "DART", title: "Filing", link: "https://example.com/filing" },
       { id: 3, source: "NEWSIS", title: "Missing link" },
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: rows }) }));

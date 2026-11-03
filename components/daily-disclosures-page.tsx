@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-type Item = Record<string, unknown> & { id: number; source: string };
+type Item = Record<string, unknown> & { id: number; source: string; link?: string };
 type WindowInfo = { hours: number; from: string; to: string } | null;
 const US_RSS_DISCLOSURE_SOURCES = ["SEC_EDGAR", "NASDAQ", "NASDAQ_TRADER", "STOCKTITAN", "GLOBENEWSWIRE"] as const;
 const SOURCES = [
@@ -36,10 +36,10 @@ export function DailyDisclosuresPage() {
     return () => { cancelled = true; };
   }, [date, hours, rangeMode, source]);
   const rangeMetadata = rangeMode === "hours" ? { hours, window: windowInfo } : { date };
-  async function copyJson() { const value = items.map((item) => item.url).filter((url): url is string => typeof url === "string" && url.length > 0).join("\n"); let result = "failed"; try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value); else throw new Error("clipboard unavailable"); setStatus("원문 링크만 복사했습니다."); result = "success"; } catch { const area = document.createElement("textarea"); area.value = value; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); const copied = document.execCommand("copy"); setStatus(copied ? "원문 링크만 복사했습니다." : "복사에 실패했습니다."); result = copied ? "success" : "failed"; area.remove(); } void fetch("/api/user-activity", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ feature: "news", action: "copy_json", resource: `${rangeMode === "hours" ? `${hours}h` : date}:${source}`, result }) }).catch(() => undefined); window.setTimeout(() => setStatus(""), 2000); }
+  async function copyJson() { const value = items.map((item) => item.link).filter((link): link is string => typeof link === "string" && link.length > 0).join("\n"); let result = "failed"; try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value); else throw new Error("clipboard unavailable"); setStatus("원문 링크만 복사했습니다."); result = "success"; } catch { const area = document.createElement("textarea"); area.value = value; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); const copied = document.execCommand("copy"); setStatus(copied ? "원문 링크만 복사했습니다." : "복사에 실패했습니다."); result = copied ? "success" : "failed"; area.remove(); } void fetch("/api/user-activity", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ feature: "news", action: "copy_json", resource: `${rangeMode === "hours" ? `${hours}h` : date}:${source}`, result }) }).catch(() => undefined); window.setTimeout(() => setStatus(""), 2000); }
   async function copyUsRssJson() {
     const usRssItems = items.filter((item) => US_RSS_DISCLOSURE_SOURCES.includes(item.source as typeof US_RSS_DISCLOSURE_SOURCES[number]));
-    const value = usRssItems.map((item) => item.url).filter((url): url is string => typeof url === "string" && url.length > 0).join("\n");
+    const value = usRssItems.map((item) => item.link).filter((link): link is string => typeof link === "string" && link.length > 0).join("\n");
     let result: "success" | "failed" = "success";
     try {
       if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
