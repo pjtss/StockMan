@@ -4,7 +4,12 @@ import { useState } from "react";
 import styles from "./sec-company-facts-lookup.module.css";
 
 type Snapshot = { cik: string; payload: Record<string, unknown>; fetchedAt: string };
-type LookupResult = { cik: string; mapping: { name: string; ticker: string; exchange: string } | null; result: { entityName: string | null; factCount: number; taxonomyCount: number; fetchedAt: string; archivedId: number | string | null } };
+type LookupResult = {
+  cik: string;
+  mapping: { name: string; ticker: string; exchange: string } | null;
+  companyMaster: { issuerCount: number; tickerCount: number; syncedAt: string };
+  result: { entityName: string | null; factCount: number; taxonomyCount: number; fetchedAt: string; archivedId: number | string | null };
+};
 
 export function SecCompanyFactsLookup() {
   const [query, setQuery] = useState("");
@@ -23,7 +28,7 @@ export function SecCompanyFactsLookup() {
       const body = await response.json().catch(() => null);
       if (!response.ok || !body?.ok) throw new Error(body?.error || `조회 실패 (HTTP ${response.status})`);
       setLookup(body as LookupResult);
-      setMessage("SEC Company Facts를 조회해 DB 최신 스냅샷과 원문 이력에 저장했습니다.");
+      setMessage("SEC 회사 식별 매핑과 Company Facts를 DB에 저장했습니다. 종목 기본정보 API에서 갱신 결과를 확인할 수 있습니다.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "조회에 실패했습니다."); }
     finally { setLoading(false); }
   }
@@ -60,8 +65,8 @@ export function SecCompanyFactsLookup() {
     {message && <p className={styles.message} role="status">{message}</p>}
     {lookup && <div className={styles.result}>
       <h3>{lookup.result.entityName || lookup.mapping?.name || "회사명 미제공"} <span>{lookup.mapping?.ticker || query.toUpperCase()}</span></h3>
-      <dl><div><dt>CIK</dt><dd>{lookup.cik}</dd></div><div><dt>거래소</dt><dd>{lookup.mapping?.exchange || "SEC ticker map 미확인"}</dd></div><div><dt>Taxonomy</dt><dd>{lookup.result.taxonomyCount.toLocaleString()}개</dd></div><div><dt>Concept</dt><dd>{lookup.result.factCount.toLocaleString()}개</dd></div><div><dt>SEC 조회 시각</dt><dd>{new Date(lookup.result.fetchedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} KST</dd></div><div><dt>원문 보관 ID</dt><dd>{lookup.result.archivedId ?? "중복 원문 생략"}</dd></div></dl>
-      <div className={styles.actions}><button type="button" onClick={() => void loadSavedJson()} disabled={loadingJson}>{loadingJson ? "DB에서 불러오는 중…" : showJson ? "저장 JSON 새로고침" : "저장된 전체 JSON 보기"}</button>{snapshot && <><button type="button" onClick={() => void copyJson()}>전체 JSON 복사</button><button type="button" className={styles.secondary} onClick={downloadJson}>JSON 파일 다운로드</button></>}</div>
+      <dl><div><dt>CIK</dt><dd>{lookup.cik}</dd></div><div><dt>거래소</dt><dd>{lookup.mapping?.exchange || "SEC ticker map 미확인"}</dd></div><div><dt>매핑 티커 수</dt><dd>{lookup.companyMaster.tickerCount.toLocaleString()}개</dd></div><div><dt>Taxonomy</dt><dd>{lookup.result.taxonomyCount.toLocaleString()}개</dd></div><div><dt>Concept</dt><dd>{lookup.result.factCount.toLocaleString()}개</dd></div><div><dt>SEC 조회 시각</dt><dd>{new Date(lookup.result.fetchedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} KST</dd></div><div><dt>회사 매핑 갱신</dt><dd>{new Date(lookup.companyMaster.syncedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} KST</dd></div><div><dt>원문 보관 ID</dt><dd>{lookup.result.archivedId ?? "중복 원문 생략"}</dd></div></dl>
+      <div className={styles.actions}><a className={styles.apiLink} href={`/api/public/us-stock-metadata?ticker=${encodeURIComponent(lookup.mapping?.ticker || "")}`} target="_blank" rel="noreferrer" aria-label={`${lookup.mapping?.ticker || "종목"} 기본정보 API 열기`}>종목 기본정보 API 보기</a><button type="button" onClick={() => void loadSavedJson()} disabled={loadingJson}>{loadingJson ? "DB에서 불러오는 중…" : showJson ? "저장 JSON 새로고침" : "저장된 전체 JSON 보기"}</button>{snapshot && <><button type="button" onClick={() => void copyJson()}>전체 JSON 복사</button><button type="button" className={styles.secondary} onClick={downloadJson}>JSON 파일 다운로드</button></>}</div>
       {showJson && snapshot && <textarea className={styles.json} aria-label="저장된 전체 SEC Company Facts JSON" readOnly value={json} spellCheck={false} />}
     </div>}
     <p className={styles.note}>이 조회·복사·다운로드 기능은 로그인 없이 이용할 수 있으며, 수동 SEC 조회에는 IP별·서비스 전체 요청 제한이 적용됩니다. 자동 갱신 대상과 스케줄은 관리자만 <code>/admin/modules/sec-company-facts</code>에서 설정할 수 있습니다.</p>

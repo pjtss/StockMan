@@ -8140,8 +8140,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 커밋 `6f16d7ec`를 `oci`에 푸시했고 OCI Actions run [41473847660](https://github.com/pjtss/StockMan/actions/runs/41473847660)이 성공해 운영 배포됐다. 배포 후 운영 health는 HTTP 200, 공개 무인증 API 매뉴얼 조회 및 AAPL 메타데이터 GET은 HTTP 200이었다. AAPL은 이 조회 시점에 CIK/company facts가 아직 비어 `PARTIAL`이었다. 수동 POST는 SEC fetch와 운영 DB 쓰기를 실행하므로 운영에서 호출하지 않았고, 따라서 해당 데이터의 즉시 갱신 동작은 실행 실증 전이다.
 - 남은 위험: SEC ticker/exchange 매핑의 정확성·범위는 SEC가 보장하지 않는다. 수동 요청은 검증된 한 issuer만 갱신하며, Company Facts가 SEC에 없거나 대표 표준 태그가 없으면 메타데이터 일부는 계속 PARTIAL일 수 있다.
 
-
-
 ## [2026-11-04] 미국 소형주 이벤트 원장 100종목 — 운영 검증 및 배포 준비
 
 ### 목적과 포함 범위
@@ -8166,3 +8164,16 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - `deploy:verify` 완료. 검증된 변경만 최신 `origin/oci` 기반 한국어 커밋으로 묶어 `oci`에 push해 자동 OCI 배포를 시작한다. 운영 workflow와 API 결과 확인이 남아 있다.
+## [2026-11-04] 수동 SEC 갱신 화면에서 종목 기본정보 API 연결
+
+### 목적 및 변경
+- 수동 Company Facts 갱신 후 해당 종목의 결합 기본정보를 바로 확인할 수 있도록 결과 화면에 SEC 회사 매핑 티커 수와 갱신 시각을 표시하고 canonical ticker 기반 `GET /api/public/us-stock-metadata` 링크를 제공한다.
+- 외부 GET/API 계약 및 DB 동작은 변경하지 않는다. SEC 수동 갱신 POST 후속으로 기존 공개 GET을 여는 UI 동선만 추가한다.
+- `docs/official/sec-edgar/companyfacts.md` 사용 안내와 본 작업 기록을 반영한다.
+
+### 검증 및 상태
+- 변경 대상: `components/sec-company-facts-lookup.tsx`, 대응 CSS 및 component test, `docs/official/sec-edgar/companyfacts.md`, 본 로그.
+- component regression test 1개 통과. 본 로그에 검증 결과를 반영한 뒤 실행한 최종 `npm.cmd run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone/OpenAPI/browser desktop·mobile smoke, 전체 Vitest 301파일(300 passed·1 skipped; 1,542 passed·3 skipped), TypeScript, docs/migrations(V165), API surface(178 route/42 public GET), verify-scope/KIS/Bearer/OCI cron 감사. `git diff --check`를 추가 확인한 뒤 상세 한국어 커밋·푸시·배포를 진행한다.
+- 남은 위험: 운영 데이터 갱신을 위한 POST는 SEC upstream 요청과 DB 쓰기를 수행한다. 이 변경은 해당 POST를 자동 실행하지 않고 수동 갱신 성공 뒤 사용자가 선택하는 읽기 전용 GET 링크만 제공한다.
+
+\n

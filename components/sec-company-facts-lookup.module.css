@@ -17,6 +17,7 @@
 .result dt { color:var(--text-muted); font-size:12px; }
 .result dd { margin:5px 0 0; overflow-wrap:anywhere; font-size:14px; font-weight:750; }
 .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
+.apiLink { display:inline-flex; min-height:44px; align-items:center; padding:0 16px; border:1px solid var(--primary); border-radius:10px; background:var(--primary); color:var(--primary-foreground); font-weight:900; text-decoration:none; }
 .json { box-sizing:border-box; width:100%; height:min(65vh,720px); margin-top:14px; padding:14px; border:1px solid var(--border); border-radius:10px; background:var(--background); color:var(--foreground); font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre; }
 .note { font-size:12px; }
-@media(max-width:640px) { .card { padding:20px 16px; border-radius:16px; } .controls { flex-direction:column; } .result dl { grid-template-columns:repeat(2,minmax(0,1fr)); } .actions button { width:100%; } }
+@media(max-width:640px) { .card { padding:20px 16px; border-radius:16px; } .controls { flex-direction:column; } .result dl { grid-template-columns:repeat(2,minmax(0,1fr)); } .actions button,.apiLink { width:100%; justify-content:center; box-sizing:border-box; } }
