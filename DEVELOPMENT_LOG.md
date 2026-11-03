@@ -19,6 +19,7 @@
 - 운영 마스터에서 100개 ticker의 COMMON_STOCK/USD/$100M 이하/CIK를 확인했다. 시총은 모두 2026-11-02 관측 STALE이며 이 한계를 보고서에 표시했다.
 - 최신 `oci` 통합 커밋 기준 `npm run deploy:verify` 통과: npm audit 취약점 0, production build 107페이지, standalone 기동 및 Chrome 데스크톱/모바일 하이드레이션·API smoke 통과, 테스트 1,542 passed/3 skipped (301 files, 1 skipped), typecheck 및 API/KIS/auth/cron/docs 감사 통과. `docs:check`의 catalog는 데이터 계약 문서 포함 124건이다.
 - `git diff --check` 통과. commit `b3ba6b5ac11d557d4a6c319b10c6bac01702ee23`를 `oci`에 반영했고 [Deploy OCI run 41676590668](https://github.com/pjtss/StockMan/actions/runs/41676590668)이 성공했다. 운영 `/api/health`는 `ok`, `/health-check`는 배포 SHA를 표시했다. 무인증 US 이벤트 API에서 canonical 237건 중 이번 배치 18개 eventId 모두 확인(14 ticker). 운영 API/DB write 없음.
+- 로그 기록 후속 커밋 `f6081c89`의 [Deploy OCI run 41679284330](https://github.com/pjtss/StockMan/actions/runs/41679284330)은 Verify deployment 단계에서 exit code 1로 종료되어 package/upload/activation은 건너뛰었다. 직전 같은 revision의 로컬 전체 검증과 데이터 커밋 OCI 배포는 통과했다. 공개 GitHub check에는 상세 로그가 없고 로그 다운로드 API는 403이라 실패한 내부 하위 명령은 미확인으로 남긴다.
 
 ### 다음 개선
 - 자동 감지: validator가 배치 event parity, SEC CIK, accession 연결, filing counts, 쌍방 filing 관계를 검사하며 docs:check에서 두 배치를 반복 검증한다. 새 조사 배치는 package validator와 자료 계약 문서의 체크리스트에 함께 추가한다.
@@ -31,7 +32,7 @@
 - 근거: 여러 배치 JSON과 canonical event 간 eventId/CIK/accession 관계를 docs:check에서 독립 검증하도록 validator 인자와 범위를 일반화했다.
 
 ### 커밋·푸시·배포
-- 운영 결과까지 기록한 후속 커밋은 전체 `npm run deploy:verify` 통과 후 한국어 상세 커밋으로 남기고 `oci`에 순차 반영한다.
+- 후속 개선: GitHub Verify deployment 실패 시 실패한 내부 하위 명령을 보존할 수 있도록 CI 로그 조회 권한/진단 경로를 검토한다. 운영에 반영된 데이터 커밋과 로그 전용 재배포 실패를 구별해 추적한다.
 
 ## [2026-10-31] 이벤트 occurrence 조회 API 추가
 
