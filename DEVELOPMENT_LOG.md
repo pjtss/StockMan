@@ -1,3 +1,38 @@
+## [2026-11-04] 미국 소형주 이벤트 원장 2차 100종목 배치 작성 및 검증
+
+### 목표
+- 운영 서버 read-only 공개 GET과 SEC 공식 자료로 미국 active COMMON_STOCK, USD 시총 1억 이하의 다음 100종목을 정리했다.
+- 2025-11-04~2026-11-05 SEC 제출 5,111건과 운영 뉴스 555건을 종목별·공시별 구조화 자료에 저장했고 직접 근거가 확인된 이벤트 18건을 canonical 원장에 연결했다. 운영 API/DB write 없음.
+
+### 반영
+- 기존 validator가 단일 배치 파일을 하드코딩하고 canonical US 전체를 비교했다. CLI 인자와 reviewed event ID filter로 batch별 검증을 지원하고 docs:check에 1·2차 검증을 연결했다.
+- 종목별 review JSON, accession ledger, canonical event, 검토 report를 분리하고 eventId/accession으로 연결했다. 신규 데이터 계약 문서에 파일 책임·키·관계·검토 상태·수집/배포 절차를 명시했다. CIK validator가 RMSG·AMSS SEC URL 오류를 발견해 수정했고, 근거가 확인되지 않은 RIME 뉴스 이벤트는 삭제했다.
+
+### 변경 파일
+- data/market-impact-events.json, data/us-smallcap-event-review-20261104.json, data/us-smallcap-filing-review-ledger-20261104.json
+- docs/operations/us-smallcap-event-review-20261104.md, docs/operations/us-smallcap-event-data-contract.md
+- scripts/validate-us-smallcap-event-data.mjs, package.json, DEVELOPMENT_LOG.md
+
+### 검증
+- `npm run validate:us-smallcap-event-data:20261031`, `npm run validate:us-smallcap-event-data:20261104`, `npm run docs:check` 통과.
+- Batch 2 validator 통과: issuer 100, filing 5,111, canonical 전체 이벤트 234, batch 이벤트/접수 관계 18, filing amendment relation 0 (공식 amendment 링크 미확인 관계는 미기록). Batch 1 검증도 canonical 전체 중 기존 216건 분리 검증 통과.
+- 운영 마스터에서 100개 ticker의 COMMON_STOCK/USD/$100M 이하/CIK를 확인했다. 시총은 모두 2026-11-02 관측 STALE이며 이 한계를 보고서에 표시했다.
+- `npm run deploy:verify` 통과: npm audit 취약점 0, production build 통과, standalone 기동 및 Chrome 데스크톱/모바일 하이드레이션·API smoke 통과, 테스트 1,541 passed/3 skipped (300 files, 1 skipped), typecheck 및 API/KIS/auth/cron/docs 감사 통과.
+- `git diff --check` 통과. 이 기록 작성 후 추가한 데이터 계약 문서는 최종 commit 전 `docs:check`로 다시 검사한다. 운영 배포 및 commit/push는 아직 수행하지 않았다.
+
+### 다음 개선
+- 자동 감지: validator가 배치 event parity, SEC CIK, accession 연결, filing counts, 쌍방 filing 관계를 검사하며 docs:check에서 두 배치를 반복 검증한다. 새 조사 배치는 package validator와 자료 계약 문서의 체크리스트에 함께 추가한다.
+- 남은 위험: 5,111 filing 전문 전수 확인이 아니고, 첨부 Exhibit 일부 및 stale cap snapshot이 남아 있다.
+- 다음: 첨부 원문·후속 공시 보강 후 최신 operating snapshot을 다시 확인한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-001
+- 성과 판정: IMPROVED
+- 근거: 여러 배치 JSON과 canonical event 간 eventId/CIK/accession 관계를 docs:check에서 독립 검증하도록 validator 인자와 범위를 일반화했다.
+
+### 커밋·푸시·배포
+- 검증 완료. 문서 변경 후 `docs:check` 재실행이 통과하면 한국어 상세 commit, push, CI 및 운영 GET 검증을 순서대로 수행한다.
+
 ## [2026-10-31] 이벤트 occurrence 조회 API 추가
 
 ### 목표

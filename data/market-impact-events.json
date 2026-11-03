@@ -9607,6 +9607,661 @@
           "https://www.sec.gov/Archives/edgar/data/1747661/000121390026099698/ea0304940-6k_zeta.htm",
           "https://www.sec.gov/Archives/edgar/data/1747661/000121390026110666/ea0307933-20f_zeta.htm"
         ]
+      },
+      {
+        "ticker": "CMND",
+        "eventId": "SEC:0001213900-26-108644:ROBOTAXI_EV_CHARGING_LAUNCH",
+        "companyName": "CLEARMIND MEDICINE INC",
+        "eventDate": "2026-10-12",
+        "eventType": "PRODUCT_LAUNCH",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Clearmind 보도자료: 자동 EV 충전 기술 공개",
+        "summary": "Clearmind는 2026-10-12 자회사 Charging Robotics가 로보택시·자율주행 fleet용 차세대 자동 EV 충전 기술을 launch했다고 SEC 6-K에서 첨부 보도자료로 공시했다. 상용 고객·계약액·매출·생산 일정은 해당 제출물의 표지에서 확인되지 않아 미확정으로 둔다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-108644",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1892500/000121390026108644/ea0308337-6k_clearmind.htm",
+        "evidence": [
+          {
+            "quote": "Attached hereto and incorporated herein is the Registrant’s press release issued on October 12, 2026",
+            "locator": "6-K cover page; Exhibit 99.1 제목·날짜",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1892500/000121390026108644/ea0308337-6k_clearmind.htm"
+          }
+        ],
+        "risks": [
+          "상용화·고객·매출 및 출시 범위가 제출물의 표지에 수치로 제시되지 않았다."
+        ],
+        "limitations": [
+          "첨부 Exhibit 99.1 원문 전문은 추가 제출물의 display-document URL로 이 원장에 연결해 추후 재검토가 필요하다."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "VBIO",
+        "eventId": "SEC:0001683168-26-007857:LARMORBIO_FEASIBILITY_MILESTONE",
+        "companyName": "VALION BIO INC",
+        "eventDate": "2026-10-15",
+        "eventType": "BUSINESS_MILESTONE",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "LarmorBio BioScan-NMR 초기 타당성 평가 완료",
+        "summary": "Valion Bio는 2026-10-15 자회사 Velocity Bioworks의 LarmorBio BioScan-NMR 플랫폼 초기 타당성 평가 완료를 8-K와 첨부 보도자료로 공시했다. 검토한 filing 표지는 평가 완료 사실만 확인하며 임상시험·FDA 허가·매출을 의미하지 않는다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001683168-26-007857",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1787740/000168316826007857/vbio_8k.htm",
+        "evidence": [
+          {
+            "quote": "On October 15, 2026, Valion Bio, Inc. issued a press release announcing completion of an initial feasibility evaluation of LarmorBio’s BioScan-NMR platform.",
+            "locator": "8-K Item 8.01",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1787740/000168316826007857/vbio_8k.htm"
+          }
+        ],
+        "risks": [
+          "제품 검증 단계 결과가 임상·규제·상업화 결과로 이어진다는 보장은 없다."
+        ],
+        "limitations": [
+          "Exhibit 99.1 전문은 원문 다운로드·확인 필요; 등록상장 reverse split authorization은 별도 proxy event로 분리하지 않음."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": [
+          null
+        ]
+      },
+      {
+        "ticker": "VBIO",
+        "eventId": "SEC:0001683168-26-007932:SPECIAL_MEETING_REVERSE_SPLIT_AUTHORIZATION",
+        "companyName": "VALION BIO INC",
+        "eventDate": "2026-11-12",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Valion Bio 특별주총: 1:2~1:12 역분할 승인 안건",
+        "summary": "DEF 14A는 2026-11-12 11:00 a.m. Central Time 가상 주총과 이사회 재량 1:2~1:12 역분할 권한 안건을 공지한다. 승인만으로 병합이 집행되는 것은 아니며 실제 비율·효력·split-adjusted 거래일은 미확정이다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001683168-26-007932",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1787740/000168316826007932/valion_def14a.htm",
+        "evidence": [
+          {
+            "quote": "NOTICE OF SPECIAL MEETING OF STOCKHOLDERS TO BE HELD ON NOVEMBER 12, 2026",
+            "locator": "DEF 14A notice; reverse split proposal",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1787740/000168316826007932/valion_def14a.htm"
+          }
+        ],
+        "risks": [
+          "주총 승인·이사회 선택·실제 집행은 각각 다른 단계다."
+        ],
+        "limitations": [
+          "이벤트 날짜는 주총 일자이며 공시일과 구분했다. 발행·유통주식수 후속 공시 미확인."
+        ],
+        "publishedAt": "2026-10-16T00:00:00Z",
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "keyDates": [
+          {
+            "date": "2026-11-12",
+            "label": "특별주총 11:00 a.m. CST / 12:00 p.m. EST / 2026-11-13 03:00 KST"
+          }
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "NIVF",
+        "eventId": "SEC:0001213900-26-105211:PUBLIC_OFFERING_CLOSED",
+        "companyName": "NEWGENIVF GROUP LIMITED",
+        "eventDate": "2026-09-30",
+        "eventType": "EQUITY_OFFERING",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "NewGenIvf $1.25M 공모 종결",
+        "summary": "NewGenIvf는 2026-09-30 공모를 종결하고 보통주 125,000주와 pre-funded warrant 17,732,143개(각 1주 기초)를 발행했다고 공시했다. 총 gross proceeds 약 $1.25M, 수수료 차감 전이며 보통주 발행량과 워런트 기초주식을 분리한다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-105211",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1981662/000121390026105211/ea0307155-6k_newgeni.htm",
+        "evidence": [
+          {
+            "quote": "On September 30, 2026, the Company closed the Offering, and issued an aggregate of 17,857,143 Class A ordinary shares",
+            "locator": "6-K offering close; 동시 424B4 0001213900-26-104917",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1981662/000121390026105211/ea0307155-6k_newgeni.htm"
+          }
+        ],
+        "risks": [
+          "125,000 common shares와 17,732,143 immediately exercisable pre-funded warrants는 잠재 발행량·희석을 포함한다."
+        ],
+        "limitations": [
+          "약 $1.25M은 gross proceeds이며 순유입액은 수수료·비용 차감 후 별도."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": [
+          null
+        ]
+      },
+      {
+        "ticker": "HCAI",
+        "eventId": "SEC:0001213900-26-100535:PUBLIC_OFFERING_CLOSED",
+        "companyName": "HUACHEN AI PARKING MANAGEMENT TECHNOLOGY HOLDING CO LTD",
+        "eventDate": "2026-09-16",
+        "eventType": "EQUITY_OFFERING",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Huachen AI $2.75M 공모 종결",
+        "summary": "Huachen AI는 Class A ordinary shares 2,750,000주와 동수 ordinary warrants를 주당 $1.00 조건으로 발행하는 best-efforts 공모의 종결 사실을 6-K에서 보고했다. 총 수령액·실제 warrant exercise는 filing 본문/첨부 확인 전 미확정이다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-100535",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1958399/000121390026100535/ea0306926-6k_huachenai.htm",
+        "evidence": [
+          {
+            "quote": "entered into a Securities Purchase Agreement ... offering of 2,750,000 Class A ordinary shares ... accompanied by ordinary warrants",
+            "locator": "6-K; 동시 424B5 0001213900-26-100374",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1958399/000121390026100535/ea0306926-6k_huachenai.htm"
+          }
+        ],
+        "risks": [
+          "최대 2.75M warrants가 행사되면 추가 주식 희석."
+        ],
+        "limitations": [
+          "발행 종결 및 warrant exercise 수량·net proceeds는 별도 구분."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": [
+          null
+        ]
+      },
+      {
+        "ticker": "DKI",
+        "eventId": "SEC:0001493152-26-046619:PUBLIC_OFFERING_CLOSED",
+        "companyName": "DARKIRIS INC.",
+        "eventDate": "2026-10-08",
+        "eventType": "EQUITY_OFFERING",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "DarkIris 최대 $6M 공모 가격결정·종결",
+        "summary": "DarkIris는 2026-10-08 최대 $6M best-efforts 공모를 가격결정하고 898,965 ordinary shares, 3,267,701 pre-funded warrants 및 4,166,666 warrants를 발행했다고 6-K에서 보고했다. 424B4는 모든 56,547,610주(제로행사 선택 포함)가 발행되면 사후 주식의 약 96.42% 상당이라고 명시하지만, 이는 최대 희석 시나리오이지 즉시 outstanding 주식 수가 아니다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-046619",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2058584/000149315226046619/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "In the aggregate, the Company issued 898,965 Class A Ordinary Shares, 3,267,701 Pre-Funded Warrants",
+            "locator": "6-K pricing and closing; 424B4 accession 0001493152-26-046431 for maximum dilution",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2058584/000149315226046619/form6-k.htm"
+          }
+        ],
+        "risks": [
+          "최대 warrant exercise 시 잠재 희석은 기존·신규 발행 주식수와 구분해야 한다."
+        ],
+        "limitations": [
+          "순수령액·모든 워런트 실제 행사 여부는 확인하지 않았다."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": [
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "ticker": "RMSG",
+        "eventId": "SEC:0001493152-26-046089:NASDAQ_EQUITY_COMPLIANCE_REGAINED",
+        "companyName": "REAL MESSENGER CORP",
+        "eventDate": "2026-10-06",
+        "eventType": "LISTING_COMPLIANCE",
+        "status": "COMPLETED",
+        "direction": "MIXED",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Real Messenger Nasdaq 주주자본 요건 회복",
+        "summary": "Real Messenger는 Nasdaq Rule 5550(b)(1) $2.5M 주주자본 요건을 충족했다는 Nasdaq의 2026-10-06 서한을 수령했다고 공시했다. 이후 2026-09-30 interim statements 제출 시점까지 계속 충족해야 한다는 조건부 경고도 함께 공개했다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-046089",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1983324/000149315226046089/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "Regained Compliance with Nasdaq Stockholders’ Equity Requirement",
+            "locator": "6-K 본문",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1983324/000149315226046089/form6-k.htm"
+          }
+        ],
+        "risks": [
+          "요건 회복은 미래 기간의 상장유지 보장을 뜻하지 않는다."
+        ],
+        "limitations": [
+          "SEC 원문에 적힌 금액 기준·조건과 발표시점을 보존."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "NCI",
+        "eventId": "SEC:0001185185-26-004504:REGISTERED_DIRECT_OFFERING_CLOSED",
+        "companyName": "NEO-CONCEPT INTL GRP HLDGS LTD",
+        "eventDate": "2026-10-01",
+        "eventType": "EQUITY_OFFERING",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Neo-Concept $2M 등록 직접 공모 종결",
+        "summary": "Neo-Concept는 단일 기관투자자에게 Class A 250,000주와 주당 $0.01 행사가 pre-funded warrants 1,750,000개를 판매해 2026-10-01 종결했고 gross proceeds 약 $2.0M을 보고했다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001185185-26-004504",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1916331/000118518526004504/nci_6k.htm",
+        "evidence": [
+          {
+            "quote": "The Offering closed on October 1, 2026. The Company received approximately $2.0 million in gross proceeds",
+            "locator": "6-K; 424B5 accession 0001185185-26-004478",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1916331/000118518526004504/nci_6k.htm"
+          }
+        ],
+        "risks": [
+          "선급 워런트 1.75M주는 행사시 추가 발행 가능."
+        ],
+        "limitations": [
+          "약 $2M은 gross proceeds."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": [
+          null
+        ]
+      },
+      {
+        "ticker": "BRTX",
+        "eventId": "SEC:0001213900-26-096810:REVERSE_SPLIT",
+        "companyName": "BIORESTORATIVE THERAPIES INC",
+        "eventDate": "2026-09-07",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "BioRestorative 1:20 역분할 법적 효력 및 조정 거래",
+        "summary": "BioRestorative는 1:20 역분할 certificate가 2026-09-07 4:30 p.m. ET에 효력이 발생하고 2026-09-08 정규장 개장부터 split-adjusted basis로 거래를 시작한다고 공시했다. 주식 수는 기존 각 20주를 1주로 병합하며, 분할 전·후 발행주식 수는 확인된 공식 수치가 없어 계산하지 않는다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-096810",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1505497/000121390026096810/ea0304389-8k_biore.htm",
+        "evidence": [
+          {
+            "quote": "The Certificate of Change will become effective at 4:30 p.m., Eastern Time, on September 7, 2026",
+            "locator": "8-K Item 5.03; Exhibit 3.1",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1505497/000121390026096810/ea0304389-8k_biore.htm"
+          }
+        ],
+        "risks": [
+          "기계적 주당 가격 조정은 실제 수익률과 다르고 Nasdaq 최소 bid 요건 회복을 보장하지 않는다."
+        ],
+        "limitations": [
+          "법적 효력 2026-09-07 4:30 p.m. EDT=2026-09-08 05:30 KST; 조정 거래 개시 2026-09-08 09:30 a.m. EDT=22:30 KST. 발행·유통주식수 미확인."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "keyDates": [
+          {
+            "date": "2026-09-07",
+            "label": "4:30 p.m. EDT 법적 효력 (2026-09-08 05:30 KST)"
+          },
+          {
+            "date": "2026-09-08",
+            "label": "Nasdaq 조정 거래 개장 (2026-09-08 09:30 a.m. EDT / 22:30 KST)"
+          }
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "SLXN",
+        "eventId": "SEC:0001178913-26-004666:PHASE23_FIRST_PATIENT",
+        "companyName": "SILEXION THERAPEUTICS CORP",
+        "eventDate": "2026-09-30",
+        "eventType": "CLINICAL_TRIAL_MILESTONE",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Silexion SIL204 췌장암 2/3상 첫 환자 투약",
+        "summary": "Silexion은 locally advanced pancreatic cancer 환자를 대상으로 하는 SIL204 2/3상에서 첫 환자가 투약됐다고 8-K의 Regulation FD 항목에서 발표했다. 투약 시작은 효능/안전성 결과나 승인 결정이 아니다. 등록 목표·endpoint·환자수는 해당 원문 excerpt에서 확인하지 못해 미공개로 둔다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001178913-26-004666",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2022416/000117891326004666/slxn_8k.htm",
+        "evidence": [
+          {
+            "quote": "Silexion Therapeutics Announces First Patient Successfully Dosed in Phase 2/3 Clinical Trial of SIL204 in Locally Advanced Pancreatic Cancer",
+            "locator": "8-K Item 7.01; Exhibit 99.1",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2022416/000117891326004666/slxn_8k.htm"
+          }
+        ],
+        "risks": [
+          "대조군·주요 평가변수·등록수·결과와 완료 시점이 여기서 확인되지 않아 임상 유효성 추론 불가."
+        ],
+        "limitations": [
+          "공식 제출은 보도자료 제목만 포함한 확인 구간이다."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": [
+          null,
+          null
+        ]
+      },
+      {
+        "ticker": "SXTP",
+        "eventId": "SEC:0001213900-26-106979:JAN2027_BABESIOSIS_DATA_READOUT",
+        "companyName": "60 DEGREES PHARMACEUTICALS INC",
+        "eventDate": "2027-01-01",
+        "eventType": "CLINICAL_DATA_READOUT",
+        "status": "ESTIMATED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "60 Degrees: 입원 babesiosis 데이터 발표 목표 2027년 1월",
+        "summary": "8-K는 January 2027 hospitalized babesiosis data readout 업데이트 보도자료를 첨부했다고 확인한다. 이는 회사 목표 시점이며 정확한 일자와 FDA pre-sNDA 미팅 날짜/결과는 별도 확정 일정으로 간주하지 않는다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-106979",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1946563/000121390026106979/ea0307761-8k_60degrees.htm",
+        "evidence": [
+          {
+            "quote": "On October 6, 2026, the Company issued a press release announcing an update to its January 2027 hospitalized babesiosis data readout.",
+            "locator": "8-K Item 8.01",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1946563/000121390026106979/ea0307761-8k_60degrees.htm"
+          }
+        ],
+        "risks": [
+          "FDA 목표일·임상 endpoints·등록 환자수 및 데이터 결과는 이 본문 확인구간에 없다. 승인확률·환자시장 규모를 추정하지 않는다."
+        ],
+        "limitations": [
+          "발표시점은 회사가 제시한 월 단위 일정으로 기록, 확정 일자 미공개."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "keyDates": [
+          {
+            "date": "2027-01-01",
+            "label": "회사 목표: hospitalized babesiosis 데이터 readout, 2027년 1월 (정확한 일자 미공개)"
+          }
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "UFG",
+        "eventId": "SEC:0001493152-26-049307:REVERSE_SPLIT",
+        "companyName": "UNI FUELS HOLDINGS LIMITED",
+        "eventDate": "2026-11-03",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Uni-Fuels 1:10 주식병합 효력일",
+        "summary": "Uni-Fuels 6-K 첨부 보도자료는 Class A 및 B ordinary shares 1:10 consolidation이 2026-11-03 효력 발생했다고 알린다. SEC 제출물에는 법적 효력 날짜가 있으나 분할 전후 주식 수·split-adjusted 거래 개시 시각은 확인되지 않아 별도 미확인으로 남긴다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049307",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2021688/000149315226049307/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "at a ratio of 1-for-10, effective on November 3, 2026",
+            "locator": "6-K Exhibit 99.1 제목·본문",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2021688/000149315226049307/form6-k.htm"
+          }
+        ],
+        "risks": [
+          "병합의 기계적 가격 조정은 실질 수익률을 의미하지 않는다."
+        ],
+        "limitations": [
+          "효력 시각 및 조정 거래 개시시각, 발행·유통주식 수는 미확인."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "NRSN",
+        "eventId": "SEC:0001213900-26-108759:NASDAQ_HEARING_AND_MILESTONES",
+        "companyName": "NEUROSENSE THERAPEUTICS LTD",
+        "eventDate": "2026-10-13",
+        "eventType": "LISTING_AND_CLINICAL_UPDATE",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "NeuroSense Nasdaq 청문 및 PrimeC 일정 제목 공시",
+        "summary": "NeuroSense는 Nasdaq hearing date 및 PrimeC 규제·자금조달 milestone을 다룬 보도자료를 6-K에 첨부했다. 보고자료 제목만으로 청문 일자·임상 일정·FDA 목표일을 확정하지 않는다.",
+        "rationale": "이 일정/결과는 해당 이벤트 유형에 한해 기록한다. 이벤트 존재가 주가 방향·사업 성공·임상 유효성 또는 허가를 보장하지 않는다.",
+        "confidence": "MEDIUM",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-108759",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1875091/000121390026108759/ea0308436-6k_neurosense.htm",
+        "evidence": [
+          {
+            "quote": "NeuroSense Secures Nasdaq Hearing Date as PrimeC Approaches Key Regulatory and Funding Milestones",
+            "locator": "6-K Ex.99.1 제목",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1875091/000121390026108759/ea0308436-6k_neurosense.htm"
+          }
+        ],
+        "risks": [
+          "정확한 hearing, clinical, FDA 일정 및 현금 runway는 확인되지 않음."
+        ],
+        "limitations": [
+          "첨부자료 전문 미검토; 제목 수준 확인을 full review로 간주하지 않는다."
+        ],
+        "publishedAt": null,
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "DRCT",
+        "eventId": "SEC:0001880613-26-000117:VOLUNTARY_NASDAQ_DELISTING",
+        "companyName": "DIRECT DIGITAL HOLDINGS INC",
+        "eventDate": "2026-10-21",
+        "eventType": "VOLUNTARY_DELISTING",
+        "status": "ESTIMATED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Direct Digital 자발적 Nasdaq 상장폐지 의사 및 예상 일정",
+        "summary": "Direct Digital은 2026-10-21 Nasdaq에 Class A 보통주 상장폐지 의사를 통지했다. 2026-11-02경 Form 25 제출 의향, 제출 10일 후인 11-12경 상장폐지 효력 예상이라고 보고했으나 이는 filing 기준 예상일이며 actual Form 25 제출·효력 확인 전이다. Nasdaq 거래는 10-05부터 이미 정지돼 OTC Pink “Limited Information”에서 거래 중이라고 공시했다.",
+        "rationale": "공시 사실과 예상·조건부 일정을 구분한다. 상장/주식 기업행위는 방향성과 향후 가격 반응을 보장하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001880613-26-000117",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1880613/000188061326000117/drct-20261021.htm",
+        "evidence": [
+          {
+            "quote": "The Company expects that the delisting ... will become effective ten days after the filing of the Form 25, on or about November 12, 2026",
+            "locator": "8-K relevant section",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1880613/000188061326000117/drct-20261021.htm"
+          }
+        ],
+        "risks": [
+          "상장폐지·보고의무 정지 및 OTC 시장의 유동성·공시 접근성 위험. 예상일은 Form 25 실제 제출에 좌우됨."
+        ],
+        "limitations": [
+          "2026-11-04 기준 이 원장에 Form 25 실제 접수·효력 공지는 연결되지 않았다. 회사는 이미 10-05 Nasdaq 거래정지 및 OTC Pink 제한정보 tier를 보고했다."
+        ],
+        "publishedAt": "2026-10-21T00:00:00Z",
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "keyDates": [
+          {
+            "date": "2026-11-12",
+            "label": "Form 25 제출 후 10일경 예상 상장폐지 효력(예상; actual Form 25 filing not verified)"
+          },
+          {
+            "date": "2027-01-31",
+            "label": "Form 25 제출 90일경 Section 12(b) registration termination 예상"
+          }
+        ]
+      },
+      {
+        "ticker": "NIVF",
+        "eventId": "SEC:0001213900-26-111191:REVERSE_SPLIT",
+        "companyName": "NEWGENIVF GROUP LIMITED",
+        "eventDate": "2026-10-23",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "NewGenIvf 1:8 역분할 및 split-adjusted 거래 개시",
+        "summary": "NewGenIvf는 각 8주의 Class A ordinary shares를 1주로 병합했고 2026-10-23 Nasdaq 개장부터 split-adjusted basis로 거래가 시작됐다고 8-K에 보고했다. 공시는 2026-10-21 현재 outstanding Class A 약 9,821,197주에서 약 1,227,650주로 감소 예상치를 기재한다. 이는 공시상 발행주식 수(유통주식 수 아님) 계산치다.",
+        "rationale": "공시 사실과 예상·조건부 일정을 구분한다. 상장/주식 기업행위는 방향성과 향후 가격 반응을 보장하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-111191",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1981662/000121390026111191/ea0309035-8k_newgen.htm",
+        "evidence": [
+          {
+            "quote": "expected to reduce ... outstanding Class A Ordinary Shares ... from approximately 9,821,197 to approximately 1,227,650",
+            "locator": "6-K relevant section",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1981662/000121390026111191/ea0309035-8k_newgen.htm"
+          }
+        ],
+        "risks": [
+          "병합으로 Nasdaq 상장 기준 충족이 보장되지 않으며 주식수의 기계적 감소는 실제 수익률이 아니다."
+        ],
+        "limitations": [
+          "법적 효력은 2026-10-23 12:01 a.m. EDT, 조정 거래 개시는 당일 장 개장으로 공시됐다. 발행주식 수를 유통주식 수로 해석하지 않는다."
+        ],
+        "publishedAt": "2026-10-21T00:00:00Z",
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "keyDates": [
+          {
+            "date": "2026-10-23",
+            "label": "법적 효력 12:01 a.m. EDT 및 Nasdaq split-adjusted 정규장 개장"
+          }
+        ],
+        "stockSplit": {
+          "ratio": "1-for-8",
+          "preSplitIssuedSharesApprox": 9821197,
+          "postSplitIssuedSharesApprox": 1227650,
+          "source": "SEC 8-K company estimate as of 2026-10-21",
+          "marketAdjustedTradingDate": "2026-10-23"
+        }
+      },
+      {
+        "ticker": "NCI",
+        "eventId": "SEC:0001185185-26-005050:CONDITIONAL_SHARE_CONSOLIDATION",
+        "companyName": "NEO-CONCEPT INTL GRP HLDGS LTD",
+        "eventDate": "2026-12-31",
+        "eventType": "REVERSE_SPLIT_AUTHORIZATION",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Neo-Concept 주주승인 1:2~1:400 주식통합 권한 및 board 결정 기한",
+        "summary": "2026-10-29 6-K는 주주들이 1:2~1:400 주식통합 범위와 이사회가 2026-12-31까지 구체 비율을 정하는 권한을 승인했다고 보고한다. 실제 consolidation ratio와 효력일은 아직 특정되지 않아 범위/board 기한으로 보존한다.",
+        "rationale": "공시 사실과 예상·조건부 일정을 구분한다. 상장/주식 기업행위는 방향성과 향후 가격 반응을 보장하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001185185-26-005050",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1916331/000118518526005050/nci_6k.htm",
+        "evidence": [
+          {
+            "quote": "the exact ratio to be set ... be determined by the board of directors ... by not later than 31 December 2026",
+            "locator": "6-K relevant section",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1916331/000118518526005050/nci_6k.htm"
+          }
+        ],
+        "risks": [
+          "허용비율 1:2~1:400은 실제 병합 비율이 아니다. 주식수·가격의 기계적 조정은 실제 수익률 및 상장요건 유지와 별개다."
+        ],
+        "limitations": [
+          "12-31은 이사회가 비율을 정할 수 있는 최종 기한이지 거래 효력일·조정 거래 개시일이 아니다."
+        ],
+        "publishedAt": "2026-10-29T00:00:00Z",
+        "updatedAt": "2026-11-04T00:00:00Z",
+        "keyDates": [
+          {
+            "date": "2026-12-31",
+            "label": "이사회가 허용 범위 내 실제 비율을 정할 최종 기한; 효력일/조정거래일 미확정"
+          }
+        ]
+      },
+      {
+        "ticker": "AMSS",
+        "eventId": "SEC:0001575872-26-000739:NASDAQ_MIN_BID_DEFICIENCY",
+        "companyName": "AMASS BRANDS INC",
+        "eventDate": "2026-10-09",
+        "eventType": "NASDAQ_MIN_BID_DEFICIENCY",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "AMASS Nasdaq $1 최소 bid 요건 결손 및 180일 회복기간",
+        "summary": "AMASS는 2026-10-09 Nasdaq deficiency notice를 받고 2026-08-26~10-08 30영업일 연속 종가 bid가 $1 미만이었다고 공시했다. 2027-04-07까지 180일 회복기간을 받았으며 요건은 최소 10연속 영업일 $1 이상 종가 bid다. Nasdaq 상장에는 notice 자체의 즉각 효과가 없다고 회사가 밝혔다.",
+        "rationale": "공시 사실과 예상·조건부 일정을 구분한다. 상장/주식 기업행위는 방향성과 향후 가격 반응을 보장하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001575872-26-000739",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1851491/000157587226000739/amass_424b5.htm",
+        "evidence": [
+          {
+            "quote": "was afforded a 180-calendar day grace period, through April 7, 2027, to regain compliance",
+            "locator": "424B5 relevant section",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1851491/000157587226000739/amass_424b5.htm"
+          }
+        ],
+        "risks": [
+          "기한 내 회복 실패 시 추가 180일은 조건부이며 상장폐지 위험이 남는다. reverse split은 이사회가 필요하다고 결정할 경우에만 실행할 수 있다."
+        ],
+        "limitations": [
+          "$1는 공시된 Nasdaq bid 기준이고 실제 주가·회복 결과를 보장하지 않는다."
+        ],
+        "publishedAt": "2026-10-26T00:00:00Z",
+        "updatedAt": "2026-11-04T00:00:00Z"
+      },
+      {
+        "ticker": "AMSS",
+        "eventId": "SEC:0001575872-26-000751:SPECIAL_MEETING_REVERSE_SPLIT",
+        "companyName": "AMASS BRANDS INC",
+        "eventDate": "2026-12-10",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "AMASS 특별주총 1:2~1:20 역분할 승인 안건",
+        "summary": "예비 proxy는 2026-12-10 10:00 a.m. Pacific 가상 특별주총과 1:2~1:20 역분할 권한 안건을 제시한다. 정확한 비율은 이사회 재량이며 시행 여부도 이사회 판단 조건이다. 공시 자료에 placeholder가 포함되어 있어 최종 안내·record date·결의 결과는 재확인 대상이다.",
+        "rationale": "공시 사실과 예상·조건부 일정을 구분한다. 상장/주식 기업행위는 방향성과 향후 가격 반응을 보장하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001575872-26-000751",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1851491/000157587226000751/amass_pre14a.htm",
+        "evidence": [
+          {
+            "quote": "reverse stock split ... at a ratio in the range of 1-for-2 to 1-for-20 with the exact ratio to be determined by the Company’s Board",
+            "locator": "PRE 14A relevant section",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1851491/000157587226000751/amass_pre14a.htm"
+          }
+        ],
+        "risks": [
+          "주주 승인 및 board action 전에는 실제 역분할·비율·효력시각이 확정되지 않는다."
+        ],
+        "limitations": [
+          "PRE 14A에 날짜 placeholder가 남아 있어 draft 공시 상태를 기록하고 후속 definitive proxy를 확인해야 한다."
+        ],
+        "publishedAt": "2026-10-30T00:00:00Z",
+        "updatedAt": "2026-11-04T00:00:00Z"
       }
     ]
   }

@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 123,
+  "documentCount": 124,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -995,6 +995,17 @@
       "url": "/manuals/operations/us-small-cap-extraction.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/us-small-cap-extraction.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-event-data-contract",
+      "title": "미국 소형주 이벤트 자료 관리 기준",
+      "category": "operations",
+      "format": "md",
+      "description": "운영 서버의 미국 종목·뉴스 snapshot과 SEC 공시 자료를 조사 배치별로 보존하고, 확인된 사건만 공통 이벤트 원장에 반영한다. 배치 원본, 공시별 검토 상태, 이벤트 공개 자료는 서로 다른 책임을 가지며 고정 식별자로 연결한다.",
+      "url": "/manuals/operations/us-smallcap-event-data-contract.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-event-data-contract.md",
       "related": []
     },
     {
