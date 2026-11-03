@@ -17,8 +17,8 @@
 - `npm run validate:us-smallcap-event-data:20261031`, `npm run validate:us-smallcap-event-data:20261104`, `npm run docs:check` 통과.
 - Batch 2 validator 통과: issuer 100, filing 5,111, canonical 전체 이벤트 234, batch 이벤트/접수 관계 18, filing amendment relation 0 (공식 amendment 링크 미확인 관계는 미기록). Batch 1 검증도 canonical 전체 중 기존 216건 분리 검증 통과.
 - 운영 마스터에서 100개 ticker의 COMMON_STOCK/USD/$100M 이하/CIK를 확인했다. 시총은 모두 2026-11-02 관측 STALE이며 이 한계를 보고서에 표시했다.
-- `npm run deploy:verify` 통과: npm audit 취약점 0, production build 통과, standalone 기동 및 Chrome 데스크톱/모바일 하이드레이션·API smoke 통과, 테스트 1,541 passed/3 skipped (300 files, 1 skipped), typecheck 및 API/KIS/auth/cron/docs 감사 통과.
-- `git diff --check` 통과. 이 기록 작성 후 추가한 데이터 계약 문서는 최종 commit 전 `docs:check`로 다시 검사한다. 운영 배포 및 commit/push는 아직 수행하지 않았다.
+- 최신 `oci` 통합 커밋 기준 `npm run deploy:verify` 통과: npm audit 취약점 0, production build 107페이지, standalone 기동 및 Chrome 데스크톱/모바일 하이드레이션·API smoke 통과, 테스트 1,542 passed/3 skipped (301 files, 1 skipped), typecheck 및 API/KIS/auth/cron/docs 감사 통과. `docs:check`의 catalog는 데이터 계약 문서 포함 124건이다.
+- `git diff --check` 통과. commit `b3ba6b5ac11d557d4a6c319b10c6bac01702ee23`를 `oci`에 반영했고 [Deploy OCI run 41676590668](https://github.com/pjtss/StockMan/actions/runs/41676590668)이 성공했다. 운영 `/api/health`는 `ok`, `/health-check`는 배포 SHA를 표시했다. 무인증 US 이벤트 API에서 canonical 237건 중 이번 배치 18개 eventId 모두 확인(14 ticker). 운영 API/DB write 없음.
 
 ### 다음 개선
 - 자동 감지: validator가 배치 event parity, SEC CIK, accession 연결, filing counts, 쌍방 filing 관계를 검사하며 docs:check에서 두 배치를 반복 검증한다. 새 조사 배치는 package validator와 자료 계약 문서의 체크리스트에 함께 추가한다.
@@ -31,7 +31,7 @@
 - 근거: 여러 배치 JSON과 canonical event 간 eventId/CIK/accession 관계를 docs:check에서 독립 검증하도록 validator 인자와 범위를 일반화했다.
 
 ### 커밋·푸시·배포
-- 검증 완료. 문서 변경 후 `docs:check` 재실행이 통과하면 한국어 상세 commit, push, CI 및 운영 GET 검증을 순서대로 수행한다.
+- 운영 결과까지 기록한 후속 커밋은 전체 `npm run deploy:verify` 통과 후 한국어 상세 커밋으로 남기고 `oci`에 순차 반영한다.
 
 ## [2026-10-31] 이벤트 occurrence 조회 API 추가
 
