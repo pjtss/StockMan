@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 126,
+  "documentCount": 127,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1026,6 +1026,17 @@
           "sourcePath": "docs/operations/us-smallcap-event-data-contract.md"
         }
       ]
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261104-b03",
+      "title": "미국 보통주 공시·뉴스 기반 이벤트 검토 — 2026-11-04 배치 3",
+      "category": "operations",
+      "format": "md",
+      "description": "100개 종목 각각의 SEC filing/accession과 공시별 상태는 $1에 있다. 운영 종목 snapshot·뉴스·issuer별 event 연결은 $1, 앱 제공 정규 원장은 $1에 있으며 ticker, CIK, accession, eventId로 연결한다.",
+      "url": "/manuals/operations/us-smallcap-event-review-20261104-b03.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b03.md",
+      "related": []
     },
     {
       "id": "operations-us-smallcap-event-review-20261104",

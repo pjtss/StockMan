@@ -41,6 +41,23 @@ const allowed = {
 const reviewIssuerByTicker = new Map(review.universe.issuers.map((issuer) => [issuer.ticker, issuer]));
 const eventById = new Map();
 const secCik = (url) => url?.match(/sec\.gov\/Archives\/edgar\/data\/(\d+)\//i)?.[1]?.replace(/^0+/, "") || null;
+const capBounds = review.criteria?.marketCap;
+for (const issuer of review.universe.issuers) {
+  const instrument = issuer.officialMaster?.instrument;
+  assert(instrument?.instrument_type === "COMMON_STOCK" && instrument.enabled === true,
+    `Issuer is not confirmed active COMMON_STOCK in the operating master: ${issuer.ticker}`);
+  for (const flag of ["is_etf", "is_warrant", "is_derivative", "is_dr"]) {
+    if (instrument[flag] !== undefined) assert(instrument[flag] === false, `Non-common instrument flag ${flag} is set for ${issuer.ticker}`);
+  }
+  assert(issuer.marketCap?.currency === capBounds?.currency && Number.isFinite(issuer.marketCap?.usd),
+    `Issuer market-cap snapshot is missing or has the wrong currency: ${issuer.ticker}`);
+  assert(issuer.marketCap.usd > (capBounds?.minExclusive ?? 0) && issuer.marketCap.usd <= capBounds?.maxInclusive,
+    `Issuer market-cap snapshot is outside the declared universe bounds: ${issuer.ticker}`);
+  if (issuer.secCompanyMaster?.cik) {
+    assert(String(issuer.secCompanyMaster.cik).replace(/^0+/, "") === String(issuer.cik).replace(/^0+/, ""),
+      `Issuer CIK differs from the official SEC ticker master: ${issuer.ticker}`);
+  }
+}
 for (const event of canonicalEvents) {
   const issuer = reviewIssuerByTicker.get(event.ticker);
   const expectedCik = String(issuer?.cik || "").replace(/^0+/, "");
@@ -160,6 +177,10 @@ for (const [ticker, issuer] of ledgerIssuerByTicker) {
   const reviewIssuer = reviewIssuerByTicker.get(ticker);
   assert(reviewIssuer, `Issuer missing from review JSON: ${ticker}`);
   assert(issuer.cik === reviewIssuer.cik, `CIK mismatch for ${ticker}`);
+  if (issuer.secCompanyMaster || reviewIssuer.secCompanyMaster) {
+    assert(String(issuer.secCompanyMaster?.cik || "").replace(/^0+/, "") === String(reviewIssuer.secCompanyMaster?.cik || "").replace(/^0+/, ""),
+      `Official SEC ticker-master CIK differs between review and ledger: ${ticker}`);
+  }
   const ledgerFilings = new Map(issuer.filings.map((filing) => [filing.accession, filing]));
   const reviewFilings = new Map(reviewIssuer.secSubmissions.filings.map((filing) => [filing.accession, filing]));
   assert(ledgerFilings.size === reviewFilings.size, `Filing count mismatch for ${ticker}`);

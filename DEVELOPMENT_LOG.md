@@ -8225,7 +8225,31 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증 및 배포 상태
 - `npm run docs:catalog:generate`, `npm run docs:catalog:check`, `npm run docs:check`, `git diff --check`를 실행했다. 문서 카탈로그는 126건/7개 분류로 생성·검증됐고, 기존 1·2차 이벤트 데이터 검증과 문서 링크 검사도 통과했다.
-- 커밋·푸시·배포는 아직 하지 않았다.
+- 문서 구조 변경 커밋 `786dcf8b`를 `oci`에 푸시했다. [Deploy OCI run 41685407401](https://github.com/pjtss/StockMan/actions/runs/41685407401)이 성공했고 운영 `/api/health`는 `ok`, `/health-check`에는 해당 SHA가 표시됐다. 운영 이벤트 공개 GET은 237건을 반환했고 2차 배치 18개 eventId 전부 확인했다. 운영 문서 카탈로그에서 이벤트 보고서 링크도 확인했다.
 
 ### 다음 개선
 - 자료 계약의 날짜·배치 ID 규칙을 validator CLI 이름과 자동으로 연결해 package script의 수동 중복을 줄이는 방안을 검토한다.
+
+## [2026-11-04] 미국 소형주 이벤트 3차 100종목 배치 수집 및 구조화
+
+### 목적 및 범위
+- 운영 서버 공개 GET과 SEC 공식 자료를 기준으로 직전 두 배치와 중복되지 않는 100개 미국 상장 COMMON_STOCK 종목을 추가 조사했다. 2025-11-04~2026-11-04 SEC 제출 inventory와 운영 뉴스에서 직접 확인한 사건을 accession별·issuer별 저장하고 정규 이벤트 원장에 연결한다.
+- 운영 공개 `/api/public/us-stock-metadata`, `/api/public/market-intelligence` GET만 사용했다. 운영 API/DB write 없음. 공식 SEC submissions와 `company_tickers_exchange.json`으로 100/100 CIK 교차 확인했다.
+- 238개 신규 후보의 운영 마스터 확인 중 225개가 시총·분류 기준을 통과했고 34개 ADR/ADS·depositary 후보를 보류 제외했다. KIS 시총 snapshot은 2026-11-02 관측 STALE이다.
+
+### 반영
+- 종목별 snapshot·뉴스·SEC filing inventory·검토 이벤트: `data/us-smallcap-event-review-20261104-b03.json`.
+- accession별 SEC 검토 ledger: `data/us-smallcap-filing-review-ledger-20261104-b03.json`.
+- 정규 이벤트 13건을 `data/market-impact-events.json`에 추가하고, 조사 범위·근거·임상·역분할·일정 한계를 `docs/operations/us-smallcap-event-review-20261104-b03.md`에 기록했다.
+- package validator 명령 `validate:us-smallcap-event-data:20261104b03`를 추가해 기존 1·2차와 독립 검증 및 `docs:check`에 연결했다. validator도 모든 기존/신규 배치의 운영 마스터 active COMMON_STOCK, 제외형 instrument flags, USD 시총 상한·하한을 검사하고 신규 배치의 운영·SEC master CIK 및 ledger를 교차 검증하도록 강화했다. 문서 카탈로그 생성기의 날짜 포함 보고서 예외를 실제 3차 보고서로 확인했다.
+- 주요 이벤트: CRE 인수 완료, GLE·SCNX 역분할, VVOS/GWAV/INBS 정기주총, SNES/DOGZ Nasdaq 최저호가 회복기한, MGN 공모 종결, DPU 사모 계약, VNRX 전환사채 일부 상환, LGVN ELPIS II 후속 분석, AMZE 역분할 권한.
+
+### 검증 결과
+- 운영 intelligence 조회 100/100 성공, 뉴스/RSS 453건, bullish 분류 93건, SEC 분류 row 31건. SEC 제출 inventory 4,183건, 사건 원문 구간 직접 검토 13건/13개 issuer. 나머지 filing은 INVENTORY_ONLY로 표시했다.
+- 배치 validator: issuer 100, filing 4,183, event 13, accession-event link 13, amendment relation 0. 운영 마스터 active COMMON_STOCK/USD cap 조건과 SEC ticker-master CIK는 100/100 일치했다. `docs:check`에서 1·2·3차 validator, API surface, 카탈로그(127건/7개 분류), 문서 링크 검사 통과.
+- LGVN은 Phase 2b/N=40/HLHS/laromestrocel/NCT04925024와 primary endpoint 미달 및 secondary MACE 8 vs 1, p=0.043을 함께 기록했다. FDA 미확정 일정·미공개 시장 수치는 생성하지 않았다.
+- 커밋·푸시·배포는 3차 데이터 추가 완료 후 전체 `npm run deploy:verify`로 build·test·runtime을 검증한 다음 진행한다.
+
+### 남은 위험 및 다음 개선
+- 시총 snapshot이 stale이고 SEC 전문 전수 검토가 아니다. 임상 후속 분석의 독립 재현, issuer 후속공시/회의 결과, reverse split 주식수 및 효력 일정은 추가 공시가 있을 때 갱신한다.
+- 다음 배치는 동일 절차로 신규 100종목을 운영 마스터에서 다시 선정하고 이전 batch ticker를 제외한다.

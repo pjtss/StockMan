@@ -10262,6 +10262,417 @@
         ],
         "publishedAt": "2026-10-30T00:00:00Z",
         "updatedAt": "2026-11-04T00:00:00Z"
+      },
+      {
+        "ticker": "CRE",
+        "eventId": "SEC:0001213900-26-115177:ACQUISITION_COMPLETED",
+        "companyName": "Cre8 Enterprise Ltd",
+        "eventDate": "2026-11-03",
+        "eventType": "ACQUISITION_COMPLETED",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "LingXpert 100% 인수 완료 — 현금 대가 $800,000",
+        "summary": "Cre8 Enterprise는 2026-11-03 발표에서 자회사 Cre8 Incorporation이 홍콩 번역 서비스 회사 Lingxpert Language Services 발행주식 100% 인수를 완료했다고 밝혔다. 2026-10-19 주식매매계약의 현금 대가는 $800,000. 매출·이익 기여도는 미공개다.",
+        "rationale": "SEC 6-K 첨부 보도자료에서 인수 완료와 100% 지분 취득, 계약상 현금 대가를 확인했다. 향후 실적 기여와 주가 방향을 추정하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-115177",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2003977/000121390026115177/ea031046001ex99-1.htm",
+        "evidence": [
+          {
+            "quote": "completed the acquisition of 100% of the issued shares of Lingxpert Language Services Limited",
+            "locator": "6-K Exhibit 99.1, acquisition completion",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2003977/000121390026115177/ea031046001ex99-1.htm"
+          }
+        ],
+        "risks": [
+          "인수 대가 $800,000; 향후 매출·수익 기여와 통합비용은 미공개."
+        ],
+        "limitations": [],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "GLE",
+        "eventId": "SEC:0001213900-26-107002:SHARE_CONSOLIDATION",
+        "companyName": "Global Engine Group Holding Ltd",
+        "eventDate": "2026-10-08",
+        "eventType": "SHARE_CONSOLIDATION",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "1대10 주식 병합 및 병합 조정 거래 개시",
+        "summary": "Global Engine Group은 Class A/B 보통주 10주를 1주로 병합했으며 2026-10-08 Nasdaq 개장부터 GLE 심볼과 신규 CUSIP로 병합 조정 거래를 시작한다고 공시했다. 병합 전후 발행·유통 주식 수는 확인하지 못했다.",
+        "rationale": "6-K와 첨부 공지에서 비율·효력 및 split-adjusted 거래일을 확인했다. 기계적 가격조정과 투자수익률을 구분한다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-107002",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1908705/000121390026107002/ea030721501ex99-1.htm",
+        "evidence": [
+          {
+            "quote": "Beginning with the opening of trading on October 8, 2026 ... on a post-Share Consolidation basis",
+            "locator": "6-K Item 8.01 and Exhibit 99.1",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1908705/000121390026107002/ea030721501ex99-1.htm"
+          }
+        ],
+        "risks": [
+          "회사는 Nasdaq 최소 호가 요건 대응 목적으로 병합을 공지했다. 병합만으로 지속적 compliance가 보장되지 않는다."
+        ],
+        "limitations": [
+          "병합 전·후 발행주식 수와 유통주식 수는 해당 자료에서 확인하지 못했다."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "SCNX",
+        "eventId": "SEC:0001493152-26-046176:REVERSE_STOCK_SPLIT",
+        "companyName": "Scienture Holdings, Inc.",
+        "eventDate": "2026-10-05",
+        "eventType": "REVERSE_STOCK_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "1대25 역분할 효력 및 조정 거래 개시",
+        "summary": "Scienture Holdings가 1대25 역분할을 결정했다. 회사는 2026-10-05 12:01 a.m. Eastern Time에 효력이 발생했고 같은 날 시장 개장 전 split-adjusted 거래가 시작된다고 공지했다. 발행·유통 주식 수는 확인한 원문에서 확인되지 않았다. 역분할 자체는 기계적 가격 조정이며 투자수익률과 다르다.",
+        "rationale": "8-K Item 3.03 및 Exhibit 99.1에서 병합비율, 법적 효력시각(12:01 a.m. ET), 병합 조정 거래 개시(10월 5일 시장 개장 전)를 확인했다. 주식 수 전후 수치는 공식 확인되지 않아 계산하지 않았다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-046176",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1382574/000149315226046176/ex99-1.htm",
+        "evidence": [
+          {
+            "quote": "a 1-for-25 reverse stock split ... before markets open on Monday, October 5, 2026",
+            "locator": "8-K Item 3.03 and Exhibit 99.1",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1382574/000149315226046176/ex99-1.htm"
+          }
+        ],
+        "risks": [
+          "Nasdaq 최소 주가 요건 관련 조치로 공시됐으며 지속적 compliance는 별도 확인이 필요하다."
+        ],
+        "limitations": [
+          "발행·유통주식의 전후 수량과 잔여주 처리 수치는 이 검토 자료에서 미확인."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "VVOS",
+        "eventId": "SEC:0001493152-26-049258:ANNUAL_MEETING_REVERSE_SPLIT_PROPOSAL",
+        "companyName": "Vivos Therapeutics, Inc.",
+        "eventDate": "2026-12-02",
+        "eventType": "ANNUAL_MEETING_REVERSE_SPLIT_PROPOSAL",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "연례 주총 — 이사회 재량 1대20~1대40 역분할 안건",
+        "summary": "Vivos Therapeutics 연례 주총은 2026-12-02 10:00 Mountain Time 가상회의(2026-12-03 02:00 KST)로 공지됐다. 안건은 보통주 1대20~1대40 역분할 권한이며, 실제 비율·시기는 이사회 재량이고 제안 철회도 가능하다. 주총 승인 전이므로 병합 실행일로 보지 않는다.",
+        "rationale": "DEF 14A의 주총 공지와 Proposal 5를 확인해 회의와 조건부 역분할 제안을 하나의 의결 이벤트로 연결했다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049258",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1716166/000149315226049258/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "will be held on December 2, 2026, at 10:00 a.m. Mountain Time",
+            "locator": "DEF 14A, Notice of Annual Meeting; Proposal 5",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1716166/000149315226049258/formdef14a.htm"
+          }
+        ],
+        "risks": [
+          "1대20~1대40 권한은 제안이며 정확한 비율·시점은 미정."
+        ],
+        "limitations": [
+          "투표 결과, 실제 법적 효력일과 조정 거래일은 아직 없음."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "GWAV",
+        "eventId": "SEC:0001493152-26-048536:ANNUAL_SHAREHOLDER_MEETING",
+        "companyName": "Greenwave Technology Solutions, Inc.",
+        "eventDate": "2026-12-07",
+        "eventType": "ANNUAL_SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "연례 주주총회 — 12:30 p.m. Eastern",
+        "summary": "Greenwave Technology Solutions 2026 연례 주주총회는 2026-12-07 12:30 p.m. Eastern(2026-12-08 02:30 KST) 가상회의로 PRE 14A에 공지됐다. 최종 안건·의결 결과는 후속 확인 대상이다.",
+        "rationale": "PRE 14A의 주주총회 공지에서 날짜·시각과 가상회의를 확인했다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-048536",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1589149/000149315226048536/formpre14a.htm",
+        "evidence": [
+          {
+            "quote": "will be held on December 7, 2026 at 12:30 p.m. Eastern Time",
+            "locator": "PRE 14A, Notice of Annual Meeting",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1589149/000149315226048536/formpre14a.htm"
+          }
+        ],
+        "risks": [
+          "주주 의결 안건의 자본구조 영향은 이 일정만으로 확정하지 않는다."
+        ],
+        "limitations": [
+          "예비 위임장 자료이며 최종 위임장 변경·의결 결과는 미확인."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "INBS",
+        "eventId": "SEC:0001493152-26-049613:ANNUAL_SHAREHOLDER_MEETING",
+        "companyName": "INTELLIGENT BIO SOLUTIONS INC.",
+        "eventDate": "2026-12-03",
+        "eventType": "ANNUAL_SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "SHORT_TERM",
+        "title": "연례 주주총회 — 4:00 p.m. Eastern",
+        "summary": "Intelligent Bio Solutions 2026 연례 주주총회는 2026-12-03 4:00 p.m. Eastern(2026-12-04 06:00 KST)으로 DEF 14A에 공지됐다. 의안과 결과는 회의 전후 재확인 대상이다.",
+        "rationale": "DEF 14A의 정식 주주총회 공지에서 일정과 시각을 확인했다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049613",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1725430/000149315226049613/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "December 3, 2026",
+            "locator": "DEF 14A, Notice of Annual Meeting",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1725430/000149315226049613/formdef14a.htm"
+          }
+        ],
+        "risks": [
+          "주주총회 의결이 자본구조에 미칠 영향은 후속 공시에서 확인해야 한다."
+        ],
+        "limitations": [
+          "회의는 향후 예정이며 의결 결과는 없음."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "SNES",
+        "eventId": "SEC:0001628280-26-066829:NASDAQ_MINIMUM_BID_COMPLIANCE_DEADLINE",
+        "companyName": "SenesTech, Inc.",
+        "eventDate": "2027-04-19",
+        "eventType": "NASDAQ_MINIMUM_BID_COMPLIANCE_DEADLINE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Nasdaq 최소 호가 $1 미준수 회복 기한",
+        "summary": "SenesTech는 Nasdaq 최소 bid $1 미준수 통지를 받고 180일 회복기간을 부여받았으며 공시 기한은 2027-04-19이다. 기한 전 최소 10연속 영업일 closing bid $1 이상이 필요하며 Nasdaq은 통상 최대 20영업일까지 연장 요구 재량을 가진다. 공시에는 기한 시각이 없다.",
+        "rationale": "8-K Item 3.01에서 미준수·기한·요건을 확인했다. 회복이나 상장폐지 결과는 발생 전이다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001628280-26-066829",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1680378/000162828026066829/snes-20261020.htm",
+        "evidence": [
+          {
+            "quote": "or until April 19, 2027, to regain compliance",
+            "locator": "8-K Item 3.01, 180-day compliance period",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1680378/000162828026066829/snes-20261020.htm"
+          }
+        ],
+        "risks": [
+          "기한 전 회복 실패 시 상장폐지 노출. 추가 180일은 별도 요건과 Nasdaq 판단에 달렸다."
+        ],
+        "limitations": [
+          "calendar deadline만 확인되며 cutoff 시각은 공시되지 않았다."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "DOGZ",
+        "eventId": "SEC:0001493152-26-047760:NASDAQ_MINIMUM_BID_COMPLIANCE_DEADLINE",
+        "companyName": "Dogness (International) Corp",
+        "eventDate": "2027-04-19",
+        "eventType": "NASDAQ_MINIMUM_BID_COMPLIANCE_DEADLINE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "Nasdaq 최소 호가 $1 미준수 회복 기한",
+        "summary": "Dogness (International)는 $1 minimum bid 미준수 통지 후 180일 회복기간을 부여받았고 2027-04-19까지 회복해야 한다. 요건은 최소 10연속 영업일 closing bid $1 이상이다. 역분할은 필요 시 가능한 수단일 뿐 당시 확정 일정이 아니다.",
+        "rationale": "6-K 첨부 공지에서 결함 통지·기한·연속 영업일 조건을 확인했다. 역분할을 확정 이벤트로 취급하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-047760",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1707303/000149315226047760/ex99-1.htm",
+        "evidence": [
+          {
+            "quote": "a compliance period of 180 calendar days, or until April 19, 2027",
+            "locator": "6-K Exhibit 99.1, Nasdaq deficiency notice",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1707303/000149315226047760/ex99-1.htm"
+          }
+        ],
+        "risks": [
+          "기한 미회복 시 Nasdaq 추가 절차와 상장폐지 위험."
+        ],
+        "limitations": [
+          "역분할 실행 및 추가 회복기간 여부는 미확정."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "MGN",
+        "eventId": "SEC:0001213900-26-114419:FOLLOW_ON_PUBLIC_OFFERING_CLOSED",
+        "companyName": "Megan Holdings Ltd.",
+        "eventDate": "2026-10-29",
+        "eventType": "FOLLOW_ON_PUBLIC_OFFERING_CLOSED",
+        "status": "COMPLETED",
+        "direction": "MIXED",
+        "impactHorizon": "SHORT_TERM",
+        "title": "후속 공모 종결 — 1,500만 주·gross 약 $7.5M",
+        "summary": "Megan Holdings는 2026-10-29 후속 공모를 종결해 Class A 보통주 15,000,000주를 주당 $0.50에 발행, 수수료·비용 전 약 $7.5M을 조달했다고 보고했다. 기존 대비 희석률은 발행 직전 주식 수를 이 자료에서 대조하지 않아 산출하지 않았다.",
+        "rationale": "6-K와 Exhibit 99.2 closing release에서 실제 종결·수량·가격·gross proceeds를 확인했다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-114419",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1995075/000121390026114419/ea031029201ex99-2.htm",
+        "evidence": [
+          {
+            "quote": "15,000,000 Class A ordinary shares ... gross proceeds ... approximately US$7.5 million",
+            "locator": "6-K Exhibit 99.2, closing release dated Oct 29",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1995075/000121390026114419/ea031029201ex99-2.htm"
+          }
+        ],
+        "risks": [
+          "Class A 15M주 신규 발행에 따른 희석. 순수령액은 비용 차감 후로 정확한 수치 미공개."
+        ],
+        "limitations": [
+          "발행 직전 fully diluted shares를 확인하지 않아 희석률 미산출."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "DPU",
+        "eventId": "SEC:0001213900-26-110756:REGULATION_S_PRIVATE_PLACEMENT",
+        "companyName": "Nexpu Ltd.",
+        "eventDate": "2026-10-14",
+        "eventType": "REGULATION_S_PRIVATE_PLACEMENT",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "SHORT_TERM",
+        "title": "사모 발행 계약 — 최대 4,000만 units·gross 최대 $28M",
+        "summary": "Nexpu는 2026-10-14 비미국 투자자와 Regulation S 계약을 체결해 최대 40,000,000 units를 unit당 $0.70에 판매하기로 했다. 각 unit은 Class A ordinary share 1주와 warrant 1개로 구성되고, warrant는 주당 $0.71 현금 행사 가능, 발행일부터 3년 만기다. closing 완료는 확인되지 않아 계약/최대치로 기록한다.",
+        "rationale": "6-K 본문과 첨부 Purchase Agreement/Warrant에서 계약 수량·가격·구성·행사가·기간을 확인했다. 최대 조달액을 실제 수령으로 간주하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-110756",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1938865/000121390026110756/ea0309031-6k_nexpu.htm",
+        "evidence": [
+          {
+            "quote": "agreed to sell 40,000,000 units ... at a price of $0.70 per Unit",
+            "locator": "6-K, Private Placement dated Oct 14; Exhibits 99.1–99.2",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1938865/000121390026110756/ea0309031-6k_nexpu.htm"
+          }
+        ],
+        "risks": [
+          "최대 40M ordinary shares와 40M warrant underlying shares의 잠재 희석; 실제 발행·행사는 별도."
+        ],
+        "limitations": [
+          "실제 종결·발행 수량·순수령액·희석률 미확인."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "VNRX",
+        "eventId": "SEC:0001477932-26-006470:CONVERTIBLE_NOTE_PARTIAL_PREPAYMENT",
+        "companyName": "VOLITIONRX LTD",
+        "eventDate": "2026-10-27",
+        "eventType": "CONVERTIBLE_NOTE_PARTIAL_PREPAYMENT",
+        "status": "REPORTED",
+        "direction": "MIXED",
+        "impactHorizon": "SHORT_TERM",
+        "title": "전환사채 $500,000 일부 현금 상환·전환권 일시 정지",
+        "summary": "VolitionRx는 $2.4M senior secured convertible note 중 $500,000을 현금 상환해 잔액 약 $706,667이라고 공지했다. 채권자의 전환권은 종가가 $0.275 이상이 되지 않는 한 2027-01-01 전까지 행사하지 않기로 했고, 2026년 11·12월 상환은 이연됐다. 원금 감소와 조건부 전환·이연 상환을 함께 기록한다.",
+        "rationale": "8-K Item 1.01과 Exhibit 99.1에서 상환액·잔액·전환권 제한·이연 조건을 확인했다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001477932-26-006470",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/93314/000147793226006470/vnrx_ex991.htm",
+        "evidence": [
+          {
+            "quote": "a $500,000 partial prepayment ... remaining outstanding balance ... $706,667",
+            "locator": "8-K Item 1.01 and Exhibit 99.1",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/93314/000147793226006470/vnrx_ex991.htm"
+          }
+        ],
+        "risks": [
+          "종가 $0.275 이상이면 전환권 정지가 해제될 수 있으며 2026년 말 상환액은 취소가 아닌 이연."
+        ],
+        "limitations": [
+          "완전희석 주식 수와 후속 상환 여부는 미산출."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "LGVN",
+        "eventId": "SEC:0001213900-26-112508:PHASE2B_UPDATED_RESULTS",
+        "companyName": "Longeveron Inc.",
+        "eventDate": "2026-10-26",
+        "eventType": "PHASE2B_UPDATED_RESULTS",
+        "status": "COMPLETED",
+        "direction": "MIXED",
+        "impactHorizon": "LONG_TERM",
+        "title": "ELPIS II Phase 2b — 1차 평가변수 미달, MACE 2차 변수 8대1 (p=0.043)",
+        "summary": "Longeveron의 laromestrocel ELPIS II는 HLHS 영아 40명 Stage II palliation 보조치료 Phase 2b 무작위 이중맹검 시험(NCT04925024)이다. Month 12 RVEF baseline 대비 변화라는 1차 효능 평가변수는 충족하지 못했다. 회사가 보고한 사전 지정 2차 major adverse cardiac events는 표준치료 8건 대 laromestrocel 1건, p=0.043. FDA와 결과 논의를 요청할 계획만 공개됐고 FDA 목표일은 없다.",
+        "rationale": "SEC 8-K Exhibit 99.1, 발행사 IR, ClinicalTrials.gov에서 자산·적응증·단계·N·primary endpoint·결과를 교차확인했다. 2차 결과는 primary 실패를 상쇄하거나 승인·주가 방향을 보장하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-112508",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1721484/000121390026112508/ea030920801ex99-1.htm",
+        "evidence": [
+          {
+            "quote": "did not meet the primary efficacy endpoint ... MACE ... 8 events ... versus 1 ... (P=0.043)",
+            "locator": "8-K Item 8.01 and Exhibit 99.1, updated results",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1721484/000121390026112508/ea030920801ex99-1.htm"
+          },
+          {
+            "quote": "Issuer/official trial reference used to cross-check the clinical study identity and reported context.",
+            "locator": "Issuer investor relations release",
+            "sourceUrl": "https://investors.longeveron.com/news/news-details/2026/Longeveron-Announces-Updated-Results-from-ELPIS-II-Phase-2b-Clinical-Trial-Evaluating-Laromestrocel-as-a-Potential-Treatment-for-Hypoplastic-Left-Heart-Syndrome-HLHS/default.aspx"
+          },
+          {
+            "quote": "Issuer/official trial reference used to cross-check the clinical study identity and reported context.",
+            "locator": "ClinicalTrials.gov record NCT04925024",
+            "sourceUrl": "https://clinicaltrials.gov/study/NCT04925024"
+          }
+        ],
+        "risks": [
+          "Primary endpoint 실패. 발행사가 보고한 2차 분석은 FDA 승인 또는 임상 효능을 보장하지 않는다."
+        ],
+        "limitations": [
+          "FDA 목표일·승인확률·시장규모·가격·매출 미공개; FDA 회의는 요청 계획뿐이며 일정 미확정."
+        ],
+        "relatedSourceUrls": []
+      },
+      {
+        "ticker": "AMZE",
+        "eventId": "SEC:0001493152-26-048509:REVERSE_SPLIT_AUTHORIZATION_RANGE",
+        "companyName": "AMAZE HOLDINGS, INC.",
+        "eventDate": "2026-10-26",
+        "eventType": "REVERSE_SPLIT_AUTHORIZATION_RANGE",
+        "status": "REPORTED",
+        "direction": "NEGATIVE",
+        "impactHorizon": "UNKNOWN",
+        "title": "이사회 재량 1대2~1대500 역분할 권한 — 시행일 미정",
+        "summary": "Amaze Holdings DEF 14C는 이사회에 1대2~1대500 역분할 비율 선택 권한을 부여하는 주주 서면동의 결과를 확정 공시했다. 권한 승인이지 실제 병합 결정이 아니며 비율·법적 효력일·split-adjusted 거래일은 미정이다.",
+        "rationale": "DEF 14C에서 역분할 권한 범위와 이사회 재량을 확인했다. NYSE American 거래정지·OTC 전환 이슈는 별도 이벤트라 혼합하지 않는다.",
+        "confidence": "HIGH",
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-048509",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1880343/000149315226048509/formdef14c.htm",
+        "evidence": [
+          {
+            "quote": "reverse stock split ... not less than one-for-two and not greater than one-for-five hundred",
+            "locator": "DEF 14C, reverse stock split proposal",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1880343/000149315226048509/formdef14c.htm"
+          }
+        ],
+        "risks": [
+          "광범위한 병합 권한은 주식 수 및 거래 구조 변동 위험. 상장/OTC 이슈는 별도 후속 확인."
+        ],
+        "limitations": [
+          "실제 이사회 결정·비율·주식수·효력·거래 일정은 미확인."
+        ],
+        "relatedSourceUrls": []
       }
     ]
   }
