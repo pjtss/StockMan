@@ -8,12 +8,14 @@
 
 | 자료 | 책임 | 기본 식별자 |
 | --- | --- | --- |
-| `data/us-smallcap-event-review-YYYYMMDD.json` | 배치 기준, 운영 종목 snapshot, 뉴스 결과, 종목별 검토 요약 및 직접 확인 이벤트 | `ticker`, `eventId` |
-| `data/us-smallcap-filing-review-ledger-YYYYMMDD.json` | 배치 대상 issuer별 SEC submissions inventory와 개별 accession의 검토 상태 | `ticker`, `accession` |
+| `data/us-smallcap-event-review-YYYYMMDD[-bNN].json` | 배치 기준, 운영 종목 snapshot, 뉴스 결과, 종목별 검토 요약 및 직접 확인 이벤트 | `ticker`, `eventId` |
+| `data/us-smallcap-filing-review-ledger-YYYYMMDD[-bNN].json` | 배치 대상 issuer별 SEC submissions inventory와 개별 accession의 검토 상태 | `ticker`, `accession` |
 | `data/market-impact-events.json` | UI/API에 제공되는 정규 이벤트 원장 | `eventId` |
-| `docs/operations/us-smallcap-event-review-YYYYMMDD.md` | 수집 범위, 근거 수준, 해석과 한계, 후속 조사 기록 | `ticker`, `accession`, `eventId` |
+| `docs/operations/us-smallcap-event-review-YYYYMMDD[-bNN].md` | 수집 범위, 근거 수준, 해석과 한계, 후속 조사 기록 | `ticker`, `accession`, `eventId` |
 
 배치 날짜는 조사 기준일이며 데이터의 최신 시각을 뜻하지 않는다. 각 종목의 운영 시총 관측 시각과 freshness를 그대로 보존한다.
+
+같은 조사일에 여러 100종목 배치를 만들면 날짜 뒤에 `-b02`, `-b03`처럼 2자리 순번을 붙인다. 첫 배치부터 순번을 붙이지 않은 기존 파일명은 호환성을 위해 유지한다. review JSON, accession ledger, 보고서와 validator 명령은 동일한 날짜·순번을 사용하며, 순번은 파일 간 조인이 아니라 파일 식별에만 쓴다. ticker·CIK·accession·eventId는 각 레코드의 관계 식별자로 유지한다.
 
 ## 연결 규칙
 
@@ -34,8 +36,8 @@
 1. 운영 공개 GET으로 종목 마스터·시총·뉴스를 읽고 수집 시각, 원본 경로, freshness를 저장한다. 운영 API/DB 쓰기를 수행하지 않는다.
 2. official SEC ticker/CIK 및 submissions를 대조하고, accession별 본문 확인 여부를 기록한다.
 3. 근거를 확인한 이벤트만 canonical 원장에 추가하고 review/ledger 양쪽에서 연결한다.
-4. `npm run validate:us-smallcap-event-data:<배치>`로 종목 수, 제출 수, event parity, CIK/accession, 검토 상태 수, 공식 amendment 관계를 확인한다.
-5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다.
+4. `npm run validate:us-smallcap-event-data:<배치>`로 종목 수, 제출 수, event parity, CIK/accession, 검토 상태 수, 공식 amendment 관계를 확인한다. 동일 날짜 복수 배치는 `YYYYMMDDbNN` 이름의 명령으로 각각 독립 검증한다.
+5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 순번 파일도 문서 카탈로그에서 누락되지 않는지 확인한다. 현재 카탈로그는 날짜 형식 파일명을 자동 제외하므로 배치 보고서는 파일명 필터와 본문 기반 탐색 중 어느 경로로 관리되는지 점검하고, 실사용 인덱스에서 도달 가능하게 유지한다.
 6. 배포 전에는 project deployment verification이 요구하는 build, full test, runtime smoke 및 audits를 통과시킨다. 커밋과 푸시는 순차 실행하고, 운영 배포 후 public GET으로 배치 이벤트를 재확인한다.
 
 ## 정확성·한계

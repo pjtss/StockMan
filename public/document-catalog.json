@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 124,
+  "documentCount": 126,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1006,6 +1006,36 @@
       "url": "/manuals/operations/us-smallcap-event-data-contract.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/us-smallcap-event-data-contract.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261031",
+      "title": "미국 보통주 공시·뉴스 기반 이벤트 검토 — 2026-10-31 기준",
+      "category": "operations",
+      "format": "md",
+      "description": "일정은 촉매 근거이지 주가 방향 예측이 아니다. FCHL 병합안은 제안·조건부이며 병합 자체의 기계적 가격조정과 실제 수익을 구분해야 한다. SGRX의 장비 인도·설치·상업운영은 서로 다른 마일스톤이다. XAIR 실적의 결과는 발표 전 공개 일정만으로 알 수 없다.",
+      "url": "/manuals/operations/us-smallcap-event-review-20261031.md",
+      "relatedPaths": [
+        "docs/operations/us-smallcap-event-data-contract.md"
+      ],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261031.md",
+      "related": [
+        {
+          "title": "미국 소형주 이벤트 자료 관리 기준",
+          "url": "/manuals/operations/us-smallcap-event-data-contract.md",
+          "sourcePath": "docs/operations/us-smallcap-event-data-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261104",
+      "title": "미국 보통주 공시·뉴스 기반 이벤트 검토 — 2026-11-04 배치",
+      "category": "operations",
+      "format": "md",
+      "description": "CMND, LRHC, DRCT, VBIO, NIVF, HCAI, DKI, NXGL, RMSG, OFAL, NCI, BRTX, FEBO, RIME, BOXL, LCFY, CAPS, SLXN, ELAB, CETX, EPSM, EHGO, PRFX, HTCR, ADGM, GP, REVB, POLA, SUGP, APVO, HCWB, AKAN, BJDX, UONE, CHR, TRNR, DCOY, XELB, VIVS, DAIC, BGLC, MBIO, JUNS, WBUY, IVDA, AIDX, ENLV, SCKT, UFG, CHSN, DCX, CTNT, FLYE, CDTG, MKZR, CGTL, JTAI, RDGT, ONCO, PAVS, TNMG, I",
+      "url": "/manuals/operations/us-smallcap-event-review-20261104.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261104.md",
       "related": []
     },
     {

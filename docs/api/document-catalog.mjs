@@ -72,7 +72,8 @@ async function walk(directory) {
     }
     if (!entry.isFile() || !allowedExtensions.has(extname(entry.name).toLowerCase())) continue;
     if (excludedFiles.has(entry.name) || entry.name.toLowerCase().includes("template")) continue;
-    if (entry.name.match(/(?:^|\D)20\d{2}[-_]?(?:0[1-9]|1[0-2])[-_]?(?:0[1-9]|[12]\d|3[01])(?:\D|$)/) && !/runbook|design|standard|schema|template/i.test(entry.name)) continue;
+    const managedEventReview = relativePath.startsWith("operations/us-smallcap-event-review-");
+    if (entry.name.match(/(?:^|\D)20\d{2}[-_]?(?:0[1-9]|1[0-2])[-_]?(?:0[1-9]|[12]\d|3[01])(?:\D|$)/) && !managedEventReview && !/runbook|design|standard|schema|template/i.test(entry.name)) continue;
     if (extname(entry.name).toLowerCase() === ".json" && !/(?:schema|template|route-inventory)/i.test(entry.name)) continue;
     const details = await stat(fullPath);
     if (details.size > 300_000) continue;
