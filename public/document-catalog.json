@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 127,
+  "documentCount": 128,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1036,6 +1036,17 @@
       "url": "/manuals/operations/us-smallcap-event-review-20261104-b03.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b03.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261104-b04",
+      "title": "미국 보통주 공시·뉴스 기반 이벤트 검토 — 2026-11-04 배치 4",
+      "category": "operations",
+      "format": "md",
+      "description": "각 종목의 operating snapshot, 분류, 뉴스 및 이벤트는 $1에 저장했다. 4,334건의 SEC 제출과 accession별 검토상태는 $1에 있다. 정규 이벤트는 $1에 eventId로 연결한다. 배치 간 ticker 중복을 제외하고 각 이벤트의 accession이 해당 issuer 제출원장에 있는지 검사한다.",
+      "url": "/manuals/operations/us-smallcap-event-review-20261104-b04.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b04.md",
       "related": []
     },
     {

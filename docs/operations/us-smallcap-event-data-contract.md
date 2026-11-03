@@ -37,7 +37,7 @@
 2. official SEC ticker/CIK 및 submissions를 대조하고, accession별 본문 확인 여부를 기록한다.
 3. 근거를 확인한 이벤트만 canonical 원장에 추가하고 review/ledger 양쪽에서 연결한다.
 4. `npm run validate:us-smallcap-event-data:<배치>`로 active COMMON_STOCK 상태, USD 시총 범위, 운영·SEC master CIK 일치, 종목 수, 제출 수, event parity, accession, 검토 상태 수, 공식 amendment 관계를 확인한다. 동일 날짜 복수 배치는 `YYYYMMDDbNN` 이름의 명령으로 각각 독립 검증한다.
-5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 순번 파일도 문서 카탈로그에서 누락되지 않는지 확인한다. 현재 카탈로그는 날짜 형식 파일명을 자동 제외하므로 배치 보고서는 파일명 필터와 본문 기반 탐색 중 어느 경로로 관리되는지 점검하고, 실사용 인덱스에서 도달 가능하게 유지한다.
+5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. validator는 배치 ID·100 issuer·검토 event 수와 정규 이벤트/issuer/accession 간 관계를 검사한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 순번 보고서는 문서 카탈로그 생성기 허용 패턴에 포함하고 catalog check 후 공개 manual 경로에서 도달할 수 있는지 확인한다.
 6. 배포 전에는 project deployment verification이 요구하는 build, full test, runtime smoke 및 audits를 통과시킨다. 커밋과 푸시는 순차 실행하고, 운영 배포 후 public GET으로 배치 이벤트를 재확인한다.
 
 ## 정확성·한계

@@ -6,6 +6,7 @@ const paths = {
   review: arg("review", "data/us-smallcap-event-review-20261031.json"),
   ledger: arg("ledger", "data/us-smallcap-filing-review-ledger-20261031.json"),
 };
+const expectedBatch = arg("batch", null);
 
 function readJson(path) {
   const text = fs.readFileSync(path, "utf8");
@@ -27,6 +28,20 @@ function sameList(a = [], b = []) {
 const eventsDocument = readJson(paths.events);
 const review = readJson(paths.review);
 const ledger = readJson(paths.ledger);
+if (expectedBatch) {
+  assert(review.batchId === expectedBatch && ledger.batchId === expectedBatch,
+    `Batch ID mismatch: expected ${expectedBatch}, got ${review.batchId}/${ledger.batchId}`);
+  const expectedPrefix = `batch_${expectedBatch.replace(/-/g, "_")}`;
+  const reviewedAccessionCount = ledger.issuers.reduce((sum, issuer) => sum + issuer.filings.filter((filing) => filing.reviewBatch === expectedPrefix && filing.reviewStatus !== "INVENTORY_ONLY").length, 0);
+  assert(reviewedAccessionCount === review.reviewedEvents.length,
+    `Reviewed accession count does not match event records: ${reviewedAccessionCount}/${review.reviewedEvents.length}`);
+  assert(review.reviewWindow?.batchId === expectedBatch && ledger.reviewWindow?.batchId === expectedBatch,
+    `Review window batch ID mismatch: expected ${expectedBatch}`);
+  assert(review.universe.issuerCount === 100 && ledger.issuerCount === 100,
+    `Expected 100 issuers for ${expectedBatch}`);
+  const eventAccessionCount = review.reviewedEvents.filter(row => row.sourceReviewStatus === "TARGETED_SECTION_REVIEW").length;
+  assert(eventAccessionCount === review.reviewedEvents.length, `Batch has non-primary reviewed events: ${eventAccessionCount}/${review.reviewedEvents.length}`);
+}
 const allCanonicalEvents = eventsDocument.markets?.US;
 assert(Array.isArray(allCanonicalEvents), "market-impact-events.json must contain markets.US[]");
 const reviewEventIds = new Set((review.reviewedEvents || []).map((row) => row.eventId));

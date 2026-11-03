@@ -10673,6 +10673,798 @@
           "실제 이사회 결정·비율·주식수·효력·거래 일정은 미확인."
         ],
         "relatedSourceUrls": []
+      },
+      {
+        "ticker": "KUST",
+        "eventId": "SEC:0001493152-26-045762:SPLIT_COMPLETED",
+        "companyName": "KUSTOM ENTERTAINMENT, INC.",
+        "eventDate": "2026-10-01",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "1대10 역분할 효력 및 Nasdaq 조정 거래 개시",
+        "summary": "회사는 2026-10-01 효력 발생 및 거래 개시를 공지했다. 발행주식 6,506,860주에서 650,686주로 감소(회사 공시 수치). 역분할의 기계적 가격 조정은 투자수익률과 다르다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-045762",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1342958/000149315226045762/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-10-01 효력 발생 및 거래 개시를 공지했다. 발행주식 6,506,860주에서 650,686주로 감소(회사 공시 수치). 역분할의 기계적 가격 조정은 투자수익률과 다르다.",
+            "locator": "SEC 8-K filed 2026-10-05; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1342958/000149315226045762/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "KUST",
+        "eventId": "SEC:0001493152-26-048183:AUTHORIZED_SHARES_INCREASE",
+        "companyName": "KUSTOM ENTERTAINMENT, INC.",
+        "eventDate": "2026-10-22",
+        "eventType": "AUTHORIZED_SHARES",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "정관상 수권주식 13,333,333주에서 12억주로 변경",
+        "summary": "정관 변경으로 수권 한도가 증가했다. 이는 실제 발행주식 또는 즉각적 희석을 뜻하지 않는다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-048183",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1342958/000149315226048183/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "정관 변경으로 수권 한도가 증가했다. 이는 실제 발행주식 또는 즉각적 희석을 뜻하지 않는다.",
+            "locator": "SEC 8-K filed 2026-10-23; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1342958/000149315226048183/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "DLXY",
+        "eventId": "SEC:0001213900-26-101140:SPLIT_AND_BID_COMPLIANCE",
+        "companyName": "Delixy Holdings Ltd",
+        "eventDate": "2026-09-28",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "1대5 역분할 및 Nasdaq $1 최소호가 회복 통지",
+        "summary": "회사는 2026-09-28 1대5 역분할과 2026-09-29 Nasdaq 최소호가 요건 회복 통지를 공시했다. split 기계조정과 실제 수익률은 구분한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-101140",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2025218/000121390026101140/ea0305947-6k_delixy.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-09-28 1대5 역분할과 2026-09-29 Nasdaq 최소호가 요건 회복 통지를 공시했다. split 기계조정과 실제 수익률은 구분한다.",
+            "locator": "SEC 6-K filed 2026-09-18; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2025218/000121390026101140/ea0305947-6k_delixy.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "GAUZ",
+        "eventId": "SEC:0001213900-26-105914:SPLIT_COMPLETED",
+        "companyName": "Gauzy Ltd.",
+        "eventDate": "2026-09-11",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "1대20 역분할 조정 거래 개시",
+        "summary": "효력은 2026-09-10 11:59 p.m. ET, 조정 거래는 09-11 개시. 발행·유통주식 합계 공시치 22,862,718주에서 1,143,135주.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-105914",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1781446/000121390026105914/ea0307425-6k_gauzy.htm",
+        "evidence": [
+          {
+            "quote": "효력은 2026-09-10 11:59 p.m. ET, 조정 거래는 09-11 개시. 발행·유통주식 합계 공시치 22,862,718주에서 1,143,135주.",
+            "locator": "SEC 6-K filed 2026-10-01; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1781446/000121390026105914/ea0307425-6k_gauzy.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "GAUZ",
+        "eventId": "SEC:0001213900-26-101847:NASDAQ_DELISTING_APPEAL",
+        "companyName": "Gauzy Ltd.",
+        "eventDate": "2026-09-15",
+        "eventType": "LISTING_RISK",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 상장폐지 결정 및 회사의 구두심리 항소 계획",
+        "summary": "Nasdaq 결정은 보고됐고 회사는 항소 계획을 밝혔다. 항소 기간 중 정지·상장폐지 유예가 적용된다고 공시했으며 최종 결과는 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-101847",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1781446/000121390026101847/ea0305898-6k_gauzy.htm",
+        "evidence": [
+          {
+            "quote": "Nasdaq 결정은 보고됐고 회사는 항소 계획을 밝혔다. 항소 기간 중 정지·상장폐지 유예가 적용된다고 공시했으며 최종 결과는 미확정.",
+            "locator": "SEC 6-K filed 2026-09-21; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1781446/000121390026101847/ea0305898-6k_gauzy.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "CYN",
+        "eventId": "SEC:0001213900-26-109853:BID_PRICE_DEADLINE",
+        "companyName": "Cyngn Inc.",
+        "eventDate": "2027-04-12",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq $1 최소호가 회복 기한",
+        "summary": "회사가 공시한 회복 기한은 2027-04-12이며 10영업일 연속 $1 이상 종가 조건이다. 달성 여부는 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-109853",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1874097/000121390026109853/ea0308739-8k_cyngn.htm",
+        "evidence": [
+          {
+            "quote": "회사가 공시한 회복 기한은 2027-04-12이며 10영업일 연속 $1 이상 종가 조건이다. 달성 여부는 미확정.",
+            "locator": "SEC 8-K filed 2026-10-15; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1874097/000121390026109853/ea0308739-8k_cyngn.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "CYN",
+        "eventId": "SEC:0001213900-26-114511:BOARD_REMEDIATION_DEADLINE",
+        "companyName": "Cyngn Inc.",
+        "eventDate": "2027-11-03",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 이사회 독립성 개선 기한",
+        "summary": "개선 기한은 다음 정기주총일과 2027-11-03 중 빠른 날이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-114511",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1874097/000121390026114511/ea0309903-8k_cyngn.htm",
+        "evidence": [
+          {
+            "quote": "개선 기한은 다음 정기주총일과 2027-11-03 중 빠른 날이다.",
+            "locator": "SEC 8-K filed 2026-10-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1874097/000121390026114511/ea0309903-8k_cyngn.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "ARAI",
+        "eventId": "SEC:0001493152-26-049616:REVERSE_SPLIT_AUTHORITY",
+        "companyName": "Arrive AI Inc.",
+        "eventDate": "2026-11-02",
+        "eventType": "REVERSE_SPLIT_PLAN",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "재편 조건부 1대10~1대65 역분할 권한",
+        "summary": "정관 개정으로 권한을 승인했으나 redomestication 조건과 이사회 결정이 남아 실제 비율·효력일은 정해지지 않았다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049616",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1818274/000149315226049616/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "정관 개정으로 권한을 승인했으나 redomestication 조건과 이사회 결정이 남아 실제 비율·효력일은 정해지지 않았다.",
+            "locator": "SEC 8-K filed 2026-11-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1818274/000149315226049616/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "ARAI",
+        "eventId": "SEC:0001493152-26-027491:BID_PRICE_DEADLINE",
+        "companyName": "Arrive AI Inc.",
+        "eventDate": "2026-11-30",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq $1 최소호가 회복 기한",
+        "summary": "180일 회복기간이 2026-11-30 종료하며 $1 이상 10영업일 연속 종가 요건을 공시했다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-027491",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1818274/000149315226027491/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "180일 회복기간이 2026-11-30 종료하며 $1 이상 10영업일 연속 종가 요건을 공시했다.",
+            "locator": "SEC 8-K filed 2026-06-05; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1818274/000149315226027491/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "ARAI",
+        "eventId": "SEC:0001493152-26-034582:MVPS_DEADLINE",
+        "companyName": "Arrive AI Inc.",
+        "eventDate": "2027-01-19",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 최소 시가총액 요건 회복 기한",
+        "summary": "회사 공시에 제시된 $15m MVPS 회복 기한은 2027-01-19. 달성 여부는 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-034582",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1818274/000149315226034582/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "회사 공시에 제시된 $15m MVPS 회복 기한은 2027-01-19. 달성 여부는 미확정.",
+            "locator": "SEC 8-K filed 2026-07-24; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1818274/000149315226034582/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "XCUR",
+        "eventId": "SEC:0001193125-26-392654:EQUITY_EXTENSION",
+        "companyName": "EXICURE, INC.",
+        "eventDate": "2026-12-05",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 주주자본 요건 연장 기간 종료일",
+        "summary": "Nasdaq이 2026-12-05까지 연장했다고 공시했다. 이후 준수 여부 또는 추가 조치는 이 자료에서 확인되지 않는다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-392654",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1698530/000119312526392654/xcur-20260916.htm",
+        "evidence": [
+          {
+            "quote": "Nasdaq이 2026-12-05까지 연장했다고 공시했다. 이후 준수 여부 또는 추가 조치는 이 자료에서 확인되지 않는다.",
+            "locator": "SEC 8-K filed 2026-09-16; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1698530/000119312526392654/xcur-20260916.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "XCUR",
+        "eventId": "SEC:0001193125-26-443911:SHAREHOLDER_MEETING_AND_AUTHORITY",
+        "companyName": "EXICURE, INC.",
+        "eventDate": "2026-12-02",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "가상 임시주총 및 수권주식·20% 초과 발행 안건",
+        "summary": "2026-12-02 오후 5시 CT 주총 소집과 수권주식 2억→4억, 20% 초과 발행 관련 안건을 공시했다. 승인·발행은 확정되지 않았다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-443911",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1698530/000119312526443911/d142601dpre14a.htm",
+        "evidence": [
+          {
+            "quote": "2026-12-02 오후 5시 CT 주총 소집과 수권주식 2억→4억, 20% 초과 발행 관련 안건을 공시했다. 승인·발행은 확정되지 않았다.",
+            "locator": "SEC PRE 14A filed 2026-11-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1698530/000119312526443911/d142601dpre14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "WCT",
+        "eventId": "SEC:0001213900-26-097242:SPLIT_COMPLETED",
+        "companyName": "Wellchange Holdings Co Ltd",
+        "eventDate": "2026-09-08",
+        "eventType": "REVERSE_SPLIT",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Class A 보통주 1대5 역분할 및 조정 거래",
+        "summary": "2026-09-08 조정 거래 개시. 발행주식 52,905,328주에서 약 10,581,066주로 공시.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-097242",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1990251/000121390026097242/ea0304616-6k_wellchange.htm",
+        "evidence": [
+          {
+            "quote": "2026-09-08 조정 거래 개시. 발행주식 52,905,328주에서 약 10,581,066주로 공시.",
+            "locator": "SEC 6-K filed 2026-09-03; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1990251/000121390026097242/ea0304616-6k_wellchange.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "WCT",
+        "eventId": "SEC:0001213900-26-033198:BID_COMPLIANCE_RECOVERED",
+        "companyName": "Wellchange Holdings Co Ltd",
+        "eventDate": "2026-03-20",
+        "eventType": "LISTING_COMPLIANCE",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq $1 최소호가 회복 및 사안 종결",
+        "summary": "회사는 2026-03-06~19 동안 $1 이상 종가를 기록해 요건을 회복했고 Nasdaq 사안 종결을 통지했다고 공시했다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-033198",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1990251/000121390026033198/ea0282970-6k_wellchange.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-03-06~19 동안 $1 이상 종가를 기록해 요건을 회복했고 Nasdaq 사안 종결을 통지했다고 공시했다.",
+            "locator": "SEC 6-K filed 2026-03-24; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1990251/000121390026033198/ea0282970-6k_wellchange.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "RCT",
+        "eventId": "SEC:0001493152-26-047176:NASDAQ_DELISTING_APPEAL",
+        "companyName": "RedCloud Holdings plc",
+        "eventDate": "2026-10-14",
+        "eventType": "LISTING_RISK",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 상장폐지 결정 및 항소에 따른 유예",
+        "summary": "회사는 상장폐지 결정에 항소했고 심리 전 거래 정지/상장폐지 효력은 유예된다고 공시했다. 자기자본 부족으로 추가 최소호가 기간이 없다는 설명 포함. 최종 결과 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-047176",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2027360/000149315226047176/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 상장폐지 결정에 항소했고 심리 전 거래 정지/상장폐지 효력은 유예된다고 공시했다. 자기자본 부족으로 추가 최소호가 기간이 없다는 설명 포함. 최종 결과 미확정.",
+            "locator": "SEC 6-K filed 2026-10-15; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2027360/000149315226047176/form6-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "RCT",
+        "eventId": "SEC:0001493152-26-049426:REVERSE_SPLIT_AUTHORITY",
+        "companyName": "RedCloud Holdings plc",
+        "eventDate": "2026-11-02",
+        "eventType": "REVERSE_SPLIT_PLAN",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "주주 승인 역분할 권한 상한을 100대1로 확대",
+        "summary": "주주가 정관상 역분할 권한을 기존 20대1에서 최대 100대1로 변경하는 안을 승인했다. 실제 비율·이사회 실행일은 정해지지 않았다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049426",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2027360/000149315226049426/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "주주가 정관상 역분할 권한을 기존 20대1에서 최대 100대1로 변경하는 안을 승인했다. 실제 비율·이사회 실행일은 정해지지 않았다.",
+            "locator": "SEC 6-K filed 2026-10-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2027360/000149315226049426/form6-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "EVGN",
+        "eventId": "SEC:0001178913-26-004654:BID_PRICE_EXTENSION",
+        "companyName": "Evogene Ltd.",
+        "eventDate": "2027-03-29",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 최소호가 추가 180일 기간 종료",
+        "summary": "회사는 추가 회복 기간이 2027-03-29까지라고 공시했다. 준수 달성은 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001178913-26-004654",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1574565/000117891326004654/zk2636176.htm",
+        "evidence": [
+          {
+            "quote": "회사는 추가 회복 기간이 2027-03-29까지라고 공시했다. 준수 달성은 미확정.",
+            "locator": "SEC 6-K filed 2026-09-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1574565/000117891326004654/zk2636176.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "EVGN",
+        "eventId": "SEC:0001178913-26-004722:SPECIAL_MEETING",
+        "companyName": "Evogene Ltd.",
+        "eventDate": "2026-11-10",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "주주 특별회의 및 협력계약 관련 안건",
+        "summary": "2026-11-10 이스라엘 현지 오후 1시 회의로 공지됐다. 제안 내용의 승인 결과는 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001178913-26-004722",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1574565/000117891326004722/zk2636203.htm",
+        "evidence": [
+          {
+            "quote": "2026-11-10 이스라엘 현지 오후 1시 회의로 공지됐다. 제안 내용의 승인 결과는 미확정.",
+            "locator": "SEC 6-K filed 2026-10-06; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1574565/000117891326004722/zk2636203.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "INM",
+        "eventId": "SEC:0001213900-26-101492:EQUITY_DEFICIENCY_PLAN",
+        "companyName": "InMed Pharmaceuticals Inc.",
+        "eventDate": "2026-11-02",
+        "eventType": "LISTING_RISK",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 주주자본 부족 통지 및 개선계획 제출",
+        "summary": "회사는 자본 $1,075,007, 기준 $2.5m을 공시했다. 계획 제출기한은 11-02이며 수락 시 최대 180일 개선 기간 가능하나 수락은 확인되지 않았다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-101492",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1728328/000121390026101492/ea0305769-8k_inmed.htm",
+        "evidence": [
+          {
+            "quote": "회사는 자본 $1,075,007, 기준 $2.5m을 공시했다. 계획 제출기한은 11-02이며 수락 시 최대 180일 개선 기간 가능하나 수락은 확인되지 않았다.",
+            "locator": "SEC 8-K filed 2026-09-18; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1728328/000121390026101492/ea0305769-8k_inmed.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "INM",
+        "eventId": "SEC:0001193125-26-436382:CVR_RECORD_DATE",
+        "companyName": "InMed Pharmaceuticals Inc.",
+        "eventDate": "2026-11-05",
+        "eventType": "CORPORATE_ACTION",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "합병 조건부 CVR 기준일",
+        "summary": "CVR 기준일은 2026-11-05로 공시됐다. CVR 발행은 합병 종결 조건이며 종결일은 확정되지 않았다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-436382",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1728328/000119312526436382/d142102d424b3.htm",
+        "evidence": [
+          {
+            "quote": "CVR 기준일은 2026-11-05로 공시됐다. CVR 발행은 합병 종결 조건이며 종결일은 확정되지 않았다.",
+            "locator": "SEC 424B3 filed 2026-10-28; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1728328/000119312526436382/d142102d424b3.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "PBK",
+        "eventId": "SEC:0001493152-26-049458:SHAREHOLDER_SPLIT_AUTHORITY",
+        "companyName": "POWERBANK Corp",
+        "eventDate": "2026-10-29",
+        "eventType": "REVERSE_SPLIT_PLAN",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "주주가 1대10~1대30 주식 병합 권한 승인",
+        "summary": "주주가 2027-10-29 이전 이사회가 결정할 병합 권한을 승인했으며 실제 시행·비율은 정하지 않았다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049458",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2011053/000149315226049458/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "주주가 2027-10-29 이전 이사회가 결정할 병합 권한을 승인했으며 실제 시행·비율은 정하지 않았다.",
+            "locator": "SEC 6-K filed 2026-10-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2011053/000149315226049458/form6-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "TCRT",
+        "eventId": "SEC:0001193125-26-427890:ACQUISITION_COMPLETED",
+        "companyName": "Alaunos Therapeutics, Inc.",
+        "eventDate": "2026-10-13",
+        "eventType": "ACQUISITION",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Velaris 인수 종결 및 관련 자금조달",
+        "summary": "회사는 2026-10-13 인수 종결을 공시했다. 계약·자금조달 세부와 향후 사업 기여는 원문 범위 내에서만 확인 가능하며 성과는 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-427890",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1107421/000119312526427890/tcrt-20261021.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-10-13 인수 종결을 공시했다. 계약·자금조달 세부와 향후 사업 기여는 원문 범위 내에서만 확인 가능하며 성과는 미확정.",
+            "locator": "SEC 8-K filed 2026-10-21; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1107421/000119312526427890/tcrt-20261021.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "TCRT",
+        "eventId": "SEC:0001193125-26-397996:REGISTERED_DIRECT_OFFERING_CLOSED",
+        "companyName": "Alaunos Therapeutics, Inc.",
+        "eventDate": "2026-09-21",
+        "eventType": "FINANCING",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "등록 직접공모 종결 및 순유입 $915,400.50",
+        "summary": "회사가 공시한 순 proceeds는 $915,400.50. 자금 유입과 기존 주주 희석 위험을 함께 고려해야 한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-397996",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1107421/000119312526397996/tcrt-20260918.htm",
+        "evidence": [
+          {
+            "quote": "회사가 공시한 순 proceeds는 $915,400.50. 자금 유입과 기존 주주 희석 위험을 함께 고려해야 한다.",
+            "locator": "SEC 8-K filed 2026-09-22; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1107421/000119312526397996/tcrt-20260918.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "MGRX",
+        "eventId": "SEC:0001493152-26-046510:OFFERING_REPORTED",
+        "companyName": "MANGOCEUTICALS, INC.",
+        "eventDate": "2026-10-09",
+        "eventType": "FINANCING",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "보통주 657,000주와 warrant 657,000개 공모",
+        "summary": "주당 결합가격 $0.75, 총액 $492,750, 예상 종결일 10-09를 최초 공시했다. 본 자료에서 별도 종결 확인 공시는 찾지 못해 종결 상태는 보고로 유지.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-046510",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1938046/000149315226046510/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "주당 결합가격 $0.75, 총액 $492,750, 예상 종결일 10-09를 최초 공시했다. 본 자료에서 별도 종결 확인 공시는 찾지 못해 종결 상태는 보고로 유지.",
+            "locator": "SEC 8-K filed 2026-10-09; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1938046/000149315226046510/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
       }
     ]
   }

@@ -8253,3 +8253,33 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 남은 위험 및 다음 개선
 - 시총 snapshot이 stale이고 SEC 전문 전수 검토가 아니다. 임상 후속 분석의 독립 재현, issuer 후속공시/회의 결과, reverse split 주식수 및 효력 일정은 추가 공시가 있을 때 갱신한다.
 - 다음 배치는 동일 절차로 신규 100종목을 운영 마스터에서 다시 선정하고 이전 batch ticker를 제외한다.
+## [2026-11-04] 미국 소형주 이벤트 원장 4차 100종목 배치 작성 및 문서 자동 검증 강화
+
+### 목표
+- 운영 서버 read-only 공개 GET 및 SEC 공식 자료로 이전 300개와 중복되지 않는 미국 active COMMON_STOCK 100종목을 조사하고, 종목·공시별 추적 구조에 다음 배치를 추가한다.
+- 2025-11-04~2026-11-05 SEC 제출 4,334건을 inventory로 기록하고, 원문에서 근거를 확인한 24개 이벤트만 정규 원장에 반영한다. 시총 snapshot은 2026-11-02 관측 stale임을 유지한다.
+
+### 반영
+- 종목 review JSON, 4,334 accession ledger, 24 event record와 보고서를 추가했다. 운영 뉴스 449건, bullish 분류 67건은 원본 출처와 함께 보존했으며 bullish 결과만으로 canonical 이벤트를 만들지 않았다.
+- 배치 ID/100 issuer/primary reviewed event를 자동 검사하도록 validator를 강화하고 `docs:check`에 b04 명령을 연결했다. 자료 계약 문서에 batch 검증과 catalog 도달성 절차를 고정했다. 날짜 배치 보고서는 카탈로그 생성기에서 허용되어 public manuals 인덱스에 포함됐다.
+- generator는 accession이 같은 종목의 1년 submissions inventory에 있는지 강제하고 canonical eventId 중복을 방지한다. 중복 실행으로 중복 행이 생긴 기존 b03/b02 canonical entries도 eventId 기준 한 건만 유지했다.
+- 변경 파일: `data/market-impact-events.json`, b04 review/ledger JSON, b04 report, `scripts/generate-us-smallcap-b04.mjs`, `scripts/validate-us-smallcap-event-data.mjs`, `docs/operations/us-smallcap-event-data-contract.md`, `package.json`, `public/document-catalog.json`, `DEVELOPMENT_LOG.md`.
+
+### 검증
+- 운영 metadata/market-intelligence GET 100/100 성공; operating ticker/CIK와 공식 SEC ticker master CIK 100/100 대조. SEC submissions 4,334건 수집; 대상 원문 응답 447/447 성공 후 사건 근거 accession 24건을 선별해 연결했다.
+- `npm run validate:us-smallcap-event-data:20261104b04` 통과: issuer 100, batch events 24, accession-event relations 24, filing counts 4,310 INVENTORY_ONLY/24 TARGETED_SECTION_REVIEW.
+- `npm run docs:check` 통과: 4개 배치 validator, 178 API route/42 public GET audit, 문서 카탈로그 128개/7개 category, 문서와 migration audit.
+- build/full test/runtime smoke/deploy verification은 아직 미실행. `git diff --check`, commit/push, 배포 및 운영 검증도 미실행.
+
+### 다음 개선
+- 남은 위험: 시총 값은 stale; 4,310 filing은 전문 미검토; 회사 exhibit의 모든 세부조건 및 후속 공시는 전수 추적하지 않았다. 일부 event summary는 primary filing의 statement를 압축했으며 보고서에서 확정 실행과 계획·항소를 구분했다.
+- 자동 감지: docs:check에 batch ID, ticker/CIK, common-stock flags, cap bounds, event parity, accession ownership, filing counts, relation reciprocity 검사 포함. report 카탈로그 포함은 docs:catalog:check로 검증한다.
+- 다음 단계: deploy:verify 통과 후 순차 commit/push하고 운영 health, canonical event IDs, catalog/manual GET을 대조한다. 이어 다음 중복 없는 100종목 batch를 같은 구조로 처리한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-002
+- 성과 판정: IMPROVED
+- 근거: 기존 자동화는 b04를 docs:check에서 실행하지 않았고 배치 ID/100종목 제한을 검사하지 않았다. 이제 개별 배치 validator가 docs gate에서 실행되며 문서 카탈로그의 보고서 도달성까지 자동 검증한다.
+
+### 커밋·푸시·배포
+- 아직 미실행. 프로젝트 규칙에 따라 전체 build·test·runtime 검증 통과 이후 진행한다.
