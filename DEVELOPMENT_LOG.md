@@ -8173,7 +8173,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증 및 상태
 - 변경 대상: `components/sec-company-facts-lookup.tsx`, 대응 CSS 및 component test, `docs/official/sec-edgar/companyfacts.md`, 본 로그.
-- component regression test 1개 통과. 본 로그에 검증 결과를 반영한 뒤 실행한 최종 `npm.cmd run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone/OpenAPI/browser desktop·mobile smoke, 전체 Vitest 301파일(300 passed·1 skipped; 1,542 passed·3 skipped), TypeScript, docs/migrations(V165), API surface(178 route/42 public GET), verify-scope/KIS/Bearer/OCI cron 감사. `git diff --check`를 추가 확인한 뒤 상세 한국어 커밋·푸시·배포를 진행한다.
+- component regression test 1개 통과. 최신 원격 변경을 포함한 최종 `npm.cmd run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone/OpenAPI/browser desktop·mobile smoke, 전체 Vitest 301파일(300 passed·1 skipped; 1,542 passed·3 skipped), TypeScript, docs/migrations(V165), API surface(178 route/42 public GET), verify-scope/KIS/Bearer/OCI cron 감사. `git diff --check`도 통과했다.
+- 커밋 `556c3786`를 `oci`에 푸시했다. OCI Actions run `41667923189` 성공. 운영 `/other`와 해당 JS bundle은 HTTP 200이며, bundle에서 새 기본정보 API 링크와 회사 매핑 표시 문자열을 확인했다. 공개 API 매뉴얼 GET과 health도 HTTP 200이다.
 - 남은 위험: 운영 데이터 갱신을 위한 POST는 SEC upstream 요청과 DB 쓰기를 수행한다. 이 변경은 해당 POST를 자동 실행하지 않고 수동 갱신 성공 뒤 사용자가 선택하는 읽기 전용 GET 링크만 제공한다.
 
 \n
