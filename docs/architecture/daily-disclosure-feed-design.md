@@ -104,7 +104,8 @@ type DailyDisclosureItem = {
 - **영향 범위**: 일별 공시 화면의 전체 링크 복사 및 미국 RSS 링크 복사. 조회·저장 API는 변경하지 않는다.
 - **운영 근거**: 운영 `/api/disclosures?hours=24&source=STOCKTITAN` read-only 조회에서 866건을 받았고 첫 항목은 `source=STOCKTITAN`, `link=https://...`를 포함하며 `url` 필드는 없었다.
 - **검증 결과**: 화면 회귀 테스트 1파일 4개 통과. `npm run deploy:verify` 통과: 전체 테스트 299파일 통과·1파일 제외, 1,541개 통과·3개 제외; 타입검사, 문서/API/인증/KIS/cron 감사, production build, standalone `/charts`·API smoke, Chrome 데스크톱·모바일 hydration 검증 통과.
-- **배포**: 검증된 변경을 `oci`에 push해 GitHub Actions `Deploy OCI`로 반영한다. 배포 run 및 운영 링크 복사 기능 재확인 결과를 별도 작업 기록에 남긴다.
+- **배포/운영 확인**: 커밋 `3e4ced86a143569a4e7a33a20f836b35ccce9384`를 `oci`에 push했다. GitHub Actions `Deploy OCI` run `41558892724` 성공. 배포 후 `/api/health`는 `ok`, `/disclosures`는 HTTP 200을 반환했다. 운영 StockTitan 조회에서 866건 모두 `link`가 있고 `url`은 0건임을 재확인했으며, 배포된 JavaScript에서도 `link` 매핑과 링크 건수 안내를 확인했다.
+- **커밋/푸시/배포**: 코드 수정과 문서화까지 완료했다. 후속 문서 기록 커밋도 배포 전에 전체 검증한다.
 - **남은 위험**: API 응답에 빈 `link`가 있는 개별 항목은 복사하지 않는다.
 
 ### 2026-11-03 링크만 복사 배포
