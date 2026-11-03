@@ -1,9 +1,10 @@
 import fs from "node:fs";
 
+const arg = (name, fallback) => process.argv.find((value) => value.startsWith(`--${name}=`))?.slice(name.length + 3) || fallback;
 const paths = {
-  events: "data/market-impact-events.json",
-  review: "data/us-smallcap-event-review-20261031.json",
-  ledger: "data/us-smallcap-filing-review-ledger-20261031.json",
+  events: arg("events", "data/market-impact-events.json"),
+  review: arg("review", "data/us-smallcap-event-review-20261031.json"),
+  ledger: arg("ledger", "data/us-smallcap-filing-review-ledger-20261031.json"),
 };
 
 function readJson(path) {
@@ -26,8 +27,10 @@ function sameList(a = [], b = []) {
 const eventsDocument = readJson(paths.events);
 const review = readJson(paths.review);
 const ledger = readJson(paths.ledger);
-const canonicalEvents = eventsDocument.markets?.US;
-assert(Array.isArray(canonicalEvents), "market-impact-events.json must contain markets.US[]");
+const allCanonicalEvents = eventsDocument.markets?.US;
+assert(Array.isArray(allCanonicalEvents), "market-impact-events.json must contain markets.US[]");
+const reviewEventIds = new Set((review.reviewedEvents || []).map((row) => row.eventId));
+const canonicalEvents = allCanonicalEvents.filter((event) => reviewEventIds.has(event.eventId));
 const allowed = {
   status: new Set(["REPORTED", "CONFIRMED_SCHEDULED", "ESTIMATED", "COMPLETED", "CANCELLED"]),
   direction: new Set(["POSITIVE", "NEGATIVE", "MIXED", "UNCERTAIN"]),
@@ -175,7 +178,7 @@ for (const [ticker, issuer] of ledgerIssuerByTicker) {
     statusCounts[filing.reviewStatus] = (statusCounts[filing.reviewStatus] || 0) + 1;
 
     for (const eventId of sorted(filing.eventIds)) {
-      assert(eventById.has(eventId), `Filing points to missing canonical event: ${ticker}/${accession}/${eventId}`);
+      assert(reviewEventIds.has(eventId) && eventById.has(eventId), `Filing points to missing batch canonical event: ${ticker}/${accession}/${eventId}`);
       expectedLinks.push(`${ticker}|${accession}|${eventId}`);
     }
   }
@@ -226,6 +229,8 @@ for (const event of canonicalEvents) {
 console.log(JSON.stringify({
   status: "OK",
   issuerCount: ledgerIssuerByTicker.size,
+  canonicalUsEventCount: allCanonicalEvents.length,
+  batchUsEventCount: canonicalEvents.length,
   submissionCount: ledger.submissionCount,
   usEventCount: canonicalEvents.length,
   accessionEventRelations: expectedLinks.length,
