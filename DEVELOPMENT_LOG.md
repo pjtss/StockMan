@@ -8140,4 +8140,29 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 커밋 `6f16d7ec`를 `oci`에 푸시했고 OCI Actions run [41473847660](https://github.com/pjtss/StockMan/actions/runs/41473847660)이 성공해 운영 배포됐다. 배포 후 운영 health는 HTTP 200, 공개 무인증 API 매뉴얼 조회 및 AAPL 메타데이터 GET은 HTTP 200이었다. AAPL은 이 조회 시점에 CIK/company facts가 아직 비어 `PARTIAL`이었다. 수동 POST는 SEC fetch와 운영 DB 쓰기를 실행하므로 운영에서 호출하지 않았고, 따라서 해당 데이터의 즉시 갱신 동작은 실행 실증 전이다.
 - 남은 위험: SEC ticker/exchange 매핑의 정확성·범위는 SEC가 보장하지 않는다. 수동 요청은 검증된 한 issuer만 갱신하며, Company Facts가 SEC에 없거나 대표 표준 태그가 없으면 메타데이터 일부는 계속 PARTIAL일 수 있다.
 
-\n
+
+
+## [2026-11-04] 미국 소형주 이벤트 원장 100종목 — 운영 검증 및 배포 준비
+
+### 목적과 포함 범위
+- 운영 OCI `oci` 브랜치의 최신 배포 기준에 미국 보통주 100종목의 공시·뉴스 이벤트 원장 216건을 추가하고, 종목별 검토표·SEC accession별 검토 원장·검증기를 같은 저장소 변경으로 관리한다.
+- 운영 API·종목 metadata는 공개 GET으로 확인했다. GitHub Actions의 최신 OCI 실행은 2026-11-03 01:32 UTC에 commit `efe88b987e0a611d686cc80ed46bdb046119d423`에서 성공했다. 현 운영 이벤트 API는 미국 3건을 반환하고 health는 `ok`다.
+
+### 운영 종목 기준 검증
+- `GET /api/public/us-stock-metadata?ticker=...`를 원장 내 100개 ticker 각각 호출했다. 100/100 모두 HTTP 200, 활성 `COMMON_STOCK`, USD market-cap 값 존재, 최신 운영 snapshot 기준 시총 1억 달러 이하로 확인했다.
+- 해당 100개 시장 snapshot은 모두 `STALE`이며 가장 최근 관측 시각은 2026-11-02 UTC다. 이를 2026-11-04 실시간 시총으로 표현하지 않고, 검증 기준과 freshness 한계를 보고서에 남긴다.
+
+### 구조화 원장 및 계약 보강
+- 이벤트 JSON 216건/100 issuer, SEC accession 이벤트 연결 227개, amendment 연결 2개를 종목 검토 JSON 및 accession 검토 ledger와 함께 반영한다. 보고서는 issuer별 조사 범위·직접 검토 수준을 보여 주고 validator는 event/ticker/accession 관계와 집계 parity를 검사한다.
+- URL host를 기준으로 197개 SEC 원문 이벤트를 `SEC_FILING`, 19개 발행사 보도자료를 `ISSUER_PRESS_RELEASE`로 분류해 출처 계열과 `sourceUrl`을 일치시켰다.
+- `npm run validate:us-smallcap-event-data`를 추가하고 `docs:check` 자동 게이트에서 실행하도록 연결했다. architecture 문서에 sourceType 분류 기준을, deployment checklist에 운영 DB 식별·사전검증·API 사후대조 절차를 기록한다.
+
+### 검증과 남은 단계
+- 로컬 구조 validator 통과: 100 issuers, 5,662 submissions, 216 US events, 227 accession-event relations, 2 amendment relations; FULL_PRIMARY_REVIEW 105 / INVENTORY_ONLY 5,413 / TRIAGE_EXCERPT 84 / TARGETED_SECTION_REVIEW 60.
+- 앞서 수동 실행한 importer 오류(`market_impact_events` relation 없음)는 `.env.local`이 가리킨 `localhost/stockman`에서 발생했다. 운영 DB 오류가 아니다. 운영 공개 이벤트 GET 정상 응답으로 운영 relation 조회가 가능함을 확인했다. 기존 미국 이벤트 3건(IAG, ERO, ABOS)은 이번 100 ticker 원장과 ticker/eventId가 겹치지 않는다.
+- `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build/standalone smoke, desktop/mobile hydration, API smoke, 300 test files (1,541 passed/3 skipped), typecheck, docs:check, API surface, verify-scope, KIS boundary, bearer-auth, OCI cron 검증 성공. `docs:check`에서 100종목/5,662 filings/216 events 구조 validator도 실행했다.
+- 운영 배포 후 API가 216건 전체와 100 ticker를 반환하는지 대조해야 한다. 이번 로그 시점에는 해당 import가 아직 반영되지 않았다.
+- `DATABASE_URL` 비밀값은 로그에 남기지 않았다. 사용자 변경분은 검증됐고 commit/push 전이다.
+
+### 커밋·푸시·배포
+- `deploy:verify` 완료. 검증된 변경만 최신 `origin/oci` 기반 한국어 커밋으로 묶어 `oci`에 push해 자동 OCI 배포를 시작한다. 운영 workflow와 API 결과 확인이 남아 있다.

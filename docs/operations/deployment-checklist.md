@@ -14,6 +14,9 @@
 - [ ] DB 스키마 변경이 있으면 기존 운영 버전과 충돌하지 않는 새 버전을 사용한다.
 - [ ] 운영 Flyway 버전보다 낮은 migration에만 있는 필수 테이블/컬럼은 현재 운영 floor 이후의 forward repair migration으로 다시 보장한다. `npm run docs:check`가 운영 floor 기반 컬럼 회귀를 검사한다.
 - [ ] 변경 기능에 회귀 테스트가 있는지 확인한다.
+- [ ] 운영 데이터 import 전 `DATABASE_URL`이 운영 DB를 가리키는지 확인한다. 호스트/DB명만 마스킹해 승인된 운영 식별값과 대조하고, `localhost` 또는 개발 DB면 운영 import를 중단한다.
+- [ ] 데이터 단독 반영은 운영 branch의 importer와 schema migration으로 사전검증한 뒤 실행한다. 운영 연결에서 대상 relation 존재, 공식 종목 마스터 적격성, eventId·자연키 충돌을 확인하고, import 후 공개 API에서 레코드 수·시장·ticker 범위를 대조한다.
+- [ ] 서버 접속·운영 DB 연결이 없으면 migration/import를 완료한 것으로 기록하지 않는다. OCI 배포 workflow의 `Deploy OCI` 결과와 운영 health/Flyway 상태를 확인한다.
 - [ ] 번역 quota 예약 SQL은 매개변수 타입을 명시하고 `translation-cache.test.ts`의 예약 성공 회귀 테스트를 통과한다.
 
 ## 자동 게이트
