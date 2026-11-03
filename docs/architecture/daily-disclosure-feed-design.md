@@ -90,13 +90,19 @@ type DailyDisclosureItem = {
 
 ### 복사 기능
 
-- 화면에는 목록을 표시하지 않고 선택 조건의 전체 응답 JSON을 복사한다.
-- `전체 JSON 복사` 버튼을 제공한다.
-- `미국 RSS JSON 복사` 버튼은 현재 조회 조건에 포함된 항목 중 `SEC_EDGAR`, `NASDAQ`, `NASDAQ_TRADER`, `STOCKTITAN`, `GLOBENEWSWIRE` 출처만 한 번에 복사한다.
-- 복사 형식은 `{ date, source, total, items }` JSON이며 `items`의 모든 응답 필드를 보존한다.
+- 화면에는 목록을 표시하지 않고 선택 조건에 해당하는 원문 URL 문자열만 줄바꿈으로 구분해 복사한다. JSON 구문, RSS DB 저장 시각, 조회 범위, 출처, 제목 등 다른 값은 클립보드에 넣지 않는다.
+- `전체 링크 복사` 버튼을 제공한다.
+- `미국 RSS 링크 복사` 버튼은 현재 조회 조건에 포함된 항목 중 `SEC_EDGAR`, `NASDAQ`, `NASDAQ_TRADER`, `STOCKTITAN`, `GLOBENEWSWIRE` 출처의 원문 URL 문자열만 복사한다.
+- 원문 링크가 없는 항목은 복사 결과에서 제외한다.
 - `navigator.clipboard.writeText`를 우선 사용하고, 권한이 없거나 비보안 컨텍스트인 경우 선택 영역 기반 fallback을 사용한다.
 - 복사 성공·실패를 버튼 상태와 접근성 라이브 영역으로 알린다. 원문 HTML은 복사하지 않고 태그를 제거한 텍스트만 복사한다.
-- 화면에서 생략된 본문은 복사 대상에 포함하되, `contentStatus=METADATA_ONLY`인 경우 그 상태를 명시한다.
+
+### 2026-11-03 링크만 복사 배포
+
+- **목적/범위**: 일별 공시 화면의 복사 동작을 URL 문자열만 줄바꿈으로 전달하도록 바꾸고, 버튼 이름과 회귀 테스트를 일치시켰다.
+- **변경 파일**: `components/daily-disclosures-page.tsx`, `components/daily-disclosures-page.test.tsx`, 본 설계 문서.
+- **검증 결과**: 배포용 worktree에서 전체 검증을 수행한다.
+- **빌드/실행**: 배포 체크리스트의 전체 자동 게이트 및 standalone smoke를 수행한다. **커밋/푸시/배포**: 사전 검증 성공 후 진행한다.
 
 ### 관리자·자동화
 

@@ -25,23 +25,37 @@ describe("DailyDisclosuresPage recent-hour filter", () => {
     expect(screen.getByLabelText("기준일")).toBeInTheDocument();
   });
 
-  it("copies only US RSS sources as one JSON payload", async () => {
-    const usItem = { id: 1, source: "NASDAQ", title: "US story" };
-    const domesticItem = { id: 2, source: "NEWSIS", title: "KR story" };
-    const dartItem = { id: 3, source: "DART", title: "Disclosure" };
+  it("copies only original links from US RSS sources", async () => {
+    const usItem = { id: 1, source: "NASDAQ", title: "US story", url: "https://example.com/us" };
+    const domesticItem = { id: 2, source: "NEWSIS", title: "KR story", url: "https://example.com/kr" };
+    const dartItem = { id: 3, source: "DART", title: "Disclosure", url: "https://example.com/dart" };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: [usItem, domesticItem, dartItem], total: 3 }) }));
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<DailyDisclosuresPage />);
 
     await waitFor(() => expect(screen.getByText("3건 전체 조회 완료")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "미국 RSS JSON 복사" }));
+    fireEvent.click(screen.getByRole("button", { name: "미국 RSS 링크 복사" }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const payload = JSON.parse(writeText.mock.calls[0][0]);
-    expect(payload.source).toBe("US_RSS");
-    expect(payload.total).toBe(1);
-    expect(payload.items).toEqual([usItem]);
-    expect(payload.sources).toEqual(["SEC_EDGAR", "NASDAQ", "NASDAQ_TRADER", "STOCKTITAN", "GLOBENEWSWIRE"]);
+    expect(writeText.mock.calls[0][0]).toBe("https://example.com/us");
+    expect(writeText.mock.calls[0][0]).not.toContain("US story");
+  });
+
+  it("copies only newline-separated URLs for all selected disclosures", async () => {
+    const rows = [
+      { id: 1, source: "NASDAQ", title: "Story", url: "https://example.com/story" },
+      { id: 2, source: "DART", title: "Filing", url: "https://example.com/filing" },
+      { id: 3, source: "NEWSIS", title: "Missing link" },
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items: rows }) }));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<DailyDisclosuresPage />);
+
+    await waitFor(() => expect(screen.getByText("3건 전체 조회 완료")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "전체 링크 복사" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toBe("https://example.com/story\nhttps://example.com/filing");
   });
 });
