@@ -32,9 +32,12 @@ if (expectedBatch) {
   assert(review.batchId === expectedBatch && ledger.batchId === expectedBatch,
     `Batch ID mismatch: expected ${expectedBatch}, got ${review.batchId}/${ledger.batchId}`);
   const expectedPrefix = `batch_${expectedBatch.replace(/-/g, "_")}`;
-  const reviewedAccessionCount = ledger.issuers.reduce((sum, issuer) => sum + issuer.filings.filter((filing) => filing.reviewBatch === expectedPrefix && filing.reviewStatus !== "INVENTORY_ONLY").length, 0);
-  assert(reviewedAccessionCount === review.reviewedEvents.length,
-    `Reviewed accession count does not match event records: ${reviewedAccessionCount}/${review.reviewedEvents.length}`);
+  const reviewedAccessions = new Set(ledger.issuers.flatMap((issuer) => issuer.filings
+    .filter((filing) => filing.reviewBatch === expectedPrefix && filing.reviewStatus !== "INVENTORY_ONLY")
+    .map((filing) => `${issuer.ticker}|${filing.accession}`)));
+  const eventAccessions = new Set(review.reviewedEvents.flatMap((row) => (row.sourceIds || []).map((accession) => `${row.ticker}|${accession}`)));
+  assert(reviewedAccessions.size === eventAccessions.size && [...reviewedAccessions].every((accession) => eventAccessions.has(accession)),
+    `Reviewed accession set does not match event source accession set: ${reviewedAccessions.size}/${eventAccessions.size}`);
   assert(review.reviewWindow?.batchId === expectedBatch && ledger.reviewWindow?.batchId === expectedBatch,
     `Review window batch ID mismatch: expected ${expectedBatch}`);
   assert(review.universe.issuerCount === 100 && ledger.issuerCount === 100,
@@ -54,6 +57,16 @@ const allowed = {
 };
 
 const reviewIssuerByTicker = new Map(review.universe.issuers.map((issuer) => [issuer.ticker, issuer]));
+assert(reviewIssuerByTicker.size === review.universe.issuers.length, "Review universe contains duplicate ticker rows");
+const selectionCounts = review.sourceMethodology?.candidateCounts;
+if (selectionCounts) {
+  for (const field of ["localUniverse", "fundamentalsReturned", "usdMarketCapAtOrBelow100mAfterPriorExclusions", "metadataCheckedUntil100Valid", "previousBatchTickersExcluded"]) {
+    assert(Number.isInteger(selectionCounts[field]) && selectionCounts[field] >= 0, `Invalid candidate selection count: ${field}`);
+  }
+  assert(selectionCounts.fundamentalsReturned === selectionCounts.localUniverse, "Fundamentals response coverage does not match local universe");
+  assert(selectionCounts.usdMarketCapAtOrBelow100mAfterPriorExclusions >= 100, "Candidate pool is smaller than the batch size");
+  assert(selectionCounts.metadataCheckedUntil100Valid >= 100, "Operating master metadata checks do not cover 100 selected issuers");
+}
 const eventById = new Map();
 const secCik = (url) => url?.match(/sec\.gov\/Archives\/edgar\/data\/(\d+)\//i)?.[1]?.replace(/^0+/, "") || null;
 const capBounds = review.criteria?.marketCap;

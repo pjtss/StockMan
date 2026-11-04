@@ -1,3 +1,49 @@
+## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 7차 배치 및 자료 구조 개선
+
+### 목표
+- 누적 600개 이후 신규 100개 미국 active COMMON_STOCK를 운영 서버 기준으로 선정하고, 공시·뉴스 일정과 accession 검토상태를 종목·공시 단위로 저장한다.
+- 7차 사전 점검의 “다음 배치 보류” 기록을 보완한다. 현재 적격성 판단이 아니라 2026-11-02 저장 snapshot 기준으로 조사하며 STALE을 그대로 표시한다.
+
+### 반영
+- 초기에 사용한 us-smallcap-shares API는 518개 후보만 반환해 전체 universe가 아니었다. 이를 후보의 완전 목록으로 쓰지 않고, localhost read-only 활성 US COMMON_STOCK universe 5,216개와 운영 공개 fundamentals 54회 GET 결과 5,216/5,216을 기준으로 다시 선정했다.
+- 600개 과거 ticker를 제외한 USD 양수·시총 1억 달러 이하 772개 후보 중 시총 순으로 운영 종목 metadata 및 SEC 공식 ticker-exchange master 고유 CIK를 교차 확인했다. 160개까지 확인해 100개를 확정했고 metadata 실패·CIK 불일치 9건을 제외했다. 선정 시총은 $104,143~$19,836,858, 관측일은 전부 2026-11-02이며 STALE이다.
+- 운영 market-intelligence 100/100 성공, RSS 332건·bullish 분류 53건. SEC submissions 100/100에서 4,182건을 수집했다. 최근 원문 528건은 SEC archive HTTP 200, 이 중 사건 관련 accession 13건에서 14개 일정/사건을 직접 검토했다. RSS 기사만으로 정규 이벤트를 확정하지 않았다.
+- 종목 review JSON, accession filing ledger, 재현 가능한 event definitions, canonical event 원장, 운영 보고서에 ticker·CIK·accession·eventId 링크를 저장했다. 보고서에는 일정 상태, 현지시각/KST, 기한 및 배당·역분할·희석 위험, stale cap 한계를 분리했다.
+- 배치 validator를 docs:check 체인에 연결하고, 전체 universe fundamentals 응답 수와 후보 선택 분모를 review에 기록·검증하도록 개선했다. 동일 accession에서 여러 이벤트가 생길 수 있으므로 이벤트 수와 공시 수를 잘못 같은 것으로 보는 체크를 고유 accession set 비교로 수정했다. 기존 issuer 중복도 fail-closed 검사한다.
+- event batch generator는 같은 eventId 재생성 때 canonical event를 교체(upsert)하도록 수정해 재실행 후 이벤트 위험·요약이 예전 내용으로 남지 않게 했다. 이벤트별 위험을 definition 입력으로 기록한다.
+
+### 변경 파일
+- scripts/generate-us-smallcap-event-batch.mjs
+- scripts/validate-us-smallcap-event-data.mjs
+- package.json
+- data/market-impact-events.json
+- data/us-smallcap-event-review-20261104-b07.json
+- data/us-smallcap-filing-review-ledger-20261104-b07.json
+- data/us-smallcap-event-defs-20261104-b07.json
+- docs/operations/us-smallcap-event-review-20261104-b07.md
+- docs/operations/us-smallcap-event-data-contract.md
+- docs/ERROR_HANDLING.md
+- DEVELOPMENT_LOG.md
+
+### 검증
+- batch validator는 100 issuer, 4,182 submissions, 14 events, 14 accession-event relations, INVENTORY_ONLY 4,169 / TARGETED_SECTION_REVIEW 13을 확인했다.
+- npm run docs:check 통과: 7개 batch validator, API surface audit, 131개 문서 catalog 및 documentation contract.
+- git diff --check 통과.
+- npm run deploy:verify 통과: dependency audit 취약점 0건, production build 107 pages, Vitest 300 files / 1,542 passed / 3 skipped, typecheck, standalone runtime smoke, Chrome desktop/mobile hydration, verify-scope/KIS/Bearer/cron 감사.
+- 커밋·푸시·운영 배포 전이며, 통과한 게이트를 근거로 커밋 후 프로젝트 deploy workflow를 실행한다.
+
+### 다음 개선
+- 운영 시총 snapshot이 stale하므로 오늘 현재 시총 적격성은 확인되지 않았다. 현재 기준 universe가 필요하면 운영의 최신 snapshot이 갱신된 뒤 다시 선정해야 한다. 이 조사에서는 운영 쓰기·refresh 실행을 하지 않았다.
+- 다음 배치도 전체 fundamentals 반환 수가 local universe와 일치하는지 자동으로 확인하고, CIK 불일치·분류 실패를 이름으로 보충하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-007
+- 성과 판정: PARTIAL
+- 근거: 후보 API 부분집합 오용을 전체 universe 수집으로 교정하고, issuer–filing–event 관계의 validator 및 generator 재실행 안정성을 개선했다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 검증은 모두 통과했고, 커밋·푸시·OCI workflow·운영 read-only 확인은 다음 단계다.
+
 ## [2026-11-04] 미국 소형주 이벤트 7차 배치 시총 신선도 사전 점검
 
 ### 목표

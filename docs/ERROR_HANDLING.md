@@ -661,3 +661,13 @@ npm test -- --run
 - **재발 방지**: 실패 주입 회귀 테스트가 automation query 실패와 마지막 성공 query 실패를 각각 재현하고 나머지 결과 보존을 확인한다. `/api/health` 공개 응답 계약은 history 가용성에 좌우되지 않게 유지한다.
 - **남은 위험**: DB 장애가 아닌 일시 query 지연도 이력 조회 실패로 표현되지만 SQL/DB 오류 상세는 공개 화면에 노출하지 않는다. 운영 진단 API와 함께 원인을 판별한다.
 
+## 2026-11-04 accession·event 다대일 검증 불일치
+
+- **증상**: 공시 한 건이 주주총회와 후속 이사회 재량 실행기한처럼 서로 다른 이벤트를 근거로 제공하면, 신규 배치 검증기가 `TARGETED_SECTION_REVIEW` 공시 수와 event record 수를 비교해 올바른 batch를 실패 처리했다.
+- **근본 원인**: accession과 event의 관계를 일대일로 가정했다. 실제 스키마는 하나의 accession에서 여러 eventId를 허용한다.
+- **영향 범위**: `validate-us-smallcap-event-data.mjs`의 신규 배치 사전 검사. 저장 데이터나 운영 서버에는 영향이 없다.
+- **해결 위치**: 검토 accession과 이벤트 source accession을 `ticker|accession` 고유 집합으로 각각 만들고 집합 동등성을 비교한다. accession–event 다대일 연결은 ledger의 각 filing eventIds와 coverageSummary가 추가 검증한다.
+- **재발 자동 감지**: batch validator는 검토 accession 집합의 일치, filing/eventId 역방향 연결, 제출 수, 검토 상태 수를 검사한다. 같은 공시에서 복수 이벤트를 생성하는 케이스를 배치 regression input으로 보존하고 전체 `npm run deploy:verify`에서 재검증한다.
+- **검증 결과**: 2026-11-04-b07 validator가 100 issuer, 4,182 filing, 14 event, 14 accession-event relation, 13 targeted filing으로 통과했다. 전체 docs/deploy 게이트는 진행 중.
+- **남은 위험 및 다음 개선**: 현재 fixture는 하나의 accession이 복수 이벤트를 제공하는 사례 하나다. future fixture에서 여러 이벤트 유형을 확장하고도 고유 source ID가 정확히 연결되는지 계속 검사한다.
+

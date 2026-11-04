@@ -57,3 +57,11 @@
 
 - 시총 snapshot이 24시간 freshness 기준을 넘으면 STALE을 유지하고, $100m 이하는 저장 시점 기준이라고 보고한다. 현재 적격성이 요구되면 stale 종목은 신규 확정 universe에서 제외하며 ticker를 임의 보충하지 않는다.
 - SEC master에서 ticker가 복수 거래소 행에 있으면 exchange 표기만으로 CIK를 추정하지 않는다. 운영 metadata CIK와 공식 SEC row의 동일 CIK가 유일할 때만 통과한다. operating CIK가 누락되면 별도 공식 identity 보강 전까지 제외한다.
+
+### 후보 universe 선택 분모와 coverage
+
+- 새 배치는 운영 후보 API가 선택적으로 제한된 목록을 돌려줄 수 있으므로 이를 전체 universe로 간주하지 않는다. localhost 활성 보통주 universe에서 요청한 fundamentals ticker 수와 정상 응답 ticker 수를 대조해 전체 범위가 일치해야 후보 순위를 확정한다.
+- `review.sourceMethodology.candidateCounts`에는 local universe 수, 반환 수, 이전 batch 제외 후 cap 후보 수, 운영 master metadata 검사 수, 이전 ticker 제외 수를 기록한다. 과거 batch에는 이 필드가 없어도 호환하지만 존재하면 validator가 정수·범위와 전체 응답 coverage를 검사한다.
+- 선택 issuer는 ticker 중복 없이 100개여야 한다. 보통주 분류 및 SEC CIK 검증 실패는 후보 순서대로 제외하고, 전체 후보 목록의 cap 정렬을 유지한다.
+- 공시 1건이 둘 이상의 이벤트 정의를 뒷받침할 수 있다. 검토 accession 수는 이벤트 record 수가 아니라 `ticker|accession` 고유 집합과 비교하고, filing row의 eventIds·canonical event·review event 간 다대일 연결을 검사한다.
+- 배치 생성 재실행 때 동일 eventId가 이미 canonical 원장에 있으면 새 검토 정의를 upsert한다. 과거 위험 문구나 일정 요약이 새 정의를 덮어쓰지 못하게 한다.
