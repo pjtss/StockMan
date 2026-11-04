@@ -28,7 +28,7 @@
 - 근거: batch9 전용 재현 정의·종목/공시 ledger와 canonical event 원장의 연결, future-date 후보 판정 완전성 및 문서 catalog/API inventory 자동 검증을 추가했다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행 (eventKey 수정 및 전체 검증 통과, 수정 commit/push·운영 재배포 대기)
+- 상태: 완료. batch 자료 커밋 `17e178e9`, importer eventKey 수정 `6f231e8c`; 최초 OCI #1260은 schema 불일치로 사전검증 실패했고 OCI #1261에서 수정본 배포 성공. 운영 공개 events GET에서 신규 이벤트 35/35, 32 ticker, SEC accession 관계 27, IR 8을 확인했다. 전체 US 이벤트 412건. 보고서·데이터 계약 UTF-8 HTTP 200.
 ### 다음 개선
 - 다음 100종목 batch에서 운영 시총 freshness를 재확인하고 stale 관측치는 현재 시총 인증으로 표현하지 않는다.
 - 신규 batch는 공식 primary text 문맥으로 이벤트/조건부 일정을 판단하고 자동 날짜 후보 누락 게이트를 유지한다.
