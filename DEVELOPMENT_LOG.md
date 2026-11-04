@@ -12,19 +12,20 @@
 - `scripts/generate-us-smallcap-event-batch.mjs`에 SEC accession과 공식 IR URL 이벤트의 서로 다른 연결 경로를 추가했다. validator는 targeted SEC와 직접 확인된 다른 공식 1차 출처를 구분 검증한다. 모든 저장 review batch 간 ticker 중복 방지와 legal-type 제외 기준을 운영 문서에 명시했다.
 - 첫 OCI 배포 #1256은 Activate release 단계에서 중단됐다. 재생성 과정에서 이전 `SEC:IR:*` 이벤트가 현재 review 목록에서 빠진 뒤에도 canonical 원장에 남아, 같은 `sourceType/sourceId/ticker/eventType`를 가진 새 IR event와 데이터베이스 identity 중복을 일으켰다. importer는 중복 사전검증에서 중단했고 DB transaction 시작 전이라 데이터베이스 변경은 없었으며 기존 운영 release가 유지됐다.
 - 재발 방지를 위해 generator가 이전 동일 배치 event ID와 현재 비-SEC 정의와 같은 identity의 obsolete canonical 이벤트를 제거하고 새 이벤트를 upsert하도록 바꿨다. 모든 canonical US 이벤트에 importer와 동일한 identity 중복검사를 추가해 CI가 배포 전 감지하게 했다.
+- 후속 public API 확인에서 일정의 현지/KST 시간이 API가 허용하는 `eventDetails` 필드에 실리지 않는 것을 찾아 `localDate/localTime/localTimezone/kstDate/kstTime` 구조를 추가했다. 미확인 시간은 `null`로 보존하고, validator가 canonical eventDate와 상세 날짜 일치 및 미확인 시간 null을 검사한다. 이벤트 데이터 계약에도 공개 필드를 기록했다.
 
 ### 변경 파일 및 확인 대상
 - `scripts/generate-us-smallcap-event-batch.mjs`, `scripts/validate-us-smallcap-event-data.mjs`, `package.json`
 - `data/market-impact-events.json`, `data/us-smallcap-event-review-20261104-b08.json`, `data/us-smallcap-filing-review-ledger-20261104-b08.json`, `data/us-smallcap-event-defs-20261104-b08.json`
 - `docs/operations/us-smallcap-event-review-20261104-b08.md`, `docs/operations/us-smallcap-event-data-contract.md`, `public/document-catalog.json`
-- `DEVELOPMENT_LOG.md`
+- `docs/ERROR_HANDLING.md`, `DEVELOPMENT_LOG.md`
 
 ### 검증
 - b08 validator: 100 issuer, 4,432 SEC filings, 31 events, 22 accession-event relations, 22 TARGETED_SECTION_REVIEW, 9 PRIMARY_SOURCE_REVIEWED를 확인했다.
 - `npm run docs:check` 통과: 기존 7개 배치와 b08의 중복·관계 검증, API surface, 132개 문서 catalog 및 문서 계약을 확인했다. 첫 검사에서 요구된 `### 다음 개선` heading 누락을 수정했고 후속 검사에서 통과했다.
 - `git diff --check` 통과. `npm run deploy:verify` 통과: dependency audit 0개 취약점, build 107 pages, test 300 files (1,542 passed/3 skipped), typecheck, standalone runtime smoke, desktop/mobile Chrome hydration, API surface, verify-scope, KIS, Bearer, cron audits.
-- 첫 운영 workflow #1256은 `events[366]`의 `SEC:IR:ir-2026-11-04`와 `events[369]`의 `IR:FTCI:ir-2026-11-04`가 같은 importer identity를 가져 Activate release에서 실패했다. 오류와 개선 내용을 `docs/ERROR_HANDLING.md`에 추가했다. identity 보강 뒤 canonical US 이벤트 374개, b08 이벤트 31개의 validator 검증은 통과했다. 수정 후 전체 배포 검증과 재배포는 아직 진행 중이다.
-- 후속 commit `e20c7023`는 OCI workflow #1257 성공으로 운영에 반영됐다. 공개 events GET에서 b08 eventId 31/31을 확인하고, 운영 보고서 manual GET 200 및 한글 UTF-8 내용을 확인했다. 후속 점검에서 공개 API가 일정 상세로 반환하는 `eventDetails`에 시각이 전달되지 않는 점을 발견해 local/KST 필드 추가 및 API payload 검증을 준비 중이다.
+- 첫 운영 workflow #1256은 `events[366]`의 `SEC:IR:ir-2026-11-04`와 `events[369]`의 `IR:FTCI:ir-2026-11-04`가 같은 importer identity를 가져 Activate release에서 실패했다. 오류와 개선 내용을 `docs/ERROR_HANDLING.md`에 추가했다. identity 보강 뒤 canonical US 이벤트 374개, b08 이벤트 31개의 validator 검증은 통과했다.
+- 수정 commit `e20c7023` / OCI #1257, eventDetails 후속 commit `09f8ba12` / OCI #1258 모두 성공했다. 최종 `npm run deploy:verify`와 문서 검증을 통과했다. 운영 공개 events GET에서 b08 eventId 31/31 및 FTCI 일정 08:30 EST / 22:30 KST를 `eventDetails`로 확인했다. 보고서 manual GET HTTP 200 UTF-8, 문서 카탈로그 검색 결과 1건도 확인했다.
 - 운영 공개 GET과 localhost DB read-only 조회만 사용했다. 운영 DB 직접 접근/write, refresh API, 알림 전송은 수행하지 않았다.
 
 ### 남은 위험
@@ -36,11 +37,11 @@
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-04-008
-- 성과 판정: PARTIAL
-- 근거: SEC accession과 회사 IR URL을 별도 출처관계로 저장하고 validator에서 각 경로를 점검하도록 확장했다. identity 충돌 수정은 운영 배포됐으나, 현지/KST 시각이 public API eventDetails에 포함되지 않은 부분을 이어서 보완 중이다.
+- 성과 판정: IMPROVED
+- 근거: SEC accession과 회사 IR URL의 출처 관계, importer identity 중복 방지, canonical eventDetails의 현지/KST 일정 정보를 구조화하고 문서·validator 계약으로 연결했다. 2회 후속 운영 배포 및 공개 GET 확인을 완료했다.
 
 ### 커밋·푸시·배포
-- 상태: 완료. `e20c7023` / OCI workflow #1257 성공. 후속 eventDetails API 필드 검증 및 재배포 진행 중.
+- 상태: 완료. `e20c7023` / OCI #1257 identity 수정, `09f8ba12` / OCI #1258 eventDetails 개선 배포 성공. 공개 API 31/31 이벤트, 일정 현지/KST 상세, 보고서 UTF-8 및 문서 catalog GET 확인 완료.
 
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 7차 배치 및 자료 구조 개선
 
