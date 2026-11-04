@@ -42,7 +42,10 @@
 - 근거: 후보 API 부분집합 오용을 전체 universe 수집으로 교정하고, issuer–filing–event 관계의 validator 및 generator 재실행 안정성을 개선했다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 검증은 모두 통과했고, 커밋·푸시·OCI workflow·운영 read-only 확인은 다음 단계다.
+- 상태: 완료. 초기 커밋 `d36c698b` 운영 배포 및 SHA·문서·API read-only 확인을 마쳤다. 후속 로그 커밋에서 배포 결과를 기록한다.
+- OCI GitHub Actions Deploy OCI #1254 (41783651715) 성공, 운영 /health-check SHA=d36c698b25775f4a982d763360d802b3786074cc 및 health HTTP 200 확인.
+- 문서 카탈로그 검색에서 보고서가 등록됐으며 /manuals/operations/us-smallcap-event-review-20261104-b07.md는 UTF-8 HTTP 200이다. 운영 market-impact-events read-only GET에서 batch7 11개 ticker·14개 이벤트를 확인했다.
+- 운영 DB 직접 접근·쓰기·refresh API 호출은 수행하지 않았다.
 
 ## [2026-11-04] 미국 소형주 이벤트 7차 배치 시총 신선도 사전 점검
 
