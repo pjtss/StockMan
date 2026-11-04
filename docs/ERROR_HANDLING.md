@@ -7,6 +7,17 @@
 - **재발 자동 감지**: npm run docs:check가 신규 batch validator를 실행한다. 원문 scan 누락, event/exclusion 미결정, 제외 사유 불일치, SEC accession relation 누락이면 fail-closed한다.
 - **검증 결과**: b09 100 issuers, 4,758 submissions, 35 events(SEC filing event 27건/26 accession, IR 8건), 12 excluded filings. SEC primary 362건 전부 HTTP 200, date candidate 73건 전부 결정 입력에 반영. docs:check, API surface, catalog 및 문서/migration 검사가 통과했다. build/test/runtime 및 배포 전.
 - **남은 위험 및 다음 개선**: 자동 날짜 추출은 문맥 판정을 대체하지 않는다. 다음 배치도 SEC/issuer primary text에서 일정 성격을 확인한다. 시총은 2026-11-02 STALE snapshot이다.
+
+## 2026-11-04 OCI Activate에서 eventKey 형식 거부
+
+- **증상**: OCI workflow #1260은 로컬 quality/build/runtime, remote verify, 패키징 및 업로드를 통과했으나 `Activate release`의 market-impact-events import에서 `events[375] has invalid eventKey`로 실패했다.
+- **근본 원인**: b09 generator가 batch와 event suffix를 콜론으로 연결했지만 운영 importer는 `^[A-Z0-9._-]{1,64}$`만 허용한다. 사전검증에서 거부되어 데이터베이스 transaction 전 중단됐다.
+- **영향 범위**: b09 event 원장 import 및 release 활성화. 운영 public GET은 기존 데이터(US event 377건)를 반환했고 신규 batch는 반영되지 않았다. 기존 운영 release와 DB는 유지됐다.
+- **해결 위치**: generator eventKey를 대문자 batch-suffix 하이픈 형식으로 변경하고 canonical 35건을 동일 형식으로 수정했다. validator에 importer와 동일한 허용문자/길이 검사를 추가하고 데이터 계약에 규칙을 명문화했다.
+- **재발 자동 감지**: `docs:check`의 전체 canonical validator가 모든 US eventKey를 importer regex로 검사한다. `deploy:verify`와 OCI import precheck가 배포 전 동일 데이터 형식을 추가 검증한다.
+- **검증 결과**: 원인은 GitHub Actions 로그 #1260에서 확인했다. 수정 후 9개 batch validator·`docs:check`, optimized build, runtime smoke/hydration, Vitest 1,542 passed/3 skipped, typecheck 및 전체 `deploy:verify`가 통과했다. 수정본 운영 재배포 및 GET 확인 대기 중이다. 운영 GET/refresh/DB write는 수행하지 않았다.
+- **남은 위험 및 다음 개선**: importer/validator의 필드 계약이 중복 구현되어 있으므로 가능하면 공유 schema 검증 모듈로 일원화한다. 이번 수정에서는 기존 importer를 임의 변경하지 않고 프로젝트 계약을 따랐다.
+
 # 오류 상황 및 해결 방법
 
 ## 2026-11-04 이벤트 배치 재생성 후 OCI import identity 중복

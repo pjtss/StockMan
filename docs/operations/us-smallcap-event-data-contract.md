@@ -73,5 +73,5 @@
 - 최근 SEC 원문 자동 스캔 결과의 `failed` 필드는 수집기 버전에 따라 실패 목록 배열 또는 정수일 수 있다. generator는 양쪽을 지원하되 `requested`와 `succeeded`가 정수이며 같고 실패 수가 0인지 fail-closed 검사한다.
 - 날짜 추출기는 날짜 후보를 발견할 뿐 이벤트 여부를 판정하지 않는다. 배치 입력은 각 미래 날짜 accession을 이벤트 정의 또는 명시적 제외로 연결해야 한다. `SEC_EXPLICIT_EXCLUSION`은 수동 검토 후 이벤트가 아니라고 판정한 문서에만 쓰며 `exclusionReason`은 구체적인 사유여야 한다. 단순 보류/검토 필요 메모는 제외 완료로 통과할 수 없다.
 - `EXPLICITLY_EXCLUDED` filing은 제외 사유를 review 복사본과 ledger에 동일하게 저장하고 canonical event ID를 연결하지 않는다. accession-event relation count는 TARGETED_SECTION_REVIEW filing만 대상으로 하고, 한 accession이 여러 eventId를 뒷받침할 수 있다.
-- 여러 이벤트가 같은 ticker와 SEC accession, eventType을 공유하면 `eventKey`를 배치·일정별로 고유하게 저장해 database identity를 분리한다. eventId만 바꾸는 것은 importer 중복 방지에 충분하지 않다.
+- 여러 이벤트가 같은 ticker와 SEC accession, eventType을 공유하면 importer 허용 형식 `^[A-Z0-9._-]{1,64}$`의 `eventKey`를 배치·일정별로 고유하게 저장해 database identity를 분리한다. 구분자 콜론은 허용되지 않으며 eventId만 바꾸는 것은 importer 중복 방지에 충분하지 않다. canonical validator도 같은 형식으로 검사한다.
 - 문서 날짜, 표결 마감, 회계기간 종료, 조건부 베스팅처럼 자동 추출에 걸렸으나 별도 이벤트가 아닌 날짜도 재현 입력에서 accession별 제외 이유를 유지한다. 1차 출처가 없거나 시각이 확인되지 않은 정보는 임의로 채우지 않는다.

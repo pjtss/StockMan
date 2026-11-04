@@ -18,7 +18,9 @@
 ### 검증
 - batch validator: 100 issuers, 4,758 SEC submissions, 35 events, 27 accession-event relations, 12 explicitly excluded filings 통과.
 - npm run docs:check 통과: 기존 8개와 신규 batch9 데이터 검증, 178 route/42 public GET API audit, 133개/7 category catalog, 28 entry points 및 migration docs. git diff --check 통과.
-- 운영 API/DB GET-only, write/refresh/알림 전송 없음.
+- 최초 OCI #1260은 Verify deployment·패키징·업로드를 통과했지만 Activate import 사전검증에서 35개 신규 eventKey 중 콜론이 포함된 값을 거부해 실패했다. import transaction 전에 중단되어 기존 운영 release/DB는 그대로였다. 운영 GET에서는 기존 US 이벤트 377건, 신규 b09 이벤트 0건으로 반영 전 상태를 확인했다.
+- generator eventKey를 importer 정규식에 맞는 대문자 하이픈 구분자로 수정하고, validator에 전체 canonical `^[A-Z0-9._-]{1,64}$` 검사, 데이터 계약 및 ERROR_HANDLING에 원인·자동감지를 추가했다. 수정 후 docs:check, optimized build, runtime smoke/hydration, Vitest 1,542 passed/3 skipped, typecheck 및 전체 deploy:verify를 다시 통과했다. 자세한 내용은 [`docs/ERROR_HANDLING.md`](docs/ERROR_HANDLING.md)를 기준으로 유지한다.
+- 운영 API/DB 검증은 read-only GET만 사용했고 write/refresh/알림 전송은 없다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-04-009
@@ -26,11 +28,11 @@
 - 근거: batch9 전용 재현 정의·종목/공시 ledger와 canonical event 원장의 연결, future-date 후보 판정 완전성 및 문서 catalog/API inventory 자동 검증을 추가했다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행 (build/test/runtime 및 문서 검증 통과, 커밋·푸시·운영 배포 대기)
+- 상태: 미실행 (eventKey 수정 및 전체 검증 통과, 수정 commit/push·운영 재배포 대기)
 ### 다음 개선
 - 다음 100종목 batch에서 운영 시총 freshness를 재확인하고 stale 관측치는 현재 시총 인증으로 표현하지 않는다.
 - 신규 batch는 공식 primary text 문맥으로 이벤트/조건부 일정을 판단하고 자동 날짜 후보 누락 게이트를 유지한다.
-- build/test/runtime 검증 통과: optimized build 완료, runtime smoke와 desktop/mobile hydration 통과, Vitest 1,542 passed/3 skipped (301 files, 1 skipped), typecheck 및 docs/API 감사 통과. 커밋·푸시·OCI 배포 결과는 완료 후 이 로그를 갱신한다.
+- 수정본은 전체 배포 게이트를 재통과했다. 다음 100종목 batch는 운영 시총 freshness와 동일한 import-schema 검사를 초기 수집 검증에 포함한다.
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 8차 배치와 자료 관리 개선
 
 ### 목표

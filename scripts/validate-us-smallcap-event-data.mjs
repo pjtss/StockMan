@@ -102,6 +102,11 @@ if (expectedBatch) {
 }
 const allCanonicalEvents = eventsDocument.markets?.US;
 assert(Array.isArray(allCanonicalEvents), "market-impact-events.json must contain markets.US[]");
+for (const [index, event] of allCanonicalEvents.entries()) {
+  const eventKey = event.eventKey ?? "DEFAULT";
+  assert(typeof eventKey === "string" && /^[A-Z0-9._-]{1,64}$/.test(eventKey),
+    `Canonical US event ${index} has invalid importer eventKey`);
+}
 const duplicateCanonicalIdentities = findDuplicateMarketImpactEventIdentities(
   allCanonicalEvents.map((event) => ({ ...event, market: "US", eventKey: event.eventKey ?? "DEFAULT" })),
 );
