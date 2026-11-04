@@ -1,3 +1,34 @@
+## [2026-11-04] 미국 소형주 이벤트 7차 배치 시총 신선도 사전 점검
+
+### 목표
+- 운영 서버 기준으로 누적 600개 issuer 이후 다음 100개 US active COMMON_STOCK 후보의 시총 $100m 이하 적격성을 확인한다.
+
+### 반영
+- localhost 운영 종목 universe를 read-only 조회해 active COMMON_STOCK 및 6개 비보통주 배제조건 일치 5,216개를 확인했다. 기존 6개 배치의 600 ticker를 제외했다.
+- 운영 공개 us-smallcap-shares API 11페이지와 로컬 운영 universe 교집합에서 신규 후보 518개를 확인했다. 후보별 fundamentalsFetchedAt은 조사 시각 대비 44.6~45.1시간 전이었고 24시간 이내 관측은 0개였다.
+- 표본 CMCT 운영 metadata는 시총 $9,402,493, 관측시각 2026-11-02T07:49:57Z, marketDataFreshness=STALE, age 161,983초로 반환됐다. 현재 시총 적격성을 입증하는 100개가 없어 batch7 issuer 확정과 SEC 원문 수집을 시작하지 않았다. 운영 API/DB write는 없었다.
+
+### 변경 파일
+- DEVELOPMENT_LOG.md
+
+### 검증
+- 후보 페이지 조회는 공개 GET, 공식 universe 대조는 localhost DB read-only 경로를 사용했다. 후보 518개 freshness 집계 결과 24시간 이내 0개.
+- npm run docs:check 및 git diff --check로 로그 계약과 문서 구조를 확인한다.
+
+### 남은 위험
+- 운영 fundamentals market cap snapshot이 2026-11-02 관측에서 갱신되지 않았다. 사용자 기준의 현시점 $100m 이하 universe는 아직 확정되지 않았다.
+
+### 다음 개선
+- 운영 서버가 24시간 이내 market snapshot을 공개할 때 재조회하고, 신선한 cap 기준을 통과한 issuer만 batch7 확정 목록에 넣는다. 운영 데이터 새로고침 쓰기는 현재 조사에서 수행하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-006
+- 성과 판정: IMPROVED
+- 근거: 518개 신규 후보의 실제 snapshot 시각을 집계해 stale cap을 현재 적격성으로 오인하는 것을 차단했고, 구조화 데이터 생성 전에 freshness 기준을 적용했다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 신선한 operating snapshot을 확인하지 못해 batch7 데이터 생성·배포는 진행하지 않았다.
+
 ## [2026-11-04] 미국 소형주 이벤트 원장 6차 배치 및 문서 검증 기준 개선
 
 ### 목표와 범위
