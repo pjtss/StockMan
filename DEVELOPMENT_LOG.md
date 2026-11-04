@@ -32,7 +32,8 @@
 - 근거: 재사용 생성기·검토 정의 입력, 6개 분류 flag와 CIK 연결 자동 검증을 추가하고 전체 deployment verification을 통과했다.
 
 ### 커밋·푸시·배포
-- 검증 완료. 한국어 상세 커밋 후 `oci` push 예정이며 운영 workflow와 배포 후 health/event/catalog GET을 확인한다.
+- 완료: 데이터 커밋 `ed52908be8ed9f80308940abdb6b2634b7f1946e`를 `oci`에 push했다. GitHub Actions [Deploy OCI run 41765621215](https://github.com/pjtss/StockMan/actions/runs/41765621215)이 verify/package/SSH/upload/activation 모두 성공했다.
+- 배포 후 `/api/health` status=ok, `/health-check` SHA 일치, US events API 317건 중 배치 5 eventId 43/43, document catalog 129건에 b05 report 등록, manual GET HTTP 200 및 `text/markdown; charset=UTF-8`를 확인했다. 운영 API/DB write 없음.
 
 ## [2026-10-31] 이벤트 occurrence 조회 API 추가
 
