@@ -1,0 +1,432 @@
+[
+  [
+    "GYRO",
+    "0001437749-26-032011",
+    "ANNUAL_MEETING",
+    "2026-11-05",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (11:00 ET / 11-06 01:00 KST)",
+    "회사는 2026-11-05 11:00 ET 연례 주주총회를 공지했다. 이사 선임, 보상 자문 및 감사인 비준 안건이며 결과는 미확정.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "DLPN",
+    "0001079973-26-001276",
+    "ANNUAL_MEETING",
+    "2026-11-04",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (10:00 ET / 11-05 00:00 KST)",
+    "회사는 2026-11-04 10:00 ET 연례 주주총회를 공지했다. 표결 안건은 이사 선임, 보상 자문, 감사인 비준이며 결과는 미확정.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "TPST",
+    "0001213900-26-112476",
+    "ANNUAL_MEETING",
+    "2026-11-09",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (13:00 PT / 11-10 06:00 KST)",
+    "연례 주총에 Lincoln Park 주식 발행 및 PIPE warrant 행사 주식 발행 안건이 포함됐다. 승인 여부와 실제 발행은 미확정.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "LSTA",
+    "0001140361-26-039986",
+    "ANNUAL_MEETING",
+    "2026-11-09",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (11:00 ET / 11-10 01:00 KST)",
+    "회사는 2026-11-09 11:00 ET 가상 연례 주총을 공지했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "BIVI",
+    "0001520138-26-000395",
+    "ANNUAL_MEETING",
+    "2026-11-10",
+    "CONFIRMED_SCHEDULED",
+    "가상 연례 주주총회 (09:00 PT / 11-11 02:00 KST)",
+    "회사는 2026-11-10 09:00 PT 가상 연례 주총을 공지했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "DARE",
+    "0001493152-26-045977",
+    "SPECIAL_MEETING",
+    "2026-11-10",
+    "CONFIRMED_SCHEDULED",
+    "특별 주주총회 (시각 미공개)",
+    "회사는 2026-11-10 특별 주총 일정을 공지했다. 확인한 SEC 원문 구간에서 회의 시각은 확인되지 않았다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "GTBP",
+    "0001493152-26-046861",
+    "SPECIAL_MEETING",
+    "2026-11-11",
+    "CONFIRMED_SCHEDULED",
+    "특별 주주총회 (시각 미공개)",
+    "회사는 2026-11-11 특별 주총을 공지했다. 확인한 SEC 원문 구간에서 회의 시각은 확인되지 않았다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "XHLD",
+    "0001493152-26-049279",
+    "ADJOURNED_MEETING",
+    "2026-11-12",
+    "CONFIRMED_SCHEDULED",
+    "정족수 미달로 연기된 연례 주총 재개 (09:00 ET / 23:00 KST)",
+    "10-29 첫 회의에서 정족수 미달로 안건을 처리하지 못해 11-12 09:00 ET 재개한다. 기존 제안은 변경되지 않았다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "TPST",
+    "0001213900-26-111032",
+    "ADJOURNED_MEETING",
+    "2026-11-12",
+    "CONFIRMED_SCHEDULED",
+    "표결 부족으로 연기된 특별 주총 재개 (14:00 ET / 11-13 04:00 KST)",
+    "제안 승인에 표가 부족해 11-12 14:00 ET 재개한다. 해당 안건은 전체 의결권의 75% 찬성이 필요하다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "AZIO",
+    "0001437749-26-034477",
+    "ADJOURNED_MEETING",
+    "2026-11-13",
+    "CONFIRMED_SCHEDULED",
+    "정족수 미달로 연기된 연례 주총 재개 (09:00 PT / 11-14 02:00 KST)",
+    "11-02 회의가 정족수 미달로 연기됐고 11-13 09:00 PT 같은 안건으로 재개한다고 공시했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "CLWT",
+    "0001654954-26-009144",
+    "ANNUAL_MEETING",
+    "2026-11-19",
+    "CONFIRMED_SCHEDULED",
+    "홍콩 연례 주주총회 (시각 미공개)",
+    "회사는 2026-11-19 홍콩에서 연례 주총을 공지했다. 확인한 보고서 구간에 시각은 없다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "TCRX",
+    "0001193125-26-431045",
+    "SPECIAL_MEETING",
+    "2026-11-20",
+    "CONFIRMED_SCHEDULED",
+    "특별 주주총회 (08:30 ET / 22:30 KST)",
+    "회사는 2026-11-20 08:30 ET 특별 주총을 공지했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "TULP",
+    "0001104659-26-114837",
+    "ANNUAL_MEETING",
+    "2026-11-23",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (13:00 CT / 11-24 04:00 KST)",
+    "회사는 2026-11-23 13:00 CT 연례 주총을 공지했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "DFNS",
+    "0001185185-26-005080",
+    "SPECIAL_MEETING",
+    "2026-11-30",
+    "CONFIRMED_SCHEDULED",
+    "가상 특별 주주총회 (16:00 ET / 12-01 06:00 KST)",
+    "회사는 2026-11-30 16:00 ET 가상 특별 주총을 공지했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "LTRN",
+    "0001493152-26-047586",
+    "ANNUAL_MEETING",
+    "2026-12-01",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 및 수권 보통주 증가 안건 (11:00 ET / 23:00 KST)",
+    "회사는 2026-12-01 11:00 ET 주총에서 수권 보통주 증가 안건을 표결한다고 공지했다. 승인 및 실제 발행은 미확정.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "LIQT",
+    "0001437749-26-033433",
+    "ANNUAL_MEETING",
+    "2026-12-03",
+    "CONFIRMED_SCHEDULED",
+    "덴마크 연례 주총 (15:00 현지 CET / 23:00 KST)",
+    "덴마크 Ballerup 현지 15:00 연례 주총으로 공지됐다. 12월 CET(UTC+1) 기준 KST 변환.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "ASTC",
+    "0001437749-26-033333",
+    "ANNUAL_MEETING",
+    "2026-12-04",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (09:00 CST / 12-05 00:00 KST)",
+    "회사는 2026-12-04 09:00 CST 연례 주총을 공지했다.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "FNGR",
+    "0001493152-26-049465",
+    "SPECIAL_MEETING",
+    "2026-12-04",
+    "CONFIRMED_SCHEDULED",
+    "역분할 권한 안건 특별 주총 (시각 미공개)",
+    "주주에게 하나 이상의 역분할을 실행할 권한을 부여하는 안건이 예정됐다. 실제 비율·실행은 확정되지 않았다. 시각은 미공개.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "SINT",
+    "0001493152-26-049429",
+    "ANNUAL_MEETING",
+    "2026-12-09",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 (10:00 MT / 12-10 02:00 KST)",
+    "회사는 2026-12-09 10:00 현지 Mountain Time 연례 주총을 공지했다. 12월 MST 기준 KST 변환.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "RKTO",
+    "0001213900-26-112099",
+    "ANNUAL_MEETING",
+    "2026-12-17",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회 및 reverse split·수권주식 안건 (12:00 ET / 12-18 02:00 KST)",
+    "회사는 2026-12-17 12:00 ET 주총에서 reverse split 및 수권주식 증가 관련 안건을 다룬다. 승인·실행은 미확정.",
+    "SHAREHOLDER_MEETING"
+  ],
+  [
+    "SEED",
+    "0001104659-26-120676",
+    "BID_PRICE_DEADLINE",
+    "2027-04-26",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "$1 이상 종가 10영업일 연속 조건의 시정 기간은 2027-04-26 종료. 달성 여부 미확정.",
+    "LISTING_RISK"
+  ],
+  [
+    "SLGB",
+    "0001213900-26-113895",
+    "BID_PRICE_DEADLINE",
+    "2027-04-26",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "회사가 공시한 추가 180일 기간은 2027-04-26 종료. listing 유지 영향은 조건 달성 여부에 달림.",
+    "LISTING_RISK"
+  ],
+  [
+    "GDTC",
+    "0001493152-26-046630",
+    "BID_PRICE_DEADLINE",
+    "2027-04-05",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "$1 이상 종가 10영업일 연속 조건의 기한은 2027-04-05. 달성 여부 미확정.",
+    "LISTING_RISK"
+  ],
+  [
+    "FNGR",
+    "0001520138-26-000262",
+    "BID_PRICE_DEADLINE",
+    "2026-12-28",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "$1 이상 종가 10영업일 연속 조건을 2026-12-28까지 회복해야 한다고 공시.",
+    "LISTING_RISK"
+  ],
+  [
+    "NEON",
+    "0001437749-26-026593",
+    "BID_PRICE_DEADLINE",
+    "2027-02-02",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "SEC 공시에 제시된 2027-02-02 기한, $1 bid 요건은 아직 해결됐다고 확인되지 않았다.",
+    "LISTING_RISK"
+  ],
+  [
+    "RKTO",
+    "0001213900-26-087771",
+    "BID_PRICE_DEADLINE",
+    "2027-02-02",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "회사 공시상 $1 이상 종가 10영업일 연속 기한은 2027-02-02.",
+    "LISTING_RISK"
+  ],
+  [
+    "PMEC",
+    "0001213900-26-093729",
+    "BID_PRICE_DEADLINE",
+    "2027-02-22",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq 최소호가 시정 기간 종료",
+    "SEC 공시에 기재된 회복 기한은 2027-02-22. 요건 충족 여부 미확정.",
+    "LISTING_RISK"
+  ],
+  [
+    "TCRX",
+    "0001193125-26-379343",
+    "BID_PRICE_DEADLINE",
+    "2027-02-23",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "회사가 공시한 $1 최소호가 회복 기한은 2027-02-23.",
+    "LISTING_RISK"
+  ],
+  [
+    "IRIX",
+    "0001193125-26-380229",
+    "BID_PRICE_DEADLINE",
+    "2027-02-23",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "회사가 공시한 $1 최소호가 회복 기한은 2027-02-23.",
+    "LISTING_RISK"
+  ],
+  [
+    "LIQT",
+    "0001437749-26-024425",
+    "BID_PRICE_DEADLINE",
+    "2027-01-19",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "SEC 공시상 회복 기간은 2027-01-19 종료.",
+    "LISTING_RISK"
+  ],
+  [
+    "FOXX",
+    "0001213900-26-082785",
+    "MVLS_DEADLINE",
+    "2027-01-19",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $35m MVLS 회복기한",
+    "$35m 최소 시가총액을 10영업일 연속 유지하는 기한은 2027-01-19.",
+    "LISTING_RISK"
+  ],
+  [
+    "LOOP",
+    "0001437749-26-024892",
+    "MVLS_DEADLINE",
+    "2027-01-20",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $50m MVLS 회복기한",
+    "$50m 최소 시가총액을 10영업일 연속 유지하는 기한은 2027-01-20. 중복된 1-25 날짜 후보는 동일 공시의 추출 중복으로 제외.",
+    "LISTING_RISK"
+  ],
+  [
+    "BIOX",
+    "0001104659-26-108004",
+    "BID_PRICE_DEADLINE",
+    "2027-03-15",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "$1 최소호가 회복 기한은 2027-03-15.",
+    "LISTING_RISK"
+  ],
+  [
+    "LTRN",
+    "0001493152-26-045344",
+    "MVLS_DEADLINE",
+    "2027-03-24",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $35m MVLS 회복기한",
+    "Nasdaq $35m MVLS 및 관련 자본 요건 회복 기한은 2027-03-24.",
+    "LISTING_RISK"
+  ],
+  [
+    "DARE",
+    "0001401914-26-000052",
+    "BID_PRICE_DEADLINE",
+    "2027-03-29",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "회사 공시상 $1 최소호가 회복 기한은 2027-03-29.",
+    "LISTING_RISK"
+  ],
+  [
+    "GTEC",
+    "0001213900-26-102404",
+    "BID_PRICE_DEADLINE",
+    "2027-03-08",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq $1 최소호가 시정기한",
+    "회사 공시상 $1 최소호가 회복 기한은 2027-03-08.",
+    "LISTING_RISK"
+  ],
+  [
+    "DFNS",
+    "0001185185-26-005016",
+    "ACQUISITION_AGREEMENT",
+    "2026-10-27",
+    "REPORTED",
+    "KeepZone 인수계약 체결 (종결 미확정)",
+    "회사는 KeepZone 지분 100% 인수계약 체결을 보고했다. 종결은 조건 충족에 달려 있으며 closing date는 공시되지 않았다.",
+    "ACQUISITION"
+  ],
+  [
+    "CUPR",
+    "0001493152-26-044861",
+    "OFFERING_CLOSED",
+    "2026-09-29",
+    "COMPLETED",
+    "공모 종결 및 총 조달액 약 $5.716m",
+    "공시는 공모와 초과배정 행사 종결 및 총 gross proceeds 약 $5.716m을 보고했다. 기존 주주 희석 위험을 동반한다.",
+    "FINANCING"
+  ],
+  [
+    "MEGL",
+    "0001493152-26-045061",
+    "REGISTERED_DIRECT_OFFERING_CLOSED",
+    "2026-09-30",
+    "COMPLETED",
+    "등록 직접공모 종결, gross 약 $3m",
+    "공시는 약 $3m gross 직접공모 종결을 보고했다. 기존 주주 희석 위험을 함께 고려한다.",
+    "FINANCING"
+  ],
+  [
+    "CUPR",
+    "0001493152-26-045444",
+    "ACQUISITION_SUBJECT_TO_APPROVAL",
+    "2026-10-01",
+    "REPORTED",
+    "SPA 기반 인수계약 관련 보고; 주주 승인·종결 미확정",
+    "계약 관련 이행은 주주 승인 조건에 달려 있다고 공시됐다. closing으로 표현하지 않으며 확정 종결 일정은 없다.",
+    "ACQUISITION"
+  ],
+  [
+    "RKTO",
+    "0001213900-26-102217",
+    "ACQUISITION_AGREEMENT",
+    "2026-09-22",
+    "REPORTED",
+    "Tracer Drone 인수계약 체결 (종결일 미공개)",
+    "회사는 definitive agreement를 공시했으나 확인한 자료에 종결일이 없다.",
+    "ACQUISITION"
+  ],
+  [
+    "FNGR",
+    "0001493152-26-044880",
+    "ACQUISITION_AGREEMENT",
+    "2026-09-10",
+    "REPORTED",
+    "Newbit 인수계약 보고 (종결일 미공개)",
+    "회사는 인수계약을 보고했으며 확인한 자료에 종결 일정은 없다.",
+    "ACQUISITION"
+  ],
+  [
+    "FNGR",
+    "0001493152-26-042255",
+    "ACQUISITION_AGREEMENT",
+    "2026-08-20",
+    "REPORTED",
+    "토지 인수계약 보고 (종결일 미공개)",
+    "회사는 토지 인수계약을 보고했으며 확인한 자료에 종결 일정은 없다.",
+    "ACQUISITION"
+  ]
+]

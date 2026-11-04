@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 128,
+  "documentCount": 129,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1047,6 +1047,17 @@
       "url": "/manuals/operations/us-smallcap-event-review-20261104-b04.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b04.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261104-b05",
+      "title": "미국 보통주 공시·뉴스 기반 이벤트 검토 — 2026-11-04 배치 5",
+      "category": "operations",
+      "format": "md",
+      "description": "종목 snapshot·뉴스·이벤트는 $1, accession별 제출 원장은 $1, 검토 정의 입력은 $1에 저장했다. 정규 이벤트는 $1의 eventId로 연결한다. 검토된 SEC archive URL의 CIK가 issuer CIK와 일치해야 validator를 통과한다.",
+      "url": "/manuals/operations/us-smallcap-event-review-20261104-b05.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b05.md",
       "related": []
     },
     {

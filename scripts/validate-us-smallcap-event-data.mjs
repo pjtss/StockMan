@@ -61,7 +61,7 @@ for (const issuer of review.universe.issuers) {
   const instrument = issuer.officialMaster?.instrument;
   assert(instrument?.instrument_type === "COMMON_STOCK" && instrument.enabled === true,
     `Issuer is not confirmed active COMMON_STOCK in the operating master: ${issuer.ticker}`);
-  for (const flag of ["is_etf", "is_warrant", "is_derivative", "is_dr"]) {
+  for (const flag of ["is_etf", "is_warrant", "is_derivative", "is_dr", "is_leveraged", "is_inverse"]) {
     if (instrument[flag] !== undefined) assert(instrument[flag] === false, `Non-common instrument flag ${flag} is set for ${issuer.ticker}`);
   }
   assert(issuer.marketCap?.currency === capBounds?.currency && Number.isFinite(issuer.marketCap?.usd),
@@ -216,6 +216,16 @@ for (const [ticker, issuer] of ledgerIssuerByTicker) {
     for (const eventId of sorted(filing.eventIds)) {
       assert(reviewEventIds.has(eventId) && eventById.has(eventId), `Filing points to missing batch canonical event: ${ticker}/${accession}/${eventId}`);
       expectedLinks.push(`${ticker}|${accession}|${eventId}`);
+    }
+  }
+
+  if (expectedBatch) {
+    assert(issuer.secCompanyMaster?.cik, `Official SEC company ticker master CIK is missing for ${ticker}`);
+    for (const filing of ledgerFilings.values()) {
+      if (filing.reviewStatus === "INVENTORY_ONLY") continue;
+      assert(filing.reviewBatch === `batch_${expectedBatch.replace(/-/g, "_")}`, `Reviewed filing has a mismatched batch for ${ticker}/${filing.accession}`);
+      const filingCik = secCik(filing.url);
+      assert(filingCik === String(issuer.cik).replace(/^0+/, ""), `Reviewed filing URL CIK differs from issuer for ${ticker}/${filing.accession}`);
     }
   }
 

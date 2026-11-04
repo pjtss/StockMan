@@ -1,38 +1,38 @@
-## [2026-11-04] 미국 소형주 이벤트 원장 2차 100종목 배치 작성 및 검증
+## [2026-11-04] 미국 소형주 이벤트 원장 5차 배치 및 문서 관리 자동화
 
 ### 목표
-- 운영 서버 read-only 공개 GET과 SEC 공식 자료로 미국 active COMMON_STOCK, USD 시총 1억 이하의 다음 100종목을 정리했다.
-- 2025-11-04~2026-11-05 SEC 제출 5,111건과 운영 뉴스 555건을 종목별·공시별 구조화 자료에 저장했고 직접 근거가 확인된 이벤트 18건을 canonical 원장에 연결했다. 운영 API/DB write 없음.
+- 운영 서버와 SEC 공식 공개자료를 기준으로 중복 없는 다음 100개 미국 active COMMON_STOCK, USD 시총 1억 이하 종목의 공시·뉴스 이벤트를 종목별·공시별로 정리한다.
+- 배치 원장 생성·검증 과정을 재사용할 수 있도록 개선하고 100종목 단위 배포를 진행한다.
 
 ### 반영
-- 기존 validator가 단일 배치 파일을 하드코딩하고 canonical US 전체를 비교했다. CLI 인자와 reviewed event ID filter로 batch별 검증을 지원하고 docs:check에 1·2차 검증을 연결했다.
-- 종목별 review JSON, accession ledger, canonical event, 검토 report를 분리하고 eventId/accession으로 연결했다. 신규 데이터 계약 문서에 파일 책임·키·관계·검토 상태·수집/배포 절차를 명시했다. CIK validator가 RMSG·AMSS SEC URL 오류를 발견해 수정했고, 근거가 확인되지 않은 RIME 뉴스 이벤트는 삭제했다.
+- 운영 후보에서 CMCT는 SEC CIK 대조 불일치로 제외하고 BENF로 대체했다. 공식 SEC ticker master와 operating metadata의 CIK가 100/100 일치했다. 2026-11-04T02:59:14Z에 운영 metadata 100/100 재조회: 모두 active COMMON_STOCK, 6개 비보통주 플래그 false, USD cap $100m 이하. 단, market cap 관측값은 2026-11-02로 모두 STALE이다.
+- 2025-11-04 포함~2026-11-05 미포함 SEC 제출 4,620건을 issuer별 filing ledger에 보관했다. 최신 operating intelligence는 100/100 성공, RSS 512건, bullish 분류 84건, operating SEC event rows 0건이다. SEC submissions 최신 메타데이터를 100개 issuer에서 재조회했고 11월 3일 이후 새 제출 10건을 확인했다. 일정 accession과 대조해 AZIO 연기 공시는 기존 event에 반영돼 있고 다른 새 제출은 주총 일정 accession 변경을 나타내지 않았다. 해당 새 filing 전문을 모두 읽었다는 뜻은 아니다.
+- 타깃 SEC 원문 604건 중 초기 440건 HTTP 429를 paced retry로 604/604 HTTP 200 복구했다. 주총·Nasdaq 기한·공모·인수 등 직접 원문 구간 확인 43건은 TARGETED_SECTION_REVIEW, 나머지 4,577건은 INVENTORY_ONLY로 기록했다. 미국 동부 시간과 KST를 구분해 DLPN 11월 4일 10:00 ET 주총을 예정 일정으로 유지했다.
+- review JSON, accession ledger, 재현 입력 event definitions, canonical event 43건과 운영 보고서를 추가했다. 재사용 배치 생성기와 validator를 연결하고, 6개 비보통주 플래그 및 reviewed filing batch/SEC URL CIK 확인을 강화했다. SEC 429 재수집 절차를 자료 관리 계약에 기록했다.
 
 ### 변경 파일
-- data/market-impact-events.json, data/us-smallcap-event-review-20261104.json, data/us-smallcap-filing-review-ledger-20261104.json
-- docs/operations/us-smallcap-event-review-20261104.md, docs/operations/us-smallcap-event-data-contract.md
-- scripts/validate-us-smallcap-event-data.mjs, package.json, DEVELOPMENT_LOG.md
+- data/market-impact-events.json, data/us-smallcap-event-review-20261104-b05.json, data/us-smallcap-filing-review-ledger-20261104-b05.json, data/us-smallcap-event-defs-20261104-b05.json
+- docs/operations/us-smallcap-event-review-20261104-b05.md, docs/operations/us-smallcap-event-data-contract.md, public/document-catalog.json
+- scripts/generate-us-smallcap-event-batch.mjs, scripts/validate-us-smallcap-event-data.mjs, package.json, DEVELOPMENT_LOG.md
 
 ### 검증
-- `npm run validate:us-smallcap-event-data:20261031`, `npm run validate:us-smallcap-event-data:20261104`, `npm run docs:check` 통과.
-- Batch 2 validator 통과: issuer 100, filing 5,111, canonical 전체 이벤트 234, batch 이벤트/접수 관계 18, filing amendment relation 0 (공식 amendment 링크 미확인 관계는 미기록). Batch 1 검증도 canonical 전체 중 기존 216건 분리 검증 통과.
-- 운영 마스터에서 100개 ticker의 COMMON_STOCK/USD/$100M 이하/CIK를 확인했다. 시총은 모두 2026-11-02 관측 STALE이며 이 한계를 보고서에 표시했다.
-- 최신 `oci` 통합 커밋 기준 `npm run deploy:verify` 통과: npm audit 취약점 0, production build 107페이지, standalone 기동 및 Chrome 데스크톱/모바일 하이드레이션·API smoke 통과, 테스트 1,542 passed/3 skipped (301 files, 1 skipped), typecheck 및 API/KIS/auth/cron/docs 감사 통과. `docs:check`의 catalog는 데이터 계약 문서 포함 124건이다.
-- `git diff --check` 통과. commit `b3ba6b5ac11d557d4a6c319b10c6bac01702ee23`를 `oci`에 반영했고 [Deploy OCI run 41676590668](https://github.com/pjtss/StockMan/actions/runs/41676590668)이 성공했다. 운영 `/api/health`는 `ok`, `/health-check`는 배포 SHA를 표시했다. 무인증 US 이벤트 API에서 canonical 237건 중 이번 배치 18개 eventId 모두 확인(14 ticker). 운영 API/DB write 없음.
-- 로그 기록 후속 커밋 `f6081c89`의 [Deploy OCI run 41679284330](https://github.com/pjtss/StockMan/actions/runs/41679284330)은 Verify deployment 단계에서 exit code 1로 종료되어 package/upload/activation은 건너뛰었다. 직전 같은 revision의 로컬 전체 검증과 데이터 커밋 OCI 배포는 통과했다. 공개 GitHub check에는 상세 로그가 없고 로그 다운로드 API는 403이라 실패한 내부 하위 명령은 미확인으로 남긴다.
+- 배치 5 validator 통과: 100 issuer, 4,620 SEC filings, 43 events, accession-event links 43, INVENTORY_ONLY 4,577 / TARGETED_SECTION_REVIEW 43. 배치 1~4도 통과.
+- docs:check 통과: 문서 카탈로그 129개/7 categories, 178 API routes/42 public GET, 165 migrations 검사. git diff --check 통과.
+- deploy:verify exit 0: dependency audit 취약점 0, production build 107 pages, full tests 300 files/1,542 passed/3 skipped, typecheck, standalone runtime/API smoke, Chrome desktop/mobile hydration, verify-scope/KIS/Bearer/cron/docs checks 통과.
+- 운영 API/DB write 없음. 현재 시총은 stale; 전체 4,620 filings의 본문 전수 검토도 아니다.
 
 ### 다음 개선
-- 자동 감지: validator가 배치 event parity, SEC CIK, accession 연결, filing counts, 쌍방 filing 관계를 검사하며 docs:check에서 두 배치를 반복 검증한다. 새 조사 배치는 package validator와 자료 계약 문서의 체크리스트에 함께 추가한다.
-- 남은 위험: 5,111 filing 전문 전수 확인이 아니고, 첨부 Exhibit 일부 및 stale cap snapshot이 남아 있다.
-- 다음: 첨부 원문·후속 공시 보강 후 최신 operating snapshot을 다시 확인한다.
+- 다음 100개 배치 전에 운영 metadata와 최신 submissions를 다시 확인하고, 회사 후속 일정 변경·상장기한 해소 공시를 추적한다.
+- 자동 감지: docs:check에서 배치별 100 issuer, 6개 분류 flags, cap bounds, event parity, accession/CIK 소유권과 filing counts를 검사한다. SEC 429는 paced retry 성공 전에 review 완료로 승격하지 않는다.
+- 남은 위험: 시총 값은 11월 2일 stale snapshot이고 filing 전문 4,577건은 미검토다. 이벤트 결과가 주가 방향을 보장하지 않으며 Nasdaq 기한이 상장폐지를 확정하지 않는다.
 
 ### 개선 과제
-- 개선 과제 ID: CI-2026-11-04-001
+- 개선 과제 ID: CI-2026-11-04-003
 - 성과 판정: IMPROVED
-- 근거: 여러 배치 JSON과 canonical event 간 eventId/CIK/accession 관계를 docs:check에서 독립 검증하도록 validator 인자와 범위를 일반화했다.
+- 근거: 재사용 생성기·검토 정의 입력, 6개 분류 flag와 CIK 연결 자동 검증을 추가하고 전체 deployment verification을 통과했다.
 
 ### 커밋·푸시·배포
-- 후속 개선: GitHub Verify deployment 실패 시 실패한 내부 하위 명령을 보존할 수 있도록 CI 로그 조회 권한/진단 경로를 검토한다. 운영에 반영된 데이터 커밋과 로그 전용 재배포 실패를 구별해 추적한다.
+- 검증 완료. 한국어 상세 커밋 후 `oci` push 예정이며 운영 workflow와 배포 후 health/event/catalog GET을 확인한다.
 
 ## [2026-10-31] 이벤트 occurrence 조회 API 추가
 
@@ -8269,12 +8269,13 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 운영 metadata/market-intelligence GET 100/100 성공; operating ticker/CIK와 공식 SEC ticker master CIK 100/100 대조. SEC submissions 4,334건 수집; 대상 원문 응답 447/447 성공 후 사건 근거 accession 24건을 선별해 연결했다.
 - `npm run validate:us-smallcap-event-data:20261104b04` 통과: issuer 100, batch events 24, accession-event relations 24, filing counts 4,310 INVENTORY_ONLY/24 TARGETED_SECTION_REVIEW.
 - `npm run docs:check` 통과: 4개 배치 validator, 178 API route/42 public GET audit, 문서 카탈로그 128개/7개 category, 문서와 migration audit.
-- build/full test/runtime smoke/deploy verification은 아직 미실행. `git diff --check`, commit/push, 배포 및 운영 검증도 미실행.
+- `npm run deploy:verify` 통과: dependency audit 취약점 0, production build 107 pages, full suite 300 files/1,542 passed/3 skipped, typecheck, docs/API/KIS/auth/cron audits, standalone runtime API smoke 및 Chrome desktop/mobile hydration 성공. `git diff --check` 통과.
+- commit `a1e471ee1c1e656ead639520f695e4cbdb3ff884`를 `oci`에 push했다. OCI workflow [41693624683](https://github.com/pjtss/StockMan/actions/runs/41693624683) 성공(verify, package, SSH, upload, activation 포함). 운영 `/api/health` status=ok, `/health-check` commit SHA 일치. public US events API는 274건 중 b04 eventId 24/24 반환; `/document-catalog.json`에서 report indexed, `/manuals/operations/us-smallcap-event-review-20261104-b04.md` HTTP 200 확인. 운영 API/DB write 없음.
 
 ### 다음 개선
 - 남은 위험: 시총 값은 stale; 4,310 filing은 전문 미검토; 회사 exhibit의 모든 세부조건 및 후속 공시는 전수 추적하지 않았다. 일부 event summary는 primary filing의 statement를 압축했으며 보고서에서 확정 실행과 계획·항소를 구분했다.
 - 자동 감지: docs:check에 batch ID, ticker/CIK, common-stock flags, cap bounds, event parity, accession ownership, filing counts, relation reciprocity 검사 포함. report 카탈로그 포함은 docs:catalog:check로 검증한다.
-- 다음 단계: deploy:verify 통과 후 순차 commit/push하고 운영 health, canonical event IDs, catalog/manual GET을 대조한다. 이어 다음 중복 없는 100종목 batch를 같은 구조로 처리한다.
+- 다음 단계: 배치 5의 후보 100개를 운영 마스터/시총/SEC CIK로 재검증하고 동일한 review·accession ledger·catalog 검증 구조를 적용한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-04-002
@@ -8282,4 +8283,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 근거: 기존 자동화는 b04를 docs:check에서 실행하지 않았고 배치 ID/100종목 제한을 검사하지 않았다. 이제 개별 배치 validator가 docs gate에서 실행되며 문서 카탈로그의 보고서 도달성까지 자동 검증한다.
 
 ### 커밋·푸시·배포
-- 아직 미실행. 프로젝트 규칙에 따라 전체 build·test·runtime 검증 통과 이후 진행한다.
+- 완료: `a1e471ee` commit, `oci` push, OCI Actions 41693624683 성공, 운영 health/event/catalog/manual 확인. 이 로그 후속 정정은 다음 검증된 기록 커밋에서 반영한다.

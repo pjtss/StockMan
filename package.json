@@ -32,9 +32,11 @@
     "validate:us-smallcap-event-data:20261104": "node scripts/validate-us-smallcap-event-data.mjs --events=data/market-impact-events.json --review=data/us-smallcap-event-review-20261104.json --ledger=data/us-smallcap-filing-review-ledger-20261104.json",
     "validate:us-smallcap-event-data:20261104b03": "node scripts/validate-us-smallcap-event-data.mjs --events=data/market-impact-events.json --review=data/us-smallcap-event-review-20261104-b03.json --ledger=data/us-smallcap-filing-review-ledger-20261104-b03.json",
     "validate:us-smallcap-event-data:20261104b04": "node scripts/validate-us-smallcap-event-data.mjs --events=data/market-impact-events.json --review=data/us-smallcap-event-review-20261104-b04.json --ledger=data/us-smallcap-filing-review-ledger-20261104-b04.json --batch=20261104-b04",
-    "docs:check": "npm run validate:us-smallcap-event-data:20261031 && npm run validate:us-smallcap-event-data:20261104 && npm run validate:us-smallcap-event-data:20261104b03 && npm run validate:us-smallcap-event-data:20261104b04 && npm run docs:api:generate && npm run audit:api-surface && npm run docs:catalog:generate && npm run docs:catalog:check && node scripts/check-docs.mjs",
+    "docs:check": "npm run validate:us-smallcap-event-data:20261031 && npm run validate:us-smallcap-event-data:20261104 && npm run validate:us-smallcap-event-data:20261104b03 && npm run validate:us-smallcap-event-data:20261104b04 && npm run validate:us-smallcap-event-data:20261104b05 && npm run docs:api:generate && npm run audit:api-surface && npm run docs:catalog:generate && npm run docs:catalog:check && node scripts/check-docs.mjs",
     "docs:catalog:generate": "node docs/api/document-catalog.mjs write",
-    "docs:catalog:check": "node docs/api/document-catalog.mjs check"
+    "docs:catalog:check": "node docs/api/document-catalog.mjs check",
+    "validate:us-smallcap-event-data:20261104b05": "node scripts/validate-us-smallcap-event-data.mjs --events=data/market-impact-events.json --review=data/us-smallcap-event-review-20261104-b05.json --ledger=data/us-smallcap-filing-review-ledger-20261104-b05.json --batch=20261104-b05",
+    "generate:us-smallcap-event-batch": "node scripts/generate-us-smallcap-event-batch.mjs"
   },
   "dependencies": {
     "@netlify/functions": "^5.2.0",

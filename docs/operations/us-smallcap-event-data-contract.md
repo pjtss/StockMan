@@ -40,6 +40,13 @@
 5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. validator는 배치 ID·100 issuer·검토 event 수와 정규 이벤트/issuer/accession 간 관계를 검사한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 순번 보고서는 문서 카탈로그 생성기 허용 패턴에 포함하고 catalog check 후 공개 manual 경로에서 도달할 수 있는지 확인한다.
 6. 배포 전에는 project deployment verification이 요구하는 build, full test, runtime smoke 및 audits를 통과시킨다. 커밋과 푸시는 순차 실행하고, 운영 배포 후 public GET으로 배치 이벤트를 재확인한다.
 
+### 반복 배치 생성과 자동 점검
+
+- `scripts/generate-us-smallcap-event-batch.mjs`는 날짜 배치 ID를 인자로 받고 `SMALLCAP_BATCH_INDEX`, `SMALLCAP_PRIOR_BATCH`, `SMALLCAP_BATCH_EVENT_DEFS`로 운영 수집 묶음, 직전 원장, 사람이 검토한 accession·이벤트 정의를 입력받는다. API 수집 결과, 검토 정의, issuer snapshot, accession ledger, canonical event를 서로 다른 파일로 유지한다.
+- `data/us-smallcap-event-defs-YYYYMMDD-bNN.json`은 원문 검토 후 이벤트 판정의 재현 입력이다. 이 파일은 SEC 제출 목록 및 CIK와 validator로 대조한다.
+- 모든 신규 배치 validator는 6개 비보통주 분류 플래그(`is_etf`, `is_warrant`, `is_derivative`, `is_dr`, `is_leveraged`, `is_inverse`)를 검사한다. `--batch` 지정 시 reviewed filing의 reviewBatch와 SEC archive URL CIK가 issuer 원장과 일치하는지 fail-closed 검사한다.
+- SEC 429가 발생하면 요청을 동시 재시도하지 않는다. 간격을 둔 재수집에서 성공한 HTTP 200 응답이 확인되기 전까지 해당 filing은 review 완료로 올리지 않는다.
+
 ## 정확성·한계
 
 - SEC submissions 전체 수는 filing 본문을 전수 검토했다는 의미가 아니다. inventory와 사건 직접 검토 수를 분리해 보고한다.
