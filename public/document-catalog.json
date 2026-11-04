@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 131,
+  "documentCount": 132,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1081,6 +1081,25 @@
       "relatedPaths": [],
       "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b07.md",
       "related": []
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261104-b08",
+      "title": "미국 보통주 공시·뉴스 이벤트 검토 — 2026-11-04 배치 8",
+      "category": "operations",
+      "format": "md",
+      "description": "SEC 이벤트는 ticker+CIK+accession+eventId로 SEC 제출 원장에 연결하고, 회사 IR 이벤트는 ticker+고유 eventId+공식 URL로 별도 연결한다. 두 출처 유형을 SEC accession으로 가장하지 않는다.",
+      "url": "/manuals/operations/us-smallcap-event-review-20261104-b08.md",
+      "relatedPaths": [
+        "docs/operations/us-smallcap-event-data-contract.md"
+      ],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b08.md",
+      "related": [
+        {
+          "title": "미국 소형주 이벤트 자료 관리 기준",
+          "url": "/manuals/operations/us-smallcap-event-data-contract.md",
+          "sourcePath": "docs/operations/us-smallcap-event-data-contract.md"
+        }
+      ]
     },
     {
       "id": "operations-us-smallcap-event-review-20261104",

@@ -1,3 +1,43 @@
+## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 8차 배치와 자료 관리 개선
+
+### 목표
+- 앞선 700개와 ticker 중복 없이 운영 서버 기준 신규 미국 보통주 100개를 조사하고, 공시·회사 IR 일정 및 원문 연결을 종목별·공시별로 저장한다.
+- 미국/현지 시각과 KST, 일정 확정 여부, 희석·상장유지·거래 종결 위험을 구분하고 문서 관리 검증을 다음 배치에도 적용한다.
+
+### 반영
+- localhost 활성 US COMMON_STOCK universe 5,216개와 운영 fundamentals 5,216/5,216을 대조했다. 앞선 700 ticker 제외 후 USD 시총 1억 달러 이하 후보 672개 중 200개 metadata 및 공식 SEC ticker-exchange CIK를 검사해 100개를 확정했다. royalty trust unit 3개, SEC registered fund 1개, preferred certificate 1개를 후보에서 제외했다.
+- 저장 시총은 $9,402,493~$29,221,500이며 2026-11-02 관측으로 모두 STALE이다. 조사일 현재 시총 적격성으로 해석하지 않도록 review와 보고서에 freshness를 보존했다.
+- 운영 market-intelligence 100/100 응답(RSS 375, bullish 47), SEC submissions 4,432건을 저장했다. SEC 원문 22 accession은 TARGETED_SECTION_REVIEW, 공식 회사 IR 일정 9건은 PRIMARY_SOURCE_REVIEWED로 분리해 총 31 이벤트를 만들었다. SEC 이벤트는 accession, IR 이벤트는 고유 IR eventId와 공식 URL로 연결한다.
+- 일정 status, 정확히 확인된 현지 시각/KST, 주총 안건의 잠재 희석, Nasdaq 기한, 대출 만기, 법원 심리와 거래 outside date를 구조화했다. 시간이나 결과를 확인하지 못한 항목은 추정하지 않았고 direction/impact horizon은 UNCERTAIN/UNKNOWN으로 유지했다.
+- `scripts/generate-us-smallcap-event-batch.mjs`에 SEC accession과 공식 IR URL 이벤트의 서로 다른 연결 경로를 추가했다. validator는 targeted SEC와 직접 확인된 다른 공식 1차 출처를 구분 검증한다. 모든 저장 review batch 간 ticker 중복 방지와 legal-type 제외 기준을 운영 문서에 명시했다.
+
+### 변경 파일 및 확인 대상
+- `scripts/generate-us-smallcap-event-batch.mjs`, `scripts/validate-us-smallcap-event-data.mjs`, `package.json`
+- `data/market-impact-events.json`, `data/us-smallcap-event-review-20261104-b08.json`, `data/us-smallcap-filing-review-ledger-20261104-b08.json`, `data/us-smallcap-event-defs-20261104-b08.json`
+- `docs/operations/us-smallcap-event-review-20261104-b08.md`, `docs/operations/us-smallcap-event-data-contract.md`, `public/document-catalog.json`
+- `DEVELOPMENT_LOG.md`
+
+### 검증
+- b08 validator: 100 issuer, 4,432 SEC filings, 31 events, 22 accession-event relations, 22 TARGETED_SECTION_REVIEW, 9 PRIMARY_SOURCE_REVIEWED를 확인했다.
+- `npm run docs:check` 통과: 기존 7개 배치와 b08의 중복·관계 검증, API surface, 132개 문서 catalog 및 문서 계약을 확인했다. 첫 검사에서 요구된 `### 다음 개선` heading 누락을 수정했고 후속 검사에서 통과했다.
+- `git diff --check` 통과. `npm run deploy:verify` 통과: dependency audit 0개 취약점, build 107 pages, test 300 files (1,542 passed/3 skipped), typecheck, standalone runtime smoke, desktop/mobile Chrome hydration, API surface, verify-scope, KIS, Bearer, cron audits.
+- 운영 공개 GET과 localhost DB read-only 조회만 사용했다. 운영 DB 직접 접근/write, refresh API, 알림 전송은 수행하지 않았다.
+
+### 남은 위험
+- 현재 운영 시총 snapshot이 stale이므로 2026-11-04 현재 적격성은 확인되지 않았다. fresh snapshot 없이는 이를 현재 시총 기준 100개로 해석하지 않는다.
+- 4,432건 filing 본문과 모든 exhibit의 전수검토는 하지 않았다. 이번 이벤트 근거 자료로 직접 검토한 SEC accession과 IR URL만 review 완료 처리했다.
+
+### 다음 개선
+- 다음 배치에서도 전체 fundamentals coverage, 공식 CIK/active COMMON_STOCK, 법적 보안유형, 전체 저장 배치 간 ticker 중복, 1차 출처 종류별 event link를 자동 검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-008
+- 성과 판정: IMPROVED
+- 근거: SEC accession과 회사 IR URL을 별도 출처관계로 저장하고 validator에서 각 경로를 점검하도록 확장했다. 기존·신규 배치 검증, 문서 catalog, 전체 테스트·빌드·실행 감사를 모두 통과했다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 전체 검증 통과 후 순차 진행한다.
+
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 7차 배치 및 자료 구조 개선
 
 ### 목표

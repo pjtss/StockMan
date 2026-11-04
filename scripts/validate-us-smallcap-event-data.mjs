@@ -28,6 +28,26 @@ function sameList(a = [], b = []) {
 const eventsDocument = readJson(paths.events);
 const review = readJson(paths.review);
 const ledger = readJson(paths.ledger);
+const batchReviewPattern = /^us-smallcap-event-review-(\d{8}(?:-b\d{2})?)\.json$/;
+const currentReviewPath = paths.review.replace(/\\/g, "/");
+const currentBatchTickers = new Set((review.universe?.issuers || []).map((issuer) => issuer.ticker));
+if (expectedBatch) {
+  const reviewDirectoryPath = new URL("../data/", import.meta.url);
+  for (const entry of fs.readdirSync(reviewDirectoryPath, { withFileTypes: true })) {
+    const filename = entry.name;
+    if (!entry.isFile()) continue;
+    const match = filename.match(batchReviewPattern);
+    if (!match) continue;
+    const candidatePath = `data/${filename}`;
+    if (candidatePath.replace(/\\/g, "/") === currentReviewPath) continue;
+    const priorReview = JSON.parse(fs.readFileSync(new URL(filename, reviewDirectoryPath), "utf8"));
+    const overlap = (priorReview.universe?.issuers || [])
+      .map((issuer) => issuer.ticker)
+      .filter((ticker) => currentBatchTickers.has(ticker));
+    assert(overlap.length === 0,
+      `Issuer ticker overlaps another persisted batch ${match[1]}: ${sorted(overlap).join(", ")}`);
+  }
+}
 if (expectedBatch) {
   assert(review.batchId === expectedBatch && ledger.batchId === expectedBatch,
     `Batch ID mismatch: expected ${expectedBatch}, got ${review.batchId}/${ledger.batchId}`);
@@ -42,8 +62,15 @@ if (expectedBatch) {
     `Review window batch ID mismatch: expected ${expectedBatch}`);
   assert(review.universe.issuerCount === 100 && ledger.issuerCount === 100,
     `Expected 100 issuers for ${expectedBatch}`);
-  const eventAccessionCount = review.reviewedEvents.filter(row => row.sourceReviewStatus === "TARGETED_SECTION_REVIEW").length;
-  assert(eventAccessionCount === review.reviewedEvents.length, `Batch has non-primary reviewed events: ${eventAccessionCount}/${review.reviewedEvents.length}`);
+  for (const row of review.reviewedEvents) {
+    if (row.sourceReviewStatus === "TARGETED_SECTION_REVIEW") {
+      assert((row.sourceIds || []).length > 0, `SEC targeted review is missing accession: ${row.eventId}`);
+    } else if (row.sourceReviewStatus === "PRIMARY_SOURCE_REVIEWED") {
+      assert((row.primarySourceUrls || []).some(url => /^https:\/\//.test(url)), `Direct primary-source review is missing a URL: ${row.eventId}`);
+    } else {
+      assert(false, `Unsupported event source review status for ${row.eventId}: ${row.sourceReviewStatus}`);
+    }
+  }
 }
 const allCanonicalEvents = eventsDocument.markets?.US;
 assert(Array.isArray(allCanonicalEvents), "market-impact-events.json must contain markets.US[]");

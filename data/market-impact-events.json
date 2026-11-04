@@ -13856,6 +13856,1243 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "LOCL",
+        "eventId": "SEC:0001140361-26-037241:meeting",
+        "companyName": "Local Bounti Corporation/DE",
+        "eventDate": "2026-11-04",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "특별 주주총회",
+        "summary": "11월 4일 09:00 MST 특별 주주총회. Nasdaq 상장주식 발행 안건의 승인 여부 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "신주 발행 승인 안건과 관련 희석 가능성"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001140361-26-037241",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1840780/000114036126037241/ny20081219x2_def14a.htm",
+        "evidence": [
+          {
+            "quote": "11월 4일 09:00 MST 특별 주주총회. Nasdaq 상장주식 발행 안건의 승인 여부 미확정.",
+            "locator": "SEC DEF 14A filed 2026-09-21; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1840780/000114036126037241/ny20081219x2_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "09:00",
+        "eventLocalTimezone": "MST",
+        "kstDate": "2026-11-05",
+        "kstTime": "01:00"
+      },
+      {
+        "ticker": "USEA",
+        "eventId": "SEC:0001140361-26-038404:meeting",
+        "companyName": "United Maritime Corp",
+        "eventDate": "2026-11-04",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 4일 17:00 그리스 현지시간 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001140361-26-038404",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1912847/000114036126038404/ef20083021_6k.htm",
+        "evidence": [
+          {
+            "quote": "11월 4일 17:00 그리스 현지시간 연례 주주총회.",
+            "locator": "SEC 6-K filed 2026-10-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1912847/000114036126038404/ef20083021_6k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "17:00",
+        "eventLocalTimezone": "EET",
+        "kstDate": "2026-11-05",
+        "kstTime": "00:00"
+      },
+      {
+        "ticker": "CVV",
+        "eventId": "SEC:0001493152-26-044302:meeting",
+        "companyName": "CVD EQUIPMENT CORP",
+        "eventDate": "2026-11-05",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 5일 10:00 EST 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-044302",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/766792/000149315226044302/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "11월 5일 10:00 EST 연례 주주총회.",
+            "locator": "SEC DEF 14A filed 2026-09-25; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/766792/000149315226044302/formdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "10:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-06",
+        "kstTime": "00:00"
+      },
+      {
+        "ticker": "NXTC",
+        "eventId": "SEC:0001104659-26-110971:hearing",
+        "companyName": "NextCure, Inc.",
+        "eventDate": "2026-11-06",
+        "eventType": "COURT_HEARING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "델라웨어 법원 심리",
+        "summary": "11월 6일 15:00 EST 법원 심리에서 과거 역분할 정관 변경 유효성 쟁점이 다뤄질 예정. 결과 미확정.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "법적 판단 및 과거 주식수 조정의 불확실성"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001104659-26-110971",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1661059/000110465926110971/nxtc-20260921x8k.htm",
+        "evidence": [
+          {
+            "quote": "11월 6일 15:00 EST 법원 심리에서 과거 역분할 정관 변경 유효성 쟁점이 다뤄질 예정. 결과 미확정.",
+            "locator": "SEC 8-K filed 2026-09-25; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1661059/000110465926110971/nxtc-20260921x8k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "15:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-07",
+        "kstTime": "05:00"
+      },
+      {
+        "ticker": "AAME",
+        "eventId": "SEC:0001140361-26-040638:meeting",
+        "companyName": "ATLANTIC AMERICAN CORP",
+        "eventDate": "2026-11-10",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 10일 10:00 EST 연례 주주총회. Nasdaq 상장유지 관련 통지 보유 상태를 별도 위험으로 추적.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "Nasdaq 상장유지 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001140361-26-040638",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/8177/000114036126040638/ny20063217x1_def14a.htm",
+        "evidence": [
+          {
+            "quote": "11월 10일 10:00 EST 연례 주주총회. Nasdaq 상장유지 관련 통지 보유 상태를 별도 위험으로 추적.",
+            "locator": "SEC DEF 14A filed 2026-10-23; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/8177/000114036126040638/ny20063217x1_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "10:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-11",
+        "kstTime": "00:00"
+      },
+      {
+        "ticker": "PPSI",
+        "eventId": "SEC:0001493152-26-043622:meeting",
+        "companyName": "PIONEER POWER SOLUTIONS, INC.",
+        "eventDate": "2026-11-12",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 12일 12:30 EST 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-043622",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1449792/000149315226043622/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "11월 12일 12:30 EST 연례 주주총회.",
+            "locator": "SEC DEF 14A filed 2026-09-22; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1449792/000149315226043622/formdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "12:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-13",
+        "kstTime": "02:30"
+      },
+      {
+        "ticker": "FIEE",
+        "eventId": "SEC:0001140361-26-039426:meeting",
+        "companyName": "FiEE, Inc.",
+        "eventDate": "2026-11-19",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 19일 09:00 EST 연례 주주총회. 우선주 정관 조정, 수권주식 6천만주에서 3억주 확대, 1:2~1:15 역분할 권한 안건 포함.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "수권주식 확대에 따른 잠재 희석",
+          "이사회 재량 역분할"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001140361-26-039426",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1467761/000114036126039426/ny20082883x2_def14a.htm",
+        "evidence": [
+          {
+            "quote": "11월 19일 09:00 EST 연례 주주총회. 우선주 정관 조정, 수권주식 6천만주에서 3억주 확대, 1:2~1:15 역분할 권한 안건 포함.",
+            "locator": "SEC DEF 14A filed 2026-10-13; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1467761/000114036126039426/ny20082883x2_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "09:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-19",
+        "kstTime": "23:00"
+      },
+      {
+        "ticker": "FTFT",
+        "eventId": "SEC:0001213900-26-110467:meeting",
+        "companyName": "Future FinTech Group Inc.",
+        "eventDate": "2026-11-19",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 19일 10:30 홍콩시간 연례 주주총회. 보통주 수권 한도를 937만5천주에서 9억주로 확대하는 안건 포함.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "수권주식 대규모 확대에 따른 잠재 희석"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-110467",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1066923/000121390026110467/ea0308047-02.htm",
+        "evidence": [
+          {
+            "quote": "11월 19일 10:30 홍콩시간 연례 주주총회. 보통주 수권 한도를 937만5천주에서 9억주로 확대하는 안건 포함.",
+            "locator": "SEC DEF 14A filed 2026-10-19; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1066923/000121390026110467/ea0308047-02.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "10:30",
+        "eventLocalTimezone": "HKT",
+        "kstDate": "2026-11-19",
+        "kstTime": "11:30"
+      },
+      {
+        "ticker": "DXLG",
+        "eventId": "SEC:0001193125-26-443781:meeting",
+        "companyName": "DESTINATION XL GROUP, INC.",
+        "eventDate": "2026-12-17",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "12월 17일 11:30 EST 연례 주주총회. 역분할 및 수권주식 관련 안건을 검토해야 함.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "역분할·수권주식 안건"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-443781",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/813298/000119312526443781/dxlg-20261102.htm",
+        "evidence": [
+          {
+            "quote": "12월 17일 11:30 EST 연례 주주총회. 역분할 및 수권주식 관련 안건을 검토해야 함.",
+            "locator": "SEC PRE 14A filed 2026-11-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/813298/000119312526443781/dxlg-20261102.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "11:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-12-18",
+        "kstTime": "01:30"
+      },
+      {
+        "ticker": "GIFT",
+        "eventId": "SEC:0001493152-26-047765:meeting",
+        "companyName": "GIFTIFY, INC.",
+        "eventDate": "2026-12-18",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "12월 18일 12:00 EST 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-047765",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1760233/000149315226047765/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "12월 18일 12:00 EST 연례 주주총회.",
+            "locator": "SEC DEF 14A filed 2026-10-20; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1760233/000149315226047765/formdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "12:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-12-19",
+        "kstTime": "02:00"
+      },
+      {
+        "ticker": "FTCI",
+        "eventId": "SEC:0001193125-26-425240:meeting",
+        "companyName": "FTC Solar, Inc.",
+        "eventDate": "2026-11-30",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "11월 30일 11:00 CST 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-425240",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1828161/000119312526425240/ftci-20261019.htm",
+        "evidence": [
+          {
+            "quote": "11월 30일 11:00 CST 연례 주주총회.",
+            "locator": "SEC DEF 14A filed 2026-10-19; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1828161/000119312526425240/ftci-20261019.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "11:00",
+        "eventLocalTimezone": "CST",
+        "kstDate": "2026-12-01",
+        "kstTime": "02:00"
+      },
+      {
+        "ticker": "BZAI",
+        "eventId": "SEC:0001871638-26-000083:meeting",
+        "companyName": "Blaize Holdings, Inc.",
+        "eventDate": "2026-12-01",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "12월 1일 10:00 EST 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001871638-26-000083",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1871638/000187163826000083/a2026-defproxy.htm",
+        "evidence": [
+          {
+            "quote": "12월 1일 10:00 EST 연례 주주총회.",
+            "locator": "SEC DEF 14A filed 2026-11-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1871638/000187163826000083/a2026-defproxy.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "10:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-12-02",
+        "kstTime": "00:00"
+      },
+      {
+        "ticker": "FKWL",
+        "eventId": "SEC:0001683168-26-007904:meeting",
+        "companyName": "FRANKLIN WIRELESS CORP",
+        "eventDate": "2026-12-04",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "12월 4일 14:00 PST 연례 주주총회.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001683168-26-007904",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/722572/000168316826007904/franklin_def14a.htm",
+        "evidence": [
+          {
+            "quote": "12월 4일 14:00 PST 연례 주주총회.",
+            "locator": "SEC DEF 14A filed 2026-10-15; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/722572/000168316826007904/franklin_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "14:00",
+        "eventLocalTimezone": "PST",
+        "kstDate": "2026-12-05",
+        "kstTime": "07:00"
+      },
+      {
+        "ticker": "AYTU",
+        "eventId": "SEC:0001437749-26-033276:meeting",
+        "companyName": "AYTU BIOPHARMA, INC",
+        "eventDate": "2026-12-10",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "연례 주주총회",
+        "summary": "12월 10일 10:00 MST 연례 주주총회. 50만주 규모 인센티브 계획 안건 포함.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "주식 인센티브 계획에 따른 잠재 희석"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001437749-26-033276",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1385818/000143774926033276/aytu20260817_def14a.htm",
+        "evidence": [
+          {
+            "quote": "12월 10일 10:00 MST 연례 주주총회. 50만주 규모 인센티브 계획 안건 포함.",
+            "locator": "SEC DEF 14A filed 2026-10-22; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1385818/000143774926033276/aytu20260817_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "10:00",
+        "eventLocalTimezone": "MST",
+        "kstDate": "2026-12-11",
+        "kstTime": "02:00"
+      },
+      {
+        "ticker": "BAER",
+        "eventId": "SEC:0001941536-26-000034:cure",
+        "companyName": "Bridger Aerospace Group Holdings, Inc.",
+        "eventDate": "2027-04-26",
+        "eventType": "NASDAQ_COMPLIANCE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 최저호가 규정준수 기한",
+        "summary": "Nasdaq 최저호가 기준 회복 기한. 연속 10거래일 요건 충족 여부는 후속 확인 필요.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "상장유지 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001941536-26-000034",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1941536/000194153626000034/baer-20261028.htm",
+        "evidence": [
+          {
+            "quote": "Nasdaq 최저호가 기준 회복 기한. 연속 10거래일 요건 충족 여부는 후속 확인 필요.",
+            "locator": "SEC 8-K filed 2026-10-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1941536/000194153626000034/baer-20261028.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "COOT",
+        "eventId": "SEC:0001213900-26-077966:cure",
+        "companyName": "Australian Oilseeds Holdings Ltd",
+        "eventDate": "2027-01-04",
+        "eventType": "NASDAQ_COMPLIANCE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 최저호가 규정준수 기한",
+        "summary": "Nasdaq 최소호가 회복 기한. 11월 3일 20-F 기준 회복 여부를 계속 확인해야 함.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "상장유지 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-077966",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1959994/000121390026077966/ea0297931-6k_australian.htm",
+        "evidence": [
+          {
+            "quote": "Nasdaq 최소호가 회복 기한. 11월 3일 20-F 기준 회복 여부를 계속 확인해야 함.",
+            "locator": "SEC 6-K filed 2026-07-14; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1959994/000121390026077966/ea0297931-6k_australian.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "BYSI",
+        "eventId": "SEC:0001171843-26-006116:cure",
+        "companyName": "BeyondSpring Inc.",
+        "eventDate": "2027-03-16",
+        "eventType": "NASDAQ_COMPLIANCE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 최저호가 규정준수 기한",
+        "summary": "최저호가 규정준수 기한.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "상장유지 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001171843-26-006116",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1677940/000117184326006116/f8k_091826.htm",
+        "evidence": [
+          {
+            "quote": "최저호가 규정준수 기한.",
+            "locator": "SEC 8-K filed 2026-09-18; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1677940/000117184326006116/f8k_091826.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "BYSI",
+        "eventId": "SEC:0001171843-26-006371:cure-mvls",
+        "companyName": "BeyondSpring Inc.",
+        "eventDate": "2027-03-29",
+        "eventType": "NASDAQ_COMPLIANCE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 시가총액 기준 규정준수 기한",
+        "summary": "최소 시가총액 기준 규정준수 기한.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "상장유지 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001171843-26-006371",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1677940/000117184326006371/f8k_100226.htm",
+        "evidence": [
+          {
+            "quote": "최소 시가총액 기준 규정준수 기한.",
+            "locator": "SEC 8-K filed 2026-10-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1677940/000117184326006371/f8k_100226.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "NSPR",
+        "eventId": "SEC:0001493152-26-038438:cure",
+        "companyName": "InspireMD, Inc.",
+        "eventDate": "2027-01-13",
+        "eventType": "NASDAQ_COMPLIANCE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 최저호가 규정준수 기한",
+        "summary": "최저호가 회복 기한. 최근 분기보고서에는 계속기업 관련 중대한 불확실성과 자금조달 위험이 언급됨.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "상장유지 위험",
+          "계속기업 및 자금조달 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-038438",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1433607/000149315226038438/form10-q.htm",
+        "evidence": [
+          {
+            "quote": "최저호가 회복 기한. 최근 분기보고서에는 계속기업 관련 중대한 불확실성과 자금조달 위험이 언급됨.",
+            "locator": "SEC 10-Q filed 2026-08-14; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1433607/000149315226038438/form10-q.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "JVA",
+        "eventId": "SEC:0001493152-26-042313:maturity",
+        "companyName": "COFFEE HOLDING CO INC",
+        "eventDate": "2026-12-28",
+        "eventType": "DEBT_MATURITY",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "사업대출 만기",
+        "summary": "사업 대출 만기일. 연장 또는 상환 여부 확인 필요.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "차환·상환 유동성 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-042313",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1007019/000149315226042313/form10-q.htm",
+        "evidence": [
+          {
+            "quote": "사업 대출 만기일. 연장 또는 상환 여부 확인 필요.",
+            "locator": "SEC 10-Q filed 2026-09-11; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1007019/000149315226042313/form10-q.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "ABVC",
+        "eventId": "SEC:0001213900-26-088348:approval",
+        "companyName": "ABVC BIOPHARMA, INC.",
+        "eventDate": "2027-06-30",
+        "eventType": "FINANCING_MILESTONE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "전환사채 주주승인 기한",
+        "summary": "전환주식 19.99% 제한 관련 주주 승인 기한. 미승인 시 채무불이행 조항 및 전환·희석 조건을 확인해야 함.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "전환 및 희석 위험",
+          "미승인 시 계약상 채무불이행 가능성"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001213900-26-088348",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1173313/000121390026088348/ea0300204-10q_abvcbio.htm",
+        "evidence": [
+          {
+            "quote": "전환주식 19.99% 제한 관련 주주 승인 기한. 미승인 시 채무불이행 조항 및 전환·희석 조건을 확인해야 함.",
+            "locator": "SEC 10-Q filed 2026-08-12; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1173313/000121390026088348/ea0300204-10q_abvcbio.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "RYET",
+        "eventId": "SEC:0001731122-26-001381:outside-date",
+        "companyName": "Ruanyun Edai Technology Inc.",
+        "eventDate": "2027-03-31",
+        "eventType": "TRANSACTION_OUTSIDE_DATE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "인수거래 외부종료일",
+        "summary": "인수계약상 외부종료일. 거래 종결이 보장되지 않으며 조건 미충족 시 종료 권리가 발생할 수 있음.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음",
+          "거래 종결 불확실성",
+          "계약 해지 위험"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001731122-26-001381",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1873454/000173112226001381/e7992_6-k.htm",
+        "evidence": [
+          {
+            "quote": "인수계약상 외부종료일. 거래 종결이 보장되지 않으며 조건 미충족 시 종료 권리가 발생할 수 있음.",
+            "locator": "SEC 6-K filed 2026-10-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1873454/000173112226001381/e7992_6-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "FTCI",
+        "eventId": "SEC:IR:ir-2026-11-04",
+        "companyName": "FTC Solar, Inc.",
+        "eventDate": "2026-11-04",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 4일 08:30 EST 실적 컨퍼런스콜. 실적 결과 미발표.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investor.ftcsolar.com/news-events/events-and-presentations",
+        "sourceUrl": "https://investor.ftcsolar.com/news-events/events-and-presentations",
+        "evidence": [
+          {
+            "quote": "11월 4일 08:30 EST 실적 컨퍼런스콜. 실적 결과 미발표.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investor.ftcsolar.com/news-events/events-and-presentations"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "08:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-04",
+        "kstTime": "22:30"
+      },
+      {
+        "ticker": "QRHC",
+        "eventId": "SEC:IR:ir-2026-11-05",
+        "companyName": "Quest Resource Holding Corp",
+        "eventDate": "2026-11-05",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표",
+        "summary": "회사가 안내한 11월 5일 3분기 실적 발표. 발표 시각 미공개.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investors.qrhc.com/overview/default.aspx?languageid=1",
+        "sourceUrl": "https://investors.qrhc.com/overview/default.aspx?languageid=1",
+        "evidence": [
+          {
+            "quote": "회사가 안내한 11월 5일 3분기 실적 발표. 발표 시각 미공개.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investors.qrhc.com/overview/default.aspx?languageid=1"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "INV",
+        "eventId": "SEC:IR:ir-2026-11-12",
+        "companyName": "Innventure, Inc.",
+        "eventDate": "2026-11-12",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 12일 장후 실적 발표, 17:00 EST 컨퍼런스콜.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://www.innventure.com/investors",
+        "sourceUrl": "https://www.innventure.com/investors",
+        "evidence": [
+          {
+            "quote": "11월 12일 장후 실적 발표, 17:00 EST 컨퍼런스콜.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://www.innventure.com/investors"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "17:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-13",
+        "kstTime": "07:00"
+      },
+      {
+        "ticker": "FTCI",
+        "eventId": "IR:FTCI:ir-2026-11-04",
+        "companyName": "FTC Solar, Inc.",
+        "eventDate": "2026-11-04",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 4일 08:30 EST 실적 컨퍼런스콜. 실적 결과 미발표.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investor.ftcsolar.com/news-events/events-and-presentations",
+        "sourceUrl": "https://investor.ftcsolar.com/news-events/events-and-presentations",
+        "evidence": [
+          {
+            "quote": "11월 4일 08:30 EST 실적 컨퍼런스콜. 실적 결과 미발표.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investor.ftcsolar.com/news-events/events-and-presentations"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "08:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-04",
+        "kstTime": "22:30"
+      },
+      {
+        "ticker": "TEAD",
+        "eventId": "IR:TEAD:ir-2026-11-05",
+        "companyName": "Teads Holding Co.",
+        "eventDate": "2026-11-05",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 5일 장전 실적 발표, 08:30 EST 컨퍼런스콜. 결과 미발표.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investors.teads.com/news-releases/news-release-details/teads-release-third-quarter-2026-financial-results-november-5",
+        "sourceUrl": "https://investors.teads.com/news-releases/news-release-details/teads-release-third-quarter-2026-financial-results-november-5",
+        "evidence": [
+          {
+            "quote": "11월 5일 장전 실적 발표, 08:30 EST 컨퍼런스콜. 결과 미발표.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investors.teads.com/news-releases/news-release-details/teads-release-third-quarter-2026-financial-results-november-5"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "08:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-05",
+        "kstTime": "22:30"
+      },
+      {
+        "ticker": "BRLT",
+        "eventId": "IR:BRLT:ir-2026-11-05",
+        "companyName": "Brilliant Earth Group, Inc.",
+        "eventDate": "2026-11-05",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 5일 장전 실적 발표, 08:30 EST 컨퍼런스콜. 결과 미발표.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investors.brilliantearth.com/",
+        "sourceUrl": "https://investors.brilliantearth.com/",
+        "evidence": [
+          {
+            "quote": "11월 5일 장전 실적 발표, 08:30 EST 컨퍼런스콜. 결과 미발표.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investors.brilliantearth.com/"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "08:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-05",
+        "kstTime": "22:30"
+      },
+      {
+        "ticker": "QRHC",
+        "eventId": "IR:QRHC:ir-2026-11-05",
+        "companyName": "Quest Resource Holding Corp",
+        "eventDate": "2026-11-05",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표",
+        "summary": "회사가 안내한 11월 5일 3분기 실적 발표. 발표 시각 미공개.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investors.qrhc.com/overview/default.aspx?languageid=1",
+        "sourceUrl": "https://investors.qrhc.com/overview/default.aspx?languageid=1",
+        "evidence": [
+          {
+            "quote": "회사가 안내한 11월 5일 3분기 실적 발표. 발표 시각 미공개.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investors.qrhc.com/overview/default.aspx?languageid=1"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "BSEM",
+        "eventId": "IR:BSEM:ir-2026-11-12",
+        "companyName": "BioStem Technologies, Inc.",
+        "eventDate": "2026-11-12",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 12일 16:30 EST 실적 컨퍼런스콜. 결과 미발표.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://ir.biostemtechnologies.com/events/",
+        "sourceUrl": "https://ir.biostemtechnologies.com/events/",
+        "evidence": [
+          {
+            "quote": "11월 12일 16:30 EST 실적 컨퍼런스콜. 결과 미발표.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://ir.biostemtechnologies.com/events/"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "16:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-13",
+        "kstTime": "06:30"
+      },
+      {
+        "ticker": "DAIO",
+        "eventId": "IR:DAIO:ir-2026-11-12",
+        "companyName": "DATA I/O CORP",
+        "eventDate": "2026-11-12",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 12일 07:00 EST 실적 발표, 08:00 EST 컨퍼런스콜.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://www.dataio.com/investor-relations/news/events/",
+        "sourceUrl": "https://www.dataio.com/investor-relations/news/events/",
+        "evidence": [
+          {
+            "quote": "11월 12일 07:00 EST 실적 발표, 08:00 EST 컨퍼런스콜.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://www.dataio.com/investor-relations/news/events/"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "08:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-12",
+        "kstTime": "22:00"
+      },
+      {
+        "ticker": "NSPR",
+        "eventId": "IR:NSPR:ir-2026-11-12",
+        "companyName": "InspireMD, Inc.",
+        "eventDate": "2026-11-12",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 12일 08:30 EST 컨퍼런스콜.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investors.inspiremd.com/news-releases/news-release-details/inspiremd-announce-third-quarter-2026-financial-results",
+        "sourceUrl": "https://investors.inspiremd.com/news-releases/news-release-details/inspiremd-announce-third-quarter-2026-financial-results",
+        "evidence": [
+          {
+            "quote": "11월 12일 08:30 EST 컨퍼런스콜.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investors.inspiremd.com/news-releases/news-release-details/inspiremd-announce-third-quarter-2026-financial-results"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "08:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-12",
+        "kstTime": "22:30"
+      },
+      {
+        "ticker": "SPRU",
+        "eventId": "IR:SPRU:ir-2026-11-12",
+        "companyName": "SPRUCE POWER HOLDING CORP",
+        "eventDate": "2026-11-12",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 12일 장후 실적 발표, 16:30 EST 컨퍼런스콜.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://investors.sprucepower.com/financials/quarterly-results/default.aspx",
+        "sourceUrl": "https://investors.sprucepower.com/financials/quarterly-results/default.aspx",
+        "evidence": [
+          {
+            "quote": "11월 12일 장후 실적 발표, 16:30 EST 컨퍼런스콜.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://investors.sprucepower.com/financials/quarterly-results/default.aspx"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "16:30",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-13",
+        "kstTime": "06:30"
+      },
+      {
+        "ticker": "INV",
+        "eventId": "IR:INV:ir-2026-11-12",
+        "companyName": "Innventure, Inc.",
+        "eventDate": "2026-11-12",
+        "eventType": "EARNINGS_RELEASE",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "3분기 실적 발표 및 컨퍼런스콜",
+        "summary": "11월 12일 장후 실적 발표, 17:00 EST 컨퍼런스콜.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 1차 자료와 검토한 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "COMPANY_IR",
+        "sourceId": "https://www.innventure.com/investors",
+        "sourceUrl": "https://www.innventure.com/investors",
+        "evidence": [
+          {
+            "quote": "11월 12일 장후 실적 발표, 17:00 EST 컨퍼런스콜.",
+            "locator": "Issuer investor-relations event announcement",
+            "sourceUrl": "https://www.innventure.com/investors"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventLocalTime": "17:00",
+        "eventLocalTimezone": "EST",
+        "kstDate": "2026-11-13",
+        "kstTime": "07:00"
       }
     ]
   }
