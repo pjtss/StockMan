@@ -6,12 +6,14 @@
 ### 반영
 - localhost 운영 종목 universe를 read-only 조회해 active COMMON_STOCK 및 6개 비보통주 배제조건 일치 5,216개를 확인했다. 기존 6개 배치의 600 ticker를 제외했다.
 - 운영 공개 us-smallcap-shares API 11페이지와 로컬 운영 universe 교집합에서 신규 후보 518개를 확인했다. 후보별 fundamentalsFetchedAt은 조사 시각 대비 44.6~45.1시간 전이었고 24시간 이내 관측은 0개였다.
+- 자동 갱신 주기 문서에는 OCI cron 24시간 간격이 명시돼 있다. 공개 관리자 실행 이력 API는 401이라 현재 서버 실행 결과를 읽지 못했고, localhost automation_runs의 최신 실제 실행은 2026-08-25로 확인돼 현재 운영 근거로 사용하지 않았다. cron 실패 원인은 미확인이다.
 - 표본 CMCT 운영 metadata는 시총 $9,402,493, 관측시각 2026-11-02T07:49:57Z, marketDataFreshness=STALE, age 161,983초로 반환됐다. 현재 시총 적격성을 입증하는 100개가 없어 batch7 issuer 확정과 SEC 원문 수집을 시작하지 않았다. 운영 API/DB write는 없었다.
 
 ### 변경 파일
 - DEVELOPMENT_LOG.md
 
 ### 검증
+- npm run deploy:verify 통과: dependency audit 0 vulnerabilities, production build 107 pages, Vitest 300 files/1,542 passed/3 skipped, typecheck, standalone runtime smoke, Chrome desktop/mobile hydration, docs/API/catalog 및 verify-scope/KIS/Bearer/cron 감사.
 - 후보 페이지 조회는 공개 GET, 공식 universe 대조는 localhost DB read-only 경로를 사용했다. 후보 518개 freshness 집계 결과 24시간 이내 0개.
 - npm run docs:check 및 git diff --check로 로그 계약과 문서 구조를 확인한다.
 
