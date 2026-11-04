@@ -12884,6 +12884,501 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "GIXI",
+        "eventId": "SEC:0001493152-26-049791:SPECIAL_GM",
+        "companyName": "Gix Internet Ltd.",
+        "eventDate": "2026-12-08",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "특별 주주총회 (17:00 Israel / 12-09 00:00 KST)",
+        "summary": "회사는 2026-12-08 17:00 이스라엘 현지시간에 Givatayim에서 특별 주주총회를 공지했다. 표결 안건 결과는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049791",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1782265/000149315226049791/form6-k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-12-08 17:00 이스라엘 현지시간에 Givatayim에서 특별 주주총회를 공지했다. 표결 안건 결과는 미확정이다.",
+            "locator": "SEC 6-K filed 2026-11-03; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1782265/000149315226049791/form6-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "IDAI",
+        "eventId": "SEC:0001718939-26-000066:ANNUAL_MEETING",
+        "companyName": "T Stamp Inc",
+        "eventDate": "2026-12-15",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "가상 연례 주주총회 (09:00 EST / 23:00 KST)",
+        "summary": "2026-12-15 09:00 EST에 가상 연례 주주총회가 예정됐다. 안건 표결 결과는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001718939-26-000066",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1718939/000171893926000066/tstamp-def14axagm2026102926.htm",
+        "evidence": [
+          {
+            "quote": "2026-12-15 09:00 EST에 가상 연례 주주총회가 예정됐다. 안건 표결 결과는 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-29; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1718939/000171893926000066/tstamp-def14axagm2026102926.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "OPTT",
+        "eventId": "SEC:0001493152-26-049264:SPECIAL_MEETING",
+        "companyName": "Ocean Power Technologies, Inc.",
+        "eventDate": "2026-11-24",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "특별 주주총회: 20% 초과 발행·최대 1:6.6 역분할 권한 (09:00 ET / 23:00 KST)",
+        "summary": "회사는 2026-11-24 09:00 ET 가상 특별 주총에서 NYSE American Rule 713 관련 20% 이상 발행, 채권교환 및 최대 1:6.6 역분할 권한 안건을 표결한다고 공지했다. 승인·실행은 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049264",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1378140/000149315226049264/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-11-24 09:00 ET 가상 특별 주총에서 NYSE American Rule 713 관련 20% 이상 발행, 채권교환 및 최대 1:6.6 역분할 권한 안건을 표결한다고 공지했다. 승인·실행은 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-29; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1378140/000149315226049264/formdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "ESYN",
+        "eventId": "SEC:0001493152-26-048698:ANNUAL_MEETING",
+        "companyName": "EnerSyn Global Inc.",
+        "eventDate": "2026-12-10",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "가상 연례 주주총회 (09:00 EST / 23:00 KST)",
+        "summary": "2026-12-10 09:00 EST에 가상 연례 주주총회가 예정됐다. 안건 결과는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-048698",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1897245/000149315226048698/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "2026-12-10 09:00 EST에 가상 연례 주주총회가 예정됐다. 안건 결과는 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-27; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1897245/000149315226048698/formdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "BTLN",
+        "eventId": "SEC:0001493152-26-048521:ANNUAL_MEETING",
+        "companyName": "Brightline Interactive, Inc./NV",
+        "eventDate": "2026-12-17",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "가상 연례 주주총회 (11:00 EST / 12-18 01:00 KST)",
+        "summary": "2026-12-17 11:00 EST 가상 연례 주총이 공지됐다. 주주 제안 표결 결과는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-048521",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1854445/000149315226048521/formdef14a.htm",
+        "evidence": [
+          {
+            "quote": "2026-12-17 11:00 EST 가상 연례 주총이 공지됐다. 주주 제안 표결 결과는 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-26; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1854445/000149315226048521/formdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "AEON",
+        "eventId": "SEC:0001837607-26-000074:SPECIAL_MEETING",
+        "companyName": "AEON Biopharma, Inc.",
+        "eventDate": "2026-12-15",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "특별 주주총회: 역분할 권한 등 (13:00 PT / 12-16 06:00 KST)",
+        "summary": "2026-12-15 13:00 Pacific Time에 특별 주주총회가 예정됐다. 역분할 권한 등 안건의 승인 여부는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001837607-26-000074",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1837607/000183760726000074/aeon-20261026xdef14a.htm",
+        "evidence": [
+          {
+            "quote": "2026-12-15 13:00 Pacific Time에 특별 주주총회가 예정됐다. 역분할 권한 등 안건의 승인 여부는 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-26; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1837607/000183760726000074/aeon-20261026xdef14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "TOVX",
+        "eventId": "SEC:0001104659-26-117417:SPECIAL_MEETING",
+        "companyName": "Theriva Biologics, Inc.",
+        "eventDate": "2026-11-18",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "특별 주주총회 (15:30 CET / 23:30 KST)",
+        "summary": "2026-11-18 15:30 현지시간에 스페인 Parets del Vallès에서 특별 주주총회가 예정됐다. 정관 변경 및 잠재적 역분할 관련 안건 결과는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001104659-26-117417",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/894158/000110465926117417/tm2627846d1_def14a.htm",
+        "evidence": [
+          {
+            "quote": "2026-11-18 15:30 현지시간에 스페인 Parets del Vallès에서 특별 주주총회가 예정됐다. 정관 변경 및 잠재적 역분할 관련 안건 결과는 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-20; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/894158/000110465926117417/tm2627846d1_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "DCM",
+        "eventId": "SEC:0001104659-26-117433:ANNUAL_MEETING",
+        "companyName": "DeFi Capital Markets, Inc.",
+        "eventDate": "2026-11-18",
+        "eventType": "SHAREHOLDER_MEETING",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "가상 연례 주주총회 (12:00 ET / 11-19 02:00 KST)",
+        "summary": "2026-11-18 12:00 ET 가상 연례 주주총회가 예정됐다. 이사 선임 등 안건 결과는 미확정이다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001104659-26-117433",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/102109/000110465926117433/tm2627349d3_def14a.htm",
+        "evidence": [
+          {
+            "quote": "2026-11-18 12:00 ET 가상 연례 주주총회가 예정됐다. 이사 선임 등 안건 결과는 미확정이다.",
+            "locator": "SEC DEF 14A filed 2026-10-20; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/102109/000110465926117433/tm2627349d3_def14a.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "REED",
+        "eventId": "SEC:0001493152-26-049780:PRIVATE_PLACEMENT_CLOSE",
+        "companyName": "REED'S, INC.",
+        "eventDate": "2026-11-06",
+        "eventType": "FINANCING",
+        "status": "ESTIMATED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "약 1,742만주 사모발행 종결 목표일 (약 $10m)",
+        "summary": "회사는 주당 $0.574에 보통주 17,421,602주를 발행하는 약 $10m 사모 거래를 공시했고 종결 목표를 2026-11-06경으로 제시했다. 종결은 조건부·추정이며 기존 주주 희석 위험이 있다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049780",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1140215/000149315226049780/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 주당 $0.574에 보통주 17,421,602주를 발행하는 약 $10m 사모 거래를 공시했고 종결 목표를 2026-11-06경으로 제시했다. 종결은 조건부·추정이며 기존 주주 희석 위험이 있다.",
+            "locator": "SEC 8-K filed 2026-11-03; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1140215/000149315226049780/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "KPTI",
+        "eventId": "SEC:0001193125-26-444164:CHAPTER_11",
+        "companyName": "Karyopharm Therapeutics Inc.",
+        "eventDate": "2026-11-02",
+        "eventType": "BANKRUPTCY",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "회생 목적 Chapter 11 자발적 파산보호 신청",
+        "summary": "회사는 2026-11-02 미국 텍사스 남부 파산법원에 Chapter 11 자발적 신청을 제출했다. 영업 지속 및 회생·자본구조 결과는 법원 절차에 달려 있다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001193125-26-444164",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1503802/000119312526444164/d141618d8k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 2026-11-02 미국 텍사스 남부 파산법원에 Chapter 11 자발적 신청을 제출했다. 영업 지속 및 회생·자본구조 결과는 법원 절차에 달려 있다.",
+            "locator": "SEC 8-K filed 2026-11-03; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1503802/000119312526444164/d141618d8k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "OPTT",
+        "eventId": "SEC:0001493152-26-049788:PROMISSORY_NOTE",
+        "companyName": "Ocean Power Technologies, Inc.",
+        "eventDate": "2026-11-02",
+        "eventType": "FINANCING",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "12% 약속어음 $325,000 매입대금 및 추가 tranche 가능성",
+        "summary": "회사는 액면 $373,750(원발행할인 $48,750), 매입대금 $325,000의 12% 어음을 발행했다. 향후 12개월 최대 $2.875m 추가 조달은 별도 합의에 달려 있으며 부채·희석 위험을 수반한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-049788",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1378140/000149315226049788/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 액면 $373,750(원발행할인 $48,750), 매입대금 $325,000의 12% 어음을 발행했다. 향후 12개월 최대 $2.875m 추가 조달은 별도 합의에 달려 있으며 부채·희석 위험을 수반한다.",
+            "locator": "SEC 8-K filed 2026-11-03; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1378140/000149315226049788/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "ELME",
+        "eventId": "SEC:0001104659-26-121321:NYSE_DELISTING",
+        "companyName": "Elme Communities",
+        "eventDate": "2026-11-05",
+        "eventType": "LISTING_RISK",
+        "status": "CONFIRMED_SCHEDULED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "NYSE Form 25-NSE 제출 후 상장폐지 효력 예정",
+        "summary": "NYSE가 2026-10-26 Form 25-NSE를 제출했고 공시상 제출 10 calendar days 뒤 효력이 발생한다. 주식은 10-26부터 OTC ELMES로 거래 중이다. 거래소 상장폐지 절차와 OTC 거래상태를 구분한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001104659-26-121321",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/104894/000110465926121321/tm2628645d1_8k.htm",
+        "evidence": [
+          {
+            "quote": "NYSE가 2026-10-26 Form 25-NSE를 제출했고 공시상 제출 10 calendar days 뒤 효력이 발생한다. 주식은 10-26부터 OTC ELMES로 거래 중이다. 거래소 상장폐지 절차와 OTC 거래상태를 구분한다.",
+            "locator": "SEC 8-K filed 2026-11-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/104894/000110465926121321/tm2628645d1_8k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "MASK",
+        "eventId": "SEC:0001185185-26-005106:NASDAQ_DELISTING_DETERMINATION",
+        "companyName": "3 E Network Technology Group Ltd",
+        "eventDate": "2026-10-30",
+        "eventType": "LISTING_RISK",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "Nasdaq 상장폐지 결정 통지 및 청문 항소 절차",
+        "summary": "Nasdaq staff가 2026-10-30 상장폐지 결정을 통지했다. 회사는 청문을 요청할 수 있고 결정 유예 여부·최종 결과를 별도 추적해야 한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001185185-26-005106",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1993097/000118518526005106/mask6k102926.htm",
+        "evidence": [
+          {
+            "quote": "Nasdaq staff가 2026-10-30 상장폐지 결정을 통지했다. 회사는 청문을 요청할 수 있고 결정 유예 여부·최종 결과를 별도 추적해야 한다.",
+            "locator": "SEC 6-K filed 2026-10-30; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1993097/000118518526005106/mask6k102926.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "PAVM",
+        "eventId": "SEC:0001493152-26-048138:OFFERING_CLOSED",
+        "companyName": "PAVmed Inc.",
+        "eventDate": "2026-10-22",
+        "eventType": "FINANCING",
+        "status": "COMPLETED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "공모 종결, gross proceeds $15m",
+        "summary": "Lucid Diagnostics는 공모 종결 및 총 조달액 $15.0m를 공시했다. 자금 유입과 발행 증권의 잠재 희석은 함께 고려한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001493152-26-048138",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1624326/000149315226048138/form8-k.htm",
+        "evidence": [
+          {
+            "quote": "Lucid Diagnostics는 공모 종결 및 총 조달액 $15.0m를 공시했다. 자금 유입과 발행 증권의 잠재 희석은 함께 고려한다.",
+            "locator": "SEC 8-K filed 2026-10-22; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1624326/000149315226048138/form8-k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+      },
+      {
+        "ticker": "AQB",
+        "eventId": "SEC:0001603978-26-000109:BRIDGE_LOAN",
+        "companyName": "AQUABOUNTY TECHNOLOGIES INC",
+        "eventDate": "2026-10-29",
+        "eventType": "FINANCING",
+        "status": "REPORTED",
+        "direction": "UNCERTAIN",
+        "impactHorizon": "UNKNOWN",
+        "title": "최대 $1m bridge loan 약정, 보고일 현재 $500k 인출",
+        "summary": "회사는 최대 $1m 약속어음 한도를 공시했으며 보고서상 $500k를 인출했다. 부채·이자 및 추가 인출 가능성을 고려한다.",
+        "rationale": "일정·공시 사실 자체는 주가 방향을 보장하지 않는다. 기업별 유동성, 자금조달 및 상장유지 위험을 함께 고려한다.",
+        "risks": [
+          "소형주 유동성 및 변동성 위험",
+          "이벤트 결과와 가격 방향은 보장되지 않음"
+        ],
+        "limitations": [
+          "공개 SEC 제출자료와 대상 원문 범위에 한정",
+          "시가총액 관측치는 2026-11-02 시점으로 stale"
+        ],
+        "sourceType": "SEC_FILING",
+        "sourceId": "0001603978-26-000109",
+        "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1603978/000160397826000109/aqb-20261029x8k.htm",
+        "evidence": [
+          {
+            "quote": "회사는 최대 $1m 약속어음 한도를 공시했으며 보고서상 $500k를 인출했다. 부채·이자 및 추가 인출 가능성을 고려한다.",
+            "locator": "SEC 8-K filed 2026-11-02; issuer event disclosure",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1603978/000160397826000109/aqb-20261029x8k.htm"
+          }
+        ],
+        "confidence": "MEDIUM",
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
       }
     ]
   }

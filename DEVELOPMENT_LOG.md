@@ -1,3 +1,44 @@
+## [2026-11-04] 미국 소형주 이벤트 원장 6차 배치 및 문서 검증 기준 개선
+
+### 목표와 범위
+- 운영 서버 기준으로 기존 500개와 중복되지 않는 다음 100개 미국 COMMON_STOCK의 SEC 공시·뉴스 이벤트를 조사하고 종목·공시별 구조 원장에 추가한다.
+- 저장 시총 관측이 stale이면 그 사실을 정량 보고하고 현재 시총처럼 표현하지 않는다. SEC 제출 inventory와 본문 직접 검토 범위를 구분한다.
+
+### 반영
+- localhost만 허용하는 프로젝트 운영 추출 절차를 사용해 활성 US COMMON_STOCK 코드 5,216개를 read-only 조회했다. 기존 500개를 제외한 4,720개를 운영 fundamentals 공개 GET 49회로 확인했으며 반환 누락·실패는 0건이다.
+- USD 양수·시총 상한 이하 후보 772개 중 운영 metadata와 SEC 공식 company_tickers_exchange.json의 고유 ticker/CIK가 일치하는 100개를 선정했다. 운영 metadata 100/100, active COMMON_STOCK, 6개 비보통주 배제 플래그 false, SEC CIK 교차 확인을 보존했다. 관측값은 모두 2026-11-02라 stale이며 현재 시총 1억 달러 이하를 보장하지 않는다는 한계를 구조화 자료와 보고서에 기록했다. CIK가 없거나 SEC identity가 불명확한 ticker는 제외했다.
+- 운영 market-intelligence 100/100을 read-only GET으로 확인했다. RSS 516건, bullish 분류 73건, 운영 SEC event rows 0건이다. SEC submissions는 2025-11-04 포함~2026-11-05 미포함 4,274건을 inventory ledger에 저장했다.
+- 10월 20일 이후 event 관련 filing 109건의 SEC 원문 HTTP 200을 확보했다. 주주총회 7건, 증자/부채·파산·상장위험 등 8건의 사건 관련 구간을 직접 확인해 15건을 TARGETED_SECTION_REVIEW로 연결했다. 나머지 4,259건은 INVENTORY_ONLY로 두어 전수 본문검토로 오인되지 않게 했다.
+- SEC master 거래소 문자열과 운영 NAS/NYS/AMS 명칭이 달라지는 경우가 있어 거래소 라벨만으로 CIK를 추정하지 않고, 운영 metadata CIK와 공식 SEC row의 단일 동일 CIK를 기준으로 확인했다. metadata CIK 누락·SEC master 모호·운영 조회 실패는 fail-closed 처리했다.
+- 검증 자동화에서 b03 legacy 원장에는 batchId가 없는데 `--batch`를 전달해 false failure가 발생했다. 저장 스키마 확인 후 b03은 legacy 호환 검증으로 두고 b04~b06은 batchId/100 issuer 강한 검증을 사용하도록 `docs:check`를 정비했다. 기존 API surface·catalog 검사도 보존했다.
+- 배치 보고서, issuer review JSON, accession ledger, 재현용 event definitions, canonical events를 ticker·CIK·accession·eventId로 연결했다. 문서 관리 계약에는 stale 시총 보고 원칙, CIK fail-closed 기준, 배치 validator/catalog 등록 절차를 추가했다.
+
+### 변경 파일
+- data/market-impact-events.json, data/us-smallcap-event-review-20261104-b06.json, data/us-smallcap-filing-review-ledger-20261104-b06.json, data/us-smallcap-event-defs-20261104-b06.json
+- docs/operations/us-smallcap-event-review-20261104-b06.md, docs/operations/us-smallcap-event-data-contract.md, public/document-catalog.json
+- scripts/generate-us-smallcap-event-batch.mjs, package.json, DEVELOPMENT_LOG.md
+
+### 검증
+- 배치 6 validator 통과: issuer 100, SEC submissions 4,274, 직접 확인 events 15, accession-event relations 15, INVENTORY_ONLY 4,259 / TARGETED_SECTION_REVIEW 15.
+- `npm run deploy:verify` 통과: 의존성 취약점 0건, production build 107 pages, Vitest 300 files/1,542 passed/3 skipped, typecheck, standalone runtime/API smoke, Chrome desktop/mobile hydration, docs/API/catalog, verify-scope/KIS/Bearer/cron 감사 통과. 최초 실행은 문서 계약 누락으로 차단됐고 보완 후 재실행해 통과했다.
+- 운영 조회는 public GET과 localhost DB read-only만 사용했다. 운영 DB/API write는 없었다.
+
+### 근본 원인·재발 감지·남은 위험
+- 근본 원인: 기존 배치들의 CIK 보강 시점과 legacy schema가 서로 달랐고, 저장 시총 관측도 갱신 지연으로 stale이었다. 일괄 동일한 batchId/exchange-name 규칙을 가정하면 legacy 데이터 오탐 또는 SEC identity 오판 위험이 생긴다.
+- 자동 감지: `docs:check`가 배치별 validator를 실행해 issuer 수, active COMMON_STOCK/6 flags, USD cap, CIK, filing/event 관계 및 문서 카탈로그 접근성을 확인한다. stale freshness는 review JSON·보고서의 observedAt과 함께 검토한다.
+- 남은 위험: 배치 6의 100개 시총 모두 2026-11-02 관측치라 현재 적격성 미확정. 4,274 filing 중 4,259건은 본문 미검토. 상장·주총·자금조달 사건의 결과와 가격 영향은 미확정이며 주가 방향을 보장하지 않는다.
+
+### 다음 개선
+- 다음 100개 배치 시작 전 운영 시총 snapshot 갱신 여부를 확인하고, 최신값을 확보하지 못하면 현재 시총 적격으로 표현하지 않는다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-005
+- 성과 판정: IMPROVED
+- 근거: 종목·공시·이벤트별 구조 원장과 재현 가능한 validator/catalog 연결을 추가했고, 누락된 로그 계약을 보완한 뒤 전체 deploy:verify가 통과했다.
+
+### 커밋·푸시·배포
+- 상태: 미실행. 전체 deploy:verify 성공 후 배치 6 변경을 commit/push하고 운영 배포 및 API 반영을 확인할 예정이다.
+
 ## [2026-11-04] 미국 소형주 이벤트 원장 5차 배치 및 문서 관리 자동화
 
 ### 목표

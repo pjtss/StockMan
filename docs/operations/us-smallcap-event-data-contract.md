@@ -37,7 +37,7 @@
 2. official SEC ticker/CIK 및 submissions를 대조하고, accession별 본문 확인 여부를 기록한다.
 3. 근거를 확인한 이벤트만 canonical 원장에 추가하고 review/ledger 양쪽에서 연결한다.
 4. `npm run validate:us-smallcap-event-data:<배치>`로 active COMMON_STOCK 상태, USD 시총 범위, 운영·SEC master CIK 일치, 종목 수, 제출 수, event parity, accession, 검토 상태 수, 공식 amendment 관계를 확인한다. 동일 날짜 복수 배치는 `YYYYMMDDbNN` 이름의 명령으로 각각 독립 검증한다.
-5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. validator는 배치 ID·100 issuer·검토 event 수와 정규 이벤트/issuer/accession 간 관계를 검사한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 순번 보고서는 문서 카탈로그 생성기 허용 패턴에 포함하고 catalog check 후 공개 manual 경로에서 도달할 수 있는지 확인한다.
+5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. validator는 배치 ID·100 issuer·검토 event 수와 정규 이벤트/issuer/accession 간 관계를 검사한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 배치 운영 보고서는 문서 카탈로그 생성기 명시 패턴으로 포함하고 catalog check 후 공개 manual 경로에서 도달할 수 있는지 확인한다.
 6. 배포 전에는 project deployment verification이 요구하는 build, full test, runtime smoke 및 audits를 통과시킨다. 커밋과 푸시는 순차 실행하고, 운영 배포 후 public GET으로 배치 이벤트를 재확인한다.
 
 ### 반복 배치 생성과 자동 점검
@@ -54,3 +54,6 @@
 - 임상 및 FDA 일정은 확정/추정 상태를 분리한다. 임의의 승인 확률·시장 규모·매출을 만들지 않는다.
 - cap snapshot이 stale이거나 조사와 배포 사이에 바뀌었을 수 있다. 이후 배치 선정 때 운영 마스터로 재검증한다.
 - 오류가 발견되면 잘못된 자료와 정규 이벤트 양쪽을 수정하고, 원인·영향·감지 방법·검증을 `DEVELOPMENT_LOG.md`에 기록한다.
+
+- 시총 snapshot이 24시간 freshness 기준을 넘으면 STALE을 유지하고, $100m 이하는 저장 시점 기준이라고 보고한다. 현재 적격성이 요구되면 stale 종목은 신규 확정 universe에서 제외하며 ticker를 임의 보충하지 않는다.
+- SEC master에서 ticker가 복수 거래소 행에 있으면 exchange 표기만으로 CIK를 추정하지 않는다. 운영 metadata CIK와 공식 SEC row의 동일 CIK가 유일할 때만 통과한다. operating CIK가 누락되면 별도 공식 identity 보강 전까지 제외한다.
