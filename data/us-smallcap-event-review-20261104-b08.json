@@ -38,6 +38,7 @@
     "snapshotFreshness": "STALE",
     "productionIntelligenceEndpoint": "/api/public/market-intelligence",
     "secSubmissionsSource": "SEC data.sec.gov submissions and official SEC company_tickers_exchange.json",
+    "apiScheduleDetails": "local-kst-v1",
     "readOnly": true
   },
   "universe": {

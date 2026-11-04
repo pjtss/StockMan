@@ -23,6 +23,7 @@
 - filing은 SEC accession으로 유일하게 식별한다. SEC 공식 submissions에 있는 CIK, form, 접수일 및 accession 경로를 일치시킨다.
 - 이벤트는 불변 `eventId`를 사용한다. 검토 이벤트의 `eventId`와 ticker는 정규 원장 및 accession ledger의 연결과 일치해야 한다.
 - SEC 제출 이벤트는 SEC accession으로 accession ledger에 연결한다. 회사 IR에 직접 게시된 일정은 `sourceType: COMPANY_IR`, 고유 `IR:<ticker>:<key>` eventId, 공식 URL로 연결하며 존재하지 않는 SEC accession을 만들지 않는다. `PRIMARY_SOURCE_REVIEWED`는 직접 확인한 공식 primary URL을 보존하고, `TARGETED_SECTION_REVIEW`는 SEC accession과 제출 원문을 보존한다.
+- 이벤트의 공개 GET은 `eventDetails`만 일정 보충정보로 반환한다. 현지 시각이 확인된 이벤트는 `eventDetails.localDate`, `localTime`, `localTimezone`, `kstDate`, `kstTime`에 저장한다. 원문 시각이 없으면 시간·timezone·KST 3개 필드는 `null`로 보존하며 날짜를 임의로 시간대로 변환하지 않는다. review validator는 `localDate`가 canonical `eventDate`와 같고 지정/미확인 시간이 `eventDetails`와 일치하는지 검사한다.
 - accession 간 `relatedFilings`는 SEC 원문에서 amendment 관계를 직접 확인한 경우에만 상호 연결한다. 날짜·form 근접성만으로 amendment를 추정하지 않는다.
 - 미확인 뉴스나 추정 일정을 정규 이벤트에 올리지 않는다. 일정 상태는 실제 결과, 회사 확정 일정, 공식 추정치, 제3자 추정치가 구별되도록 둔다.
 

@@ -130,6 +130,20 @@ for (const event of canonicalEvents) {
   }
   assert(event.eventId && event.ticker && event.eventDate && event.status, "Canonical event is missing an identity or schedule field");
   assert(/^\d{4}-\d{2}-\d{2}$/.test(event.eventDate) && !Number.isNaN(Date.parse(`${event.eventDate}T00:00:00Z`)), `Invalid eventDate: ${event.eventId}`);
+  if (review.sourceMethodology?.apiScheduleDetails === "local-kst-v1" && reviewEventIds.has(event.eventId)) {
+    assert(event.eventDetails?.localDate === event.eventDate,
+      `Batch event eventDetails.localDate must match eventDate: ${event.eventId}`);
+    if (event.eventLocalTime !== undefined) {
+      assert(event.eventDetails.localTime === event.eventLocalTime &&
+        event.eventDetails.localTimezone === event.eventLocalTimezone &&
+        event.eventDetails.kstDate === event.kstDate && event.eventDetails.kstTime === event.kstTime,
+      `Batch event API eventDetails must preserve local and KST time fields: ${event.eventId}`);
+    } else {
+      assert(event.eventDetails.localTime === null && event.eventDetails.localTimezone === null &&
+        event.eventDetails.kstDate === null && event.eventDetails.kstTime === null,
+      `Unspecified event time must remain null in API eventDetails: ${event.eventId}`);
+    }
+  }
   if (event.datePrecision !== undefined) {
     assert(new Set(["DAY", "MONTH", "PART_OF_MONTH", "QUARTER", "RANGE", "UNDATED", "APPROXIMATE_DAY"]).has(event.datePrecision), `Invalid datePrecision for ${event.eventId}`);
     if (event.datePrecision === "MONTH") {

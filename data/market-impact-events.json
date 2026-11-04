@@ -13890,6 +13890,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-04",
+          "localTime": "09:00",
+          "localTimezone": "MST",
+          "kstDate": "2026-11-05",
+          "kstTime": "01:00"
+        },
         "eventLocalTime": "09:00",
         "eventLocalTimezone": "MST",
         "kstDate": "2026-11-05",
@@ -13927,6 +13934,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-04",
+          "localTime": "17:00",
+          "localTimezone": "EET",
+          "kstDate": "2026-11-05",
+          "kstTime": "00:00"
+        },
         "eventLocalTime": "17:00",
         "eventLocalTimezone": "EET",
         "kstDate": "2026-11-05",
@@ -13964,6 +13978,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-05",
+          "localTime": "10:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-06",
+          "kstTime": "00:00"
+        },
         "eventLocalTime": "10:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-06",
@@ -14002,6 +14023,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-06",
+          "localTime": "15:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-07",
+          "kstTime": "05:00"
+        },
         "eventLocalTime": "15:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-07",
@@ -14040,6 +14068,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-10",
+          "localTime": "10:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-11",
+          "kstTime": "00:00"
+        },
         "eventLocalTime": "10:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-11",
@@ -14077,6 +14112,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-12",
+          "localTime": "12:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-13",
+          "kstTime": "02:30"
+        },
         "eventLocalTime": "12:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-13",
@@ -14116,6 +14158,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-19",
+          "localTime": "09:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-19",
+          "kstTime": "23:00"
+        },
         "eventLocalTime": "09:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-19",
@@ -14154,6 +14203,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-19",
+          "localTime": "10:30",
+          "localTimezone": "HKT",
+          "kstDate": "2026-11-19",
+          "kstTime": "11:30"
+        },
         "eventLocalTime": "10:30",
         "eventLocalTimezone": "HKT",
         "kstDate": "2026-11-19",
@@ -14192,6 +14248,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-12-17",
+          "localTime": "11:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-12-18",
+          "kstTime": "01:30"
+        },
         "eventLocalTime": "11:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-12-18",
@@ -14229,6 +14292,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-12-18",
+          "localTime": "12:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-12-19",
+          "kstTime": "02:00"
+        },
         "eventLocalTime": "12:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-12-19",
@@ -14266,6 +14336,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-30",
+          "localTime": "11:00",
+          "localTimezone": "CST",
+          "kstDate": "2026-12-01",
+          "kstTime": "02:00"
+        },
         "eventLocalTime": "11:00",
         "eventLocalTimezone": "CST",
         "kstDate": "2026-12-01",
@@ -14303,6 +14380,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-12-01",
+          "localTime": "10:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-12-02",
+          "kstTime": "00:00"
+        },
         "eventLocalTime": "10:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-12-02",
@@ -14340,6 +14424,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-12-04",
+          "localTime": "14:00",
+          "localTimezone": "PST",
+          "kstDate": "2026-12-05",
+          "kstTime": "07:00"
+        },
         "eventLocalTime": "14:00",
         "eventLocalTimezone": "PST",
         "kstDate": "2026-12-05",
@@ -14378,6 +14469,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-12-10",
+          "localTime": "10:00",
+          "localTimezone": "MST",
+          "kstDate": "2026-12-11",
+          "kstTime": "02:00"
+        },
         "eventLocalTime": "10:00",
         "eventLocalTimezone": "MST",
         "kstDate": "2026-12-11",
@@ -14415,7 +14513,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-04-26",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "COOT",
@@ -14449,7 +14554,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-01-04",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "BYSI",
@@ -14483,7 +14595,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-03-16",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "BYSI",
@@ -14517,7 +14636,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-03-29",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "NSPR",
@@ -14552,7 +14678,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-01-13",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "JVA",
@@ -14586,7 +14719,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-12-28",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "ABVC",
@@ -14621,7 +14761,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-06-30",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "RYET",
@@ -14656,7 +14803,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2027-03-31",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "FTCI",
@@ -14690,6 +14844,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-04",
+          "localTime": "08:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-04",
+          "kstTime": "22:30"
+        },
         "eventLocalTime": "08:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-04",
@@ -14727,6 +14888,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-05",
+          "localTime": "08:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-05",
+          "kstTime": "22:30"
+        },
         "eventLocalTime": "08:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-05",
@@ -14764,6 +14932,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-05",
+          "localTime": "08:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-05",
+          "kstTime": "22:30"
+        },
         "eventLocalTime": "08:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-05",
@@ -14800,7 +14975,14 @@
           }
         ],
         "confidence": "MEDIUM",
-        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류"
+        "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-05",
+          "localTime": null,
+          "localTimezone": null,
+          "kstDate": null,
+          "kstTime": null
+        }
       },
       {
         "ticker": "BSEM",
@@ -14834,6 +15016,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-12",
+          "localTime": "16:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-13",
+          "kstTime": "06:30"
+        },
         "eventLocalTime": "16:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-13",
@@ -14871,6 +15060,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-12",
+          "localTime": "08:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-12",
+          "kstTime": "22:00"
+        },
         "eventLocalTime": "08:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-12",
@@ -14908,6 +15104,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-12",
+          "localTime": "08:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-12",
+          "kstTime": "22:30"
+        },
         "eventLocalTime": "08:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-12",
@@ -14945,6 +15148,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-12",
+          "localTime": "16:30",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-13",
+          "kstTime": "06:30"
+        },
         "eventLocalTime": "16:30",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-13",
@@ -14982,6 +15192,13 @@
         ],
         "confidence": "MEDIUM",
         "impactHorizonBasis": "정량 주가 반응 표본 검증을 수행하지 않아 미분류",
+        "eventDetails": {
+          "localDate": "2026-11-12",
+          "localTime": "17:00",
+          "localTimezone": "EST",
+          "kstDate": "2026-11-13",
+          "kstTime": "07:00"
+        },
         "eventLocalTime": "17:00",
         "eventLocalTimezone": "EST",
         "kstDate": "2026-11-13",

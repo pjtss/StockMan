@@ -24,6 +24,7 @@
 - `npm run docs:check` 통과: 기존 7개 배치와 b08의 중복·관계 검증, API surface, 132개 문서 catalog 및 문서 계약을 확인했다. 첫 검사에서 요구된 `### 다음 개선` heading 누락을 수정했고 후속 검사에서 통과했다.
 - `git diff --check` 통과. `npm run deploy:verify` 통과: dependency audit 0개 취약점, build 107 pages, test 300 files (1,542 passed/3 skipped), typecheck, standalone runtime smoke, desktop/mobile Chrome hydration, API surface, verify-scope, KIS, Bearer, cron audits.
 - 첫 운영 workflow #1256은 `events[366]`의 `SEC:IR:ir-2026-11-04`와 `events[369]`의 `IR:FTCI:ir-2026-11-04`가 같은 importer identity를 가져 Activate release에서 실패했다. 오류와 개선 내용을 `docs/ERROR_HANDLING.md`에 추가했다. identity 보강 뒤 canonical US 이벤트 374개, b08 이벤트 31개의 validator 검증은 통과했다. 수정 후 전체 배포 검증과 재배포는 아직 진행 중이다.
+- 후속 commit `e20c7023`는 OCI workflow #1257 성공으로 운영에 반영됐다. 공개 events GET에서 b08 eventId 31/31을 확인하고, 운영 보고서 manual GET 200 및 한글 UTF-8 내용을 확인했다. 후속 점검에서 공개 API가 일정 상세로 반환하는 `eventDetails`에 시각이 전달되지 않는 점을 발견해 local/KST 필드 추가 및 API payload 검증을 준비 중이다.
 - 운영 공개 GET과 localhost DB read-only 조회만 사용했다. 운영 DB 직접 접근/write, refresh API, 알림 전송은 수행하지 않았다.
 
 ### 남은 위험
@@ -35,11 +36,11 @@
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-04-008
-- 성과 판정: IMPROVED
-- 근거: SEC accession과 회사 IR URL을 별도 출처관계로 저장하고 validator에서 각 경로를 점검하도록 확장했다. 기존·신규 배치 검증, 문서 catalog, 전체 테스트·빌드·실행 감사를 모두 통과했다.
+- 성과 판정: PARTIAL
+- 근거: SEC accession과 회사 IR URL을 별도 출처관계로 저장하고 validator에서 각 경로를 점검하도록 확장했다. identity 충돌 수정은 운영 배포됐으나, 현지/KST 시각이 public API eventDetails에 포함되지 않은 부분을 이어서 보완 중이다.
 
 ### 커밋·푸시·배포
-- 상태: 실패. 최초 `19aad848` / OCI workflow #1256은 데이터 import identity 중복으로 운영 활성화되지 않았다. 중복 제거와 validator 개선 후 재검증·재배포한다.
+- 상태: 완료. `e20c7023` / OCI workflow #1257 성공. 후속 eventDetails API 필드 검증 및 재배포 진행 중.
 
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 7차 배치 및 자료 구조 개선
 
