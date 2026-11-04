@@ -21,7 +21,7 @@
 ### 검증
 - 배치 6 validator 통과: issuer 100, SEC submissions 4,274, 직접 확인 events 15, accession-event relations 15, INVENTORY_ONLY 4,259 / TARGETED_SECTION_REVIEW 15.
 - `npm run deploy:verify` 통과: 의존성 취약점 0건, production build 107 pages, Vitest 300 files/1,542 passed/3 skipped, typecheck, standalone runtime/API smoke, Chrome desktop/mobile hydration, docs/API/catalog, verify-scope/KIS/Bearer/cron 감사 통과. 최초 실행은 문서 계약 누락으로 차단됐고 보완 후 재실행해 통과했다.
-- 운영 조회는 public GET과 localhost DB read-only만 사용했다. 운영 DB/API write는 없었다.
+- 운영 조회는 public GET과 localhost DB read-only만 사용했다. 배포 후 health=ok, /health-check SHA 일치, events API 페이지 순회에서 batch6 accession 관계 15/15, document catalog 130건 및 보고서 HTTP 200/text/markdown; charset=UTF-8을 확인했다. 운영 DB/API write는 없었다.
 
 ### 근본 원인·재발 감지·남은 위험
 - 근본 원인: 기존 배치들의 CIK 보강 시점과 legacy schema가 서로 달랐고, 저장 시총 관측도 갱신 지연으로 stale이었다. 일괄 동일한 batchId/exchange-name 규칙을 가정하면 legacy 데이터 오탐 또는 SEC identity 오판 위험이 생긴다.
@@ -37,7 +37,8 @@
 - 근거: 종목·공시·이벤트별 구조 원장과 재현 가능한 validator/catalog 연결을 추가했고, 누락된 로그 계약을 보완한 뒤 전체 deploy:verify가 통과했다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 전체 deploy:verify 성공 후 배치 6 변경을 commit/push하고 운영 배포 및 API 반영을 확인할 예정이다.
+- 완료: 데이터 커밋 1d3715337de222bc24fb7c0e566b14dc2bf9f663를 origin/oci에 push했다. GitHub Actions Deploy OCI run 41773056609가 verify/package/SSH/upload/activation 모두 성공했고 운영 SHA 및 batch6 API·문서 응답을 확인했다.
+
 
 ## [2026-11-04] 미국 소형주 이벤트 원장 5차 배치 및 문서 관리 자동화
 
