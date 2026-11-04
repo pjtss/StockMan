@@ -68,3 +68,4 @@
 - 운영 마스터의 `COMMON_STOCK` 값만으로 미국 ordinary/common share의 법적 유형을 확정하지 않는다. SEC 원문이 royalty trust unit, preferred certificate 또는 registered investment fund를 확인하면 운영 분류와 달라도 해당 issuer를 배치에서 제외하고, 예외·근거·제외 수를 보고서와 재현 selection metadata에 남긴다. 분류 불일치는 이름 추정으로 덮어쓰지 않는다.
 - 공시 1건이 둘 이상의 이벤트 정의를 뒷받침할 수 있다. 검토 accession 수는 이벤트 record 수가 아니라 `ticker|accession` 고유 집합과 비교하고, filing row의 eventIds·canonical event·review event 간 다대일 연결을 검사한다.
 - 배치 생성 재실행 때 동일 eventId가 이미 canonical 원장에 있으면 새 검토 정의를 upsert한다. 과거 위험 문구나 일정 요약이 새 정의를 덮어쓰지 못하게 한다.
+- 배치 재생성 때 이전 review가 가진 해당 배치 eventId를 먼저 제거한 후 재구성하고, 입력한 비-SEC source identity와 같지만 eventId가 다른 obsolete canonical 항목도 제거한다. validator는 importer와 동일한 `(market, sourceType, sourceId, ticker, eventType, eventKey)` 규칙으로 전체 US 원장의 identity 중복을 검사한다.

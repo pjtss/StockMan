@@ -25,11 +25,27 @@ for (const filename of fs.readdirSync('data')) {
   }
 }
 const canonical = JSON.parse(fs.readFileSync('data/market-impact-events.json', 'utf8'));
+const previousReviewPath = `data/us-smallcap-event-review-${batch}.json`;
+const previousBatchEventIds = fs.existsSync(previousReviewPath)
+  ? new Set((JSON.parse(fs.readFileSync(previousReviewPath, 'utf8')).reviewedEvents || []).map((row) => row.eventId))
+  : new Set();
+canonical.markets.US = canonical.markets.US.filter((event) => !previousBatchEventIds.has(event.eventId));
 const batchTag = `batch_${batch.replace(/-/g, '_')}`;
 const ids = (accession, suffix) => `SEC:${accession}:${suffix}`;
 const eventDefsPath = process.env.SMALLCAP_BATCH_EVENT_DEFS;
 if (!eventDefsPath) throw new Error('Set SMALLCAP_BATCH_EVENT_DEFS to the reviewed event definitions JSON');
 const eventDefs = JSON.parse(fs.readFileSync(eventDefsPath, 'utf8'));
+const incomingNonSecIdentity = new Map(eventDefs
+  .filter((definition) => definition[9]?.sourceType && definition[9].sourceType !== 'SEC_FILING')
+  .map(([ticker, accession, suffix, , , , , type, , source]) => [
+    [ticker, source.sourceType, source.sourceId, type].join('|'),
+    `IR:${ticker}:${suffix}`,
+  ]));
+canonical.markets.US = canonical.markets.US.filter((event) => {
+  const identity = [event.ticker, event.sourceType, event.sourceId, event.eventType].join('|');
+  const expectedEventId = incomingNonSecIdentity.get(identity);
+  return !expectedEventId || event.eventId === expectedEventId;
+});
 
 const selected = selection.selected;
 const duplicateBatchTickers = selected.filter((issuer) => persistedBatchTickers.has(issuer.ticker));

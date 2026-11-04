@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { findDuplicateMarketImpactEventIdentities } from "./market-impact-event-identity.mjs";
 
 const arg = (name, fallback) => process.argv.find((value) => value.startsWith(`--${name}=`))?.slice(name.length + 3) || fallback;
 const paths = {
@@ -74,6 +75,11 @@ if (expectedBatch) {
 }
 const allCanonicalEvents = eventsDocument.markets?.US;
 assert(Array.isArray(allCanonicalEvents), "market-impact-events.json must contain markets.US[]");
+const duplicateCanonicalIdentities = findDuplicateMarketImpactEventIdentities(
+  allCanonicalEvents.map((event) => ({ ...event, market: "US", eventKey: event.eventKey ?? "DEFAULT" })),
+);
+assert(duplicateCanonicalIdentities.length === 0,
+  `Canonical US events contain duplicate database identities: ${duplicateCanonicalIdentities.slice(0, 10).map((item) => `${item.eventId}/${item.duplicateEventId}`).join(", ")}`);
 const reviewEventIds = new Set((review.reviewedEvents || []).map((row) => row.eventId));
 const canonicalEvents = allCanonicalEvents.filter((event) => reviewEventIds.has(event.eventId));
 const allowed = {

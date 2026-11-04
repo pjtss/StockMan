@@ -10,6 +10,8 @@
 - 운영 market-intelligence 100/100 응답(RSS 375, bullish 47), SEC submissions 4,432건을 저장했다. SEC 원문 22 accession은 TARGETED_SECTION_REVIEW, 공식 회사 IR 일정 9건은 PRIMARY_SOURCE_REVIEWED로 분리해 총 31 이벤트를 만들었다. SEC 이벤트는 accession, IR 이벤트는 고유 IR eventId와 공식 URL로 연결한다.
 - 일정 status, 정확히 확인된 현지 시각/KST, 주총 안건의 잠재 희석, Nasdaq 기한, 대출 만기, 법원 심리와 거래 outside date를 구조화했다. 시간이나 결과를 확인하지 못한 항목은 추정하지 않았고 direction/impact horizon은 UNCERTAIN/UNKNOWN으로 유지했다.
 - `scripts/generate-us-smallcap-event-batch.mjs`에 SEC accession과 공식 IR URL 이벤트의 서로 다른 연결 경로를 추가했다. validator는 targeted SEC와 직접 확인된 다른 공식 1차 출처를 구분 검증한다. 모든 저장 review batch 간 ticker 중복 방지와 legal-type 제외 기준을 운영 문서에 명시했다.
+- 첫 OCI 배포 #1256은 Activate release 단계에서 중단됐다. 재생성 과정에서 이전 `SEC:IR:*` 이벤트가 현재 review 목록에서 빠진 뒤에도 canonical 원장에 남아, 같은 `sourceType/sourceId/ticker/eventType`를 가진 새 IR event와 데이터베이스 identity 중복을 일으켰다. importer는 중복 사전검증에서 중단했고 DB transaction 시작 전이라 데이터베이스 변경은 없었으며 기존 운영 release가 유지됐다.
+- 재발 방지를 위해 generator가 이전 동일 배치 event ID와 현재 비-SEC 정의와 같은 identity의 obsolete canonical 이벤트를 제거하고 새 이벤트를 upsert하도록 바꿨다. 모든 canonical US 이벤트에 importer와 동일한 identity 중복검사를 추가해 CI가 배포 전 감지하게 했다.
 
 ### 변경 파일 및 확인 대상
 - `scripts/generate-us-smallcap-event-batch.mjs`, `scripts/validate-us-smallcap-event-data.mjs`, `package.json`
@@ -21,6 +23,7 @@
 - b08 validator: 100 issuer, 4,432 SEC filings, 31 events, 22 accession-event relations, 22 TARGETED_SECTION_REVIEW, 9 PRIMARY_SOURCE_REVIEWED를 확인했다.
 - `npm run docs:check` 통과: 기존 7개 배치와 b08의 중복·관계 검증, API surface, 132개 문서 catalog 및 문서 계약을 확인했다. 첫 검사에서 요구된 `### 다음 개선` heading 누락을 수정했고 후속 검사에서 통과했다.
 - `git diff --check` 통과. `npm run deploy:verify` 통과: dependency audit 0개 취약점, build 107 pages, test 300 files (1,542 passed/3 skipped), typecheck, standalone runtime smoke, desktop/mobile Chrome hydration, API surface, verify-scope, KIS, Bearer, cron audits.
+- 첫 운영 workflow #1256은 `events[366]`의 `SEC:IR:ir-2026-11-04`와 `events[369]`의 `IR:FTCI:ir-2026-11-04`가 같은 importer identity를 가져 Activate release에서 실패했다. 오류와 개선 내용을 `docs/ERROR_HANDLING.md`에 추가했다. identity 보강 뒤 canonical US 이벤트 374개, b08 이벤트 31개의 validator 검증은 통과했다. 수정 후 전체 배포 검증과 재배포는 아직 진행 중이다.
 - 운영 공개 GET과 localhost DB read-only 조회만 사용했다. 운영 DB 직접 접근/write, refresh API, 알림 전송은 수행하지 않았다.
 
 ### 남은 위험
@@ -36,7 +39,7 @@
 - 근거: SEC accession과 회사 IR URL을 별도 출처관계로 저장하고 validator에서 각 경로를 점검하도록 확장했다. 기존·신규 배치 검증, 문서 catalog, 전체 테스트·빌드·실행 감사를 모두 통과했다.
 
 ### 커밋·푸시·배포
-- 상태: 미실행. 전체 검증 통과 후 순차 진행한다.
+- 상태: 실패. 최초 `19aad848` / OCI workflow #1256은 데이터 import identity 중복으로 운영 활성화되지 않았다. 중복 제거와 validator 개선 후 재검증·재배포한다.
 
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 7차 배치 및 자료 구조 개선
 

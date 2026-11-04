@@ -1,5 +1,15 @@
 # 오류 상황 및 해결 방법
 
+## 2026-11-04 이벤트 배치 재생성 후 OCI import identity 중복
+
+- **증상**: OCI workflow #1256의 Activate release 단계에서 `Duplicate market impact event identity` 오류가 발생해 운영 release가 활성화되지 않았다.
+- **근본 원인**: event definitions 변경으로 새 eventId를 만들 때 generator가 현재 검토 ID를 upsert했지만, 이전 동일 배치의 orphaned canonical eventId는 원장에 남았다. 회사 IR 일정의 sourceType/sourceId/ticker/eventType이 같아 importer identity 중복으로 판정됐다.
+- **영향 범위**: `market-impact-events.json` 배치 이벤트 import와 release 활성화. importer의 duplicate precheck는 DB transaction 전에 실행돼 DB 기록을 변경하지 않았으며 이전 운영 release가 유지됐다.
+- **해결 위치**: `scripts/generate-us-smallcap-event-batch.mjs`가 이전 동일 배치 review event ID를 제거한 뒤 재구성하고, 새 비-SEC source identity와 같지만 eventId가 다른 stale canonical 항목도 정리한다. `scripts/validate-us-smallcap-event-data.mjs`는 전체 US 원장을 importer와 동일한 identity tuple로 fail-closed 검사한다.
+- **재발 자동 감지**: `npm run docs:check`의 batch validator가 canonical 전체 identity 중복을 검사한다. OCI workflow는 `deploy:verify`와 import precheck를 수행한다. 서로 다른 의미의 이벤트가 동일 ticker/sourceId/eventType을 쓰면 고유 eventKey를 지정한다.
+- **검증 결과**: OCI #1256은 중복으로 activate에 실패했다. orphan 제거 후 canonical US 이벤트 374개, batch8 이벤트 31개 및 22 accession 연결 validator를 통과했다. 수정 커밋의 deploy:verify와 재배포는 후속 기록한다.
+- **남은 위험 및 다음 개선**: 같은 공식 URL이 둘 이상의 실적 발표/상황을 담을 수 있어 identity 충돌이 가능하다. 같은 source URL·ticker·event type에 별도 event가 정의되면 정의 파일에서 stable eventKey를 지정하고 canonical validator에서 감지한다.
+
 ## 2026-10-28 종목 뉴스 요약에 RSS HTML 태그 노출
 
 - **증상**: 종목 뉴스 요약에 `<b>` 등의 HTML 태그가 문자 그대로 보였다.
