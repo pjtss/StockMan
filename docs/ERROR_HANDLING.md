@@ -1,3 +1,12 @@
+## 2026-11-04 미국 소형주 배치 SEC 날짜 후보와 accession 상태 불일치
+
+- **증상**: b09 validator에서 SEC 미래 날짜 후보의 이벤트/제외 판정 집합과 filing ledger의 SEC event accession 집합 불일치가 감지됐다. SEC 원문 수집기가 실패 건수를 배열로 반환했는데 generator가 숫자 0으로만 처리해 완료된 스캔을 불완전으로 오판했다.
+- **근본 원인**: 자동 날짜 추출, SEC keyword scan, 확정 이벤트, accession 상태를 같은 개수로 취급했고 filing 하나에서 다수 날짜 후보가 나올 수 있다는 점 및 legacy 배치에 강화 coverage 필드가 없다는 점을 반영하지 않았다.
+- **영향 범위**: 로컬 b09 review/ledger 생성 및 validator. 운영 조회는 read-only GET만 사용했고 운영 데이터 쓰기·refresh·알림 전송은 없다.
+- **해결 위치**: scripts/generate-us-smallcap-event-batch.mjs에서 failed 숫자/배열을 정상화하고 요청·성공 건수를 검사한다. 미래 날짜 accession은 원문 검토 후 이벤트 또는 해결된 SEC_EXPLICIT_EXCLUSION으로 연결한다. filing 상태와 event accession 집합을 재정렬한다. scripts/validate-us-smallcap-event-data.mjs는 review/ledger exclusion 사유 parity, event links 및 날짜 후보 coverage를 검증한다. 새 coverage 메타데이터가 없는 legacy batch는 강화 coverage 검사를 건너뛴다.
+- **재발 자동 감지**: npm run docs:check가 신규 batch validator를 실행한다. 원문 scan 누락, event/exclusion 미결정, 제외 사유 불일치, SEC accession relation 누락이면 fail-closed한다.
+- **검증 결과**: b09 100 issuers, 4,758 submissions, 35 events(SEC filing event 27건/26 accession, IR 8건), 12 excluded filings. SEC primary 362건 전부 HTTP 200, date candidate 73건 전부 결정 입력에 반영. docs:check, API surface, catalog 및 문서/migration 검사가 통과했다. build/test/runtime 및 배포 전.
+- **남은 위험 및 다음 개선**: 자동 날짜 추출은 문맥 판정을 대체하지 않는다. 다음 배치도 SEC/issuer primary text에서 일정 성격을 확인한다. 시총은 2026-11-02 STALE snapshot이다.
 # 오류 상황 및 해결 방법
 
 ## 2026-11-04 이벤트 배치 재생성 후 OCI import identity 중복

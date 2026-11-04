@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 132,
+  "documentCount": 133,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1093,6 +1093,25 @@
         "docs/operations/us-smallcap-event-data-contract.md"
       ],
       "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b08.md",
+      "related": [
+        {
+          "title": "미국 소형주 이벤트 자료 관리 기준",
+          "url": "/manuals/operations/us-smallcap-event-data-contract.md",
+          "sourcePath": "docs/operations/us-smallcap-event-data-contract.md"
+        }
+      ]
+    },
+    {
+      "id": "operations-us-smallcap-event-review-20261104-b09",
+      "title": "미국 보통주 소형주 공시·뉴스 이벤트 검토 — 2026-11-04 배치 9",
+      "category": "operations",
+      "format": "md",
+      "description": "SEC 이벤트는 ticker+CIK+accession+eventId로, 회사 IR은 ticker+고유 IR eventId+공식 URL로 연결한다. 이벤트 후보에서 제외된 SEC 제출은 ledger의 EXPLICITLYEXCLUDED 상태와 이유를 보존한다. 날짜 후보 누락은 generator가 실패 처리한다.",
+      "url": "/manuals/operations/us-smallcap-event-review-20261104-b09.md",
+      "relatedPaths": [
+        "docs/operations/us-smallcap-event-data-contract.md"
+      ],
+      "sourcePath": "docs/operations/us-smallcap-event-review-20261104-b09.md",
       "related": [
         {
           "title": "미국 소형주 이벤트 자료 관리 기준",

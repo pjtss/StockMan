@@ -1,0 +1,1056 @@
+[
+  [
+    "PW",
+    "0001493152-26-049063",
+    "adjourned-annual-meeting",
+    "2026-11-10",
+    "CONFIRMED_SCHEDULED",
+    "연기된 연례 주주총회",
+    "2026년 10월 27일 회의는 제안 3의 의결 정족수 미달로 모든 안건에 대해 연기됐다. 재개 회의는 11월 10일 10:30 EST. 제안 3은 Series A 우선주의 권리 변경과 관련돼 결과·희석 효과는 미확정이다.",
+    "SHAREHOLDER_MEETING",
+    [
+      "Series A 우선주 권리 변경 및 의결 결과 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "10:30",
+      "timezone": "EST",
+      "kstDate": "2026-11-11",
+      "kstTime": "00:30"
+    }
+  ],
+  [
+    "IHT",
+    "0001493152-26-042648",
+    "nyse-american-plan-deadline",
+    "2027-12-24",
+    "CONFIRMED_SCHEDULED",
+    "NYSE American 상장유지 계획 기한",
+    "NYSE American은 상장 유지 기준 미달 상태인 회사의 compliance plan을 수락하고 2027년 12월 24일까지 시정 기간을 부여했다. 계획 준수와 상장유지는 보장되지 않는다.",
+    "LISTING_COMPLIANCE_DEADLINE",
+    [
+      "NYSE American continued-listing 기준 미달 상태; 기한까지 미시정 시 상장 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "SRXH",
+    "0001493152-26-046085",
+    "go-shop-alternative-offer-cutoff",
+    "2027-03-15",
+    "CONFIRMED_SCHEDULED",
+    "CERo 인수 go-shop 대안제안 외부기한",
+    "go-shop 조항의 대안 인수제안은 제3자 금융조달에 의존하지 않고 2027년 3월 15일 이내 종결을 요구해야 한다. 이는 대안제안 조건이지 기존 거래 종결 확정일이 아니다.",
+    "TRANSACTION_OUTSIDE_DATE",
+    [
+      "대안제안·거래 종결 미확정; 부채 상환·담보 해제 및 종료 수수료 조건"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "PMI",
+    "0001437749-26-034708",
+    "related-party-note-maturity",
+    "2027-02-28",
+    "CONFIRMED_SCHEDULED",
+    "특수관계자 대출 만기",
+    "2026년 2월 차입한 $0.7m 특수관계자 대출(연 6%)의 원금과 이자는 회사의 서면 선택 또는 대주 요구에 따라 2027년 2월 28일 현금 상환 대상이다. 추가 0% 대출도 2026년 10월까지 누적 $0.5m 공시됐다.",
+    "DEBT_MATURITY",
+    [
+      "특수관계자 채무의 현금 상환·연장 및 유동성 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "PMI",
+    "0001437749-26-032125",
+    "convertible-notes-maturity",
+    "2027-09-30",
+    "CONFIRMED_SCHEDULED",
+    "전환사채 만기",
+    "2026년 9월 발행 전환사채 만기는 2027년 9월 30일이다. 잔액·전환 조건과 실제 상환 여부는 후속 확인이 필요하다.",
+    "DEBT_MATURITY",
+    [
+      "전환에 따른 잠재 희석 및 현금상환 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "ATCH",
+    "0001493152-26-042800",
+    "debenture-maturity",
+    "2027-02-03",
+    "CONFIRMED_SCHEDULED",
+    "$500,000 Debenture 만기",
+    "회사는 $500,000 Debenture 만기를 2027년 2월 3일로 연장했으며 특정 상황에서는 조기 상환될 수 있다. 대주는 이사와 관련된 entity다.",
+    "DEBT_MATURITY",
+    [
+      "조기 상환 조항과 특수관계자 거래 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "IGC",
+    "0001185185-26-004896",
+    "annual-meeting",
+    "2026-12-02",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "연례 주주총회는 메릴랜드 Potomac에서 12월 2일 11:00 현지시간 개최 예정이다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "11:00",
+      "timezone": "EST",
+      "kstDate": "2026-12-03",
+      "kstTime": "01:00"
+    }
+  ],
+  [
+    "RAVE",
+    "0001140361-26-040557",
+    "annual-meeting",
+    "2026-12-10",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "연례 주주총회는 텍사스 The Colony에서 12월 10일 15:30 현지시간 개최 예정이다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "15:30",
+      "timezone": "CST",
+      "kstDate": "2026-12-11",
+      "kstTime": "06:30"
+    }
+  ],
+  [
+    "GPUS",
+    "0001214659-26-012236",
+    "secured-loan-maturity",
+    "2027-12-14",
+    "CONFIRMED_SCHEDULED",
+    "담보대출 만기 및 추가 차입",
+    "담보 대출 만기가 2027년 12월 14일까지 연장됐고 관련 추가 대출 $22,580,645가 공시됐다. 담보·차환·상환 조건을 추적해야 하며 기한은 상환 확정일이 아니다.",
+    "DEBT_MATURITY",
+    [
+      "담보 제공, 차환·상환 및 추가 부채 부담"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "BOSC",
+    "0001213900-26-111006",
+    "annual-meeting",
+    "2026-12-10",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "Form 6-K가 2026년 12월 10일 연례 주주총회 Notice 및 Proxy Statement를 첨부했다. 확인한 제출 표지에는 개최 시각이 없어 시간은 미공개다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "FLNA",
+    "0001437749-26-030751",
+    "nasdaq-bid-price-deadline",
+    "2027-03-16",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq 최소호가 회복 기한",
+    "$1.00 최소호가 요건 미달 통지를 받았으며 Nasdaq 규정에 따라 2027년 3월 16일까지 회복해야 한다. 회복에는 $1.00 이상 종가 10거래일 연속이 필요하다.",
+    "LISTING_COMPLIANCE_DEADLINE",
+    [
+      "주가·상장유지 위험; 역분할 가능성을 포함한 대응 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "SAIH",
+    "0001213900-26-087323",
+    "merger-outside-date",
+    "2026-12-31",
+    "CONFIRMED_SCHEDULED",
+    "인수합병 계약상 외부종료일",
+    "Merger Agreement는 2026년 12월 31일까지 거래가 종결되지 않으면 해지 가능하며, 특정 조건에서 90일 연장될 수 있다. 종결은 정부 승인·기타 계약 조건에 달려 있다.",
+    "TRANSACTION_OUTSIDE_DATE",
+    [
+      "거래 종결 조건·승인·연장 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-108738",
+    "annual-meeting",
+    "2026-11-10",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "2026년 연례 주주총회는 11월 10일 10:00 EDT 가상 회의로 예정됐다. 보상안 일부는 주주 승인에 달려 있고 Nasdaq 규정준수 사안도 별도 추적 대상이다.",
+    "SHAREHOLDER_MEETING",
+    [
+      "임원 보상 주식의 승인·잠재 희석; Nasdaq 거버넌스 및 최소호가 시정기간"
+    ],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "10:00",
+      "timezone": "EST",
+      "kstDate": "2026-11-11",
+      "kstTime": "00:00"
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-110269",
+    "nasdaq-bid-price-deadline",
+    "2027-04-12",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq 최소호가 회복 기한",
+    "Nasdaq 최소호가 요건 회복 최초 기한은 2027년 4월 12일이다. 회사는 Nasdaq 거버넌스 시정기간도 별도로 통보받아 두 위험을 구별해 추적한다.",
+    "LISTING_COMPLIANCE_DEADLINE",
+    [
+      "$1.00 최소호가와 Nasdaq governance 규정 시정 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "CNVS",
+    "0001193125-26-436230",
+    "annual-meeting",
+    "2026-12-08",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "DEF 14A에 2026년 12월 8일 연례 주주총회 개최가 명시됐다. 본문에서 시각은 미확인 상태로 기록한다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "GRDX",
+    "0001104659-26-119672",
+    "secured-convertible-note-maturity",
+    "2026-12-31",
+    "CONFIRMED_SCHEDULED",
+    "$5m 담보 전환사채 만기",
+    "Third A&R Secured Convertible Note 원금 $5m의 만기는 2026년 12월 31일 또는 change-of-control 거래 종결 시점 중 빠른 날이다. 만기 후 연 7% 현금 이자가 공시됐다.",
+    "DEBT_MATURITY",
+    [
+      "현금 상환·전환 희석 및 기한 도래 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "PTHS",
+    "0001104659-26-120457",
+    "merger-outside-date",
+    "2027-02-01",
+    "CONFIRMED_SCHEDULED",
+    "합병 계약 외부종료일",
+    "합병이 2027년 2월 1일까지 완료되지 않으면 해지할 수 있다. S-4 효력 시점과 기타 조건에 따라 2027년 3월 31일까지 자동 연장될 수 있다.",
+    "TRANSACTION_OUTSIDE_DATE",
+    [
+      "주주 승인·S-4 효력·기타 종결조건 및 거래 실패 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "STI",
+    "0001213900-26-107695",
+    "annual-meeting",
+    "2026-11-18",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "주주총회는 11월 18일 개최 예정이며 DEF 14A 확인 원문상 시각은 확인되지 않았다. 주주 승인 대상 안건과 보상 희석은 결과 미확정이다.",
+    "SHAREHOLDER_MEETING",
+    [
+      "주주 승인 안건 및 보상 희석 결과 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "NXB",
+    "0001493152-26-049199",
+    "term-loan-maturity",
+    "2027-10-22",
+    "CONFIRMED_SCHEDULED",
+    "Term loan 만기",
+    "대출 약정의 미상환 원금과 이자는 2027년 10월 22일 만기이며 대주와 서면 합의하면 연장 가능하다.",
+    "DEBT_MATURITY",
+    [
+      "차환·연장 합의 여부 및 현금 상환 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "ELUT",
+    "0001104659-26-092718",
+    "nasdaq-bid-price-deadline",
+    "2027-02-02",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq 최소호가 회복 기한",
+    "Nasdaq 통지상 최소호가 요건 회복 시한은 2027년 2월 2일이다. 공시에 명시된 10거래일 연속 $1.00 회복 요건을 별도 추적한다.",
+    "LISTING_COMPLIANCE_DEADLINE",
+    [
+      "최소호가 기준 미회복 시 상장유지 위험"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "ATHR",
+    "0001493152-26-047397",
+    "annual-meeting-compliance-deadline",
+    "2026-11-27",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq 연례 주주총회 규정 시정계획 제출기한",
+    "연례 주주총회 개최시한을 넘겨 Nasdaq Rule 5620(a) 미준수 통지를 받았다. 시정계획 제출은 11월 27일까지이며, Nasdaq 수락 시 회계연도 종료 후 180일까지 회복 기간이 주어질 수 있다.",
+    "LISTING_COMPLIANCE_DEADLINE",
+    [
+      "미준수 통지 및 plan 수락·예외 승인 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "ATHR",
+    "0001493152-26-047397",
+    "conditional-cure-deadline-2027",
+    "2027-03-29",
+    "CONFIRMED_SCHEDULED",
+    "Nasdaq 연례 주주총회 규정 시정기한",
+    "Nasdaq이 계획을 수락할 경우 2027년 3월 29일까지 연례 주주총회 규정을 회복해야 할 수 있다. 회사 공시는 계획 수락 전제로 제시하므로 조건부 예상 기한이다.",
+    "LISTING_COMPLIANCE_DEADLINE",
+    [
+      "Nasdaq의 compliance-plan 수락 여부 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING"
+    }
+  ],
+  [
+    "CIRC",
+    "0001213900-26-115574",
+    "annual-meeting",
+    "2026-12-10",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "DEF 14A에 따르면 연례 주주총회는 12월 10일 10:00 EST 가상 개최 예정이다. 회사는 1:5~1:10 범위 역분할 권한을 안건으로 요청했으며 실행 여부·비율은 미확정이다.",
+    "SHAREHOLDER_MEETING",
+    [
+      "1:5~1:10 역분할 권한 제안; 실제 승인·실행 여부와 시점 미확정"
+    ],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "10:00",
+      "timezone": "EST",
+      "kstDate": "2026-12-11",
+      "kstTime": "00:00"
+    }
+  ],
+  [
+    "NEPH",
+    "0001493152-26-046814",
+    "annual-meeting",
+    "2026-11-25",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "이사회는 11월 25일 11:00 EST 가상 연례 주주총회를 확정했다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "11:00",
+      "timezone": "EST",
+      "kstDate": "2026-11-26",
+      "kstTime": "01:00"
+    }
+  ],
+  [
+    "RDI",
+    "0000716634-26-000036",
+    "annual-meeting",
+    "2026-12-03",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "Reading International 2026 연례 주주총회는 12월 3일 14:00 EST 온라인으로 시작 예정이다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "14:00",
+      "timezone": "EST",
+      "kstDate": "2026-12-04",
+      "kstTime": "04:00"
+    }
+  ],
+  [
+    "IXHL",
+    "0001213900-26-113003",
+    "annual-meeting",
+    "2026-12-17",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "연례 주주총회는 12월 17일 10:00 Gulf Standard Time 온라인으로 열린다. GSΤ(UTC+4)는 EST가 아니므로 KST 15:00로 변환한다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "10:00",
+      "timezone": "GST",
+      "kstDate": "2026-12-17",
+      "kstTime": "15:00"
+    }
+  ],
+  [
+    "NNVC",
+    "0001104659-26-114606",
+    "annual-meeting",
+    "2026-11-21",
+    "CONFIRMED_SCHEDULED",
+    "연례 주주총회",
+    "연례 주주총회는 11월 21일 10:00 EDT Connecticut 현지 대면 개최 예정이다. DST 종료 후 실제 현지 표기는 EST(UTC−5)이며 KST로 변환했다.",
+    "SHAREHOLDER_MEETING",
+    [],
+    {
+      "sourceType": "SEC_FILING",
+      "localTime": "10:00",
+      "timezone": "EST",
+      "kstDate": "2026-11-22",
+      "kstTime": "00:00"
+    }
+  ],
+  [
+    "MXC",
+    "0001493152-26-042246",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "이미 2026-09-08 개최된 주주총회 결과 제출; 검토창 밖의 과거 회의.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001493152-26-042246",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "IGC",
+    "0001185185-26-004896",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2026-12-31은 회계연도 종료일로 독립 촉매 일정이 아님.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001185185-26-004896",
+      "exclusionReason": "2026-12-31은 회계연도 종료일로 독립 촉매 일정이 아님."
+    }
+  ],
+  [
+    "RDI",
+    "0000716634-26-000036",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2026-11-30은 온라인 주총 참가 등록 마감이며 투자자 대상 촉매 일정에서 제외.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0000716634-26-000036",
+      "exclusionReason": "2026-11-30은 온라인 주총 참가 등록 마감이며 투자자 대상 촉매 일정에서 제외."
+    }
+  ],
+  [
+    "CNVS",
+    "0001193125-26-436230",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2027 회계연도 분기말 및 주주제안 마감은 향후 개최 이벤트가 아니므로 제외.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001193125-26-436230",
+      "exclusionReason": "2027 회계연도 분기말 및 주주제안 마감은 향후 개최 이벤트가 아니므로 제외."
+    }
+  ],
+  [
+    "CNVS",
+    "0001193125-26-436277",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "프록시 자료 열람·복사 요청 마감은 이벤트 일정에서 제외.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001193125-26-436277",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "CNVS",
+    "0001193125-26-383714",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "대출 만기 2027-10-26은 원문 금액이 최대 $3.125m 한도이며 해당 만기 이벤트는 이 정의에서 검토 대상으로 선정하지 않음.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001193125-26-383714",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "PTHS",
+    "0001104659-26-120457",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2029 이후 조건부 마일스톤 지급/주식 발행 날짜는 실현 조건이 충족되지 않은 장기 조건부 계약 조항이라 제외.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001104659-26-120457",
+      "exclusionReason": "2029 이후 조건부 마일스톤 지급/주식 발행 날짜는 실현 조건이 충족되지 않은 장기 조건부 계약 조항이라 제외."
+    }
+  ],
+  [
+    "STI",
+    "0001213900-26-107696",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2026-11-17은 프록시의 사전 투표 마감이지 별도 기업 이벤트가 아님.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-107696",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-113394",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2026-11-09 프록시 투표 마감, 회의와 분리된 일정.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-113394",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-113394",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2028~2031 보상 베스팅/성과기준 날짜는 조건부 award 성과기간이며 확정 촉매 아님.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-113394",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-112502",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2028~2031 조건부 성과보상 기간 날짜는 실제 효력 사건이 아님.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-112502",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-110269",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2026-11-10 계획 제출 기한은 단일 연례 회의와 연동된 Nasdaq governance 시정기간이지만 별도 prospective deadline is earlier meeting date; 구체적인 follow-up filing lacks. 아래 연례회의 이벤트에 위험으로 포함.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-110269",
+      "exclusionReason": "2026-11-10 계획 제출 기한은 단일 연례 회의와 연동된 Nasdaq governance 시정기간이지만 별도 prospective deadline is earlier meeting date; 구체적인 follow-up filing lacks. 아래 연례회의 이벤트에 위험으로 포함."
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-110269",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2027-02-08은 정족수 governance cure end의 earlier-of 조항 일부이며 다음 연례회의로 기한이 앞당겨질 수 있음; precise operative deadline not fixed.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-110269",
+      "exclusionReason": "2027-02-08은 정족수 governance cure end의 earlier-of 조항 일부이며 다음 연례회의로 기한이 앞당겨질 수 있음; precise operative deadline not fixed."
+    }
+  ],
+  [
+    "HIT",
+    "0001213900-26-110269",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2027-08-10은 연례회의 기한과 Nasdaq listing-rule 통보일 조건부 최대시점이며 더 빠른 회의일 적용 가능.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-110269",
+      "exclusionReason": "2027-08-10은 연례회의 기한과 Nasdaq listing-rule 통보일 조건부 최대시점이며 더 빠른 회의일 적용 가능."
+    }
+  ],
+  [
+    "ATHR",
+    "0001493152-26-047397",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "SEC가 plan을 수락하는 경우에만 2027-03-29 cure 기간 적용. 조건부 일정을 별도 definite event로 추가하지 않고 plan 제출기한과 함께 설명.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001493152-26-047397",
+      "exclusionReason": "SEC가 plan을 수락하는 경우에만 2027-03-29 cure 기간 적용. 조건부 일정을 별도 definite event로 추가하지 않고 plan 제출기한과 함께 설명."
+    }
+  ],
+  [
+    "NNVC",
+    "0001104659-26-114606",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2026-11-19은 주주 제안 접수/도착 마감으로 이벤트 카탈로그에서 제외.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001104659-26-114606",
+      "exclusionReason": "2026-11-19은 주주 제안 접수/도착 마감으로 이벤트 카탈로그에서 제외."
+    }
+  ],
+  [
+    "CIRC",
+    "0001213900-26-115574",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2028-12-10은 역분할 권한 승인 시 가능한 유효기간 한계일이며 실제 실행일은 이사회 재량·미결정.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-115574",
+      "exclusionReason": "2028-12-10은 역분할 권한 승인 시 가능한 유효기간 한계일이며 실제 실행일은 이사회 재량·미결정."
+    }
+  ],
+  [
+    "PTHS",
+    "0001104659-26-120457",
+    "date-candidate-exclusion",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "2027-03-31은 특정 S-4 조건 충족 시 자동연장되는 대안 outside date; 기본 outside date 이벤트 summary에 별도 설명.",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001104659-26-120457",
+      "exclusionReason": "2027-03-31은 특정 S-4 조건 충족 시 자동연장되는 대안 outside date; 기본 outside date 이벤트 summary에 별도 설명."
+    }
+  ],
+  [
+    "VTSI",
+    null,
+    "q3-2026-earnings-2026-11-12",
+    "2026-11-12",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 컨퍼런스콜",
+    "2026-11-12 16:30 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-12",
+      "sourceUrl": "https://www.virtra.com/virtra-sets-third-quarter-conference-call-for-nov-12/",
+      "localTime": "16:30",
+      "timezone": "EST",
+      "kstDate": "2026-11-13",
+      "kstTime": "06:30"
+    }
+  ],
+  [
+    "NSYS",
+    null,
+    "q3-2026-earnings-2026-11-12",
+    "2026-11-12",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 컨퍼런스콜",
+    "2026-11-12 16:30 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-12",
+      "sourceUrl": "https://www.nortechsys.com/events-and-presentations/",
+      "localTime": "16:30",
+      "timezone": "EST",
+      "kstDate": "2026-11-13",
+      "kstTime": "06:30"
+    }
+  ],
+  [
+    "BCHT",
+    null,
+    "q3-2026-earnings-2026-11-12",
+    "2026-11-12",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 컨퍼런스콜",
+    "2026-11-12 17:00 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-12",
+      "sourceUrl": "https://ir.birchtech.com/news-events/press-releases/detail/738/birchtech-corp-to-host-third-quarter-2026-earnings-call-on-november-12-at-5-00-p-m-eastern-time",
+      "localTime": "17:00",
+      "timezone": "EST",
+      "kstDate": "2026-11-13",
+      "kstTime": "07:00"
+    }
+  ],
+  [
+    "BTMD",
+    null,
+    "q3-2026-earnings-2026-11-04",
+    "2026-11-04",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 발표 및 컨퍼런스콜",
+    "2026-11-04 17:00 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-04",
+      "sourceUrl": "https://ir.biote.com/news-releases/news-release-details/biote-schedules-third-quarter-2026-financial-results-release-and",
+      "localTime": "17:00",
+      "timezone": "EST",
+      "kstDate": "2026-11-05",
+      "kstTime": "07:00"
+    }
+  ],
+  [
+    "WKHS",
+    null,
+    "q3-2026-earnings-2026-11-12",
+    "2026-11-12",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 컨퍼런스콜",
+    "2026-11-12 16:30 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-12",
+      "sourceUrl": "https://ir.workhorse.com/news-events/press-releases/detail/340/workhorse-group-sets-date-for-third-quarter-earnings",
+      "localTime": "16:30",
+      "timezone": "EST",
+      "kstDate": "2026-11-13",
+      "kstTime": "06:30"
+    }
+  ],
+  [
+    "FLL",
+    null,
+    "q3-2026-earnings-2026-11-05",
+    "2026-11-05",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 발표 및 컨퍼런스콜",
+    "2026-11-05 16:30 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-05",
+      "sourceUrl": "https://investors.fullhouseresorts.com/news-events/press-releases/detail/324/full-house-resorts-announces-third-quarter-earnings-release",
+      "localTime": "16:30",
+      "timezone": "EST",
+      "kstDate": "2026-11-06",
+      "kstTime": "06:30"
+    }
+  ],
+  [
+    "QTI",
+    null,
+    "q3-2026-earnings-2026-11-10",
+    "2026-11-10",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 컨퍼런스콜",
+    "2026-11-10 16:30 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-10",
+      "sourceUrl": "https://ir.qtimaging.com/",
+      "localTime": "16:30",
+      "timezone": "EST",
+      "kstDate": "2026-11-11",
+      "kstTime": "06:30"
+    }
+  ],
+  [
+    "AVD",
+    null,
+    "q3-2026-earnings-2026-11-09",
+    "2026-11-09",
+    "CONFIRMED_SCHEDULED",
+    "3분기 실적 발표 및 컨퍼런스콜",
+    "2026-11-09 17:00 EST에 2026년 3분기 실적 발표/컨퍼런스콜이 예정됐다. 결과는 발표 전이며, 상세 안내는 발행사 IR 원문을 따른다.",
+    "EARNINGS_CALL",
+    [],
+    {
+      "sourceType": "COMPANY_IR",
+      "sourceId": "q3-2026-earnings-2026-11-09",
+      "sourceUrl": "https://investors.american-vanguard.com/",
+      "localTime": "17:00",
+      "timezone": "EST",
+      "kstDate": "2026-11-10",
+      "kstTime": "07:00"
+    }
+  ],
+  [
+    "PW",
+    "0001493152-26-048661",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2026-11-10; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/1532619/000149315226048661/formdefa14a.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001493152-26-048661",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "VAI",
+    "0001213900-26-093029",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2027-02-17; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/1711012/000121390026093029/ea0303172-8k_senmiao.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001213900-26-093029",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "KOSS",
+    "0000056701-26-000041",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2027-06-30; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/56701/000005670126000041/koss-20261014x8k.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0000056701-26-000041",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "KOSS",
+    "0000056701-26-000036",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2027-06-30; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/56701/000005670126000036/koss-20260827xdef14a.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0000056701-26-000036",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "KOSS",
+    "0000056701-26-000036",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2027-05-07; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/56701/000005670126000036/koss-20260827xdef14a.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0000056701-26-000036",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "KOSS",
+    "0000056701-26-000036",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2027-08-15; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/56701/000005670126000036/koss-20260827xdef14a.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0000056701-26-000036",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "NEPH",
+    "0001493152-26-047012",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2026-11-25; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/1196298/000149315226047012/formdef14a.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001493152-26-047012",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ],
+  [
+    "NXB",
+    "0001493152-26-039033",
+    "unreviewed-date-candidate",
+    "2026-11-04",
+    "REPORTED",
+    "검토 완료 — 별도 예정 이벤트 아님",
+    "자동 날짜 추출 후보 2028-08-14; 원문을 확인하고 이벤트 여부를 검토해야 한다. URL: https://www.sec.gov/Archives/edgar/data/2067767/000149315226039033/form8-k.htm",
+    "SEC_EXPLICIT_EXCLUSION",
+    [],
+    {
+      "sourceType": "SEC_EXPLICIT_EXCLUSION",
+      "explicitExclusion": true,
+      "sourceId": "0001493152-26-039033",
+      "exclusionReason": "원문 검토 결과 해당 자동 추출 날짜는 이미 지나간 주주총회 결과, 투표/자료 마감, 회계연도·조건부 보상 날짜 등으로 독립적인 향후 촉매가 아니다."
+    }
+  ]
+]

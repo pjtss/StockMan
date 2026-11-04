@@ -1,3 +1,36 @@
+## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 9차 100종목과 문서 관리 자동 검증
+
+### 목표
+- 운영 서버 공개 read-only 데이터를 기준으로 앞선 800 ticker와 겹치지 않는 활성 미국 보통주 100개를 조사한다. 공시 및 회사 IR 일정을 accession/event ID로 종목별 관리한다.
+- snapshot, 공시 ledger, 재현 정의, canonical API 원장, 보고서와 catalog 간 연결 및 자동 검증을 보강한다.
+
+### 반영
+- 활성 US COMMON_STOCK universe/fundamentals 전체 coverage 5,216/5,216 확인. 저장 시총 USD $100m 이하 후보 569개 중 metadata 180건 및 SEC CIK 검증 후 100종목을 선택했다. 범위 $2,467,046–$37,074,489, 전부 2026-11-02 STALE snapshot이다.
+- 운영 intelligence 100/100, RSS 263건·bullish 후보 41건. SEC submissions 4,758건 및 최근 SEC primary 문서 362건을 수집·대조했다. date candidates 73건은 사건 또는 해결된 제외 판정에 연결했다. 정규 이벤트 35건(SEC event 27/26 unique accession, official IR 8), 명시 제외 accession 12건이다.
+- b09 review, accession ledger, definitions, 운영 보고서 및 canonical events를 업데이트했다. official event source와 accession을 분리하고 filing exclusion state를 두 원장에 연결했다.
+- SEC scan failed array/integer 포맷, 전체 성공 coverage, future-date candidate decisions, review-ledger parity, eventKey uniqueness 및 legacy coverage compatibility를 generator/validator/docs contract에 반영했다. API docs와 133-document manual catalog도 갱신했다.
+
+### 변경 파일 및 확인 대상
+- scripts/generate-us-smallcap-event-batch.mjs, scripts/validate-us-smallcap-event-data.mjs, package.json
+- data/market-impact-events.json 및 b09 review/ledger/definitions JSON
+- docs/operations/us-smallcap-event-review-20261104-b09.md, us-smallcap-event-data-contract.md, docs/ERROR_HANDLING.md, DEVELOPMENT_LOG.md, public/document-catalog.json
+
+### 검증
+- batch validator: 100 issuers, 4,758 SEC submissions, 35 events, 27 accession-event relations, 12 explicitly excluded filings 통과.
+- npm run docs:check 통과: 기존 8개와 신규 batch9 데이터 검증, 178 route/42 public GET API audit, 133개/7 category catalog, 28 entry points 및 migration docs. git diff --check 통과.
+- 운영 API/DB GET-only, write/refresh/알림 전송 없음.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-04-009
+- 성과 판정: IMPROVED
+- 근거: batch9 전용 재현 정의·종목/공시 ledger와 canonical event 원장의 연결, future-date 후보 판정 완전성 및 문서 catalog/API inventory 자동 검증을 추가했다.
+
+### 커밋·푸시·배포
+- 상태: 미실행 (build/test/runtime 및 문서 검증 통과, 커밋·푸시·운영 배포 대기)
+### 다음 개선
+- 다음 100종목 batch에서 운영 시총 freshness를 재확인하고 stale 관측치는 현재 시총 인증으로 표현하지 않는다.
+- 신규 batch는 공식 primary text 문맥으로 이벤트/조건부 일정을 판단하고 자동 날짜 후보 누락 게이트를 유지한다.
+- build/test/runtime 검증 통과: optimized build 완료, runtime smoke와 desktop/mobile hydration 통과, Vitest 1,542 passed/3 skipped (301 files, 1 skipped), typecheck 및 docs/API 감사 통과. 커밋·푸시·OCI 배포 결과는 완료 후 이 로그를 갱신한다.
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 8차 배치와 자료 관리 개선
 
 ### 목표

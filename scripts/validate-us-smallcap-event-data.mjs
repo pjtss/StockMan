@@ -54,7 +54,7 @@ if (expectedBatch) {
     `Batch ID mismatch: expected ${expectedBatch}, got ${review.batchId}/${ledger.batchId}`);
   const expectedPrefix = `batch_${expectedBatch.replace(/-/g, "_")}`;
   const reviewedAccessions = new Set(ledger.issuers.flatMap((issuer) => issuer.filings
-    .filter((filing) => filing.reviewBatch === expectedPrefix && filing.reviewStatus !== "INVENTORY_ONLY")
+    .filter((filing) => filing.reviewBatch === expectedPrefix && filing.reviewStatus === "TARGETED_SECTION_REVIEW")
     .map((filing) => `${issuer.ticker}|${filing.accession}`)));
   const eventAccessions = new Set(review.reviewedEvents.flatMap((row) => (row.sourceIds || []).map((accession) => `${row.ticker}|${accession}`)));
   assert(reviewedAccessions.size === eventAccessions.size && [...reviewedAccessions].every((accession) => eventAccessions.has(accession)),
@@ -71,6 +71,33 @@ if (expectedBatch) {
     } else {
       assert(false, `Unsupported event source review status for ${row.eventId}: ${row.sourceReviewStatus}`);
     }
+  }
+  for (const issuer of ledger.issuers) {
+    const ledgerFilingByAccession = new Map(issuer.filings.map((filing) => [filing.accession, filing]));
+    const reviewIssuer = review.universe.issuers.find((row) => row.ticker === issuer.ticker);
+    for (const filing of reviewIssuer?.secSubmissions.filings || []) {
+      if (filing.reviewStatus !== "EXPLICITLY_EXCLUDED") continue;
+      const ledgerFiling = ledgerFilingByAccession.get(filing.accession);
+      assert(ledgerFiling?.reviewStatus === "EXPLICITLY_EXCLUDED" && typeof filing.exclusionReason === "string" &&
+        filing.exclusionReason === ledgerFiling.exclusionReason && (filing.eventIds || []).length === 0,
+      `Review/ledger explicit exclusion is missing, inconsistent, or event-linked: ${issuer.ticker}/${filing.accession}`);
+    }
+    for (const filing of issuer.filings) {
+      if (filing.reviewStatus === "EXPLICITLY_EXCLUDED") {
+        assert(typeof filing.exclusionReason === "string" && filing.exclusionReason.trim().length > 10,
+          `Explicitly excluded SEC filing lacks a review reason: ${issuer.ticker}/${filing.accession}`);
+        assert((filing.eventIds || []).length === 0,
+          `Explicitly excluded filing cannot link to a canonical event: ${issuer.ticker}/${filing.accession}`);
+      }
+    }
+  }
+  const dateCoverage = ledger.reviewCoverageSummary;
+  if (dateCoverage?.dateCandidateCount !== undefined || dateCoverage?.dateCandidatesWithExplicitDecision !== undefined) {
+    assert(Number.isInteger(dateCoverage.dateCandidateCount) && dateCoverage.dateCandidateCount === dateCoverage.dateCandidatesWithExplicitDecision,
+      "Every SEC future-date extraction candidate must have an explicit event or exclusion decision");
+    assert(Number.isInteger(dateCoverage.secPrimaryDocumentsRead) && Number.isInteger(dateCoverage.secKeywordHitDocuments) &&
+      dateCoverage.secPrimaryDocumentsRead >= dateCoverage.secKeywordHitDocuments,
+    "SEC primary-document scan coverage metrics are invalid");
   }
 }
 const allCanonicalEvents = eventsDocument.markets?.US;
@@ -267,11 +294,24 @@ for (const [ticker, issuer] of ledgerIssuerByTicker) {
     assert(sorted(copy.eventIds).length === (copy.eventIds || []).length, `Duplicate eventId in review filing copy: ${ticker}/${accession}`);
     assert(copy.reviewStatus === filing.reviewStatus, `Filing status mismatch: ${ticker}/${accession}`);
     assert(sameList(copy.eventIds, filing.eventIds), `Filing eventIds mismatch: ${ticker}/${accession}`);
+    if (filing.reviewStatus === "EXPLICITLY_EXCLUDED") {
+      assert(typeof filing.exclusionReason === "string" && filing.exclusionReason.trim().length > 10 &&
+        filing.exclusionReason === copy.exclusionReason && (filing.eventIds || []).length === 0,
+      `Explicit exclusion reason or event links differ between review and ledger: ${ticker}/${accession}`);
+    }
     const relations = (filing.relatedFilings || []).map((x) => `${x.accession}|${x.relationshipType}`).sort();
     const copiedRelations = (copy.relatedFilings || []).map((x) => `${x.accession}|${x.relationshipType}`).sort();
     assert(JSON.stringify(relations) === JSON.stringify(copiedRelations), `Filing relatedFilings mismatch: ${ticker}/${accession}`);
     assert(new Set(relations).size === relations.length, `Duplicate relatedFiling relation: ${ticker}/${accession}`);
     statusCounts[filing.reviewStatus] = (statusCounts[filing.reviewStatus] || 0) + 1;
+    if (filing.reviewStatus === "EXPLICITLY_EXCLUDED") {
+      assert(typeof filing.exclusionReason === "string" && filing.exclusionReason.trim().length > 10,
+        `Explicitly excluded SEC filing lacks a review reason: ${ticker}/${accession}`);
+      assert((filing.eventIds || []).length === 0,
+        `Explicitly excluded filing cannot link to a canonical event: ${ticker}/${accession}`);
+      assert(copy.exclusionReason === filing.exclusionReason,
+        `Explicit exclusion reason differs between review and ledger: ${ticker}/${accession}`);
+    }
 
     for (const eventId of sorted(filing.eventIds)) {
       assert(reviewEventIds.has(eventId) && eventById.has(eventId), `Filing points to missing batch canonical event: ${ticker}/${accession}/${eventId}`);

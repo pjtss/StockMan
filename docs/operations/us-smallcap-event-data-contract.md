@@ -70,3 +70,8 @@
 - 공시 1건이 둘 이상의 이벤트 정의를 뒷받침할 수 있다. 검토 accession 수는 이벤트 record 수가 아니라 `ticker|accession` 고유 집합과 비교하고, filing row의 eventIds·canonical event·review event 간 다대일 연결을 검사한다.
 - 배치 생성 재실행 때 동일 eventId가 이미 canonical 원장에 있으면 새 검토 정의를 upsert한다. 과거 위험 문구나 일정 요약이 새 정의를 덮어쓰지 못하게 한다.
 - 배치 재생성 때 이전 review가 가진 해당 배치 eventId를 먼저 제거한 후 재구성하고, 입력한 비-SEC source identity와 같지만 eventId가 다른 obsolete canonical 항목도 제거한다. validator는 importer와 동일한 `(market, sourceType, sourceId, ticker, eventType, eventKey)` 규칙으로 전체 US 원장의 identity 중복을 검사한다.
+- 최근 SEC 원문 자동 스캔 결과의 `failed` 필드는 수집기 버전에 따라 실패 목록 배열 또는 정수일 수 있다. generator는 양쪽을 지원하되 `requested`와 `succeeded`가 정수이며 같고 실패 수가 0인지 fail-closed 검사한다.
+- 날짜 추출기는 날짜 후보를 발견할 뿐 이벤트 여부를 판정하지 않는다. 배치 입력은 각 미래 날짜 accession을 이벤트 정의 또는 명시적 제외로 연결해야 한다. `SEC_EXPLICIT_EXCLUSION`은 수동 검토 후 이벤트가 아니라고 판정한 문서에만 쓰며 `exclusionReason`은 구체적인 사유여야 한다. 단순 보류/검토 필요 메모는 제외 완료로 통과할 수 없다.
+- `EXPLICITLY_EXCLUDED` filing은 제외 사유를 review 복사본과 ledger에 동일하게 저장하고 canonical event ID를 연결하지 않는다. accession-event relation count는 TARGETED_SECTION_REVIEW filing만 대상으로 하고, 한 accession이 여러 eventId를 뒷받침할 수 있다.
+- 여러 이벤트가 같은 ticker와 SEC accession, eventType을 공유하면 `eventKey`를 배치·일정별로 고유하게 저장해 database identity를 분리한다. eventId만 바꾸는 것은 importer 중복 방지에 충분하지 않다.
+- 문서 날짜, 표결 마감, 회계기간 종료, 조건부 베스팅처럼 자동 추출에 걸렸으나 별도 이벤트가 아닌 날짜도 재현 입력에서 accession별 제외 이유를 유지한다. 1차 출처가 없거나 시각이 확인되지 않은 정보는 임의로 채우지 않는다.
