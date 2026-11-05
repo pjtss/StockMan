@@ -8489,3 +8489,20 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 완료: `a1e471ee` commit, `oci` push, OCI Actions 41693624683 성공, 운영 health/event/catalog/manual 확인. 이 로그 후속 정정은 다음 검증된 기록 커밋에서 반영한다.
+# [2026-11-06] SEC RSS Discord 알림을 EDGAR Form Type 기준으로 제한
+
+## 목적 및 범위
+- SEC EDGAR RSS 자동화에서 Discord 알림 대상을 정확한 `8-K`, `6-K`로 제한한다. RSS 전체 수집·저장은 유지한다.
+- EDGAR Atom의 명시적 `category` 중 `label="form type"`인 `term`만 신규 항목 판정에 사용한다. 해당 category가 없으면 알림 대상에서 제외(fail-closed)한다. amendment(`8-K/A`, `6-K/A`)도 제외한다.
+- 과거 DB 행 중 원본 form category가 보존되지 않은 경우에만 SEC title 접두어를 fallback으로 사용한다.
+
+## 반영
+- `lib/sec-rss-discord-filter.ts`: 원본 Atom Form Type 파싱과 허용 목록을 독립 모듈로 제공한다.
+- `lib/market-rss-pipeline.ts`: 신규 SEC 수집에서 form type 외 항목을 notification-ineligible 처리하고, 이미 대기 중인 과거 비대상 항목도 Discord delivery 전에 건너뛴다.
+- `lib/sec-rss-discord-filter.test.ts`: 허용/제외 form, category 누락, category/title 불일치, 복수 category 및 legacy fallback을 검증한다.
+
+## 검증 및 배포
+- SEC 실제 `all`, `type=8-K`, `type=6-K` Atom RSS 요청을 각각 HTTP 200으로 확인했다. 각 form 전용 100건 응답의 category term은 모두 요청 유형과 일치했다. all 100건 표본에서 8-K는 4건, 6-K는 0건이었고 제목 표시와 명시 category 간 허용 유형 불일치는 0건이었다.
+- 필터 단위 테스트: 10개 통과. 전체 `npm run deploy:verify`: dependency audit 0 vulnerabilities, production build/typecheck, standalone `/charts`·공개 API·API 오류/인증 smoke, Chrome 데스크톱·모바일, 전체 Vitest 301파일 1,552 통과·3 skip, docs/API/catalog, verify-scope, KIS boundary, Bearer auth, OCI cron gates 통과.
+- 전체 테스트 1차 실행에서 기존 KIS Retry-After 테스트가 60 대신 59를 받아 실패했으나 단독 재실행 및 전체 deploy verifier 재실행은 통과했다. rate limiter가 실제 남은 초를 반환하는 데 비해 테스트가 60초를 고정 기대하는 시간 경계 민감성으로 확인했으며, 이번 SEC 작업 범위 밖이라 수정하지 않았다.
+- production standalone 실행과 브라우저 검증 완료. 커밋·푸시·운영 배포 상태는 후속 기록에 적는다.

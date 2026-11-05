@@ -28,6 +28,7 @@ import { mapWithConcurrency } from "./map-with-concurrency";
 import { countMarketRssTranslationFallbackReasons } from "./market-rss-translation-fallback-count";
 import { TranslationClientOperationError } from "./translation-types";
 import { MARKET_RSS_DISCORD_ALLOWED_SOURCES } from "./market-rss-discord-policy";
+import { isSecRssDiscordItemAllowed } from "./sec-rss-discord-filter";
 import { interleaveMarketRssSourceQueues } from "./market-rss-source-fairness";
 import { buildMarketRssSecFilingLocalizationAssignments, MARKET_RSS_SEC_FILING_TITLE_SQL_PATTERN } from "./market-rss-sec-filing-localization";
 import { buildStoredMarketRssTranslationRetryState, validateStoredMarketRssTranslation } from "./market-rss-notification-translation-validation";
@@ -91,7 +92,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       const values = items.map((item) => {
         const classification = classifyMarketRssItem(item);
         const mappedTicker = item.source === "SEC_EDGAR" ? secTickerMap.get(extractSecCik(item.title)) || null : null;
-        const notifyEligible = true;
+        const notifyEligible = item.source !== "SEC_EDGAR" || isSecRssDiscordItemAllowed(item);
         const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
         const isBacklog = false;
         return {
@@ -305,6 +306,10 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   let sent = 0;
   let queueEnqueueFailed = 0;
   for (const row of rows) {
+    if (row.source === "SEC_EDGAR" && !isSecRssDiscordItemAllowed({ title: row.title, raw: row.rawPayload || undefined }, { allowLegacyTitleFallback: true })) {
+      await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "sec_form_type_not_allowed", updatedAt: new Date() }).where(and(eq(marketRssArticles.id, row.id), eq(marketRssArticles.notificationStatus, "PENDING")));
+      continue;
+    }
     let notificationRow = row;
     if (row.translationStatus === "TRANSLATED" && row.translatedTitle) {
       const validation = validateStoredMarketRssTranslation(row.title, row.translatedTitle);
