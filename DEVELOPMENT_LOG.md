@@ -8506,3 +8506,10 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 필터 단위 테스트: 10개 통과. 전체 `npm run deploy:verify`: dependency audit 0 vulnerabilities, production build/typecheck, standalone `/charts`·공개 API·API 오류/인증 smoke, Chrome 데스크톱·모바일, 전체 Vitest 301파일 1,552 통과·3 skip, docs/API/catalog, verify-scope, KIS boundary, Bearer auth, OCI cron gates 통과.
 - 전체 테스트 1차 실행에서 기존 KIS Retry-After 테스트가 60 대신 59를 받아 실패했으나 단독 재실행 및 전체 deploy verifier 재실행은 통과했다. rate limiter가 실제 남은 초를 반환하는 데 비해 테스트가 60초를 고정 기대하는 시간 경계 민감성으로 확인했으며, 이번 SEC 작업 범위 밖이라 수정하지 않았다.
 - production standalone 실행과 브라우저 검증 완료. 커밋·푸시·운영 배포 상태는 후속 기록에 적는다.
+
+## [2026-11-06] SEC Form Type 필터 OCI 운영 배포 확인
+
+- 적용 커밋 `7b08f2d7`를 원격 `oci`에 푸시했고, GitHub Actions `Deploy OCI` run `42078913852`가 성공했다. `Verify deployment`, standalone package, SSH configure, upload, `Activate release`가 모두 성공했다.
+- 배포 후 `https://stockman.r-e.kr/api/health`는 HTTP 200, `status=ok`를 반환했다.
+- runbook의 인증된 `GET /api/debug/automation-runs?module=market-rss&limit=5`는 `.env.local`에서 CRON_SECRET을 출력 없이 주입해 read-only 호출했으나 15~20초 timeout됐다. 따라서 배포 후 market-rss의 신규 실행 기록은 확인하지 못했다. 재확인은 운영 조회 지연 해소 후 수행한다.
+- SEC Form Type은 신규 Atom `<category label="form type" term="...">`만 신뢰하고 category 누락 시 fail-closed하므로 EDGAR Atom에 정확히 표시된 `8-K`/`6-K`만 새 Discord 전송 대상으로 만든다. 운영 알림을 수동 발사하지 않았다.
