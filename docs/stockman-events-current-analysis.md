@@ -98,7 +98,7 @@ V166은 forward-only additive migration이다. 원본 source row를 삭제하거
 
 1. 문서: architecture/data-model/API/operations 및 API contract를 추가했다. 애매한 RSS 출처는 `UNVERIFIED`다.
 2. 저장·조회: `lib/stockman-events.ts`의 `materializeStockmanSecEvents`와 `materializeStockmanRssEvents`, `listStockmanEvents`, `getStockmanEvent`, `getStockmanEventHistory`, `listStockmanCollectionStatus`, `renderStockmanEventsMarkdown`를 기존 SEC/RSS 원본에 연결했다.
-3. API: 이벤트 list/detail/history, 보고서/latest, collection-status 공개 GET과 무인증 source-ID materialization POST를 추가했다. 분석 revision 및 이벤트 상태/relatedEventId 편집은 관리자 session API로 보호한다.
+3. API: 이벤트 list/detail/history, `/api/reports` (Next.js `/latest` alias 포함), collection-status 공개 GET과 무인증 source-ID materialization POST를 추가했다. 분석 revision 및 이벤트 상태/relatedEventId 편집은 관리자 session API로 보호한다.
 4. 배치: `app/api/cron/sec-edgar/route.ts`와 `app/api/cron/market-rss/route.ts`가 source pipeline 이후 ledger materializer를 best-effort로 호출하고 실패·부분 성공을 automation run 결과에 기록한다. 기존 source rows와 알림 흐름은 ledger 실패로 롤백하지 않는다.
 5. 문서/API surface: `scripts/api-surface.mjs`가 공개 GET schema·query 및 route access 분류를 생성한다. collect POST의 공개 쓰기 범위는 source-ID materialization뿐이다.
 6. 로컬 격리 PostgreSQL에서 V166 DDL 적용을 확인했다. 앱 기본 스키마가 없는 상태의 health smoke가 503을 반환해 HTTP materialization/idempotency 검증은 완료로 판정하지 않았다. 운영 DB 적용은 하지 않았다.

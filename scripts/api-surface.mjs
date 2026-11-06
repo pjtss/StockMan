@@ -27,6 +27,14 @@ function routePath(file) {
   return `/api/${suffix.replace(/\[\.\.\.(\w+)\]/g, "{$1}").replace(/\[\[\.\.\.(\w+)\]\]/g, "{$1}").replace(/\[(\w+)\]/g, "{$1}")}`;
 }
 
+function apiPath(file) {
+  const path = routePath(file);
+  // Next.js resolves /latest as a static segment under /reports; the shared
+  // report handler accepts type=... and hours=..., so both surfaces are one path.
+  if (path === "/api/reports/latest") return "/api/reports";
+  return path;
+}
+
 function accessFor(path, source, methods) {
   if (path === "/api/events/collect") return requestAuthenticationPattern.test(source) ? "internal-or-operator" : "public-write-source-materialization";
   if (/requireAdminSession/.test(source)) return "admin-session";
@@ -366,7 +374,7 @@ for (const file of await routeFiles(apiRoot)) {
   const source = await readFile(file, "utf8");
   const methods = [...source.matchAll(methodsPattern)].map((match) => match[1] ?? match[2]);
   if (!methods.length) continue;
-  const path = routePath(file);
+  const path = apiPath(file);
   const access = accessFor(path, source, methods);
   if (methods.includes("GET") && access === "public-read-candidate" && requestAuthenticationPattern.test(source)) {
     routePolicyFailures.push(`Externally readable GET must not inspect caller authentication: ${path}`);

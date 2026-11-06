@@ -8529,6 +8529,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm run docs:check`, `node scripts/api-surface.mjs check`, `node scripts/operational-schema-migration-audit.mjs`, `git diff --check`: 통과. V166 및 route inventory 일치 확인.
 - 로컬 Docker PostgreSQL 격리 DB에 V166 DDL 적용은 통과했다. HTTP smoke는 앱 기본 스키마가 빠져 `/api/health` 503을 반환했으므로 DB 기반 API materialization 검증은 미완료다. 임시 서버/DB 컨테이너는 정리했다.
 - 신규 이벤트·timestamp/API/schema 관련 테스트: 6개 파일 42개 통과.
+- 배포 후 API 경로 확인에서 `/api/reports/latest`가 별도 URL로 남지 않고 Next.js 정적 segment `/api/reports`로 보이는 점을 확인했다. route inventory generator가 같은 논리 경로에 두 파일을 덮어쓰며 OpenAPI 응답 schema 연결을 누락하던 문서화 문제를 보완하고 `/api/reports?hours=12`를 표준 경로로 명시했다.
 - 전체 Vitest: 306개 파일을 10개씩 31개 순차 shard로 실행해 모든 shard 통과(일부 skip 포함). 이전 worker OOM 문제를 shard 방식으로 우회했다.
 - 수정 범위 밖 기존 테스트 실패는 없어 별도 기존 테스트 수정은 필요하지 않았다.
 - `git diff --check`: 통과.
@@ -8542,4 +8543,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 근거: 코드·빌드·타입·문서/API 감사 및 306개 테스트 파일 shard 검증 통과. DB 기반 HTTP smoke는 미완료이며 배포 후 health/Flyway/read-only API 확인이 남았다.
 
 ### 커밋·푸시·배포
-- 아직 미실행: 배포 commit/push 전. 사용자 요청에 따라 `oci` 배포를 진행하고 자동 workflow 및 운영 health/API를 read-only로 확인한다.
+- 커밋 `ad12a696`을 `oci`에 push했고 OCI workflow `42196880567`이 성공했다. 운영 `/api/health` 및 `/api/events`, 12시간/티커 필터는 HTTP 200. `/api/reports`의 alias 동작은 이후 재확인하며 신규 report/status route 일부 응답이 read-only 확인에서 늦거나 404인 구간이 있어 안정화 점검이 남았다.
