@@ -8553,16 +8553,18 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `GET /api/events?view=report`를 기존 운영 확인된 이벤트 route에 연결했다. `view` 생략 시 기존 이벤트 목록 응답은 유지한다.
 - API manual/OpenAPI/route inventory에 report view 파라미터와 응답 schema를 반영한다.
 - standalone deploy verification이 `/api/events?view=report&hours=6`의 400 JSON `INVALID_HOURS` 응답을 확인해 handler의 존재를 검증한다.
+- Linux Node 22/26 Vitest 환경에서는 Node의 built-in `localStorage`가 jsdom browser storage를 대체할 수 있어 `FeedPage` mount effect가 storage를 읽다 실패했다. `components/feed-page.test.tsx`에서 browser localStorage를 명시적으로 stub하도록 보강했다. 애플리케이션 코드의 브라우저 동작은 변경하지 않는다.
 - 원인: 운영 `/api/reports`는 `x-nextjs-prerender: 1`이 포함된 HTML 404로 반환되어 보고서 handler에 도달하지 않았다. 기존 event route는 200으로 확인했다. collection-status API는 일부 확인에서 응답이 20초 이상 지연됐다.
 
 ### 검증 및 운영 적용
 - 전체 Vitest 통과: 307개 파일 통과, 1개 skip; 1,590개 테스트 통과, 3개 skip. `npm run typecheck`, `docs:check`, `audit:api-surface`, `cron:check`, `git diff --check`, `npm run build` 통과.
 - standalone 실행에서 report 분기 검증 오류 400 JSON, 기존 `/api/reports` 검증 오류 400 JSON, DB 미구성 상태의 `/api/events?hours=12` 표준 503 JSON을 확인했다. 운영 DB 접근 또는 쓰기는 실행 smoke에 포함하지 않았다.
-- HOSTNAME bind 보정 뒤 `npm run deploy:verify` 전체 통과: 307개 테스트 파일 통과, 1개 skip; 1,590개 테스트 통과, 3개 skip; build, standalone browser/API runtime smoke, typecheck, docs, API/auth/KIS/cron audits 통과.
-- OCI run `42202406076`과 `42203831528`은 각각 22초, 18초 후 `Verify deployment` 단계에서 실패해 package/SSH/deploy를 건너뛰었다. 후속 Linux 컨테이너 재현에서 standalone `server.js`는 `HOSTNAME` 값의 주소로 정상 시작했지만 verifier가 요청하는 `127.0.0.1`에는 bind되지 않아 connection refused를 받았다. verifier 자식 프로세스에 `HOSTNAME=127.0.0.1`을 지정해 주소를 일치시켰다. 이는 이른 CI runtime smoke 실패와 부합하며, 다음 OCI run에서 수정 여부를 확인한다.
+- `components/feed-page.test.tsx` 단독 재실행: 1/1 통과. Node 22 Linux 전체 테스트: 307개 파일 통과, 1개 skip; 1,590개 테스트 통과, 3개 skip. HOSTNAME bind와 localStorage test stub을 포함한 Windows `npm run deploy:verify` 최종 재실행도 통과.
+- Node 22 Linux에서 build, standalone browser/API runtime smoke, typecheck, docs, API/auth/KIS/cron audits가 통과했다. 컨테이너가 Windows worktree CRLF를 tar 복사한 뒤 `bash -n`에서 실패했으나, `git ls-files --eol`로 OCI 대상 shell 파일은 index LF/worktree CRLF임을 확인했다. 이 오류는 GitHub의 Linux checkout이 아닌 로컬 Linux 재현 wrapper의 줄바꿈 입력 차이다.
+- OCI run `42202406076`, `42203831528`, `42206248569`는 각각 22초, 18초, 19초 후 `Verify deployment`에서 실패해 package/SSH/deploy를 건너뛰었다. 익명 Actions 화면은 세부 로그를 제공하지 않는다. 별도로 Linux standalone이 상속된 `HOSTNAME`에 bind해 loopback smoke가 실패하는 것을 재현하여 verifier에 `HOSTNAME=127.0.0.1`을 지정했다. 이후 CI 결과에서 수정 여부를 확인한다.
 - OCI 재배포 뒤 이벤트 report view의 운영 DB 응답을 확인할 예정.
-- 변경 파일: `app/api/events/route.ts`, 해당 route test, `scripts/api-surface.mjs`, `scripts/verify-deploy.mjs`, Stockman 이벤트 API/운영/분석 문서, `public/openapi.json`, `docs/api/route-inventory.json`.
-- 커밋·푸시: report route fix `1fe5501a`, 검증 이력 `3c467964` 완료. HOSTNAME bind fix는 검증 통과 후 커밋·푸시 예정.
+- 변경 파일: `app/api/events/route.ts`, `app/api/events/route.test.ts`, `components/feed-page.test.tsx`, `scripts/api-surface.mjs`, `scripts/verify-deploy.mjs`, Stockman 이벤트 API/운영/분석 문서, `public/openapi.json`, `docs/api/route-inventory.json`.
+- 커밋·푸시: report route fix `1fe5501a`, 검증 이력 `3c467964`, HOSTNAME bind 보정 `e4c7b8f9` 완료. localStorage test fix는 `npm run deploy:verify` 통과 후 커밋·푸시한다.
 
 ### 남은 개선
 - `/api/reports`와 collection-status의 직접 route 404/지연 원인은 운영 artifact/server routing에서 추가 추적한다. report view smoke와 loopback bind는 release workflow의 구조 게이트로 유지한다.

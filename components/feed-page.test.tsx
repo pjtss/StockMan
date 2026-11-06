@@ -22,6 +22,11 @@ vi.mock('./feed-page.module.css', () => ({
 
 describe('FeedPage Component', () => {
   beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+    });
+
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: any) => {
       if (typeof url === 'string' && url.includes('stock')) {
         return Promise.resolve({
