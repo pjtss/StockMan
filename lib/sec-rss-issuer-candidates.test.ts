@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const query = vi.hoisted(() => vi.fn());
 vi.mock("./db", () => ({ getDb: vi.fn(), getPool: () => ({ query }) }));
 
-import { loadPendingSecRssIssuerCiks } from "./sec-edgar-repository";
+import { loadPendingSecRssIssuerCandidates, loadPendingSecRssIssuerCiks } from "./sec-edgar-repository";
 
 describe("pending SEC RSS issuer candidates", () => {
   beforeEach(() => query.mockReset().mockResolvedValue({ rows: [{ cik: "0000001234" }, { cik: "invalid" }] }));
@@ -24,5 +24,16 @@ describe("pending SEC RSS issuer candidates", () => {
   it.each([[0, 1], [500, 50], [Number.NaN, 10]])("bounds invalid or oversized batch size %s", async (input, expected) => {
     await loadPendingSecRssIssuerCiks(input);
     expect(query.mock.calls[0][1]).toEqual([expected]);
+  });
+
+  it("groups the exact unnormalized SEC accessions by issuer and bounds RSS article age", async () => {
+    query.mockResolvedValueOnce({ rows: [{ cik: "0000001234", accessions: ["0000001234-26-000001", "invalid"] }] });
+    await expect(loadPendingSecRssIssuerCandidates(7)).resolves.toEqual([{ cik: "0000001234", accessions: ["0000001234-26-000001"] }]);
+    const [sql, params] = query.mock.calls[0];
+    expect(params).toEqual([7]);
+    expect(sql).toContain("array_agg(DISTINCT substring(a.external_id");
+    expect(sql).toContain("a.published_at >= NOW() - INTERVAL '90 days'");
+    expect(sql).toContain("GROUP BY 1 ORDER BY 1 LIMIT $1");
+    expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
   });
 });

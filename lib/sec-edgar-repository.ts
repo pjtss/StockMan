@@ -1,7 +1,7 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { getDb, getPool } from "./db";
 import { secCodexAnalysisQueue, secCompanies, secFilingDocuments, secFilingEvents, secSubmissions, secXbrlSnapshots } from "./schema";
-import { fetchAllSecSubmissions, type SecSubmissionRow } from "./sec-submissions";
+import { fetchAllSecSubmissions, fetchSecSubmissions, type SecSubmissionRow } from "./sec-submissions";
 import { classifySecEvent } from "./sec-event-classifier";
 import { fetchSecPrimaryDocument } from "./sec-primary-document";
 import { analyzeSecFinancing } from "./sec-financing-analyzer";
@@ -33,6 +33,59 @@ export async function syncSecCompany(cik: string) {
   return { ok: true, cik: result.cik, company: result.name, source: { ok: true, status: result.source.status, url: result.source.url, fetchedAt: result.source.fetchedAt, responseHeaders: result.source.responseHeaders }, submissions: result.filings.length, inserted };
 }
 
+/** Sync only the SEC RSS accessions in scope, avoiding a complete historical filing download. */
+export async function syncSecRssCandidateSubmissions(cik: string, candidateAccessions: string[]) {
+  const result = await fetchSecSubmissions(cik);
+  if (!result.source.ok) return { ok: false, cik: result.cik, error: result.source.error, status: result.source.status, source: result.source, submissions: 0, inserted: 0, unmatchedAccessions: candidateAccessions };
+  await archiveSecSourceSnapshot({ sourceType: "SUBMISSIONS", sourceKey: result.cik, url: result.source.url, status: result.source.status, responseHeaders: result.source.responseHeaders, rawPayload: result.source.rawText, fetchedAt: result.source.fetchedAt });
+  const db = getDb();
+  await db.insert(secCompanies).values({ cik: result.cik, name: result.name, tickers: result.tickers, exchanges: result.exchanges, sic: result.sic || null, sourceUpdatedAt: new Date(), updatedAt: new Date() }).onConflictDoUpdate({ target: secCompanies.cik, set: { name: result.name, tickers: result.tickers, exchanges: result.exchanges, sic: result.sic || null, sourceUpdatedAt: new Date(), updatedAt: new Date() } });
+  const requested = new Set(candidateAccessions);
+  const filings = result.filings.filter((row) => requested.has(row.accession));
+  const unmatchedAccessions = candidateAccessions.filter((accession) => !filings.some((row) => row.accession === accession));
+  if (filings.length) {
+    const now = new Date();
+    const submissions = filings.map((row) => {
+      const classification = classifySecEvent({ form: row.form, items: row.items });
+      return {
+        accession: row.accession, cik: result.cik, form: row.form, filingDate: row.filingDate, reportDate: row.reportDate || null,
+        primaryDocument: row.primaryDocument, primaryDocDescription: row.primaryDocDescription || null, items: row.items || null,
+        acceptanceDateTime: row.acceptanceDateTime || null, filingUrl: secFilingUrl(result.cik, row.accession, row.primaryDocument),
+        rawPayload: row as unknown as Record<string, unknown>, classifiedCategory: classification.category, classifiedDirection: classification.direction,
+        classifiedScore: classification.score, matchedTerms: classification.matchedTerms, updatedAt: now,
+      };
+    });
+    await db.insert(secSubmissions).values(submissions).onConflictDoUpdate({
+      target: secSubmissions.accession,
+      set: {
+        form: sql.raw("excluded.form"), filingDate: sql.raw("excluded.filing_date"), reportDate: sql.raw("excluded.report_date"),
+        primaryDocument: sql.raw("excluded.primary_document"), primaryDocDescription: sql.raw("excluded.primary_doc_description"),
+        items: sql.raw("excluded.items"), acceptanceDateTime: sql.raw("excluded.acceptance_datetime"), filingUrl: sql.raw("excluded.filing_url"),
+        rawPayload: sql.raw("excluded.raw_payload"), classifiedCategory: sql.raw("excluded.classified_category"),
+        classifiedDirection: sql.raw("excluded.classified_direction"), classifiedScore: sql.raw("excluded.classified_score"),
+        matchedTerms: sql.raw("excluded.matched_terms"), updatedAt: now,
+      },
+    });
+    const events = filings.map((row) => {
+      const classification = classifySecEvent({ form: row.form, items: row.items });
+      return { accession: row.accession, cik: result.cik, category: classification.category, direction: classification.direction, score: classification.score, matchedTerms: classification.matchedTerms, updatedAt: now };
+    });
+    await db.insert(secFilingEvents).values(events).onConflictDoUpdate({
+      target: secFilingEvents.accession,
+      set: { category: sql.raw("excluded.category"), direction: sql.raw("excluded.direction"), score: sql.raw("excluded.score"), matchedTerms: sql.raw("excluded.matched_terms"), updatedAt: now },
+    });
+  }
+  return {
+    ok: true,
+    cik: result.cik,
+    company: result.name,
+    source: { ok: true, status: result.source.status, url: result.source.url, fetchedAt: result.source.fetchedAt, responseHeaders: result.source.responseHeaders },
+    submissions: filings.length,
+    inserted: filings.length,
+    unmatchedAccessions,
+  };
+}
+
 /** Finds a bounded set of active US common-stock issuers from official SEC RSS rows
  * whose accession is not normalized yet. The RSS timestamp is never used as acceptance time. */
 export async function loadPendingSecRssIssuerCiks(limit = 10) {
@@ -53,6 +106,30 @@ export async function loadPendingSecRssIssuerCiks(limit = 10) {
           WHERE s.accession=substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})'))
       ORDER BY cik LIMIT $1`, [boundedLimit]);
   return result.rows.map((row) => row.cik).filter((cik) => /^\d{10}$/.test(cik));
+}
+
+export async function loadPendingSecRssIssuerCandidates(limit = 10) {
+  const boundedLimit = Math.min(50, Math.max(1, Number.isFinite(limit) ? Math.trunc(limit) : 10));
+  const result = await getPool().query<{ cik: string; accessions: string[] }>(
+    `SELECT lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0') AS cik,
+            array_agg(DISTINCT substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})')) AS accessions
+       FROM market_rss_articles a
+       JOIN sec_companies c ON c.cik=lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0')
+       CROSS JOIN LATERAL unnest(c.tickers) AS company_ticker(ticker)
+      WHERE a.source='SEC_EDGAR'
+        AND a.published_at >= NOW() - INTERVAL '90 days'
+        AND substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})') IS NOT NULL
+        AND substring(a.link from '/Archives/edgar/data/([0-9]+)/') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM us_common_stock_universe u
+          WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK'
+            AND UPPER(u.code)=UPPER(company_ticker.ticker)
+            AND UPPER(u.market)=ANY(ARRAY['NASDAQ','NAS','NYSE','NYS','AMEX','AMS']::text[]))
+        AND NOT EXISTS (SELECT 1 FROM sec_submissions s
+          WHERE s.accession=substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})'))
+      GROUP BY 1 ORDER BY 1 LIMIT $1`,
+    [boundedLimit],
+  );
+  return result.rows.flatMap((row) => /^\d{10}$/.test(row.cik) && Array.isArray(row.accessions) ? [{ cik: row.cik, accessions: row.accessions.filter((accession) => /^\d{10}-\d{2}-\d{6}$/.test(accession)) }] : []);
 }
 
 export async function loadSecSubmission(accession: string) { const rows = await getDb().select().from(secSubmissions).where(eq(secSubmissions.accession, accession)).limit(1); return rows[0] || null; }

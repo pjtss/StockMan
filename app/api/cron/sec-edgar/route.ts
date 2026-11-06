@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
-import { analyzeSecSubmission, collectMissingSecCompanyDocuments, loadPendingSecEvents, loadPendingSecRssIssuerCiks, loadRecentSecSubmissions, markSecEventDiscord, retryFailedSecCodexAnalyses, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
+import { analyzeSecSubmission, collectMissingSecCompanyDocuments, loadPendingSecEvents, loadPendingSecRssIssuerCandidates, loadRecentSecSubmissions, markSecEventDiscord, retryFailedSecCodexAnalyses, syncSecCompany, syncSecCompanyFacts, syncSecRssCandidateSubmissions } from "@/lib/sec-edgar-repository";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
@@ -13,28 +13,28 @@ import { classifyStockmanEventError, materializeStockmanSecEvents } from "@/lib/
 
 async function runSecRssCandidateSync(excludedCiks: string[] = []) {
   return withAutomationRun("sec-edgar", async () => {
-    let pendingCiks: string[];
+    let pendingCandidates: Array<{ cik: string; accessions: string[] }>;
     try {
-      pendingCiks = await loadPendingSecRssIssuerCiks(Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 10));
+      pendingCandidates = await loadPendingSecRssIssuerCandidates(Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 10));
     } catch (error) {
       return {
         ok: false,
         mode: "COMMIT",
-        submissionCoverage: { candidateLookupOk: false, candidateCikCount: 0, rssOnlyCikCount: 0, fetchSuccessCikCount: 0, fetchFailureCikCount: 0, submissionCount: 0, insertedSubmissionCount: 0 },
+        submissionCoverage: { candidateLookupOk: false, candidateCikCount: 0, rssOnlyCikCount: 0, fetchSuccessCikCount: 0, fetchFailureCikCount: 0, unmatchedAccessionCount: 0, submissionCount: 0, insertedSubmissionCount: 0 },
         results: [],
         failedCikCount: 0,
         errorCode: describeError(error).errorCode,
       };
     }
     const configuredSet = new Set(excludedCiks);
-    const rssCandidateCiks = pendingCiks.filter((cik) => !configuredSet.has(cik));
+    const rssCandidates = pendingCandidates.filter((candidate) => !configuredSet.has(candidate.cik));
     const results = [];
-    for (const cik of rssCandidateCiks) {
+    for (const candidate of rssCandidates) {
       try {
-        const submissions = await syncSecCompany(cik);
-        results.push({ cik, scope: "SEC_RSS_CANDIDATE", ok: submissions.ok, submissions });
+        const submissions = await syncSecRssCandidateSubmissions(candidate.cik, candidate.accessions);
+        results.push({ cik: candidate.cik, scope: "SEC_RSS_CANDIDATE", ok: submissions.ok && submissions.unmatchedAccessions.length === 0, submissions });
       } catch (error) {
-        results.push({ cik, scope: "SEC_RSS_CANDIDATE", ok: false, ...describeError(error) });
+        results.push({ cik: candidate.cik, scope: "SEC_RSS_CANDIDATE", ok: false, ...describeError(error) });
       }
     }
     let eventLedger: Awaited<ReturnType<typeof materializeStockmanSecEvents>> | { status: "FAILED"; errorCode: string };
@@ -42,15 +42,17 @@ async function runSecRssCandidateSync(excludedCiks: string[] = []) {
     catch (error) { eventLedger = { status: "FAILED", errorCode: classifyStockmanEventError(error) }; }
     const successful = results.filter((item) => item.ok && "submissions" in item);
     const failedCikCount = results.length - successful.length;
+    const unmatchedAccessionCount = results.reduce((sum, item) => sum + ("submissions" in item ? item.submissions?.unmatchedAccessions.length ?? 0 : 0), 0);
     return {
       ok: failedCikCount === 0 && eventLedger.status !== "FAILED" && eventLedger.status !== "PARTIAL_SUCCESS",
       mode: "COMMIT",
       submissionCoverage: {
         candidateLookupOk: true,
-        candidateCikCount: pendingCiks.length,
-        rssOnlyCikCount: rssCandidateCiks.length,
+        candidateCikCount: pendingCandidates.length,
+        rssOnlyCikCount: rssCandidates.length,
         fetchSuccessCikCount: successful.length,
         fetchFailureCikCount: failedCikCount,
+        unmatchedAccessionCount,
         submissionCount: successful.reduce((sum, item) => sum + Number("submissions" in item ? item.submissions?.submissions || 0 : 0), 0),
         insertedSubmissionCount: successful.reduce((sum, item) => sum + Number("submissions" in item ? item.submissions?.inserted || 0 : 0), 0),
       },

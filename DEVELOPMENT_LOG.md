@@ -8717,3 +8717,19 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 최초 typecheck에서 union 타입의 skipped 속성 narrowing 오류 2건 발견했으며 속성 존재 여부 narrowing으로 수정했다.
 - 최종 코드 반영 후 npm run deploy:verify 종료코드 0: production build, local runtime/API/browser smoke, Vitest 310 files passed/1 skipped (1,624 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron gates 통과.
 - 변경은 feature branch에 커밋 준비 상태이며, 운영 OCI 배포와 실제 운영 schedule/SEC accession 검증은 별도 승인을 기다린다. 운영 DB 직접 변경, cron 수동 호출, backfill은 하지 않았다.
+## [2026-11-07] SEC RSS cron 시간 제한 내 accession 전용 저장 경로와 OCI 배포 확인
+
+### 목적 및 원인
+- 커밋 7163b07f를 OCI에 배포한 뒤 공개 health API는 정상(200/status=ok)이었으나, collection-status의 sec-edgar run이 장시간 RUNNING으로 남았고 /api/events?hours=24 전체 pagination 663건에서 SEC_EDGAR 이벤트가 0건이었다.
+- 코드 확인 결과 기존 syncSecCompany()는 RSS 후보의 단일 accession 처리에도 CIK 전체 SEC filing history JSON 파일을 추가 요청하고 모든 제출을 개별 upsert한다. OCI cron HTTP 제한은 180초라 RSS 보강에 과도한 범위이며 정상 종료/coverage를 검증하기 어려웠다.
+
+### 변경
+- lib/sec-edgar-repository.ts: 별도 기존 전체 syncSecCompany() 동작을 보존하면서 공식 recent Submissions 문서에서 RSS가 지정한 accession만 저장하는 syncSecRssCandidateSubmissions()를 추가했다. 원본 Submissions 응답은 기존 content-addressed snapshot에 보관하고, 일치한 accession row 및 분류를 batch upsert한다.
+- RSS candidate query는 최근 90일 SEC_EDGAR 원문에서 issuer별 미저장 accession을 그룹핑한다. SEC recent metadata와 일치하지 않은 accession 수는 collection coverage에서 숨기지 않는다.
+- app/api/cron/sec-edgar/route.ts와 단위 테스트, collection-status coverage sanitizer, API/운영 문서를 갱신했다. 기존 configured CIK의 전체 SEC 동기화/XBRL/원문 분석 및 기존 API는 변경하지 않았다.
+
+### 검증 및 배포
+- focused Vitest 4 files/50 tests 통과, npm run typecheck 통과.
+- OCI 최초 schedule 분리 배포: commit 7163b07f, Actions run 42259771792 성공(verify/package/upload/activate 전체 success). 운영 GET은 health OK였으나 SEC event normalization은 미검증이어서 후속 수정으로 이어졌다.
+- accession 전용 경로 focused tests 4 files/50 tests 통과 및 전체 npm run deploy:verify 종료코드 0. Production build, local runtime/browser smoke, Vitest 311 files passed/1 skipped (1,627 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron gates 통과.
+- 새 코드 배포는 별도 commit/OCI workflow로 이어간다. 이번 수정에서 운영 DB 직접 변경, 수동 cron 호출, backfill은 하지 않았다.

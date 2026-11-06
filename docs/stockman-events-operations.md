@@ -24,6 +24,8 @@ SEC RSS의 `detected_ticker`는 null인 항목이 많다. 배포된 후보 로�
 
 2026-11-06 16:45 UTC read-only 점검에서 SEC 공식 Atom, Stockman `/api/market-news`, 공개 disclosure API에는 신규 SEC feed 항목이 있었지만 `/api/events`에는 정규화된 SEC 이벤트가 없었다. 최신 `market-rss` 및 `sec-realtime` collection status가 SKIPPED/summary 없는 예약 이력에 가려 실제 성공을 보여주지 않는 문제도 확인했다. 이를 근거로 코드의 기존 `sec-edgar`(기본 활성 요일 전체) schedule을 SEC RSS issuer CIK candidate/Submissions 동기화에 적용하고, 기존 `sec-realtime`(기본 월–금) schedule은 설정 CIK의 XBRL/원문 분석에 유지한다. 두 경로에서 같은 CIK를 중복 동기화하지 않으며 실패는 503/coverage로 드러낸다. collection-status는 RSS, sec-realtime, sec-edgar 각각의 최신 non-SKIPPED run을 표시하고, 성공적인 후보 0건 조회를 UNVERIFIED와 구별한다. 관련 단위 테스트와 API 문서를 갱신했다. 이 로컬 변경 단계에서는 운영 DB 직접 변경, 운영 cron 수동 호출, backfill을 수행하지 않았다.
 
+2026-11-06 17:23 UTC 새 코드 활성화 후 공개 status에서 `sec-edgar` run이 장시간 RUNNING이고 24시간 이벤트 전체 페이지(663건)에 SEC 원장 이벤트가 여전히 0건임을 확인했다. 기존 `syncSecCompany()`가 RSS accession 한 건 보강에도 SEC Submissions의 전체 과거 JSON 파일을 가져와 모든 filing을 순차 upsert하는 경로임을 코드에서 확인했다. cron endpoint 제한(180초) 내에 끝나지 않을 수 있으므로, RSS 전용 후보 경로는 RSS external ID의 정확한 accession만 선택하고 최근 Submissions JSON의 일치 row만 저장하도록 변경한다. 기존 설정 CIK용 전체 동기화 동작은 보존한다. RSS 후보는 최근 90일로 제한하고, 일치하지 않은 accession은 coverage에 별도 노출해 0건/미대조를 감추지 않는다. 활성화 후 SEC RSS normalization은 운영에서 아직 검증되지 않았으며, 재배포 후 run completion 및 SEC events를 다시 확인한다.
+
 2026-11-06 16:26 UTC 후속 read-only 확인에서도 `market-rss`는 SUCCESS(SEC_EDGAR 포함 source 3개, 실패 0, article inserted 204, ledger fetched/stored 114/114)였고, `sec-realtime`은 16:25 UTC 실행이 UNVERIFIED/coverage null이었다. `/api/events?hours=24`의 663행 전체 페이지를 조회해 SEC_EDGAR 0건, `/api/events?hours=12` total 229, `/api/reports/latest` HTTP 200/count 0을 확인했다. 이 반복 실행은 KST 토요일 01:25 무렵의 상태여서 schedule-active SEC 수집 확인이 아니다.
 
 ## 배포 및 데이터 보존 경계
