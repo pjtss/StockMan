@@ -12,11 +12,13 @@ V167 배포 후 `/api/events`와 `/api/reports/latest`는 응답하지만 `/api/
 
 SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SEC는 filing이 EDGAR system timestamp 이후 보통 1–3분 뒤 sec.gov에 제공될 수 있다고 설명한다. RSS 게시/갱신 시각을 acceptance time으로 대체하지 않는다. [SEC Webmaster FAQ](https://www.sec.gov/about/webmaster-frequently-asked-questions). 운영 SEC universe는 기존 `featureSettings.secEdgar.ciks`, `SEC_SYNC_CIKS`, 또는 `SEC_SYNC_SMALLCAP=true` 중 하나로 결정되며 현재는 유효 CIK가 0이다. small-cap 모드는 기존 프로젝트 기준 시가총액 1억 달러 이하 후보로 범위가 제한되므로 전체 시장 설정과 동일하지 않다. 종목 범위를 확인하지 않은 채 운영 설정을 변경하지 않는다.
 
-## RSS 기반 SEC issuer 보강 변경 (미배포)
+## RSS 기반 SEC issuer 보강 변경 (배포 완료, cron 효과 확인 중)
 
 SEC cron은 공식 SEC RSS의 저장 행 중 미정규화 accession을 탐색해 활성 미국 보통주 마스터와 일치하는 후보 CIK를 기본 10개/실행, 설정 상한 50개/실행으로 기존 Submissions 경로에 추가한다. RSS 후보는 Submissions metadata만 동기화하고 XBRL 및 회사 전체 원문 수집은 명시 설정 CIK에 한정해 넓은 backfill이 발생하지 않게 한다. RSS 후보도 SEC ticker/acceptance metadata 검증과 event materializer를 통과해야 한다. 운영 status의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`로 configured CIK와 RSS 보강 대상을 구별한다. 신규 migration이나 운영 DB 직접 수정은 포함하지 않는다.
 
-배포 전에는 전체 `npm run deploy:verify`를 통과시키고 OCI workflow 계획을 제출한다. 실제 배포/운영 cron 실행은 기존 운영 변경 승인 조건에 따라 별도 승인 후 진행하며, 배포 뒤 candidate/fetch counts, SEC event count, duplicate 여부, 12시간 조회를 확인한다. SEC 요청량은 batch limit에 의해 제한되나 각 issuer Submissions 응답은 최근 제출 metadata를 기존처럼 upsert한다.
+커밋 `b11e5439`는 OCI workflow `42236863405`에서 성공 배포됐고, RSS 후보에 전체 원문 수집이 붙지 않도록 한정한 `ec0cf692`도 workflow `42239656706`에서 성공 배포됐다. 양쪽 배포 모두 전체 verify를 통과했다. 배포 후 공개 `/api/health`는 HTTP 200이며 `/api/collection-status`에서 새 coverage 필드가 보이는 것으로 새 상태 코드가 활성화된 것을 확인했다. 단, 2026-11-06 15:10 UTC의 최신 sec-realtime run은 `UNVERIFIED`, summary/coverage 없음으로 나타났다. 이는 실제 Submissions fetch 성공으로 인정하지 않는다. 해당 관찰은 KST 토요일 00시 시간대로 기본 sec-realtime 요일 설정(월–금) 밖일 가능성이 있지만, 운영 DB에 저장된 실제 schedule 설정은 공개 status만으로 확인할 수 없다.
+
+다음 활성 sec-realtime cron 실행에서 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`, fetch counts, submission counts 및 `eventLedger`를 확인한다. 정확한 SEC accession이 원장에 생겼는지, unique identity로 반복 수집이 한 건으로 유지되는지와 12시간 time window의 accepted_at을 별도로 검증한다. SEC 요청량은 batch limit에 의해 제한되며 issuer Submissions metadata만 보강한다. 실제 운영 DB 직접 쓰기나 별도 backfill은 하지 않았다.
 
 ## 배포 전제
 

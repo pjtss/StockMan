@@ -8661,3 +8661,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **운영/커밋 상태**: 운영 DB 직접 변경 및 backfill은 하지 않았다. commit `b11e5439`를 `oci`에 push해 OCI run `42236863405`가 실행됐다. 배포 뒤 새 `/api/collection-status` 응답에서 RSS 후보 coverage 필드가 나타나 새 코드 활성화를 확인했다.
 - **운영 관측/추가 안전 조정**: 첫 SEC cron 실행이 아직 종료되지 않아 추가 점검했다. RSS 후보를 기존 full-document collector로 넘기면 범위가 accession metadata lookup을 넘어갈 수 있음을 발견했다. RSS candidate CIK는 Submissions metadata만 동기화하고 XBRL/회사 전체 원문 수집은 명시 설정 CIK에 한정하도록 `app/api/cron/sec-edgar/route.ts`를 보정했다. 관련 분석/architecture/operations 문서도 이에 맞춰 수정했다.
 - **남은 위험/다음 단계**: 공식 SEC RSS URL에 issuer CIK/accession이 있는 행만 후보가 된다. RSS ticker가 보통주 마스터와 불일치하면 fail-closed로 제외된다. 최초 운영 cron 실행 완료와 source coverage 확인 후 추가 범위 제한을 전체 검증·배포해야 한다.
+
+### 운영 배포 후속 기록
+- `b11e5439`를 `oci`에 배포: workflow `42236863405` success. `/api/collection-status`에서 `rssCandidateCikCount` 등 새 fields가 노출되어 해당 앱 코드가 운영에 활성화된 것을 확인했다.
+- 첫 실행을 관찰하며 RSS issuer 후보에 전체 누락 원문 collector까지 연결될 수 있음을 발견해 Submissions-only 제한을 추가했다. 전체 `npm run deploy:verify` 통과(309 test files, 1,614 passed/3 skipped, build/runtime/browser/typecheck/docs/API/auth/cron gates 성공) 후 `ec0cf692`를 `oci`와 작업 branch에 push했다. OCI workflow `42239656706` success; 운영 `/api/health` 200.
+- 2026-11-06 15:10 UTC latest `sec-realtime` row는 `UNVERIFIED`, `sourceCoverage=null`, `eventLedger=UNVERIFIED`, finished 15:10:07로 확인되어 SEC candidate fetch 효과는 아직 검증되지 않았다. UTC 15시대는 KST 토요일 00시로 default weekday schedule 밖일 수 있으나 운영 DB schedule은 확인하지 않았다. 직접 DB 쓰기/backfill은 하지 않았다.
+- 다음 개선/검증: 첫 schedule-active run에서 new coverage fields의 실제 값, SEC official accepted_at 기반 정규 event, 중복 재실행, 12시간 API 노출을 검증한다. RSS 후보 selection 실패/재시도 횟수의 영구 queue와 backoff는 현재 테이블 없이 구현되지 않았으며, operational attempt diagnostics가 부족하면 보강한다.
