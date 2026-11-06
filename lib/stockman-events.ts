@@ -224,7 +224,7 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
      WHERE ($3::text IS NULL OR s.accession=$3)
        AND (NOT EXISTS (SELECT 1 FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession)
        OR GREATEST(s.updated_at,COALESCE(d.fetched_at,s.updated_at),COALESCE(q.analyzed_at,s.updated_at)) > COALESCE((SELECT x.source_updated_at FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession),'-infinity'::timestamptz))
-       AND s.acceptance_datetime ~ '^([0-9]{14}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z)$'
+       AND s.acceptance_datetime ~ '^([0-9]{14}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z)$'
        AND EXISTS (SELECT 1 FROM us_common_stock_universe u WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK' AND UPPER(u.market)=ANY($2::text[]) AND UPPER(u.code)=ANY(SELECT UPPER(unnest(c.tickers))))
      ORDER BY s.acceptance_datetime DESC NULLS LAST,s.accession LIMIT $1`, [Math.min(2000, Math.max(1, limit)), EXCHANGE_MARKETS, accessionFilter ?? null]);
   let stored = 0;
