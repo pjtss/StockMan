@@ -29,14 +29,15 @@ export async function POST(request: Request) {
       const { syncXbrl, discordBatch } = runtime;
       const results = [];
       for (const cik of ciks) {
+        const configured = configuredSet.has(cik);
         try {
           const submissions = await syncSecCompany(cik);
-          const facts = syncXbrl ? await syncSecCompanyFacts(cik) : null;
-          const documents = submissions.ok ? await collectMissingSecCompanyDocuments(cik) : null;
-          results.push({ cik, ok: submissions.ok && (facts == null || facts.ok) && (documents == null || documents.failed.length === 0), submissions, facts, documents });
+          const facts = configured && syncXbrl ? await syncSecCompanyFacts(cik) : null;
+          const documents = configured && submissions.ok ? await collectMissingSecCompanyDocuments(cik) : null;
+          results.push({ cik, scope: configured ? "CONFIGURED" : "SEC_RSS_CANDIDATE", ok: submissions.ok && (facts == null || facts.ok) && (documents == null || documents.failed.length === 0), submissions, facts, documents });
         } catch (error) {
           const diagnostics = describeError(error);
-          results.push({ cik, ok: false, ...diagnostics });
+          results.push({ cik, scope: configured ? "CONFIGURED" : "SEC_RSS_CANDIDATE", ok: false, ...diagnostics });
         }
       }
       let eventLedger: Awaited<ReturnType<typeof materializeStockmanSecEvents>> | { status: "FAILED"; errorCode: string };

@@ -8658,5 +8658,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **문서**: current analysis, architecture, API 및 operations에 source 연결, timestamp 구분, batch 범위와 미배포 상태를 기록했다.
 - **인증/호환성**: 공개 disclosure GET 및 기존 원본 ID 기반 event collect POST의 무인증 정책을 유지한다. 기존 SEC/RSS source API·테이블을 변경하지 않고 새 migration을 추가하지 않았다.
 - **검증**: focused Vitest 2 files / 37 tests passed. `npm run deploy:verify` 통과: production build, standalone runtime/API smoke, desktop/mobile browser hydration, Vitest 309 files(1 skipped) 1,614 passed/3 skipped, typecheck, docs/migration/API/auth/KIS/cron audit 모두 성공. `git diff --check` 통과.
-- **운영/커밋 상태**: 운영 DB 직접 변경, backfill, commit, push, deploy는 하지 않았다. 실제 cron 동작은 운영 배포 승인 이후 확인한다.
-- **남은 위험/다음 단계**: 공식 SEC RSS URL에 issuer CIK/accession이 있는 행만 후보가 된다. RSS ticker가 보통주 마스터와 불일치하면 fail-closed로 제외된다. 운영 영향은 배포 이후 cron 관측으로 검증해야 하며, 현재 commit/push/deploy는 사용자 확인 대기 상태다.
+- **운영/커밋 상태**: 운영 DB 직접 변경 및 backfill은 하지 않았다. commit `b11e5439`를 `oci`에 push해 OCI run `42236863405`가 실행됐다. 배포 뒤 새 `/api/collection-status` 응답에서 RSS 후보 coverage 필드가 나타나 새 코드 활성화를 확인했다.
+- **운영 관측/추가 안전 조정**: 첫 SEC cron 실행이 아직 종료되지 않아 추가 점검했다. RSS 후보를 기존 full-document collector로 넘기면 범위가 accession metadata lookup을 넘어갈 수 있음을 발견했다. RSS candidate CIK는 Submissions metadata만 동기화하고 XBRL/회사 전체 원문 수집은 명시 설정 CIK에 한정하도록 `app/api/cron/sec-edgar/route.ts`를 보정했다. 관련 분석/architecture/operations 문서도 이에 맞춰 수정했다.
+- **남은 위험/다음 단계**: 공식 SEC RSS URL에 issuer CIK/accession이 있는 행만 후보가 된다. RSS ticker가 보통주 마스터와 불일치하면 fail-closed로 제외된다. 최초 운영 cron 실행 완료와 source coverage 확인 후 추가 범위 제한을 전체 검증·배포해야 한다.

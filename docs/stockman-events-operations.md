@@ -14,7 +14,7 @@ SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SE
 
 ## RSS 기반 SEC issuer 보강 변경 (미배포)
 
-코드 변경은 아직 운영에 반영하지 않았다. SEC cron이 공식 SEC RSS의 저장 행 중 미정규화 accession을 탐색해 활성 미국 보통주 마스터와 일치하는 후보 CIK를 기본 10개/실행, 설정 상한 50개/실행으로 기존 Submissions 경로에 추가하는 방식이다. RSS 후보도 기존 SEC ticker/acceptance metadata 검증과 event materializer를 통과해야 한다. 운영 status의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`로 configured CIK와 RSS 보강 대상을 구별한다. 신규 migration이나 운영 DB 직접 수정은 포함하지 않는다.
+SEC cron은 공식 SEC RSS의 저장 행 중 미정규화 accession을 탐색해 활성 미국 보통주 마스터와 일치하는 후보 CIK를 기본 10개/실행, 설정 상한 50개/실행으로 기존 Submissions 경로에 추가한다. RSS 후보는 Submissions metadata만 동기화하고 XBRL 및 회사 전체 원문 수집은 명시 설정 CIK에 한정해 넓은 backfill이 발생하지 않게 한다. RSS 후보도 SEC ticker/acceptance metadata 검증과 event materializer를 통과해야 한다. 운영 status의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`로 configured CIK와 RSS 보강 대상을 구별한다. 신규 migration이나 운영 DB 직접 수정은 포함하지 않는다.
 
 배포 전에는 전체 `npm run deploy:verify`를 통과시키고 OCI workflow 계획을 제출한다. 실제 배포/운영 cron 실행은 기존 운영 변경 승인 조건에 따라 별도 승인 후 진행하며, 배포 뒤 candidate/fetch counts, SEC event count, duplicate 여부, 12시간 조회를 확인한다. SEC 요청량은 batch limit에 의해 제한되나 각 issuer Submissions 응답은 최근 제출 metadata를 기존처럼 upsert한다.
 

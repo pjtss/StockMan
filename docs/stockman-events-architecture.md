@@ -27,7 +27,7 @@ flowchart LR
 ## 데이터·검증 흐름
 
 - 기존 RSS/SEC cron이 source rows를 먼저 저장한다. 그 다음 별도 best-effort materializer가 기존 기록을 ledger에 멱등 연결한다. ledger 실패는 원래 수집·알림 결과를 롤백하지 않고 cron 결과를 degraded로 남긴다.
-- SEC cron은 추가로 SEC_EDGAR RSS 중 SEC 제출 테이블에 아직 없는 accession을 최대 10 CIK/실행(환경값 상한 50) 찾아 기존 `syncSecCompany`로 정식 Submissions metadata를 보강한다. 후보는 활성 미국 COMMON_STOCK 마스터와 매칭되는 RSS ticker만 포함하고 기존 설정 CIK와 중복 호출하지 않는다.
+- SEC cron은 추가로 SEC_EDGAR RSS 중 SEC 제출 테이블에 아직 없는 accession을 최대 10 CIK/실행(환경값 상한 50) 찾아 기존 `syncSecCompany`로 정식 Submissions metadata를 보강한다. 후보는 활성 미국 COMMON_STOCK 마스터와 매칭되는 RSS ticker만 포함하고 기존 설정 CIK와 중복 호출하지 않는다. RSS 후보 보강 경로는 Submissions metadata만 동기화하고 XBRL/회사 전체 원문 수집은 명시 설정 CIK에 한정한다.
 - SEC는 `(CIK, accession)`에서 안정 identity를 만든다. `acceptance_datetime`의 14자리 Eastern Time wall clock을 UTC instant로 변환하며, 티커는 SEC 회사 ticker 목록과 활성 `us_common_stock_universe` 보통주/미국 거래소 마스터가 모두 확인될 때만 처리한다.
 - RSS는 `(source, external_id)`로 event/document를 멱등 연결한다. RSS가 제공한 ticker가 활성 common-stock master와 일치해도 그 사실만으로 원문을 공식 검증하지 않는다. RSS source documents는 기본 `UNVERIFIED`다.
 - 관리자는 `/api/admin/events/{id}/analysis`에 Codex 분석과 원문 문서 ID를 제출한다. 긍정 등급은 HTTPS 원문, 티커, 활성 보통주 마스터, evidence quote와 문서 검토가 모두 있어야 저장/검증된다. 등급 재평가는 hash가 다른 새 revision으로 저장한다.
