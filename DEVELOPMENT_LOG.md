@@ -8587,8 +8587,20 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증 및 배포
 - `npm test -- --run lib/stockman-events.test.ts`: 22 tests passed.
-- 전체 `npm run deploy:verify` 통과: production build 107 pages, standalone API/Chrome desktop·mobile smoke, Vitest 307 files(1 skipped), 1,597 passed/3 skipped, typecheck, docs/migration V166, API surface, auth/KIS/cron 감사 통과. `git diff --check` 통과. 운영 status 재확인은 새 배포와 다음 cron 실행 뒤 수행한다. 이 변경 시점에는 운영 데이터 쓰기/수동 수집 POST를 하지 않았다.
+- Full `deploy:verify`: production build and standalone/browser smoke, 307 test files (1 skipped), 1,597 tests passed/3 skipped, typecheck, docs/migration V166, API/auth/KIS/cron audits passed.
 - 커밋·푸시·배포: 미실행.
 
 ### 남은 위험 및 다음 확인
 - 다음 배포 뒤 한 번 이상의 자동 cron 실행에서 `eventLedger.fetched/stored/failed/failureCodes`를 읽어 구체 오류를 확인하고, 오류를 수정한 후 `SUCCESS` 또는 정당한 `UNVERIFIED` 상태와 운영 데이터 누적을 확인한다.
+
+## [2026-11-06] 원장 저장 API 운영 1건 재현 결과
+
+- 공개 SEC disclosure GET에서 accession `0001511737-26-000076`이 기존 저장소에 있음을 확인했다. 같은 원본 ID 하나로 무인증 `POST /api/events/collect`를 호출했지만 HTTP 503 `EVENT_STORAGE_UNAVAILABLE`이 반환됐다. API가 원문/분석 입력을 받지 않고 기존 accession만 받는지 확인했고, 성공 저장은 발생하지 않았다.
+- 배포된 collection status는 cron run이 실행 중인 시점에는 `UNVERIFIED`를 반환했다. 완료된 이전 run은 `SCHEMA_TABLE_MISSING`이었으나 누락 relation을 공개하지 않아 원인을 특정할 수 없다.
+- DB 오류 메시지는 제한된 relation allowlist만 검사해 `SCHEMA_TABLE_MISSING_<KNOWN_TABLE>`로 세분화한다. 공개 collect API도 내부 메시지 대신 같은 안전 분류 코드를 반환한다. API route test가 원문 비밀 문자열을 응답에 노출하지 않는지 검사한다.
+- 1건 수집 요청은 실패했으며 direct DB write는 수행되지 않았다. 수동 재시도보다 자동 cron status의 분류 결과를 우선 확인한다.
+
+
+### 1건 재현 오류 진단 후속
+- collect route는 SCHEMA_TABLE_MISSING_<KNOWN_TABLE> 형태의 안전 코드만 반환하도록 수정했고 누락 relation 분류 회귀 테스트를 추가했다. focused tests 29 passed, 전체 deploy:verify는 Vitest 307 files(1 skipped), 1,600 passed/3 skipped, build/runtime/browser/typecheck/docs/API/auth/KIS/cron gate 모두 통과했다.
+- 운영 배포 및 자동 cron 재실행 후 /api/collection-status와 동일 accession 1건을 다시 확인해 실제 누락 relation을 확인한다.

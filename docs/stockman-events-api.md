@@ -34,3 +34,5 @@
 ## 응답/오류
 
 성공 응답은 `{ok:true,...}`; 검증 오류는 HTTP 400, 없는 ID는 404, 저장소 장애는 민감한 상세 없이 503 표준 오류 코드를 반환한다. 페이지 필터 및 cursor는 동일 API 버전 범위에서 유지한다. 신규 GET 경로는 API discovery/manual/route inventory와 `scripts/api-surface.mjs` 감사 대상이다.
+
+저장소 오류 코드는 `DATABASE_UNAVAILABLE`, `DATABASE_ERROR`, `SCHEMA_TABLE_MISSING[_<KNOWN_TABLE>]`, `SCHEMA_COLUMN_MISSING`, `UNIQUE_CONFLICT`, `FOREIGN_KEY_CONFLICT`, `INVALID_SOURCE_DATA` 중 하나다. 알려진 relation 이름은 고정 allowlist에서만 반환하고 DB 오류 메시지나 연결 문자열은 공개하지 않는다.

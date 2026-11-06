@@ -83,7 +83,12 @@ const EXCHANGE_MARKETS = ["NASDAQ", "NAS", "NYSE", "NYS", "AMEX", "AMS"];
 /** Stable, non-sensitive error categories safe for the public collection-status API. */
 export function classifyStockmanEventError(error: unknown) {
   const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
-  if (code === "42P01") return "SCHEMA_TABLE_MISSING";
+  if (code === "42P01") {
+    const message = error && typeof error === "object" && "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
+    const missingRelation = /relation\s+"([a-z0-9_]+)"\s+does not exist/i.exec(message)?.[1]?.toLowerCase();
+    const knownRelations = new Set(["market_rss_articles", "market_rss_llm_analyses", "sec_submissions", "sec_companies", "sec_filing_events", "sec_filing_documents", "sec_codex_analysis_queue", "us_common_stock_universe", "stockman_events", "stockman_event_documents", "stockman_event_analyses", "stockman_event_history", "stockman_event_metrics"]);
+    return missingRelation && knownRelations.has(missingRelation) ? `SCHEMA_TABLE_MISSING_${missingRelation.toUpperCase()}` : "SCHEMA_TABLE_MISSING";
+  }
   if (code === "42703") return "SCHEMA_COLUMN_MISSING";
   if (code === "23505") return "UNIQUE_CONFLICT";
   if (code === "23503") return "FOREIGN_KEY_CONFLICT";

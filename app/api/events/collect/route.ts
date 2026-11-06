@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { consumeSecStockRiskLimit } from "@/lib/sec-stock-risk-public-rate-limit";
-import { materializeStockmanRssEvents, materializeStockmanSecEvents } from "@/lib/stockman-events";
+import { classifyStockmanEventError, materializeStockmanRssEvents, materializeStockmanSecEvents } from "@/lib/stockman-events";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,8 @@ export async function POST(request: Request) {
     try {
       const result = await materializeStockmanSecEvents(1, input.accession);
       return NextResponse.json({ ok: result.failed === 0 && result.unverified === 0, source: "SEC_EDGAR", result }, { status: result.failed ? 503 : result.unverified ? 422 : 200, headers: { "Cache-Control": "no-store" } });
-    } catch {
-      return NextResponse.json({ ok: false, error: "EVENT_STORAGE_UNAVAILABLE" }, { status: 503 });
+    } catch (error) {
+      return NextResponse.json({ ok: false, error: classifyStockmanEventError(error) }, { status: 503 });
     }
   }
   if (input.source === "RSS" && Object.keys(input).includes("provider")) {
@@ -34,8 +34,8 @@ export async function POST(request: Request) {
     try {
       const result = await materializeStockmanRssEvents(1, String(input.provider), input.externalId);
       return NextResponse.json({ ok: result.failed === 0, source: "RSS", result }, { status: result.failed ? 503 : 200, headers: { "Cache-Control": "no-store" } });
-    } catch {
-      return NextResponse.json({ ok: false, error: "EVENT_STORAGE_UNAVAILABLE" }, { status: 503 });
+    } catch (error) {
+      return NextResponse.json({ ok: false, error: classifyStockmanEventError(error) }, { status: 503 });
     }
   }
   return NextResponse.json({ ok: false, error: "UNSUPPORTED_SOURCE" }, { status: 400 });

@@ -18,6 +18,8 @@ describe("Stockman event identity, times, and exact metrics", () => {
 
   it.each([
     [{ code: "42P01" }, "SCHEMA_TABLE_MISSING"],
+    [{ code: "42P01", message: 'relation "market_rss_llm_analyses" does not exist' }, "SCHEMA_TABLE_MISSING_MARKET_RSS_LLM_ANALYSES"],
+    [{ code: "42P01", message: 'relation "private_secrets" does not exist' }, "SCHEMA_TABLE_MISSING"],
     [{ code: "42703" }, "SCHEMA_COLUMN_MISSING"],
     [{ code: "23505" }, "UNIQUE_CONFLICT"],
     [{ code: "23503" }, "FOREIGN_KEY_CONFLICT"],
