@@ -43,6 +43,12 @@ export function getStockmanEventTimeWindow(asOf: Date, hours: number) {
   return { from: new Date(asOf.getTime() - hours * 3_600_000), to: new Date(asOf) };
 }
 
+export function getStockmanEventOccurredAt(sourceType: string, acceptedAt: Date | null, publishedAt: Date | null) {
+  return sourceType === "SEC_EDGAR" ? acceptedAt : publishedAt;
+}
+
+const stockmanEventOccurredAtSql = (alias = "e") => `CASE WHEN ${alias}.source_type='SEC_EDGAR' THEN ${alias}.accepted_at ELSE ${alias}.published_at END`;
+
 export function isStockmanEventWithinWindow(value: Date, window: { from: Date; to: Date }) {
   const timestamp = value.getTime();
   return timestamp >= window.from.getTime() && timestamp <= window.to.getTime();
@@ -330,16 +336,17 @@ export async function listStockmanEvents(options: StockmanEventQuery = {}) {
   const pageSize = options.pageSize ?? 50;
   const values: unknown[] = [];
   const predicates = ["TRUE"];
+  const occurredAtSql = stockmanEventOccurredAtSql();
   if (options.hours) {
     const asOf = options.asOf ?? new Date();
     const window = getStockmanEventTimeWindow(asOf, options.hours);
     values.push(window.from);
-    predicates.push(`COALESCE(e.accepted_at,e.published_at) >= $${values.length}`);
+    predicates.push(`${occurredAtSql} >= $${values.length}`);
     values.push(window.to);
-    predicates.push(`COALESCE(e.accepted_at,e.published_at) <= $${values.length}`);
+    predicates.push(`${occurredAtSql} <= $${values.length}`);
   } else if (options.from || options.to) {
-    if (options.from) { values.push(options.from); predicates.push(`COALESCE(e.accepted_at,e.published_at) >= $${values.length}`); }
-    if (options.to) { values.push(options.to); predicates.push(`COALESCE(e.accepted_at,e.published_at) <= $${values.length}`); }
+    if (options.from) { values.push(options.from); predicates.push(`${occurredAtSql} >= $${values.length}`); }
+    if (options.to) { values.push(options.to); predicates.push(`${occurredAtSql} <= $${values.length}`); }
   }
   for (const [value, expression] of [
     [options.ticker?.toUpperCase(), "UPPER(e.ticker) = $"],
@@ -358,15 +365,15 @@ export async function listStockmanEvents(options: StockmanEventQuery = {}) {
      LEFT JOIN LATERAL (SELECT * FROM stockman_event_analyses a0 WHERE a0.event_id=e.id ORDER BY a0.analyzed_at DESC,a0.id DESC LIMIT 1) a ON TRUE WHERE ${where}`, values);
   const pageValues = [...values, pageSize, (page - 1) * pageSize];
   const orderBy = options.sort === "importance"
-    ? `CASE a.bullish_grade WHEN 'A' THEN 4 WHEN 'B' THEN 3 WHEN 'C' THEN 2 WHEN 'EXCLUDED' THEN 1 ELSE 0 END DESC, CASE WHEN a.key_metrics->>'priority' ~ '^[0-9]+$' THEN (a.key_metrics->>'priority')::int ELSE 0 END DESC, COALESCE(e.accepted_at,e.published_at) DESC NULLS LAST,e.id DESC`
-    : `COALESCE(e.accepted_at,e.published_at) DESC NULLS LAST,e.id DESC`;
+    ? `CASE a.bullish_grade WHEN 'A' THEN 4 WHEN 'B' THEN 3 WHEN 'C' THEN 2 WHEN 'EXCLUDED' THEN 1 ELSE 0 END DESC, CASE WHEN a.key_metrics->>'priority' ~ '^[0-9]+$' THEN (a.key_metrics->>'priority')::int ELSE 0 END DESC, ${occurredAtSql} DESC NULLS LAST,e.id DESC`
+    : `${occurredAtSql} DESC NULLS LAST,e.id DESC`;
   const rows = await pool.query(
     `SELECT e.id::text AS id,e.identity_key AS "identityKey",e.ticker,e.cik,e.accession_number AS "accessionNumber",e.related_event_id::text AS "relatedEventId",
        e.event_type AS "eventType",e.title,e.published_at AS "publishedAt",e.accepted_at AS "acceptedAt",e.first_seen_at AS "firstSeenAt",
        e.source_type AS "sourceType",e.source_url AS "sourceUrl",e.verification_status AS "verificationStatus",e.event_status AS "eventStatus",
        a.bullish_grade AS "bullishGrade",a.bullish_reason AS "bullishReason",a.bearish_reason AS "bearishReason",a.dilution_risk AS "dilutionRisk",
        a.key_metrics AS "keyMetrics",a.unknown_factors AS "unknownFactors",a.analysis_version AS "analysisVersion",a.analyzed_at AS "analyzedAt",
-       COALESCE(e.accepted_at,e.published_at) AS "eventOccurredAt",m.metrics
+       ${occurredAtSql} AS "eventOccurredAt",m.metrics
      FROM stockman_events e
      LEFT JOIN LATERAL (SELECT * FROM stockman_event_analyses a0 WHERE a0.event_id=e.id ORDER BY a0.analyzed_at DESC,a0.id DESC LIMIT 1) a ON TRUE
      LEFT JOIN LATERAL (SELECT COALESCE(jsonb_agg(jsonb_build_object('metricKey',m0.metric_key,'amountValue',m0.amount_value::text,'quantityValue',m0.quantity_value::text,'currency',m0.currency,'unit',m0.unit,'asOfDate',m0.as_of_date,'splitAdjustment',m0.split_adjustment,'calculationFormula',m0.calculation_formula,'calculationInputs',m0.calculation_inputs) ORDER BY m0.created_at DESC,m0.id DESC),'[]'::jsonb) AS metrics FROM stockman_event_metrics m0 WHERE m0.event_id=e.id) m ON TRUE
@@ -503,7 +510,7 @@ export function renderStockmanEventsMarkdown(items: Array<Record<string, unknown
   const lines = [`# Stockman 최근 호재 보고서`, ``, `- 기준 시각: ${kst.format(now)} KST`, `- 검증된 공식 원문과 티커가 연결된 A/B/C 분석만 수록`, ``];
   if (!items.length) lines.push("조회 조건에 맞는 검증된 호재가 없습니다.");
   for (const event of items) {
-    const occurredAt = event.acceptedAt ?? event.publishedAt;
+    const occurredAt = getStockmanEventOccurredAt(String(event.sourceType ?? ""), event.acceptedAt instanceof Date ? event.acceptedAt : event.acceptedAt ? new Date(String(event.acceptedAt)) : null, event.publishedAt instanceof Date ? event.publishedAt : event.publishedAt ? new Date(String(event.publishedAt)) : null);
     const exactMetrics = Array.isArray(event.metrics) ? event.metrics as Array<Record<string, unknown>> : [];
     const metrics = exactMetrics.length
       ? exactMetrics.map((metric) => [

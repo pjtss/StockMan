@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { classifyStockmanEventError, eventIdentityForSec, eventRevisionHash, getStockmanCollectionSourceStatus, getStockmanEventTimeWindow, isStockmanEventWithinWindow, multiplyExactDecimalStrings, parseSecAcceptanceTimestamp, renderStockmanEventsMarkdown } from "./stockman-events";
+import { classifyStockmanEventError, eventIdentityForSec, eventRevisionHash, getStockmanCollectionSourceStatus, getStockmanEventOccurredAt, getStockmanEventTimeWindow, isStockmanEventWithinWindow, multiplyExactDecimalStrings, parseSecAcceptanceTimestamp, renderStockmanEventsMarkdown } from "./stockman-events";
 
 describe("Stockman event identity, times, and exact metrics", () => {
+  it("never substitutes a SEC feed published timestamp for its accepted timestamp", () => {
+    const publishedAt = new Date("2026-11-06T13:30:00.000Z");
+    const acceptedAt = new Date("2026-11-06T13:29:00.000Z");
+    expect(getStockmanEventOccurredAt("SEC_EDGAR", null, publishedAt)).toBeNull();
+    expect(getStockmanEventOccurredAt("SEC_EDGAR", acceptedAt, publishedAt)).toBe(acceptedAt);
+    expect(getStockmanEventOccurredAt("STOCKTITAN", null, publishedAt)).toBe(publishedAt);
+  });
+
   it.each([
     [{ moduleKey: "market-rss", sourceResults: { count: 4, sample: [] }, rssIngestFailureCount: 0 }, "SUCCESS"],
     [{ moduleKey: "market-rss", sourceResults: { count: 4, sample: [] }, rssIngestFailureCount: 2 }, "PARTIAL_SUCCESS"],

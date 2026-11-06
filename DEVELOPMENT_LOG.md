@@ -8641,3 +8641,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - SEC cron 요약에 요청/성공/실패 CIK 및 수집·신규 제출 수 집계를 추가하고, RSS compact source result의 전체 source count/ingest failure/article insert count를 status API에 제한적으로 노출하도록 수정.
 - source coverage에 맞춰 `SUCCESS`/`PARTIAL_SUCCESS`/`FAILED`/`UNVERIFIED`를 산출하는 순수 분류기와 회귀 테스트를 추가. 원문 오류 및 CIK 목록은 공개하지 않는다.
 - API 사용 문서의 collection-status 응답 설명을 갱신. focused source tests 36 passed, typecheck passed. 전체 deploy:verify 및 운영 배포/실데이터 status 재확인은 진행 중.
+
+### SEC accepted time과 RSS published time 분리 수정 진행
+- 운영 coverage API가 `configuredCikCount=0`, `fetchSuccessCikCount=0`, `submissionCount=0`을 확인했다. 따라서 SEC submissions sync가 현재 실행 대상 CIK 없이 성공 no-op을 기록하고 있었다.
+- SEC 공시 RSS 기사에는 `published_at`이 있으나 정규 SEC submissions에서 확인된 `acceptance_datetime`은 없을 수 있다. 기존 시간창의 `COALESCE(accepted_at,published_at)`는 서로 다른 의미의 시각을 혼용했다.
+- `/api/events` 필터·정렬·`eventOccurredAt` 및 보고서 표시에서 SEC_EDGAR는 accepted_at만, 기업/RSS는 published_at만 쓰도록 변경하고 회귀 테스트/API 문서 추가.
+- SEC CIK universe는 운영상 SEC 요청 범위와 호출량을 결정하므로 현재 환경 설정을 임의 변경하지 않는다. 사용 가능한 공개 SEC Atom/RSS의 원문은 기존 market-rss 경로에 계속 저장한다.
