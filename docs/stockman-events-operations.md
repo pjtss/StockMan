@@ -20,6 +20,8 @@ SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SE
 
 다음 schedule-active sec-realtime cron 실행에서 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`, fetch counts, submission counts 및 `eventLedger`를 확인한다. 정확한 SEC accession이 원장에 생겼는지, unique identity로 반복 수집이 한 건으로 유지되는지와 12시간 time window의 accepted_at을 별도로 검증한다. SEC 요청량은 batch limit에 의해 제한되며 issuer Submissions metadata만 보강한다. 실제 운영 DB 직접 쓰기나 별도 backfill은 하지 않았다.
 
+2026-11-06 15:47 UTC read-only post-deploy check: no-auth `/api/events?hours=12&page=1&pageSize=1` returned HTTP 200/total 227; `/api/reports/latest` returned HTTP 200 with zero verified bullish items; `/api/collection-status` returned HTTP 200 but latest `sec-realtime` is `UNVERIFIED`, coverage null, started 15:45:02 UTC (KST Saturday 00:45). Existing event/report read APIs are available and do not promote unverified RSS as bullish. This off-schedule no-summary record does not prove SEC candidate fetch/store; confirm on an active SEC schedule run.
+
 ## 배포 전제
 
 1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.
