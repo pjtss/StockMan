@@ -62,7 +62,7 @@ Stockman에는 SEC 제출정보, SEC 공시 원문, RSS 원문/응답 스냅샷,
 ## 5. SEC RSS accession 정규화 연계 (2026-11-06 추가)
 
 - `market_rss_articles`에 저장된 `SEC_EDGAR` 공식 RSS 행에서 SEC Archives URL의 issuer CIK와 external ID의 accession을 추출한다. 게시 timestamp는 정식 acceptance time으로 사용하지 않는다.
-- `lib/sec-edgar-repository.ts:loadPendingSecRssIssuerCiks`는 accession이 아직 `sec_submissions`에 없는 항목 중 `us_common_stock_universe`의 enabled `COMMON_STOCK` 및 NASDAQ/NYSE/AMEX 티커와 일치하는 CIK만 조회한다. 기본 배치 한도는 10 CIK이며 `SEC_RSS_SYNC_CIK_LIMIT`은 1–50으로 제한한다.
+- `lib/sec-edgar-repository.ts:loadPendingSecRssIssuerCiks`는 accession이 아직 `sec_submissions`에 없는 항목 중 SEC 원문 URL에서 issuer CIK를 읽고, 기존 SEC 공식 ticker master(`sec_companies.tickers`)와 enabled `COMMON_STOCK` NASDAQ/NYSE/AMEX universe가 함께 일치하는 CIK만 조회한다. RSS `detected_ticker`는 SEC feed에서 자주 null이라 적격성 근거로 사용하지 않는다. 기본 배치 한도는 10 CIK이며 `SEC_RSS_SYNC_CIK_LIMIT`은 1–50으로 제한한다.
 - `app/api/cron/sec-edgar/route.ts:POST`는 기존 feature 설정 CIK와 RSS 후보 CIK를 중복 제거하고, 둘 다 기존 `syncSecCompany`로 제출 metadata만 조회한다. XBRL 및 회사 전체 누락 원문 수집은 기존 feature 설정 CIK에만 유지해 RSS 후보 보강이 전체 문서 backfill로 확장되지 않게 한다. SEC Submissions 응답의 공식 ticker 목록과 acceptance metadata가 저장된 뒤에만 기존 SEC event materializer가 검증 이벤트를 만든다. 보통주 마스터나 acceptance timestamp가 확인되지 않으면 조회 시간창에 임의 포함하지 않는다.
 - 새 테이블/마이그레이션은 추가하지 않았다. SEC submissions의 기존 unique accession, RSS `(source, external_id)` unique, SEC event/document identity가 멱등성을 제공한다. 공개 status는 configured/RSS candidate/requested/success/failure CIK 및 submission 수를 구분한다.
 - 공개 API 조회 및 원본 키 기반 `/api/events/collect` 저장은 인증 없이 유지한다. 운영 DB 직접 변경·대량 backfill은 하지 않았다. 실제 운영 cron 효과는 배포 승인 및 다음 scheduled run 이후 별도로 확인해야 한다.

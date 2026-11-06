@@ -8667,3 +8667,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 첫 실행을 관찰하며 RSS issuer 후보에 전체 누락 원문 collector까지 연결될 수 있음을 발견해 Submissions-only 제한을 추가했다. 전체 `npm run deploy:verify` 통과(309 test files, 1,614 passed/3 skipped, build/runtime/browser/typecheck/docs/API/auth/cron gates 성공) 후 `ec0cf692`를 `oci`와 작업 branch에 push했다. OCI workflow `42239656706` success; 운영 `/api/health` 200.
 - 2026-11-06 15:10 UTC latest `sec-realtime` row는 `UNVERIFIED`, `sourceCoverage=null`, `eventLedger=UNVERIFIED`, finished 15:10:07로 확인되어 SEC candidate fetch 효과는 아직 검증되지 않았다. UTC 15시대는 KST 토요일 00시로 default weekday schedule 밖일 수 있으나 운영 DB schedule은 확인하지 않았다. 직접 DB 쓰기/backfill은 하지 않았다.
 - 다음 개선/검증: 첫 schedule-active run에서 new coverage fields의 실제 값, SEC official accepted_at 기반 정규 event, 중복 재실행, 12시간 API 노출을 검증한다. RSS 후보 selection 실패/재시도 횟수의 영구 queue와 backoff는 현재 테이블 없이 구현되지 않았으며, operational attempt diagnostics가 부족하면 보강한다.
+
+### SEC RSS issuer 후보 입력 검증 후속
+- 운영 무인증 GET `/api/market-news?source=SEC_EDGAR&hours=24&pageSize=10`의 실제 항목을 확인했다. 최근 SEC feed는 Form 4, 13F, 424B 등 다양한 공식 filings를 포함하고 sample 대부분 `detectedTicker=null`이다. 기존 신규 후보 query의 `a.detected_ticker IS NOT NULL` 조건은 SEC CIK 후보 coverage를 크게 누락할 수 있었다.
+- `lib/sec-edgar-repository.ts:loadPendingSecRssIssuerCiks`를 수정해 SEC Archives URL에서 issuer CIK를 추출하고 기존 SEC 공식 ticker master `sec_companies`와 enabled US `COMMON_STOCK` universe의 ticker 교집합으로 확인한다. RSS ticker parser 추정은 후보 판별에 사용하지 않는다. 모르는 CIK와 inactive/special instrument는 계속 fail-closed다.
+- current analysis, architecture, operations 문서에 운영 표본 근거와 수정/미배포 상태를 기록했다. focused candidate tests 4/4 pass; full `deploy:verify` 및 배포는 진행 중이다. 다음 배포 이후 SEC schedule-active cron evidence가 확보되기 전까지 실제 SEC event coverage는 검증 미완료 상태다.

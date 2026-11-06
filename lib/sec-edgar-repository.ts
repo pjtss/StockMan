@@ -40,13 +40,14 @@ export async function loadPendingSecRssIssuerCiks(limit = 10) {
   const result = await getPool().query<{ cik: string }>(
     `SELECT DISTINCT lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0') AS cik
        FROM market_rss_articles a
+       JOIN sec_companies c ON c.cik=lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0')
+       CROSS JOIN LATERAL unnest(c.tickers) AS company_ticker(ticker)
       WHERE a.source='SEC_EDGAR'
         AND substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})') IS NOT NULL
         AND substring(a.link from '/Archives/edgar/data/([0-9]+)/') IS NOT NULL
-        AND a.detected_ticker IS NOT NULL
         AND EXISTS (SELECT 1 FROM us_common_stock_universe u
           WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK'
-            AND UPPER(u.code)=UPPER(a.detected_ticker)
+            AND UPPER(u.code)=UPPER(company_ticker.ticker)
             AND UPPER(u.market)=ANY(ARRAY['NASDAQ','NAS','NYSE','NYS','AMEX','AMS']::text[]))
         AND NOT EXISTS (SELECT 1 FROM sec_submissions s
           WHERE s.accession=substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})'))
