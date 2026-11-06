@@ -475,7 +475,7 @@ export async function listStockmanCollectionStatus() {
     const sourceCoverage = row.moduleKey === "market-rss"
       ? { sourceCount: Number.isSafeInteger(compactSourceCount) && compactSourceCount >= 0 ? compactSourceCount : Array.isArray(row.sourceResults) ? sourceResults.length : null, ingestFailureCount: row.rssIngestFailureCount === null ? null : Number(row.rssIngestFailureCount), insertedArticleCount: row.rssInsertedCount === null ? null : Number(row.rssInsertedCount) }
       : row.moduleKey === "sec-realtime" && row.submissionCoverage && typeof row.submissionCoverage === "object"
-        ? Object.fromEntries(["configuredCikCount", "fetchSuccessCikCount", "fetchFailureCikCount", "submissionCount", "insertedSubmissionCount"].map((key) => { const value = Number((row.submissionCoverage as Record<string, unknown>)[key]); return [key, Number.isSafeInteger(value) && value >= 0 ? value : null]; }))
+        ? Object.fromEntries(["configuredCikCount", "rssCandidateCikCount", "rssOnlyCikCount", "requestedCikCount", "fetchSuccessCikCount", "fetchFailureCikCount", "submissionCount", "insertedSubmissionCount"].map((key) => { const value = Number((row.submissionCoverage as Record<string, unknown>)[key]); return [key, Number.isSafeInteger(value) && value >= 0 ? value : null]; }))
         : null;
     const rawLedger = row.eventLedger && typeof row.eventLedger === "object" ? row.eventLedger as Record<string, unknown> : {};
     const ledgerStatus = typeof rawLedger.status === "string" ? rawLedger.status : "UNVERIFIED";

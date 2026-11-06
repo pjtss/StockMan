@@ -1,5 +1,5 @@
 import { and, desc, eq, lt, sql } from "drizzle-orm";
-import { getDb } from "./db";
+import { getDb, getPool } from "./db";
 import { secCodexAnalysisQueue, secCompanies, secFilingDocuments, secFilingEvents, secSubmissions, secXbrlSnapshots } from "./schema";
 import { fetchAllSecSubmissions, type SecSubmissionRow } from "./sec-submissions";
 import { classifySecEvent } from "./sec-event-classifier";
@@ -31,6 +31,27 @@ export async function syncSecCompany(cik: string) {
     await db.insert(secFilingEvents).values({ accession: row.accession, cik: result.cik, category: classification.category, direction: classification.direction, score: classification.score, matchedTerms: classification.matchedTerms, updatedAt: new Date() }).onConflictDoUpdate({ target: secFilingEvents.accession, set: { category: classification.category, direction: classification.direction, score: classification.score, matchedTerms: classification.matchedTerms, updatedAt: new Date() } });
   }
   return { ok: true, cik: result.cik, company: result.name, source: { ok: true, status: result.source.status, url: result.source.url, fetchedAt: result.source.fetchedAt, responseHeaders: result.source.responseHeaders }, submissions: result.filings.length, inserted };
+}
+
+/** Finds a bounded set of active US common-stock issuers from official SEC RSS rows
+ * whose accession is not normalized yet. The RSS timestamp is never used as acceptance time. */
+export async function loadPendingSecRssIssuerCiks(limit = 10) {
+  const boundedLimit = Math.min(50, Math.max(1, Number.isFinite(limit) ? Math.trunc(limit) : 10));
+  const result = await getPool().query<{ cik: string }>(
+    `SELECT DISTINCT lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0') AS cik
+       FROM market_rss_articles a
+      WHERE a.source='SEC_EDGAR'
+        AND substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})') IS NOT NULL
+        AND substring(a.link from '/Archives/edgar/data/([0-9]+)/') IS NOT NULL
+        AND a.detected_ticker IS NOT NULL
+        AND EXISTS (SELECT 1 FROM us_common_stock_universe u
+          WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK'
+            AND UPPER(u.code)=UPPER(a.detected_ticker)
+            AND UPPER(u.market)=ANY(ARRAY['NASDAQ','NAS','NYSE','NYS','AMEX','AMS']::text[]))
+        AND NOT EXISTS (SELECT 1 FROM sec_submissions s
+          WHERE s.accession=substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})'))
+      ORDER BY cik LIMIT $1`, [boundedLimit]);
+  return result.rows.map((row) => row.cik).filter((cik) => /^\d{10}$/.test(cik));
 }
 
 export async function loadSecSubmission(accession: string) { const rows = await getDb().select().from(secSubmissions).where(eq(secSubmissions.accession, accession)).limit(1); return rows[0] || null; }

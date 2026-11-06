@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
-import { analyzeSecSubmission, collectMissingSecCompanyDocuments, loadPendingSecEvents, loadRecentSecSubmissions, markSecEventDiscord, retryFailedSecCodexAnalyses, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
+import { analyzeSecSubmission, collectMissingSecCompanyDocuments, loadPendingSecEvents, loadPendingSecRssIssuerCiks, loadRecentSecSubmissions, markSecEventDiscord, retryFailedSecCodexAnalyses, syncSecCompany, syncSecCompanyFacts } from "@/lib/sec-edgar-repository";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadFeatureDiscordWebhook } from "@/lib/discord-config";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
@@ -21,7 +21,11 @@ export async function POST(request: Request) {
       const runtime = resolveSecEdgarRuntimeConfig(settings.featureSettings);
       const analysisRetries = await retryFailedSecCodexAnalyses();
       const smallcapTargets = runtime.smallcapUniverse ? await loadSecSmallcapTickerTargets() : [];
-      const ciks = runtime.smallcapUniverse ? [...new Set(smallcapTargets.map((target) => target.cik))] : runtime.ciks;
+      const configuredCiks = runtime.smallcapUniverse ? [...new Set(smallcapTargets.map((target) => target.cik))] : runtime.ciks;
+      const rssCandidateCiks = await loadPendingSecRssIssuerCiks(Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 10));
+      const configuredSet = new Set(configuredCiks);
+      const rssOnlyCiks = rssCandidateCiks.filter((cik) => !configuredSet.has(cik));
+      const ciks = [...new Set([...configuredCiks, ...rssOnlyCiks])];
       const { syncXbrl, discordBatch } = runtime;
       const results = [];
       for (const cik of ciks) {
@@ -58,13 +62,16 @@ export async function POST(request: Request) {
       const successfulFetches = results.filter((item) => item.submissions && typeof item.submissions === "object" && item.submissions.ok === true);
       const failedFetches = results.length - successfulFetches.length;
       const submissionCoverage = {
-        configuredCikCount: ciks.length,
+        configuredCikCount: configuredCiks.length,
+        rssCandidateCikCount: rssCandidateCiks.length,
+        rssOnlyCikCount: rssOnlyCiks.length,
+        requestedCikCount: ciks.length,
         fetchSuccessCikCount: successfulFetches.length,
         fetchFailureCikCount: failedFetches,
         submissionCount: successfulFetches.reduce((sum, item) => sum + Number(item.submissions?.submissions || 0), 0),
         insertedSubmissionCount: successfulFetches.reduce((sum, item) => sum + Number(item.submissions?.inserted || 0), 0),
       };
-      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, submissionCoverage, smallcapUniverse: runtime.smallcapUniverse, syncXbrl, discordBatch, analysisRetries, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook), eventLedger, degraded: eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS" };
+      return { ok: true, mode: "COMMIT", configuredCikCount: configuredCiks.length, submissionCoverage, smallcapUniverse: runtime.smallcapUniverse, syncXbrl, discordBatch, analysisRetries, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook), eventLedger, degraded: eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS" };
     });
     return NextResponse.json(result);
   } catch (error) {

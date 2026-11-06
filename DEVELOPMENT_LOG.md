@@ -8650,3 +8650,13 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 검증/배포: focused event tests 33 passed, 전체 deploy:verify 통과 (Vitest 308 files/1 skipped, 1,610 passed/3 skipped; build, standalone, browser, typecheck, API/auth/KIS/cron audits). commit `60337eb6`, OCI workflow `42232437604` success.
 - 운영 확인: `/api/collection-status` 200; market-rss source 3/3 SUCCESS, failures 0, insertedArticleCount 203, event ledger 500/500. SEC realtime coverage는 requested CIK 0, submissions 0, ledger 0. `/api/events?hours=12` total 217, SEC_EDGAR 0, report positive count 0. Official SEC RSS source is running, but exact accepted time and SEC submissions normalization require a configured CIK universe.
 - 남은 승인 범위: 선택된 SEC issuer CIK 목록, existing small-cap universe mode(시총 ≤$100M), 또는 전체 미국 보통주 SEC RSS accession별 acceptance lookup 중 어느 운영 범위를 사용할지 확인이 필요하다. 현재 SEC 수집 대상을 임의로 확대하지 않았다.
+
+## [2026-11-06] 공식 SEC RSS accession의 bounded Submissions 보강
+
+- **목적/근거**: 운영 status에서 SEC RSS source는 정상 수집되지만 SEC Submissions 설정 CIK가 0이고 정규화 SEC 이벤트가 0건인 점을 확인했다. RSS 게시시각을 SEC 접수시각으로 가장하지 않고, 이미 저장된 공식 SEC RSS의 accession을 기존 SEC Submissions 경로에 연결한다.
+- **범위/변경 파일**: `lib/sec-edgar-repository.ts`에 미정규화 accession 기반 issuer CIK 검색을 추가했다. enabled 미국 거래소 `COMMON_STOCK` 마스터가 RSS ticker와 일치하는 후보만 뽑고 기본 10, 최대 50 CIK/실행으로 제한한다. `app/api/cron/sec-edgar/route.ts`는 설정 CIK와 RSS 후보를 deduplicate하여 기존 `syncSecCompany`를 재사용한다. `lib/stockman-events.ts`의 공개 coverage에 configured/RSS candidate/requested counts를 포함한다. `lib/sec-rss-issuer-candidates.test.ts`에 필터와 배치 상한 회귀 검사를 추가했다.
+- **문서**: current analysis, architecture, API 및 operations에 source 연결, timestamp 구분, batch 범위와 미배포 상태를 기록했다.
+- **인증/호환성**: 공개 disclosure GET 및 기존 원본 ID 기반 event collect POST의 무인증 정책을 유지한다. 기존 SEC/RSS source API·테이블을 변경하지 않고 새 migration을 추가하지 않았다.
+- **검증**: focused Vitest 2 files / 37 tests passed. `npm run deploy:verify` 통과: production build, standalone runtime/API smoke, desktop/mobile browser hydration, Vitest 309 files(1 skipped) 1,614 passed/3 skipped, typecheck, docs/migration/API/auth/KIS/cron audit 모두 성공. `git diff --check` 통과.
+- **운영/커밋 상태**: 운영 DB 직접 변경, backfill, commit, push, deploy는 하지 않았다. 실제 cron 동작은 운영 배포 승인 이후 확인한다.
+- **남은 위험/다음 단계**: 공식 SEC RSS URL에 issuer CIK/accession이 있는 행만 후보가 된다. RSS ticker가 보통주 마스터와 불일치하면 fail-closed로 제외된다. 운영 영향은 배포 이후 cron 관측으로 검증해야 하며, 현재 commit/push/deploy는 사용자 확인 대기 상태다.

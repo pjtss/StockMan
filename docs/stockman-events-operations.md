@@ -12,6 +12,12 @@ V167 배포 후 `/api/events`와 `/api/reports/latest`는 응답하지만 `/api/
 
 SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SEC는 filing이 EDGAR system timestamp 이후 보통 1–3분 뒤 sec.gov에 제공될 수 있다고 설명한다. RSS 게시/갱신 시각을 acceptance time으로 대체하지 않는다. [SEC Webmaster FAQ](https://www.sec.gov/about/webmaster-frequently-asked-questions). 운영 SEC universe는 기존 `featureSettings.secEdgar.ciks`, `SEC_SYNC_CIKS`, 또는 `SEC_SYNC_SMALLCAP=true` 중 하나로 결정되며 현재는 유효 CIK가 0이다. small-cap 모드는 기존 프로젝트 기준 시가총액 1억 달러 이하 후보로 범위가 제한되므로 전체 시장 설정과 동일하지 않다. 종목 범위를 확인하지 않은 채 운영 설정을 변경하지 않는다.
 
+## RSS 기반 SEC issuer 보강 변경 (미배포)
+
+코드 변경은 아직 운영에 반영하지 않았다. SEC cron이 공식 SEC RSS의 저장 행 중 미정규화 accession을 탐색해 활성 미국 보통주 마스터와 일치하는 후보 CIK를 기본 10개/실행, 설정 상한 50개/실행으로 기존 Submissions 경로에 추가하는 방식이다. RSS 후보도 기존 SEC ticker/acceptance metadata 검증과 event materializer를 통과해야 한다. 운영 status의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`로 configured CIK와 RSS 보강 대상을 구별한다. 신규 migration이나 운영 DB 직접 수정은 포함하지 않는다.
+
+배포 전에는 전체 `npm run deploy:verify`를 통과시키고 OCI workflow 계획을 제출한다. 실제 배포/운영 cron 실행은 기존 운영 변경 승인 조건에 따라 별도 승인 후 진행하며, 배포 뒤 candidate/fetch counts, SEC event count, duplicate 여부, 12시간 조회를 확인한다. SEC 요청량은 batch limit에 의해 제한되나 각 issuer Submissions 응답은 최근 제출 metadata를 기존처럼 upsert한다.
+
 ## 배포 전제
 
 1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.
