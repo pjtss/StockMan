@@ -1,7 +1,7 @@
 # Stockman SEC·RSS 호재 영구 저장 시스템 — 현황 분석 및 구현 계획
 
 작성일: 2026-11-06  
-범위: 실제 코드·DB 스키마 조사와 이벤트 ledger 구현 및 운영 배포 결과. V166은 OCI 배포 workflow에서 적용됐고 report/events/status 공개 GET은 운영에서 HTTP 200 JSON을 반환했다. 2026-11-06 재확인에서 최근 market-rss 실행과 ledger가 FAILED로 나타나 자동 수집 동작은 아직 정상 확인되지 않았다. 운영 데이터를 직접 변경하는 별도 요청은 수행하지 않았다.
+범위: 실제 코드·DB 스키마 조사와 이벤트 ledger 구현 및 운영 배포 결과. V166은 OCI 배포 workflow에서 적용됐고 report/events/status 공개 GET은 운영에서 HTTP 200 JSON을 반환했다. 2026-11-06 운영 재현에서 기존 V141 `market_rss_llm_analyses`, V142 `sec_codex_analysis_queue`가 없어 RSS/SEC 원장 저장이 실패했다. V167 additive repair migration을 추가했으며 다음 release 적용 및 자동 수집 재검증이 남아 있다.
 
 ## 1. 요약
 
@@ -92,7 +92,7 @@ Stockman에는 SEC 제출정보, SEC 공시 원문, RSS 원문/응답 스냅샷,
 - 정확 수치: 신규 구조는 `NUMERIC` 또는 정밀 십진 문자열을 쓰며 값과 함께 currency, quantity unit, as-of date, split adjustment basis, calculation formula/input provenance를 저장한다. 미공개 값은 null. 기존 double 컬럼은 그대로 둔다.
 - 수집 실행 결과는 기존 `automation_runs`의 market-rss/sec-realtime 실행 결과에 `eventLedger` 요약을 추가한다. 공개 collection status는 최근 실행의 제한된 상태 정보만 조회한다.
 
-V166은 forward-only additive migration이다. 원본 source row를 삭제하거나 덮어쓰지 않는다. cron materializer는 저장된 최신 source rows를 작은 제한으로 재조회하고 identity/document unique key와 source update 시각으로 누락·변경을 처리한다.
+V166은 forward-only additive migration이다. V167은 운영에서 실제 누락이 확인된 기존 V141/V142 테이블을 `IF NOT EXISTS`로 복구한다. 두 migration은 source row를 삭제하거나 덮어쓰지 않는다. cron materializer는 저장된 최신 source rows를 작은 제한으로 재조회하고 identity/document unique key와 source update 시각으로 누락·변경을 처리한다.
 
 ### 7.2 구현된 기능
 

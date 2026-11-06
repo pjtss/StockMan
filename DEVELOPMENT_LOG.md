@@ -8604,3 +8604,22 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 1건 재현 오류 진단 후속
 - collect route는 SCHEMA_TABLE_MISSING_<KNOWN_TABLE> 형태의 안전 코드만 반환하도록 수정했고 누락 relation 분류 회귀 테스트를 추가했다. focused tests 29 passed, 전체 deploy:verify는 Vitest 307 files(1 skipped), 1,600 passed/3 skipped, build/runtime/browser/typecheck/docs/API/auth/KIS/cron gate 모두 통과했다.
 - 운영 배포 및 자동 cron 재실행 후 /api/collection-status와 동일 accession 1건을 다시 확인해 실제 누락 relation을 확인한다.
+
+## [2026-11-06] 운영 누락 V141/V142 테이블 복구 migration
+
+### 목적 및 근거
+- 배포된 안전 진단에서 `SCHEMA_TABLE_MISSING_SEC_CODEX_ANALYSIS_QUEUE`와 `SCHEMA_TABLE_MISSING_MARKET_RSS_LLM_ANALYSES`를 순차 확인했다. 기존 V141/V142 정의의 두 source-analysis relation이 운영에서 누락되어 event materializer의 LEFT JOIN이 실패했다.
+- 임의 신규 schema가 아니라 코드가 이미 참조하는 기존 source table contract를 forward-only migration으로 복구한다. 기존 행은 삭제·덮어쓰기 하지 않는다.
+
+### 변경
+- `db/migration/V167__restore_missing_source_analysis_tables.sql`: V141 RSS analysis revisions/agent state/index와 V142 SEC Codex queue/index를 원 migration DDL과 같은 column/constraint/index 계약으로 `IF NOT EXISTS` 생성.
+- `db/README.md`, Stockman current-analysis/operations 및 `docs/ERROR_HANDLING.md`에 누락 원인, 복구, 운영 검증 기준 기록.
+
+### 검증 / 배포 상태
+- 적용 전: migration DDL review와 전체 deploy:verify 실행 예정.
+- 운영 write: migration은 OCI release workflow만 적용한다. source POST는 아직 재실행하지 않았다.
+- 커밋·푸시·배포: 미실행.
+
+### 다음 확인
+- deploy:verify 후 OCI migration V167, release activation 성공을 확인한다.
+- 다음 RSS/SEC cron 완료 후 `/api/collection-status`에서 sourceStatus/eventLedgerStatus/count/errorCode를 확인한다. 0건이면 `/api/disclosures` 원본과 비교해 source materialization scope/공통주 eligibility를 추적한다.

@@ -20,6 +20,16 @@
 
 # 오류 상황 및 해결 방법
 
+## 2026-11-06 운영 SEC/RSS 이벤트 원장 저장 실패 — 누락된 V141/V142 source-analysis tables
+
+- **증상**: OCI workflow는 V166까지 성공했지만 `/api/collection-status`에서 `SCHEMA_TABLE_MISSING_MARKET_RSS_LLM_ANALYSES`와 `SCHEMA_TABLE_MISSING_SEC_CODEX_ANALYSIS_QUEUE`를 관측했다. 공개 SEC 저장 API accession 1건 재현도 같은 누락 queue 테이블에서 HTTP 503이었다. report/events GET은 DB 연결 및 V166 event 테이블 존재만으로 200/0건을 반환하므로 수집 성공을 증명하지 못했다.
+- **근본 원인**: 운영 migration 이력에 이후 버전이 적용된 상태에서도, 기존 SEC/RSS analysis migrations V141/V142가 만든 source table이 실제 schema에 없었다. 원장 materializer SQL은 source 분석을 `LEFT JOIN`하지만 PostgreSQL은 없는 relation도 오류로 처리해 이벤트 저장을 중단했다.
+- **영향 범위**: 기존 source fetch/import는 별도 경로로 수행될 수 있지만 SEC/RSS source analysis relation과 새 event materializer를 참조하는 동작이 실패한다. source archive와 V166 event data는 삭제되지 않았다. 실패한 수동 materialization은 transaction commit 없이 종료됐다.
+- **해결 위치**: `db/migration/V167__restore_missing_source_analysis_tables.sql`은 V141 `market_rss_llm_analyses`, state table, 인덱스 및 V142 `sec_codex_analysis_queue`와 인덱스를 `IF NOT EXISTS`로 복구한다. 기존 정의·unique/check/FK 계약을 재사용하며 존재 데이터는 덮어쓰지 않는다. Error classifier는 공개 진단에 고정 allowlist table code만 기록하고 raw DB message를 노출하지 않는다.
+- **재발 자동 감지**: `docs:check` 및 `deploy:verify`는 전체 migration 수와 operational relation contracts를 검사한다. 배포 뒤 `/api/collection-status`는 ledger status/count/error code를 반환하고, API `POST /api/events/collect`는 한정된 source ID에 대해서만 HTTP 503 안전 코드로 실패한다. 오류 코드에 원문 비밀이나 연결 문자열이 포함되지 않는 route test가 있다.
+- **검증 결과**: read-only 운영 API에서 두 누락 relation을 확인했다. PostgreSQL 16 임시 DB에서 V167 단독 2회 반복 적용과 기존 V141+V142 적용 뒤 V167 재적용을 모두 통과했다. 로컬 `npm run deploy:verify`도 테스트 1,600 passed/3 skipped와 V167 docs/migration check를 통과했다. V167 운영 배포와 자동 cron 저장 결과는 대기 중이다.
+- **남은 위험 및 다음 개선**: 운영 V141/V142 history와 실제 schema가 어긋난 이유는 공개 API만으로 확인되지 않았다. V167 적용 후 `market-rss` 및 `sec-realtime`가 실행 완료된 status와 idempotent source materialization을 확인하고, 다른 누락 relation이 나오면 원인별로 재현한다. 기존 source payload/analysis data가 없는 table은 빈 상태로 복구될 수 있다.
+
 ## 2026-11-04 이벤트 배치 재생성 후 OCI import identity 중복
 
 - **증상**: OCI workflow #1256의 Activate release 단계에서 `Duplicate market impact event identity` 오류가 발생해 운영 release가 활성화되지 않았다.

@@ -15,3 +15,4 @@
 
 DB·메모리 캐시·외부 호출의 책임 경계와 성능 검증 증거는 [`../docs/architecture/system-module-catalog.md`](../docs/architecture/system-module-catalog.md)에 정리되어 있습니다.
 - `V166__stockman_event_ledger.sql`: 기존 SEC/RSS source row를 보존하며 공통 이벤트, 문서 연결, 불변 분석 revision, 상태 이력 및 정확 decimal 지표 테이블을 추가한다. 배포 전에 forward-only schema audit 및 롤백 계획 검토가 필요하다.
+- `V167__restore_missing_source_analysis_tables.sql`: 운영 collection-status에서 누락을 재현한 `market_rss_llm_analyses`와 `sec_codex_analysis_queue` 및 관련 보조 테이블을 `IF NOT EXISTS`로 복구한다. 이미 존재하는 테이블과 데이터는 변경하지 않는다.

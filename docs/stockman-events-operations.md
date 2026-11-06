@@ -4,6 +4,8 @@
 
 V166 운영 migration 및 코드 배포는 OCI workflow run `42211364948`에서 Verify, Package, SSH, Upload, Activate 단계 모두 성공했다. 공개 report/events/status endpoint는 HTTP 200 JSON을 반환한다. 2026-11-06 11:45 UTC 관찰에서는 latest `market-rss` event ledger가 FAILED, source가 UNVERIFIED였고 `sec-realtime`도 UNVERIFIED였다. 보고서/최근 이벤트가 0건인 사실만으로 수집 성공으로 판단하지 않는다. `GET /api/collection-status`의 `eventLedger` 집계/error code와 최신 실행 시각을 확인한다.
 
+후속 운영 재현에서는 기존 V141 `market_rss_llm_analyses` 및 V142 `sec_codex_analysis_queue`가 missing relation으로 확인됐다. V167 repair migration은 기존 원본 정의를 `CREATE TABLE/INDEX IF NOT EXISTS`로 복구한다. 적용 뒤 다음 cron에서 두 materializer의 result를 다시 확인한다.
+
 ## 배포 전제
 
 1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.
