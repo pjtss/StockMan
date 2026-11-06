@@ -55,7 +55,16 @@ export async function POST(request: Request) {
         const body = [`🚨 **SEC EDGAR 공시 이벤트**`, `Form ${filing.form} · ${filing.cik}`, `분류 ${event.category} · ${event.direction} · 점수 ${event.score}`, event.matchedTerms.length ? `근거 ${event.matchedTerms.join(", ")}` : "", financing?.detected ? `자금조달 ${financing.amountUsd ?? "금액 확인 불가"} · 희석위험 ${financing.dilutionRisk}` : "", insider?.detected ? `내부자 ${insider.action}` : "", filing.filingUrl].filter(Boolean).join("\n");
         try { const response = await fetch(`${webhook}?wait=true`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: body, allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(8_000) }); if (!response.ok) throw new Error(`Discord HTTP ${response.status}`); await markSecEventDiscord(event.accession, "SENT"); sent++; } catch (error) { await markSecEventDiscord(event.accession, "FAILED", error instanceof Error ? error.message : String(error)); }
       }
-      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, smallcapUniverse: runtime.smallcapUniverse, syncXbrl, discordBatch, analysisRetries, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook), eventLedger, degraded: eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS" };
+      const successfulFetches = results.filter((item) => item.submissions && typeof item.submissions === "object" && item.submissions.ok === true);
+      const failedFetches = results.length - successfulFetches.length;
+      const submissionCoverage = {
+        configuredCikCount: ciks.length,
+        fetchSuccessCikCount: successfulFetches.length,
+        fetchFailureCikCount: failedFetches,
+        submissionCount: successfulFetches.reduce((sum, item) => sum + Number(item.submissions?.submissions || 0), 0),
+        insertedSubmissionCount: successfulFetches.reduce((sum, item) => sum + Number(item.submissions?.inserted || 0), 0),
+      };
+      return { ok: true, mode: "COMMIT", configuredCikCount: ciks.length, submissionCoverage, smallcapUniverse: runtime.smallcapUniverse, syncXbrl, discordBatch, analysisRetries, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook), eventLedger, degraded: eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS" };
     });
     return NextResponse.json(result);
   } catch (error) {

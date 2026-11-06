@@ -8635,3 +8635,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 커밋/배포: commit `07409bb9`를 `oci`에 push. OCI run `42225415268` 성공.
 - 운영 재확인: `GET /api/collection-status` 200/0.55초; 첫 관찰에서는 market-rss RUNNING이었으나 13:35 UTC에는 market-rss event ledger SUCCESS (fetched=500, stored=500, failed=0), `sec-realtime` ledger SUCCESS (fetched=0, stored=0). `GET /api/events?hours=12` 339건, ticker DRK history 3건; 표본은 UNVERIFIED. `GET /api/reports/latest`는 검증 호재 0건으로 원문 검증 전 호재로 잘못 승격하지 않았다.
 - 남은 확인: market-rss 실행 완료 후 SUCCESS/PARTIAL_SUCCESS와 stored 수를 다시 확인하고, SEC 원본 materializer의 0건 원인(서명된 filing event/common-stock eligibility)을 운영 상태 요약 및 source 데이터와 대조한다.
+
+### SEC/RSS source coverage 진단 개선 진행
+- 운영 status의 `sourceStatus=UNVERIFIED`는 RSS 요약의 배열 압축과 SEC cron 요약에 `submissionCoverage`가 없어서 실제 성공/실패를 판별하지 못하는 상태였다.
+- SEC cron 요약에 요청/성공/실패 CIK 및 수집·신규 제출 수 집계를 추가하고, RSS compact source result의 전체 source count/ingest failure/article insert count를 status API에 제한적으로 노출하도록 수정.
+- source coverage에 맞춰 `SUCCESS`/`PARTIAL_SUCCESS`/`FAILED`/`UNVERIFIED`를 산출하는 순수 분류기와 회귀 테스트를 추가. 원문 오류 및 CIK 목록은 공개하지 않는다.
+- API 사용 문서의 collection-status 응답 설명을 갱신. focused source tests 36 passed, typecheck passed. 전체 deploy:verify 및 운영 배포/실데이터 status 재확인은 진행 중.

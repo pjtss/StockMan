@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { classifyStockmanEventError, eventIdentityForSec, eventRevisionHash, getStockmanEventTimeWindow, isStockmanEventWithinWindow, multiplyExactDecimalStrings, parseSecAcceptanceTimestamp, renderStockmanEventsMarkdown } from "./stockman-events";
+import { classifyStockmanEventError, eventIdentityForSec, eventRevisionHash, getStockmanCollectionSourceStatus, getStockmanEventTimeWindow, isStockmanEventWithinWindow, multiplyExactDecimalStrings, parseSecAcceptanceTimestamp, renderStockmanEventsMarkdown } from "./stockman-events";
 
 describe("Stockman event identity, times, and exact metrics", () => {
+  it.each([
+    [{ moduleKey: "market-rss", sourceResults: { count: 4, sample: [] }, rssIngestFailureCount: 0 }, "SUCCESS"],
+    [{ moduleKey: "market-rss", sourceResults: { count: 4, sample: [] }, rssIngestFailureCount: 2 }, "PARTIAL_SUCCESS"],
+    [{ moduleKey: "market-rss", sourceResults: { count: 2, sample: [] }, rssIngestFailureCount: 2 }, "FAILED"],
+    [{ moduleKey: "market-rss", sourceResults: { count: 4, sample: [] }, rssIngestFailureCount: null }, "UNVERIFIED"],
+    [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 5, fetchFailureCikCount: 0 } }, "SUCCESS"],
+    [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 3, fetchFailureCikCount: 2 } }, "PARTIAL_SUCCESS"],
+    [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 0, fetchFailureCikCount: 2 } }, "FAILED"],
+    [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 0, fetchFailureCikCount: 0 } }, "UNVERIFIED"],
+  ])("classifies source collection coverage %#", (input, expected) => {
+    expect(getStockmanCollectionSourceStatus({ sourceResults: [], submissionCoverage: null, rssIngestFailureCount: null, ...input })).toBe(expected);
+  });
+
   it("converts SEC Eastern acceptance wall time to UTC in standard and daylight time", () => {
     expect(parseSecAcceptanceTimestamp("20261106123456")?.toISOString()).toBe("2026-11-06T17:34:56.000Z");
     expect(parseSecAcceptanceTimestamp("20260706123456")?.toISOString()).toBe("2026-07-06T16:34:56.000Z");

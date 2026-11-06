@@ -412,22 +412,47 @@ export async function getStockmanEventHistory(id: number) {
      FROM stockman_event_history WHERE event_id=$1 ORDER BY changed_at DESC,id DESC`, [id]);
 }
 
+export function getStockmanCollectionSourceStatus(input: { moduleKey: string; sourceResults: unknown; submissionCoverage: unknown; rssIngestFailureCount: unknown }) {
+  const safeCount = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const results = Array.isArray(input.sourceResults) ? input.sourceResults as Array<Record<string, unknown>> : [];
+  const compact = input.sourceResults && typeof input.sourceResults === "object" && !Array.isArray(input.sourceResults) ? input.sourceResults as Record<string, unknown> : null;
+  const sourceCount = safeCount(compact?.count) ?? (results.length ? results.length : null);
+  if (input.moduleKey === "market-rss") {
+    const failed = safeCount(input.rssIngestFailureCount);
+    if (sourceCount === null || failed === null || sourceCount === 0) return "UNVERIFIED";
+    return failed === 0 ? "SUCCESS" : failed < sourceCount ? "PARTIAL_SUCCESS" : "FAILED";
+  }
+  if (input.moduleKey === "sec-realtime" && input.submissionCoverage && typeof input.submissionCoverage === "object") {
+    const coverage = input.submissionCoverage as Record<string, unknown>;
+    const successes = safeCount(coverage.fetchSuccessCikCount);
+    const failures = safeCount(coverage.fetchFailureCikCount);
+    if (successes === null || failures === null) return "UNVERIFIED";
+    if (failures > 0) return successes > 0 ? "PARTIAL_SUCCESS" : "FAILED";
+    return successes > 0 ? "SUCCESS" : "UNVERIFIED";
+  }
+  if (results.length === 0) return "UNVERIFIED";
+  const failures = results.filter((item) => item.ok !== true || ["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus))).length;
+  return failures === 0 ? "SUCCESS" : failures < results.length ? "PARTIAL_SUCCESS" : "FAILED";
+}
+
 export async function listStockmanCollectionStatus() {
   const pool = getPool();
   const client = await pool.connect();
-  let result: QueryResult<{ moduleKey: string; status: string; startedAt: Date; finishedAt: Date | null; eventLedger: unknown; sourceResults: unknown; submissionCoverage: unknown }>;
+  let result: QueryResult<{ moduleKey: string; status: string; startedAt: Date; finishedAt: Date | null; eventLedger: unknown; sourceResults: unknown; submissionCoverage: unknown; rssIngestFailureCount: string | null; rssInsertedCount: string | null }>;
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL statement_timeout = '8s'");
     result = await client.query(
       `SELECT 'market-rss'::text AS "moduleKey",latest.status,latest.started_at AS "startedAt",latest.finished_at AS "finishedAt",
               latest.summary->'eventLedger' AS "eventLedger",latest.summary->'ingested'->'sourceResults' AS "sourceResults",
-              latest.summary->'submissionCoverage' AS "submissionCoverage"
+              latest.summary->'submissionCoverage' AS "submissionCoverage",latest.summary->'ingested'->>'ingestFailureCount' AS "rssIngestFailureCount",
+              latest.summary->'ingested'->>'inserted' AS "rssInsertedCount"
          FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 1) latest
        UNION ALL
        SELECT 'sec-realtime'::text AS "moduleKey",latest.status,latest.started_at AS "startedAt",latest.finished_at AS "finishedAt",
               latest.summary->'eventLedger' AS "eventLedger",latest.summary->'ingested'->'sourceResults' AS "sourceResults",
-              latest.summary->'submissionCoverage' AS "submissionCoverage"
+              latest.summary->'submissionCoverage' AS "submissionCoverage",latest.summary->'ingested'->>'ingestFailureCount' AS "rssIngestFailureCount",
+              latest.summary->'ingested'->>'inserted' AS "rssInsertedCount"
          FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='sec-realtime' ORDER BY started_at DESC LIMIT 1) latest`);
     await client.query("COMMIT");
   } catch (error) {
@@ -436,16 +461,15 @@ export async function listStockmanCollectionStatus() {
   } finally {
     client.release();
   }
-  const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; eventLedgerStatus: string; eventLedger: { status: string; fetched: number | null; stored: number | null; unverified: number | null; failed: number | null; failureCodes: Record<string, number>; errorCode: string | null }; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
-    const sourceResults = Array.isArray(row.sourceResults) ? row.sourceResults as Array<Record<string, unknown>> : [];
-    const failures = sourceResults.filter((item) => item.ok !== true || ["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus))).length;
-    const sourceStatus = sourceResults.length === 0
-      ? row.moduleKey === "sec-realtime" && row.submissionCoverage && typeof row.submissionCoverage === "object"
-        ? Number((row.submissionCoverage as Record<string, unknown>).fetchFailureCikCount ?? 0) > 0
-          ? Number((row.submissionCoverage as Record<string, unknown>).fetchSuccessCikCount ?? 0) > 0 ? "PARTIAL_SUCCESS" : "FAILED"
-          : Number((row.submissionCoverage as Record<string, unknown>).fetchSuccessCikCount ?? 0) > 0 ? "SUCCESS" : "UNVERIFIED"
-        : "UNVERIFIED"
-      : failures === 0 ? "SUCCESS" : failures < sourceResults.length ? "PARTIAL_SUCCESS" : "FAILED";
+  const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; sourceCoverage: Record<string, number | null> | null; eventLedgerStatus: string; eventLedger: { status: string; fetched: number | null; stored: number | null; unverified: number | null; failed: number | null; failureCodes: Record<string, number>; errorCode: string | null }; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
+    const sourceResults = Array.isArray(row.sourceResults) ? row.sourceResults as Array<Record<string, unknown>> : row.sourceResults && typeof row.sourceResults === "object" ? ((row.sourceResults as Record<string, unknown>).sample as Array<Record<string, unknown>> ?? []) : [];
+    const sourceStatus = getStockmanCollectionSourceStatus({ moduleKey: row.moduleKey, sourceResults: row.sourceResults, submissionCoverage: row.submissionCoverage, rssIngestFailureCount: row.rssIngestFailureCount === null ? null : Number(row.rssIngestFailureCount) });
+    const compactSourceCount = row.sourceResults && typeof row.sourceResults === "object" && !Array.isArray(row.sourceResults) ? Number((row.sourceResults as Record<string, unknown>).count) : NaN;
+    const sourceCoverage = row.moduleKey === "market-rss"
+      ? { sourceCount: Number.isSafeInteger(compactSourceCount) && compactSourceCount >= 0 ? compactSourceCount : Array.isArray(row.sourceResults) ? sourceResults.length : null, ingestFailureCount: row.rssIngestFailureCount === null ? null : Number(row.rssIngestFailureCount), insertedArticleCount: row.rssInsertedCount === null ? null : Number(row.rssInsertedCount) }
+      : row.moduleKey === "sec-realtime" && row.submissionCoverage && typeof row.submissionCoverage === "object"
+        ? Object.fromEntries(["configuredCikCount", "fetchSuccessCikCount", "fetchFailureCikCount", "submissionCount", "insertedSubmissionCount"].map((key) => { const value = Number((row.submissionCoverage as Record<string, unknown>)[key]); return [key, Number.isSafeInteger(value) && value >= 0 ? value : null]; }))
+        : null;
     const rawLedger = row.eventLedger && typeof row.eventLedger === "object" ? row.eventLedger as Record<string, unknown> : {};
     const ledgerStatus = typeof rawLedger.status === "string" ? rawLedger.status : "UNVERIFIED";
     const safeCount = (key: string) => typeof rawLedger[key] === "number" && Number.isSafeInteger(rawLedger[key]) && (rawLedger[key] as number) >= 0 ? rawLedger[key] as number : null;
@@ -460,6 +484,7 @@ export async function listStockmanCollectionStatus() {
       moduleKey: row.moduleKey,
       status: overallStatus,
       sourceStatus,
+      sourceCoverage,
       eventLedgerStatus: ledgerStatus,
       eventLedger: { status: ledgerStatus, fetched: safeCount("fetched"), stored: safeCount("stored"), unverified: safeCount("unverified"), failed: safeCount("failed"), failureCodes, errorCode },
       sources: sourceResults.map((item) => ({ source: item.source, status: item.ok === true && !["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus)) ? "SUCCESS" : "FAILED" })),
@@ -468,7 +493,7 @@ export async function listStockmanCollectionStatus() {
     };
   });
   for (const moduleKey of ["market-rss", "sec-realtime"]) {
-    if (!mapped.some((item) => item.moduleKey === moduleKey)) mapped.push({ moduleKey, status: "UNVERIFIED", sourceStatus: "UNVERIFIED", eventLedgerStatus: "UNVERIFIED", eventLedger: { status: "UNVERIFIED", fetched: null, stored: null, unverified: null, failed: null, failureCodes: {}, errorCode: null }, sources: [], startedAt: null, finishedAt: null });
+    if (!mapped.some((item) => item.moduleKey === moduleKey)) mapped.push({ moduleKey, status: "UNVERIFIED", sourceStatus: "UNVERIFIED", sourceCoverage: null, eventLedgerStatus: "UNVERIFIED", eventLedger: { status: "UNVERIFIED", fetched: null, stored: null, unverified: null, failed: null, failureCodes: {}, errorCode: null }, sources: [], startedAt: null, finishedAt: null });
   }
   return mapped;
 }
