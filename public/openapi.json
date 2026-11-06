@@ -21,6 +21,9 @@
       "name": "automation-settings"
     },
     {
+      "name": "collection-status"
+    },
+    {
       "name": "dart"
     },
     {
@@ -28,6 +31,9 @@
     },
     {
       "name": "domestic-financial-export"
+    },
+    {
+      "name": "events"
     },
     {
       "name": "health"
@@ -40,6 +46,9 @@
     },
     {
       "name": "public"
+    },
+    {
+      "name": "reports"
     },
     {
       "name": "scan"
@@ -90,6 +99,68 @@
         "x-code-path": "app/api/automation-settings/route.ts",
         "x-access-classification": "public-read-candidate",
         "deprecated": true
+      }
+    },
+    "/api/collection-status": {
+      "get": {
+        "tags": [
+          "collection-status"
+        ],
+        "operationId": "getCollectionStatus",
+        "summary": "Collection Status API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/collection-status/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "asOf",
+                    "sources"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/collection-status/route.ts",
+        "x-access-classification": "public-read-candidate"
       }
     },
     "/api/dart": {
@@ -571,6 +642,407 @@
           }
         },
         "x-code-path": "app/api/domestic-financial-export/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "operationId": "getEvents",
+        "summary": "Events API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/events/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "dilutionRisk",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "eventType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "포함 UTC 시작 시각."
+            },
+            "description": "포함 UTC 시작 시각."
+          },
+          {
+            "name": "grade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B",
+                "C",
+                "EXCLUDED"
+              ]
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                1,
+                12,
+                24,
+                168
+              ],
+              "description": "공식 발생 시각 기준 rolling window. from/to와 함께 사용할 수 없습니다."
+            },
+            "description": "공식 발생 시각 기준 rolling window. from/to와 함께 사용할 수 없습니다."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "importance"
+              ],
+              "default": "latest"
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9.-]{0,9}$"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "포함 UTC 종료 시각."
+            },
+            "description": "포함 UTC 종료 시각."
+          },
+          {
+            "name": "verificationStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VERIFIED",
+                "UNVERIFIED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "query",
+                    "timezone",
+                    "items",
+                    "total",
+                    "page",
+                    "pageSize",
+                    "hasMore"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "query": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "title",
+                          "eventType",
+                          "verificationStatus",
+                          "sourceUrl"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ticker": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "eventType": {
+                            "type": "string"
+                          },
+                          "publishedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "acceptedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "bullishGrade": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "A",
+                              "B",
+                              "C",
+                              "EXCLUDED",
+                              null
+                            ]
+                          },
+                          "verificationStatus": {
+                            "type": "string",
+                            "enum": [
+                              "VERIFIED",
+                              "UNVERIFIED",
+                              "REJECTED"
+                            ]
+                          },
+                          "sourceUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pageSize": {
+                      "type": "integer"
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/events/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
+    "/api/events/{id}": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "operationId": "getEventsId",
+        "summary": "Events / Id API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/events/[id]/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "event"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "event": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/events/[id]/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
+    "/api/events/{id}/history": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "operationId": "getEventsIdHistory",
+        "summary": "Events / Id / History API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/events/[id]/history/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "eventId",
+                    "history"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/events/[id]/history/route.ts",
         "x-access-classification": "public-read-candidate"
       }
     },
@@ -2907,6 +3379,135 @@
           }
         },
         "x-code-path": "app/api/public/us-stock-metadata/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "operationId": "getReports",
+        "summary": "Reports API",
+        "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/reports/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "KST 달력일 보고서 날짜."
+            },
+            "description": "KST 달력일 보고서 날짜."
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                1,
+                12,
+                24,
+                168
+              ]
+            }
+          },
+          {
+            "name": "ticker",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9.-]{0,9}$"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "bullish",
+                "daily",
+                "ticker",
+                "dilution",
+                "collection"
+              ],
+              "default": "bullish"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "reportType",
+                    "asOf",
+                    "timezone",
+                    "count",
+                    "markdown",
+                    "items"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    },
+                    "reportType": {
+                      "type": "string"
+                    },
+                    "asOf": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "timezone": {
+                      "const": "Asia/Seoul"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "markdown": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/reports/route.ts",
         "x-access-classification": "public-read-candidate"
       }
     },

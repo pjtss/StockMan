@@ -82,3 +82,8 @@
 - 2026-10-15 소형주 급등 후보 262개의 최근 3개월 SEC 공시 요약·coverage: [`reports/sec-edgar-analysis/cohorts/2026-10-15-risers/`](../reports/sec-edgar-analysis/cohorts/2026-10-15-risers/README.md)
 
 - [미사용 기능 후보 조사 (2026-10-20)](operations/unused-feature-candidates-20261020.md)
+
+## 이벤트 ledger 작업 기록
+
+- 2026-11-06 — SEC·RSS 영구 이벤트 ledger 및 공개 무인증 이벤트 API 구현 결과는 [현황 분석](./stockman-events-current-analysis.md), [아키텍처](./stockman-events-architecture.md), [데이터 모델](./stockman-events-data-model.md), [API](./stockman-events-api.md), [운영 가이드](./stockman-events-operations.md)에 기록했다.
+- 검증: build·typecheck·docs/API/migration audit 및 격리 PostgreSQL idempotency 통과. 전체 Vitest는 worker 종료로 미완료. 운영 배포와 migration은 미실행.

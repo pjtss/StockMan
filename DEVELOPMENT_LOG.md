@@ -8513,3 +8513,33 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 배포 후 `https://stockman.r-e.kr/api/health`는 HTTP 200, `status=ok`를 반환했다.
 - runbook의 인증된 `GET /api/debug/automation-runs?module=market-rss&limit=5`는 `.env.local`에서 CRON_SECRET을 출력 없이 주입해 read-only 호출했으나 15~20초 timeout됐다. 따라서 배포 후 market-rss의 신규 실행 기록은 확인하지 못했다. 재확인은 운영 조회 지연 해소 후 수행한다.
 - SEC Form Type은 신규 Atom `<category label="form type" term="...">`만 신뢰하고 category 누락 시 fail-closed하므로 EDGAR Atom에 정확히 표시된 `8-K`/`6-K`만 새 Discord 전송 대상으로 만든다. 운영 알림을 수동 발사하지 않았다.
+## [2026-11-06] SEC·RSS 영구 이벤트 원장 및 공개 무인증 API
+
+### 목표
+기존 SEC/RSS 수집 저장소를 활용해 이벤트·문서·분석 revision·상태 이력을 영구 저장하고 종목/시간/등급별 공개 조회와 보고서를 제공한다.
+
+### 반영
+- 최신 배포 기준 `origin/oci`에 V166 forward-only additive migration, Drizzle schema 및 SEC/RSS materializer를 구현했다. SEC는 CIK+accession, RSS는 provider+external id로 중복 방지한다.
+- `/api/events/collect`는 무인증 공개 API이며 기존 원본 식별자만 받아 저장한다. 조회·이력·보고서·수집상태 API, 관리자 분석 revision API 및 SEC/RSS cron 연계를 추가했다.
+- 현황·아키텍처·데이터 모델·API·운영 문서를 추가하고 OpenAPI, route inventory, document catalog를 갱신했다.
+
+### 검증
+- `npm run typecheck`: 통과.
+- `npm run build`: Next.js production build 성공, 신규 API routes 포함.
+- `npm run docs:check`, `node scripts/api-surface.mjs check`, `node scripts/operational-schema-migration-audit.mjs`, `git diff --check`: 통과. V166 및 route inventory 일치 확인.
+- 로컬 Docker PostgreSQL 격리 DB에 V166 DDL 적용은 통과했다. HTTP smoke는 앱 기본 스키마가 빠져 `/api/health` 503을 반환했으므로 DB 기반 API materialization 검증은 미완료다. 임시 서버/DB 컨테이너는 정리했다.
+- 신규 이벤트·timestamp/API/schema 관련 테스트: 6개 파일 42개 통과.
+- 전체 Vitest: 306개 파일을 10개씩 31개 순차 shard로 실행해 모든 shard 통과(일부 skip 포함). 이전 worker OOM 문제를 shard 방식으로 우회했다.
+- 수정 범위 밖 기존 테스트 실패는 없어 별도 기존 테스트 수정은 필요하지 않았다.
+- `git diff --check`: 통과.
+
+### 다음 개선
+- DB 기반 runtime smoke는 앱 전체 migration schema를 가진 격리 DB에서 재실행한다. 운영 backfill은 표본·중복·종목 eligibility read-only 산정 후 별도 범위를 정한다.
+
+### 개선 과제
+개선 과제 ID: EVENT-LEDGER-2026-11-06-001
+성과 판정: VERIFIED_FOR_RELEASE
+근거: 코드·빌드·타입·문서/API 감사 및 306개 테스트 파일 shard 검증 통과. DB 기반 HTTP smoke는 미완료이며 배포 후 health/Flyway/read-only API 확인이 남았다.
+
+### 커밋·푸시·배포
+- 아직 미실행: 배포 commit/push 전. 사용자 요청에 따라 `oci` 배포를 진행하고 자동 workflow 및 운영 health/API를 read-only로 확인한다.

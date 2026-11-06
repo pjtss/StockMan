@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 133,
+  "documentCount": 138,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1597,7 +1597,12 @@
         "docs/operations/us-sec-form-item-catalyst-risk-guide.md",
         "docs/operations/us-equity-dilution-risk-harness.md",
         "docs/operations/sec-ticker-company-analysis-dossier-standard.md",
-        "docs/operations/us-market-october-2026-outlook.md"
+        "docs/operations/us-market-october-2026-outlook.md",
+        "docs/stockman-events-current-analysis.md",
+        "docs/stockman-events-architecture.md",
+        "docs/stockman-events-data-model.md",
+        "docs/stockman-events-api.md",
+        "docs/stockman-events-operations.md"
       ],
       "sourcePath": "docs/README.md",
       "related": [
@@ -1780,6 +1785,31 @@
           "title": "2026년 10월 미국 주식시장 호재·악재 점검",
           "url": "/manuals/operations/us-market-october-2026-outlook.md",
           "sourcePath": "docs/operations/us-market-october-2026-outlook.md"
+        },
+        {
+          "title": "Stockman SEC·RSS 호재 영구 저장 시스템 — 현황 분석 및 구현 계획",
+          "url": "/manuals/stockman-events-current-analysis.md",
+          "sourcePath": "docs/stockman-events-current-analysis.md"
+        },
+        {
+          "title": "Stockman SEC·RSS 이벤트 관리 아키텍처",
+          "url": "/manuals/stockman-events-architecture.md",
+          "sourcePath": "docs/stockman-events-architecture.md"
+        },
+        {
+          "title": "Stockman SEC·RSS 이벤트 데이터 모델",
+          "url": "/manuals/stockman-events-data-model.md",
+          "sourcePath": "docs/stockman-events-data-model.md"
+        },
+        {
+          "title": "Stockman SEC·RSS 이벤트 API",
+          "url": "/manuals/stockman-events-api.md",
+          "sourcePath": "docs/stockman-events-api.md"
+        },
+        {
+          "title": "Stockman 이벤트 저장·운영·장애 대응",
+          "url": "/manuals/stockman-events-operations.md",
+          "sourcePath": "docs/stockman-events-operations.md"
         }
       ]
     },
@@ -1844,6 +1874,61 @@
       "url": "/manuals/sec-edgar-official-reference.md",
       "relatedPaths": [],
       "sourcePath": "docs/sec-edgar-official-reference.md",
+      "related": []
+    },
+    {
+      "id": "stockman-events-api",
+      "title": "Stockman SEC·RSS 이벤트 API",
+      "category": "project-guide",
+      "format": "md",
+      "description": "모든 이벤트 GET은 인증 없이 호출할 수 있으며 응답 timestamp는 UTC ISO 형식이다. 보고서 timestamp는 KST도 함께 표시한다. 원문 payload, 관리자 데이터, 내부 오류 상세는 반환하지 않는다. 이벤트 저장용 공개 POST도 인증 없이 호출할 수 있으나 Stockman이 이미 보유한 원본 식별자만 허용한다. 분석 결과 검토·수정 저장 경로는 관리자 세션이 필요하다.",
+      "url": "/manuals/stockman-events-api.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/stockman-events-api.md",
+      "related": []
+    },
+    {
+      "id": "stockman-events-architecture",
+      "title": "Stockman SEC·RSS 이벤트 관리 아키텍처",
+      "category": "project-guide",
+      "format": "md",
+      "description": "기존 marketrssarticles, secsubmissions, secfilingevents와 원문 archive를 source of record로 유지하면서 장기 이벤트 ID, source document 연결, 분석 revision과 변경 이력을 추가한다. 새 ledger는 원문/기존 분석 데이터를 대체하지 않는다.",
+      "url": "/manuals/stockman-events-architecture.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/stockman-events-architecture.md",
+      "related": []
+    },
+    {
+      "id": "stockman-events-current-analysis",
+      "title": "Stockman SEC·RSS 호재 영구 저장 시스템 — 현황 분석 및 구현 계획",
+      "category": "project-guide",
+      "format": "md",
+      "description": "작성일: 2026-11-06  ",
+      "url": "/manuals/stockman-events-current-analysis.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/stockman-events-current-analysis.md",
+      "related": []
+    },
+    {
+      "id": "stockman-events-data-model",
+      "title": "Stockman SEC·RSS 이벤트 데이터 모델",
+      "category": "project-guide",
+      "format": "md",
+      "description": "Migration: db/migration/V166stockmaneventledger.sql. 모든 시각은 PostgreSQL TIMESTAMPTZ UTC instant로 저장하고 보고서에서 KST로 표시한다. 금액·주식 수는 NUMERIC(38,12)로 저장하며 API/입력에서 십진 문자열을 사용한다. 값 미공개는 null로 둔다.",
+      "url": "/manuals/stockman-events-data-model.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/stockman-events-data-model.md",
+      "related": []
+    },
+    {
+      "id": "stockman-events-operations",
+      "title": "Stockman 이벤트 저장·운영·장애 대응",
+      "category": "project-guide",
+      "format": "md",
+      "description": "1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.",
+      "url": "/manuals/stockman-events-operations.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/stockman-events-operations.md",
       "related": []
     },
     {

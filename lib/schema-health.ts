@@ -22,6 +22,12 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "kr_instrument_universe_candles",
   "us_instrument_universe_candles",
   "us_obv_divergence_snapshot",
+  "market_impact_events",
+  "stockman_events",
+  "stockman_event_documents",
+  "stockman_event_analyses",
+  "stockman_event_history",
+  "stockman_event_metrics",
   "instrument_fundamental_snapshots",
   "instrument_fundamental_refresh_jobs",
   "instrument_fundamental_refresh_items",
@@ -30,7 +36,6 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "debug_run_items",
   "debug_kis_calls",
   "kis_rate_limit_events",
-  "market_impact_events",
   "user_watchlist",
 ] as const;
 
@@ -91,8 +96,8 @@ export async function inspectDatabaseSchema(pool = getPool()): Promise<SchemaHea
         [OPERATIONAL_SCHEMA_TABLES],
       ),
       pool.query<{ table_name: string; column_name: string }>(
-        "SELECT columns.table_name, columns.column_name FROM information_schema.columns AS columns JOIN unnest($1::text[], $2::text[]) AS required(table_name, column_name) USING (table_name, column_name) WHERE columns.table_schema = 'public'",
-        [REQUIRED_OPERATIONAL_COLUMNS.map(([table]) => table), REQUIRED_OPERATIONAL_COLUMNS.map(([, column]) => column)],
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (table_name, column_name) IN (" + REQUIRED_OPERATIONAL_COLUMNS.map((_, index) => `($${index * 2 + 1}, $${index * 2 + 2})`).join(", ") + ")",
+        REQUIRED_OPERATIONAL_COLUMNS.flatMap(([table, column]) => [table, column]),
       ),
       pool.query<{ table_name: string }>(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",

@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision, primaryKey, numeric } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART ë° SEC ê³µì ì´ë ¥ ìí°í°
@@ -50,10 +50,12 @@ export const pushSubscriptions = pgTable(
     p256dh: text("p256dh").notNull(),
     auth: text("auth").notNull(),
     userAgent: text("user_agent"),
-    enabled: boolean("enabled").notNull().default(true),
-    dartEnabled: boolean("dart_enabled").notNull().default(true),
-    intensityEnabled: boolean("intensity_enabled").notNull().default(true),
-    risingEnabled: boolean("rising_enabled").notNull().default(true),
+    enabled: boolean("enabled").notNull().default(false),
+    dartEnabled: boolean("dart_enabled").notNull().default(false),
+    intensityEnabled: boolean("intensity_enabled").notNull().default(false),
+    risingEnabled: boolean("rising_enabled").notNull().default(false),
+    previewMode: text("preview_mode").notNull().default("GENERIC"),
+    preferenceRevision: integer("preference_revision").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   }
@@ -455,6 +457,100 @@ export const secSourceSnapshots = pgTable("sec_source_snapshots", {
 export const secFilingEvents = pgTable("sec_filing_events", {
   accession: text("accession").primaryKey(), cik: text("cik").notNull(), category: text("category").notNull(), direction: text("direction").notNull(), score: integer("score").notNull(), matchedTerms: text("matched_terms").array().notNull().default(sql`'{}'::text[]`), bodyExcerpt: text("body_excerpt").notNull().default(""), financingAmountUsd: doublePrecision("financing_amount_usd"), dilutionRisk: text("dilution_risk"), insiderAction: text("insider_action"), discordStatus: text("discord_status").notNull().default("PENDING"), discordSentAt: timestamp("discord_sent_at", { withTimezone: true }), lastError: text("last_error"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Long-lived event identity that links existing SEC/RSS records without replacing them. */
+export const stockmanEvents = pgTable("stockman_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  identityKey: text("identity_key").notNull(),
+  ticker: text("ticker"),
+  cik: text("cik"),
+  accessionNumber: text("accession_number"),
+  relatedEventId: bigint("related_event_id", { mode: "number" }),
+  eventType: text("event_type").notNull(),
+  title: text("title").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  sourceType: text("source_type").notNull(),
+  sourceUrl: text("source_url").notNull().default(""),
+  verificationStatus: text("verification_status").notNull().default("UNVERIFIED"),
+  eventStatus: text("event_status").notNull().default("ANNOUNCED"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("stockman_events_identity_key_unique").on(table.identityKey),
+  index("stockman_events_ticker_published_idx").on(table.ticker, table.publishedAt),
+  index("stockman_events_accepted_idx").on(table.acceptedAt),
+]);
+
+export const stockmanEventDocuments = pgTable("stockman_event_documents", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  eventId: bigint("event_id", { mode: "number" }).notNull().references(() => stockmanEvents.id),
+  source: text("source").notNull(),
+  externalId: text("external_id").notNull(),
+  documentType: text("document_type").notNull(),
+  cik: text("cik"),
+  accessionNumber: text("accession_number"),
+  exhibitNumber: text("exhibit_number"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  sourceUrl: text("source_url").notNull().default(""),
+  contentHash: text("content_hash"),
+  storageReference: text("storage_reference"),
+  verificationStatus: text("verification_status").notNull().default("UNVERIFIED"),
+  sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("stockman_event_documents_source_external_unique").on(table.source, table.externalId),
+  index("stockman_event_documents_event_idx").on(table.eventId, table.createdAt),
+]);
+
+export const stockmanEventAnalyses = pgTable("stockman_event_analyses", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  eventId: bigint("event_id", { mode: "number" }).notNull().references(() => stockmanEvents.id),
+  analysisVersion: text("analysis_version").notNull(),
+  revisionHash: text("revision_hash").notNull(),
+  bullishGrade: text("bullish_grade").notNull(),
+  bullishReason: text("bullish_reason").notNull().default(""),
+  bearishReason: text("bearish_reason").notNull().default(""),
+  dilutionRisk: text("dilution_risk"),
+  keyMetrics: jsonb("key_metrics").notNull().default({}),
+  unknownFactors: jsonb("unknown_factors").notNull().default([]),
+  analyzedAt: timestamp("analyzed_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("stockman_event_analyses_revision_unique").on(table.eventId, table.revisionHash),
+  index("stockman_event_analyses_latest_idx").on(table.eventId, table.analyzedAt),
+]);
+
+export const stockmanEventHistory = pgTable("stockman_event_history", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  eventId: bigint("event_id", { mode: "number" }).notNull().references(() => stockmanEvents.id),
+  changeType: text("change_type").notNull(),
+  beforeState: jsonb("before_state"),
+  afterState: jsonb("after_state").notNull(),
+  reason: text("reason").notNull(),
+  evidenceUrl: text("evidence_url"),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("stockman_event_history_event_idx").on(table.eventId, table.changedAt)]);
+
+/** Exact financial/share quantities are decimal strings at the application boundary. */
+export const stockmanEventMetrics = pgTable("stockman_event_metrics", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  eventId: bigint("event_id", { mode: "number" }).notNull().references(() => stockmanEvents.id),
+  metricKey: text("metric_key").notNull(),
+  revisionHash: text("revision_hash").notNull(),
+  amountValue: numeric("amount_value", { precision: 38, scale: 12 }),
+  quantityValue: numeric("quantity_value", { precision: 38, scale: 12 }),
+  currency: text("currency"),
+  unit: text("unit"),
+  asOfDate: date("as_of_date"),
+  splitAdjustment: text("split_adjustment"),
+  calculationFormula: text("calculation_formula"),
+  calculationInputs: jsonb("calculation_inputs").notNull().default({}),
+  sourceDocumentId: bigint("source_document_id", { mode: "number" }).references(() => stockmanEventDocuments.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("stockman_event_metrics_event_idx").on(table.eventId, table.metricKey)]);
 
 export const dailyBollingerCacheRetries = pgTable("daily_bollinger_cache_retries", {
   id: bigserial("id", { mode: "number" }).primaryKey(), scope: text("scope").notNull(), zone: text("zone").notNull(), status: text("status").notNull().default("PENDING"), attempts: integer("attempts").notNull().default(0), nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(), lastError: text("last_error"), lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }), succeededAt: timestamp("succeeded_at", { withTimezone: true }), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -7,6 +7,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { materializeStockmanRssEvents } from "@/lib/stockman-events";
 import { getMarketRssCronStatus } from "@/lib/market-rss-cron-status";
 import type { MarketRssSource } from "@/lib/market-rss-sources";
 
@@ -64,9 +65,12 @@ export async function POST(request: Request) {
       // The separate Bullish RSS mirror performs a full-table scan and must
       // not hold the time-bounded Discord notification timer open.
       const bullish = { skipped: true, reason: "deferred_from_notification_cron" };
+      let eventLedger: Awaited<ReturnType<typeof materializeStockmanRssEvents>> | { status: "FAILED"; errorCode: string };
+      try { eventLedger = await materializeStockmanRssEvents(); }
+      catch { eventLedger = { status: "FAILED", errorCode: "EVENT_LEDGER_UNAVAILABLE" }; }
       const outcome = getMarketRssCronStatus(ingested.ingestFailureCount, translated);
       const deliveryIncomplete = !notified.webhookConfigured || notified.sent < notified.attempted;
-      return { ok: true, mode: "COMMIT", ...outcome, backlogRemaining, degraded: outcome.degraded || deliveryIncomplete || backlogRemaining, deliveryIncomplete, sources, ingested, translated, notified, bullish };
+      return { ok: true, mode: "COMMIT", ...outcome, backlogRemaining, degraded: outcome.degraded || deliveryIncomplete || backlogRemaining || eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS", deliveryIncomplete, sources, ingested, translated, notified, bullish, eventLedger };
     }));
     if (result === null) {
       await recordSkippedAutomationRun("market-rss", "already_running", { lockKey: "market-rss-pipeline" });

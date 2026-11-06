@@ -13,6 +13,15 @@ describe("schema-health", () => {
     expect(getMissingSchemaTables([], OPERATIONAL_SCHEMA_TABLES)).toContain("market_impact_events");
   });
 
+  it("requires permanent Stockman event ledger tables for operational readiness", () => {
+    expect(OPERATIONAL_SCHEMA_TABLES).toEqual(expect.arrayContaining([
+      "stockman_events", "stockman_event_documents", "stockman_event_analyses", "stockman_event_history", "stockman_event_metrics",
+    ]));
+    expect(getMissingSchemaTables([], OPERATIONAL_SCHEMA_TABLES)).toEqual(expect.arrayContaining([
+      "stockman_events", "stockman_event_documents", "stockman_event_analyses", "stockman_event_history", "stockman_event_metrics",
+    ]));
+  });
+
   it("reports missing core tables", () => {
     expect(getMissingSchemaTables(["automation_runs"])).toContain("market_rss_articles");
     expect(getMissingSchemaTables([...CORE_SCHEMA_TABLES])).toEqual([]);
@@ -48,9 +57,9 @@ describe("schema-health", () => {
 
     const health = await inspectDatabaseSchema(pool as never);
     const columnProbe = calls.find(({ text }) => text.includes("FROM information_schema.columns"));
-    expect(columnProbe?.text).toContain("unnest($1::text[], $2::text[])");
-    expect(columnProbe?.values?.[0]).toContain("market_rss_articles");
-    expect(columnProbe?.values?.[1]).toContain("normalized_summary");
+    expect(columnProbe?.text).toContain("($1, $2)");
+    expect(columnProbe?.values).toContain("market_rss_articles");
+    expect(columnProbe?.values).toContain("normalized_summary");
     expect(health.schemaReady).toBe(true);
     expect(health.missingOperationalColumns).toEqual([]);
   });

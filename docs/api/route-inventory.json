@@ -77,6 +77,14 @@
       "source": "app/api/admin/domestic-universe-import/route.ts"
     },
     {
+      "path": "/api/admin/events/{id}/analysis",
+      "methods": [
+        "POST"
+      ],
+      "access": "admin-session",
+      "source": "app/api/admin/events/[id]/analysis/route.ts"
+    },
+    {
       "path": "/api/admin/feature-modules",
       "methods": [
         "GET"
@@ -603,6 +611,14 @@
       "source": "app/api/client-errors/route.ts"
     },
     {
+      "path": "/api/collection-status",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/collection-status/route.ts"
+    },
+    {
       "path": "/api/cron/discord-delivery-retry",
       "methods": [
         "GET",
@@ -934,6 +950,38 @@
       "source": "app/api/domestic-financial-export/route.ts"
     },
     {
+      "path": "/api/events",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/events/route.ts"
+    },
+    {
+      "path": "/api/events/{id}",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/events/[id]/route.ts"
+    },
+    {
+      "path": "/api/events/{id}/history",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/events/[id]/history/route.ts"
+    },
+    {
+      "path": "/api/events/collect",
+      "methods": [
+        "POST"
+      ],
+      "access": "public-write-source-materialization",
+      "source": "app/api/events/collect/route.ts"
+    },
+    {
       "path": "/api/health",
       "methods": [
         "GET"
@@ -1191,6 +1239,14 @@
       ],
       "access": "user-session-or-user-data",
       "source": "app/api/push/test/route.ts"
+    },
+    {
+      "path": "/api/reports",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/reports/route.ts"
     },
     {
       "path": "/api/scan/daytrade",

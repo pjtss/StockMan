@@ -28,6 +28,7 @@ function routePath(file) {
 }
 
 function accessFor(path, source, methods) {
+  if (path === "/api/events/collect") return requestAuthenticationPattern.test(source) ? "internal-or-operator" : "public-write-source-materialization";
   if (/requireAdminSession/.test(source)) return "admin-session";
   if (/isCronRequestAuthorized/.test(source)) return "cron-guarded";
   if (/x-request-log-secret|REQUEST_LOG_SECRET/.test(source)) return "internal-secret";
@@ -129,6 +130,25 @@ function queryParameters(source, path) {
       pageSize: { type: "integer", minimum: 1, maximum: 500, description: "limit 별칭." },
       limit: { type: "integer", minimum: 1, maximum: 500, description: "pageSize 별칭." },
     },
+    "/api/events": {
+      hours: { type: "integer", enum: [1, 12, 24, 168], description: "공식 발생 시각 기준 rolling window. from/to와 함께 사용할 수 없습니다." },
+      from: { type: "string", format: "date-time", description: "포함 UTC 시작 시각." },
+      to: { type: "string", format: "date-time", description: "포함 UTC 종료 시각." },
+      ticker: { type: "string", pattern: "^[A-Z][A-Z0-9.-]{0,9}$" },
+      eventType: { type: "string", maxLength: 40 },
+      grade: { type: "string", enum: ["A", "B", "C", "EXCLUDED"] },
+      verificationStatus: { type: "string", enum: ["VERIFIED", "UNVERIFIED", "REJECTED"] },
+      dilutionRisk: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "UNKNOWN"] },
+      sort: { type: "string", enum: ["latest", "importance"], default: "latest" },
+      page: { type: "integer", minimum: 1, default: 1 },
+      pageSize: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+    },
+    "/api/reports": {
+      type: { type: "string", enum: ["bullish", "daily", "ticker", "dilution", "collection"], default: "bullish" },
+      hours: { type: "integer", enum: [1, 12, 24, 168] },
+      date: { type: "string", format: "date", description: "KST 달력일 보고서 날짜." },
+      ticker: { type: "string", pattern: "^[A-Z][A-Z0-9.-]{0,9}$" },
+    },
     "/api/domestic-financial-export": { format: { type: "string", enum: ["raw", "llm"], default: "normalized" } },
     "/api/stock/chart": {
       code: { type: "string", minLength: 1, maxLength: 64, required: true },
@@ -167,6 +187,12 @@ function queryParameters(source, path) {
 function responseSchema(path) {
   const generic = { type: "object", additionalProperties: true };
   const schemas = {
+    "/api/events": { type: "object", required: ["ok", "query", "timezone", "items", "total", "page", "pageSize", "hasMore"], properties: { ok: { const: true }, query: { type: "object", additionalProperties: true }, timezone: { type: "string" }, items: { type: "array", items: { type: "object", required: ["id", "title", "eventType", "verificationStatus", "sourceUrl"], properties: { id: { type: "string" }, ticker: { type: ["string", "null"] }, title: { type: "string" }, eventType: { type: "string" }, publishedAt: { type: ["string", "null"], format: "date-time" }, acceptedAt: { type: ["string", "null"], format: "date-time" }, bullishGrade: { type: ["string", "null"], enum: ["A", "B", "C", "EXCLUDED", null] }, verificationStatus: { type: "string", enum: ["VERIFIED", "UNVERIFIED", "REJECTED"] }, sourceUrl: { type: "string", format: "uri" } } } }, total: { type: "integer" }, page: { type: "integer" }, pageSize: { type: "integer" }, hasMore: { type: "boolean" } } },
+    "/api/events/{id}": { type: "object", required: ["ok", "event"], properties: { ok: { const: true }, event: { type: "object", additionalProperties: true } } },
+    "/api/events/{id}/history": { type: "object", required: ["ok", "eventId", "history"], properties: { ok: { const: true }, eventId: { type: "string" }, history: { type: "array", items: { type: "object", additionalProperties: true } } } },
+    "/api/reports": { type: "object", required: ["ok", "reportType", "asOf", "timezone", "count", "markdown", "items"], properties: { ok: { const: true }, reportType: { type: "string" }, asOf: { type: "string", format: "date-time" }, timezone: { const: "Asia/Seoul" }, count: { type: "integer" }, markdown: { type: "string" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } },
+    "/api/reports/latest": { type: "object", required: ["ok", "reportType", "asOf", "timezone", "count", "markdown", "items"], properties: { ok: { const: true }, reportType: { type: "string" }, asOf: { type: "string", format: "date-time" }, timezone: { const: "Asia/Seoul" }, count: { type: "integer" }, markdown: { type: "string" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } },
+    "/api/collection-status": { type: "object", required: ["ok", "asOf", "sources"], properties: { ok: { const: true }, asOf: { type: "string", format: "date-time" }, sources: { type: "array", items: { type: "object", additionalProperties: true } } } },
     "/api/health": { type: "object", required: ["status", "checkedAt", "responseTimeMs", "requestId"], properties: { status: { type: "string", enum: ["ok", "degraded"] }, checkedAt: { type: "string", format: "date-time" }, responseTimeMs: { type: "integer" }, requestId: { type: "string" } } },
     "/api/market-news": { type: "object", required: ["ok", "schemaVersion", "scope", "items", "page"], properties: { ok: { const: true }, schemaVersion: { const: "us-market-rss.v1" }, scope: { type: "object", properties: { market: { const: "US" }, sources: { type: "array", items: { type: "string" } }, source: { type: "string" }, kind: { type: "string", enum: ["ALL", "NEWS", "FILING"] }, ticker: { type: ["string", "null"] }, window: { type: "object", properties: { hours: { type: "integer" }, from: { type: "string", format: "date-time" }, to: { type: "string", format: "date-time" } } }, timezone: { const: "UTC" } } }, items: { type: "array", items: { type: "object", properties: { title: { type: "object", properties: { original: { type: "string" }, ko: { type: ["string", "null"] } } }, link: { type: "string", format: "uri" } } } }, page: { type: "object", properties: { pageSize: { type: "integer" }, returned: { type: "integer" }, nextCursor: { type: ["string", "null"] }, hasMore: { type: "boolean" } } } } },
     "/api/stock/lookup": { type: "object", required: ["names"], properties: { names: { type: "object", additionalProperties: { type: "string" } } } },
