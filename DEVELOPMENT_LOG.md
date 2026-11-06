@@ -8562,9 +8562,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `components/feed-page.test.tsx` 단독 재실행: 1/1 통과. Node 22 Linux 전체 테스트: 307개 파일 통과, 1개 skip; 1,590개 테스트 통과, 3개 skip. HOSTNAME bind와 localStorage test stub을 포함한 Windows `npm run deploy:verify` 최종 재실행도 통과.
 - Node 22 Linux에서 build, standalone browser/API runtime smoke, typecheck, docs, API/auth/KIS/cron audits가 통과했다. 컨테이너가 Windows worktree CRLF를 tar 복사한 뒤 `bash -n`에서 실패했으나, `git ls-files --eol`로 OCI 대상 shell 파일은 index LF/worktree CRLF임을 확인했다. 이 오류는 GitHub의 Linux checkout이 아닌 로컬 Linux 재현 wrapper의 줄바꿈 입력 차이다.
 - OCI run `42202406076`, `42203831528`, `42206248569`는 각각 22초, 18초, 19초 후 `Verify deployment`에서 실패해 package/SSH/deploy를 건너뛰었다. 익명 Actions 화면은 세부 로그를 제공하지 않는다. 별도로 Linux standalone이 상속된 `HOSTNAME`에 bind해 loopback smoke가 실패하는 것을 재현하여 verifier에 `HOSTNAME=127.0.0.1`을 지정했다. 이후 CI 결과에서 수정 여부를 확인한다.
-- OCI 재배포 뒤 이벤트 report view의 운영 DB 응답을 확인할 예정.
+- `.gitignore`에서 `reports/`를 `/reports/`로 한정해 루트의 로컬 reports 출력 제외는 유지하고 `app/api/reports/route.ts` 및 latest alias를 Git에 포함했다. OCI 원격 빌드 실패 원인이 이 ignore 패턴이었음을 run `42209511456` 로그의 Module not found 메시지로 확인했다.
+- 수정 후 `npm run deploy:verify` 통과: production build 107 pages 및 `/api/reports`, `/api/reports/latest` route 생성; standalone/OpenAPI 47 read paths/API/browser desktop·mobile smoke; Vitest 307 files (1 skipped), 1,590 passed/3 skipped; typecheck, docs/migration V166, API surface 185 routes/47 public GET, verify-scope/KIS/Bearer/OCI cron 감사 성공.
+- GitHub Actions 로그 확인 결과 앞선 세 실패(run `42202406076`, `42203831528`, `42206248569`)와 `42209511456`은 모두 build의 module resolution failure였다. 이전 HOSTNAME 및 localStorage 가설은 해당 실패 원인이 아니었으며, 현재는 불필요한 코드 변경 없이 경로 누락 원인을 수정했다.
+- 수정 커밋·푸시 후 신규 OCI workflow의 Activate release와 운영 GET을 확인한다. 운영 직접 DB 접근/쓰기 smoke는 수행하지 않았다.
 - 변경 파일: `app/api/events/route.ts`, `app/api/events/route.test.ts`, `components/feed-page.test.tsx`, `scripts/api-surface.mjs`, `scripts/verify-deploy.mjs`, Stockman 이벤트 API/운영/분석 문서, `public/openapi.json`, `docs/api/route-inventory.json`.
-- 커밋·푸시: report route fix `1fe5501a`, 검증 이력 `3c467964`, HOSTNAME bind 보정 `e4c7b8f9` 완료. localStorage test fix는 `npm run deploy:verify` 통과 후 커밋·푸시한다.
+- 커밋·푸시: report route fix `1fe5501a`, 검증 이력 `3c467964`, HOSTNAME bind 보정 `e4c7b8f9`, Linux localStorage 테스트 보정 `d9ac7a34` 완료. OCI run `42209511456`도 Verify 단계의 production build에서 실패했다. 로그는 `app/api/events/route.ts`가 import한 `app/api/reports/route.ts`를 찾지 못했다고 명시했다. 원인은 `.gitignore`의 일반 `reports/` 패턴이 중첩 API 디렉터리까지 무시해 해당 route가 원격 Git tree에 누락된 것이다. `/reports/`로 범위를 한정하고 검증 후 별도 수정 커밋·푸시한다.
 
 ### 남은 개선
 - `/api/reports`와 collection-status의 직접 route 404/지연 원인은 운영 artifact/server routing에서 추가 추적한다. report view smoke와 loopback bind는 release workflow의 구조 게이트로 유지한다.
