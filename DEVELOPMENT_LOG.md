@@ -8558,9 +8558,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 검증 및 운영 적용
 - 전체 Vitest 통과: 307개 파일 통과, 1개 skip; 1,590개 테스트 통과, 3개 skip. `npm run typecheck`, `docs:check`, `audit:api-surface`, `cron:check`, `git diff --check`, `npm run build` 통과.
 - standalone 실행에서 report 분기 검증 오류 400 JSON, 기존 `/api/reports` 검증 오류 400 JSON, DB 미구성 상태의 `/api/events?hours=12` 표준 503 JSON을 확인했다. 운영 DB 접근 또는 쓰기는 실행 smoke에 포함하지 않았다.
+- `npm run deploy:verify` 전체 재현도 로컬에서 통과: build, standalone browser/API smoke, 1,590 tests, typecheck, docs/API/auth/cron audit. 신규 route smoke가 별도 검증됨.
+- OCI run `42202406076`은 22초 후 `Verify deployment` 단계에서 실패하고 package/SSH/deploy는 건너뛰었다. 공개 job summary에는 실패 단계만 있고 원인 로그는 익명 열람에서 제공되지 않아 근본 원인은 확인되지 않았다. 같은 소스의 로컬 `deploy:verify`는 통과했으므로 CI runner 차이/일시 오류를 후속 재실행에서 판별한다.
 - OCI 재배포 뒤 이벤트 report view의 운영 DB 응답을 확인할 예정.
 - 변경 파일: `app/api/events/route.ts`, 해당 route test, `scripts/api-surface.mjs`, `scripts/verify-deploy.mjs`, Stockman 이벤트 API/운영/분석 문서, `public/openapi.json`, `docs/api/route-inventory.json`.
-- 커밋·푸시·배포: 검증 완료 후 수행.
+- 커밋·푸시: report route fix `1fe5501a` 완료. OCI 배포는 CI 실패 후 재시도 대기.
 
 ### 남은 개선
 - `/api/reports`와 collection-status의 직접 route 404/지연 원인은 운영 artifact/server routing에서 추가 추적한다. report view smoke는 release workflow의 구조 게이트로 유지한다.
