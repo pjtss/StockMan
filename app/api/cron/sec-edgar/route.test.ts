@@ -95,6 +95,7 @@ describe("POST /api/cron/sec-edgar RSS candidate coverage", () => {
     expect(body.secEdgar.submissionCoverage).toMatchObject({ candidateLookupOk: true, candidateCikCount: 1, rssOnlyCikCount: 1, fetchSuccessCikCount: 1, fetchFailureCikCount: 0, submissionCount: 1, insertedSubmissionCount: 1 });
     expect(body.secEdgar.results[0]).toMatchObject({ cik: CIK_A, scope: "SEC_RSS_CANDIDATE" });
     expect(mocks.syncSecRssCandidateSubmissions).toHaveBeenCalledWith(CIK_A, [ACCESSION_A]);
+    expect(mocks.materializeStockmanSecEvents).toHaveBeenCalledWith(500, undefined, [ACCESSION_A]);
     expect(mocks.syncSecCompany).not.toHaveBeenCalled();
     expect(mocks.syncSecCompanyFacts).not.toHaveBeenCalled();
     expect(mocks.collectMissingSecCompanyDocuments).not.toHaveBeenCalled();
@@ -111,6 +112,8 @@ describe("POST /api/cron/sec-edgar RSS candidate coverage", () => {
     expect(body.submissionCoverage).toMatchObject({ configuredCikCount: 1, fetchSuccessCikCount: 1, fetchFailureCikCount: 0 });
     expect(body.secEdgar.submissionCoverage).toMatchObject({ candidateCikCount: 2, rssOnlyCikCount: 1, fetchSuccessCikCount: 1 });
     expect(mocks.syncSecRssCandidateSubmissions).toHaveBeenCalledWith(CIK_B, [ACCESSION_B]);
+    expect(mocks.materializeStockmanSecEvents).toHaveBeenNthCalledWith(1, 500, undefined, [ACCESSION_B]);
+    expect(mocks.materializeStockmanSecEvents).toHaveBeenNthCalledWith(2);
     expect(mocks.syncSecCompany.mock.calls.map(([cik]) => cik)).toEqual([CIK_A]);
     expect(mocks.syncSecCompanyFacts.mock.calls.map(([cik]) => cik)).toEqual([CIK_A]);
     expect(mocks.collectMissingSecCompanyDocuments.mock.calls.map(([cik]) => cik)).toEqual([CIK_A]);
@@ -128,6 +131,7 @@ describe("POST /api/cron/sec-edgar RSS candidate coverage", () => {
     expect(body.secRealtime).toMatchObject({ skipped: true, reason: "outside_schedule" });
     expect(body.secEdgar.submissionCoverage).toMatchObject({ candidateLookupOk: true, candidateCikCount: 1, fetchSuccessCikCount: 1 });
     expect(mocks.syncSecRssCandidateSubmissions).toHaveBeenCalledWith(CIK_A, [ACCESSION_A]);
+    expect(mocks.materializeStockmanSecEvents).toHaveBeenCalledWith(500, undefined, [ACCESSION_A]);
     expect(mocks.syncSecCompanyFacts).not.toHaveBeenCalled();
     expect(mocks.collectMissingSecCompanyDocuments).not.toHaveBeenCalled();
   });

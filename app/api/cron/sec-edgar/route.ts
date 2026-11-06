@@ -38,7 +38,7 @@ async function runSecRssCandidateSync(excludedCiks: string[] = []) {
       }
     }
     let eventLedger: Awaited<ReturnType<typeof materializeStockmanSecEvents>> | { status: "FAILED"; errorCode: string };
-    try { eventLedger = await materializeStockmanSecEvents(); }
+    try { eventLedger = await materializeStockmanSecEvents(500, undefined, [...new Set(rssCandidates.flatMap((candidate) => candidate.accessions))]); }
     catch (error) { eventLedger = { status: "FAILED", errorCode: classifyStockmanEventError(error) }; }
     const successful = results.filter((item) => item.ok && "submissions" in item);
     const failedCikCount = results.length - successful.length;

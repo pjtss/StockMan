@@ -60,3 +60,6 @@ SEC RSS의 `detected_ticker`는 null인 항목이 많다. 배포된 후보 로�
 ## 롤백
 
 애플리케이션 롤백 시 이전 버전은 새 테이블을 참조하지 않도록 먼저 배포를 되돌린다. V166 테이블 DROP/TRUNCATE 또는 source 데이터 삭제는 자동 롤백에 포함하지 않는다. 데이터가 보존된 상태에서 새 코드만 비활성화하고, destructive schema rollback이 필요하면 영향 분석과 별도 사전 승인을 거친다.
+
+
+SEC RSS 후보 cron은 동기화한 accession 목록만 materialize한다. configured sec-realtime 경로의 기존 전체 pending materialization은 유지한다.
