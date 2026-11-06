@@ -8692,3 +8692,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **검증/운영**: 문서 및 실행 결과만 변경했다. `npm run deploy:verify` 종료코드 0: build, standalone runtime/API smoke, desktop/mobile hydration, Vitest 309 files passed/1 skipped (1,614 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/cron audits 통과. 운영 DB 쓰기, cron 수동 호출, 배포, backfill, 삭제는 수행하지 않았다.
 - 무인증 쓰기 경계 확인: 운영 `/api/events/collect`에 인증 헤더 없이 `{"source":"INVALID"}`를 POST해 HTTP 400 `UNSUPPORTED_SOURCE`를 받았다. 입력 검증에서 반환되므로 원장 저장을 수행하지 않았다. 유효 SEC accession 경로의 무인증 materialization은 route unit test에서 source repository 호출까지 검증돼 있다.
 - 해당 운영 확인을 포함한 최종 로컬 `npm run deploy:verify`도 종료코드 0으로 재통과했다(309 test files passed, 1 skipped; 1,614 passed, 3 skipped; build, runtime/browser smoke, typecheck, docs/migration/API/auth/KIS/cron gates).
+
+## [2026-11-06] SEC active-schedule run 대기 중 운영 재확인
+
+- **확인 범위**: 배포된 앱의 공개 GET만 호출하고, 현재 branch/log와 운영 문서를 재검토했다. 내부 관리자/cron 진단, DB 쓰기, 수동 cron 실행은 하지 않았다.
+- **운영 상태(16:26 UTC)**: `/api/collection-status` HTTP 200. `market-rss` SUCCESS, SEC_EDGAR 포함 source 3개, ingestion failure 0, inserted 204, ledger fetched/stored 114/114/failed 0. `sec-realtime` 최신 16:25 UTC row는 UNVERIFIED이며 coverage/summary null. `/api/events?hours=24` 663개 전수 pagination에서 SEC_EDGAR 0, `/api/events?hours=12` total 229. `/api/reports/latest` HTTP 200, count 0. Unverified 기사는 호재 보고서에 들어가지 않는 것을 확인했다.
+- **Schedule 판단**: 런타임 source 기본 `sec-realtime.activeDays`는 월–금이고 `lib/schedule-time.ts`는 KST를 사용한다. 이 관측은 KST 토요일 01:25대다. 운영 DB에서 저장한 setting은 공개 API에 노출되지 않으므로 실제 schedule 상세는 미확인으로 유지한다.
+- **문서/다음 단계**: `docs/stockman-events-operations.md`에 최신 공개 status와 정확한 건수를 추가했다. 다음 실제 활성 sec-realtime 실행에서 source coverage, SEC accession accepted time, event ledger 저장/멱등성 및 12시간 조회를 확인한다. 이번 턴에는 운영 변경과 배포를 하지 않았다.
+- **검증**: 문서 변경 후 `npm run deploy:verify` 종료코드 0; production build, runtime/API/browser smoke, Vitest 309 files passed/1 skipped (1,614 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron gates 모두 통과.
