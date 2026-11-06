@@ -16,7 +16,7 @@
 - SEC Submissions 저장 후 materializer가 SEC accession과 활성 common-stock ticker를 확인해 event/document를 연결한다. SEC accepted time 14자리 parse 실패 및 마스터 불일치는 신규 검증 이벤트로 승격하지 않는다.
 - 관리자는 공식 문서를 직접 확인하고 Codex 원문 분석 결과를 admin analysis endpoint에 revision으로 기록한다. POSITIVE 결과라도 명확한 evidence와 ticker가 없으면 저장/보고서 대상에서 제외한다.
 - 보고서는 DB query로 매 요청 생성되므로 재생성 가능한 원장 결과다. Reports/latest는 기본 12시간 창이며 12시간 경과 이벤트도 DB에 보존된다.
-- `GET /api/reports`는 `type=bullish|daily|ticker|dilution|collection`을 제공한다. daily 날짜 경계는 KST 자정 기준이며, ticker에는 ticker가 필수다. dilution hours 생략 시 전체 보존 이력에서 위험이 입력된 건을 조회한다.
+- `GET /api/reports`와 `GET /api/events?view=report`는 `type=bullish|daily|ticker|dilution|collection`을 제공한다. daily 날짜 경계는 KST 자정 기준이며, ticker에는 ticker가 필수다. dilution hours 생략 시 전체 보존 이력에서 위험이 입력된 건을 조회한다. 배포 후 report 모드 JSON을 확인해 라우트가 404 HTML로 처리되지 않는지 점검한다.
 
 ## 장애 구분·복구
 

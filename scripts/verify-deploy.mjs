@@ -250,6 +250,11 @@ async function verifyRuntime() {
       || !openApi.paths?.["/api/public/api-manual"]?.get) {
       throw new Error("Standalone OpenAPI smoke failed: specification version or expected public paths are missing.");
     }
+    const eventReportSmoke = await fetch(`http://127.0.0.1:${port}/api/events?view=report&hours=6`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
+    const eventReportBody = await eventReportSmoke.json();
+    if (eventReportSmoke.status !== 400 || eventReportBody.error !== "INVALID_HOURS") {
+      throw new Error(`Standalone event report route smoke failed: HTTP ${eventReportSmoke.status}`);
+    }
     const stockMetadataOperation = openApi.paths["/api/public/us-stock-metadata"].get;
     if (stockMetadataOperation.security?.length || !stockMetadataOperation.parameters?.some((parameter) => parameter.name === "ticker" && parameter.required === true)) {
       throw new Error("Standalone OpenAPI smoke failed: stock metadata must be an anonymous GET with a required ticker parameter.");

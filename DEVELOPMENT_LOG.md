@@ -8544,3 +8544,25 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 커밋·푸시·배포
 - 커밋 `ad12a696`을 `oci`에 push했고 OCI workflow `42196880567`이 성공했다. 운영 `/api/health` 및 `/api/events`, 12시간/티커 필터는 HTTP 200. `/api/reports`의 alias 동작은 이후 재확인하며 신규 report/status route 일부 응답이 read-only 확인에서 늦거나 404인 구간이 있어 안정화 점검이 남았다.
+## [2026-11-06] 이벤트 보고서 운영 라우트 호환성과 standalone smoke 보강
+
+### 목표
+- 운영에서 404로 확인된 보고서 경로의 조회 대안을 제공하고, 배포 전 라우팅 누락을 감지한다.
+
+### 반영
+- `GET /api/events?view=report`를 기존 운영 확인된 이벤트 route에 연결했다. `view` 생략 시 기존 이벤트 목록 응답은 유지한다.
+- API manual/OpenAPI/route inventory에 report view 파라미터와 응답 schema를 반영한다.
+- standalone deploy verification이 `/api/events?view=report&hours=6`의 400 JSON `INVALID_HOURS` 응답을 확인해 handler의 존재를 검증한다.
+- 원인: 운영 `/api/reports`는 `x-nextjs-prerender: 1`이 포함된 HTML 404로 반환되어 보고서 handler에 도달하지 않았다. 기존 event route는 200으로 확인했다. collection-status API는 일부 확인에서 응답이 20초 이상 지연됐다.
+
+### 검증 및 운영 적용
+- 전체 Vitest 통과: 307개 파일 통과, 1개 skip; 1,590개 테스트 통과, 3개 skip. `npm run typecheck`, `docs:check`, `audit:api-surface`, `cron:check`, `git diff --check`, `npm run build` 통과.
+- standalone 실행에서 report 분기 검증 오류 400 JSON, 기존 `/api/reports` 검증 오류 400 JSON, DB 미구성 상태의 `/api/events?hours=12` 표준 503 JSON을 확인했다. 운영 DB 접근 또는 쓰기는 실행 smoke에 포함하지 않았다.
+- OCI 재배포 뒤 이벤트 report view의 운영 DB 응답을 확인할 예정.
+- 변경 파일: `app/api/events/route.ts`, 해당 route test, `scripts/api-surface.mjs`, `scripts/verify-deploy.mjs`, Stockman 이벤트 API/운영/분석 문서, `public/openapi.json`, `docs/api/route-inventory.json`.
+- 커밋·푸시·배포: 검증 완료 후 수행.
+
+### 남은 개선
+- `/api/reports`와 collection-status의 직접 route 404/지연 원인은 운영 artifact/server routing에서 추가 추적한다. report view smoke는 release workflow의 구조 게이트로 유지한다.
+
+\r\n

@@ -1,12 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listStockmanEvents } = vi.hoisted(() => ({ listStockmanEvents: vi.fn() }));
-vi.mock("@/lib/stockman-events", () => ({ listStockmanEvents }));
+const { listStockmanEvents, listStockmanCollectionStatus, renderStockmanEventsMarkdown } = vi.hoisted(() => ({ listStockmanEvents: vi.fn(), listStockmanCollectionStatus: vi.fn(), renderStockmanEventsMarkdown: vi.fn() }));
+vi.mock("@/lib/stockman-events", () => ({ listStockmanEvents, listStockmanCollectionStatus, renderStockmanEventsMarkdown }));
 
 import { GET } from "./route";
 
 describe("GET /api/events", () => {
-  beforeEach(() => listStockmanEvents.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50, hasMore: false }));
+  beforeEach(() => {
+    listStockmanEvents.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50, hasMore: false });
+    listStockmanCollectionStatus.mockReset().mockResolvedValue([]);
+    renderStockmanEventsMarkdown.mockReset().mockReturnValue("# Stockman 최근 호재 보고서");
+  });
+
+  it("serves report mode through the live events route", async () => {
+    const response = await GET(new Request("https://stockman.example/api/events?view=report&hours=12"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, reportType: "BULLISH", hours: 12, markdown: expect.any(String) });
+    expect(listStockmanEvents).toHaveBeenCalledWith(expect.objectContaining({ hours: 12, positiveOnly: true }));
+  });
 
   it("rejects unsupported hour windows", async () => {
     const response = await GET(new Request("https://stockman.example/api/events?hours=6"));

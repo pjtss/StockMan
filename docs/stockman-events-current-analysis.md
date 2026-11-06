@@ -101,7 +101,7 @@ V166은 forward-only additive migration이다. 원본 source row를 삭제하거
 3. API: 이벤트 list/detail/history, `/api/reports` (Next.js `/latest` alias 포함), collection-status 공개 GET과 무인증 source-ID materialization POST를 추가했다. 분석 revision 및 이벤트 상태/relatedEventId 편집은 관리자 session API로 보호한다.
 4. 배치: `app/api/cron/sec-edgar/route.ts`와 `app/api/cron/market-rss/route.ts`가 source pipeline 이후 ledger materializer를 best-effort로 호출하고 실패·부분 성공을 automation run 결과에 기록한다. 기존 source rows와 알림 흐름은 ledger 실패로 롤백하지 않는다.
 5. 문서/API surface: `scripts/api-surface.mjs`가 공개 GET schema·query 및 route access 분류를 생성한다. collect POST의 공개 쓰기 범위는 source-ID materialization뿐이다.
-6. 로컬 격리 PostgreSQL에서 V166 DDL 적용을 확인했다. 앱 기본 스키마가 없는 상태의 health smoke가 503을 반환해 HTTP materialization/idempotency 검증은 완료로 판정하지 않았다. 운영 DB 적용은 하지 않았다.
+6. 로컬 격리 PostgreSQL에서 V166 DDL과 source fixture 기반 HTTP materialization/idempotency(SEC/RSS 각 2회 호출, events/documents/analyses/history 각 2건)를 확인했다. 운영 migration과 운영 데이터 변경은 승인된 배포 workflow에서만 수행했다.
 
 ### 7.3 남은 확인 사항 및 운영 승인 경계
 
@@ -117,5 +117,5 @@ V166은 forward-only additive migration이다. 원본 source row를 삭제하거
 - 주요 경로: `lib/stockman-events.ts`, `db/migration/V166__stockman_event_ledger.sql`, `app/api/events/`, `app/api/reports/`, `app/api/collection-status/`, `app/api/admin/events/`, `app/api/events/collect/`, 기존 SEC/RSS cron route.
 - API 무인증 정책: 이벤트 GET와 `POST /api/events/collect`는 인증 불필요. 저장 POST는 SEC accession 또는 허용 RSS provider/source ID만 받고 기존 source table에서 재료화한다. analysis revision 직접 등록은 관리자 세션을 유지한다.
 - 검증: Vitest 전체 306 파일을 31 shard로 실행해 전 shard 통과(일부 skip 포함); 신규 이벤트·timestamp/API/schema 6파일 42건 통과. `npm run typecheck`, `npm run build` (Next.js production, 107 static pages), `npm run docs:check` (185 route/47 public GET, catalog 138 documents), API surface audit, operational schema migration audit, `git diff --check` 통과.
-- 격리 PostgreSQL smoke 한계: V166 DDL 적용은 통과했으나 앱 기본 스키마를 준비하지 않은 상태라 `/api/health` 503에서 중단했다. 임시 앱 서버와 DB 컨테이너는 정리했다. DB 기반 end-to-end materialization 검증은 미완료다.
+- 격리 PostgreSQL HTTP integration은 최소 애플리케이션 원본 테이블 fixture를 갖춘 뒤 성공했고, 실행 컨테이너/서버는 정리했다. 운영 API 관찰에서 `/api/reports`와 `/api/collection-status`가 Next prerendered 404/장시간 응답을 반환하고 `/api/events`는 200인 배포 라우팅 문제가 확인되어, event endpoint에 opt-in report view를 연결하고 standalone deployment smoke에서 400 JSON validation 응답을 확인하도록 보강 중이다.
 - 운영 DB 연결·migration·배포·실제 source 데이터 변경은 수행하지 않았다. 사용자 요청의 개발·배포를 이행하기 위해 검증 기록을 포함해 release commit/push를 진행한다. `oci` push는 운영 migration과 서비스 재시작을 자동 실행한다.

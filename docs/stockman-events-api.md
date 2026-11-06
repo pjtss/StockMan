@@ -7,9 +7,10 @@
 | Method/경로 | 기능 |
 |---|---|
 | `GET /api/events` | 이벤트 목록. `hours=1|12|24|168`, `from`, `to`, `ticker`, `eventType`, `grade`, `verificationStatus`, `dilutionRisk`, `sort=latest|importance`, `page`, `pageSize`를 지원. 시각창은 SEC `accepted_at`, 뉴스 `published_at` 기준. |
+| `GET /api/events?view=report&hours=12` | 동일 공개 라우트에서 Markdown 호재 보고서를 생성. 보고서 `type`, `date`, `ticker` 필터도 지원하며 `view=report` 생략 시 기존 이벤트 목록 응답을 유지. |
 | `GET /api/events/{id}` | 상세와 원문 메타데이터, 분석 revision, metric 목록. 원문 body는 포함하지 않음. |
 | `GET /api/events/{id}/history` | append-only 상태 변경 이력. |
-| `GET /api/reports?hours=12` | 현재 시각 기준 최근 12시간의 검증된 A/B/C 호재를 DB에서 Markdown으로 재생성. `/api/reports/latest`는 Next.js 정적 segment alias이며 `type=bullish`와 12시간 기본값을 사용. |
+| `GET /api/reports?hours=12` | 현재 시각 기준 최근 12시간의 검증된 A/B/C 호재를 DB에서 Markdown으로 재생성. 배포 호환 경로로 `/api/events?view=report&hours=12`도 제공. |
 | `GET /api/reports?type=bullish&hours=1|12|24|168` | 기간별 검증 호재 보고서. 기본 type=bullish, hours=12. |
 | `GET /api/reports?type=daily&date=YYYY-MM-DD` | KST 달력일 기준 일간 검증 호재 보고서. date 생략 시 현재 KST 날짜. |
 | `GET /api/reports?type=ticker&ticker=INO` | 종목별 영구 이벤트 이력 보고서. ticker 필수, hours를 주면 최근 기간으로 제한. |

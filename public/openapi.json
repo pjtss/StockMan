@@ -794,6 +794,19 @@
                 "REJECTED"
               ]
             }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "report"
+              ],
+              "description": "report이면 공개 보고서 조회 응답을 반환합니다. 생략 시 이벤트 목록 응답."
+            },
+            "description": "report이면 공개 보고서 조회 응답을 반환합니다. 생략 시 이벤트 목록 응답."
           }
         ],
         "security": [],
@@ -803,110 +816,154 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "ok",
-                    "query",
-                    "timezone",
-                    "items",
-                    "total",
-                    "page",
-                    "pageSize",
-                    "hasMore"
-                  ],
-                  "properties": {
-                    "ok": {
-                      "const": true
-                    },
-                    "query": {
+                  "oneOf": [
+                    {
                       "type": "object",
-                      "additionalProperties": true
-                    },
-                    "timezone": {
-                      "type": "string"
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id",
-                          "title",
-                          "eventType",
-                          "verificationStatus",
-                          "sourceUrl"
-                        ],
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "ticker": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "eventType": {
-                            "type": "string"
-                          },
-                          "publishedAt": {
-                            "type": [
-                              "string",
-                              "null"
+                      "required": [
+                        "ok",
+                        "query",
+                        "timezone",
+                        "items",
+                        "total",
+                        "page",
+                        "pageSize",
+                        "hasMore"
+                      ],
+                      "properties": {
+                        "ok": {
+                          "const": true
+                        },
+                        "query": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "title",
+                              "eventType",
+                              "verificationStatus",
+                              "sourceUrl"
                             ],
-                            "format": "date-time"
-                          },
-                          "acceptedAt": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
-                            "format": "date-time"
-                          },
-                          "bullishGrade": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
-                            "enum": [
-                              "A",
-                              "B",
-                              "C",
-                              "EXCLUDED",
-                              null
-                            ]
-                          },
-                          "verificationStatus": {
-                            "type": "string",
-                            "enum": [
-                              "VERIFIED",
-                              "UNVERIFIED",
-                              "REJECTED"
-                            ]
-                          },
-                          "sourceUrl": {
-                            "type": "string",
-                            "format": "uri"
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "ticker": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "eventType": {
+                                "type": "string"
+                              },
+                              "publishedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date-time"
+                              },
+                              "acceptedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date-time"
+                              },
+                              "bullishGrade": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "enum": [
+                                  "A",
+                                  "B",
+                                  "C",
+                                  "EXCLUDED",
+                                  null
+                                ]
+                              },
+                              "verificationStatus": {
+                                "type": "string",
+                                "enum": [
+                                  "VERIFIED",
+                                  "UNVERIFIED",
+                                  "REJECTED"
+                                ]
+                              },
+                              "sourceUrl": {
+                                "type": "string",
+                                "format": "uri"
+                              }
+                            }
                           }
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "pageSize": {
+                          "type": "integer"
+                        },
+                        "hasMore": {
+                          "type": "boolean"
                         }
                       }
                     },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "pageSize": {
-                      "type": "integer"
-                    },
-                    "hasMore": {
-                      "type": "boolean"
+                    {
+                      "type": "object",
+                      "required": [
+                        "ok",
+                        "reportType",
+                        "asOf",
+                        "timezone",
+                        "count",
+                        "markdown",
+                        "items"
+                      ],
+                      "properties": {
+                        "ok": {
+                          "const": true
+                        },
+                        "reportType": {
+                          "type": "string"
+                        },
+                        "asOf": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "timezone": {
+                          "const": "Asia/Seoul"
+                        },
+                        "count": {
+                          "type": "integer"
+                        },
+                        "markdown": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        }
+                      }
                     }
-                  }
+                  ]
                 }
               }
             }

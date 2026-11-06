@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listStockmanEvents } from "@/lib/stockman-events";
+import { GET as getEventsReport } from "../reports/route";
 
 export const dynamic = "force-dynamic";
 const ALLOWED_HOURS = new Set([1, 12, 24, 168]);
@@ -15,6 +16,7 @@ function isoDate(value: string | null) {
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
+  if (params.get("view") === "report") return getEventsReport(request);
   const rawHours = params.get("hours");
   const hours = rawHours === null ? null : Number(rawHours);
   if (hours !== null && (!Number.isInteger(hours) || !ALLOWED_HOURS.has(hours))) return NextResponse.json({ ok: false, error: "INVALID_HOURS", allowed: [...ALLOWED_HOURS] }, { status: 400 });
