@@ -9,7 +9,7 @@ import { resolveSecEdgarRuntimeConfig } from "@/lib/sec-edgar-config";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { loadSecSmallcapTickerTargets } from "@/lib/sec-smallcap-universe";
-import { materializeStockmanSecEvents } from "@/lib/stockman-events";
+import { classifyStockmanEventError, materializeStockmanSecEvents } from "@/lib/stockman-events";
 
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       }
       let eventLedger: Awaited<ReturnType<typeof materializeStockmanSecEvents>> | { status: "FAILED"; errorCode: string };
       try { eventLedger = await materializeStockmanSecEvents(); }
-      catch { eventLedger = { status: "FAILED", errorCode: "EVENT_LEDGER_UNAVAILABLE" }; }
+      catch (error) { eventLedger = { status: "FAILED", errorCode: classifyStockmanEventError(error) }; }
       const webhook = await loadFeatureDiscordWebhook("sec-realtime", ["SEC_DISCORD_WEBHOOK_URL"]);
       let sent = 0;
       let documentCaptured = 0;

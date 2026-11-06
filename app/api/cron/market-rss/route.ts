@@ -7,7 +7,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { describeError, isSchemaError } from "@/lib/error-diagnostics";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
-import { materializeStockmanRssEvents } from "@/lib/stockman-events";
+import { classifyStockmanEventError, materializeStockmanRssEvents } from "@/lib/stockman-events";
 import { getMarketRssCronStatus } from "@/lib/market-rss-cron-status";
 import type { MarketRssSource } from "@/lib/market-rss-sources";
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       const bullish = { skipped: true, reason: "deferred_from_notification_cron" };
       let eventLedger: Awaited<ReturnType<typeof materializeStockmanRssEvents>> | { status: "FAILED"; errorCode: string };
       try { eventLedger = await materializeStockmanRssEvents(); }
-      catch { eventLedger = { status: "FAILED", errorCode: "EVENT_LEDGER_UNAVAILABLE" }; }
+      catch (error) { eventLedger = { status: "FAILED", errorCode: classifyStockmanEventError(error) }; }
       const outcome = getMarketRssCronStatus(ingested.ingestFailureCount, translated);
       const deliveryIncomplete = !notified.webhookConfigured || notified.sent < notified.attempted;
       return { ok: true, mode: "COMMIT", ...outcome, backlogRemaining, degraded: outcome.degraded || deliveryIncomplete || backlogRemaining || eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS", deliveryIncomplete, sources, ingested, translated, notified, bullish, eventLedger };

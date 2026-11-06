@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventIdentityForSec, eventRevisionHash, getStockmanEventTimeWindow, isStockmanEventWithinWindow, multiplyExactDecimalStrings, parseSecAcceptanceTimestamp, renderStockmanEventsMarkdown } from "./stockman-events";
+import { classifyStockmanEventError, eventIdentityForSec, eventRevisionHash, getStockmanEventTimeWindow, isStockmanEventWithinWindow, multiplyExactDecimalStrings, parseSecAcceptanceTimestamp, renderStockmanEventsMarkdown } from "./stockman-events";
 
 describe("Stockman event identity, times, and exact metrics", () => {
   it("converts SEC Eastern acceptance wall time to UTC in standard and daylight time", () => {
@@ -14,6 +14,18 @@ describe("Stockman event identity, times, and exact metrics", () => {
 
   it("normalizes SEC identity to the CIK plus accession natural key", () => {
     expect(eventIdentityForSec("12345", "0001234567-26-000001")).toBe("SEC:0000012345:0001234567-26-000001");
+  });
+
+  it.each([
+    [{ code: "42P01" }, "SCHEMA_TABLE_MISSING"],
+    [{ code: "42703" }, "SCHEMA_COLUMN_MISSING"],
+    [{ code: "23505" }, "UNIQUE_CONFLICT"],
+    [{ code: "23503" }, "FOREIGN_KEY_CONFLICT"],
+    [{ code: "22P02" }, "INVALID_SOURCE_DATA"],
+    [{ code: "08006" }, "DATABASE_UNAVAILABLE"],
+    [{ message: "secret database connection details" }, "DATABASE_ERROR"],
+  ])("maps persistence errors to a safe public code", (error, expected) => {
+    expect(classifyStockmanEventError(error)).toBe(expected);
   });
 
   it("includes both exact 12-hour boundaries and excludes instants outside the window", () => {

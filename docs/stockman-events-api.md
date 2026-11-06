@@ -16,7 +16,7 @@
 | `GET /api/reports?type=ticker&ticker=INO` | 종목별 영구 이벤트 이력 보고서. ticker 필수, hours를 주면 최근 기간으로 제한. |
 | `GET /api/reports?type=dilution&hours=168` | 희석 위험이 기록된 이벤트 보고서. hours 생략 시 전체 보존 이력. |
 | `GET /api/reports?type=collection` | DB에 저장된 SEC/RSS 수집 및 원장 materialization 상태 보고서. |
-| `GET /api/collection-status` | 최신 RSS/SEC automation run의 제한된 상태 정보. |
+| `GET /api/collection-status` | 최신 RSS/SEC automation run의 source/ledger 상태, 실행 시각, fetched/stored/unverified/failed 집계 및 제한된 error code. 원문 오류 메시지·비밀값은 반환하지 않음. |
 | `POST /api/events/collect` | 이미 저장된 원본 SEC 접수 또는 지원 RSS 레코드 하나를 이벤트 ledger로 멱등 반영. 무인증이며 원본 제목·티커·등급·분석 본문 입력은 받지 않음. |
 
 목록 기본 정렬은 최신순, 중요도순은 등급·priority 후 최신순이다. `pageSize`는 1–100, offset은 최대 1,000,000으로 제한한다. 전체 날짜 범위는 과거 이력 검색에 쓰며 `hours`와 동시에 사용할 수 없다. 정확한 상·하한 시각은 inclusive다.

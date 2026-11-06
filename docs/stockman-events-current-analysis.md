@@ -1,7 +1,7 @@
 # Stockman SEC·RSS 호재 영구 저장 시스템 — 현황 분석 및 구현 계획
 
 작성일: 2026-11-06  
-범위: 실제 코드·DB 스키마 조사와 이벤트 ledger 구현 결과. 빌드와 전체 테스트는 통과했다. 격리 DB에 V166을 적용했으나, HTTP smoke용 앱 기본 테이블이 부족해 health 503을 반환했으므로 저장 API 통합 확인은 미완료다. 운영 DB 접속·migration·배포는 아직 수행하지 않았다.
+범위: 실제 코드·DB 스키마 조사와 이벤트 ledger 구현 및 운영 배포 결과. V166은 OCI 배포 workflow에서 적용됐고 report/events/status 공개 GET은 운영에서 HTTP 200 JSON을 반환했다. 2026-11-06 재확인에서 최근 market-rss 실행과 ledger가 FAILED로 나타나 자동 수집 동작은 아직 정상 확인되지 않았다. 운영 데이터를 직접 변경하는 별도 요청은 수행하지 않았다.
 
 ## 1. 요약
 
@@ -101,7 +101,7 @@ V166은 forward-only additive migration이다. 원본 source row를 삭제하거
 3. API: 이벤트 list/detail/history, `/api/reports` (Next.js `/latest` alias 포함), collection-status 공개 GET과 무인증 source-ID materialization POST를 추가했다. 분석 revision 및 이벤트 상태/relatedEventId 편집은 관리자 session API로 보호한다.
 4. 배치: `app/api/cron/sec-edgar/route.ts`와 `app/api/cron/market-rss/route.ts`가 source pipeline 이후 ledger materializer를 best-effort로 호출하고 실패·부분 성공을 automation run 결과에 기록한다. 기존 source rows와 알림 흐름은 ledger 실패로 롤백하지 않는다.
 5. 문서/API surface: `scripts/api-surface.mjs`가 공개 GET schema·query 및 route access 분류를 생성한다. collect POST의 공개 쓰기 범위는 source-ID materialization뿐이다.
-6. 로컬 격리 PostgreSQL에서 V166 DDL과 source fixture 기반 HTTP materialization/idempotency(SEC/RSS 각 2회 호출, events/documents/analyses/history 각 2건)를 확인했다. 운영 migration과 운영 데이터 변경은 승인된 배포 workflow에서만 수행했다.
+6. 로컬 격리 PostgreSQL에서 V166 DDL과 source fixture 기반 HTTP materialization/idempotency(SEC/RSS 각 2회 호출, events/documents/analyses/history 각 2건)를 확인했다. V166 운영 migration 및 코드 반영은 OCI 배포 workflow run `42211364948`에서 성공했다. 운영 공개 GET은 확인했으나 공개 status에서 최신 market-rss ledger가 FAILED여서 실제 운영 source materialization은 미완료 상태다.
 
 ### 7.3 남은 확인 사항 및 운영 승인 경계
 
@@ -118,4 +118,4 @@ V166은 forward-only additive migration이다. 원본 source row를 삭제하거
 - API 무인증 정책: 이벤트 GET와 `POST /api/events/collect`는 인증 불필요. 저장 POST는 SEC accession 또는 허용 RSS provider/source ID만 받고 기존 source table에서 재료화한다. analysis revision 직접 등록은 관리자 세션을 유지한다.
 - 검증: Vitest 전체 306 파일을 31 shard로 실행해 전 shard 통과(일부 skip 포함); 신규 이벤트·timestamp/API/schema 6파일 42건 통과. `npm run typecheck`, `npm run build` (Next.js production, 107 static pages), `npm run docs:check` (185 route/47 public GET, catalog 138 documents), API surface audit, operational schema migration audit, `git diff --check` 통과.
 - 격리 PostgreSQL HTTP integration은 최소 애플리케이션 원본 테이블 fixture를 갖춘 뒤 성공했고, 실행 컨테이너/서버는 정리했다. 운영 API 관찰에서 `/api/reports`와 `/api/collection-status`가 Next prerendered 404/장시간 응답을 반환하고 `/api/events`는 200인 배포 라우팅 문제가 확인되어, event endpoint에 opt-in report view를 연결하고 standalone deployment smoke에서 400 JSON validation 응답을 확인하도록 보강 중이다.
-- 운영 DB 연결·migration·배포·실제 source 데이터 변경은 수행하지 않았다. 사용자 요청의 개발·배포를 이행하기 위해 검증 기록을 포함해 release commit/push를 진행한다. `oci` push는 운영 migration과 서비스 재시작을 자동 실행한다.
+- 운영 migration·배포는 사용자 요청에 따라 OCI release workflow가 수행했고 run `42211364948`의 모든 단계가 성공했다. 운영 source 데이터에 대한 직접 POST/DB 변경은 수행하지 않았다. 2026-11-06 11:45 UTC의 `/api/collection-status`는 `market-rss` sourceStatus=UNVERIFIED, eventLedgerStatus=FAILED, `sec-realtime` UNVERIFIED를 반환했다. event 조회와 report는 HTTP 200이나 조회 0건이다. 상세 row 실패 원인은 기존 공개 DTO가 건수/error code를 숨겨 확인할 수 없으므로 collection status diagnostics를 보강하고 다음 cron 상태에서 분류한다.

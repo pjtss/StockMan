@@ -80,6 +80,23 @@ function formatDecimal(value: bigint, scale: number) {
 
 const EXCHANGE_MARKETS = ["NASDAQ", "NAS", "NYSE", "NYS", "AMEX", "AMS"];
 
+/** Stable, non-sensitive error categories safe for the public collection-status API. */
+export function classifyStockmanEventError(error: unknown) {
+  const code = error && typeof error === "object" && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  if (code === "42P01") return "SCHEMA_TABLE_MISSING";
+  if (code === "42703") return "SCHEMA_COLUMN_MISSING";
+  if (code === "23505") return "UNIQUE_CONFLICT";
+  if (code === "23503") return "FOREIGN_KEY_CONFLICT";
+  if (code === "22P02") return "INVALID_SOURCE_DATA";
+  if (code.startsWith("08")) return "DATABASE_UNAVAILABLE";
+  return "DATABASE_ERROR";
+}
+
+function addFailureCode(counts: Record<string, number>, error: unknown) {
+  const code = classifyStockmanEventError(error);
+  counts[code] = (counts[code] ?? 0) + 1;
+}
+
 async function resolveActiveCommonTicker(tickers: string[], cik: string): Promise<string | null> {
   if (!tickers.length) return null;
   const pool = getPool();
@@ -196,6 +213,7 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
   let stored = 0;
   let unverified = 0;
   let failed = 0;
+  const failureCodes: Record<string, number> = {};
   for (const row of rows.rows) {
     const acceptedAt = parseSecAcceptanceTimestamp(row.accepted);
     const ticker = await resolveActiveCommonTicker(row.tickers || [], row.cik);
@@ -219,9 +237,9 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
         analysis: row.analysis,
       });
       stored++;
-    } catch { failed++; }
+    } catch (error) { failed++; addFailureCode(failureCodes, error); }
   }
-  return { status: failed ? (stored ? "PARTIAL_SUCCESS" : "FAILED") : unverified ? (stored ? "PARTIAL_SUCCESS" : "UNVERIFIED") : "SUCCESS", fetched: rows.rows.length, stored, unverified, failed } as const;
+  return { status: failed ? (stored ? "PARTIAL_SUCCESS" : "FAILED") : unverified ? (stored ? "PARTIAL_SUCCESS" : "UNVERIFIED") : "SUCCESS", fetched: rows.rows.length, stored, unverified, failed, failureCodes } as const;
 }
 
 /** Historical RSS records remain unverified until an official issuer/SEC document is linked. */
@@ -244,6 +262,7 @@ export async function materializeStockmanRssEvents(limit = 500, sourceFilter?: s
      ORDER BY a.updated_at DESC,a.id DESC LIMIT $4`, [EXCHANGE_MARKETS, sourceFilter ?? null, externalIdFilter ?? null, Math.min(2000, Math.max(1, limit))]);
   let stored = 0;
   let failed = 0;
+  const failureCodes: Record<string, number> = {};
   for (const row of result.rows) {
     const poolClient = await pool.connect();
     try {
@@ -284,12 +303,13 @@ export async function materializeStockmanRssEvents(limit = 500, sourceFilter?: s
       }
       await poolClient.query("COMMIT");
       stored++;
-    } catch {
+    } catch (error) {
       await poolClient.query("ROLLBACK");
       failed++;
+      addFailureCode(failureCodes, error);
     } finally { poolClient.release(); }
   }
-  return { status: failed ? (stored ? "PARTIAL_SUCCESS" : "FAILED") : "SUCCESS", fetched: result.rows.length, stored, failed } as const;
+  return { status: failed ? (stored ? "PARTIAL_SUCCESS" : "FAILED") : "SUCCESS", fetched: result.rows.length, stored, failed, failureCodes } as const;
 }
 
 export type StockmanEventQuery = {
@@ -388,13 +408,13 @@ export async function getStockmanEventHistory(id: number) {
 
 export async function listStockmanCollectionStatus() {
   const pool = getPool();
-  const result = await pool.query<{ moduleKey: string; status: string; startedAt: Date; finishedAt: Date | null; eventLedgerStatus: string | null; sourceResults: unknown; submissionCoverage: unknown }>(
+  const result = await pool.query<{ moduleKey: string; status: string; startedAt: Date; finishedAt: Date | null; eventLedger: unknown; sourceResults: unknown; submissionCoverage: unknown }>(
     `SELECT DISTINCT ON (module_key) module_key AS "moduleKey",status,started_at AS "startedAt",finished_at AS "finishedAt",
-       summary->'eventLedger'->>'status' AS "eventLedgerStatus",
+       summary->'eventLedger' AS "eventLedger",
        summary->'ingested'->'sourceResults' AS "sourceResults",
        summary->'submissionCoverage' AS "submissionCoverage"
      FROM automation_runs WHERE module_key IN ('market-rss','sec-realtime') ORDER BY module_key,started_at DESC`);
-  const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; eventLedgerStatus: string; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
+  const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; eventLedgerStatus: string; eventLedger: { status: string; fetched: number | null; stored: number | null; unverified: number | null; failed: number | null; failureCodes: Record<string, number>; errorCode: string | null }; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
     const sourceResults = Array.isArray(row.sourceResults) ? row.sourceResults as Array<Record<string, unknown>> : [];
     const failures = sourceResults.filter((item) => item.ok !== true || ["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus))).length;
     const sourceStatus = sourceResults.length === 0
@@ -404,7 +424,12 @@ export async function listStockmanCollectionStatus() {
           : Number((row.submissionCoverage as Record<string, unknown>).fetchSuccessCikCount ?? 0) > 0 ? "SUCCESS" : "UNVERIFIED"
         : "UNVERIFIED"
       : failures === 0 ? "SUCCESS" : failures < sourceResults.length ? "PARTIAL_SUCCESS" : "FAILED";
-    const ledgerStatus = row.eventLedgerStatus ?? "UNVERIFIED";
+    const rawLedger = row.eventLedger && typeof row.eventLedger === "object" ? row.eventLedger as Record<string, unknown> : {};
+    const ledgerStatus = typeof rawLedger.status === "string" ? rawLedger.status : "UNVERIFIED";
+    const safeCount = (key: string) => typeof rawLedger[key] === "number" && Number.isSafeInteger(rawLedger[key]) && (rawLedger[key] as number) >= 0 ? rawLedger[key] as number : null;
+    const rawFailureCodes = rawLedger.failureCodes && typeof rawLedger.failureCodes === "object" ? rawLedger.failureCodes as Record<string, unknown> : {};
+    const failureCodes = Object.fromEntries(Object.entries(rawFailureCodes).filter(([code, count]) => /^[A-Z][A-Z0-9_]{0,63}$/.test(code) && typeof count === "number" && Number.isSafeInteger(count) && count > 0)) as Record<string, number>;
+    const errorCode = typeof rawLedger.errorCode === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(rawLedger.errorCode) ? rawLedger.errorCode : null;
     const statuses = [sourceStatus, ledgerStatus];
     const overallStatus = statuses.includes("FAILED") ? "FAILED"
       : statuses.includes("PARTIAL_SUCCESS") ? "PARTIAL_SUCCESS"
@@ -414,13 +439,14 @@ export async function listStockmanCollectionStatus() {
       status: overallStatus,
       sourceStatus,
       eventLedgerStatus: ledgerStatus,
+      eventLedger: { status: ledgerStatus, fetched: safeCount("fetched"), stored: safeCount("stored"), unverified: safeCount("unverified"), failed: safeCount("failed"), failureCodes, errorCode },
       sources: sourceResults.map((item) => ({ source: item.source, status: item.ok === true && !["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus)) ? "SUCCESS" : "FAILED" })),
       startedAt: row.startedAt,
       finishedAt: row.finishedAt,
     };
   });
   for (const moduleKey of ["market-rss", "sec-realtime"]) {
-    if (!mapped.some((item) => item.moduleKey === moduleKey)) mapped.push({ moduleKey, status: "UNVERIFIED", sourceStatus: "UNVERIFIED", eventLedgerStatus: "UNVERIFIED", sources: [], startedAt: null, finishedAt: null });
+    if (!mapped.some((item) => item.moduleKey === moduleKey)) mapped.push({ moduleKey, status: "UNVERIFIED", sourceStatus: "UNVERIFIED", eventLedgerStatus: "UNVERIFIED", eventLedger: { status: "UNVERIFIED", fetched: null, stored: null, unverified: null, failed: null, failureCodes: {}, errorCode: null }, sources: [], startedAt: null, finishedAt: null });
   }
   return mapped;
 }

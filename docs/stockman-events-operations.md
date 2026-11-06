@@ -1,5 +1,9 @@
 # Stockman 이벤트 저장·운영·장애 대응
 
+## 배포 및 운영 상태
+
+V166 운영 migration 및 코드 배포는 OCI workflow run `42211364948`에서 Verify, Package, SSH, Upload, Activate 단계 모두 성공했다. 공개 report/events/status endpoint는 HTTP 200 JSON을 반환한다. 2026-11-06 11:45 UTC 관찰에서는 latest `market-rss` event ledger가 FAILED, source가 UNVERIFIED였고 `sec-realtime`도 UNVERIFIED였다. 보고서/최근 이벤트가 0건인 사실만으로 수집 성공으로 판단하지 않는다. `GET /api/collection-status`의 `eventLedger` 집계/error code와 최신 실행 시각을 확인한다.
+
 ## 배포 전제
 
 1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.
@@ -8,7 +12,7 @@
 4. OCI의 기존 market-rss/sec-edgar cron을 재사용한다. route는 기존 `CRON_SECRET` 인증을 계속 요구한다. migration이 준비되지 않으면 event ledger 보조 단계는 FAILED/degraded를 남기고 기존 RSS/SEC 원본을 삭제하지 않는다.
 5. 이벤트 조회 GET은 무인증 공개이며, `POST /api/events/collect`도 무인증으로 기존 원본 ID만 materialize한다. 이 route는 공유 write rate limit을 적용한다. 분석 등록/수정 POST는 관리자 session 없이는 저장하지 않는다.
 
-운영 migration 및 배포는 별도 사전 승인 전 실행하지 않는다. 빌드/test/실행 smoke, deploy workflow, 운영 health/Flyway 확인을 모두 기록해야 배포 완료다.
+운영 migration/배포는 사용자 요청에 따른 OCI release workflow로 적용했다. 후속 운영 직접 DB 변경이나 대량 backfill은 이 배포와 별개이며 사전 승인 없이 수행하지 않는다.
 
 ## 정상 처리
 
@@ -24,7 +28,7 @@
 |---|---|---|
 | `SUCCESS` | source 조회/materialization 실행 완료 | event count와 automation run을 확인 |
 | `PARTIAL_SUCCESS` | 일부 source/row 성공, 일부 실패 또는 미검증 | 실패 단계와 공통 stock master를 구분하고 다음 cron 재시도 확인 |
-| `FAILED` | source 저장 또는 ledger 단계가 실패 | 상세 원인은 내부 automation run에 남기고 503/cron summary 대조. source raw rows는 유지 |
+| `FAILED` | source 저장 또는 ledger 단계가 실패 | 공개 상태에는 민감한 오류 메시지 없이 집계 건수와 허용된 error code만 표시한다. 내부 automation run 상세는 운영 진단에서 대조한다. source raw rows는 유지 |
 | `UNVERIFIED` | 정보가 부족해 자동 확정하지 않음 | 공식 URL/ticker/accepted/published timestamp 보강 후 관리자 review |
 
 재실행은 unique SEC identity, RSS source key, document key 및 revision hash로 중복을 억제한다. materializer/analysis 실패를 “신규 이벤트 0건”이라고 해석하지 않는다. 기존 DB 내용은 수집/API 장애로 삭제하지 않는다.

@@ -1925,7 +1925,7 @@
       "title": "Stockman 이벤트 저장·운영·장애 대응",
       "category": "project-guide",
       "format": "md",
-      "description": "1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.",
+      "description": "V166 운영 migration 및 코드 배포는 OCI workflow run 42211364948에서 Verify, Package, SSH, Upload, Activate 단계 모두 성공했다. 공개 report/events/status endpoint는 HTTP 200 JSON을 반환한다. 2026-11-06 11:45 UTC 관찰에서는 latest market-rss event ledger가 FAILED, source가 UNVERIFIED였고 sec-realtime도 UNVERIFIED였다. 보고서/최근 이벤트가 0건인 사실만으로 수집 성공으로 판단하지 않는다. GET /api/collection-status의 eventLedger ",
       "url": "/manuals/stockman-events-operations.md",
       "relatedPaths": [],
       "sourcePath": "docs/stockman-events-operations.md",

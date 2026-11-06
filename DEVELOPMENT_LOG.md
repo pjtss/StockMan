@@ -8573,3 +8573,22 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `/api/reports`와 collection-status의 직접 route 404/지연 원인은 운영 artifact/server routing에서 추가 추적한다. report view smoke와 loopback bind는 release workflow의 구조 게이트로 유지한다.
 
 \r\n
+## [2026-11-06] 운영 이벤트 ledger 실패 진단 정보 공개 보강
+
+### 목적 및 범위
+- 배포 뒤 운영 `/api/collection-status`에서 market-rss `eventLedgerStatus=FAILED`, source `UNVERIFIED`, 12시간 report/events 0건을 확인했다. 기존 상태 DTO는 `fetched/stored/failed/errorCode`를 숨겨 실제 수집 실패와 정상 0건을 구분하기 어려웠다.
+- event materializer의 개별 저장 실패를 PostgreSQL 원문 오류 없이 고정 코드로 집계하고, 공개 status/report에 실행 시각 및 제한된 실패 건수를 제공한다. 실패 메세지·접속정보는 공개하지 않는다.
+
+### 변경
+- `lib/stockman-events.ts`: DB error classifier, SEC/RSS row 실패코드 집계, collection status의 안전한 eventLedger summary 조회/검증.
+- SEC/RSS cron route: materializer query-level 예외도 동일한 안전 error code로 기록.
+- API 문서와 현황/운영 문서: 실제 OCI 배포 성공과 관측한 FAILED 상태를 반영.
+- 테스트: DB 코드 분류 및 민감 메시지 비노출 분류 7개 추가.
+
+### 검증 및 배포
+- `npm test -- --run lib/stockman-events.test.ts`: 22 tests passed.
+- 전체 `npm run deploy:verify` 통과: production build 107 pages, standalone API/Chrome desktop·mobile smoke, Vitest 307 files(1 skipped), 1,597 passed/3 skipped, typecheck, docs/migration V166, API surface, auth/KIS/cron 감사 통과. `git diff --check` 통과. 운영 status 재확인은 새 배포와 다음 cron 실행 뒤 수행한다. 이 변경 시점에는 운영 데이터 쓰기/수동 수집 POST를 하지 않았다.
+- 커밋·푸시·배포: 미실행.
+
+### 남은 위험 및 다음 확인
+- 다음 배포 뒤 한 번 이상의 자동 cron 실행에서 `eventLedger.fetched/stored/failed/failureCodes`를 읽어 구체 오류를 확인하고, 오류를 수정한 후 `SUCCESS` 또는 정당한 `UNVERIFIED` 상태와 운영 데이터 누적을 확인한다.
