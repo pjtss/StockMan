@@ -11,33 +11,102 @@ import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { loadSecSmallcapTickerTargets } from "@/lib/sec-smallcap-universe";
 import { classifyStockmanEventError, materializeStockmanSecEvents } from "@/lib/stockman-events";
 
+async function runSecRssCandidateSync(excludedCiks: string[] = []) {
+  return withAutomationRun("sec-edgar", async () => {
+    let pendingCiks: string[];
+    try {
+      pendingCiks = await loadPendingSecRssIssuerCiks(Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 10));
+    } catch (error) {
+      return {
+        ok: false,
+        mode: "COMMIT",
+        submissionCoverage: { candidateLookupOk: false, candidateCikCount: 0, rssOnlyCikCount: 0, fetchSuccessCikCount: 0, fetchFailureCikCount: 0, submissionCount: 0, insertedSubmissionCount: 0 },
+        results: [],
+        failedCikCount: 0,
+        errorCode: describeError(error).errorCode,
+      };
+    }
+    const configuredSet = new Set(excludedCiks);
+    const rssCandidateCiks = pendingCiks.filter((cik) => !configuredSet.has(cik));
+    const results = [];
+    for (const cik of rssCandidateCiks) {
+      try {
+        const submissions = await syncSecCompany(cik);
+        results.push({ cik, scope: "SEC_RSS_CANDIDATE", ok: submissions.ok, submissions });
+      } catch (error) {
+        results.push({ cik, scope: "SEC_RSS_CANDIDATE", ok: false, ...describeError(error) });
+      }
+    }
+    let eventLedger: Awaited<ReturnType<typeof materializeStockmanSecEvents>> | { status: "FAILED"; errorCode: string };
+    try { eventLedger = await materializeStockmanSecEvents(); }
+    catch (error) { eventLedger = { status: "FAILED", errorCode: classifyStockmanEventError(error) }; }
+    const successful = results.filter((item) => item.ok && "submissions" in item);
+    const failedCikCount = results.length - successful.length;
+    return {
+      ok: failedCikCount === 0 && eventLedger.status !== "FAILED" && eventLedger.status !== "PARTIAL_SUCCESS",
+      mode: "COMMIT",
+      submissionCoverage: {
+        candidateLookupOk: true,
+        candidateCikCount: pendingCiks.length,
+        rssOnlyCikCount: rssCandidateCiks.length,
+        fetchSuccessCikCount: successful.length,
+        fetchFailureCikCount: failedCikCount,
+        submissionCount: successful.reduce((sum, item) => sum + Number("submissions" in item ? item.submissions?.submissions || 0 : 0), 0),
+        insertedSubmissionCount: successful.reduce((sum, item) => sum + Number("submissions" in item ? item.submissions?.inserted || 0 : 0), 0),
+      },
+      results,
+      failedCikCount,
+      eventLedger,
+      degraded: eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS",
+    };
+  });
+}
+
+type SecRssCandidateRun = Awaited<ReturnType<typeof runSecRssCandidateSync>> | { ok: true; skipped: true; reason: string } | { ok: false; errorCode: string };
+
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   try {
-    const settings = await loadFeatureModuleSettings("sec-realtime");
-    if (!settings.enabled) { await recordSkippedAutomationRun("sec-realtime", "disabled"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "disabled" }); }
-    if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("sec-realtime", "outside_schedule"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" }); }
+    const [settings, rssSettings] = await Promise.all([loadFeatureModuleSettings("sec-realtime"), loadFeatureModuleSettings("sec-edgar")]);
+    const realtimeActive = settings.enabled && isWithinSchedule(settings, new Date());
+    const runtime = resolveSecEdgarRuntimeConfig(settings.featureSettings);
+    const smallcapTargets = realtimeActive && runtime.smallcapUniverse ? await loadSecSmallcapTickerTargets() : [];
+    const configuredCiks = realtimeActive ? (runtime.smallcapUniverse ? [...new Set(smallcapTargets.map((target) => target.cik))] : runtime.ciks) : [];
+    let rssCandidateRun: SecRssCandidateRun;
+    if (!rssSettings.enabled) {
+      await recordSkippedAutomationRun("sec-edgar", "disabled");
+      rssCandidateRun = { ok: true, skipped: true, reason: "disabled" };
+    } else if (!isWithinSchedule(rssSettings, new Date())) {
+      await recordSkippedAutomationRun("sec-edgar", "outside_schedule");
+      rssCandidateRun = { ok: true, skipped: true, reason: "outside_schedule" };
+    } else {
+      try { rssCandidateRun = await runSecRssCandidateSync(configuredCiks); }
+      catch (error) { rssCandidateRun = { ok: false, errorCode: describeError(error).errorCode }; }
+    }
+    if (!settings.enabled) {
+      await recordSkippedAutomationRun("sec-realtime", "disabled");
+      const skipped = { ok: true, mode: "COMMIT", skipped: true, reason: "disabled" };
+      return NextResponse.json({ ...("skipped" in rssCandidateRun && rssCandidateRun.skipped ? skipped : { ok: rssCandidateRun.ok, mode: "COMMIT" }), secRealtime: skipped, secEdgar: rssCandidateRun, ...(!rssCandidateRun.ok && "errorCode" in rssCandidateRun ? { errorCode: rssCandidateRun.errorCode } : {}) }, { status: rssCandidateRun.ok ? 200 : 503 });
+    }
+    if (!realtimeActive) {
+      await recordSkippedAutomationRun("sec-realtime", "outside_schedule");
+      const skipped = { ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" };
+      return NextResponse.json({ ...("skipped" in rssCandidateRun && rssCandidateRun.skipped ? skipped : { ok: rssCandidateRun.ok, mode: "COMMIT" }), secRealtime: skipped, secEdgar: rssCandidateRun, ...(!rssCandidateRun.ok && "errorCode" in rssCandidateRun ? { errorCode: rssCandidateRun.errorCode } : {}) }, { status: rssCandidateRun.ok ? 200 : 503 });
+    }
     const result = await withAutomationRun("sec-realtime", async () => {
-      const runtime = resolveSecEdgarRuntimeConfig(settings.featureSettings);
       const analysisRetries = await retryFailedSecCodexAnalyses();
-      const smallcapTargets = runtime.smallcapUniverse ? await loadSecSmallcapTickerTargets() : [];
-      const configuredCiks = runtime.smallcapUniverse ? [...new Set(smallcapTargets.map((target) => target.cik))] : runtime.ciks;
-      const rssCandidateCiks = await loadPendingSecRssIssuerCiks(Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 10));
-      const configuredSet = new Set(configuredCiks);
-      const rssOnlyCiks = rssCandidateCiks.filter((cik) => !configuredSet.has(cik));
-      const ciks = [...new Set([...configuredCiks, ...rssOnlyCiks])];
+      const ciks = configuredCiks;
       const { syncXbrl, discordBatch } = runtime;
       const results = [];
       for (const cik of ciks) {
-        const configured = configuredSet.has(cik);
         try {
           const submissions = await syncSecCompany(cik);
-          const facts = configured && syncXbrl ? await syncSecCompanyFacts(cik) : null;
-          const documents = configured && submissions.ok ? await collectMissingSecCompanyDocuments(cik) : null;
-          results.push({ cik, scope: configured ? "CONFIGURED" : "SEC_RSS_CANDIDATE", ok: submissions.ok && (facts == null || facts.ok) && (documents == null || documents.failed.length === 0), submissions, facts, documents });
+          const facts = syncXbrl ? await syncSecCompanyFacts(cik) : null;
+          const documents = submissions.ok ? await collectMissingSecCompanyDocuments(cik) : null;
+          results.push({ cik, scope: "CONFIGURED", ok: submissions.ok && (facts == null || facts.ok) && (documents == null || documents.failed.length === 0), submissions, facts, documents });
         } catch (error) {
           const diagnostics = describeError(error);
-          results.push({ cik, scope: configured ? "CONFIGURED" : "SEC_RSS_CANDIDATE", ok: false, ...diagnostics });
+          results.push({ cik, scope: "CONFIGURED", ok: false, ...diagnostics });
         }
       }
       let eventLedger: Awaited<ReturnType<typeof materializeStockmanSecEvents>> | { status: "FAILED"; errorCode: string };
@@ -64,9 +133,6 @@ export async function POST(request: Request) {
       const failedFetches = results.length - successfulFetches.length;
       const submissionCoverage = {
         configuredCikCount: configuredCiks.length,
-        rssCandidateCikCount: rssCandidateCiks.length,
-        rssOnlyCikCount: rssOnlyCiks.length,
-        requestedCikCount: ciks.length,
         fetchSuccessCikCount: successfulFetches.length,
         fetchFailureCikCount: failedFetches,
         submissionCount: successfulFetches.reduce((sum, item) => sum + Number(item.submissions?.submissions || 0), 0),
@@ -74,7 +140,7 @@ export async function POST(request: Request) {
       };
       return { ok: true, mode: "COMMIT", configuredCikCount: configuredCiks.length, submissionCoverage, smallcapUniverse: runtime.smallcapUniverse, syncXbrl, discordBatch, analysisRetries, results, failedCikCount: results.filter((item) => !item.ok).length, documentCaptured, documentCaptureFailed, discordSent: sent, webhookConfigured: Boolean(webhook), eventLedger, degraded: eventLedger.status === "FAILED" || eventLedger.status === "PARTIAL_SUCCESS" };
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, ok: result.ok && rssCandidateRun.ok, secEdgar: rssCandidateRun, ...(!rssCandidateRun.ok && "errorCode" in rssCandidateRun ? { errorCode: rssCandidateRun.errorCode } : {}) }, { status: result.failedCikCount > 0 || !rssCandidateRun.ok ? 503 : 200 });
   } catch (error) {
     const diagnostics = describeError(error);
     return NextResponse.json({ ok: false, mode: "COMMIT", stage: diagnostics.errorCode === "SCHEMA_TABLE_MISSING" ? "load_feature_settings" : "pipeline", ...diagnostics }, { status: isSchemaError(error) ? 503 : 500 });

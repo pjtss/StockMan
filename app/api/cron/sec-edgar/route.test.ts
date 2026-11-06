@@ -84,8 +84,8 @@ describe("POST /api/cron/sec-edgar RSS candidate coverage", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.submissionCoverage).toMatchObject({ configuredCikCount: 0, rssCandidateCikCount: 1, rssOnlyCikCount: 1, requestedCikCount: 1, fetchSuccessCikCount: 1, fetchFailureCikCount: 0, submissionCount: 1, insertedSubmissionCount: 1 });
-    expect(body.results[0]).toMatchObject({ cik: CIK_A, scope: "SEC_RSS_CANDIDATE" });
+    expect(body.secEdgar.submissionCoverage).toMatchObject({ candidateLookupOk: true, candidateCikCount: 1, rssOnlyCikCount: 1, fetchSuccessCikCount: 1, fetchFailureCikCount: 0, submissionCount: 1, insertedSubmissionCount: 1 });
+    expect(body.secEdgar.results[0]).toMatchObject({ cik: CIK_A, scope: "SEC_RSS_CANDIDATE" });
     expect(mocks.syncSecCompany).toHaveBeenCalledWith(CIK_A);
     expect(mocks.syncSecCompanyFacts).not.toHaveBeenCalled();
     expect(mocks.collectMissingSecCompanyDocuments).not.toHaveBeenCalled();
@@ -99,11 +99,27 @@ describe("POST /api/cron/sec-edgar RSS candidate coverage", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.submissionCoverage).toMatchObject({ configuredCikCount: 1, rssCandidateCikCount: 2, rssOnlyCikCount: 1, requestedCikCount: 2 });
-    expect(mocks.syncSecCompany.mock.calls.map(([cik]) => cik)).toEqual([CIK_A, CIK_B]);
+    expect(body.submissionCoverage).toMatchObject({ configuredCikCount: 1, fetchSuccessCikCount: 1, fetchFailureCikCount: 0 });
+    expect(body.secEdgar.submissionCoverage).toMatchObject({ candidateCikCount: 2, rssOnlyCikCount: 1, fetchSuccessCikCount: 1 });
+    expect(mocks.syncSecCompany.mock.calls.map(([cik]) => cik)).toEqual([CIK_B, CIK_A]);
     expect(mocks.syncSecCompanyFacts.mock.calls.map(([cik]) => cik)).toEqual([CIK_A]);
     expect(mocks.collectMissingSecCompanyDocuments.mock.calls.map(([cik]) => cik)).toEqual([CIK_A]);
-    expect(body.results.map((result: { scope: string }) => result.scope)).toEqual(["CONFIGURED", "SEC_RSS_CANDIDATE"]);
+    expect(body.results.map((result: { scope: string }) => result.scope)).toEqual(["CONFIGURED"]);
+  });
+
+  it("runs the RSS issuer candidate schedule when configured SEC realtime is outside its schedule", async () => {
+    mocks.isWithinSchedule.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    mocks.loadPendingSecRssIssuerCiks.mockResolvedValue([CIK_A]);
+
+    const response = await POST(new Request("https://stockman.example/api/cron/sec-edgar", { method: "POST", headers: { "x-cron-secret": "valid" } }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.secRealtime).toMatchObject({ skipped: true, reason: "outside_schedule" });
+    expect(body.secEdgar.submissionCoverage).toMatchObject({ candidateLookupOk: true, candidateCikCount: 1, fetchSuccessCikCount: 1 });
+    expect(mocks.syncSecCompany).toHaveBeenCalledWith(CIK_A);
+    expect(mocks.syncSecCompanyFacts).not.toHaveBeenCalled();
+    expect(mocks.collectMissingSecCompanyDocuments).not.toHaveBeenCalled();
   });
 
   it("does not query candidates outside the configured SEC schedule", async () => {
@@ -123,8 +139,8 @@ describe("POST /api/cron/sec-edgar RSS candidate coverage", () => {
 
     const response = await POST(new Request("https://stockman.example/api/cron/sec-edgar", { method: "POST", headers: { "x-cron-secret": "valid" } }));
 
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toMatchObject({ ok: false, errorCode: "DATABASE_ERROR" });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ ok: false, errorCode: "DATABASE_ERROR", secEdgar: { submissionCoverage: { candidateLookupOk: false } } });
     expect(mocks.syncSecCompany).not.toHaveBeenCalled();
   });
 });

@@ -19,6 +19,11 @@ describe("Stockman event identity, times, and exact metrics", () => {
     [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 3, fetchFailureCikCount: 2 } }, "PARTIAL_SUCCESS"],
     [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 0, fetchFailureCikCount: 2 } }, "FAILED"],
     [{ moduleKey: "sec-realtime", submissionCoverage: { fetchSuccessCikCount: 0, fetchFailureCikCount: 0 } }, "UNVERIFIED"],
+    [{ moduleKey: "sec-edgar", submissionCoverage: { candidateLookupOk: true, fetchSuccessCikCount: 0, fetchFailureCikCount: 0 } }, "SUCCESS"],
+    [{ moduleKey: "sec-edgar", submissionCoverage: { candidateLookupOk: true, fetchSuccessCikCount: 1, fetchFailureCikCount: 1 } }, "PARTIAL_SUCCESS"],
+    [{ moduleKey: "sec-edgar", submissionCoverage: { candidateLookupOk: true, fetchSuccessCikCount: 0, fetchFailureCikCount: 1 } }, "FAILED"],
+    [{ moduleKey: "sec-edgar", submissionCoverage: { candidateLookupOk: false, fetchSuccessCikCount: 0, fetchFailureCikCount: 0 } }, "FAILED"],
+    [{ moduleKey: "sec-edgar", submissionCoverage: { fetchSuccessCikCount: 0, fetchFailureCikCount: 0 } }, "UNVERIFIED"],
   ])("classifies source collection coverage %#", (input, expected) => {
     expect(getStockmanCollectionSourceStatus({ sourceResults: [], submissionCoverage: null, rssIngestFailureCount: null, ...input })).toBe(expected);
   });

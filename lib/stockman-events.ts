@@ -437,6 +437,16 @@ export function getStockmanCollectionSourceStatus(input: { moduleKey: string; so
     if (failures > 0) return successes > 0 ? "PARTIAL_SUCCESS" : "FAILED";
     return successes > 0 ? "SUCCESS" : "UNVERIFIED";
   }
+  if (input.moduleKey === "sec-edgar" && input.submissionCoverage && typeof input.submissionCoverage === "object") {
+    const coverage = input.submissionCoverage as Record<string, unknown>;
+    if (coverage.candidateLookupOk === false) return "FAILED";
+    if (coverage.candidateLookupOk !== true) return "UNVERIFIED";
+    const successes = safeCount(coverage.fetchSuccessCikCount);
+    const failures = safeCount(coverage.fetchFailureCikCount);
+    if (successes === null || failures === null) return "UNVERIFIED";
+    if (failures > 0) return successes > 0 ? "PARTIAL_SUCCESS" : "FAILED";
+    return "SUCCESS";
+  }
   if (results.length === 0) return "UNVERIFIED";
   const failures = results.filter((item) => item.ok !== true || ["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus))).length;
   return failures === 0 ? "SUCCESS" : failures < results.length ? "PARTIAL_SUCCESS" : "FAILED";
@@ -454,13 +464,19 @@ export async function listStockmanCollectionStatus() {
               latest.summary->'eventLedger' AS "eventLedger",latest.summary->'ingested'->'sourceResults' AS "sourceResults",
               latest.summary->'submissionCoverage' AS "submissionCoverage",latest.summary->'ingested'->>'ingestFailureCount' AS "rssIngestFailureCount",
               latest.summary->'ingested'->>'inserted' AS "rssInsertedCount"
-         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 1) latest
+         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='market-rss' AND status <> 'SKIPPED' ORDER BY started_at DESC LIMIT 1) latest
        UNION ALL
        SELECT 'sec-realtime'::text AS "moduleKey",latest.status,latest.started_at AS "startedAt",latest.finished_at AS "finishedAt",
               latest.summary->'eventLedger' AS "eventLedger",latest.summary->'ingested'->'sourceResults' AS "sourceResults",
               latest.summary->'submissionCoverage' AS "submissionCoverage",latest.summary->'ingested'->>'ingestFailureCount' AS "rssIngestFailureCount",
               latest.summary->'ingested'->>'inserted' AS "rssInsertedCount"
-         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='sec-realtime' ORDER BY started_at DESC LIMIT 1) latest`);
+         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='sec-realtime' AND status <> 'SKIPPED' ORDER BY started_at DESC LIMIT 1) latest
+       UNION ALL
+       SELECT 'sec-edgar'::text AS "moduleKey",latest.status,latest.started_at AS "startedAt",latest.finished_at AS "finishedAt",
+              latest.summary->'eventLedger' AS "eventLedger",NULL::jsonb AS "sourceResults",
+              latest.summary->'submissionCoverage' AS "submissionCoverage",NULL::text AS "rssIngestFailureCount",
+              NULL::text AS "rssInsertedCount"
+         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='sec-edgar' AND status <> 'SKIPPED' ORDER BY started_at DESC LIMIT 1) latest`);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -468,7 +484,7 @@ export async function listStockmanCollectionStatus() {
   } finally {
     client.release();
   }
-  const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; sourceCoverage: Record<string, number | null> | null; eventLedgerStatus: string; eventLedger: { status: string; fetched: number | null; stored: number | null; unverified: number | null; failed: number | null; failureCodes: Record<string, number>; errorCode: string | null }; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
+  const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; sourceCoverage: Record<string, number | boolean | null> | null; eventLedgerStatus: string; eventLedger: { status: string; fetched: number | null; stored: number | null; unverified: number | null; failed: number | null; failureCodes: Record<string, number>; errorCode: string | null }; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
     const sourceResults = Array.isArray(row.sourceResults) ? row.sourceResults as Array<Record<string, unknown>> : row.sourceResults && typeof row.sourceResults === "object" ? ((row.sourceResults as Record<string, unknown>).sample as Array<Record<string, unknown>> ?? []) : [];
     const sourceStatus = getStockmanCollectionSourceStatus({ moduleKey: row.moduleKey, sourceResults: row.sourceResults, submissionCoverage: row.submissionCoverage, rssIngestFailureCount: row.rssIngestFailureCount === null ? null : Number(row.rssIngestFailureCount) });
     const compactSourceCount = row.sourceResults && typeof row.sourceResults === "object" && !Array.isArray(row.sourceResults) ? Number((row.sourceResults as Record<string, unknown>).count) : NaN;
@@ -476,6 +492,8 @@ export async function listStockmanCollectionStatus() {
       ? { sourceCount: Number.isSafeInteger(compactSourceCount) && compactSourceCount >= 0 ? compactSourceCount : Array.isArray(row.sourceResults) ? sourceResults.length : null, ingestFailureCount: row.rssIngestFailureCount === null ? null : Number(row.rssIngestFailureCount), insertedArticleCount: row.rssInsertedCount === null ? null : Number(row.rssInsertedCount) }
       : row.moduleKey === "sec-realtime" && row.submissionCoverage && typeof row.submissionCoverage === "object"
         ? Object.fromEntries(["configuredCikCount", "rssCandidateCikCount", "rssOnlyCikCount", "requestedCikCount", "fetchSuccessCikCount", "fetchFailureCikCount", "submissionCount", "insertedSubmissionCount"].map((key) => { const value = Number((row.submissionCoverage as Record<string, unknown>)[key]); return [key, Number.isSafeInteger(value) && value >= 0 ? value : null]; }))
+        : row.moduleKey === "sec-edgar" && row.submissionCoverage && typeof row.submissionCoverage === "object"
+          ? Object.fromEntries(["candidateLookupOk", "candidateCikCount", "rssOnlyCikCount", "fetchSuccessCikCount", "fetchFailureCikCount", "submissionCount", "insertedSubmissionCount"].map((key) => { const raw = (row.submissionCoverage as Record<string, unknown>)[key]; const value = Number(raw); return [key, key === "candidateLookupOk" ? raw === true || raw === false ? raw : null : Number.isSafeInteger(value) && value >= 0 ? value : null]; }))
         : null;
     const rawLedger = row.eventLedger && typeof row.eventLedger === "object" ? row.eventLedger as Record<string, unknown> : {};
     const ledgerStatus = typeof rawLedger.status === "string" ? rawLedger.status : "UNVERIFIED";

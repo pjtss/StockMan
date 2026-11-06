@@ -8701,3 +8701,19 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **문서/다음 단계**: `docs/stockman-events-operations.md`에 최신 공개 status와 정확한 건수를 추가했다. 다음 실제 활성 sec-realtime 실행에서 source coverage, SEC accession accepted time, event ledger 저장/멱등성 및 12시간 조회를 확인한다. 이번 턴에는 운영 변경과 배포를 하지 않았다.
 - **검증**: 문서 변경 후 `npm run deploy:verify` 종료코드 0; production build, runtime/API/browser smoke, Vitest 309 files passed/1 skipped (1,614 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron gates 모두 통과.
 - **SEC cron 회귀 테스트 보강**: route 전용 test가 없던 것을 확인해 `app/api/cron/sec-edgar/route.test.ts`를 추가했다. RSS issuer CIK metadata-only 처리, configured/RSS CIK union과 dedupe, RSS 후보에 XBRL/full-document collector를 적용하지 않는 경계, outside-schedule skip, 후보 query failure의 500 구분을 검증한다. focused Vitest 1 file/4 tests 통과; 전체 `npm run deploy:verify`도 종료코드 0으로 통과(310 files passed/1 skipped; 1,618 passed/3 skipped; build/runtime/browser/typecheck/docs/migration/API/auth/KIS/cron gates). 운영 설정/DB에는 영향 없음.
+## [2026-11-07] SEC RSS issuer sync schedule 분리 및 collection-status 신뢰성 보강
+
+### 목적 및 원인
+- 2026-11-06 read-only 운영 점검에서 SEC feed/source는 신규 항목을 제공했으나 SEC event ledger는 비어 있었고, 최신 SKIPPED automation run이 앞선 실제 RSS 성공 상태를 가려 collection-status가 UNVERIFIED로 보이는 문제를 확인했다.
+- SEC RSS 후보 Submissions 수집은 module registry의 sec-edgar schedule, 설정 CIK의 확장 SEC 작업은 sec-realtime schedule을 각각 적용해 주말에도 candidate coverage를 수행하고 서로 다른 실행 범위를 유지한다.
+
+### 변경
+- app/api/cron/sec-edgar/route.ts 및 테스트: RSS issuer 후보 동기화를 sec-edgar automation run으로 분리, configured CIK 중복 동기화 제외, 후보 모듈 조회/동기화 실패를 coverage와 HTTP 503으로 반환. 기존 sec-realtime schedule에서는 설정 CIK/XBRL/문서 분석 흐름 유지.
+- lib/stockman-events.ts 및 테스트: collection status에 sec-edgar coverage를 분류하고 최신 non-SKIPPED run을 RSS/SEC 모듈별로 표시. 후보 lookup 성공 후 후보 0건은 SUCCESS로 구분.
+- 이벤트 API/운영 문서 갱신. 운영 DB 직접 변경, cron 수동 호출, backfill 없음.
+
+### 검증 및 배포 상태
+- SEC cron 및 event collection status focused tests 43/43 통과, npm run typecheck 및 git diff --check 통과.
+- 최초 typecheck에서 union 타입의 skipped 속성 narrowing 오류 2건 발견했으며 속성 존재 여부 narrowing으로 수정했다.
+- 최종 코드 반영 후 npm run deploy:verify 종료코드 0: production build, local runtime/API/browser smoke, Vitest 310 files passed/1 skipped (1,624 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron gates 통과.
+- 변경은 feature branch에 커밋 준비 상태이며, 운영 OCI 배포와 실제 운영 schedule/SEC accession 검증은 별도 승인을 기다린다. 운영 DB 직접 변경, cron 수동 호출, backfill은 하지 않았다.
