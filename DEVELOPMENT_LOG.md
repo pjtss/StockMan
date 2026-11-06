@@ -8733,3 +8733,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - OCI 최초 schedule 분리 배포: commit 7163b07f, Actions run 42259771792 성공(verify/package/upload/activate 전체 success). 운영 GET은 health OK였으나 SEC event normalization은 미검증이어서 후속 수정으로 이어졌다.
 - accession 전용 경로 focused tests 4 files/50 tests 통과 및 전체 npm run deploy:verify 종료코드 0. Production build, local runtime/browser smoke, Vitest 311 files passed/1 skipped (1,627 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron gates 통과.
 - 새 코드 배포는 별도 commit/OCI workflow로 이어간다. 이번 수정에서 운영 DB 직접 변경, 수동 cron 호출, backfill은 하지 않았다.
+
+### SEC Submissions UTC acceptance timestamp normalization
+- **Root cause**: read-only public coverage after commit `8dea51b3` showed 33 SEC submissions stored, but zero normalized SEC events. The official `data.sec.gov/submissions/CIK0000351998.json` response provided DAIO accession `0001654954-26-009591` with ISO UTC `acceptanceDateTime` (observed `2026-11-06T17:58:58.000Z`), while the event parser/query accepted only legacy 14-digit Eastern wall time.
+- **Change**: accept validated ISO UTC `Z` timestamps unchanged while preserving the legacy ET conversion; let the materializer query both formats. Add parser coverage and update operations guidance. Null/malformed timestamps continue to fail closed.
+- **Scope and verification**: local code/docs/tests were verified before release. No production DB write, manual cron, backfill, or deletion was performed.
+- **Regression detection / remaining risk**: tests pin both the ISO UTC instant and legacy DST conversion and reject malformed values. After deployment, use public read-only status/events GETs to verify materializer stored counts and SEC event visibility; if those stay zero, inspect the next surfaced status/error without treating zero as successful normalization.

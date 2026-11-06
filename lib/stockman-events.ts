@@ -7,7 +7,12 @@ import { classifyRssTimestamp } from "./disclosure-timestamp-precision";
 export const STOCKMAN_EVENT_ANALYSIS_VERSION = "stockman-event-analysis.v1";
 
 export function parseSecAcceptanceTimestamp(value: string | null | undefined): Date | null {
-  if (!value || !/^\d{14}$/.test(value)) return null;
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 19) !== value.slice(0, 19) ? null : parsed;
+  }
+  if (!/^\d{14}$/.test(value)) return null;
   const year = Number(value.slice(0, 4));
   const month = Number(value.slice(4, 6));
   const day = Number(value.slice(6, 8));
@@ -18,7 +23,7 @@ export function parseSecAcceptanceTimestamp(value: string | null | undefined): D
   const wallClock = new Date(wallClockUtc);
   if (wallClock.getUTCFullYear() !== year || wallClock.getUTCMonth() !== month - 1 || wallClock.getUTCDate() !== day
     || wallClock.getUTCHours() !== hour || wallClock.getUTCMinutes() !== minute || wallClock.getUTCSeconds() !== second) return null;
-  // SEC acceptanceDateTime is an Eastern Time wall clock without an offset.
+  // Legacy 14-digit SEC acceptanceDateTime is an Eastern Time wall clock without an offset.
   // Derive the offset using IANA rules at the filing instant (EDGAR accepts filings
   // during the day, away from the DST transition boundary).
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -219,7 +224,7 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
      WHERE ($3::text IS NULL OR s.accession=$3)
        AND (NOT EXISTS (SELECT 1 FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession)
        OR GREATEST(s.updated_at,COALESCE(d.fetched_at,s.updated_at),COALESCE(q.analyzed_at,s.updated_at)) > COALESCE((SELECT x.source_updated_at FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession),'-infinity'::timestamptz))
-       AND s.acceptance_datetime ~ '^[0-9]{14}$'
+       AND s.acceptance_datetime ~ '^([0-9]{14}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z)$'
        AND EXISTS (SELECT 1 FROM us_common_stock_universe u WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK' AND UPPER(u.market)=ANY($2::text[]) AND UPPER(u.code)=ANY(SELECT UPPER(unnest(c.tickers))))
      ORDER BY s.acceptance_datetime DESC NULLS LAST,s.accession LIMIT $1`, [Math.min(2000, Math.max(1, limit)), EXCHANGE_MARKETS, accessionFilter ?? null]);
   let stored = 0;

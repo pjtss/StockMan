@@ -33,7 +33,11 @@ describe("Stockman event identity, times, and exact metrics", () => {
     expect(parseSecAcceptanceTimestamp("20260706123456")?.toISOString()).toBe("2026-07-06T16:34:56.000Z");
   });
 
-  it.each([null, undefined, "202611061234", "20260230123456", "not-a-date"])(
+  it("preserves SEC Submissions ISO UTC acceptance timestamps", () => {
+    expect(parseSecAcceptanceTimestamp("2026-11-06T17:58:58.000Z")?.toISOString()).toBe("2026-11-06T17:58:58.000Z");
+  });
+
+  it.each([null, undefined, "202611061234", "20260230123456", "2026-02-30T12:34:56.000Z", "2026-11-06T17:58:58", "not-a-date"])(
     "rejects malformed acceptance timestamp %s",
     (value) => expect(parseSecAcceptanceTimestamp(value)).toBeNull(),
   );
