@@ -218,7 +218,7 @@ async function verifyRuntime() {
   // standalone server when the smoke check times out and cleanup targets the
   // short-lived command shell instead of the actual server process.
   const child = spawn(process.execPath, args, {
-    env: { ...process.env, ...readLocalEnvFile(), PORT: port, NODE_ENV: "production" },
+    env: { ...process.env, ...readLocalEnvFile(), HOSTNAME: "127.0.0.1", PORT: port, NODE_ENV: "production" },
     stdio: ["ignore", "pipe", "pipe"],
     shell: false,
     detached: false,
