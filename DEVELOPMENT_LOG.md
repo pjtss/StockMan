@@ -8647,3 +8647,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - SEC 공시 RSS 기사에는 `published_at`이 있으나 정규 SEC submissions에서 확인된 `acceptance_datetime`은 없을 수 있다. 기존 시간창의 `COALESCE(accepted_at,published_at)`는 서로 다른 의미의 시각을 혼용했다.
 - `/api/events` 필터·정렬·`eventOccurredAt` 및 보고서 표시에서 SEC_EDGAR는 accepted_at만, 기업/RSS는 published_at만 쓰도록 변경하고 회귀 테스트/API 문서 추가.
 - SEC CIK universe는 운영상 SEC 요청 범위와 호출량을 결정하므로 현재 환경 설정을 임의 변경하지 않는다. 사용 가능한 공개 SEC Atom/RSS의 원문은 기존 market-rss 경로에 계속 저장한다.
+- 검증/배포: focused event tests 33 passed, 전체 deploy:verify 통과 (Vitest 308 files/1 skipped, 1,610 passed/3 skipped; build, standalone, browser, typecheck, API/auth/KIS/cron audits). commit `60337eb6`, OCI workflow `42232437604` success.
+- 운영 확인: `/api/collection-status` 200; market-rss source 3/3 SUCCESS, failures 0, insertedArticleCount 203, event ledger 500/500. SEC realtime coverage는 requested CIK 0, submissions 0, ledger 0. `/api/events?hours=12` total 217, SEC_EDGAR 0, report positive count 0. Official SEC RSS source is running, but exact accepted time and SEC submissions normalization require a configured CIK universe.
+- 남은 승인 범위: 선택된 SEC issuer CIK 목록, existing small-cap universe mode(시총 ≤$100M), 또는 전체 미국 보통주 SEC RSS accession별 acceptance lookup 중 어느 운영 범위를 사용할지 확인이 필요하다. 현재 SEC 수집 대상을 임의로 확대하지 않았다.

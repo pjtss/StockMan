@@ -8,6 +8,10 @@ V167 운영 migration 및 코드 배포는 OCI workflow run `42219588759`에서 
 
 V167 배포 후 `/api/events`와 `/api/reports/latest`는 응답하지만 `/api/collection-status` 요청이 20초 이상 응답하지 않는 현상을 read-only GET으로 재현했다. 8초 PostgreSQL `statement_timeout` 배포 후 route가 503을 8.4초에 반환해 latest-run `DISTINCT ON` query가 timeout 원인임을 확인했다. status query를 module별 indexed `ORDER BY started_at DESC LIMIT 1` 두 lookup으로 바꿔 각 모듈 최신 행만 읽도록 한다. 운영 성공 여부를 입증하기 전까지 0건 응답을 정상 수집으로 판정하지 않는다.
 
+2026-11-06 14:25 UTC 후속 운영 확인: status API는 200/1초 미만이다. `market-rss` sourceStatus/eventLedgerStatus는 SUCCESS, RSS sources 3개 성공, ingest failure 0, insertedArticleCount 203, event ledger fetched/stored 500/500/failed 0이다. `SEC_EDGAR` RSS source도 SUCCESS로 들어온다. 반면 `sec-realtime`은 configuredCikCount=0, fetchSuccess/failure=0/0, submissionCount/inserted=0/0이며 event ledger fetched/stored=0/0이다. 최근 12시간 목록 217건에는 SEC_EDGAR 이벤트가 0건이다. SEC RSS 행의 posted/updated time은 accepted_at으로 대체하지 않기 때문에 accepted time 미확인인 SEC 행을 시간창에서 제외한다. 보고서는 검증된 호재 0건이다.
+
+SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SEC는 filing이 EDGAR system timestamp 이후 보통 1–3분 뒤 sec.gov에 제공될 수 있다고 설명한다. RSS 게시/갱신 시각을 acceptance time으로 대체하지 않는다. [SEC Webmaster FAQ](https://www.sec.gov/about/webmaster-frequently-asked-questions). 운영 SEC universe는 기존 `featureSettings.secEdgar.ciks`, `SEC_SYNC_CIKS`, 또는 `SEC_SYNC_SMALLCAP=true` 중 하나로 결정되며 현재는 유효 CIK가 0이다. small-cap 모드는 기존 프로젝트 기준 시가총액 1억 달러 이하 후보로 범위가 제한되므로 전체 시장 설정과 동일하지 않다. 종목 범위를 확인하지 않은 채 운영 설정을 변경하지 않는다.
+
 ## 배포 전제
 
 1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.
