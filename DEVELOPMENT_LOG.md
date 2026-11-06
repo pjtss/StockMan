@@ -8682,3 +8682,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - DB 쿼리 검증: 운영 DB를 건드리지 않고 일회성 `postgres:16-alpine` 컨테이너에 임시 fixture를 넣어 후보 SQL을 실행했다. SEC ticker null, 이미 등록된 accession, 잘못된 accession, ETF-only 및 OTC-only 마스터 케이스를 포함했고 적격 CIK `{0000000123}`만 선택됨을 확인한 뒤 컨테이너를 정리했다. 이 결과는 SQL 조건 검증이며 운영 SEC cron의 실제 저장 성공을 대체하지 않는다.
 - 검증/운영: 코드 변경은 없고 이 검증 및 근거만 문서화했다. 운영 SEC cron은 여전히 실제 SEC candidate coverage를 제공하지 않아 최종 runtime acceptance가 남아 있다. 운영 데이터 변경/배포는 하지 않았다.
 - 최종 로컬 검증: `npm run deploy:verify` 종료코드 0. Production build, standalone runtime/API smoke, Chrome desktop/mobile hydration, 전체 Vitest(309 files passed, 1 skipped; 1,614 passed, 3 skipped), typecheck, docs/migration/API/auth/KIS/OCI cron audits가 통과했다. 이번 변경은 개발 로그 문서만이며 코드/운영 배포는 없다.
+
+## [2026-11-06] SEC 운영 API 재확인 및 운영 문서 최신화
+
+- **목적/범위**: 활성 목표의 completion audit을 위해 공개 운영 API, 최신 repository 및 SEC schedule/source 경로를 다시 확인했다. 운영 endpoint는 read-only GET만 사용했다.
+- **현재 운영 증거(16:07 UTC)**: `/api/collection-status` HTTP 200. `market-rss` SUCCESS; SEC_EDGAR 포함 3 sources, ingestion failure 0, event ledger fetched/stored 109/109, failed 0. 같은 응답의 `sec-realtime`은 UNVERIFIED, `sourceCoverage=null`, summary 없는 16:05 UTC run. `/api/events?hours=24` HTTP 200, 전체 667건 페이지를 순회했으나 `sourceType=SEC_EDGAR`는 0건. `/api/market-news?source=SEC_EDGAR&hours=24&pageSize=100`은 100건/16건 ticker-detected였으며 후보 판정은 추정 ticker가 아닌 official CIK/ticker master + active common-stock universe를 이용한다.
+- **코드 근거**: OCI timer는 5분마다 `scripts/oci-cron.sh`를 실행하고 sec-edgar POST를 포함한다. route의 실제 활성 schedule은 DB feature settings(`sec-realtime`)에 의해 결정되며 source default는 평일이지만 운영 DB schedule은 공개 GET에서 읽을 수 없다. 상세 automation debug는 관리자/cron 인증이 필요하므로 우회하지 않았다. SEC source feed의 SUCCESS는 Submissions normalizer의 성공으로 간주하지 않는다.
+- **문서 변경**: `docs/stockman-events-operations.md`에서 보완 코드 배포 상태 및 V166/V167 적용 사실을 정확히 반영하고 과거 CIK=0 관측에 시각을 명시했다. 현재 운영 요약에 RSS ingest와 SEC Submissions runtime 증거를 분리해 남겼다.
+- **검증/운영**: 문서 및 실행 결과만 변경했다. `npm run deploy:verify` 종료코드 0: build, standalone runtime/API smoke, desktop/mobile hydration, Vitest 309 files passed/1 skipped (1,614 passed/3 skipped), typecheck, docs/migration/API/auth/KIS/cron audits 통과. 운영 DB 쓰기, cron 수동 호출, 배포, backfill, 삭제는 수행하지 않았다.

@@ -10,25 +10,25 @@ V167 배포 후 `/api/events`와 `/api/reports/latest`는 응답하지만 `/api/
 
 2026-11-06 14:25 UTC 후속 운영 확인: status API는 200/1초 미만이다. `market-rss` sourceStatus/eventLedgerStatus는 SUCCESS, RSS sources 3개 성공, ingest failure 0, insertedArticleCount 203, event ledger fetched/stored 500/500/failed 0이다. `SEC_EDGAR` RSS source도 SUCCESS로 들어온다. 반면 `sec-realtime`은 configuredCikCount=0, fetchSuccess/failure=0/0, submissionCount/inserted=0/0이며 event ledger fetched/stored=0/0이다. 최근 12시간 목록 217건에는 SEC_EDGAR 이벤트가 0건이다. SEC RSS 행의 posted/updated time은 accepted_at으로 대체하지 않기 때문에 accepted time 미확인인 SEC 행을 시간창에서 제외한다. 보고서는 검증된 호재 0건이다.
 
-SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SEC는 filing이 EDGAR system timestamp 이후 보통 1–3분 뒤 sec.gov에 제공될 수 있다고 설명한다. RSS 게시/갱신 시각을 acceptance time으로 대체하지 않는다. [SEC Webmaster FAQ](https://www.sec.gov/about/webmaster-frequently-asked-questions). 운영 SEC universe는 기존 `featureSettings.secEdgar.ciks`, `SEC_SYNC_CIKS`, 또는 `SEC_SYNC_SMALLCAP=true` 중 하나로 결정되며 현재는 유효 CIK가 0이다. small-cap 모드는 기존 프로젝트 기준 시가총액 1억 달러 이하 후보로 범위가 제한되므로 전체 시장 설정과 동일하지 않다. 종목 범위를 확인하지 않은 채 운영 설정을 변경하지 않는다.
+SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SEC는 filing이 EDGAR system timestamp 이후 보통 1–3분 뒤 sec.gov에 제공될 수 있다고 설명한다. RSS 게시/갱신 시각을 acceptance time으로 대체하지 않는다. [SEC Webmaster FAQ](https://www.sec.gov/about/webmaster-frequently-asked-questions). 운영 SEC universe는 기존 `featureSettings.secEdgar.ciks`, `SEC_SYNC_CIKS`, 또는 `SEC_SYNC_SMALLCAP=true` 중 하나로 결정된다. 2026-11-06 14:25 UTC 실행에서는 configured CIK 0이었으나, RSS 후보 보강 배포 후 현재 운영 coverage는 summary 없는 실행 때문에 확인되지 않았다. small-cap 모드는 기존 프로젝트 기준 시가총액 1억 달러 이하 후보로 범위가 제한되므로 전체 시장 설정과 동일하지 않다. 종목 범위를 확인하지 않은 채 운영 설정을 변경하지 않는다.
 
-## RSS 기반 SEC issuer 보강 (보완 코드 배포 완료, cron 효과 검증 대기)
+## RSS 기반 SEC issuer 보강 (코드 배포 완료, 운영 수집 효과 검증 대기)
 
-기본 구현은 공식 SEC RSS의 `detected_ticker`와 활성 common-stock master를 대조해 issuer CIK를 기존 Submissions 경로에 추가한다. 운영 read-only 표본에서 SEC RSS 항목 대부분의 `detectedTicker`가 null인 것을 확인해 현재 배포된 selector가 coverage를 놓칠 수 있다는 제한을 발견했다. 로컬 보완 변경은 RSS 공식 URL의 CIK를 `sec_companies.tickers` 공식 SEC ticker master 및 활성 미국 보통주 universe와 대조하도록 바꾼다. 공식 master 또는 활성 보통주 매칭이 없으면 fail-closed로 제외한다. RSS 후보는 Submissions metadata만 동기화하고 XBRL 및 회사 전체 원문 수집은 명시 설정 CIK에 한정한다. 운영 status의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`로 configured CIK와 RSS 보강 대상을 구별한다. 이 보완은 아직 배포되지 않았고 새 migration이나 운영 DB 직접 수정은 포함하지 않는다.
+SEC RSS의 `detected_ticker`는 null인 항목이 많다. 배포된 후보 로더는 공식 RSS 링크에서 issuer CIK를 읽고 `sec_companies.tickers`의 SEC 공식 CIK/ticker master 및 활성 미국 `COMMON_STOCK` universe와 교차 확인한다. 공식 CIK master와 활성 보통주 일치가 없으면 fail-closed로 제외한다. 후보 CIK는 Submissions metadata만 동기화하고 XBRL 및 회사 전체 원문 수집은 명시적으로 설정된 CIK에만 수행한다. `SEC_RSS_SYNC_CIK_LIMIT`은 실행당 1–50, 기본 10이다. 운영 status DTO의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`는 실제 summary가 있는 실행에서 후보 coverage를 구분한다.
 
-커밋 `b11e5439`는 OCI workflow `42236863405`에서 성공 배포됐고, RSS 후보에 전체 원문 수집이 붙지 않도록 한정한 `ec0cf692`도 workflow `42239656706`에서 성공 배포됐다. 운영 표본에서 SEC RSS `detectedTicker`가 대부분 null인 제한을 발견해 후보를 official CIK/ticker master 교집합으로 찾는 커밋 `6d17f4a7`을 추가 배포했으며 workflow `42244119303`도 성공했다. 각 코드 변경은 전체 verify를 통과했다. 배포 후 공개 `/api/health`는 HTTP 200이고 `/api/collection-status`는 새 coverage fields를 제공한다. 단, 2026-11-06 15:35 UTC의 최신 sec-realtime run은 `UNVERIFIED`, summary/coverage 없음으로 나타났다. 이는 실제 Submissions fetch 성공으로 인정하지 않는다. 해당 관찰은 KST 토요일 00시 시간대로 기본 sec-realtime 요일 설정(월–금) 밖일 가능성이 있지만, 운영 DB에 저장된 실제 schedule 설정은 공개 status만으로 확인할 수 없다.
+커밋 `b11e5439`는 OCI workflow `42236863405`, RSS 후보의 문서 수집 범위를 제한한 `ec0cf692`는 `42239656706`, official CIK/ticker master를 사용하는 `6d17f4a7`은 `42244119303`에서 각각 성공 배포됐다. 각 코드 변경은 전체 verify를 통과했다. 공개 `/api/health`와 무인증 event/report/status API는 HTTP 200 응답을 확인했다. 후보 accession 정규식은 SEC 공식 Atom ID `urn:tag:sec.gov,2008:accession-number=...`와 Archives URL에서 읽은 실제 값에 맞고, 운영 DB를 변경하지 않은 일회성 PostgreSQL fixture에서도 공통주 후보만 통과했다.
 
-다음 schedule-active sec-realtime cron 실행에서 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`, fetch counts, submission counts 및 `eventLedger`를 확인한다. 정확한 SEC accession이 원장에 생겼는지, unique identity로 반복 수집이 한 건으로 유지되는지와 12시간 time window의 accepted_at을 별도로 검증한다. SEC 요청량은 batch limit에 의해 제한되며 issuer Submissions metadata만 보강한다. 실제 운영 DB 직접 쓰기나 별도 backfill은 하지 않았다.
+2026-11-06 16:07 UTC read-only 확인에서 `market-rss`는 SEC_EDGAR 포함 3개 source `SUCCESS`, ingest failure 0, event ledger fetched/stored 109/109/failed 0이었다. 반면 최신 `sec-realtime` 상태는 `UNVERIFIED`, `sourceCoverage=null`, summary 없는 실행(16:05 UTC)이었다. 공개 `/api/events?hours=24` 전체 페이지를 순회한 결과 667건 중 `sourceType=SEC_EDGAR`는 0건이었다. 즉 RSS 원본 ingest와 일반 RSS 원장 materialization은 성공했지만 SEC Submissions 정규화 경로의 실제 성공은 아직 증명되지 않았다. 공식 SEC RSS `/api/market-news` 표본 100건 중 16건만 `detectedTicker`가 있었고, 투자자문사·신탁 등 non-issuer 제출도 섞여 있어 ticker 추정만으로 SEC issuer를 승격하지 않는다.
 
-2026-11-06 15:47 UTC read-only post-deploy check: no-auth `/api/events?hours=12&page=1&pageSize=1` returned HTTP 200/total 227; `/api/reports/latest` returned HTTP 200 with zero verified bullish items; `/api/collection-status` returned HTTP 200 but latest `sec-realtime` is `UNVERIFIED`, coverage null, started 15:45:02 UTC (KST Saturday 00:45). Existing event/report read APIs are available and do not promote unverified RSS as bullish. This off-schedule no-summary record does not prove SEC candidate fetch/store; confirm on an active SEC schedule run.
+`sec-realtime`의 코드 기본 schedule은 월–금이며 현재 운영 DB 설정은 공개 API에서 확인할 수 없다. KST 토요일 시각에 기록된 summary 없는 실행은 이 schedule의 성공 증거가 아니다. 내부 automation 진단 API는 관리자/cron 인증을 요구하므로 공개 endpoint로 운영 schedule이나 상세 run을 추측하지 않는다. 다음 실제 활성 schedule 실행에서 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`, SEC fetch/submission counts 및 `eventLedger`를 확인하고, SEC accession의 `accepted_at` 기반 원장 반영과 재수집 멱등성을 검증한다. 그 전까지 운영 SEC coverage는 미검증으로 둔다. 운영 DB 직접 변경, cron 수동 호출, 별도 backfill은 하지 않았다.
 
-## 배포 전제
+## 배포 및 데이터 보존 경계
 
-1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.
-2. 운영 데이터에 대량 backfill은 하지 않는다. 먼저 migration 적용 후 source volume, 유니버스 join, 예상 row 수를 read-only로 추정하고 별도 승인/실행 범위를 정한다.
-3. `GET /api/health`에서 운영 Flyway version이 V166 이상이고 모든 `stockman_event_*` 테이블이 준비됐는지 확인한다.
-4. OCI의 기존 market-rss/sec-edgar cron을 재사용한다. route는 기존 `CRON_SECRET` 인증을 계속 요구한다. migration이 준비되지 않으면 event ledger 보조 단계는 FAILED/degraded를 남기고 기존 RSS/SEC 원본을 삭제하지 않는다.
-5. 이벤트 조회 GET은 무인증 공개이며, `POST /api/events/collect`도 무인증으로 기존 원본 ID만 materialize한다. 이 route는 공유 write rate limit을 적용한다. 분석 등록/수정 POST는 관리자 session 없이는 저장하지 않는다.
+1. V166 event ledger 및 V167 missing-table repair migration은 forward-only로 OCI release workflow에 적용했다. 애플리케이션은 schema DDL을 실행하지 않는다.
+2. 운영 데이터 대량 backfill은 수행하지 않았다. 새로운 역사 데이터 backfill은 volume과 issuer/ticker 매핑을 read-only로 추정하고 별도 실행 범위를 정해야 한다.
+3. 배포 후 공개 health/event/report/status endpoint가 응답하고, event ledger 원본 테이블이 source materializer에서 실행 가능한 것을 확인했다. 최신 SEC Submissions coverage는 별도 runtime 성공 증거가 남아 있다.
+4. OCI의 기존 market-rss/sec-edgar cron을 재사용한다. route는 기존 `CRON_SECRET` 인증을 계속 요구한다. ledger 보조 단계가 실패해도 기존 RSS/SEC source rows는 삭제하지 않는다.
+5. 이벤트 조회 GET과 `POST /api/events/collect`는 무인증 공개다. POST는 SEC accession 또는 허용된 RSS source ID를 받아 이미 저장된 원본에서만 materialize하고 공유 write rate limit을 적용한다. 분석 등록/수정 POST는 관리자 session을 유지한다.
 
 운영 migration/배포는 사용자 요청에 따른 OCI release workflow로 적용했다. 후속 운영 직접 DB 변경이나 대량 backfill은 이 배포와 별개이며 사전 승인 없이 수행하지 않는다.
 
