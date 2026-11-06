@@ -15,7 +15,10 @@ async function runSecRssCandidateSync(excludedCiks: string[] = []) {
   return withAutomationRun("sec-edgar", async () => {
     let pendingCandidates: Array<{ cik: string; accessions: string[] }>;
     try {
-      pendingCandidates = await loadPendingSecRssIssuerCandidates(Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 10));
+      pendingCandidates = await loadPendingSecRssIssuerCandidates(
+        Number(process.env.SEC_RSS_SYNC_CIK_LIMIT || 5),
+        Number(process.env.SEC_RSS_SYNC_ACCESSIONS_PER_CIK || 10),
+      );
     } catch (error) {
       return {
         ok: false,

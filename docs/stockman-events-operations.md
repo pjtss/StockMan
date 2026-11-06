@@ -65,3 +65,5 @@ SEC RSS의 `detected_ticker`는 null인 항목이 많다. 배포된 후보 로�
 SEC RSS 후보 cron은 동기화한 accession 목록만 materialize한다. configured sec-realtime 경로의 기존 전체 pending materialization은 유지한다.
 
 SEC RSS 이벤트 정규화는 후보 실행의 exact accession 배열 필터를 사용해 처리 범위를 제한한다. configured sec-realtime 전체 처리와 public single-accession 호출은 각각 기존 호환 경로를 유지한다.
+
+SEC RSS 후보 실행은 기본 5개 issuer CIK 및 issuer당 최신 미처리 accession 10개로 제한한다. SEC_RSS_SYNC_CIK_LIMIT과 SEC_RSS_SYNC_ACCESSIONS_PER_CIK로 조정할 수 있고 각각 1–50 범위로 제한된다. 저장 완료된 accession은 다음 조회에서 제외되어 후속 실행이 나머지 pending backlog를 이어간다.

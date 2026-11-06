@@ -108,11 +108,14 @@ export async function loadPendingSecRssIssuerCiks(limit = 10) {
   return result.rows.map((row) => row.cik).filter((cik) => /^\d{10}$/.test(cik));
 }
 
-export async function loadPendingSecRssIssuerCandidates(limit = 10) {
+export async function loadPendingSecRssIssuerCandidates(limit = 5, accessionsPerCik = 10) {
   const boundedLimit = Math.min(50, Math.max(1, Number.isFinite(limit) ? Math.trunc(limit) : 10));
+  const boundedAccessionsPerCik = Math.min(50, Math.max(1, Number.isFinite(accessionsPerCik) ? Math.trunc(accessionsPerCik) : 10));
   const result = await getPool().query<{ cik: string; accessions: string[] }>(
-    `SELECT lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0') AS cik,
-            array_agg(DISTINCT substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})')) AS accessions
+    `WITH eligible AS (
+       SELECT lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0') AS cik,
+              substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})') AS accession,
+              max(a.published_at) AS published_at
        FROM market_rss_articles a
        JOIN sec_companies c ON c.cik=lpad(substring(a.link from '/Archives/edgar/data/([0-9]+)/'),10,'0')
        CROSS JOIN LATERAL unnest(c.tickers) AS company_ticker(ticker)
@@ -126,8 +129,15 @@ export async function loadPendingSecRssIssuerCandidates(limit = 10) {
             AND UPPER(u.market)=ANY(ARRAY['NASDAQ','NAS','NYSE','NYS','AMEX','AMS']::text[]))
         AND NOT EXISTS (SELECT 1 FROM sec_submissions s
           WHERE s.accession=substring(a.external_id from 'accession-number=([0-9]{10}-[0-9]{2}-[0-9]{6})'))
-      GROUP BY 1 ORDER BY 1 LIMIT $1`,
-    [boundedLimit],
+      GROUP BY 1,2
+     ), ranked AS (
+       SELECT cik,accession,ROW_NUMBER() OVER (PARTITION BY cik ORDER BY published_at DESC,accession DESC) AS accession_rank
+       FROM eligible
+     )
+     SELECT cik,array_agg(accession ORDER BY accession_rank) AS accessions
+       FROM ranked WHERE accession_rank <= $2
+      GROUP BY cik ORDER BY cik LIMIT $1`,
+    [boundedLimit, boundedAccessionsPerCik],
   );
   return result.rows.flatMap((row) => /^\d{10}$/.test(row.cik) && Array.isArray(row.accessions) ? [{ cik: row.cik, accessions: row.accessions.filter((accession) => /^\d{10}-\d{2}-\d{6}$/.test(accession)) }] : []);
 }
