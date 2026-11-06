@@ -6,6 +6,8 @@ V166 운영 migration 및 코드 배포는 OCI workflow run `42211364948`에서 
 
 후속 운영 재현에서는 기존 V141 `market_rss_llm_analyses` 및 V142 `sec_codex_analysis_queue`가 missing relation으로 확인됐다. V167 repair migration은 기존 원본 정의를 `CREATE TABLE/INDEX IF NOT EXISTS`로 복구한다. 적용 뒤 다음 cron에서 두 materializer의 result를 다시 확인한다.
 
+V167 배포 후 `/api/events`와 `/api/reports/latest`는 응답하지만 `/api/collection-status` 요청이 20초 이상 응답하지 않는 현상을 read-only GET으로 재현했다. status 조회는 `automation_runs`의 최신 RSS/SEC 실행 요약을 읽는다. 후속 코드에서는 해당 query에 8초 클라이언트 timeout을 적용해 DB 대기를 무한히 노출하지 않고 표준 503으로 반환한다. 운영 성공 여부를 입증하기 전까지 0건 응답을 정상 수집으로 판정하지 않는다.
+
 ## 배포 전제
 
 1. V166을 새 forward-only migration으로 적용할 계획을 리뷰한다. 애플리케이션은 schema DDL을 실행하지 않는다.

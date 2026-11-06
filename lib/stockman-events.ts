@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { QueryResult } from "pg";
 import { getPool } from "./db";
 import { classifyRssTimestamp } from "./disclosure-timestamp-precision";
 
@@ -413,12 +414,24 @@ export async function getStockmanEventHistory(id: number) {
 
 export async function listStockmanCollectionStatus() {
   const pool = getPool();
-  const result = await pool.query<{ moduleKey: string; status: string; startedAt: Date; finishedAt: Date | null; eventLedger: unknown; sourceResults: unknown; submissionCoverage: unknown }>(
-    `SELECT DISTINCT ON (module_key) module_key AS "moduleKey",status,started_at AS "startedAt",finished_at AS "finishedAt",
+  const client = await pool.connect();
+  let result: QueryResult<{ moduleKey: string; status: string; startedAt: Date; finishedAt: Date | null; eventLedger: unknown; sourceResults: unknown; submissionCoverage: unknown }>;
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL statement_timeout = '8s'");
+    result = await client.query(
+      `SELECT DISTINCT ON (module_key) module_key AS "moduleKey",status,started_at AS "startedAt",finished_at AS "finishedAt",
        summary->'eventLedger' AS "eventLedger",
        summary->'ingested'->'sourceResults' AS "sourceResults",
        summary->'submissionCoverage' AS "submissionCoverage"
-     FROM automation_runs WHERE module_key IN ('market-rss','sec-realtime') ORDER BY module_key,started_at DESC`);
+       FROM automation_runs WHERE module_key IN ('market-rss','sec-realtime') ORDER BY module_key,started_at DESC`);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
   const mapped: Array<{ moduleKey: string; status: string; sourceStatus: string; eventLedgerStatus: string; eventLedger: { status: string; fetched: number | null; stored: number | null; unverified: number | null; failed: number | null; failureCodes: Record<string, number>; errorCode: string | null }; sources: Array<{ source: unknown; status: string }>; startedAt: Date | null; finishedAt: Date | null }> = result.rows.map((row) => {
     const sourceResults = Array.isArray(row.sourceResults) ? row.sourceResults as Array<Record<string, unknown>> : [];
     const failures = sourceResults.filter((item) => item.ok !== true || ["FETCH_FAILED", "PERSIST_FAILED"].includes(String(item.ingestStatus))).length;

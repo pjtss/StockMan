@@ -8621,5 +8621,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 커밋·푸시·배포: 미실행.
 
 ### 다음 확인
-- deploy:verify 후 OCI migration V167, release activation 성공을 확인한다.
-- 다음 RSS/SEC cron 완료 후 `/api/collection-status`에서 sourceStatus/eventLedgerStatus/count/errorCode를 확인한다. 0건이면 `/api/disclosures` 원본과 비교해 source materialization scope/공통주 eligibility를 추적한다.
+- V167 적용 후 다음 RSS/SEC cron 완료 후 `/api/collection-status`에서 sourceStatus/eventLedgerStatus/count/errorCode를 확인한다. 0건이면 `/api/disclosures` 원본과 비교해 source materialization scope/공통주 eligibility를 추적한다.
+
+### 2026-11-06 후속 운영 검증
+- 배포 결과: OCI workflow `42219588759` 성공, V167 code/migration release 활성화 완료.
+- 운영 확인: `/api/events?hours=12` 및 `/api/reports/latest`는 200 JSON, 각각 0 이벤트/0 검증 호재. `/api/health`는 200. `/api/collection-status`는 반복 GET에서 20초 이상 응답이 없어 수집 결과를 검증할 수 없음.
+- 제한된 재현: 기존 SEC 원본에서 활성 common 여부가 확인되지 않은 accession 1건의 멱등 collect 결과 fetched=0/stored=0을 확인. 새 이벤트 저장을 증명하지 않으며 bulk write는 하지 않음.
+- 변경: `listStockmanCollectionStatus`의 automation history query를 8초 PostgreSQL `statement_timeout`이 적용되는 read-only transaction에서 실행하게 하고 route 회귀 테스트를 추가했다.
+- 검증: route focused test 통과(1/1); `npm run deploy:verify` 통과: production build 107 static pages, standalone/runtime/browser smoke, Vitest 308 files (1 skipped), 1,601 passed/3 skipped, typecheck, docs/API/auth/KIS/cron gates 통과.
+- 커밋·푸시·후속 OCI 배포: 아직 진행 전. 배포 후 status GET의 503 또는 source 요약 응답과 다음 cron 성공 여부를 확인한다.
