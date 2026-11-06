@@ -8630,4 +8630,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 변경: `listStockmanCollectionStatus`의 automation history query를 8초 PostgreSQL `statement_timeout`이 적용되는 read-only transaction에서 실행하게 하고 route 회귀 테스트를 추가했다.
 - 검증: route focused test 통과(1/1); `npm run deploy:verify` 통과: production build 107 static pages, standalone/runtime/browser smoke, Vitest 308 files (1 skipped), 1,601 passed/3 skipped, typecheck, docs/API/auth/KIS/cron gates 통과.
 - OCI 후속 배포 `42223031296` 활성화 성공. 운영 status GET이 503을 8.4초에 반환해 statement timeout 작동을 확인했다. 이는 성공적인 collection status가 아니라 latest-run query가 timeout됐다는 관측이다.
-- 원인 개선: `automation_runs`의 `DISTINCT ON` 최신 실행 조회를 module별 인덱스 lookup (`ORDER BY started_at DESC LIMIT 1`)으로 교체해 불필요한 전체 module history scan을 제거한다. 이 변경의 verify/deploy와 운영 status 재확인이 남아 있다.
+- 원인 개선: `automation_runs`의 `DISTINCT ON` 최신 실행 조회를 module별 인덱스 lookup (`ORDER BY started_at DESC LIMIT 1`)으로 교체해 불필요한 전체 module history scan을 제거했다.
+- 검증: 두 번째 `npm run deploy:verify` 통과 (build, standalone/runtime/browser smoke, Vitest 308 files/1 skipped, 1,601 passed/3 skipped, typecheck, docs/API/auth/KIS/cron gates).
+- 커밋/배포: commit `07409bb9`를 `oci`에 push. OCI run `42225415268` 성공.
+- 운영 재확인: `GET /api/collection-status` 200/0.55초; 첫 관찰에서는 market-rss RUNNING이었으나 13:35 UTC에는 market-rss event ledger SUCCESS (fetched=500, stored=500, failed=0), `sec-realtime` ledger SUCCESS (fetched=0, stored=0). `GET /api/events?hours=12` 339건, ticker DRK history 3건; 표본은 UNVERIFIED. `GET /api/reports/latest`는 검증 호재 0건으로 원문 검증 전 호재로 잘못 승격하지 않았다.
+- 남은 확인: market-rss 실행 완료 후 SUCCESS/PARTIAL_SUCCESS와 stored 수를 다시 확인하고, SEC 원본 materializer의 0건 원인(서명된 filing event/common-stock eligibility)을 운영 상태 요약 및 source 데이터와 대조한다.

@@ -2,7 +2,7 @@
 
 ## 배포 및 운영 상태
 
-V166 운영 migration 및 코드 배포는 OCI workflow run `42211364948`에서 Verify, Package, SSH, Upload, Activate 단계 모두 성공했다. 공개 report/events/status endpoint는 HTTP 200 JSON을 반환한다. 2026-11-06 11:45 UTC 관찰에서는 latest `market-rss` event ledger가 FAILED, source가 UNVERIFIED였고 `sec-realtime`도 UNVERIFIED였다. 보고서/최근 이벤트가 0건인 사실만으로 수집 성공으로 판단하지 않는다. `GET /api/collection-status`의 `eventLedger` 집계/error code와 최신 실행 시각을 확인한다.
+V167 운영 migration 및 코드 배포는 OCI workflow run `42219588759`에서 Verify, Package, SSH, Upload, Activate 단계 모두 성공했다. 공개 events/report/status endpoint는 HTTP 200 JSON을 반환한다. V167 전 latest `market-rss` event ledger는 FAILED였고 V167 후에도 collection status 조회 SQL이 timeout되어 후속 query 최적화를 수행했다. 후속 OCI workflow `42225415268`도 성공했다. 최적화 후 status GET은 200/0.55초에 응답한다. 2026-11-06 13:35 UTC 관찰에서 `market-rss` ledger는 SUCCESS fetched=500/stored=500/failed=0, `sec-realtime` ledger는 SUCCESS fetched=0/stored=0이었다. 직전 12시간 이벤트 API는 339건, 종목별 DRK 조회는 3건을 반환했고 표본 이벤트는 UNVERIFIED였다. 최신 보고서는 검증 호재 0건이다. RSS 영구 저장 경로는 확인됐고 SEC 정규화 경로는 계속 진단한다. 정상 조회와 호재 검증 완료를 구분해 운영한다.
 
 후속 운영 재현에서는 기존 V141 `market_rss_llm_analyses` 및 V142 `sec_codex_analysis_queue`가 missing relation으로 확인됐다. V167 repair migration은 기존 원본 정의를 `CREATE TABLE/INDEX IF NOT EXISTS`로 복구한다. 적용 뒤 다음 cron에서 두 materializer의 result를 다시 확인한다.
 
