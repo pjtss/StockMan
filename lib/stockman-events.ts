@@ -210,6 +210,8 @@ async function persistSecEvent(row: {
 /** Materializes verified SEC filings from existing source tables; ticker eligibility fails closed. */
 export async function materializeStockmanSecEvents(limit = 500, accessionFilter?: string, accessionFilters?: string[]) {
   const pool = getPool();
+  const accessionValues = accessionFilters ?? (accessionFilter ? [accessionFilter] : null);
+  const accessionClause = accessionValues ? "AND s.accession = ANY($3::text[])" : "";
   const rows = await pool.query<{
     accession: string; cik: string; tickers: string[]; title: string; form: string; accepted: string | null; source_updated_at: Date;
     filing_url: string; category: string; direction: string; score: number; matched_terms: string[];
@@ -221,12 +223,12 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
      FROM sec_submissions s JOIN sec_companies c ON c.cik=s.cik JOIN sec_filing_events e ON e.accession=s.accession
      LEFT JOIN sec_filing_documents d ON d.accession=s.accession
      LEFT JOIN sec_codex_analysis_queue q ON q.accession=s.accession AND q.status='COMPLETED'
-     WHERE (($3::text IS NULL AND $4::text[] IS NULL) OR s.accession=ANY(COALESCE($4::text[],ARRAY[$3::text])))
+     WHERE TRUE ${accessionClause}
        AND (NOT EXISTS (SELECT 1 FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession)
        OR GREATEST(s.updated_at,COALESCE(d.fetched_at,s.updated_at),COALESCE(q.analyzed_at,s.updated_at)) > COALESCE((SELECT x.source_updated_at FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession),'-infinity'::timestamptz))
        AND s.acceptance_datetime ~ '^([0-9]{14}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z)$'
        AND EXISTS (SELECT 1 FROM us_common_stock_universe u WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK' AND UPPER(u.market)=ANY($2::text[]) AND UPPER(u.code)=ANY(SELECT UPPER(unnest(c.tickers))))
-     ORDER BY s.acceptance_datetime DESC NULLS LAST,s.accession LIMIT $1`, [Math.min(2000, Math.max(1, limit)), EXCHANGE_MARKETS, accessionFilter ?? null, accessionFilters ?? null]);
+     ORDER BY s.acceptance_datetime DESC NULLS LAST,s.accession LIMIT $1`, [Math.min(2000, Math.max(1, limit)), EXCHANGE_MARKETS, ...(accessionValues ? [accessionValues] : [])]);
   let stored = 0;
   let unverified = 0;
   let failed = 0;

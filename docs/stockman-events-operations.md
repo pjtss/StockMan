@@ -63,3 +63,5 @@ SEC RSS의 `detected_ticker`는 null인 항목이 많다. 배포된 후보 로�
 
 
 SEC RSS 후보 cron은 동기화한 accession 목록만 materialize한다. configured sec-realtime 경로의 기존 전체 pending materialization은 유지한다.
+
+SEC RSS 이벤트 정규화는 후보 실행의 exact accession 배열 필터를 사용해 처리 범위를 제한한다. configured sec-realtime 전체 처리와 public single-accession 호출은 각각 기존 호환 경로를 유지한다.
