@@ -8629,4 +8629,5 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 제한된 재현: 기존 SEC 원본에서 활성 common 여부가 확인되지 않은 accession 1건의 멱등 collect 결과 fetched=0/stored=0을 확인. 새 이벤트 저장을 증명하지 않으며 bulk write는 하지 않음.
 - 변경: `listStockmanCollectionStatus`의 automation history query를 8초 PostgreSQL `statement_timeout`이 적용되는 read-only transaction에서 실행하게 하고 route 회귀 테스트를 추가했다.
 - 검증: route focused test 통과(1/1); `npm run deploy:verify` 통과: production build 107 static pages, standalone/runtime/browser smoke, Vitest 308 files (1 skipped), 1,601 passed/3 skipped, typecheck, docs/API/auth/KIS/cron gates 통과.
-- 커밋·푸시·후속 OCI 배포: 아직 진행 전. 배포 후 status GET의 503 또는 source 요약 응답과 다음 cron 성공 여부를 확인한다.
+- OCI 후속 배포 `42223031296` 활성화 성공. 운영 status GET이 503을 8.4초에 반환해 statement timeout 작동을 확인했다. 이는 성공적인 collection status가 아니라 latest-run query가 timeout됐다는 관측이다.
+- 원인 개선: `automation_runs`의 `DISTINCT ON` 최신 실행 조회를 module별 인덱스 lookup (`ORDER BY started_at DESC LIMIT 1`)으로 교체해 불필요한 전체 module history scan을 제거한다. 이 변경의 verify/deploy와 운영 status 재확인이 남아 있다.

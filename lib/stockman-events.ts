@@ -420,11 +420,15 @@ export async function listStockmanCollectionStatus() {
     await client.query("BEGIN");
     await client.query("SET LOCAL statement_timeout = '8s'");
     result = await client.query(
-      `SELECT DISTINCT ON (module_key) module_key AS "moduleKey",status,started_at AS "startedAt",finished_at AS "finishedAt",
-       summary->'eventLedger' AS "eventLedger",
-       summary->'ingested'->'sourceResults' AS "sourceResults",
-       summary->'submissionCoverage' AS "submissionCoverage"
-       FROM automation_runs WHERE module_key IN ('market-rss','sec-realtime') ORDER BY module_key,started_at DESC`);
+      `SELECT 'market-rss'::text AS "moduleKey",latest.status,latest.started_at AS "startedAt",latest.finished_at AS "finishedAt",
+              latest.summary->'eventLedger' AS "eventLedger",latest.summary->'ingested'->'sourceResults' AS "sourceResults",
+              latest.summary->'submissionCoverage' AS "submissionCoverage"
+         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='market-rss' ORDER BY started_at DESC LIMIT 1) latest
+       UNION ALL
+       SELECT 'sec-realtime'::text AS "moduleKey",latest.status,latest.started_at AS "startedAt",latest.finished_at AS "finishedAt",
+              latest.summary->'eventLedger' AS "eventLedger",latest.summary->'ingested'->'sourceResults' AS "sourceResults",
+              latest.summary->'submissionCoverage' AS "submissionCoverage"
+         FROM (SELECT status,started_at,finished_at,summary FROM automation_runs WHERE module_key='sec-realtime' ORDER BY started_at DESC LIMIT 1) latest`);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
