@@ -8764,3 +8764,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **결과**: OCI workflow `42282886377` 성공, health `ok`; sec-edgar 5 CIK/13 accession/13 events 저장 성공, market-rss 원장 110건 처리 성공, 두 실행 모두 failed=0. 공개 이벤트 목록에서 최근 이벤트와 VERIFIED SEC 이벤트 확인. 최신 호재 보고서는 아직 분석된 A/B/C가 없어 count=0.
 - **변경 파일**: `docs/stockman-events-operations.md`, `DEVELOPMENT_LOG.md`.
 - **검증/배포**: 공개 GET 확인. 이번 문서 변경은 현재 검증 후 커밋/푸시할 예정이며, 배포 여부는 후속 workflow 결과에 기록한다. 운영 DB 쓰기, 수동 cron/backfill은 수행하지 않음.
+
+### 2026-11-06 — 문서 배포 및 최종 공개 API 재확인
+- **배포**: docs-only commit `8957f660` OCI workflow `42286281701`이 GitHub workflow 페이지에서 `completed successfully`로 확인됐다.
+- **운영 확인**: health `ok`; `/api/events?hours=12` total 267, 응답 100건 중 VERIFIED SEC 18건; `/api/collection-status`에서 sec-edgar 5/5 CIK fetch, 원장 stored 13/failed 0, market-rss SUCCESS 및 원장 stored 104/failed 0; report API 정상이며 approved A/B/C count=0.
+- **무인증 저장 경로 확인**: POST `/api/events/collect`에 허용되지 않은 source를 인증 없이 전송했을 때 401이 아닌 입력 검증 HTTP 400 `UNSUPPORTED_SOURCE`를 반환했다. 유효한 저장 요청이나 운영 데이터 변경은 하지 않았다.
+- **검증/범위**: 공개 endpoint 확인만 수행. sec-realtime은 해당 시점 UNVERIFIED로 남아 있었고, 검증된 분석 항목이 없어 보고서는 0건이다. DB 직접 수정·수동 cron/backfill은 하지 않았다.
