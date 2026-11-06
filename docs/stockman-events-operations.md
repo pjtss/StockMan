@@ -67,3 +67,11 @@ SEC RSS 후보 cron은 동기화한 accession 목록만 materialize한다. confi
 SEC RSS 이벤트 정규화는 후보 실행의 exact accession 배열 필터를 사용해 처리 범위를 제한한다. configured sec-realtime 전체 처리와 public single-accession 호출은 각각 기존 호환 경로를 유지한다.
 
 SEC RSS 후보 실행은 기본 5개 issuer CIK 및 issuer당 최신 미처리 accession 10개로 제한한다. SEC_RSS_SYNC_CIK_LIMIT과 SEC_RSS_SYNC_ACCESSIONS_PER_CIK로 조정할 수 있고 각각 1–50 범위로 제한된다. 저장 완료된 accession은 다음 조회에서 제외되어 후속 실행이 나머지 pending backlog를 이어간다.
+
+### 2026-11-06 20:04 UTC 배포 후 공개 상태 확인
+
+- 배포 커밋 `a622b274`의 OCI workflow `42282886377`은 `success`로 종료되었다. 운영 health API는 `ok`를 반환한다.
+- 공개 `/api/collection-status`에서 `sec-edgar` 실행(20:00:13–20:01:56 UTC)은 `SUCCESS`: 후보 CIK 5개, SEC Submissions fetch 5/5, accession 13건 및 이벤트 원장 13건 저장, 실패 0건.
+- `market-rss` 실행(19:59:18–20:03:54 UTC)은 `SUCCESS`: 이벤트 원장 110건 처리, 실패 0건.
+- 공개 `/api/events?hours=12&page=1&pageSize=100`은 총 262건과 VERIFIED SEC 이벤트를 반환한다. `/api/reports/latest`는 정상 응답이며 count 0으로, 현재 검증된 A/B/C 분석 항목이 아직 없다.
+- 이 확인은 공개 GET만 사용했다. DB 직접 변경, cron 수동 호출 및 backfill은 하지 않았다.

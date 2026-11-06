@@ -8758,3 +8758,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **Evidence**: public API confirms 18 verified SEC_EDGAR filings in the 12-hour event window and 0 analyzed bullish report entries. However, successive sec-edgar automation rows remain RUNNING and are replaced by the next scheduled invocation before coverage summary is exposed. The current query batches up to 10 issuer CIKs with every pending accession from 90 days, which can make one serverless run too large.
 - **Change**: default RSS candidate execution to 5 CIKs and at most 10 latest pending accessions per CIK (`SEC_RSS_SYNC_CIK_LIMIT`, `SEC_RSS_SYNC_ACCESSIONS_PER_CIK` remain configurable, each clamped to 1–50). Successfully persisted accessions naturally leave the pending set; subsequent scheduled executions continue the backlog. Configured sec-realtime full sync and public APIs are unchanged.
 - **Tests**: candidate SQL ranking/caps and route defaults are covered. The first full verify exposed one stale assertion in `sec-rss-issuer-candidates.test.ts` that still expected the unbounded accession aggregate; updated it for ranking and per-issuer limit. Focused candidate/cron/materializer tests now pass (15 tests). Full `npm run deploy:verify` passed: 313 test files passed/1 skipped, 1,635 tests passed/3 skipped; typecheck, docs/API/auth/cron gates, build, and runtime smoke passed. Production remains read-only; no manual cron/backfill/data mutation.
+
+### 2026-11-06 — OCI 배포 후 SEC/RSS 상태 확인
+- **범위**: 공개 상태·이벤트·보고서 API의 read-only 운영 확인.
+- **결과**: OCI workflow `42282886377` 성공, health `ok`; sec-edgar 5 CIK/13 accession/13 events 저장 성공, market-rss 원장 110건 처리 성공, 두 실행 모두 failed=0. 공개 이벤트 목록에서 최근 이벤트와 VERIFIED SEC 이벤트 확인. 최신 호재 보고서는 아직 분석된 A/B/C가 없어 count=0.
+- **변경 파일**: `docs/stockman-events-operations.md`, `DEVELOPMENT_LOG.md`.
+- **검증/배포**: 공개 GET 확인. 이번 문서 변경은 현재 검증 후 커밋/푸시할 예정이며, 배포 여부는 후속 workflow 결과에 기록한다. 운영 DB 쓰기, 수동 cron/backfill은 수행하지 않음.
