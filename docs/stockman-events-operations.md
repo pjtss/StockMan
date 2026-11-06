@@ -12,13 +12,13 @@ V167 배포 후 `/api/events`와 `/api/reports/latest`는 응답하지만 `/api/
 
 SEC acceptance date/time은 공식 제출 메타데이터에서 가져오며, SEC는 filing이 EDGAR system timestamp 이후 보통 1–3분 뒤 sec.gov에 제공될 수 있다고 설명한다. RSS 게시/갱신 시각을 acceptance time으로 대체하지 않는다. [SEC Webmaster FAQ](https://www.sec.gov/about/webmaster-frequently-asked-questions). 운영 SEC universe는 기존 `featureSettings.secEdgar.ciks`, `SEC_SYNC_CIKS`, 또는 `SEC_SYNC_SMALLCAP=true` 중 하나로 결정되며 현재는 유효 CIK가 0이다. small-cap 모드는 기존 프로젝트 기준 시가총액 1억 달러 이하 후보로 범위가 제한되므로 전체 시장 설정과 동일하지 않다. 종목 범위를 확인하지 않은 채 운영 설정을 변경하지 않는다.
 
-## RSS 기반 SEC issuer 보강 (기본 경로 배포, ticker-master 보완 진행 중)
+## RSS 기반 SEC issuer 보강 (보완 코드 배포 완료, cron 효과 검증 대기)
 
 기본 구현은 공식 SEC RSS의 `detected_ticker`와 활성 common-stock master를 대조해 issuer CIK를 기존 Submissions 경로에 추가한다. 운영 read-only 표본에서 SEC RSS 항목 대부분의 `detectedTicker`가 null인 것을 확인해 현재 배포된 selector가 coverage를 놓칠 수 있다는 제한을 발견했다. 로컬 보완 변경은 RSS 공식 URL의 CIK를 `sec_companies.tickers` 공식 SEC ticker master 및 활성 미국 보통주 universe와 대조하도록 바꾼다. 공식 master 또는 활성 보통주 매칭이 없으면 fail-closed로 제외한다. RSS 후보는 Submissions metadata만 동기화하고 XBRL 및 회사 전체 원문 수집은 명시 설정 CIK에 한정한다. 운영 status의 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`로 configured CIK와 RSS 보강 대상을 구별한다. 이 보완은 아직 배포되지 않았고 새 migration이나 운영 DB 직접 수정은 포함하지 않는다.
 
-커밋 `b11e5439`는 OCI workflow `42236863405`에서 성공 배포됐고, RSS 후보에 전체 원문 수집이 붙지 않도록 한정한 `ec0cf692`도 workflow `42239656706`에서 성공 배포됐다. 양쪽 배포 모두 전체 verify를 통과했다. 배포 후 공개 `/api/health`는 HTTP 200이며 `/api/collection-status`에서 새 coverage 필드가 보이는 것으로 새 상태 코드가 활성화된 것을 확인했다. 단, 2026-11-06 15:10 UTC의 최신 sec-realtime run은 `UNVERIFIED`, summary/coverage 없음으로 나타났다. 이는 실제 Submissions fetch 성공으로 인정하지 않는다. 해당 관찰은 KST 토요일 00시 시간대로 기본 sec-realtime 요일 설정(월–금) 밖일 가능성이 있지만, 운영 DB에 저장된 실제 schedule 설정은 공개 status만으로 확인할 수 없다.
+커밋 `b11e5439`는 OCI workflow `42236863405`에서 성공 배포됐고, RSS 후보에 전체 원문 수집이 붙지 않도록 한정한 `ec0cf692`도 workflow `42239656706`에서 성공 배포됐다. 운영 표본에서 SEC RSS `detectedTicker`가 대부분 null인 제한을 발견해 후보를 official CIK/ticker master 교집합으로 찾는 커밋 `6d17f4a7`을 추가 배포했으며 workflow `42244119303`도 성공했다. 각 코드 변경은 전체 verify를 통과했다. 배포 후 공개 `/api/health`는 HTTP 200이고 `/api/collection-status`는 새 coverage fields를 제공한다. 단, 2026-11-06 15:35 UTC의 최신 sec-realtime run은 `UNVERIFIED`, summary/coverage 없음으로 나타났다. 이는 실제 Submissions fetch 성공으로 인정하지 않는다. 해당 관찰은 KST 토요일 00시 시간대로 기본 sec-realtime 요일 설정(월–금) 밖일 가능성이 있지만, 운영 DB에 저장된 실제 schedule 설정은 공개 status만으로 확인할 수 없다.
 
-다음 배포 뒤 활성 sec-realtime cron 실행에서 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`, fetch counts, submission counts 및 `eventLedger`를 확인한다. 정확한 SEC accession이 원장에 생겼는지, unique identity로 반복 수집이 한 건으로 유지되는지와 12시간 time window의 accepted_at을 별도로 검증한다. SEC 요청량은 batch limit에 의해 제한되며 issuer Submissions metadata만 보강한다. 실제 운영 DB 직접 쓰기나 별도 backfill은 하지 않았다.
+다음 schedule-active sec-realtime cron 실행에서 `rssCandidateCikCount`, `rssOnlyCikCount`, `requestedCikCount`, fetch counts, submission counts 및 `eventLedger`를 확인한다. 정확한 SEC accession이 원장에 생겼는지, unique identity로 반복 수집이 한 건으로 유지되는지와 12시간 time window의 accepted_at을 별도로 검증한다. SEC 요청량은 batch limit에 의해 제한되며 issuer Submissions metadata만 보강한다. 실제 운영 DB 직접 쓰기나 별도 backfill은 하지 않았다.
 
 ## 배포 전제
 

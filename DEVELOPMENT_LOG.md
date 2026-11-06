@@ -8672,3 +8672,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 운영 무인증 GET `/api/market-news?source=SEC_EDGAR&hours=24&pageSize=10`의 실제 항목을 확인했다. 최근 SEC feed는 Form 4, 13F, 424B 등 다양한 공식 filings를 포함하고 sample 대부분 `detectedTicker=null`이다. 기존 신규 후보 query의 `a.detected_ticker IS NOT NULL` 조건은 SEC CIK 후보 coverage를 크게 누락할 수 있었다.
 - `lib/sec-edgar-repository.ts:loadPendingSecRssIssuerCiks`를 수정해 SEC Archives URL에서 issuer CIK를 추출하고 기존 SEC 공식 ticker master `sec_companies`와 enabled US `COMMON_STOCK` universe의 ticker 교집합으로 확인한다. RSS ticker parser 추정은 후보 판별에 사용하지 않는다. 모르는 CIK와 inactive/special instrument는 계속 fail-closed다.
 - current analysis, architecture, operations 문서에 운영 표본 근거와 수정/미배포 상태를 기록했다. focused candidate tests 4/4 pass; full `deploy:verify` 및 배포는 진행 중이다. 다음 배포 이후 SEC schedule-active cron evidence가 확보되기 전까지 실제 SEC event coverage는 검증 미완료 상태다.
+
+#### Official CIK 후보 보완 배포 결과
+- Full `npm run deploy:verify` 통과: Vitest 309 files(1 skipped), 1,614 passed/3 skipped; production build, standalone/browser smoke, typecheck, docs/API/auth/KIS/cron audits 성공.
+- commit `6d17f4a7`를 `oci` 및 작업 branch에 push. OCI workflow `42244119303` success. 운영 전환 중 health GET이 한 번 timeout됐으나 재시도 HTTP 200; `/api/collection-status`에서 새 SEC coverage DTO가 계속 제공되는 것을 확인했다.
+- 2026-11-06 15:35 UTC SEC latest run은 KST 토요일 00:35에 시작/종료한 no-summary row(`UNVERIFIED`, coverage null)다. SEC 실제 fetch/저장 효과는 미검증이며, 다음 평일(active schedule 추정) 실행에서 확인한다. 운영 DB 직접 쓰기/backfill은 수행하지 않았다.
