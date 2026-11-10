@@ -5,6 +5,110 @@ const file = path.resolve("scripts/oci-cron.sh");
 const source = fs.readFileSync(file, "utf8");
 const matches = [...source.matchAll(/run_cron_endpoint\s+"([^"]+)"\s+(\d+)\s+"([^"]+)"/g)];
 if (matches.length === 0) throw new Error("No cron endpoints were found");
+if (!source.includes('run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"')) {
+  throw new Error("The bounded database retention job must run in the shared OCI cron pipeline");
+}
+const retentionRoute = fs.readFileSync(path.resolve("app/api/cron/db-retention/route.ts"), "utf8");
+const healthProbeRoute = fs.readFileSync(path.resolve("app/api/cron/health-probe-snapshot/route.ts"), "utf8");
+if (!healthProbeRoute.includes("DELETE FROM health_probe_history WHERE checked_at < NOW() - INTERVAL '14 days'")) {
+  throw new Error("Health probe history must retain its existing 14-day cleanup path");
+}
+if (!retentionRoute.includes("const DELETE_BATCH_SIZE = 5_000")
+  || !retentionRoute.includes("const MAX_BATCHES_PER_TABLE = 3")
+  || !retentionRoute.includes("FOR UPDATE SKIP LOCKED")
+  || !retentionRoute.includes("target.ctid = expired.ctid")
+  || !retentionRoute.includes("failed[job.table] = code")
+  || !retentionRoute.includes("status: ok ? 200 : 503")) {
+  throw new Error("Database retention deletes must use bounded PostgreSQL batches");
+}
+const retentionSchemaRequirements = {
+  kr_minute_candles: ["candle_date", "candle_time"], us_minute_candles: ["candle_date", "candle_time"],
+  request_logs: ["created_at"], market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id"],
+  sec_source_snapshots: ["source_type", "source_key", "fetched_at", "id"], kis_signal_snapshots: ["fetched_at"],
+  discord_delivery_queue: ["status", "updated_at"], kr_minute_fetch_logs: ["fetched_at"], debug_kis_calls: ["observed_at"],
+  debug_run_items: ["completed_at"], automation_runs: ["started_at"], kis_realtime_events: ["observed_at"],
+  intraday_detection_transitions: ["observed_at", "tick_id"], intraday_detection_ticks: ["observed_at", "tick_id", "run_id"],
+  intraday_detection_runs: ["finished_at", "run_id"], us_trade_intensity_ticks: ["fetched_at"],
+  instrument_fundamental_history: ["fetched_at"], kis_rate_limit_events: ["occurred_at"],
+  kis_token_issuance_history: ["issued_at"], market_rss_translation_cache: ["updated_at"],
+  automation_notification_deliveries: ["delivery_date"], us_top_rising_snapshots: ["collected_at"],
+  us_intraday_vwap_snapshots: ["observed_at"], instrument_universe_sync_runs: ["started_at"],
+  instrument_candle_cache_failures: ["observed_at"], instrument_candle_cache_retries: ["status", "updated_at"],
+  daily_bollinger_cache_retries: ["status", "updated_at"], daily_cache_followup_retries: ["status", "updated_at"],
+  translation_usage_reservations: ["reserved_at"],
+};
+const migrationFiles = fs.readdirSync(path.resolve("db/migration"))
+  .filter((name) => /^V\d+__.*\.sql$/i.test(name))
+  .map((name) => ({ name, sql: fs.readFileSync(path.resolve("db/migration", name), "utf8") }));
+const migrationSql = migrationFiles.map(({ sql }) => sql).join("\n");
+const retentionMigrationConfig = fs.readFileSync(path.resolve("db/migration/V168__bounded_non_daily_data_retention.sql.conf"), "utf8");
+const deployWorkflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
+const retentionMigration = migrationFiles.find(({ name }) => name === "V168__bounded_non_daily_data_retention.sql")?.sql ?? "";
+if (!/^executeInTransaction=false\s*$/m.test(retentionMigrationConfig)
+  || !/CREATE INDEX CONCURRENTLY IF NOT EXISTS/.test(retentionMigration)
+  || /CREATE INDEX IF NOT EXISTS/.test(retentionMigration)
+  || !deployWorkflow.includes('cp db/migration/*.sql.conf "$release_dir/db/migration/"')
+  || !deployWorkflow.includes("./db/migration/V168__bounded_non_daily_data_retention.sql.conf")) {
+  throw new Error("V168 concurrent indexes must run outside a Flyway transaction and ship with their script configuration");
+}
+for (const [table, columns] of Object.entries(retentionSchemaRequirements)) {
+  const tablePattern = new RegExp(`CREATE TABLE(?: IF NOT EXISTS)?\\s+${table}\\s*\\(([\\s\\S]*?)\\);`, "i");
+  const tableDefinition = migrationSql.match(tablePattern)?.[1];
+  if (!tableDefinition) throw new Error(`No migration creates retention table ${table}`);
+  for (const column of columns) {
+    const columnPattern = new RegExp(`\\b${column}\\s+(?:TEXT|TIMESTAMPTZ|BIGSERIAL|BIGINT|INTEGER|NUMERIC|DOUBLE\\s+PRECISION|BOOLEAN|JSONB|UUID|DATE)\\b`, "i");
+    const alteredColumnPattern = new RegExp(`ALTER TABLE\\s+${table}\\s+ADD COLUMN(?: IF NOT EXISTS)?\\s+${column}\\s+(?:TEXT|TIMESTAMPTZ|BIGSERIAL|BIGINT|INTEGER|NUMERIC|DOUBLE\\s+PRECISION|BOOLEAN|JSONB|UUID|DATE)\\b`, "i");
+    if (!columnPattern.test(tableDefinition) && !alteredColumnPattern.test(migrationSql)) throw new Error(`No migration defines ${table}.${column}`);
+  }
+}
+const indexSpecs = (sql) => [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX(?:\s+IF NOT EXISTS)?\s+[^\s]+\s+ON\s+([a-z_][a-z0-9_]*)\s*\(([^()]*)\)/gi)]
+  .map(([, table, columns]) => ({
+    table: table.toLowerCase(),
+    columns: columns.split(",").map((column) => column.trim().replace(/\s+(?:ASC|DESC)(?:\s+NULLS\s+(?:FIRST|LAST))?$/i, "").replace(/\s+/g, " ").toLowerCase()).join(","),
+  }));
+const earlierIndexSpecs = indexSpecs(migrationFiles.filter(({ name }) => name !== "V168__bounded_non_daily_data_retention.sql").map(({ sql }) => sql).join("\n"));
+for (const index of indexSpecs(retentionMigration)) {
+  if (earlierIndexSpecs.some((existing) => existing.table === index.table && existing.columns === index.columns)) {
+    throw new Error(`V168 adds a duplicate index on ${index.table} (${index.columns})`);
+  }
+}
+for (const [table, interval] of [
+  ["kr_minute_candles", "30 days"], ["us_minute_candles", "30 days"], ["request_logs", "30 days"],
+  ["automation_runs", "90 days"], ["discord_delivery_queue", "30 days"], ["kis_signal_snapshots", "365 days"],
+  ["instrument_fundamental_history", "90 days"], ["kis_rate_limit_events", "90 days"],
+  ["market_rss_translation_cache", "180 days"], ["us_top_rising_snapshots", "30 days"],
+  ["us_intraday_vwap_snapshots", "30 days"],
+]) {
+  const policyPattern = new RegExp(`batchedDelete\\(\\"${table}\\", [^\\n]*INTERVAL '${interval}'`);
+  if (!policyPattern.test(retentionRoute)) throw new Error(`Database retention policy is missing or changed for ${table}`);
+}
+for (const dailyCandleTable of ["kr_daily_price_candles", "us_daily_price_candles", "kr_latest_daily_candles", "us_latest_daily_candles", "kr_instrument_universe_candles", "us_instrument_universe_candles"]) {
+  if (retentionRoute.includes(`batchedDelete("${dailyCandleTable}"`) || retentionRoute.includes(`DELETE FROM ${dailyCandleTable}`)) {
+    throw new Error(`Daily candle table ${dailyCandleTable} must be excluded from database retention cleanup`);
+  }
+}
+if (!retentionRoute.includes("UPDATE market_rss_articles AS article SET source_snapshot_id = NULL")
+  || !retentionRoute.includes("DELETE FROM market_rss_fetch_snapshots AS snapshot USING expired")
+  || retentionRoute.includes("DELETE FROM market_rss_articles")) {
+  throw new Error("RSS feed snapshot cleanup must detach article links while preserving article payloads");
+}
+if (!retentionRoute.includes("snapshot.source_type = 'SUBMISSIONS'")
+  || !retentionRoute.includes("newer.source_type = snapshot.source_type")
+  || !retentionRoute.includes("snapshot.source_type <> 'SUBMISSIONS'")
+  || !retentionRoute.includes("snapshot.fetched_at < NOW() - INTERVAL '365 days'")
+  || !retentionRoute.includes("snapshot.fetched_at < NOW() - INTERVAL '180 days'")) {
+  throw new Error("SEC source snapshot cleanup must retain each issuer's latest submissions snapshot");
+}
+const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
+const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");
+const activationScript = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
+if (!/OnCalendar=\*:0\/5/.test(sharedCronTimer) || !/Persistent=true/.test(sharedCronTimer)
+  || !sharedCronService.includes("scripts/oci-cron.sh")
+  || !activationScript.includes("stockman-cron.timer")
+  || !activationScript.includes("systemctl enable stockman-cron.timer")
+  || !activationScript.includes("systemctl restart stockman-cron.timer")) {
+  throw new Error("Database retention must be reachable from the persistent five-minute OCI cron timer after activation");
+}
 const obvSnapshotCall = 'run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"';
 if (!source.includes(obvSnapshotCall)
   || source.indexOf(obvSnapshotCall) < source.indexOf('run_cron_endpoint "us-daily-cache"')

@@ -1,5 +1,13 @@
 # DB 구조
 
+## 비일봉 데이터 보존
+
+V168은 보호된 `/api/cron/db-retention`을 통해 만료된 분봉·운영 로그·임시 관측 데이터를 테이블별 5,000행 단위, 실행당 최대 3회 정리합니다. 실행 상한에 도달한 테이블은 다음 5분 cron에서 이어 처리하고, 일부 테이블 실패 시 나머지 정리를 계속한 뒤 HTTP 503과 실패 목록을 반환합니다. PENDING 재시도·전송 중 상태는 보존하고 일봉 캔들 테이블은 삭제 대상에서 제외합니다. RSS 전체 feed snapshot은 180일 뒤 기사 연결을 분리해 삭제하며 기사별 payload는 보존합니다. SEC 제출 snapshot은 이전 이력을 365일, 기타 원문 snapshot은 180일 보존하고 CIK별 최신 제출 snapshot을 유지합니다. KIS 원본 신호 snapshot은 365일 보존합니다.
+
+대형 테이블의 쓰기 잠금을 피하기 위해 V168은 `CREATE INDEX CONCURRENTLY`를 사용하며 `V168__bounded_non_daily_data_retention.sql.conf`로 Flyway 트랜잭션을 비활성화합니다. 배포 artifact에는 migration `.sql`과 `.sql.conf`가 모두 포함됩니다. Concurrent index build 실패 시 invalid index가 남을 수 있으므로 재시도 전 해당 index를 점검·제거하고 Flyway migration 이력을 repair해야 합니다.
+
+`npm run cron:check`는 보존 테이블·컬럼, 기존 인덱스 중복 여부, 일봉 제외, route와 OCI 공통 5분 timer의 연결 및 migration 배포 포함 여부를 검사합니다. 운영 적용은 다음 OCI 배포에서 Flyway migrate가 완료된 뒤 시작됩니다.
+
 - `schema.ts`: Drizzle 런타임 스키마
 - `migration/`: Flyway 적용 순서가 보장되는 SQL
 - `V141__local_rss_llm_analyses.sql`: Codex 직접 RSS 분석 revision 이력과 Discord 중복방지 전송 상태. 운영 반영은 배포 체크리스트와 health schema 검증을 거쳐야 합니다.

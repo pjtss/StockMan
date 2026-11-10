@@ -619,6 +619,14 @@
       "source": "app/api/collection-status/route.ts"
     },
     {
+      "path": "/api/cron/db-retention",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/db-retention/route.ts"
+    },
+    {
       "path": "/api/cron/discord-delivery-retry",
       "methods": [
         "GET",

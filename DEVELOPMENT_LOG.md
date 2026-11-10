@@ -8770,3 +8770,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **운영 확인**: health `ok`; `/api/events?hours=12` total 267, 응답 100건 중 VERIFIED SEC 18건; `/api/collection-status`에서 sec-edgar 5/5 CIK fetch, 원장 stored 13/failed 0, market-rss SUCCESS 및 원장 stored 104/failed 0; report API 정상이며 approved A/B/C count=0.
 - **무인증 저장 경로 확인**: POST `/api/events/collect`에 허용되지 않은 source를 인증 없이 전송했을 때 401이 아닌 입력 검증 HTTP 400 `UNSUPPORTED_SOURCE`를 반환했다. 유효한 저장 요청이나 운영 데이터 변경은 하지 않았다.
 - **검증/범위**: 공개 endpoint 확인만 수행. sec-realtime은 해당 시점 UNVERIFIED로 남아 있었고, 검증된 분석 항목이 없어 보고서는 0건이다. DB 직접 수정·수동 cron/backfill은 하지 않았다.
+
+## [2026-11-10] 비일봉 DB 누적 데이터 보존 및 OCI 배포
+
+- 목적/범위: 일봉 데이터를 보존하면서 비일봉 운영 로그, 임시 큐, 분봉·관측 캐시의 무기한 누적을 제한한다.
+- 변경: 보호된 `/api/cron/db-retention`을 공통 OCI cron에 연결하고, V168 concurrent index migration과 Flyway per-script 설정을 추가했다. KIS raw signal snapshot은 365일 보존하며 RSS·SEC snapshot 및 운영 데이터는 route의 retention 기준에 따른다. 기존 `health_probe_history`의 14일 자체 정리는 유지한다.
+- 안전성: 테이블별 5,000행 단위 최대 3회 배치 정리, `FOR UPDATE SKIP LOCKED`, 일봉 테이블 제외, 보류 재시도·전송 상태 보존. concurrent index 실패 복구 절차를 `db/README.md`에 기록했다.
+- 검증: `cron:check`, typecheck, deploy:verify의 전체 테스트·빌드·실행 smoke를 배포 전에 수행한다. 운영 적용 후 workflow 성공, health의 Flyway 버전, 보호된 cron 응답 및 정리 결과를 확인한다.
+- 커밋·푸시·배포: 배포 진행 중이며 완료 시 workflow와 운영 확인 결과를 여기에 추가한다.
+- 남은 위험: 운영 DB 연결은 애플리케이션 배포의 Flyway 단계에서만 확인한다. cleanup cron이 일부 테이블에서 실패하면 503으로 기록하며 다음 주기 재시도한다.

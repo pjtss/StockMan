@@ -69,6 +69,7 @@ jobs:
           cp deploy/oci/stockman-fundamentals.service "$release_dir/deploy/oci/stockman-fundamentals.service"
           cp deploy/oci/stockman-fundamentals.timer "$release_dir/deploy/oci/stockman-fundamentals.timer"
           cp db/migration/*.sql "$release_dir/db/migration/"
+          cp db/migration/*.sql.conf "$release_dir/db/migration/"
           node -e "const fs=require('fs'); const p=require('./package.json'); fs.writeFileSync('.next-deploy-verify/standalone/build-info.json', JSON.stringify({version:p.version,commit:process.env.STOCKMAN_BUILD_VERSION||'unknown',builtAt:process.env.STOCKMAN_BUILD_TIME||new Date().toISOString()}));"
           tar -czf stockman-oci.tar.gz -C "$release_dir" .
           tar -tzf stockman-oci.tar.gz | grep -Fx './server.js'
@@ -83,6 +84,7 @@ jobs:
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.service'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.timer'
           tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V1__initial_schema.sql'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V168__bounded_non_daily_data_retention.sql.conf'
 
       - name: Configure SSH
         timeout-minutes: 3
