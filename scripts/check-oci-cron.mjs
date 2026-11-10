@@ -130,6 +130,7 @@ const fundamentalsTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-fund
 const nginx = fs.readFileSync(path.resolve("deploy/oci/nginx-stockman.conf"), "utf8");
 const activation = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
 const workflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
+const flywayPreflight = fs.readFileSync(path.resolve("scripts/oci-flyway-v168-preflight.mjs"), "utf8");
 const automationRuns = fs.readFileSync(path.resolve("lib/automation-run-repository.ts"), "utf8");
 const rssTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-rss.timer"), "utf8");
 const rssRoute = fs.readFileSync(path.resolve("app/api/cron/market-rss/route.ts"), "utf8");
@@ -161,6 +162,14 @@ for (const required of [
   "start --no-block stockman-fundamentals.service",
 ]) {
   if (!activation.includes(required)) throw new Error(`Deployment activation is missing ${required}`);
+}
+if (!workflow.includes("oci-flyway-v168-preflight.mjs")
+  || !activation.includes("flyway-repair-v168")
+  || !activation.includes("2400s docker run")
+  || !/name: Activate release\s+timeout-minutes: 45/.test(workflow)
+  || !flywayPreflight.includes("DROP INDEX CONCURRENTLY IF EXISTS")
+  || !flywayPreflight.includes("refusing automatic repair")) {
+  throw new Error("OCI Flyway activation must allow a long migration and recover only V168 failed history/invalid indexes");
 }
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");

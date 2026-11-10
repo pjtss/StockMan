@@ -8779,3 +8779,23 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 검증: `cron:check`, typecheck, deploy:verify의 전체 테스트·빌드·실행 smoke를 배포 전에 수행한다. 운영 적용 후 workflow 성공, health의 Flyway 버전, 보호된 cron 응답 및 정리 결과를 확인한다.
 - 커밋·푸시·배포: 배포 진행 중이며 완료 시 workflow와 운영 확인 결과를 여기에 추가한다.
 - 남은 위험: 운영 DB 연결은 애플리케이션 배포의 Flyway 단계에서만 확인한다. cleanup cron이 일부 테이블에서 실패하면 503으로 기록하며 다음 주기 재시도한다.
+## [2026-11-10] OCI V168 retention migration 재배포 복구
+
+### 목적 및 원인
+- 비일봉 데이터 보존 배포 #1292에서 GitHub `Activate release` 10분 제한이 Flyway V168 concurrent index 생성 도중 만료됐다. 운영 앱은 이전 릴리스와 Flyway 167을 계속 제공했다.
+- `CREATE INDEX CONCURRENTLY`는 중단 시 무효 인덱스를 남길 수 있고 Flyway non-transactional 실패 이력은 별도 복구가 필요하다.
+
+### 범위 및 변경 파일
+- `deploy/oci/stockman-activate`: V168 전용 preflight로 migration 대상 무효 인덱스만 concurrent drop하고, 실패 migration이 V168 하나일 때에만 Flyway repair를 호출한다. migration timeout을 40분으로 연장한다.
+- `scripts/oci-flyway-v168-preflight.mjs`: 현재 schema의 Flyway 실패 이력 및 V168 SQL의 인덱스 목록만 검사한다. 다른 버전 실패 이력이 있으면 변경 전 중단한다.
+- `.github/workflows/deploy-oci.yml`: preflight 스크립트를 standalone artifact에 넣고 archive 포함을 검사하며 activation step을 45분으로 연장한다.
+- `scripts/check-oci-cron.mjs`: V168 한정 복구·긴 timeout·artifact 경로를 자동 검사한다.
+
+### 검증 및 배포
+- `npm run deploy:verify` 통과: production build, standalone runtime smoke 및 desktop/mobile hydration, 313 test files passed/1 skipped, 1,635 tests passed/3 skipped, typecheck, docs/API checks, KIS/auth/cron gates.
+- `npm run cron:check`, `node --check scripts/oci-flyway-v168-preflight.mjs`, `git diff --check` 통과.
+- #1292는 Activate release timeout으로 실패했다. 복구 커밋 push가 새 OCI 배포를 트리거한 뒤 운영 app commit 및 `flywayVersion=168`을 확인한다.
+
+### 남은 위험 및 다음 개선
+- preflight는 V168이 만드는 인덱스명에 한정해 무효 객체를 제거한다. V168에 포함되지 않은 실패 이력이 있으면 자동 repair 없이 실패하므로 별도 수동 조사 대상이다.
+- 재발 감지는 OCI activation의 GitHub timeout, Flyway migration 단계 로그 및 배포 후 schema version 확인으로 수행한다.

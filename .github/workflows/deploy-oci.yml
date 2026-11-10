@@ -54,6 +54,7 @@ jobs:
           # .next/static directory after an atomic release switch.
           cp -r .next-deploy-verify/static/. "$release_dir/public/_next/static/"
           cp scripts/oci-cron.sh "$release_dir/scripts/oci-cron.sh"
+          cp scripts/oci-flyway-v168-preflight.mjs "$release_dir/scripts/oci-flyway-v168-preflight.mjs"
           cp scripts/oci-fundamentals-cron.sh "$release_dir/scripts/oci-fundamentals-cron.sh"
           cp scripts/oci-rss-cron.sh "$release_dir/scripts/oci-rss-cron.sh"
           cp scripts/register-discord-commands.mjs "$release_dir/scripts/register-discord-commands.mjs"
@@ -76,6 +77,7 @@ jobs:
           tar -tzf stockman-oci.tar.gz | grep -Fx './build-info.json'
           test "$(tar -tzf stockman-oci.tar.gz | grep -c '/.next/static/chunks/.*\.js$')" -gt 0
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-cron.sh'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-flyway-v168-preflight.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/import-market-impact-events.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/market-impact-event-identity.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/local-env.mjs'
@@ -114,7 +116,7 @@ jobs:
             "ubuntu@${{ secrets.OCI_HOST }}:/tmp/stockman-activate-${{ github.sha }}"
 
       - name: Activate release
-        timeout-minutes: 10
+        timeout-minutes: 45
         env:
           OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH }}
         run: |

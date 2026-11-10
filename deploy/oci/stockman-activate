@@ -23,6 +23,7 @@ tar -xzf "$RELEASE" -C "$TEMP_PATH"
 chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-rss-cron.sh"
+chmod +x "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs"
 # Keep hashed static assets from the previous release available for clients
 # that still hold an older HTML document during a browser/proxy cache transition.
 # New assets already present in the incoming release win.
@@ -58,7 +59,24 @@ FLYWAY_USER="${DB_AUTH%%:*}"
 FLYWAY_PASSWORD="${DB_AUTH#*:}"
 FLYWAY_JDBC_URL="jdbc:postgresql://${DB_HOST_AND_NAME}"
 stage="flyway-migrate"
-timeout --signal=TERM --kill-after=30s 600s docker run --rm --network host \
+preflight_output="$(runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
+  node "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs" "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql")"
+printf '%s\n' "$preflight_output"
+if [[ "$preflight_output" == *'"repairRequired":true'* ]]; then
+  stage="flyway-repair-v168"
+  timeout --signal=TERM --kill-after=30s 120s docker run --rm --network host \
+    -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
+    "$FLYWAY_IMAGE" \
+    -url="$FLYWAY_JDBC_URL" \
+    -user="$FLYWAY_USER" \
+    -password="$FLYWAY_PASSWORD" \
+    -locations="filesystem:/flyway/sql" \
+    -ignoreMigrationPatterns="*:ignored" \
+    -connectRetries=3 \
+    repair
+fi
+stage="flyway-migrate"
+timeout --signal=TERM --kill-after=30s 2400s docker run --rm --network host \
   -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
   "$FLYWAY_IMAGE" \
   -url="$FLYWAY_JDBC_URL" \
