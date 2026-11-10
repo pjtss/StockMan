@@ -171,6 +171,8 @@ if (!workflow.includes("oci-flyway-v168-preflight.mjs")
   || !flywayPreflight.includes("DROP INDEX CONCURRENTLY IF EXISTS")
   || !flywayPreflight.includes("connectionTimeoutMillis: 15_000")
   || !flywayPreflight.includes("statement_timeout: 60_000")
+  || !flywayPreflight.includes("pg_stat_activity")
+  || !flywayPreflight.includes("old database snapshots")
   || !flywayPreflight.includes("refusing automatic repair")) {
   throw new Error("OCI Flyway activation must allow a long migration and recover only V168 failed history/invalid indexes");
 }

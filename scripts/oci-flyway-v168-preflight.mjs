@@ -34,6 +34,21 @@ try {
     throw new Error("Flyway history contains a failed migration outside V168; refusing automatic repair");
   }
   const schema = await client.query("SELECT current_schema() AS schema_name");
+  const oldSnapshots = await client.query(`
+    SELECT pid, backend_type, state, wait_event_type, wait_event,
+      FLOOR(EXTRACT(EPOCH FROM (NOW() - xact_start)))::integer AS transaction_age_seconds
+    FROM pg_stat_activity
+    WHERE datname = current_database()
+      AND pid <> pg_backend_pid()
+      AND backend_xmin IS NOT NULL
+      AND xact_start < NOW() - INTERVAL '30 seconds'
+    ORDER BY xact_start
+    LIMIT 20
+  `);
+  if (oldSnapshots.rowCount > 0) {
+    process.stderr.write(`V168 preflight: old snapshot holders detected ${JSON.stringify(oldSnapshots.rows)}\n`);
+    throw new Error("V168 preflight found old database snapshots; refusing concurrent index cleanup until they finish");
+  }
   const invalidIndexes = await client.query(`
     SELECT index_class.relname AS index_name
     FROM pg_index AS index_state
