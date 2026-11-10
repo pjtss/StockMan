@@ -12,13 +12,17 @@ if (indexNames.length === 0) throw new Error("No concurrent indexes found in V16
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 15_000,
+  statement_timeout: 60_000,
   ...(new URL(process.env.DATABASE_URL).hostname === "localhost" || new URL(process.env.DATABASE_URL).hostname === "127.0.0.1"
     ? {}
     : { ssl: { rejectUnauthorized: false } }),
 });
 
 try {
+  process.stderr.write("V168 preflight: connecting to configured database\n");
   await client.connect();
+  process.stderr.write("V168 preflight: database connected; checking Flyway history and indexes\n");
   const failedMigrations = await client.query(`
     SELECT version
     FROM flyway_schema_history
@@ -43,6 +47,7 @@ try {
 
   for (const { index_name: indexName } of invalidIndexes.rows) {
     if (!indexNames.includes(indexName)) throw new Error("Unexpected invalid index in V168 preflight");
+    process.stderr.write(`V168 preflight: dropping invalid index ${indexName}\n`);
     await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${quoteIdentifier(schema.rows[0].schema_name)}.${quoteIdentifier(indexName)}`);
   }
 

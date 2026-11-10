@@ -8794,7 +8794,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 검증 및 배포
 - `npm run deploy:verify` 통과: production build, standalone runtime smoke 및 desktop/mobile hydration, 313 test files passed/1 skipped, 1,635 tests passed/3 skipped, typecheck, docs/API checks, KIS/auth/cron gates.
 - `npm run cron:check`, `node --check scripts/oci-flyway-v168-preflight.mjs`, `git diff --check` 통과.
-- #1292는 Activate release timeout으로 실패했다. 복구 커밋 push가 새 OCI 배포를 트리거한 뒤 운영 app commit 및 `flywayVersion=168`을 확인한다.
+- 최초 #1292는 Activate release 10분 제한으로 실패해 앱 commit `06761a33`, Flyway 167을 확인했다. 복구 커밋 `39791459`의 #1293은 Verify/package/upload까지 통과했으나 Activate 도중 SSH가 `Connection reset by peer`로 끊겨 실패했다(2026-11-10 10:49 UTC). 원격 Flyway 완료 여부는 미확인이다.
+- 이후 공개 root GET은 200을 반환했지만 `/api/health`는 20~60초 timeout, 보호된 debug health도 timeout되어 운영 DB/Flyway 버전을 읽지 못했다. 원격 상태를 안전하게 확인하기 전 재실행하지 않는다.
+- #1293 종료 후에도 root 200, DB health timeout이 이어져 다음 activation 관측성을 보강한다. V168 preflight에 공식 node-postgres 설정 기준 15초 connection timeout, 60초 statement timeout과 단계별 stderr 로그를 추가했고 activation SSH에는 30초 server-alive probe를 설정했다. 변경 후 `deploy:verify`(313 files passed/1 skipped, 1,635 tests passed/3 skipped 포함), `cron:check`, Node 구문검사, `git diff --check` 통과.
 
 ### 남은 위험 및 다음 개선
 - preflight는 V168이 만드는 인덱스명에 한정해 무효 객체를 제거한다. V168에 포함되지 않은 실패 이력이 있으면 자동 repair 없이 실패하므로 별도 수동 조사 대상이다.

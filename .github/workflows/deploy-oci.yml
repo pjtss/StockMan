@@ -120,5 +120,5 @@ jobs:
         env:
           OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH }}
         run: |
-          ssh -i ~/.ssh/oci_key "ubuntu@${{ secrets.OCI_HOST }}" \
+          ssh -i ~/.ssh/oci_key -o ServerAliveInterval=30 -o ServerAliveCountMax=15 "ubuntu@${{ secrets.OCI_HOST }}" \
             "sudo -n install -m 0755 '/tmp/stockman-activate-${{ github.sha }}' /usr/local/sbin/stockman-activate && sudo -n /usr/local/sbin/stockman-activate '$OCI_DEPLOY_PATH' '/tmp/stockman-oci-${{ github.sha }}.tar.gz'"

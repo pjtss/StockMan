@@ -164,10 +164,13 @@ for (const required of [
   if (!activation.includes(required)) throw new Error(`Deployment activation is missing ${required}`);
 }
 if (!workflow.includes("oci-flyway-v168-preflight.mjs")
+  || !workflow.includes("ServerAliveInterval=30")
   || !activation.includes("flyway-repair-v168")
   || !activation.includes("2400s docker run")
   || !/name: Activate release\s+timeout-minutes: 45/.test(workflow)
   || !flywayPreflight.includes("DROP INDEX CONCURRENTLY IF EXISTS")
+  || !flywayPreflight.includes("connectionTimeoutMillis: 15_000")
+  || !flywayPreflight.includes("statement_timeout: 60_000")
   || !flywayPreflight.includes("refusing automatic repair")) {
   throw new Error("OCI Flyway activation must allow a long migration and recover only V168 failed history/invalid indexes");
 }
