@@ -23,7 +23,8 @@ if (!retentionRoute.includes("const DELETE_BATCH_SIZE = 5_000")
 }
 const retentionSchemaRequirements = {
   kr_minute_candles: ["candle_date", "candle_time"], us_minute_candles: ["candle_date", "candle_time"],
-  request_logs: ["created_at"], market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id"],
+  request_logs: ["created_at"], market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id", "published_at", "created_at"],
+  market_rss_bullish_articles: ["published_at", "created_at"],
   sec_source_snapshots: ["source_type", "source_key", "fetched_at", "id"], kis_signal_snapshots: ["fetched_at"],
   discord_delivery_queue: ["status", "updated_at"], kr_minute_fetch_logs: ["fetched_at"], debug_kis_calls: ["observed_at"],
   debug_run_items: ["completed_at"], automation_runs: ["started_at"], kis_realtime_events: ["observed_at"],
@@ -40,6 +41,21 @@ const retentionSchemaRequirements = {
 const migrationFiles = fs.readdirSync(path.resolve("db/migration"))
   .filter((name) => /^V\d+__.*\.sql$/i.test(name))
   .map((name) => ({ name, sql: fs.readFileSync(path.resolve("db/migration", name), "utf8") }));
+const retentionJobs = [...retentionRoute.matchAll(/batchedDelete\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,?\s*\)/gs)]
+  .map(([, table, predicate]) => ({ table, predicate }));
+for (const table of ["market_rss_articles", "market_rss_bullish_articles"]) {
+  const job = retentionJobs.find((entry) => entry.table === table);
+  if (!job
+    || !job.predicate.includes("published_at < NOW() - INTERVAL '7 days'")
+    || !job.predicate.includes("published_at IS NULL")
+    || !job.predicate.includes("created_at < NOW() - INTERVAL '7 days'")) {
+    throw new Error(`${table} must expire after seven days using created_at when published_at is missing`);
+  }
+}
+const bullishRetentionJob = retentionJobs.find((entry) => entry.table === "market_rss_bullish_articles");
+if (!bullishRetentionJob?.predicate.includes("source_article_id IN (SELECT id FROM market_rss_articles")) {
+  throw new Error("Bullish projections linked to expired RSS articles must be removed before their parent rows");
+}
 const migrationSql = migrationFiles.map(({ sql }) => sql).join("\n");
 const retentionMigrationConfig = fs.readFileSync(path.resolve("db/migration/V168__bounded_non_daily_data_retention.sql.conf"), "utf8");
 const deployWorkflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
@@ -89,8 +105,9 @@ for (const dailyCandleTable of ["kr_daily_price_candles", "us_daily_price_candle
 }
 if (!retentionRoute.includes("UPDATE market_rss_articles AS article SET source_snapshot_id = NULL")
   || !retentionRoute.includes("DELETE FROM market_rss_fetch_snapshots AS snapshot USING expired")
-  || retentionRoute.includes("DELETE FROM market_rss_articles")) {
-  throw new Error("RSS feed snapshot cleanup must detach article links while preserving article payloads");
+  || !retentionRoute.includes('"market_rss_articles"')
+  || !retentionRoute.includes('"market_rss_bullish_articles"')) {
+  throw new Error("RSS feed snapshots and seven-day article retention must have separate cleanup paths");
 }
 if (!retentionRoute.includes("snapshot.source_type = 'SUBMISSIONS'")
   || !retentionRoute.includes("newer.source_type = snapshot.source_type")
@@ -98,6 +115,17 @@ if (!retentionRoute.includes("snapshot.source_type = 'SUBMISSIONS'")
   || !retentionRoute.includes("snapshot.fetched_at < NOW() - INTERVAL '365 days'")
   || !retentionRoute.includes("snapshot.fetched_at < NOW() - INTERVAL '180 days'")) {
   throw new Error("SEC source snapshot cleanup must retain each issuer's latest submissions snapshot");
+}
+const rssRetentionMigrationConfigPath = path.resolve("db/migration/V169__rss_article_retention_indexes.sql.conf");
+const rssRetentionMigrationConfig = fs.readFileSync(rssRetentionMigrationConfigPath, "utf8");
+const rssRetentionMigration = migrationFiles.find(({ name }) => name === "V169__rss_article_retention_indexes.sql")?.sql ?? "";
+if (!/^executeInTransaction=false\s*$/m.test(rssRetentionMigrationConfig)
+  || (rssRetentionMigration.match(/CREATE INDEX CONCURRENTLY IF NOT EXISTS/g) ?? []).length !== 3
+  || !rssRetentionMigration.includes("ON market_rss_articles (published_at)")
+  || (rssRetentionMigration.match(/WHERE published_at IS NULL/g) ?? []).length !== 2
+  || !deployWorkflow.includes("cp db/migration/*.sql.conf \"$release_dir/db/migration/\"")
+  || !deployWorkflow.includes("./db/migration/V169__rss_article_retention_indexes.sql.conf")) {
+  throw new Error("V169 must ship concurrent RSS retention indexes outside a Flyway transaction");
 }
 const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
 const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");

@@ -34,6 +34,16 @@ const RETENTION_JOBS: CleanupJob[] = [
   batchedDelete("kr_minute_candles", "candle_date < to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')", "candle_date, candle_time"),
   batchedDelete("us_minute_candles", "candle_date < to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')", "candle_date, candle_time"),
   batchedDelete("request_logs", "created_at < NOW() - INTERVAL '30 days'", "created_at"),
+  batchedDelete(
+    "market_rss_bullish_articles",
+    "published_at < NOW() - INTERVAL '7 days' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '7 days') OR source_article_id IN (SELECT id FROM market_rss_articles WHERE published_at < NOW() - INTERVAL '7 days' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '7 days'))",
+    "published_at ASC NULLS FIRST, created_at ASC",
+  ),
+  batchedDelete(
+    "market_rss_articles",
+    "published_at < NOW() - INTERVAL '7 days' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '7 days')",
+    "published_at ASC NULLS FIRST, created_at ASC",
+  ),
   {
     table: "market_rss_fetch_snapshots",
     query: `WITH expired AS (

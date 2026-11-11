@@ -200,6 +200,8 @@ export const marketRssArticles = pgTable(
   (table) => [
     uniqueIndex("market_rss_articles_source_external_unique").on(table.source, table.externalId),
     index("market_rss_articles_notification_idx").on(table.notificationStatus, table.createdAt),
+    index("market_rss_articles_published_retention_idx").on(table.publishedAt),
+    index("market_rss_articles_null_published_retention_idx").on(table.createdAt).where(sql`${table.publishedAt} IS NULL`),
   ],
 );
 
@@ -235,6 +237,7 @@ export const marketRssBullishArticles = pgTable(
     uniqueIndex("market_rss_bullish_source_external_unique").on(table.source, table.externalId),
     uniqueIndex("market_rss_bullish_source_article_unique").on(table.sourceArticleId),
     index("market_rss_bullish_published_idx").on(table.publishedAt, table.priority),
+    index("market_rss_bullish_articles_null_published_retention_idx").on(table.createdAt).where(sql`${table.publishedAt} IS NULL`),
   ],
 );
 

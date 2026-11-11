@@ -87,6 +87,8 @@ jobs:
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.timer'
           tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V1__initial_schema.sql'
           tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V168__bounded_non_daily_data_retention.sql.conf'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V169__rss_article_retention_indexes.sql'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V169__rss_article_retention_indexes.sql.conf'
 
       - name: Configure SSH
         timeout-minutes: 3

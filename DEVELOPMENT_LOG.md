@@ -8798,7 +8798,34 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 이후 공개 root GET은 200을 반환했지만 `/api/health`는 20~60초 timeout, 보호된 debug health도 timeout되어 운영 DB/Flyway 버전을 읽지 못했다. 원격 상태를 안전하게 확인하기 전 재실행하지 않는다.
 - #1293 종료 후에도 root 200, DB health timeout이 이어져 다음 activation 관측성을 보강한다. V168 preflight에 공식 node-postgres 설정 기준 15초 connection timeout, 60초 statement timeout과 단계별 stderr 로그를 추가했고 activation SSH에는 30초 server-alive probe를 설정했다. 변경 후 `deploy:verify`(313 files passed/1 skipped, 1,635 tests passed/3 skipped 포함), `cron:check`, Node 구문검사, `git diff --check` 통과.
 - #1294는 preflight DB 연결 및 history/index 조회에 성공했고, invalid `kr_minute_fetch_logs_retention_idx`를 `DROP INDEX CONCURRENTLY`로 처리하려다 60초 `statement_timeout`으로 취소됐다. Flyway migrate에는 도달하지 않았다. PostgreSQL 공식 문서상 concurrent drop은 충돌 트랜잭션 완료를 기다린다. DB health diagnostics는 HTTP 503, pool total=10/idle=0/waiting=10을 반환했다. 반복 점검은 중단하고, 다음 preflight는 30초 넘은 xmin snapshot 보유 세션을 읽기 전용 확인해 있으면 로그에 PID/state/wait/transaction age를 남기고 무효 인덱스 변경 전에 중단하도록 한다.
+- #1295 최초 실행과 안전한 failed-job 재실행 모두 SSH 연결은 유지됐지만, V168 preflight가 Flyway 전에 오래된 snapshot holder를 확인해 fail-closed했다. 최초 확인은 17개 holder였고 PID 4178222는 `idle in transaction`, age 5,544초, `ClientRead`; PID 4179132는 relation lock 대기였다. 재실행에서도 같은 PID가 `idle in transaction`, age 6,178초(약 103분)로 유지됐으며 active client/parallel worker snapshot들도 남아 있었다. DB pool 진단은 total=10/idle=0/waiting=10이었다. PID 종료는 미커밋 transaction rollback을 일으키므로 사용자 승인을 요청했으며 Flyway 168은 아직 적용되지 않았다.
+- #1295의 추가 안전 재실행도 같은 preflight blocker로 중단됐다(2026-11-10 11:57 UTC). PID 4178222는 `idle in transaction`, age 6,734초(약 112분)로 계속 존재했고 PID 4179132의 relation lock 대기 및 다수 active/parallel worker snapshot도 확인됐다. 추가 재시도만으로 상태가 바뀌지 않아 중단했다. 사용자 승인 또는 운영자가 해당 transaction을 종료/자연 완료해야 Flyway 168을 진행할 수 있다.
 
 ### 남은 위험 및 다음 개선
 - preflight는 V168이 만드는 인덱스명에 한정해 무효 객체를 제거한다. V168에 포함되지 않은 실패 이력이 있으면 자동 repair 없이 실패하므로 별도 수동 조사 대상이다.
 - 재발 감지는 OCI activation의 GitHub timeout, Flyway migration 단계 로그 및 배포 후 schema version 확인으로 수행한다.
+
+## [2026-11-10] 운영 RSS 7일 자동 정리 정책
+
+- **목적/범위**: 운영 공통 DB retention cron에서 7일이 지난 RSS 기사와 호재 projection을 정리한다. RSS raw fetch snapshot의 180일 보존 및 SEC/DART filing은 바꾸지 않는다.
+- **근본 원인**: V168 retention 경로가 `market_rss_fetch_snapshots` 180일 만료만 처리하고 기사 행은 보존했다.
+- **변경 파일**: `app/api/cron/db-retention/route.ts`, `db/migration/V169__rss_article_retention_indexes.sql` 및 `.conf`, `lib/schema.ts`, `scripts/check-oci-cron.mjs`, OCI artifact workflow, DB/error handling 문서.
+- **동작**: 발행시각이 있으면 `published_at < NOW() - INTERVAL '7 days'`, 없으면 `created_at`으로 만료한다. bullish projection은 자체 만료 또는 expired source article 참조로 먼저 지우고, 이후 부모 기사를 지운다. 기존 5,000행 batch/실행당 최대 3회/`SKIP LOCKED` 정책과 5분 cron을 사용한다.
+- **검증**: `npm.cmd run cron:check`, `npx.cmd tsc --noEmit --incremental false`, `git diff --check` 통과. 사용자 지시에 따라 로컬 PostgreSQL `localhost:5432`에 직접 연결해 `stockman`/PostgreSQL 16.15/Flyway 161을 확인했다. `market_rss_articles`는 총 552행이며 552행이 7일 초과, null-date fallback은 0행이다. 로컬에 `market_rss_bullish_articles`가 없으므로 전체 retention endpoint는 실행하지 않았고 데이터 삭제도 하지 않았다. 기존 개발 로그의 #1295 기록에 따라 Flyway 168 preflight는 오래된 transaction snapshot과 DB pool exhaustion으로 중단된 상태이며 V168은 미적용으로 기록돼 있다. DB 세션 종료나 migration 실행을 재시도하지 않았다.
+- **커밋/푸시/배포**: 보류. 운영 DB blocker 확인 및 사용 가능한 검증 통과 후 진행한다.
+- **후속 확인**: 이번 재확인에서도 GitHub CLI는 이 Windows 환경에 없고 연결된 GitHub 도구는 public GET 중심이라 private deployment workflow 실행·OCI 호스트 접속을 할 수 없었다. 비밀이 포함된 secret store나 workflow 권한을 로컬에서 우회하지 않았다. 공개 `/api/health`는 DB 진단을 반환하지 않는다. 운영 V168의 적용 완료 여부도 확인할 수 없어 activation 재시도는 하지 않았다. 로컬 5432의 Flyway 161과 552개 만료 RSS 행은 이전과 같은 별도 로컬 DB 근거다. 로컬 DB 장기 snapshot holder는 0개였으나 운영 blocker 해소 근거가 아니다.
+## [2026-11-11] 운영 RSS 보존정책 배포 blocker 재확인
+
+- **목적/범위**: 11월 10일 준비한 RSS 7일 자동 삭제를 운영에 활성화할 수 있는지 재확인한다. 운영 DB write·세션 종료·workflow 재실행은 하지 않는다.
+- **현재 근거**: GitHub 공식 Actions REST GET에서 최신 Deploy OCI run #1295 (`42808111103`, SHA `5a4ffbed`)가 2026-11-10 11:57 UTC에 `failure`로 완료된 상태를 확인했다. 공개 운영 `/api/health`는 이번 조회에서 25초 timeout, 보호된 `/api/admin/health-diagnostics`는 인증 없는 GET에 401을 반환했다. 따라서 운영 Flyway version과 현재 snapshot holder 상태를 이 환경에서 판별할 수 없다.
+- **코드 상태**: RSS 7일 batch-delete, V169 concurrent index 및 5분 cron 통합은 로컬 작업트리에 준비되어 있으나 아직 oci에 push/배포되지 않았다. 로컬 5432는 운영 DB와 별개다.
+- **다음 조치**: 운영 호스트에서 read-only Flyway version 및 `pg_stat_activity` snapshot holder 확인 후 DB pool/장기 transaction blocker를 운영자가 해소한다. 그 뒤에만 V168/V169 activation과 cron 결과 검증을 수행한다. 기존 V168 실패가 반복됐으므로 지금 자동 재시도나 PID 종료는 하지 않는다.
+- **검증**: `npm.cmd run cron:check`, `git diff --check` 통과. 커밋·푸시·배포 미실행.
+## [2026-11-11] OCI 운영 PostgreSQL 위치 정정 및 RSS 배포 재개
+
+- **목적/범위**: 운영 DB 위치를 명확히 정정하고 RSS 7일 자동 삭제 배포를 계속한다. 노트북 로컬 DB와 OCI 서버 내부 PostgreSQL을 분리한다.
+- **DB 위치 정정**: 노트북 `localhost:5432`는 Docker `stockman-postgres-local` 컨테이너이며 운영 DB와 별개다. 운영 DB는 OCI 운영 서버 안의 PostgreSQL이다. 배포 workflow는 OCI SSH 접속 후 `/etc/stockman/stockman.env`의 `DATABASE_URL`로 운영 DB에 연결한다. Supabase 제안은 잘못된 경로였다.
+- **운영 실행 로그 확인**: GitHub Actions Deploy OCI #1295 job log를 직접 조회했다. Verify, standalone package, SSH 설정과 release upload는 성공했으며 activation은 운영 서버에서 V168 preflight가 장기 snapshot holder를 발견해 Flyway 전에 fail-closed했다. 기록된 대표 상태는 PID 4178222 `idle in transaction` 6,734초, PID 4179132 relation lock 대기 5,065초 및 다수 active/parallel worker다. 로그는 2026-11-10 시점이며 현재 holder 상태를 대신하지 않는다.
+- **현재 한계와 다음 조치**: OCI 접속 자격은 GitHub Actions secrets에만 있고 노트북 SSH 폴더에는 private key가 없다. 현재 OCI DB live 상태는 운영 workflow 실행으로만 확인 가능하다. 변경분 검증 후 안전한 배포 실행은 V168 preflight에서 holder가 남아 있으면 자동 중단하고, 해소됐으면 V168/V169를 순차 적용한다.
+- **검증/기록**: `npm.cmd run deploy:verify` 통과: production build, standalone runtime/browser smoke, 313 test files passed/1 skipped, 1,635 tests passed/3 skipped, typecheck, docs/API/KIS/auth/cron gates. `git diff --check` 통과. dependency audit는 fast-xml-parser low advisory 1건을 출력했으나 audit gate는 통과했다. 사용자에게 운영 DB가 Supabase 또는 노트북 DB라는 잘못된 설명을 하지 않는다.
+- **커밋·푸시·배포**: 검증 결과 및 workflow 진행 조건 확인 후 기록한다.

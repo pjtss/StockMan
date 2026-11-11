@@ -711,3 +711,17 @@ npm test -- --run
 - **검증 결과**: 2026-11-04-b07 validator가 100 issuer, 4,182 filing, 14 event, 14 accession-event relation, 13 targeted filing으로 통과했다. 전체 docs/deploy 게이트는 진행 중.
 - **남은 위험 및 다음 개선**: 현재 fixture는 하나의 accession이 복수 이벤트를 제공하는 사례 하나다. future fixture에서 여러 이벤트 유형을 확장하고도 고유 source ID가 정확히 연결되는지 계속 검사한다.
 
+- **남은 위험 및 다음 개선**: preflight는 V168이 만드는 인덱스명에 한정해 무효 객체를 제거한다. V168에 포함되지 않은 실패 이력이 있으면 자동 repair 없이 실패하므로 별도 수동 조사 대상이다.
+- 재발 감지는 OCI activation의 GitHub timeout, Flyway migration 단계 로그 및 배포 후 schema version 확인으로 수행한다.
+
+## 2026-11-10 RSS 기사 7일 자동 보존정책 누락
+
+- **증상**: `/api/cron/db-retention`은 raw RSS fetch snapshot을 180일 뒤 정리하지만 `market_rss_articles` 기사와 `market_rss_bullish_articles` projection은 만료시키지 않았다.
+- **근본 원인**: 기존 운영정책은 RSS snapshot만 180일 보존 대상으로 두고, 기사 행은 장기 보존하며 article-level DELETE를 정적 cron gate가 금지했다.
+- **영향 범위**: RSS 기사와 bullish RSS projection. `market_rss_fetch_snapshots`의 180일, SEC/DART 공시, 사용자 생성 데이터 정책은 변경하지 않는다. `published_at`이 없으면 `created_at`으로 7일을 계산한다.
+- **해결 위치**: 공통 retention job에 두 RSS 테이블의 7일 batch-delete를 추가한다. bullish row는 expired source article 연결도 조건에 포함해 parent보다 먼저 정리하며 FK cascade는 동시성 안전망으로 유지한다. V169는 published-date 및 null-date 만료 경로 인덱스를 concurrent로 추가한다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`가 두 table의 정확한 7일 predicate, bullish parent 관계 조건, V169 partial indexes와 migration 배포 포함 여부를 검사한다.
+- **검증 및 영향 확인**: 사용자가 지정한 로컬 PostgreSQL 5432에 직접 연결해 데이터베이스명 `stockman`, PostgreSQL 16.15, Flyway 161을 확인했다. `market_rss_articles`에는 만료 published row 552개와 null-date fallback row 0개가 있으며, local schema에는 `market_rss_bullish_articles`가 없다. 쿼리는 read-only로 수행했고 RSS 행은 삭제하지 않았다. 따라서 로컬에서 전체 retention endpoint를 실행하지 않았다.
+- **DB 위치 정정**: 운영 DB는 Supabase가 아니라 OCI 운영 서버 내부 PostgreSQL이다. `localhost:5432`는 사용자의 노트북에서 Docker로 실행 중인 별도 개발 DB이므로 운영 상태 확인에 사용하지 않는다. OCI deployment workflow는 SSH로 서버에 접속한 뒤 `/etc/stockman/stockman.env`의 `DATABASE_URL`로 운영 DB를 조회한다.
+- **최신 운영 blocker**: 2026-11-10 GitHub Actions Deploy OCI #1295 로그를 직접 확인했다. SSH 접속과 artifact 업로드는 성공했지만 V168 preflight가 이전 transaction snapshot holder를 발견해 Flyway 전에 중단됐다. 오래된 `idle in transaction`, relation lock 대기 및 active parallel worker가 기록됐고, migration은 실행되지 않았다.
+- **남은 위험/다음 단계**: OCI 운영 DB의 현재 blocker가 해소됐는지 운영 서버 경로로 확인한 뒤 V168/V169 migration을 적용하고 retention endpoint의 `deleted`/`failed` 결과를 확인해야 한다. 현재까지 이를 증명하는 새 운영 실행은 없다. 기존 트랜잭션 PID를 강제 종료하지 않는다.

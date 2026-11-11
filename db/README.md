@@ -2,7 +2,7 @@
 
 ## 비일봉 데이터 보존
 
-V168은 보호된 `/api/cron/db-retention`을 통해 만료된 분봉·운영 로그·임시 관측 데이터를 테이블별 5,000행 단위, 실행당 최대 3회 정리합니다. 실행 상한에 도달한 테이블은 다음 5분 cron에서 이어 처리하고, 일부 테이블 실패 시 나머지 정리를 계속한 뒤 HTTP 503과 실패 목록을 반환합니다. PENDING 재시도·전송 중 상태는 보존하고 일봉 캔들 테이블은 삭제 대상에서 제외합니다. RSS 전체 feed snapshot은 180일 뒤 기사 연결을 분리해 삭제하며 기사별 payload는 보존합니다. SEC 제출 snapshot은 이전 이력을 365일, 기타 원문 snapshot은 180일 보존하고 CIK별 최신 제출 snapshot을 유지합니다. KIS 원본 신호 snapshot은 365일 보존합니다.
+V168은 보호된 `/api/cron/db-retention`을 통해 만료된 분봉·운영 로그·임시 관측 데이터를 테이블별 5,000행 단위, 실행당 최대 3회 정리합니다. 실행 상한에 도달한 테이블은 다음 5분 cron에서 이어 처리하고, 일부 테이블 실패 시 나머지 정리를 계속한 뒤 HTTP 503과 실패 목록을 반환합니다. PENDING 재시도·전송 중 상태는 보존하고 일봉 캔들 테이블은 삭제 대상에서 제외합니다. `market_rss_articles`와 `market_rss_bullish_articles`는 발행 후 7일(발행시각이 없으면 저장 후 7일)이 지나면 같은 retention API에서 batch 삭제합니다. bullish projection을 먼저 정리하고 FK cascade는 동시성 안전망으로 유지합니다. RSS 전체 feed snapshot과 raw payload는 별도 보존정책에 따라 180일 보존합니다. SEC 제출 snapshot은 이전 이력을 365일, 기타 원문 snapshot은 180일 보존하고 CIK별 최신 제출 snapshot을 유지합니다. KIS 원본 신호 snapshot은 365일 보존합니다.
 
 대형 테이블의 쓰기 잠금을 피하기 위해 V168은 `CREATE INDEX CONCURRENTLY`를 사용하며 `V168__bounded_non_daily_data_retention.sql.conf`로 Flyway 트랜잭션을 비활성화합니다. 배포 artifact에는 migration `.sql`과 `.sql.conf`가 모두 포함됩니다. Concurrent index build 실패 시 invalid index가 남을 수 있으므로 재시도 전 해당 index를 점검·제거하고 Flyway migration 이력을 repair해야 합니다.
 
@@ -24,3 +24,4 @@ V168은 보호된 `/api/cron/db-retention`을 통해 만료된 분봉·운영 �
 DB·메모리 캐시·외부 호출의 책임 경계와 성능 검증 증거는 [`../docs/architecture/system-module-catalog.md`](../docs/architecture/system-module-catalog.md)에 정리되어 있습니다.
 - `V166__stockman_event_ledger.sql`: 기존 SEC/RSS source row를 보존하며 공통 이벤트, 문서 연결, 불변 분석 revision, 상태 이력 및 정확 decimal 지표 테이블을 추가한다. 배포 전에 forward-only schema audit 및 롤백 계획 검토가 필요하다.
 - `V167__restore_missing_source_analysis_tables.sql`: 운영 collection-status에서 누락을 재현한 `market_rss_llm_analyses`와 `sec_codex_analysis_queue` 및 관련 보조 테이블을 `IF NOT EXISTS`로 복구한다. 이미 존재하는 테이블과 데이터는 변경하지 않는다.
+- `V169__rss_article_retention_indexes.sql`: 발행시각이 없는 RSS 기사 만료 검색용 concurrent index를 추가하며 `.sql.conf`로 트랜잭션을 비활성화한다.
