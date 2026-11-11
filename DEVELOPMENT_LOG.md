@@ -8829,3 +8829,15 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **현재 한계와 다음 조치**: OCI 접속 자격은 GitHub Actions secrets에만 있고 노트북 SSH 폴더에는 private key가 없다. 현재 OCI DB live 상태는 운영 workflow 실행으로만 확인 가능하다. 변경분 검증 후 안전한 배포 실행은 V168 preflight에서 holder가 남아 있으면 자동 중단하고, 해소됐으면 V168/V169를 순차 적용한다.
 - **검증/기록**: `npm.cmd run deploy:verify` 통과: production build, standalone runtime/browser smoke, 313 test files passed/1 skipped, 1,635 tests passed/3 skipped, typecheck, docs/API/KIS/auth/cron gates. `git diff --check` 통과. dependency audit는 fast-xml-parser low advisory 1건을 출력했으나 audit gate는 통과했다. 사용자에게 운영 DB가 Supabase 또는 노트북 DB라는 잘못된 설명을 하지 않는다.
 - **커밋·푸시·배포**: 검증 결과 및 workflow 진행 조건 확인 후 기록한다.
+### 2026-11-11 OCI 배포 #1296 운영 DB preflight 결과
+
+- commit `16036f8b` push 후 Deploy OCI #1296 (`42973304033`)에서 verify/package/SSH/upload 모두 성공했다. activation은 OCI 서버의 PostgreSQL 연결 후 V168 preflight에서 fail-closed했다.
+- 최신 server-side read-only snapshot 목록: PID 4178222 `idle in transaction`, `ClientRead`, transaction age 74,074초(약 20.6시간); PID 4179132 `active`, relation lock wait, age 72,405초(약 20.1시간). 그 외 DataFileRead 및 active client/parallel worker snapshot holder가 남아 있었다.
+- Preflight가 Flyway 전에 종료되어 V168/V169 적용과 release activation은 이뤄지지 않았다. 따라서 7일 RSS 삭제는 아직 운영에서 시작되지 않았다.
+- PID 강제 종료는 해당 미커밋 transaction을 rollback할 수 있고, 나머지 active snapshot holder가 있어 한 PID 종료만으로 해결될지도 불확실하다. 승인 없이 세션을 종료하거나 같은 activation을 반복하지 않는다. 다음은 운영자가 blocker transaction을 자연 종료하거나 종료를 승인한 뒤 재검사한다.
+- 검증/운영: 앞선 `npm.cmd run deploy:verify` 통과(313 test files/1,635 tests, build, runtime smoke). OCI run #1296은 위 DB blocker로 실패. 로컬 노트북 DB 5432는 OCI 운영 DB가 아니다.
+### 승인된 OCI DB 세션 종료 및 preflight 재개
+
+- 사용자 승인을 받은 뒤 one-off recovery workflow로 PID `4178222`만 대상으로 실행했다. 첫 attempt는 configured release path에 `/current`를 중복 추가해 `cd`에서 실패했고 DB 작업은 실행되지 않았다. 경로를 수정한 후 workflow run `42992166984`가 성공했다.
+- OCI 서버에서 target PID가 `idle in transaction`, `ClientRead`, `backend_xmin` 보유, transaction age 82,778초(약 23시간)임을 즉시 재검증했다. `pg_terminate_backend(4178222)`가 `true`를 반환했다. 다른 PID는 종료하지 않았다.
+- **다음 단계**: Deploy OCI를 새로 실행해 V168 preflight를 재검사하고 V168/V169 적용 및 retention cron 결과를 확인한다. 다른 snapshot holder가 남아 있으면 deployment preflight가 계속 fail-closed한다.
