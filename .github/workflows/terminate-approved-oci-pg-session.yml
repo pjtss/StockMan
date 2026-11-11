@@ -41,5 +41,5 @@ jobs:
           set -euo pipefail
           test "${GITHUB_REF_NAME}" = "codex/terminate-oci-pg-4178222"
           test -n "$OCI_DEPLOY_PATH"
-          remote_command="sudo -n bash -lc 'set -euo pipefail; set -a; . /etc/stockman/stockman.env; set +a; cd \"${OCI_DEPLOY_PATH}/current\"; runuser -u stockman -- env OCI_PG_TERMINATION_APPROVED_PID=4178222 DATABASE_URL=\"\$DATABASE_URL\" node --input-type=module - 4178222'"
+          remote_command="sudo -n bash -lc 'set -euo pipefail; set -a; . /etc/stockman/stockman.env; set +a; cd \"${OCI_DEPLOY_PATH}\"; runuser -u stockman -- env OCI_PG_TERMINATION_APPROVED_PID=4178222 DATABASE_URL=\"\$DATABASE_URL\" node --input-type=module - 4178222'"
           ssh -i ~/.ssh/oci_key -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=6 "ubuntu@${OCI_HOST}" "$remote_command" < scripts/terminate-approved-oci-pg-session.mjs
