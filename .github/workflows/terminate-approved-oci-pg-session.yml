@@ -1,0 +1,45 @@
+name: Terminate approved OCI PostgreSQL session
+
+on:
+  push:
+    branches:
+      - codex/terminate-oci-pg-4178222
+
+permissions:
+  contents: read
+
+jobs:
+  terminate-approved-session:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure OCI SSH
+        timeout-minutes: 3
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OCI_HOST"
+          test -n "$OCI_SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -T 10 -H "$OCI_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          printf '%s\n' "$OCI_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+          ssh-keygen -y -f ~/.ssh/oci_key > ~/.ssh/oci_key.pub
+
+      - name: Recheck and terminate only the approved PID
+        timeout-minutes: 3
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_DEPLOY_PATH: ${{ secrets.OCI_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "codex/terminate-oci-pg-4178222"
+          test -n "$OCI_DEPLOY_PATH"
+          remote_command="sudo -n bash -lc 'set -euo pipefail; set -a; . /etc/stockman/stockman.env; set +a; cd \"${OCI_DEPLOY_PATH}/current\"; runuser -u stockman -- env OCI_PG_TERMINATION_APPROVED_PID=4178222 DATABASE_URL=\"\$DATABASE_URL\" node --input-type=module - 4178222'"
+          ssh -i ~/.ssh/oci_key -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=6 "ubuntu@${OCI_HOST}" "$remote_command" < scripts/terminate-approved-oci-pg-session.mjs
