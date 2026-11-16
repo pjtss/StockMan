@@ -8881,11 +8881,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 목적·범위
 - 배포 run `43829487560` (#1299, commit `5c3cb7e0`)가 V168 preflight의 오래된 snapshot 때문에 중단됐다. 사용자 승인은 PID `218746`, `219115` 두 개에 한정한다.
-- 일회성 격리 workflow와 스크립트에서 정확히 두 PID만 원격 재확인하고 종료한다. 다른 client/parallel worker는 대상으로 삼지 않는다.
+- 최초 승인 대상은 PID `218746`, `219115`였다. pair 재확인 시 PID 세트가 맞지 않아 어느 세션도 종료되지 않았다. 뒤이은 배포 preflight는 PID `219115`가 여전히 active snapshot holder라고 확인했고 PID `218746`은 더 이상 표시되지 않았다. 후속 격리 workflow는 승인된 PID `219115` 하나만 재확인한다. 다른 client/parallel worker는 대상으로 삼지 않는다.
 
 ### 재확인 조건·재발 방지
-- 실행 시 두 PID가 모두 현재 DB의 `client backend`, `active`, `backend_xmin` 보유, transaction age 60분 이상일 때만 종료 SQL을 보낸다. 어느 하나라도 조건을 벗어나거나 사전 확인과 종료 SQL 사이에 상태가 달라지면 fail-closed한다.
+- 실행 시 현재 승인 PID가 DB의 `client backend`, `active`, `backend_xmin` 보유, transaction age 60분 이상일 때만 종료 SQL을 보낸다. 조건을 벗어나거나 사전 확인과 종료 SQL 사이에 상태가 달라지면 fail-closed한다.
 - `npm run deploy:verify`가 통과한 격리 브랜치에서만 workflow를 실행한다. 종료 후 대상 PID가 사라졌음을 다시 조회하고, 이어서 Deploy OCI 재시도에서 V168 preflight 및 health check를 확인한다.
 - 커밋 전 검증: dependency audit 0 vulnerabilities; production build/standalone runtime/browser smoke 통과; 전체 Vitest 313 files passed·1 skipped, 1,644 tests passed·3 skipped; typecheck, docs/catalog/migration, API surface, verify-scope, KIS boundary, Bearer auth, OCI cron 검사 통과.
 - 확인 대상: `.github/workflows/terminate-approved-oci-snapshot-holders.yml`, `scripts/terminate-approved-oci-snapshot-holders.mjs`, `DEVELOPMENT_LOG.md`, `docs/ERROR_HANDLING.md`.
-- 실행 결과: 검증 및 사용자 승인 완료 후 기입한다.
+- pair workflow 결과: PID `218746`이 현재 snapshot holder set에 없어 승인 세트 불일치로 종료 없이 중단했다. 뒤이은 Deploy OCI attempt 3도 V168 preflight에서 중단했고, PID `219115`를 active snapshot holder로 확인했다. 승인된 PID `219115` 한 개만 재확인하는 workflow를 별도 격리 브랜치에서 실행할 예정이며, 이후 Deploy OCI 재시도와 운영 확인이 남아 있다.
