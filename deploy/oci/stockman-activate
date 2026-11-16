@@ -27,8 +27,8 @@ chmod +x "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs"
 # Keep hashed static assets from the previous release available for clients
 # that still hold an older HTML document during a browser/proxy cache transition.
 # New assets already present in the incoming release win.
-if [ -d "$DEPLOY_PATH/.next/static" ] && [ -d "$TEMP_PATH/.next/static" ]; then
-  cp -rn "$DEPLOY_PATH/.next/static/." "$TEMP_PATH/.next/static/"
+if [ -d "$DEPLOY_PATH/.next-deploy-verify/static" ] && [ -d "$TEMP_PATH/.next-deploy-verify/static" ]; then
+  cp -rn "$DEPLOY_PATH/.next-deploy-verify/static/." "$TEMP_PATH/.next-deploy-verify/static/"
 fi
 if [ -d "$DEPLOY_PATH/public/_next/static" ] && [ -d "$TEMP_PATH/public/_next/static" ]; then
   cp -rn "$DEPLOY_PATH/public/_next/static/." "$TEMP_PATH/public/_next/static/"

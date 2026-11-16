@@ -43,3 +43,4 @@
 ## 재발 방지 원칙
 
 검증 실패를 경고로 취급하지 않는다. 특히 마이그레이션 충돌, 테스트 실패, 타입 오류, 빌드 실패, runtime smoke test 실패 중 하나라도 있으면 패키징·업로드·활성화로 진행하지 않는다.
+배포 아카이브의 standalone 정적 파일은 설정된 Next distDir(`.next-deploy-verify`) 아래 `static/`과 `server/instrumentation.js` 경로를 포함해야 한다. 패키지 단계에서 이 두 경로를 확인한다.

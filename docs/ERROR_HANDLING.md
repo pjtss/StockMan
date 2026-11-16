@@ -725,3 +725,17 @@ npm test -- --run
 - **DB 위치 정정**: 운영 DB는 Supabase가 아니라 OCI 운영 서버 내부 PostgreSQL이다. `localhost:5432`는 사용자의 노트북에서 Docker로 실행 중인 별도 개발 DB이므로 운영 상태 확인에 사용하지 않는다. OCI deployment workflow는 SSH로 서버에 접속한 뒤 `/etc/stockman/stockman.env`의 `DATABASE_URL`로 운영 DB를 조회한다.
 - **최신 운영 blocker**: 2026-11-11 Deploy OCI #1296은 V168 preflight에서 중단됐다. 사용자 승인 후 OCI recovery workflow가 PID 4178222의 `idle in transaction` 상태와 snapshot 보유를 재확인하고 `pg_terminate_backend` 성공을 받았다. 다른 snapshot holder는 그대로다. 새 Deploy OCI preflight 이후에만 V168/V169 적용 여부를 확정할 수 있다.
 - **남은 위험/다음 단계**: 승인된 PID 4178222에는 terminate signal이 전달됐지만 다른 active/snapshot holder가 계속 보일 수 있다. Deploy OCI 재실행에서 V168 preflight가 남은 blocker를 fail-closed하는지 확인한다. V168/V169 적용과 5분 cron의 RSS `deleted`/`failed` 결과가 확인되기 전까지 자동 삭제 활성화로 판정하지 않는다. 추가 세션 종료는 별도 승인 없이 하지 않는다.
+## OCI standalone 정적 자산 경로 불일치
+
+- **원인**: CI가 Next `distDir`를 `.next-deploy-verify`로 지정했지만 verifier, package archive, activation 보존 경로는 기본 `.next/`를 가정했다. 이 경우 서버 instrumentation 또는 JS chunk가 누락될 수 있다.
+- **수정**: `scripts/verify-deploy.mjs`, `.github/workflows/deploy-oci.yml`, `deploy/oci/stockman-activate`에서 설정된 distDir을 일치시키고 CI archive 검사에서 instrumentation 및 hashed chunk를 요구한다.
+- **재발 자동 감지**: `npm run deploy:verify` standalone runtime smoke와 `Deploy OCI` package assertions.
+- **검증**: `deploy:verify` 통과, 실제 standalone `/charts`와 JavaScript chunk HTTP 200.
+- **남은 위험**: OCI activation health check에서 실제 운영 결과를 확인한다.
+
+## RSS XML 입력 또는 화면 polling 실패
+
+- **원인 후보**: 잘못된 XML, 비정상적인 DART channel/item, 과도한 응답 크기, 잘못된 기사 응답 형식, 겹치는 polling 요청.
+- **대응**: `lib/rss.ts`에서 XML/channel/date/URL을 검증하고 중복 receipt를 제거한다. fetch는 시간·크기·content-type 제한을 적용한다. `components/use-feed-data.ts`는 이전 요청을 취소하고 payload shape를 검사한다.
+- **재발 감지**: `lib/rss.test.ts`와 전체 Vitest suite에서 malformed/oversized/duplicate 입력과 polling 응답을 검증한다.
+- **운영 주의**: 실패한 RSS 항목은 정상 기사로 취급하지 않는다.

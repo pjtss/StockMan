@@ -8841,3 +8841,23 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 사용자 승인을 받은 뒤 one-off recovery workflow로 PID `4178222`만 대상으로 실행했다. 첫 attempt는 configured release path에 `/current`를 중복 추가해 `cd`에서 실패했고 DB 작업은 실행되지 않았다. 경로를 수정한 후 workflow run `42992166984`가 성공했다.
 - OCI 서버에서 target PID가 `idle in transaction`, `ClientRead`, `backend_xmin` 보유, transaction age 82,778초(약 23시간)임을 즉시 재검증했다. `pg_terminate_backend(4178222)`가 `true`를 반환했다. 다른 PID는 종료하지 않았다.
 - **다음 단계**: Deploy OCI를 새로 실행해 V168 preflight를 재검사하고 V168/V169 적용 및 retention cron 결과를 확인한다. 다른 snapshot holder가 남아 있으면 deployment preflight가 계속 fail-closed한다.
+## [2026-11-16] RSS 파서 방어 강화 및 OCI 배포 산출물 경로 수정
+
+### 목표와 범위
+- DART RSS 입력 검증과 화면 polling의 중복 요청/응답 검증을 보강하고, OCI 배포 아카이브가 실제 Next distDir 경로를 포함하도록 수정한다.
+
+### 반영 및 확인 대상
+- `lib/rss.ts`, `lib/rss.test.ts`, `components/use-feed-data.ts`: XML/채널/날짜 검증, receipt 중복 제거, DART URL 정규화, 응답 크기·형식 검사, polling 취소와 payload 검사.
+- `.github/workflows/deploy-oci.yml`, `scripts/verify-deploy.mjs`, `deploy/oci/stockman-activate`: `.next-deploy-verify` 기준 static/instrumentation 경로 일치.
+- `docs/operations/deployment-checklist.md`, `deploy/oci/README.md`: 아카이브 계약 문서화.
+- 커밋·푸시·배포: 미실행. 운영 배포 후 확인 대기.
+
+### 검증
+- `npm run deploy:verify` 통과: 빌드, 전체 테스트(1,640 passed/3 skipped), typecheck, 문서/API/인증/cron 게이트, standalone runtime 및 브라우저 smoke.
+- `npx vitest run lib/rss.test.ts` 9/9 통과, `npm audit --audit-level=moderate` 취약점 0. standalone 실행에서 `/charts`와 참조 JavaScript 청크 HTTP 200 확인. CI package assertion은 instrumentation/static 경로를 검사하도록 갱신.
+
+### 근본 원인과 재발 감지
+- Next standalone의 실제 출력은 설정된 distDir 아래 `server/instrumentation.js`와 `static/`을 두지만 패키지/활성화 경로는 기본 `.next/`를 가정했다. OCI 패키지 smoke 검증에서 두 distDir 경로를 검사한다.
+
+### 남은 위험 및 다음 개선
+- 운영 DB에 장기 PostgreSQL snapshot 세션이 남으면 V168 사전 점검이 안전하게 활성화를 거부한다. 세션이 해소된 뒤 배포 workflow가 통과하고 health check가 성공하는지 확인한다.
