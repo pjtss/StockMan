@@ -1,4 +1,4 @@
-import { XMLParser } from "fast-xml-parser";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
 import type { DartItem, DartJudgment, FeedPayload } from "@/lib/types";
 import { calculateDartScore } from "./scoring";
 
@@ -11,6 +11,8 @@ const parser = new XMLParser({
 });
 
 const DART_URL = "https://dart.fss.or.kr/api/todayRSS.xml";
+const MAX_RSS_BYTES = 2 * 1024 * 1024;
+const RSS_TIMEOUT_MS = 10_000;
 
 const SEOUL_TIME_ZONE = "Asia/Seoul";
 
@@ -109,13 +111,39 @@ type DartRawItem = {
 };
 
 function extractRceptNo(link: string): string {
-  const match = link.match(/rcpNo=(\d{14})/);
-  return match ? match[1] : "";
+  try {
+    const url = new URL(link);
+    const receiptNos = url.searchParams.getAll("rcpNo");
+    const rawQuery = url.search.startsWith("?") ? url.search.slice(1) : "";
+    if (
+      url.protocol !== "https:" ||
+      url.hostname !== "dart.fss.or.kr" ||
+      url.port !== "" ||
+      url.pathname !== "/dsaf001/main.do" ||
+      url.username !== "" ||
+      url.password !== "" ||
+      url.hash !== "" ||
+      receiptNos.length !== 1 ||
+      !/^rcpNo=\d{14}$/.test(rawQuery) ||
+      !/^\d{14}$/.test(receiptNos[0])
+    ) {
+      return "";
+    }
+    return receiptNos[0];
+  } catch {
+    return "";
+  }
 }
 
 export function parseDartItems(xml: string, todayInSeoul: string): DartItem[] {
+  if (typeof xml !== "string" || xml.length === 0 || xml.length > MAX_RSS_BYTES) return [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(todayInSeoul) || Number.isNaN(Date.parse(`${todayInSeoul}T00:00:00Z`))) return [];
+  if (XMLValidator.validate(xml) !== true) return [];
   const parsed = parser.parse(xml);
-  return ensureArray<DartRawItem>(parsed?.rss?.channel?.item)
+  const channel = parsed?.rss?.channel;
+  if (!channel || typeof channel !== "object") return [];
+  const seen = new Set<string>();
+  return ensureArray<DartRawItem>(channel.item)
     .map((item) => {
       const title = normalizeText(item.title);
       const publishedAt = normalizeText(item.pubDate);
@@ -124,7 +152,11 @@ export function parseDartItems(xml: string, todayInSeoul: string): DartItem[] {
         return null;
       }
 
-      const link = normalizeText(item.link);
+      const candidateLink = normalizeText(item.link);
+      const rceptNo = extractRceptNo(candidateLink);
+      const identity = rceptNo || `${title}\u0000${publishedAt}`;
+      if (seen.has(identity)) return null;
+      seen.add(identity);
       return {
         source: "DART" as const,
         company: extractDartCompany(title),
@@ -132,8 +164,8 @@ export function parseDartItems(xml: string, todayInSeoul: string): DartItem[] {
         judgment,
         keywords: extractDartKeywords(title),
         publishedAt,
-        link,
-        rceptNo: extractRceptNo(link),
+        link: rceptNo ? `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${rceptNo}` : "",
+        rceptNo,
       };
     })
     .filter((item): item is DartItem => item !== null);
@@ -143,6 +175,7 @@ export async function fetchDartFeed(): Promise<FeedPayload<DartItem>> {
   const todayInSeoul = getTodayInSeoul();
   const response = await fetch(DART_URL, {
     cache: "no-store",
+    signal: AbortSignal.timeout(RSS_TIMEOUT_MS),
     headers: {
       Accept: "application/rss+xml, application/xml, text/xml",
     },
@@ -152,7 +185,21 @@ export async function fetchDartFeed(): Promise<FeedPayload<DartItem>> {
     throw new Error(`DART RSS 요청 실패: ${response.status}`);
   }
 
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (contentType && !/(rss|xml|text\/plain)/.test(contentType)) {
+    throw new Error("DART RSS 응답 형식이 XML이 아닙니다.");
+  }
+
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RSS_BYTES) {
+    throw new Error("DART RSS 응답 크기가 제한을 초과했습니다.");
+  }
+
   const xml = await response.text();
+  if (new TextEncoder().encode(xml).byteLength > MAX_RSS_BYTES) {
+    throw new Error("DART RSS 응답 크기가 제한을 초과했습니다.");
+  }
+  if (XMLValidator.validate(xml) !== true) throw new Error("DART RSS XML 구문이 올바르지 않습니다.");
   const items = sortByPublishedAtDesc(parseDartItems(xml, todayInSeoul));
 
   return {

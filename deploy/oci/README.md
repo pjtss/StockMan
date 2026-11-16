@@ -36,9 +36,9 @@ npm run build
 
 OCI에는 다음 항목을 배포합니다.
 
-- `.next/standalone`
-- `.next/static` -> `.next/standalone/.next/static`
-- `public` -> `.next/standalone/public`
+- `.next-deploy-verify/standalone`
+- `.next-deploy-verify/static` -> `.next-deploy-verify/standalone/.next-deploy-verify/static`
+- `public` -> `.next-deploy-verify/standalone/public`
 - `scripts/oci-cron.sh`
 
 `public`에는 외부 API discovery 파일(`/openapi.json`, `/api-reference.md`, `/llms.txt`)이 포함된다. 배포 smoke verification은 standalone에서 세 파일이 HTTP 200으로 제공되고 OpenAPI 공개 경로가 유지되는지 확인한다.

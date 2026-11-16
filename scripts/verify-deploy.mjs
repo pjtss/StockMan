@@ -191,7 +191,7 @@ async function waitForTcpListener(port, child, timeoutMs = 30_000) {
 async function verifyRuntime() {
   const port = process.env.DEPLOY_VERIFY_PORT || await findAvailablePort();
   const staticSource = `${verifyDistDir}/static`;
-  const staticTarget = `${verifyDistDir}/standalone/.next/static`;
+  const staticTarget = `${verifyDistDir}/standalone/${verifyDistDir}/static`;
   const publicStaticTarget = `${verifyDistDir}/standalone/public/_next/static`;
   if (!existsSync(staticSource)) throw new Error(`Standalone package smoke failed: missing ${staticSource}`);
   const standaloneRoot = `${verifyDistDir}/standalone`;
@@ -209,7 +209,7 @@ async function verifyRuntime() {
   // directory is platform-dependent and can produce static/static nesting.
   rmSync(staticTarget, { recursive: true, force: true });
   rmSync(publicStaticTarget, { recursive: true, force: true });
-  mkdirSync(`${verifyDistDir}/standalone/.next`, { recursive: true });
+  mkdirSync(`${verifyDistDir}/standalone/${verifyDistDir}`, { recursive: true });
   mkdirSync(`${verifyDistDir}/standalone/public/_next`, { recursive: true });
   cpSync(staticSource, staticTarget, { recursive: true });
   cpSync(staticSource, publicStaticTarget, { recursive: true });

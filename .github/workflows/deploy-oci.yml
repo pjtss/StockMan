@@ -33,6 +33,7 @@ jobs:
         env:
           STOCKMAN_BUILD_VERSION: ${{ github.sha }}
           STOCKMAN_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.run_started_at }}
+          NEXT_DIST_DIR: .next-deploy-verify
         run: npm run deploy:verify
 
       - name: Package Next.js standalone
@@ -40,18 +41,19 @@ jobs:
         env:
           STOCKMAN_BUILD_VERSION: ${{ github.sha }}
           STOCKMAN_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.run_started_at }}
+          NEXT_DIST_DIR: .next-deploy-verify
         run: |
           set -euo pipefail
           release_dir=.next-deploy-verify/standalone
           test -f "$release_dir/server.js"
           test -f "$release_dir/node_modules/pg/package.json"
-          mkdir -p "$release_dir/public/_next/static" "$release_dir/.next/static" "$release_dir/scripts" "$release_dir/deploy/oci" "$release_dir/db/migration" "$release_dir/data"
+          mkdir -p "$release_dir/public/_next/static" "$release_dir/.next-deploy-verify/static" "$release_dir/scripts" "$release_dir/deploy/oci" "$release_dir/db/migration" "$release_dir/data"
           # Next standalone does not include hashed client assets by itself.
           # Without this copy, HTML returns 200 while every app chunk returns 404.
-          cp -r .next-deploy-verify/static/. "$release_dir/.next/static/"
+          cp -r .next-deploy-verify/static/. "$release_dir/.next-deploy-verify/static/"
           cp -r public/. "$release_dir/public/"
           # Keep a public fallback for runtimes that do not resolve the standalone
-          # .next/static directory after an atomic release switch.
+          # configured Next distDir static directory after an atomic release switch.
           cp -r .next-deploy-verify/static/. "$release_dir/public/_next/static/"
           cp scripts/oci-cron.sh "$release_dir/scripts/oci-cron.sh"
           cp scripts/oci-flyway-v168-preflight.mjs "$release_dir/scripts/oci-flyway-v168-preflight.mjs"
@@ -75,7 +77,8 @@ jobs:
           tar -czf stockman-oci.tar.gz -C "$release_dir" .
           tar -tzf stockman-oci.tar.gz | grep -Fx './server.js'
           tar -tzf stockman-oci.tar.gz | grep -Fx './build-info.json'
-          test "$(tar -tzf stockman-oci.tar.gz | grep -c '/.next/static/chunks/.*\.js$')" -gt 0
+          tar -tzf stockman-oci.tar.gz | grep -Fx './.next-deploy-verify/server/instrumentation.js'
+          test "$(tar -tzf stockman-oci.tar.gz | grep -c '/.next-deploy-verify/static/chunks/.*\.js$')" -gt 0
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-cron.sh'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-flyway-v168-preflight.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/import-market-impact-events.mjs'
