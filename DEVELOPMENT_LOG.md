@@ -8889,3 +8889,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 커밋 전 검증: dependency audit 0 vulnerabilities; production build/standalone runtime/browser smoke 통과; 전체 Vitest 313 files passed·1 skipped, 1,644 tests passed·3 skipped; typecheck, docs/catalog/migration, API surface, verify-scope, KIS boundary, Bearer auth, OCI cron 검사 통과.
 - 확인 대상: `.github/workflows/terminate-approved-oci-snapshot-holders.yml`, `scripts/terminate-approved-oci-snapshot-holders.mjs`, `DEVELOPMENT_LOG.md`, `docs/ERROR_HANDLING.md`.
 - pair workflow 결과: PID `218746`이 현재 snapshot holder set에 없어 승인 세트 불일치로 종료 없이 중단했다. 뒤이은 Deploy OCI attempt 3도 V168 preflight에서 중단했고, PID `219115`를 active snapshot holder로 확인했다. 승인된 PID `219115` 한 개만 재확인하는 workflow를 별도 격리 브랜치에서 실행할 예정이며, 이후 Deploy OCI 재시도와 운영 확인이 남아 있다.
+
+### 승인 범위 갱신 — 2026-11-16
+- 사용자가 2026-11-16 Deploy OCI attempt 5 preflight에서 관측된 client PID `220694`, `220331`, `220958`, `221333`, `221753`, `222632`, `222565`, `223360` 중 실행 시점에도 active snapshot holder이며 transaction age 60분 이상인 PID만 종료하도록 승인했다.
+- 전용 workflow를 같은 명시 승인 PID 집합으로 갱신했다. 사전 조회 이후 종료 SQL에서도 현재 `client backend`, `active`, `backend_xmin` 보유, 60분 이상 조건을 재검사하고, 그 시점에 모두 부합하는 승인 PID 부분집합만 종료한다. 조건 미달 PID 및 parallel worker는 건너뛰며, 종료된 PID가 `pg_stat_activity`에서 사라졌는지 확인한다.
+- 자동 감지: 실행 직전 DB 상태 조회와 종료 SQL 내부 재검증이 각각 불일치 시 fail-closed하고, 워크플로 로그에 전체 승인 PID 중 관측·대상·종료 PID를 남긴다.
+- 남은 위험/다음 단계: 허용된 종료로도 모든 장기 snapshot이 해소되지 않으면 OCI 배포 preflight는 계속 중단된다. 종료 workflow 완료 후 Deploy OCI를 재시도하고 V168 migration 및 health check를 확인한다. 두 ㄷㅊㅇ snapshot 명령은 새 공개 API가 운영에 활성화되고 정상 응답한 다음 실행한다.
