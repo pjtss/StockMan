@@ -1,6 +1,6 @@
 import pg from "pg";
 
-const APPROVED_PIDS = [218746, 219115];
+const APPROVED_PIDS = [219115];
 const MIN_TRANSACTION_AGE_SECONDS = 60 * 60;
 const approvedPidsMarker = process.env.OCI_PG_TERMINATION_APPROVED_PIDS;
 
@@ -17,7 +17,7 @@ const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
   connectionTimeoutMillis: 10_000,
   statement_timeout: 15_000,
-  application_name: "codex-approved-pg-snapshot-termination-218746-219115",
+  application_name: "codex-approved-pg-snapshot-termination-219115",
 });
 
 const currentTargetsSql = `

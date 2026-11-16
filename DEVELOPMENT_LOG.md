@@ -8887,5 +8887,6 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 실행 시 두 PID가 모두 현재 DB의 `client backend`, `active`, `backend_xmin` 보유, transaction age 60분 이상일 때만 종료 SQL을 보낸다. 어느 하나라도 조건을 벗어나거나 사전 확인과 종료 SQL 사이에 상태가 달라지면 fail-closed한다.
 - `npm run deploy:verify`가 통과한 격리 브랜치에서만 workflow를 실행한다. 종료 후 대상 PID가 사라졌음을 다시 조회하고, 이어서 Deploy OCI 재시도에서 V168 preflight 및 health check를 확인한다.
 - 커밋 전 검증: dependency audit 0 vulnerabilities; production build/standalone runtime/browser smoke 통과; 전체 Vitest 313 files passed·1 skipped, 1,644 tests passed·3 skipped; typecheck, docs/catalog/migration, API surface, verify-scope, KIS boundary, Bearer auth, OCI cron 검사 통과.
+- 첫 승인 workflow 재확인에서는 PID 218746이 사라져 두 PID 동시 조건이 충족되지 않았다. 아무 세션도 종료하지 않았다. 다음 재확인은 승인된 잔여 PID 219115만 대상으로 하며 다른 PID는 제외한다.
 - 확인 대상: `.github/workflows/terminate-approved-oci-snapshot-holders.yml`, `scripts/terminate-approved-oci-snapshot-holders.mjs`, `DEVELOPMENT_LOG.md`, `docs/ERROR_HANDLING.md`.
 - 실행 결과: 검증 및 사용자 승인 완료 후 기입한다.
