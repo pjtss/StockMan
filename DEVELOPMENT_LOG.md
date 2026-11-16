@@ -8876,3 +8876,16 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, Next production build, standalone server/API documentation/browser smoke, Vitest 313 files·1 skipped / 1,644 tests·3 skipped, TypeScript, docs/catalog/migration audit, public API surface 186 routes·47 public GETs, bearer-auth, verify-scope, KIS boundary, cron check. 단축어 API route test는 6개 통과했다.
 - 운영 배포 전 실제 공개 API는 기존에 `universe=true` 요청에 HTTP 400 `INVALID_QUERY`를 반환했으며 두 JSON snapshot은 아직 없다. 배포 후 `/api/health`, 무인증 universe 조회, US/KR snapshot의 대상·누락·거래일·fetchedAt을 확인하고 결과를 후속 기록한다.
 - 배포 방법: 변경 세트의 검증 완료 후 `oci` 브랜치에 fast-forward push하여 `Deploy OCI` workflow를 실행한다. DB migration 없음.
+
+## [2026-11-16] 승인된 OCI snapshot holder 종료 및 배포 재개
+
+### 목적·범위
+- 배포 run `43829487560` (#1299, commit `5c3cb7e0`)가 V168 preflight의 오래된 snapshot 때문에 중단됐다. 사용자 승인은 PID `218746`, `219115` 두 개에 한정한다.
+- 일회성 격리 workflow와 스크립트에서 정확히 두 PID만 원격 재확인하고 종료한다. 다른 client/parallel worker는 대상으로 삼지 않는다.
+
+### 재확인 조건·재발 방지
+- 실행 시 두 PID가 모두 현재 DB의 `client backend`, `active`, `backend_xmin` 보유, transaction age 60분 이상일 때만 종료 SQL을 보낸다. 어느 하나라도 조건을 벗어나거나 사전 확인과 종료 SQL 사이에 상태가 달라지면 fail-closed한다.
+- `npm run deploy:verify`가 통과한 격리 브랜치에서만 workflow를 실행한다. 종료 후 대상 PID가 사라졌음을 다시 조회하고, 이어서 Deploy OCI 재시도에서 V168 preflight 및 health check를 확인한다.
+- 커밋 전 검증: dependency audit 0 vulnerabilities; production build/standalone runtime/browser smoke 통과; 전체 Vitest 313 files passed·1 skipped, 1,644 tests passed·3 skipped; typecheck, docs/catalog/migration, API surface, verify-scope, KIS boundary, Bearer auth, OCI cron 검사 통과.
+- 확인 대상: `.github/workflows/terminate-approved-oci-snapshot-holders.yml`, `scripts/terminate-approved-oci-snapshot-holders.mjs`, `DEVELOPMENT_LOG.md`, `docs/ERROR_HANDLING.md`.
+- 실행 결과: 검증 및 사용자 승인 완료 후 기입한다.
