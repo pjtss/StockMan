@@ -47,6 +47,7 @@
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 전체 전달 생명주기: [`development/delivery-lifecycle.md`](./development/delivery-lifecycle.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
+- 대화 단축어와 운영 API 일봉 JSON 스냅샷 절차: [`operations/shortcuts.md`](./operations/shortcuts.md)
 - RSS 번역 상태 공개 검수 API: [`operations/market-rss-translation-debug-api.md`](./operations/market-rss-translation-debug-api.md)
 - 공시 기반 일별 주가 영향 이벤트 JSON·DB·API·작성 가이드 API: [`architecture/market-impact-events-design.md`](./architecture/market-impact-events-design.md)
 - 해외 뉴스 탭 10초 자동 갱신: [`operations/market-news-auto-refresh.md`](./operations/market-news-auto-refresh.md)

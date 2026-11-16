@@ -8861,3 +8861,18 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 남은 위험 및 다음 개선
 - 운영 DB에 장기 PostgreSQL snapshot 세션이 남으면 V168 사전 점검이 안전하게 활성화를 거부한다. 세션이 해소된 뒤 배포 workflow가 통과하고 health check가 성공하는지 확인한다.
+## [2026-11-16] 운영 API 활성 보통주 일봉 JSON 단축어 배포
+
+### 목표·범위
+- `ㄷㅊㅇ5`·`ㄷㅊㅇ6`으로 운영 공식 활성 미국·국내 COMMON_STOCK 유니버스와 종목별 최근 120개 일봉을 조회해 문서 JSON으로 관리한다.
+- 운영 API에 공개, 무인증 `universe=true` 페이지 조회 기능을 추가하고 일봉 응답에 종목명과 봉별 갱신시각을 보존한다.
+
+### 구현·재발 방지
+- 일봉 API는 기존 공식 마스터의 enabled/common-stock 및 상품 제외 필터를 적용해 최대 100종목의 universe page와 전체 개수를 반환한다. API surface audit/OpenAPI 및 route inventory도 함께 관리한다.
+- snapshot 실행기는 거래소별 유니버스 페이지를 모두 읽고, 최대 100종목 단위로 일봉을 요청한다. 종목 식별자, 날짜, OHLCV, fetchedAt, 응답 수를 검증하며 누락은 별도 기록한다. 요청 또는 데이터 검증 실패 시 기존 JSON을 그대로 보존한다.
+- 자동 감지: route test의 universe pagination/경계 검사, `audit:api-surface`, 스냅샷의 fail-closed 검증과 기존 파일 원자 교체.
+
+### 검증·운영 결과
+- `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, Next production build, standalone server/API documentation/browser smoke, Vitest 313 files·1 skipped / 1,644 tests·3 skipped, TypeScript, docs/catalog/migration audit, public API surface 186 routes·47 public GETs, bearer-auth, verify-scope, KIS boundary, cron check. 단축어 API route test는 6개 통과했다.
+- 운영 배포 전 실제 공개 API는 기존에 `universe=true` 요청에 HTTP 400 `INVALID_QUERY`를 반환했으며 두 JSON snapshot은 아직 없다. 배포 후 `/api/health`, 무인증 universe 조회, US/KR snapshot의 대상·누락·거래일·fetchedAt을 확인하고 결과를 후속 기록한다.
+- 배포 방법: 변경 세트의 검증 완료 후 `oci` 브랜치에 fast-forward push하여 `Deploy OCI` workflow를 실행한다. DB migration 없음.

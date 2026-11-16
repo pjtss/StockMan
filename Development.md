@@ -1,5 +1,8 @@
 # Development
 
+## 2026-11-16
+- **[운영 API 일봉 JSON 단축어]** `ㄷㅊㅇ5`·`ㄷㅊㅇ6`으로 활성 미국·국내 보통주 최근 120개 일봉을 운영 공개 API에서 받아 프로젝트 JSON 스냅샷으로 관리한다. API 유니버스 목록은 공식 COMMON_STOCK 필터를 적용한 페이지 조회이며, 결과 검증 후에만 JSON 파일을 원자 교체한다. 상세 기준은 `docs/operations/shortcuts.md`를 참고한다.
+
 ## 2026-10-28
 - **[외부 읽기 API 문서화]** 원격 `oci` 브랜치의 169개 API route를 권한별로 분류하고 외부 AI용 읽기 GET 35개를 OpenAPI 3.1.1, 상세 매뉴얼, `/llms.txt` discovery에 연결했다. 민감·쓰기·부수효과 경로는 제외했으며, 생성·drift 감사 및 standalone HTTP smoke를 추가했다.
 

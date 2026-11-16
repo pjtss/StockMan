@@ -69,6 +69,9 @@ function queryParameters(source, path) {
     },
     "/api/public/daily-candles": {
       market: { type: "string", enum: ["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"], required: true },
+      universe: { type: "boolean", description: "true이면 운영 공식 활성 COMMON_STOCK 종목 목록을 페이지 조회합니다. code/codes와 함께 사용할 수 없습니다." },
+      offset: { type: "integer", minimum: 0, default: 0, description: "universe=true 페이지 시작 위치." },
+      pageSize: { type: "integer", minimum: 1, maximum: 100, default: 100, description: "universe=true 페이지 크기." },
       code: { type: "string", description: "단일 종목 코드. codes와 함께 쓰지 않습니다." },
       codes: { type: "string", description: "쉼표로 구분한 최대 100개 종목 코드." },
       timeframe: { type: "string", enum: ["D", "W", "M"], default: "D" },

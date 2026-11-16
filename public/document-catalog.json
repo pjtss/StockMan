@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 138,
+  "documentCount": 139,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -893,6 +893,17 @@
       ]
     },
     {
+      "id": "operations-shortcuts",
+      "title": "대화 단축어",
+      "category": "operations",
+      "format": "md",
+      "description": "이 문서는 사용자가 대화에서 단축어를 입력했을 때 수행할 기준과 응답 형식을 관리한다. 조회 단축어는 운영 서버의 read-only 데이터 조회만 수행한다. 캐시 동기화 단축어는 운영 공개 API에서 데이터를 읽어 로컬 DB에 저장하며, 운영 DB에는 직접 접속하거나 쓰지 않는다.",
+      "url": "/manuals/operations/shortcuts.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/shortcuts.md",
+      "related": []
+    },
+    {
       "id": "operations-us-2026-dilution-review-request",
       "title": "미국 보통주 2026년 자금조달·희석 위험 조사 — 진행 기록",
       "category": "operations",
@@ -1583,6 +1594,7 @@
         "docs/development/conventions.md",
         "docs/development/delivery-lifecycle.md",
         "docs/operations/runbook.md",
+        "docs/operations/shortcuts.md",
         "docs/operations/market-rss-translation-debug-api.md",
         "docs/architecture/market-impact-events-design.md",
         "docs/operations/market-news-auto-refresh.md",
@@ -1710,6 +1722,11 @@
           "title": "운영 런북",
           "url": "/manuals/operations/runbook.md",
           "sourcePath": "docs/operations/runbook.md"
+        },
+        {
+          "title": "대화 단축어",
+          "url": "/manuals/operations/shortcuts.md",
+          "sourcePath": "docs/operations/shortcuts.md"
         },
         {
           "title": "RSS 번역 상태 검수 API",

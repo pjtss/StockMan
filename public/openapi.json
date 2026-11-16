@@ -1619,6 +1619,31 @@
             }
           },
           {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "universe=true 페이지 시작 위치."
+            },
+            "description": "universe=true 페이지 시작 위치."
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100,
+              "description": "universe=true 페이지 크기."
+            },
+            "description": "universe=true 페이지 크기."
+          },
+          {
             "name": "timeframe",
             "in": "query",
             "required": false,
@@ -1631,6 +1656,16 @@
               ],
               "default": "D"
             }
+          },
+          {
+            "name": "universe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true이면 운영 공식 활성 COMMON_STOCK 종목 목록을 페이지 조회합니다. code/codes와 함께 사용할 수 없습니다."
+            },
+            "description": "true이면 운영 공식 활성 COMMON_STOCK 종목 목록을 페이지 조회합니다. code/codes와 함께 사용할 수 없습니다."
           }
         ],
         "security": [],
