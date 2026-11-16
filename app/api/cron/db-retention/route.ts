@@ -36,12 +36,12 @@ const RETENTION_JOBS: CleanupJob[] = [
   batchedDelete("request_logs", "created_at < NOW() - INTERVAL '30 days'", "created_at"),
   batchedDelete(
     "market_rss_bullish_articles",
-    "published_at < NOW() - INTERVAL '7 days' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '7 days') OR source_article_id IN (SELECT id FROM market_rss_articles WHERE published_at < NOW() - INTERVAL '7 days' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '7 days'))",
+    "published_at < NOW() - INTERVAL '24 hours' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '24 hours') OR source_article_id IN (SELECT id FROM market_rss_articles WHERE published_at < NOW() - INTERVAL '24 hours' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '24 hours'))",
     "published_at ASC NULLS FIRST, created_at ASC",
   ),
   batchedDelete(
     "market_rss_articles",
-    "published_at < NOW() - INTERVAL '7 days' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '7 days')",
+    "published_at < NOW() - INTERVAL '24 hours' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '24 hours')",
     "published_at ASC NULLS FIRST, created_at ASC",
   ),
   {

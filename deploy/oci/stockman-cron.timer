@@ -1,8 +1,8 @@
 [Unit]
-Description=Run Stockman automation every five minutes
+Description=Run Stockman automation every hour
 
 [Timer]
-OnCalendar=*:0/5
+OnCalendar=hourly
 Persistent=true
 
 [Install]

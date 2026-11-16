@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 function isoDate(value: string | null) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
 }
 
 export async function GET(request: Request) {
@@ -14,9 +14,11 @@ export async function GET(request: Request) {
   const ticker = (params.get("ticker") ?? "").trim().toUpperCase();
   const from = isoDate(params.get("from"));
   const to = isoDate(params.get("to"));
-  const rawLimit = Number(params.get("limit") ?? 50);
-  const limit = Number.isSafeInteger(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 50;
-  if (params.has("from") && !from || params.has("to") && !to) return NextResponse.json({ ok: false, error: "INVALID_DATE" }, { status: 400 });
+  const rawLimit = params.get("limit");
+  const limit = rawLimit === null || rawLimit.trim() === "" ? 50 : (/^\d+$/.test(rawLimit) ? Number(rawLimit) : Number.NaN);
+  if (ticker && !/^[A-Z][A-Z0-9.-]{0,14}$/.test(ticker)) return NextResponse.json({ ok: false, error: "INVALID_TICKER" }, { status: 400 });
+  if (params.has("from") && !from || params.has("to") && !to || from && to && from >= to) return NextResponse.json({ ok: false, error: "INVALID_DATE_RANGE" }, { status: 400 });
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) return NextResponse.json({ ok: false, error: "INVALID_LIMIT" }, { status: 400 });
   try {
     const pool = getPool();
     const tickerParam = ticker || null;

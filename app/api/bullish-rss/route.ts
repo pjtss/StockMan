@@ -11,11 +11,19 @@ function authorized(request: Request) {
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const source = params.get("source")?.trim().toUpperCase() || undefined;
-  const limit = Number(params.get("limit") || 200);
+  const rawSource = params.get("source");
+  const source = rawSource?.trim().toUpperCase() || undefined;
+  if (rawSource !== null && (!source || source.length > 64 || !/^[A-Z0-9_:-]+$/.test(source))) {
+    return NextResponse.json({ ok: false, error: "INVALID_SOURCE" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
+  const rawLimit = params.get("limit");
+  const limit = rawLimit === null || rawLimit.trim() === "" ? 200 : (/^\d+$/.test(rawLimit) ? Number(rawLimit) : Number.NaN);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+    return NextResponse.json({ ok: false, error: "INVALID_LIMIT" }, { status: 400, headers: { "Cache-Control": "no-store" } });
+  }
   try {
     const articles = await listMarketRssBullishArticles({ source, limit });
-    return NextResponse.json({ ok: true, source: source || "ALL", count: articles.length, articles });
+    return NextResponse.json({ ok: true, source: source || "ALL", count: articles.length, articles }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }

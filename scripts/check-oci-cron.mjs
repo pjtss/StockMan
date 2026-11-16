@@ -46,10 +46,10 @@ const retentionJobs = [...retentionRoute.matchAll(/batchedDelete\(\s*"([^"]+)"\s
 for (const table of ["market_rss_articles", "market_rss_bullish_articles"]) {
   const job = retentionJobs.find((entry) => entry.table === table);
   if (!job
-    || !job.predicate.includes("published_at < NOW() - INTERVAL '7 days'")
+    || !job.predicate.includes("published_at < NOW() - INTERVAL '24 hours'")
     || !job.predicate.includes("published_at IS NULL")
-    || !job.predicate.includes("created_at < NOW() - INTERVAL '7 days'")) {
-    throw new Error(`${table} must expire after seven days using created_at when published_at is missing`);
+    || !job.predicate.includes("created_at < NOW() - INTERVAL '24 hours'")) {
+    throw new Error(`${table} must expire after 24 hours using created_at when published_at is missing`);
   }
 }
 const bullishRetentionJob = retentionJobs.find((entry) => entry.table === "market_rss_bullish_articles");
@@ -130,12 +130,12 @@ if (!/^executeInTransaction=false\s*$/m.test(rssRetentionMigrationConfig)
 const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
 const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");
 const activationScript = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
-if (!/OnCalendar=\*:0\/5/.test(sharedCronTimer) || !/Persistent=true/.test(sharedCronTimer)
+if (!/OnCalendar=hourly/.test(sharedCronTimer) || !/Persistent=true/.test(sharedCronTimer)
   || !sharedCronService.includes("scripts/oci-cron.sh")
   || !activationScript.includes("stockman-cron.timer")
   || !activationScript.includes("systemctl enable stockman-cron.timer")
   || !activationScript.includes("systemctl restart stockman-cron.timer")) {
-  throw new Error("Database retention must be reachable from the persistent five-minute OCI cron timer after activation");
+  throw new Error("Database retention must be reachable from the persistent hourly OCI cron timer after activation");
 }
 const obvSnapshotCall = 'run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"';
 if (!source.includes(obvSnapshotCall)
@@ -167,7 +167,7 @@ const rssTranslationGate = fs.readFileSync(path.resolve("lib/market-rss-notifica
 const secRssSource = fs.readFileSync(path.resolve("lib/sec-edgar-rss.ts"), "utf8");
 
 if (source.includes("/api/cron/instrument-fundamentals")) {
-  throw new Error("Instrument fundamentals must not run inline in the shared five-minute cron pipeline");
+  throw new Error("Instrument fundamentals must not run inline in the shared cron pipeline");
 }
 if (!fundamentalsScript.includes("/api/cron/instrument-fundamentals") || !/--max-time\s+15300/.test(fundamentalsScript)) {
   throw new Error("Dedicated fundamentals runner must call its endpoint with a timeout sized for measured full refreshes");

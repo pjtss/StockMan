@@ -3,6 +3,7 @@ import { desc, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { marketRssArticles } from "@/lib/schema";
 import { extractMarketRssCoreSummary } from "@/lib/market-rss-summary";
+import { safeErrorMetadata } from "@/lib/error-diagnostics";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ export async function GET(request: Request) {
       summary: extractMarketRssCoreSummary(normalizedSummary || row.summary, row.title),
     }));
     return NextResponse.json({ ok: true, ticker, source: "ALL_MARKET_RSS", items });
-  } catch {
-    return NextResponse.json({ ok: false, error: "STOCK_NEWS_UNAVAILABLE" }, { status: 503 });
+  } catch (error) {
+    console.error("[API /stock/news] RSS query failed", safeErrorMetadata(error));
+    return NextResponse.json({ ok: false, error: "STOCK_NEWS_UNAVAILABLE" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

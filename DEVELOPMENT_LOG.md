@@ -8876,3 +8876,30 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, Next production build, standalone server/API documentation/browser smoke, Vitest 313 files·1 skipped / 1,644 tests·3 skipped, TypeScript, docs/catalog/migration audit, public API surface 186 routes·47 public GETs, bearer-auth, verify-scope, KIS boundary, cron check. 단축어 API route test는 6개 통과했다.
 - 운영 배포 전 실제 공개 API는 기존에 `universe=true` 요청에 HTTP 400 `INVALID_QUERY`를 반환했으며 두 JSON snapshot은 아직 없다. 배포 후 `/api/health`, 무인증 universe 조회, US/KR snapshot의 대상·누락·거래일·fetchedAt을 확인하고 결과를 후속 기록한다.
 - 배포 방법: 변경 세트의 검증 완료 후 `oci` 브랜치에 fast-forward push하여 `Deploy OCI` workflow를 실행한다. DB migration 없음.
+## [2026-11-16] RSS 24시간 보존·시간별 cron 및 조회 입력 방어
+
+### 목표
+- RSS 원문 및 bullish projection을 발행 후 24시간이 지나면 정리하고 OCI 공통 자동화를 1시간 간격으로 실행한다. RSS 조회 오류 가능성도 사용자 입력과 DB 오류 경계에서 줄인다.
+
+### 반영
+- retention route의 `market_rss_articles`·`market_rss_bullish_articles` 만료 조건을 7일에서 24시간으로 바꾸고, 발행시각이 없으면 저장시각을 사용한다. bullish 행을 먼저 정리하고 기존 bounded batch·deferred 동작을 유지한다.
+- OCI 공통 timer를 `OnCalendar=hourly`로 바꾸고 `cron:check`에서 1시간 주기와 24시간 조건을 검사하게 했다. systemd 공식 시간 문서의 `hourly` 표현은 매 정시 반복이다: https://www.freedesktop.org/software/systemd/man/254/systemd.time.html
+- RSS 목록 route의 `limit`·`source` 및 market intelligence의 ticker/date/limit를 검증하고, RSS DB 조회 장애는 503과 진단 로그로 구분한다.
+- V169 retention 인덱스 및 migration 배포 경로가 원격 최신 `oci`에 이미 있어 재사용한다.
+
+### 검증
+- 최신 원격 `oci` HEAD `5c3cb7e0` 기준 `npm.cmd run deploy:verify` 통과: dependency audit 취약점 0건, production build, standalone HTTP/API smoke와 Chrome desktop/mobile hydration, Vitest 313 files·1 skipped / 1,644 passed·3 skipped, typecheck, docs, API-surface, verify-scope, KIS-boundary, bearer-auth, cron gates.
+- systemd 공식 시간 명세에서 `hourly`는 `*-*-* *:00:00`으로 정규화되는 정시 반복 표현이다. source timer 파일의 적용은 배포 후 runtime 확인이 필요하다.
+
+### 다음 개선
+- 이번 분리 변경만 commit·push해 Deploy OCI workflow를 실행하고 운영 health/Flyway/cron timer 상태를 검증한다.
+
+### 개선 과제
+개선 과제 ID: CI-2026-11-16-002
+성과 판정: PARTIAL
+근거: 24시간 retention과 시간별 timer 변경이 최신 원격 branch에서 전체 배포 검증을 통과했다. 원격 배포와 운영 상태 확인은 미완료다.
+
+### 커밋·푸시·배포
+- 미실행: 검증 완료; 분리 commit·push 및 운영 상태 확인 대기.
+
+\r\n
