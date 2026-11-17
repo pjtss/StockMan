@@ -8910,13 +8910,14 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 배포 전후에 active client snapshot holder가 반복 생성됐다. 기존 activation은 V168/V169 Flyway 실행 중 앱 서비스와 5분·RSS·fundamentals timer를 계속 실행하므로 동시 DB 트래픽이 old snapshot 대기를 다시 만들 수 있었다.
 
 ### 수정 범위와 재발 감지
-- `deploy/oci/stockman-activate`: V168/V169 처리 전에 앱과 세 timer, 세 scheduler service를 일시 중지한다. OCI 로컬 PostgreSQL에서 active `client backend` + non-null `backend_xmin` + transaction age >30초 조건을 만족하는 세션만 재검증 후 종료한다. parallel worker와 inactive session은 종료하지 않는다.
+- `deploy/oci/stockman-activate`: V168/V169 처리 전에 앱과 세 timer, 세 scheduler service를 일시 중지한다. OCI 로컬 PostgreSQL에서 `client backend` + non-null `backend_xmin` + transaction age >30초 조건을 만족하는 세션(active 및 idle-in-transaction 포함)만 재검증 후 종료한다. parallel worker는 별도로 종료하지 않는다.
 - migration 실패 시 ERR trap이 이전 release 경로의 app service와 timer를 다시 시작한다. migration 및 새 release 활성화가 정상 완료되면 기존 service restart 경로를 유지한다.
 - `.github/workflows/deploy-oci.yml`는 격리된 snapshot holder runner를 release archive에 포함하는지 검증한다. `scripts/check-oci-cron.mjs`는 quiesce, cleanup 및 failure rollback 구조를 자동 검사한다.
 - 공식 근거: PostgreSQL `CREATE INDEX CONCURRENTLY`는 이전 snapshot을 가진 트랜잭션이 끝나기를 기다릴 수 있다(https://www.postgresql.org/docs/current/sql-createindex.html). 앱/timer 중지는 migration 구간에만 적용하며 실패 때 복구한다.
 
 ### 검증·운영 결과
 - `npm run deploy:verify` 통과: npm audit 0 vulnerabilities, production build, standalone runtime/API/browser smoke (Chrome desktop/mobile), 313 test files passed·1 skipped, 1,644 tests passed·3 skipped, typecheck, docs/catalog/migration audit, public API surface/Bearer/KIS/verify-scope/cron checks.
+- OCI Deploy run `44001959780`에서 새 quiesce 경로를 실제 실행했다. 앱·timer·scheduler service 정지 후 active snapshot client PID 7개를 종료하고 사라짐을 확인했으나, preflight가 별도 `idle in transaction` PID `241173`(3,848초)을 감지해 중단했다. Error trap이 앱과 timer를 다시 시작한 로그도 확인했다. 이 운영 결과로 종료 조건을 inactive 제외에서 모든 snapshot-holding client backend로 확장했다.
 - 격리 commit/push, Deploy OCI 재실행, 운영 health 및 공개 universe API, ㄷㅊㅇ5·ㄷㅊㅇ6 결과 확인은 남아 있다. 기능의 운영 활성 상태를 완료로 간주하지 않는다.
 - 운영 health 요청은 직전 점검에서 15초 timeout, NAS/KOSPI universe GET은 HTTP 400이었다. migration 실패 전 운영 release는 활성화되지 않았다.
 

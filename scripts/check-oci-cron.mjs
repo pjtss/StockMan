@@ -211,7 +211,7 @@ if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('stage="quiesce-services"')
   || !activation.includes('systemctl stop "$unit"')
   || !activation.includes("clear-old-snapshots")
-  || !activation.includes("active-client-snapshot-holders-over-30s")
+  || !activation.includes("client-snapshot-holders-over-30s")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {
   throw new Error("V168 activation must pause DB-producing services, clear old client snapshots, and restore services on failure");
 }

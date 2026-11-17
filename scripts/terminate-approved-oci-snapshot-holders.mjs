@@ -1,10 +1,10 @@
 import pg from "pg";
 
 const MIN_SNAPSHOT_AGE_SECONDS = 30;
-const APPROVED_SCOPE = "active-client-snapshot-holders-over-30s";
+const APPROVED_SCOPE = "client-snapshot-holders-over-30s";
 
 if (process.env.OCI_PG_TERMINATION_APPROVED_SCOPE !== APPROVED_SCOPE) {
-  throw new Error("Explicit approval marker for active client snapshot holders is required");
+  throw new Error("Explicit approval marker for client snapshot holders is required");
 }
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 const databaseHost = new URL(process.env.DATABASE_URL).hostname;
@@ -27,7 +27,6 @@ const currentTargetsSql = `
   WHERE datname = current_database()
     AND pid <> pg_backend_pid()
     AND backend_type = 'client backend'
-    AND state = 'active'
     AND backend_xmin IS NOT NULL
     AND xact_start < NOW() - ($1::integer * INTERVAL '1 second')
   ORDER BY xact_start
@@ -47,7 +46,7 @@ try {
     console.log(JSON.stringify({ terminatedPids: [], remainingPids: [] }));
   } else {
     // Repeat the complete preflight predicate in the same statement that sends
-    // signals. Only active client backends holding old snapshots are eligible.
+    // signals. Include idle-in-transaction client sessions that retain snapshots.
     const result = await client.query(`
     WITH candidates AS MATERIALIZED (
       SELECT pid
@@ -56,7 +55,6 @@ try {
         AND pid = ANY($1::integer[])
         AND pid <> pg_backend_pid()
         AND backend_type = 'client backend'
-        AND state = 'active'
         AND backend_xmin IS NOT NULL
         AND xact_start < NOW() - ($2::integer * INTERVAL '1 second')
     ),

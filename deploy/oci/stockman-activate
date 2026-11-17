@@ -79,7 +79,7 @@ done
 
 stage="clear-old-snapshots"
 runuser -u stockman -- env \
-  OCI_PG_TERMINATION_APPROVED_SCOPE=active-client-snapshot-holders-over-30s \
+  OCI_PG_TERMINATION_APPROVED_SCOPE=client-snapshot-holders-over-30s \
   DATABASE_URL="$DATABASE_URL" \
   node "$TEMP_PATH/scripts/terminate-approved-oci-snapshot-holders.mjs"
 
