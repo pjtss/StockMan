@@ -8918,7 +8918,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ### 검증·운영 결과
 - `npm run deploy:verify` 통과: npm audit 0 vulnerabilities, production build, standalone runtime/API/browser smoke (Chrome desktop/mobile), 313 test files passed·1 skipped, 1,644 tests passed·3 skipped, typecheck, docs/catalog/migration audit, public API surface/Bearer/KIS/verify-scope/cron checks.
 - OCI Deploy run `44001959780`에서 새 quiesce 경로를 실제 실행했다. 앱·timer·scheduler service 정지 후 active snapshot client PID 7개를 종료하고 사라짐을 확인했으나, preflight가 별도 `idle in transaction` PID `241173`(3,848초)을 감지해 중단했다. Error trap이 앱과 timer를 다시 시작한 로그도 확인했다. 이 운영 결과로 종료 조건을 inactive 제외에서 모든 snapshot-holding client backend로 확장했다.
-- 격리 commit/push, Deploy OCI 재실행, 운영 health 및 공개 universe API, ㄷㅊㅇ5·ㄷㅊㅇ6 결과 확인은 남아 있다. 기능의 운영 활성 상태를 완료로 간주하지 않는다.
+- `c830a083` 배포는 idle 및 active snapshot holder 2개를 정리하고 preflight를 통과했으나, V168 4번째 인덱스에서 운영 DB에 없는 `us_trade_intensity_ticks` relation을 참조해 실패했다. 앱과 스케줄러 복구 trap은 실행됐다. 원인은 V70에서 해당 legacy 테이블을 제거한 뒤 V168 인덱스 목록에 stale 참조가 남은 것이다.
+- V168에서 삭제된 relation 인덱스를 제거하고, `cron:check`가 전체 Flyway 순서에서 V168 대상 테이블이 최종적으로 존재하는지 검사하도록 보강한다. 기존 실패 migration은 완료 기록되지 않았고 concurrent index 생성은 일부만 진행됐으므로 `IF NOT EXISTS`로 재시도 가능하다.
+- 현재까지 공개 API는 아직 재검증하지 않았다. 다음 배포 검증/배포, 운영 health·universe API 및 ㄷㅊㅇ5·ㄷㅊㅇ6 snapshot JSON 검증이 남아 있다. 기능의 운영 활성 상태를 완료로 간주하지 않는다.
 - 운영 health 요청은 직전 점검에서 15초 timeout, NAS/KOSPI universe GET은 HTTP 400이었다. migration 실패 전 운영 release는 활성화되지 않았다.
 
 \r\n

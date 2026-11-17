@@ -3,7 +3,6 @@
 CREATE INDEX CONCURRENTLY IF NOT EXISTS kr_minute_fetch_logs_retention_idx ON kr_minute_fetch_logs (fetched_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS automation_runs_retention_idx ON automation_runs (started_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS debug_run_items_retention_idx ON debug_run_items (completed_at);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS us_trade_intensity_ticks_retention_idx ON us_trade_intensity_ticks (fetched_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS intraday_detection_transitions_retention_idx ON intraday_detection_transitions (observed_at);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS us_minute_candles_retention_idx ON us_minute_candles (candle_date);
 CREATE INDEX CONCURRENTLY IF NOT EXISTS kr_minute_candles_retention_idx ON kr_minute_candles (candle_date);

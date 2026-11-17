@@ -82,6 +82,22 @@ const indexSpecs = (sql) => [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX(?:\s+
     table: table.toLowerCase(),
     columns: columns.split(",").map((column) => column.trim().replace(/\s+(?:ASC|DESC)(?:\s+NULLS\s+(?:FIRST|LAST))?$/i, "").replace(/\s+/g, " ").toLowerCase()).join(","),
   }));
+const orderedMigrations = [...migrationFiles].sort((left, right) =>
+  Number(left.name.match(/^V(\d+)/)?.[1] ?? 0) - Number(right.name.match(/^V(\d+)/)?.[1] ?? 0),
+);
+for (const index of indexSpecs(retentionMigration)) {
+  let lastCreate = -1;
+  let lastDrop = -1;
+  orderedMigrations.forEach(({ name, sql }, migrationIndex) => {
+    const createsTable = new RegExp(`CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:public\\.)?${index.table}\\b`, "i").test(sql);
+    const dropsTable = new RegExp(`DROP\\s+TABLE(?:\\s+IF\\s+EXISTS)?\\s+(?:public\\.)?${index.table}\\b`, "i").test(sql);
+    if (createsTable) lastCreate = migrationIndex;
+    if (dropsTable) lastDrop = migrationIndex;
+  });
+  if (lastCreate < 0 || lastDrop > lastCreate) {
+    throw new Error(`V168 indexes ${index.table}, but migration history does not leave that table present`);
+  }
+}
 const earlierIndexSpecs = indexSpecs(migrationFiles.filter(({ name }) => name !== "V168__bounded_non_daily_data_retention.sql").map(({ sql }) => sql).join("\n"));
 for (const index of indexSpecs(retentionMigration)) {
   if (earlierIndexSpecs.some((existing) => existing.table === index.table && existing.columns === index.columns)) {
