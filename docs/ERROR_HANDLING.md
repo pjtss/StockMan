@@ -765,6 +765,14 @@ npm test -- --run
 - **수정**: 배포의 자동 세션 일괄 종료를 제거한다. 현재 후속 승인으로 지정된 정확 PID `246213`, `246722`, `246903`, `247294`, `247463`, `247509`, `248010`, `248077`, `248691`, `248857`, `249223`, `249386`, `249548`, `249564`, `249815`, `249816`, `250094`, `250277`, `250401`, `250475`, `250476`, `250751`, `253038`만 scope 환경변수의 명시적 allowlist에 넣고, 실행 직전 `client backend`·snapshot 보유·30초 초과를 다시 확인한다. PID가 사라졌거나 조건을 충족하지 않으면 해당 PID는 건너뛴다. 서비스 중지 이후에도 다른 오래된 snapshot이 있으면 V168 preflight를 30초 간격 최대 20회 재시도하고, 계속 남으면 fail-closed한다. allowlist 밖 세션 및 parallel worker는 건드리지 않는다.
 - **재발 자동 감지**: `scripts/check-oci-cron.mjs`에서 artifact의 전용 runner 포함과 activation의 정확한 PID allowlist를 검사한다. runner는 allowlist 비어 있음/잘못된 PID에서 실패하고 SQL에서도 승인 PID 전체를 재검증한다. 진단에는 application name·DB user·client address를 포함하고 raw query text는 기록하지 않는다.
 - **남은 위험/다음 단계**: concurrent index가 다른 오래된 snapshot을 기다리면 배포는 실패하고 기존 서비스/timer 복구 경로가 작동한다. 그 세션은 별도 관측 및 승인 범위 없이 종료하지 않는다.
+
+## 운영 공개 일봉 API가 대량 스냅샷 수집 중 502를 반환함
+
+- **증상/근거**: OCI deploy run `44024922650` 성공 뒤 `/health-check`, NAS universe, 1종목 및 20종목 일봉 조회가 HTTP 200이었다. 전체 US 스냅샷 순차 수집 중 NAS 162배치 완료 후 NYS 50/94배치 시점부터 HTTP 502가 반복됐다. 이어 health와 universe도 nginx 502를 반환했다. 스냅샷 JSON은 완성되지 않아 기존 결과를 덮지 않았다. deploy activation 재실행 후 health는 HTTP 200으로 복구됐다.
+- **근본 원인**: 확인되지 않았다. 요청 누적과 장애 발생 시각은 연관됐지만, 운영 애플리케이션/DB 진단 로그 없이 서버 과부하나 특정 조회 코드 경로를 원인으로 확정하지 않는다.
+- **대응**: 502 또는 health 실패가 발생하면 전체 수집을 즉시 중지한다. 추가 universe/candle 요청을 하지 말고 health만 확인한다. 배포가 필요하면 승인된 OCI deploy workflow를 실행하고 성공 후 health를 재검증한다. 부분 수집 결과는 최종 JSON으로 승격하지 않는다.
+- **재발 자동 감지**: 전체 스냅샷 전 health, universe, 소량 일봉 요청을 확인하며 수집 중 실패도 기록한다. 후속 개선은 서버측 502 로그/DB 진단, checkpoint resume, 호출 부하 제한을 갖춘 수집 방식을 추가하고 운영에서 소량 검증한 후 전체 실행하는 것이다.
+- **남은 위험**: 전체 ㄷㅊㅇ5·ㄷㅊㅇ6 파일은 아직 생성·검증되지 않았다. 서버측 원인이 확인되고 안전한 재개 방식이 준비될 때까지 전체 운영 universe 수집을 반복하지 않는다.
 # V168 snapshot blocker와 장기 OBV 조회
 
 - **증상/근거**: OCI read-only 진단 run `44020043575`에서 localhost `stockman` client backend가 1,235초 동안 active 상태로 snapshot을 유지하고 두 parallel worker를 보유했다. 당시 `application_name`은 비어 있고 OS client process mapping은 확인되지 않았다.

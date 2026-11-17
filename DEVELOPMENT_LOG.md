@@ -8923,6 +8923,24 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 현재까지 공개 API는 아직 재검증하지 않았다. 다음 배포 검증/배포, 운영 health·universe API 및 ㄷㅊㅇ5·ㄷㅊㅇ6 snapshot JSON 검증이 남아 있다. 기능의 운영 활성 상태를 완료로 간주하지 않는다.
 - 운영 health 요청은 직전 점검에서 15초 timeout, NAS/KOSPI universe GET은 HTTP 400이었다. migration 실패 전 운영 release는 활성화되지 않았다.
 
+## [2026-11-17] V169 배포 완료 및 운영 일봉 스냅샷 조회 장애
+
+### 목적·범위
+- 목적: ㄷㅊㅇ5·ㄷㅊㅇ6 공개 일봉 API가 포함된 OCI release를 활성화하고 운영 health 및 일봉 수집 경로를 확인한다.
+- 배포: OCI workflow run `44024922650` attempt 2와 동일 run의 activation 재실행을 진행했다. 두 번째 실행은 Verify deployment, package/upload, Activate release를 모두 통과했다. 직후 `/health-check`, NAS universe, 1종목 및 20종목 daily-candles GET 모두 HTTP 200이었다.
+- 변경 파일: 이번 운영 확인 중 원격 소스 변경 없음. 임시 probe/runner 파일과 로컬 배치 실험은 제거·원복했다.
+
+### 운영 결과·원인·영향
+- 전체 US 일봉 스냅샷은 NAS 162배치(3,176종목 수신, 64종목 일봉 미반환) 후 NYS 50/94배치(995종목 수신, 5종목 미반환)에서 HTTP 502를 반복해 중단됐다. 완성된 JSON 파일은 작성되지 않아 불완전 데이터를 결과물로 저장하지 않았다.
+- 수집 중 health와 universe endpoint도 nginx HTTP 502가 되어 추가 요청을 중단했다. 배포 activation 재실행 성공 후 health는 HTTP 200으로 복구됐다.
+- API upstream 502의 근본 원인은 서버 로그/DB 진단 자료로 확인되지 않았다. 스냅샷의 순차 요청 부하와 시간상 연관은 관측됐으나 이를 확정 원인으로 단정하지 않는다. 운영 데이터의 가용성에 영향을 줄 수 있는 위험이다.
+
+### 검증·자동 감지·다음 개선
+- 검증: 성공한 운영 배포 workflow, `/health-check` HTTP 200 확인. 이전에 NAS universe와 daily-candles 소량 GET도 HTTP 200을 확인했다. 스냅샷 전체 검증은 미완료다.
+- 재발 감지: 전체 수집 전 health, universe, 1/20 종목 조회를 확인한다. 수집 중 502 또는 health 실패가 보이면 즉시 중단하고 health만 재확인한다. 부분 수집은 최종 파일로 승격하지 않는다.
+- 다음 개선: 공개 API 운영 로그와 DB 진단으로 502의 서버측 원인을 확인하고, 체크포인트/재개 및 호출 부하 제한을 갖춘 수집 방식이 검증되기 전에는 전체 운영 universe를 반복 요청하지 않는다.
+- 커밋/푸시: 신규 소스 변경은 없으며 이번 운영 작업으로 새 커밋·푸시하지 않았다. 이전 검증된 commit `3d5fcbb4`의 배포는 성공했다.
+
 \r\n
 # 2026-11-17 V168 인덱스 대상 오류 수정
 
