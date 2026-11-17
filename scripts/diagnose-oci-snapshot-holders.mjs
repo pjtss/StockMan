@@ -29,6 +29,7 @@ try {
   const result = await client.query(`
     SELECT pid, backend_type, application_name, usename, client_addr::text AS client_addr, client_port,
       state, wait_event_type, wait_event,
+      query_id::text AS query_id, query,
       backend_xmin IS NOT NULL AS holds_snapshot,
       FLOOR(EXTRACT(EPOCH FROM (NOW() - xact_start)))::integer AS transaction_age_seconds,
       FLOOR(EXTRACT(EPOCH FROM (NOW() - query_start)))::integer AS query_age_seconds
@@ -48,7 +49,20 @@ try {
   }
   const targetedDockerContainer = targetDockerId ? await inspectDockerContainer(targetDockerId) : null;
   const holders = await Promise.all(result.rows.map(async (row) => ({
-    ...row,
+    pid: row.pid,
+    backend_type: row.backend_type,
+    application_name: row.application_name,
+    usename: row.usename,
+    client_addr: row.client_addr,
+    client_port: row.client_port,
+    state: row.state,
+    wait_event_type: row.wait_event_type,
+    wait_event: row.wait_event,
+    query_id: row.query_id,
+    query_shape: normalizeQueryShape(row.query),
+    holds_snapshot: row.holds_snapshot,
+    transaction_age_seconds: row.transaction_age_seconds,
+    query_age_seconds: row.query_age_seconds,
     local_client_process: await inspectLocalClientProcess(row.client_addr, row.client_port),
   })));
   process.stdout.write(`${JSON.stringify({
@@ -127,4 +141,16 @@ async function inspectDockerContainer(dockerId) {
 
 function normalizeHost(value) {
   return value.split("/", 1)[0].replace(/^\[|\]$/g, "").replace(/^::ffff:/i, "").toLowerCase();
+}
+
+function normalizeQueryShape(query) {
+  if (typeof query !== "string") return null;
+  return query
+    .replace(/--[^\r\n]*/g, " ")
+    .replace(/\$[a-zA-Z_0-9]*\$[\s\S]*?\$[a-zA-Z_0-9]*\$/g, "$STRING")
+    .replace(/'(?:''|[^'])*'/g, "'$STRING'")
+    .replace(/\b\d+(?:\.\d+)?\b/g, "?")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 2_000);
 }
