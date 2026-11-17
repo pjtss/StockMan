@@ -132,7 +132,7 @@ async function runDbScreenerUncached(
     .join(" UNION ALL ");
   const rows = (
     await pool.query(
-      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.listed_shares,f.currency,c.timeframe,c.candles FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,listed_shares,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (SELECT candles.timeframe,JSON_AGG(JSON_BUILD_OBJECT('candle_date',candles.candle_date,'fetched_at',candles.fetched_at,'close',candles.close,'high',candles.high,'low',candles.low,'volume',candles.volume) ORDER BY candles.candle_date) AS candles FROM (${candleLookups}) candles GROUP BY candles.timeframe) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($4::numeric IS NULL OR f.market_cap >= $4) AND ($5::numeric IS NULL OR f.market_cap <= $5)`,
+      `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.listed_shares,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,listed_shares,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (${candleLookups}) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($4::numeric IS NULL OR f.market_cap >= $4) AND ($5::numeric IS NULL OR f.market_cap <= $5)`,
       [markets, asOfKey, asOf, minMarketCap, maxMarketCap],
     )
   ).rows;
@@ -143,10 +143,10 @@ async function runDbScreenerUncached(
       groups.set(key, { ...row, candles: [], byTimeframe: new Map() });
     const group = groups.get(key);
     const bucket = group.byTimeframe.get(row.timeframe ?? timeframe) ?? [];
-    bucket.push(...(Array.isArray(row.candles) ? row.candles : []));
+    bucket.push(row);
     group.byTimeframe.set(row.timeframe ?? timeframe, bucket);
     if ((row.timeframe ?? timeframe) === timeframe)
-      group.candles.push(...(Array.isArray(row.candles) ? row.candles : []));
+      group.candles.push(row);
   }
   for (const group of groups.values()) {
     group.candles.sort((a: any, b: any) => String(a.candle_date).localeCompare(String(b.candle_date)));

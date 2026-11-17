@@ -2,32 +2,30 @@
 
 ## 목표와 범위
 
-`/charts` 직접 조건 종목 추출의 cold 지연과 클라이언트 timeout 경로를 개선한다. 영향 범위는 `POST /api/screener/run`의 조회 결과 행 형식과 `components/ticker-chart-workbench.tsx` 요청 제한이다.
+`/charts` 직접 조건 종목 추출의 cold 지연과 클라이언트 timeout 경로를 개선한다. 영향 범위는 `POST /api/screener/run`의 응답 처리와 `components/ticker-chart-workbench.tsx` 요청 제한이다.
 
 ## 원인과 기준값
 
-- 운영 공개 API의 국내 일봉 기본 스캔은 첫 요청 `HTTP 200`, 10,307ms(`Server-Timing`), 10개 결과였다.
-- 미국 일봉 기본 스캔은 첫 요청 `HTTP 200`, 56,286ms, 10개 결과였다. 즉시 반복은 결과 캐시 적중 약 1ms여서 비교에서 제외한다.
-- UI는 45초에 요청을 취소하여 정상적인 미국 cold 응답이 끝나기 전에 오류를 표시할 수 있었다.
-- 기존 쿼리는 종목별 최대 65개 봉을 행 단위로 반환한다. 5,300개 활성 미국 공통주 기준 최대 약 34만 행이다. 현재 전체 `Server-Timing`만으로 DB 대 Node 비용은 분리되지 않았다.
+- 배포 전 기록된 운영 cold 기준은 KR 10,307ms, US 56,286ms이며 양쪽 모두 10개 결과였다. 즉시 반복은 인메모리 cache hit이므로 비교에서 제외한다.
+- UI timeout은 45초여서 정상 완료가 56초 걸리는 US 요청은 사용자에게 오류로 보일 수 있었다.
+- 배포 후 첫 측정은 KR 34.8초, US server timing 24.9초(전체 29.29초)로 시장 간 결과가 엇갈렸다. 서로 다른 시점/서버 부하의 단일 샘플만으로 개선을 주장할 수 없다.
+- DB 실행계획 도구는 `.env.local`에 지정된 localhost PostgreSQL이 없어 연결에 실패했다.
 
-## 변경
+## 변경과 결정
 
-- `lib/db-screener.ts`: 종목·봉 주기별 캔들을 `JSON_AGG` 배열로 묶어 행 수와 반복 종목 필드를 줄이고 배열을 기존 계산 경로로 복원한다.
-- `components/ticker-chart-workbench.tsx`: 요청 제한을 45초에서 90초로 늘린다.
-- `lib/db-screener-aggregated-rows.test.ts`: 집계 D/W 봉에서 결과 종목과 candle date/fetched-at 메타데이터를 검증한다.
-- 상세 설계는 [`../CHARTS_CUSTOM_SCREENER_DESIGN.md`](../CHARTS_CUSTOM_SCREENER_DESIGN.md), 반복 장애 처리는 [`../ERROR_HANDLING.md`](../ERROR_HANDLING.md)에 연결한다.
+- `components/ticker-chart-workbench.tsx`: 요청 timeout을 45초에서 90초로 늘려 cold 완료 전에 클라이언트가 취소하는 경로를 완화한다.
+- `lib/db-screener.ts`: JSON_AGG 집계 방식은 운영 결과로 개선이 입증되지 않아 원래 행 기반 데이터 shape로 복구한다.
+- 기존 regression fixture를 행 기반 응답에 맞추고 candle date/fetched-at 결과 검증을 유지한다.
+- 상세 조건 설계는 [`../CHARTS_CUSTOM_SCREENER_DESIGN.md`](../CHARTS_CUSTOM_SCREENER_DESIGN.md), 반복 장애 기록은 [`../ERROR_HANDLING.md`](../ERROR_HANDLING.md)에 연결한다.
 
 ## 검증과 배포
 
-- 변경 관련 회귀 테스트: 2개 파일·10개 테스트 통과. 전체 suite는 276개 파일 중 275 passed/1 skipped, 1,484 passed/3 skipped.
-- 전체 TypeScript 검사와 `npm run deploy:verify` 통과. 검증에는 production build, standalone `/charts` HTTP 200, 11개 JS chunk, desktop/mobile Chrome hydration 및 API smoke가 포함됐다.
-- PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)` 및 변경 후 운영 cold 요청은 배포 전 아직 수행하지 않았다.
-- 검증 통과 후 커밋과 `oci` push가 OCI 배포 workflow를 시작한다. 실제 배포 및 운영 health 확인은 완료 후 기록한다.
+- 최초 집계안은 commit `21423216`으로 `oci`에 배포됐다. workflow #1323은 성공했다.
+- 해당 배포의 `/charts`와 `/api/health`는 HTTP 200이었다. KR 요청은 10개 결과와 봉 거래일/갱신시각 metadata를 반환했다. US 요청은 HTTP 200, 10개 결과였고 server timing 24.9초였다.
+- 후속 행 기반 복원은 전체 사전 build/test/run 검증 뒤 OCI로 다시 배포한다. 두 번째 배포 결과와 재측정은 이 문서 및 `DEVELOPMENT_LOG.md`에 추가한다.
 
 ## 재발 감지와 다음 단계
 
-- 신규 fingerprint의 첫 응답만 cold 비교값으로 기록하고 반복 캐시 응답은 제외한다.
-- 배포 후 KR/US 응답시간, 결과 종목·조건 값, D/W/M 거래일과 갱신시각 메타데이터를 전후 비교한다.
-- JSON 집계는 DB가 읽는 캔들 수를 줄이지 않는다. cold 지연이 지속되면 DB 조회와 Node 계산을 별도 계측하고 해당 쿼리의 실행 계획을 분석한다.
-- 개선 과제 ID: `CI-2026-11-18-001`; 성과 판정은 배포 후 실측 전까지 `PARTIAL`이다.
+- 성능 비교는 동일 payload, cold fingerprint, 같은 배포 버전에서 각 시장 여러 번 측정하고 median/p95 및 결과/metadata 동등성을 기록한다.
+- 성능 회귀가 계속되면 운영 read-only DB 접근이 가능한 환경에서 PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)`와 Node 계산 시간을 분리 계측한다. 현재 로컬 DB 미가용 상태가 남은 제한이다.
+- 개선 과제 ID `CI-2026-11-18-001`은 후속 배포 측정 전까지 `PARTIAL`로 둔다.

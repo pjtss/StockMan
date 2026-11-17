@@ -4,7 +4,7 @@
 - 운영 `/charts` 종목 추출의 cold 지연과 화면 timeout 경로를 개선한다.
 
 ### 반영
-- `lib/db-screener.ts`에서 종목/봉 주기별 캔들 행을 JSON 배열 한 행으로 묶어 전송 행과 반복 종목 정보를 줄이고 기존 계산 입력으로 복원한다.
+- `lib/db-screener.ts`에 종목별 캔들 행 JSON 집계를 반영했다가 운영 cold 측정에서 개선이 입증되지 않아 기존 행 기반 응답으로 복원했다.
 - `components/ticker-chart-workbench.tsx` 요청 timeout을 45초에서 90초로 늘린다.
 - `lib/db-screener-aggregated-rows.test.ts`와 운영 설계·오류·성능 문서에서 메타데이터 동등성 및 실패 위험을 관리한다.
 
@@ -12,19 +12,20 @@
 - 변경 전 운영 read-only API: KR 첫 요청 10,307ms, US 첫 요청 56,286ms, HTTP 200. warm 요청은 메모리 캐시 적중으로 비교에서 제외한다.
 - 변경 회귀 테스트 2개 파일 10개 통과. 전체 테스트 276개 파일 중 275 passed/1 skipped, 1,484 passed/3 skipped. TypeScript 전체 검사 통과.
 - `npm run deploy:verify` 통과: dependency audit, docs/API/cron 감사, production build 및 standalone 실행, `/charts` desktop/mobile Chrome hydration, API smoke 포함.
-- API 결과의 봉 거래일시와 갱신일시, 추출 종목명·코드 메타데이터 계약은 집계 행 복원 테스트로 확인했다. JSON 집계 성능 개선 폭과 운영 cold 결과는 배포 후 측정한다.
+- 복원 회귀 테스트는 행 기반 D/W 봉 각각 65건, 7개 assertion을 통과했고 candle date/fetched-at metadata를 확인했다.
+- 후속 수정 `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone `/charts` HTTP 200, 11개 JS chunk, desktop/mobile Chrome hydration, API smoke, 전체 테스트 275 passed/1 skipped (1,484 passed/3 skipped), typecheck, docs/API/KIS/auth/cron 게이트.
 
 ### 다음 개선
-- 검증이 통과했으므로 OCI workflow를 통해 운영 배포하고 완료 상태를 확인한다.
-- 배포 후 신규 fingerprint의 KR/US 응답시간과 종목·조건·D/W/M 메타데이터를 비교한다. 개선 폭이 부족하면 DB/Node 단계를 분리 계측한다.
+- 최초 OCI 배포 후 운영 read-only 측정 결과: KR cold 34.8초, US 24.9초 server timing (29.29초 end-to-end), 양쪽 10개 결과. 기존 기록 baseline KR 10.3초, US 56.3초와 시장별 결과가 엇갈려 집계안의 개선으로 판정하지 않는다.
+- EXPLAIN 스크립트는 `.env.local`의 localhost PostgreSQL 연결 거부로 실행계획을 얻지 못했다. 이에 검증되지 않은 JSON_AGG 변경은 제거한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-18-001
 - 성과 판정: PARTIAL
-- 근거: 관측된 56초 정상 응답과 45초 UI 취소의 원인을 확인하고 해결 경로와 회귀 검증을 추가했다. 전송 행 축소의 성능 영향은 배포 후 아직 미측정이다.
+- 근거: 45초 UI 취소 제한을 90초로 늘리고 metadata regression을 검증했다. 첫 배포 집계안의 개선은 운영에서 입증되지 않아 행 기반 쿼리로 복원했으며, 재배포 후 성능 확인이 남았다.
 
 ### 커밋·푸시·배포
-- 상태: 전체 사전 검증 통과. 커밋과 `oci` 푸시, 자동 배포 결과 확인은 진행 중이다.
+- 상태: 첫 배포 `21423216` 및 OCI workflow #1323 성공. 후속 행 기반 복원은 전체 `deploy:verify` 통과 후 커밋·푸시·자동 배포를 진행한다.
 
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 9차 100종목과 문서 관리 자동 검증
 

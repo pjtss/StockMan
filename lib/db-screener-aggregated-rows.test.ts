@@ -20,32 +20,22 @@ function makeCandles(timeframe: "D" | "W") {
   }));
 }
 
-describe("database screener grouped candle rows", () => {
+describe("database screener candle rows", () => {
   beforeEach(() => query.mockReset());
 
-  it("reconstructs indicators and timeframe metadata from aggregated candles", async () => {
+  it("reconstructs indicators and timeframe metadata from row-shaped candles", async () => {
     query.mockResolvedValue({
       rows: [
-        {
+        ...["D", "W"].flatMap((timeframe) => makeCandles(timeframe as "D" | "W").map((candle) => ({
           market: "KOSPI",
           code: "005930",
           name: "삼성전자",
           market_cap: "40000000000",
           listed_shares: "1000000",
           currency: "KRW",
-          timeframe: "D",
-          candles: makeCandles("D"),
-        },
-        {
-          market: "KOSPI",
-          code: "005930",
-          name: "삼성전자",
-          market_cap: "40000000000",
-          listed_shares: "1000000",
-          currency: "KRW",
-          timeframe: "W",
-          candles: makeCandles("W"),
-        },
+          timeframe,
+          ...candle,
+        }))),
       ],
     });
 
@@ -66,6 +56,6 @@ describe("database screener grouped candle rows", () => {
     expect(results[0].timeframeMeta.W.candleDate).toBe(
       makeCandles("W").at(-1)?.candle_date,
     );
-    expect(query.mock.calls[0][0]).toContain("JSON_AGG(JSON_BUILD_OBJECT");
+    expect(query.mock.calls[0][0]).not.toContain("JSON_AGG");
   });
 });
