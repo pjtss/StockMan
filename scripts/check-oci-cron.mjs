@@ -144,6 +144,15 @@ if (!/^executeInTransaction=false\s*$/m.test(rssRetentionMigrationConfig)
   || !deployWorkflow.includes("./db/migration/V169__rss_article_retention_indexes.sql.conf")) {
   throw new Error("V169 must ship concurrent RSS retention indexes outside a Flyway transaction");
 }
+const secMaterializerMigrationConfig = fs.readFileSync(path.resolve("db/migration/V170__sec_materializer_recent_index.sql.conf"), "utf8");
+const secMaterializerMigration = migrationFiles.find(({ name }) => name === "V170__sec_materializer_recent_index.sql")?.sql ?? "";
+if (!/^executeInTransaction=false\s*$/m.test(secMaterializerMigrationConfig)
+  || !secMaterializerMigration.includes("CREATE INDEX CONCURRENTLY IF NOT EXISTS sec_submissions_materialize_acceptance_idx")
+  || !secMaterializerMigration.includes("ON sec_submissions (acceptance_datetime DESC, accession)")
+  || !secMaterializerMigration.includes("WHERE acceptance_datetime ~")
+  || !deployWorkflow.includes("./db/migration/V170__sec_materializer_recent_index.sql.conf")) {
+  throw new Error("V170 must package the concurrent SEC materializer ordering index outside a Flyway transaction");
+}
 const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
 const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");
 const activationScript = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
