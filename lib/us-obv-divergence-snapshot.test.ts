@@ -11,6 +11,7 @@ describe("refreshUsObvDivergenceSnapshot", () => {
     vi.setSystemTime(new Date("2026-10-29T22:10:00.000Z")); // Thursday, 18:10 America/New_York.
     clientQueryMock.mockReset().mockImplementation(async (query: string) => {
       if (query === "BEGIN" || query === "ROLLBACK" || query === "COMMIT") return { rows: [] };
+      if (query.includes("set_config")) return { rows: [] };
       if (query.includes("pg_try_advisory_xact_lock")) return { rows: [{ locked: true }] };
       if (query.includes("MAX(CASE")) return { rows: [{ latest_date: new Date("2026-10-29T00:00:00.000Z") }] };
       if (query.includes("FOR UPDATE")) return { rows: [] };
@@ -33,5 +34,12 @@ describe("refreshUsObvDivergenceSnapshot", () => {
     await expect(refreshUsObvDivergenceSnapshot()).rejects.toThrow("LOW_DATA_COVERAGE");
     expect(clientQueryMock).toHaveBeenCalledWith("ROLLBACK");
     expect(clientQueryMock.mock.calls.some(([query]) => String(query).includes("INSERT INTO us_obv_divergence_snapshot"))).toBe(false);
+  });
+
+  it("identifies the scan and bounds query and idle transaction lifetimes", async () => {
+    await expect(refreshUsObvDivergenceSnapshot()).rejects.toThrow("LOW_DATA_COVERAGE");
+    expect(clientQueryMock).toHaveBeenCalledWith("SELECT set_config('application_name', 'stockman-us-obv-snapshot', true)");
+    expect(clientQueryMock).toHaveBeenCalledWith("SELECT set_config('statement_timeout', '900000ms', true)");
+    expect(clientQueryMock).toHaveBeenCalledWith("SELECT set_config('idle_in_transaction_session_timeout', '60000ms', true)");
   });
 });

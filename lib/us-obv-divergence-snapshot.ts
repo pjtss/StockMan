@@ -49,6 +49,9 @@ export async function refreshUsObvDivergenceSnapshot(now = new Date()): Promise<
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT set_config('application_name', 'stockman-us-obv-snapshot', true)");
+    await client.query("SELECT set_config('statement_timeout', '900000ms', true)");
+    await client.query("SELECT set_config('idle_in_transaction_session_timeout', '60000ms', true)");
     const lock = await client.query<{ locked: boolean }>(
       "SELECT pg_try_advisory_xact_lock(hashtext('us-obv-divergence-snapshot')) AS locked",
     );
