@@ -8937,4 +8937,5 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **후속 blocker 2**: run `44010497775`는 세 PID를 실행 직전 재검증 후 종료했으나 PID `247463`(496초, parallel worker 보유)와 `247509`(32초)이 계속 snapshot을 보유해 preflight에서 중단됐다. 재시도 allowlist를 두 정확 client PID까지 확장하고 세션의 application/user/remote-address를 민감 SQL 없이 기록한다.
 - **후속 blocker 3**: run `44011991858`은 PID `247463`을 종료했으나 새 active snapshot client PID `248010`(667초, parallel worker 보유)과 `248077`(503초)이 남아 중단됐다. 다음 재시도는 이 두 client PID만 지정하고 parallel worker는 계속 종료하지 않는다.
 - **후속 blocker 4**: run `44013496931`은 PID `248010`(1577초)과 `248077`(1413초)을 종료했으나 V168 preflight에서 새 client PID `248691`(671초, parallel worker 보유), `248857`(381초, parallel worker 보유), `249223`(71초)이 확인돼 fail-closed했다. 다음 재시도는 이 정확한 세 client PID만 실행 직전 재검증한다.
+- **후속 blocker 5**: run `44015105176`은 PID `248691`(1491초), `248857`(1201초)을 종료했으나 V168 preflight에서 새 client PID `249386`(586초, parallel worker 보유), `249548`(236초, parallel worker 보유), `249564`(164초), `249815`(56초), `249816`(57초)이 확인돼 fail-closed했다. 다음 재시도는 이 다섯 정확 client PID만 실행 직전 재검증한다.
 - **남은 위험/다음 단계**: 실패한 non-transactional V168은 일부 인덱스와 Flyway 실패 행을 남길 수 있다. 배포 preflight의 V168 한정 복구와 후속 V169/운영 상태 확인 필요.
