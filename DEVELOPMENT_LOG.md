@@ -8901,3 +8901,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - parallel worker와 inactive 세션은 종료하지 않는다. 후보 조회와 종료 SQL 모두 조건을 재확인하고, 후보 집합 전체가 유지되는 경우에만 신호를 보내며, 종료 PID들이 `pg_stat_activity`에서 사라졌음을 확인한다. OCI DB는 localhost 경유만 허용한다.
 - 재발 탐지: 같은 V168 preflight가 잔여 snapshot holder를 출력하면 종료 workflow를 다시 실행하기 전 상태를 재조회한다. 신규 세션 생성이 계속되면 허용된 client session만 반복 확인한다.
 - 남은 위험/다음 단계: 현재 활성 쿼리는 사용자 요청을 중단할 수 있다. preflight가 통과한 후에만 마이그레이션·재기동이 진행되며, 이후 health/public universe API와 ㄷㅊㅇ5·ㄷㅊㅇ6 실행 결과를 확인한다.
+
+### 2026-11-17 V168 배포 재시도 결과 및 승인 PID 진단
+- Deploy OCI #1299 attempt 9 (`43829487560`)의 V168 사전 점검은 통과했고 `invalidIndexesRemoved=0`, `repairRequired=false`, 현재 Flyway version 167이었다. 비트랜잭션 V168 migration이 01:20:41 UTC 시작됐으나 2,400초 timeout 내 완료되지 않아 02:00:20 UTC exit 137로 activation이 중단됐다. V168/V169 완료 여부와 release activation은 확인되지 않았다.
+- V168 중단이 부분 인덱스를 남겼을 수 있으므로 다음 시도는 Flyway history, invalid V168 인덱스, 현재 `pg_stat_progress_create_index`, snapshot holder를 함께 기록한다.
+- 사용자는 PID `238702, 238866, 239061, 239261`만 active client backend·`backend_xmin` 보유·transaction age 60분 이상일 때 종료하도록 승인했다. 전용 recovery script는 exact allowlist와 실행 시점 상태를 재확인하고, 조건을 만족하는 승인 PID만 종료한다. 다른 PID는 처리하지 않는다.
+- 자동감지/검증: 전용 workflow가 exact PID marker를 요구하고 동일 SQL에서 backend/state/snapshot/age 조건을 재확인한다. 종료 이후 해당 PID가 사라졌는지 확인한다. 배포 성공 판정에는 V168/V169 migration, release SHA, `/api/health`, timer cadence, retention job result 확인이 필요하다.
