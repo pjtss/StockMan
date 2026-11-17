@@ -783,6 +783,7 @@ npm test -- --run
 - **재발 자동 감지**: `scripts/check-oci-cron.mjs`가 V168/V170 복구 범위, invalid index 정리, 승인 PID allowlist, preflight retry를 검사한다. Deploy 로그에서 V170 migration progress/timeout을 확인하고, health 200과 Flyway V170 성공이 모두 확인되기 전 완료로 처리하지 않는다.
 - **남은 위험/다음 단계**: 테이블 크기나 동시 인덱스 대기 원인은 아직 확인되지 않았다. 수정 배포 후 preflight 진단 통계와 V170 migration 결과를 확인한다. V170에서 재차 timeout되면 같은 인덱스 생성만 더 오래 반복하지 말고 OCI `pg_stat_progress_create_index`와 active snapshot holder를 읽기 전용으로 진단한다.
 - **후속 증거·정밀 조치**: run `44047418291`에서 V170 invalid index가 확인됐다. `sec_submissions`는 추정 61,549행·38,199,296 bytes였으며, preflight 시 client PID `261867`이 `idle in transaction`, `ClientRead`, snapshot 보유 상태로 4,112→4,143초 유지됐다. preflight는 허용 목록 밖 PID를 종료하지 않고 20회 재시도 후 중단했다. 정확 PID `261867`은 실행 직전 client backend·snapshot 보유·최소 30초를 재검증해 조건이 맞는 경우에만 종료되도록 승인 allowlist에 추가한다. 이후 invalid V170 index만 정리하고 Flyway 실패 이력을 repair한다.
+- **해결 확인**: run `44050453172`에서 PID `261867`은 실행 직전 4,739초·snapshot 보유 조건으로 다시 확인되어 종료됐다. 이때 V170 index는 이미 valid/ready였고 Flyway 실패 이력도 없어, `IF NOT EXISTS`가 기존 인덱스를 확인하며 V170 및 release activation을 성공 완료했다. `/api/health`와 NAS universe가 HTTP 200이었다. 이 관측으로 V170 40분 timeout의 blocker는 오래된 snapshot PID `261867`로 확인됐다. 이후 동일 유형이 보이면 검증된 exact PID 범위와 실행 직전 조건 확인을 그대로 적용한다.
 # V168 snapshot blocker와 장기 OBV 조회
 
 - **증상/근거**: OCI read-only 진단 run `44020043575`에서 localhost `stockman` client backend가 1,235초 동안 active 상태로 snapshot을 유지하고 두 parallel worker를 보유했다. 당시 `application_name`은 비어 있고 OS client process mapping은 확인되지 않았다.

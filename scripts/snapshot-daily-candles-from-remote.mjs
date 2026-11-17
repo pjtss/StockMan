@@ -19,6 +19,21 @@ const rawLimit = args.get("limit") || "120";
 if (!/^\d+$/.test(rawLimit) || Number(rawLimit) < 1 || Number(rawLimit) > 300) throw new Error("--limit은 1~300 정수여야 합니다.");
 const limit = Number(rawLimit);
 
+async function fetchWithTransientRetry(url, label) {
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(60_000), headers: { accept: "application/json" } });
+      if (response.ok || ![502, 503, 504].includes(response.status) || attempt === 4) return response;
+      console.warn(JSON.stringify({ label, status: response.status, retry: attempt }));
+    } catch (error) {
+      if (attempt === 4) throw error;
+      console.warn(JSON.stringify({ label, error: error.name, retry: attempt }));
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
+  }
+  throw new Error(`운영 API 요청 재시도 소진: ${label}`);
+}
+
 const envPath = path.join(root, ".env.local");
 const envText = await readFile(envPath, "utf8");
 const env = new Map();
@@ -61,7 +76,7 @@ for (const exchange of exchanges) {
     page.searchParams.set("universe", "true");
     page.searchParams.set("offset", String(universeOffset));
     page.searchParams.set("pageSize", "100");
-    const response = await fetch(page, { signal: AbortSignal.timeout(60_000), headers: { accept: "application/json" } });
+    const response = await fetchWithTransientRetry(page, `${exchange}:universe:${universeOffset}`);
     if (!response.ok) throw new Error(`운영 유니버스 API HTTP 오류: ${response.status}`);
     const body = await response.json();
     if (!body || body.ok !== true || body.source !== "OPERATING_OFFICIAL_UNIVERSE" || !Array.isArray(body.items) || !body.page) throw new Error("운영 유니버스 API 응답 형식이 올바르지 않습니다.");
@@ -77,14 +92,14 @@ for (const exchange of exchanges) {
   const items = [];
   const missing = [];
   let batchCount = 0;
-  for (let offset = 0; offset < universe.rows.length; offset += 100) {
-    const batch = universe.rows.slice(offset, offset + 100);
+  for (let offset = 0; offset < universe.rows.length; offset += 20) {
+    const batch = universe.rows.slice(offset, offset + 20);
     const page = new URL(endpoint);
     page.searchParams.set("market", exchange);
     page.searchParams.set("codes", batch.map((r) => r.code).join(","));
     page.searchParams.set("timeframe", "D");
     page.searchParams.set("limit", String(limit));
-    const response = await fetch(page, { signal: AbortSignal.timeout(60_000), headers: { accept: "application/json" } });
+    const response = await fetchWithTransientRetry(page, `${exchange}:candles:${offset}`);
     if (!response.ok) throw new Error(`운영 API HTTP 오류: ${response.status}`);
     const body = await response.json();
     if (!body || body.ok !== true || !Array.isArray(body.items)) throw new Error("운영 API 응답 형식이 올바르지 않습니다.");
@@ -111,6 +126,7 @@ for (const exchange of exchanges) {
       items.push({ market: item.market, code: item.code, name: item.name, candles: item.candles.map((c) => ({ date: String(c.date).replaceAll("-", ""), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close), volume: Number(c.volume), fetchedAt: new Date(c.fetchedAt).toISOString() })), metadata: { latestCandleDate: item.metadata?.latestCandleDate ?? null, dataUpdatedAt: item.metadata?.dataUpdatedAt ?? null, returnedCount: item.candles.length } });
     }
     batchCount += 1;
+    if (batchCount % 10 === 0 || batchCount === Math.ceil(universe.rows.length / 20)) console.log(JSON.stringify({ market, exchange, completedBatches: batchCount, totalBatches: Math.ceil(universe.rows.length / 20), instrumentsRetrieved: items.length, missing: missing.length }));
   }
   items.sort((a, b) => a.code.localeCompare(b.code));
   const dates = items.flatMap((item) => item.candles.map((c) => c.date)).sort();

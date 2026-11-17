@@ -8955,6 +8955,13 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 재발 시 `pg_stat_progress_create_index`와 current snapshot holder를 OCI에서 read-only 조회한다. 원인 확인 없이 migration timeout만 늘려 app downtime을 연장하지 않는다.
 - 후속 run `44047418291`은 preflight에서 V170 invalid index를 확인하고 `sec_submissions` 규모를 61,549행·38,199,296 bytes로 기록했다. 새 client PID `261867`이 `idle in transaction`/`ClientRead`로 snapshot을 4,112→4,143초 보유해 20회 재시도 후 fail-closed했다. 정확 PID allowlist와 자동 검사를 추가해 다음 배포에서 실행 직전 조건을 재검증하며, 맞을 때만 종료한다.
 
+## [2026-11-17] V170 snapshot blocker 종료 및 공개 API 스냅샷 수집 재개
+
+- Deploy run `44050453172`는 PID `261867`을 실행 직전에 client backend, `idle in transaction`, snapshot 보유, 4,739초 조건으로 재검증해 종료했다. V170 인덱스는 이미 `indisvalid=true`, `indisready=true`였고 failed migration 기록도 없어 invalid index 정리/repair 없이 Flyway가 V170을 즉시 완료했다. 해당 run의 migration 및 activation 성공을 확인했다.
+- 새 public health endpoint `/api/health`, NAS universe, 1종목 및 20종목 일봉 조회가 HTTP 200이었다. 20종목 request는 약 9.2초.
+- 스냅샷 도구는 전체 수집 안정성을 위해 요청 batch를 20종목으로 제한하고 502/503/504 및 네트워크/timeout 오류에 최대 4회 재시도, 10 batch 단위 진척 로그를 추가한다. 기존 JSON은 전체 응답과 품질 검사가 완료될 때까지 원자적으로 교체하지 않는다.
+- 검증·배포: snapshot 도구 변경을 포함한 `npm run deploy:verify`, 커밋 및 OCI 배포는 다음 실행에서 완료한다. 전체 US/KR snapshot 산출 검증은 운영 API 부하를 고려해 각 단계 결과를 관찰하며 수행한다.
+
 \r\n
 # 2026-11-17 V168 인덱스 대상 오류 수정
 
