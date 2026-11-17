@@ -1,9 +1,29 @@
 import pg from "pg";
-import { readFile } from "node:fs/promises";
 
 const APPROVED_PIDS = [238702, 238866, 239061, 239261];
 const MIN_TRANSACTION_AGE_SECONDS = 60 * 60;
 const APPROVED_PID_MARKER = APPROVED_PIDS.join(",");
+const V168_INDEX_NAMES = [
+  "kr_minute_fetch_logs_retention_idx",
+  "automation_runs_retention_idx",
+  "debug_run_items_retention_idx",
+  "us_trade_intensity_ticks_retention_idx",
+  "intraday_detection_transitions_retention_idx",
+  "us_minute_candles_retention_idx",
+  "kr_minute_candles_retention_idx",
+  "instrument_fundamental_history_retention_idx",
+  "market_rss_translation_cache_retention_idx",
+  "automation_notification_deliveries_retention_idx",
+  "instrument_universe_sync_runs_retention_idx",
+  "discord_delivery_queue_retention_idx",
+  "market_rss_fetch_snapshots_retention_idx",
+  "market_rss_articles_source_snapshot_idx",
+  "sec_source_snapshots_key_fetched_idx",
+  "intraday_detection_runs_finished_retention_idx",
+  "instrument_candle_cache_retries_retention_idx",
+  "daily_bollinger_cache_retries_retention_idx",
+  "daily_cache_followup_retries_retention_idx",
+];
 
 if (process.env.OCI_PG_TERMINATION_APPROVED_PIDS !== APPROVED_PID_MARKER) {
   throw new Error("Explicit approval marker for exactly the approved PIDs is required");
@@ -34,11 +54,6 @@ const currentTargetsSql = `
 
 try {
   await client.connect();
-  const migrationSql = await readFile("db/migration/V168__bounded_non_daily_data_retention.sql", "utf8");
-  const migrationIndexes = [...migrationSql.matchAll(/CREATE\s+INDEX\s+CONCURRENTLY\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi)]
-    .map((match) => match[1]);
-  if (migrationIndexes.length === 0) throw new Error("V168 migration index list is empty");
-
   const [snapshotHolders, flyway168, invalidIndexes, createIndexProgress, current] = await Promise.all([
     client.query(`
       SELECT pid, backend_type, state, wait_event_type, wait_event,
@@ -68,7 +83,7 @@ try {
         AND NOT index_state.indisvalid
         AND index_class.relname = ANY($1::text[])
       ORDER BY index_class.relname
-    `, [migrationIndexes]),
+    `, [V168_INDEX_NAMES]),
     client.query(`
       SELECT pid, relid::regclass::text AS table_name, index_relid::regclass::text AS index_name,
         command, phase, blocks_total, blocks_done, tuples_total, tuples_done

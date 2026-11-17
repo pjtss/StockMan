@@ -8907,3 +8907,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - V168 중단이 부분 인덱스를 남겼을 수 있으므로 다음 시도는 Flyway history, invalid V168 인덱스, 현재 `pg_stat_progress_create_index`, snapshot holder를 함께 기록한다.
 - 사용자는 PID `238702, 238866, 239061, 239261`만 active client backend·`backend_xmin` 보유·transaction age 60분 이상일 때 종료하도록 승인했다. 전용 recovery script는 exact allowlist와 실행 시점 상태를 재확인하고, 조건을 만족하는 승인 PID만 종료한다. 다른 PID는 처리하지 않는다.
 - 자동감지/검증: 전용 workflow가 exact PID marker를 요구하고 동일 SQL에서 backend/state/snapshot/age 조건을 재확인한다. 종료 이후 해당 PID가 사라졌는지 확인한다. 배포 성공 판정에는 V168/V169 migration, release SHA, `/api/health`, timer cadence, retention job result 확인이 필요하다.
+- 승인 전용 workflow #6 (`44003176151`)은 SSH 연결 뒤 원격 `OCI_DEPLOY_PATH`에 `db/migration/V168__bounded_non_daily_data_retention.sql`이 없어 `ENOENT`로 종료됐다. 진단이 시작되지 않았고 종료 SQL은 호출되지 않았다. 복구 runner가 원격 release에 해당 파일이 있어야 한다고 가정한 점을 수정해 V168 index name 목록을 자체 상수로 고정한다.
