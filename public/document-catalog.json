@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 139,
+  "documentCount": 140,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -832,6 +832,31 @@
       "related": []
     },
     {
+      "id": "operations-screener-performance",
+      "title": "종목 추출 응답 병목 개선 (2026-11-18)",
+      "category": "operations",
+      "format": "md",
+      "description": "종목 추출 응답 병목 개선 (2026-11-18) 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/screener-performance.md)",
+      "url": "/manuals/operations/screener-performance.md",
+      "relatedPaths": [
+        "docs/CHARTS_CUSTOM_SCREENER_DESIGN.md",
+        "docs/ERROR_HANDLING.md"
+      ],
+      "sourcePath": "docs/operations/screener-performance.md",
+      "related": [
+        {
+          "title": "`/charts` 사용자 직접 조건 추출 설계안",
+          "url": "/manuals/CHARTS_CUSTOM_SCREENER_DESIGN.md",
+          "sourcePath": "docs/CHARTS_CUSTOM_SCREENER_DESIGN.md"
+        },
+        {
+          "title": "오류 상황 및 해결 방법",
+          "url": "/manuals/ERROR_HANDLING.md",
+          "sourcePath": "docs/ERROR_HANDLING.md"
+        }
+      ]
+    },
+    {
       "id": "operations-sec-edgar-analysis-records",
       "title": "SEC EDGAR 공시 분석 기록 관리",
       "category": "operations",
@@ -1248,9 +1273,17 @@
       "format": "md",
       "description": "1. 시장: 국내·해외·전체, 해외 거래소 선택",
       "url": "/manuals/CHARTS_CUSTOM_SCREENER_DESIGN.md",
-      "relatedPaths": [],
+      "relatedPaths": [
+        "docs/operations/screener-performance.md"
+      ],
       "sourcePath": "docs/CHARTS_CUSTOM_SCREENER_DESIGN.md",
-      "related": []
+      "related": [
+        {
+          "title": "종목 추출 응답 병목 개선 (2026-11-18)",
+          "url": "/manuals/operations/screener-performance.md",
+          "sourcePath": "docs/operations/screener-performance.md"
+        }
+      ]
     },
     {
       "id": "daily-cache-bulk-sync-design",

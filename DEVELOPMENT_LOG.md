@@ -1,3 +1,31 @@
+# [2026-11-18] 차트 종목 추출 응답 병목과 timeout 개선
+
+### 목표
+- 운영 `/charts` 종목 추출의 cold 지연과 화면 timeout 경로를 개선한다.
+
+### 반영
+- `lib/db-screener.ts`에서 종목/봉 주기별 캔들 행을 JSON 배열 한 행으로 묶어 전송 행과 반복 종목 정보를 줄이고 기존 계산 입력으로 복원한다.
+- `components/ticker-chart-workbench.tsx` 요청 timeout을 45초에서 90초로 늘린다.
+- `lib/db-screener-aggregated-rows.test.ts`와 운영 설계·오류·성능 문서에서 메타데이터 동등성 및 실패 위험을 관리한다.
+
+### 검증
+- 변경 전 운영 read-only API: KR 첫 요청 10,307ms, US 첫 요청 56,286ms, HTTP 200. warm 요청은 메모리 캐시 적중으로 비교에서 제외한다.
+- 변경 회귀 테스트 2개 파일 10개 통과. 전체 테스트 276개 파일 중 275 passed/1 skipped, 1,484 passed/3 skipped. TypeScript 전체 검사 통과.
+- `npm run deploy:verify` 통과: dependency audit, docs/API/cron 감사, production build 및 standalone 실행, `/charts` desktop/mobile Chrome hydration, API smoke 포함.
+- API 결과의 봉 거래일시와 갱신일시, 추출 종목명·코드 메타데이터 계약은 집계 행 복원 테스트로 확인했다. JSON 집계 성능 개선 폭과 운영 cold 결과는 배포 후 측정한다.
+
+### 다음 개선
+- 검증이 통과했으므로 OCI workflow를 통해 운영 배포하고 완료 상태를 확인한다.
+- 배포 후 신규 fingerprint의 KR/US 응답시간과 종목·조건·D/W/M 메타데이터를 비교한다. 개선 폭이 부족하면 DB/Node 단계를 분리 계측한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-18-001
+- 성과 판정: PARTIAL
+- 근거: 관측된 56초 정상 응답과 45초 UI 취소의 원인을 확인하고 해결 경로와 회귀 검증을 추가했다. 전송 행 축소의 성능 영향은 배포 후 아직 미측정이다.
+
+### 커밋·푸시·배포
+- 상태: 전체 사전 검증 통과. 커밋과 `oci` 푸시, 자동 배포 결과 확인은 진행 중이다.
+
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 9차 100종목과 문서 관리 자동 검증
 
 ### 목표

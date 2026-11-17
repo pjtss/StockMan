@@ -108,6 +108,14 @@
 
 이 문서는 RSS 프로젝트에서 반복적으로 발생할 수 있는 오류와 확인 순서를 관리한다. 모든 진단은 실제 응답·로그·DB 상태를 기준으로 하며, 추정만으로 토큰이나 캐시를 삭제하지 않는다.
 
+## 2026-11-18 `/charts` 종목 추출이 화면 제한시간보다 늦게 완료됨
+
+- **증상 및 근본 원인**: 운영 공개 스캐너 API에서 KR cold 요청은 10.3초, US cold 요청은 56.3초였지만 차트 UI가 45초에 요청을 abort하여 정상 응답이 오류로 표시될 수 있었다. 쿼리는 종목별 최대 65개 캔들을 행으로 반환했다.
+- **수정**: `components/ticker-chart-workbench.tsx` 제한을 90초로 조정하고 `lib/db-screener.ts`에서 캔들을 종목/봉 주기별 JSON 배열로 DB 집계해 기존 메모리 계산 구조로 복원한다.
+- **영향과 위험**: 캔들 내용·필터·지표 계산은 유지한다. PostgreSQL은 동일 캔들 수를 읽으므로 집계 연산이 실제 시간을 줄이는지는 아직 운영에서 검증 전이다.
+- **재발 자동 감지**: `lib/db-screener-aggregated-rows.test.ts`는 집계된 D/W 봉에서 결과 종목과 최신 거래일·갱신 시각 및 봉 주기 메타데이터를 검증한다. `docs/operations/screener-performance.md`는 신규 fingerprint의 cold 요청을 비교 기준으로 규정한다.
+- **다음 개선**: 전체 `npm run deploy:verify` 및 배포를 마친 뒤 KR/US cold `Server-Timing`, 결과 종목과 D/W/M 메타데이터를 기준값과 대조한다. 지속 지연 시 DB 조회와 Node 계산을 분리 계측한다.
+
 ## 공통 진단 원칙
 
 1. 요청 ID, HTTP 상태, 외부 API 응답 코드와 메시지를 먼저 확보한다.

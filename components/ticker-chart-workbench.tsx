@@ -365,7 +365,7 @@ export function TickerChartWorkbench() {
           value: true,
         });
       const controller = new AbortController();
-      scanTimeout = window.setTimeout(() => controller.abort(), 45_000);
+      scanTimeout = window.setTimeout(() => controller.abort(), 90_000);
       const response = await fetch("/api/screener/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
