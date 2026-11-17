@@ -107,5 +107,5 @@ async function inspectLocalProcess(pid) {
 }
 
 function normalizeHost(value) {
-  return value.replace(/^\[|\]$/g, "").replace(/^::ffff:/i, "").toLowerCase();
+  return value.split("/", 1)[0].replace(/^\[|\]$/g, "").replace(/^::ffff:/i, "").toLowerCase();
 }

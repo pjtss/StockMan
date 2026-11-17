@@ -773,3 +773,4 @@ npm test -- --run
 - **안전 조건**: 진단 workflow는 배포 브랜치에서 실행되지 않으며 `pg_terminate_backend`, DDL, timer/service 변경을 하지 않는다.
 - **검증/다음 단계**: deploy verification 후 진단 결과를 보고 세션 발생 경로를 특정한다. PID 목록 자체만으로 세션을 종료하지 않는다.
 - **공식 근거/한계**: PostgreSQL 공식 [`pg_stat_activity` 문서](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW)에 따라 `application_name`, `usename`, `client_addr`, `client_port`, `backend_xmin`, wait event 및 age만 조회한다. DB 연결이 Unix socket이거나 `ss`가 소켓 소유자를 노출하지 않으면 client process mapping은 비어 있을 수 있다.
+- **후속 결과/진단 보정**: Deploy OCI #1313(run `44021996821`)은 PID `253038`이 idle in transaction으로 928초 snapshot을 보유해 preflight 재시도 20회 뒤 fail-closed했다. 종료하지 않았다. 최초 진단 출력의 `client_addr`는 PostgreSQL CIDR 문자열(`127.0.0.1/32`)인데 socket endpoint는 host-only라 `/32` 제거가 필요했다. host 정규화를 수정하고 root 권한으로 `/proc` 및 `ss`의 읽기 전용 process/unit 메타데이터를 수집한다.

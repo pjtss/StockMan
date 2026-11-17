@@ -46,4 +46,4 @@ jobs:
             "ubuntu@${OCI_HOST}:${diagnostic_script}"
           ssh -i ~/.ssh/oci_key -o ServerAliveInterval=30 -o ServerAliveCountMax=5 \
             "ubuntu@${OCI_HOST}" \
-            "sudo -n bash -lc 'set -euo pipefail; set -a; . /etc/stockman/stockman.env; set +a; runuser -u stockman -- env DATABASE_URL=\"\$DATABASE_URL\" STOCKMAN_RELEASE_PATH=/opt/stockman/current node ${diagnostic_script}'"
+            "sudo -n bash -lc 'set -euo pipefail; set -a; . /etc/stockman/stockman.env; set +a; export STOCKMAN_RELEASE_PATH=/opt/stockman/current; node ${diagnostic_script}'"
