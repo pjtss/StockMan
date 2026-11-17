@@ -47,6 +47,8 @@ reports/sec-edgar-analysis/companies/{10자리 CIK}-{현재티커}/
 - SEC 제출 목록의 조회 범위와 저장한 filing 목록의 건수·Form별 건수를 대조한다.
 - 각 accession에 분석 파일 하나가 존재하고, SEC 제출 상세/주 문서 링크가 열리는지 확인한다.
 - 날짜 변환, 동일 이벤트 accession 연결, 희석 주식수, 등록 재판매와 신규 발행 구분을 확인한다.
+- 각 accession의 표지에서 실제 Form·개정 번호·등록번호를 확인하고, 회사 공통 요약을 여러 제출에 복사하지 않는다. 등록 주식은 총 등록량, 이미 발행·매각된 양, 잔여 재판매 등록량을 원문 수치와 대조한다. 동일 회사의 별도 계약 종료·상장 사건을 해당 accession 요약과 혼합하지 않는다.
+- Form 3/4/5 거래코드는 해당 거래행의 Code 셀에서 확인한다. 인쇄된 표 머리글의 “Code V”는 code legend 링크/각주일 수 있으므로 행의 `A`/`D` 표시와 혼동하지 않는다. Code A는 grant/award 등 취득, Code F는 증권 수령·행사·vesting 때 주식으로 납부하거나 withholding한 행사대금·세금 정산으로 해석하며, 공개시장 거래와 구분한다. [SEC Form 4 instructions](https://www.sec.gov/about/forms/form4.pdf) 기준.
 - 한글 UTF-8, 모든 내부 Markdown 링크, 종합 문서에서 개별 분석으로의 왕복 링크를 확인한다.
 - 새 문서 구조·커버리지는 `reports/sec-edgar-analysis/README.md`, `docs/company-analysis/us/README.md`, `docs/README.md` 및 `DEVELOPMENT_LOG.md`에서 찾을 수 있게 한다.
 

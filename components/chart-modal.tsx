@@ -8,6 +8,9 @@ import { normalizeOHLCVCandles } from "@/lib/chart-candles";
 import { formatDisplayAmount, formatDisplayDate, formatDisplayDateTime, formatDisplayNumber, formatDisplayVolume } from "@/lib/display-number";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { loadChartLibrary } from "@/lib/chart-library";
+import { isValidCompactCalendarDate } from "@/lib/calendar-date-quality.mjs";
+import { chartDataMemoryKey, getChartDataMemory, normalizeUsableChartData, setChartDataMemory } from "@/lib/chart-data-memory-cache";
+import { decryptKisRealtimePayload } from "@/lib/kis-realtime-payload";
 
 type StockTitanNewsItem = { id: number; title: string; translatedTitle: string | null; summary?: string | null; link: string; publishedAt: string | null; source: string; translationStatus?: string | null };
 type FlowResponse = { ok: boolean; source?: string; mode?: string; flowStatus?: string; collectedAt?: string; rows?: Array<Record<string, unknown>>; note?: string; instrumentDetail?: Record<string, unknown> };
@@ -29,7 +32,9 @@ function ratioFieldLabel(key: string) {
 }
 
 const MODAL_SETTINGS_KEY = "stockman:chart-modal-settings";
-type ChartTimeframe = "D" | "W" | "M" | "1" | "5";
+const isUsTickerCode = (code: string) => /^US:/i.test(code.trim());
+const normalizeTickerCode = (code: string) => code.trim().replace(/^US:/i, "").trim().toUpperCase();
+type ChartTimeframe = "D" | "W" | "M" | "1" | "2" | "3" | "5" | "10" | "15" | "30" | "60";
 type ModalSettings = { timeframe: ChartTimeframe; activeTab: "chart" | "fundamentals" | "flow" | "ratio" | "news"; flowMode: FlowMode; ratioType: RatioType };
 function readModalSettings(): Partial<ModalSettings> {
   if (typeof window === "undefined") return {};
@@ -62,16 +67,36 @@ interface ChartModalProps {
   prefetchCodes?: Array<{ code: string; company: string; exchange?: "NAS" | "AMS" | "NYS" | "KOSPI" | "KOSDAQ" }>;
 }
 
-const chartDataCache = new Map<string, ChartData>();
-const chartCacheKey = (code: string, timeframe: string, exchange?: string) => `${code}:${exchange ?? ""}:${timeframe}`;
-function minuteRowsToChartData(code: string, company: string, rows: Array<Record<string, unknown>>): ChartData {
-  const number = (value: unknown) => { const parsed = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(parsed) ? parsed : 0; };
-  const parsedCandles = rows.map((row) => {
-    const date = String(row.stck_bsop_date ?? row.xymd ?? row.date ?? "").replace(/-/g, "");
-    const time = String(row.stck_cntg_hour ?? row.khms ?? row.time ?? "000000").padStart(6, "0");
-    const last = number(row.stck_prpr ?? row.last ?? row.price);
-    return { date: `${date}${time}`, open: number(row.stck_oprc ?? row.open) || last, high: number(row.stck_hgpr ?? row.high) || last, low: number(row.stck_lwpr ?? row.low) || last, close: last, volume: number(row.cntg_vol ?? row.evol ?? row.volume), tradingValue: null, raw: row };
-  }).filter((candle) => /^\d{14}$/.test(candle.date) && candle.close > 0).sort((a, b) => a.date.localeCompare(b.date));
+export function minuteRowsToChartData(code: string, company: string, rows: Array<Record<string, unknown>>): ChartData {
+  const number = (value: unknown): number | null => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value !== "string" || value.trim() === "") return null;
+    const parsed = Number(value.trim().replace(/,/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const parsedCandles = rows.flatMap((row) => {
+    const hasKoreanTimestamp = row.kymd != null && row.khms != null;
+    const hasExchangeTimestamp = row.xymd != null && row.xhms != null;
+    const hasOverseasTimestampField = row.xymd != null || row.xhms != null || row.kymd != null || row.khms != null;
+    if (hasOverseasTimestampField && !hasKoreanTimestamp && !hasExchangeTimestamp) return [];
+    const date = String(row.stck_bsop_date ?? (hasKoreanTimestamp ? row.kymd : row.xymd ?? row.date) ?? "").replace(/-/g, "");
+    const rawTime = String(row.stck_cntg_hour ?? (hasKoreanTimestamp ? row.khms : hasExchangeTimestamp ? row.xhms : row.khms ?? row.time) ?? "");
+    const time = /^\d{4}$/.test(rawTime) ? `${rawTime}00` : rawTime;
+    if (!isValidCompactCalendarDate(date) || !/^\d{6}$/.test(time)) return [];
+    const hour = Number(time.slice(0, 2));
+    const minute = Number(time.slice(2, 4));
+    const second = Number(time.slice(4, 6));
+    if (hour > 23 || minute > 59 || second > 59) return [];
+    const open = number(row.stck_oprc ?? row.open);
+    const high = number(row.stck_hgpr ?? row.high);
+    const low = number(row.stck_lwpr ?? row.low);
+    const close = number(row.stck_prpr ?? row.last ?? row.price);
+    const volume = number(row.cntg_vol ?? row.evol ?? row.volume);
+    if (open === null || high === null || low === null || close === null || volume === null
+      || open <= 0 || high <= 0 || low <= 0 || close <= 0 || volume < 0
+      || high < Math.max(open, low, close) || low > Math.min(open, high, close)) return [];
+    return [{ date: `${date}${time}`, open, high, low, close, volume, tradingValue: null, raw: row }];
+  }).sort((a, b) => a.date.localeCompare(b.date));
   const candles = [...new Map(parsedCandles.map((candle) => [candle.date, candle])).values()];
   const last = candles.at(-1);
   const previous = candles.at(-2);
@@ -79,21 +104,22 @@ function minuteRowsToChartData(code: string, company: string, rows: Array<Record
   const rate = previous?.close ? (change / previous.close) * 100 : 0;
   return { code, company, candles, indicators: { rsi14: null, macd: null, macdSignal: null, macdHist: null, bbUpper: null, bbMiddle: null, bbLower: null }, latestPrice: last?.close ?? 0, latestChange: previous ? `${change >= 0 ? "+" : ""}${change.toFixed(4)}` : "", latestChangeRate: previous ? `${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%` : "", candleDataUpdatedAt: new Date().toISOString() };
 }
-async function fetchChartData(code: string, company: string, timeframe: ChartTimeframe, signal?: AbortSignal, exchange?: string) {
-  const key = chartCacheKey(code, timeframe, exchange);
-  const cached = chartDataCache.get(key);
-  if (cached) return cached;
-  const market = code.startsWith("US:") ? "US" : "KR";
-  if (timeframe === "1" || timeframe === "5") {
-    const exchangeQuery = code.startsWith("US:") && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+export async function fetchChartData(code: string, company: string, timeframe: ChartTimeframe, signal?: AbortSignal, exchange?: string) {
+  const key = chartDataMemoryKey(code, timeframe, exchange);
+  const cached = getChartDataMemory(key);
+  if (cached) return { ...cached, code, company };
+  const market = isUsTickerCode(code) ? "US" : "KR";
+  if (["1", "2", "3", "5", "10", "15", "30", "60"].includes(timeframe)) {
+    const exchangeQuery = exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
     const response = await fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&mode=minute&minute=${timeframe}&count=120${exchangeQuery}`, { signal, cache: "no-store" });
     const body = await readJsonResponse<{ rows?: Array<Record<string, unknown>>; error?: string }>(response);
     if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
     const result = minuteRowsToChartData(code, company, body.rows ?? []);
-    chartDataCache.set(key, result);
+    if (result.candles.length === 0) throw new Error("KIS_MINUTE_DATA_EMPTY_OR_INVALID");
+    setChartDataMemory(key, result);
     return result;
   }
-  const exchangeQuery = market === "US" && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+  const exchangeQuery = exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
   const response = await fetch(`/api/stock/chart?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${market}&timeframe=${timeframe}${exchangeQuery}`, { signal, cache: "no-store" });
   const body = await readJsonResponse<ChartData & { error?: string }>(response);
   if (!response.ok) {
@@ -101,8 +127,10 @@ async function fetchChartData(code: string, company: string, timeframe: ChartTim
     error.fundamentals = body.fundamentals;
     throw error;
   }
-  chartDataCache.set(key, body as ChartData);
-  return body as ChartData;
+  const normalized = normalizeUsableChartData(body);
+  if (!normalized) throw new Error("INVALID_CHART_DATA");
+  setChartDataMemory(key, normalized);
+  return normalized;
 }
 
 /** RSI 해석 */
@@ -121,10 +149,11 @@ function bbLabel(close: number, upper: number | null, lower: number | null): { t
   return { text: "밴드 내", cls: styles.bbNormal };
 }
 
-function chartTime(date: string) {
+export function chartTime(date: string) {
   if (!/^\d{14}$/.test(date)) return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}` as any;
-  const value = new Date(Number(date.slice(0, 4)), Number(date.slice(4, 6)) - 1, Number(date.slice(6, 8)), Number(date.slice(8, 10)), Number(date.slice(10, 12)), Number(date.slice(12, 14)));
-  return Math.floor(value.getTime() / 1000) as any;
+  // Lightweight Charts treats UTCTimestamp values as UTC and has no built-in timezone.
+  // Encode the KIS-provided wall-clock fields as UTC so labels stay stable across viewer timezones.
+  return Math.floor(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(4, 6)) - 1, Number(date.slice(6, 8)), Number(date.slice(8, 10)), Number(date.slice(10, 12)), Number(date.slice(12, 14))) / 1000) as any;
 }
 
 type IndicatorLine = { label: string; color: string; values: Array<number | null> };
@@ -239,7 +268,7 @@ function KISOpinionPanel({ data, loading, error, isUs }: { data: OpinionResponse
 }
 
 export function ChartModal({ code, company, exchange, onClose, onPrevious, onNext, position, prefetchCodes = [] }: ChartModalProps) {
-  const isUsChart = code.startsWith("US:");
+  const isUsChart = isUsTickerCode(code);
   const [timeframe, setTimeframe] = useState<ChartTimeframe>(() => readModalSettings().timeframe ?? "D");
   const [activeTab, setActiveTab] = useState<"chart" | "fundamentals" | "flow" | "ratio" | "news">(() => readModalSettings().activeTab ?? "chart");
   const [data, setData] = useState<ChartData | null>(null);
@@ -255,6 +284,9 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   const [flowRefreshKey, setFlowRefreshKey] = useState(0);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "unavailable" | "closed">("closed");
   const [realtimeRow, setRealtimeRow] = useState<Record<string, unknown> | null>(null);
+  const [realtimeReconnectNonce, setRealtimeReconnectNonce] = useState(0);
+  const realtimeReconnectAttemptsRef = useRef(0);
+  const realtimeReconnectScopeRef = useRef("");
   const [flowMode, setFlowMode] = useState<FlowMode>(() => readModalSettings().flowMode ?? "investor");
   const [ratio, setRatio] = useState<RatioResponse | null>(null);
   const [ratioLoading, setRatioLoading] = useState(false);
@@ -280,20 +312,23 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   // 모달 자체에서도 한 번 보완 조회해 헤더에 티커만 남지 않게 한다.
   useEffect(() => {
     setResolvedCompany(company);
-    const fallback = company.trim().toUpperCase() === code.replace(/^US:/i, "").trim().toUpperCase();
+    const lookupCode = normalizeTickerCode(code);
+    const fallback = company.trim().toUpperCase() === lookupCode;
     if (!fallback) return;
     const controller = new AbortController();
-    const market = code.startsWith("US:") ? "US" : "KR";
-    const lookupCode = code.replace(/^US:/i, "").trim().toUpperCase();
-    fetch(`/api/stock/lookup?market=${market}&codes=${encodeURIComponent(lookupCode)}`, { signal: controller.signal, cache: "no-store" })
+    const market = isUsTickerCode(code) ? "US" : "KR";
+    const exchangeQuery = exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+    fetch(`/api/stock/lookup?market=${market}&codes=${encodeURIComponent(lookupCode)}${exchangeQuery}`, { signal: controller.signal, cache: "no-store" })
       .then((response) => response.ok ? response.json() as Promise<{ names?: Record<string, string> }> : null)
       .then((body) => {
-        const name = body?.names?.[lookupCode];
+        const name = (exchange ? body?.names?.[`${exchange}:${lookupCode}`] : undefined)
+          ?? body?.names?.[`${market}:${lookupCode}`]
+          ?? body?.names?.[lookupCode];
         if (name) setResolvedCompany(name);
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [code, company]);
+  }, [code, company, exchange]);
 
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(document.fullscreenElement === modalRef.current);
@@ -314,8 +349,11 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     try { window.sessionStorage.setItem(MODAL_SETTINGS_KEY, JSON.stringify({ timeframe, activeTab, flowMode, ratioType } satisfies ModalSettings)); } catch { /* sessionStorage may be unavailable */ }
   }, [timeframe, activeTab, flowMode, ratioType]);
 
-  const watchlistMarket = code.startsWith("US:") ? "US" : "KR";
-  const watchlistCode = code.replace(/^US:/i, "").trim().toUpperCase();
+  const watchlistMarket = isUsTickerCode(code) ? "US" : "KR";
+  const watchlistCode = normalizeTickerCode(code);
+  const watchlistScope = `${watchlistMarket}:${watchlistCode}`;
+  const watchlistScopeRef = useRef(watchlistScope);
+  watchlistScopeRef.current = watchlistScope;
 
   // 로그인 사용자만 현재 종목의 개인 관심종목 상태를 조회한다.
   useEffect(() => {
@@ -323,6 +361,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     setIsAuthenticated(null);
     setIsWatchlisted(false);
     setWatchlistMessage(null);
+    setWatchlistBusy(false);
     fetch(`/api/auth/me?ts=${Date.now()}`, { credentials: "same-origin", cache: "no-store" })
       .then((response) => response.ok ? response.json() : null)
       .then(async (body: { authenticated?: boolean } | null) => {
@@ -341,6 +380,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
 
   async function toggleWatchlist() {
     if (isAuthenticated !== true || watchlistBusy) return;
+    const requestScope = watchlistScope;
     const nextWatchlisted = !isWatchlisted;
     setWatchlistBusy(true);
     setWatchlistMessage(null);
@@ -353,12 +393,13 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
       });
       const body = await response.json().catch(() => null) as { error?: string } | null;
       if (!response.ok) throw new Error(body?.error === "UNAUTHORIZED" ? "로그인이 필요합니다." : "관심종목 변경에 실패했습니다.");
+      if (watchlistScopeRef.current !== requestScope) return;
       setIsWatchlisted(nextWatchlisted);
       setWatchlistMessage(nextWatchlisted ? "관심종목에 추가했습니다." : "관심종목에서 삭제했습니다.");
     } catch (error) {
-      setWatchlistMessage(error instanceof Error ? error.message : "관심종목 변경에 실패했습니다.");
+      if (watchlistScopeRef.current === requestScope) setWatchlistMessage(error instanceof Error ? error.message : "관심종목 변경에 실패했습니다.");
     } finally {
-      setWatchlistBusy(false);
+      if (watchlistScopeRef.current === requestScope) setWatchlistBusy(false);
     }
   }
 
@@ -428,7 +469,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     setFlowLoading(true); setFlowError(null);
     const queryMode = flowMode === "minute" || flowMode === "minute-5" ? "minute" : isUsChart ? (flowMode === "asking" ? "asking" : flowMode === "price-detail" ? "price-detail" : flowMode === "daily" ? "daily" : flowMode === "info" ? "info" : "trade") : flowMode;
     const minute = flowMode === "minute-5" ? "5" : "1";
-    const exchangeQuery = isUsChart && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+    const exchangeQuery = exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
     const flowRequest = fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=${isUsChart ? "US" : "KR"}&mode=${queryMode}${exchangeQuery}${queryMode === "minute" ? `&minute=${minute}&count=120` : ""}`, { cache: "no-store" }).then(async (response) => { const body = await readJsonResponse<FlowResponse & { error?: string }>(response); if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body; });
     const detailRequest = isUsChart ? Promise.resolve(null) : fetch(`/api/kis/market-flow?code=${encodeURIComponent(code)}&company=${encodeURIComponent(company)}&market=KR&mode=price-detail`, { cache: "no-store" }).then(async (response) => response.ok ? await readJsonResponse<FlowResponse>(response) : null);
     Promise.all([flowRequest, detailRequest]).then(([body, detail]) => { if (!cancelled) { const detailRow = detail?.rows?.[0]; const flowRows = body.rows ?? []; const labeledDetail = detailRow ? { "KIS 상장주수": detailRow.listedShares, ...detailRow } : null; const rows = labeledDetail ? (flowRows.length ? [labeledDetail ? { ...labeledDetail, ...flowRows[0] } : flowRows[0], ...flowRows.slice(1)] : [labeledDetail]) : flowRows; setFlow({ ...body, rows, instrumentDetail: detailRow }); } }).catch((e: Error) => { if (!cancelled) setFlowError(e.message); }).finally(() => { if (!cancelled) setFlowLoading(false); });
@@ -438,47 +479,189 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   useEffect(() => {
     if (activeTab !== "flow" || typeof WebSocket === "undefined") {
       setRealtimeStatus("closed");
+      realtimeReconnectAttemptsRef.current = 0;
+      realtimeReconnectScopeRef.current = "";
       return;
     }
     let cancelled = false;
     let socket: WebSocket | null = null;
     let lastPersistAt = 0;
+    let realtimeKey: string | null = null;
+    let realtimeIv: string | null = null;
+    let realtimeEncrypted = false;
+    let realtimeProtocolFailed = false;
+    const pendingRealtimeMessages: string[] = [];
+    let processingRealtimeMessages = false;
+    const maxPendingRealtimeMessages = 32;
     setRealtimeStatus("connecting");
     setRealtimeRow(null);
     const market = isUsChart ? "US" : "KR";
     const channel = flowMode === "asking" ? "asking" : "trade";
-    fetch(`/api/kis/realtime/approval?market=${market}&channel=${channel}&code=${encodeURIComponent(code)}`, { cache: "no-store" })
-      .then(async (response) => { const body = await response.json(); if (!response.ok || !body.ok) throw new Error(body.error ?? `HTTP ${response.status}`); return body as { wsUrl: string; frame: string }; })
+    const subscriptionTrId = market === "US"
+      ? channel === "asking" ? "HDFSASP0" : "HDFSCNT0"
+      : channel === "asking" ? "H0STASP0" : "H0STCNT0";
+    const reconnectScope = `${market}:${normalizeTickerCode(code)}:${exchange ?? ""}:${channel}`;
+    if (realtimeReconnectScopeRef.current !== reconnectScope) {
+      realtimeReconnectScopeRef.current = reconnectScope;
+      realtimeReconnectAttemptsRef.current = 0;
+    }
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectScheduled = false;
+    const scheduleReconnect = (minimumDelayMs = 0) => {
+      if (cancelled || reconnectScheduled) return;
+      reconnectScheduled = true;
+      if (realtimeReconnectAttemptsRef.current >= 3) {
+        setRealtimeStatus("unavailable");
+        socket?.close(4001, "KIS realtime retry limit reached");
+        return;
+      }
+      realtimeReconnectAttemptsRef.current += 1;
+      setRealtimeStatus("unavailable");
+      socket?.close(4000, "KIS realtime protocol recovery");
+      const backoffDelayMs = 500 * (2 ** (realtimeReconnectAttemptsRef.current - 1));
+      reconnectTimer = setTimeout(() => {
+        if (!cancelled) setRealtimeReconnectNonce((value) => value + 1);
+      }, Math.max(backoffDelayMs, minimumDelayMs));
+    };
+    const exchangeQuery = isUsChart && exchange ? `&exchange=${encodeURIComponent(exchange)}` : "";
+    fetch(`/api/kis/realtime/approval?market=${market}&channel=${channel}&code=${encodeURIComponent(code)}${exchangeQuery}`, { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok || !body.ok) {
+          const retryAfterSeconds = response.status === 429 ? Number(response.headers.get("retry-after")) : 0;
+          const minimumDelayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+            ? Math.min(60_000, retryAfterSeconds * 1_000)
+            : 0;
+          scheduleReconnect(minimumDelayMs);
+          throw new Error(body.error ?? `HTTP ${response.status}`);
+        }
+        return body as { wsUrl: string; frame: string };
+      })
       .then((body) => {
         if (cancelled) return;
         socket = new WebSocket(body.wsUrl);
         socket.onopen = () => { if (!cancelled) { socket?.send(body.frame); setRealtimeStatus("connected"); } };
-        socket.onmessage = (event) => {
-          if (cancelled || typeof event.data !== "string") return;
+        const dataFrameTrId = (rawMessage: string) => {
+          const [frameType, trId, , values] = rawMessage.split("|");
+          return (frameType === "0" || frameType === "1") && values ? trId : null;
+        };
+        const processRealtimeMessage = async (rawMessage: string) => {
           const persist = (trId: string, payload: unknown) => {
             const now = Date.now();
             if (now - lastPersistAt < 1000) return;
             lastPersistAt = now;
-            void fetch("/api/kis/realtime/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ market, code, channel, trId, payload, rawPayload: event.data }), keepalive: true }).catch(() => undefined);
+            void fetch("/api/kis/realtime/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ market, code, channel, trId, payload, rawPayload: rawMessage }), keepalive: true }).catch(() => undefined);
           };
           try {
-            const parsed = JSON.parse(event.data) as { body?: { output?: Record<string, unknown> } };
-            if (parsed.body?.output) { const trId = String((parsed.body.output as Record<string, unknown>).tr_id ?? "realtime"); setRealtimeRow(parsed.body.output); persist(trId, parsed.body.output); }
+            const parsed = JSON.parse(rawMessage) as { header?: { tr_id?: string; encrypt?: string }; body?: { rt_cd?: string; output?: Record<string, unknown> } };
+            const output = parsed.body?.output;
+            const isSubscriptionResponse = parsed.header?.tr_id === subscriptionTrId;
+            if (isSubscriptionResponse && parsed.header?.encrypt !== undefined) {
+              realtimeEncrypted = parsed.header.encrypt === "Y";
+              realtimeProtocolFailed = false;
+              if (!realtimeEncrypted) {
+                realtimeKey = null;
+                realtimeIv = null;
+              }
+            }
+            if (isSubscriptionResponse && parsed.body && parsed.body.rt_cd !== undefined && parsed.body.rt_cd !== "0") {
+              realtimeProtocolFailed = true;
+              scheduleReconnect();
+              return;
+            }
+            if (isSubscriptionResponse && realtimeEncrypted) {
+              if (typeof output?.key === "string" && typeof output.iv === "string") {
+                realtimeKey = output.key;
+                realtimeIv = output.iv;
+              } else {
+                realtimeProtocolFailed = true;
+                scheduleReconnect();
+              }
+            }
+            // KIS JSON frames carry subscription/control metadata, never market rows.
             return;
           } catch { /* KIS data frames are pipe-delimited */ }
-          const [, trId, , rawValues] = event.data.split("|");
-          if (!rawValues) return;
-          const values = rawValues.split("^");
+          const [, trId, , rawValues] = rawMessage.split("|");
+          if (realtimeProtocolFailed || trId !== subscriptionTrId || !rawValues) return;
+          let plainValues = rawValues;
+          if (realtimeEncrypted) {
+            if (!realtimeKey || !realtimeIv) {
+              realtimeProtocolFailed = true;
+              scheduleReconnect();
+              return;
+            }
+            try {
+              plainValues = await decryptKisRealtimePayload(rawValues, realtimeKey, realtimeIv);
+            } catch {
+              realtimeProtocolFailed = true;
+              scheduleReconnect();
+              return;
+            }
+          }
+          if (cancelled || realtimeProtocolFailed) return;
+          const values = plainValues.split("^");
           const normalizedPayload = { tr_id: trId, values: values.slice(0, 12).join(" | ") };
+          realtimeReconnectAttemptsRef.current = 0;
           setRealtimeRow(normalizedPayload);
           persist(trId, normalizedPayload);
         };
-        socket.onerror = () => { if (!cancelled) setRealtimeStatus("unavailable"); };
-        socket.onclose = () => { if (!cancelled) setRealtimeStatus("closed"); };
+        const drainRealtimeMessages = async () => {
+          if (processingRealtimeMessages) return;
+          processingRealtimeMessages = true;
+          try {
+            while (!cancelled && pendingRealtimeMessages.length > 0) {
+              const rawMessage = pendingRealtimeMessages.shift();
+              if (!rawMessage) continue;
+              try {
+                await processRealtimeMessage(rawMessage);
+              } catch {
+                scheduleReconnect();
+              }
+            }
+          } finally {
+            processingRealtimeMessages = false;
+          }
+        };
+        socket.onmessage = (event) => {
+          if (cancelled || reconnectScheduled || typeof event.data !== "string") return;
+          const incomingTrId = dataFrameTrId(event.data);
+          if (incomingTrId) {
+            if (incomingTrId !== subscriptionTrId) return;
+            // Only the latest pending market update matters while decrypt is busy.
+            const olderPendingDataIndex = pendingRealtimeMessages.findIndex((message) => dataFrameTrId(message) === subscriptionTrId);
+            if (olderPendingDataIndex >= 0) pendingRealtimeMessages.splice(olderPendingDataIndex, 1);
+          } else {
+            try {
+              const control = JSON.parse(event.data) as { header?: { tr_id?: string } };
+              if (control.header?.tr_id === "PINGPONG") return;
+            } catch { /* retain malformed frames for the normal protocol error path */ }
+          }
+          if (pendingRealtimeMessages.length >= maxPendingRealtimeMessages) {
+            const oldestDataIndex = pendingRealtimeMessages.findIndex((message) => dataFrameTrId(message) !== null);
+            if (oldestDataIndex >= 0) pendingRealtimeMessages.splice(oldestDataIndex, 1);
+            else if (incomingTrId) return;
+            else {
+              pendingRealtimeMessages.length = 0;
+              realtimeEncrypted = false;
+              realtimeProtocolFailed = true;
+              realtimeKey = null;
+              realtimeIv = null;
+              scheduleReconnect();
+              return;
+            }
+          }
+          pendingRealtimeMessages.push(event.data);
+          void drainRealtimeMessages();
+        };
+        socket.onerror = () => { scheduleReconnect(); };
+        socket.onclose = () => {
+          if (cancelled || reconnectScheduled) return;
+          scheduleReconnect();
+        };
       })
-      .catch(() => { if (!cancelled) setRealtimeStatus("unavailable"); });
-    return () => { cancelled = true; socket?.close(); };
-  }, [activeTab, code, flowMode, isUsChart]);
+      .catch(() => { scheduleReconnect(); });
+    return () => { cancelled = true; if (reconnectTimer) clearTimeout(reconnectTimer); pendingRealtimeMessages.length = 0; socket?.close(); };
+  }, [activeTab, code, exchange, flowMode, isUsChart, realtimeReconnectNonce]);
 
   useEffect(() => {
     if (activeTab !== "ratio" || isUsChart) return;
@@ -676,7 +859,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
         <div className={styles.header}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
             <div className={styles.titleBlock}>
-              <span className={styles.company}>{resolvedCompany || code.replace(/^US:/i, "")}</span>
+              <span className={styles.company}>{resolvedCompany || normalizeTickerCode(code)}</span>
               <span className={styles.code}>{code}</span>
             </div>
             {data && (
@@ -717,14 +900,12 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
                 {label}
               </button>
             ))}
-            <button type="button" onClick={() => { setActiveTab("chart"); setTimeframe("1"); }} aria-label="1분봉 차트 보기"
-              style={{ marginLeft: "auto", padding: "8px 14px", borderRadius: "8px", background: activeTab === "chart" && timeframe === "1" ? "#00ffa3" : "rgba(148,163,184,.16)", color: activeTab === "chart" && timeframe === "1" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
-              1분봉
-            </button>
-            <button type="button" onClick={() => { setActiveTab("chart"); setTimeframe("5"); }} aria-label="5분봉 차트 보기"
-              style={{ padding: "8px 14px", borderRadius: "8px", background: activeTab === "chart" && timeframe === "5" ? "#00ffa3" : "rgba(148,163,184,.16)", color: activeTab === "chart" && timeframe === "5" ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
-              5분봉
-            </button>
+            {(isUsChart ? [1, 5, 10, 15, 30, 60] : [1, 2, 3, 5, 10, 15, 30, 60]).map((minute) => (
+              <button key={minute} type="button" onClick={() => { setActiveTab("chart"); setTimeframe(String(minute) as ChartTimeframe); }} aria-label={`${minute}분봉 차트 보기`}
+                style={{ marginLeft: minute === 1 ? "auto" : undefined, padding: "8px 14px", borderRadius: "8px", background: activeTab === "chart" && timeframe === String(minute) ? "#00ffa3" : "rgba(148,163,184,.16)", color: activeTab === "chart" && timeframe === String(minute) ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
+                {minute}분봉
+              </button>
+            ))}
           </div>
           {loading && (
             <div className={styles.chartWrap}>

@@ -12,16 +12,33 @@ function parseSubscriptionBody(body: unknown, requireKeys: boolean) {
   const keys = value.keys && typeof value.keys === "object" ? value.keys as Record<string, unknown> : {};
   const p256dh = typeof keys.p256dh === "string" ? keys.p256dh : "";
   const auth = typeof keys.auth === "string" ? keys.auth : "";
-  if (requireKeys && (!p256dh || !auth || p256dh.length > 512 || auth.length > 512)) throw new Error("INVALID_PUSH_SUBSCRIPTION");
-  const bool = (input: unknown, fallback = true) => typeof input === "boolean" ? input : fallback;
+  if (!p256dh || !auth || p256dh.length > 512 || auth.length > 512) throw new Error("INVALID_PUSH_SUBSCRIPTION");
+  const bool = (input: unknown) => typeof input === "boolean" ? input : requireKeys ? false : undefined;
   return { endpoint, p256dh, auth, enabled: bool(value.enabled), dartEnabled: bool(value.dartEnabled), intensityEnabled: bool(value.intensityEnabled), risingEnabled: bool(value.risingEnabled) };
+}
+
+function statusResponse(debug: Awaited<ReturnType<typeof loadPushSubscriptionDebug>>) {
+  return NextResponse.json({
+    ok: true,
+    currentDeviceSaved: debug.currentDeviceSaved,
+    enabled: debug.currentDevice?.enabled ?? false,
+    dartEnabled: debug.currentDevice?.dartEnabled ?? false,
+    intensityEnabled: debug.currentDevice?.intensityEnabled ?? false,
+    risingEnabled: debug.currentDevice?.risingEnabled ?? false,
+    previewMode: debug.currentDevice?.previewMode ?? "GENERIC",
+    preferenceRevision: debug.currentDevice?.preferenceRevision ?? 0,
+  }, { status: debug.currentDeviceSaved ? 200 : 401 });
+}
+
+export async function GET() {
+  return NextResponse.json({ error: "PUSH_SUBSCRIPTION_PROOF_REQUIRED" }, { status: 401 });
 }
 
 export async function POST(request: Request) {
   try {
     const body = parseSubscriptionBody(await request.json(), true);
     await ensureSchema();
-    await savePushSubscription({
+    const saved = await savePushSubscription({
       endpoint: body.endpoint,
       p256dh: body.p256dh,
       auth: body.auth,
@@ -31,20 +48,9 @@ export async function POST(request: Request) {
       intensityEnabled: body.intensityEnabled,
       risingEnabled: body.risingEnabled,
     });
-
-    const debug = await loadPushSubscriptionDebug(body.endpoint);
-
-    return NextResponse.json({
-      ok: true,
-      savedCount: debug.count,
-      currentDeviceSaved: debug.currentDeviceSaved,
-      latestUpdatedAt: debug.latest?.updatedAt ?? null,
-      latestEndpoint: debug.latest?.endpoint ?? null,
-      enabled: debug.currentDevice?.enabled ?? true,
-      dartEnabled: debug.currentDevice?.dartEnabled ?? true,
-      intensityEnabled: debug.currentDevice?.intensityEnabled ?? true,
-      risingEnabled: debug.currentDevice?.risingEnabled ?? true,
-    });
+    if (!saved) return NextResponse.json({ error: "PUSH_SUBSCRIPTION_PROOF_REQUIRED" }, { status: 401 });
+    const debug = await loadPushSubscriptionDebug(body.endpoint, body.p256dh, body.auth);
+    return statusResponse(debug);
   } catch (error) {
     const invalid = error instanceof SyntaxError || error instanceof Error && error.message === "INVALID_PUSH_SUBSCRIPTION";
     if (!invalid) console.error("[API /push/subscribe POST] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
@@ -56,54 +62,23 @@ export async function PATCH(request: Request) {
   try {
     const body = parseSubscriptionBody(await request.json(), false);
     await ensureSchema();
+    if (body.enabled === undefined && body.dartEnabled === undefined && body.intensityEnabled === undefined && body.risingEnabled === undefined) {
+      return statusResponse(await loadPushSubscriptionDebug(body.endpoint, body.p256dh, body.auth));
+    }
     await updatePushSubscriptionPreferences({
       endpoint: body.endpoint,
-      p256dh: "",
-      auth: "",
+      p256dh: body.p256dh,
+      auth: body.auth,
       enabled: body.enabled,
       dartEnabled: body.dartEnabled,
       intensityEnabled: body.intensityEnabled,
       risingEnabled: body.risingEnabled,
     });
-
-    const debug = await loadPushSubscriptionDebug(body.endpoint);
-
-    return NextResponse.json({
-      ok: true,
-      currentDeviceSaved: debug.currentDeviceSaved,
-      latestUpdatedAt: debug.latest?.updatedAt ?? null,
-      enabled: debug.currentDevice?.enabled ?? true,
-      dartEnabled: debug.currentDevice?.dartEnabled ?? true,
-      intensityEnabled: debug.currentDevice?.intensityEnabled ?? true,
-      risingEnabled: debug.currentDevice?.risingEnabled ?? true,
-    });
+    const debug = await loadPushSubscriptionDebug(body.endpoint, body.p256dh, body.auth);
+    return statusResponse(debug);
   } catch (error) {
     const invalid = error instanceof SyntaxError || error instanceof Error && error.message === "INVALID_PUSH_SUBSCRIPTION";
     if (!invalid) console.error("[API /push/subscribe PATCH] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
     return NextResponse.json({ error: invalid ? "INVALID_PUSH_SUBSCRIPTION" : "PUSH_PREFERENCES_FAILED" }, { status: invalid ? 400 : 503 });
-  }
-}
-
-export async function GET(request: Request) {
-  try {
-    await ensureSchema();
-    const { searchParams } = new URL(request.url);
-    const endpoint = searchParams.get("endpoint") ?? undefined;
-    const debug = await loadPushSubscriptionDebug(endpoint);
-    return NextResponse.json({
-      ok: true,
-      savedCount: debug.count,
-      currentDeviceSaved: debug.currentDeviceSaved,
-      latestEndpoint: debug.latest?.endpoint ?? null,
-      latestUpdatedAt: debug.latest?.updatedAt ?? null,
-      latestUserAgent: debug.latest?.userAgent ?? null,
-      enabled: debug.currentDevice?.enabled ?? true,
-      dartEnabled: debug.currentDevice?.dartEnabled ?? true,
-      intensityEnabled: debug.currentDevice?.intensityEnabled ?? true,
-      risingEnabled: debug.currentDevice?.risingEnabled ?? true,
-    });
-  } catch (error) {
-    console.error("[API /push/subscribe] Error:", error instanceof Error ? error.message : "unknown error");
-    return NextResponse.json({ error: "푸시 구독 상태 조회에 실패했습니다." }, { status: 503 });
   }
 }

@@ -1,0 +1,82 @@
+{
+  "contractVersion": "capital-impact-separation.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "impactKinds": [
+    "CASH_RECEIVED_GROSS",
+    "CASH_RECEIVED_NET",
+    "NON_CASH_DEBT_SETTLEMENT",
+    "DEBT_DERECOGNIZED",
+    "NEW_SHARES_ISSUED",
+    "TREASURY_SHARES_RELEASED",
+    "SHARES_RESTRICTED_FROM_TRADING",
+    "PUBLIC_SUPPLY_POTENTIAL"
+  ],
+  "vectors": [
+    {
+      "id": "CIP-01-CB-CONVERSION-NONCASH",
+      "input": { "security": "CB", "event": "CONVERSION", "convertedPrincipal": "200000000", "newShares": "100000", "conversionSettlementCash": "0", "cashEvidence": "CONFIRMED_NO_CASH", "debtEvidence": "CONFIRMED_DERECOGNITION" },
+      "expected": { "cashReceivedGross": { "status": "CONFIRMED", "value": "0" }, "debtDerecognized": { "status": "CONFIRMED", "value": "200000000" }, "newSharesIssued": { "status": "CONFIRMED_FOR_STAGE", "value": "100000" }, "displayRule": "CONVERSION_IS_NOT_NEW_CASH_PROCEEDS", "forbiddenPublicText": ["전환으로 현금 2억원 유입", "CB 발행대금 재유입"] }
+    },
+    {
+      "id": "CIP-02-BW-CASH-EXERCISE",
+      "input": { "security": "BW", "event": "EXERCISE", "exerciseAmount": "480000000", "cashPaymentProof": "CONFIRMED", "cashReceived": "480000000", "bondCancellationProof": null, "newShares": "394088" },
+      "expected": { "cashReceivedGross": { "status": "CONFIRMED", "value": "480000000" }, "cashReceivedNet": { "status": "UNVERIFIABLE" }, "debtDerecognized": { "status": "NOT_REPORTED" }, "newSharesIssued": { "status": "CONFIRMED_FOR_STAGE", "value": "394088" }, "forbiddenPublicText": ["순유입 4.8억원", "사채 4.8억원 상환"] }
+    },
+    {
+      "id": "CIP-03-BW-BOND-OFFSET",
+      "input": { "security": "BW", "event": "EXERCISE", "exerciseAmount": "480000000", "cashPaymentProof": null, "bondCancellationProof": "CONFIRMED", "newShares": "394088" },
+      "expected": { "cashReceivedGross": { "status": "CONFIRMED", "value": "0" }, "nonCashDebtSettlement": { "status": "CONFIRMED", "value": "480000000" }, "debtDerecognized": { "status": "CONFIRMED", "value": "480000000" }, "newSharesIssued": { "status": "CONFIRMED_FOR_STAGE", "value": "394088" }, "forbiddenPublicText": ["현금 4.8억원 유입", "BW 대금 현금납입"] }
+    },
+    {
+      "id": "CIP-04-EB-TREASURY-EXCHANGE",
+      "input": { "security": "EB", "event": "EXCHANGE", "bondIssuer": "ISSUER-A", "underlyingIssuer": "ISSUER-A", "deliverySource": "ISSUER_TREASURY", "exchangedShares": "250000", "newShares": "0", "cashAtExchange": "0", "debtDerecognized": "10525000000", "deliveryProof": "CONFIRMED" },
+      "expected": { "newSharesIssued": { "status": "CONFIRMED", "value": "0" }, "treasurySharesReleased": { "status": "CONFIRMED", "value": "250000" }, "publicSupplyPotential": { "status": "CONFIRMED_TRANSFER_NOT_MARKET_SALE", "value": "250000" }, "cashReceivedGross": { "status": "CONFIRMED", "value": "0" }, "debtDerecognized": { "status": "CONFIRMED", "value": "10525000000" }, "forbiddenPublicText": ["신주 25만주 발행", "주식 공급 영향 없음"] }
+    },
+    {
+      "id": "CIP-05-EB-THIRD-PARTY-SHARES",
+      "input": { "security": "EB", "event": "EXCHANGE", "bondIssuer": "ISSUER-A", "underlyingIssuer": "ISSUER-B", "deliverySource": "THIRD_PARTY_OWNED", "exchangedShares": "70000", "newSharesByA": "0", "treasurySharesReleasedByA": "0", "underlyingMaster": "UNRESOLVED" },
+      "expected": { "issuerACapitalImpact": "NO_SHARE_DELIVERY_BY_A_CONFIRMED", "underlyingBOwnershipTransfer": "EVIDENCE_OBSERVED", "publicSupplyPotential": { "status": "UNVERIFIABLE" }, "subjectBRecommendation": "SUPPRESSED_MASTER_UNRESOLVED", "forbiddenPublicText": ["ISSUER-A 신주 희석 7만주", "ISSUER-B public float +7만주"] }
+    },
+    {
+      "id": "CIP-06-EB-TREASURY-LOCKUP",
+      "input": { "security": "EB", "deliverySource": "ISSUER_TREASURY", "treasurySharesDelivered": "100000", "lockupShares": "100000", "restrictionExpiry": "FUTURE", "saleEvidence": null },
+      "expected": { "treasurySharesReleased": { "status": "CONFIRMED", "value": "100000" }, "sharesRestrictedFromTrading": { "status": "CONFIRMED", "value": "100000" }, "publicSupplyPotential": { "status": "CONDITIONAL_AFTER_RESTRICTION", "value": "100000" }, "publiclyTradableNow": { "status": "CONFIRMED", "value": "0" }, "forbiddenPublicText": ["즉시 유통가능 10만주", "매도물량 10만주 확정"] }
+    },
+    {
+      "id": "CIP-07-CB-POTENTIAL-NOT-ACTUAL",
+      "input": { "security": "CB", "event": "TERMS_ONLY", "potentialShares": "500000", "exerciseEvidence": null, "issuanceEvidence": null },
+      "expected": { "newSharesIssued": { "status": "NOT_REPORTED" }, "conditionalShares": { "status": "CONDITIONAL_ONLY", "value": "500000" }, "cashReceivedGross": { "status": "NOT_REPORTED" }, "forbiddenPublicText": ["신주 50만주 발행 완료", "현금 유입 완료"] }
+    },
+    {
+      "id": "CIP-08-RATIO-BASIS-STALE",
+      "input": { "newShares": "100000", "preEventIssuedShares": "10000000", "treasuryShares": "500000", "issuedSharesAsOf": "2026-05-01", "treasurySharesAsOf": "2026-04-01" },
+      "expected": { "issuedShareIncreaseRatio": { "status": "NOT_COMPUTABLE", "reason": "BASIS_DATE_MISMATCH" }, "ownershipDilutionRatio": { "status": "NOT_COMPUTABLE" }, "forbiddenPublicText": ["희석률 1.0%", "동일 기준 주식수"] }
+    },
+    {
+      "id": "CIP-09-RATIO-TYPED-DENOMINATOR",
+      "input": { "newShares": "100000", "preEventIssuedShares": "10000000", "issuedSharesAsOf": "2026-05-01", "newSharesAsOf": "2026-05-01", "securityClass": "COMMON", "denominatorBasis": "ISSUED_INCLUDES_TREASURY" },
+      "expected": { "issuedShareIncreaseRatio": { "status": "CONDITIONAL_CALCULATION", "numerator": "100000", "denominator": "10000000", "value": "0.01", "label": "신주 수 / 증자 전 발행주식수" }, "ownershipDilutionRatio": { "status": "NOT_COMPUTABLE_WITHOUT_HOLDER_AND_TREASURY_BASIS" }, "forbiddenPublicText": ["기존 주주 지분이 정확히 1% 감소"] }
+    },
+    {
+      "id": "CIP-10-CASH-ZERO-VS-UNKNOWN",
+      "input": { "cashEvidence": "CONFIRMED_NO_CASH", "cashAmount": "0", "feeEvidence": null, "netCashAmount": null },
+      "expected": { "cashReceivedGross": { "status": "CONFIRMED", "value": "0" }, "cashReceivedNet": { "status": "UNVERIFIABLE" }, "forbiddenPublicText": ["순유입 0원 확정", "현금 유입 미확인"] }
+    },
+    {
+      "id": "CIP-11-ORIGINAL-PROCEEDS-NOT-CONVERSION-CASH",
+      "input": { "security": "CB", "originalIssueCashReceived": "1000000000", "originalIssueDate": "2025-01-10", "conversionDate": "2026-05-10", "convertedPrincipal": "200000000", "conversionCashReceived": "0" },
+      "expected": { "originalIssueProceeds": { "status": "HISTORICAL_CONFIRMED", "value": "1000000000", "asOf": "2025-01-10" }, "conversionDateCashReceived": { "status": "CONFIRMED", "value": "0", "asOf": "2026-05-10" }, "forbiddenPublicText": ["전환일 현금 10억원 유입"] }
+    },
+    {
+      "id": "CIP-12-UNRESOLVED-CORRECTION-SUPPRESSES-METRICS",
+      "input": { "originalTerms": "SYNTHETIC-A", "correctedTerms": "SYNTHETIC-B", "correctionRelation": "UNRESOLVED", "cashClaim": "CONFLICTED", "shareClaim": "OBSERVED" },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "cashReceivedGross": { "status": "UNVERIFIABLE" }, "newSharesIssued": { "status": "UNVERIFIABLE" }, "forbiddenPublicText": ["확정 순유입", "확정 희석 수치"] }
+    }
+  ]
+}

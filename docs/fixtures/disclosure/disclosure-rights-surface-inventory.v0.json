@@ -1,0 +1,117 @@
+{
+  "contractVersion": "disclosure-rights-surface-inventory.v0",
+  "classification": "REPOSITORY_CALL_GRAPH_INVENTORY_NOT_LEGAL_PERMISSION",
+  "asOf": "2026-11-04",
+  "sourcePolicy": {
+    "rightsApproval": "NONE",
+    "unmappedActionsDefault": "UNRESOLVED_AND_BLOCKED",
+    "designCandidateIsNotRuntimeUse": true,
+    "sourceProductsDoNotInheritRights": true
+  },
+  "surfaces": [
+    {
+      "surfaceId": "DART_RSS_TODAY_FEED",
+      "product": "DART public today RSS",
+      "officialLocator": "https://dart.fss.or.kr/api/todayRSS.xml",
+      "codeEvidence": ["lib/rss.ts:fetchDartFeed", "lib/alerts.ts:getTodayDartBullishFeed", "app/api/dart/route.ts:GET"],
+      "payloadClass": "LIST_METADATA_AND_OFFICIAL_RECEIPT_LINK",
+      "observedPath": ["provider fetch", "transient XML parse", "heuristic title classification", "public GET response"],
+      "persistedPayloadEvidence": "NO_RSS_XML_OR_ROW_PERSISTENCE_IN_THIS_PATH_CONFIRMED",
+      "actions": {
+        "FETCH": "UNRESOLVED",
+        "TRANSIENT_PARSE": "UNRESOLVED",
+        "PERSIST_RAW": "UNRESOLVED",
+        "PERSIST_DERIVATIVE": "UNRESOLVED",
+        "DISPLAY_METADATA": "UNRESOLVED",
+        "DISPLAY_DERIVATIVE": "UNRESOLVED",
+        "DISTRIBUTE_API": "UNRESOLVED",
+        "DISTRIBUTE_PUSH": "UNRESOLVED",
+        "BACKUP": "UNRESOLVED"
+      }
+    },
+    {
+      "surfaceId": "OPENDART_LIST_AUTOMATION",
+      "product": "OpenDART disclosure search API",
+      "officialLocator": "https://opendart.fss.or.kr/api/list.json",
+      "codeEvidence": ["lib/dart-opendart-client.ts:fetchOpenDartToday", "lib/dart-automation-mapper.ts:mapOpenDartRowsToCandidates", "lib/dart-automation.ts:runDartAutomation"],
+      "payloadClass": "LIST_METADATA",
+      "observedFields": ["corp_code", "corp_cls", "corp_name", "stock_code", "report_nm", "rcept_no", "flr_nm", "rcept_dt", "rm"],
+      "observedPath": ["paged GET", "transient JSON parse", "title scoring", "receipt/status persistence", "Web Push", "Discord webhook"],
+      "persistedPayloadEvidence": "ONLY_RECEIPT_ID_AND_DELIVERY_STATUS_TABLE_CONFIRMED; FULL_SOURCE_ROW_NOT_CONFIRMED",
+      "actions": {
+        "FETCH": "UNRESOLVED",
+        "TRANSIENT_PARSE": "UNRESOLVED",
+        "PERSIST_RAW": "UNRESOLVED",
+        "PERSIST_DERIVATIVE": "UNRESOLVED",
+        "DISPLAY_METADATA": "UNRESOLVED",
+        "DISPLAY_DERIVATIVE": "UNRESOLVED",
+        "DISTRIBUTE_API": "UNRESOLVED",
+        "DISTRIBUTE_PUSH": "UNRESOLVED",
+        "DISTRIBUTE_DISCORD": "UNRESOLVED",
+        "BACKUP": "UNRESOLVED"
+      }
+    },
+    {
+      "surfaceId": "OPENDART_VIEWER_LINK",
+      "product": "OpenDART PC document viewer",
+      "officialLocator": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
+      "codeEvidence": ["lib/dart-automation-mapper.ts:buildViewerLink", "lib/rss.ts:parseDartItems", "lib/push.ts:sendPushAlerts"],
+      "payloadClass": "RECEIPT_LOCATOR_AND_LINK",
+      "observedPath": ["construct receipt URL", "return in public feed", "include in Push/Discord payload"],
+      "documentBodyFetchEvidence": "NO_BODY_FETCH_IN_THESE_CALLERS",
+      "actions": {
+        "GENERATE_LINK": "UNRESOLVED",
+        "DISPLAY_LINK": "UNRESOLVED",
+        "DISTRIBUTE_LINK": "UNRESOLVED"
+      }
+    },
+    {
+      "surfaceId": "OPENDART_CONTRACT_DETAIL",
+      "product": "OpenDART single-sale/supply-contract structured API",
+      "officialLocator": "https://opendart.fss.or.kr/api/snglpnrsctrt.json",
+      "codeEvidence": ["lib/opendart.ts:getContractDetails", "app/api/dart/contract/route.ts:GET", "components/contract-badge.tsx"],
+      "payloadClass": "STRUCTURED_API_FIELD",
+      "observedPath": ["GET from server", "in-memory corp-code cache", "public route JSON response", "client badge display"],
+      "actions": {
+        "FETCH": "UNRESOLVED",
+        "TRANSIENT_PARSE": "UNRESOLVED",
+        "PERSIST_RAW": "UNRESOLVED",
+        "PERSIST_DERIVATIVE": "UNRESOLVED",
+        "DISTRIBUTE_API": "UNRESOLVED",
+        "DISPLAY_METADATA": "UNRESOLVED",
+        "BACKUP": "UNRESOLVED"
+      }
+    },
+    {
+      "surfaceId": "KIND_PUBLIC_RSS",
+      "product": "KRX KIND 오늘의공시 RSS",
+      "officialLocator": "https://kind.krx.co.kr/disclosure/rsstodaydistribute.do?method=searchRssTodayDistribute&repIsuSrtCd=&mktTpCd=0&searchCorpName=&currentPageSize=100",
+      "codeEvidence": ["lib/domestic-rss-sources.ts:fetchDomesticRss", "lib/domestic-rss-sources.ts:defaultUrls"],
+      "payloadClass": "DESIGNATED_PUBLIC_RSS_ADAPTER",
+      "observedPath": ["adapter capability and default URL exist", "production/admin caller not established in current route scan"],
+      "runtimeUse": "NOT_ESTABLISHED_IN_THIS_INVENTORY",
+      "actions": {
+        "FETCH": "UNRESOLVED",
+        "TRANSIENT_PARSE": "UNRESOLVED",
+        "PERSIST_RAW": "UNRESOLVED",
+        "PERSIST_DERIVATIVE": "UNRESOLVED",
+        "DISPLAY_METADATA": "UNRESOLVED",
+        "DISTRIBUTE_API": "UNRESOLVED",
+        "BACKUP": "UNRESOLVED"
+      }
+    }
+  ],
+  "ownerEvidenceRequired": [
+    "exact product/terms/license revision and observed effective interval",
+    "product-to-endpoint applicability statement for each payload class",
+    "action × purpose × channel × retention decision, including attribution text",
+    "source owner or data/legal reviewer identity and signed decision reference",
+    "revocation/change monitoring owner and re-review trigger"
+  ],
+  "knownGaps": [
+    "Official page/API guide describes interface and some license labels but does not resolve all product action rights.",
+    "DART RSS and OpenDART API are separate surfaces; no inheritance is assumed.",
+    "A source locator in the application does not establish permission to fetch or redistribute its target document.",
+    "This inventory is code-path evidence and does not represent production database, deployment, or external consumer state."
+  ]
+}

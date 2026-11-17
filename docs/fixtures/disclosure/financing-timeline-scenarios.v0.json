@@ -1,0 +1,72 @@
+{
+  "contractVersion": "financing-timeline-scenarios.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "vectors": [
+    {
+      "id": "FTS-01-ISSUE-DATE-VS-CASH-DATE",
+      "input": { "security": "CB", "issueResolutionDate": "2025-01-05", "paymentDate": "2025-01-10", "cashReceiptDateEvidence": "2025-01-10", "cashAmount": "1000000000" },
+      "expected": { "timeline": [{ "kind": "TERMS_APPROVED", "date": "2025-01-05" }, { "kind": "CASH_RECEIVED", "date": "2025-01-10" }], "cashImpactAsOf": "2025-01-10", "forbiddenPublicText": ["1월 5일 현금 유입", "결의일을 납입일로 표시"] }
+    },
+    {
+      "id": "FTS-02-CB-WINDOW-VS-CONVERSION",
+      "input": { "security": "CB", "conversionWindowStart": "2026-01-10", "conversionWindowEnd": "2027-01-10", "actualExerciseDate": "2026-05-10", "exerciseShares": "100000" },
+      "expected": { "timeline": [{ "kind": "EXERCISE_WINDOW", "status": "OFFICIAL_PERIOD" }, { "kind": "EXERCISE_REPORTED", "date": "2026-05-10" }], "impactDate": "2026-05-10", "windowStartIsNotExercise": true, "forbiddenPublicText": ["1월 10일 전환 완료", "1년 전량 전환"] }
+    },
+    {
+      "id": "FTS-03-BW-DETACHED-RIGHT-TIMELINE",
+      "input": { "security": "BW", "bondIssueDate": "2025-02-01", "warrantDetachmentDate": "2025-02-03", "exerciseWindowStart": "2025-03-01", "exerciseReportedDate": null },
+      "expected": { "timeline": [{ "kind": "BOND_ISSUED", "date": "2025-02-01" }, { "kind": "WARRANT_DETACHED", "date": "2025-02-03" }, { "kind": "EXERCISE_WINDOW", "date": "2025-03-01" }], "exercise": "NOT_REPORTED", "forbiddenPublicText": ["분리일에 행사 완료", "행사기간 시작 즉시 주식발행"] }
+    },
+    {
+      "id": "FTS-04-EB-EXCHANGE-DELIVERY-RESTRICTION",
+      "input": { "security": "EB", "exchangeWindowStart": "2026-01-01", "exchangeReportedDate": "2026-03-01", "deliveryDate": "2026-03-05", "restrictionEnd": "2026-09-05", "treasuryShares": "100000" },
+      "expected": { "timeline": [{ "kind": "EXCHANGE_WINDOW", "status": "OFFICIAL_PERIOD" }, { "kind": "EXCHANGE_REPORTED", "date": "2026-03-01" }, { "kind": "TREASURY_DELIVERY", "date": "2026-03-05" }, { "kind": "TRADING_RESTRICTION_END", "date": "2026-09-05" }], "publicSupplyPotentialDate": "2026-09-05", "forbiddenPublicText": ["3월 1일 즉시 유통가능", "교환청구기간을 교부일로 표시"] }
+    },
+    {
+      "id": "FTS-05-PROPOSED-LISTING-NOT-ACTUAL",
+      "input": { "exerciseDate": "2026-04-01", "proposedListingDate": "2026-04-20", "proposedDateStatus": "ESTIMATED_OR_PROPOSED", "actualListingEvidence": null },
+      "expected": { "listing": "NOT_REPORTED", "listingDateCertainty": "ESTIMATED_OR_PROPOSED", "exerciseDateUnaffected": true, "forbiddenPublicText": ["4월 20일 상장 완료", "거래가능 확정"] }
+    },
+    {
+      "id": "FTS-06-FULL-EXERCISE-CONDITIONAL-SCENARIO",
+      "input": { "security": "CB", "eligibleShares": "500000", "exerciseWindowOpen": true, "actualExerciseShares": "100000", "scenario": "ALL_REMAINING_CONVERT" },
+      "expected": { "actualShares": { "status": "CONFIRMED_FOR_STAGE", "value": "100000" }, "scenarioShares": { "status": "CONDITIONAL", "value": "400000", "asOf": "SCENARIO_ONLY" }, "cashImpact": "NOT_INFERRED_FROM_CONVERSION", "forbiddenPublicText": ["현재 신주 50만주 발행", "전량 전환 확정"] }
+    },
+    {
+      "id": "FTS-07-BW-CASH-OR-OFFSET-EXCLUSIVE",
+      "input": { "security": "BW", "remainingRights": "200000", "exerciseScenario": "ALL_REMAINING", "settlementOptions": ["CASH", "BOND_OFFSET"], "proof": null },
+      "expected": { "scenarioBranches": [{ "kind": "CASH", "status": "CONDITIONAL" }, { "kind": "BOND_OFFSET", "status": "CONDITIONAL" }], "branchesAreMutuallyExclusive": true, "cashReceivedActual": "NOT_REPORTED", "forbiddenPublicText": ["현금납입과 대용납입 동시 반영", "최대 현금유입 확정"] }
+    },
+    {
+      "id": "FTS-08-PUT-REDEMPTION-FUTURE-OUTFLOW",
+      "input": { "security": "CB", "putWindowStart": "2026-12-01", "putWindowEnd": "2026-12-31", "putAmount": "500000000", "putExerciseEvidence": null, "settlementEvidence": null },
+      "expected": { "timeline": [{ "kind": "PUT_WINDOW", "status": "OFFICIAL_PERIOD" }], "cashOutflow": { "status": "CONDITIONAL_LIABILITY_SCENARIO", "value": "500000000" }, "actualRedemption": "NOT_REPORTED", "forbiddenPublicText": ["5억원 상환 완료", "12월 1일 자동상환"] }
+    },
+    {
+      "id": "FTS-09-MATURITY-DATE-NO-SETTLEMENT",
+      "input": { "security": "CB", "maturityDate": "2026-06-30", "settlementEvidence": null, "extensionOrConversionEvidence": null, "asOf": "2026-07-01" },
+      "expected": { "timeline": [{ "kind": "MATURITY_DATE", "status": "DATE_PASSED" }], "redemption": "UNVERIFIABLE", "conversion": "UNVERIFIABLE", "terminalStatus": "OUTCOME_NOT_VERIFIED", "forbiddenPublicText": ["만기 상환 완료", "미전환 종료"] }
+    },
+    {
+      "id": "FTS-10-CORRECTED-DATE-ONLY",
+      "input": { "eventRevision": "REV-2", "originalListingDate": "2026-05-20", "correctedListingDate": "2026-05-23", "correctionRelation": "RESOLVED", "exerciseShares": "853586" },
+      "expected": { "dateAssertion": "SUPERSEDES_PRIOR_DATE", "exerciseSharesRemain": "853586", "sharesAddedAgain": false, "forbiddenPublicText": ["정정으로 행사주식수 2회 반영", "5월 23일 상장 완료"] }
+    },
+    {
+      "id": "FTS-11-EVENT-SUBJECT-VS-UNDERLYING-SUBJECT",
+      "input": { "bondIssuer": "ISSUER-A", "underlyingIssuer": "ISSUER-B", "underlyingMaster": "UNRESOLVED", "bondEventDate": "2026-04-01", "underlyingDeliveryDate": "2026-04-05" },
+      "expected": { "timelineSubjects": [{ "issuer": "ISSUER-A", "kind": "BOND_EVENT" }, { "issuer": "ISSUER-B", "kind": "UNDERLYING_SHARE_DELIVERY" }], "underlyingRecommendation": "SUPPRESSED_MASTER_UNRESOLVED", "forbiddenPublicText": ["ISSUER-A의 일정으로 ISSUER-B 종목 추천", "발행자와 기초주식 회사를 같은 종목으로 병합"] }
+    },
+    {
+      "id": "FTS-12-SNAPSHOT-DATE-IMPACT-MISMATCH",
+      "input": { "dateSnapshot": "SNAPSHOT-A", "impactSnapshot": "SNAPSHOT-B", "uiRecomputesScenario": true },
+      "expected": { "publicationDisposition": "REJECT_RESPONSE", "timeline": [], "scenarioMetrics": [], "forbiddenPublicText": ["일정과 수치가 함께 확정된 화면", "서로 다른 asOf 조합"] }
+    }
+  ]
+}

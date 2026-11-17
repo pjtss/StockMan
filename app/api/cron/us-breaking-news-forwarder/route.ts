@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { forwardBreakingNews } from "@/lib/kis-breaking-news-forwarder";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
-import { withAutomationRun } from "@/lib/automation-run";
+import { withExclusiveAutomationRun } from "@/lib/automation-run";
 import { recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 export const dynamic = "force-dynamic";
 async function handle(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  try { const settings = await loadFeatureModuleSettings("us-breaking-news-forwarder"); if (!settings.enabled) { await recordSkippedAutomationRun("us-breaking-news-forwarder", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); } if (!isWithinSchedule(settings)) { await recordSkippedAutomationRun("us-breaking-news-forwarder", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); } return NextResponse.json({ ok: true, ...(await withAutomationRun("us-breaking-news-forwarder", () => forwardBreakingNews({ send: true }))) }); }
+  try { const settings = await loadFeatureModuleSettings("us-breaking-news-forwarder"); if (!settings.enabled) { await recordSkippedAutomationRun("us-breaking-news-forwarder", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); } if (!isWithinSchedule(settings)) { await recordSkippedAutomationRun("us-breaking-news-forwarder", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); } const execution = await withExclusiveAutomationRun("us-breaking-news-forwarder", () => forwardBreakingNews({ send: true })); if (!execution.acquired) return NextResponse.json({ ok: true, skipped: true, reason: "already_running" }); return NextResponse.json(execution.result); }
   catch (error) { console.error("[API /cron/us-breaking-news-forwarder] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, error: "US_BREAKING_NEWS_FORWARDER_FAILED" }, { status: 502 }); }
 }
 export const GET = handle;

@@ -1,0 +1,86 @@
+{
+  "contractVersion": "issuer-capital-state-reconciliation.v0",
+  "classification": "SYNTHETIC_PRODUCT_ACCEPTANCE_NOT_ISSUER_DATA_OR_INVESTMENT_RECOMMENDATION",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealFinancialValue": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "decisionId": "KR-CAPITAL-RECONCILIATION-01",
+  "status": "PROPOSED_UNAPPROVED",
+  "sources": [
+    "DART_PERIODIC_REPORT_STOCK_TOTAL_AND_SECURITIES_BALANCES",
+    "DART_MAJOR_REPORT_AND_SECURITIES_REGISTRATION_FILING",
+    "KIND_EXERCISE_OR_EXCHANGE_NOTICE",
+    "KIND_ADDITIONAL_LISTING_OR_MARKET_ACTION"
+  ],
+  "seriesIdentity": [
+    "issuerInstrumentId",
+    "underlyingIssuerInstrumentId?",
+    "securityClass",
+    "instrumentKind",
+    "seriesOrTrancheId",
+    "issuanceReceiptRevisionId",
+    "corporateActionBasisId"
+  ],
+  "stateContract": {
+    "snapshotAsOfAndObservedAtAreSeparate": true,
+    "reportedBaseSnapshotAndSubsequentMovementsAreReconciledNotBlindlySummed": true,
+    "outstandingPrincipalPotentialSharesIssuedSharesAndListedSharesAreSeparate": true,
+    "currenciesAndSecurityClassesAreNeverImplicitlyCombined": true,
+    "unknownOrUnsearchedAmountsAreNotZero": true,
+    "scenarioResultsRemainConditionalAndDoNotUseInventedProbabilities": true,
+    "publicStateRequiresRightsIdentityCoverageAndDecisionGates": true
+  },
+  "requiredOutputFields": [
+    "issuerInstrumentId",
+    "securityClass",
+    "seriesOrTrancheId",
+    "stateAsOf",
+    "observedAt",
+    "sourceRevisionIds",
+    "coverageStatus",
+    "reportedBaseSnapshot",
+    "linkedMovements",
+    "outstandingPrincipalByCurrency",
+    "potentialSharesByScenario",
+    "sharesIssuedByStage",
+    "sharesListedByStage",
+    "unresolvedAmountsAndReasons",
+    "reconciliationStatus",
+    "dependencyFingerprint"
+  ],
+  "vectors": [
+    { "id": "ICSR-01-SAME-ISSUER-DIFFERENT-SERIES-STAY-SEPARATE", "expected": "KEEP_SEPARATE_BY_SERIES" },
+    { "id": "ICSR-02-REPEATED-RECEIPT-REVISION-IS-NOT-DOUBLE-COUNTED", "expected": "ONE_CURRENT_MOVEMENT_WITH_REVISION_LINEAGE" },
+    { "id": "ICSR-03-EXERCISE-REPORT-AND-LISTING-STAGE-DO-NOT-ADD-SHARES-TWICE", "expected": "ONE_MOVEMENT_WITH_MULTIPLE_STAGE_ASSERTIONS" },
+    { "id": "ICSR-04-REPORTED-SHARE-TOTAL-MAY-INCLUDE-PROPOSED-LISTING", "expected": "RECONCILE_BASE_SNAPSHOT_BEFORE_MOVEMENT_DELTA" },
+    { "id": "ICSR-05-CORRECTED-CONVERSION-TERMS-STALE-ONLY-DEPENDENT-SCENARIO", "expected": "INVALIDATE_DEPENDENT_SCENARIO_REVISION" },
+    { "id": "ICSR-06-UNRESOLVED-TRANCHE-IDENTITY-DOES-NOT-FUZZY-MERGE", "expected": "KEEP_SEPARATE_AND_BLOCK_AGGREGATE" },
+    { "id": "ICSR-07-EXCHANGE-BOND-ISSUER-AND-UNDERLYING-ISSUER-STAY-SEPARATE", "expected": "PROJECT_TO_EXACT_SUBJECTS_ONLY" },
+    { "id": "ICSR-08-MULTI-CURRENCY-PRINCIPAL-IS-NOT-SUMMED", "expected": "PRESERVE_CURRENCY_BUCKETS" },
+    { "id": "ICSR-09-CORPORATE-ACTION-BASIS-MISMATCH-BLOCKS-SHARE-RATIO", "expected": "NOT_COMPUTABLE_UNTIL_BASIS_MATCH" },
+    { "id": "ICSR-10-PARTIAL-ISSUANCE-COVERAGE-IS-NOT-ZERO-REMAINDER", "expected": "PARTIAL_WITH_UNRESOLVED_REMAINDER" },
+    { "id": "ICSR-11-OBSERVED-AT-DOES-NOT-LOOK-AHEAD-STATE-AS-OF", "expected": "NO_FUTURE_INFORMATION_IN_HISTORICAL_SNAPSHOT" },
+    { "id": "ICSR-12-CORRECTION-SUPERSEDES-ONLY-LINKED-MOVEMENT", "expected": "PRESERVE_PRIOR_AND_RECONCILE_DEPENDENTS" },
+    { "id": "ICSR-13-AUTHORIZED-AMOUNT-IS-NOT-ISSUED-OR-OUTSTANDING", "expected": "KEEP_AUTHORIZATION_SEPARATE_FROM_BALANCE" },
+    { "id": "ICSR-14-PRINCIPAL-AND-POTENTIAL-SHARES-ARE-DIFFERENT-MEASURES", "expected": "NO_IMPLICIT_CONVERSION_OR_CROSS_SUM" },
+    { "id": "ICSR-15-UNLINKED-FILINGS-DO-NOT-FORM-A-SYNTHETIC-SERIES", "expected": "UNRESOLVED_RELATION_BLOCKS_ISSUER_AGGREGATE" },
+    { "id": "ICSR-16-RIGHTS-OR-MASTER-FAILURE-SUPPRESSES-PUBLIC-PROJECTION", "expected": "FAIL_CLOSED" }
+  ],
+  "publicationGate": [
+    "EXACT_ISSUER_AND_SECURITY_CLASS",
+    "REVIEWED_SERIES_AND_CORPORATE_ACTION_BASIS",
+    "COMPLETE_DECLARED_SOURCE_WINDOW_AND_CORRECTION_COVERAGE",
+    "RECONCILED_BASE_SNAPSHOT_AND_MOVEMENT_DENOMINATOR",
+    "CURRENT_RIGHTS_AND_MASTER_CAP_ELIGIBILITY",
+    "APPROVED_DEPENDENCY_FINGERPRINT_AND_SINGLE_SNAPSHOT"
+  ],
+  "knownLimitations": [
+    "OpenDART structured extracts may be partial and do not replace the filing body.",
+    "KIND search enumeration and cross-filing series linking require separate coverage and review evidence.",
+    "A reconciled share or principal state does not establish tradable float, investor ownership, conversion probability, valuation, or price impact."
+  ]
+}

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
 
-type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
+type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED";
 type Job = {
   jobId: string;
   status: JobStatus;
@@ -23,7 +23,15 @@ async function run(job: Job) {
   job.status = "PROCESSING";
   try {
     job.result = await warmUsDailyPriceCache({ onProgress: (progress) => { job.progress = progress; } });
-    job.status = "COMPLETED";
+    if (job.result.status === "FAILED" || !job.result.universeAvailable || (job.result.instrumentCount > 0 && job.result.successCount === 0 && job.result.failureCount > 0)) {
+      job.status = "FAILED";
+      job.error = job.result.universeAvailable ? "US_DAILY_CACHE_ALL_INSTRUMENTS_FAILED" : "US_INSTRUMENT_UNIVERSE_UNAVAILABLE";
+    } else if (!job.result.ok) {
+      job.status = "PARTIAL";
+      job.error = "US_DAILY_CACHE_PARTIAL_FAILURE";
+    } else {
+      job.status = "COMPLETED";
+    }
   } catch (error) {
     job.status = "FAILED";
     job.error = error instanceof Error ? error.message : String(error);

@@ -29,6 +29,17 @@ describe("KIS realtime approval API", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("uses the requested US exchange in the subscription key", async () => {
+    vi.stubEnv("KIS_APPKEY", "app-key");
+    vi.stubEnv("KIS_APPSECRET", "app-secret");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ approval_key: "approval-key" })));
+    const response = await GET(new Request("https://local/api/kis/realtime/approval?market=US&channel=trade&code=US%3AIBM&exchange=NYS"));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(JSON.parse(body.frame).body.input).toEqual({ tr_id: "HDFSCNT0", tr_key: "NYSIBM" });
+  });
+
   it("maps provider failures to a stable 503 response without exposing exception text", async () => {
     vi.stubEnv("KIS_APPKEY", "app-key");
     vi.stubEnv("KIS_APPSECRET", "app-secret");

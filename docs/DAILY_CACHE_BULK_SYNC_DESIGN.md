@@ -14,6 +14,7 @@
 1. 운영 `GET /api/public/daily-candles`
    - 인증 헤더 없이 시장·종목 목록·기간·봉 개수를 받아 종목별 최근 봉을 반환한다.
    - 다종목 조회는 `unnest(codes) + LATERAL LIMIT`으로 종목별 인덱스를 사용한다. 윈도 함수로 전체 시장 캔들 테이블을 먼저 스캔하지 않는다.
+   - 동기화 스크립트는 봉/기본정보 요청 및 본문 읽기에 각각 35초 timeout을 적용하고, timeout·HTTP·본문 읽기·JSON 오류에 stage와 market을 표시한다. 요청 URL과 자격증명은 오류에 포함하지 않는다. Node.js의 `AbortSignal.timeout()` 동작은 [공식 문서](https://nodejs.org/api/globals.html#static-method-abortsignaltimeoutdelay)를 따른다.
 2. 로컬 `scripts/sync-daily-cache-async.mjs`
    - 로컬 universe에서 `enabled=true`, `daily_active=true`, `instrument_type='COMMON_STOCK'`만 읽는다.
    - 시장별로 운영 API를 호출하고, 운영 응답을 로컬 `kr_instrument_universe_candles`·`us_instrument_universe_candles`에 트랜잭션 UPSERT한다.
@@ -32,6 +33,8 @@ node scripts/sync-daily-cache-async.mjs --market=ALL --timeframe=D --limit=120 -
 ## 데이터 무결성
 
 - 운영 API 응답은 JSON·HTTP 성공·`ok/items` 구조를 모두 확인한다.
+- 로컬 PostgreSQL pool은 `connectionTimeoutMillis=10000`으로 새 연결 대기 무한화를 방지하고, idle client의 `error` 이벤트를 받아 첫 sanitized 오류와 발생 횟수를 최종 JSON에 포함하며 exit code 1로 처리한다. 근거: [node-postgres Pool API](https://node-postgres.com/apis/pool).
+- OHLCV는 현재 API·DB 계약에 맞춰 유한한 double precision 숫자로 저장하며 거래량은 비음수여야 한다. JSON number의 정수부가 JavaScript 안전 정수 범위를 넘을 때 생기는 원문 정밀도 손실은 이 계약만으로 복구할 수 없으므로 정확한 원천 값 보존이 필요한 경우 별도의 문자열/decimal API 계약이 필요하다.
 - 각 봉의 `(market, code, timeframe, candle_date)`를 충돌 키로 사용한다.
 - 배치 저장은 트랜잭션이며 저장 실패 시 해당 배치만 rollback한다.
 - 기존 로컬 캐시는 삭제하지 않는다.
@@ -39,8 +42,21 @@ node scripts/sync-daily-cache-async.mjs --market=ALL --timeframe=D --limit=120 -
 
 ## 성능 기준
 
-- 운영 public API의 다종목 요청은 한 요청에서 최대 100종목을 받을 수 있지만, 실제 응답 시간을 측정해 `--batch=10`부터 시작한다.
-- 운영 API가 30초를 초과하면 해당 배치는 실패로 기록하고 다음 배치를 진행한다.
+- 운영 public API의 다종목 요청은 한 요청에서 최대 100종목을 받을 수 있지만, 기본 `--batch=10`부터 시작해 실제 응답 시간을 측정한다. 운영에서 batch를 늘릴 때도 timeout 및 504 여부를 먼저 확인한다.
+- 운영 API 요청이 35초 안에 끝나지 않으면 현재 실행은 단계·시장·timeout으로 실패한다. 이 동기화 스크립트는 이후 배치를 계속하지 않으며 이미 커밋된 앞선 batch는 유지된다.
+- 동기 실행 `sync-daily-cache-from-remote.mjs`는 요청 유니버스가 비었거나, 검증 저장 봉이 0건이거나, 응답에 봉이 없는 종목이 하나라도 있으면 시장별 `ok=false`를 반환하고 프로세스 exit code를 1로 설정한다. 누락 종목 표본은 `missingCodeSample`에서 확인한다.
+- 기본정보 snapshot API는 보유된 row만 반환할 수 있으므로 미보유 종목은 `fundamentalsMissingCount`와 전체 시장 결과 기준 최대 20개의 `market:code` 표본 `fundamentalsMissingCodeSample`로 별도 노출하며 봉 적재 성공 여부에는 포함하지 않는다. 실패 batch의 `failure.fundamentalsMissingCodeSample`도 같은 `market:code` 형식으로 해당 batch 내 최대 20개를 제공한다. 반환된 기본정보는 요청 market/code 범위 및 중복 여부를 검증한 뒤에만 snapshot으로 저장한다.
+- 최종 집계의 `received`/`saved`와 coverage counters는 commit된 batch만 반영한다. 실패한 현재 batch의 `failure.received`, `expectedSaveCount`, `duplicateCandleCount`, `missingCount`(fundamentals 단계 이후라면 fundamentals counters 포함)는 시도된 응답량을 별도로 보여준다. 동일 날짜·동일 OHLCV 중복은 한 행으로 저장하고 `duplicateCandleCount`에 집계한다. 같은 날짜에 OHLCV가 다르면 값을 임의 선택하지 않고 저장 전에 batch를 실패시킨다.
+- async 동기화도 원본 수 `fetched`, 중복 제거 후 commit된 수 `saved`, commit된 `duplicateCandleRows`를 분리한다. 전체 성공은 시장별 `saved + duplicateCandleRows === fetched`일 때만 성립하며 rollback된 batch의 중복은 결과 counter에 포함하지 않는다.
+- 진행 로그와 누적 저장/coverage 집계는 시장별 transaction commit이 성공한 뒤에만 갱신한다. 따라서 실패 시 마지막 `committed` 로그까지가 확인 가능한 영속 진행 경계다.
+- batch 또는 universe 조회 중 오류가 나면 해당 시장의 부분 집계와 `failure.phase/market/offset/codeCount/error`를 포함해 `ok=false` 결과를 출력한다. `--market=ALL`에서는 한 시장의 오류가 다른 시장 조회를 막지 않으며, 최상위 결과는 실패가 하나라도 있으면 exit code 1이다.
+- 최종 JSON은 요청 시장 처리와 DB pool 종료가 모두 끝난 뒤 출력한다. 예기치 않은 실행 오류와 pool 종료 오류도 각각 `fatalFailure`/`poolShutdownFailure`로 표시하고 최상위 `ok=false`, exit code 1에 반영한다.
+- `--limit`과 `--batch`는 안전한 정수인지 DB pool 생성 전에 확인한다. 무효 문자열·소수·범위 밖 안전정수 값은 명시 오류로 거부하고, 정수의 정상 범위 밖 값은 기존처럼 허용 구간으로 제한한다.
+- CLI는 `market`, `timeframe`, `limit`, `batch`, `skip-fundamentals`만 허용한다. 알 수 없는/중복 옵션, 위치 인자, 값이 비어 있는 옵션, boolean 이외 문자열은 DB pool/API 실행 전에 오류 처리한다.
+- 원격 daily-candles/fundamentals 응답은 JSON object, `ok === true`, items 배열 및 item 구조를 수 집계보다 먼저 검증한다. JSON `null`이나 null/malformed row가 일반 TypeError 대신 stage·market이 포함된 응답 형식 오류로 처리되어야 한다. fundamentals의 nullable 숫자 필드는 API 응답에서 실제 `null` 또는 유한 JSON number여야 하며, 필드 누락·문자열·비유한 값은 저장 전에 거부한다. `name`은 문자열, `currency`는 존재하는 문자열 또는 null, `observedAt`/`fetchedAt`은 존재하는 유효 timestamp 문자열 또는 null이어야 한다.
+- `failure.phase`는 API request/HTTP/body/JSON, envelope, items 검증, OHLCV 정규화, fundamentals 처리, DB 저장을 각각 구분한다(`daily-candles-request/http/body/json`, `daily-candles-envelope/items/normalize`, `instrument-fundamentals-*`, `database-save`).
+- 실패 객체는 최상위 error와 함께 최대 4단계의 `errorDetails.cause` 및 `AggregateError.errors`를 보존한다. 오류 문구 안의 URI userinfo와 query parameter의 password/token/API·app key/secret/authorization/credential/signature 값은 마스킹한다.
+- 로컬 트랜잭션 rollback 실패 시 해당 pool client를 파기하고 원본·rollback 오류를 함께 기록한다. COMMIT 요청 오류는 서버 commit 여부를 확인할 수 없으므로 `failure.transactionOutcome=COMMIT_UNKNOWN`으로 표시하고 해당 연결을 pool에서 제거한다. 이때 마지막 committed 진행 로그만을 해당 batch의 commit 증거로 간주하면 안 되며, 재실행 전 DB coverage를 재조회한다.
 - 전체 동기화 완료 조건은 국내·해외 각각 `failed=0`, `saved>0`, 시장별 최신일 확인이다.
 - 국내 운영 public cache가 비어 있으면 전체 fallback 호출은 장시간 작업이므로, 운영 서버의 국내 일봉 cache 자동화 또는 별도 bulk 원천 API가 먼저 정상화되어야 한다.
 
@@ -49,6 +65,9 @@ node scripts/sync-daily-cache-async.mjs --market=ALL --timeframe=D --limit=120 -
 - 2026-10-02 로컬 스크립트 실행: 미국 활성 보통주 유니버스 5,343종목, limit=120, 537 운영 API 요청, 저장 584,334봉, 저장 검증 불일치 0. 성공 배치 495/535, 실패 40배치. 종목별 봉이 없는 경우 배치 전체를 실패 처리하므로 운영 캐시에서 하나 이상의 종목이 누락된 실패 배치의 나머지 종목도 이번 실행에는 적재하지 않았다. 결과 `ok=false`; AMS 203/243, NAS 2,900/3,210, NYS 1,840/1,890 보유. 시장별 최신 날짜 2026-10-01.
 - 2026-10-02 당시 키 없는 운영 GET smoke check는 HTTP 401을 반환했다. 2026-10-29 소스에서 public daily-candles 인증 검사를 제거했으나, 소스 변경만으로 기존 운영 인스턴스 동작은 바뀌지 않는다. 새 무인증 동작은 이 변경의 운영 배포 후 확인해야 한다.
 - `scripts/sync-daily-cache-async.mjs --only-unrefreshed=true`는 미국 보통주 중 최신 일봉 요약의 `fetched_at`이 최근 30분보다 오래됐거나 요약이 없는 종목만 재조회한다. 미국 응답에서 특정 종목의 봉이 비어 있으면 그 종목은 실패로 세되 같은 API 배치의 정상 종목들은 계속 UPSERT한다. 국내 시장의 chart fallback·누락 실패 동작은 그대로 유지한다.
+- 기본 universe는 활성 일봉 종목만 포함하지만 US 일봉의 `--include-inactive-daily=true`가 지정되면 해당 제외 조건을 해제한다. `--us-market-cap-under`를 함께 쓸 때도 시총 snapshot eligibility query는 같은 active filter를 사용해야 한다.
+- `--us-market-cap-under`는 USD 양수 시총과 `fetched_at` 최근 24시간 조건을 모두 만족하는 로컬 fundamental snapshot만 사용한다. 없거나 오래된 스냅샷은 fail-closed로 제외하며, 결과 `marketCapFilter`에는 `maxSnapshotAgeHours: 24`와 `unknownOrStaleExcluded: true`가 포함된다.
+- US 일봉에서 `--only-missing-date=true`와 `--only-unrefreshed=true`를 함께 주면 지정일의 유효 봉이 없고 latest summary도 30분 이상 갱신되지 않은 종목만 선택한다. 유효성 필터에서 탈락한 summary는 미갱신으로 취급한다.
 - 2026-10-02 누락 복구 실행에서 401개 잔여 종목을 41 API 요청으로 조회해 358종목의 42,399봉을 추가 저장했다. 비어 있는 43종목은 미수신으로 남았다. 최근 실행 기준 DB 확인: AMS 238종목/28,060봉, NAS 3,177종목/374,225봉, NYS 1,885종목/224,331봉, 최신 거래일 2026-10-01. DB 갱신 검증 불일치 0.
 
 - 2026-09-23 전체 배치를 실제 운영 API와 로컬 PostgreSQL로 완료했다.

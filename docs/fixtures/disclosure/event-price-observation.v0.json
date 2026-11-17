@@ -1,0 +1,479 @@
+{
+  "contractVersion": "event-price-observation.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealPriceSeries": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "timePrecisionStates": ["EXACT_INSTANT", "DATE_ONLY", "UNKNOWN"],
+  "priceObservationStates": ["OBSERVED_AS_OF", "LATEST_REVISED_ONLY", "MISSING", "BASIS_UNKNOWN", "CONFLICTED"],
+  "reactionStates": ["REPRODUCIBLE_DESCRIPTIVE", "DAILY_ONLY_WINDOW_AMBIGUOUS", "NOT_REPRODUCIBLE", "NOT_COMPUTABLE", "CONFOUNDED", "CONFOUNDER_SCOPE_UNASSESSED", "EXPLORATORY_SENSITIVITY_ONLY", "PUBLICATION_TIME_UNVERIFIED"],
+  "ownerControlledAnalysisPolicies": {
+    "minimumSubgroupSampleSize": "NOT_SET_BY_OWNER",
+    "multiplicityAdjustmentMethod": "NOT_SET_BY_OWNER",
+    "confirmatorySignificanceThreshold": "NOT_SET_BY_OWNER",
+    "inferentialPublicationApproval": "NOT_APPROVED"
+  },
+  "requiredSnapshotFields": ["snapshotId", "instrumentId", "marketAndVenue", "candleKey", "barStartOrDate", "barEnd", "observedAtUtc", "fetchedAtUtc", "sourceProvider", "sourceRevisionOrPayloadHash", "priceBasis", "currency", "sessionCalendarRevision", "corporateActionBasis", "snapshotManifestHash"],
+  "requiredStudyFields": ["eventWindowPolicyId", "policyFrozenAt", "cohortDefinitionHash", "inclusionExclusionCounts", "comparatorPolicyRevision", "comparatorCandidateSetHash", "preEventContextWindowPolicyRevision", "confounderSearchScope", "sensitivityWindowSet", "subgroupFamilyId", "minimumSamplePolicyRevision", "multiplicityPolicyRevision", "analysisRunManifest", "analysisRunHash", "inputRevisionSetHash", "corporateActionRevisionSetHash", "dependencyClosureHash", "resultLineageStatus"],
+  "requiredAnalysisRunManifestFields": ["algorithmVersion", "codeArtifactHash", "runtimeVersion", "canonicalization", "inputManifestHash", "policySetHash", "environmentFingerprint", "resultDigest"],
+  "resultLineageStates": ["CURRENT", "STALE_INPUT_REVISION", "STALE_CORPORATE_ACTION", "STALE_BENCHMARK_REVISION", "REPLAY_REQUIRED", "REPRODUCIBILITY_MISMATCH", "RIGHTS_EXPIRED"],
+  "revisionImpactContract": {
+    "classification": "SYNTHETIC_DESIGN_ACCEPTANCE_NOT_RUNTIME_IMPLEMENTATION",
+    "lineageBindings": ["price snapshot IDs and revisions", "corporate action basis/revision per instrument and window", "benchmark snapshot IDs and index membership/methodology revisions", "event-time and cohort policy revisions", "rights and retention decision revisions", "analysis code/runtime/canonicalization revision"],
+    "impactRule": "A changed dependency expires the affected run and descendants; recompute only with available inputs and current replay rights; otherwise suppress current derived result and preserve prior run as historical audit.",
+    "scopeRule": "Reopen results whose dependency closure intersects the changed price/benchmark/corporate-action source and window; leave disjoint source/subject results current only when non-dependency is proven.",
+    "notRuntimeProof": true
+  },
+  "requiredReplayRightsFields": ["sourceAction", "rightsDecisionRevision", "allowedRetentionClass", "replayPayloadAvailability", "reexecutionPermission"],
+  "requiredGovernanceDecisionIds": ["KR-MARKET-DATA-RIGHTS-01", "KR-RETENTION-01", "KR-EVENT-STUDY-POLICY-01", "KR-SHADOW-SLO-01", "KR-END-TO-END-ACCEPTANCE-01"],
+  "analysisDigestExclusions": ["runId", "startedAt", "completedAt", "workerId"],
+  "requiredCohortCoverageFields": ["candidateReceiptSetHash", "historicalInstrumentMasterRevision", "eligibilityAsOf", "listingLifecycleCoverage", "unresolvedEligibilityCount", "outcomeMissingnessDispositionByReason"],
+  "announcementTimeBasisFields": ["filingAcceptedAt", "firstPublicAvailabilityAt", "timestampSource", "timezone", "precision", "availabilityEvidenceRef"],
+  "vectors": [
+    {
+      "id": "EPO-01-EXACT-PREMARKET-ANNOUNCEMENT-USES-NEXT-REGULAR-OPEN",
+      "input": { "market": "KR", "announcementPrecision": "EXACT_INSTANT", "announcementLocalTime": "08:50", "session": "PREMARKET", "dailyBarsOnly": true },
+      "expected": { "reactionState": "REPRODUCIBLE_DESCRIPTIVE", "referencePoint": "SAME_SESSION_REGULAR_OPEN_IF_BAR_BASIS_VERIFIED", "causalClaim": false }
+    },
+    {
+      "id": "EPO-02-EXACT-INTRADAY-ANNOUNCEMENT-CANNOT-USE-DAILY-CLOSE-ORDER",
+      "input": { "announcementPrecision": "EXACT_INSTANT", "session": "INTRADAY", "dailyBarsOnly": true, "dailyCloseDateSameAsAnnouncementDate": true },
+      "expected": { "reactionState": "DAILY_ONLY_WINDOW_AMBIGUOUS", "intradayPrePostSeparation": "NOT_AVAILABLE", "sameDateCloseAsPostEventProof": false }
+    },
+    {
+      "id": "EPO-03-DATE-ONLY-FILING-DOES-NOT-PIN-REACTION-START",
+      "input": { "announcementPrecision": "DATE_ONLY", "dailyBarsOnly": true, "possiblePublicationSession": ["PREMARKET", "REGULAR", "AFTER_HOURS"] },
+      "expected": { "reactionState": "DAILY_ONLY_WINDOW_AMBIGUOUS", "exactStartInstant": null, "windowPolicy": "OWNER_PREAPPROVED_DATE_ONLY_RULE_REQUIRED" }
+    },
+    {
+      "id": "EPO-04-LATEST-REVISED-CANDLE-IS-NOT-POINT-IN-TIME-OBSERVATION",
+      "input": { "cacheNaturalKey": "INSTRUMENT-TIMEFRAME-DATE", "upsertReplacedPriorOHLCV": true, "requestedAsOf": "PRIOR_FETCH" },
+      "expected": { "priceState": "LATEST_REVISED_ONLY", "pointInTimeClaim": false, "reactionState": "NOT_REPRODUCIBLE" }
+    },
+    {
+      "id": "EPO-05-RETURN-REQUIRES-MATCHED-CURRENCY-AND-CORPORATE-ACTION-BASIS",
+      "input": { "startCurrency": "KRW", "endCurrency": "KRW", "startAdjustmentBasis": "RAW", "endAdjustmentBasis": "SPLIT_ADJUSTED" },
+      "expected": { "reactionState": "NOT_COMPUTABLE", "return": null, "basisMismatch": true }
+    },
+    {
+      "id": "EPO-06-BENCHMARK-SESSION-MISMATCH-OMITS-ADJUSTED-COMPARISON",
+      "input": { "stockWindow": ["OPEN-A", "CLOSE-A"], "benchmarkWindow": ["OPEN-A", "CLOSE-PREVIOUS"], "rawPricesValid": true },
+      "expected": { "rawReturn": "AVAILABLE_IF_OTHER_GATES_PASS", "marketAdjustedReturn": null, "comparisonState": "NOT_COMPUTABLE" }
+    },
+    {
+      "id": "EPO-07-TRADING-HALT-IS-NOT-ZERO-RETURN",
+      "input": { "startPrice": "SYNTH-10", "endPrice": null, "haltStatus": "HALTED" },
+      "expected": { "reactionState": "NOT_COMPUTABLE", "return": null, "haltDisposition": "EXPLICIT" }
+    },
+    {
+      "id": "EPO-08-PRICE-VENDOR-CORRECTION-EXPIRES-PRIOR-RESULT",
+      "input": { "priorSnapshotHash": "HASH-A", "currentProviderRevision": "REV-B", "priorPublishedResult": true },
+      "expected": { "priorResult": "EXPIRED_FOR_CURRENT_VIEW", "newSnapshotRequired": true, "auditHistory": "PRESERVED" }
+    },
+    {
+      "id": "EPO-09-SAME-WINDOW-SECONDARY-FILING-MARKS-CONFOUNDING",
+      "input": { "targetFilingCount": 1, "otherMaterialOfficialFilingCount": 1, "overlapWindow": true },
+      "expected": { "reactionState": "CONFOUNDED", "singleFilingCausality": false, "otherFilingLinked": true }
+    },
+    {
+      "id": "EPO-10-MULTI-INSTRUMENT-SNAPSHOT-MUST-NOT-MIX-ASOF",
+      "input": { "instrumentAObservedAt": "T1", "instrumentBObservedAt": "T2", "requestedSnapshot": "T1", "allowSkew": false },
+      "expected": { "snapshotState": "REJECTED_MIXED_ASOF", "publishedRowCount": 0 }
+    },
+    {
+      "id": "EPO-11-WINDOW-POLICY-IS-FROZEN-BEFORE-OUTCOME-INSPECTION",
+      "input": { "policyFrozenAt": null, "priceOutcomeAlreadyInspected": true, "candidateWindows": ["1D", "3D", "5D"] },
+      "expected": { "confirmatoryResult": "BLOCKED_POST_HOC_WINDOW", "exploratoryLabelRequired": true, "bestPerformingWindowSelected": false }
+    },
+    {
+      "id": "EPO-12-COHORT-DENOMINATOR-RETAINS-DELISTED-HALTED-AND-MISSING-CASES",
+      "input": { "cohortDefinitionHash": "COHORT-SYN-A", "selectedSurvivors": 40, "delisted": 3, "halted": 2, "missingPrices": 5 },
+      "expected": { "denominator": 50, "excludedCasesReported": 10, "survivorOnlySummary": false }
+    },
+    {
+      "id": "EPO-13-CURRENT-CONSTITUENTS-DO-NOT-SUBSTITUTE-FOR-ASOF-COMPARATOR",
+      "input": { "comparatorPolicyRevision": null, "constituentSet": "CURRENT_ONLY", "eventDate": "PAST" },
+      "expected": { "adjustedComparison": "NOT_COMPUTABLE", "survivorshipBiasWarning": true, "membershipAsOfRequired": true }
+    },
+    {
+      "id": "EPO-14-UNSEARCHED-CONFOUNDER-SCOPE-IS-NOT-CLEAN-EVENT",
+      "input": { "confounderSearchScope": "NONE", "sameWindowOtherMaterialEvent": "UNKNOWN" },
+      "expected": { "reactionState": "CONFOUNDER_SCOPE_UNASSESSED", "unconfoundedClaim": false, "singleEventCausality": false }
+    },
+    {
+      "id": "EPO-15-MULTIPLE-WINDOW-SENSITIVITY-DOES-NOT-PICK-A-FAVORABLE-RESULT",
+      "input": { "sensitivityWindowSet": ["1D", "3D", "5D"], "results": ["POSITIVE", "NEGATIVE", "POSITIVE"], "primaryWindow": null },
+      "expected": { "reactionState": "EXPLORATORY_SENSITIVITY_ONLY", "confirmatoryWindow": null, "windowCherryPicking": false }
+    },
+    {
+      "id": "EPO-16-FILING-ACCEPTANCE-TIME-IS-NOT-PUBLIC-AVAILABILITY-TIME",
+      "input": { "filingAcceptedAt": "2026-11-04T15:20:00+09:00", "firstPublicAvailabilityAt": null, "timestampSource": "OFFICIAL_RECEIPT_ONLY", "precision": "EXACT_INSTANT" },
+      "expected": { "reactionState": "PUBLICATION_TIME_UNVERIFIED", "reactionStartInstant": null, "sameDayPriceChangeAsEventReaction": false, "singleEventCausality": false }
+    },
+    {
+      "id": "EPO-17-TIMEZONE-OR-PRECISION-UNKNOWN-KEEPS-SESSION-AMBIGUOUS",
+      "input": { "filingAcceptedAt": "2026-11-04 15:20", "firstPublicAvailabilityAt": "2026-11-04 15:22", "timezone": null, "precision": "DATE_OR_LOCAL_TIME_UNVERIFIED", "availabilityEvidenceRef": null },
+      "expected": { "reactionState": "DAILY_ONLY_WINDOW_AMBIGUOUS", "sessionAssignment": "UNKNOWN", "eventWindowStart": null, "causalClaim": false }
+    },
+    {
+      "id": "EPO-18-INCOMPLETE-HISTORICAL-MASTER-BLOCKS-COHORT-DENOMINATOR",
+      "input": {
+        "candidateReceiptSetHash": "COHORT-FRAME-SYN-18",
+        "candidateReceiptCount": 50,
+        "historicalInstrumentMasterRevision": null,
+        "eligibilityAsOf": "EVENT_DATE",
+        "listingLifecycleCoverage": "PARTIAL",
+        "unresolvedEligibilityCount": 4
+      },
+      "expected": {
+        "cohortState": "DENOMINATOR_UNVERIFIED",
+        "candidateReceiptsRetained": 50,
+        "unresolvedEligibilityCount": 4,
+        "headlineReturnStatistic": null,
+        "eligibleOnlyDenominatorClaim": false
+      }
+    },
+    {
+      "id": "EPO-19-INFORMATIVE-OUTCOME-MISSINGNESS-IS-NOT-ZERO-OR-FORWARD-FILLED",
+      "input": {
+        "selectedCohortCount": 50,
+        "observedReturnCount": 40,
+        "missingOutcomesByReason": { "DELISTED": 3, "TRADING_HALT": 2, "PRICE_SOURCE_GAP": 5 },
+        "missingnessRelationshipToOutcome": "UNKNOWN_OR_PLAUSIBLY_INFORMATIVE"
+      },
+      "expected": {
+        "fullCohortReturnStatistic": null,
+        "missingValuesImputed": false,
+        "observedSubsetStatisticLabel": "OBSERVED_SUBSET_ONLY",
+        "missingnessCountsReportedByReason": true,
+        "completeOutcomeClaim": false
+      }
+    },
+    {
+      "id": "EPO-20-PRE-EVENT-PRICE-TREND-IS-SEPARATE-CONTEXT-NOT-CAUSAL-CONTROL",
+      "input": {
+        "preEventContextWindowPolicyRevision": "PREDECLARED-SYN-20",
+        "preEventReturn": 0.18,
+        "eventWindowReturn": -0.04,
+        "postHocWindowChange": false
+      },
+      "expected": {
+        "preEventTrendReportedSeparately": true,
+        "eventWindowReturnRewrittenByPreTrend": false,
+        "trendAdjustedCausalEffect": "NOT_ESTABLISHED",
+        "windowPolicyValid": true
+      }
+    },
+    {
+      "id": "EPO-21-COMPARATOR-SIGN-CONFLICT-IS-REPORTED-AS-SENSITIVITY",
+      "input": {
+        "comparatorCandidateSetHash": "COMPARATOR-SET-SYN-21",
+        "policyFrozenAt": "BEFORE_OUTCOME_INSPECTION",
+        "predeclaredPrimaryComparator": "BROAD_MARKET_INDEX",
+        "marketAdjustedReturns": {
+          "BROAD_MARKET_INDEX": -0.02,
+          "SECTOR_INDEX": 0.03
+        },
+        "indexMethodologyRefs": {
+          "BROAD_MARKET_INDEX": "KRX_INDEX_METHOD-SYN-A",
+          "SECTOR_INDEX": "KRX_INDEX_METHOD-SYN-B"
+        }
+      },
+      "expected": {
+        "primaryComparator": "BROAD_MARKET_INDEX",
+        "bothComparatorResultsReported": true,
+        "sensitivityState": "COMPARATOR_DEPENDENT_EXPLORATORY",
+        "bestResultSelectedAsConfirmatory": false,
+        "causalClaim": false
+      }
+    },
+    {
+      "id": "EPO-22-SUBGROUPS-ARE-FROZEN-BEFORE-OUTCOME-INSPECTION",
+      "input": {
+        "subgroupFamilyId": null,
+        "candidateStrata": ["DISCLOSURE_TYPE", "MARKET_CAP_BAND", "MARKET_STATE"],
+        "strataPolicyFrozenAt": null,
+        "priceOutcomesAlreadyInspected": true,
+        "selectedStratum": "BEST_PERFORMING_DISCLOSURE_TYPE"
+      },
+      "expected": {
+        "confirmatorySubgroupResult": "BLOCKED_POST_HOC_STRATIFICATION",
+        "reportedAs": "EXPLORATORY_ONLY",
+        "selectedWinnerHeadline": false,
+        "overallCohortDenominatorPreserved": true
+      }
+    },
+    {
+      "id": "EPO-23-SMALL-OR-UNRESOLVED-SUBGROUP-DOES-NOT-INHERIT-COHORT-PASS",
+      "input": {
+        "stratumId": "MARKET_CAP-BAND-SYN-23",
+        "minimumSamplePolicyRevision": null,
+        "selectedCount": 4,
+        "unresolvedCount": 2,
+        "outcomeObservedCount": 3
+      },
+      "expected": {
+        "inferentialClaim": "NOT_AVAILABLE",
+        "minimumSampleStatus": "OWNER_POLICY_UNSET",
+        "stratumCountsReported": true,
+        "parentCohortAcceptanceInherited": false
+      }
+    },
+    {
+      "id": "EPO-24-MULTIPLE-TEST-FAMILY-REQUIRES-PREDECLARED-OWNER-POLICY",
+      "input": {
+        "multiplicityPolicyRevision": null,
+        "plannedHypothesisCount": 12,
+        "observedPValues": 12,
+        "outcomeInspectedBeforePolicy": true
+      },
+      "expected": {
+        "confirmatorySignificanceClaim": "BLOCKED_POLICY_UNSET_OR_POST_HOC",
+        "adjustmentMethodInvented": false,
+        "rawExploratoryResultsLabeled": true,
+        "bestPValueHeadline": false
+      }
+    },
+    {
+      "id": "EPO-25-SAME-INPUT-POLICY-AND-ARTIFACT-MUST-REPLAY-SAME-DIGEST",
+      "input": {
+        "algorithmVersion": "EVENT-STUDY-SYN-1",
+        "inputManifestHash": "INPUT-SYN-25",
+        "policySetHash": "POLICY-SYN-25",
+        "codeArtifactHash": "CODE-SYN-25",
+        "runA": { "resultDigest": "sha256:SAME-RESULT", "startedAt": "2026-11-04T00:00:00Z", "workerId": "WORKER-A" },
+        "runB": { "resultDigest": "sha256:SAME-RESULT", "startedAt": "2026-11-04T00:05:00Z", "workerId": "WORKER-B" }
+      },
+      "expected": {
+        "replayState": "DETERMINISTIC_MATCH",
+        "executionMetadataExcludedFromDigest": true,
+        "resultRevisionReusable": true
+      }
+    },
+    {
+      "id": "EPO-26-INPUT-OR-POLICY-REVISION-CHANGE-EXPIRES-CURRENT-RESULT",
+      "input": {
+        "priorInputManifestHash": "INPUT-SYN-26-A",
+        "currentInputManifestHash": "INPUT-SYN-26-B",
+        "priorPolicySetHash": "POLICY-SYN-26-A",
+        "currentPolicySetHash": "POLICY-SYN-26-A",
+        "priorResultState": "CURRENT"
+      },
+      "expected": {
+        "priorResultState": "EXPIRED_FOR_CURRENT_VIEW",
+        "newRunRequired": true,
+        "auditHistoryPreserved": true,
+        "priorResultOverwritten": false
+      }
+    },
+    {
+      "id": "EPO-27-REPLAY-DIGEST-MISMATCH-IS-NOT-SILENTLY-ACCEPTED",
+      "input": {
+        "sameInputManifestHash": true,
+        "samePolicySetHash": true,
+        "sameCodeArtifactHash": true,
+        "runAResultDigest": "sha256:RESULT-A",
+        "runBResultDigest": "sha256:RESULT-B"
+      },
+      "expected": {
+        "runState": "REPRODUCIBILITY_MISMATCH",
+        "currentResultPublication": "SUPPRESSED_PENDING_REVIEW",
+        "priorAuditRecordMutable": false,
+        "automaticResultSelection": false
+      }
+    },
+    {
+      "id": "EPO-28-HASH-INTEGRITY-DOES-NOT-MEAN-SOURCE-REPLAY-IS-AUTHORIZED",
+      "input": {
+        "rights": {
+          "sourceAction": "ANALYZE_AND_RETAIN_PRICE_PAYLOAD",
+          "rightsDecisionRevision": "RIGHTS-SYN-28",
+          "allowedRetentionClass": "TRANSIENT_ONLY",
+          "replayPayloadAvailability": "HASH_AND_LOCATOR_ONLY",
+          "reexecutionPermission": "UNRESOLVED"
+        },
+        "inputManifestHash": "INPUT-HASH-SYN-28",
+        "storedRawPricePayload": false
+      },
+      "expected": {
+        "replayability": "HASH_ONLY_INTEGRITY_NOT_REPLAYABLE",
+        "hashMatchProvesInputBytesAvailable": false,
+        "authorizedReexecution": false,
+        "replayClaim": "NOT_REPRODUCIBLE"
+      }
+    },
+    {
+      "id": "EPO-29-UNAVAILABLE-OR-UNAUTHORIZED-REACQUISITION-EXPIRES-CURRENT-REPLAY-CLAIM",
+      "input": {
+        "rights": {
+          "sourceAction": "REACQUIRE_AND_ANALYZE_PRICE_HISTORY",
+          "rightsDecisionRevision": "RIGHTS-SYN-29",
+          "allowedRetentionClass": "NO_PERSISTENT_PAYLOAD",
+          "replayPayloadAvailability": "SOURCE_UNAVAILABLE",
+          "reexecutionPermission": "DENIED"
+        },
+        "priorRunState": "DETERMINISTIC_MATCH",
+        "priorResultRevision": "RESULT-SYN-29-A"
+      },
+      "expected": {
+        "currentReplayability": "NOT_REPRODUCIBLE",
+        "priorResultHistoryPreserved": true,
+        "currentConfirmatoryPublication": "SUPPRESSED",
+        "rightsDecisionBypassed": false
+      }
+    },
+    {
+      "id": "EPO-30-TERMS-REVISION-REOPENS-AFFECTED-PRICE-ACTIONS",
+      "input": {
+        "priorRun": { "rightsDecisionRevision": "MD-RIGHTS-SYN-30-A", "state": "DETERMINISTIC_MATCH" },
+        "currentSourceTerms": { "revision": "MD-RIGHTS-SYN-30-B", "effectiveAt": "2026-11-01T00:00:00Z" },
+        "affectedActions": ["RETAIN_SNAPSHOT", "REEXECUTE", "PUBLISH_DERIVED_STATISTIC"],
+        "reacquisitionPermission": "UNRESOLVED"
+      },
+      "expected": {
+        "priorRunHistoryPreserved": true,
+        "affectedCurrentRunState": "EXPIRED_RIGHTS_REVISION",
+        "unaffectedSourceIndependentClaimsReevaluatedSeparately": true,
+        "affectedActionPublication": "SUPPRESSED",
+        "legacyApprovalInherited": false
+      }
+    },
+    {
+      "id": "EPO-31-PRICE-RIGHTS-AND-EVENT-STUDY-SHADOW-GATES-ARE-BOTH-REQUIRED",
+      "input": {
+        "marketDataRightsDecision": "OPEN",
+        "eventStudyPolicyDecision": "OPEN",
+        "shadowGoldDenominator": "NOT_APPROVED",
+        "independentReviewerEvidence": "MISSING",
+        "priceResult": "POSITIVE_DESCRIPTIVE"
+      },
+      "expected": {
+        "priceAccessOrRetentionAction": "BLOCKED",
+        "confirmatoryInterpretation": "BLOCKED",
+        "shadowAcceptance": "NOT_ACCEPTED",
+        "automaticRankingOrRecommendation": false,
+        "positivePriceResultOverridesGates": false
+      }
+    },
+    {
+      "id": "EPO-32-PRICE-REVISION-EXPIRES-DEPENDENT-RUN-AND-DESCENDANTS",
+      "input": {
+        "priorRun": {"runId": "RUN-SYN-32-A", "inputRevisionSetHash": "INPUT-SET-SYN-32-A", "resultLineageStatus": "CURRENT", "dependencyClosure": ["PRICE-SNAPSHOT-SYN-A", "BENCHMARK-SYN-A", "CORPORATE-ACTION-SYN-A"]},
+        "changedDependency": {"kind": "PRICE_SNAPSHOT_REVISION", "id": "PRICE-SNAPSHOT-SYN-A", "revision": "PRICE-REV-SYN-32-B"},
+        "storedReplayInputAvailable": false,
+        "currentReplayRights": "UNRESOLVED",
+        "unrelatedRunDependsOnChangedSnapshot": false
+      },
+      "expected": {"affectedRunCurrentState": "STALE_INPUT_REVISION", "dependentProjectionPublished": false, "recomputeWithoutInputAndRights": false, "priorRunHistoryPreserved": true, "unrelatedRunInvalidated": false}
+    },
+    {
+      "id": "EPO-33-CORPORATE-ACTION-REVISION-REQUIRES-BASIS-CONSISTENT-REPLAY",
+      "input": {"priorCorporateActionRevision": "CA-SYN-33-A", "currentCorporateActionRevision": "CA-SYN-33-B", "affectedInstruments": ["INSTRUMENT-SYN-A"], "dependentRuns": ["RUN-SYN-33-A", "RUN-SYN-33-B"], "unrelatedInstrumentRun": "RUN-SYN-33-C"},
+      "expected": {"affectedRunsExpired": true, "rawAndAdjustedBasisMixed": false, "newRunRequiresMatchedBasis": true, "priorRunsOverwritten": false, "unrelatedInstrumentRunInvalidated": false}
+    },
+    {
+      "id": "EPO-34-BENCHMARK-REVISION-INVALIDATES-ONLY-DEPENDENT-ADJUSTED-RESULTS",
+      "input": {"benchmarkRevisionChanged": true, "runA": {"usesBenchmark": true, "output": "MARKET_ADJUSTED_RETURN"}, "runB": {"usesBenchmark": false, "output": "RAW_RETURN"}, "currentBenchmarkReplayRights": "DENIED"},
+      "expected": {"runAState": "STALE_BENCHMARK_REVISION", "runAPublication": "SUPPRESSED", "runBState": "CURRENT_IF_OTHER_DEPENDENCIES_CURRENT", "runBOverInvalidated": false, "benchmarkRightBypass": false}
+    },
+    {
+      "id": "EPO-35-REPLAY-RECOVERY-REQUIRES-NEW-REVIEW-AND-ATOMIC-PROJECTION",
+      "input": {
+        "priorRun": {"runId": "RUN-SYN-35-A", "state": "STALE_INPUT_REVISION", "priorApproval": "APPROVED", "priorProjectionEpoch": 12},
+        "currentInputs": {"replayPayloadAvailable": true, "currentRightsDecision": "APPROVED_FOR_REEXECUTION_AND_DERIVED_PUBLICATION", "inputRevisionSetHash": "INPUT-SET-SYN-35-B", "policyRevision": "POLICY-SYN-35-A", "algorithmArtifactHash": "ARTIFACT-SYN-35-A"},
+        "replay": {"resultDigest": "RESULT-SYN-35-B", "independentReproduction": "MATCH", "counterEvidenceReview": "CURRENT", "interpretationReview": "APPROVED_NEW_REVISION"},
+        "publication": {"expectedEpoch": 13, "currentEpoch": 13, "consumerSnapshot": "SNAPSHOT-SYN-35-B", "notificationCandidate": "CANDIDATE-SYN-35-B"}
+      },
+      "expected": {
+        "newAnalysisRunCreated": true,
+        "priorRunOrApprovalMutated": false,
+        "priorApprovalInherited": false,
+        "newReviewBindsExactInputPolicyArtifactAndResult": true,
+        "publicationRequiresCurrentRightsAndEligibility": true,
+        "publicationEpochAdvancedExactlyOnce": true,
+        "allConsumersUseNewSnapshotAndEpoch": true,
+        "duplicateNotificationForSameLogicalResult": false,
+        "noPartialOrStaleFallback": true
+      }
+    },
+    {
+      "id": "EPO-36-CONCURRENT-IDENTICAL-REPLAY-PUBLISHERS-ARE-IDEMPOTENT",
+      "input": {
+        "expectedPublicationEpoch": 13,
+        "currentPublicationEpoch": 13,
+        "publisherA": {"fencingToken": 81, "inputRevisionSetHash": "INPUT-SET-SYN-36-B", "resultDigest": "RESULT-SYN-36-B"},
+        "publisherB": {"fencingToken": 82, "inputRevisionSetHash": "INPUT-SET-SYN-36-B", "resultDigest": "RESULT-SYN-36-B"},
+        "logicalResultKey": "EVENT-SYN-36|INSTRUMENT-SYN-36|WINDOW-SYN-36|RESULT-SYN-36-B"
+      },
+      "expected": {
+        "onePublicationEpochAdvance": true,
+        "oneCurrentProjection": true,
+        "duplicateEquivalentPublisherIsIdempotentNoop": true,
+        "logicalNotificationOutboxEntries": 1,
+        "lastWriteWins": false,
+        "auditAttemptRecordsPreserved": true
+      }
+    },
+    {
+      "id": "EPO-37-LATE-STALE-REPLAY-CANNOT-OVERWRITE-NEWER-DEPENDENCY",
+      "input": {
+        "publisherA": {"fencingToken": 91, "inputRevisionSetHash": "INPUT-SET-SYN-37-A", "state": "REPLAY_RUNNING"},
+        "currentDependencyRevisionSetHash": "INPUT-SET-SYN-37-B",
+        "currentPublicationEpoch": 14,
+        "publisherB": {"fencingToken": 92, "inputRevisionSetHash": "INPUT-SET-SYN-37-B", "state": "PUBLISHED"}
+      },
+      "expected": {
+        "publisherACommit": "REJECTED_STALE_FENCE_OR_DEPENDENCY_CAS",
+        "currentProjectionRemainsRevisionB": true,
+        "publicationEpochRewound": false,
+        "staleWorkerNotificationAllowed": false,
+        "publisherAAuditAttemptPreserved": true,
+        "unrelatedProjectionChanged": false
+      }
+    },
+    {
+      "id": "EPO-38-RIGHTS-REVOCATION-BETWEEN-PROJECTION-COMMIT-AND-DISPATCH-REUSES-IRAP-DUES",
+      "input": {
+        "publication": {"snapshotId": "SNAPSHOT-SYN-38-A", "epoch": 15, "outboxState": "QUEUED"},
+        "rights": {"decisionRevisionAtCommit": "RIGHTS-SYN-38-A", "currentDecisionRevisionBeforeDispatch": "RIGHTS-SYN-38-B", "currentAction": "DISPLAY_PUBLIC_API", "state": "REVOKED"},
+        "notification": {"candidateEpoch": 15, "queued": true, "dispatchAttemptStarted": false},
+        "sharedContracts": ["investment-rights-action-propagation.v0", "disclosure-user-event-subscription.v0"]
+      },
+      "expected": {
+        "publicationSuppressionAndEpochAdvanceUseSharedRightsPropagation": true,
+        "publicReadReturnsRevokedSnapshot": false,
+        "queuedNotificationDispatch": false,
+        "dispatchRevalidatesCurrentEpochRightsAndSubscription": true,
+        "providerAcceptedOrDeliveredAssumedFromOutbox": false,
+        "alreadyAcceptedDeliveryTreatedAsAutomaticallyRetracted": false,
+        "deliveryReconciliationRequiredWhenPriorExposureExists": true,
+        "separateEPORevocationStateMachineCreated": false
+      }
+    },
+    {
+      "id": "EPO-39-RIGHTS-REGRANT-DOES-NOT-RESURRECT-OLD-ANALYSIS-OR-DELIVERY",
+      "input": {
+        "priorRun": {"runId": "RUN-SYN-39-A", "state": "EXPIRED_RIGHTS_REVISION", "approval": "STALE_REVIEW", "projectionEpoch": 16},
+        "currentRights": {"revision": "RIGHTS-SYN-39-B", "state": "ALLOW", "actions": ["REEXECUTE", "PUBLISH_DERIVED_STATISTIC", "DISPLAY_PUBLIC_API"]},
+        "currentInputsAvailable": true,
+        "currentSubscriptionOptIn": false,
+        "priorNotificationDeliveryState": "PROVIDER_ACCEPTED",
+        "remediationComplete": true,
+        "sharedContract": "investment-rights-action-propagation.v0#IRAP-09"
+      },
+      "expected": {
+        "priorApprovalOrProjectionResurrected": false,
+        "newAnalysisRunAndReviewRequired": true,
+        "newPublicationSnapshotAndEpochRequired": true,
+        "notificationDispatchWithoutCurrentOptIn": false,
+        "priorProviderAcceptedDeliveryHistoryMutated": false,
+        "rightsRegrantCountsAsRetractionOrCorrection": false,
+        "rightsRegrantMayBypassUnrelatedOpenGates": false
+      }
+    }
+  ]
+}

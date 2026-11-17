@@ -1,0 +1,74 @@
+{
+  "contractVersion": "consumer-identity-acceptance-report.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredentialsOrProductionConnectionString": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "stageStates": ["NOT_RUN", "PASS", "FAIL", "INCOMPLETE", "EXPIRED"],
+  "overallStates": ["NOT_RUN", "INCOMPLETE", "PASS", "FAIL", "EXPIRED"],
+  "decisionStates": ["NO_GO", "HOLD", "GO_CANARY", "GO_LIMITED"],
+  "requiredManifestFields": [
+    "runId",
+    "acceptanceManifestHash",
+    "fixtureContractVersion",
+    "sourceCommitSha",
+    "runnerBuildSha",
+    "canonicalizerNameVersionHash",
+    "rfc8785SuiteVersionHash",
+    "databaseEngineVersion",
+    "schemaMigrationRangeAndHash",
+    "isolatedTargetIdentity",
+    "startedAtUtc",
+    "completedAtUtc",
+    "stageResults",
+    "overallResult",
+    "operationalDecision",
+    "reportPayloadHash"
+  ],
+  "vectors": [
+    {
+      "id": "CIRR-01-JCS-PASS-DB-NOT-RUN-IS-INCOMPLETE",
+      "input": { "jcsState": "PASS", "relationalState": "NOT_RUN", "impactState": "NOT_RUN", "rightsState": "NOT_RUN" },
+      "expected": { "overallResult": "INCOMPLETE", "operationalDecision": "HOLD", "forbiddenPublicText": ["acceptance 전체 PASS", "GO_CANARY"] }
+    },
+    {
+      "id": "CIRR-02-DB-SCHEMA-FINGERPRINT-MISMATCH-BLOCKS",
+      "input": { "expectedSchemaHash": "SCHEMA-A", "observedSchemaHash": "SCHEMA-B", "relationalState": "NOT_RUN" },
+      "expected": { "relationalState": "FAIL", "overallResult": "FAIL", "operationalDecision": "NO_GO", "forbiddenPublicText": ["예상하지 않은 DDL로 실행 진행", "schema mismatch를 warning 처리"] }
+    },
+    {
+      "id": "CIRR-03-DB-UNAVAILABLE-IS-NOT-RUN",
+      "input": { "isolatedDatabaseProvisioned": false, "jcsState": "PASS", "relationalState": "NOT_RUN" },
+      "expected": { "overallResult": "INCOMPLETE", "relationalProof": "NONE", "operationalDecision": "HOLD", "forbiddenPublicText": ["JCS PASS로 relational PASS 추론", "DB proof 완료"] }
+    },
+    {
+      "id": "CIRR-04-SET-DIGEST-DIFF-FAILS-CLOSED",
+      "input": { "canonicalSetHash": "HASH-A", "indexSetHash": "HASH-B", "antiJoinRows": 1, "dbRollback": true },
+      "expected": { "relationalState": "FAIL", "overallResult": "FAIL", "publicationGate": "SUPPRESSED", "forbiddenPublicText": ["count만 비슷하므로 PASS", "실패 transaction 결과를 projection에 잔류"] }
+    },
+    {
+      "id": "CIRR-05-COMPLETE-EMPTY-SET-REQUIRES-DECLARED-DENOMINATOR",
+      "input": { "manifestExpectedRows": 0, "sourceSnapshotStatus": "COMPLETE_EMPTY", "canonicalSetHash": "EMPTY-HASH", "indexSetHash": "EMPTY-HASH", "antiJoinRows": 0 },
+      "expected": { "relationalState": "PASS", "emptyResultMeaning": "COMPLETE_EMPTY_FIXTURE_ONLY", "forbiddenPublicText": ["임의로 비워진 run도 PASS", "전체 source coverage 증명"] }
+    },
+    {
+      "id": "CIRR-06-REPORT-PAYLOAD-TAMPER-EXPIRES-RESULT",
+      "input": { "storedReportHash": "HASH-A", "recomputedReportHash": "HASH-B" },
+      "expected": { "overallResult": "FAIL", "operationalDecision": "NO_GO", "forbiddenPublicText": ["변조된 report 재사용", "서명되지 않은 수정본 승인"] }
+    },
+    {
+      "id": "CIRR-07-FIXTURE-OR-RUNNER-CHANGE-NEW-RUN-LINEAGE",
+      "input": { "acceptedManifestHash": "MANIFEST-A", "currentManifestHash": "MANIFEST-B", "priorRun": "RUN-A" },
+      "expected": { "priorResult": "EXPIRED", "newRunRequired": true, "forbiddenPublicText": ["이전 PASS 재사용", "fixture 변경을 동일 run에 덮어쓰기"] }
+    },
+    {
+      "id": "CIRR-08-REPORT-EXCLUDES-SECRETS-AND-SOURCE-BODY",
+      "input": { "reportContainsConnectionString": false, "reportContainsSourceBody": false, "reportHasRedactedTargetIdentity": true },
+      "expected": { "reportAdmissible": true, "forbiddenPublicText": ["credential/connection string 보존", "권리 미확인 원문 body 보존"] }
+    }
+  ]
+}

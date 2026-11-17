@@ -1,5 +1,6 @@
 import { findUsFiveDayHighBreakout, type UsFiveDayHighBreakoutResult } from "@/lib/us-five-day-high-breakout";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
+import { isUsDailyScanComplete } from "@/lib/us-daily-scan-failure-reasons";
 
 let activeScan: Promise<Awaited<ReturnType<typeof executeScan>>> | null = null;
 
@@ -10,6 +11,7 @@ async function executeScan(options: { limit?: number; concurrency?: number; cont
   const context = options.context ?? await createUsDailyScanContext({ candleLimit: 100 });
   const universe = context.universe;
   const watchlist = universe.scopes;
+  const universeAvailable = Boolean((universe.universe as any).ok) && watchlist.length > 0;
   const limit = Number.isFinite(options.limit) && (options.limit ?? 0) > 0 ? Math.floor(options.limit as number) : null;
   const scanList = limit ? watchlist.slice(0, limit) : watchlist;
   const cachedCandles = context.candles;
@@ -33,7 +35,23 @@ async function executeScan(options: { limit?: number; concurrency?: number; cont
   const failures = completedResults.filter((result) => !result.ok);
   const failureReasons = failures.reduce<Record<string, number>>((counts, result) => { const reason = result.error ?? "unknown"; counts[reason] = (counts[reason] ?? 0) + 1; return counts; }, {});
   const marketCounts = completedResults.reduce<Record<string, number>>((counts, result) => { counts[result.market] = (counts[result.market] ?? 0) + 1; return counts; }, {});
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, watchlistCount: watchlist.length, instrumentCount: scanList.length, concurrency, limited: Boolean(limit && limit < watchlist.length), durationMs: Date.now() - startedAt, throughputPerSecond: completedResults.length ? Number((completedResults.length / ((Date.now() - startedAt) / 1000)).toFixed(2)) : 0, qualified: completedResults.filter((result) => result.qualifies), successCount: completedResults.filter((result) => result.ok).length, failureCount: failures.length, failureReasons, resolvedMarketCounts: marketCounts, results: completedResults };
+  const cacheLookupFailuresByMarket: Record<string, number> = {};
+  let cacheLookupFailureCount = 0;
+  for (const result of completedResults) {
+    const diagnostics = result.daily.diagnostics;
+    if (!diagnostics || typeof diagnostics !== "object") continue;
+    const lookupFailures = (diagnostics as Record<string, unknown>).cacheLookupFailures;
+    if (!Array.isArray(lookupFailures)) continue;
+    for (const failure of lookupFailures) {
+      if (!failure || typeof failure !== "object" || typeof (failure as Record<string, unknown>).market !== "string") continue;
+      const market = (failure as Record<string, string>).market;
+      cacheLookupFailureCount += 1;
+      cacheLookupFailuresByMarket[market] = (cacheLookupFailuresByMarket[market] ?? 0) + 1;
+    }
+  }
+  if (!universeAvailable) failureReasons.UNIVERSE_UNAVAILABLE = 1;
+  const scanResult = { status: universeAvailable ? undefined : "FAILED", universeAvailable, universe: universe.universe, watchlistCount: watchlist.length, instrumentCount: scanList.length, concurrency, limited: Boolean(limit && limit < watchlist.length), durationMs: Date.now() - startedAt, throughputPerSecond: completedResults.length ? Number((completedResults.length / ((Date.now() - startedAt) / 1000)).toFixed(2)) : 0, qualified: completedResults.filter((result) => result.qualifies), successCount: completedResults.filter((result) => result.ok).length, failureCount: failures.length, partialFailureCount: cacheLookupFailureCount, failureReasons, cacheLookupFailureCount, cacheLookupFailuresByMarket, resolvedMarketCounts: marketCounts, results: completedResults };
+  return { ...scanResult, ok: isUsDailyScanComplete(scanResult) };
 }
 
 /** Coalesces concurrent timer/manual requests into one scan. */

@@ -1,0 +1,1084 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Synthetic database inventory golden case",
+  "description": "Strict structural schema for DBI acceptance fixtures; it does not establish database observations.",
+  "oneOf": [
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "valid-empty"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "querySucceeded",
+                "visibleSchemas",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches",
+                "writerState",
+                "declaredScope"
+              ],
+              "properties": {
+                "querySucceeded": {
+                  "type": "boolean"
+                },
+                "visibleSchemas": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "permissionDeniedScopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedRelationKinds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "observedRelationKinds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "independentSummaryMatches": {
+                  "type": "boolean"
+                },
+                "writerState": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "declaredScope": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "permission-gap"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "querySucceeded",
+                "visibleSchemas",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches",
+                "writerState",
+                "declaredScope"
+              ],
+              "properties": {
+                "querySucceeded": {
+                  "type": "boolean"
+                },
+                "visibleSchemas": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "permissionDeniedScopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedRelationKinds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "observedRelationKinds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "independentSummaryMatches": {
+                  "type": "boolean"
+                },
+                "writerState": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "declaredScope": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "count-mismatch"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "querySucceeded",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches"
+              ],
+              "properties": {
+                "querySucceeded": {
+                  "type": "boolean"
+                },
+                "permissionDeniedScopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedRelationKinds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "observedRelationKinds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "independentSummaryMatches": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "query-failure"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "querySucceeded",
+                "errorClass",
+                "rowsReturned",
+                "permissionDeniedScopes"
+              ],
+              "properties": {
+                "querySucceeded": {
+                  "type": "boolean"
+                },
+                "errorClass": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rowsReturned": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "permissionDeniedScopes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "digest-integrity"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "canonicalizationRevision",
+                "sortedRows",
+                "duplicateRows",
+                "digestBefore",
+                "digestAfter"
+              ],
+              "properties": {
+                "canonicalizationRevision": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sortedRows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "duplicateRows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "digestBefore": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "digestAfter": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "digest-canonicalization"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "canonicalizationRevision",
+                "orderedRows",
+                "reorderedRows",
+                "digestOrdered",
+                "digestReordered"
+              ],
+              "properties": {
+                "canonicalizationRevision": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "orderedRows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "reorderedRows": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "digestOrdered": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "digestReordered": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "writer-gap"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "repositoryEntrypoints",
+                "writeCapablePrincipals",
+                "deploymentTasks",
+                "ownerAttestation",
+                "externalWriterInventoryState"
+              ],
+              "properties": {
+                "repositoryEntrypoints": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "writeCapablePrincipals": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "deploymentTasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ownerAttestation": {
+                  "type": "boolean"
+                },
+                "externalWriterInventoryState": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "writer-complete"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "repositoryEntrypoints",
+                "writeCapablePrincipals",
+                "deploymentTasks",
+                "externalWriterInventoryState",
+                "ownerAttestation",
+                "unresolvedDynamicTargets"
+              ],
+              "properties": {
+                "repositoryEntrypoints": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "writeCapablePrincipals": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "deploymentTasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "externalWriterInventoryState": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "ownerAttestation": {
+                  "type": "boolean"
+                },
+                "unresolvedDynamicTargets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "dynamic-target"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "writer",
+                "targetRelation",
+                "deploymentCommit",
+                "ownerRole"
+              ],
+              "properties": {
+                "writer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "targetRelation": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deploymentCommit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ownerRole": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "category",
+            "input",
+            "expected"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^DBI-[0-9]{2}-[A-Z0-9-]+$"
+            },
+            "category": {
+              "const": "scope-drift"
+            },
+            "input": {
+              "type": "object"
+            },
+            "expected": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "catalogCompleteness",
+                "writerCompleteness",
+                "migrationGate",
+                "zeroMeansAbsent"
+              ],
+              "properties": {
+                "catalogCompleteness": {
+                  "enum": [
+                    "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+                    "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+                    "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+                  ]
+                },
+                "writerCompleteness": {
+                  "enum": [
+                    "COMPLETE_ATTESTED_SCOPE",
+                    "PARTIAL_REPOSITORY_ONLY",
+                    "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+                  ]
+                },
+                "migrationGate": {
+                  "enum": [
+                    "BLOCKED",
+                    "OPEN_FOR_REVIEW_ONLY"
+                  ]
+                },
+                "zeroMeansAbsent": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "previousScope",
+                "currentScope",
+                "previousDigest",
+                "currentDigest"
+              ],
+              "properties": {
+                "previousScope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "currentScope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "previousDigest": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "currentDigest": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

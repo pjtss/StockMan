@@ -1,0 +1,151 @@
+{
+  "contractVersion": "disclosure-investment-gold-set-protocol.v0",
+  "classification": "SYNTHETIC_REVIEW_PROTOCOL_NOT_REAL_SAMPLE_OR_ACCEPTANCE_RESULT",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsRealReviewLabels": false,
+    "retentionRightsApproved": false
+  },
+  "workflowStates": [
+    "WAITING_FOR_RIGHTS_SCOPE",
+    "FRAME_SPECIFIED",
+    "FRAME_COVERAGE_VERIFIED",
+    "SAMPLE_FROZEN",
+    "INDEPENDENT_REVIEW",
+    "ADJUDICATION_REQUIRED",
+    "GOLD_SET_VERSIONED",
+    "ACCEPTANCE_NOT_RUN",
+    "ACCEPTANCE_INCOMPLETE",
+    "ACCEPTANCE_REJECTED",
+    "ACCEPTANCE_PASSED_FOR_DECLARED_SCOPE",
+    "EXPIRED_REQUIRES_REVIEW"
+  ],
+  "ownerDecisions": {
+    "rightsScope": "OPEN_KR-DART-RIGHTS-01",
+    "reviewerRolesAndIndependence": "OPEN_KR-END-TO-END-ACCEPTANCE-01",
+    "sampleSizePerStratum": "NOT_SET_BY_OWNER",
+    "evaluationWindow": "NOT_SET_BY_OWNER",
+    "acceptanceThresholds": "NOT_SET_BY_OWNER",
+    "adjudicatorIdentity": "NOT_ASSIGNED"
+  },
+  "samplingFrame": {
+    "unit": "ONE_OFFICIAL_FILING_RECEIPT_AND_DECLARED_DOCUMENT_REVISION_SET",
+    "mustFreeze": [
+      "sourceProductAndEndpoint",
+      "rightsDecisionRevisionAndAllowedActions",
+      "KSTWindowStartAndEnd",
+      "queryParametersAndSort",
+      "pageCountAndEveryPageDisposition",
+      "advertisedAndObservedRowDenominators",
+      "distinctReceiptSetDigest",
+      "inclusionAndExclusionReasons",
+      "codeParserNormalizerTaxonomyPromptAndSchemaVersions"
+    ],
+    "officialMetadataFieldsForStratification": ["pblntf_ty", "pblntf_detail_ty", "corp_cls", "report_nm", "rcept_no", "corp_code", "rcept_dt", "rm"],
+    "enumerationLimit": "OpenDART list pagination provides page and total metadata but no frozen snapshot token; full page traversal is not proof of a point-in-time complete population.",
+    "samplingRule": "Owner-approved deterministic random selection within declared strata plus a separately enumerated challenge set; freeze query, seed commitment, selected receipt digests, and disposition denominator before candidate output is reviewed.",
+    "strata": [
+      { "id": "DISCLOSURE_TYPE", "basis": "Official pblntf_ty and pblntf_detail_ty values; include every in-scope type or retain an explicit OUT_OF_SCOPE disposition." },
+      { "id": "TITLE_SIGNAL_CLASS", "basis": "Candidate scorer outputs including positive, neutral, negative, and no-match." },
+      { "id": "CORRECTION_OR_WITHDRAWAL", "basis": "Correction markers, rm flags, explicit relation, unresolved relation, and no marker." },
+      { "id": "ISSUER_PARTY_COMPLEXITY", "basis": "Single filer, affiliate/counterparty, multiple named parties, and unresolved subject attribution." },
+      { "id": "QUANTITATIVE_BASIS", "basis": "Explicit value with denominator/period, partial basis, explicit zero, missing value, and conflicting fields." },
+      { "id": "RISK_AND_COUNTEREVIDENCE", "basis": "Termination/conditions, dilution/financing, litigation/regulatory, negative outcome, and no located counterevidence." },
+      { "id": "SOURCE_AVAILABILITY_AND_RIGHTS", "basis": "Body available and permitted, unavailable, fetch failed, or action rights blocked; never silently exclude." }
+    ],
+    "sizePolicy": "No numeric sample size or threshold is invented. Owner approval is required before selection; all unreviewed, unavailable, excluded, and rights-blocked records remain in the denominator with disposition."
+  },
+  "blindReviewProtocol": {
+    "reviewers": "Two independent qualified reviewers label the frozen evidence before seeing candidate model/scorer output; identities and roles are assigned by owner, not supplied by the candidate system.",
+    "adjudication": "Any disagreement on source fact, locator, party role, correction relation, quantitative basis, risk, or publication disposition requires a separately assigned adjudicator; majority vote does not resolve conflicts.",
+    "labelLayers": [
+      "SOURCE_FACT_AND_LOCATOR",
+      "FILING_PARTY_AND_AFFECTED_ISSUER_ROLE",
+      "EVENT_TYPE_AND_DIRECTIONAL_FACT_CLASS",
+      "DATE_VALUE_PRECISION_AND_CERTAINTY",
+      "QUANTITATIVE_VALUE_UNIT_DENOMINATOR_PERIOD_AND_FORMULA_BASIS",
+      "SUPPORTING_AND_CONTRADICTING_EVIDENCE",
+      "DILUTION_GOVERNANCE_LEGAL_AND_EXECUTION_RISKS",
+      "RIGHTS_AND_COMMON_STOCK_ELIGIBILITY",
+      "USER_VISIBLE_DISPOSITION"
+    ],
+    "allowedFactLabels": ["SUPPORTED", "CONTRADICTED", "NOT_STATED", "UNLOCATABLE", "UNAVAILABLE", "RIGHTS_BLOCKED", "CONFLICTING", "NOT_APPLICABLE"],
+    "investmentOutputLabels": ["TITLE_SIGNAL_ONLY", "EVIDENCE_INCOMPLETE", "CONFLICT_REVIEW_REQUIRED", "VERIFIED_FACTS_WITH_COUNTEREVIDENCE", "REVIEWED_INVESTMENT_EFFECT", "SUPPRESSED_RIGHTS_OR_ELIGIBILITY"],
+    "candidateDisclosure": "Candidate output is revealed only after independent labels are frozen; disagreement or candidate leakage invalidates the affected review pass."
+  },
+  "evidenceRetention": {
+    "ifRightsAllowBodyRetention": "Store exact source URL/product, receipt, document revision/hash, permitted locator, reviewer label revisions and access scope; body storage remains a separate exact action decision.",
+    "ifRightsAllowTransientReviewOnly": "Use controlled transient review, then retain only permitted metadata, locator/hash if explicitly allowed, decision labels and disposal receipt; do not copy body text into fixtures or logs.",
+    "ifRightsUnresolvedOrDenied": "Do not fetch or inspect body; mark RIGHTS_BLOCKED and NOT_RUN, keep the selected record in denominator, and do not classify content as correct/incorrect."
+  },
+  "versionInvalidationTriggers": [
+    "source terms/product license or field/action scope change",
+    "official guide schema, taxonomy or correction semantics change",
+    "filing body revision or correction relation changes",
+    "instrument master, common-stock eligibility or market-cap policy changes",
+    "parser, normalization, taxonomy, prompt, model or output schema changes",
+    "reviewer qualification, independence, or adjudication policy changes",
+    "sampling frame, denominator, or acceptance threshold changes"
+  ],
+  "acceptanceRules": {
+    "frameCoverageMustBeDeclaredBeforeSampling": true,
+    "selectedCountEqualsAllTerminalAndPendingDispositions": true,
+    "rightsBlockedOrUnavailableAreNotRemovedFromDenominator": true,
+    "noThresholdMeansNotAccepted": true,
+    "disagreementWithoutAdjudicatorMeansIncomplete": true,
+    "candidateOutputMustNotInfluenceGoldLabels": true,
+    "claimAcceptanceRequiresExactEvidenceLocatorAndCurrentRevision": true,
+    "multiEventFilingRequiresEventLevelClaimAndPartyRoleLabels": true,
+    "eventInstrumentLinkRequiresDirectImpactEvidencePerEvent": true,
+    "sourceFactsDoNotAutomaticallyResolveInvestmentEffect": true,
+    "aPassAppliesOnlyToFrozenDeclaredScope": true
+  },
+  "vectors": [
+    { "id": "DIGSP-01-RIGHTS-UNRESOLVED-BLOCKS-BODY-REVIEW", "input": { "rights": "UNRESOLVED", "bodyReviewRequested": true }, "expected": { "bodyFetch": "NOT_RUN", "contentLabel": "NOT_RUN", "disposition": "RIGHTS_BLOCKED_IN_DENOMINATOR" } },
+    { "id": "DIGSP-02-UNAVAILABLE-ROW-REMAINS-IN-DENOMINATOR", "input": { "selected": 12, "reviewed": 8, "unavailable": 2, "rightsBlocked": 1, "pending": 1 }, "expected": { "dispositionTotal": 12, "caseState": "ACCEPTANCE_INCOMPLETE" } },
+    { "id": "DIGSP-03-OPEN-DART-PAGINATION-IS-NOT-SNAPSHOT-PROOF", "input": { "allAdvertisedPagesFetched": true, "snapshotToken": null }, "expected": { "populationClaim": "ENUMERATION_OBSERVED_NOT_POINT_IN_TIME_COMPLETE" } },
+    { "id": "DIGSP-04-SAMPLING-SEED-AND-FRAME-FROZEN-BEFORE-OUTPUT", "input": { "candidateOutputSeenByReviewers": true, "frameFrozen": false }, "expected": { "goldReview": "INVALIDATE_AND_RESELECT" } },
+    { "id": "DIGSP-05-REVIEWER-DISAGREEMENT-REQUIRES-ADJUDICATOR", "input": { "reviewerA": "SUPPORTED", "reviewerB": "CONTRADICTED", "adjudicator": null }, "expected": { "label": "CONFLICTING", "caseState": "ACCEPTANCE_INCOMPLETE" } },
+    { "id": "DIGSP-06-MAJORITY-VOTE-DOES-NOT-REPLACE-ADJUDICATION", "input": { "labels": ["SUPPORTED", "CONTRADICTED", "SUPPORTED"], "adjudicator": null }, "expected": { "label": "CONFLICTING", "caseState": "ACCEPTANCE_INCOMPLETE" } },
+    { "id": "DIGSP-07-SAMPLE-SIZE-AND-THRESHOLD-ARE-OWNER-DECISIONS", "input": { "sampleSize": "NOT_SET_BY_OWNER", "threshold": "NOT_SET_BY_OWNER" }, "expected": { "sampleSelection": "NOT_STARTED", "acceptance": "NOT_ACCEPTED" } },
+    { "id": "DIGSP-08-EXPLICIT-OUT-OF-SCOPE-STAYS-COUNTED", "input": { "selected": 9, "inScopeReviewed": 7, "outOfScope": 1, "unresolvedScope": 1 }, "expected": { "dispositionTotal": 9, "unresolvedScope": "INCOMPLETE_NOT_DROPPED" } },
+    { "id": "DIGSP-09-CORRECTION-REVISION-STALES-GOLD-LABEL", "input": { "reviewedRevision": "REV-A", "currentRevision": "REV-B", "relation": "RESOLVED_CORRECTS" }, "expected": { "priorLabel": "STALE_FOR_CURRENT_REVISION", "reReview": "REQUIRED" } },
+    { "id": "DIGSP-10-GOLD-LABELS-DO-NOT-LEAK-COPYRIGHTED-BODY", "input": { "bodyRights": "TRANSIENT_ONLY", "fixtureStoresBodyQuote": true }, "expected": { "fixture": "REJECT", "retainOnly": "PERMITTED_LOCATOR_HASH_AND_LABELS" } },
+    {
+      "id": "DIGSP-11-MULTI-EVENT-FILING-IS-LABELED-PER-EVENT-AND-PARTY-ROLE",
+      "input": {
+        "filingReceipt": "RCP-SYN-11",
+        "events": [
+          { "eventId": "EV-SYN-A", "partyRoles": ["SUBMITTER", "CONTRACTING_PARTY"], "affectedIssuer": "ISSUER-SYN-A", "directImpactLocator": "LOC-SYN-A" },
+          { "eventId": "EV-SYN-B", "partyRoles": ["SUBMITTER", "GUARANTOR"], "affectedIssuer": "ISSUER-SYN-B", "directImpactLocator": null }
+        ],
+        "instrumentMaster": { "ISSUER-SYN-A": "ACTIVE_COMMON_STOCK", "ISSUER-SYN-B": "UNKNOWN" }
+      },
+      "expected": {
+        "eventCount": 2,
+        "eventALabel": "REVIEWABLE_WITH_DIRECT_EVIDENCE",
+        "eventBLabel": "SUBJECT_UNRESOLVED_NO_INSTRUMENT_OUTPUT",
+        "submitterRolePromotedToAffectedIssuer": false,
+        "filingLevelSingleTicker": false
+      }
+    },
+    {
+      "id": "DIGSP-12-CONTRADICTORY-EVENTS-ON-ONE-INSTRUMENT-ARE-NOT-NETTED",
+      "input": {
+        "instrumentId": "COMMON-SYN-A",
+        "eventClaims": [
+          { "eventId": "EV-SYN-A", "claimState": "VERIFIED_SUPPORT", "effectHorizon": "CURRENT_FY" },
+          { "eventId": "EV-SYN-B", "claimState": "VERIFIED_COUNTEREVIDENCE", "effectHorizon": "CURRENT_FY" }
+        ]
+      },
+      "expected": {
+        "eventClaimsKeptSeparate": true,
+        "singleNetDirection": "NOT_INFERRED",
+        "conflictState": "MIXED_EVIDENCE_REVIEW_REQUIRED",
+        "buySellInstruction": "NONE"
+      }
+    }
+  ]
+}

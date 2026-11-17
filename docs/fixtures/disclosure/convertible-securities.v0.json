@@ -1,0 +1,87 @@
+{
+  "contractVersion": "convertible-securities.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "vectors": [
+    {
+      "id": "FUCS-01-CB-TERMS-ONLY",
+      "input": { "security": "CB", "terms": "FILED", "potentialShares": "500000", "conversionEvidence": null, "coverage": "CURRENT" },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "TERMS": "EVIDENCE_OBSERVED", "ISSUANCE": "UNVERIFIABLE", "CONVERSION": "NOT_REPORTED" }, "dilution": "CONDITIONAL_ONLY", "forbiddenPublicText": ["전환 완료", "희석 확정", "50만주 발행 완료"] }
+    },
+    {
+      "id": "FUCS-02-CB-PARTIAL-CONVERSION",
+      "input": { "security": "CB", "principalIssued": "1000000000", "convertedPrincipal": "200000000", "convertedShares": "100000", "remainingPrincipal": "800000000", "coverage": "CURRENT" },
+      "expected": { "publicationDisposition": "PUBLISHED", "stageStatuses": { "ISSUANCE": "CONFIRMED_FOR_STAGE", "CONVERSION": "PARTIAL_CONFIRMED", "REMAINING_BALANCE": "OBSERVED" }, "dilution": "ACTUAL_CONVERTED_SHARES_ONLY", "forbiddenPublicText": ["전량 전환", "잔액 전환 완료"] }
+    },
+    {
+      "id": "FUCS-03-CB-RESET-TERMS-UNRESOLVED",
+      "input": { "security": "CB", "resetClause": "FILED", "resetFloor": "UNKNOWN", "resetBasis": "UNRESOLVED", "effectiveResetEvidence": null },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "stageStatuses": { "RESET_TERMS": "CONFLICTED", "EFFECTIVE_RESET": "UNVERIFIABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["확정 전환가", "확정 희석주식수"] }
+    },
+    {
+      "id": "FUCS-04-CB-UNDERLYING-CLASS-UNKNOWN",
+      "input": { "security": "CB", "underlyingClass": "UNKNOWN", "potentialShares": "100000", "masterCommonSubject": "UNRESOLVED" },
+      "expected": { "publicationDisposition": "SUPPRESSED_SUBJECT", "stageStatuses": { "UNDERLYING_CLASS": "UNVERIFIABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["보통주 희석", "보통주 전환"] }
+    },
+    {
+      "id": "FUCS-05-BW-BOND-WARRANT-SEPARATE",
+      "input": { "security": "BW", "bondPrincipalOutstanding": "600000000", "warrantDetached": true, "warrantPotentialShares": "120000", "exerciseEvidence": null },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "BOND_BALANCE": "OBSERVED", "WARRANT_DETACHMENT": "EVIDENCE_OBSERVED", "EXERCISE": "NOT_REPORTED" }, "dilution": "CONDITIONAL_ONLY", "forbiddenPublicText": ["사채 상환 완료", "워런트 행사 완료"] }
+    },
+    {
+      "id": "FUCS-06-BW-EXERCISE-NOT-ISSUANCE",
+      "input": { "security": "BW", "exerciseNoticeShares": "50000", "paymentEvidence": null, "issuedShares": null },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "EXERCISE_NOTICE": "EVIDENCE_OBSERVED", "PAYMENT": "NOT_REPORTED", "ISSUANCE": "NOT_REPORTED" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["5만주 발행 완료", "행사대금 납입 완료"] }
+    },
+    {
+      "id": "FUCS-07-BW-RESET-FLOOR-UNKNOWN",
+      "input": { "security": "BW", "exercisePrice": "FILED", "resetFloor": null, "resetBasis": null, "effectivePrice": "UNKNOWN" },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "stageStatuses": { "EXERCISE_PRICE": "UNVERIFIABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["확정 행사주식수"] }
+    },
+    {
+      "id": "FUCS-08-EB-EXISTING-SHARES",
+      "input": { "security": "EB", "exchangeTarget": "EXISTING_ISSUER_HELD_SHARES", "targetShares": "90000", "newShareIssuanceEvidence": null },
+      "expected": { "publicationDisposition": "PUBLISHED", "stageStatuses": { "EXCHANGE_TARGET": "EVIDENCE_OBSERVED", "EXCHANGE": "UNVERIFIABLE", "NEW_ISSUANCE": "NOT_REPORTED" }, "dilution": "NO_NEW_ISSUANCE_INFERRED", "forbiddenPublicText": ["신주 9만주 발행", "희석 확정"] }
+    },
+    {
+      "id": "FUCS-09-EB-TARGET-OWNERSHIP-UNKNOWN",
+      "input": { "security": "EB", "exchangeTarget": "SHARES", "targetOwnership": "UNKNOWN", "targetClass": "UNKNOWN" },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "stageStatuses": { "EXCHANGE_TARGET": "UNVERIFIABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["기존주식 교환 확정", "신주 희석 확정"] }
+    },
+    {
+      "id": "FUCS-10-TERMS-CORRECTION-UNRESOLVED",
+      "input": { "security": "CB", "originalReceipt": "SYNTHETIC-A", "correctionReceipt": "SYNTHETIC-B", "relation": "UNRESOLVED", "coverage": "CURRENT" },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "stageStatuses": { "TERMS": "CONFLICTED" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["최신 조건 확정", "전환가 확정"] }
+    },
+    {
+      "id": "FUCS-11-VALID-EMPTY-NO-OUTCOME",
+      "input": { "security": "CB", "queryStatus": "VALID_EMPTY", "historicalScope": "INCOMPLETE", "conversion": null, "redemption": null },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "coverage": "VALID_EMPTY_SCOPE_ONLY", "stageStatuses": { "CONVERSION": "UNVERIFIABLE", "REDEMPTION": "UNVERIFIABLE" }, "dilution": "CONDITIONAL_ONLY", "forbiddenPublicText": ["미전환 확정", "미상환 확정", "미실행"] }
+    },
+    {
+      "id": "FUCS-12-PARTIAL-COVERAGE",
+      "input": { "security": "BW", "pagesExpected": 4, "pagesSucceeded": 2, "providerStatus": "QUOTA_ERROR", "exerciseEvidence": null },
+      "expected": { "publicationDisposition": "SUPPRESSED_SOURCE_COVERAGE", "coverage": "PARTIAL", "stageStatuses": { "EXERCISE": "UNVERIFIABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["행사 없음", "미행사 확정"] }
+    },
+    {
+      "id": "FUCS-13-MATURITY-NOT-SETTLEMENT",
+      "input": { "security": "CB", "maturityDate": "PAST", "settlementEvidence": null, "redemptionEvidence": null },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "MATURITY": "DATE_PASSED", "SETTLEMENT": "UNVERIFIABLE", "REDEMPTION": "UNVERIFIABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["상환 완료", "전환 종료", "미전환 확정"] }
+    },
+    {
+      "id": "FUCS-14-SECURITY-TRANCHE-MISMATCH",
+      "input": { "planSecurityId": "SYNTHETIC-CB-TRANCHE-1", "observedSecurityId": "SYNTHETIC-CB-TRANCHE-2", "sameIssuer": true, "sameTerms": false },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "stageStatuses": { "CONVERSION": "NOT_COMPARABLE" }, "dilution": "NOT_COMPUTABLE", "forbiddenPublicText": ["동일 사채 후속 결과", "전환 누계"] }
+    },
+    {
+      "id": "FUCS-15-SNAPSHOT-MISMATCH",
+      "input": { "termsSnapshot": "SNAPSHOT-A", "conversionSnapshot": "SNAPSHOT-B", "uiRecomputesStatus": true },
+      "expected": { "publicationDisposition": "REJECT_RESPONSE", "stageStatuses": {}, "dilution": "REJECT_RESPONSE", "forbiddenPublicText": ["전환 완료", "희석 확정"] }
+    }
+  ]
+}

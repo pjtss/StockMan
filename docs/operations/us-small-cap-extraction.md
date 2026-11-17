@@ -40,3 +40,16 @@
 - 주식수 운영 중단: 2026-10-13부터 종목 주수 기준을 KIS 상세시세로 통일했다. SEC 소형주 발행주식수 수집·공개 API·보고서·관련 테이블은 제거되었으며, 이 추출 절차는 SEC 주식수 조회 경로로 사용할 수 없다. 해외주식 상장주수는 KIS `price-detail`의 `output.shar`를 사용한다.
 - SEC 요청은 식별 가능한 `User-Agent`를 사용하고 공식 최대 10회/초 제한 이하로 순차 요청한다. 출처는 [SEC EDGAR API 안내](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), [ticker·거래소 매핑 파일](https://www.sec.gov/files/company_tickers_exchange.json), [SEC fair-access 기준](https://www.sec.gov/about/developer-resources)이다.
 - 2026-10-01 결과 Excel은 활성 미국 보통주 대상 430행 중 394행에서 표준 shares fact를 찾았다. 30행은 eligible concept 미확인, 4행은 Company Facts HTTP 404, 2행은 ticker/CIK 매핑 부재라 발행주식수를 비워뒀다. 조회한 fact 기준일은 2008-12-16~2026-09-29로 넓게 분포하므로 각 행의 기준일을 현재 발행주식수라고 간주하지 않는다.
+
+
+## 미국 USD 1억 이하 로컬 일봉 동기화
+
+운영 서버의 daily-candles read-only GET 결과를 로컬 PostgreSQL 일봉 테이블에 반영할 때는 기존 `scripts/sync-daily-cache-async.mjs`를 사용한다. 이 경로의 시총 필터는 일봉 종가×주식수 계산값이 아니라 로컬 `instrument_fundamental_snapshots`의 USD 시총 스냅샷을 사용한다. 스냅샷이 없거나 USD 양수가 아니거나 `fetched_at`이 현재보다 24시간 이상 오래되면 fail-closed로 제외한다. 이 신선도 기준은 SEC 소형주 선별과 동일하다. 보통주는 활성 COMMON_STOCK 및 ETF·워런트·파생·DR·레버리지·인버스 제외 마스터 플래그로 제한한다. 단, 로컬 마스터가 오래됐을 수 있으므로 후보 코드의 KIS 최신 해외주식 마스터를 대조하고 이름에 ADR/ADS/Depositary/Depository가 명시된 코드는 보통주 범위에서 제외한다. 이 예탁증서 표기 확인 전에는 일괄 갱신하지 않는다.
+
+```powershell
+node scripts/sync-daily-cache-async.mjs --market=US --timeframe=D --us-market-cap-under=100000000 --us-market-cap-under-inclusive=true --skip-fundamentals=true --batch=25 --fetch-workers=2 --save-workers=2 --limit=120
+```
+
+`--skip-fundamentals=true`는 fundamentals 테이블을 변경하지 않고 일봉만 저장한다. API 빈 봉/시간초과 종목은 기존 캐시를 임의로 덮어쓰거나 삭제하지 않는다. KIS 일봉 응답은 최신 날짜가 배열 첫 행일 수 있으므로 각 종목의 candle_date 최대값을 선택한다. 거래량 0이어도 유효한 OHLC 응답이면 날짜와 OHLC를 검증해 history 및 latest summary에 함께 저장한다. 재시도는 `--only-unrefreshed=true`를 추가하며, 이 옵션은 최근 30분 이내 fetched_at이 없는/오래된 종목을 다시 선택한다. 결과의 batch coverage는 실행 중 응답을 기준으로 하므로 반드시 로컬 DB에서 대상 유니버스와 최신 거래일·fetched_at을 재조회하여 성공 건수와 미갱신 건수를 확인한다.
+
+시총 상한은 포함 옵션을 명시해야 한다. `--us-market-cap-under-inclusive=true`가 없으면 경계값은 제외된다. 본 절차에서 시총 스냅샷과 종가×상장주수의 차이는 결과 한계로 남기고 임의로 서로 대체하지 않는다.

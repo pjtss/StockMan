@@ -23,7 +23,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: true, reason });
     }
     const intervalSeconds = Math.max(3600, settings.intervalSeconds ?? 86_400);
-    const latest = await loadLatestExecutedAutomationRun(moduleKey).catch(() => null);
+    let latest;
+    try { latest = await loadLatestExecutedAutomationRun(moduleKey); }
+    catch (error) { console.error("[API /cron/sec-smallcap-share-facts] interval gate history unavailable:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "interval-gate", error: "SEC_SMALLCAP_SHARE_FACTS_INTERVAL_CHECK_UNAVAILABLE", intervalSeconds }, { status: 503 }); }
     const elapsed = latest?.started_at ? Math.round((Date.now() - new Date(latest.started_at).getTime()) / 1000) : null;
     const effectiveIntervalSeconds = latest?.status === "SUCCESS" ? intervalSeconds : Math.min(intervalSeconds, 3600);
     if (elapsed != null && elapsed < effectiveIntervalSeconds) {

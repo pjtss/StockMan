@@ -302,6 +302,7 @@ https://stockman.r-e.kr/api/disclosures?date=YYYY-MM-DD&source=stocktitan
 ## 실행 에이전트 시작 절차
 
 - RSS 호재 분석 요청을 받으면 분석 전에 이 런북의 `호출 방법`과 사용자가 시간 범위를 명시했는지 판정하는 규칙을 읽는다. “KST 기준 금일 오후 3시 이후 RSS만”이라는 요청은 기준일 15:00 정각을 포함하는 시작 경계로 적용한다. 이 조건은 사용자 요청에 명시된 경우에만 적용하며, 시간 조건이 없을 때 일별 전체 조회 기본값을 축소하지 않는다.
+- 강도별 응답과 POSITIVE 종목의 공시 리스크 분석은 [RSS 호재 분석·응답 표준](../company-analysis/rss-bullish-analysis-standard.md)을 함께 읽고 따른다. 강도는 공식 원문 근거와 사건의 실질성 기준으로만 분류하며, POSITIVE 회사는 공시 기반 희석·현금·계약조건·규제/소송·상장 리스크를 확인한다. 원문 미확인/도구 실패는 완료 건수에 포함하지 않는다.
 - RSS 분석 키워드를 받으면 Codex가 직접 준비 JSON을 읽고 원문을 판단한다. Codex가 해당 대화 모델로 분석하며 API key 기반 호출은 하지 않는다. 운영 RSS GET → Codex 직접 분석 및 로컬 JSON 누적 → POSITIVE+명확한 티커 필터 → Downloads HTML만 수행한다. 서버 저장/Discord 전송은 하지 않는다.
 
 ## 1분 Codex 자동 감시 (HTML 보고서와 별도 기능)

@@ -2,7 +2,7 @@
 
 ## 문서 상태
 
-- 상태: 1차 adapter 구현 완료, 통합 저장·자동화 확장 진행 중
+- 상태: adapter 및 제한된 `/api/disclosures` sourceCoverage projection 구현; 국내 RSS 예약 저장 연결·source-run manifest reconciliation은 미구현/확인 필요
 - 대상: KRX KIND, OpenDART, 뉴시스, 매일경제, 한국경제, 이투데이 및 등록된 공식 RSS
 - 조회 경로: `/disclosures`
 - 최종 소비자: 저장된 원문을 이용한 ChatGPT 호재 분석
@@ -33,7 +33,9 @@
 
 출처별 adapter는 `fetch → parse → normalize`만 담당한다. 호재 판정, 번역, Discord 전송은 수집 adapter에 넣지 않고 후속 파이프라인에서 처리한다.
 
-현재 1차 구현은 `lib/domestic-rss-sources.ts`에서 출처별 URL을 읽어 공통 RSS parser로 정규화한다. 국내 RSS는 기존 `market-rss-pipeline`을 통해 `market_rss_fetch_snapshots`와 `market_rss_articles`에 저장되고, `/api/disclosures?source=KRX_KIND|NEWSIS|MK|HANKYUNG|ETODAY`로 조회한다. URL이 설정되지 않은 출처는 `SKIPPED`로 처리하여 전체 cron을 실패시키지 않는다.
+현재 `lib/domestic-rss-sources.ts`는 출처별 URL을 읽어 공통 RSS parser로 정규화하는 adapter를 제공한다. 저장소 내 caller를 대조한 결과, `fetchMarketRssSource()`가 관리자 `/api/admin/market-rss-test`에서 import되지만 해당 route의 source validation은 `MARKET_RSS_SOURCES`만 허용하므로 국내 5 source 호출은 route에서 거부된다. `fetchAllDomesticRss()`는 테스트 외 runtime caller를 찾지 못했다. 실제 저장·전송을 하는 market-rss cron은 `MARKET_RSS_SOURCES` 5종 중 `GLOBENEWSWIRE`, `STOCKTITAN`, `SEC_EDGAR`만 전달하고 `fetchAllMarketRss()`도 domestic source 배열을 순회하지 않는다. 따라서 이 checkout에서는 국내 RSS를 호출·저장하는 production/admin 경로 또는 국내 RSS가 `market_rss_fetch_snapshots`/`market_rss_articles`에 주기적으로 저장된다고 확인할 수 없다. `/api/disclosures?source=KRX_KIND|NEWSIS|MK|HANKYUNG|ETODAY`는 해당 DB source 행을 읽는 필터만 제공한다. 운영 DB의 현재 row 분포와 저장소 밖 collector/수동 writer 존재는 미확인이다. 자세한 source coverage 개선안은 [일별 공시·RSS 통합 조회 설계](./daily-disclosure-feed-design.md)의 현재 코드 대조 및 F0–F4 계획을 참조한다.
+
+`/api/disclosures`에는 source별 coverage projection이 추가되어 있으나 canonical reconciliation manifest는 아니다. route는 요청 queryWindow와 실행 구간이 겹치는 최신 `automation_runs` 행을 module별로 읽고 `projectMarketRssSourceCoverage()`가 그 `summary.ingested.sourceResults`에서 `GLOBENEWSWIRE`, `STOCKTITAN`, `SEC_EDGAR` 결과를 투영한다. RSS `sourceResults`는 고정된 소수 출처 outcome이므로 automation summary 압축에서도 전부 보존하고, 일반 배열은 기존처럼 최대 3개 sample과 count로 축약한다. helper는 fetch/persist 상태, 제한된 item count, sanitized failure code를 반환할 수 있지만 `observedAt`은 provider fetch time이 아니라 run finish/start 시각이다. `configuredState`는 source별 활성 설정을 증명하지 않아 대부분 `UNKNOWN`이며, `lastSuccessfulPersistAt`은 항상 null이다. RSS·SEC run 조회는 요청 queryWindow와 실행 구간의 교집합으로 제한된다. 그래도 automation run에는 provider request window, page denominator·correction watermark·rights/master/applicability revision이 없어 모든 source의 `rangeCoverage`는 `UNKNOWN`이다. DART는 `dart-realtime` automation summary에 해당 날짜의 실제 목록 응답이 있을 때만 투영한다. pagination/receipt reconciliation이 성공한 전체 KST 날짜 조회만 provider response 열거 상태로 표시하고, alert-only 경로라 `persistState: NOT_RUN`이다. SEC은 `sec-realtime` run summary에서 CIK별 Submissions fetch 성공/실패/미확인, 응답 item 및 upsert row 집계와 snapshot 보존 수를 제공한다. 해당 run이 요청 window와 겹칠 때 latestAttempt를 표시하지만 요청 source range 분모가 없어 rangeCoverage는 UNKNOWN이다. 국내 RSS 및 NASDAQ 계열은 `latestAttempt: null`이며, repository scan은 국내 collector를 확인하지 못했다. 따라서 이 구현은 수집 이력을 일부 보여주는 개선이지만 complete/empty/negative evidence를 주장하는 coverage gate가 아니다. provider request window 및 canonical source-run manifest reconciliation과 권리 인지 공개 문구는 F1/F3 설계가 남아 있다.
 
 기본값은 KIND 전체시장 RSS, 뉴시스 경제 RSS, 매일경제 증권 RSS, 한국경제 증권 RSS, 이투데이 마켓 RSS이며, 환경변수 `KRX_KIND_RSS_URL`, `NEWSIS_RSS_URL`, `MK_RSS_URL`, `HANKYUNG_RSS_URL`, `ETODAY_RSS_URL`로 교체할 수 있다. 실제 값은 각 제공자가 공개한 공식 RSS 주소만 사용하며 문서나 저장소에 URL 인증값을 기록하지 않는다.
 

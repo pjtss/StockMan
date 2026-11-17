@@ -1,0 +1,108 @@
+{
+  "contractVersion": "consumer-identity-executable-acceptance.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": false,
+    "hashesAreComputedFromSyntheticInputs": true
+  },
+  "algorithmContract": {
+    "canonicalization": "RFC8785-JCS",
+    "encoding": "UTF-8",
+    "domainSeparatorEncoding": "UTF-8(domain) || 0x00 || canonicalBytes",
+    "digest": "SHA-256 lowercase hex",
+    "consumerIdentityDomain": "KR-DISCLOSURE-CONSUMER-IDENTITY-v1",
+    "consumerRevisionDomain": "KR-DISCLOSURE-CONSUMER-REVISION-v1",
+    "unicodeNormalization": "PRESERVE_CODE_POINTS"
+  },
+  "hashVectors": [
+    {
+      "id": "CIX-01-IDENTITY-ASCII",
+      "purpose": "consumer_identity_key",
+      "domain": "KR-DISCLOSURE-CONSUMER-IDENTITY-v1",
+      "canonicalJson": "{\"consumerKind\":\"SUMMARY_SEGMENT\",\"eventId\":\"EV-A\",\"naturalKey\":{\"segmentId\":\"SEG-A\"}}",
+      "canonicalBytesUtf8Hex": "7b22636f6e73756d65724b696e64223a2253554d4d4152595f5345474d454e54222c226576656e744964223a2245562d41222c226e61747572616c4b6579223a7b227365676d656e744964223a225345472d41227d7d",
+      "inputBytesHex": "4b522d444953434c4f535552452d434f4e53554d45522d4944454e544954592d7631007b22636f6e73756d65724b696e64223a2253554d4d4152595f5345474d454e54222c226576656e744964223a2245562d41222c226e61747572616c4b6579223a7b227365676d656e744964223a225345472d41227d7d",
+      "expectedSha256": "ebd469e8bfd8a2247c9af3f5bda490b52ba007dc6ba11304d6749ee900a7f9cf"
+    },
+    {
+      "id": "CIX-02-IDENTITY-ARRAY-ORDER-PRESERVED",
+      "purpose": "consumerContentHash",
+      "encoding": "canonicalBytesOnly",
+      "canonicalJson": "{\"claimIds\":[\"CL-B\",\"CL-A\"],\"consumerKind\":\"SUMMARY_SEGMENT\",\"eventId\":\"EV-A\",\"naturalKey\":{\"segmentId\":\"SEG-A\"}}",
+      "canonicalBytesUtf8Hex": "7b22636c61696d496473223a5b22434c2d42222c22434c2d41225d2c22636f6e73756d65724b696e64223a2253554d4d4152595f5345474d454e54222c226576656e744964223a2245562d41222c226e61747572616c4b6579223a7b227365676d656e744964223a225345472d41227d7d",
+      "inputBytesHex": "7b22636c61696d496473223a5b22434c2d42222c22434c2d41225d2c22636f6e73756d65724b696e64223a2253554d4d4152595f5345474d454e54222c226576656e744964223a2245562d41222c226e61747572616c4b6579223a7b227365676d656e744964223a225345472d41227d7d",
+      "expectedSha256": "a1406ebdc926c07ba71ac1be3c378839dba5ca7d804a169e87a5bc668e7906f5"
+    },
+    {
+      "id": "CIX-03-REVISION-DOMAIN-AND-CANONICAL-ORDER",
+      "purpose": "consumer_key",
+      "domain": "KR-DISCLOSURE-CONSUMER-REVISION-v1",
+      "canonicalJson": "{\"consumerContentHash\":\"CONTENT-A\",\"consumerIdentityKey\":\"IDENTITY-A\",\"eventId\":\"EV-A\",\"eventRevision\":\"REV-2\",\"projectionCommitSHA\":\"COMMIT-A\"}",
+      "canonicalBytesUtf8Hex": "7b22636f6e73756d6572436f6e74656e7448617368223a22434f4e54454e542d41222c22636f6e73756d65724964656e746974794b6579223a224944454e544954592d41222c226576656e744964223a2245562d41222c226576656e745265766973696f6e223a225245562d32222c2270726f6a656374696f6e436f6d6d6974534841223a22434f4d4d49542d41227d",
+      "inputBytesHex": "4b522d444953434c4f535552452d434f4e53554d45522d5245564953494f4e2d7631007b22636f6e73756d6572436f6e74656e7448617368223a22434f4e54454e542d41222c22636f6e73756d65724964656e746974794b6579223a224944454e544954592d41222c226576656e744964223a2245562d41222c226576656e745265766973696f6e223a225245562d32222c2270726f6a656374696f6e436f6d6d6974534841223a22434f4d4d49542d41227d",
+      "expectedSha256": "a86c7630871cdede838fdd2623bcebd94c7a62020e0b81caf06ce6015d12dded"
+    }
+  ],
+  "canonicalizationCases": [
+    {
+      "id": "CIX-04-OBJECT-PROPERTY-PERMUTATION",
+      "inputA": "{\"eventId\":\"EV-A\",\"consumerKind\":\"SUMMARY_SEGMENT\",\"naturalKey\":{\"segmentId\":\"SEG-A\"}}",
+      "inputB": "{\"naturalKey\":{\"segmentId\":\"SEG-A\"},\"eventId\":\"EV-A\",\"consumerKind\":\"SUMMARY_SEGMENT\"}",
+      "expectedCanonicalJson": "{\"consumerKind\":\"SUMMARY_SEGMENT\",\"eventId\":\"EV-A\",\"naturalKey\":{\"segmentId\":\"SEG-A\"}}",
+      "expectedIdentityRelation": "SAME"
+    },
+    {
+      "id": "CIX-05-ARRAY-ORDER-CHANGE-CHANGES-CANONICAL",
+      "inputA": ["CL-B", "CL-A"],
+      "inputB": ["CL-A", "CL-B"],
+      "expectedIdentityRelation": "DIFFERENT_CANONICAL_BYTES"
+    },
+    {
+      "id": "CIX-06-NFC-NFD-ARE-NOT-NORMALIZED",
+      "inputA": "\u00e9",
+      "inputB": "e\u0301",
+      "expectedIdentityRelation": "DIFFERENT_CANONICAL_BYTES"
+    },
+    {
+      "id": "CIX-07-UNSAFE-INTEGER-USES-DECIMAL-STRING",
+      "inputNumberRawJson": "9007199254740993",
+      "expectedInputRepresentation": "DECIMAL_STRING_REQUIRED_FOR_EXACT_INTEGER",
+      "expectedCanonicalization": "REJECT_NUMBER_OR_REQUIRE_EXPLICIT_STRING_SCHEMA"
+    },
+    {
+      "id": "CIX-08-DUPLICATE-PROPERTY-AND-LONE-SURROGATE-REJECT",
+      "rawDuplicatePropertyJson": "{\"eventId\":\"EV-A\",\"eventId\":\"EV-B\"}",
+      "loneSurrogateEscape": "\\ud800",
+      "expectedCanonicalization": "REJECT"
+    }
+  ],
+  "generationJoinCases": [
+    {
+      "id": "CIX-09-OLD-NEW-COMPOSITE-FK-RECONSTRUCTION",
+      "oldGeneration": { "commit": "COMMIT-A", "identityCount": 2, "revisionCount": 2, "claimEdgeCount": 3, "impactConsumerCount": 1, "coverageRefCount": 2 },
+      "newGeneration": { "commit": "COMMIT-B", "identityCount": 2, "revisionCount": 3, "claimEdgeCount": 4, "impactConsumerCount": 1, "coverageRefCount": 2 },
+      "expected": { "identityTransitions": 2, "sameGenerationCompositeJoins": true, "crossGenerationJoinRows": 0, "allSetsReconciled": true, "acceptance": "PASS_FOR_FIXTURE" }
+    },
+    {
+      "id": "CIX-10-IMPACT-ITEM-CROSSES-COMMIT",
+      "attemptCommit": "COMMIT-B",
+      "consumerRevisionCommit": "COMMIT-A",
+      "expected": { "compositeFk": "REJECT", "publication": "SUPPRESSED", "acceptance": "FAIL_CLOSED" }
+    },
+    {
+      "id": "CIX-11-IDENTITY-REVISION-REF-COUNT-MISMATCH",
+      "expectedCounts": { "identity": 2, "revision": 3, "claimRef": 4, "impactItem": 1, "coverageRef": 2 },
+      "actualCounts": { "identity": 2, "revision": 3, "claimRef": 3, "impactItem": 1, "coverageRef": 2 },
+      "expected": { "setDigest": "MISMATCH", "acceptance": "FAIL_CLOSED", "publication": "SUPPRESSED" }
+    },
+    {
+      "id": "CIX-12-TRANSITION-OMISSION-IS-INCOMPLETE-NOT-UNAFFECTED",
+      "expectedTransitionEdges": 2,
+      "actualTransitionEdges": 1,
+      "expected": { "disposition": "INCOMPLETE", "unaffectedCount": "NOT_COMPUTABLE", "suppression": "REMAINS_ACTIVE" }
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "contractVersion": "issuer-risk-status-timeline.v0",
+  "classification": "SYNTHETIC_PRODUCT_ACCEPTANCE_NOT_ISSUER_DATA_OR_INVESTMENT_RECOMMENDATION",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealFinancialValue": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "decisionId": "KR-ISSUER-RISK-STATUS-01",
+  "status": "PROPOSED_UNAPPROVED",
+  "sourceFamilies": [
+    "OPENDART_PERIODIC_FINANCIAL_OR_AUDIT_OBSERVATION",
+    "OPENDART_MAJOR_REPORT_DEFAULT_OR_REHABILITATION_APPLICATION",
+    "COURT_OR_COMPETENT_AUTHORITY_DECISION",
+    "KRX_ADMINISTRATIVE_DESIGNATION_OR_MARKET_ACTION",
+    "KRX_LISTING_ELIGIBILITY_OR_DELISTING_DECISION"
+  ],
+  "independentStateAxes": {
+    "issuerDisclosureAssertion": [
+      "OBSERVED",
+      "UPDATED",
+      "WITHDRAWN",
+      "CONFLICTED",
+      "UNVERIFIED"
+    ],
+    "legalOrRegulatoryProcess": [
+      "NOT_ESTABLISHED",
+      "FILED",
+      "PENDING",
+      "DECIDED",
+      "UNDER_REVIEW",
+      "CLOSED",
+      "UNKNOWN"
+    ],
+    "exchangeMarketAction": [
+      "NOT_REPORTED",
+      "ANNOUNCED",
+      "ACTIVE",
+      "SUSPENDED",
+      "RESUMED",
+      "TERMINATED",
+      "UNKNOWN"
+    ],
+    "rule": "An observation on one axis never implies a transition on another axis; axis labels describe workflow state and are not a severity ranking."
+  },
+  "requiredOutputFields": [
+    "issuerInstrumentId",
+    "affectedInstrumentIds",
+    "securityClass",
+    "sourceAuthority",
+    "sourceRevisionIds",
+    "sourceLocatorRefs",
+    "eventTime",
+    "observedAt",
+    "stateAsOf",
+    "issuerDisclosureAssertion",
+    "legalOrRegulatoryProcess",
+    "exchangeMarketAction",
+    "coverageStatus",
+    "correctionStatus",
+    "conflictRefs",
+    "recheckAfter",
+    "decisionPolicyVersion",
+    "dependencyFingerprint"
+  ],
+  "stateContract": {
+    "financialOrAuditIndicatorDoesNotEqualDefaultOrDelisting": true,
+    "rehabilitationApplicationDoesNotEqualCourtCommencementOrDecision": true,
+    "exchangeDesignationListingReviewTradingStatusAndFinalDelistingStayDistinct": true,
+    "issuerSubsidiaryAndAffectedInstrumentRequireExactIdentityLink": true,
+    "eventTimeObservedAtAndAsOfAreSeparate": true,
+    "correctionInvalidatesOnlyDependentProjectionUntilReconciled": true,
+    "unsearchedOrExpiredCoverageCannotAssertClearOrCurrent": true,
+    "contradictingOfficialAssertionsRemainUnresolved": true,
+    "unknownNeverMeansNoRiskOrNoAction": true,
+    "noAggregateSeverityScoreOrInvestmentRecommendationWithoutSeparateDecision": true
+  },
+  "publicationGate": [
+    "EXACT_ISSUER_AND_AFFECTED_INSTRUMENT_IDENTITY",
+    "AUTHORIZED_SOURCE_AND_EXACT_REVISION_LOCATOR",
+    "CURRENT_DECLARED_SOURCE_COVERAGE_AND_ASOF",
+    "RECONCILED_CORRECTION_AND_CONFLICT_STATE",
+    "APPROVED_POLICY_AND_SNAPSHOT",
+    "COMMON_STOCK_MASTER_AND_CAP_ELIGIBILITY"
+  ],
+  "vectors": [
+    {
+      "id": "IRST-01-NEGATIVE-FINANCIAL-INDICATOR-IS-NOT-DEFAULT",
+      "expected": "KEEP_DISCLOSED_SIGNAL_ONLY"
+    },
+    {
+      "id": "IRST-02-AUDIT-OPINION-AND-GOING-CONCERN-ARE-SEPARATE-ASSERTIONS",
+      "expected": "PRESERVE_EXACT_OPINION_AND_LOCATOR"
+    },
+    {
+      "id": "IRST-03-REHABILITATION-APPLICATION-IS-NOT-COURT-OPENING",
+      "expected": "LEGAL_PROCESS_REMAINS_FILED_UNTIL_AUTHORITY_EVIDENCE"
+    },
+    {
+      "id": "IRST-04-APPLICATION-REJECTION-DOES-NOT-ERASE-FILING-HISTORY",
+      "expected": "APPEND_DECISION_AND_RECONCILE_DEPENDENTS"
+    },
+    {
+      "id": "IRST-05-MANAGED-DESIGNATION-IS-NOT-DELISTING",
+      "expected": "KEEP_EXCHANGE_ACTION_AND_LISTING_OUTCOME_SEPARATE"
+    },
+    {
+      "id": "IRST-06-LISTING-ELIGIBILITY-REVIEW-IS-NOT-FINAL-DELISTING",
+      "expected": "KEEP_REVIEW_STAGE_OPEN"
+    },
+    {
+      "id": "IRST-07-TRADING-SUSPENSION-IS-NOT-DELISTING",
+      "expected": "REPORT_EXCHANGE_TRADING_STATUS_SEPARATELY"
+    },
+    {
+      "id": "IRST-08-RESUMED-TRADING-DOES-NOT-ERASE-HISTORICAL-ACTION",
+      "expected": "PRESERVE_ACTION_LINEAGE"
+    },
+    {
+      "id": "IRST-09-EXPIRED-STATUS-SNAPSHOT-CANNOT-ASSERT-CURRENT-STATE",
+      "expected": "MARK_CURRENTNESS_UNKNOWN"
+    },
+    {
+      "id": "IRST-10-CORRECTED-REPORT-INVALIDATES-DEPENDENT-STATE",
+      "expected": "REBUILD_ONLY_LINKED_PROJECTION"
+    },
+    {
+      "id": "IRST-11-ISSUER-ASSERTION-IS-NOT-KRX-ACTION",
+      "expected": "DO_NOT_PROMOTE_AUTHORITY"
+    },
+    {
+      "id": "IRST-12-SUBSIDIARY-CASE-DOES-NOT-AUTO-ATTRIBUTE-TO-PARENT",
+      "expected": "REQUIRE_EXACT_ISSUER_IMPACT_LINK"
+    },
+    {
+      "id": "IRST-13-COURT-FILING-AND-COURT-ORDER-ARE-DIFFERENT-EVIDENCE",
+      "expected": "KEEP_PROCESS_STAGE_AND_AUTHORITY_SEPARATE"
+    },
+    {
+      "id": "IRST-14-SAME-FACT-IN-REPORT-AND-EXCHANGE-NOTICE-IS-NOT-TWO-DISTRESS-POINTS",
+      "expected": "LINK_ASSERTIONS_WITHOUT_DOUBLE_COUNTING"
+    },
+    {
+      "id": "IRST-15-CONFLICTING-OFFICIAL-STATUS-REMAINS-UNRESOLVED",
+      "expected": "SUPPRESS_CURRENT_STATE_CLAIM"
+    },
+    {
+      "id": "IRST-16-PARTIAL-SOURCE-COVERAGE-IS-NOT-CLEAR-STATUS",
+      "expected": "KEEP_COVERAGE_PARTIAL_AND_STATE_UNKNOWN"
+    },
+    {
+      "id": "IRST-17-HISTORICAL-ASOF-EXCLUDES-LATER-KNOWN-OUTCOME",
+      "expected": "NO_LOOKAHEAD"
+    },
+    {
+      "id": "IRST-18-RULE-REVISION-USES-EFFECTIVE-TIME-AND-SOURCE-VERSION",
+      "expected": "APPLY_ONLY_APPROVED_ASOF_POLICY"
+    }
+  ],
+  "knownLimitations": [
+    "OpenDART structured extracts are partial and do not establish the absence of an issuer disclosure or replace filing review.",
+    "KIND search/status coverage, currentness, issuer mapping and announcement-vs-effective time require independently declared denominators and rights review.",
+    "A disclosed risk or official market action does not by itself establish default, final delisting, future price direction, or investment recommendation."
+  ]
+}

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
+import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 
 /**
  * Rebuilds weekly OHLCV from persisted daily candles for the eligible universe.
@@ -9,7 +10,7 @@ export async function upsertWeeklyFromDaily(market: "KR" | "US", options: { minD
   const db = getDb();
   const universe = market === "KR" ? "kr_common_stock_universe" : "us_common_stock_universe";
   const candles = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
-  const coverage = await db.execute(sql.raw(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM ${candles} c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D' AND c.close IS NOT NULL))::int AS ready FROM ${universe} u WHERE u.enabled = true AND u.daily_active = true`));
+  const coverage = await db.execute(sql.raw(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM ${candles} c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D' AND ${validDailyCandleSql("c")}))::int AS ready FROM ${universe} u WHERE u.enabled = true AND u.daily_active = true AND u.instrument_type = 'COMMON_STOCK'`));
   const total = Number((coverage.rows[0] as any)?.total ?? 0);
   const ready = Number((coverage.rows[0] as any)?.ready ?? 0);
   const ratio = total > 0 ? ready / total : 0;
@@ -31,7 +32,7 @@ export async function upsertWeeklyFromDaily(market: "KR" | "US", options: { minD
              SUM(COALESCE(c.volume, 0)) AS volume
       FROM ${candles} c
              JOIN ${universe} u ON u.market = c.market AND u.code = c.code AND u.enabled = true AND u.daily_active = true
-      WHERE c.timeframe = 'D' AND c.close IS NOT NULL
+      WHERE c.timeframe = 'D' AND ${validDailyCandleSql("c")}
       GROUP BY c.market, c.code, DATE_TRUNC('week', TO_DATE(c.candle_date, 'YYYYMMDD'))
     )
     INSERT INTO ${candles} (market, code, timeframe, candle_date, period_end_date, candle_time, open, high, low, close, volume, source, fetched_at)

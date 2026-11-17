@@ -311,6 +311,7 @@ async function verifyRuntime() {
 // make an otherwise ready /charts response exceed the per-request timeout.
 await run(npm, ["run", "audit:dependencies"]);
 await runDeploymentVerification({
+  fastGates: verifyFastGates,
   build: () => run(npm, ["run", "build"], { env: { ...process.env, NEXT_DIST_DIR: verifyDistDir } }),
   runtime: verifyRuntime,
   quality: verifyQuality,

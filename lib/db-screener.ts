@@ -7,6 +7,14 @@ import {
 
 const inFlightScreenerRuns = new Map<string, Promise<ScreenerResult[]>>();
 
+export function minimumScreenerMarketCap(isUs: boolean, requestedMinimum: number | null) {
+  return isUs ? requestedMinimum : Math.max(30_000_000_000, requestedMinimum ?? 0);
+}
+
+export function screenerMarketCapFreshnessPredicate(isUs: boolean) {
+  return isUs ? "" : "AND f.currency = 'KRW' AND f.fetched_at >= NOW() - INTERVAL '24 hours' AND f.fetched_at <= NOW()";
+}
+
 function screenerRequestKey(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(screenerRequestKey).join(",")}]`;
   if (value && typeof value === "object") {
@@ -115,6 +123,8 @@ async function runDbScreenerUncached(
     .map((filter) => Number(filter.value))
     .filter(Number.isFinite)
     .sort((a, b) => b - a)[0] ?? null;
+  const requiredMinMarketCap = minimumScreenerMarketCap(isUs, minMarketCap);
+  const marketCapFreshnessPredicate = screenerMarketCapFreshnessPredicate(isUs);
   const maxMarketCap = marketCapFilters
     .filter((filter) => filter.operator === "<=" || filter.operator === "<")
     .map((filter) => Number(filter.value))
@@ -153,10 +163,10 @@ async function runDbScreenerUncached(
         LIMIT 65`,
     )
     .join(" UNION ALL ");
-  const params = [markets, asOfKey, asOf, minMarketCap, maxMarketCap];
+  const params = [markets, asOfKey, asOf, requiredMinMarketCap, maxMarketCap];
   const sql = canRankMarketCapInSql
-    ? `WITH ${latestCtes}, candidate_universe AS (SELECT market,code,name,enabled,market_cap,listed_shares,currency FROM (SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.listed_shares,f.currency,RANK() OVER (PARTITION BY u.market ORDER BY f.market_cap DESC NULLS LAST) AS market_cap_rank FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,listed_shares,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($4::numeric IS NULL OR f.market_cap >= $4) AND ($5::numeric IS NULL OR f.market_cap <= $5)) ranked WHERE market_cap_rank <= $6) SELECT u.market,u.code,u.name,u.enabled,u.market_cap,u.listed_shares,u.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM candidate_universe u JOIN LATERAL (${candleLookups}) c ON true`
-    : `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.listed_shares,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,listed_shares,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (${candleLookups}) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($4::numeric IS NULL OR f.market_cap >= $4) AND ($5::numeric IS NULL OR f.market_cap <= $5)`;
+    ? `WITH ${latestCtes}, candidate_universe AS (SELECT market,code,name,enabled,market_cap,listed_shares,currency FROM (SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.listed_shares,f.currency,RANK() OVER (PARTITION BY u.market ORDER BY f.market_cap DESC NULLS LAST) AS market_cap_rank FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,listed_shares,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code ${marketCapFreshnessPredicate} AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($4::numeric IS NULL OR f.market_cap >= $4) AND ($5::numeric IS NULL OR f.market_cap <= $5)) ranked WHERE market_cap_rank <= $6) SELECT u.market,u.code,u.name,u.enabled,u.market_cap,u.listed_shares,u.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM candidate_universe u JOIN LATERAL (${candleLookups}) c ON true`
+    : `WITH ${latestCtes} SELECT u.market,u.code,u.name,u.enabled,f.market_cap,f.listed_shares,f.currency,c.candle_date,c.fetched_at,c.close,c.high,c.low,c.volume,c.timeframe FROM ${universeTable} u LEFT JOIN LATERAL (SELECT market_cap,listed_shares,currency FROM instrument_fundamental_snapshots f WHERE f.market=u.market AND f.code=u.code ${marketCapFreshnessPredicate} AND ($3::date IS NULL OR f.observed_at < ($3::date + INTERVAL '1 day')) ORDER BY f.observed_at DESC NULLS LAST, f.fetched_at DESC NULLS LAST LIMIT 1) f ON true JOIN market_latest ml ON ml.market=u.market JOIN instrument_daily_latest dl ON dl.market=u.market AND dl.code=u.code AND dl.candle_date=ml.candle_date JOIN LATERAL (${candleLookups}) c ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1) AND ($4::numeric IS NULL OR f.market_cap >= $4) AND ($5::numeric IS NULL OR f.market_cap <= $5)`;
   const rows = (
     await pool.query(sql, canRankMarketCapInSql ? [...params, request.limit ?? 100] : params)
   ).rows;

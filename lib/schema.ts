@@ -557,7 +557,14 @@ export const stockmanEventMetrics = pgTable("stockman_event_metrics", {
 
 export const dailyBollingerCacheRetries = pgTable("daily_bollinger_cache_retries", {
   id: bigserial("id", { mode: "number" }).primaryKey(), scope: text("scope").notNull(), zone: text("zone").notNull(), status: text("status").notNull().default("PENDING"), attempts: integer("attempts").notNull().default(0), nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(), lastError: text("last_error"), lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }), succeededAt: timestamp("succeeded_at", { withTimezone: true }), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [uniqueIndex("daily_bollinger_cache_retries_key").on(table.scope, table.zone), index("daily_bollinger_cache_retries_due_idx").on(table.status, table.nextAttemptAt)]);
+}, (table) => [
+  uniqueIndex("daily_bollinger_cache_retries_key").on(table.scope, table.zone),
+  index("daily_bollinger_cache_retries_due_idx").on(table.status, table.nextAttemptAt),
+  check("daily_bollinger_cache_retries_scope_check", sql`${table.scope} IN ('KR', 'US')`),
+  check("daily_bollinger_cache_retries_zone_check", sql`${table.zone} IN ('LOWER_OR_BELOW', 'MIDDLE_TO_LOWER')`),
+  check("daily_bollinger_cache_retries_status_check", sql`${table.status} IN ('PENDING', 'SUCCESS')`),
+  check("daily_bollinger_cache_retries_attempts_check", sql`${table.attempts} >= 0`),
+]);
 
 /** Full SEC index/primary document captured for later AI analysis. */
 export const secFilingDocuments = pgTable("sec_filing_documents", {
@@ -605,3 +612,14 @@ export const secStockRisks = pgTable("sec_stock_risks", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: text("updated_by").notNull().default("LOCAL_API"),
 }, (table) => [primaryKey({ columns: [table.market, table.ticker], name: "sec_stock_risks_pkey" }), index("sec_stock_risks_ticker_idx").on(table.ticker)]);
+
+export const intradayTurnoverObservations = pgTable("intraday_turnover_observations", {
+  market: text("market").notNull(), code: text("code").notNull(), sessionDate: text("session_date").notNull(),
+  bucketAt: timestamp("bucket_at", { withTimezone: true }).notNull(), observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  currency: text("currency").notNull(), price: doublePrecision("price"), volume: doublePrecision("volume"),
+  sourceTradingValue: doublePrecision("source_trading_value"), minuteTradingValue: doublePrecision("minute_trading_value").notNull().default(0),
+  minuteTradingValueSource: text("minute_trading_value_source").notNull().default("UNKNOWN"), marketCap: doublePrecision("market_cap"),
+  marketCapObservedAt: timestamp("market_cap_observed_at", { withTimezone: true }), marketCapFetchedAt: timestamp("market_cap_fetched_at", { withTimezone: true }),
+  rollingTradingValue: doublePrecision("rolling_trading_value").notNull().default(0), turnoverRatio: doublePrecision("turnover_ratio"),
+  source: text("source").notNull().default("KIS"), sourcePayload: jsonb("source_payload").notNull().default(sql`'{}'::jsonb`),
+}, (table) => [primaryKey({ columns: [table.market, table.code, table.sessionDate, table.bucketAt], name: "intraday_turnover_observations_pkey" }), index("intraday_turnover_observations_lookup_idx").on(table.market, table.code, table.observedAt), index("intraday_turnover_observations_observed_idx").on(table.observedAt)]);

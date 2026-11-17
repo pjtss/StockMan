@@ -22,6 +22,7 @@ export interface OHLCVCandle {
   close: number;
   volume: number;
   tradingValue?: number | null;
+  fetchedAt?: string | null;
   raw?: unknown;
 }
 

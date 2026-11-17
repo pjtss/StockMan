@@ -71,9 +71,9 @@ type UsTopRisingChartResponse = {
 
 기존 `/api/kis/market-flow?mode=minute` 계약을 확장하거나, 차트 모달 전용으로 다음 API를 추가한다.
 
-`GET /api/stock/us/minute-chart?code=AAPL&market=NAS&interval=1m|5m&count=120`
+`GET /api/stock/us/minute-chart?code=AAPL&market=NAS&interval=1m|5m|10m|15m|30m|60m&count=120`
 
-- `interval=1m`은 KIS 1분봉, `interval=5m`은 KIS 5분봉으로 매핑한다.
+- ChartModal 해외 차트에서 선택 가능한 간격은 1·5·10·15·30·60분이다. 이를 KIS 해외 분봉 API의 `NMIN`에 그대로 전달한다.
 - `count`는 1~240으로 제한한다.
 - 응답에는 `code`, `name`, `market`, `interval`, `points`, `collectedAt`, `source`, `status`를 포함한다.
 - KIS가 지원하지 않는 시장·간격·장외 응답은 JSON 오류로 정규화한다.
@@ -111,7 +111,7 @@ type UsTopRisingChartResponse = {
 />
 ```
 
-모달 내부에는 해외 차트 탭에서 `1분봉`, `5분봉` 선택 컨트롤을 제공한다. 선택 간격은 모달 종목이 바뀌어도 기본값 `1분봉`을 유지하고, 동일 종목의 이미 조회된 간격은 클라이언트 메모리 캐시에서 재사용한다.
+모달 내부에는 해외 차트 탭에서 `1분봉`, `5분봉`, `10분봉`, `15분봉`, `30분봉`, `60분봉` 선택 컨트롤을 제공한다. 선택 간격은 모달 종목이 바뀌어도 기본값 `1분봉`을 유지하고, 동일 종목의 이미 조회된 간격은 최대 60초 동안 클라이언트 메모리 캐시에서 재사용한다. 캐시는 최대 128개를 보관하고 LRU 순서로 정리한다. 국내 차트는 KIS 1분봉을 1·2·3·5·10·15·30·60분 간격으로 서버에서 집계한다. 당일 분봉 원천의 최대 30건 제한으로 긴 주기는 표시 캔들 수가 적을 수 있다.
 
 - 분봉 차트는 기존 캔들 차트와 동일한 가격축·거래량 영역을 사용한다.
 - 기본정보·뉴스·관심종목·이전/다음·키보드 동작은 기존 모달 기능을 변경하지 않는다.

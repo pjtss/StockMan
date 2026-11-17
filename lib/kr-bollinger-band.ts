@@ -6,6 +6,8 @@ import {
 import type { OHLCVCandle } from "@/lib/kis-chart";
 import { calculateObvAdlSignal } from "@/lib/daily-obv-adl-filter";
 import { findRecentLowerBandTouch } from "@/lib/bollinger-lower-touch";
+import { getKisCacheSourceTimestamp } from "@/lib/kis-cache";
+import { KR_MARKET_CAP_MAX_AGE_HOURS, loadKrMarketCapSnapshots, meetsKrMarketCapFloorKrw } from "@/lib/kr-market-cap";
 const RESULT_CACHE_TTL_MS = Math.max(0, Number(process.env.BOLLINGER_RESULT_CACHE_TTL_MS ?? 30000) || 30000);
 const resultCache = new Map<string, { expiresAt: number; value: any }>();
 
@@ -32,6 +34,7 @@ export type KrBollingerResult = {
   qualifies: boolean;
   candleCount: number;
   latestCandleDate: string | null;
+  latestCandleUpdatedAt: string | null;
   close: number | null;
   low: number | null;
   volume: number | null;
@@ -46,7 +49,7 @@ export type KrBollingerResult = {
     lower: number;
     distanceToLowerPercent: number;
   } | null;
-  filter: { minPrice: boolean; minVolume: boolean; minTurnoverRatio: boolean };
+  filter: { minPrice: boolean; minVolume: boolean; minTurnoverRatio: boolean; marketCap?: boolean };
   error?: string;
   touchState: "TOUCH" | "BELOW" | "NONE";
   reasonCode?: string;
@@ -131,8 +134,9 @@ export function calculateKrBollingerBands(
   return points;
 }
 export async function scanStoredKrBollingerBands(
-  options: { policy?: Partial<KrBollingerPolicy>; moduleKey?: "kr-bollinger-band" | "kr-bollinger-middle-lower" } = {},
+  options: { policy?: Partial<KrBollingerPolicy>; moduleKey?: "kr-bollinger-band" | "kr-bollinger-middle-lower"; sourceCheckedAt?: string } = {},
 ) {
+  const sourceCheckedAt = options.sourceCheckedAt ?? await getKisCacheSourceTimestamp();
   const moduleKey = options.moduleKey ?? "kr-bollinger-band";
   const loaded = await loadKrBollingerPolicy(moduleKey);
   const overrides = options.policy ?? {};
@@ -160,11 +164,13 @@ export async function scanStoredKrBollingerBands(
     reboundTolerancePercent: Math.max(0, Number(overrides.reboundTolerancePercent ?? loaded.reboundTolerancePercent ?? 0.5)),
   } as KrBollingerPolicy;
   const universe = await loadStoredKrInstrumentScopes();
+  const marketCaps = await loadKrMarketCapSnapshots(universe.scopes);
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
-  const cacheKey = JSON.stringify(policy);
-  if (RESULT_CACHE_TTL_MS > 0) {
+  const universeAvailable = universe.universe.ok === true && universe.scopes.length > 0;
+  const cacheKey = JSON.stringify({ policy, universe: universe.scopes.map((scope) => `${scope.market}:${scope.code}`).sort(), marketCaps: [...marketCaps.entries()].sort(([a], [b]) => a.localeCompare(b)) });
+  if (universeAvailable && RESULT_CACHE_TTL_MS > 0) {
     const cached = resultCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return { ...cached.value, cacheHit: true };
+    if (cached && cached.expiresAt > Date.now() && cached.value.ok === true && cached.value.universeAvailable === true) return { ...cached.value, cacheHit: true };
   }
   const candles = await loadCachedKrDailyCandlesBulk(
     universe.scopes,
@@ -189,7 +195,7 @@ export async function scanStoredKrBollingerBands(
       const latest = band
         ? (series.find((c) => c.date === band.date) ?? null)
         : null;
-      const metric = metrics.get(key);
+    const metric = metrics.get(key) ?? { marketCap: marketCaps.get(`${item.market}:${item.code}`) ?? null, turnoverRatio: null };
       const pricePass =
         band !== null &&
         (policy.minPrice <= 0 || band.close >= policy.minPrice);
@@ -198,7 +204,8 @@ export async function scanStoredKrBollingerBands(
         policy.minTurnoverRatio <= 0 ||
         (metric?.turnoverRatio != null &&
           metric.turnoverRatio >= policy.minTurnoverRatio);
-      const passes = pricePass && volumePass && turnoverPass;
+      const marketCapPass = meetsKrMarketCapFloorKrw(metric.marketCap);
+      const passes = pricePass && volumePass && turnoverPass && marketCapPass;
       const touchState = !band ? "NONE" : band.close < band.lower ? "BELOW" : band.close <= band.lower ? "TOUCH" : "NONE";
       const inMiddleToLower = Boolean(band && band.close >= band.lower && band.close <= band.middle);
       const signal = calculateObvAdlSignal(series, policy.obvSignalPeriod, policy.adlSignalPeriod);
@@ -219,9 +226,10 @@ export async function scanStoredKrBollingerBands(
               : "NOT_TOUCHING",
         qualifies,
         touchState,
-        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : policy.zone !== "MIDDLE_TO_LOWER" && !recentTouch.qualifies ? "NO_RECENT_LOWER_TOUCH" : undefined,
+        reasonCode: !band ? "INSUFFICIENT_HISTORY" : !marketCapPass ? "MARKET_CAP_BELOW_FLOOR_OR_UNKNOWN" : !signalPass ? "OBV_ADL_SIGNAL_REQUIRED" : policy.zone !== "MIDDLE_TO_LOWER" && !recentTouch.qualifies ? "NO_RECENT_LOWER_TOUCH" : undefined,
         candleCount: series.length,
         latestCandleDate: band?.date ?? null,
+        latestCandleUpdatedAt: latest?.fetchedAt ?? null,
         close: band?.close ?? null,
         low: band?.low ?? null,
         volume: latest?.volume ?? null,
@@ -237,6 +245,7 @@ export async function scanStoredKrBollingerBands(
           minPrice: pricePass,
           minVolume: volumePass,
           minTurnoverRatio: turnoverPass,
+          marketCap: marketCapPass,
         },
         error: !band
           ? `insufficient valid candles (${series.length}/${policy.period})`
@@ -252,26 +261,36 @@ export async function scanStoredKrBollingerBands(
         touchState: "NONE",
         candleCount: 0,
         latestCandleDate: null,
+        latestCandleUpdatedAt: null,
         close: null,
         low: null,
         volume: null,
         marketCap: null,
         turnoverRatio: null,
         band: null,
-        filter: { minPrice: false, minVolume: false, minTurnoverRatio: false },
+        filter: { minPrice: false, minVolume: false, minTurnoverRatio: false, marketCap: false },
         error: e instanceof Error ? e.message : String(e),
       });
     }
   }
+  const successCount = results.filter((r) => r.status !== "FAILED" && r.status !== "INSUFFICIENT_HISTORY").length;
+  const failureCount = results.filter((r) => r.status === "FAILED" || r.status === "INSUFFICIENT_HISTORY").length;
+  const complete = universeAvailable && successCount === universe.scopes.length && failureCount === 0;
+  const status = !universeAvailable || (results.length > 0 && successCount === 0) ? "FAILED" : complete ? "COMPLETED" : "PARTIAL";
   const output = {
-    ok: true,
+    ok: complete,
+    status,
     checkedAt: new Date().toISOString(),
-    universeAvailable: true,
+    sourceCheckedAt,
+    universeAvailable,
     universe: universe.universe,
     policy,
     dataPolicy: {
       source: "kr_instrument_universe_candles",
       timeframe,
+      marketCapFloorKrwExclusive: 30_000_000_000,
+      unknownOrStaleMarketCap: "excluded",
+      marketCapSnapshotMaxAgeHours: KR_MARKET_CAP_MAX_AGE_HOURS,
       zone: policy.zone,
       bandCalculation: "종가 기반",
       touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 저장 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 또는 직전 거래일 종가가 해당 봉의 하단선 이하",
@@ -279,8 +298,8 @@ export async function scanStoredKrBollingerBands(
       currentDayExcluded: false,
     },
     instrumentCount: universe.scopes.length,
-    successCount: results.filter((r) => r.status !== "FAILED" && r.status !== "INSUFFICIENT_HISTORY").length,
-    failureCount: results.filter((r) => r.status === "FAILED" || r.status === "INSUFFICIENT_HISTORY").length,
+    successCount,
+    failureCount,
     statistics: {
       qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length,
       qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length,
@@ -294,6 +313,6 @@ export async function scanStoredKrBollingerBands(
     results,
     cacheHit: false,
   };
-  if (RESULT_CACHE_TTL_MS > 0) resultCache.set(cacheKey, { expiresAt: Date.now() + RESULT_CACHE_TTL_MS, value: output });
+  if (complete && RESULT_CACHE_TTL_MS > 0) resultCache.set(cacheKey, { expiresAt: Date.now() + RESULT_CACHE_TTL_MS, value: output });
   return output;
 }

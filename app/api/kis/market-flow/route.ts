@@ -4,27 +4,19 @@ import { fetchDailyTradeVolume, fetchDomesticDailyPrice, fetchTimeItemChartPrice
 import { fetchKisUsTradeTrend, fetchKisUsAskingPrice, fetchKisUsPriceDetail, fetchKisUsMinuteChart, fetchKisUsPeriodPrice, fetchKisUsSearchInfo } from "@/lib/kis-us-trade-trend";
 import { fetchKrPriceDetail } from "@/lib/kis-kr-price-detail";
 import { writeKisSignalSnapshot } from "@/lib/kis-signal-snapshot";
+import { isValidCompactCalendarDate } from "@/lib/calendar-date-quality.mjs";
+import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 function readDate(url: URL) {
   const value = url.searchParams.get("date")?.trim();
   if (!value) return undefined;
-  if (!/^\d{8}$/.test(value)) return null;
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  const candidate = new Date(Date.UTC(year, month - 1, day));
-  return candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month - 1 && candidate.getUTCDate() === day ? value : null;
+  return isValidCompactCalendarDate(value) ? value : null;
 }
 
 function isValidDateValue(value: string | null) {
-  if (!value || !/^\d{8}$/.test(value)) return false;
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  const candidate = new Date(Date.UTC(year, month - 1, day));
-  return candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month - 1 && candidate.getUTCDate() === day;
+  return isValidCompactCalendarDate(value);
 }
 
 function isValidUsCode(value: string) {
@@ -41,25 +33,57 @@ function currentKstDate() {
   return `${values.year}${values.month}${values.day}`;
 }
 
-function aggregateDomesticMinuteRows(rows: Record<string, unknown>[], interval: 1 | 5) {
+function aggregateDomesticMinuteRows(rows: Record<string, unknown>[], interval: number) {
   if (interval === 1) return rows;
   const timeKey = (row: Record<string, unknown>) => String(row.stck_cntg_hour ?? row.cntg_hour ?? row.time ?? "");
-  const price = (row: Record<string, unknown>) => Number(row.stck_prpr ?? row.prpr ?? row.price ?? 0);
+  const dateKey = (row: Record<string, unknown>) => String(row.stck_bsop_date ?? row.xymd ?? row.date ?? "");
+  const close = (row: Record<string, unknown>) => Number(row.stck_prpr ?? row.prpr ?? row.price ?? 0);
+  const open = (row: Record<string, unknown>) => Number(row.stck_oprc ?? row.open ?? close(row));
+  const high = (row: Record<string, unknown>) => Number(row.stck_hgpr ?? row.high ?? close(row));
+  const low = (row: Record<string, unknown>) => Number(row.stck_lwpr ?? row.low ?? close(row));
   const volume = (row: Record<string, unknown>) => Number(row.cntg_vol ?? row.stck_cntg_vol ?? row.volume ?? 0);
-  const ordered = [...rows].sort((a, b) => timeKey(a).localeCompare(timeKey(b)));
+  const ordered = [...rows].sort((a, b) => dateKey(a).localeCompare(dateKey(b)) || timeKey(a).localeCompare(timeKey(b)));
   const grouped = new Map<string, Record<string, unknown>[]>();
   for (const row of ordered) {
     const time = timeKey(row);
     const minute = Number(time.slice(2, 4));
-    const bucket = time.length >= 4 && Number.isFinite(minute) ? `${time.slice(0, 2)}${String(Math.floor(minute / interval) * interval).padStart(2, "0")}` : time;
+    const bucketTime = time.length >= 4 && Number.isFinite(minute) ? `${time.slice(0, 2)}${String(Math.floor(minute / interval) * interval).padStart(2, "0")}` : time;
+    const bucket = `${dateKey(row)}:${bucketTime}`;
     grouped.set(bucket, [...(grouped.get(bucket) ?? []), row]);
   }
-  return [...grouped.entries()].map(([bucket, group]) => {
+  return [...grouped.entries()].map(([key, group]) => {
+    const bucket = key.slice(key.indexOf(":") + 1);
     const first = group[0];
-    const prices = group.map(price).filter((value) => value > 0);
-    const result = { ...first, stck_cntg_hour: bucket, stck_oprc: prices[0] ?? null, stck_hgpr: prices.length ? Math.max(...prices) : null, stck_lwpr: prices.length ? Math.min(...prices) : null, stck_prpr: prices.at(-1) ?? null, cntg_vol: group.reduce((sum, row) => sum + volume(row), 0), interval: 5 };
+    const highs = group.map(high).filter((value) => value > 0);
+    const lows = group.map(low).filter((value) => value > 0);
+    const result = { ...first, stck_cntg_hour: bucket, stck_oprc: open(first) || null, stck_hgpr: highs.length ? Math.max(...highs) : null, stck_lwpr: lows.length ? Math.min(...lows) : null, stck_prpr: close(group.at(-1)!) || null, cntg_vol: group.reduce((sum, row) => sum + volume(row), 0), interval };
     return result;
   }).reverse();
+}
+
+function isValidDomesticMinuteRow(row: Record<string, unknown>) {
+  const date = String(row.stck_bsop_date ?? row.xymd ?? row.date ?? "");
+  const time = String(row.stck_cntg_hour ?? row.cntg_hour ?? row.time ?? "");
+  const hour = Number(time.slice(0, 2));
+  const minute = Number(time.slice(2, 4));
+  const second = Number(time.slice(4, 6));
+  const value = (...keys: string[]): number | null => {
+    const raw = keys.map((key) => row[key]).find((item) => item !== null && item !== undefined);
+    if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+    if (typeof raw !== "string" || raw.trim() === "") return null;
+    const parsed = Number(raw.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const open = value("stck_oprc", "open");
+  const high = value("stck_hgpr", "high");
+  const low = value("stck_lwpr", "low");
+  const close = value("stck_prpr", "prpr", "price");
+  const volume = value("cntg_vol", "stck_cntg_vol", "volume");
+  return isValidCompactCalendarDate(date) && /^\d{6}$/.test(time)
+    && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59
+    && open !== null && high !== null && low !== null && close !== null && volume !== null
+    && open > 0 && high > 0 && low > 0 && close > 0 && volume >= 0
+    && high >= Math.max(open, low, close) && low <= Math.min(open, high, close);
 }
 
 async function handleGet(request: Request) {
@@ -83,10 +107,33 @@ async function handleGet(request: Request) {
     if (url.searchParams.get("mode") === "minute" && !["1", "5", "10", "15", "30", "60"].includes(requestedMinute)) return NextResponse.json({ ok: false, error: "INVALID_US_MINUTE", expected: "1|5|10|15|30|60" }, { status: 400 });
     if (url.searchParams.get("mode") === "minute" && (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 120)) return NextResponse.json({ ok: false, error: "INVALID_US_COUNT", expected: "1..120" }, { status: 400 });
     if (url.searchParams.get("mode") === "minute") {
+      try {
+        const universe = await getPool().query<{ code: string }>(
+          `SELECT code FROM us_common_stock_universe
+            WHERE market = $1 AND code = $2 AND enabled = true AND daily_active = true
+              AND instrument_type = 'COMMON_STOCK'
+              AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false
+              AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false
+              AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false
+            LIMIT 1`,
+          [exchange ?? "NAS", code],
+        );
+        if (universe.rows.length !== 1) return NextResponse.json({ ok: false, error: "US_COMMON_STOCK_NOT_FOUND", eligibility: "FAIL_CLOSED" }, { status: 422 });
+      } catch {
+        return NextResponse.json({ ok: false, error: "COMMON_STOCK_UNIVERSE_UNAVAILABLE", eligibility: "FAIL_CLOSED" }, { status: 503 });
+      }
       const result = await fetchKisUsMinuteChart({ code, market: exchange, minute: url.searchParams.get("minute") ?? "1", count: url.searchParams.get("count") ?? "120" });
       if (!result) return NextResponse.json({ ok: false, error: "KIS_TOKEN_UNAVAILABLE", source: "KIS", market, code }, { status: 503 });
-      await writeKisSignalSnapshot({ market, code, signalType: "us_minute_chart", status: result.ok ? "AVAILABLE" : "UNAVAILABLE", payload: result.rows, rawPayload: result.rawText });
-      return NextResponse.json({ ...result, source: "KIS", market, mode: "minute", instrument: { code, name: company }, flowStatus: result.ok ? "AVAILABLE" : "UNAVAILABLE", collectedAt: new Date().toISOString() }, { status: result.ok ? 200 : 502 });
+      const available = result.ok && result.rows.length > 0;
+      const error = result.ok && result.rows.length === 0 ? "KIS_MINUTE_DATA_EMPTY_OR_INVALID" : undefined;
+      const responseResult = { ...result, ok: available, ...(error ? { error } : {}) };
+      let snapshotStored = true;
+      try {
+        await writeKisSignalSnapshot({ market, code, signalType: "us_minute_chart", status: available ? "AVAILABLE" : "UNAVAILABLE", payload: result.rows, rawPayload: result.rawText });
+      } catch {
+        snapshotStored = false;
+      }
+      return NextResponse.json({ ...responseResult, source: "KIS", market, mode: "minute", instrument: { code, name: company }, flowStatus: available ? "AVAILABLE" : "UNAVAILABLE", snapshot: { stored: snapshotStored }, ...(!snapshotStored ? { warning: "SIGNAL_SNAPSHOT_WRITE_FAILED" } : {}), collectedAt: new Date().toISOString() }, { status: available ? 200 : 502 });
     }
     if (url.searchParams.get("mode") === "daily") {
       const result = await fetchKisUsPeriodPrice({ code, market: exchange, period: (url.searchParams.get("period") as "0" | "1" | "2" | null) ?? "0", referenceDate: url.searchParams.get("toDate") ?? "", adjusted: "1" });
@@ -145,13 +192,46 @@ async function handleGet(request: Request) {
     return NextResponse.json({ ...result, source: "KIS", market: "KR", code: rawCode, instrument: { code: rawCode, name: company }, mode: "trade-participation", collectedAt: new Date().toISOString() }, { status: result.ok ? 200 : 502 });
   }
   if (url.searchParams.get("mode") === "minute") {
+    const interval = Number(url.searchParams.get("minute") ?? "1");
+    if (![1, 2, 3, 5, 10, 15, 30, 60].includes(interval)) return NextResponse.json({ ok: false, error: "INVALID_KR_MINUTE", expected: "1|2|3|5|10|15|30|60" }, { status: 400 });
+    const requestedExchange = url.searchParams.get("exchange")?.trim().toUpperCase() || null;
+    if (requestedExchange && !["KOSPI", "KOSDAQ"].includes(requestedExchange)) return NextResponse.json({ ok: false, error: "INVALID_KR_EXCHANGE", expected: "KOSPI|KOSDAQ" }, { status: 400 });
+    let eligibleMarkets: string[];
+    try {
+      const universe = await getPool().query<{ market: string }>(
+        `SELECT market FROM kr_common_stock_universe
+          WHERE code = $1 AND enabled = true AND instrument_type = 'COMMON_STOCK'
+            AND COALESCE(is_suspended, false) = false
+            AND COALESCE(trading_halt_code, '') NOT IN ('Y', '1')
+            AND COALESCE(liquidation_code, '') NOT IN ('Y', '1')
+            AND COALESCE(managed_issue_code, '') <> 'Y'
+            AND market IN ('KOSPI', 'KOSDAQ') AND ($2::text IS NULL OR market = $2)
+          ORDER BY market LIMIT 2`,
+        [rawCode, requestedExchange],
+      );
+      eligibleMarkets = [...new Set(universe.rows.map((row) => row.market).filter((value) => ["KOSPI", "KOSDAQ"].includes(value)))];
+    } catch {
+      return NextResponse.json({ ok: false, error: "COMMON_STOCK_UNIVERSE_UNAVAILABLE", eligibility: "FAIL_CLOSED" }, { status: 503 });
+    }
+    if (eligibleMarkets.length !== 1) {
+      const ambiguous = eligibleMarkets.length > 1;
+      return NextResponse.json({ ok: false, error: ambiguous ? "AMBIGUOUS_KR_EXCHANGE" : "KR_COMMON_STOCK_NOT_FOUND", eligibility: "FAIL_CLOSED" }, { status: 422 });
+    }
     const token = await getAccessToken();
     if (!token) return NextResponse.json({ ok: false, error: "KIS_TOKEN_UNAVAILABLE", source: "KIS", market: "KR", code: rawCode }, { status: 503 });
-    const interval = url.searchParams.get("minute") === "5" ? 5 : 1;
     const result = await fetchTimeItemChartPrice(token, rawCode, url.searchParams.get("hour") ?? "153000", url.searchParams.get("includePrevious") ?? "Y");
-    if (interval === 5) result.rows = aggregateDomesticMinuteRows(result.rows as Record<string, unknown>[], interval) as typeof result.rows;
-    await writeKisSignalSnapshot({ market: "KR", code: rawCode, signalType: "domestic_minute_chart", status: result.ok ? "AVAILABLE" : "UNAVAILABLE", payload: result.rows });
-    return NextResponse.json({ ...result, source: "KIS", market: "KR", code: rawCode, instrument: { code: rawCode, name: company }, mode: "minute", interval, collectedAt: new Date().toISOString() }, { status: result.ok ? 200 : 502 });
+    const validRows = (Array.isArray(result.rows) ? result.rows : []).filter((row) => isValidDomesticMinuteRow(row as Record<string, unknown>)) as Record<string, unknown>[];
+    const rows = interval > 1 ? aggregateDomesticMinuteRows(validRows, interval) : validRows;
+    const available = result.ok && rows.length > 0;
+    const error = result.ok && rows.length === 0 ? "KIS_MINUTE_DATA_EMPTY_OR_INVALID" : undefined;
+    const responseResult = { ...result, ok: available, rows, ...(error ? { error } : {}) };
+    let snapshotStored = true;
+    try {
+      await writeKisSignalSnapshot({ market: "KR", code: rawCode, signalType: "domestic_minute_chart", status: available ? "AVAILABLE" : "UNAVAILABLE", payload: rows });
+    } catch {
+      snapshotStored = false;
+    }
+    return NextResponse.json({ ...responseResult, source: "KIS", market: "KR", code: rawCode, instrument: { code: rawCode, name: company }, mode: "minute", interval, snapshot: { stored: snapshotStored }, ...(!snapshotStored ? { warning: "SIGNAL_SNAPSHOT_WRITE_FAILED" } : {}), collectedAt: new Date().toISOString() }, { status: available ? 200 : 502 });
   }
   if (url.searchParams.get("mode") === "daily-minute") {
     const requestedDate = url.searchParams.get("date");

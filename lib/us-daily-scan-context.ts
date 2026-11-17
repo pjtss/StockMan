@@ -27,7 +27,7 @@ export async function createUsDailyScanContext(options: { candleLimit?: number; 
   const candleLimit = Math.max(35, Math.floor(options.candleLimit ?? 100));
   const timeframe = options.timeframe ?? "D";
   const candlesStartedAt = performance.now();
-  const candles = await loadCachedUsDailyCandlesBulk(universe.scopes, candleLimit, timeframe).catch(() => new Map<string, UsDailyCandle[]>());
+  const candles = await loadCachedUsDailyCandlesBulk(universe.scopes, candleLimit, timeframe);
   const candlesMs = Math.round(performance.now() - candlesStartedAt);
   return {
     universe,

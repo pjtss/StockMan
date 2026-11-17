@@ -2,6 +2,7 @@ import { getAccessToken, refreshAccessToken } from "@/lib/kis";
 import { loadKisApiConfig } from "@/lib/kis-api-config";
 import { isKisTokenExpiredResponse } from "@/lib/kis-authorization";
 import { kisRequest } from "@/lib/kis-request-framework";
+import { isValidCompactCalendarDate } from "./calendar-date-quality.mjs";
 
 export type UsDailyPriceRequest = {
   code: string;
@@ -31,7 +32,7 @@ export type UsDailyPriceResponse = {
   request: { method: "GET"; url: string; headers: Record<string, string> };
   response: { rawText: string; parsed: unknown };
   candles: UsDailyCandle[];
-  diagnostics: { source?: string; httpStatus: number; kisOk: boolean; rtCd: string | null; msgCd: string | null; msg1: string | null; outputKey: string | null; rawOutputCount: number; parsedCandleCount: number; firstDate: string | null; lastDate: string | null };
+  diagnostics: { source?: string; httpStatus: number; kisOk: boolean; rtCd: string | null; msgCd: string | null; msg1: string | null; outputKey: string | null; rawOutputCount: number; parsedCandleCount: number; firstDate: string | null; lastDate: string | null; savedCandleCount?: number; discardedOrDuplicateCandleCount?: number; saveError?: string; cacheLookup?: "FAILED"; cacheLookupErrorName?: string };
 };
 
 const BASE_URL = "https://openapi.koreainvestment.com:9443";
@@ -43,29 +44,50 @@ function ascii(value: unknown, fallback = "") {
 }
 
 function number(value: unknown) {
-  const parsed = Number(String(value ?? "").replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+  const raw = String(value ?? "").trim();
+  if (!/^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)$/.test(raw)) return Number.NaN;
+  const parsed = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function optionalNumber(value: unknown) {
+  if (value == null || String(value).trim() === "") return null;
+  const parsed = number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function json(raw: string) {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+export function parseUsDailyPriceRows(output: unknown[]): UsDailyCandle[] {
+  return output.map((value: any) => ({
+    __raw: value,
+    date: String(value?.xymd ?? value?.stck_bsop_date ?? value?.bass_dt ?? value?.date ?? "").trim(),
+    open: number(value?.xopn ?? value?.open ?? value?.stck_oprc ?? value?.oprc),
+    high: number(value?.xhgh ?? value?.high ?? value?.stck_hgpr ?? value?.hgpr),
+    low: number(value?.xlow ?? value?.low ?? value?.stck_lwpr ?? value?.lwpr),
+    close: number(value?.xclo ?? value?.clos ?? value?.xprc ?? value?.last ?? value?.close ?? value?.stck_clpr ?? value?.clpr),
+    volume: number(value?.xvol ?? value?.tvol ?? value?.acml_vol ?? value?.volume),
+    tradingValue: optionalNumber(value?.tamt),
+    priceSign: value?.sign == null ? null : String(value.sign),
+    priceDiff: optionalNumber(value?.diff),
+    changeRate: optionalNumber(value?.rate),
+    raw: value,
+  })).filter((candle: UsDailyCandle) => {
+    const date = candle.date;
+    return isValidCompactCalendarDate(date)
+      && [candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+      && Math.min(candle.open, candle.high, candle.low, candle.close) > 0
+      && candle.volume >= 0
+      && candle.high >= Math.max(candle.open, candle.low, candle.close)
+      && candle.low <= Math.min(candle.open, candle.high, candle.close);
+  });
+}
+
 function parseCandles(parsed: any): UsDailyCandle[] {
   const output = Array.isArray(parsed?.output) ? parsed.output : Array.isArray(parsed?.output2) ? parsed.output2 : [];
-  return output.map((row: any) => ({
-    date: String(row.xymd ?? row.stck_bsop_date ?? row.bass_dt ?? row.date ?? "").trim(),
-    open: number(row.xopn ?? row.open ?? row.stck_oprc ?? row.oprc),
-    high: number(row.xhgh ?? row.high ?? row.stck_hgpr ?? row.hgpr),
-    low: number(row.xlow ?? row.low ?? row.stck_lwpr ?? row.lwpr),
-    close: number(row.xclo ?? row.clos ?? row.xprc ?? row.last ?? row.close ?? row.stck_clpr ?? row.clpr),
-    volume: number(row.xvol ?? row.tvol ?? row.acml_vol ?? row.volume),
-    tradingValue: row.tamt == null ? null : number(row.tamt),
-    priceSign: row.sign == null ? null : String(row.sign),
-    priceDiff: row.diff == null ? null : number(row.diff),
-    changeRate: row.rate == null ? null : number(row.rate),
-    raw: row,
-  })).filter((candle: UsDailyCandle) => candle.date && candle.close > 0);
+  return parseUsDailyPriceRows(output);
 }
 
 function dailyDiagnostics(parsed: any, status: number, candles: UsDailyCandle[]) {

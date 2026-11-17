@@ -20,11 +20,17 @@ export async function scanUsMinuteBollingerBands(options: { policy?: Partial<UsM
   const universe = await loadUsTopRisingScopes();
   const scopes = universe.scopes.filter((scope) => (scope.rank ?? 999) <= policy.topN && (scope.changeRate ?? 0) >= policy.minChangeRate);
   let persisted = { persisted: 0, markets: [] as string[] };
+  let universeSyncOk = true;
   try { persisted = await syncUsMinuteScanUniverse(scopes, policy.topN); }
-  catch (error) { console.warn("[US Minute] scan universe persistence unavailable:", error instanceof Error ? error.message : error); }
+  catch (error) { universeSyncOk = false; console.warn("[US Minute] scan universe persistence unavailable:", error instanceof Error ? error.message : error); }
   const results: UsMinuteBollingerResult[] = []; let cursor = 0; const concurrency = Math.max(1, Math.min(options.concurrency ?? 4, 8));
   async function worker() { while (true) { const scope = scopes[cursor++]; if (!scope) return; try { const response = await fetchUsMinuteTurnover({ code: scope.code, market: scope.market }); const points = [...(response?.points ?? [])].sort((a, b) => a.time.localeCompare(b.time)); const values = points.map((point) => point.price).filter((value) => Number.isFinite(value) && value > 0); const calculated = bands(values, policy.period, policy.stdDevMultiplier); const currentPrice = values.at(-1) ?? null; const qualifies = Boolean(calculated && currentPrice != null && currentPrice <= calculated.lower); results.push({ market: scope.market, code: scope.code, name: scope.name ?? "", rank: scope.rank ?? 0, changeRate: scope.changeRate ?? null, pointCount: values.length, currentPrice, middle: calculated?.middle ?? null, upper: calculated?.upper ?? null, lower: calculated?.lower ?? null, qualifies, status: !calculated ? "FAILED" : qualifies ? "QUALIFIED" : "NOT_TOUCHING", error: !calculated ? `insufficient valid 1-minute candles (${values.length}/${policy.period})` : undefined }); } catch (error) { results.push({ market: scope.market, code: scope.code, name: scope.name ?? "", rank: scope.rank ?? 0, changeRate: scope.changeRate ?? null, pointCount: 0, currentPrice: null, middle: null, upper: null, lower: null, qualifies: false, status: "FAILED", error: error instanceof Error ? error.message : String(error) }); } } }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, scopes.length)) }, worker));
   results.sort((a, b) => Number(b.qualifies) - Number(a.qualifies) || a.market.localeCompare(b.market) || a.rank - b.rank);
-  return { ok: universe.universe.ok, checkedAt: new Date().toISOString(), policy, universe: universe.universe, persistedUniverse: persisted, instrumentCount: scopes.length, successCount: results.filter((item) => item.status !== "FAILED").length, failureCount: results.filter((item) => item.status === "FAILED").length, qualified: results.filter((item) => item.qualifies), results };
+  const successCount = results.filter((item) => item.status !== "FAILED").length;
+  const failureCount = results.filter((item) => item.status === "FAILED").length;
+  const ok = universe.universe.ok === true && universe.universe.complete === true && universeSyncOk && failureCount === 0;
+  const universeAvailable = universe.universe.ok === true && universe.universe.complete === true;
+  const status = !universeAvailable || !universeSyncOk || (results.length > 0 && successCount === 0) ? "FAILED" : ok ? "COMPLETED" : "PARTIAL";
+  return { ok, status, universeAvailable, universeSyncOk, checkedAt: new Date().toISOString(), policy, universe: universe.universe, persistedUniverse: persisted, instrumentCount: scopes.length, successCount, failureCount, qualified: results.filter((item) => item.qualifies), results };
 }

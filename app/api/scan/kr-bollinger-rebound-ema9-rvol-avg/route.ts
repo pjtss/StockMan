@@ -45,7 +45,7 @@ export async function GET() {
       const rebound = touchedLower && latestBand ? { qualifies: Number(latest?.close) >= latestBand.lower, state: "LOWER_TOUCH_THEN_REBOUND" as const } : { qualifies: false, state: "NO_REBOUND" as const };
       const rvolAverage = recentRvolAverage(candles, 5);
       if (!latest || !latestBand || ema9 === null || !rebound.qualifies || !(Number(latest.low) <= ema9 && ema9 <= Number(latest.high)) || rvolAverage === null || rvolAverage < 1) continue;
-      results.push({ market: item.market, code: item.code, name: item.name, candleDate: latest.date, reboundState: rebound.state, ema9: Number(ema9.toFixed(4)), rvolAverage: Number(rvolAverage.toFixed(4)), lowerBand: latestBand.lower });
+      results.push({ market: item.market, code: item.code, name: item.name, marketCap: item.marketCap, fundamentalObservedAt: item.fundamentalObservedAt ?? null, fundamentalFetchedAt: item.fundamentalUpdatedAt, candleDate: latest.date, reboundState: rebound.state, ema9: Number(ema9.toFixed(4)), rvolAverage: Number(rvolAverage.toFixed(4)), lowerBand: latestBand.lower });
     }
     results.sort((a, b) => b.rvolAverage - a.rvolAverage || a.code.localeCompare(b.code));
     return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });

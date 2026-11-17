@@ -2,6 +2,7 @@ import { type UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { getUsDailyObvSignalPolicy } from "@/lib/automation-settings";
 import { analyzeUsObvSignal, calculateUsObvSeries } from "@/lib/us-obv-signal";
+import { summarizeUsDailyScanFailures } from "@/lib/us-daily-scan-failure-reasons";
 
 export async function scanStoredUsDailyObv(options: { lookback?: number; signalPeriod?: number; signalAboveDays?: number; signalCrossLookback?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const lookback = Math.max(3, Math.floor(options.lookback ?? 5));
@@ -19,9 +20,9 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
     const item = instruments[cursor++];
     try {
       const prefetched = cachedCandles.get(`${item.market}:${item.code}`) ?? [];
-      const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : { ok: false, status: 0, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: prefetched?.length ?? 0 } };
+      const daily = prefetched && prefetched.length >= lookback * 2 + 1 ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } } : { ok: false, status: 200, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", cacheLookup: "AVAILABLE", parsedCandleCount: prefetched?.length ?? 0 } };
       const candles = daily?.candles ?? [];
-      if (!daily?.ok || candles.length < lookback * 2 + 1) { results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, obvSignal: null, signalGap: null, aboveSignalDays: 0, signalAbove: false, signalCrossedRecently: false, rising: false, qualifies: false, error: !daily ? "DB daily candles unavailable (0)" : !daily.ok ? `DB daily candles unavailable (${candles.length})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
+      if (!daily?.ok || candles.length < lookback * 2 + 1) { const error = candles.length === 0 ? "no cached daily candles" : !daily.ok ? `insufficient daily candles (${candles.length}/${lookback * 2 + 1})` : `insufficient parsed candles (${candles.length}/${lookback * 2 + 1})`; results.push({ market: item.market, code: item.code, name: item.name, candleCount: candles.length, obv: null, recentObv: null, priorObv: null, change: null, obvSignal: null, signalGap: null, aboveSignalDays: 0, signalAbove: false, signalCrossedRecently: false, rising: false, qualifies: false, error, dailyDiagnostics: daily?.diagnostics ?? null }); continue; }
       const ordered = [...candles].sort((a, b) => a.date.localeCompare(b.date));
       const recent = ordered.slice(-lookback);
       const obvSeries = calculateUsObvSeries(ordered);
@@ -29,10 +30,12 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
       const recentStartIndex = Math.max(0, obvSeries.length - lookback);
       const recentObv = obvSeries.at(-1)?.obv ?? null;
       const priorObv = obvSeries[recentStartIndex - 1]?.obv ?? null;
-      const change = recentObv !== null && priorObv !== null ? recentObv - priorObv : null;
+      const rawChange = recentObv !== null && priorObv !== null ? recentObv - priorObv : null;
+      const change = rawChange !== null && Number.isFinite(rawChange) ? rawChange : null;
       const risingBars = recent.slice(1).filter((candle, i) => candle.close > recent[i].close).length;
       const risingBarRate = risingBars / Math.max(1, recent.length - 1);
       const rising = change !== null && change > 0 && signal.aboveSignal && signal.crossedRecently;
+      const error = change === null ? "OBV change could not be calculated" : undefined;
       results.push({
         market: item.market,
         code: item.code,
@@ -58,6 +61,7 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
         date: ordered.at(-1)?.date ?? null,
         rising,
         qualifies: rising,
+        error,
         dailyDiagnostics: daily.diagnostics,
         rawText: daily.response.rawText || undefined,
       });
@@ -65,5 +69,6 @@ export async function scanStoredUsDailyObv(options: { lookback?: number; signalP
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 1, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.change ?? -Infinity) - (a.change ?? -Infinity));
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, lookback, signalPeriod, signalAboveDays, signalCrossLookback, qualification: "recent OBV > previous OBV AND OBV is above EMA signal for the configured consecutive days AND a recent golden cross occurred", instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, qualified: results.filter((x) => x.qualifies), qualifiedCount: results.filter((x) => x.qualifies).length, results };
+  const failureReasons = summarizeUsDailyScanFailures(results.filter((item) => item.change == null));
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, lookback, signalPeriod, signalAboveDays, signalCrossLookback, qualification: "recent OBV > previous OBV AND OBV is above EMA signal for the configured consecutive days AND a recent golden cross occurred", instrumentCount: instruments.length, successCount: results.filter((x) => x.change !== undefined && x.change !== null).length, failureCount: results.filter((x) => x.change === undefined || x.change === null).length, failureReasons, qualified: results.filter((x) => x.qualifies), qualifiedCount: results.filter((x) => x.qualifies).length, results };
 }

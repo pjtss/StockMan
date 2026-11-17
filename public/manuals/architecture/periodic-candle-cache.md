@@ -1,0 +1,55 @@
+# 국내·해외 일·주·월봉 캐시 운영 설계
+
+상태: 구현 완료·운영 중  
+최종 검증: 2026-08-26 로컬 DB 캐시 및 자동화 실행 이력 확인
+
+## 운영 목표
+
+국내·해외 유니버스를 기준으로 KIS 봉 데이터를 DB에 캐시하고, 탐지 API는 KIS를 직접 반복 호출하지 않고 `us_instrument_universe_candles`, `kr_instrument_universe_candles`만 읽는다.
+
+| 데이터 | 목표 갱신 주기 | 당일/최근 봉 | 알림 |
+|---|---:|---|---|
+| 일봉 | 1시간 freshness 판정 | 당일 포함 | 자동화 완료 요약 |
+| 주봉 | 24시간 freshness 판정 | 최신 저장 봉 포함 | 자동화 완료 요약에 포함 |
+| 월봉 | 24시간 freshness 판정 | 최신 저장 봉 포함 | 자동화 완료 요약에 포함 |
+
+## 실행 흐름
+
+```text
+OCI cron tick
+  ↓
+DB feature_module_settings에서 활성·시간창·간격 조회
+  ↓
+timeframe별 마지막 성공 실행 시각 확인
+  ↓ (기한이 지난 timeframe만)
+기한이 지난 국내·해외 유니버스 배치 조회
+  ↓
+KIS 응답을 timeframe별 캐시 테이블에 upsert
+  ↓
+종목별 성공·실패·원인·소요시간 이력 저장
+  ↓
+하루 1회 누적 결과 요약을 Discord webhook으로 전송
+```
+
+## 데이터 무결성 규칙
+
+- 일·주·월봉은 `(market, code, timeframe, candle_date)`를 고유 키로 사용한다.
+- 당일 또는 최신 미완성 봉도 저장한다. 동일 날짜가 다시 오면 upsert한다.
+- KIS 실패 시 기존 캐시를 삭제하지 않는다.
+- 실패 종목은 실행 이력에 원본 상태 코드와 오류 원인을 저장한다.
+- 알림 실패는 캐시 성공과 분리하여 재전송 이력으로 관리한다.
+
+## 현재 구현 및 남은 작업
+
+- 신규 유니버스 적재·무결성 디버깅 API: 완료
+- 유니버스 기반 일·주·월봉 캐시 테이블: 구현 완료 (`V67`)
+- 운영 검증: 국내 유니버스는 `KOSPI`·`KOSDAQ` 시장 코드로 저장하며, 캐시 현황은 `market`별로 검증한다.
+- 일봉 캐시 자동화: `D` 1시간, `W` 24시간, `M` 24시간 freshness 판정
+- 주봉·월봉 timeframe별 독립 간격 판정: 구현 완료 (`fetched_at` 기준)
+- 하루 1회 캐시 결과 Discord 요약: 구현 완료 (DB dedupe)
+
+현재 탐지와 캐시는 `*_instrument_universe` 및 `*_instrument_universe_candles`만 사용한다.
+
+## 검증 API
+
+`GET /api/admin/instrument-universe-debug`는 유니버스 건수·시장별 분포·중복·최근 동기화 이력을 반환한다. 캐시 작업 결과는 `automation_runs`와 각 캐시 테이블의 `fetched_at`을 함께 대조한다.

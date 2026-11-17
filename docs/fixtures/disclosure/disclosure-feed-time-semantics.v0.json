@@ -1,0 +1,66 @@
+{
+  "contractVersion": "disclosure-feed-time-semantics.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "displayTimezone": "Asia/Seoul",
+  "timeFields": ["publishedAt", "filedAt", "fetchedAt", "storedAt", "sortBasis", "precision", "sourceTimezone"],
+  "sortBasis": ["PUBLISHED_INSTANT", "FILED_DATE", "VERIFIED_FETCH_INSTANT", "UNKNOWN"],
+  "vectors": [
+    {
+      "id": "DFT-01-KST-MIDNIGHT-DERIVES-TODAY-INDEPENDENT-OF-UTC-DATE",
+      "input": { "now": "2026-11-03T15:00:00Z", "hostTimezone": "UTC", "userTimezone": "Asia/Seoul" },
+      "expected": { "defaultDate": "2026-11-04", "displayTimezone": "Asia/Seoul", "utcIsoSliceAccepted": false }
+    },
+    {
+      "id": "DFT-02-INSTANT-BEFORE-KST-MIDNIGHT-BELONGS-TO-PRIOR-DAY",
+      "input": { "publishedAt": "2026-11-03T14:59:59Z" },
+      "expected": { "kSTDisplay": "2026-11-03 23:59:59", "sortBasis": "PUBLISHED_INSTANT" }
+    },
+    {
+      "id": "DFT-03-EXPLICIT-DATE-USES-KST-HALF-OPEN-DAY",
+      "input": { "date": "2026-11-04" },
+      "expected": { "from": "2026-11-03T15:00:00Z", "toExclusive": "2026-11-04T15:00:00Z", "queryKind": "KST_CALENDAR_DAY" }
+    },
+    {
+      "id": "DFT-04-ROLLING-HOURS-REMAINS-INSTANT-WINDOW",
+      "input": { "hours": 6, "now": "2026-11-03T15:00:00Z" },
+      "expected": { "from": "2026-11-03T09:00:00Z", "to": "2026-11-03T15:00:00Z", "queryKind": "ROLLING_HOURS" }
+    },
+    {
+      "id": "DFT-05-DATE-ONLY-FILING-DOES-NOT-INVENT-MIDNIGHT",
+      "input": { "filedAt": "2026-11-04", "precision": "DATE" },
+      "expected": { "filedAt": "2026-11-04", "instant": null, "sortBasis": "FILED_DATE", "uiLabel": "접수일만 확인" }
+    },
+    {
+      "id": "DFT-06-UPDATED-AT-IS-STORED-TIME-NOT-FETCH-TIME",
+      "input": { "storedAt": "2026-11-04T12:00:00Z", "sourceFetchAt": null },
+      "expected": { "fetchedAt": null, "sortBasis": "UNKNOWN", "freshness": "UNKNOWN" }
+    },
+    {
+      "id": "DFT-07-MISSING-PUBLISHED-INSTANT-USES-ONLY-VERIFIED-FALLBACK",
+      "input": { "publishedAt": null, "filedAt": null, "sourceFetchAt": null, "storedAt": "2026-11-04T12:00:00Z" },
+      "expected": { "sortBasis": "UNKNOWN", "storedAtUsedAsFetch": false }
+    },
+    {
+      "id": "DFT-08-ORDERING-IS-STABLE-FOR-EQUAL-TIME-AND-BASIS",
+      "input": { "items": [{ "source": "SRC-B", "externalId": "ID-2" }, { "source": "SRC-A", "externalId": "ID-1" }] },
+      "expected": { "tieBreak": "source+externalId", "stable": true }
+    },
+    {
+      "id": "DFT-09-TRANSLATION-OR-ROW-UPDATE-DOES-NOT-CHANGE-SOURCE-TIME",
+      "input": { "publishedAt": "2026-11-04T01:00:00Z", "translationUpdatedAt": "2026-11-04T12:00:00Z" },
+      "expected": { "sortBasis": "PUBLISHED_INSTANT", "orderUsesTranslationUpdatedAt": false }
+    },
+    {
+      "id": "DFT-10-DATE-AND-HOUR-MODE-RETURN-DISTINCT-WINDOW-METADATA",
+      "input": { "modes": ["date", "hours"] },
+      "expected": { "dateKind": "KST_CALENDAR_DAY", "hoursKind": "ROLLING_HOURS", "displayTimezone": "Asia/Seoul" }
+    }
+  ]
+}

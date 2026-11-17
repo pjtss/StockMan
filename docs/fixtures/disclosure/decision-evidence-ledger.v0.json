@@ -1,0 +1,18 @@
+{
+  "contractVersion": "decision-evidence-ledger.v0",
+  "classification": "APPEND_ONLY_DECISION_EVIDENCE_LEDGER_WITH_HASH_CHAIN",
+  "dataPolicy": {
+    "containsCredentials": false,
+    "containsPersonalContactData": false,
+    "containsOperationalDecisionEvidence": true,
+    "namedOwnersAndReviewersUseStablePersonIds": true
+  },
+  "hashContract": {
+    "canonicalization": "RFC8785-JCS",
+    "domainSeparator": "KR-DISCLOSURE-DECISION-LEDGER-RECORD-v1",
+    "firstPreviousRecordHash": null,
+    "chainScope": "GLOBAL_APPEND_ORDER"
+  },
+  "chainTailHash": null,
+  "entries": []
+}

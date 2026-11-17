@@ -70,16 +70,16 @@ PostgreSQL + Flyway / process memory / external providers
 | 영역 | 위치 | 입력 | 출력/책임 | 경계 |
 |---|---|---|---|---|
 | 페이지 | `app/**/page.tsx` | URL·세션 | 페이지 조립 | 직접 장시간 수집 금지 |
-| 레이아웃 | `app/layout.tsx`, `app/admin/layout.tsx` | 공통 세션/UI | 공통 셸 | 도메인 쿼리 금지 |
+| 레이아웃 | `app/layout.tsx` | 공통 세션/UI | 공통 셸 | 도메인 쿼리 금지 |
 | API | `app/api/**/route.ts` | Request/query/body | 검증된 service 결과 | route는 얇게 유지 |
 | cron | `app/api/cron/**` | secret·실행 요청 | automation 결과 | 실제 작업은 lib job |
-| 관리자/디버그 | `app/api/admin/**`, `app/api/internal/**` | 관리자 권한 | 진단 DTO | 비밀 원문 금지 |
+| 내부 API | `app/api/internal/**` | 내부 secret | 제한된 내부 DTO | 비밀 원문 금지 |
 
 라우트 순서는 입력 파싱 → 권한/secret → validation → application service → 표준 응답이다. route 안에서 토큰 발급·retry·throttle·종목 전체 순회를 직접 구현하지 않는다.
 
 ### 4.2 UI·클라이언트 컴포넌트
 
-대표 파일군은 `components/chart-*`, `components/*dashboard*`, `components/page-navigation.tsx`, `components/admin-*`, `components/*scanner*`다.
+대표 파일군은 `components/chart-*`, `components/*dashboard*`, `components/page-navigation.tsx`, `components/*scanner*`다.
 
 | 허용 책임 | 금지 책임 |
 |---|---|
@@ -142,7 +142,7 @@ raw response → mapper → domain DTO
 
 `instrument-fundamentals.ts`는 활성 국내·해외 유니버스의 현재가 기본정보 스냅샷 갱신 application service다. 종목 주수는 KIS 상세시세만 사용한다. 국내 `inquire-price`의 `output.lstn_stcn`과 해외 `/uapi/overseas-price/v1/quotations/price-detail`의 `output.shar`를 `listedShares`로 정규화해 스냅샷·이력의 `listed_shares`에 저장한다. 타 출처 발행/유통주식수와 free-float 값은 종목 주수 필드로 사용하지 않는다. 미국 소형주 SEC 주식수 전용 동기화·공개 API·보고서 기능은 V149에서 테이블을 제거하고 앱 경로를 삭제했다. OCI cron이 `/api/cron/instrument-fundamentals`를 호출하며 자동 갱신 간격은 86,400초(24시간)로 고정한다. 갱신 값은 최대 200행 단위의 bounded queue를 통해 이력과 최신 스냅샷에 같은 DB transaction으로 저장한다. 해외 종목을 최신 스냅샷으로 저장할 때는 `kis-us-price-detail`의 프로세스/DB TTL 캐시와 stale fallback을 우회하고 KIS 재조회를 요구한다. 유효하지 않은(누락·0 이하) 가격은 실패로 계수하고 기존 최신 스냅샷을 덮지 않는다. 전체 갱신 외에 활성 유니버스에서 확인되는 `(market, code)` 범위만 지정하는 targeted retry를 지원하며, 빈 범위나 비활성/미등록 종목이 섞인 요청은 외부 API 호출 전에 거부한다. 진행 이벤트와 최종 결과에는 wall elapsed, 동시 fetch 호출시간 합계, DB transaction 시간 합계, writer 시작 전 queue 대기시간 합계(큐 포화 backpressure 포함) 및 처리율을 노출한다. fetch/DB/queue 시간은 동시 작업 구간이 겹칠 수 있어 서로 더해 총 wall time으로 해석하지 않는다. 시장별 fetch 시간은 합계로 제공한다. 결과에는 시장별 대상·수집·저장·실패 수와 제한된 실패 샘플을 포함한다. 이 동작은 `lib/instrument-fundamentals.test.ts`, `lib/bounded-write-queue.test.ts`와 `lib/kis-us-price-detail.test.ts`의 회귀 테스트로 고정한다.
 
-스케줄러는 `withAutomationRun`을 통해 최종 결과를 `automation_runs.summary`에 저장한다. 관리자 `/admin/observability` 실행 상세는 `instrument-fundamentals` 전용으로 단계별 성능을 사람이 읽는 카드로 표시하고 원본 요약 JSON도 유지한다. summary compaction은 이 성능 객체의 숫자 필드를 보존한다.
+스케줄러는 `withAutomationRun`을 통해 최종 결과를 `automation_runs.summary`에 저장한다. `automation_runs.summary`에는 실행 결과와 성능 요약 JSON을 보존한다. 현재 관리자 화면은 없으며 요약은 내부 저장·진단 용도다.
 
 `instrument-universe-import.ts`는 해외 보통주/특수상품 간 기존 DB 행을 현재 판별 규칙으로 미리보기 및 원자적 재분류할 수 있다. 운영 스크립트는 localhost DB만 허용하고 dry-run을 기본값으로 하며, 실제 적용 시 양방향 예상 이동 수를 모두 지정해야 한다. 이동 결과는 destination upsert와 source 비활성화를 한 transaction으로 처리하며, 사후 dry-run 0건을 확인한다.
 

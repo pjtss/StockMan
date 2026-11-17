@@ -11,8 +11,7 @@ on_error() {
     systemctl start stockman-cron.timer stockman-rss.timer stockman-fundamentals.timer || true
   fi
   if [ "$stage" = "service-restart" ]; then
-    systemctl --no-pager --full status stockman.service stockman-cron.timer >&2 || true
-    journalctl --no-pager -u stockman.service -n 40 >&2 || true
+    collect_service_diagnostics
   fi
   exit "$code"
 }
@@ -22,6 +21,42 @@ DEPLOY_PATH="${1:?deployment path is required}"
 RELEASE="${2:?release archive is required}"
 TEMP_PATH="${DEPLOY_PATH}.incoming"
 
+on_exit() {
+  local code=$?
+  trap - EXIT
+  if [ ! -e "$DEPLOY_PATH" ] && [ ! -L "$DEPLOY_PATH" ] \
+    && { [ -e "$DEPLOY_PATH.previous" ] || [ -L "$DEPLOY_PATH.previous" ]; }; then
+    echo "current release path is missing; restoring previous release" >&2
+    if ! mv "$DEPLOY_PATH.previous" "$DEPLOY_PATH"; then
+      echo "previous release restoration failed after interrupted activation" >&2
+      code=1
+    fi
+  fi
+  if { [ -e "$DEPLOY_PATH" ] || [ -L "$DEPLOY_PATH" ]; } \
+    && { [ -e "$TEMP_PATH" ] || [ -L "$TEMP_PATH" ]; }; then
+    if ! rm -rf "$TEMP_PATH"; then
+      echo "failed release staging directory cleanup: $TEMP_PATH" >&2
+      code=1
+    fi
+  fi
+  exit "$code"
+}
+trap on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [ ! -e "$DEPLOY_PATH" ] && [ ! -L "$DEPLOY_PATH" ] \
+  && { [ -e "$DEPLOY_PATH.previous" ] || [ -L "$DEPLOY_PATH.previous" ]; }; then
+  echo "recovering previous release before deployment preflight" >&2
+  mv "$DEPLOY_PATH.previous" "$DEPLOY_PATH"
+fi
+
+stage="validate-archive"
+if ! tar -tzf "$RELEASE" >/dev/null; then
+  echo "release archive is invalid or incomplete" >&2
+  exit 1
+fi
 rm -rf "$TEMP_PATH"
 mkdir -p "$TEMP_PATH"
 stage="extract-release"
@@ -40,26 +75,27 @@ fi
 if [ -d "$DEPLOY_PATH/public/_next/static" ] && [ -d "$TEMP_PATH/public/_next/static" ]; then
   cp -rn "$DEPLOY_PATH/public/_next/static/." "$TEMP_PATH/public/_next/static/"
 fi
+stage="flyway-preflight"
 if ! command -v docker >/dev/null 2>&1; then
-  echo "docker is required for the Flyway migration container but was not found on OCI" >&2
+  echo "stockman-activate failed: stage=${stage}: docker is required for the Flyway migration container but was not found on OCI" >&2
   exit 1
 fi
 if [ ! -f /etc/stockman/stockman.env ]; then
-  echo "/etc/stockman/stockman.env is required for Flyway DATABASE_URL" >&2
+  echo "stockman-activate failed: stage=${stage}: /etc/stockman/stockman.env is required for Flyway DATABASE_URL" >&2
   exit 1
 fi
 set -a
 # shellcheck disable=SC1091
 . /etc/stockman/stockman.env
 set +a
-: "${DATABASE_URL:?DATABASE_URL is required for Flyway}"
+: "${DATABASE_URL:?stage=flyway-preflight DATABASE_URL is required for Flyway}"
 FLYWAY_IMAGE="${FLYWAY_IMAGE:-flyway/flyway:latest}"
 DB_URL_WITHOUT_SCHEME="${DATABASE_URL#postgresql://}"
 DB_URL_WITHOUT_SCHEME="${DB_URL_WITHOUT_SCHEME#postgres://}"
 DB_AUTH="${DB_URL_WITHOUT_SCHEME%@*}"
 DB_HOST_AND_NAME="${DB_URL_WITHOUT_SCHEME#*@}"
 if [ "$DB_AUTH" = "$DB_URL_WITHOUT_SCHEME" ] || [ -z "$DB_AUTH" ] || [ -z "$DB_HOST_AND_NAME" ]; then
-  echo "DATABASE_URL must include PostgreSQL credentials for Flyway" >&2
+  echo "stockman-activate failed: stage=${stage}: DATABASE_URL must include PostgreSQL credentials for Flyway" >&2
   exit 1
 fi
 FLYWAY_USER="${DB_AUTH%%:*}"
@@ -139,9 +175,23 @@ if [ -f "$TEMP_PATH/data/market-impact-events.json" ]; then
 fi
 rm -f "$RELEASE"
 stage="activate-files"
-rm -rf "$DEPLOY_PATH.previous"
-if [ -d "$DEPLOY_PATH" ]; then mv "$DEPLOY_PATH" "$DEPLOY_PATH.previous"; fi
-mv "$TEMP_PATH" "$DEPLOY_PATH"
+had_previous_release=0
+if [ -e "$DEPLOY_PATH" ] || [ -L "$DEPLOY_PATH" ]; then
+  rm -rf "$DEPLOY_PATH.previous"
+  mv "$DEPLOY_PATH" "$DEPLOY_PATH.previous"
+  had_previous_release=1
+fi
+if mv "$TEMP_PATH" "$DEPLOY_PATH"; then
+  :
+else
+  move_error=$?
+  if [ "$had_previous_release" -eq 1 ] && [ ! -e "$DEPLOY_PATH" ]; then
+    if ! mv "$DEPLOY_PATH.previous" "$DEPLOY_PATH"; then
+      echo "release activation failed and previous release could not be restored" >&2
+    fi
+  fi
+  exit "$move_error"
+fi
 chown -R stockman:stockman "$DEPLOY_PATH"
 stage="service-restart"
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.service" /etc/systemd/system/stockman-cron.service
@@ -166,12 +216,21 @@ timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-fundamenta
 timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-cron.service
 timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-fundamentals.service
 for attempt in $(seq 1 60); do
-  if systemctl is-active --quiet stockman.service; then break; fi
+  if systemctl is-active --quiet stockman.service && probe_stockman_health; then break; fi
   if [ "$attempt" -eq 60 ]; then
-    systemctl --no-pager --full status stockman.service >&2 || true
+    if systemctl is-active --quiet stockman.service; then
+      echo "stockman.service is active but GET /api/health did not return HTTP 200 within 60 attempts" >&2
+    else
+      echo "stockman.service did not become active within 60 attempts" >&2
+    fi
+    collect_service_diagnostics
     exit 1
   fi
-  sleep 2
+  # /api/health checks schema and automation history on every request. Back
+  # off between failures to avoid repeatedly querying the database while it is
+  # still recovering, while retaining a short first retry for normal startup.
+  retry_delay=$((attempt < 6 ? attempt * 2 : 10))
+  sleep "$retry_delay"
 done
 systemctl is-active --quiet stockman-cron.timer
 systemctl is-active --quiet stockman-rss.timer

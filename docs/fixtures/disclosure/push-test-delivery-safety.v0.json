@@ -1,0 +1,20 @@
+{
+  "contractVersion": "push-test-delivery-safety.v0",
+  "classification": "SYNTHETIC_OPERATIONAL_DESIGN_FIXTURES_NOT_RUNTIME_OR_DEPLOYMENT_PROOF",
+  "dataPolicy": { "containsRealUser": false, "containsRealEndpoint": false, "containsCredentials": false, "identitiesAreSynthetic": true },
+  "executionStages": ["AUTHORIZATION", "CSRF_IF_COOKIE_AUTH", "ACTOR_RATE_LIMIT", "OWNER_TARGET_RESOLUTION", "PREFERENCE_CHECK", "TEST_PAYLOAD_RENDER", "SCOPED_DISPATCH", "APPEND_ONLY_AUDIT"],
+  "requiredDispatchFields": ["requestId", "actorScope", "targetScope", "recipientCount", "payloadHash", "attemptState", "createdAt"],
+  "deploymentEvidenceStates": ["PRESENT_AND_VERIFIED", "MISSING", "UNVERIFIED"],
+  "vectors": [
+    { "id": "PTDS-01-AUTHORIZATION-PRECEDES-DB-AND-SENDER-SIDE-EFFECTS", "input": { "actor": "ANONYMOUS", "routeAuthorization": "MISSING", "ensureSchemaBeforeAuth": true }, "expected": { "dispatch": false, "schemaWork": false, "requiredOrder": ["AUTHORIZATION", "DB_ACCESS", "DISPATCH"] } },
+    { "id": "PTDS-02-USER-TEST-REQUIRES-VERIFIABLE-ENDPOINT-OWNER-BINDING", "input": { "actor": "USER-A", "requestedEndpointOwner": null, "subscriptionSchemaHasOwnerId": false }, "expected": { "dispatch": false, "reason": "OWNER_BINDING_UNAVAILABLE", "selfServiceMode": "BLOCKED_UNTIL_OWNER_LINK" } },
+    { "id": "PTDS-03-USER-TEST-NEVER-USES-ALL-ENDPOINT-BROADCAST-LOADER", "input": { "authorizedOwner": "USER-A", "ownedEndpointCount": 1, "globalEndpointCount": 12, "senderTargetMode": "ALL_ENDPOINTS" }, "expected": { "dispatch": false, "allowedTargetCount": 1, "globalBroadcast": false } },
+    { "id": "PTDS-04-ADMIN-TEST-USES-AN-EXPLICIT-BOUNDED-TARGET-SET", "input": { "actorRole": "ADMIN", "requestedTargetCount": 12, "approvedTestTargetCount": 2, "recipientCap": 2 }, "expected": { "dispatchTargets": 2, "excessTargets": "REJECTED", "ordinaryUserTargetsImplicit": false } },
+    { "id": "PTDS-05-REPEATED-TEST-REQUESTS-ARE-RATE-LIMITED-AND-AUDITED", "input": { "actorScope": "ADMIN", "requestsInWindow": 4, "approvedLimit": 2, "policyRevision": "POLICY-SYN-1" }, "expected": { "overLimitDispatch": false, "limitOutcomeRecorded": true, "policyRevisionRecorded": true } },
+    { "id": "PTDS-06-COOKIE-AUTHENTICATED-POST-REQUIRES-CSRF-DEFENSE", "input": { "authentication": "COOKIE", "origin": null, "csrfTokenValid": false }, "expected": { "dispatch": false, "reason": "CSRF_REJECTED" } },
+    { "id": "PTDS-07-AUDIT-IS-RECONCILABLE-WITHOUT-RAW-ENDPOINT-OR-CREDENTIALS", "input": { "attemptState": "PROVIDER_ACCEPTED", "rawEndpointIncluded": true, "authKeyIncluded": true }, "expected": { "rawEndpointPersisted": false, "credentialPersisted": false, "targetHashAndRequestIdPresent": true, "providerAcceptedMeansDeviceReceipt": false } },
+    { "id": "PTDS-08-REPOSITORY-ROUTE-FACTS-DO-NOT-PROVE-DEPLOYMENT-REACHABILITY", "input": { "routeAuthorization": "MISSING", "middlewareAuthorization": "MISSING", "repoIngressRule": "NOT_FOUND", "deploymentAccountEvidence": "MISSING" }, "expected": { "codePathProtection": "ABSENT", "externalReachability": "UNVERIFIED", "deploymentProtectionClaim": false } },
+    { "id": "PTDS-09-TEST-PAYLOAD-IS-DISTINCT-FROM-REAL-DART-INVESTMENT-ALERT", "input": { "testMode": true, "positiveGrade": "최강호재", "realIssuer": "SYNTH-ISSUER", "filingTitle": "SYNTH-FILING" }, "expected": { "clearlyMarkedTest": true, "positiveSignalImplied": false, "realFilingDetailsIncluded": false } },
+    { "id": "PTDS-10-AMBIGUOUS-OR-EMPTY-TARGET-SET-FAILS-CLOSED", "input": { "actorAuthorized": true, "targetResolution": "AMBIGUOUS", "recipientCount": 0 }, "expected": { "dispatch": false, "reason": "TARGET_SCOPE_UNRESOLVED", "fallbackToAll": false } }
+  ]
+}

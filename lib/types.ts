@@ -58,6 +58,8 @@ export interface PushSubscriptionRecord {
   dartEnabled?: boolean;
   intensityEnabled?: boolean;
   risingEnabled?: boolean;
+  previewMode?: "GENERIC" | "DETAILED";
+  preferenceRevision?: number;
 }
 
 export interface PushDebugStatus {
@@ -68,12 +70,12 @@ export interface PushDebugStatus {
   currentDeviceSaved?: boolean;
   endpoint?: string;
   lastSaved?: string;
-  savedCount?: number;
-  latestUserAgent?: string;
   actionRequired?: boolean;
   enabled?: boolean;
   dartEnabled?: boolean;
   intensityEnabled?: boolean;
   risingEnabled?: boolean;
+  previewMode?: "GENERIC" | "DETAILED";
+  preferenceRevision?: number;
   error?: string;
 }

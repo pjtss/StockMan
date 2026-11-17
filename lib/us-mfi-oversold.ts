@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { usInstrumentUniverse } from "@/lib/schema";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestMfi } from "@/lib/us-mfi";
+import { summarizeUsDailyScanFailures } from "@/lib/us-daily-scan-failure-reasons";
 import { getMfiThreshold } from "@/lib/automation-settings";
 import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
@@ -58,16 +59,17 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
         const prefetched = cachedCandles.get(`${instrument.market}:${instrument.code}`) ?? [];
         const daily = prefetched && prefetched.length >= period + 1
           ? { ok: true, status: 200, candles: prefetched, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: prefetched.length } }
-          : { ok: false, status: 0, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: prefetched?.length ?? 0 } };
+          : { ok: false, status: 200, candles: prefetched ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", cacheLookup: "AVAILABLE", parsedCandleCount: prefetched?.length ?? 0 } };
         if (!daily?.ok) {
           const parsed = daily?.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown; output2?: unknown } | null;
-          results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: daily?.candles.length ?? 0, qualifies: false, error: `daily price API failed (${daily?.status ?? 0})`, httpStatus: daily?.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });
+          const candleCount = daily?.candles.length ?? 0;
+          results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount, qualifies: false, error: candleCount === 0 ? "no cached daily candles" : `insufficient daily candles (${candleCount}/${period + 1})`, httpStatus: daily?.status, dailyDiagnostics: daily?.diagnostics, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0, rawText: daily?.response.rawText.slice(0, 1000) ?? null });
           continue;
         }
         const latest = latestMfi(daily.candles, period);
-        if (!latest) {
+        if (!latest || !Number.isFinite(latest.value)) {
           const parsed = daily.response.parsed as { rt_cd?: unknown; msg_cd?: unknown; msg1?: unknown; output?: unknown; output2?: unknown } | null;
-          results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: `fewer than ${period + 1} daily candles`, httpStatus: daily.status, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0 });
+          results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: null, mfiDate: null, candleCount: daily.candles.length, qualifies: false, error: !latest ? `fewer than ${period + 1} daily candles` : "MFI calculation returned non-finite value", httpStatus: daily.status, dailyDiagnostics: daily.diagnostics, rtCd: parsed?.rt_cd ?? null, msgCd: parsed?.msg_cd ?? null, msg1: parsed?.msg1 ?? null, rawOutputCount: Array.isArray(parsed?.output) ? parsed.output.length : Array.isArray(parsed?.output2) ? parsed.output2.length : 0 });
           continue;
         }
         results.push({ market: instrument.market, code: instrument.code, name: instrument.name ?? "", mfi: latest.value, mfiDate: latest.date, candleCount: daily.candles.length, dailyDiagnostics: daily.diagnostics, rawText: daily.response.rawText || undefined, qualifies: latest.value <= threshold });
@@ -78,5 +80,7 @@ export async function scanStoredUsMfiOversold(options: { period?: number; thresh
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, instruments.length || 1) }, () => worker()));
   results.sort((a, b) => (a.mfi ?? 101) - (b.mfi ?? 101) || a.market.localeCompare(b.market) || a.code.localeCompare(b.code));
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, period, threshold, instrumentCount: instruments.length, successCount: results.filter((item) => item.mfi !== null).length, failureCount: results.filter((item) => item.mfi === null).length, qualified: results.filter((item) => item.qualifies), results };
+  const succeeded = (item: (typeof results)[number]) => typeof item.mfi === "number" && Number.isFinite(item.mfi);
+  const failureReasons = summarizeUsDailyScanFailures(results.filter((item) => !succeeded(item)));
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, period, threshold, instrumentCount: instruments.length, successCount: results.filter(succeeded).length, failureCount: results.filter((item) => !succeeded(item)).length, failureReasons, qualified: results.filter((item) => item.qualifies), results };
 }

@@ -15,7 +15,9 @@
 
 ### 거래대금 관측 저장과 DB 장애 복구
 
-탐지의 rolling window 계산은 메모리에서 유지하고, KIS 원본 관측·분 거래대금·시총 대비 비율은 `intraday_turnover_observations`에 분 버킷 단위로 batch upsert한다. DB write 장애 중에는 `IntradayTurnoverWriteBuffer`가 자연 키(시장/종목/세션/분)로 최신값을 합쳐 최대 9,000행, 최대 30분간 보관하고 1–30초 지수 backoff로 재시도한다. 영속 저장 후에만 buffer에서 제거한다. 상한/TTL을 넘긴 손실은 worker를 `DEGRADED`로 표시하고 로그에 남긴다. 버퍼는 단일 모놀리식 프로세스 안의 일시 복구 장치일 뿐 영속 큐나 재시작 복구 수단이 아니다.
+탐지의 rolling window 계산은 메모리에서 유지하고, KIS 원본 관측·분 거래대금·시총 대비 비율은 `intraday_turnover_observations`에 분 버킷 단위로 batch upsert한다. 시총 값은 해당 fundamentals snapshot의 `market_cap_observed_at`/`market_cap_fetched_at`으로 원천 측정시각과 로컬 적재시각을 함께 보존한다. DB write 장애 중에는 `IntradayTurnoverWriteBuffer`가 자연 키(시장/종목/세션/분)로 최신값을 합쳐 최대 9,000행, 최대 30분간 보관하고 1–30초 지수 backoff로 재시도한다. 영속 저장 후에만 buffer에서 제거한다. 상한/TTL을 넘긴 손실은 worker를 `DEGRADED`로 표시하고 로그에 남긴다. 버퍼는 단일 모놀리식 프로세스 안의 일시 복구 장치일 뿐 영속 큐나 재시작 복구 수단이 아니다.
+
+공개 `GET /api/kis/intraday-mvp`의 focus/qualified candidate는 메모리에 가진 시총 snapshot 관측·적재시각을 각각 반환한다. GET은 worker를 시작하지 않으며 상태 조회만 한다. 운영 Node 프로세스에서는 `instrumentation.register()`가 singleton worker를 서버 기동 시 시작한다. 관리자 `GET /api/debug/intraday-flow`는 최근 30분의 persisted turnover rows에서 시총 존재 수와 해당 시총 row 중 관측/적재시각 보존·누락 수, 가장 최근 provenance 시각을 집계한다. V171 컬럼 누락은 `SCHEMA_OUTDATED`와 컬럼명을 보여주며 DB 접속 오류와 구분한다.
 
 ## 책임 분리
 
@@ -989,7 +991,7 @@ kis_rate_limit_events
 이 정책으로 탐지 판단 경로의 지연을 DB 관측 기록이 유발하지 않도록 하면서, SLO 계산에 필요한 통계와 핵심 감사 이벤트는 보존한다.
 # Durable KIS turnover observations
 
-The live rolling window remains in process memory for low-latency detection. Each successful instrument observation is also persisted to `intraday_turnover_observations` with the KIS source fields, derived minute value, its `minute_trading_value_source` (`KIS_CUMULATIVE_DELTA` or `PRICE_VOLUME_FALLBACK`), market cap, rolling value, ratio, exchange-local session date, and minute bucket. The provenance column prevents downstream reports from presenting a price×volume estimate as a provider-supplied turnover value. The primary key `(market, code, session_date, bucket_at)` makes repeated polling of the same minute idempotent. Raw KIS point payload is retained as JSONB for audit/recalculation; it contains market data only.
+The live rolling window remains in process memory for low-latency detection. Each successful instrument observation is also persisted to `intraday_turnover_observations` with the KIS source fields, derived minute value, its `minute_trading_value_source` (`KIS_CUMULATIVE_DELTA` or `PRICE_VOLUME_FALLBACK`), market cap plus its `market_cap_observed_at` and `market_cap_fetched_at` provenance, rolling value, ratio, exchange-local session date, and minute bucket. The provenance columns prevent downstream reports from presenting a local fetch time as the provider observation time. The primary key `(market, code, session_date, bucket_at)` makes repeated polling of the same minute idempotent. Raw KIS point payload is retained as JSONB for audit/recalculation; it contains market data only.
 
 Persistence is batched after candidate polling to avoid one database round trip per symbol. Failed KIS HTTP responses and successful responses with no valid positive-price minute points are excluded rather than persisted as synthetic zero-turnover observations. If persistence fails, the worker reports `DEGRADED` and retains the error instead of silently claiming a healthy tick. Minute observations are not used to reconstruct the in-memory rolling window across process restarts in this change; restart recovery remains a separately testable follow-up.
 

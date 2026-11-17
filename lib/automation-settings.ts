@@ -1,23 +1,9 @@
 import { loadFeatureModuleSettings, saveFeatureModuleSettings } from "./feature-module-settings";
 
-export const DEFAULT_AUTOMATION_INTERVAL_SECONDS = 30;
 export const DEFAULT_MFI_THRESHOLD = 30;
 export const DEFAULT_OBV_SIGNAL_PERIOD = 9;
 export const DEFAULT_OBV_SIGNAL_ABOVE_DAYS = 3;
 export const DEFAULT_OBV_SIGNAL_CROSS_LOOKBACK = 5;
-
-/**
- * 공개 피드 폴링과 기존 호출부가 사용하는 최소 호환 계층이다.
- * 저장소의 단일 진실 공급원은 feature_module_settings이다.
- */
-export async function getAutomationIntervalSeconds() {
-  try {
-    const settings = await loadFeatureModuleSettings("us-scanners");
-    return Math.max(5, Math.min(3600, Number(settings.intervalSeconds ?? DEFAULT_AUTOMATION_INTERVAL_SECONDS)));
-  } catch {
-    return DEFAULT_AUTOMATION_INTERVAL_SECONDS;
-  }
-}
 
 export async function getMfiThreshold() {
   try {
@@ -61,9 +47,3 @@ export async function getUsDailyObvSignalPolicy(): Promise<UsDailyObvSignalPolic
   }
 }
 
-export async function saveAutomationIntervalSeconds(seconds: number) {
-  const value = Math.max(5, Math.min(3600, Math.round(seconds)));
-  const settings = await loadFeatureModuleSettings("us-scanners");
-  await saveFeatureModuleSettings("us-scanners", { ...settings, intervalSeconds: value });
-  return value;
-}

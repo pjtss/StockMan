@@ -44,6 +44,8 @@
 | `etyp` | 3 | ETP 상세 유형 | `001` ETF, `002` ETN, `003` ETC, `004` Others, `005` VIX Underlying ETF, `006` VIX Underlying ETN |
 | `ttyp_sb` | 3 | Tick size 상세 유형 | 런던·제트라·유로넥스트 등 특수시장 |
 
+탭 필드 인덱스(0부터)는 `isdr=17`, `drcd=18`, `icod=19`, `sjong=20`, `ttyp=21`, `etyp=22`, `ttyp_sb=23`이다. 보통주 분류에서 DR 여부는 `isdr`(17)을, 산업 분류 코드는 `icod`(19)를 읽는다.
+
 ### 해외 상품 분류 규칙
 
 ```text

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { getAccessToken, writeKisSignalSnapshot, fetchMarketCapRanking, fetchTopInterestStock } = vi.hoisted(() => ({
+const { getAccessToken, writeKisSignalSnapshot, fetchMarketCapRanking, fetchTopInterestStock, queryEligibleUniverse } = vi.hoisted(() => ({
   getAccessToken: vi.fn(),
   writeKisSignalSnapshot: vi.fn().mockResolvedValue(undefined),
   fetchMarketCapRanking: vi.fn().mockResolvedValue({
@@ -11,11 +11,14 @@ const { getAccessToken, writeKisSignalSnapshot, fetchMarketCapRanking, fetchTopI
   msg1: "secret-token https://db.internal.example/abc",
   rows: [{ data_rank: "1", mksc_shrn_iscd: "005930", hts_kor_isnm: "삼성전자", stck_prpr: "70000", stck_avls: "500000" }, { data_rank: "2", mksc_shrn_iscd: "000001", hts_kor_isnm: "소형주", stck_avls: "299" }],
   }),
-  fetchTopInterestStock: vi.fn().mockResolvedValue({ ok: true, status: 200, rtCd: "0", msgCd: "0", msg1: "정상", rows: [{ data_rank: "1", mksc_shrn_iscd: "005930", hts_kor_isnm: "삼성전자" }] }),
+  fetchTopInterestStock: vi.fn().mockResolvedValue({ ok: true, status: 200, rtCd: "0", msgCd: "0", msg1: "정상", rows: [{ data_rank: "1", mksc_shrn_iscd: "005930", hts_kor_isnm: "삼성전자", stck_avls: "500000" }] }),
+  queryEligibleUniverse: vi.fn().mockResolvedValue({ rows: [{ code: "005930" }, { code: "000001" }], compatibilityFallback: false }),
 }));
 
 vi.mock("@/lib/kis-token", () => ({ getAccessToken }));
 vi.mock("@/lib/kis-signal-snapshot", () => ({ writeKisSignalSnapshot }));
+vi.mock("@/lib/db", () => ({ getDb: vi.fn(() => ({})) }));
+vi.mock("@/lib/instrument-eligibility", () => ({ queryEligibleUniverse }));
 vi.mock("@/lib/kis-domestic-api", () => ({
   fetchDomesticTradeValueRanking: vi.fn(),
   fetchDomesticVolumePower: vi.fn(),
@@ -63,6 +66,38 @@ describe("KIS detection candidates route", () => {
     expect(json.rows[0]).toMatchObject({ code: "005930", name: "삼성전자", rank: "1" });
     expect(fetchTopInterestStock).toHaveBeenCalled();
     expect(writeKisSignalSnapshot).toHaveBeenCalledWith(expect.objectContaining({ signalType: "candidate_top-interest-stock" }));
+  });
+
+  it("does not expose or snapshot rows from a failed KIS source", async () => {
+    getAccessToken.mockResolvedValueOnce("token");
+    fetchTopInterestStock.mockResolvedValueOnce({ ok: false, status: 200, rtCd: "1", msgCd: "EGW99999", msg1: "provider failure", rows: [{ mksc_shrn_iscd: "005930", stck_avls: "500000" }] });
+    const response = await GET(new Request("http://localhost/api/kis/detection-candidates?source=top-interest-stock"));
+    const json = await response.json();
+    expect(response.status).toBe(502);
+    expect(json.ok).toBe(false);
+    expect(json.rows).toEqual([]);
+    expect(writeKisSignalSnapshot).toHaveBeenCalledWith(expect.objectContaining({ status: "UNAVAILABLE", payload: [] }));
+  });
+
+  it("keeps only active common-stock codes confirmed by the official universe", async () => {
+    getAccessToken.mockResolvedValueOnce("token");
+    fetchTopInterestStock.mockResolvedValueOnce({ ok: true, status: 200, rtCd: "0", rows: [
+      { mksc_shrn_iscd: "005930", stck_avls: "500000" },
+      { mksc_shrn_iscd: "000002", stck_avls: "600000" },
+    ] });
+    const response = await GET(new Request("http://localhost/api/kis/detection-candidates?source=top-interest-stock"));
+    const json = await response.json();
+    expect(response.status).toBe(200);
+    expect(json.rows.map((row: { code: string }) => row.code)).toEqual(["005930"]);
+  });
+
+  it("fails closed when the official common-stock universe cannot be read", async () => {
+    getAccessToken.mockResolvedValueOnce("token");
+    fetchTopInterestStock.mockResolvedValueOnce({ ok: true, status: 200, rtCd: "0", rows: [{ mksc_shrn_iscd: "005930", stck_avls: "500000" }] });
+    queryEligibleUniverse.mockRejectedValueOnce(new Error("universe unavailable"));
+    const response = await GET(new Request("http://localhost/api/kis/detection-candidates?source=top-interest-stock"));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "COMMON_STOCK_UNIVERSE_UNAVAILABLE", eligibility: { failClosed: true } });
   });
 
   it("returns a stable error code instead of an exception message", async () => {

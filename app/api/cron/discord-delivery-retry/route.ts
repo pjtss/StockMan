@@ -12,7 +12,12 @@ async function handle(request: Request) {
     const settings = await loadFeatureModuleSettings("discord-delivery-retry");
     if (!settings.enabled) { await recordSkippedAutomationRun("discord-delivery-retry", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
     if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("discord-delivery-retry", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
-    return NextResponse.json({ ok: true, ...(await withAutomationRun("discord-delivery-retry", retryDiscordDeliveries)) });
+    const result = await withAutomationRun("discord-delivery-retry", async () => {
+      const delivery = await retryDiscordDeliveries();
+      const degraded = delivery.failed > 0 || delivery.permanentFailed > 0 || delivery.persistenceFailed > 0 || delivery.uncertain > 0;
+      return { ...delivery, ok: !degraded, degraded };
+    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[API /cron/discord-delivery-retry] Error:", error instanceof Error ? error.message : "unknown error");
     return NextResponse.json({ ok: false, error: "DISCORD_DELIVERY_RETRY_FAILED" }, { status: 502 });

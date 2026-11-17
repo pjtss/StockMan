@@ -1,0 +1,394 @@
+{
+  "contractVersion": "decision-register-lifecycle.v0",
+  "classification": "SYNTHETIC_VECTORS_WITH_DOCUMENT_STATUS_BASELINE",
+  "dataPolicy": {
+    "containsOperationalDecisionEvidence": false,
+    "containsRealOwnerOrReviewer": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true,
+    "registerBaselineDerivedFromEvidenceLedger": true
+  },
+  "statusVocabulary": [
+    "OPEN",
+    "EVIDENCE_READY",
+    "APPROVED",
+    "CLOSED",
+    "REJECTED",
+    "EXPIRED"
+  ],
+  "allowedTransitions": {
+    "OPEN": [
+      "OPEN",
+      "EVIDENCE_READY",
+      "REJECTED"
+    ],
+    "EVIDENCE_READY": [
+      "EVIDENCE_READY",
+      "APPROVED",
+      "REJECTED",
+      "EXPIRED",
+      "OPEN"
+    ],
+    "APPROVED": [
+      "APPROVED",
+      "CLOSED",
+      "REJECTED",
+      "EXPIRED",
+      "OPEN"
+    ],
+    "CLOSED": [
+      "CLOSED",
+      "EXPIRED",
+      "OPEN"
+    ],
+    "REJECTED": [
+      "REJECTED",
+      "OPEN"
+    ],
+    "EXPIRED": [
+      "EXPIRED",
+      "OPEN"
+    ]
+  },
+  "requiredDecisionRecordFields": [
+    "decisionId",
+    "decisionRevision",
+    "status",
+    "scope",
+    "selectedValue",
+    "ownerRole",
+    "namedOwner",
+    "evidenceManifestHash",
+    "evidenceObservedAt",
+    "reviewer",
+    "decisionRef",
+    "validUntil",
+    "reviewCondition",
+    "acceptanceArtifact",
+    "acceptanceResult",
+    "fixtureCount",
+    "reason",
+    "reopenWhen",
+    "effectiveAt",
+    "previousRevision",
+    "dependencyDecisionIds",
+    "codeGateEvidence",
+    "rollbackEvidence",
+    "previousRecordHash",
+    "recordHash"
+  ],
+  "statusRequirements": {
+    "OPEN": [
+      "reason",
+      "reviewCondition"
+    ],
+    "EVIDENCE_READY": [
+      "scope",
+      "evidenceManifestHash",
+      "evidenceObservedAt",
+      "acceptanceArtifact"
+    ],
+    "APPROVED": [
+      "selectedValue",
+      "decisionRef",
+      "validUntil",
+      "acceptanceResult:PASS"
+    ],
+    "CLOSED": [
+      "selectedValue",
+      "decisionRef",
+      "acceptanceResult:PASS",
+      "codeGateEvidence",
+      "rollbackEvidence"
+    ],
+    "REJECTED": [
+      "reason",
+      "reopenWhen"
+    ],
+    "EXPIRED": [
+      "expiredAt",
+      "reviewAction"
+    ]
+  },
+  "registerBaseline": [
+    {
+      "decisionId": "KR-DART-RIGHTS-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-CAP-FRESHNESS-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-RECONCILIATION-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-CAPITAL-RECONCILIATION-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-ISSUER-RISK-STATUS-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-RETENTION-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-TAXONOMY-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-LEGACY-CUTOVER-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-MASTER-SNAPSHOT-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-ANALYSIS-REPRO-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-MARKET-DATA-RIGHTS-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-EVENT-STUDY-POLICY-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-IMPORTER-OPS-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-DB-DRIFT-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-SHADOW-SLO-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-DOCUMENT-UX-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-PERSONAL-THESIS-UX-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-CURSOR-SECURITY-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-EVENT-ATTRIBUTION-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-API-UI-CONSISTENCY-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-OPERATIONAL-SECURITY-01",
+      "currentStatus": "OPEN"
+    },
+    {
+      "decisionId": "KR-END-TO-END-ACCEPTANCE-01",
+      "currentStatus": "OPEN"
+    }
+  ],
+  "vectors": [
+    {
+      "id": "DRL-01-OPEN-REGISTER-MAY-START-WITHOUT-HISTORY",
+      "input": {
+        "currentStatus": "OPEN",
+        "history": []
+      },
+      "expected": {
+        "valid": true,
+        "gateEffect": "FAIL_CLOSED"
+      }
+    },
+    {
+      "id": "DRL-02-NON-OPEN-STATUS-REQUIRES-MATCHING-LEDGER-REVISION",
+      "input": {
+        "currentStatus": "APPROVED",
+        "history": []
+      },
+      "expected": {
+        "valid": false,
+        "reason": "MISSING_DECISION_EVIDENCE"
+      }
+    },
+    {
+      "id": "DRL-03-CURRENT-STATUS-MUST-MATCH-LATEST-REVISION",
+      "input": {
+        "currentStatus": "EVIDENCE_READY",
+        "historyStatuses": [
+          "OPEN"
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "reason": "STATUS_HISTORY_MISMATCH"
+      }
+    },
+    {
+      "id": "DRL-04-REVISION-SEQUENCE-MUST-BE-CONTIGUOUS",
+      "input": {
+        "currentStatus": "EVIDENCE_READY",
+        "historyRevisions": [
+          1,
+          3
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "reason": "REVISION_GAP"
+      }
+    },
+    {
+      "id": "DRL-05-OPEN-CANNOT-SKIP-EVIDENCE-REVIEW",
+      "input": {
+        "currentStatus": "APPROVED",
+        "historyStatuses": [
+          "OPEN",
+          "APPROVED"
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "reason": "ILLEGAL_STATUS_TRANSITION"
+      }
+    },
+    {
+      "id": "DRL-06-APPROVAL-REQUIRES-SCOPED-DECISION-AND-PASSING-ACCEPTANCE",
+      "input": {
+        "status": "APPROVED",
+        "selectedValue": null,
+        "decisionRef": null,
+        "acceptanceResult": "NOT_RUN"
+      },
+      "expected": {
+        "valid": false,
+        "reason": "APPROVAL_EVIDENCE_INCOMPLETE"
+      }
+    },
+    {
+      "id": "DRL-07-REJECTION-REQUIRES-REASON-AND-REOPEN-CONDITION",
+      "input": {
+        "status": "REJECTED",
+        "reason": null,
+        "reopenWhen": null
+      },
+      "expected": {
+        "valid": false,
+        "reason": "REJECTION_REOPEN_CONDITION_MISSING"
+      }
+    },
+    {
+      "id": "DRL-08-EXPIRY-REQUIRES-TIMESTAMP-AND-REVIEW-ACTION",
+      "input": {
+        "status": "EXPIRED",
+        "expiredAt": null,
+        "reviewAction": null
+      },
+      "expected": {
+        "valid": false,
+        "reason": "EXPIRY_EVIDENCE_MISSING"
+      }
+    },
+    {
+      "id": "DRL-09-DECISION-SCOPE-DOES-NOT-AUTO-ACTIVATE-OTHER-CONSUMER",
+      "input": {
+        "decisionScope": "DART_METADATA_INTERNAL",
+        "requestedScope": "DART_BODY_PUBLIC_API"
+      },
+      "expected": {
+        "valid": false,
+        "reason": "SCOPE_NOT_COVERED",
+        "gateEffect": "FAIL_CLOSED"
+      }
+    },
+    {
+      "id": "DRL-10-ACTIVE-IS-CONSUMER-GATE-NOT-DECISION-STATUS",
+      "input": {
+        "decisionStatus": "APPROVED",
+        "consumerGate": "ACTIVE"
+      },
+      "expected": {
+        "valid": true,
+        "decisionStatusAfter": "APPROVED"
+      }
+    },
+    {
+      "id": "DRL-11-CURRENT-STATUS-IS-DERIVED-FROM-LATEST-LEDGER-REVISION",
+      "input": {
+        "canonicalDecisionStatusField": "ABSENT",
+        "ledgerEntries": [],
+        "manualStatusEdit": "APPROVED"
+      },
+      "expected": {
+        "currentStatus": "OPEN",
+        "manualStatusEditAccepted": false,
+        "gateEffect": "FAIL_CLOSED"
+      }
+    },
+    {
+      "id": "DRL-12-EVIDENCE-SCOPE-MUST-MATCH-REGISTERED-DECISION-SCOPE",
+      "input": {
+        "registeredScope": "EXACT-SCOPE-A",
+        "evidenceScope": "PARTIAL-SCOPE-A1",
+        "status": "APPROVED"
+      },
+      "expected": {
+        "valid": false,
+        "reason": "DECISION_SCOPE_MISMATCH",
+        "currentStatus": "OPEN"
+      }
+    },
+    {
+      "id": "DRL-13-LEDGER-RECORD-HASH-MISMATCH-BLOCKS-STATUS-PROJECTION",
+      "input": {
+        "recordHash": "HASH-A",
+        "computedRecordHash": "HASH-B",
+        "status": "APPROVED"
+      },
+      "expected": {
+        "valid": false,
+        "reason": "LEDGER_RECORD_HASH_INVALID",
+        "currentStatus": "OPEN"
+      }
+    },
+    {
+      "id": "DRL-14-GLOBAL-LEDGER-CHAIN-BREAK-BLOCKS-STATUS-PROJECTION",
+      "input": {
+        "previousRecordHash": "HASH-OLD",
+        "actualPreviousRecordHash": "HASH-CURRENT",
+        "status": "APPROVED"
+      },
+      "expected": {
+        "valid": false,
+        "reason": "LEDGER_CHAIN_BROKEN",
+        "currentStatus": "OPEN"
+      }
+    },
+    {
+      "id": "DRL-15-APPROVED-STATUS-REQUIRES-EXACT-SCOPE-AND-PASSING-EVIDENCE",
+      "input": {
+        "status": "APPROVED",
+        "scopeMatches": true,
+        "acceptanceResult": "NOT_RUN",
+        "decisionRef": null
+      },
+      "expected": {
+        "valid": false,
+        "reason": "APPROVAL_EVIDENCE_INCOMPLETE",
+        "currentStatus": "OPEN"
+      }
+    }
+  ]
+}

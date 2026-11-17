@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { safeErrorMetadata } from "@/lib/error-diagnostics";
+import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,20 @@ export async function GET(request: Request) {
              f.observed_at AS "observedAt", f.fetched_at AS "fetchedAt",
              f.raw_payload AS "rawPayload",
              d.data AS daily, w.data AS weekly, m.data AS monthly
-      FROM kr_instrument_universe u
-      LEFT JOIN instrument_fundamental_snapshots f ON f.market = 'KR' AND f.code = u.code
-      LEFT JOIN LATERAL (SELECT jsonb_build_object('date', c.candle_date, 'open', c.open, 'high', c.high, 'low', c.low, 'close', c.close, 'volume', c.volume, 'updatedAt', c.fetched_at, 'rawPayload', c.raw_payload) AS data FROM kr_instrument_universe_candles c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D' ORDER BY c.candle_date DESC LIMIT 1) d ON true
-      LEFT JOIN LATERAL (SELECT jsonb_build_object('date', c.candle_date, 'open', c.open, 'high', c.high, 'low', c.low, 'close', c.close, 'volume', c.volume, 'updatedAt', c.fetched_at, 'rawPayload', c.raw_payload) AS data FROM kr_instrument_universe_candles c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'W' ORDER BY c.candle_date DESC LIMIT 1) w ON true
-      LEFT JOIN LATERAL (SELECT jsonb_build_object('date', c.candle_date, 'open', c.open, 'high', c.high, 'low', c.low, 'close', c.close, 'volume', c.volume, 'updatedAt', c.fetched_at, 'rawPayload', c.raw_payload) AS data FROM kr_instrument_universe_candles c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'M' ORDER BY c.candle_date DESC LIMIT 1) m ON true
-      WHERE u.instrument_type = 'COMMON_STOCK'
+      FROM kr_common_stock_universe u
+      JOIN instrument_fundamental_snapshots f ON f.market = u.market AND f.code = u.code
+      LEFT JOIN LATERAL (SELECT jsonb_build_object('date', c.candle_date, 'open', c.open, 'high', c.high, 'low', c.low, 'close', c.close, 'volume', c.volume, 'updatedAt', c.fetched_at, 'rawPayload', c.raw_payload) AS data FROM kr_instrument_universe_candles c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D' AND ${sql.raw(validDailyCandleSql("c"))} ORDER BY c.candle_date DESC LIMIT 1) d ON true
+      LEFT JOIN LATERAL (SELECT jsonb_build_object('date', c.candle_date, 'open', c.open, 'high', c.high, 'low', c.low, 'close', c.close, 'volume', c.volume, 'updatedAt', c.fetched_at, 'rawPayload', c.raw_payload) AS data FROM kr_instrument_universe_candles c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'W' AND ${sql.raw(validDailyCandleSql("c"))} ORDER BY c.candle_date DESC LIMIT 1) w ON true
+      LEFT JOIN LATERAL (SELECT jsonb_build_object('date', c.candle_date, 'open', c.open, 'high', c.high, 'low', c.low, 'close', c.close, 'volume', c.volume, 'updatedAt', c.fetched_at, 'rawPayload', c.raw_payload) AS data FROM kr_instrument_universe_candles c WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'M' AND ${sql.raw(validDailyCandleSql("c"))} ORDER BY c.candle_date DESC LIMIT 1) m ON true
+      WHERE u.enabled = TRUE
+        AND u.instrument_type = 'COMMON_STOCK'
+        AND u.is_etp = FALSE
+        AND u.is_warrant = FALSE
+        AND u.is_preferred = FALSE
+        AND f.currency = 'KRW'
+        AND f.market_cap > 30000000000
+        AND f.fetched_at >= NOW() - INTERVAL '24 hours'
+        AND f.fetched_at <= NOW()
       ORDER BY u.market, u.code
     `);
     const items = (result.rows as Array<Record<string, unknown>>).map((row) => ({

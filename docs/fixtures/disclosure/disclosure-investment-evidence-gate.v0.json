@@ -1,0 +1,174 @@
+{
+  "contractVersion": "disclosure-investment-evidence-gate.v0",
+  "classification": "SYNTHETIC_PRODUCT_ACCEPTANCE_NOT_RUNTIME_EVIDENCE_OR_INVESTMENT_ADVICE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealPricesOrFinancialValues": false,
+    "containsSourceBody": false
+  },
+  "sourceBasis": [
+    {
+      "url": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001",
+      "use": "The list API exposes report title, receipt number, filer, receipt date and related metadata; it is discovery metadata and does not provide the report body in this contract."
+    },
+    {
+      "url": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019003",
+      "use": "The official document endpoint is a separate source surface for the original filing archive; body acquisition is a distinct gated stage."
+    }
+  ],
+  "requiredClaimDimensions": [
+    "claimId",
+    "claimType",
+    "claimText",
+    "issuerRole",
+    "sourceReceiptId",
+    "documentRevisionId",
+    "evidenceLocator",
+    "evidenceRelation",
+    "verificationState",
+    "rightsDecisionRevision",
+    "counterEvidenceRefs",
+    "unknowns",
+    "reviewDecisionRef"
+  ],
+  "requiredQuantitativeDimensions": [
+    "value",
+    "unit",
+    "currency",
+    "reportedOrDerived",
+    "numeratorClaimRef",
+    "denominatorClaimRef",
+    "periodOrStage",
+    "formulaVersion",
+    "roundingPolicy",
+    "asOf"
+  ],
+  "outputStates": [
+    "TITLE_SIGNAL_ONLY",
+    "BODY_UNAVAILABLE",
+    "EVIDENCE_INCOMPLETE",
+    "CONFLICT_REVIEW_REQUIRED",
+    "VERIFIED_FACTS_WITH_COUNTEREVIDENCE",
+    "REVIEWED_INVESTMENT_EFFECT",
+    "SUPPRESSED_RIGHTS_OR_ELIGIBILITY"
+  ],
+  "invariants": {
+    "titleClassifierIsNotInvestmentClaim": true,
+    "titleScoreIsNotDirectionOrTradeInstruction": true,
+    "missingValueIsNotZeroOrNegativeEvidence": true,
+    "filingSubmitterIsNotAutomaticallyAffectedIssuer": true,
+    "positiveFactsAndMaterialRisksCoexist": true,
+    "priceMovementDoesNotProveCausality": true,
+    "rightsAndCommonStockGatesPrecedePublication": true,
+    "oneReceiptMayContainMultipleEventAndHorizonScopedClaimGroups": true,
+    "legacyTitleJudgmentIsNotInvestmentReview": true,
+    "companyWatchlistDoesNotImplyEventSubscription": true
+  },
+  "vectors": [
+    {
+      "id": "DIEG-01-TITLE-ONLY-POSITIVE-IS-NOT-CLAIM",
+      "input": { "stage": "LIST_METADATA_ONLY", "titleClass": "BULLISH_CANDIDATE", "body": null, "rights": "UNRESOLVED" },
+      "expected": { "outputState": "TITLE_SIGNAL_ONLY", "investmentClaim": "NOT_CREATED", "direction": "NOT_ASSESSED", "tradeInstruction": "NONE", "publication": "SUPPRESS_DERIVED_CLAIM" }
+    },
+    {
+      "id": "DIEG-02-BODY-FETCH-DENIED-KEEPS-METADATA-AND-ANALYSIS-SEPARATE",
+      "input": { "stage": "BODY_FETCH", "rights": "DENY", "priorTitleSignal": "BULLISH_CANDIDATE" },
+      "expected": { "outputState": "SUPPRESSED_RIGHTS_OR_ELIGIBILITY", "bodyFetch": "NOT_RUN", "titleSignal": "RETAIN_AS_UNVERIFIED_METADATA_ONLY", "bodyClaim": "NOT_CREATED" }
+    },
+    {
+      "id": "DIEG-03-UNLOCATABLE-BODY-ASSERTION-IS-UNVERIFIED",
+      "input": { "stage": "BODY_PARSED", "claimText": "SYNTHETIC_CLAIM", "evidenceLocator": null },
+      "expected": { "outputState": "EVIDENCE_INCOMPLETE", "claimVerification": "UNVERIFIED", "publication": "SUPPRESSED" }
+    },
+    {
+      "id": "DIEG-04-REPORTED-ZERO-AND-MISSING-DATA-DIFFER",
+      "input": { "reportedField": null, "explicitSourceZero": "SYNTHETIC_ZERO" },
+      "expected": { "missingValue": "UNKNOWN_NOT_ZERO", "explicitSourceZero": "ZERO_ONLY_IF_LOCATOR_AND_UNIT_VERIFIED" }
+    },
+    {
+      "id": "DIEG-05-QUANTIFIED-EFFECT-REQUIRES-BASIS-AND-DENOMINATOR",
+      "input": { "numerator": "SYNTH_N", "denominator": null, "period": null, "unit": null },
+      "expected": { "quantifiedEffect": "NOT_COMPUTABLE", "unknowns": ["DENOMINATOR", "PERIOD", "UNIT"], "inventedEstimate": false }
+    },
+    {
+      "id": "DIEG-06-POSITIVE-CONTRACT-FACT-COEXISTS-WITH-TERMINATION-RISK",
+      "input": { "supportingClaim": "SYNTH_CONTRACT_AWARD", "counterEvidence": ["SYNTH_TERMINATION_CLAUSE", "SYNTH_CONDITIONS_UNMET"] },
+      "expected": { "outputState": "VERIFIED_FACTS_WITH_COUNTEREVIDENCE", "supportingClaimPreserved": true, "riskClaimPreserved": true, "singleNetScore": "NOT_INFERRED" }
+    },
+    {
+      "id": "DIEG-07-SUBMITTER-AND-AFFECTED-ISSUER-ARE-SEPARATE",
+      "input": { "submitterRole": "FILING_SUBMITTER", "affectedIssuerEvidence": null },
+      "expected": { "filingParty": "PRESERVE", "eventSubject": "UNRESOLVED", "tickerExposure": "SUPPRESSED" }
+    },
+    {
+      "id": "DIEG-08-CORRECTION-INVALIDATES-DEPENDENT-APPROVAL",
+      "input": { "priorAnalysis": "APPROVED", "sourceRelation": "RESOLVED_CORRECTS", "dependentClaimChanged": true },
+      "expected": { "priorApproval": "STALE", "newAnalysis": "REQUIRED", "publication": "SUPPRESS_UNTIL_REVIEW" }
+    },
+    {
+      "id": "DIEG-09-PRICE-MOVE-IS-NOT-CAUSAL-EVIDENCE",
+      "input": { "event": "SYNTH_DISCLOSURE", "priceChange": "SYNTH_RETURN", "confounderSearch": "NOT_RUN" },
+      "expected": { "causalAttribution": "NOT_ESTABLISHED", "marketReaction": "SEPARATE_OBSERVATION", "recommendation": "NONE" }
+    },
+    {
+      "id": "DIEG-10-SECURITY-CLASS-AND-DILUTION-RISK-ARE-EXPLICIT",
+      "input": { "proposedInstrument": "UNVERIFIED", "dilutionEvidence": "SYNTH_CONVERTIBLE_TERMS" },
+      "expected": { "commonStockEligibility": "UNVERIFIED_BLOCK", "dilutionRisk": "REVIEW_AS_SEPARATE_COUNTEREVIDENCE", "recommendation": "SUPPRESSED" }
+    },
+    {
+      "id": "DIEG-11-REVIEWED-EFFECT-REQUIRES-ALL-DEPENDENCY-GATES",
+      "input": { "factReview": "APPROVED", "rights": "UNRESOLVED", "issuerAttribution": "UNRESOLVED", "counterEvidenceReview": "PENDING" },
+      "expected": { "outputState": "SUPPRESSED_RIGHTS_OR_ELIGIBILITY", "investmentEffect": "NOT_PUBLISHED" }
+    },
+    {
+      "id": "DIEG-12-ONE-RECEIPT-MULTIPLE-EVENTS-KEEP-SEPARATE-EVIDENCE-GROUPS",
+      "input": {
+        "sourceReceiptId": "RECEIPT-SYN-12",
+        "issuerId": "ISSUER-SYN-12",
+        "events": [
+          {"eventId": "EVENT-SYN-12-A", "horizon": "HORIZON-SYN-12-A", "claimRelations": ["SUPPORTS"]},
+          {"eventId": "EVENT-SYN-12-B", "horizon": "HORIZON-SYN-12-B", "claimRelations": ["CONTRADICTS"]}
+        ]
+      },
+      "expected": {
+        "eventScopedEvidenceGroups": 2,
+        "sourceReceiptSharedAsProvenance": true,
+        "eventClaimsMerged": false,
+        "horizonsMerged": false,
+        "singleNetDirection": "NOT_INFERRED",
+        "sourceReceiptCountUsedAsEventCount": false
+      }
+    },
+    {
+      "id": "DIEG-13-LEGACY-TITLE-JUDGMENT-IS-NOT-PROMOTED-TO-REVIEW",
+      "input": {
+        "legacyJudgment": "SYNTH_LEGACY_BULLISH_LABEL",
+        "bodyClaimRefs": [],
+        "reviewDecisionRef": null,
+        "migrationMode": "PRESERVE_HISTORY"
+      },
+      "expected": {
+        "legacyJudgmentPreservedAs": "LEGACY_TRIAGE_LABEL",
+        "analysisStatus": "NOT_CREATED",
+        "direction": "NOT_ASSESSED",
+        "historicalRevisionRewritten": false,
+        "publicationAsVerifiedInvestmentClaim": false
+      }
+    },
+    {
+      "id": "DIEG-14-COMPANY-WATCHLIST-DOES-NOT-CREATE-EVENT-SUBSCRIPTION",
+      "input": {
+        "watchlistKeyKind": "COMPANY_NAME",
+        "verifiedInstrumentId": null,
+        "eventSubscriptionOptIn": false
+      },
+      "expected": {
+        "eventSubscriptionCreated": false,
+        "instrumentEligibility": "UNRESOLVED",
+        "eventNotificationEligible": false,
+        "watchlistMutationImplied": "NONE"
+      }
+    }
+  ]
+}

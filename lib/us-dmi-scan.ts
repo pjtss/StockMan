@@ -1,5 +1,6 @@
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestDmi } from "@/lib/us-dmi";
+import { summarizeUsDailyScanFailures } from "@/lib/us-daily-scan-failure-reasons";
 
 export async function scanStoredUsDmi(options: { period?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const period = options.period ?? 14;
@@ -12,7 +13,7 @@ export async function scanStoredUsDmi(options: { period?: number; concurrency?: 
     const cached = cachedCandles.get(`${item.market}:${item.code}`) ?? [];
     return cached && cached.length >= period + 1
       ? Promise.resolve({ ok: true, status: 200, candles: cached, diagnostics: { source: "DB_CACHE_BULK", parsedCandleCount: cached.length } })
-      : Promise.resolve({ ok: false, status: 0, candles: cached ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: cached?.length ?? 0 } });
+      : Promise.resolve({ ok: false, status: 200, candles: cached ?? [], response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", cacheLookup: "AVAILABLE", parsedCandleCount: cached?.length ?? 0 } });
   };
   let cursor = 0;
   const worker = async () => { while (cursor < instruments.length) {
@@ -20,11 +21,15 @@ export async function scanStoredUsDmi(options: { period?: number; concurrency?: 
     try {
       const daily = await getDaily(item);
       const dmi = daily?.ok ? latestDmi(daily.candles, period) : null;
-      const qualifies = Boolean(dmi && dmi.plusDi > dmi.minusDi && dmi.plusDi - dmi.minusDi >= 5 && dmi.adx >= 20);
-      results.push({ market: item.market, code: item.code, name: item.name, plusDi: dmi?.plusDi ?? null, minusDi: dmi?.minusDi ?? null, adx: dmi?.adx ?? null, date: dmi?.date ?? null, candleCount: daily?.candles.length ?? 0, dailyDiagnostics: daily?.diagnostics ?? null, rawText: (daily as any)?.response?.rawText || undefined, qualifies, qualificationRule: "+DI > -DI, DI spread >= 5, ADX >= 20", error: dmi ? undefined : !daily ? "DB daily candles unavailable (0)" : !daily.ok ? `DB daily candles unavailable (${daily.candles.length})` : "insufficient parsed candles for DMI" });
+      const dmiIsFinite = Boolean(dmi && [dmi.plusDi, dmi.minusDi, dmi.adx].every(Number.isFinite));
+      const qualifies = Boolean(dmiIsFinite && dmi && dmi.plusDi > dmi.minusDi && dmi.plusDi - dmi.minusDi >= 5 && dmi.adx >= 20);
+      const candleCount = daily?.candles.length ?? 0;
+      results.push({ market: item.market, code: item.code, name: item.name, plusDi: dmiIsFinite ? dmi?.plusDi ?? null : null, minusDi: dmiIsFinite ? dmi?.minusDi ?? null : null, adx: dmiIsFinite ? dmi?.adx ?? null : null, date: dmi?.date ?? null, candleCount, dailyDiagnostics: daily?.diagnostics ?? null, rawText: (daily as any)?.response?.rawText || undefined, qualifies, qualificationRule: "+DI > -DI, DI spread >= 5, ADX >= 20", error: dmiIsFinite ? undefined : dmi ? "DMI calculation returned non-finite value" : candleCount === 0 ? "no cached daily candles" : !daily?.ok ? `insufficient daily candles (${candleCount}/${period + 1})` : "insufficient parsed candles for DMI" });
     } catch (error) { results.push({ market: item.market, code: item.code, name: item.name, plusDi: null, minusDi: null, adx: null, date: null, candleCount: 0, qualifies: false, error: error instanceof Error ? error.message : String(error) }); }
   } };
   await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 4, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => (b.adx ?? -1) - (a.adx ?? -1));
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, period, instrumentCount: instruments.length, successCount: results.filter((x) => x.adx !== null).length, failureCount: results.filter((x) => x.adx === null).length, qualified: results.filter((x) => x.qualifies), results };
+  const succeeded = (item: (typeof results)[number]) => typeof item.plusDi === "number" && Number.isFinite(item.plusDi) && typeof item.minusDi === "number" && Number.isFinite(item.minusDi) && typeof item.adx === "number" && Number.isFinite(item.adx);
+  const failureReasons = summarizeUsDailyScanFailures(results.filter((item) => !succeeded(item)));
+  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, period, instrumentCount: instruments.length, successCount: results.filter(succeeded).length, failureCount: results.filter((item) => !succeeded(item)).length, failureReasons, qualified: results.filter((x) => x.qualifies), results };
 }

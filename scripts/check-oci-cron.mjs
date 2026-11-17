@@ -3,6 +3,280 @@ import path from "node:path";
 
 const file = path.resolve("scripts/oci-cron.sh");
 const source = fs.readFileSync(file, "utf8");
+const dailyCacheSyncSource = fs.readFileSync(path.resolve("scripts/sync-daily-cache-from-remote.mjs"), "utf8");
+const asyncDailyCacheSyncSource = fs.readFileSync(path.resolve("scripts/sync-daily-cache-async.mjs"), "utf8");
+const dailyCandleFallbackSource = fs.readFileSync(path.resolve("lib/daily-candle-fallback.mjs"), "utf8");
+const dailyCacheSyncResultSource = fs.readFileSync(path.resolve("lib/daily-cache-sync-result.mjs"), "utf8");
+const apiUrlInitialization = dailyCacheSyncSource.match(/function createDailyCacheApiUrl\([\s\S]*?\n\}/)?.[0] ?? "";
+const poolInitialization = dailyCacheSyncSource.match(/let pool;\s*let poolBackgroundErrorCount = 0;\s*let firstPoolBackgroundError;\s*try \{\s*pool = new Pool\(\{ connectionString: localDatabaseUrl, connectionTimeoutMillis: databaseConnectionTimeoutMs \}\);\s*\}\s*catch \{\s*throw new Error\("LOCAL_DATABASE_URL could not initialize PostgreSQL pool"\);\s*\}/)?.[0] ?? "";
+const summarizeErrorSource = dailyCacheSyncSource.match(/function summarizeError\([\s\S]*?\n\}/)?.[0] ?? "";
+const summaryTryPosition = summarizeErrorSource.indexOf("  try {");
+const summaryCatchPosition = summarizeErrorSource.indexOf("  } catch {");
+const summaryFallbackPosition = summarizeErrorSource.indexOf('return { name: "ErrorSummaryFailed", message: "error details unavailable" }');
+const aggregateArrayCheckPosition = summarizeErrorSource.indexOf("if (!Array.isArray(aggregateErrors))");
+const aggregateArrayReadPosition = summarizeErrorSource.indexOf("const aggregateErrors = error.errors;");
+const aggregateSlicePosition = summarizeErrorSource.indexOf("aggregateErrors.slice(0, 20)");
+const sanitizeErrorMessageSource = dailyCacheSyncSource.match(/function sanitizeErrorMessage\([\s\S]*?\n\}/)?.[0] ?? "";
+const fundamentalsItemValidation = dailyCacheSyncSource.match(/for \(const item of fundamentalsPayload\.items\) \{([\s\S]*?)\n\s*\}/)?.[1] ?? "";
+const fundamentalsNumericValidation = dailyCacheSyncSource.match(/const fundamentalNumericFields = \[([\s\S]*?)\];([\s\S]*?)returnedFundamentalCodes\.add\(code\);/)?.[0] ?? "";
+const fundamentalsMetadataValidation = dailyCacheSyncSource.match(/if \(typeof item\.name !== "string"\)[\s\S]*?returnedFundamentalCodes\.add\(code\);/)?.[0] ?? "";
+const redactionRules = [
+  String.raw`postgres(?:ql)?|https?`,
+  String.raw`[^/\s@]*@`,
+  String.raw`password|passwd|pwd|token|access[_-]?token`,
+  String.raw`(?:api|app)[_-]?key`,
+  String.raw`(?:app|client)[_-]?secret`,
+  String.raw`secret(?:key)?`,
+  String.raw`authorization|credential|signature|sig`,
+  String.raw`Bearer\s+`,
+  String.raw`\s*[:=]\s*`,
+  "<redacted>",
+];
+if (!summarizeErrorSource || !sanitizeErrorMessageSource || redactionRules.some((rule) => !sanitizeErrorMessageSource.includes(rule))) {
+  throw new Error("Daily-cache sync error summaries must redact URI userinfo and sensitive query credentials");
+}
+if (!summarizeErrorSource.includes("sanitizeErrorMessage(error.message)")
+  || !summarizeErrorSource.includes("sanitizeErrorMessage(error)")
+  || !summarizeErrorSource.includes("sanitizeErrorMessage(error.name).slice(0, 100)")
+  || !summarizeErrorSource.includes("Array.isArray(aggregateErrors)")
+  || !summarizeErrorSource.includes("aggregateErrors.slice(0, 20)")
+  || !summarizeErrorSource.includes("summary.errorsOmitted = aggregateErrors.length - summary.errors.length")
+  || !summarizeErrorSource.includes("summary.errorsUnavailable = true")
+  || !summarizeErrorSource.includes("error details unavailable")
+  || !sanitizeErrorMessageSource.includes(".slice(0, 500)")) {
+  throw new Error("Daily-cache sync must sanitize and bound error messages, names, and AggregateError width");
+}
+if (summaryTryPosition < 0 || summaryCatchPosition <= summaryTryPosition || summaryFallbackPosition <= summaryCatchPosition
+  || aggregateArrayReadPosition < 0 || aggregateArrayCheckPosition <= aggregateArrayReadPosition
+  || aggregateSlicePosition <= aggregateArrayCheckPosition) {
+  throw new Error("Daily-cache sync must guard error-property access and AggregateError array use in execution order");
+}
+if (!dailyCacheSyncSource.includes('fatalFailure = { phase: "run", error: summarizeError(error).message }')
+  || !dailyCacheSyncSource.includes('poolShutdownFailure = { phase: "pool-shutdown", error: summarizeError(error).message }')) {
+  throw new Error("Daily-cache sync top-level and pool-shutdown failures must use sanitized error summaries");
+}
+if (!apiUrlInitialization.includes('new URL("/api/public/daily-candles", normalizedBaseUrl)')
+  || !apiUrlInitialization.includes("String(baseUrl).trim()")
+  || !apiUrlInitialization.includes('["http:", "https:"]')
+  || !apiUrlInitialization.includes("url.username || url.password")
+  || !apiUrlInitialization.includes("rawAuthority.includes(\"@\")")
+  || !apiUrlInitialization.includes('authority.includes("@")')
+  || !apiUrlInitialization.includes("catch {")
+  || !apiUrlInitialization.includes("DAILY_CACHE_API_URL must be a valid absolute HTTP(S) URL without credentials")) {
+  throw new Error("Daily-cache sync must validate a credential-free public API URL without exposing its configured value");
+}
+const apiInitializationPosition = dailyCacheSyncSource.indexOf("const api = createDailyCacheApiUrl(");
+const poolInitializationPosition = dailyCacheSyncSource.indexOf("pool = new Pool(");
+if (apiInitializationPosition < 0 || poolInitializationPosition < 0 || apiInitializationPosition > poolInitializationPosition) {
+  throw new Error("Daily-cache sync must validate the API URL before creating the local database pool");
+}
+if (!poolInitialization) {
+  throw new Error("Daily-cache sync must convert synchronous pool initialization failures to a secret-free error");
+}
+if (!dailyCacheSyncSource.includes("const localDatabaseUrl = process.env.LOCAL_DATABASE_URL?.trim();")
+  || !dailyCacheSyncSource.includes("const dailyCacheApiBaseUrl = process.env.DAILY_CACHE_API_URL?.trim();")
+  || !dailyCacheSyncSource.includes("const api = createDailyCacheApiUrl(dailyCacheApiBaseUrl);")
+  || !dailyCacheSyncSource.includes('new URL("/api/public/instrument-fundamentals", dailyCacheApiBaseUrl)')) {
+  throw new Error("Daily-cache sync must trim and consistently use validated environment URLs");
+}
+const asyncApiUrlValidation = asyncDailyCacheSyncSource.match(/function validateDailyCacheApiBaseUrl\(value\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+if (!asyncApiUrlValidation.includes("value.match(/^https?:\\/\\/([^/?#]*)/i)")
+  || !asyncApiUrlValidation.includes('["http:", "https:"]')
+  || !asyncApiUrlValidation.includes("url.username")
+  || !asyncApiUrlValidation.includes("url.password")
+  || !asyncApiUrlValidation.includes("rawAuthority.includes(\"@\")")
+  || !asyncDailyCacheSyncSource.includes("const dailyCacheApiBaseUrl = process.env.DAILY_CACHE_API_URL?.trim();")
+  || !asyncDailyCacheSyncSource.includes("const validatedDailyCacheApiBaseUrl = dailyCacheApiBaseUrl ? validateDailyCacheApiBaseUrl(dailyCacheApiBaseUrl) : null;")) {
+  throw new Error("Async daily-cache sync must trim and validate a credential-free HTTP(S) base URL");
+}
+for (const line of asyncDailyCacheSyncSource.split("\n")) {
+  if (/new URL\([^\n]*process\.env\.DAILY_CACHE_API_URL/.test(line)) {
+    throw new Error("Async daily-cache endpoints must use the validated base URL");
+  }
+}
+if (!asyncDailyCacheSyncSource.includes("async function persistParts(kind, parts)")
+  || !asyncDailyCacheSyncSource.includes("persistParts(kind, job.parts)")
+  || !asyncDailyCacheSyncSource.includes("refreshDailyCandleSummaries(client, kind, part.market, codes)")) {
+  throw new Error("Async daily-cache persistence must pass the market kind to summary refresh");
+}
+const asyncFundamentalsStart = asyncDailyCacheSyncSource.indexOf("if (!skipFundamentals) {", asyncDailyCacheSyncSource.indexOf("async function fetchBatch"));
+const asyncFundamentalsEnd = asyncDailyCacheSyncSource.indexOf("const compactTargetDate", asyncFundamentalsStart);
+const asyncFundamentalsValidation = asyncFundamentalsStart >= 0 && asyncFundamentalsEnd > asyncFundamentalsStart
+  ? asyncDailyCacheSyncSource.slice(asyncFundamentalsStart, asyncFundamentalsEnd)
+  : "";
+if (!asyncDailyCacheSyncSource.includes("payload.market !== market || payload.timeframe !== timeframe")
+  || !asyncDailyCacheSyncSource.includes("payload = { ok: true, market, timeframe, items: [] }")) {
+  throw new Error("Async daily-candle responses must match the requested market and timeframe");
+}
+const asyncIntegerParserPosition = asyncDailyCacheSyncSource.indexOf("function readIntegerOption(name, defaultValue, minimum, maximum = Number.MAX_SAFE_INTEGER)");
+const asyncPoolCreationPosition = asyncDailyCacheSyncSource.indexOf("const pool = new Pool(");
+const asyncLastIntegerOptionPosition = asyncDailyCacheSyncSource.indexOf('const maxInstruments = readIntegerOption("max-instruments", 0, 0);');
+const asyncArgumentParserPosition = asyncDailyCacheSyncSource.indexOf("const supportedOptions = new Set([");
+if (asyncArgumentParserPosition < 0
+  || asyncIntegerParserPosition < asyncArgumentParserPosition
+  || asyncPoolCreationPosition < 0
+  || asyncLastIntegerOptionPosition < asyncIntegerParserPosition
+  || asyncLastIntegerOptionPosition > asyncPoolCreationPosition
+  || !asyncDailyCacheSyncSource.includes("if (!supportedOptions.has(name)) throw new Error(`Unknown option: --${name}`)")
+  || !asyncDailyCacheSyncSource.includes("if (args.has(name)) throw new Error(`Duplicate option: --${name}`)")
+  || !asyncDailyCacheSyncSource.includes("Positional arguments are not supported")
+  || !asyncDailyCacheSyncSource.includes('if (booleanOptions.has(name) && !["true", "false"].includes(value))')
+  || !asyncDailyCacheSyncSource.includes("if (!Number.isSafeInteger(value)) throw new Error(`--${name} must be a safe integer`)")
+  || !asyncDailyCacheSyncSource.includes('const saveConcurrency = readIntegerOption("save-workers", 2, 1, 4);')
+  || !asyncDailyCacheSyncSource.includes('const queueLimit = readIntegerOption("queue", 10, 1, 50);')) {
+  throw new Error("Async sync worker and queue CLI values must be validated before pool creation");
+}
+const asyncErrorSanitizer = asyncDailyCacheSyncSource.match(/function sanitizeErrorMessage\(value\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+const asyncErrorSummarizer = asyncDailyCacheSyncSource.match(/function summarizeRuntimeError\(error, depth = 0\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+if (!asyncErrorSanitizer.includes("postgres(?:ql)?|https?")
+  || !asyncErrorSanitizer.includes("Bearer\\s+")
+  || !asyncErrorSanitizer.includes("authorization|credential|signature|sig")
+  || !asyncErrorSanitizer.includes("[#?&](?:password")
+  || !asyncErrorSanitizer.includes("api[_-]?key|app[_-]?key|access[_-]?token")
+  || !asyncErrorSanitizer.includes("\\s+(?:is|was)\\s+")
+  || !asyncErrorSanitizer.includes("(?:Bearer|Basic)\\s+")
+  || !asyncErrorSanitizer.includes(".slice(0, 500)")
+  || !asyncErrorSummarizer.includes("error.cause !== undefined")
+  || !asyncErrorSummarizer.includes("aggregateErrors.slice(0, 20)")
+  || !asyncDailyCacheSyncSource.includes("formatRuntimeError(error)")
+  || !asyncDailyCacheSyncSource.includes("fatalFailure = summarizeRuntimeError(error)")
+  || !asyncDailyCacheSyncSource.includes("poolShutdownFailure = summarizeRuntimeError(error)")) {
+  throw new Error("Async sync diagnostics must retain bounded nested causes while redacting sensitive values");
+}
+if (asyncDailyCacheSyncSource.split("\n").some((line) => line.includes("console.warn(") && line.includes("error.message"))) {
+  throw new Error("Async sync warning logs must not print raw error messages");
+}
+if (!asyncFundamentalsValidation.includes("requestedFundamentalCodes.has(code)")
+  || !asyncFundamentalsValidation.includes("returnedFundamentalCodes.has(code)")
+  || !asyncFundamentalsValidation.includes("itemMarket !== String(market).trim().toUpperCase()")
+  || !asyncFundamentalsValidation.includes('typeof item[field] !== "number"')
+  || !asyncFundamentalsValidation.includes("!Number.isFinite(item[field])")
+  || !asyncFundamentalsValidation.includes('typeof item.name !== "string"')
+  || !asyncFundamentalsValidation.includes('typeof item.currency !== "string"')
+  || !asyncFundamentalsValidation.includes("Date.parse(timestamp)")
+  || !asyncFundamentalsValidation.includes("code: requestedFundamentalCodes.get")) {
+  throw new Error("Async fundamentals rows must be validated against the requested market, codes, and field types before save");
+}
+if (!dailyCandleFallbackSource.includes("...(previous?.candles ?? [])")
+  || !dailyCandleFallbackSource.includes('...result.candles.map((candle) => ({ ...candle, source: "OPERATING_CHART_API" }))')
+  || !asyncDailyCacheSyncSource.includes("originalCandleCodes.has(code)")
+  || !asyncDailyCacheSyncSource.includes("requestedCandleCodes.has(code)")
+  || asyncDailyCacheSyncSource.includes("KR fallback incomplete")) {
+  throw new Error("Daily chart fallback must preserve existing candles and reject malformed bulk rows without discarding usable history");
+}
+const asyncTransactionFailureHandling = asyncDailyCacheSyncSource.match(/async function persistParts\(kind, parts\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+if (!asyncTransactionFailureHandling.includes('client.release(true);')
+  || !asyncTransactionFailureHandling.includes('LOCAL_TRANSACTION_COMMIT_OUTCOME_UNKNOWN')
+  || !asyncTransactionFailureHandling.includes('LOCAL_TRANSACTION_ROLLBACK_FAILED:')
+  || !asyncTransactionFailureHandling.includes('new AggregateError([error, rollbackError]')) {
+  throw new Error("Async daily-cache transaction failures must preserve commit uncertainty and both rollback errors");
+}
+if ((asyncDailyCacheSyncSource.match(/LOCAL_TRANSACTION_COMMIT_OUTCOME_UNKNOWN/g) ?? []).length < 2
+  || (asyncDailyCacheSyncSource.match(/LOCAL_TRANSACTION_ROLLBACK_FAILED:/g) ?? []).length < 2
+  || (asyncDailyCacheSyncSource.match(/new AggregateError\(\[error, rollbackError\]/g) ?? []).length < 2) {
+  throw new Error("All async daily-cache transactions must preserve commit and rollback failures");
+}
+const asyncPoolErrorListenerPosition = asyncDailyCacheSyncSource.indexOf('pool.on("error", (error) => {');
+const asyncFirstPoolUsePosition = asyncDailyCacheSyncSource.indexOf("await pool.query(");
+if (!asyncDailyCacheSyncSource.includes("const databaseConnectionTimeoutMs = 10_000;")
+  || !asyncDailyCacheSyncSource.includes("connectionTimeoutMillis: databaseConnectionTimeoutMs")
+  || asyncPoolErrorListenerPosition < 0
+  || asyncFirstPoolUsePosition < 0
+  || asyncPoolErrorListenerPosition > asyncFirstPoolUsePosition
+  || !asyncDailyCacheSyncSource.includes("poolBackgroundErrorCount++;")
+  || !asyncDailyCacheSyncSource.includes("const poolBackgroundFailure =")
+  || !asyncDailyCacheSyncSource.includes("poolBackgroundFailure, telemetry, result")) {
+  throw new Error("Async daily-cache sync must bound DB connection waits and report background pool errors as failures");
+}
+const asyncUsMarketCapFilterStart = asyncDailyCacheSyncSource.indexOf("if (kind === \"US\" && usMarketCapUnder !== null)");
+const asyncUsMarketCapFilterEnd = asyncDailyCacheSyncSource.indexOf("if (marketCapUnder !== null || marketCapOver !== null)", asyncUsMarketCapFilterStart);
+const asyncUsMarketCapFilter = asyncUsMarketCapFilterStart >= 0 && asyncUsMarketCapFilterEnd > asyncUsMarketCapFilterStart
+  ? asyncDailyCacheSyncSource.slice(asyncUsMarketCapFilterStart, asyncUsMarketCapFilterEnd)
+  : "";
+if (!asyncUsMarketCapFilter.includes("WHERE u.enabled=true ${dailyActiveFilter}")
+  || asyncUsMarketCapFilter.includes("u.daily_active=true")) {
+  throw new Error("US market-cap filtering must preserve include-inactive-daily universe semantics");
+}
+if (!asyncDailyCacheSyncSource.includes('latest.fetched_at < $2')
+  || !asyncDailyCacheSyncSource.includes('targetDate.replaceAll("-", ""), new Date(Date.now() - 30 * 60 * 1000)')) {
+  throw new Error("Combining only-missing-date and only-unrefreshed must apply both date and freshness filters");
+}
+if (!asyncDailyCacheSyncSource.includes('if (onlyUnrefreshed && (marketArg !== "US" || timeframe !== "D"))')) {
+  throw new Error("only-unrefreshed must be rejected outside US daily mode");
+}
+const asyncPoolEndPosition = asyncDailyCacheSyncSource.lastIndexOf("await pool.end();");
+const asyncFinalJsonPosition = asyncDailyCacheSyncSource.lastIndexOf("console.log(JSON.stringify({ ok, mode: \"async-bounded-queue\"");
+if (asyncPoolEndPosition < 0
+  || asyncFinalJsonPosition <= asyncPoolEndPosition
+  || !asyncDailyCacheSyncSource.includes("poolShutdownFailure = summarizeRuntimeError(error)")
+  || !asyncDailyCacheSyncSource.includes("!fatalFailure && !poolShutdownFailure && !poolBackgroundFailure")) {
+  throw new Error("Async daily-cache final output must follow pool shutdown and include execution/shutdown failures");
+}
+if (!asyncTransactionFailureHandling.includes('"open", "high", "low", "close", "volume"')
+  || !asyncTransactionFailureHandling.includes("existingRow[field] !== normalizedRow[field]")
+  || !asyncTransactionFailureHandling.includes("conflicting duplicate candle")
+  || !asyncTransactionFailureHandling.includes("duplicateCandleRows++")) {
+  throw new Error("Async daily-cache sync must reject conflicting duplicate candles and count only identical duplicates");
+}
+if (!asyncTransactionFailureHandling.includes("let duplicateCandleRows = 0;")
+  || !asyncTransactionFailureHandling.includes("telemetry.duplicateCandleRows += duplicateCandleRows;")
+  || !asyncTransactionFailureHandling.includes("return { saved, duplicateCandleRows }")
+  || !asyncDailyCacheSyncSource.includes("duplicateCandleRows += persisted.duplicateCandleRows")
+  || !asyncDailyCacheSyncSource.includes("duplicateCandleRows,")
+  || !dailyCacheSyncResultSource.includes("result.saved + (result.duplicateCandleRows ?? 0) === result.fetched")) {
+  throw new Error("Async daily-cache duplicate counts must include committed writes only and reach market results");
+}
+const poolErrorListenerPosition = dailyCacheSyncSource.indexOf('pool.on("error", (error) => {');
+const firstPoolQueryPosition = dailyCacheSyncSource.indexOf("const universe = await pool.query(");
+if (!dailyCacheSyncSource.includes("const databaseConnectionTimeoutMs = 10_000;")
+  || poolErrorListenerPosition < 0 || firstPoolQueryPosition < 0 || poolErrorListenerPosition > firstPoolQueryPosition
+  || !dailyCacheSyncSource.includes("poolBackgroundErrorCount += 1;")
+  || !dailyCacheSyncSource.includes("firstPoolBackgroundError = summarizeError(error);")
+  || !dailyCacheSyncSource.includes("!poolBackgroundFailure")
+  || !dailyCacheSyncSource.includes("...(poolBackgroundFailure ? { poolBackgroundFailure } : {})")) {
+  throw new Error("Daily-cache sync must bound PostgreSQL connection waits and report idle pool errors in its final result");
+}
+const poolEndPosition = dailyCacheSyncSource.lastIndexOf("await pool.end();");
+const poolFailureAggregatePosition = dailyCacheSyncSource.indexOf("const poolBackgroundFailure = poolBackgroundErrorCount > 0");
+const finalOkPosition = dailyCacheSyncSource.indexOf("const ok = !fatalFailure && !poolShutdownFailure && !poolBackgroundFailure");
+const finalJsonPosition = dailyCacheSyncSource.indexOf("console.log(JSON.stringify({ ok, timeframe, limit, result");
+const exitCodePosition = dailyCacheSyncSource.indexOf("if (!ok) process.exitCode = 1;");
+if (poolEndPosition < 0 || poolFailureAggregatePosition <= poolEndPosition
+  || finalOkPosition <= poolFailureAggregatePosition || finalJsonPosition <= finalOkPosition
+  || exitCodePosition <= finalJsonPosition) {
+  throw new Error("Daily-cache sync must close the pool before aggregating background errors and reporting final status");
+}
+if (!fundamentalsItemValidation.includes("!item || typeof item !== \"object\" || Array.isArray(item)")) {
+  throw new Error("Daily-cache sync must reject null, primitive, and array fundamentals rows before property access");
+}
+for (const required of [
+  "price", "changeRate", "open", "high", "low", "volume", "tradingValue", "marketCap", "listedShares",
+  "field in item", "item[field] !== null", "typeof item[field] !== \"number\"", "!Number.isFinite(item[field])",
+  "원격 기본정보 수치 필드 오류",
+]) {
+  if (!fundamentalsNumericValidation.includes(required)) {
+    throw new Error(`Daily-cache sync must validate nullable finite fundamentals numbers before saving (${required})`);
+  }
+}
+for (const required of [
+  "typeof item.name !== \"string\"", "!(\"currency\" in item)", "item.currency !== null",
+  "observedAt", "fetchedAt", "Date.parse(timestamp)", "timestamp !== null",
+  "원격 기본정보 텍스트 필드 오류", "원격 기본정보 시간 필드 오류",
+]) {
+  if (!fundamentalsMetadataValidation.includes(required)) {
+    throw new Error(`Daily-cache sync must validate fundamentals name, currency, and timestamps before saving (${required})`);
+  }
+}
+for (const required of [
+  "fundamentalsMissingCodeSample",
+  "fundamentalsMissingCodeSample.push",
+  "fundamentalsMissingCount: batchFundamentalsMissingCodes.length",
+  "batchFundamentalsMissingCodes.slice(0, 20).map((code) => `${market}:${code}`)",
+  "Math.max(0, 20 - fundamentalsMissingCodeSample.length)",
+  "fundamentalsMissingCodeSample, failure",
+]) {
+  if (!dailyCacheSyncSource.includes(required)) throw new Error(`Daily-cache sync must expose missing fundamentals codes separately (${required})`);
+}
 const matches = [...source.matchAll(/run_cron_endpoint\s+"([^"]+)"\s+(\d+)\s+"([^"]+)"/g)];
 if (matches.length === 0) throw new Error("No cron endpoints were found");
 if (!source.includes('run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"')) {
@@ -183,6 +457,7 @@ const fundamentalsService = fs.readFileSync(path.resolve("deploy/oci/stockman-fu
 const fundamentalsTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-fundamentals.timer"), "utf8");
 const nginx = fs.readFileSync(path.resolve("deploy/oci/nginx-stockman.conf"), "utf8");
 const activation = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
+const discordCommandRegistration = fs.readFileSync(path.resolve("scripts/register-discord-commands.mjs"), "utf8");
 const workflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
 const flywayPreflight = fs.readFileSync(path.resolve("scripts/oci-flyway-v168-preflight.mjs"), "utf8");
 const automationRuns = fs.readFileSync(path.resolve("lib/automation-run-repository.ts"), "utf8");

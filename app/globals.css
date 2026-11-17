@@ -346,3 +346,7 @@ body { overflow-x: clip; }
   --pageButton-border: rgba(0,0,0,.1); --pageButton-color: #0f172a; --groupHeader-border: rgba(0,0,0,.08); --groupHeader-h2: #0f172a;
   --groupHeader-span: #64748b; --empty-bg: rgba(0,0,0,.02); --empty-border: rgba(0,0,0,.08); --neutral-bg: rgba(0,0,0,.04); --neutral-border: rgba(0,0,0,.08); --toolbar-label: #334155;
 }
+
+.disclosurePagination{display:flex;align-items:center;justify-content:center;gap:12px;margin:22px 0}.disclosurePagination span{color:#9aa8c2;font-size:13px;font-weight:700}.disclosurePagination button{min-height:40px;padding:0 16px;border:1px solid rgba(0,231,155,.38);border-radius:10px;background:#0c1323;color:#e8edf8;font-weight:750;cursor:pointer}.disclosurePagination button:disabled{opacity:.45;cursor:not-allowed}
+
+.disclosureSearchControl{display:flex;align-items:flex-end;gap:8px}.disclosureSearchControl label{display:grid;gap:7px;color:#8d9ab3;font-size:12px;font-weight:700}.disclosureSearchControl input{height:44px;min-width:220px;padding:0 12px;border:1px solid rgba(148,163,184,.24);border-radius:11px;background:#0c1323;color:#e8edf8;font:600 14px Inter,system-ui,sans-serif}.disclosureSearchControl button{height:44px;padding:0 16px;border:1px solid rgba(0,231,155,.38);border-radius:11px;background:#00e79b;color:#03131a;font-weight:850;cursor:pointer}@media(max-width:700px){.disclosureSearchControl{grid-column:1/-1}.disclosureSearchControl label{flex:1}.disclosureSearchControl input{min-width:0;width:100%}.disclosureSearchControl button{min-height:44px}}

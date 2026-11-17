@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/cron-response-classifier.sh"
 
 BASE_URL="${STOCKMAN_BASE_URL:-http://127.0.0.1:3000}"
 CRON_SECRET="${CRON_SECRET:?CRON_SECRET is required}"
@@ -8,8 +9,14 @@ TOTAL_COUNT=0
 SUCCESS_COUNT=0
 FAILED_COUNT=0
 SKIPPED_COUNT=0
+DEFERRED_ENDPOINT_COUNT=0
 START_MS="$(date +%s%3N)"
 CRON_RUN_ID="${CRON_RUN_ID:-cron-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+
+print_cron_summary() {
+  printf '[CronSummary] total=%s success=%s failed=%s skipped=%s deferredEndpoints=%s elapsedMs=%s\n' \
+    "$TOTAL_COUNT" "$SUCCESS_COUNT" "$FAILED_COUNT" "$SKIPPED_COUNT" "$DEFERRED_ENDPOINT_COUNT" "$1"
+}
 
 run_cron_endpoint() {
   local label="$1"
@@ -33,12 +40,24 @@ run_cron_endpoint() {
     # no-op, while other routes may expose an application-level failure in a
     # JSON body. Classify the body so CronSummary reflects the actual result
     # instead of treating every HTTP 2xx as success.
+    track_cron_deferred_response "$output"
     if [[ "$output" =~ \"ok\"[[:space:]]*:[[:space:]]*false ]]; then
       FAILED_COUNT=$((FAILED_COUNT + 1))
-      printf '[Cron] %s failed requestId=%s durationMs=%s application_response=%s\n' "$label" "$request_id" "$duration_ms" "$output" >&2
+      if (( CRON_RESPONSE_HAS_DEFERRED )); then
+        printf '[Cron] %s failed-with-deferred requestId=%s durationMs=%s application_response=%s\n' "$label" "$request_id" "$duration_ms" "$output" >&2
+      else
+        printf '[Cron] %s failed requestId=%s durationMs=%s application_response=%s\n' "$label" "$request_id" "$duration_ms" "$output" >&2
+      fi
     elif [[ "$output" =~ \"skipped\"[[:space:]]*:[[:space:]]*true ]]; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-      printf '[Cron] %s skipped requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
+      if (( CRON_RESPONSE_HAS_DEFERRED )); then
+        printf '[Cron] %s skipped-with-deferred requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
+      else
+        printf '[Cron] %s skipped requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
+      fi
+    elif (( CRON_RESPONSE_HAS_DEFERRED )); then
+      SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+      printf '[Cron] %s success-with-deferred requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
     else
       SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
       printf '[Cron] %s success requestId=%s durationMs=%s %s\n' "$label" "$request_id" "$duration_ms" "$output"
@@ -47,20 +66,25 @@ run_cron_endpoint() {
     exit_code=$?
     duration_ms=$(( $(date +%s%3N) - endpoint_start_ms ))
     FAILED_COUNT=$((FAILED_COUNT + 1))
-    printf '[Cron] %s failed requestId=%s durationMs=%s exit=%s response=%s\n' "$label" "$request_id" "$duration_ms" "$exit_code" "$output" >&2
+    track_cron_deferred_response "$output"
+    if (( CRON_RESPONSE_HAS_DEFERRED )); then
+      printf '[Cron] %s failed-with-deferred requestId=%s durationMs=%s exit=%s response=%s\n' "$label" "$request_id" "$duration_ms" "$exit_code" "$output" >&2
+    else
+      printf '[Cron] %s failed requestId=%s durationMs=%s exit=%s response=%s\n' "$label" "$request_id" "$duration_ms" "$exit_code" "$output" >&2
+    fi
   fi
 }
 
-# Run before other potentially long cron tasks so the daily KST 08:00 window
-# is not missed when market-data refreshes or delivery retries run slowly.
+if [[ "${CRON_SCRIPT_SOURCE_ONLY:-0}" != "1" ]]; then
+# Start each cycle with health and retention checks before time-sensitive work.
 run_cron_endpoint "health-probe-snapshot" 20 "/api/cron/health-probe-snapshot"
 run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"
 run_cron_endpoint "sec-company-facts" 900 "/api/cron/sec-company-facts"
 
 run_cron_endpoint "discord-delivery-retry" 50 "/api/cron/discord-delivery-retry"
 
-# Run the news ingestion before long-running market-data refreshes. A delayed
-# candle job must not prevent RSS from being collected during the same cycle.
+# Run time-sensitive SEC facts, delivery retry, and news collection before the
+# long candle refreshes. A delayed candle job must not block RSS collection.
 run_cron_endpoint "market-rss" 180 "/api/cron/market-rss"
 
 run_cron_endpoint "sync-filings" 50 "/api/cron/sync-filings"
@@ -72,16 +96,10 @@ run_cron_endpoint "sync-filings" 50 "/api/cron/sync-filings"
 # without requiring a duplicate environment-variable configuration.
 run_cron_endpoint "sec-edgar" 180 "/api/cron/sec-edgar"
 
-run_cron_endpoint "us-breaking-news-forwarder" 50 "/api/cron/us-breaking-news-forwarder"
 run_cron_endpoint "sec-smallcap-share-facts" 900 "/api/cron/sec-smallcap-share-facts"
 
-# Full-universe daily candle refresh can take longer than five minutes.
-# Keep the request alive so the DB automation run can finalize SUCCESS/FAILED
-# and its per-instrument retry queue is committed instead of being orphaned.
-# 국내 일봉은 해외 전체 캐시보다 먼저 실행해 긴 해외 작업 때문에
-# 국내 장중 스케줄이 지나가거나 서비스 타임아웃으로 누락되지 않게 한다.
-run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
-
+# Full-universe US refresh can take longer than five minutes; keep its request
+# alive so the automation run can finalize and retry state is persisted.
 run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
 US_OBV_REFRESH_WEEKDAY="$(TZ=America/New_York date +%u)"
 US_OBV_REFRESH_HHMM="$(TZ=America/New_York date +%H%M)"
@@ -106,9 +124,9 @@ run_cron_endpoint "kr-bollinger-middle-lower" 180 "/api/cron/kr-bollinger-middle
 run_cron_endpoint "kr-golden-cross" 180 "/api/cron/kr-golden-cross"
 
 ELAPSED_MS=$(( $(date +%s%3N) - START_MS ))
-printf '[CronSummary] total=%s success=%s failed=%s skipped=%s elapsedMs=%s\n' \
-  "$TOTAL_COUNT" "$SUCCESS_COUNT" "$FAILED_COUNT" "$SKIPPED_COUNT" "$ELAPSED_MS"
+print_cron_summary "$ELAPSED_MS"
 
 if (( FAILED_COUNT > 0 )); then
   exit 1
+fi
 fi

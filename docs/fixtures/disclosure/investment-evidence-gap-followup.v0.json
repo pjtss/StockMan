@@ -1,0 +1,141 @@
+{
+  "contractVersion": "investment-evidence-gap-followup.v0",
+  "classification": "SYNTHETIC_PRODUCT_ACCEPTANCE_NOT_RUNTIME_EVIDENCE_OR_INVESTMENT_ADVICE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsPersonalRecipientData": false
+  },
+  "requiredGapFields": [
+    "gapId",
+    "blockedClaimRefs",
+    "questionKey",
+    "missingDimensionCodes",
+    "declaredScopeRef",
+    "candidateEvidenceType",
+    "candidateOfficialSurfaceRef",
+    "rightsDisposition",
+    "coverageDisposition",
+    "resolutionPredicate",
+    "planState",
+    "nextReviewTrigger",
+    "notificationOptInRef"
+  ],
+  "planStates": [
+    "ACTIONABLE_SOURCE_KNOWN",
+    "BLOCKED_RIGHTS",
+    "BLOCKED_COVERAGE",
+    "OWNER_DECISION_REQUIRED",
+    "NO_VERIFIED_PATH",
+    "RESOLVED",
+    "SUPERSEDED"
+  ],
+  "allowedResolutionPredicates": [
+    "APPROVED_SOURCE_DOCUMENT_WITH_LOCATOR",
+    "MATCHED_DENOMINATOR_CLAIM_AND_AS_OF",
+    "CURRENT_RECONCILIATION_MANIFEST",
+    "NAMED_OWNER_DECISION"
+  ],
+  "invariants": {
+    "questionDoesNotAssertAnswer": true,
+    "missingEvidenceIsNotNegativeEvidence": true,
+    "candidateSourceIsNotCoverageProof": true,
+    "rightsBlockedSourceIsNotExposedAsActionable": true,
+    "noAutomaticFetchOrPolling": true,
+    "notificationRequiresSeparateOptIn": true,
+    "planIsInvalidatedByDependencyRevision": true,
+    "gapStatusCannotCreateDirectionOrRecommendation": true
+  },
+  "vectors": [
+    {
+      "id": "EGA-01-KNOWN-DENOMINATOR-GAP-SHOWS-RESOLUTION-CONDITION",
+      "input": {
+        "blockedClaimRefs": ["CLAIM-SYN-EGA-01"],
+        "missingDimensionCodes": ["SHARE_COUNT_DENOMINATOR", "AS_OF"],
+        "candidateOfficialSurfaceRef": "SOURCE-PROFILE-SYN-EGA-01",
+        "rightsDisposition": "ALLOW_FOR_DECLARED_ACTION",
+        "coverageDisposition": "NOT_YET_SEARCHED",
+        "resolutionPredicate": "MATCHED_DENOMINATOR_CLAIM_AND_AS_OF"
+      },
+      "expected": {
+        "planState": "ACTIONABLE_SOURCE_KNOWN",
+        "questionAndResolutionConditionVisible": true,
+        "coverageClaim": "NOT_SEARCHED",
+        "dilutionEffect": "NOT_COMPUTED",
+        "direction": "NOT_ASSESSED"
+      }
+    },
+    {
+      "id": "EGA-02-PARTIAL-COVERAGE-DOES-NOT-PROMISE-NEGATIVE-ANSWER",
+      "input": {
+        "candidateOfficialSurfaceRef": "SOURCE-PROFILE-SYN-EGA-02",
+        "rightsDisposition": "ALLOW_FOR_DECLARED_ACTION",
+        "coverageDisposition": "PARTIAL",
+        "noMatchingEvidenceObserved": true
+      },
+      "expected": {
+        "planState": "BLOCKED_COVERAGE",
+        "notFoundInScope": false,
+        "gapRemainsOpen": true,
+        "automaticRetryScheduled": false
+      }
+    },
+    {
+      "id": "EGA-03-UNRESOLVED-RIGHTS-WITHHOLDS-SOURCE-ACTION",
+      "input": {
+        "candidateOfficialSurfaceRef": "SOURCE-PROFILE-SYN-EGA-03",
+        "rightsDisposition": "UNRESOLVED",
+        "sourceContainsBody": true
+      },
+      "expected": {
+        "planState": "OWNER_DECISION_REQUIRED",
+        "actionableSourceLink": false,
+        "bodyOrExcerptExposed": false,
+        "nextReviewTrigger": "NAMED_OWNER_DECISION"
+      }
+    },
+    {
+      "id": "EGA-04-NO-VERIFIED-SOURCE-DOES-NOT-INVENT-A-FOLLOWUP",
+      "input": {
+        "candidateOfficialSurfaceRef": null,
+        "reviewScope": "SYNTH_SCOPE_EGA_04",
+        "knownAuthoritativeResolutionPath": false
+      },
+      "expected": {
+        "planState": "NO_VERIFIED_PATH",
+        "futureDateInvented": false,
+        "automaticReminderScheduled": false,
+        "unresolvedReasonVisible": true
+      }
+    },
+    {
+      "id": "EGA-05-DEPENDENCY-REVISION-SUPERSEDES-OLD-GAP-PLAN",
+      "input": {
+        "priorClaimRevision": "CLAIM-REV-SYN-EGA-05-A",
+        "currentClaimRevision": "CLAIM-REV-SYN-EGA-05-B",
+        "priorPlanState": "ACTIONABLE_SOURCE_KNOWN"
+      },
+      "expected": {
+        "priorPlanState": "SUPERSEDED",
+        "priorResolutionActionRemainsCurrent": false,
+        "newPlanReviewRequired": true,
+        "historicalPlanMutated": false
+      }
+    },
+    {
+      "id": "EGA-06-GAP-CARD-DOES-NOT-IMPLY-NOTIFICATION-OPT-IN",
+      "input": {
+        "gapPlanVisible": true,
+        "notificationOptInRef": null,
+        "nextReviewTrigger": "SOURCE_RECONCILIATION"
+      },
+      "expected": {
+        "gapCardVisible": true,
+        "notificationScheduled": false,
+        "eventSubscriptionCreated": false,
+        "directionOrRecommendationCreated": false
+      }
+    }
+  ]
+}

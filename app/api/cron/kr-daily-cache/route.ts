@@ -11,17 +11,25 @@ export async function POST(request: Request) {
   try {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   const settings = await loadFeatureModuleSettings("kr-daily-cache");
-  if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
-  if (!settings.enabled) { await recordSkippedAutomationRun("kr-daily-cache", "disabled"); return NextResponse.json({ ok: true, skipped: true, reason: "disabled" }); }
-  if (!isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("kr-daily-cache", "outside_schedule"); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule" }); }
+  const evaluatedAt = new Date();
   const intervalSeconds = Math.max(60, settings.intervalSeconds ?? 3_600);
-  const latestRun = await loadLatestExecutedAutomationRun("kr-daily-cache").catch(() => null);
+  const schedule = { timezone: "Asia/Seoul", evaluatedAtKst: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "medium" }).format(evaluatedAt).replace(" ", "T") + "+09:00", enabled: settings.enabled, scheduleMode: settings.scheduleMode ?? "daily-window", startTime: settings.startTime, endTime: settings.endTime, activeDays: settings.activeDays, startDay: settings.startDay ?? null, endDay: settings.endDay ?? null, intervalSeconds };
+  if (!(await isDailyCandleAutomationEnabled())) { await recordSkippedAutomationRun("kr-daily-cache", "daily_automation_disabled", { schedule }); return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled", schedule }); }
+  if (!settings.enabled) { await recordSkippedAutomationRun("kr-daily-cache", "disabled", { schedule }); return NextResponse.json({ ok: true, skipped: true, reason: "disabled", schedule }); }
+  if (!isWithinSchedule(settings, evaluatedAt)) { await recordSkippedAutomationRun("kr-daily-cache", "outside_schedule", { schedule }); return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule", schedule }); }
+  let latestRun;
+  try {
+    latestRun = await loadLatestExecutedAutomationRun("kr-daily-cache");
+  } catch (error) {
+    console.error("[API /cron/kr-daily-cache] interval gate history unavailable:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, stage: "interval-gate", error: "KR_DAILY_CACHE_INTERVAL_CHECK_UNAVAILABLE", schedule }, { status: 503 });
+  }
   const latestStartedAt = latestRun?.started_at ? new Date(latestRun.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
   if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
     const reason = latestRun?.status === "RUNNING" ? "already_running" : "outside_interval";
-    await recordSkippedAutomationRun("kr-daily-cache", reason, { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
-    return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+    await recordSkippedAutomationRun("kr-daily-cache", reason, { schedule, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
+    return NextResponse.json({ ok: true, skipped: true, reason, schedule, intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
   }
   const result = await withAutomationRun("kr-daily-cache", runKrDailyCacheNow);
   return NextResponse.json({ ok: true, intervalSeconds, ...result });

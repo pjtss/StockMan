@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: stockman
       POSTGRES_PASSWORD: stockman-local-only
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - stockman-postgres-local-data:/var/lib/postgresql/data
 

@@ -1,0 +1,22 @@
+{
+  "contractVersion": "push-privacy-dataflow.v0",
+  "classification": "SYNTHETIC_PRODUCT_DESIGN_FIXTURES_NOT_RUNTIME_OR_DEVICE_QA_PROOF",
+  "dataPolicy": { "containsRealUser": false, "containsRealFiling": false, "containsRealIssuerOrTicker": false, "containsCredentials": false, "identitiesAreSynthetic": true },
+  "projectionModes": ["GENERIC", "DETAILED"],
+  "requiredProjectionFields": ["notificationId", "preferenceRevision", "previewMode", "title", "body", "tag", "actions", "opaqueTarget", "publicationEpoch", "rendererRevision"],
+  "deviceQaEvidenceFields": ["browserName", "browserVersion", "osName", "osVersion", "deviceClass", "osPreviewSetting", "permissionState", "appPreviewMode", "buildDigest", "testRunAt", "visibleTitle", "visibleBody", "visibleActions", "result", "evidenceRef"],
+  "vectors": [
+    { "id": "PPD-01-GENERIC-PROJECTION-REMOVES-IDENTIFYING-FILING-DETAILS", "input": { "mode": "GENERIC", "company": "SYNTH-COMPANY", "title": "SYNTH-FILING-TITLE", "keyword": "SYNTH-KEYWORD", "grade": "SYNTH-GRADE", "financialValue": "SYNTH-VALUE" }, "expected": { "title": "공시 알림", "body": "새 공시를 확인하세요.", "companyVisible": false, "titleVisible": false, "keywordVisible": false, "gradeVisible": false, "financialValueVisible": false } },
+    { "id": "PPD-02-DETAILED-PROJECTION-REQUIRES-CURRENT-EXPLICIT-PREVIEW-CHOICE", "input": { "mode": "DETAILED", "explicitChoice": true, "preferenceRevisionCurrent": true }, "expected": { "detailedAllowed": true, "previewModeBoundToRevision": true } },
+    { "id": "PPD-03-MISSING-OR-STALE-PREFERENCE-FAILS-CLOSED-TO-GENERIC", "input": { "storedPreviewMode": "DETAILED", "preferenceRevisionCurrent": false }, "expected": { "effectiveMode": "GENERIC", "detailedFallback": false } },
+    { "id": "PPD-04-SERVER-PROJECTION-IS-THE-ONLY-SOURCE-OF-VISIBLE-TEXT", "input": { "mode": "GENERIC", "serverTitle": "공시 알림", "serverBody": "새 공시를 확인하세요.", "rawAlertFieldsInPayload": true }, "expected": { "serviceWorkerUsesProjectedFieldsOnly": true, "rawFieldFallback": false, "rawAlertFieldsInPayload": false } },
+    { "id": "PPD-05-GENERIC-MODE-REMOVES-IDENTITY-FROM-TAG-ACTIONS-AND-TARGET", "input": { "mode": "GENERIC", "companyInTag": true, "filingTitleInAction": true, "directFilingUrlInOpaqueTarget": true }, "expected": { "companyInTag": false, "filingTitleInAction": false, "targetIsOpaqueInAppRoute": true } },
+    { "id": "PPD-06-EVENT-PUSH-REQUIRES-DUES-OPT-IN-IN-ADDITION-TO-PREVIEW-CHOICE", "input": { "previewMode": "DETAILED", "dartEnabled": true, "eventSubscription": false }, "expected": { "eventPushAllowed": false, "previewChoiceMeansEventConsent": false } },
+    { "id": "PPD-07-QUEUED-DETAILED-PAYLOAD-IS-REBUILT-AFTER-PRIVACY-CHANGE", "input": { "queuedPreferenceRevision": 4, "currentPreferenceRevision": 5, "queuedMode": "DETAILED", "currentMode": "GENERIC", "currentMasterEnabled": true, "currentSourceEnabled": true }, "expected": { "oldPayloadDispatch": false, "queuedDetailedSuppressed": true, "staleGenericProjectionSuppressed": true, "currentPreferenceRecheckedAtReceipt": true, "rebuildMode": null, "oldPayloadFallback": false } },
+    { "id": "PPD-08-EVENT-CLICK-RESOLVES-CURRENT-EPOCH-AND-RIGHTS", "input": { "notificationEpoch": 7, "currentEpoch": 8, "cachedEventBody": true }, "expected": { "currentGateRequired": true, "cachedBodyReturned": false, "staleEpochDetail": false } },
+    { "id": "PPD-09-OS-PREVIEW-SETTING-IS-RECORDED-SEPARATELY-FROM-APP-MODE", "input": { "osPreviewSetting": "HIDE", "appPreviewMode": "DETAILED" }, "expected": { "bothSettingsRecorded": true, "appClaimsOsWillShowDetails": false, "deviceQaRequired": true } },
+    { "id": "PPD-10-APP-OPT-OUT-DOES-NOT-CLAIM-TO-RECALL-ALREADY-DISPLAYED-NOTIFICATION", "input": { "notificationAlreadyDisplayed": true, "appMasterTurnedOff": true }, "expected": { "futureDispatchAllowed": false, "displayedNotificationRecallClaim": false, "limitationExplained": true } },
+    { "id": "PPD-11-DEVICE-QA-REQUIRES-VERSIONED-MATRIX-AND-VISIBLE-RESULTS", "input": { "matrixOwner": "UNASSIGNED", "browserVersion": null, "osVersion": null, "buildDigest": null, "visibleBody": null }, "expected": { "qaStatus": "NOT_RUN", "supportClaim": false, "missingEvidenceListed": true } },
+    { "id": "PPD-12-PRIVACY-REGRESSION-EVIDENCE-USES-SYNTHETIC-CONTENT", "input": { "evidenceRef": "EVID-SYN-1", "realFiling": true, "realUser": true }, "expected": { "evidenceAccepted": false, "realFilingStored": false, "realUserDataStored": false } }
+  ]
+}

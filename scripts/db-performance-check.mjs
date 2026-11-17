@@ -1,4 +1,6 @@
 import { Client } from "pg";
+import { refreshDailyCandleSummaries } from "./daily-candle-summary-sync.mjs";
+import { validDailyCandleSql } from "./daily-candle-quality-sql.mjs";
 
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 console.log(JSON.stringify({ databaseHost: new URL(process.env.DATABASE_URL).hostname }));
@@ -15,8 +17,20 @@ try {
   await client.query("CREATE INDEX IF NOT EXISTS us_candles_screener_cover_idx ON us_instrument_universe_candles (market, code, timeframe, candle_date) INCLUDE (open, high, low, close, volume, fetched_at) WHERE volume > 0");
   await client.query(`CREATE TABLE IF NOT EXISTS kr_latest_daily_candles (market text NOT NULL, code text NOT NULL, candle_date text NOT NULL, open double precision, high double precision, low double precision, close double precision, volume double precision, fetched_at timestamptz NOT NULL DEFAULT NOW(), PRIMARY KEY (market, code))`);
   await client.query(`CREATE TABLE IF NOT EXISTS us_latest_daily_candles (market text NOT NULL, code text NOT NULL, candle_date text NOT NULL, open double precision, high double precision, low double precision, close double precision, volume double precision, fetched_at timestamptz NOT NULL DEFAULT NOW(), PRIMARY KEY (market, code))`);
-  await client.query(`INSERT INTO kr_latest_daily_candles (market, code, candle_date, open, high, low, close, volume, fetched_at) SELECT DISTINCT ON (market, code) market, code, candle_date, open, high, low, close, volume, fetched_at FROM kr_instrument_universe_candles WHERE timeframe='D' AND volume > 0 AND close IS NOT NULL ORDER BY market, code, candle_date DESC, fetched_at DESC ON CONFLICT (market, code) DO UPDATE SET candle_date=excluded.candle_date, open=excluded.open, high=excluded.high, low=excluded.low, close=excluded.close, volume=excluded.volume, fetched_at=excluded.fetched_at WHERE kr_latest_daily_candles.candle_date <= excluded.candle_date`);
-  await client.query(`INSERT INTO us_latest_daily_candles (market, code, candle_date, open, high, low, close, volume, fetched_at) SELECT DISTINCT ON (market, code) market, code, candle_date, open, high, low, close, volume, fetched_at FROM us_instrument_universe_candles WHERE timeframe='D' AND volume > 0 AND close IS NOT NULL ORDER BY market, code, candle_date DESC, fetched_at DESC ON CONFLICT (market, code) DO UPDATE SET candle_date=excluded.candle_date, open=excluded.open, high=excluded.high, low=excluded.low, close=excluded.close, volume=excluded.volume, fetched_at=excluded.fetched_at WHERE us_latest_daily_candles.candle_date <= excluded.candle_date`);
+  for (const [kind, rawTable] of [["KR", "kr_instrument_universe_candles"], ["US", "us_instrument_universe_candles"]]) {
+    const markets = await client.query(`SELECT DISTINCT market FROM ${rawTable} WHERE timeframe='D' ORDER BY market`);
+    for (const { market } of markets.rows) {
+      const codes = await client.query(`SELECT DISTINCT code FROM ${rawTable} WHERE market=$1 AND timeframe='D' ORDER BY code`, [market]);
+      await client.query("BEGIN");
+      try {
+        await refreshDailyCandleSummaries(client, kind, market, codes.rows.map((row) => row.code));
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      }
+    }
+  }
   await client.query("ANALYZE kr_instrument_universe_candles");
   await client.query("ANALYZE us_instrument_universe_candles");
   console.log(JSON.stringify({ appliedLocalIndexes: true }));
@@ -62,7 +76,7 @@ try {
   const summaryPlan = await client.query(`EXPLAIN (ANALYZE, BUFFERS, TIMING)
     SELECT u.market, u.code, u.name, l.candle_date, l.close, l.volume
     FROM kr_common_stock_universe u JOIN kr_latest_daily_candles l ON l.market=u.market AND l.code=u.code
-    WHERE u.enabled=true AND u.instrument_type='COMMON_STOCK' ORDER BY u.market, u.code`);
+    WHERE u.enabled=true AND u.instrument_type='COMMON_STOCK' AND ${validDailyCandleSql("l")} ORDER BY u.market, u.code`);
   console.log(summaryPlan.rows.map((row) => row['QUERY PLAN']).join("\n"));
 } finally {
   await client.end();

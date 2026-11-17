@@ -16,13 +16,14 @@ describe("withAutomationLock", () => {
   });
 
   it("runs the task while holding a session advisory lock and releases it", async () => {
+    query.mockResolvedValueOnce({ rows: [{ locked: true }] }).mockResolvedValueOnce({ rows: [{ unlocked: true }] });
     const task = vi.fn(async () => "done");
 
     await expect(withAutomationLock("market-rss-pipeline", task)).resolves.toBe("done");
 
     expect(query).toHaveBeenNthCalledWith(1, "SELECT pg_try_advisory_lock(hashtext($1)) AS locked", ["market-rss-pipeline"]);
     expect(task).toHaveBeenCalledOnce();
-    expect(query).toHaveBeenNthCalledWith(2, "SELECT pg_advisory_unlock(hashtext($1))", ["market-rss-pipeline"]);
+    expect(query).toHaveBeenNthCalledWith(2, "SELECT pg_advisory_unlock(hashtext($1)) AS unlocked", ["market-rss-pipeline"]);
     expect(release).toHaveBeenCalledOnce();
   });
 
@@ -38,11 +39,12 @@ describe("withAutomationLock", () => {
   });
 
   it("releases the lock when the task fails", async () => {
+    query.mockResolvedValueOnce({ rows: [{ locked: true }] }).mockResolvedValueOnce({ rows: [{ unlocked: true }] });
     const task = vi.fn(async () => { throw new Error("pipeline failed"); });
 
     await expect(withAutomationLock("market-rss-pipeline", task)).rejects.toThrow("pipeline failed");
 
-    expect(query).toHaveBeenNthCalledWith(2, "SELECT pg_advisory_unlock(hashtext($1))", ["market-rss-pipeline"]);
+    expect(query).toHaveBeenNthCalledWith(2, "SELECT pg_advisory_unlock(hashtext($1)) AS unlocked", ["market-rss-pipeline"]);
     expect(release).toHaveBeenCalledOnce();
   });
 });

@@ -15,6 +15,17 @@ YYYY-MM-DD/
 
 압축파일은 다운로드 원본이고, 날짜 디렉터리는 압축을 해제한 원본이다. 파서 구현 시 원본 파일을 직접 변경하지 않고 staging 테이블로 적재한다.
 
+## 2026-10-24 추출본
+
+이번 원본은 국내 보통주 업종별 실제 거래대금 집계의 종목 유니버스와 대분류 업종을 확인하는 데 사용했다. KIS 공식 종목 다운로드 자료를 2026-10-24 09:55:03 UTC 기준으로 보관했다.
+
+| 파일 | 시장 | SHA-256 |
+|---|---|---|
+| [`kospi_code.mst`](./2026-10-24/kospi_code.mst) | KOSPI | `4E2855E7F8C80AC39BF3B957E26F14B08FE47C5549BDFCE573D68B893A394E7` |
+| [`kosdaq_code.mst`](./2026-10-24/kosdaq_code.mst) | KOSDAQ | `160CCB7787D9F80CDC6D0621244EA19BAE9A66E860995BC9DAFE3C7C277C4D67` |
+
+국내 `.mst` 원본은 CP949 계열 고정폭 데이터다. 보고서에서는 공식 마스터의 주권(ST)·외국주권(FS) 보통주만 포함하고, 우선주·DR·ETP·워런트·권리 등은 제외했다. 공식 샘플: [KOSPI 종목 마스터 다운로드](https://github.com/koreainvestment/open-trading-api/blob/main/stocks_info/kis_kospi_code_mst.py).
+
 ## 2026-08-18 추출본
 
 | 파일 | 시장 | 파일 계열 | 관찰 형식 |

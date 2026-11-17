@@ -30,7 +30,13 @@ export async function POST(request: Request) {
     await recordSkippedAutomationRun("instrument-fundamentals", latestStatus === "SUCCESS" ? "outside_interval" : "retry_cooldown", { intervalSeconds: retryIntervalSeconds, elapsedSeconds: elapsed, lastStatus: latestStatus });
     return NextResponse.json({ ok: true, skipped: true, reason: latestStatus === "SUCCESS" ? "outside_interval" : "retry_cooldown", intervalSeconds: retryIntervalSeconds, elapsedSeconds: elapsed, lastStatus: latestStatus });
   }
-  const latestBackoffSkip = await loadLatestInstrumentFundamentalBackoffSkip().catch(() => null);
+  let latestBackoffSkip;
+  try {
+    latestBackoffSkip = await loadLatestInstrumentFundamentalBackoffSkip();
+  } catch (error) {
+    console.error("[API /cron/instrument-fundamentals] backoff gate history unavailable:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, stage: "backoff-gate", error: "INSTRUMENT_FUNDAMENTALS_BACKOFF_CHECK_UNAVAILABLE" }, { status: 503 });
+  }
   if (latestBackoffSkip) {
     const backoffSkipStartedAt = new Date(latestBackoffSkip.started_at).getTime();
     const nextRetryAt = new Date(latestBackoffSkip.next_retry_at).getTime();

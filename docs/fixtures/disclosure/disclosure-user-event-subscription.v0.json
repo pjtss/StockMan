@@ -1,0 +1,62 @@
+{
+  "contractVersion": "disclosure-user-event-subscription.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": { "containsRealUser": false, "containsRealFiling": false, "containsRealIssuerOrTicker": false, "containsPersonalRecipientData": false, "containsCredentials": false, "identitiesAreSynthetic": true },
+  "subscriptionScopes": ["GENERAL_DART_FEED", "EVENT_TRANSITION", "CONFIRMED_DATE_REMINDER", "ESTIMATE_RECHECK"],
+  "requiredEventSubscriptionFields": ["ownerUserId", "eventId", "eventRevisionId", "publicationEpoch", "transitionKinds", "channels", "subscriptionRevision", "createdAt", "revokedAt"],
+  "dispatchBinding": {
+    "candidateIdentityFields": ["recipientScopeId", "subscriptionId", "subscriptionRevision", "eventId", "eventRevisionId", "notificationKind", "channel", "notificationPolicyRevision", "publicationEpoch"],
+    "attemptIdentityFields": ["candidateId", "targetIdentityHash", "targetIdentityKeyId", "attemptNumber", "creditState", "payloadHash", "creditManifestHash", "creditComponents", "rendererRevision", "locale", "notificationRevision", "rightsDecisionRevision", "attributionPolicyRevision", "publicationEpoch", "providerOutcome", "deviceDeliveryObservation"],
+    "reconciliationFields": ["exposureScope", "surfaceKind", "targetIdentityHash", "targetIdentityKeyId", "sourceRevision", "publicationEpoch", "disposition"]
+  },
+  "targetIdentityHashContract": {
+    "contractRef": "DELIVERY-TARGET-HASH-v1",
+    "algorithm": "HMAC-SHA-256",
+    "domainSeparator": "KR-DISCLOSURE-DELIVERY-TARGET-v1",
+    "canonicalization": "RFC8785-JCS",
+    "inputFields": ["provider", "surfaceKind", "targetKind", "targetIdentity"],
+    "targetIdentityNormalization": "provider-adapter-versioned opaque identifier; preserve provider-returned identifier bytes as a JSON string; no URL rewriting or query stripping",
+    "resultFormat": "hmac-sha256:<keyId>:<lowercase-hex>",
+    "rawTargetPolicy": "never persist, log, or include raw endpoint/webhook target in attempt, manifest, or fixture; compute transiently at the adapter boundary",
+    "keyPolicy": "runtime key is secret-managed and keyId is public metadata; synthetic golden-vector key is test-only and must never be deployed",
+    "goldenVector": {
+      "keyPolicy": "SYNTHETIC_ONLY",
+      "keyId": "SYNTH-KEY-1",
+      "testOnlyKeyUtf8": "synthetic-fixture-key-never-for-runtime",
+      "input": { "provider": "webpush", "surfaceKind": "WEB_PUSH_ENDPOINT", "targetIdentity": "https://push.example.invalid/synthetic-endpoint", "targetKind": "PUSH_ENDPOINT" },
+      "expectedHash": "hmac-sha256:SYNTH-KEY-1:f33dcd1c1b720021198332282d4754909b0f3d6fa1f7caea2453141078328297"
+    }
+  },
+  "targetIdentityRetentionContract": {
+    "dataClass": "PSEUDONYMOUS_PERSONAL_DELIVERY_METADATA",
+    "anonymous": false,
+    "rawTargetPersistedInDeliveryLedger": false,
+    "retentionPolicyRevision": null,
+    "targetHashRetention": "UNRESOLVED_UNTIL_OWNER_APPROVES_RETENTION_WINDOW_AND_PURPOSE",
+    "accountDeletion": "remove active subscription and lookup mapping; retain attempt/exposure hashes only when an approved retention basis and expiry apply",
+    "keyRetirement": "retain a key version only for its approved reconciliation window; rotation without an approved overlap/rekey procedure blocks cross-window reconciliation",
+    "backupDisposition": "UNRESOLVED_OWNER_DECISION"
+  },
+  "vectors": [
+    { "id": "DUES-01-WATCHLIST-ADD-DOES-NOT-SUBSCRIBE-TO-EVENT", "input": { "watchlistAdded": true, "eventSubscriptionOptIn": false }, "expected": { "eventSubscriptionCreated": false, "pushCandidate": false } },
+    { "id": "DUES-02-BROAD-DART-PREFERENCE-IS-NOT-REINTERPRETED-AS-EVENT-OPT-IN", "input": { "legacyDartEnabled": true, "eventSpecificConsent": false, "migration": true }, "expected": { "generalFeedPreferencePreserved": true, "eventSubscriptionCreated": false, "implicitConsent": false } },
+    { "id": "DUES-03-EVENT-SUBSCRIPTION-REQUIRES-EXPLICIT-SCOPE-AND-CHANNEL", "input": { "eventId": "EV-SYN-A", "transitionKinds": [], "channels": ["PUSH"], "userAction": "SUBSCRIBE" }, "expected": { "saved": false, "reason": "SCOPE_REQUIRED" } },
+    { "id": "DUES-04-WATCHLIST-RELEVANCE-NEEDS-APPROVED-ELIGIBLE-SUBJECT", "input": { "watchlistExactMatch": true, "subjectApproval": "PENDING_REVIEW", "masterClass": "COMMON_STOCK" }, "expected": { "relevanceLabel": "NOT_VERIFIED", "instrumentPushCandidate": false } },
+    { "id": "DUES-05-FILER-ONLY-MATCH-DOES-NOT-BECOME-DIRECT-IMPACT", "input": { "watchlistMatchesFiler": true, "approvedEventSubject": false, "eventSubscription": false }, "expected": { "directImpactClaim": false, "autoEventSubscription": false } },
+    { "id": "DUES-06-EXPLICIT-EVENT-SUBSCRIPTION-IS-INDEPENDENT-OF-WATCHLIST", "input": { "eventSubscription": true, "watchlistRemoved": true, "subscriptionRevoked": false }, "expected": { "eventSubscription": "ACTIVE", "watchlistRelevance": "REMOVED", "holdingInference": false } },
+    { "id": "DUES-07-OWNER-SCOPE-ISOLATES-READS-AND-COUNTS", "input": { "ownerUserId": "USER-A", "requestUserId": "USER-B", "eventSubscriptionExists": true }, "expected": { "read": "DENIED_OR_NOT_FOUND", "existenceLeak": false, "crossUserCount": "NOT_RETURNED" } },
+    { "id": "DUES-08-REVOCATION-ADVANCES-REVISION-AND-FENCES-QUEUED-SEND", "input": { "queuedCandidate": true, "subscriptionRevision": 4, "currentSubscriptionRevision": 5, "revoked": true }, "expected": { "dispatch": false, "candidate": "STALE_SUPPRESSED" } },
+    { "id": "DUES-09-READ-DISMISS-AND-MUTE-ARE-PERSONAL-OVERLAY-ONLY", "input": { "userAction": "DISMISS", "eventLifecycle": "ACTIVE", "otherUserSubscription": true }, "expected": { "globalEventChanged": false, "otherUserChanged": false, "personalStateChanged": true } },
+    { "id": "DUES-10-ACCOUNT-DELETE-REMOVES-ACTIVE-PRIVATE-SUBSCRIPTIONS", "input": { "accountDeletion": true, "activeSubscriptionRows": 2, "deliveryIndexRows": 2, "backupPolicy": "UNRESOLVED" }, "expected": { "activeSubscriptions": 0, "deliveryIndexRows": 0, "backupDisposition": "RETENTION_REVIEW_REQUIRED" } },
+    { "id": "DUES-11-CANDIDATE-KEY-PINS-SUBSCRIPTION-EVENT-CHANNEL-AND-EPOCH", "input": { "sameRecipient": true, "sameSubscriptionRevision": true, "sameEventRevision": true, "sameKind": true, "sameChannel": true, "sameEpoch": true, "duplicateSchedulerRuns": 3 }, "expected": { "logicalCandidates": 1, "candidateIdentityIncludes": ["recipientScopeId", "subscriptionRevision", "eventRevisionId", "notificationKind", "channel", "publicationEpoch"], "duplicateCandidate": false } },
+    { "id": "DUES-12-ONE-USER-CANDIDATE-FANS-OUT-TO-HASHED-ENDPOINT-ATTEMPTS", "input": { "logicalCandidate": "CANDIDATE-SYN-A", "eligibleEndpoints": 2, "rawEndpointInLedger": true }, "expected": { "logicalCandidates": 1, "attempts": 2, "attemptsHaveDistinctTargetIdentityHash": true, "rawEndpointPersisted": false } },
+    { "id": "DUES-13-EVENT-TRANSITION-AND-DATE-REMINDER-USE-SEPARATE-OPT-INS", "input": { "eventTransitionOptIn": true, "confirmedDateReminderOptIn": false, "bothKindsDue": true }, "expected": { "eventTransitionCandidate": true, "confirmedDateReminderCandidate": false, "kindConflated": false } },
+    { "id": "DUES-14-LEGACY-DART-DEVICE-TOGGLE-IS-A-SUPPRESSION-GATE-NOT-CONSENT", "input": { "eventSubscriptionOptIn": true, "endpointEnabled": true, "legacyDartEnabled": false }, "expected": { "eventConsentInferredFromLegacyToggle": false, "dispatch": false, "disposition": "SUPPRESSED_BY_DEVICE_PREFERENCE" } },
+    { "id": "DUES-15-DISPATCH-REVALIDATES-LIVE-REVISION-RIGHTS-AND-RECIPIENT-GATES", "input": { "candidateEpoch": 7, "currentEpoch": 8, "rightsCurrent": true, "subscriptionCurrent": true, "accountActive": true }, "expected": { "dispatch": false, "reason": "STALE_PUBLICATION_EPOCH", "fallbackToOldPayload": false } },
+    { "id": "DUES-16-CORRECTION-RECIPIENTS-COME-FROM-COMPLETE-AFFECTED-EXPOSURE-SET", "input": { "priorExposures": ["TARGET-A", "TARGET-B"], "affectedTargets": ["TARGET-A"], "exposureSetCoverage": "COMPLETE", "activeEventSubscribers": ["USER-A", "USER-B", "USER-C"] }, "expected": { "correctionTargets": ["TARGET-A"], "unaffectedTargetSent": false, "allCurrentSubscribersBroadcast": false, "newEpochRequired": true } },
+    { "id": "DUES-17-PROVIDER-ACCEPTANCE-AND-TIMEOUT-DO-NOT-CLAIM-USER-RECEIPT", "input": { "providerOutcome": "UNKNOWN_AFTER_POST_TIMEOUT", "deviceReceipt": null }, "expected": { "attemptState": "ATTEMPTED_UNKNOWN", "userReceipt": "UNOBSERVED", "deviceDeliveredClaim": false, "blindRetry": false, "attemptAppendOnly": true } },
+    { "id": "DUES-18-ACCEPTED-OLD-PUSH-CAN-NOT-BE-RETRACTED-AND-LINK-REVALIDATES", "input": { "priorPushProviderAccepted": true, "correctionEpoch": 8, "cachedOldBody": true, "oldLinkOpened": true }, "expected": { "providerRetractionClaim": false, "cachedOldBodyUsed": false, "currentEpochRevalidated": true, "correctionAttemptSeparate": true } },
+    { "id": "DUES-19-TARGET-IDENTITY-HASH-IS-KEYED-DOMAIN-SEPARATED-AND-REPRODUCIBLE", "input": { "rawTargetPersisted": false, "keyId": "SYNTH-KEY-1", "canonicalization": "RFC8785-JCS", "targetIdentity": "https://push.example.invalid/synthetic-endpoint" }, "expected": { "hashMatchesGoldenVector": true, "rawTargetInLedger": false, "keyIdBoundToAttempt": true, "hashIsAnonymous": false } },
+    { "id": "DUES-20-KEY-ROTATION-OR-RETENTION-EXPIRY-BLOCKS-UNLINKABLE-RECONCILIATION", "input": { "priorKeyId": "KEY-OLD", "currentKeyId": "KEY-NEW", "crossWindowMapping": null, "retentionPolicyRevision": null }, "expected": { "crossKeyJoin": "BLOCKED", "retentionClaim": "UNRESOLVED", "silentlyTreatAsUnaffected": false } }
+  ]
+}

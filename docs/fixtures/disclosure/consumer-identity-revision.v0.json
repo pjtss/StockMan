@@ -1,0 +1,52 @@
+{
+  "contractVersion": "consumer-identity-revision.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "vectors": [
+    {
+      "id": "CIR-01-CONTENT-CHANGE-NEW-REVISION-SAME-IDENTITY",
+      "input": { "eventId": "EV-A", "consumerKind": "SUMMARY_SEGMENT", "naturalKey": { "segmentId": "SEG-A" }, "oldContentHash": "HASH-A", "newContentHash": "HASH-B", "projectionCommitChanged": true },
+      "expected": { "identitySame": true, "revisionKeySame": false, "revisionRows": 2, "forbiddenPublicText": ["내용이 바뀌었는데 같은 불변 revision으로 덮어쓰기", "새 내용이라 논리 consumer가 사라짐"] }
+    },
+    {
+      "id": "CIR-02-CLAIM-EDGE-CHANGE-PRESERVES-IDENTITY-REBUILDS-REFS",
+      "input": { "identityKey": "IDENTITY-A", "oldClaimIds": ["CL-A"], "newClaimIds": ["CL-A", "CL-B"], "contentChanged": true },
+      "expected": { "identitySame": true, "newRevisionRequired": true, "oldEdgesImmutable": true, "forbiddenPublicText": ["새 claim ref 누락", "과거 generation의 edge를 덮어쓰기"] }
+    },
+    {
+      "id": "CIR-03-EVENT-CHANGE-NEW-IDENTITY",
+      "input": { "oldEventId": "EV-A", "newEventId": "EV-B", "consumerKind": "SUMMARY_SEGMENT", "naturalKey": { "segmentId": "SEG-A" } },
+      "expected": { "identitySame": false, "automaticCrossEventMerge": false, "forbiddenPublicText": ["event 경계를 넘는 ID 재사용", "동일 segment 이름만으로 병합"] }
+    },
+    {
+      "id": "CIR-04-IMMUTABLE-CORRECTED-DATE-NEW-IDENTITY-RELATION",
+      "input": { "oldDateId": "DATE-OLD", "newDateId": "DATE-NEW", "relation": "SUPERSEDES", "sameEvent": true },
+      "expected": { "identitySame": false, "relationRequired": true, "oldAssertionImmutable": true, "forbiddenPublicText": ["정정 날짜가 기존 assertion을 덮어씀", "관계 없이 두 날짜를 동시에 현재값으로 노출"] }
+    },
+    {
+      "id": "CIR-05-NATURAL-KEY-HASH-COLLISION-EXACT-CHECK",
+      "input": { "sameIdentityHash": true, "naturalKeyA": { "filingPartyId": "PARTY-A", "role": "ISSUER" }, "naturalKeyB": { "filingPartyId": "PARTY-B", "role": "ISSUER" } },
+      "expected": { "identityMerge": false, "disposition": "HASH_COLLISION_QUARANTINE", "forbiddenPublicText": ["hash 일치만으로 identity 병합", "서로 다른 party에 같은 consumer로 edge 연결"] }
+    },
+    {
+      "id": "CIR-06-CANONICAL-AND-INDEX-CARDINALITY-MISMATCH",
+      "input": { "canonicalIdentities": 2, "indexedIdentities": 1, "canonicalRevisions": 3, "indexedRevisions": 3, "canonicalClaimEdges": 4, "indexedClaimEdges": 4 },
+      "expected": { "acceptance": "FAIL_CLOSED", "publication": "SUPPRESSED", "forbiddenPublicText": ["revision 수가 맞으므로 index 누락 무시", "불완전 reverse index를 승인"] }
+    },
+    {
+      "id": "CIR-07-OLD-NEW-TRANSITION-EDGE-MISSING",
+      "input": { "oldIdentity": "IDENTITY-A", "newIdentity": "IDENTITY-A", "oldRevisionKey": "REV-A", "newRevisionKey": "REV-B", "transitionRowPresent": false },
+      "expected": { "acceptance": "INCOMPLETE", "crossGenerationImpact": "SUPPRESSED", "forbiddenPublicText": ["transition 누락을 영향 없음으로 해석", "새 revision을 old approval로 연결"] }
+    },
+    {
+      "id": "CIR-08-SUMMARY-SEGMENT-IDENTITY-EXCLUDES-ANALYSIS-REVISION",
+      "input": { "eventId": "EV-A", "segmentId": "SEG-A", "oldAnalysisRevision": "AN-A", "newAnalysisRevision": "AN-B" },
+      "expected": { "identitySame": true, "analysisRevisionBoundToConsumerRevision": true, "forbiddenPublicText": ["analysis revision 변경 시 새 unrelated segment identity 생성", "분석 revision 참조 누락"] }
+    }
+  ]
+}

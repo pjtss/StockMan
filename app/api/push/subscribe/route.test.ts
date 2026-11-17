@@ -34,7 +34,7 @@ describe("push subscription API", () => {
     expect(invalid.status).toBe(400);
     ensureSchema.mockResolvedValueOnce(undefined);
     updatePushSubscriptionPreferences.mockRejectedValueOnce(new Error("database unavailable"));
-    const failed = await PATCH(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ endpoint: valid.endpoint }) }));
+    const failed = await PATCH(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ endpoint: valid.endpoint, keys: valid.keys, enabled: false }) }));
     expect(failed.status).toBe(503);
   });
 });

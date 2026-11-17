@@ -25,7 +25,7 @@ const response = await fetch(endpoint, { method: "PUT", headers: { authorization
   { name: "us-golden-cross-cache", description: "해외 일봉 골든크로스 캐시를 조회합니다.", type: 1 },
   { name: "bb-pullback-export", description: "국내·해외 다중 시간봉 볼린저밴드 결과를 HTML로 다운로드합니다.", type: 1, options: [{ name: "market", description: "조회 시장", type: 3, required: false, choices: [{ name: "전체", value: "ALL" }, { name: "국내", value: "KR" }, { name: "해외", value: "US" }] }] },
   { name: "bb-all-middle-above", description: "일·주·월봉 모두 BB 중단선 이상 종목을 HTML로 다운로드합니다.", type: 1, options: [{ name: "market", description: "조회 시장", type: 3, required: false, choices: [{ name: "전체", value: "ALL" }, { name: "국내", value: "KR" }, { name: "해외", value: "US" }] }] },
-]) });
+]), signal: AbortSignal.timeout(15_000) });
 if (!response.ok) throw new Error(`Discord command registration failed: ${response.status} ${await response.text()}`);
 console.log(`Registered /ticker (${guildId ? "guild" : "global"})`);
 console.log(`Registered /news (${guildId ? "guild" : "global"})`);

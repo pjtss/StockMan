@@ -1,0 +1,109 @@
+{
+  "contractVersion": "event-schedule-notification.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsPersonalRecipientData": false,
+    "containsSourceBody": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "notificationKinds": ["CONFIRMED_DATE_REMINDER", "ESTIMATE_RECHECK", "SCHEDULE_CHANGED", "OUTCOME_NOT_VERIFIED"],
+  "requiredScheduleKeyFields": ["recipientScopeId", "subscriptionRevision", "eventRevisionId", "dateAssertionId", "reminderPolicyRevision", "notificationKind", "channel", "scheduledFor", "timezone", "publicationEpoch", "outcomeCheckRevisionId", "followupSequence"],
+  "outcomeFollowupPolicyFields": ["policyRevision", "maxAttempts", "minimumInterval", "cutoffAt", "coverageRequirement", "separateOptInScope"],
+  "coverageAssertionManifestRef": "disclosure-source-coverage.v0.json#/coverageAssertionManifestContract",
+  "outcomeResolutionStates": ["OUTCOME_CONFIRMED", "OUTCOME_NOT_REPORTED_IN_COMPLETE_SCOPE", "UNVERIFIABLE_COVERAGE_INCOMPLETE", "CONFLICT_UNRESOLVED"],
+  "vectors": [
+    {
+      "id": "ESN-01-WATCHLIST-MATCH-DOES-NOT-OPT-IN-TO-EVENT-REMINDERS",
+      "input": { "watchlistMatch": true, "eventReminderSubscription": false, "dateAssertionApproved": true },
+      "expected": { "scheduledCount": 0, "watchlistImpliesOptIn": false }
+    },
+    {
+      "id": "ESN-02-CONFIRMED-DATE-REMINDER-REQUIRES-APPROVED-ASSERTION-AND-OPT-IN",
+      "input": { "certainty": "OFFICIAL_CONFIRMED", "dateAssertionApproved": true, "eventReminderSubscription": true, "publicationAllowed": true },
+      "expected": { "candidate": true, "messageKind": "CONFIRMED_DATE_REMINDER", "eventCompletionClaim": false }
+    },
+    {
+      "id": "ESN-03-DATE-ONLY-CAN-NOT-CREATE-AN-INVENTED-TIMED-PUSH",
+      "input": { "certainty": "OFFICIAL_CONFIRMED", "precision": "DATE", "timezone": null, "timedReminderPolicy": "MORNING_AT_USER_LOCAL_TIME" },
+      "expected": { "timedPush": false, "inventedLocalTime": false, "dateOnlyDisplayAllowed": true }
+    },
+    {
+      "id": "ESN-04-ESTIMATED-DATE-USES-ESTIMATE-RECHECK-LABEL-AND-SEPARATE-OPT-IN",
+      "input": { "certainty": "COMPANY_ESTIMATE", "estimateRecheckOptIn": true, "confirmedReminderOptIn": false },
+      "expected": { "messageKind": "ESTIMATE_RECHECK", "confirmedDateReminder": false, "confirmedDateClaim": false }
+    },
+    {
+      "id": "ESN-05-POSTPONEMENT-FENCES-OLD-QUEUED-REMINDER",
+      "input": { "queuedDateAssertion": "DATE-1", "currentDateAssertion": "DATE-2", "publicationEpochChanged": true },
+      "expected": { "oldReminder": "STALE_SUPPRESSED", "oldDateSendAllowed": false, "newScheduleRequiresRevalidation": true }
+    },
+    {
+      "id": "ESN-06-OPT-OUT-OR-REVOKED-SUBSCRIPTION-CANCELS-QUEUED-CANDIDATE",
+      "input": { "candidateQueued": true, "subscriptionRevokedBeforeDispatch": true },
+      "expected": { "dispatch": false, "disposition": "SUPPRESSED_BEFORE_SEND" }
+    },
+    {
+      "id": "ESN-07-DUPLICATE-SCHEDULER-RUNS-ARE-IDEMPOTENT-PER-REVISION",
+      "input": { "sameRecipient": true, "sameSubscriptionRevision": true, "sameEventRevision": true, "sameDateAssertion": true, "samePolicyRevision": true, "runs": 3 },
+      "expected": { "logicalCandidates": 1, "deliveryAttempts": "APPEND_ONLY", "duplicateDispatch": false }
+    },
+    {
+      "id": "ESN-08-PASSED-DATE-AND-MISSING-OUTCOME-IS-NOT-A-COMPLETION-REMINDER",
+      "input": { "scheduledDatePassed": true, "outcomeEvidence": null, "coverage": "UNKNOWN" },
+      "expected": { "eventCompletionClaim": false, "notificationKind": "OUTCOME_NOT_VERIFIED", "completed": false, "cancelled": false }
+    },
+    {
+      "id": "ESN-09-USER-LOCAL-TIME-AND-DST-RESOLUTION-REQUIRE-A-VERSIONED-POLICY",
+      "input": { "userTimezone": "Asia/Seoul", "scheduledLocalTime": "02:30", "localTimeAmbiguousOrMissing": true, "policyRevision": null },
+      "expected": { "timedPush": false, "scheduleResolution": "UNRESOLVED_POLICY", "utcInstantInvented": false }
+    },
+    {
+      "id": "ESN-10-MISSED-REMINDER-OUTAGE-DOES-NOT-CAUSE-UNBOUNDED-CATCHUP-BURST",
+      "input": { "missedOccurrences": 4, "currentDateAssertion": "DATE-2", "catchupPolicyRevision": null },
+      "expected": { "burstDispatch": false, "catchupDisposition": "HOLD_FOR_POLICY", "currentRevisionRevalidated": true }
+    },
+    {
+      "id": "ESN-11-LOCKSCREEN-PREVIEW-EXCLUDES-SOURCE-AND-PRIVATE-DETAILS",
+      "input": { "approvedMinimalNotice": true, "sourceQuote": "synthetic quote", "investmentConclusion": "synthetic conclusion", "watchlistOrHoldingDetail": "synthetic private value" },
+      "expected": { "previewContainsSourceQuote": false, "previewContainsInvestmentConclusion": false, "previewContainsPersonalPortfolioData": false, "verifiedAppLinkOnly": true }
+    },
+    {
+      "id": "ESN-12-OPENING-OLD-PUSH-LINK-REVALIDATES-CURRENT-PUBLICATION-EPOCH",
+      "input": { "pushEpoch": 7, "currentPublicationEpoch": 8, "currentDisposition": "SUPPRESSED", "cachedPushBodyHasEventDetail": true },
+      "expected": { "eventDetailReturned": false, "cachedBodyUsedAsFallback": false, "staleLinkDisposition": "CURRENT_STATE_REQUIRED" }
+    },
+    {
+      "id": "ESN-13-OUTCOME-FOLLOWUP-REQUIRES-ITS-OWN-EXPLICIT-OPT-IN",
+      "input": { "confirmedDateReminderOptIn": true, "outcomeFollowupOptIn": false, "scheduledDatePassed": true },
+      "expected": { "outcomeFollowupCandidate": false, "confirmedReminderImpliesOutcomeFollowup": false }
+    },
+    {
+      "id": "ESN-14-OUTCOME-FOLLOWUP-REQUIRES-APPROVED-FINITE-POLICY",
+      "input": { "policyRevision": null, "maxAttempts": null, "cutoffAt": null, "coverageRequirement": "COMPLETE" },
+      "expected": { "candidate": false, "disposition": "HOLD_FOR_POLICY", "unboundedRepeat": false }
+    },
+    {
+      "id": "ESN-15-INCOMPLETE-COVERAGE-IS-UNVERIFIABLE-NOT-NO-OUTCOME",
+      "input": { "coverage": "PARTIAL", "outcomeFound": false, "lastSuccessfulSearchAt": "SYNTH-UTC" },
+      "expected": { "resolutionState": "UNVERIFIABLE_COVERAGE_INCOMPLETE", "noOutcomeClaim": false, "retryEligibility": "POLICY_AND_OPT_IN_REQUIRED" }
+    },
+    {
+      "id": "ESN-16-VERIFIED-OUTCOME-CLOSES-ONLY-THE-LINKED-FOLLOWUP-CYCLE",
+      "input": { "outcomeEvidenceApproved": true, "outcomeCheckRevisionId": "SYNTH-OUTCOME-CHECK-2", "queuedFollowupExists": true },
+      "expected": { "resolutionState": "OUTCOME_CONFIRMED", "queuedFollowupDispatch": false, "eventLifecycleAutoMutated": false, "evidenceRevisionPinned": true }
+    },
+    {
+      "id": "ESN-17-OUTCOME-FOLLOWUP-IDEMPOTENCY-INCLUDES-CHECK-REVISION-AND-SEQUENCE",
+      "input": { "sameRecipient": true, "sameSubscriptionRevision": true, "sameOutcomeCheckRevisionId": true, "sameFollowupSequence": true, "schedulerRuns": 3 },
+      "expected": { "logicalCandidates": 1, "duplicateDispatch": false, "attemptHistoryAppendOnly": true }
+    },
+    {
+      "id": "ESN-18-COMPLETE-SCOPE-NO-RESULT-AND-INCOMPLETE-SCOPE-ARE-DIFFERENT",
+      "input": { "outcomeFound": false, "completeScope": true, "sourceErrors": 0 },
+      "expected": { "resolutionState": "OUTCOME_NOT_REPORTED_IN_COMPLETE_SCOPE", "completed": false, "cancelled": false }
+    }
+  ]
+}

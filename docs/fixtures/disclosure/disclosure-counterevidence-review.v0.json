@@ -1,0 +1,370 @@
+{
+  "contractVersion": "disclosure-counterevidence-review.v0",
+  "classification": "SYNTHETIC_PRODUCT_ACCEPTANCE_NOT_RUNTIME_EVIDENCE_OR_INVESTMENT_ADVICE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealUser": false,
+    "containsSourceBody": false,
+    "identitiesAreSynthetic": true
+  },
+  "requiredReviewFields": [
+    "reviewId",
+    "targetClaimRevisionRefs",
+    "eventGroupRefs",
+    "reviewSetRevision",
+    "evaluationInformationCutoffAt",
+    "riskCategoryDispositions",
+    "sourceProfileRevisionRefs",
+    "searchScopeRef",
+    "searchWindow",
+    "queryDefinitionRevision",
+    "rightsDecisionRevisionRefs",
+    "coverageAssertionRefs",
+    "foundCounterClaimRevisionRefs",
+    "reviewState",
+    "reviewerDecisionRef",
+    "preparedByActorRef",
+    "adjudicatedByActorRef",
+    "reviewerRoleDecisionRef",
+    "reviewerEligibilitySnapshotRef",
+    "reviewerConflictDeclarationState",
+    "reviewerIndependencePolicyRevision",
+    "supersedesReviewId"
+  ],
+  "reviewerGovernanceStates": [
+    "POLICY_NOT_READY",
+    "REVIEWER_UNASSIGNED",
+    "ACTOR_IDENTITY_UNVERIFIED",
+    "CAPABILITY_UNVERIFIED",
+    "CONFLICT_UNRESOLVED",
+    "REVIEWER_ELIGIBLE",
+    "REVIEWER_CONFLICTED",
+    "REVIEWER_POLICY_EXCEPTION_APPROVED"
+  ],
+  "reviewerIndependenceRequirements": [
+    "REQUIRED",
+    "NOT_REQUIRED_BY_CURRENT_POLICY",
+    "NOT_READY"
+  ],
+  "reviewerGovernanceDecisionBindings": [
+    "KR-OPERATIONAL-SECURITY-01",
+    "KR-END-TO-END-ACCEPTANCE-01"
+  ],
+  "reviewerGovernance": {
+    "policyOwnerApprovalRequired": true,
+    "defaultIndependenceRequirement": "NOT_READY",
+    "opaqueActorReferencesOnly": true,
+    "identitySource": "SERVER_SIDE_AUTHENTICATED_ACTOR_AND_CURRENT_ROLE_DECISION",
+    "clientSuppliedReviewerIdentityAccepted": false,
+    "publicProjectionIncludesInternalReviewerIdentity": false
+  },
+  "riskCategories": [
+    "CORRECTION_OR_SUPERSEDING_FILING",
+    "FINANCING_DILUTION_OR_LIQUIDITY",
+    "CONDITIONS_DEPENDENCIES_OR_CANCELLATION",
+    "LEGAL_REGULATORY_OR_LISTING_STATUS",
+    "COUNTERPARTY_CREDIT_OR_PERFORMANCE",
+    "ASSET_OPERATING_OR_REVENUE_IMPACT",
+    "RELATED_PARTY_OR_CONFLICT_OF_INTEREST"
+  ],
+  "categoryDispositions": [
+    "APPLICABLE_PENDING",
+    "EVIDENCE_FOUND_PENDING_REVIEW",
+    "REVIEWED_COUNTEREVIDENCE",
+    "NO_MATCH_IN_COMPLETE_SCOPE_AS_OF",
+    "PARTIAL_UNVERIFIABLE",
+    "RIGHTS_BLOCKED",
+    "SOURCE_UNAVAILABLE",
+    "NOT_APPLICABLE_WITH_RATIONALE",
+    "STALE_REVIEW_REQUIRED"
+  ],
+  "aggregateReviewStates": [
+    "NOT_ASSESSED",
+    "EVIDENCE_INCOMPLETE",
+    "COUNTEREVIDENCE_REVIEWED",
+    "STALE_REVIEW_REQUIRED",
+    "SUPPRESSED_RIGHTS_OR_COVERAGE"
+  ],
+  "downstreamBindings": {
+    "consumerContract": "investment-effect-projection-bridge.v0.json",
+    "consumerStage": "INTERPRETATION_REVIEW",
+    "requiredDependencyFields": [
+      "counterevidenceReviewId",
+      "reviewSetRevision",
+      "reviewSnapshotHash",
+      "targetClaimRevisionDigest",
+      "rightsDecisionSetHash",
+      "coverageAssertionSetDigest"
+    ],
+    "stateMapping": {
+      "COUNTEREVIDENCE_REVIEWED": "ELIGIBLE_FOR_SEPARATE_INTERPRETATION_REVIEW",
+      "EVIDENCE_INCOMPLETE": "BLOCK_DIRECTION_AS_EVIDENCE_INCOMPLETE",
+      "STALE_REVIEW_REQUIRED": "BLOCK_DIRECTION_AS_EVIDENCE_INCOMPLETE",
+      "SUPPRESSED_RIGHTS_OR_COVERAGE": "SUPPRESS_PROJECTION"
+    }
+  },
+  "invariants": {
+    "allRiskCategoriesReceiveExplicitDisposition": true,
+    "notApplicableRequiresReviewerRationale": true,
+    "absenceRequiresRightsAndCompleteDeclaredScope": true,
+    "noMatchIsBoundedByCutoffAndScope": true,
+    "marketReactionIsNotCounterevidenceSearch": true,
+    "foundEvidenceRequiresAdjudication": true,
+    "staleReviewCannotApproveCurrentDirection": true,
+    "incompleteCounterevidenceBlocksSingleDirection": true,
+    "counterevidenceReviewDoesNotGenerateTradeInstruction": true,
+    "sharedCredentialDoesNotProveNamedReviewer": true,
+    "unresolvedReviewerEligibilityCannotCloseReview": true,
+    "independenceRequirementIsExplicitAndOwnerApproved": true,
+    "sameActorReviewIsBlockedWhenCurrentPolicyRequiresSeparation": true,
+    "unknownConflictStateKeepsReviewIncomplete": true,
+    "reviewerPolicyExceptionIsScopedAndRevisionPinned": true
+  },
+  "vectors": [
+    {
+      "id": "DCR-01-MISSING-RISK-CATEGORY-KEEPS-REVIEW-INCOMPLETE",
+      "input": {
+        "requiredCategories": ["CORRECTION_OR_SUPERSEDING_FILING", "FINANCING_DILUTION_OR_LIQUIDITY"],
+        "riskCategoryDispositions": { "CORRECTION_OR_SUPERSEDING_FILING": "NO_MATCH_IN_COMPLETE_SCOPE_AS_OF" }
+      },
+      "expected": {
+        "reviewState": "EVIDENCE_INCOMPLETE",
+        "omittedCategoryTreatedAsNotApplicable": false,
+        "singleDirectionApproval": false
+      }
+    },
+    {
+      "id": "DCR-02-NOT-APPLICABLE-REQUIRES-REASON-AND-REVIEWER",
+      "input": {
+        "category": "COUNTERPARTY_CREDIT_OR_PERFORMANCE",
+        "disposition": "NOT_APPLICABLE_WITH_RATIONALE",
+        "rationaleRef": null,
+        "reviewerDecisionRef": null
+      },
+      "expected": {
+        "categoryState": "APPLICABLE_PENDING",
+        "aggregateReviewState": "EVIDENCE_INCOMPLETE",
+        "omissionAsNoRisk": false
+      }
+    },
+    {
+      "id": "DCR-03-PARTIAL-COVERAGE-NO-MATCH-IS-UNVERIFIABLE",
+      "input": {
+        "category": "FINANCING_DILUTION_OR_LIQUIDITY",
+        "matchingEvidence": null,
+        "coverageState": "PARTIAL",
+        "rightsState": "ALLOW_FOR_DECLARED_ACTION"
+      },
+      "expected": {
+        "categoryState": "PARTIAL_UNVERIFIABLE",
+        "noRiskClaimAllowed": false,
+        "singleDirectionApproval": false
+      }
+    },
+    {
+      "id": "DCR-04-RIGHTS-BLOCKED-SEARCH-IS-NOT-A-CLEAN-CATEGORY",
+      "input": {
+        "category": "LEGAL_REGULATORY_OR_LISTING_STATUS",
+        "matchingEvidence": null,
+        "coverageState": "COVERED_AS_OF",
+        "rightsState": "UNRESOLVED"
+      },
+      "expected": {
+        "categoryState": "RIGHTS_BLOCKED",
+        "noRiskClaimAllowed": false,
+        "sourceBodyOrExcerptExposed": false
+      }
+    },
+    {
+      "id": "DCR-05-COMPLETE-SCOPE-NO-MATCH-IS-AS-OF-ONLY",
+      "input": {
+        "category": "CORRECTION_OR_SUPERSEDING_FILING",
+        "matchingEvidence": null,
+        "coverageState": "COVERED_AS_OF",
+        "rightsState": "ALLOW_FOR_DECLARED_ACTION",
+        "evaluationInformationCutoffAt": "2026-10-02T00:00:00Z"
+      },
+      "expected": {
+        "categoryState": "NO_MATCH_IN_COMPLETE_SCOPE_AS_OF",
+        "claimThatNoCorrectionEverExists": false,
+        "cutoffPinned": true
+      }
+    },
+    {
+      "id": "DCR-06-FOUND-COUNTEREVIDENCE-REQUIRES-ADJUDICATION",
+      "input": {
+        "category": "CONDITIONS_DEPENDENCIES_OR_CANCELLATION",
+        "matchingEvidence": "CLAIM-SYN-DCR-06",
+        "claimReviewState": "PENDING"
+      },
+      "expected": {
+        "categoryState": "EVIDENCE_FOUND_PENDING_REVIEW",
+        "counterClaimSuppressedFromConclusionUntilReviewed": true,
+        "singleDirectionApproval": false
+      }
+    },
+    {
+      "id": "DCR-07-PRICE-REACTION-DOES-NOT-FILL-RISK-SEARCH",
+      "input": {
+        "category": "FINANCING_DILUTION_OR_LIQUIDITY",
+        "priceReactionObserved": true,
+        "counterClaimRefs": [],
+        "coverageState": "NOT_SEARCHED"
+      },
+      "expected": {
+        "categoryState": "APPLICABLE_PENDING",
+        "priceReactionCountsAsSearchEvidence": false,
+        "singleDirectionApproval": false
+      }
+    },
+    {
+      "id": "DCR-08-NEW-CORRECTION-STALES-PRIOR-COUNTEREVIDENCE-REVIEW",
+      "input": {
+        "priorReviewId": "REVIEW-SYN-DCR-08-A",
+        "reviewedClaimRevision": "CLAIM-SYN-DCR-08-R1",
+        "currentClaimRevision": "CLAIM-SYN-DCR-08-R2"
+      },
+      "expected": {
+        "aggregateReviewState": "STALE_REVIEW_REQUIRED",
+        "priorReviewMutable": false,
+        "priorDirectionApprovalReusable": false
+      }
+    },
+    {
+      "id": "DCR-09-COMPLETE-CATEGORY-SET-STILL-DOES-NOT-GENERATE-TRADE",
+      "input": {
+        "allApplicableCategoriesReviewed": true,
+        "reviewerConclusion": "MIXED"
+      },
+      "expected": {
+        "aggregateReviewState": "COUNTEREVIDENCE_REVIEWED",
+        "tradeInstruction": null,
+        "investmentOutcomeProbability": null
+      }
+    },
+    {
+      "id": "DCR-10-INCOMPLETE-REVIEW-BLOCKS-INVESTMENT-EFFECT-BRIDGE",
+      "input": {
+        "aggregateReviewState": "EVIDENCE_INCOMPLETE",
+        "counterevidenceReviewId": "REVIEW-SYN-DCR-10",
+        "reviewSnapshotHash": "HASH-SYN-DCR-10"
+      },
+      "expected": {
+        "consumerStage": "INTERPRETATION_REVIEW",
+        "projection": "EVIDENCE_INCOMPLETE",
+        "directionPublished": false
+      }
+    },
+    {
+      "id": "DCR-11-STALE-REVIEW-DEPENDENCY-CANNOT-REUSE-OLD-BRIDGE-APPROVAL",
+      "input": {
+        "aggregateReviewState": "STALE_REVIEW_REQUIRED",
+        "reviewedClaimRevisionDigest": "CLAIM-DIGEST-A",
+        "currentClaimRevisionDigest": "CLAIM-DIGEST-B",
+        "priorInterpretationApproval": "APPROVED"
+      },
+      "expected": {
+        "projection": "EVIDENCE_INCOMPLETE",
+        "priorInterpretationApprovalReusable": false,
+        "newReviewSnapshotRequired": true
+      }
+    },
+    {
+      "id": "DCR-12-REVIEWED-MANIFEST-IS-NECESSARY-BUT-DOES-NOT-APPROVE-INTERPRETATION",
+      "input": {
+        "aggregateReviewState": "COUNTEREVIDENCE_REVIEWED",
+        "currentDependencyHashesMatch": true,
+        "interpretationReview": "NOT_ASSESSED"
+      },
+      "expected": {
+        "projection": "VERIFIED_FACTS_WITH_COUNTEREVIDENCE",
+        "direction": "NOT_ASSESSED",
+        "interpretationApprovalInferred": false
+      }
+    },
+    {
+      "id": "DCR-13-SHARED-SESSION-OR-CLIENT-REVIEWER-ID-DOES-NOT-ADJUDICATE",
+      "input": {
+        "preparedByActorRef": null,
+        "clientSuppliedAdjudicatedByActorRef": "ACTOR-SYN-DCR-13",
+        "authenticationMode": "SHARED_PASSWORD_SESSION"
+      },
+      "expected": {
+        "reviewerGovernanceState": "ACTOR_IDENTITY_UNVERIFIED",
+        "clientReviewerIdentityAccepted": false,
+        "reviewState": "EVIDENCE_INCOMPLETE"
+      }
+    },
+    {
+      "id": "DCR-14-REVIEWER-INDEPENDENCE-POLICY-NOT-READY-BLOCKS-CLOSURE",
+      "input": {
+        "reviewerIndependencePolicyRevision": null,
+        "defaultIndependenceRequirement": "NOT_READY",
+        "allCategoriesOtherwiseComplete": true
+      },
+      "expected": {
+        "reviewerGovernanceState": "POLICY_NOT_READY",
+        "reviewState": "EVIDENCE_INCOMPLETE",
+        "singleDirectionApproval": false
+      }
+    },
+    {
+      "id": "DCR-15-SAME-ACTOR-IS-BLOCKED-WHEN-SEPARATION-IS-REQUIRED",
+      "input": {
+        "preparedByActorRef": "ACTOR-SYN-DCR-15-A",
+        "adjudicatedByActorRef": "ACTOR-SYN-DCR-15-A",
+        "independenceRequirement": "REQUIRED",
+        "policyRevisionCurrent": true
+      },
+      "expected": {
+        "reviewerGovernanceState": "REVIEWER_CONFLICTED",
+        "reviewerAdjudicationAccepted": false,
+        "reviewState": "EVIDENCE_INCOMPLETE"
+      }
+    },
+    {
+      "id": "DCR-16-STALE-ROLE-OR-CAPABILITY-SNAPSHOT-REQUIRES-REVIEW",
+      "input": {
+        "reviewerEligibilitySnapshotRef": "ELIGIBILITY-SYN-DCR-16-R1",
+        "currentEligibilitySnapshotRef": "ELIGIBILITY-SYN-DCR-16-R2",
+        "reviewerCapability": "REVOKED"
+      },
+      "expected": {
+        "reviewerGovernanceState": "CAPABILITY_UNVERIFIED",
+        "priorAdjudicationReusable": false,
+        "reviewState": "STALE_REVIEW_REQUIRED"
+      }
+    },
+    {
+      "id": "DCR-17-UNKNOWN-CONFLICT-DECLARATION-IS-NOT-CLEARANCE",
+      "input": {
+        "reviewerConflictDeclarationState": "UNKNOWN",
+        "conflictDecisionRef": null,
+        "allCategoriesOtherwiseComplete": true
+      },
+      "expected": {
+        "reviewerGovernanceState": "CONFLICT_UNRESOLVED",
+        "reviewState": "EVIDENCE_INCOMPLETE",
+        "clearanceInferred": false
+      }
+    },
+    {
+      "id": "DCR-18-OWNER-APPROVED-NO-SEPARATION-REQUIREMENT-IS-SCOPE-PINNED",
+      "input": {
+        "preparedByActorRef": "ACTOR-SYN-DCR-18-A",
+        "adjudicatedByActorRef": "ACTOR-SYN-DCR-18-A",
+        "independenceRequirement": "NOT_REQUIRED_BY_CURRENT_POLICY",
+        "policyDecisionRef": "KR-OPERATIONAL-SECURITY-01@SYN-REV-18",
+        "policyScopeMatches": true,
+        "reviewerEligibilitySnapshotCurrent": true,
+        "conflictDeclarationState": "CLEARED_BY_AUTHORIZED_REVIEW"
+      },
+      "expected": {
+        "reviewerGovernanceState": "REVIEWER_ELIGIBLE",
+        "policyScopePinned": true,
+        "globalIndependenceDefaultInferred": false
+      }
+    }
+  ]
+}

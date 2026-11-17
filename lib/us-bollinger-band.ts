@@ -1,8 +1,10 @@
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
+import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { calculateObvAdlSignal } from "@/lib/daily-obv-adl-filter";
 import { findRecentLowerBandTouch } from "@/lib/bollinger-lower-touch";
+import { getKisCacheSourceTimestamp } from "@/lib/kis-cache";
 
 export const DEFAULT_BOLLINGER_PERIOD = 20;
 export const DEFAULT_BOLLINGER_MULTIPLIER = 2;
@@ -113,7 +115,8 @@ export async function loadUsBollingerPolicy(moduleKey: "us-bollinger-band" | "us
   };
 }
 
-export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsBollingerPolicy>; concurrency?: number; context?: UsDailyScanContext; moduleKey?: "us-bollinger-band" | "us-bollinger-middle-lower" } = {}) {
+export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsBollingerPolicy>; concurrency?: number; context?: UsDailyScanContext; moduleKey?: "us-bollinger-band" | "us-bollinger-middle-lower"; sourceCheckedAt?: string } = {}) {
+  const sourceCheckedAt = options.sourceCheckedAt ?? await getKisCacheSourceTimestamp();
   const moduleKey = options.moduleKey ?? "us-bollinger-band";
   const configured = options.policy ? { ...(await loadUsBollingerPolicy(moduleKey)), ...options.policy } : await loadUsBollingerPolicy(moduleKey);
   const policy: UsBollingerPolicy = {
@@ -132,10 +135,12 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
     reboundTolerancePercent: Math.max(0, Number(configured.reboundTolerancePercent ?? 0.5)),
   };
   const timeframe = (policy.timeframe ?? "D") as "D" | "W" | "M";
-  const cacheKey = JSON.stringify(policy);
-  if (!options.context && RESULT_CACHE_TTL_MS > 0) {
+  const currentUniverse = options.context?.universe ?? await loadStoredUsInstrumentScopes();
+  const currentUniverseAvailable = currentUniverse.universe.ok === true && currentUniverse.scopes.length > 0;
+  const cacheKey = JSON.stringify({ policy, universe: currentUniverse.scopes.map((scope) => `${scope.market}:${scope.code}`).sort() });
+  if (!options.context && currentUniverseAvailable && RESULT_CACHE_TTL_MS > 0) {
     const cached = resultCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return { ...cached.value, cacheHit: true };
+    if (cached && cached.expiresAt > Date.now() && cached.value.ok === true && cached.value.universeAvailable === true) return { ...cached.value, cacheHit: true };
   }
   const context = options.context ?? await createUsDailyScanContext({ candleLimit: Math.max(35, policy.period + 1), timeframe });
   const instruments = context.universe.scopes;
@@ -183,23 +188,30 @@ export async function scanStoredUsBollingerBands(options: { policy?: Partial<UsB
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, worker));
   results.sort((a, b) => Number(b.qualifies) - Number(a.qualifies) || a.market.localeCompare(b.market) || a.code.localeCompare(b.code));
+  const successCount = results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length;
+  const failureCount = results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length;
+  const universeAvailable = Boolean((context.universe.universe as any).ok) && instruments.length > 0;
+  const complete = universeAvailable && successCount === instruments.length && failureCount === 0;
+  const status = !universeAvailable || (results.length > 0 && successCount === 0) ? "FAILED" : complete ? "COMPLETED" : "PARTIAL";
   const output = {
-    ok: Boolean((context.universe.universe as any).ok),
+    ok: complete,
+    status,
     checkedAt: new Date().toISOString(),
+    sourceCheckedAt,
     durationMs: Date.now() - startedAt,
-    universeAvailable: Boolean((context.universe.universe as any).ok),
+    universeAvailable,
     universe: context.universe.universe,
     policy,
     dataPolicy: { source: "us_instrument_universe_candles", timeframe, completedDailyCandleOnly: false, exclusionRule: "최신 저장 봉부터 사용", bandCalculation: "종가 기반", zone: policy.zone, touchRule: policy.zone === "MIDDLE_TO_LOWER" ? "최근 봉 종가가 하단선 이상·중단선 이하" : "최근 봉 또는 직전 거래일 종가가 해당 봉의 하단선 이하", indicatorFilter: "비활성화", commonFilter: { applied: false, reason: "COMMON_STOCK 전체 대상" } },
     instrumentCount: instruments.length,
-    successCount: results.filter((result) => result.status !== "FAILED" && result.status !== "INSUFFICIENT_HISTORY").length,
-    failureCount: results.filter((result) => result.status === "FAILED" || result.status === "INSUFFICIENT_HISTORY").length,
+    successCount,
+    failureCount,
     statistics: { qualifiedTouch: results.filter((r) => r.status === "QUALIFIED_TOUCH").length, qualifiedBelow: results.filter((r) => r.status === "QUALIFIED_BELOW").length, qualifiedMiddleToLower: results.filter((r) => r.status === "QUALIFIED_MIDDLE_TO_LOWER").length, filtered: results.filter((r) => r.status === "FILTERED").length, insufficientHistory: results.filter((r) => r.status === "INSUFFICIENT_HISTORY").length, failed: results.filter((r) => r.status === "FAILED").length },
     filterExcludedCount: results.filter((result) => result.status === "FILTERED").length,
     qualified: results.filter((result) => result.qualifies),
     results,
     cacheHit: false,
   };
-  if (!options.context && RESULT_CACHE_TTL_MS > 0) resultCache.set(cacheKey, { expiresAt: Date.now() + RESULT_CACHE_TTL_MS, value: output });
+  if (complete && !options.context && RESULT_CACHE_TTL_MS > 0) resultCache.set(cacheKey, { expiresAt: Date.now() + RESULT_CACHE_TTL_MS, value: output });
   return output;
 }

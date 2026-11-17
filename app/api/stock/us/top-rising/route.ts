@@ -18,9 +18,13 @@ export async function GET(request: Request) {
 
     if (!result) return NextResponse.json({ ok: false, error: "US_TOP_RISING_UNAVAILABLE" }, { status: 503 });
 
+    if (!result.ok) {
+      return NextResponse.json({ ok: false, error: "KIS_UPSTREAM_ERROR", upstreamStatus: result.status }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
+
     const parsed = result.response.parsed as any;
     const output = [parsed?.output, parsed?.output2, parsed?.output1].find(Array.isArray) ?? [];
 
-    return NextResponse.json(output, { status: result.ok ? 200 : result.status, headers: { "Cache-Control": "no-store, max-age=0" } });
+    return NextResponse.json(output, { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch { return NextResponse.json({ ok: false, error: "US_TOP_RISING_UNAVAILABLE" }, { status: 503 }); }
 }

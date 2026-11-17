@@ -27,7 +27,13 @@ export type OpenDartTodayResult = {
   dateKey: string;
   fetchedAt: string;
   pagesFetched: number;
+  expectedPages: number;
   totalCount: number;
+  rawRowCount: number;
+  uniqueReceiptCount: number;
+  duplicateReceiptCount: number;
+  missingReceiptCount: number;
+  reconciliationState: "RECONCILED" | "PARTIAL";
   rows: OpenDartListRow[];
 };
 
@@ -53,6 +59,14 @@ export function getKstDateKey(now = new Date()) {
 function parsePositiveInteger(value: number | string | undefined, fieldName: string) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`OPEN DART 응답의 ${fieldName} 값이 올바르지 않습니다.`);
+  }
+  return parsed;
+}
+
+function parseNonNegativeInteger(value: number | string | undefined, fieldName: string) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(`OPEN DART 응답의 ${fieldName} 값이 올바르지 않습니다.`);
   }
   return parsed;
@@ -85,7 +99,7 @@ async function fetchPage(apiKey: string, dateKey: string, pageNo: number) {
     throw new Error(`OPEN DART 응답 JSON 파싱 실패 (HTTP ${response.status}, ${contentType}): ${error instanceof Error ? error.message : String(error)}`);
   }
   if (payload.status === "013") {
-    return { rows: [] as OpenDartListRow[], totalCount: 0, totalPages: 0 };
+    return { rows: [] as OpenDartListRow[], totalCount: 0, totalPages: 0, responsePageNo: pageNo, responsePageCount: PAGE_SIZE, noData: true };
   }
   if (payload.status !== "000") {
     throw new Error(payload.message || `OPEN DART 오류 코드: ${payload.status || "UNKNOWN"}`);
@@ -93,8 +107,11 @@ async function fetchPage(apiKey: string, dateKey: string, pageNo: number) {
 
   return {
     rows: payload.list ?? [],
-    totalCount: Number(payload.total_count) || 0,
+    totalCount: parseNonNegativeInteger(payload.total_count, "total_count"),
     totalPages: parsePositiveInteger(payload.total_page, "total_page"),
+    responsePageNo: parsePositiveInteger(payload.page_no, "page_no"),
+    responsePageCount: parsePositiveInteger(payload.page_count, "page_count"),
+    noData: false,
   };
 }
 
@@ -106,28 +123,59 @@ export async function fetchOpenDartToday(): Promise<OpenDartTodayResult> {
   let totalPages = 1;
   let totalCount = 0;
   let pagesFetched = 0;
+  let rawRowCount = 0;
+  let duplicateReceiptCount = 0;
+  let missingReceiptCount = 0;
+  let expectedPages: number | null = null;
+  let emptyResponse = false;
 
   while (pageNo <= totalPages) {
     const page = await fetchPage(apiKey, dateKey, pageNo);
+    emptyResponse ||= page.noData === true;
+    if (page.responsePageNo !== pageNo) throw new Error(`OPEN DART 페이지 번호 불일치: 요청 ${pageNo}, 응답 ${page.responsePageNo}`);
+    if (page.responsePageCount !== PAGE_SIZE) throw new Error(`OPEN DART 페이지 크기 불일치: 요청 ${PAGE_SIZE}, 응답 ${page.responsePageCount}`);
+    if (expectedPages === null) {
+      expectedPages = page.totalPages;
+      totalPages = page.totalPages;
+      totalCount = page.totalCount;
+    } else if (page.totalPages !== expectedPages || page.totalCount !== totalCount) {
+      throw new Error(`OPEN DART 페이지 분모 불일치: ${dateKey} 조회 중 total_count 또는 total_page가 변경되었습니다.`);
+    }
     pagesFetched += 1;
-    totalPages = page.totalPages;
-    totalCount = page.totalCount;
+    rawRowCount += page.rows.length;
 
     for (const row of page.rows) {
       const receiptNo = row.rcept_no?.trim();
-      if (receiptNo) {
-        rowsByReceiptNo.set(receiptNo, row);
-      }
+      if (!receiptNo) { missingReceiptCount += 1; continue; }
+      if (rowsByReceiptNo.has(receiptNo)) duplicateReceiptCount += 1;
+      rowsByReceiptNo.set(receiptNo, row);
     }
 
     pageNo += 1;
   }
 
+  const uniqueReceiptCount = rowsByReceiptNo.size;
+  const effectiveExpectedPages = expectedPages ?? 0;
+  const reconciliationState = (emptyResponse && pagesFetched === 1 && totalCount === 0 && rawRowCount === 0)
+    || (pagesFetched === effectiveExpectedPages
+    && effectiveExpectedPages === Math.ceil(totalCount / PAGE_SIZE)
+    && rawRowCount === totalCount
+    && uniqueReceiptCount === totalCount
+    && missingReceiptCount === 0
+    && duplicateReceiptCount === 0)
+    ? "RECONCILED" as const
+    : "PARTIAL" as const;
   return {
     dateKey,
     fetchedAt: new Date().toISOString(),
     pagesFetched,
+    expectedPages: effectiveExpectedPages,
     totalCount,
+    rawRowCount,
+    uniqueReceiptCount,
+    duplicateReceiptCount,
+    missingReceiptCount,
+    reconciliationState,
     rows: [...rowsByReceiptNo.values()],
   };
 }

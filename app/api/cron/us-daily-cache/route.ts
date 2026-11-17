@@ -9,21 +9,27 @@ import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/l
 
 export async function POST(request: Request) {
   try {
-  if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   const moduleSettings = await loadFeatureModuleSettings("us-daily-cache");
   if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings)) {
     await recordSkippedAutomationRun("us-daily-cache", moduleSettings.enabled ? "outside_schedule" : "disabled");
     return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 3_600, schedule: "DB schedule, hourly" });
   }
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 3_600);
-  const latest = await loadLatestExecutedAutomationRun("us-daily-cache").catch(() => null);
+  let latest;
+  try {
+    latest = await loadLatestExecutedAutomationRun("us-daily-cache");
+  } catch (error) {
+    console.error("[API /cron/us-daily-cache] interval gate history unavailable:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error");
+    return NextResponse.json({ ok: false, stage: "interval-gate", error: "US_DAILY_CACHE_INTERVAL_CHECK_UNAVAILABLE", intervalSeconds }, { status: 503 });
+  }
   const latestStartedAt = latest?.started_at ? new Date(latest.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
   if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
     await recordSkippedAutomationRun("us-daily-cache", "outside_interval", { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds) });
     return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), schedule: "DB schedule, hourly" });
   }
-  return NextResponse.json({ ok: true, ...(await withAutomationRun("us-daily-cache", warmUsDailyPriceCache)) });
+  return NextResponse.json(await withAutomationRun("us-daily-cache", warmUsDailyPriceCache));
   } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
 }

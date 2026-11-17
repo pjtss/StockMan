@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: deploy-oci
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -27,6 +27,15 @@ jobs:
       - name: Install dependencies
         timeout-minutes: 5
         run: npm ci --no-audit --no-fund
+
+      - name: Verify GNU tar for OCI archive regressions
+        run: |
+          tar_version="$(tar --version)"
+          printf '%s\n' "$tar_version"
+          if [[ "$tar_version" != *"GNU tar"* ]]; then
+            echo "::error::OCI archive regression checks require GNU tar"
+            exit 1
+          fi
 
       - name: Verify deployment
         timeout-minutes: 15
@@ -60,6 +69,7 @@ jobs:
           cp scripts/terminate-approved-oci-snapshot-holders.mjs "$release_dir/scripts/terminate-approved-oci-snapshot-holders.mjs"
           cp scripts/oci-fundamentals-cron.sh "$release_dir/scripts/oci-fundamentals-cron.sh"
           cp scripts/oci-rss-cron.sh "$release_dir/scripts/oci-rss-cron.sh"
+          chmod +x "$release_dir/scripts/oci-cron.sh" "$release_dir/scripts/oci-fundamentals-cron.sh" "$release_dir/scripts/oci-rss-cron.sh"
           cp scripts/register-discord-commands.mjs "$release_dir/scripts/register-discord-commands.mjs"
           cp scripts/import-market-impact-events.mjs "$release_dir/scripts/import-market-impact-events.mjs"
           cp scripts/market-impact-event-identity.mjs "$release_dir/scripts/market-impact-event-identity.mjs"
@@ -77,6 +87,7 @@ jobs:
           node -e "const fs=require('fs'); const p=require('./package.json'); fs.writeFileSync('.next-deploy-verify/standalone/build-info.json', JSON.stringify({version:p.version,commit:process.env.STOCKMAN_BUILD_VERSION||'unknown',builtAt:process.env.STOCKMAN_BUILD_TIME||new Date().toISOString()}));"
           tar -czf stockman-oci.tar.gz -C "$release_dir" .
           tar -tzf stockman-oci.tar.gz | grep -Fx './server.js'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './.next-deploy-verify/server/instrumentation.js'
           tar -tzf stockman-oci.tar.gz | grep -Fx './build-info.json'
           tar -tzf stockman-oci.tar.gz | grep -Fx './.next-deploy-verify/server/instrumentation.js'
           test "$(tar -tzf stockman-oci.tar.gz | grep -c '/.next-deploy-verify/static/chunks/.*\.js$')" -gt 0
@@ -88,6 +99,7 @@ jobs:
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/local-env.mjs'
           tar -tzf stockman-oci.tar.gz | grep -Fx './data/market-impact-events.json'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-fundamentals-cron.sh'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-rss-cron.sh'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.service'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.timer'
           tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V1__initial_schema.sql'

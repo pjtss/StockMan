@@ -9,12 +9,13 @@ import { sendUsDailyIndicatorSignals } from "@/lib/discord-us-daily-signal";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { filterUsDailyCandidates } from "@/lib/us-daily-common-filter";
-import { withAutomationRun } from "@/lib/automation-run";
-import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { withExclusiveAutomationRun } from "@/lib/automation-run";
+import { loadLatestExecutedAutomationRun, loadRunningAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { scanUsDailyTrend } from "@/lib/us-daily-trend-scan";
 import { sendUsDailyTrendToDiscord } from "@/lib/discord-us-daily-trend";
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { scanStoredUsDailyAdl } from "@/lib/us-adl";
+import { isUsDailyScanComplete } from "@/lib/us-daily-scan-failure-reasons";
 
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -24,7 +25,13 @@ export async function POST(request: Request) {
   const envInterval = Number.parseInt(process.env.US_DAILY_INDICATORS_INTERVAL_SECONDS || "600", 10) || 600;
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? envInterval);
   const effectiveIntervalSeconds = Math.max(intervalSeconds, Math.max(0, moduleSettings.cooldownSeconds ?? 0));
-  const latestRun = await loadLatestExecutedAutomationRun("us-daily-indicators").catch(() => null);
+  let activeRun;
+  try { activeRun = await loadRunningAutomationRun("us-daily-indicators"); }
+  catch (error) { console.error("[API /cron/us-daily-indicators] running gate history unavailable:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "running-gate", error: "US_DAILY_INDICATORS_RUNNING_CHECK_UNAVAILABLE", intervalSeconds, effectiveIntervalSeconds }, { status: 503 }); }
+  if (activeRun) { await recordSkippedAutomationRun("us-daily-indicators", "already_running", { runningRunId: activeRun.id, runningStartedAt: activeRun.started_at }); return NextResponse.json({ ok: true, skipped: true, reason: "already_running", runningRunId: activeRun.id, intervalSeconds, effectiveIntervalSeconds }); }
+  let latestRun;
+  try { latestRun = await loadLatestExecutedAutomationRun("us-daily-indicators"); }
+  catch (error) { console.error("[API /cron/us-daily-indicators] interval gate history unavailable:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "interval-gate", error: "US_DAILY_INDICATORS_INTERVAL_CHECK_UNAVAILABLE", intervalSeconds, effectiveIntervalSeconds }, { status: 503 }); }
   const latestStartedAt = latestRun?.started_at ? new Date(latestRun.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
   if (elapsedSeconds != null && elapsedSeconds < effectiveIntervalSeconds) {
@@ -33,14 +40,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason, intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), latestRunStatus: latestRun?.status });
   }
   try {
-    const result = await withAutomationRun("us-daily-indicators", async () => {
+    const execution = await withExclusiveAutomationRun("us-daily-indicators", async () => {
     const context = await createUsDailyScanContext({ candleLimit: 100 });
     const [mfi, dmi, macd, obv, adl, trend] = await Promise.all([scanStoredUsMfiOversold({ context }), scanStoredUsDmi({ context }), scanStoredUsMacd({ context }), scanStoredUsDailyObv({ context }), scanStoredUsDailyAdl({ context }), scanUsDailyTrend({ context })]);
     const [mfiFiltered, dmiFiltered, macdFiltered, obvFiltered, adlFiltered] = await Promise.all([mfi.qualified, dmi.qualified, macd.qualified, obv.qualified, adl.qualified].map((items) => filterUsDailyCandidates(items as any)));
     const discord = await sendUsDailyIndicatorSignals({ mfi: mfiFiltered.filtered as any, dmi: dmiFiltered.filtered as any, macd: macdFiltered.filtered as any, obv: obvFiltered.filtered as any, adl: adlFiltered.filtered as any });
     const trendDiscord = await sendUsDailyTrendToDiscord(trend.results);
+    const scans = [mfi, dmi, macd, obv, adl, trend];
+    const instrumentCount = scans.reduce((total, scan) => total + scan.instrumentCount, 0);
+    const successCount = scans.reduce((total, scan) => total + scan.successCount, 0);
+    const failureCount = scans.reduce((total, scan) => total + scan.failureCount, 0);
+    const universeAvailable = scans.every((scan) => ("universeAvailable" in scan ? scan.universeAvailable !== false : scan.ok !== false) && scan.instrumentCount > 0);
     return {
-      ok: discord.ok,
+      ok: discord.ok && trendDiscord.ok && scans.every(isUsDailyScanComplete),
+      status: universeAvailable ? undefined : "FAILED",
+      instrumentCount,
+      successCount,
+      failureCount,
       mfi,
       dmi,
       macd,
@@ -57,6 +73,8 @@ export async function POST(request: Request) {
       trendDiscord,
     };
     });
+    if (!execution.acquired) return NextResponse.json({ ok: true, skipped: true, reason: "already_running", intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds });
+    const result = execution.result;
     return NextResponse.json({ intervalSeconds, cooldownSeconds: moduleSettings.cooldownSeconds, effectiveIntervalSeconds, ...result });
   } catch (error) { console.error("[API /cron/us-daily-indicators] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, error: "US_DAILY_INDICATORS_FAILED" }, { status: 502 }); }
 }

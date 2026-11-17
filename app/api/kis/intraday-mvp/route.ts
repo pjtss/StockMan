@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { intradayMemoryState } from "@/lib/intraday-memory-state";
-import { ensureIntradayDetectionWorker, getIntradayWorkerSnapshot } from "@/lib/intraday-detection-worker";
+import { getIntradayWorkerSnapshot } from "@/lib/intraday-detection-worker";
 import { isDomesticScannerOpen, isUsScannerOpen } from "@/lib/scanner-hours";
 import { loadIntradayMvpPolicy } from "@/lib/intraday-mvp-policy";
 
@@ -8,10 +8,6 @@ export const dynamic = "force-dynamic";
 
 /** Returns qualified candidates and recent in-memory turnover for the US focus pool. */
 export async function GET() {
-  // Do not rely exclusively on Next instrumentation in standalone/container
-  // deployments. This remains process-singleton and is a no-op in development
-  // or when the explicit emergency kill switch is set.
-  ensureIntradayDetectionWorker();
   const snapshot = intradayMemoryState.snapshot();
   const policy = await loadIntradayMvpPolicy();
   const [domesticOpen, usOpen] = await Promise.all([
@@ -27,6 +23,8 @@ export async function GET() {
       market: candidate.market,
       code: candidate.code,
       marketCap: candidate.marketCap ?? null,
+      marketCapObservedAt: candidate.marketCapObservedAt ?? null,
+      marketCapFetchedAt: candidate.marketCapFetchedAt ?? null,
       rollingTradingValue: candidate.rollingTurnoverValue ?? 0,
       rollingTurnoverRatio: candidate.rollingTurnoverRatio ?? null,
       turnoverWindows: intradayMemoryState.getRollingTurnoverWindows(candidate.market, candidate.code, candidate.marketCap),
@@ -52,6 +50,8 @@ export async function GET() {
         name: current?.name ?? candidate.code,
         rank: current?.rank ?? candidate.focusRank ?? null,
         marketCap: candidate.marketCap ?? null,
+        marketCapObservedAt: candidate.marketCapObservedAt ?? null,
+        marketCapFetchedAt: candidate.marketCapFetchedAt ?? null,
         currency: "USD",
         status: latestWindow?.sampleCount ? "OBSERVING" : "WAITING_FOR_FIRST_SAMPLE",
         state: candidate.state ?? "WARMING_UP",

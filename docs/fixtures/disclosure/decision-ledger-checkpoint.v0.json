@@ -1,0 +1,79 @@
+{
+  "contractVersion": "decision-ledger-checkpoint.v0",
+  "classification": "SYNTHETIC_SECURITY_ACCEPTANCE_NOT_SIGNATURE_OR_RUNTIME_PROOF",
+  "dataPolicy": {
+    "containsOperationalDecisionEvidence": false,
+    "containsCredentials": false,
+    "containsPrivateKeys": false,
+    "usesSyntheticIdentities": true
+  },
+  "decisionId": "KR-OPERATIONAL-SECURITY-01",
+  "status": "PROPOSED_UNAPPROVED",
+  "checkpointPayloadFields": [
+    "contractVersion",
+    "ledgerId",
+    "sequence",
+    "tailRecordHash",
+    "previousCheckpointHash",
+    "createdAt",
+    "signingKeyId",
+    "signatureAlgorithm"
+  ],
+  "unapprovedChoices": {
+    "signatureAlgorithm": null,
+    "keyProvider": null,
+    "checkpointCadence": null,
+    "minimumIndependentCopies": null,
+    "signerAndLedgerWriterSeparation": null
+  },
+  "projectionPolicy": {
+    "checkpointMustCoverLatestRecord": true,
+    "missingInvalidStaleOrUnavailableCheckpoint": "BLOCK_NON_OPEN_STATUS_PROJECTION",
+    "OPENWithoutLedgerEvidence": "REMAINS_OPEN",
+    "checkpointDoesNotProveEvidenceTruth": true
+  },
+  "recordHashGoldenVector": {
+    "contractVersion": "synthetic-decision-ledger-record-hash.v1",
+    "record": {
+      "decisionId": "KR-OPERATIONAL-SECURITY-01",
+      "decisionRevision": 1,
+      "status": "OPEN",
+      "scope": "synthetic-scope",
+      "ownerRole": "synthetic-role",
+      "previousRevision": null,
+      "previousRecordHash": null,
+      "evidenceManifestHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "evidenceObservedAt": "2026-11-04T00:00:00Z",
+      "namedOwner": "person:synthetic-owner",
+      "reviewer": "person:synthetic-reviewer",
+      "decisionRef": "fixture:decision-1",
+      "validUntil": "2027-11-04",
+      "effectiveAt": "2026-11-04T00:00:00Z",
+      "reviewCondition": "synthetic review condition",
+      "acceptanceArtifact": "fixture:acceptance-1",
+      "fixtureCount": 0,
+      "acceptanceResult": "NOT_RUN",
+      "dependencyDecisionIds": [],
+      "reason": "synthetic open reason"
+    },
+    "expectedHash": "sha256:e3f43a252949b1edb2c1a5b8d394012562458fc5178444ca4b5371c583108bd5"
+  },
+  "requiredControls": [
+    "detached_signature_over_domain_separated_rfc8785_jcs_payload",
+    "monotonic_sequence_and_compare_and_set_append",
+    "independent_trust_domain_and_backup_copy",
+    "signer_identity_and_permission_audit",
+    "key_rotation_overlap_and_old_key_revocation",
+    "incident_reanchor_requires_reviewed_new_checkpoint"
+  ],
+  "vectors": [
+    { "id": "DLCP-01-VALID-SIGNATURE-AND-LATEST-TAIL", "expected": "ACCEPT_ANCHORED_STATUS" },
+    { "id": "DLCP-02-WHOLE-FILE-REWRITE-CHANGES-TAIL", "expected": "BLOCK_NON_OPEN_STATUS_PROJECTION" },
+    { "id": "DLCP-03-TRUNCATED-OR-REPLAYED-CHECKPOINT", "expected": "BLOCK_NON_OPEN_STATUS_PROJECTION" },
+    { "id": "DLCP-04-APPENDED-RECORD-IS-NOT-YET-ANCHORED", "expected": "BLOCK_NEW_NON_OPEN_STATUS" },
+    { "id": "DLCP-05-ANCHOR-STORE-UNAVAILABLE", "expected": "BLOCK_NON_OPEN_STATUS_PROJECTION" },
+    { "id": "DLCP-06-REVOKED-OR-UNKNOWN-SIGNING-KEY", "expected": "BLOCK_NON_OPEN_STATUS_PROJECTION" },
+    { "id": "DLCP-07-ROTATION-REQUIRES-OVERLAP-AND-REVIEW", "expected": "BLOCK_UNTIL_ROTATION_ACCEPTANCE" },
+    { "id": "DLCP-08-COMPROMISE-REANCHOR-DOES-NOT-REWRITE-HISTORY", "expected": "PRESERVE_OLD_CHAIN_AND_REQUIRE_INCIDENT_REVIEW" }
+  ]
+}

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { PageNavigation } from './page-navigation';
 
 // Mock next/link
@@ -17,7 +17,10 @@ vi.mock('./page-navigation.module.css', () => ({
 }));
 
 describe('PageNavigation Component', () => {
-  it('renders all links', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('renders all links', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
     render(<PageNavigation current="home" />);
     expect(screen.getByText('홈')).toBeDefined();
     expect(screen.getByText('티커 차트')).toBeDefined();

@@ -1,0 +1,181 @@
+{
+  "contractVersion": "disclosure-decision-register.v0",
+  "classification": "DESIGN_REGISTER_BASELINE_NOT_OPERATIONAL_APPROVAL",
+  "dataPolicy": {
+    "containsOperationalDecisionEvidence": false,
+    "containsRealOwnerOrReviewer": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "statusVocabulary": [
+    "OPEN",
+    "EVIDENCE_READY",
+    "APPROVED",
+    "CLOSED",
+    "REJECTED",
+    "EXPIRED"
+  ],
+  "decisionFields": [
+    "decisionId",
+    "ownerRole",
+    "scope",
+    "defaultBehavior",
+    "acceptanceEvidence"
+  ],
+  "decisions": [
+    {
+      "decisionId": "KR-DART-RIGHTS-01",
+      "ownerRole": "데이터/법무 책임자",
+      "scope": "DART/KIND endpoint·field·payload class별 fetch, transient parse, retain, derivative, quote, UI/API, backup 권한과 출처표시",
+      "defaultBehavior": "권리 snapshot이 정확한 source/product/component/action과 일치하지 않으면 해당 action 금지. 개별 metadata 권리가 확인된 경로만 예외 허용",
+      "acceptanceEvidence": "공식 약관/상품 license snapshot hash, endpoint-field mapping, reviewer·effective date"
+    },
+    {
+      "decisionId": "KR-CAP-FRESHNESS-01",
+      "ownerRole": "투자 데이터 책임자",
+      "scope": "cap 원천, KRW 환산 기준시각/환율 원천, 장중 변동·시장 휴일 포함 stale window, event-time/current-time eligibility semantics",
+      "defaultBehavior": "freshness/통화 미판정은 `UNVERIFIED`; public subject는 숨김",
+      "acceptanceEvidence": "정책 version, 수치 기준, representative cases, signed review record"
+    },
+    {
+      "decisionId": "KR-RECONCILIATION-01",
+      "ownerRole": "데이터 운영 책임자",
+      "scope": "historical overlap lookback, cadence, correction denominator/completeness SLO, source freshness max-age 및 required window, quota budget",
+      "defaultBehavior": "기간/max-age 승인 전 historical completeness를 주장하지 않고 coverage=`UNVERIFIED`; 일정 freshness는 `UNKNOWN`으로 두고 active/upcoming publication 차단",
+      "acceptanceEvidence": "range/cadence/max-age, 공식 quota evidence, replay/late-arrival/outage fixture, freshness denominator, 운영 승인"
+    },
+    {
+      "decisionId": "KR-CAPITAL-RECONCILIATION-01",
+      "ownerRole": "공시 도메인·재무 데이터 책임자",
+      "scope": "issuer 단위 증권 series/tranche 식별, 발행·잔액·전환/행사·상장·상환 movement 연결, 정기보고서 기준 stock과 거래 event 조정, coverage/as-of 및 통합 capital-state 공개 정책",
+      "defaultBehavior": "정확한 issuer·security class·series 관계, 기준 snapshot 및 movement denominator가 확인되지 않거나 coverage가 부분이면 issuer 통합 잔액·희석/공급 합계를 공개하지 않고 unresolved amounts를 보존",
+      "acceptanceEvidence": "공식 DART/KIND 층화 fixture, tranche/revision crosswalk, periodic snapshot-to-movement reconciliation denominator, 중복/정정/기준시점/통화/class 경계 acceptance, 독립 reviewer 승인"
+    },
+    {
+      "decisionId": "KR-ISSUER-RISK-STATUS-01",
+      "ownerRole": "공시 도메인·상장상태 책임자",
+      "scope": "issuer 단위 재무·감사 공시 신호, 법원/행정 절차, KRX 관리·매매 상태·상장적격성 단계의 공식 관측을 시점·revision·대상 instrument별로 연결하고 현재 상태/공개 정책 결정",
+      "defaultBehavior": "공시 신호, 법원 절차, 거래소 조치, 상장 결과는 서로 자동 전이하지 않는다. authority·issuer/instrument 관계·source coverage·as-of·정정 상태가 미확인/충돌/오래된 경우 `UNKNOWN` 또는 `UNRESOLVED`로 두고 건강/해소/거래가능 결론 및 aggregate score 공개를 차단한다",
+      "acceptanceEvidence": "OpenDART/KIND 공식 분류·원문 층화 fixture, issuer/security identity와 3개 상태축 전이표, event-time/observed-time·정정·coverage 분모, 권한별 source freshness 및 reviewer 승인"
+    },
+    {
+      "decisionId": "KR-RETENTION-01",
+      "ownerRole": "법무·보안·운영 책임자",
+      "scope": "원문/파생물/백업별 retention, deletion SLA, RPO/RTO, restore test cadence 및 접근권한",
+      "defaultBehavior": "원문 body는 rights retention이 승인되지 않으면 보존하지 않음. 파생물도 rights scope 불명 시 저장·공개 금지",
+      "acceptanceEvidence": "retention matrix, source body/byte/hash/locator/derived packet lifecycle by action and purpose, deletion/backup restore evidence, access policy approval"
+    },
+    {
+      "decisionId": "KR-TAXONOMY-01",
+      "ownerRole": "공시 도메인 reviewer",
+      "scope": "event/date vocabulary, source form/field mapping, allowed transitions",
+      "defaultBehavior": "fixture 없는 date token은 `UNMAPPED/NEEDS_EVIDENCE`, 공개 금지",
+      "acceptanceEvidence": "versioned taxonomy release + official form fixtures + reviewer sign-off"
+    },
+    {
+      "decisionId": "KR-LEGACY-CUTOVER-01",
+      "ownerRole": "저장소/DB 운영 책임자",
+      "scope": "v1 mapping, DB importer/projection ownership, deployment and rollback",
+      "defaultBehavior": "기존 importer·calendar DB를 새 source of truth로 전환하지 않음",
+      "acceptanceEvidence": "schema drift remediation, immutable snapshot, dry-run reconciliation, restore/rollback rehearsal"
+    },
+    {
+      "decisionId": "KR-MASTER-SNAPSHOT-01",
+      "ownerRole": "종목 데이터 책임자",
+      "scope": "보통주 판정의 공식 마스터, 원본/version/hash 보존 가능 범위, identifier 유효기간 및 재평가 주기",
+      "defaultBehavior": "활성 COMMON_STOCK를 공식 snapshot으로 입증하지 못한 종목은 생성·연결·노출 금지",
+      "acceptanceEvidence": "공식 원천 명세, snapshot fixture/hash, 코드 재사용·분류변경·효력일 correction 사례, candidate/preparer/reviewer capability matrix, self-approval 분리 및 CAS/reopen/expiry acceptance와 named owner 승인"
+    },
+    {
+      "decisionId": "KR-ANALYSIS-REPRO-01",
+      "ownerRole": "공시 도메인 reviewer",
+      "scope": "prompt/schema/model/normalizer 버전, 입력 정규화, 재실행 동등성, prompt injection 대응",
+      "defaultBehavior": "버전·입력 hash가 없거나 untrusted 본문 경계가 불명확한 분석은 승인·공개 금지",
+      "acceptanceEvidence": "golden filing fixtures, deterministic validation report, adversarial prompt fixture, reviewer sign-off"
+    },
+    {
+      "decisionId": "KR-MARKET-DATA-RIGHTS-01",
+      "ownerRole": "시장 데이터/법무 책임자",
+      "scope": "KRX 및 가격·benchmark provider별 product/endpoint/field/action/purpose/channel 권한, transient access, snapshot retention, replay/reacquisition, derived statistic calculation/publication, terms revision과 expiry",
+      "defaultBehavior": "provider·상품·action별 직접 근거와 유효 revision이 없거나 scope가 충돌하면 해당 취득·보존·재실행·계산·공개 action은 `UNRESOLVED`로 차단한다. hash/locator는 권한이나 source byte 가용성을 뜻하지 않는다",
+      "acceptanceEvidence": "공식 약관/계약 snapshot hash와 effective date, provider-action-retention matrix, endpoint/field mapping, terms change/revocation fixture, named legal/data owner approval"
+    },
+    {
+      "decisionId": "KR-EVENT-STUDY-POLICY-01",
+      "ownerRole": "시장분석 책임자·독립 통계 reviewer",
+      "scope": "event-study 목적과 confirmatory/exploratory 구분, event window/primary endpoint, cohort/comparator, subgroup/multiplicity, minimum sample, missingness/confounder policy, result interpretation and publication",
+      "defaultBehavior": "사전 정책 revision과 승인된 분석 family가 없거나 rights/replay gate가 닫혀 있으면 결과는 기술적 미확정·탐색 상태로만 보존하고 confirmatory claim 및 public ranking을 차단한다",
+      "acceptanceEvidence": "versioned preregistration template, synthetic adversarial cases, independently reviewed gold denominator, approved statistical policy and expiry/reopen triggers"
+    },
+    {
+      "decisionId": "KR-IMPORTER-OPS-01",
+      "ownerRole": "애플리케이션/DB 운영 책임자",
+      "scope": "importer 배포 산출물·호출자, mainline checkpoint CAS, 재시도·재조정·관측·rollback 소유자",
+      "defaultBehavior": "앱 deploy를 projection 반영으로 간주하지 않으며 명시적 checkpoint가 없는 import는 거부",
+      "acceptanceEvidence": "배포 manifest, 승인 commit SHA, idempotent replay 및 장애 rollback rehearsal"
+    },
+    {
+      "decisionId": "KR-DB-DRIFT-01",
+      "ownerRole": "DB 운영 책임자",
+      "scope": "로컬/운영 schema history drift, 선행 migration 손상, projection additive migration 승인",
+      "defaultBehavior": "drift가 미해결이면 migration·import 금지. 자동 repair/baseline 금지",
+      "acceptanceEvidence": "환경별 schema inventory, 백업·restore 성공, 승인된 additive migration dry-run"
+    },
+    {
+      "decisionId": "KR-SHADOW-SLO-01",
+      "ownerRole": "데이터 운영/도메인 책임자",
+      "scope": "표본 기간·층화·크기, 오귀속/누락 수용 기준, quota 및 ingest/review 지표 목표",
+      "defaultBehavior": "baseline·분모·owner-approved threshold가 없으면 shadow 결과는 `NOT_ACCEPTED`, 운영 승격 금지",
+      "acceptanceEvidence": "재현 가능한 표본/분모, 층별 결과, SLO 승인 및 rollback rehearsal"
+    },
+    {
+      "decisionId": "KR-DOCUMENT-UX-01",
+      "ownerRole": "제품/법무 책임자",
+      "scope": "문서 분류·revision·접근권한, 허용 인용량·표시형식·삭제 요청 UX",
+      "defaultBehavior": "권리 범위가 확인된 원문 링크/메타데이터만 표시하고 임의 인용·전문 저장 금지",
+      "acceptanceEvidence": "문서 생애주기 matrix, 역할별 접근 시나리오, 사용자 공개 문구 승인"
+    },
+    {
+      "decisionId": "KR-PERSONAL-THESIS-UX-01",
+      "ownerRole": "제품 책임자·개인정보 책임자",
+      "scope": "사용자 명시적 opt-in thesis journal의 가설/근거/time horizon/검토기준 UX, 개인 데이터 최소화, event/claim revision link, 개인 기록 export/delete 및 공개·분석 consumer 경계",
+      "defaultBehavior": "watchlist·종목 열람·공시 알림만으로 thesis 또는 보유/거래 정보를 만들지 않는다. 가설은 사용자 소유 기록으로 표시하고, 기준·근거·기간이 미완성되거나 source/rights가 stale이면 성과·정확도 claim을 생성하지 않는다",
+      "acceptanceEvidence": "versioned user research/UX copy, synthetic privacy/revision/outcome-attribution cases, owner-scoped API/UI contract, retention/export/delete review 및 independent product/privacy approval"
+    },
+    {
+      "decisionId": "KR-CURSOR-SECURITY-01",
+      "ownerRole": "애플리케이션 보안/제품 책임자",
+      "scope": "cursor HMAC key source/rotation/revocation, canonical query binding, max age, materialized snapshot retention/quota, emergency invalidation",
+      "defaultBehavior": "결정 승인 전 public pagination 비활성; offset/page-number 방식으로 snapshot 일관성을 가장하지 않음",
+      "acceptanceEvidence": "threat model, key lifecycle/compromise drill, tamper/cross-endpoint/filter replay/expiry/concurrent revocation fixtures, quota/retention 승인"
+    },
+    {
+      "decisionId": "KR-EVENT-ATTRIBUTION-01",
+      "ownerRole": "공시 도메인·종목 마스터 책임자",
+      "scope": "제출자·당사자·대상 issuer가 다른 filing의 stable entity link, 직접 영향 근거, 다자 event subject cardinality와 attribution reviewer",
+      "defaultBehavior": "제출자/당사자 이름이나 종목코드 문자열만으로 event ticker를 만들지 않으며 attribution 근거가 불충분한 subject는 `UNVERIFIED`로 숨김",
+      "acceptanceEvidence": "공식 filing fixture, entity crosswalk snapshot/hash, 직접 영향 claim trace, 다자 오귀속 adversarial set 및 reviewer 승인"
+    },
+    {
+      "decisionId": "KR-API-UI-CONSISTENCY-01",
+      "ownerRole": "API·제품·DB 운영 책임자",
+      "scope": "public API/UI projection revision, as-of 의미, filter/sort/page contract, ETag/cache와 revocation 동작, 권리-aware 문서 UX의 일관성",
+      "defaultBehavior": "동일 응답의 모든 row·메타데이터가 단일 immutable snapshot을 가리키지 않으면 응답/페이지를 공개하지 않음",
+      "acceptanceEvidence": "route/UI contract inventory, 동일 snapshot hash fixture, filter/page/revocation race acceptance, no-store/cache 정책 승인"
+    },
+    {
+      "decisionId": "KR-OPERATIONAL-SECURITY-01",
+      "ownerRole": "보안·개인정보·운영 책임자",
+      "scope": "retry/idempotency/fencing, authorization/audit retention, revocation/deletion propagation, backup/restore and privacy controls, incident response, decision-ledger append authorization, detached checkpoint signing, independent anchor retention and key rotation/revocation",
+      "defaultBehavior": "미분류 데이터는 최소 수집하고 승인 없는 본문·개인정보 보존, 검증되지 않은 결정 근거 projection, 권한/삭제 전파 미확인 shadow·운영 실행을 차단한다. ledger 전체 재작성 또는 stale checkpoint를 배제할 수 없으면 비-OPEN decision status를 적용하지 않는다",
+      "acceptanceEvidence": "threat/privacy model, server-side actor scope/revocation/self-approval/CAS and read-only audit enforcement, evidence redaction/access/deletion lineage, recovery rehearsal, retry/idempotency/fencing fixtures, signed external ledger checkpoint contract, truncation/rewrite/replay/key-revocation acceptance, named owner approval"
+    },
+    {
+      "decisionId": "KR-END-TO-END-ACCEPTANCE-01",
+      "ownerRole": "독립 품질 reviewer·업무 owner",
+      "scope": "층화 gold set/전체 분모, 누락·오귀속·날짜 오류 기준, 독립 판정, 반복 기간, rollback acceptance",
+      "defaultBehavior": "분모·gold set·사전 승인 기준이 없으면 결과를 `NOT_ACCEPTED`로 남기고 설계 승인·shadow 승격·배포 금지",
+      "acceptanceEvidence": "versioned gold set/hash, 독립 reviewer 기록, source-to-publication end-to-end 실행 결과, 승인 threshold 및 rollback rehearsal"
+    }
+  ]
+}

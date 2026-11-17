@@ -1,9 +1,26 @@
 import { getAccessToken } from "@/lib/kis";
 import { kisRequest } from "@/lib/kis-request-framework";
 import type { OHLCVCandle } from "@/lib/kis-chart";
+import { isValidCompactCalendarDate } from "./calendar-date-quality.mjs";
 
 export type KrDailyPriceResponse = { ok: boolean; status: number; request: { url: string; headers: Record<string,string> }; response: { rawText: string; parsed: unknown }; candles: Array<OHLCVCandle & { raw: unknown }>; diagnostics: Record<string, unknown> };
-function num(value: unknown) { const n = Number(String(value ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; }
+function num(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!/^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d*)?|\.\d+)$/.test(raw)) return Number.NaN;
+  const parsed = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+export function parseKrDailyPriceRows(rows: unknown[]): Array<OHLCVCandle & { raw: unknown }> {
+  return rows.map((value: any) => ({ date: String(value?.stck_bsop_date ?? ""), open: num(value?.stck_oprc), high: num(value?.stck_hgpr), low: num(value?.stck_lwpr), close: num(value?.stck_clpr), volume: num(value?.acml_vol), raw: value })).filter((row: OHLCVCandle & { raw: unknown }) => {
+    const date = row.date;
+    return isValidCompactCalendarDate(date)
+      && [row.open, row.high, row.low, row.close, row.volume].every(Number.isFinite)
+      && Math.min(row.open, row.high, row.low, row.close) > 0
+      && row.volume >= 0
+      && row.high >= Math.max(row.open, row.low, row.close)
+      && row.low <= Math.min(row.open, row.high, row.close);
+  });
+}
 export async function fetchKrDailyPrice(request: { code: string; startDate?: string; endDate?: string; timeframe?: "D" | "W" | "M" }): Promise<KrDailyPriceResponse | null> {
   const code = request.code.trim();
   const timeframe = request.timeframe ?? "D";
@@ -18,6 +35,6 @@ export async function fetchKrDailyPrice(request: { code: string; startDate?: str
   const token = await getAccessToken(); if (!token) return null;
   const { response, rawText, parsed } = await kisRequest<any>({ url, token, trId: "FHKST03010100" });
   const rows = Array.isArray(parsed?.output2) ? parsed.output2 : [];
-  const candles = rows.map((row:any) => ({ date:String(row.stck_bsop_date ?? ""), open:num(row.stck_oprc), high:num(row.stck_hgpr), low:num(row.stck_lwpr), close:num(row.stck_clpr), volume:num(row.acml_vol), raw:row })).filter((row:any) => row.date && row.close > 0);
+  const candles = parseKrDailyPriceRows(rows);
   return { ok: response.ok && parsed?.rt_cd === "0" && candles.length > 0, status: response.status, request: { url:url.toString(), headers:{ Authorization:"Bearer <masked>", appkey:"<masked>", appsecret:"<masked>", tr_id:"FHKST03010100" } }, response:{ rawText, parsed }, candles, diagnostics:{ httpStatus:response.status, kisOk:parsed?.rt_cd === "0", rtCd:parsed?.rt_cd ?? null, msgCd:parsed?.msg_cd ?? null, msg1:parsed?.msg1 ?? null, outputKey:"output2", rawOutputCount:rows.length, parsedCandleCount:candles.length, firstDate:candles[0]?.date ?? null, lastDate:candles.at(-1)?.date ?? null, error:parsed?.rt_cd === "0" && candles.length === 0 ? "EMPTY_DAILY_CANDLES" : undefined } };
 }

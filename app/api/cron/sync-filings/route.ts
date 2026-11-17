@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { runFilingSync } from "@/lib/filing-sync";
-import { withAutomationRun } from "@/lib/automation-run";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +10,7 @@ async function handleSyncFilings(request: Request) {
   }
 
   try {
-    return NextResponse.json(await withAutomationRun("dart-realtime", runFilingSync));
+    return NextResponse.json(await runFilingSync());
   } catch (error) {
     console.error("[API /cron/sync-filings] Error:", error instanceof Error ? error.message : "unknown error");
     return NextResponse.json({ ok: false, error: "FILING_SYNC_FAILED" }, { status: 502 });

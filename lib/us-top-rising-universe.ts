@@ -19,7 +19,7 @@ const ETF_NAME_HINT = /\b(?:ISHARES|VISTASHARES|ROUNDHILL|KRANESHARES|KFA|SPDR|V
 // KIS's overseas master marks many preferred shares, notes and units as
 // security type 2 (stock). The official master name remains the authoritative
 // product descriptor for these cases, so exclude them from common-stock scans.
-export const EXCLUDED_US_OFFICIAL_NAME = /(?:preferred|\bpfd\b|\b(?:senior\s+)?notes?\b|\bnts\b|\bbonds?\b|\bunits?\b|\bwarrants?\b|\bright\b|\bdebentures?\b|우선주|채권|워런트)/i;
+export const EXCLUDED_US_OFFICIAL_NAME = /(?:preferred|\b(?:pref|prf|pfd)\b|\b(?:senior|subordinated|subord|junior|jnr)\s+(?:notes?|nts|deb(?:entures?)?|oblig(?:ations?)?)\b|\b(?:notes?|nts|deb(?:entures?)?|oblig(?:ations?)?)\b|\bbonds?\b|\bunits?\b|\bwarrants?\b|\bright\b|우선주|채권|워런트)/i;
 function safeProviderCode(value: unknown) {
   const candidate = value == null ? "" : String(value);
   return /^[A-Za-z0-9_-]{1,40}$/.test(candidate) ? candidate : null;
@@ -101,7 +101,7 @@ export function selectIntradayFocusKeys<T extends UsTopRisingScope>(
 }
 function code(row: any) { return String(row.symb ?? row.rsym ?? row.code ?? "").replace(/^D[A-Z]{3}/, "").trim().toUpperCase(); }
 
-export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null; priority?: number; turnoverToMarketCap?: number; priorityReasons?: string[]; focusTracking?: boolean };
+export type UsTopRisingScope = { market: string; code: string; name?: string; rank?: number; changeRate?: number | null; rankingVolume?: number | null; rankingTradeValue?: number | null; marketCap?: number | null; marketCapObservedAt?: string | null; marketCapFetchedAt?: string | null; priority?: number; turnoverToMarketCap?: number; priorityReasons?: string[]; focusTracking?: boolean };
 
 export function retainOfficialCommonStocks<T extends UsTopRisingScope>(scopes: T[], officialKeys: Set<string>) {
   return scopes.filter((scope) => officialKeys.has(`${scope.market}:${scope.code}`));
@@ -142,6 +142,7 @@ export type StoredUsInstrumentScopes = {
     markets: Array<{ market: string; sourceCount: number }>;
     availableMarketCount: number;
     criteria: Record<string, unknown>;
+    error?: string;
   };
 };
 let storedScopeCache: { expiresAt: number; value: StoredUsInstrumentScopes } | null = null;
@@ -232,9 +233,9 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
   storedScopeInflight = (async () => {
     await syncDailyActivityStatus("US");
     const db = getDb();
-    const rows = db ? await db.select({ market: usCommonStockUniverse.market, code: usCommonStockUniverse.code, name: usCommonStockUniverse.name, englishName: usCommonStockUniverse.englishName, instrumentType: usCommonStockUniverse.instrumentType, isEtf: usCommonStockUniverse.isEtf, isLeveraged: usCommonStockUniverse.isLeveraged, isInverse: usCommonStockUniverse.isInverse, isWarrant: usCommonStockUniverse.isWarrant, isDerivative: usCommonStockUniverse.isDerivative, isDr: usCommonStockUniverse.isDr })
-      .from(usCommonStockUniverse).where(and(eq(usCommonStockUniverse.enabled, true), sql`daily_active = true`, inArray(usCommonStockUniverse.market, [...US_EXCHANGES])))
-      : [];
+    if (!db) throw new Error("US_INSTRUMENT_UNIVERSE_DATABASE_UNAVAILABLE");
+    const rows = await db.select({ market: usCommonStockUniverse.market, code: usCommonStockUniverse.code, name: usCommonStockUniverse.name, englishName: usCommonStockUniverse.englishName, instrumentType: usCommonStockUniverse.instrumentType, isEtf: usCommonStockUniverse.isEtf, isLeveraged: usCommonStockUniverse.isLeveraged, isInverse: usCommonStockUniverse.isInverse, isWarrant: usCommonStockUniverse.isWarrant, isDerivative: usCommonStockUniverse.isDerivative, isDr: usCommonStockUniverse.isDr })
+      .from(usCommonStockUniverse).where(and(eq(usCommonStockUniverse.enabled, true), sql`daily_active = true`, inArray(usCommonStockUniverse.market, [...US_EXCHANGES])));
     const settings = await loadUsTurnoverFilterSettings();
     // Cache membership is deliberately independent from market-cap, turnover,
     // price and volume policies. Only the official persisted product type is
@@ -247,7 +248,7 @@ export async function loadStoredUsInstrumentScopes(): Promise<StoredUsInstrument
     // provide a marketCap value; the stored master is filtered by product type.
     const scopes = eligibleRows.map((row, index) => ({ market: row.market, code: row.code, name: row.name, rank: index + 1, changeRate: null, rankingVolume: null, rankingTradeValue: null }));
     const commonFilterEnabled = settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0;
-    return { scopes, universe: { ok: true, source: "DB_INTEGRATED_US_INSTRUMENT_UNIVERSE", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instrument_universe", instrumentType: "COMMON_STOCK", numericFilters: "NONE", ignoredTurnoverSettings: commonFilterEnabled ? { minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap } : null } } };
+    return { scopes, universe: { ok: scopes.length > 0, source: "DB_INTEGRATED_US_INSTRUMENT_UNIVERSE", markets: US_EXCHANGES.map((market) => ({ market, sourceCount: scopes.filter((item) => item.market === market).length })), availableMarketCount: new Set(scopes.map((item) => item.market)).size, criteria: { exchanges: [...US_EXCHANGES], source: "us_instrument_universe", instrumentType: "COMMON_STOCK", numericFilters: "NONE", ignoredTurnoverSettings: commonFilterEnabled ? { minMarketCap: settings.globalMinMarketCap, maxMarketCap: settings.globalMaxMarketCap } : null }, error: scopes.length > 0 ? undefined : "NO_ACTIVE_COMMON_STOCKS" } };
   })();
   try {
     const value = await storedScopeInflight;
@@ -361,9 +362,15 @@ async function loadUsTopRisingScopesUncached() {
   scopes.push(...officialScopes);
   const settings = await loadUsTurnoverFilterSettings();
   if (settings.globalMinMarketCap > 0 || settings.globalMaxMarketCap > 0) {
-    const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null }>("SELECT market, code, market_cap FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])", [[...US_EXCHANGES], scopes.map((scope) => scope.code)]).catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null }> }));
+    const capRows = await getPool().query<{ market: string; code: string; market_cap: number | null; observed_at: Date | string | null; fetched_at: Date | string | null }>("SELECT market, code, market_cap, observed_at, fetched_at FROM instrument_fundamental_snapshots WHERE market = ANY($1::text[]) AND code = ANY($2::text[])", [[...US_EXCHANGES], scopes.map((scope) => scope.code)]).catch(() => ({ rows: [] as Array<{ market: string; code: string; market_cap: number | null; observed_at: Date | string | null; fetched_at: Date | string | null }> }));
     const caps = new Map(capRows.rows.map((row) => [`${row.market}:${row.code}`, row.market_cap]));
-    for (const scope of scopes) scope.marketCap = caps.get(`${scope.market}:${scope.code}`) ?? null;
+    const capSnapshots = new Map(capRows.rows.map((row) => [`${row.market}:${row.code}`, row]));
+    for (const scope of scopes) {
+      const snapshot = capSnapshots.get(`${scope.market}:${scope.code}`);
+      scope.marketCap = caps.get(`${scope.market}:${scope.code}`) ?? null;
+      scope.marketCapObservedAt = snapshot?.observed_at == null ? null : new Date(snapshot.observed_at).toISOString();
+      scope.marketCapFetchedAt = snapshot?.fetched_at == null ? null : new Date(snapshot.fetched_at).toISOString();
+    }
   }
   const filteredScopes = await applyCommonMarketCapFilter(scopes, settings);
   const scoredByKey = new Map<string, ReturnType<typeof scoreIntradayCandidate>>();
@@ -397,16 +404,18 @@ async function loadUsTopRisingScopesUncached() {
         nextCheckAt: previous?.nextCheckAt ?? Date.now(),
         consecutiveFailures: previous?.consecutiveFailures ?? 0,
         marketCap: scope.marketCap ?? null,
+        marketCapObservedAt: scope.marketCapObservedAt ?? null,
+        marketCapFetchedAt: scope.marketCapFetchedAt ?? null,
         tradingValue: scope.rankingTradeValue ?? null,
         mvpTracking: true,
         focusTracking: true,
         focusRank: focusRanks.get(key),
       });
-      else if (previous) intradayMemoryState.upsertCandidate({ ...previous, marketCap: scope.marketCap ?? null, tradingValue: scope.rankingTradeValue ?? null, mvpTracking: true, focusTracking: false, focusRank: undefined });
+      else if (previous) intradayMemoryState.upsertCandidate({ ...previous, marketCap: scope.marketCap ?? null, marketCapObservedAt: scope.marketCapObservedAt ?? null, marketCapFetchedAt: scope.marketCapFetchedAt ?? null, tradingValue: scope.rankingTradeValue ?? null, mvpTracking: true, focusTracking: false, focusRank: undefined });
       continue;
     }
     const isFocused = focusKeys.has(key);
-    intradayMemoryState.upsertCandidate({ ...previous, ...scored, mvpTracking: true, focusTracking: isFocused, focusRank: isFocused ? focusRanks.get(key) : undefined });
+    intradayMemoryState.upsertCandidate({ ...previous, ...scored, marketCapObservedAt: scope.marketCapObservedAt ?? null, marketCapFetchedAt: scope.marketCapFetchedAt ?? null, mvpTracking: true, focusTracking: isFocused, focusRank: isFocused ? focusRanks.get(key) : undefined });
   }
   const displayScopes = prioritizedScopes.map((scope) => {
     const key = `${scope.market}:${scope.code}`;

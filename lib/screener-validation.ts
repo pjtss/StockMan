@@ -1,3 +1,5 @@
+import { isValidIsoCalendarDate } from "./calendar-date-quality.mjs";
+
 const operators = new Set(["=", "!=", ">", ">=", "<", "<="]);
 const metricFields = new Set([
   "marketCap",
@@ -17,10 +19,7 @@ export function validateScreenerRequest(body: unknown): string | null {
   if (value.market != null && !["KR", "US", "ALL"].includes(String(value.market))) return "INVALID_MARKET";
   if (value.timeframe != null && !["D", "W", "M"].includes(String(value.timeframe))) return "INVALID_TIMEFRAME";
   if (value.asOf != null && value.asOf !== "LATEST") {
-    if (typeof value.asOf !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value.asOf)) return "INVALID_AS_OF";
-    const [year, month, day] = value.asOf.split("-").map(Number);
-    const parsed = new Date(Date.UTC(year, month - 1, day));
-    if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return "INVALID_AS_OF";
+    if (!isValidIsoCalendarDate(value.asOf)) return "INVALID_AS_OF";
   }
   if (value.logic != null && !["AND", "OR"].includes(String(value.logic))) return "INVALID_LOGIC";
   if (value.instrumentType != null && value.instrumentType !== "COMMON_STOCK") return "INVALID_INSTRUMENT_TYPE";

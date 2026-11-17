@@ -2,6 +2,7 @@ export interface DailyCacheMarketResult {
   universe: number;
   fetched: number;
   saved: number;
+  duplicateCandleRows?: number;
   failed: number;
 }
 

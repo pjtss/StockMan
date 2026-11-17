@@ -35,8 +35,10 @@ async function executeRefresh(options: { concurrency?: number } = {}) {
           continue;
         }
         currentCandleCount += 1;
-        updatedCandleCount += await saveUsDailyCandles(item.market, item.code, [current]);
-        successCount += 1;
+        const savedCount = await saveUsDailyCandles(item.market, item.code, [current]);
+        updatedCandleCount += savedCount;
+        if (savedCount > 0) successCount += 1;
+        else failures.push({ market: item.market, code: item.code, error: `current US market candle was not saved (${marketDate})` });
       } catch (error) {
         failures.push({ market: item.market, code: item.code, error: error instanceof Error ? error.message : String(error) });
       }
@@ -44,8 +46,11 @@ async function executeRefresh(options: { concurrency?: number } = {}) {
   }
 
   await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, instruments.length)) }, () => worker()));
+  const universeAvailable = Boolean((universe.universe as any).ok) && instruments.length > 0;
   return {
-    universeAvailable: Boolean((universe.universe as any).ok),
+    ok: universeAvailable && failures.length === 0,
+    status: universeAvailable ? undefined : "FAILED",
+    universeAvailable,
     universe: universe.universe,
     marketDate,
     startedAt,

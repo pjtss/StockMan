@@ -1,8 +1,9 @@
 const { Client } = require('pg');
 
 (async () => {
+  const { validDailyCandleSql } = await import('./daily-candle-quality-sql.mjs');
   const db = new Client({ connectionString: process.env.DATABASE_URL }); await db.connect();
-  const q = await db.query(`SELECT u.market,u.code,c.open,c.high,c.low,c.close,c.volume FROM us_common_stock_universe u JOIN us_instrument_universe_candles c ON c.market=u.market AND c.code=u.code AND c.timeframe='D' AND c.volume>0 WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND COALESCE(u.is_etf,false)=false ORDER BY u.market,u.code,c.candle_date`);
+  const q = await db.query(`SELECT u.market,u.code,c.open,c.high,c.low,c.close,c.volume FROM us_common_stock_universe u JOIN us_instrument_universe_candles c ON c.market=u.market AND c.code=u.code AND c.timeframe='D' AND c.volume>0 AND ${validDailyCandleSql('c')} WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND COALESCE(u.is_etf,false)=false AND COALESCE(u.is_warrant,false)=false AND COALESCE(u.is_derivative,false)=false AND COALESCE(u.is_dr,false)=false AND COALESCE(u.is_leveraged,false)=false AND COALESCE(u.is_inverse,false)=false ORDER BY u.market,u.code,c.candle_date`);
   const groups = new Map(); for (const r of q.rows) { const k = `${r.market}:${r.code}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
   const defs = [['RVOL<1', -Infinity, 1], ['RVOL1~1.2', 1, 1.2], ['RVOL1.2~2', 1.2, 2], ['RVOL2+', 2, Infinity]];
   const out = []; for (const [name] of defs) for (const minScore of [50, 75, 90, 95]) out.push({ name, minScore, signals: 0, decided: 0, wins: 0 });

@@ -1,0 +1,67 @@
+{
+  "contractVersion": "personal-disclosure-review-note.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealUser": false,
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsPersonalNoteText": false,
+    "identitiesAreSynthetic": true
+  },
+  "requiredNoteDimensions": ["noteId", "ownerUserId", "eventId", "eventRevisionId", "publicationSnapshotId", "selectedClaimIds", "createdAt", "updatedAt", "noteRevision", "visibility", "stalenessState", "retentionState"],
+  "visibilityStates": ["OWNER_ONLY", "DELETED"],
+  "stalenessStates": ["CURRENT_REVISION", "SOURCE_REVISION_CHANGED", "EVENT_SUPPRESSED", "SNAPSHOT_EXPIRED", "INELIGIBLE_OR_UNRESOLVED", "UNLINKED_LEGACY_NOTE"],
+  "vectors": [
+    {
+      "id": "PDN-01-CROSS-USER-READ-IS-DENIED",
+      "input": { "ownerUserId": "USER-A", "requestUserId": "USER-B", "noteId": "NOTE-SYN-A" },
+      "expected": { "read": "DENIED_OR_NOT_FOUND", "existenceLeak": false, "publicApiExposure": false }
+    },
+    {
+      "id": "PDN-02-WATCHLIST-DOES-NOT-IMPLY-OWNERSHIP-OR-NOTE-CREATION",
+      "input": { "watchlisted": true, "eventSubjectApproved": true, "existingNote": false },
+      "expected": { "noteCreated": false, "holdingInference": false, "userOptInRequired": true }
+    },
+    {
+      "id": "PDN-03-NOTE-PINS-EXACT-EVENT-AND-CLAIM-REVISIONS",
+      "input": { "eventId": "EV-SYN-A", "eventRevisionId": "EVREV-4", "selectedClaimIds": ["CLAIM-A"], "currentRevisionId": "EVREV-5" },
+      "expected": { "pinnedRevision": "EVREV-4", "stalenessState": "SOURCE_REVISION_CHANGED", "silentRetarget": false }
+    },
+    {
+      "id": "PDN-04-SUPPRESSED-EVENT-HIDES-EVENT-CONTENT-KEEPS-OWNER-RECORD",
+      "input": { "eventRevisionId": "EVREV-4", "publicationState": "SUPPRESSED", "noteOwnerMatches": true },
+      "expected": { "eventContent": "NOT_RENDERED", "noteDisposition": "OWNER_ONLY_STALE_NOTICE", "noteDeleted": false }
+    },
+    {
+      "id": "PDN-05-CLAIM-CORRECTION-MARKS-DEPENDENT-NOTE-STALE",
+      "input": { "selectedClaimIds": ["CLAIM-A", "CLAIM-B"], "changedClaimIds": ["CLAIM-A"], "consumerImpactComplete": true },
+      "expected": { "noteState": "SOURCE_REVISION_CHANGED", "affectedClaimIds": ["CLAIM-A"], "unaffectedClaimIds": ["CLAIM-B"], "noteTextMutated": false }
+    },
+    {
+      "id": "PDN-06-UNRESOLVED-IMPACT-MARKS-WHOLE-NOTE-REVIEW-REQUIRED",
+      "input": { "selectedClaimIds": ["CLAIM-A"], "consumerImpactComplete": false },
+      "expected": { "noteState": "INELIGIBLE_OR_UNRESOLVED", "affectedScope": "NOTE_REVIEW_REQUIRED", "assumeUnaffected": false }
+    },
+    {
+      "id": "PDN-07-OWNER-DELETE-DOES-NOT-DELETE-CANONICAL-EVENT",
+      "input": { "ownerDeleteRequested": true, "eventId": "EV-SYN-A", "noteLinked": true },
+      "expected": { "note": "DELETED_PER_RETENTION_POLICY", "canonicalEvent": "UNCHANGED", "otherUserNotes": "UNCHANGED" }
+    },
+    {
+      "id": "PDN-08-SEARCH-AND-COUNTS-ARE-OWNER-SCOPED",
+      "input": { "requestUserId": "USER-A", "otherUserNoteExists": true, "aggregateNoteCountRequested": true },
+      "expected": { "searchScope": "OWNER_ONLY", "crossUserCount": "NOT_RETURNED", "publicIndex": "EXCLUDED" }
+    },
+    {
+      "id": "PDN-09-LEGACY-UNLINKED-NOTE-IS-NOT-AUTO-LINKED",
+      "input": { "legacyNoteId": "NOTE-LEGACY", "titleTickerMatch": true, "eventRelationEvidence": null },
+      "expected": { "linkState": "UNLINKED_LEGACY_NOTE", "autoLink": false, "userReviewRequired": true }
+    },
+    {
+      "id": "PDN-10-OPT-OUT-ACCOUNT-DELETION-CLEARS-PRIVATE-INDEX",
+      "input": { "accountDeletion": true, "noteRows": 3, "searchIndexEntries": 3, "backupRetentionDecision": "UNRESOLVED" },
+      "expected": { "activeNotes": 0, "searchIndexEntries": 0, "backupDisposition": "RETENTION_REVIEW_REQUIRED", "crossUserResidue": 0 }
+    }
+  ]
+}

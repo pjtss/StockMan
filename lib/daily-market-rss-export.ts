@@ -9,6 +9,9 @@ export type DailyMarketRssAnalysisItem = {
   externalId: string;
   sourceSnapshotId: number | null;
   publishedAt: string | null;
+  filedAt: string | null;
+  timePrecision: "INSTANT" | "DATE" | "UNKNOWN";
+  sortBasis: "PUBLISHED_INSTANT" | "FILED_DATE" | "UNKNOWN";
   titleOriginal: string;
   titleTranslated: string | null;
   summary: string;
@@ -80,12 +83,6 @@ function iso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
 }
 
-function safeIso(value: string | null | undefined, fallback: string | null = null) {
-  if (!value) return fallback;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
-}
-
 function splitItems(value: string | null | undefined) {
   return value ? value.split(/[,;\s]+/).map((item) => item.trim()).filter(Boolean) : [];
 }
@@ -97,7 +94,9 @@ function gradeRank(value: MarketRssGrade) {
 type Candidate = {
   identity: string;
   priority: number;
-  publishedAtMs: number;
+  publishedAtMs: number | null;
+  filedDate: string | null;
+  timeGroup: number;
   analysis: DailyMarketRssAnalysisItem;
   compact: DailyMarketRssCompactItem;
   raw: Record<string, unknown>;
@@ -144,6 +143,9 @@ export async function loadDailyMarketRssExport(date: string, options?: { include
       externalId: row.externalId,
       sourceSnapshotId: row.sourceSnapshotId ?? null,
       publishedAt: iso(row.publishedAt),
+      filedAt: null,
+      timePrecision: row.publishedAt ? "INSTANT" : "UNKNOWN",
+      sortBasis: row.publishedAt ? "PUBLISHED_INSTANT" : "UNKNOWN",
       titleOriginal: row.title,
       titleTranslated: row.translatedTitle,
       summary: row.summary,
@@ -182,7 +184,7 @@ export async function loadDailyMarketRssExport(date: string, options?: { include
       },
     };
     const sourceSnapshot = typeof row.sourceSnapshotId === "number" ? snapshotMap.get(row.sourceSnapshotId) : undefined;
-    candidates.push({ identity: identityFor(row.title, row.link, row.externalId), priority: row.priority, publishedAtMs: row.publishedAt?.getTime() || 0, analysis, compact: { title: row.translatedTitle || row.title, link: row.link, grade: analysis.grade }, raw: { rawPayload: row.rawPayload, sourceSnapshot: sourceSnapshot ? { source: sourceSnapshot.source, url: sourceSnapshot.url, status: sourceSnapshot.status, responseHeaders: sourceSnapshot.responseHeaders, fetchedAt: sourceSnapshot.fetchedAt, rawPayload: sourceSnapshot.rawPayload } : null } });
+    candidates.push({ identity: identityFor(row.title, row.link, row.externalId), priority: row.priority, publishedAtMs: row.publishedAt?.getTime() ?? null, filedDate: null, timeGroup: row.publishedAt ? 3 : 0, analysis, compact: { title: row.translatedTitle || row.title, link: row.link, grade: analysis.grade }, raw: { rawPayload: row.rawPayload, sourceSnapshot: sourceSnapshot ? { source: sourceSnapshot.source, url: sourceSnapshot.url, status: sourceSnapshot.status, responseHeaders: sourceSnapshot.responseHeaders, fetchedAt: sourceSnapshot.fetchedAt, rawPayload: sourceSnapshot.rawPayload } : null } });
     sourceCounts[row.source] = (sourceCounts[row.source] || 0) + 1;
   }
 
@@ -198,7 +200,10 @@ export async function loadDailyMarketRssExport(date: string, options?: { include
       sourceType: "SEC_SUBMISSIONS",
       externalId: row.accession,
       sourceSnapshotId: null,
-      publishedAt: safeIso(row.acceptanceDateTime, `${row.filingDate}T00:00:00.000Z`),
+      publishedAt: null,
+      filedAt: row.filingDate,
+      timePrecision: "DATE",
+      sortBasis: "FILED_DATE",
       titleOriginal: title,
       titleTranslated: null,
       summary: "",
@@ -236,7 +241,7 @@ export async function loadDailyMarketRssExport(date: string, options?: { include
         translationFallback: false,
       },
     };
-    candidates.push({ identity: identityFor(title, row.filingUrl, row.accession), priority: row.classifiedScore ?? 0, publishedAtMs: row.updatedAt?.getTime() || 0, analysis, compact: { title, link: row.filingUrl, grade: analysis.grade }, raw: { rawPayload: row.rawPayload, fullDocument: document?.hasFullDocument ? { indexUrl: document.indexUrl, primaryUrl: document.primaryUrl, indexHtml: document.indexHtml, primaryHtml: document.primaryHtml, primaryText: document.primaryText } : null } });
+    candidates.push({ identity: identityFor(title, row.filingUrl, row.accession), priority: row.classifiedScore ?? 0, publishedAtMs: null, filedDate: row.filingDate, timeGroup: 2, analysis, compact: { title, link: row.filingUrl, grade: analysis.grade }, raw: { rawPayload: row.rawPayload, fullDocument: document?.hasFullDocument ? { indexUrl: document.indexUrl, primaryUrl: document.primaryUrl, indexHtml: document.indexHtml, primaryHtml: document.primaryHtml, primaryText: document.primaryText } : null } });
     sourceCounts.SEC_SUBMISSIONS = (sourceCounts.SEC_SUBMISSIONS || 0) + 1;
   }
 
@@ -249,7 +254,7 @@ export async function loadDailyMarketRssExport(date: string, options?: { include
     if (gradeRank(candidate.analysis.gradeCode) > gradeRank(previous.analysis.gradeCode) || (gradeRank(candidate.analysis.gradeCode) === gradeRank(previous.analysis.gradeCode) && candidate.priority > previous.priority)) unique.set(candidate.identity, candidate);
   }
 
-  const selected = [...unique.values()].sort((left, right) => right.priority - left.priority || right.publishedAtMs - left.publishedAtMs);
+  const selected = [...unique.values()].sort((left, right) => right.priority - left.priority || right.timeGroup - left.timeGroup || ((right.publishedAtMs ?? 0) - (left.publishedAtMs ?? 0)) || (right.filedDate || "").localeCompare(left.filedDate || "") || left.identity.localeCompare(right.identity));
   const analysisItems = selected.map((item) => item.analysis);
   const compactItems = selected.map((item) => item.compact);
   const rawItems = options?.includeRaw ? selected.map((item) => ({ ...item.analysis, raw: item.raw })) : undefined;

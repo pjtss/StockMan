@@ -1,0 +1,504 @@
+{
+  "contractVersion": "disclosure-dossier-public-read.v0",
+  "classification": "SYNTHETIC_PUBLIC_READ_API_PROPOSAL_NOT_RUNTIME_CONTRACT",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealSourceBody": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "status": "PROPOSED_UNAPPROVED",
+  "decisionDependencies": [
+    "KR-DART-RIGHTS-01",
+    "KR-DOCUMENT-UX-01",
+    "KR-API-UI-CONSISTENCY-01",
+    "KR-CURSOR-SECURITY-01",
+    "KR-EVENT-ATTRIBUTION-01",
+    "KR-MASTER-SNAPSHOT-01",
+    "KR-CAP-FRESHNESS-01",
+    "KR-RECONCILIATION-01"
+  ],
+  "compatibilityBoundary": {
+    "legacyRoute": "GET /api/public/market-impact-events",
+    "legacySchema": "market-impact-events.v1",
+    "legacyMarketScope": [
+      "KR",
+      "US"
+    ],
+    "legacyBehavior": "UNCHANGED_BY_THIS_PROPOSAL",
+    "newKoreanContract": "SEPARATE_VERSIONED_ROUTE_OR_OWNER_APPROVED_VERSION_NEGOTIATION",
+    "legacyResponseMayContainPartialV2Fields": false,
+    "externalConsumerInventoryRequired": true
+  },
+  "legacyImplementationBaseline": {
+    "sourcePath": "app/api/public/market-impact-events/route.ts",
+    "routeInventoryPath": "docs/api/route-inventory.json",
+    "openApiPath": "public/openapi.json",
+    "method": "GET",
+    "access": "public-read-candidate",
+    "authentication": "NONE",
+    "queryParameters": ["date", "from", "to", "market", "ticker", "limit"],
+    "marketValues": ["KR", "US"],
+    "dateFormat": "YYYY-MM-DD; exact calendar date validation",
+    "dateAndRangeConflict": "date cannot be combined with from or to",
+    "tickerNormalization": "trim and uppercase; 1-32 ASCII letters, digits, dot, underscore or hyphen",
+    "limitNormalization": "default 100; safe integer clamped to 1..500; non-integer or unsafe becomes 100",
+    "unknownParameterBehavior": "IGNORED",
+    "successEnvelope": ["ok", "schemaVersion", "query", "asOf", "items"],
+    "successSchemaVersion": "market-impact-events.v1",
+    "asOf": "application response time; not DB snapshot time",
+    "cacheControl": "no-store",
+    "ordering": ["event_date DESC", "published_at DESC NULLS LAST", "event_id ASC"],
+    "pagination": "limit only; no cursor",
+    "errorResponses": {
+      "400": "INVALID_QUERY",
+      "503": "MARKET_IMPACT_EVENTS_UNAVAILABLE"
+    },
+    "table": "market_impact_events",
+    "marketScope": "mixed KR/US",
+    "issuerInstrumentApplicabilityGate": false,
+    "rightsMasterCapCoverageSnapshotGate": false,
+    "disclaimer": "Current repository source contract; deployed service behavior and external consumers are not verified."
+  },
+  "sourceRightsAttributionBoundary": {
+    "classification": "OFFICIAL_EVIDENCE_SUMMARY_NOT_PERMISSION_DECISION",
+    "evidenceRefs": [
+      {
+        "evidenceId": "DART-TERMS-20261104-OBSERVED",
+        "sourceProduct": "OpenDART service terms",
+        "officialUrl": "https://opendart.fss.or.kr/intro/terms.do",
+        "observedAt": "2026-11-04",
+        "observations": [
+          "Terms state API use quota is limited and may be changed.",
+          "Terms state copyright in the OpenDART API service and related programs belongs to FSS; unspecified copyright matters follow applicable law including the Public Data Act.",
+          "Terms state disclosed information is prepared under the submitter's responsibility and FSS does not guarantee accuracy or completeness."
+        ],
+        "doesNotDecide": ["product field redistribution rights", "document or attachment reuse scope", "derivative persistence", "public API or notification channel authorization", "required attribution wording for each product/action/channel"]
+      },
+      {
+        "evidenceId": "DART-LIST-GUIDE-20261104-OBSERVED",
+        "sourceProduct": "OpenDART disclosure search list API",
+        "officialUrl": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001",
+        "observedAt": "2026-11-04",
+        "observations": [
+          "The guide describes list.json/list.xml request fields and page_no/page_count/total_page pagination.",
+          "The response includes issuer/list metadata, 14-digit receipt number, filing date and correction/withdrawal markers.",
+          "The guide shows the official PC viewer URL pattern using rcpNo."
+        ],
+        "doesNotDecide": ["whether the guide authorizes redistributing each field", "whether viewer-link display authorizes document-body copying", "whether correction markers provide a complete relation graph"]
+      },
+      {
+        "evidenceId": "DATA-GO-KR-3075133-KOGL-1-OBSERVED",
+        "sourceProduct": "Financial Supervisory Service disclosure search catalog item 3075133",
+        "officialUrl": "https://www.data.go.kr/data/3075133/openapi.do",
+        "observedAt": "2026-11-04",
+        "observations": [
+          "Existing architecture record identifies provider FSS, API type LINK, JSON/XML format and displayed KOGL Type 1 label with catalog update date 2020-06-09.",
+          "Official KOGL Type 1 guidance states attribution is required and commercial and modified use are allowed under that type's conditions."
+        ],
+        "scopeLimit": "The catalog item's displayed license label is evidence for that catalog item's stated scope only; it is not treated as a blanket grant for direct OpenDART endpoints, document.xml ZIP contents, attachments, KIND data, derivatives, or every product channel.",
+        "officialGuidanceUrl": "https://www.kogl.or.kr/info/faqList.do?cPage=1&dataGroup=2&mstIdx=KOGL_005",
+        "doesNotDecide": ["exact field/file scope of the catalog item", "applicability to direct OpenDART response", "attribution wording and placement for this product", "retention and redistribution by public API, push or Discord"]
+      },
+      {
+        "evidenceId": "DART-DOCUMENT-ZIP-GUIDE-20261104-OBSERVED",
+        "sourceProduct": "OpenDART original filing document ZIP API",
+        "officialUrl": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019003",
+        "observedAt": "2026-11-04",
+        "observations": ["Repository architecture records a separate document.xml binary ZIP request contract using a receipt number."],
+        "evidenceAccessStatus": "OFFICIAL_PAGE_NOT_REOPENED_IN_THIS_TURN",
+        "doesNotDecide": ["raw ZIP retention", "embedded attachment rights", "body/attachment derivative and quotation rights", "redistribution or channel permissions"]
+      }
+    ],
+    "decisionRules": {
+      "permissionStatesRemainUnresolvedUntilOwnerDecision": true,
+      "rightsAreKeyedBy": ["sourceProduct", "sourceClass", "endpointOrSurface", "fieldOrPayloadScope", "action", "purpose", "channel", "retentionClass"],
+      "sourceAndLicenseInheritance": "NO_INHERITANCE_ACROSS_PRODUCT_ENDPOINT_PAYLOAD_OR_CHANNEL_WITHOUT_EXPLICIT_EVIDENCE_AND_OWNER_DECISION",
+      "attribution": "Required only when an exact current action-scoped decision says so; record canonical text, placement, locale, safe official link and policy revision per displayed claim. Showing credit never grants fetch, derivative, retention or redistribution permission.",
+      "unresolvedCredit": "WITHHOLD_THE_AFFECTED_BODY_DERIVATIVE_OR_CHANNEL_PAYLOAD; do not replace with a data-only version",
+      "mixedSourceResponse": "Evaluate each item's source claim and credit independently. Omit or suppress only the affected unauthorized subject/claim when the approved response contract allows partial output; otherwise suppress the response. Preserve the withheld denominator/status without leaking protected content."
+    },
+    "ownerDecisionQuestions": [
+      "Which exact catalog product and fields does the KOGL Type 1 label cover, and does a direct OpenDART API client fall within that scope?",
+      "What exact Korean attribution text, placement, link and omission behavior apply to each allowed surface: browser detail, public API, push and Discord?",
+      "Are metadata, structured API fields, document ZIP bytes, embedded attachments, extracted text, claims, summaries and numeric derivatives separate rights classes for this product?",
+      "For mixed-source multi-item reads, is per-item suppression allowed and which counts/status reasons may be disclosed safely?",
+      "What evidence revision, effective interval, review owner and change/revocation trigger invalidate already materialized projections and cursors?"
+    ],
+    "noPermissionGrantedByThisFixture": true
+  },
+  "negativeEvidenceContract": {
+    "coverageAssertionManifestRef": "disclosure-source-coverage.v0.json#/coverageAssertionManifestContract",
+    "manifestDigestRequiredBeforeCoverageClaim": true,
+    "statusVocabulary": [
+      "NOT_FOUND_IN_SCOPE",
+      "NOT_REPORTED",
+      "UNVERIFIABLE",
+      "CONFLICT_UNRESOLVED",
+      "SUPPRESSED_RIGHTS",
+      "NOT_SEARCHED"
+    ],
+    "publicCoverageStatusVocabulary": [
+      "COVERED_AS_OF",
+      "ENUMERATED_INCOMPLETE_RECONCILIATION",
+      "PARTIAL",
+      "UNVERIFIABLE",
+      "SUPPRESSED_RIGHTS",
+      "NOT_SEARCHED",
+      "CONFLICT_UNRESOLVED"
+    ],
+    "publicCoverageStatusMapping": {
+      "RECONCILED_AS_OF": "COVERED_AS_OF",
+      "PAGE_ENUMERATION_COMPLETE": "ENUMERATED_INCOMPLETE_RECONCILIATION",
+      "OBSERVED_STABLE": "UNVERIFIABLE",
+      "UNKNOWN": "UNVERIFIABLE",
+      "UNVERIFIABLE_COVERAGE_INCOMPLETE": "UNVERIFIABLE",
+      "PARTIAL": "PARTIAL_IF_SCOPE_AND_COUNTS_ARE_RIGHTS_APPROVED_OTHERWISE_UNVERIFIABLE",
+      "requiredActionDeniedOrUnresolved": "SUPPRESSED_RIGHTS",
+      "noRun": "NOT_SEARCHED",
+      "manifestDigestOrScopeConflict": "CONFLICT_UNRESOLVED"
+    },
+    "publicCoverageMessageKo": {
+      "COVERED_AS_OF": "선언한 조회 범위를 기준 시각까지 대조했습니다.",
+      "ENUMERATED_INCOMPLETE_RECONCILIATION": "페이지 조회는 끝났지만 정정·권리·대상 대조가 완료되지 않았습니다.",
+      "PARTIAL": "일부 출처 또는 조회 범위만 확인했습니다.",
+      "UNVERIFIABLE": "조회 범위의 완전성을 확인할 수 없습니다.",
+      "SUPPRESSED_RIGHTS": "자료 이용 권한을 확인할 수 없어 결과를 표시하지 않습니다.",
+      "NOT_SEARCHED": "아직 조회되지 않았습니다.",
+      "CONFLICT_UNRESOLVED": "조회 범위 또는 증거 간 불일치가 해결되지 않았습니다.",
+      "NOT_FOUND_IN_SCOPE": "선언한 출처·기간·대상 범위에서 일치 항목이 확인되지 않았습니다.",
+      "NOT_REPORTED": "확인한 문서에는 해당 항목이 기재되지 않았습니다."
+    },
+    "publicExposureRules": [
+      "Never expose internal manifest state names, raw provider errors, API credentials, reviewer identity, or policy decision IDs.",
+      "COVERED_AS_OF describes only the declared source/query/window/subject scope and as-of; it is not market-wide completeness.",
+      "PARTIAL may be returned only when the covered/missing scope and any displayed counts are approved for the exact public action; otherwise return UNVERIFIABLE or SUPPRESSED_RIGHTS.",
+      "NOT_FOUND_IN_SCOPE and NOT_REPORTED are result meanings, not coverage completeness states."
+    ],
+    "validEmptyRequirements": [
+      "exact provider/product/endpoint and query filters recorded",
+      "issuer/instrument applicability and temporal scope resolved for the requested subject",
+      "requested date/window and timezone/precision explicit",
+      "all required pages enumerated with terminal page and response status verified",
+      "page metadata and observed response counts reconcile under an approved policy",
+      "no transport/API/parse/quota/auth errors or omitted page",
+      "required correction/withdrawal reconciliation watermark is current and complete",
+      "rights decision permits recording and exposing this result and its counts"
+    ],
+    "validEmptyMeaning": "NOT_FOUND_IN_SCOPE_ONLY; no matching row was returned in this exact completed provider query scope and snapshot.",
+    "notReportedMeaning": "The retrieved, identified source document was examined and the specific expected assertion was not stated in that document; this is not a market-wide no-event conclusion.",
+    "unverifiableConditions": [
+      "page gap or total_page/total_count inconsistency",
+      "provider error, quota/rate limit, timeout, HTTP failure or malformed response",
+      "ambiguous issuer/instrument mapping or incomplete declared source universe",
+      "stale/missing correction or withdrawal reconciliation",
+      "rights prevent required search, retention, or publication",
+      "source pagination may have shifted during the scan and no approved stable snapshot/reconciliation closes the gap"
+    ],
+    "scopeBindingFields": [
+      "sourceProduct",
+      "endpointOrSurface",
+      "normalizedQueryHash",
+      "manifestId",
+      "manifestDigest",
+      "issuerId",
+      "instrumentId",
+      "marketAndSecurityClass",
+      "windowStart",
+      "windowEnd",
+      "datePrecisionAndTimezone",
+      "sourceSnapshotOrReconciliationId",
+      "rightsDecisionRevision",
+      "rightsDecisionSetHash",
+      "masterSnapshotId",
+      "subjectApplicabilityRevisionId",
+      "correctionWatermarkAsOf",
+      "coveragePolicyRevision",
+      "coverageAssertionId",
+      "evaluatedAt"
+    ],
+    "forbiddenInference": [
+      "empty list/013 does not mean no filing exists outside the exact query window or source",
+      "no matching filing does not mean the event did not occur",
+      "missing field in one structured API response does not mean the filing omitted the fact",
+      "NOT_REPORTED in a read document does not mean the subject has no related event",
+      "suppressed or rights-blocked search must not be exposed as zero results"
+    ],
+    "dossierHeadlineRule": "No negative/no-event/no-risk headline from absence alone. Show scope-limited availability and coverage state; outcome remains UNVERIFIED unless a separate reviewed evidence relation establishes it.",
+    "partialResultRule": "Do not call an incomplete scan empty. Return UNVERIFIABLE or a policy-approved PARTIAL status with explicit requested/covered window and withheld denominator; if count disclosure itself lacks rights, omit counts and suppress the result.",
+    "currentRepositoryCollectorObservation": {
+      "sourcePath": "lib/dart-opendart-client.ts",
+      "queryScope": "single KST receipt date, list.json, page_count=100",
+      "successCode": "000",
+      "emptyCode": "013",
+      "pagination": "follow total_page until last page; deduplicate by rcept_no",
+      "limitations": [
+        "013 is represented as zero pages/zero rows for this helper's one-day query only",
+        "no immutable provider snapshot is bound across multiple page requests",
+        "returned total_count is not reconciled with received page rows before the result is returned",
+        "receipt deduplication is not proof that source pagination was complete or correction history reconciled"
+      ],
+      "isDossierCoverageProof": false
+    }
+  },
+  "accessContract": {
+    "method": "GET",
+    "authentication": "PUBLIC_UNAUTHENTICATED_READ_ONLY",
+    "mutation": false,
+    "internalReviewFields": false,
+    "writeOrTriggerSideEffects": false,
+    "noStore": true,
+    "missingOrUnapprovedDisplayRights": "SUPPRESS_BODY_DERIVED_CONTENT"
+  },
+  "queryContract": {
+    "issuerId": {
+      "type": "opaque_stable_id",
+      "required": false
+    },
+    "instrumentId": {
+      "type": "opaque_instrument_id",
+      "required": false
+    },
+    "market": {
+      "enum": [
+        "KR"
+      ],
+      "default": "KR"
+    },
+    "includeIssuerContext": {
+      "type": "boolean",
+      "default": false
+    },
+    "asOf": {
+      "type": "timestamp",
+      "required": false
+    },
+    "limit": {
+      "type": "integer",
+      "min": 1,
+      "max": 100,
+      "default": 20
+    },
+    "cursor": {
+      "type": "opaque_signed_token",
+      "required": false
+    },
+    "unknownParameters": "REJECT",
+    "conflictingIssuerAndInstrument": "ALLOW_ONLY_IF_EXACT_CROSSWALK_CONFIRMS_RELATION_ELSE_400"
+  },
+  "scopeSemantics": {
+    "directInstrumentFacts": "Include only when exact affected instrument applicability is verified for this snapshot.",
+    "issuerFacts": "Exclude by default from instrument query; include only with includeIssuerContext=true and label CONTEXT_ONLY.",
+    "issuerContextCounts": "Separate directItemCount, issuerContextItemCount and withheldOrUnresolvedCount; never mix counts.",
+    "partialSubject": "Return only independently eligible subjects when the declared response contract permits partial results, with responseStatus=PARTIAL and per-subject reason; otherwise suppress complete response. Policy remains owner decision.",
+    "unresolvedApplicability": "Do not attribute as instrument fact; preserve issuer-scoped observation where independently publishable.",
+    "multiInstrumentRequest": "Each subject has independent eligibility/applicability/coverage disposition; shared issuer context never counts as instrument-specific event."
+  },
+  "snapshotContract": {
+    "sameSnapshotFields": [
+      "snapshotId",
+      "snapshotCapturedAt",
+      "asOf",
+      "publicationEpoch",
+      "rightsDecisionSetHash",
+      "instrumentUniverseHash",
+      "subjectApplicabilityRevisionId",
+      "cursorScopeHash"
+    ],
+    "readIsolation": "ONE_READ_ONLY_REPEATABLE_READ_TRANSACTION_PER_REQUEST",
+    "pages": "Cursor binds immutable materialized snapshot and canonical query scope; no transaction remains open between requests.",
+    "revocation": "A request seeing stale rights/publication epoch is suppressed. Cached rows are never reused as current; no 304 for changed or revoked snapshot.",
+    "asOfSemantics": "Distinguish snapshot capture time, source last reconciled time, document fetched time, projection commit time and response generated time."
+  },
+  "responseEnvelope": [
+    "schemaVersion",
+    "responseStatus",
+    "query",
+    "snapshot",
+    "coverage",
+    "pagination",
+    "items",
+    "withheldSubjects",
+    "unresolvedCounts",
+    "generatedAt"
+  ],
+  "requiredItemFields": [
+    "itemId",
+    "issuerId",
+    "applicabilityScope",
+    "directAffectedInstrumentIds",
+    "contextOnly",
+    "sourceRevisionRefs",
+    "eventRevisionId",
+    "capitalStateRevisionId",
+    "issuerRiskStateRevisionId",
+    "coverageRef",
+    "rightsDecisionRevisionRefs",
+    "attributionPolicyRevisionRefs",
+    "creditState",
+    "creditText",
+    "safeSourceUrl",
+    "lastVerifiedAt",
+    "reasons"
+  ],
+  "pagination": {
+    "stableSort": "approved deterministic tuple with unique terminal key",
+    "cursorBinding": [
+      "routeVersion",
+      "canonicalFilters",
+      "includeIssuerContext",
+      "asOf",
+      "limit",
+      "snapshotId",
+      "publicationEpoch",
+      "rightsDecisionSetHash"
+    ],
+    "tamper": "REJECT",
+    "crossRouteOrFilterReplay": "REJECT",
+    "expiryAndKeyRotation": "OWNER_DECISION_REQUIRED; EXPIRED_OR_UNVERIFIED_CURSOR_REJECTED",
+    "pageBoundary": "No duplicate or skipped item within immutable snapshot acceptance fixture"
+  },
+  "errorContract": {
+    "400": "INVALID_QUERY_OR_SCOPE_CONFLICT",
+    "401": "NOT_USED_FOR_PUBLIC_READ",
+    "409": "SNAPSHOT_OR_SCOPE_STALE_RESTART_REQUIRED",
+    "410": "CURSOR_EXPIRED_OR_REVOKED",
+    "429": "RATE_LIMITED_WITH_SAFE_RETRY_METADATA",
+    "503": "SOURCE_OR_READ_MODEL_UNAVAILABLE",
+    "safeBody": "stable code only; no SQL, credentials, source body, private diagnostics or owner identity"
+  },
+  "publicationGates": [
+    "PUBLIC_READ_RIGHTS_FOR_EXACT_FIELDS_AND_ACTION",
+    "EXACT_SURFACE_ATTRIBUTION_POLICY_AND_RENDERED_CREDIT",
+    "EXACT_ISSUER_INSTRUMENT_AND_TEMPORAL_APPLICABILITY",
+    "ACTIVE_COMMON_STOCK_MASTER_AND_CAP_FRESHNESS",
+    "DECLARED_SOURCE_AND_CORRECTION_COVERAGE",
+    "CURRENT_ANALYSIS_AND_PUBLICATION_APPROVALS",
+    "SINGLE_IMMUTABLE_SNAPSHOT_AND_CURSOR_SCOPE"
+  ],
+  "vectors": [
+    {
+      "id": "DPR-01-PUBLIC-GET-IS-READ-ONLY-AND-UNAUTHENTICATED",
+      "expected": "PUBLIC_READ_NO_MUTATION"
+    },
+    {
+      "id": "DPR-02-LEGACY-V1-CONTRACT-IS-UNCHANGED",
+      "expected": "NO-SILENT-V1-SEMANTIC-CHANGE"
+    },
+    {
+      "id": "DPR-03-INSTRUMENT-FILTER-EXCLUDES-ISSUER-CONTEXT-BY-DEFAULT",
+      "expected": "DIRECT_FACTS_ONLY"
+    },
+    {
+      "id": "DPR-04-EXPLICIT-ISSUER-CONTEXT-IS-LABELED-AND-COUNTED-SEPARATELY",
+      "expected": "CONTEXT_ONLY_SEPARATE_COUNT"
+    },
+    {
+      "id": "DPR-05-SERIES-MOVEMENT-DOES-NOT-LEAK-ACROSS-TRANCHE",
+      "expected": "EXACT_SERIES_SCOPE"
+    },
+    {
+      "id": "DPR-06-PARTIAL-SUBJECT-ELIGIBILITY-REPORTS-WITHHELD-DENOMINATOR",
+      "expected": "PARTIAL_WITH_REASONS_OR_SUPPRESS"
+    },
+    {
+      "id": "DPR-07-SAME-ISSUER-ID-DOES-NOT-PROVE-INSTRUMENT-APPLICABILITY",
+      "expected": "UNRESOLVED_NO_ATTRIBUTION"
+    },
+    {
+      "id": "DPR-08-UNKNOWN-OR-EXTRA-QUERY-PARAMETER-IS-REJECTED",
+      "expected": "400_INVALID_QUERY"
+    },
+    {
+      "id": "DPR-09-CURSOR-CANNOT-REPLAY-ANOTHER-FILTER-OR-ROUTE",
+      "expected": "REJECT_REPLAY"
+    },
+    {
+      "id": "DPR-10-MUTATION-DURING-PAGING-KEEPS-SNAPSHOT-OR-RESTARTS",
+      "expected": "NO_MIXED_PAGES"
+    },
+    {
+      "id": "DPR-11-REVOCATION-SUPPRESSES-ROWS-AND-304",
+      "expected": "NO_STALE_CACHE_REUSE"
+    },
+    {
+      "id": "DPR-12-STALE-MASTER-OR-CAP-IS-NOT-ELIGIBLE",
+      "expected": "SUPPRESS_SUBJECT"
+    },
+    {
+      "id": "DPR-13-PARTIAL-SOURCE-COVERAGE-IS-NOT-EMPTY",
+      "expected": "PARTIAL_OR_UNAVAILABLE_DISTINCT"
+    },
+    {
+      "id": "DPR-14-MULTI-INSTRUMENT-RESPONSE-KEEPS-PER-SUBJECT-STATUS",
+      "expected": "NO_CROSS_SUBJECT_LEAKAGE"
+    },
+    {
+      "id": "DPR-15-ERROR-BODY-DOES-NOT-EXPOSE-INTERNAL-DIAGNOSTICS",
+      "expected": "SAFE_STABLE_ERROR"
+    },
+    {
+      "id": "DPR-16-ETAG-304-REQUIRES-UNCHANGED-APPROVED-SNAPSHOT",
+      "expected": "NO_304_ON_REVOCATION_OR_STALE"
+    },
+    {
+      "id": "DPR-17-OPEN-DART-TERMS-DO-NOT-BECOME-BLANKET-FIELD-REDISTRIBUTION-RIGHT",
+      "expected": "ACTION_SCOPED_RIGHTS_REMAIN_REQUIRED"
+    },
+    {
+      "id": "DPR-18-KOGL-CATALOG-LABEL-DOES-NOT-INHERIT-TO-ZIP-ATTACHMENT-OR-DIRECT-API",
+      "expected": "NO_CROSS_PRODUCT_OR_PAYLOAD_INHERITANCE"
+    },
+    {
+      "id": "DPR-19-REQUIRED-CREDIT-IS-BOUND-TO-CLAIM-AND-SURFACE-REVISION",
+      "expected": "NO_CREDIT_STRIPPING_OR_PERMISSION_INFERENCE"
+    },
+    {
+      "id": "DPR-20-MIXED-SOURCE-RESPONSE-KEEPS-PER-CLAIM-CREDIT-AND-WITHHELD-DENOMINATOR",
+      "expected": "INDEPENDENT_SOURCE_ATTRIBUTION_AND_SAFE_PARTIAL_POLICY"
+    },
+    {
+      "id": "DPR-21-OPENDART-013-IS-EMPTY-ONLY-IN-ITS-EXACT-COMPLETED-DATE-SCOPE",
+      "expected": "NOT_FOUND_IN_SCOPE_NOT_NO_EVENT"
+    },
+    {
+      "id": "DPR-22-PAGE-GAP-OR-COUNT-MISMATCH-IS-UNVERIFIABLE-NOT-EMPTY",
+      "expected": "UNVERIFIABLE_COVERAGE_INCOMPLETE"
+    },
+    {
+      "id": "DPR-23-EMPTY-SEARCH-DOES-NOT-CLAIM-ABSENCE-OUTSIDE-WINDOW-OR-SOURCE",
+      "expected": "NO_UNBOUNDED_NEGATIVE_INFERENCE"
+    },
+    {
+      "id": "DPR-24-NOT-REPORTED-IS-DOCUMENT-SCOPED-NOT-SUBJECT-WIDE-ABSENCE",
+      "expected": "DOCUMENT_SCOPED_ABSENCE_ONLY"
+    },
+    {
+      "id": "DPR-25-STALE-CORRECTION-COVERAGE-DOES-NOT-CLOSE-NEGATIVE-RESULT",
+      "expected": "UNVERIFIABLE_UNTIL_CORRECTION_RECONCILED"
+    }
+  ],
+  "unapprovedChoices": {
+    "routePath": null,
+    "versionNegotiation": null,
+    "limitMax": null,
+    "cursorTtl": null,
+    "signingKeyProvider": null,
+    "snapshotStorageAndQuota": null,
+    "rateLimit": null,
+    "partialResultPolicy": null,
+    "countDisclosure": null,
+    "cachePolicy": null,
+    "partialDisclosurePolicy": null,
+    "creditTextAndPlacement": null,
+    "catalogLicenseApplicability": null,
+    "retention": null
+  },
+  "knownLimitations": [
+    "This proposal does not establish DART/KIND product or field rights.",
+    "Repository route/OpenAPI inventory does not enumerate deployed external consumers.",
+    "Static vectors do not prove runtime query isolation, cursor cryptography, pagination parity, UI rendering, or revocation propagation.",
+    "Do not deploy this proposal by changing the existing mixed-market v1 route."
+  ]
+}

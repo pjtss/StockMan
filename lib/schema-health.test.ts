@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CORE_SCHEMA_TABLES, OPERATIONAL_SCHEMA_TABLES, RETIRED_SCHEMA_TABLES, REQUIRED_OPERATIONAL_COLUMNS, getMissingSchemaTables, inspectDatabaseSchema } from "./schema-health";
+import { CORE_SCHEMA_TABLES, KIS_RATE_LIMIT_EVENT_COLUMN_SHAPES, OPERATIONAL_SCHEMA_TABLES, OPERATIONAL_SCHEMA_VIEWS, RETIRED_SCHEMA_TABLES, REQUIRED_OPERATIONAL_COLUMNS, getMissingSchemaTables, inspectDatabaseSchema } from "./schema-health";
 
 describe("schema-health", () => {
   it("requires KIS retry/rate-limit telemetry tables for operational readiness", () => {
@@ -45,21 +45,47 @@ describe("schema-health", () => {
         calls.push({ text, values });
         if (text === "SELECT 1") return { rows: [{ "?column?": 1 }] };
         if (text.includes("FROM information_schema.tables")) {
-          return { rows: ((values?.[0] as string[]) ?? []).filter((table) => !RETIRED_SCHEMA_TABLES.includes(table as typeof RETIRED_SCHEMA_TABLES[number])).map((table_name) => ({ table_name })) };
+          if (text.includes("table_type = 'VIEW'")) return { rows: OPERATIONAL_SCHEMA_VIEWS.map((table_name) => ({ table_name })) };
+          if (text.includes("table_type = 'BASE TABLE'")) {
+            const requiredTables = values?.[0] as string[];
+            return { rows: requiredTables.filter((table) => !RETIRED_SCHEMA_TABLES.includes(table as typeof RETIRED_SCHEMA_TABLES[number])).map((table_name) => ({ table_name })) };
+          }
+          return { rows: [] };
         }
         if (text.includes("FROM information_schema.columns")) {
-          return { rows: REQUIRED_OPERATIONAL_COLUMNS.map(([table_name, column_name]) => ({ table_name, column_name })) };
+          const required = REQUIRED_OPERATIONAL_COLUMNS.map(([table_name, column_name]) => ({ table_name, column_name, data_type: "text", is_nullable: "YES", column_default: null }));
+          const eventShapes = KIS_RATE_LIMIT_EVENT_COLUMN_SHAPES.map(([column_name, data_type, is_nullable, hasDefault]) => ({
+            table_name: "kis_rate_limit_events",
+            column_name,
+            data_type,
+            is_nullable,
+            column_default: hasDefault ? "nextval('kis_rate_limit_events_id_seq'::regclass)" : null,
+          }));
+          return { rows: [...required, ...eventShapes] };
         }
+        if (text.includes("SELECT required.table_name, required.column_name")) return { rows: [] };
+        if (text.includes("SELECT index_integrity.*")) return { rows: [] };
         if (text.includes("flyway_schema_history")) return { rows: [{ version: "161" }] };
         return { rows: [] };
       },
     };
 
     const health = await inspectDatabaseSchema(pool as never);
+    expect(health).toMatchObject({
+      schemaReady: true,
+      missingOperationalTables: [],
+      missingOperationalViews: [],
+      missingOperationalColumns: [],
+      operationalColumnShapeIssues: [],
+      operationalPrimaryKeyIssues: [],
+      operationalIndexIssues: [],
+      retiredTablesPresent: [],
+      flywayVersion: "161",
+    });
     const columnProbe = calls.find(({ text }) => text.includes("FROM information_schema.columns"));
-    expect(columnProbe?.text).toContain("($1, $2)");
-    expect(columnProbe?.values).toContain("market_rss_articles");
-    expect(columnProbe?.values).toContain("normalized_summary");
+    expect(columnProbe?.text).toContain("available.column_name");
+    expect(columnProbe?.values?.[0]).toContain("market_rss_articles");
+    expect(REQUIRED_OPERATIONAL_COLUMNS).toContainEqual(["market_rss_articles", "normalized_summary"]);
     expect(health.schemaReady).toBe(true);
     expect(health.missingOperationalColumns).toEqual([]);
   });

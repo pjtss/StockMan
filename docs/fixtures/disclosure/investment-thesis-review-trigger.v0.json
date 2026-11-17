@@ -1,0 +1,284 @@
+{
+  "contractVersion": "investment-thesis-review-trigger.v0",
+  "classification": "SYNTHETIC_PRODUCT_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE_OR_INVESTMENT_ADVICE",
+  "dataPolicy": {
+    "containsRealUser": false,
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsRealPriceSeries": false,
+    "identitiesAreSynthetic": true
+  },
+  "requiredTriggerFields": [
+    "triggerId",
+    "thesisRevisionRef",
+    "triggerSetRevision",
+    "triggerType",
+    "userAuthoredConditionRef",
+    "subjectRef",
+    "evidenceRuleRef",
+    "sourceScopeRef",
+    "rightsDecisionRef",
+    "coverageAssertionRef",
+    "effectiveWindow",
+    "evaluationInformationCutoffAt",
+    "evaluationState",
+    "evidenceSnapshotRef",
+    "reviewDecisionRef",
+    "supersedesTriggerId"
+  ],
+  "triggerTypes": [
+    "SOURCE_CLAIM_REVISION",
+    "DISCLOSED_EVENT_MILESTONE",
+    "CAPITAL_OR_LIQUIDITY_FACT",
+    "LISTING_OR_LEGAL_STATUS",
+    "USER_DEFINED_REVIEW_DATE"
+  ],
+  "predicateModel": {
+    "allowedPredicateKinds": [
+      "REVISION_CHANGED",
+      "STRUCTURED_FACT_COMPARISON",
+      "EXPLICIT_EVENT_STATE",
+      "REVIEW_DUE",
+      "MANUAL_REVIEW_REQUIRED"
+    ],
+    "comparisonOperators": ["EQ", "NE", "GT", "GTE", "LT", "LTE"],
+    "logicalCombinators": ["ALL", "ANY"],
+    "requiredStructuredFactBindingFields": [
+      "sourceFieldLocator",
+      "subjectRef",
+      "unit",
+      "periodOrAsOf",
+      "basis",
+      "comparisonOperator",
+      "thresholdRef",
+      "sourceRevisionRef"
+    ],
+    "unsupportedConditionState": "MANUAL_REVIEW_REQUIRED",
+    "invariants": {
+      "naturalLanguageAloneIsNotExecutable": true,
+      "unitsPeriodBasisAndSubjectMustMatch": true,
+      "combinatorIsExplicitAndRevisionPinned": true,
+      "reviewDueDoesNotMeanConditionMet": true
+    }
+  },
+  "evaluationStates": [
+    "NOT_DUE",
+    "OBSERVED_CONDITION_MET",
+    "NO_MATCH_IN_COMPLETE_SCOPE_AS_OF",
+    "UNVERIFIABLE_COVERAGE",
+    "RIGHTS_BLOCKED",
+    "SOURCE_UNAVAILABLE",
+    "TIMING_UNRESOLVED",
+    "MANUAL_REVIEW_REQUIRED",
+    "REVIEW_REQUIRED",
+    "USER_REVIEWED",
+    "SUPERSEDED"
+  ],
+  "invariants": {
+    "triggerIsUserAuthoredAndRevisionPinned": true,
+    "triggerObservationDoesNotDecideThesis": true,
+    "noMatchingDisclosureDoesNotMeanConditionFalse": true,
+    "elapsedDateDoesNotMeanMilestoneMissed": true,
+    "coverageAndRightsAreRequiredForAbsenceClaim": true,
+    "evaluationUsesPinnedInformationCutoff": true,
+    "newEvidenceCreatesReviewInsteadOfMutatingPriorReview": true,
+    "systemDoesNotGenerateTradeOrPortfolioInstruction": true,
+    "automaticFetchPollingAndNotificationAreNotImplied": true
+  },
+  "vectors": [
+    {
+      "id": "ITHR-01-CLAIM-CORRECTION-OPENS-USER-REVIEW",
+      "input": {
+        "triggerType": "SOURCE_CLAIM_REVISION",
+        "pinnedClaimRevision": "CLAIM-SYN-1-R1",
+        "currentClaimRevision": "CLAIM-SYN-1-R2",
+        "triggerSetRevision": 3
+      },
+      "expected": {
+        "evaluationState": "REVIEW_REQUIRED",
+        "priorThesisDecisionMutated": false,
+        "userReviewCreatedAutomatically": false
+      }
+    },
+    {
+      "id": "ITHR-02-NO-MATCH-IN-PARTIAL-COVERAGE-IS-UNVERIFIABLE",
+      "input": {
+        "triggerType": "DISCLOSED_EVENT_MILESTONE",
+        "matchingEvidence": null,
+        "coverageState": "PARTIAL",
+        "rightsState": "ALLOW_FOR_DECLARED_ACTION"
+      },
+      "expected": {
+        "evaluationState": "UNVERIFIABLE_COVERAGE",
+        "conditionFalse": false,
+        "thesisInvalidated": false
+      }
+    },
+    {
+      "id": "ITHR-03-ELAPSED-MILESTONE-WITHOUT-COVERAGE-IS-NOT-MISSED",
+      "input": {
+        "triggerType": "DISCLOSED_EVENT_MILESTONE",
+        "expectedDateElapsed": true,
+        "matchingEvidence": null,
+        "coverageState": "UNKNOWN"
+      },
+      "expected": {
+        "evaluationState": "UNVERIFIABLE_COVERAGE",
+        "milestoneMissed": false,
+        "futureEventInvented": false
+      }
+    },
+    {
+      "id": "ITHR-04-COMPLETE-SCOPE-NO-MATCH-REMAINS-AS-OF-OBSERVATION",
+      "input": {
+        "triggerType": "CAPITAL_OR_LIQUIDITY_FACT",
+        "matchingEvidence": null,
+        "coverageState": "COVERED_AS_OF",
+        "coverageCutoffAt": "2026-10-02T00:00:00Z",
+        "rightsState": "ALLOW_FOR_DECLARED_ACTION"
+      },
+      "expected": {
+        "evaluationState": "NO_MATCH_IN_COMPLETE_SCOPE_AS_OF",
+        "claimThatConditionNeverOccurred": false,
+        "evaluationCutoffPinned": true
+      }
+    },
+    {
+      "id": "ITHR-05-RIGHTS-BLOCKED-EVIDENCE-DOES-NOT-EVALUATE-CONDITION",
+      "input": {
+        "triggerType": "LISTING_OR_LEGAL_STATUS",
+        "matchingEvidence": null,
+        "coverageState": "COVERED_AS_OF",
+        "rightsState": "UNRESOLVED"
+      },
+      "expected": {
+        "evaluationState": "RIGHTS_BLOCKED",
+        "conditionFalse": false,
+        "sourceActionExposed": false
+      }
+    },
+    {
+      "id": "ITHR-06-NEW-EVIDENCE-APPENDS-REVIEW-UNDER-NEW-SNAPSHOT",
+      "input": {
+        "priorReviewId": "REVIEW-SYN-6-A",
+        "newEvidenceSnapshotRef": "SNAP-SYN-6-B",
+        "priorEvaluationCutoffAt": "2026-10-02T00:00:00Z"
+      },
+      "expected": {
+        "newReviewSupersedesPrior": true,
+        "priorReviewMutable": false,
+        "newSnapshotRequired": true
+      }
+    },
+    {
+      "id": "ITHR-07-TRIGGER-SET-EDIT-DOES-NOT-RETROACTIVELY-EVALUATE",
+      "input": {
+        "priorTriggerSetRevision": 2,
+        "currentTriggerSetRevision": 3,
+        "outcomeAlreadyObserved": true
+      },
+      "expected": {
+        "priorTriggerImmutable": true,
+        "newTriggerSetRequiresNewReview": true,
+        "confirmatoryBackfillAllowed": false
+      }
+    },
+    {
+      "id": "ITHR-08-USER-REVIEW-IS-NOT-A-TRADE-INSTRUCTION",
+      "input": {
+        "evaluationState": "OBSERVED_CONDITION_MET",
+        "userReview": "THESIS_RECONSIDERED"
+      },
+      "expected": {
+        "systemTradeInstruction": null,
+        "portfolioAction": null,
+        "userConclusionOwnsDecision": true
+      }
+    },
+    {
+      "id": "ITHR-09-NATURAL-LANGUAGE-ONLY-TRIGGER-REQUIRES-MANUAL-REVIEW",
+      "input": {
+        "userAuthoredCondition": "회사 상황이 크게 악화되면 다시 검토",
+        "predicateKind": null,
+        "structuredEvidenceRuleRef": null
+      },
+      "expected": {
+        "evaluationState": "MANUAL_REVIEW_REQUIRED",
+        "conditionAutoInterpreted": false,
+        "thresholdInvented": false
+      }
+    },
+    {
+      "id": "ITHR-10-STRUCTURED-FACT-NEEDS-UNIT-PERIOD-BASIS-AND-SUBJECT",
+      "input": {
+        "predicateKind": "STRUCTURED_FACT_COMPARISON",
+        "sourceFieldLocator": "FIELD-SYN-10",
+        "subjectRef": "ISSUER-SYN-10",
+        "unit": "KRW",
+        "periodOrAsOf": null,
+        "basis": "CONSOLIDATED",
+        "comparisonOperator": "LT",
+        "thresholdRef": "THRESHOLD-SYN-10"
+      },
+      "expected": {
+        "evaluationState": "MANUAL_REVIEW_REQUIRED",
+        "comparisonExecuted": false,
+        "missingPeriodSilentlyFilled": false
+      }
+    },
+    {
+      "id": "ITHR-11-UNIT-MISMATCH-DOES-NOT-EVALUATE-THRESHOLD",
+      "input": {
+        "predicateKind": "STRUCTURED_FACT_COMPARISON",
+        "observedUnit": "KRW",
+        "thresholdUnit": "USD",
+        "fxConversionRuleRef": null
+      },
+      "expected": {
+        "evaluationState": "MANUAL_REVIEW_REQUIRED",
+        "implicitCurrencyConversion": false,
+        "conditionMet": false
+      }
+    },
+    {
+      "id": "ITHR-12-ALL-ANY-LOGIC-IS-EXPLICIT-AND-PINNED",
+      "input": {
+        "triggerSetRevision": 4,
+        "combinator": null,
+        "childPredicates": ["PRED-SYN-12-A", "PRED-SYN-12-B"]
+      },
+      "expected": {
+        "evaluationState": "MANUAL_REVIEW_REQUIRED",
+        "implicitCombinator": false,
+        "priorTriggerSetMutable": false
+      }
+    },
+    {
+      "id": "ITHR-13-REVIEW-DATE-DUE-ONLY-OPENS-A-REVIEW",
+      "input": {
+        "predicateKind": "REVIEW_DUE",
+        "scheduledReviewAt": "2026-11-01T00:00:00Z",
+        "currentTime": "2026-11-02T00:00:00Z"
+      },
+      "expected": {
+        "evaluationState": "REVIEW_REQUIRED",
+        "reviewPromptDue": true,
+        "conditionMet": false,
+        "thesisJudgmentCreated": false
+      }
+    },
+    {
+      "id": "ITHR-14-FACT-COMPARISON-DOES-NOT-INFER-INVESTMENT-IMPACT",
+      "input": {
+        "predicateKind": "STRUCTURED_FACT_COMPARISON",
+        "comparisonState": "OBSERVED_CONDITION_MET",
+        "eventImpactReview": "NOT_RUN"
+      },
+      "expected": {
+        "triggerObservation": "OBSERVED_CONDITION_MET",
+        "investmentImpact": "NOT_ASSESSED",
+        "tradeInstruction": null
+      }
+    }
+  ]
+}

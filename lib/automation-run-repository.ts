@@ -88,6 +88,7 @@ export async function recordSkippedAutomationRun(moduleKey: FeatureModuleKey, re
            WHERE module_key = $1
              AND status = 'SKIPPED'
              AND summary->>'reason' = $2
+             AND ((summary->'schedule') - 'evaluatedAtKst'::text) IS NOT DISTINCT FROM ((($3::jsonb)->'schedule') - 'evaluatedAtKst'::text)
              AND started_at >= NOW() - ($4 * INTERVAL '1 second')
         )`,
       [moduleKey, reason, summary, SKIP_OBSERVATION_WINDOW_SECONDS],

@@ -14,6 +14,31 @@ export type MarketRssFeed = {
   responseHeaders?: Record<string, string>;
 };
 
+export type MarketRssFetchStage = "request" | "timeout" | "http_status" | "response_body" | "parse";
+
+export class MarketRssFetchError extends Error {
+  constructor(
+    readonly source: string,
+    readonly stage: MarketRssFetchStage,
+    readonly errorCode: string,
+    readonly upstreamStatus?: number,
+  ) {
+    super(`${source} RSS ${errorCode}`);
+    this.name = "MarketRssFetchError";
+  }
+}
+
+export function getMarketRssFetchDiagnostics(error: unknown) {
+  if (error instanceof MarketRssFetchError) {
+    return {
+      stage: error.stage,
+      errorCode: error.errorCode,
+      ...(error.upstreamStatus ? { upstreamStatus: error.upstreamStatus } : {}),
+    };
+  }
+  return { stage: "request" as const, errorCode: "RSS_REQUEST_FAILED" };
+}
+
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "", trimValues: true, processEntities: false });
 const text = (value: unknown) => typeof value === "string"
   ? decodeXML(value).trim()
@@ -62,18 +87,43 @@ export async function fetchMarketRss(source: string, url: string, init: RequestI
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal, headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml", ...(init.headers || {}) }, cache: "no-store" });
-    if (!response.ok) throw new Error(`${source} RSS 요청 실패: ${response.status}`);
-    const rawPayload = await response.text();
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: controller.signal, headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml", ...(init.headers || {}) }, cache: "no-store" });
+    } catch {
+      if (controller.signal.aborted) throw new MarketRssFetchError(source, "timeout", "RSS_FETCH_TIMEOUT");
+      throw new MarketRssFetchError(source, "request", "RSS_REQUEST_FAILED");
+    }
+    if (!response.ok) throw new MarketRssFetchError(source, "http_status", "RSS_HTTP_ERROR", response.status);
+    let rawPayload: string;
+    try {
+      rawPayload = await response.text();
+    } catch {
+      if (controller.signal.aborted) throw new MarketRssFetchError(source, "timeout", "RSS_FETCH_TIMEOUT");
+      throw new MarketRssFetchError(source, "response_body", "RSS_RESPONSE_BODY_FAILED", response.status);
+    }
+    let parsed: MarketRssFeed;
+    try {
+      parsed = parseMarketRss(rawPayload, source, url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const errorCode = /올바른 XML이 아닙니다/.test(message)
+        ? "RSS_XML_INVALID"
+        : /RSS 또는 Atom feed가 아닙니다|channel이 없습니다/.test(message)
+          ? "RSS_FEED_FORMAT_INVALID"
+          : "RSS_PARSE_FAILED";
+      throw new MarketRssFetchError(source, "parse", errorCode, response.status);
+    }
     return {
-      ...parseMarketRss(rawPayload, source, url),
+      ...parsed,
       rawPayload,
       responseStatus: response.status,
       responseHeaders: Object.fromEntries(response.headers.entries()),
     };
   } catch (error) {
-    if (controller.signal.aborted) throw new Error(`${source} RSS 요청 시간 초과(${timeoutMs}ms)`);
-    throw error;
+    if (error instanceof MarketRssFetchError) throw error;
+    if (controller.signal.aborted) throw new MarketRssFetchError(source, "timeout", "RSS_FETCH_TIMEOUT");
+    throw new MarketRssFetchError(source, "request", "RSS_REQUEST_FAILED");
   } finally {
     clearTimeout(timeout);
   }

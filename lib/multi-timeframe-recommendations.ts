@@ -4,6 +4,8 @@ import { queryEligibleUniverse } from "@/lib/instrument-eligibility";
 import { writeKisCache } from "@/lib/kis-cache";
 import { analyzeTechnicalEntry } from "@/lib/technical-entry-analysis";
 import { evaluateDayTradeSignal, type DayTradeCandle } from "@/lib/daytrade-signal";
+import { validDailyCandleSql } from "@/lib/candle-sql-quality";
+import { KR_MARKET_CAP_MAX_AGE_HOURS, loadKrMarketCapSnapshots, meetsKrMarketCapFloorKrw } from "@/lib/kr-market-cap";
 
 type Mode = "scalp" | "swing" | "all";
 type Candle = DayTradeCandle & { updatedAt: string | null };
@@ -26,30 +28,43 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
   const db = getDb();
   const eligibility = await queryEligibleUniverse(db, market);
   const scopes = { rows: eligibility.rows };
+  const marketCaps = market === "KR" ? await loadKrMarketCapSnapshots(scopes.rows as Array<{ market: string; code: string }>) : new Map<string, number | null>();
   const timeframeFilter = mode === "scalp" ? "c.timeframe = 'D'" : "c.timeframe IN ('D','W','M')";
   const completedDailyFilter = mode === "scalp" ? `AND c.candle_date < to_char((CURRENT_TIMESTAMP AT TIME ZONE '${market === "KR" ? "Asia/Seoul" : "America/New_York"}')::date, 'YYYYMMDD')` : "";
-  const candles = await db.execute(sql.raw(`WITH ranked_candles AS (SELECT c.market, c.code, c.timeframe, c.candle_date AS date, c.open, c.high, c.low, c.close, c.volume, c.fetched_at AS "updatedAt", ROW_NUMBER() OVER (PARTITION BY c.market, c.code, c.timeframe ORDER BY c.candle_date DESC, c.fetched_at DESC) AS rn FROM ${candlesTable} c JOIN ${universeTable} u ON u.market = c.market AND u.code = c.code WHERE ${timeframeFilter} ${completedDailyFilter} AND c.close IS NOT NULL AND u.enabled = true AND u.daily_active = true AND u.instrument_type = 'COMMON_STOCK' ${market === "KR" ? "AND COALESCE(u.is_suspended, false) = false AND COALESCE(u.trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(u.liquidation_code, '') NOT IN ('Y','1') AND COALESCE(u.managed_issue_code, '') <> 'Y'" : "AND COALESCE(u.is_etf, false) = false AND COALESCE(u.is_warrant, false) = false AND COALESCE(u.is_derivative, false) = false AND COALESCE(u.is_dr, false) = false AND COALESCE(u.is_leveraged, false) = false AND COALESCE(u.is_inverse, false) = false"}) SELECT market, code, timeframe, date, open, high, low, close, volume, "updatedAt" FROM ranked_candles WHERE (timeframe = 'D' AND rn <= 140) OR (timeframe IN ('W','M') AND rn <= 30) ORDER BY market, code, timeframe, date`));
+  const candles = await db.execute(sql.raw(`WITH ranked_candles AS (SELECT c.market, c.code, c.timeframe, c.candle_date AS date, c.open, c.high, c.low, c.close, c.volume, c.fetched_at AS "updatedAt", ROW_NUMBER() OVER (PARTITION BY c.market, c.code, c.timeframe ORDER BY c.candle_date DESC, c.fetched_at DESC) AS rn FROM ${candlesTable} c JOIN ${universeTable} u ON u.market = c.market AND u.code = c.code WHERE ${timeframeFilter} ${completedDailyFilter} AND ${validDailyCandleSql("c")} AND u.enabled = true AND u.daily_active = true AND u.instrument_type = 'COMMON_STOCK' ${market === "KR" ? "AND COALESCE(u.is_suspended, false) = false AND COALESCE(u.trading_halt_code, '') NOT IN ('Y','1') AND COALESCE(u.liquidation_code, '') NOT IN ('Y','1') AND COALESCE(u.managed_issue_code, '') <> 'Y'" : "AND COALESCE(u.is_etf, false) = false AND COALESCE(u.is_warrant, false) = false AND COALESCE(u.is_derivative, false) = false AND COALESCE(u.is_dr, false) = false AND COALESCE(u.is_leveraged, false) = false AND COALESCE(u.is_inverse, false) = false"}) SELECT market, code, timeframe, date, open, high, low, close, volume, "updatedAt" FROM ranked_candles WHERE (timeframe = 'D' AND rn <= 140) OR (timeframe IN ('W','M') AND rn <= 30) ORDER BY market, code, timeframe, date`));
   let fundamentals = new Map<string, any>();
   try {
-    const rows = await db.execute(sql.raw(`SELECT market, code, price, trading_value AS "tradingValue", market_cap AS "marketCap", volume, fetched_at AS "fetchedAt" FROM instrument_fundamental_snapshots WHERE market = '${market}'`));
+    const snapshotMarkets = market === "KR" ? "'KOSPI','KOSDAQ'" : "'NAS','NYS','AMS'";
+    const freshness = market === "KR" ? "AND currency = 'KRW' AND fetched_at >= NOW() - INTERVAL '24 hours' AND fetched_at <= NOW()" : "";
+    const rows = await db.execute(sql.raw(`SELECT market, code, price, trading_value AS "tradingValue", market_cap AS "marketCap", currency, volume, observed_at AS "observedAt", fetched_at AS "fetchedAt" FROM instrument_fundamental_snapshots WHERE market IN (${snapshotMarkets}) ${freshness}`));
     for (const row of rows.rows as any[]) fundamentals.set(`${row.market}:${row.code}`, row);
-  } catch { /* fundamentals are an enhancement; candle-only scoring remains available during migration */ }
+  } catch (error) {
+    if (market === "KR") throw error;
+    /* US fundamentals remain an enhancement; the KR floor must fail closed. */
+  }
   const grouped = new Map<string, { D: Candle[]; W: Candle[]; M: Candle[] }>();
   for (const row of candles.rows as any[]) { const key = `${row.market}:${row.code}`; const item = grouped.get(key) ?? { D: [], W: [], M: [] }; item[row.timeframe as "D" | "W" | "M"].push({ date: String(row.date), open: Number(row.open ?? row.close), high: Number(row.high ?? row.close), low: Number(row.low ?? row.close), close: Number(row.close), volume: Number(row.volume ?? 0), updatedAt: row.updatedAt ? new Date(row.updatedAt).toISOString() : null }); grouped.set(key, item); }
   const latestDailyDate = latestCompletedDailyDate(grouped.values());
+  let insufficientTimeframeDataCount = 0;
+  let staleDailyDateCount = 0;
+  let invalidLatestVolumeCount = 0;
   const results = (scopes.rows as any[])
     .map((scope) => {
       const g = grouped.get(`${scope.market}:${scope.code}`);
-      if (!g || g.D.length < 20 || (mode !== "scalp" && (g.W.length < 20 || g.M.length < 20))) return null;
+      if (!g || g.D.length < 20 || (mode !== "scalp" && (g.W.length < 20 || g.M.length < 20))) { insufficientTimeframeDataCount += 1; return null; }
       const f = fundamentals.get(`${scope.market}:${scope.code}`);
+      const snapshotCap = market === "KR"
+        ? marketCaps.get(`${scope.market}:${scope.code}`) ?? null
+        : f?.currency === "USD" ? Number(f.marketCap) : null;
+      if (market === "KR" && !meetsKrMarketCapFloorKrw(snapshotCap)) return null;
       const d = g.D;
       const w = g.W;
       const m = g.M;
       const dc = d.at(-1)!;
       const wc = w.at(-1) ?? null;
       const mc = m.at(-1) ?? null;
-      if (!Number.isFinite(dc.volume) || dc.volume <= 0) return null;
-      if (latestDailyDate !== null && dc.date !== latestDailyDate) return null;
+      if (!Number.isFinite(dc.volume) || dc.volume <= 0) { invalidLatestVolumeCount += 1; return null; }
+      if (latestDailyDate !== null && dc.date !== latestDailyDate) { staleDailyDateCount += 1; return null; }
 
       const technical = analyzeTechnicalEntry(d);
       const dbb = bb(d.map((x) => x.close))!;
@@ -63,7 +78,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
       const dVol = avg(d.slice(-20).map((x) => x.volume)) ?? 0;
       const volRatio = dVol > 0 ? dc.volume / dVol : 0;
       const tradingValue = Number(f?.tradingValue ?? 0);
-      const marketCap = Number(f?.marketCap ?? 0);
+      const marketCap = Number(snapshotCap ?? f?.marketCap ?? 0);
       const valuePerCap = marketCap > 0 ? tradingValue / marketCap : 0;
       const dayTrade = evaluateDayTradeSignal(d, { minRvol: 1 });
       if (mode === "scalp" && !dayTrade.qualifies) return null;
@@ -86,7 +101,7 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
         dayTrade,
         technical,
         latest: { date: dc.date, updatedAt: dc.updatedAt, close: dc.close, volume: dc.volume },
-        fundamentals: f ? { price: Number(f.price ?? dc.close), tradingValue, marketCap, fetchedAt: f.fetchedAt } : null,
+        fundamentals: f ? { price: Number(f.price ?? dc.close), tradingValue, marketCap, observedAt: f.observedAt ?? null, fetchedAt: f.fetchedAt ?? null } : null,
         averages: { volume20: dVol, volumeRatio: volRatio, tradingValueToMarketCap: valuePerCap },
         trend: { dailyEma9: dE9, dailyEma20: dE20, weeklyEma9: wE9, weeklyEma20: wE20 },
         bollinger: { daily: dbb, weekly: wbb, monthly: mbb },
@@ -99,8 +114,11 @@ export async function recommendMultiTimeframe(market: "KR" | "US", mode: Mode = 
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, Math.max(1, Math.min(limit, 100)));
   const generatedAt = new Date().toISOString();
-  const policy = { source: "*_instrument_universe_candles", timeframes: mode === "scalp" ? ["D"] : ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" };
-  const output = { ok: true, market, mode, instrumentCount: scopes.rows.length, qualifiedCount: results.length, latestDailyDate, tickers: results.map((result: any) => result.code).join(","), results, policy, responseMeta: { generatedAt, generatedAtTimeZone: "Asia/Seoul", dataSource: "DB_CACHE_ONLY", signalBasis: "latest completed daily candle only; next session open required", executionKey: `technical-entry-analysis:${market}:${mode}` } };
-  await writeKisCache(`technical-entry-analysis:${market}:${mode}`, output);
+  const policy = { source: "*_instrument_universe_candles", timeframes: mode === "scalp" ? ["D"] : ["D", "W", "M"], maxResults: 100, eligibility: "official COMMON_STOCK/product/status filter", marketCapFloorKrw: market === "KR" ? { minimumExclusive: 30_000_000_000, unknownOrStale: "excluded", maxSnapshotAgeHours: KR_MARKET_CAP_MAX_AGE_HOURS } : null, disclaimer: "기술적 조건 기반 후보이며 투자 수익을 보장하지 않음" };
+  const insufficientDataCount = insufficientTimeframeDataCount + staleDailyDateCount + invalidLatestVolumeCount;
+  const dataComplete = scopes.rows.length > 0 && insufficientDataCount === 0;
+  const status = !scopes.rows.length ? "FAILED" : dataComplete ? "COMPLETED" : "PARTIAL";
+  const output = { ok: dataComplete, status, market, mode, instrumentCount: scopes.rows.length, analyzedCount: results.length, insufficientDataCount, insufficientTimeframeDataCount, staleDailyDateCount, invalidLatestVolumeCount, qualifiedCount: results.length, latestDailyDate, tickers: results.map((result: any) => result.code).join(","), results, policy, responseMeta: { generatedAt, generatedAtTimeZone: "Asia/Seoul", dataSource: "DB_CACHE_ONLY", signalBasis: "latest completed daily candle only; next session open required", executionKey: `technical-entry-analysis:${market}:${mode}`, cacheUpdated: dataComplete } };
+  if (dataComplete) await writeKisCache(`technical-entry-analysis:${market}:${mode}`, output);
   return output;
 }

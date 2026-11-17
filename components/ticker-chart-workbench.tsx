@@ -203,11 +203,16 @@ export function TickerChartWorkbench() {
     [input, market],
   );
   const chartItems = useMemo(() => {
-    if (scanCompleted && scanRows.length) return scanRows.map((row) => ({ code: row.code, company: row.name || row.code, market: isDomesticMarket(row.market) ? "KR" as const : "US" as const }));
-    return tickers.map((code) => ({ code, company: names[code] || code, market }));
+    if (scanCompleted && scanRows.length) return scanRows.map((row) => ({
+      code: row.code,
+      company: row.name || row.code,
+      market: isDomesticMarket(row.market) ? "KR" as const : "US" as const,
+      exchange: ["KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"].includes(row.market) ? row.market as "KOSPI" | "KOSDAQ" | "NAS" | "NYS" | "AMS" : undefined,
+    }));
+    return tickers.map((code) => ({ code, company: names[`${market}:${code}`] || names[code] || code, market, exchange: undefined }));
   }, [market, names, scanCompleted, scanRows, tickers]);
   const selectedChartIndex = selected ? chartItems.findIndex((item) => item.code === selected && item.market === selectedMarket) : -1;
-  const adjacentChartItems = selectedChartIndex >= 0 ? chartItems.slice(Math.max(0, selectedChartIndex - 1), selectedChartIndex + 2).map((item) => ({ code: item.market === "US" ? `US:${item.code}` : item.code, company: item.company })) : [];
+  const adjacentChartItems = selectedChartIndex >= 0 ? chartItems.slice(Math.max(0, selectedChartIndex - 1), selectedChartIndex + 2).map((item) => ({ code: item.market === "US" ? `US:${item.code}` : item.code, company: item.company, exchange: item.exchange })) : [];
 
   useEffect(() => {
     if (!tickers.length) {
@@ -849,7 +854,7 @@ export function TickerChartWorkbench() {
                 <div>
                   <strong>
                     {ticker}
-                    {names[ticker] ? ` · ${names[ticker]}` : ""}
+                    {(names[`${market}:${ticker}`] || names[ticker]) ? ` · ${names[`${market}:${ticker}`] || names[ticker]}` : ""}
                   </strong>
                   <small>
                     {market === "KR" ? "국내 종목코드" : "해외 티커"}
@@ -858,7 +863,7 @@ export function TickerChartWorkbench() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedCompany(names[ticker] || ticker);
+                    setSelectedCompany(names[`${market}:${ticker}`] || names[ticker] || ticker);
                     setSelectedMarket(market);
                     setSelected(ticker);
                   }}
@@ -873,7 +878,8 @@ export function TickerChartWorkbench() {
       {selected && (
         <ChartModal
           code={selectedMarket === "US" ? `US:${selected}` : selected}
-          company={selectedCompany || names[selected] || selected}
+          company={selectedCompany || names[`${selectedMarket}:${selected}`] || names[selected] || selected}
+          exchange={selectedChartIndex >= 0 ? chartItems[selectedChartIndex].exchange : undefined}
           position={selectedChartIndex >= 0 ? { current: selectedChartIndex + 1, total: chartItems.length } : undefined}
           prefetchCodes={adjacentChartItems}
           onPrevious={selectedChartIndex > 0 ? () => { const item = chartItems[selectedChartIndex - 1]; setSelectedMarket(item.market); setSelectedCompany(item.company); setSelected(item.code); } : undefined}

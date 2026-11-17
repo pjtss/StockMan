@@ -36,12 +36,21 @@ describe("KIS overseas price-detail response handling", () => {
     expect(getKisUsPriceDetailOutput({ output: [], output1: null })).toEqual({});
   });
 
-  it("does not cache a successful HTTP response with a KIS business error", async () => {
+  it("does not report or cache a successful HTTP response with a KIS business error", async () => {
     state.fetchMock.mockResolvedValueOnce(jsonResponse({ rt_cd: "1", msg_cd: "EGW00103", output: { last: "12", tomv: "100" } }));
 
-    const result = await fetchKisUsPriceDetail({ code: "BUSINESS-ERROR-TEST", market: "NAS" });
+    const result = await fetchKisUsPriceDetail({ code: "BUSINESS-ERROR-TEST", market: "NAS", allowStaleFallback: false });
 
-    expect(result).toMatchObject({ ok: true, status: 200 });
+    expect(result).toMatchObject({ ok: false, status: 200 });
+    expect(state.persisted).toHaveLength(0);
+  });
+
+  it("fails closed when a priced HTTP 200 response omits rt_cd", async () => {
+    state.fetchMock.mockResolvedValueOnce(jsonResponse({ output: { last: "12", tomv: "100" } }));
+
+    const result = await fetchKisUsPriceDetail({ code: "MISSING-RTCD-TEST", market: "NAS", allowStaleFallback: false });
+
+    expect(result).toMatchObject({ ok: false, status: 200 });
     expect(state.persisted).toHaveLength(0);
   });
 

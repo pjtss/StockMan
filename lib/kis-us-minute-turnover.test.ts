@@ -1,5 +1,22 @@
-import { describe, expect, it } from "vitest";
-import { buildUsMinuteTurnoverUrl, parseUsMinuteTurnoverPoints } from "./kis-us-minute-turnover";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ fetch: vi.fn() }));
+vi.mock("@/lib/kis", () => ({ getAccessToken: vi.fn(async () => "test-token"), refreshAccessToken: vi.fn(async () => "renewed-token") }));
+vi.mock("@/lib/kis-api-config", () => ({ loadKisApiConfig: vi.fn(async () => ({ content_type: "application/json", tr_id: "HHDFS76950200", custtype: "P" })) }));
+vi.mock("@/lib/kis-authorization", () => ({ buildKisAuthorization: (token: string) => `Bearer ${token}`, isKisTokenExpiredResponse: () => false }));
+vi.mock("@/lib/kis-request-throttle", () => ({ withKisRequestThrottle: (request: () => Promise<unknown>) => request() }));
+
+import { buildUsMinuteTurnoverUrl, fetchUsMinuteTurnover, parseUsMinuteTurnoverPoints } from "./kis-us-minute-turnover";
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", mocks.fetch);
+  mocks.fetch.mockReset();
+});
+afterEach(() => vi.unstubAllGlobals());
+
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), { status, headers: { "content-type": "application/json" } });
+}
 
 describe("KIS US minute turnover parsing", () => {
   it("uses the official overseas minute-candle query fields and requested exchange", () => {
@@ -32,5 +49,23 @@ describe("KIS US minute turnover parsing", () => {
   it("keeps incremental evol for MVP turnover", () => {
     const [point] = parseUsMinuteTurnoverPoints({ output: [{ kymd: "20260913", khms: "101000", last: "10", evol: "25", tvol: "100000" }] });
     expect(point.volume).toBe(25);
+  });
+
+  it("fails closed and discards points when HTTP 200 contains a KIS business error", async () => {
+    mocks.fetch.mockResolvedValue(jsonResponse({ rt_cd: "1", msg1: "business error", output: [{ kymd: "20261112", khms: "100000", last: "12.34", evol: "10" }] }));
+    await expect(fetchUsMinuteTurnover({ code: "AAA", market: "NAS" })).resolves.toMatchObject({ ok: false, status: 200, points: [] });
+  });
+
+  it("fails closed when HTTP 200 has minute rows but no KIS success code", async () => {
+    mocks.fetch.mockResolvedValue(jsonResponse({ output: [{ kymd: "20261112", khms: "100000", last: "12.34", evol: "10" }] }));
+    await expect(fetchUsMinuteTurnover({ code: "AAA", market: "NAS" })).resolves.toMatchObject({ ok: false, points: [] });
+  });
+
+  it("does not append an error continuation page to successful minute data", async () => {
+    mocks.fetch
+      .mockResolvedValueOnce(jsonResponse({ rt_cd: "0", output1: { next: "cursor-1", more: "1" }, output: [{ kymd: "20261112", khms: "100000", last: "12.34", evol: "10" }] }))
+      .mockResolvedValueOnce(jsonResponse({ rt_cd: "1", output: [{ kymd: "20261112", khms: "100100", last: "99.99", evol: "999" }] }));
+
+    await expect(fetchUsMinuteTurnover({ code: "AAA", market: "NAS" })).resolves.toMatchObject({ ok: true, pageCount: 1, complete: false, points: [{ price: 12.34, volume: 10 }] });
   });
 });

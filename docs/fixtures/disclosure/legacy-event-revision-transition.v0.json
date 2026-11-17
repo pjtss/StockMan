@@ -1,0 +1,66 @@
+{
+  "contractVersion": "legacy-event-revision-transition.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealEvent": false,
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "identitiesAreSynthetic": true,
+    "hashesAreSyntheticLabels": true
+  },
+  "revisionStates": ["APPROVED_REVISION", "LEGACY_CURRENT_STATE_ONLY", "SHADOW_ONLY", "SUPPRESSED", "UNRESOLVED"],
+  "requiredRevisionDimensions": ["eventId", "eventRevisionId", "revisionOrdinal", "sourceSnapshotHash", "analysisRevisionId", "contentHash", "observedAt", "approvalState", "publicationGeneration"],
+  "vectors": [
+    {
+      "id": "LER-01-EDIT-CREATES-NEW-IMMUTABLE-REVISION",
+      "input": { "eventId": "EV-SYN-A", "currentRevisionId": "REV-SYN-1", "incomingContentHash": "HASH-SYN-2", "sameEventIdentity": true },
+      "expected": { "priorRevision": "PRESERVED", "newRevision": "APPENDED", "currentPointer": "REV-SYN-2", "priorContentMutated": false }
+    },
+    {
+      "id": "LER-02-API-ASOF-DOES-NOT-RECONSTRUCT-OLD-PAYLOAD",
+      "input": { "routeAsOf": "2026-11-04T10:00:00Z", "storageHasOnlyCurrentRow": true, "priorRevisionStored": false },
+      "expected": { "historicalPayload": "NOT_REPRODUCIBLE", "asOfMeansHistoricalRevision": false }
+    },
+    {
+      "id": "LER-03-OMITTED-JSON-ROW-IS-NOT-A-CANCELLATION",
+      "input": { "eventId": "EV-SYN-A", "presentInLatestJson": false, "explicitWithdrawalEvidence": false },
+      "expected": { "eventTransition": "UNCHANGED_OR_REVIEW_REQUIRED", "deletionInferred": false, "cancellationInferred": false }
+    },
+    {
+      "id": "LER-04-UNTRACEABLE-CURRENT-ROW-IS-NOT-BACKDATED",
+      "input": { "currentPayloadPresent": true, "sourceCommit": null, "priorPayload": null, "observedAt": "2026-11-04T10:00:00Z" },
+      "expected": { "revisionState": "LEGACY_CURRENT_STATE_ONLY", "revisionTimeBackdated": false, "historicalCompareAllowed": false }
+    },
+    {
+      "id": "LER-05-TRACEABLE-GIT-SNAPSHOT-KEEPS-ITS-OWN-PROVENANCE",
+      "input": { "sourceCommit": "COMMIT-SYN-1", "sourceBlobHash": "BLOB-SYN-1", "importRunId": "RUN-SYN-1", "eventId": "EV-SYN-A" },
+      "expected": { "sourceEvidence": "PRESERVED_AS_OBSERVED", "eventApproval": "NOT_IMPLIED", "sourceCommit": "COMMIT-SYN-1" }
+    },
+    {
+      "id": "LER-06-SHADOW-PARITY-MISMATCH-DOES-NOT-PUBLISH",
+      "input": { "sameGeneration": true, "v1Count": 10, "vNextCount": 9, "approvedDifferenceManifest": null },
+      "expected": { "vNextPublication": "BLOCKED", "runState": "INCOMPLETE", "v1RouteChanged": false }
+    },
+    {
+      "id": "LER-07-V1-COMPATIBILITY-ISOLATES-NEW-REVISION-READ",
+      "input": { "v1ConsumerActive": true, "vNextApproval": "OPEN", "requestedContract": "vNext" },
+      "expected": { "v1ContractMutated": false, "vNextResponse": "NOT_PUBLISHED", "consumerMigrationAssumed": false }
+    },
+    {
+      "id": "LER-08-NOTE-PINS-ONLY-EXPLICITLY-SELECTED-REVISION",
+      "input": { "noteOptIn": true, "selectedRevisionId": "REV-SYN-1", "currentRevisionId": "REV-SYN-2", "publicationState": "APPROVED_REVISION" },
+      "expected": { "pinnedRevisionId": "REV-SYN-1", "silentRetarget": false, "staleNotice": true }
+    },
+    {
+      "id": "LER-09-EXTERNAL-CONSUMER-UNKNOWN-BLOCKS-RETIREMENT",
+      "input": { "repositoryConsumersKnown": true, "externalConsumerInventory": "UNKNOWN", "retentionDecision": "OPEN" },
+      "expected": { "v1Retirement": "BLOCKED", "unknownConsumers": "NOT_ASSUMED_UNUSED" }
+    },
+    {
+      "id": "LER-10-REVOKED-RIGHTS-SUPPRESS-DERIVATIVE-REVISION",
+      "input": { "revisionUsesSource": "SOURCE-SYN-A", "rightsState": "REVOKED", "independentEvidence": false },
+      "expected": { "revisionPublication": "SUPPRESSED", "sourceDeletion": "FOLLOW_RETENTION_DECISION", "oldApprovalReused": false }
+    }
+  ]
+}

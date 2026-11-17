@@ -37,7 +37,7 @@ export async function GET() {
       const ema9 = ema(ordered.map((row) => Number(row.close)), 9);
       const rvols = recentRvols(ordered, 5);
       if (!latest || ema9 === null || !(Number(latest.close) > ema9) || rvols.length !== 5 || rvols.some((point) => point.rvol === null || point.rvol < 1)) continue;
-      results.push({ market: item.market, code: item.code, name: item.name, candleDate: latest.date, close: latest.close, ema9: Number(ema9.toFixed(4)), rvols });
+      results.push({ market: item.market, code: item.code, name: item.name, marketCap: item.marketCap, fundamentalObservedAt: item.fundamentalObservedAt ?? null, fundamentalFetchedAt: item.fundamentalUpdatedAt, candleDate: latest.date, close: latest.close, ema9: Number(ema9.toFixed(4)), rvols });
     }
     results.sort((a, b) => (b.rvols.at(-1)?.rvol ?? 0) - (a.rvols.at(-1)?.rvol ?? 0) || a.code.localeCompare(b.code));
     return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, criteria: { timeframe: "D", movingAverage: "EMA9", position: "latest close > EMA9", rvol: "each latest 5 trading days >= 1.0 using prior 20-day average volume", marketCapFloor: "30,000,000,000 KRW" }, universeCount: instruments.length, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });

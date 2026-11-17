@@ -1,0 +1,30 @@
+{
+  "contractVersion": "push-producer-catalog.v0",
+  "classification": "SYNTHETIC_PRODUCT_INVENTORY_NOT_DELIVERY_PROOF",
+  "dataPolicy": { "containsRealUser": false, "containsRealFiling": false, "containsCredentials": false, "identitiesAreSynthetic": true },
+  "inventorySnapshot": {
+    "sendFunction": "lib/push.ts:sendPushAlerts",
+    "productionCallSites": ["lib/dart-automation.ts:deliverCandidate"],
+    "testCallSites": [],
+    "disabledTestRoutes": ["app/api/push/test/route.ts:POST"],
+    "scanScope": ["app", "components", "lib", "scripts", "netlify/functions"],
+    "excludedFromProductionInventory": ["*.test.*", "coverage/**", "scratch/**", "node_modules/**"],
+    "sourceStates": ["PRODUCTION_DELIVERY_VERIFIED", "PREFERENCE_AND_FORMATTER_ONLY", "FORMATTER_ONLY_NO_CONSENT", "NO_PRODUCER_OR_FORMATTER", "TEST_ONLY"]
+  },
+  "sources": [
+    { "source": "DART", "uiLabel": "DART 공시", "preferenceField": "dartEnabled", "formatter": "lib/push.ts:buildNotificationBody", "productionCaller": "lib/dart-automation.ts:deliverCandidate", "state": "PRODUCTION_DELIVERY_VERIFIED", "effectiveGate": "enabled && dartEnabled", "userClaimAllowed": true },
+    { "source": "INTENSITY", "uiLabel": null, "preferenceField": "intensityEnabled", "formatter": null, "productionCaller": null, "state": "PREFERENCE_AND_FORMATTER_ONLY", "effectiveGate": "dispatch disabled until producer exists", "userClaimAllowed": false },
+    { "source": "TOP_RISING", "uiLabel": null, "preferenceField": "risingEnabled", "formatter": null, "productionCaller": null, "state": "PREFERENCE_AND_FORMATTER_ONLY", "effectiveGate": "dispatch disabled until producer exists", "userClaimAllowed": false },
+    { "source": "NEWS_RADAR", "uiLabel": null, "preferenceField": null, "formatter": "lib/push.ts:buildNotificationBody", "productionCaller": null, "state": "FORMATTER_ONLY_NO_CONSENT", "effectiveGate": "enabled-only (unsupported source bypasses per-source preference branch)", "userClaimAllowed": false }
+  ],
+  "vectors": [
+    { "id": "PPC-01-DART-IS-THE-ONLY-VERIFIED-PRODUCTION-CALL-SITE", "expected": { "verifiedSources": ["DART"], "caller": "lib/dart-automation.ts:deliverCandidate" } },
+    { "id": "PPC-02-SCANNER-PREFERENCE-DOES-NOT-PROVE-A-PRODUCER", "source": "INTENSITY", "expected": { "state": "PREFERENCE_AND_FORMATTER_ONLY", "deliveryClaim": false } },
+    { "id": "PPC-03-US-RISING-PREFERENCE-DOES-NOT-PROVE-A-PRODUCER", "source": "TOP_RISING", "expected": { "state": "PREFERENCE_AND_FORMATTER_ONLY", "deliveryClaim": false } },
+    { "id": "PPC-04-UNCONFIGURED-SOURCE-FAILS-CLOSED-WITHOUT-SUBSCRIPTION", "source": "NEWS_RADAR", "input": { "subscriptionEnabled": true, "explicitSourceConsent": false }, "expected": { "dispatch": false, "requiresExplicitPreference": true } },
+    { "id": "PPC-05-UNKNOWN-SOURCE-NEVER-INHERITS-MASTER-ONLY-DELIVERY", "source": "UNKNOWN", "input": { "subscriptionEnabled": true, "sourcePreference": null }, "expected": { "dispatch": false } },
+    { "id": "PPC-06-UI-LABEL-REQUIRES-ACTIVE-END-TO-END-PRODUCER", "source": "TOP_RISING", "expected": { "labelMayPromiseDelivery": false, "enableWhen": "producer+filter+sender+sourcePreference+tests verified" } },
+    { "id": "PPC-07-INVENTORY-REQUIRES-CALL-SITE-AND-USER-CLAIM-EVIDENCE", "expected": { "productionCallSitesAudited": true, "formatterOnlyIsNotDelivery": true, "testOnlyIsNotProduction": true } },
+    { "id": "PPC-08-SOURCE-PARITY-CHANGE-REQUIRES-INVENTORY-UPDATE", "expected": { "unlistedProductionCaller": "CHECK_FAIL", "removedProductionCaller": "CHECK_FAIL", "sourceLabelWithoutActiveProducer": "CHECK_FAIL" } }
+  ]
+}

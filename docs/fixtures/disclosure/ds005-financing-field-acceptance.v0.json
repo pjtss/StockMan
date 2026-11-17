@@ -1,0 +1,86 @@
+{
+  "contractVersion": "ds005-financing-field-acceptance.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "officialGuides": {
+    "CB": { "api": "cvbdIsDecsn.json", "guide": "DS005/2020033" },
+    "BW": { "api": "bdwtIsDecsn.json", "guide": "DS005/2020034" },
+    "EB": { "api": "exbdIsDecsn.json", "guide": "DS005/2020035" }
+  },
+  "missingFieldStates": [
+    "PRESENT",
+    "EXPLICIT_EMPTY",
+    "NOT_IN_RESPONSE_VERSION",
+    "NOT_RETURNED",
+    "PARSE_ERROR",
+    "CONFLICT_WITH_BODY",
+    "NOT_APPLICABLE"
+  ],
+  "vectors": [
+    {
+      "id": "DS5F-01-RECEIPT-EXACT-JOIN",
+      "input": { "listReceipt": "RCPT-A", "structuredReceipt": "RCPT-A", "listCorpCode": "CORP-A", "structuredCorpCode": "CORP-A", "tranche": "01" },
+      "expected": { "join": "EXACT_RECEIPT_AND_ISSUER", "termsApprovedDate": "bddd", "forbiddenPublicText": ["회사명과 날짜가 비슷하므로 동일 회차 확정", "기초회사와 사채 발행회사를 자동 병합"] }
+    },
+    {
+      "id": "DS5F-02-BOARD-DATE-IS-NOT-CASH",
+      "input": { "field": "bddd", "date": "2025-01-05", "pymd": "2025-01-10", "actualCashEvidence": null },
+      "expected": { "termsDate": "2025-01-05", "cashReceived": "NOT_REPORTED", "cashImpactAsOf": null, "forbiddenPublicText": ["1월 5일 현금 유입", "결의일 기준 조달 완료"] }
+    },
+    {
+      "id": "DS5F-03-PLANNED-PAYMENT-NOT-CASH-PROOF",
+      "input": { "field": "pymd", "plannedDate": "2025-02-10", "plannedAmount": "1000000000", "paymentProof": null },
+      "expected": { "dateKind": "PLANNED_PAYMENT", "cashReceived": "NOT_REPORTED", "forbiddenPublicText": ["납입 완료", "10억원 실제 입금"] }
+    },
+    {
+      "id": "DS5F-04-MATURITY-NOT-SETTLEMENT",
+      "input": { "field": "bd_mtd", "maturityDate": "2026-06-30", "asOf": "2026-07-01", "resultEvidence": null },
+      "expected": { "dateStatus": "DATE_PASSED", "terminalOutcome": "NOT_VERIFIED", "forbiddenPublicText": ["만기 상환 완료", "미전환·소멸 확정"] }
+    },
+    {
+      "id": "DS5F-05-EXERCISE-CAPACITY-NOT-ACTUAL-SHARES",
+      "input": { "security": "CB", "fields": { "cvrqpd_bgd": "2026-01-01", "cvrqpd_edd": "2027-01-01", "cvisstk_cnt": "500000" }, "exerciseReport": null },
+      "expected": { "exerciseWindow": "OFFICIAL_PERIOD", "actualShares": "NOT_REPORTED", "conditionalShares": "500000", "forbiddenPublicText": ["50만주 발행 완료", "청구기간 전체가 실제 전환"] }
+    },
+    {
+      "id": "DS5F-06-BW-SETTLEMENT-METHOD-NOT-OBSERVED-BRANCH",
+      "input": { "security": "BW", "fields": { "nstk_pym_mth": "대용납입", "bdwt_div_atn": "분리형" }, "exerciseAndSettlementEvidence": null },
+      "expected": { "settlement": "NOT_REPORTED", "actualCashReceived": "NOT_REPORTED", "forbiddenPublicText": ["대용납입 실행 완료", "현금납입과 채무상계를 동시 반영"] }
+    },
+    {
+      "id": "DS5F-07-EB-EXCHANGE-NOT-DELIVERY-OR-SALE",
+      "input": { "security": "EB", "fields": { "extg": "자기주식", "extg_stkcnt": "100000", "exrqpd_bgd": "2026-01-01", "exrqpd_edd": "2026-12-31" }, "exchangeAndDeliveryEvidence": null },
+      "expected": { "exchangeWindow": "OFFICIAL_PERIOD", "treasuryDelivered": "NOT_REPORTED", "actualSale": "NOT_REPORTED", "forbiddenPublicText": ["즉시 시장 유통", "실제 매도 완료"] }
+    },
+    {
+      "id": "DS5F-08-ABSENT-FIELD-IS-NOT-ZERO",
+      "input": { "api": "cvbdIsDecsn.json", "field": "pymd", "responseFieldPresent": false, "sourceVersion": "SHAPE-A" },
+      "expected": { "fieldState": "NOT_RETURNED", "numericValue": null, "paymentStatus": "UNVERIFIABLE", "forbiddenPublicText": ["납입액 0원", "납입하지 않음"] }
+    },
+    {
+      "id": "DS5F-09-EXPLICIT-EMPTY-DIFFERS-FROM-OMITTED",
+      "input": { "field": "bd_mtd", "fieldExists": true, "rawValue": "", "sourceVersion": "SHAPE-B" },
+      "expected": { "fieldState": "EXPLICIT_EMPTY", "dateValue": null, "forbiddenPublicText": ["만기일이 없으므로 만기 의무 없음", "미기재는 0 또는 없음"] }
+    },
+    {
+      "id": "DS5F-10-STRUCTURED-VS-BODY-CONFLICT",
+      "input": { "field": "pymd", "structuredValue": "2025-03-01", "bodyValue": "2025-03-15", "correctionRelation": "UNRESOLVED" },
+      "expected": { "fieldState": "CONFLICT_WITH_BODY", "cashEffect": "SUPPRESSED_REVIEW", "forbiddenPublicText": ["최신값 임의 선택", "현금 유입 날짜 확정"] }
+    },
+    {
+      "id": "DS5F-11-CORRECTION-REVISION-NOT-DOUBLE-COUNT",
+      "input": { "originalReceipt": "RCPT-A", "correctionReceipt": "RCPT-B", "relation": "RESOLVED", "originalAmount": "1000000000", "correctedAmount": "800000000", "cashReceiptEvidence": null },
+      "expected": { "termsRevision": "SUPERSEDES_PRIOR_TERMS", "actualCashReceived": "NOT_REPORTED", "countedCash": "0", "forbiddenPublicText": ["18억원 수령", "정정 조건을 실제 납입으로 간주"] }
+    },
+    {
+      "id": "DS5F-12-DETAIL-RECEIPT-NOT-IN-DISCOVERY-DENOMINATOR",
+      "input": { "discoveryStatus": "PARTIAL", "pageEnumerationComplete": false, "structuredResponses": 1, "expectedReceiptCount": 2 },
+      "expected": { "coverage": "PARTIAL", "publication": "SUPPRESS_ACTIVE_TIMELINE", "forbiddenPublicText": ["전체 공시 확인 완료", "검색되지 않은 공시는 존재하지 않음"] }
+    }
+  ]
+}

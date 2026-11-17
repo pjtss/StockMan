@@ -80,10 +80,10 @@ export async function fetchKisUsPriceDetail({ code: rawCode, market: rawMarket =
     if (!token) return allowStaleFallback ? loadStale() : null;
     result = await fetchOnce(token);
   }
-  const value = { ok: result.response.ok, status: result.response.status, code, market, parsed: result.parsed };
-  const parsedObject = value.parsed && typeof value.parsed === "object" ? value.parsed as Record<string, unknown> : {};
-  const businessSuccess = String(parsedObject.rt_cd ?? parsedObject.rtCd ?? "0") === "0";
-  const hasUsablePrice = value.ok && businessSuccess && getKisUsPriceDetailPrice(value.parsed) !== null;
+  const parsedObject = result.parsed && typeof result.parsed === "object" ? result.parsed as Record<string, unknown> : {};
+  const businessSuccess = String(parsedObject.rt_cd ?? parsedObject.rtCd ?? "") === "0";
+  const value = { ok: result.response.ok && businessSuccess, status: result.response.status, code, market, parsed: result.parsed };
+  const hasUsablePrice = value.ok && getKisUsPriceDetailPrice(value.parsed) !== null;
   if (hasUsablePrice) {
     detailCache.set(cacheKey, { expiresAt: Date.now() + DETAIL_TTL_MS, result: value });
     if (db) await db.insert(usPriceDetailCache).values({ market, code, status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() }).onConflictDoUpdate({ target: [usPriceDetailCache.market, usPriceDetailCache.code], set: { status: value.status, parsed: value.parsed as Record<string, unknown>, fetchedAt: new Date() } }).catch(() => undefined);

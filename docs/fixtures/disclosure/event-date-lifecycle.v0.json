@@ -1,0 +1,66 @@
+{
+  "contractVersion": "event-date-lifecycle.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "certaintyStates": ["OFFICIAL_CONFIRMED", "COMPANY_ESTIMATE", "REGISTER_ESTIMATE", "THIRD_PARTY_ESTIMATE", "UNKNOWN", "CONTESTED"],
+  "eventStatuses": ["ANNOUNCED", "POSTPONED", "CANCELLED", "COMPLETED", "UNKNOWN"],
+  "dateAssertionFields": ["dateAssertionId", "eventRevisionId", "dateKind", "value", "precision", "sourceLocator", "certainty", "lifecycleStatus", "supersedesAssertionId", "decisionId"],
+  "vectors": [
+    {
+      "id": "EDL-01-ESTIMATE-IS-NOT-CONFIRMED-DATE",
+      "input": { "date": "2026-12", "precision": "MONTH", "certainty": "COMPANY_ESTIMATE", "eventStatus": "ESTIMATED" },
+      "expected": { "displayPrecision": "MONTH", "exactDate": null, "countdown": false, "positiveCatalystInference": false }
+    },
+    {
+      "id": "EDL-02-ESTIMATE-TO-CONFIRMED-REQUIRES-NEW-DIRECT-EVIDENCE",
+      "input": { "priorAssertion": "DATE-A", "priorCertainty": "COMPANY_ESTIMATE", "newOfficialLocator": null, "requestedStatus": "OFFICIAL_CONFIRMED" },
+      "expected": { "transition": "BLOCKED", "priorAssertionMutable": false, "newAssertionPublished": false }
+    },
+    {
+      "id": "EDL-03-POSTPONEMENT-APPENDS-ASSERTION-AND-PRESERVES-OLD-DATE",
+      "input": { "priorDate": "2026-11-10", "newDate": "2026-11-20", "directChangeEvidence": true },
+      "expected": { "eventStatus": "POSTPONED", "newAssertion": "APPENDED", "priorAssertion": "IMMUTABLE_SUPERSEDED", "relation": "SUPERSEDES" }
+    },
+    {
+      "id": "EDL-04-DATE-PASSED-DOES-NOT-PROVE-EVENT-COMPLETED",
+      "input": { "scheduledDate": "2026-10-01", "asOf": "2026-10-02", "outcomeEvidence": null, "sourceCoverage": "PARTIAL" },
+      "expected": { "eventStatus": "UNKNOWN", "outcome": "NOT_VERIFIED", "completed": false, "cancelled": false }
+    },
+    {
+      "id": "EDL-05-COMPLETED-EVENT-DOES-NOT-REWRITE-PLANNED-DATE-ASSERTION",
+      "input": { "plannedDateAssertion": "DATE-PLAN", "completionEvidence": "DIRECT_OFFICIAL", "actualDate": "2026-11-12" },
+      "expected": { "eventStatus": "COMPLETED", "plannedDateAssertion": "IMMUTABLE", "actualDateAssertion": "NEW_ASSERTION", "dateKindsKeptSeparate": true }
+    },
+    {
+      "id": "EDL-06-WITHDRAWAL-MARKER-ALONE-DOES-NOT-CANCEL-UNDERLYING-EVENT",
+      "input": { "filingDisposition": "WITHDRAWAL_INDICATED", "eventCancellationClaim": null, "relation": "UNRESOLVED" },
+      "expected": { "eventStatus": "UNKNOWN", "filingSuppressed": "EVIDENCE_REVIEW", "cancelled": false }
+    },
+    {
+      "id": "EDL-07-CONFLICTING-DATE-ASSERTIONS-ARE-NOT-LATEST-WINS",
+      "input": { "assertions": [{ "value": "2026-11-10", "certainty": "OFFICIAL_CONFIRMED" }, { "value": "2026-11-12", "certainty": "OFFICIAL_CONFIRMED" }], "relation": "UNRESOLVED" },
+      "expected": { "dateState": "CONTESTED", "automaticWinner": null, "affectedPublication": "BLOCKED_REVIEW" }
+    },
+    {
+      "id": "EDL-08-DATE-ONLY-OR-LOCAL-TIME-WITHOUT-ZONE-DOES-NOT-SCHEDULE-TIMED-ALERT",
+      "input": { "value": "2026-11-15 10:00", "precision": "LOCAL_DATE_TIME", "timezone": null },
+      "expected": { "instant": null, "timedPush": false, "originalValuePreserved": true }
+    },
+    {
+      "id": "EDL-09-DISTINCT-DATE-KINDS-REMAIN-SEPARATE-ASSERTIONS",
+      "input": { "dates": [{ "kind": "MEETING_START", "value": "2026-11-15" }, { "kind": "VOTING_RECORD_DATE", "value": "2026-11-01" }] },
+      "expected": { "assertionCount": 2, "mergedDate": false, "kindIdentityIncluded": true }
+    },
+    {
+      "id": "EDL-10-RESPONSE-DOES-NOT-MIX-EVENT-AND-DATE-REVISIONS",
+      "input": { "eventRevision": "EVR-2", "dateAssertionRevision": "DATE-1", "publicationDecisionRevision": "PUB-2" },
+      "expected": { "snapshotDisposition": "REJECT_MIXED_REVISION", "publishedRows": 0 }
+    }
+  ]
+}

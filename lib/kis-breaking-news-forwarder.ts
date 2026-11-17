@@ -30,5 +30,18 @@ export async function forwardBreakingNews(options: { send: boolean; date?: strin
       result.push({ externalId, title: event.title, status: "FAILED", error: message });
     }
   }
-  return { configured: await isBreakingNewsDiscordConfigured(), fetchedCount: events.length, sentCount: result.filter((item) => item.status === "SENT").length, duplicateCount: result.filter((item) => item.status === "ALREADY_SENT").length, results: result };
+  const deliveryFailedCount = result.filter((item) => item.status === "FAILED").length;
+  return {
+    ok: true,
+    degraded: deliveryFailedCount > 0,
+    instrumentCount: events.length,
+    partialFailureCount: deliveryFailedCount,
+    deliveryFailedCount,
+    retryQueuedCount: deliveryFailedCount,
+    configured: await isBreakingNewsDiscordConfigured(),
+    fetchedCount: events.length,
+    sentCount: result.filter((item) => item.status === "SENT").length,
+    duplicateCount: result.filter((item) => item.status === "ALREADY_SENT").length,
+    results: result,
+  };
 }

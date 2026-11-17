@@ -11,6 +11,7 @@
 | 아키텍처 | `docs/architecture/` | 모듈 경계, 데이터 흐름, DB 구조 |
 | 개발 | `docs/development/` | 코딩·테스트·마이그레이션 규칙 |
 | 운영 | `docs/operations/` | 배포·스케줄·장애 대응 |
+| 분석 기록 | `docs/company-analysis/` | 시장별 기업 dossier와 다국가 RSS 날짜별 분석 아카이브를 분리 관리 |
 | 공식 참고 | `docs/official/`, `docs/references/` | KIS·DART·SEC 공식 문서와 원본 보관 기준 |
 | 기능 설계 | `docs/*.md` | 기능별 계약과 사용자 동작 |
 | 변경 이력 | `Development.md`, `DEVELOPMENT_LOG.md` | 구현·검증·운영 변경 기록 |
@@ -45,6 +46,7 @@
 - 상세 책임·의존성·검증 증거는 [`system-module-catalog.md`](./system-module-catalog.md)에서 책임별로 나누어 관리한다. 이 문서가 전체 원칙을, 카탈로그가 파일군과 변경 촉발 조건을 담당한다.
 
 - 문서 진입점: 충족 (`docs/README.md`, 영역별 README 존재).
+- 분석 기록 경계: 시장별 회사 dossier와 다국가 RSS 링크 분석 기록을 하위 인덱스로 분리한다 (`docs/company-analysis/{kr,us,rss}/README.md`).
 - 공식 문서 보관 경계: 충족 (`docs/official/`, `docs/references/`).
 - 코드 책임 분류: 충족하는 구조가 있으나, 대형 UI·통합 모듈은 기능 추가 시 분리 후보로 계속 점검한다.
 - 자동 검증: 문서 진입점과 migration 파일명은 `scripts/check-docs.mjs`가 검사한다. 본 문서가 추가되면서 문서 인덱스와 필수 진입점 검사에도 포함한다.

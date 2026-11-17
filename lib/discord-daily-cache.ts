@@ -76,7 +76,7 @@ export function splitDailyCacheCommand(result: Awaited<ReturnType<typeof loadDai
   // Report the rows that will actually be emitted. Legacy rows without the
   // mandatory OBV/ADL fields are intentionally removed above and must not be
   // counted as qualified in the Discord summary.
-  const meta = `갱신 ${payload.updatedAt ?? "-"} · 대상 ${payload.scannedCount ?? 0}개 · 조건 충족 ${items.length}개`;
+  const meta = `캐시 갱신 ${payload.updatedAt ?? "-"} · scan 시작 ${payload.sourceCheckedAt ?? "-"} · 대상 ${payload.scannedCount ?? 0}개 · 조건 충족 ${items.length}개`;
   const policyLine = result.title.includes("골든크로스") ? `기준 EMA ${payload.policy?.ema ?? "9/20"} · 직전/당일/최근 ${payload.policy?.recentCrossLookback ?? 5}봉 · ${payload.policy?.requiredSignals?.join(" AND ") ?? "OBV > Signal AND ADL > Signal"}` : "";
   const limit = 1900;
   const chunks: string[] = [];

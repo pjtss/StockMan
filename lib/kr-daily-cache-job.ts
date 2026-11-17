@@ -4,11 +4,12 @@ import { refreshKrDailyCandles } from "@/lib/kr-daily-price-cache";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
-import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
+import { listDueCandleCacheRetryTimeframes, loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
 import { refreshDailyBollingerCaches, refreshDailyGoldenCrossCache } from "@/lib/daily-cache-followup";
 import { upsertWeeklyFromDaily } from "@/lib/daily-to-weekly-upsert";
 import { measureCandleRefresh } from "@/lib/candle-refresh-observability";
 import { withAutomationLock } from "@/lib/automation-lock";
+import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
 type Job = {
@@ -20,6 +21,10 @@ type Job = {
   processedCount: number;
   successCount: number;
   failureCount: number;
+  dailySavedCandleCount: number;
+  dailyDiscardedOrDuplicateCandleCount: number;
+  dailyCoverage?: Array<{ market: string; eligibleCount: number; cachedCount: number; latestDateCount: number; gapCount: number; latestMarketDate: string | null }>;
+  partialFailureCount: number;
   results: any[];
   error?: string;
   dueTimeframes?: Array<"D" | "W" | "M">;
@@ -48,8 +53,8 @@ async function run(job: Job) {
     await Promise.all((Object.keys(freshness) as Array<keyof typeof freshness>).map(async (timeframe) => {
       const stale = await getDb().execute(timeframe === "D" ? sql`SELECT u.market, u.code
         FROM kr_common_stock_universe u
-        LEFT JOIN kr_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code
-        CROSS JOIN (SELECT MAX(candle_date) AS candle_date FROM kr_latest_daily_candles) market_latest
+        LEFT JOIN kr_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code AND ${sql.raw(validDailyCandleSql("latest"))}
+        CROSS JOIN (SELECT MAX(s.candle_date) AS candle_date FROM kr_latest_daily_candles s WHERE ${sql.raw(validDailyCandleSql("s"))}) market_latest
         WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
           AND (latest.fetched_at IS NULL
             OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
@@ -58,14 +63,14 @@ async function run(job: Job) {
         LEFT JOIN LATERAL (
           SELECT c.fetched_at, c.candle_date
           FROM kr_instrument_universe_candles c
-          WHERE c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe}
+          WHERE c.market = u.market AND c.code = u.code AND c.timeframe = ${timeframe} AND ${sql.raw(validDailyCandleSql("c"))}
           ORDER BY c.candle_date DESC, c.fetched_at DESC
           LIMIT 1
         ) latest ON true
         WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
           AND (latest.fetched_at IS NULL
             OR latest.fetched_at <= NOW() - (${freshness[timeframe]} * INTERVAL '1 millisecond')
-            OR latest.candle_date < (SELECT MAX(c2.candle_date) FROM kr_instrument_universe_candles c2 WHERE c2.timeframe = ${timeframe} AND c2.volume > 0))`);
+            OR latest.candle_date < (SELECT MAX(c2.candle_date) FROM kr_instrument_universe_candles c2 WHERE c2.timeframe = ${timeframe} AND ${sql.raw(validDailyCandleSql("c2"))}))`);
       staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
     }));
     const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);
@@ -76,12 +81,13 @@ async function run(job: Job) {
     if (dueTimeframes.includes("D") && dueTimeframes.length > 1) {
       dueTimeframes.splice(0, dueTimeframes.length, "D");
     }
-    const retryRows = await loadDueCandleCacheRetries();
+    const dueRetryTimeframes = await listDueCandleCacheRetryTimeframes(scopes);
+    for (const timeframe of dueRetryTimeframes) if (!dueTimeframes.includes(timeframe)) dueTimeframes.push(timeframe);
+    // Daily-first applies to refreshing stale universes, not to persistent
+    // retry rows. Keep all due retry lanes selected so repeated D failures
+    // cannot permanently starve W/M retries; the claim query orders by due time.
+    const retryRows = await loadDueCandleCacheRetries(scopes, 500, dueRetryTimeframes);
     const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
-    for (const row of retryRows) if (!dueTimeframes.includes(row.timeframe)) dueTimeframes.push(row.timeframe);
-    if (dueTimeframes.includes("D") && dueTimeframes.length > 1) {
-      dueTimeframes.splice(0, dueTimeframes.length, "D");
-    }
     job.dueTimeframes = dueTimeframes;
   let cursor = 0;
     let dailySuccessCount = 0;
@@ -93,28 +99,47 @@ async function run(job: Job) {
         const requestedTimeframes = dueTimeframes.filter((timeframe) => staleKeysByTimeframe.get(timeframe)?.has(key) || retryKeys.has(`${key}:${timeframe}`));
         if (!requestedTimeframes.length) continue;
         try {
-          const dailyMeasured = requestedTimeframes.includes("D") ? await measureCandleRefresh({market:item.market,timeframe:"D",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"D",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
-          const weeklyMeasured = requestedTimeframes.includes("W") ? await measureCandleRefresh({market:item.market,timeframe:"W",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"W",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
-          const monthlyMeasured = requestedTimeframes.includes("M") ? await measureCandleRefresh({market:item.market,timeframe:"M",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"M",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.parsedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.parsedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
+          const dailyMeasured = requestedTimeframes.includes("D") ? await measureCandleRefresh({market:item.market,timeframe:"D",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"D",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.savedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.savedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
+          const weeklyMeasured = requestedTimeframes.includes("W") ? await measureCandleRefresh({market:item.market,timeframe:"W",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"W",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.savedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.savedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
+          const monthlyMeasured = requestedTimeframes.includes("M") ? await measureCandleRefresh({market:item.market,timeframe:"M",instrumentCount:1}, async()=>{const x=await refreshKrDailyCandles(item.code,"M",item.market,{skipUniverseCheck:true}); return {ok:Number(x?.diagnostics?.savedCandleCount??0)>0,savedCandleCount:Number(x?.diagnostics?.savedCandleCount??0),diagnostics:x?.diagnostics}}) : null;
           const daily=dailyMeasured?.value, weekly=weeklyMeasured?.value, monthly=monthlyMeasured?.value;
-          const result = { market: item.market, code: item.code, daily: (daily as any)?.diagnostics ?? null, weekly: (weekly as any)?.diagnostics ?? null, monthly: (monthly as any)?.diagnostics ?? null };
-          if (Number(result.daily?.parsedCandleCount ?? 0) > 0) dailySuccessCount += 1;
+          const result = { market: item.market, code: item.code, daily: (daily as any)?.diagnostics ?? null, weekly: (weekly as any)?.diagnostics ?? null, monthly: (monthly as any)?.diagnostics ?? null, retryQueueFailures: [] as string[] };
+          if (Number(result.daily?.savedCandleCount ?? 0) > 0) dailySuccessCount += 1;
+          job.dailySavedCandleCount += Number(result.daily?.savedCandleCount ?? 0);
+          job.dailyDiscardedOrDuplicateCandleCount += Number(result.daily?.discardedOrDuplicateCandleCount ?? 0);
           job.results.push(result);
-          const success = requestedTimeframes.every((timeframe) => Number((timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly)?.parsedCandleCount ?? 0) > 0);
-          for (const timeframe of requestedTimeframes) { const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly; if (Number(diagnostic?.parsedCandleCount ?? 0) > 0 && retryKeys.has(`${key}:${timeframe}`)) await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe }); }
-          if (success) job.successCount += 1;
+          const success = requestedTimeframes.every((timeframe) => Number((timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly)?.savedCandleCount ?? 0) > 0);
+          for (const timeframe of requestedTimeframes) {
+            const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly;
+            const retry = retryRows.find((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}` === `${key}:${timeframe}`);
+            if (Number(diagnostic?.savedCandleCount ?? 0) > 0 && retry && !await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe, attempts: retry.attempts })) result.retryQueueFailures.push(`${timeframe}: success marker not updated (stale claim or database error)`);
+          }
+          const retryStateFailed = result.retryQueueFailures.length > 0;
+          if (success && !retryStateFailed) job.successCount += 1;
           else {
             job.failureCount += 1;
             for (const timeframe of requestedTimeframes) {
               const diagnostic = timeframe === "D" ? result.daily : timeframe === "W" ? result.weekly : result.monthly;
-              if (Number(diagnostic?.parsedCandleCount ?? 0) <= 0) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: `${timeframe}: ${diagnostic?.msg1 ?? "KIS returned no candles"}` });
+              if (Number(diagnostic?.savedCandleCount ?? 0) <= 0) {
+                const retry = retryRows.find((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}` === `${key}:${timeframe}`);
+                if (!await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, expectedAttempts: retry?.attempts, error: `${timeframe}: ${diagnostic?.error ?? diagnostic?.msg1 ?? "KIS returned no saved candles"}` })) result.retryQueueFailures.push(timeframe);
+              }
             }
           }
         } catch (error) {
           job.failureCount += 1;
           const message = error instanceof Error ? error.message : String(error);
           job.results.push({ market: item.market, code: item.code, error: message });
-          for (const timeframe of requestedTimeframes) await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
+          const retryQueueFailures: string[] = [];
+          for (const timeframe of requestedTimeframes) {
+            try {
+              const retry = retryRows.find((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}` === `${key}:${timeframe}`);
+              if (!await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, expectedAttempts: retry?.attempts, error: message })) retryQueueFailures.push(timeframe);
+            } catch (queueError) {
+              retryQueueFailures.push(`${timeframe}: retry persistence threw (${queueError instanceof Error ? queueError.message : String(queueError)})`);
+            }
+          }
+          if (retryQueueFailures.length) job.results.push({ market: item.market, code: item.code, retryQueueFailures });
       } finally {
         job.processedCount += 1;
         const elapsedMs = Date.now() - progressStartedAt;
@@ -129,6 +154,33 @@ async function run(job: Job) {
     if (scopes.length > 0 && dailySuccessCount === 0) {
       throw new Error(`KR daily candle refresh returned no usable candles for ${scopes.length} instruments`);
     }
+    const coverage = await getDb().execute(sql`WITH market_latest AS (
+      SELECT s.market, MAX(s.candle_date) AS latest_date
+      FROM kr_latest_daily_candles s
+      WHERE ${sql.raw(validDailyCandleSql("s"))}
+      GROUP BY s.market
+    )
+    SELECT u.market,
+      COUNT(*)::int AS eligible_count,
+      COUNT(latest.code)::int AS cached_count,
+      COUNT(*) FILTER (WHERE latest.candle_date = market_latest.latest_date)::int AS latest_date_count,
+      COUNT(*) FILTER (WHERE latest.code IS NULL OR latest.candle_date < market_latest.latest_date)::int AS gap_count,
+      market_latest.latest_date AS latest_market_date
+    FROM kr_common_stock_universe u
+    LEFT JOIN kr_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code AND ${sql.raw(validDailyCandleSql("latest"))}
+    LEFT JOIN market_latest ON market_latest.market = u.market
+    WHERE u.enabled = true AND u.instrument_type = 'COMMON_STOCK'
+    GROUP BY u.market, market_latest.latest_date
+    ORDER BY u.market`);
+    job.dailyCoverage = (coverage.rows as Array<Record<string, unknown>>).map((row) => ({
+      market: String(row.market),
+      eligibleCount: Number(row.eligible_count),
+      cachedCount: Number(row.cached_count),
+      latestDateCount: Number(row.latest_date_count),
+      gapCount: Number(row.gap_count),
+      latestMarketDate: row.latest_market_date == null ? null : String(row.latest_market_date),
+    }));
+    job.partialFailureCount = job.dailyCoverage.reduce((total, market) => total + market.gapCount, 0);
     job.status = "COMPLETED";
     (job as any).dailySuccessCount = dailySuccessCount;
     (job as any).weeklyDerived = await upsertWeeklyFromDaily("KR", { runDailyTotal: scopes.length, runDailySuccess: dailySuccessCount });
@@ -169,7 +221,7 @@ export function startKrDailyCacheJob() {
 }
 
 function createJob(): Job {
-  return { jobId: crypto.randomUUID(), status: "QUEUED", startedAt: new Date().toISOString(), instrumentCount: 0, processedCount: 0, successCount: 0, failureCount: 0, results: [] };
+  return { jobId: crypto.randomUUID(), status: "QUEUED", startedAt: new Date().toISOString(), instrumentCount: 0, processedCount: 0, successCount: 0, failureCount: 0, dailySavedCandleCount: 0, dailyDiscardedOrDuplicateCandleCount: 0, partialFailureCount: 0, results: [] };
 }
 
 /** Synchronous application-service entry point used by OCI cron. */

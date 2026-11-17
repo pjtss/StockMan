@@ -8,6 +8,20 @@ import { readKisCache, writeKisCache } from "./kis-cache";
 import { fetchDomesticFluctuation, fetchDomesticVolumePower } from "./kis-domestic-api";
 import { fetchInvestorByStock, fetchProgramTradeByStock, fetchNearNewHighLow } from "./kis-investor-flow";
 import { safeErrorMetadata } from "./error-diagnostics";
+import { filterActiveKrCommonStockRows } from "./instrument-eligibility";
+import { filterKrRowsByStoredMarketCap } from "./kr-market-cap";
+
+async function readEligibleKrScannerCache<T extends { code?: unknown }>(key: string) {
+  const cached = await readKisCache<T[]>(key);
+  if (!cached) return null;
+  const common = await filterActiveKrCommonStockRows(cached);
+  return filterKrRowsByStoredMarketCap(common);
+}
+
+async function filterEligibleKrScannerRows<T>(rows: T[], codeOf: (row: T) => unknown) {
+  const common = await filterActiveKrCommonStockRows(rows, codeOf);
+  return filterKrRowsByStoredMarketCap(common, codeOf);
+}
 
 function kisNumber(row: Record<string, unknown> | undefined, ...keys: string[]) {
   for (const key of keys) {
@@ -60,7 +74,7 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
   // B. 실 운영 환경에서 API 키 누락 시 -> 절대 Mock을 반환하지 않고 DB 캐시 복원 시도 (없을 시 빈 배열)
   if (!KIS_APPKEY || !KIS_APPSECRET) {
     try {
-      const cached = await readKisCache<VolumeSpikeItem[]>("volume_spike");
+      const cached = await readEligibleKrScannerCache<VolumeSpikeItem>("volume_spike");
       if (cached) return cached;
     } catch {}
     return [];
@@ -74,7 +88,8 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
+        const eligibleItems = await filterEligibleKrScannerRows(realItems, (item) => item.mksc_shrn_iscd ?? item.stck_shrn_iscd);
+        const mappedData = eligibleItems.slice(0, 10).map((item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
           const rate = parseFloat(String(item.prdy_ctrt ?? "0")) || 0.0;
           const isUp = rate >= 0;
@@ -110,7 +125,7 @@ export async function fetchVolumeSpike(): Promise<VolumeSpikeItem[]> {
   try {
     const db = getDb();
     if (db) {
-        const cached = await readKisCache<VolumeSpikeItem[]>(cacheKey);
+        const cached = await readEligibleKrScannerCache<VolumeSpikeItem>(cacheKey);
         if (cached) return cached;
     }
   } catch (dbReadErr) {
@@ -140,7 +155,7 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
   // B. 실 운영 환경에서 API 키 누락 시 -> 절대 Mock을 반환하지 않고 DB 캐시 복원 시도 (없을 시 빈 배열)
   if (!KIS_APPKEY || !KIS_APPSECRET) {
     try {
-      const cached = await readKisCache<NetBuyingItem[]>("net_buying");
+      const cached = await readEligibleKrScannerCache<NetBuyingItem>("net_buying");
       if (cached) return cached;
     } catch {}
     return [];
@@ -154,7 +169,8 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = (await Promise.all(realItems.slice(0, 10).map(async (item, i) => {
+        const eligibleItems = await filterEligibleKrScannerRows(realItems, (item) => item.mksc_shrn_iscd ?? item.stck_shrn_iscd);
+        const mappedData = (await Promise.all(eligibleItems.slice(0, 10).map(async (item, i) => {
           const rawPrice = parseInt(String(item.stck_prpr ?? "0"), 10) || 0;
           const rate = parseFloat(String(item.prdy_ctrt ?? "0")) || 0.0;
           const isUp = rate >= 0;
@@ -201,7 +217,7 @@ export async function fetchNetBuying(): Promise<NetBuyingItem[]> {
   try {
     const db = getDb();
     if (db) {
-      const cached = await readKisCache<NetBuyingItem[]>(cacheKey);
+      const cached = await readEligibleKrScannerCache<NetBuyingItem>(cacheKey);
       if (cached) return cached;
     }
   } catch (dbReadErr) {
@@ -230,7 +246,7 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
   // B. 실 운영 환경에서 API 키 누락 시 -> 절대 Mock을 반환하지 않고 DB 캐시 복원 시도 (없을 시 빈 배열)
   if (!KIS_APPKEY || !KIS_APPSECRET) {
     try {
-      const cached = await readKisCache<ProgramTradingItem[]>("program_trading");
+      const cached = await readEligibleKrScannerCache<ProgramTradingItem>("program_trading");
       if (cached) return cached;
     } catch {}
     return [];
@@ -244,7 +260,8 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = (await Promise.all(realItems.slice(0, 10).map(async (item, i) => {
+        const eligibleItems = await filterEligibleKrScannerRows(realItems, (item) => item.mksc_shrn_iscd ?? item.stck_shrn_iscd);
+        const mappedData = (await Promise.all(eligibleItems.slice(0, 10).map(async (item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
           const rate = parseFloat(item.prdy_ctrt) || 0.0;
           const isUp = rate >= 0;
@@ -290,7 +307,7 @@ export async function fetchProgramTrading(): Promise<ProgramTradingItem[]> {
   try {
     const db = getDb();
     if (db) {
-      const cached = await readKisCache<ProgramTradingItem[]>(cacheKey);
+      const cached = await readEligibleKrScannerCache<ProgramTradingItem>(cacheKey);
       if (cached) return cached;
     }
   } catch (dbReadErr) {
@@ -319,7 +336,7 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
   // B. 실 운영 환경에서 API 키 누락 시 -> 절대 Mock을 반환하지 않고 DB 캐시 복원 시도 (없을 시 빈 배열)
   if (!KIS_APPKEY || !KIS_APPSECRET) {
     try {
-      const cached = await readKisCache<NewHighItem[]>("new_high");
+      const cached = await readEligibleKrScannerCache<NewHighItem>("new_high");
       if (cached) return cached;
     } catch {}
     return [];
@@ -334,7 +351,8 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
       const highlow = await fetchNearNewHighLow(token, "0000", "high");
       const realItems = highlow.rows;
       if (highlow.ok && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
+        const eligibleItems = await filterEligibleKrScannerRows(realItems, (item) => item.mksc_shrn_iscd ?? item.stck_shrn_iscd);
+        const mappedData = eligibleItems.slice(0, 10).map((item, i) => {
           const rawPrice = parseInt(String(item.stck_prpr ?? "0"), 10) || 0;
           const rate = parseFloat(String(item.prdy_ctrt ?? "0")) || 0.0;
           const isUp = rate >= 0;
@@ -370,7 +388,7 @@ export async function fetchNewHigh(): Promise<NewHighItem[]> {
   try {
     const db = getDb();
     if (db) {
-      const cached = await readKisCache<NewHighItem[]>(cacheKey);
+      const cached = await readEligibleKrScannerCache<NewHighItem>(cacheKey);
       if (cached) return cached;
     }
   } catch (dbReadErr) {
@@ -399,7 +417,7 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
   // B. 실 운영 환경에서 API 키 누락 시 -> 절대 Mock을 반환하지 않고 DB 캐시 복원 시도 (없을 시 빈 배열)
   if (!KIS_APPKEY || !KIS_APPSECRET) {
     try {
-      const cached = await readKisCache<BidAskRatioItem[]>("bid_ask_ratio");
+      const cached = await readEligibleKrScannerCache<BidAskRatioItem>("bid_ask_ratio");
       if (cached) return cached;
     } catch {}
     return [];
@@ -413,7 +431,8 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
     if (token) {
       const realItems = await fetchRealVolumeRank(token);
       if (realItems && realItems.length > 0) {
-        const mappedData = realItems.slice(0, 10).map((item, i) => {
+        const eligibleItems = await filterEligibleKrScannerRows(realItems, (item) => item.mksc_shrn_iscd ?? item.stck_shrn_iscd);
+        const mappedData = eligibleItems.slice(0, 10).map((item, i) => {
           const rawPrice = parseInt(item.stck_prpr, 10) || 0;
           const rate = parseFloat(item.prdy_ctrt) || 0.0;
           const isUp = rate >= 0;
@@ -449,7 +468,7 @@ export async function fetchBidAskRatio(): Promise<BidAskRatioItem[]> {
   try {
     const db = getDb();
     if (db) {
-      const cached = await readKisCache<BidAskRatioItem[]>(cacheKey);
+      const cached = await readEligibleKrScannerCache<BidAskRatioItem>(cacheKey);
       if (cached) return cached;
     }
   } catch (dbReadErr) {

@@ -7,6 +7,7 @@ import { recordCandleCacheFailure } from "@/lib/candle-cache-failure-history";
 import { loadDueCandleCacheRetries, markCandleCacheRetrySuccess } from "@/lib/candle-cache-retry";
 import { refreshDailyBollingerCaches, refreshDailyGoldenCrossCache } from "@/lib/daily-cache-followup";
 import { withAutomationLock } from "@/lib/automation-lock";
+import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
 
@@ -20,7 +21,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   // lane frequent, while the completed weekly/monthly lanes stay bounded.
   // 주봉은 1일, 월봉은 7일 주기로 KIS 원본을 독립 적재한다.
   const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
-  const retryRows = await loadDueCandleCacheRetries();
+  const retryRows = await loadDueCandleCacheRetries(instruments);
   const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
   const retryTimeframes = new Set(retryRows.map((row) => row.timeframe));
   const timeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
@@ -33,8 +34,8 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
     const timeframeFilter = timeframe === "D" ? "" : ` AND c.timeframe = '${timeframe}'`;
     const stale = await getDb().execute(sql.raw(timeframe === "D" ? `SELECT u.market, u.code
       FROM us_common_stock_universe u
-      LEFT JOIN us_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code
-      CROSS JOIN (SELECT MAX(candle_date) AS candle_date FROM us_latest_daily_candles) market_latest
+      LEFT JOIN us_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code AND ${validDailyCandleSql("latest")}
+      CROSS JOIN (SELECT MAX(s.candle_date) AS candle_date FROM us_latest_daily_candles s WHERE ${validDailyCandleSql("s")}) market_latest
       WHERE u.enabled = true
         AND u.instrument_type = 'COMMON_STOCK'
         AND COALESCE(u.is_etf, false) = false
@@ -50,7 +51,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
       LEFT JOIN LATERAL (
         SELECT c.fetched_at, c.candle_date
         FROM ${latestTable} c
-        WHERE c.market = u.market AND c.code = u.code${timeframeFilter}
+        WHERE c.market = u.market AND c.code = u.code${timeframeFilter} AND ${validDailyCandleSql("c")}
         ORDER BY c.candle_date DESC, c.fetched_at DESC
         LIMIT 1
       ) latest ON true
@@ -86,12 +87,14 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
           SELECT 1
           FROM us_instrument_universe_candles c
           WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
+            AND ${sql.raw(validDailyCandleSql("c"))}
           LIMIT 1 OFFSET 34
         )
         OR EXISTS (
           SELECT 1
           FROM us_instrument_universe_candles c
           WHERE c.market = u.market AND c.code = u.code AND c.timeframe = 'D'
+            AND ${sql.raw(validDailyCandleSql("c"))}
             AND COALESCE(c.raw_payload, '') = ''
           LIMIT 1
         )
@@ -101,6 +104,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   let successCount = 0;
   let dailySuccessCount = 0;
   let candleCount = 0;
+  let discardedOrDuplicateCandleCount = 0;
   let dbWriteDurationMs = 0;
   let processedCount = 0;
   const progressStarted = Date.now();
@@ -120,27 +124,46 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
     while (true) {
       const item = laneItems[cursor++];
       if (!item) return;
+      const key = `${item.market.toUpperCase()}:${item.code.toUpperCase()}`;
+      const claimedRetry = retryRows.find((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}` === `${key}:${timeframe}`);
       try {
         const response = await fetchUsDailyPrice({ code: item.code, market: item.market, timeframe });
         if (!response?.ok || response.candles.length === 0) {
           const error = `${timeframe}: ${!response ? "KIS access token unavailable" : !response.ok ? `KIS API failed (${response.status})` : "KIS returned no candles"}`;
-          failures.push({ market: item.market, code: item.code, error });
-          await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error });
+          const failure = { market: item.market, code: item.code, error, retryQueued: true };
+          failures.push(failure);
+          try { failure.retryQueued = await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, expectedAttempts: claimedRetry?.attempts, error }); }
+          catch (queueError) { failure.retryQueued = false; failure.error += `; retry persistence failed: ${queueError instanceof Error ? queueError.message : String(queueError)}`; }
         } else {
           const dbWriteStartedAt = Date.now();
+          let savedCount = 0;
           try {
-            candleCount += await saveUsDailyCandles(item.market, item.code, response.candles, timeframe);
+            savedCount = await saveUsDailyCandles(item.market, item.code, response.candles, timeframe);
+            candleCount += savedCount;
           } finally {
             dbWriteDurationMs += Date.now() - dbWriteStartedAt;
           }
-          if (timeframe === "D") dailySuccessCount += 1;
-          await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe });
+          response.diagnostics.savedCandleCount = savedCount;
+          response.diagnostics.discardedOrDuplicateCandleCount = Math.max(0, response.candles.length - savedCount);
+          discardedOrDuplicateCandleCount += response.diagnostics.discardedOrDuplicateCandleCount;
+          if (savedCount === 0) {
+            const error = `${timeframe}: KIS returned candles but no valid rows were saved`;
+            const failure = { market: item.market, code: item.code, error, retryQueued: true };
+            failures.push(failure);
+            try { failure.retryQueued = await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, expectedAttempts: claimedRetry?.attempts, error }); }
+            catch (queueError) { failure.retryQueued = false; failure.error += `; retry persistence failed: ${queueError instanceof Error ? queueError.message : String(queueError)}`; }
+          } else {
+            if (timeframe === "D") dailySuccessCount += 1;
+            if (claimedRetry && !await markCandleCacheRetrySuccess({ market: item.market, code: item.code, timeframe, attempts: claimedRetry.attempts })) failures.push({ market: item.market, code: item.code, error: `${timeframe}: retry success marker not updated (stale claim or database error)` });
+            successCount += 1;
+          }
         }
-          if (response?.ok && response.candles.length > 0) successCount += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        failures.push({ market: item.market, code: item.code, error: message });
-        await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, error: message });
+        const failure = { market: item.market, code: item.code, error: message, retryQueued: true };
+        failures.push(failure);
+        try { failure.retryQueued = await recordCandleCacheFailure({ market: item.market, code: item.code, timeframe, expectedAttempts: claimedRetry?.attempts, error: message }); }
+        catch (queueError) { failure.retryQueued = false; failure.error += `; retry persistence failed: ${queueError instanceof Error ? queueError.message : String(queueError)}`; }
       }
       processedCount += 1;
       const elapsedMs = Date.now() - progressStarted;
@@ -154,6 +177,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   }
   const completedAt = new Date().toISOString();
   const durationMs = Date.parse(completedAt) - Date.parse(startedAt);
+  const universeAvailable = Boolean((universe.universe as any).ok) && instruments.length > 0;
   const weeklyDerived = { skipped: true, reason: "US_WEEKLY_USES_KIS_ORIGINAL_CANDLES", source: "KIS" as const };
   // Partial KIS failures must not block follow-up caches for instruments
   // whose candles were saved successfully. The scanners read the DB cache
@@ -165,7 +189,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const [bollingerCache, goldenCrossCache] = followupBlocked
     ? [skippedFollowup, skippedFollowup]
     : await Promise.all([refreshDailyBollingerCaches("US"), refreshDailyGoldenCrossCache("US")]);
-  return { universeAvailable: Boolean((universe.universe as any).ok), universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
+  return { ok: universeAvailable && failures.length === 0, status: universeAvailable ? undefined : "FAILED", universeAvailable, universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, discardedOrDuplicateCandleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
 }
 
 export function warmUsDailyPriceCache(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {

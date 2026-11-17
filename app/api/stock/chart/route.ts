@@ -7,6 +7,8 @@ import { loadRemoteStockChart } from "@/lib/remote-stock-chart";
 import { chartCandleMemoryKey, getChartCandleMemory, setChartCandleMemory } from "@/lib/chart-candle-memory-cache";
 import { sql } from "drizzle-orm";
 import { buildChartDataFromCandles, type ChartData, type ChartFundamentals, type OHLCVCandle } from "@/lib/kis-chart";
+import { validDailyCandleSql } from "@/lib/candle-sql-quality";
+import { KR_MARKET_CAP_MAX_AGE_HOURS } from "@/lib/kr-market-cap";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +45,17 @@ export async function GET(request: Request) {
     return timedJson({ error: "code is required" }, { status: 400 });
   }
 
+  let resolvedExchange = exchange;
   try {
     let data: ChartData | null = null;
     let chartSource = "KIS";
     const remoteConfigured = Boolean(process.env.DAILY_CACHE_API_URL?.trim());
-    let resolvedExchange = exchange;
     let eligibilityError: "not-found" | "ambiguous" | "unavailable" | null = null;
-    if (market === "US") {
+    if (market === "KR" || market === "US") {
       try {
-        const instrument = await measure("instrument-master", () => resolveUsCommonStockExchange(code, exchange));
+        const instrument = await measure("instrument-master", () => market === "KR"
+          ? resolveKrCommonStockExchange(code, exchange)
+          : resolveUsCommonStockExchange(code, exchange));
         resolvedExchange = instrument.exchange;
         eligibilityError = instrument.error;
       } catch {
@@ -59,14 +63,22 @@ export async function GET(request: Request) {
         eligibilityError = "unavailable";
       }
     }
+    if (eligibilityError) {
+      const error = eligibilityError === "unavailable"
+        ? `${market === "US" ? "해외" : "국내"} 활성 보통주 종목 정보를 확인할 수 없습니다. 잠시 후 다시 시도하세요.`
+        : eligibilityError === "ambiguous"
+          ? "동일 종목 코드가 여러 거래소에 있어 거래소를 지정해야 합니다."
+          : "활성 보통주 종목 마스터에서 종목 코드를 확인할 수 없습니다.";
+      return timedJson({ error, chartStatus: "UNAVAILABLE", eligibility: "FAIL_CLOSED" }, { status: eligibilityError === "unavailable" ? 503 : 422 });
+    }
     const cacheMarket = resolvedExchange && (market === "KR" ? ["KOSPI", "KOSDAQ"].includes(resolvedExchange) : ["NAS", "NYS", "AMS"].includes(resolvedExchange)) ? resolvedExchange : market;
     const memoryKey = chartCandleMemoryKey({ market, code, exchange: resolvedExchange, timeframe });
     const memory = getChartCandleMemory(memoryKey);
-    if (memory?.candles.length && (market !== "US" || resolvedExchange)) {
+    if (memory?.candles.length && resolvedExchange) {
       data = buildChartDataFromCandles(code, memory.candles, memory.updatedAt);
       chartSource = "PROCESS_CANDLE_MEMORY";
     }
-    if (!data && (market !== "US" || resolvedExchange)) {
+    if (!data && resolvedExchange) {
       const remote = await measure("remote-cache", () => loadRemoteDailyCandles({ market: cacheMarket, code, timeframe }).catch(() => null));
       if (remote?.candles.length) {
         setChartCandleMemory(memoryKey, remote.candles, remote.updatedAt);
@@ -79,7 +91,7 @@ export async function GET(request: Request) {
       if (data) chartSource = "DB_CACHE";
     }
     try {
-      if (!data && (market !== "US" || resolvedExchange)) {
+      if (!data && resolvedExchange) {
         data = await measure("kis", () => market === "US"
           ? fetchUsChartData(code, timeframe, resolvedExchange!)
           : fetchChartData(code, timeframe));
@@ -88,15 +100,15 @@ export async function GET(request: Request) {
     } catch {
       console.warn(`[API /stock/chart] KIS unavailable; trying ${market} DB cache`);
       if (market !== "US") {
-        data = await measure("db-cache", () => loadCachedChartData(code, timeframe, market, exchange));
+        data = await measure("db-cache", () => loadCachedChartData(code, timeframe, market, resolvedExchange));
         if (data) chartSource = "DB_CACHE";
       }
     }
-    if (!data && (market !== "US" || resolvedExchange)) {
-      data = await measure("db-cache", () => loadCachedChartData(code, timeframe, market, exchange));
+    if (!data && resolvedExchange) {
+      data = await measure("db-cache", () => loadCachedChartData(code, timeframe, market, resolvedExchange));
       if (data) chartSource = "DB_CACHE";
     }
-    if (!data && remoteConfigured && (market !== "US" || resolvedExchange)) {
+    if (!data && remoteConfigured && resolvedExchange) {
       data = await measure("remote-chart-fallback", () => loadRemoteStockChart({ market, code, company, timeframe, exchange: resolvedExchange, callerUrl: request.url }));
       if (data) {
         chartSource = "OPERATING_CHART_API";
@@ -104,14 +116,6 @@ export async function GET(request: Request) {
       }
     }
     if (!data) {
-      if (market === "US" && eligibilityError) {
-        const error = eligibilityError === "unavailable"
-          ? "해외 활성 보통주 종목 정보를 확인할 수 없습니다. 잠시 후 다시 시도하세요."
-          : eligibilityError === "ambiguous"
-            ? "동일 티커가 여러 거래소에 있어 거래소를 지정해야 합니다."
-            : "활성 보통주 종목 마스터에서 티커를 확인할 수 없습니다.";
-        return timedJson({ error, chartStatus: "UNAVAILABLE", eligibility: "FAIL_CLOSED" }, { status: eligibilityError === "unavailable" ? 503 : 422 });
-      }
       const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe, resolvedExchange).catch(() => unknownFundamentals(market));
       return timedJson(
         { error: remoteConfigured ? "원격 캐시와 실시간 시세에서 차트 데이터를 찾지 못했습니다." : "차트 데이터를 불러올 수 없습니다. KIS API 자격증명을 확인하세요.", chartStatus: "UNAVAILABLE", fundamentals },
@@ -127,7 +131,7 @@ export async function GET(request: Request) {
     return timedJson(data);
   } catch (err: any) {
     console.error("[API /stock/chart] Error:", err instanceof Error ? err.message : "unknown error");
-    const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe, exchange).catch(() => unknownFundamentals(market));
+    const fundamentals = await loadFundamentalsSnapshot(code, market, timeframe, resolvedExchange).catch(() => unknownFundamentals(market));
     return timedJson({ error: "차트 데이터를 처리할 수 없습니다.", chartStatus: "UNAVAILABLE", fundamentals }, { status: 502 });
   }
 }
@@ -139,18 +143,22 @@ async function loadCachedChartData(rawCode: string, timeframe: "D" | "W" | "M", 
         SELECT candle_date AS date, open, high, low, close, volume, fetched_at,
                ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
           FROM us_instrument_universe_candles
-         WHERE code = $1 AND timeframe = $2 AND close IS NOT NULL
+         WHERE code = $1 AND timeframe = $2 AND ${validDailyCandleSql("us_instrument_universe_candles")}
            AND ($3::text IS NULL OR market = $3)
       ) cached WHERE rn = 1 ORDER BY date ASC`, [code, timeframe, exchange])
     : await getDb().execute(sql`SELECT date AS "date", open, high, low, close, volume, fetched_at AS "fetchedAt" FROM (
         SELECT candle_date AS date, open, high, low, close, volume, fetched_at,
                ROW_NUMBER() OVER (PARTITION BY candle_date ORDER BY fetched_at DESC) AS rn
           FROM kr_instrument_universe_candles
-         WHERE code = ${code} AND timeframe = ${timeframe} AND close IS NOT NULL
+         WHERE code = ${code} AND timeframe = ${timeframe}
+           AND (${exchange === "KOSPI" || exchange === "KOSDAQ" ? sql`market = ${exchange}` : sql`true`})
+           AND ${sql.raw(validDailyCandleSql("kr_instrument_universe_candles"))}
       ) cached WHERE rn = 1 ORDER BY date ASC`);
   const candles = (result.rows as Array<Record<string, unknown>>).map((row): OHLCVCandle => ({
-    date: String(row.date), open: Number(row.open ?? 0), high: Number(row.high ?? 0), low: Number(row.low ?? 0), close: Number(row.close ?? 0), volume: Number(row.volume ?? 0),
-  })).filter((candle) => /^\d{8}$/.test(candle.date) && Number.isFinite(candle.close));
+    date: String(row.date), open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume),
+  })).filter((candle) => /^\d{8}$/.test(candle.date) && [candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+    && Math.min(candle.open, candle.high, candle.low, candle.close) > 0 && candle.volume >= 0
+    && candle.high >= Math.max(candle.open, candle.low, candle.close) && candle.low <= Math.min(candle.open, candle.high, candle.close));
   const fetchedAt = result.rows.at(-1)?.fetchedAt ? new Date(String(result.rows.at(-1)?.fetchedAt)).toISOString() : null;
   return candles.length ? buildChartDataFromCandles(code, candles, fetchedAt) : null;
 }
@@ -172,6 +180,24 @@ async function resolveUsCommonStockExchange(codeWithPrefix: string, requestedExc
   return { exchange: null, error: markets.length > 1 ? "ambiguous" : "not-found" };
 }
 
+async function resolveKrCommonStockExchange(codeWithPrefix: string, requestedExchange: string | null): Promise<{ exchange: string | null; error: "not-found" | "ambiguous" | null }> {
+  const code = codeWithPrefix.trim().toUpperCase();
+  const result = await getPool().query<{ market: string }>(
+    `SELECT market FROM kr_common_stock_universe
+      WHERE code = $1 AND enabled = true AND instrument_type = 'COMMON_STOCK'
+        AND COALESCE(is_suspended, false) = false
+        AND COALESCE(trading_halt_code, '') NOT IN ('Y', '1')
+        AND COALESCE(liquidation_code, '') NOT IN ('Y', '1')
+        AND COALESCE(managed_issue_code, '') <> 'Y'
+        AND market IN ('KOSPI', 'KOSDAQ') AND ($2::text IS NULL OR market = $2)
+      ORDER BY market LIMIT 2`,
+    [code, requestedExchange],
+  );
+  const markets = [...new Set(result.rows.map((row) => row.market).filter((value) => ["KOSPI", "KOSDAQ"].includes(value)))];
+  if (markets.length === 1) return { exchange: markets[0], error: null };
+  return { exchange: null, error: markets.length > 1 ? "ambiguous" : "not-found" };
+}
+
 function unknownFundamentals(market: string): ChartFundamentals {
   return { marketCap: null, latestTradingValue: null, averageTradingValue20: null, latestVolume: null, averageVolume20: null, rvol: null, currency: market === "US" ? "USD" : "KRW", observedAt: null, fetchedAt: null, source: null, status: "UNKNOWN" };
 }
@@ -182,26 +208,29 @@ async function loadChartFundamentals(data: ChartData, market: string, timeframe:
   const table = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
   const tradingValueColumn = market === "US" ? `trading_value AS "tradingValue"` : `NULL AS "tradingValue"`;
   const usExchange = market === "US" && ["NAS", "NYS", "AMS"].includes(exchange ?? "") ? exchange : null;
+  const krExchange = market === "KR" && ["KOSPI", "KOSDAQ"].includes(exchange ?? "") ? exchange : null;
+  const snapshotExchange = usExchange ?? krExchange;
   const [rows, stored] = await Promise.all([
-    usExchange
-      ? db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE market = ${usExchange} AND code = ${code} ORDER BY fetched_at DESC LIMIT 1`)
+    snapshotExchange
+      ? db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE market = ${snapshotExchange} AND code = ${code} ORDER BY fetched_at DESC LIMIT 1`)
       : db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE code = ${code} ORDER BY fetched_at DESC LIMIT 1`),
-    db.execute(sql.raw(`SELECT ${tradingValueColumn}, close, volume FROM ${table} WHERE code = '${code.replace(/'/g, "''")}' AND timeframe = '${timeframe}' ${usExchange ? `AND market = '${usExchange}'` : ""} AND close IS NOT NULL ORDER BY candle_date DESC LIMIT 21`)),
+    db.execute(sql.raw(`SELECT ${tradingValueColumn}, c.close, c.volume FROM ${table} c WHERE c.code = '${code.replace(/'/g, "''")}' AND c.timeframe = '${timeframe}' ${snapshotExchange ? `AND c.market = '${snapshotExchange}'` : ""} AND ${validDailyCandleSql("c")} ORDER BY c.candle_date DESC LIMIT 21`)),
   ]);
   const snapshot = (rows.rows[0] ?? {}) as Record<string, unknown>;
-  const storedCandles = (stored.rows as Array<Record<string, unknown>>).map((row) => ({ volume: finiteOrNull(row.volume), tradingValue: finiteOrNull(row.tradingValue) ?? derivedTradingValue(row.close, row.volume) }));
+  const storedCandles = (stored.rows as Array<Record<string, unknown>>).map((row) => ({ volume: finiteOrNull(row.volume), tradingValue: finiteOrNull(row.tradingValue) ?? derivedTradingValue(row.close, row.volume) })).filter((row) => row.volume !== null && row.tradingValue !== null);
   const candles = storedCandles.length ? storedCandles.reverse() : data.candles.filter((c) => Number.isFinite(c.volume) && c.volume >= 0).slice(-21);
   const previous = candles.slice(0, -1);
   const latest = candles.at(-1);
   const averageVolume20 = meanOrNull(previous.map((c) => c.volume));
   const averageTradingValue20 = meanOrNull(previous.map((c) => c.tradingValue));
   const fetchedAt = snapshot.fetchedAt ? new Date(String(snapshot.fetchedAt)).toISOString() : null;
-  const stale = fetchedAt ? Date.now() - new Date(fetchedAt).getTime() > 48 * 60 * 60 * 1000 : false;
-  const marketCap = Number.isFinite(Number(snapshot.marketCap)) ? Number(snapshot.marketCap) : null;
-  const latestTradingValue = latest?.tradingValue ?? finiteOrNull(snapshot.tradingValue);
+  const snapshotFresh = isChartSnapshotFresh(snapshot, market);
+  const snapshotHasValues = hasChartSnapshotValues(snapshot);
+  const marketCap = snapshotFresh ? finiteOrNull(snapshot.marketCap) : null;
+  const latestTradingValue = latest?.tradingValue ?? (snapshotFresh ? finiteOrNull(snapshot.tradingValue) : null);
   const latestVolume = latest?.volume ?? null;
   const hasData = marketCap !== null || latestTradingValue !== null || latestVolume !== null || averageVolume20 !== null;
-  return { marketCap, latestTradingValue, averageTradingValue20, latestVolume, averageVolume20, rvol: averageVolume20 && latestVolume ? latestVolume / averageVolume20 : null, currency: String(snapshot.currency ?? (market === "US" ? "USD" : "KRW")), observedAt: snapshot.observedAt ? new Date(String(snapshot.observedAt)).toISOString() : null, fetchedAt, source: snapshot.source ? String(snapshot.source) : null, status: !hasData ? "UNKNOWN" : stale ? "STALE" : "AVAILABLE" };
+  return { marketCap, latestTradingValue, averageTradingValue20, latestVolume, averageVolume20, rvol: averageVolume20 && latestVolume ? latestVolume / averageVolume20 : null, currency: market === "KR" ? "KRW" : String(snapshot.currency ?? "USD"), observedAt: snapshot.observedAt ? new Date(String(snapshot.observedAt)).toISOString() : null, fetchedAt, source: snapshot.source ? String(snapshot.source) : null, status: snapshotHasValues && !snapshotFresh ? "STALE" : !hasData ? "UNKNOWN" : "AVAILABLE" };
 }
 
 function meanOrNull(values: Array<number | null | undefined>) {
@@ -227,24 +256,40 @@ async function loadFundamentalsSnapshot(rawCode: string | null, market: string, 
   const table = market === "US" ? "us_instrument_universe_candles" : "kr_instrument_universe_candles";
   const tradingValueColumn = market === "US" ? `trading_value AS "tradingValue"` : `NULL AS "tradingValue"`;
   const usExchange = market === "US" && ["NAS", "NYS", "AMS"].includes(exchange ?? "") ? exchange : null;
+  const krExchange = market === "KR" && ["KOSPI", "KOSDAQ"].includes(exchange ?? "") ? exchange : null;
+  const snapshotExchange = usExchange ?? krExchange;
   const [rows, stored] = await Promise.all([
-    usExchange
-      ? db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE market = ${usExchange} AND code = ${code} ORDER BY fetched_at DESC LIMIT 1`)
+    snapshotExchange
+      ? db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE market = ${snapshotExchange} AND code = ${code} ORDER BY fetched_at DESC LIMIT 1`)
       : db.execute(sql`SELECT market_cap AS "marketCap", trading_value AS "tradingValue", volume, currency, observed_at AS "observedAt", fetched_at AS "fetchedAt", source FROM instrument_fundamental_snapshots WHERE code = ${code} ORDER BY fetched_at DESC LIMIT 1`),
-    db.execute(sql.raw(`SELECT ${tradingValueColumn}, close, volume FROM ${table} WHERE code = '${code.replace(/'/g, "''")}' AND timeframe = '${timeframe}' ${usExchange ? `AND market = '${usExchange}'` : ""} AND close IS NOT NULL ORDER BY candle_date DESC LIMIT 21`)),
+    db.execute(sql.raw(`SELECT ${tradingValueColumn}, c.close, c.volume FROM ${table} c WHERE c.code = '${code.replace(/'/g, "''")}' AND c.timeframe = '${timeframe}' ${snapshotExchange ? `AND c.market = '${snapshotExchange}'` : ""} AND ${validDailyCandleSql("c")} ORDER BY c.candle_date DESC LIMIT 21`)),
   ]);
   const snapshot = (rows.rows[0] ?? {}) as Record<string, unknown>;
-  const candles = (stored.rows as Array<Record<string, unknown>>).map((row) => ({ tradingValue: finiteOrNull(row.tradingValue) ?? derivedTradingValue(row.close, row.volume), volume: finiteOrNull(row.volume) })).reverse();
+  const candles = (stored.rows as Array<Record<string, unknown>>).map((row) => ({ tradingValue: finiteOrNull(row.tradingValue) ?? derivedTradingValue(row.close, row.volume), volume: finiteOrNull(row.volume) })).filter((row) => row.volume !== null && row.tradingValue !== null).reverse();
   const latest = candles.at(-1);
   const previous = candles.slice(0, -1);
   const averageVolume20 = meanOrNull(previous.map((row) => row.volume));
   const averageTradingValue20 = meanOrNull(previous.map((row) => row.tradingValue));
   const fetchedAt = snapshot.fetchedAt ? new Date(String(snapshot.fetchedAt)).toISOString() : null;
-  const marketCap = finiteOrNull(snapshot.marketCap);
-  const latestTradingValue = latest?.tradingValue ?? finiteOrNull(snapshot.tradingValue);
-  const latestVolume = latest?.volume ?? finiteOrNull(snapshot.volume);
+  const snapshotFresh = isChartSnapshotFresh(snapshot, market);
+  const snapshotHasValues = hasChartSnapshotValues(snapshot);
+  const marketCap = snapshotFresh ? finiteOrNull(snapshot.marketCap) : null;
+  const latestTradingValue = latest?.tradingValue ?? (snapshotFresh ? finiteOrNull(snapshot.tradingValue) : null);
+  const latestVolume = latest?.volume ?? (snapshotFresh ? finiteOrNull(snapshot.volume) : null);
   const hasData = marketCap !== null || latestTradingValue !== null || latestVolume !== null || averageVolume20 !== null;
-  return { marketCap, latestTradingValue, averageTradingValue20, latestVolume, averageVolume20, rvol: averageVolume20 && latestVolume ? latestVolume / averageVolume20 : null, currency: String(snapshot.currency ?? (market === "US" ? "USD" : "KRW")), observedAt: snapshot.observedAt ? new Date(String(snapshot.observedAt)).toISOString() : null, fetchedAt, source: snapshot.source ? String(snapshot.source) : null, status: fetchedAt && Date.now() - new Date(fetchedAt).getTime() > 48 * 60 * 60 * 1000 ? "STALE" : hasData ? "AVAILABLE" : "UNKNOWN" };
+  return { marketCap, latestTradingValue, averageTradingValue20, latestVolume, averageVolume20, rvol: averageVolume20 && latestVolume ? latestVolume / averageVolume20 : null, currency: market === "KR" ? "KRW" : String(snapshot.currency ?? "USD"), observedAt: snapshot.observedAt ? new Date(String(snapshot.observedAt)).toISOString() : null, fetchedAt, source: snapshot.source ? String(snapshot.source) : null, status: snapshotHasValues && !snapshotFresh ? "STALE" : !hasData ? "UNKNOWN" : "AVAILABLE" };
+}
+
+function isChartSnapshotFresh(snapshot: Record<string, unknown>, market: string): boolean {
+  if (market === "KR" && snapshot.currency !== "KRW") return false;
+  const fetchedAt = snapshot.fetchedAt == null ? NaN : new Date(String(snapshot.fetchedAt)).getTime();
+  const ageMs = Date.now() - fetchedAt;
+  const maxAgeMs = (market === "KR" ? KR_MARKET_CAP_MAX_AGE_HOURS : 48) * 60 * 60 * 1000;
+  return Number.isFinite(fetchedAt) && ageMs >= 0 && ageMs <= maxAgeMs;
+}
+
+function hasChartSnapshotValues(snapshot: Record<string, unknown>): boolean {
+  return [snapshot.marketCap, snapshot.tradingValue, snapshot.volume].some((value) => value !== null && value !== undefined);
 }
 
 async function fetchUsChartData(rawCode: string, timeframe: "D" | "W" | "M", requestedExchange: string): Promise<ChartData | null> {

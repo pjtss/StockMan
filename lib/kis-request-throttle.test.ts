@@ -16,8 +16,17 @@ describe("KIS failure classification", () => {
     expect(classifyKisFailure({ response: { status: 200 }, parsed: { rt_cd: "1", msg_cd: "EGW99999", msg1: "business error" } })).toBe("PERMANENT");
   });
 
+  it("classifies a JSON response without an explicit KIS success code as a protocol error", () => {
+    expect(classifyKisFailure({ response: { status: 200 }, rawText: '{"output":[]}', parsed: { output: [] } })).toBe("PERMANENT");
+    expect(classifyKisFailure({ response: { status: 200 }, rawText: '{"rt_cd":"0"}', parsed: { rt_cd: 0 } })).toBeNull();
+  });
+
   it("classifies a non-JSON response as a permanent protocol error", () => {
     expect(classifyKisFailure({ response: { status: 200 }, rawText: "<!doctype html>", parsed: null })).toBe("PERMANENT");
+  });
+
+  it("classifies an empty HTTP 200 body as a permanent protocol error", () => {
+    expect(classifyKisFailure({ response: { status: 200 }, rawText: "", parsed: null })).toBe("PERMANENT");
   });
 });
 

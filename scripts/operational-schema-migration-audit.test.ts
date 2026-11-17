@@ -42,13 +42,13 @@ describe("operational schema migration audit", () => {
     expect(findMissingOperationalRelations(schema, [{ fileName: "V1__fixture.sql", contents: 'CREATE TABLE IF NOT EXISTS public."quoted_fixture" (id BIGINT);' }])).toEqual([]);
   });
 
-  it("detects a table dropped by a later migration unless replaced by a view", () => {
+  it("detects a required table dropped or replaced by a view", () => {
     const schema = 'export const OPERATIONAL_SCHEMA_TABLES = ["compat_fixture", "retired_fixture"] as const;';
     const fixtureMigrations = [
       { fileName: "V1__create.sql", contents: "CREATE TABLE compat_fixture (id BIGINT); CREATE TABLE retired_fixture (id BIGINT);" },
       { fileName: "V2__replace.sql", contents: "DROP TABLE compat_fixture; CREATE VIEW compat_fixture AS SELECT 1 AS id; DROP TABLE retired_fixture;" },
     ];
-    expect(findMissingOperationalRelations(schema, fixtureMigrations)).toEqual(["retired_fixture"]);
+    expect(findMissingOperationalRelations(schema, fixtureMigrations)).toEqual(["compat_fixture", "retired_fixture"]);
   });
 
   it("tracks a table rename as removal of the old name and creation of the new name", () => {

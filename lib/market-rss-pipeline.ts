@@ -11,7 +11,7 @@ import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { buildMarketRssQueueEnqueueFailureState, createDiscordHttpError, isRetryableDiscordError, marketRssDeliveryExternalId, withDiscordWaitParameter } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import { dedupeMarketRssItems } from "./market-rss-dedupe";
-import { buildMarketRssTranslationCandidateCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
+import { buildMarketRssTranslationRetryCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
 import { buildMarketRssTranslationPersistence } from "./market-rss-translation-persistence";
 import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notification-message";
 import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";
@@ -81,13 +81,14 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
     try { secTickerMap = new Map((await resolvePreferredSecCompanyTickers(secCiks)).map((row) => [row.cik, row.ticker])); } catch { secTickerMap = new Map(); }
   }
   let inserted = 0;
-  const duplicateCounts = new Map<string, number>();
+  const sourceIngestResults = new Map<string, { rawItemCount: number; duplicateCount: number; deduplicatedItemCount: number; upsertAffectedRowCount: number; snapshotStored: boolean }>();
   const ingestOutcomes = new Map<string, { ok: true } | { ok: false; error: ReturnType<typeof import("./error-diagnostics").describeError> }>();
   for (const result of allResults) {
     if (!result.ok) continue;
     if ("skipped" in result && result.skipped) continue;
     const outcome = await runMarketRssIngestSource(result.source, async () => {
       const sourceSnapshotId = await archiveMarketRssFeed(result.feed);
+      if (!sourceSnapshotId) throw new Error("RSS source snapshot was not persisted");
       const { items, duplicateCount } = dedupeMarketRssItems(result.feed.items);
       const values = items.map((item) => {
         const classification = classifyMarketRssItem(item);
@@ -117,7 +118,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
           isBacklog,
         };
       });
-      if (values.length === 0) return { duplicateCount, inserted: 0 };
+      if (values.length === 0) return { duplicateCount, deduplicatedItemCount: 0, upsertAffectedRowCount: 0 };
       const rows = await db.insert(marketRssArticles).values(values).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
         title: sql`excluded.title`, summary: sql`excluded.summary`, normalizedSummary: sql`excluded.normalized_summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         ...buildMarketRssTranslationUpsertReset(),
@@ -130,15 +131,21 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         // because the article is now older than RSS_MAX_ARTICLE_AGE_MINUTES.
         isBacklog: sql`CASE WHEN ${marketRssArticles.notificationStatus} = 'PENDING' THEN excluded.is_backlog ELSE ${marketRssArticles.isBacklog} END`, updatedAt: new Date(),
       }}).returning({ id: marketRssArticles.id });
-      return { duplicateCount, inserted: rows.length };
+      return { duplicateCount, deduplicatedItemCount: values.length, upsertAffectedRowCount: rows.length };
     });
     if (!outcome.ok) {
       ingestOutcomes.set(result.source, { ok: false, error: outcome.error });
       continue;
     }
     ingestOutcomes.set(result.source, { ok: true });
-    duplicateCounts.set(result.source, outcome.value.duplicateCount);
-    inserted += outcome.value.inserted;
+    sourceIngestResults.set(result.source, {
+      rawItemCount: result.feed.items.length,
+      duplicateCount: outcome.value.duplicateCount,
+      deduplicatedItemCount: outcome.value.deduplicatedItemCount,
+      upsertAffectedRowCount: outcome.value.upsertAffectedRowCount,
+      snapshotStored: true,
+    });
+    inserted += outcome.value.upsertAffectedRowCount;
   }
   const sourceResults = allResults.map((item) => {
     const skipped = "skipped" in item && item.skipped;
@@ -149,6 +156,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       ok: item.ok && ingestOutcome?.ok !== false,
       skipped,
       ingestStatus,
+      fetchedAt: item.ok ? item.feed.fetchedAt : null,
       ...(!item.ok ? { ingestError: { errorCode: "RSS_FETCH_FAILED" } } : ingestOutcome?.ok === false ? { ingestError: {
         errorCode: ingestOutcome.error.errorCode,
         ...(ingestOutcome.error.databaseCode ? { databaseCode: ingestOutcome.error.databaseCode } : {}),
@@ -157,11 +165,15 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         ...(ingestOutcome.error.constraint ? { constraint: ingestOutcome.error.constraint } : {}),
       } } : {}),
       count: item.ok ? item.feed.items.length : 0,
-      duplicateCount: duplicateCounts.get(item.source) ?? 0,
+      duplicateCount: sourceIngestResults.get(item.source)?.duplicateCount ?? 0,
+      rawItemCount: item.ok ? item.feed.items.length : 0,
+      deduplicatedItemCount: sourceIngestResults.get(item.source)?.deduplicatedItemCount ?? 0,
+      upsertAffectedRowCount: sourceIngestResults.get(item.source)?.upsertAffectedRowCount ?? 0,
+      snapshotStored: sourceIngestResults.get(item.source)?.snapshotStored ?? false,
     };
   });
   const ingestFailureCount = sourceResults.filter((item) => item.ingestStatus === "FETCH_FAILED" || item.ingestStatus === "PERSIST_FAILED").length;
-  return { fetchedAt: fetched.fetchedAt, sourceResults, ingestFailureCount, inserted };
+  return { fetchedAt: fetched.fetchedAt, sourceResults, ingestFailureCount, inserted, insertedSemantics: "LEGACY_UPSERT_AFFECTED_ROW_COUNT" as const };
 }
 
 export async function translatePendingMarketRssArticles(limit = 10) {
@@ -305,6 +317,7 @@ export async function notifyPendingMarketRssArticles(limit = 10) {
   const rows = interleaveMarketRssSourceQueues(sourceQueues, limit);
   let sent = 0;
   let queueEnqueueFailed = 0;
+  let filteredOut = 0;
   for (const row of rows) {
     if (row.source === "SEC_EDGAR" && !isSecRssDiscordItemAllowed({ title: row.title, raw: row.rawPayload || undefined }, { allowLegacyTitleFallback: true })) {
       await db.update(marketRssArticles).set({ notificationStatus: "SKIPPED", lastError: "sec_form_type_not_allowed", updatedAt: new Date() }).where(and(eq(marketRssArticles.id, row.id), eq(marketRssArticles.notificationStatus, "PENDING")));

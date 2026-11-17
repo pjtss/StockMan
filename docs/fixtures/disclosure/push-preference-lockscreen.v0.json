@@ -1,0 +1,22 @@
+{
+  "contractVersion": "push-preference-lockscreen.v0",
+  "classification": "SYNTHETIC_PRODUCT_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": { "containsRealUser": false, "containsRealFiling": false, "containsRealIssuerOrTicker": false, "containsCredentials": false, "identitiesAreSynthetic": true },
+  "preferenceScopes": ["OS_PERMISSION", "DEVICE_MASTER", "DEVICE_SOURCE", "EVENT_SUBSCRIPTION", "LOCKSCREEN_PREVIEW"],
+  "requiredPreferenceFields": ["deviceIdentity", "masterEnabled", "enabledSources", "previewMode", "preferenceRevision", "updatedAt"],
+  "vectors": [
+    { "id": "NPL-01-MASTER-OFF-PRESERVES-INDIVIDUAL-SOURCE-CHOICES", "input": { "masterEnabled": true, "sourceChoices": { "DART": true, "INTENSITY": false, "RISING": true }, "action": "MASTER_OFF" }, "expected": { "masterEnabled": false, "sourceChoices": { "DART": true, "INTENSITY": false, "RISING": true }, "sourceChoicesMutated": false } },
+    { "id": "NPL-02-MASTER-ON-RESUMES-ONLY-EXPLICITLY-ENABLED-SOURCES", "input": { "masterEnabled": false, "sourceChoices": { "DART": true, "INTENSITY": false, "RISING": true }, "action": "MASTER_ON" }, "expected": { "effectiveSources": ["DART", "RISING"], "allSourcesForcedOn": false } },
+    { "id": "NPL-03-FIRST-SOURCE-OPT-IN-DOES-NOT-ENABLE-OTHER-SOURCES", "input": { "subscriptionExists": false, "selectedSource": "DART", "osPermission": "GRANTED" }, "expected": { "enabledSources": ["DART"], "otherSourcesEnabled": false, "consentInferredFromPermission": false } },
+    { "id": "NPL-04-OS-PERMISSION-AND-APP-PREFERENCES-ARE-INDEPENDENT", "input": { "osPermission": "GRANTED", "masterEnabled": false, "sourceEnabled": false }, "expected": { "deliveryAllowed": false, "permissionImpliesPreference": false } },
+    { "id": "NPL-05-PREFERENCE-UI-IDENTIFIES-CURRENT-DEVICE-SCOPE", "input": { "storedPreferenceScope": "ENDPOINT", "uiLabel": "계정 전체 알림" }, "expected": { "uiLabel": "이 기기 알림 설정", "accountWideClaim": false } },
+    { "id": "NPL-06-GENERAL-DART-PREFERENCE-IS-NOT-EVENT-SUBSCRIPTION", "input": { "dartEnabled": true, "eventSubscription": false, "eventTransitionDue": true }, "expected": { "generalDartFeedAllowed": true, "eventPushAllowed": false } },
+    { "id": "NPL-07-GENERIC-LOCKSCREEN-PREVIEW-OMITS-FILING-AND-INVESTMENT-DETAILS", "input": { "previewMode": "GENERIC", "company": "SYNTH-COMPANY", "filingTitle": "SYNTH-FILING-TITLE", "keyword": "SYNTH-KEYWORD", "investmentGrade": "SYNTH-GRADE" }, "expected": { "visibleTitleContainsCompany": false, "visibleBodyContainsFilingTitle": false, "visibleBodyContainsKeyword": false, "visibleBodyContainsGrade": false } },
+    { "id": "NPL-08-DETAILED-LOCKSCREEN-PREVIEW-REQUIRES-EXPLICIT-DEVICE-CHOICE", "input": { "previewMode": "GENERIC", "detailedPreviewOptIn": false }, "expected": { "companyVisible": false, "filingDetailsVisible": false, "defaultMode": "GENERIC" } },
+    { "id": "NPL-09-PREVIEW-CHANGE-IS-REVALIDATED-BEFORE-QUEUED-DISPATCH", "input": { "queuedPreviewMode": "DETAILED", "currentPreviewMode": "GENERIC", "payloadAlreadyRendered": true }, "expected": { "oldDetailedPayloadDispatch": false, "payloadRebuiltOrSuppressed": true } },
+    { "id": "NPL-10-TEST-PUSH-IS-AUTHORIZED-AND-CURRENT-DEVICE-ONLY", "input": { "routeAppAuthorization": "MISSING", "subscriptionsLoaded": "ALL_ENDPOINTS", "uiAction": "TEST_PUSH" }, "expected": { "dispatch": false, "requiredAuthorization": "OWNER_OR_ADMIN", "targetScope": "CURRENT_DEVICE_ONLY", "broadcastToOthers": false } },
+    { "id": "NPL-11-TEST-MESSAGE-CANNOT-MIMIC-A-REAL-POSITIVE-DART-ALERT", "input": { "testPush": true, "grade": "최강호재", "realCompanyName": "SYNTH-COMPANY", "filingTitle": "SYNTH-FILING" }, "expected": { "messageClearlyMarkedTest": true, "realIssuerUsed": false, "positiveInvestmentSignalImplied": false } },
+    { "id": "NPL-12-PERMISSION-REGRANT-DOES-NOT-RESTORE-APP-SOURCE-CONSENT", "input": { "osPermissionBefore": "DENIED", "osPermissionAfter": "GRANTED", "masterEnabled": false, "enabledSources": [] }, "expected": { "masterEnabled": false, "enabledSources": [], "deliveryAllowed": false } },
+    { "id": "NPL-13-SETTINGS-CATEGORIES-MUST-MATCH-AUDITED-PRODUCER-CALL-SITES", "input": { "uiPromises": ["DART", "INTENSITY", "TOP_RISING"], "productionSendPushAlertsCallSites": ["DART_AUTOMATION"], "testCallSite": "TEST_PUSH" }, "expected": { "verifiedProductionSources": ["DART"], "scannerDeliveryClaimVerified": false, "labelRequiresProducerInventory": true } }
+  ]
+}

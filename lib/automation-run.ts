@@ -4,6 +4,7 @@ import { describeError } from "@/lib/error-diagnostics";
 import { readRequestTrace } from "@/lib/request-trace";
 import { notifyAutomationCompletion } from "@/lib/automation-completion-discord";
 import { getAutomationRunResultStatus } from "@/lib/automation-run-result-status";
+import { withAutomationLock } from "@/lib/automation-lock";
 
 const SUMMARY_MAX_DEPTH = 4;
 const SUMMARY_MAX_STRING_LENGTH = 2_000;
@@ -12,9 +13,14 @@ const SUMMARY_MAX_ARRAY_SAMPLE = 3;
 /** Keep automation_runs useful for diagnosis without persisting full scanner payloads. */
 export function compactAutomationSummary(value: unknown, depth = 0, key = ""): unknown {
   if (value == null || typeof value === "number" || typeof value === "boolean") return value;
-  if (typeof value === "string") return value.length > SUMMARY_MAX_STRING_LENGTH ? `${value.slice(0, SUMMARY_MAX_STRING_LENGTH)}…` : value;
+  if (typeof value === "string") return truncateSummaryString(value);
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "Invalid Date" : value.toISOString();
+  if (value instanceof Error) return { name: truncateSummaryString(value.name), message: truncateSummaryString(value.message) };
   if (depth >= SUMMARY_MAX_DEPTH) return "[depth-limited]";
   if (Array.isArray(value)) {
+    // RSS has a small, fixed source set. Preserve every source outcome so the
+    // disclosure coverage reader can distinguish sources beyond the sample.
+    if (key === "sourceResults") return value.map((item) => compactAutomationSummary(item, depth + 1));
     // Per-market totals are a small bounded set and are required to diagnose
     // partial fundamentals refreshes; do not collapse them to a sample.
     if (key === "markets") return value.map((item) => compactAutomationSummary(item, depth + 1));
@@ -44,31 +50,14 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
     // A worker can finish its loop while individual instruments failed. Persist
     // the same outcome that is sent to the completion notification so schedules
     // can distinguish a complete daily refresh from a partial/failed attempt.
-    const count = (value: unknown) => {
-      if (value == null) return { value: 0, valid: true };
-      if (typeof value === "string" && value.trim() === "") return { value: 0, valid: false };
-      const parsed = Number(value);
-      const valid = Number.isSafeInteger(parsed) && parsed >= 0;
-      return { value: valid ? parsed : 0, valid };
-    };
-    const failure = count(summary.failureCount);
-    const instrument = count(summary.instrumentCount);
-    const unattempted = count(summary.unattemptedCount);
-    const failureCount = failure.value;
-    const instrumentCount = instrument.value;
-    const unattemptedCount = unattempted.value;
-    const incomplete = summary.ok === false || failureCount > 0 || unattemptedCount > 0 || !failure.valid || !instrument.valid || !unattempted.valid;
-    const runStatus = summary.skipped === true
-      ? "SKIPPED"
-      : !incomplete
-        ? "SUCCESS"
-        : instrumentCount > 0 && failureCount + unattemptedCount >= instrumentCount
-          ? "FAILED"
-          : "PARTIAL";
+    const runStatus = summary.skipped === true ? "SKIPPED" : getAutomationRunResultStatus(summary).runStatus;
+    const failureCount = typeof summary.failureCount === "number" && Number.isFinite(summary.failureCount) && summary.failureCount > 0
+      ? summary.failureCount
+      : null;
     try {
       summary.notifications = runStatus === "SKIPPED"
         ? { completion: { sent: false, skipped: true, reason: "already_running" } }
-        : { completion: await notifyAutomationCompletion(moduleKey, runStatus, summary, runStatus === "FAILED" ? `${summary.failureCount}개 종목 처리 실패` : undefined) };
+        : { completion: await notifyAutomationCompletion(moduleKey, runStatus, summary, runStatus === "FAILED" && failureCount != null ? `${failureCount}개 종목 처리 실패` : undefined) };
     } catch (error) {
       summary.notifications = { completion: { sent: false, skipped: false, reason: "delivery_failed", error: error instanceof Error ? error.message : String(error) } };
       console.warn(`[Automation] completion notification failed for ${moduleKey}:`, error instanceof Error ? error.message : error);
@@ -87,4 +76,17 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
     await finishSafely("FAILED", summary, diagnostics.message);
     throw error;
   }
+}
+
+/** Serialize same-module executions across processes before creating a run row. */
+export async function withExclusiveAutomationRun<T>(moduleKey: FeatureModuleKey, task: () => Promise<T>, dimensions: AutomationRunDimensions = {}) {
+  const lockKey = `automation-run:${moduleKey}`;
+  const locked = await withAutomationLock(lockKey, async () => ({
+    result: await withAutomationRun(moduleKey, task, dimensions),
+  }));
+  if (locked === null) {
+    await recordSkippedAutomationRun(moduleKey, "already_running", { lockKey });
+    return { acquired: false as const };
+  }
+  return { acquired: true as const, result: locked.result };
 }

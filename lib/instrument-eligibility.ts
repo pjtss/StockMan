@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { getDb } from "@/lib/db";
 
 /** 공식 KIS 종목 마스터 기준 공통 거래 대상 판정 모듈. */
 export function isEligibleKrCommonStock(row: { instrumentType?: unknown; tradingHaltCode?: unknown; liquidationCode?: unknown; managedIssueCode?: unknown; isSuspended?: unknown }) {
@@ -43,6 +44,17 @@ export async function queryEligibleUniverse(db: { execute: (query: any) => Promi
       throw new Error(`Universe schema/query unavailable (${market}); official query failed and compatibility query failed: ${detail}`);
     }
   }
+}
+
+/** Filters provider candidates by the official active COMMON_STOCK master; query errors propagate for fail-closed callers. */
+export async function filterActiveKrCommonStockRows<T>(rows: T[], codeOf: (row: T) => unknown = (row) => (row as any)?.code) {
+  if (rows.length === 0) return [] as T[];
+  const universe = await queryEligibleUniverse(getDb(), "KR");
+  const eligible = new Set(universe.rows.map((row: { code: unknown }) => String(row.code).trim()));
+  return rows.filter((row) => {
+    const code = String(codeOf(row) ?? "").trim();
+    return code !== "" && eligible.has(code);
+  });
 }
 
 export const eligibilityPolicy = {

@@ -1,0 +1,593 @@
+{
+  "contractVersion": "source-attribution-projection.v0",
+  "classification": "SYNTHETIC_ACCEPTANCE_DESIGN_NOT_LICENSE_DECISION_OR_RUNTIME_PROOF",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredential": false,
+    "rightsDecisionsAreUnapproved": true
+  },
+  "creditStates": [
+    "CREDIT_REQUIRED",
+    "CREDIT_NOT_REQUIRED",
+    "CREDIT_POLICY_UNRESOLVED",
+    "CREDIT_WITHHELD"
+  ],
+  "requiredProjectionFields": [
+    "claimRevisionId",
+    "evidenceRevisionId",
+    "sourceProduct",
+    "sourceClass",
+    "endpointOrSurface",
+    "sourceLocator",
+    "rightsDecisionId",
+    "rightsDecisionRevision",
+    "attributionPolicyEvidenceId",
+    "attributionPolicyRevision",
+    "displaySurface",
+    "publicationEpoch",
+    "creditState"
+  ],
+  "deliveryAttemptFields": [
+    "candidateId",
+    "targetIdentityHash",
+    "targetIdentityKeyId",
+    "attemptNumber",
+    "creditState",
+    "payloadHash",
+    "creditManifestHash",
+    "creditComponents",
+    "rendererRevision",
+    "locale",
+    "notificationRevision",
+    "rightsDecisionRevision",
+    "attributionPolicyRevision",
+    "publicationEpoch",
+    "providerOutcome",
+    "deviceDeliveryObservation"
+  ],
+  "targetIdentityHashContractRef": "DELIVERY-TARGET-HASH-v1",
+  "creditComponentFields": [
+    "deliveryOrder",
+    "sourceAttributionProjectionId",
+    "claimRevisionId",
+    "evidenceRevisionId",
+    "rightsDecisionRevision",
+    "attributionPolicyRevision",
+    "creditTextHash"
+  ],
+  "creditManifestGoldenVector": {
+    "domainSeparator": "KR-DISCLOSURE-CREDIT-MANIFEST-v1",
+    "canonicalization": "RFC8785-JCS",
+    "components": [
+      {
+        "deliveryOrder": 0,
+        "sourceAttributionProjectionId": "SAP-SYN-A",
+        "claimRevisionId": "CLAIM-SYN-A1",
+        "evidenceRevisionId": "EVIDENCE-SYN-A2",
+        "rightsDecisionRevision": "RIGHTS-SYN-A4",
+        "attributionPolicyRevision": "POLICY-SYN-A2",
+        "creditTextHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "deliveryOrder": 1,
+        "sourceAttributionProjectionId": "SAP-SYN-B",
+        "claimRevisionId": "CLAIM-SYN-B1",
+        "evidenceRevisionId": "EVIDENCE-SYN-B3",
+        "rightsDecisionRevision": "RIGHTS-SYN-B2",
+        "attributionPolicyRevision": "POLICY-SYN-B1",
+        "creditTextHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "expectedHash": "sha256:2bdd7370e26858224d11ae2570fe143f06b3ad6733fdc3c471eadcba0ebd6699"
+  },
+  "cases": [
+    {
+      "id": "SAP-01-REQUIRED-CREDIT-TRAVELS-WITH-CLAIM",
+      "input": {
+        "claimCount": 1,
+        "sourceCount": 1,
+        "creditState": "CREDIT_REQUIRED",
+        "creditTextAvailable": true,
+        "surfaceAllowed": true
+      },
+      "expected": {
+        "claimDisplay": "ALLOWED_WITH_LINKED_CREDIT",
+        "creditBoundToClaimRevision": true
+      }
+    },
+    {
+      "id": "SAP-02-MULTIPLE-SOURCES-KEEP-SEPARATE-CREDITS",
+      "input": {
+        "claimCount": 2,
+        "sourceProducts": [
+          "SYNTH-PRODUCT-A",
+          "SYNTH-PRODUCT-B"
+        ],
+        "policyRevisions": [
+          "POLICY-A1",
+          "POLICY-B4"
+        ]
+      },
+      "expected": {
+        "creditCount": 2,
+        "singleInheritedLicenseBadge": false,
+        "lineagePerClaim": true
+      }
+    },
+    {
+      "id": "SAP-03-UNRESOLVED-CREDIT-WITHHOLDS-DERIVATIVE",
+      "input": {
+        "claimCount": 1,
+        "creditState": "CREDIT_POLICY_UNRESOLVED",
+        "summaryDependsOnClaim": true
+      },
+      "expected": {
+        "claimDisplay": "WITHHELD",
+        "summaryDisplay": "WITHHELD",
+        "sourceStatusFallbackRequiresSeparateDecision": true
+      }
+    },
+    {
+      "id": "SAP-04-ATTRIBUTION-DOES-NOT-GRANT-REDISTRIBUTION",
+      "input": {
+        "creditState": "CREDIT_REQUIRED",
+        "attributionProvided": true,
+        "distributionRight": "UNRESOLVED"
+      },
+      "expected": {
+        "distribution": "BLOCKED",
+        "creditIsPermission": false
+      }
+    },
+    {
+      "id": "SAP-05-NOTIFICATION-USES-SURFACE-SPECIFIC-CREDIT",
+      "input": {
+        "displaySurface": "PUSH",
+        "pushCreditDecision": "ALLOW_WITH_CONTROLS",
+        "detailCreditDecision": "ALLOW",
+        "fullSourceBodyRequested": true
+      },
+      "expected": {
+        "payload": "MINIMAL_APPROVED_CREDIT_AND_SAFE_LINK",
+        "fullSourceBodyIncluded": false,
+        "detailDecisionInherited": false
+      }
+    },
+    {
+      "id": "SAP-06-API-EXPORT-CANNOT-STRIP-REQUIRED-CREDIT",
+      "input": {
+        "displaySurface": "PUBLIC_API",
+        "creditState": "CREDIT_REQUIRED",
+        "serializerHasCreditField": false
+      },
+      "expected": {
+        "response": "BLOCKED",
+        "dataOnlyFallback": false
+      }
+    },
+    {
+      "id": "SAP-07-CORRECTION-PINS-NEW-EVIDENCE-CREDIT-REVISION",
+      "input": {
+        "priorEvidenceRevision": "EVIDENCE-1",
+        "currentEvidenceRevision": "EVIDENCE-2",
+        "priorCreditPolicyRevision": "POLICY-1"
+      },
+      "expected": {
+        "priorProjection": "HISTORICAL_IMMUTABLE",
+        "currentProjection": "RECOMPUTE_AND_REVIEW",
+        "oldCreditAutoInherited": false
+      }
+    },
+    {
+      "id": "SAP-08-CATALOG-LICENSE-DOES-NOT-CROSS-SOURCE-CLASS",
+      "input": {
+        "catalogLicenseSourceClass": "LIST_METADATA",
+        "targetSourceClass": "OFFICIAL_DOCUMENT_BODY",
+        "targetLicenseEvidence": null
+      },
+      "expected": {
+        "targetRights": "UNRESOLVED",
+        "targetCredit": "CREDIT_POLICY_UNRESOLVED",
+        "inheritance": false
+      }
+    },
+    {
+      "id": "SAP-09-REQUIRED-CREDIT-IS-NEVER-TRUNCATED-TO-FIT",
+      "input": {
+        "displaySurface": "PUSH",
+        "requiredCreditFits": false,
+        "approvedShortCredit": false,
+        "approvedCreditPreservingLink": false
+      },
+      "expected": {
+        "payload": "SUPPRESSED",
+        "contentWithoutCredit": false,
+        "truncateRequiredCredit": false
+      }
+    },
+    {
+      "id": "SAP-10-PROVIDER-ACCEPTANCE-IS-NOT-DEVICE-DELIVERY",
+      "input": {
+        "providerOutcome": "ACCEPTED",
+        "deviceDeliveryObservation": "UNOBSERVED",
+        "payloadCreditIds": [
+          "CREDIT-SYNTH-1"
+        ]
+      },
+      "expected": {
+        "providerState": "PROVIDER_ACCEPTED",
+        "deviceState": "DEVICE_DELIVERY_UNOBSERVED",
+        "creditDeliveredClaim": false
+      }
+    },
+    {
+      "id": "SAP-11-ATTEMPT-PRESERVES-EXACT-CREDIT-PROJECTION-HASH",
+      "input": {
+        "creditComponents": [
+          {
+            "deliveryOrder": 0,
+            "sourceAttributionProjectionId": "CREDIT-SYNTH-1",
+            "claimRevisionId": "CLAIM-SYNTH-1",
+            "evidenceRevisionId": "EVIDENCE-SYNTH-2",
+            "rightsDecisionRevision": "RIGHTS-SYNTH-3",
+            "attributionPolicyRevision": "POLICY-SYNTH-4",
+            "creditTextHash": "sha256:SYNTH-CREDIT-HASH"
+          }
+        ],
+        "payloadHash": "sha256:SYNTH-PAYLOAD-HASH"
+      },
+      "expected": {
+        "attemptStoresPairedCreditComponents": true,
+        "manifestArrayOrderAffectsHash": true,
+        "receiptAttributionReconstructable": true
+      }
+    },
+    {
+      "id": "SAP-12-POLICY-REVISION-FENCES-STALE-RETRY",
+      "input": {
+        "queuedPolicyRevision": "POLICY-1",
+        "currentPolicyRevision": "POLICY-2",
+        "providerOutcome": "ATTEMPTED_UNKNOWN"
+      },
+      "expected": {
+        "oldPayloadRetry": "SUPPRESSED_UNTIL_REBUILD",
+        "newRightsCheckRequired": true,
+        "blindDuplicateRetry": false
+      }
+    },
+    {
+      "id": "SAP-13-CORRECTION-RECONCILES-CREDIT-IMPACT-PER-CHANNEL",
+      "input": {
+        "recipientCount": 2,
+        "channelCount": 2,
+        "creditPolicyChanged": true,
+        "impactLedgerComplete": false
+      },
+      "expected": {
+        "expectedRecipientChannelCount": 4,
+        "correctionState": "DELIVERY_SCOPE_UNRESOLVED",
+        "reconciled": false
+      }
+    },
+    {
+      "id": "SAP-14-CREDIT-TEXT-HASH-USES-EXACT-RENDERED-UTF8",
+      "input": {
+        "rawCreditText": "출처: 합성 자료",
+        "locale": "ko-KR",
+        "rendererRevision": "RENDERER-SYN-1",
+        "link": "https://example.invalid/synthetic"
+      },
+      "expected": {
+        "hashInputStage": "CANONICAL_AFTER_LOCALE_BEFORE_CHANNEL_ESCAPE",
+        "normalization": "NONE_PRESERVE_CODE_POINTS",
+        "linkIncludedInCreditTextHash": false,
+        "linkCoveredByPayloadHash": true
+      }
+    },
+    {
+      "id": "SAP-15-NFC-NFD-CREDIT-TEXTS-REMAIN-DISTINCT",
+      "input": {
+        "nfcText": "é",
+        "nfdText": "é"
+      },
+      "expected": {
+        "nfcNfdHashesEqual": false,
+        "implicitUnicodeNormalization": false
+      }
+    },
+    {
+      "id": "SAP-16-RENDERER-OR-LOCALE-CHANGE-REBUILDS-ATTEMPT",
+      "input": {
+        "priorRendererRevision": "RENDERER-1",
+        "currentRendererRevision": "RENDERER-2",
+        "priorLocale": "ko-KR",
+        "currentLocale": "en-US",
+        "priorPayloadHash": "sha256:PAYLOAD-1"
+      },
+      "expected": {
+        "priorPayloadReusable": false,
+        "newPayloadHashRequired": true,
+        "newRightsAndCreditCheckRequired": true
+      }
+    },
+    {
+      "id": "SAP-17-CHANNEL-ESCAPING-DOES-NOT-REWRITE-CANONICAL-CREDIT",
+      "input": {
+        "canonicalCredit": "출처: [합성](https://example.invalid)",
+        "channel": "DISCORD",
+        "rendererRevision": "DISCORD-SYN-1"
+      },
+      "expected": {
+        "creditTextHashInput": "CANONICAL_AFTER_LOCALE_BEFORE_CHANNEL_ESCAPE",
+        "escapedOutputHashDiffersPermitted": true,
+        "payloadHashCoversEscapedOutput": true
+      }
+    },
+    {
+      "id": "SAP-18-LINEBREAK-OR-CONTROL-CHARACTER-CHANGE-INVALIDATES-ATTEMPT",
+      "input": {
+        "creditText": "출처: 합성\n추가 줄",
+        "mutatedCreditText": "출처: 합성 추가 줄",
+        "containsControlInjection": true
+      },
+      "expected": {
+        "linebreakMutationChangesCreditTextHash": true,
+        "controlInjectionDisposition": "REJECT_OR_SANITIZE_WITH_NEW_RENDERER_OUTPUT",
+        "priorPayloadReusable": false
+      }
+    },
+    {
+      "id": "SAP-19-SAFE-LINK-CHANGE-CHANGES-PAYLOAD-NOT-CREDIT-TEXT-HASH",
+      "input": {
+        "creditText": "출처: 합성 자료",
+        "priorSafeUrl": "https://example.invalid/a",
+        "currentSafeUrl": "https://example.invalid/b"
+      },
+      "expected": {
+        "creditTextHashUnchanged": true,
+        "payloadHashChanged": true,
+        "priorPayloadReusable": false
+      }
+    },
+    {
+      "id": "SAP-20-CHANNEL-RENDERER-REVISION-IS-PINNED-PER-ATTEMPT",
+      "input": {
+        "priorRendererRevision": "DISCORD-1",
+        "currentRendererRevision": "DISCORD-2",
+        "canonicalCreditTextUnchanged": true
+      },
+      "expected": {
+        "priorAttemptImmutable": true,
+        "newPayloadHashRequired": true,
+        "receiptReferencesRendererRevision": true
+      }
+    }
+  ],
+  "creditTextHashContract": {
+    "domainSeparator": "KR-DISCLOSURE-CREDIT-TEXT-v1",
+    "input": "UTF8(exact locale-selected canonical credit text before any channel-specific escaping or markup)",
+    "canonicalization": "RFC8785-JCS",
+    "unicodeNormalization": "NONE_PRESERVE_CODE_POINTS",
+    "hashFormula": "SHA256(UTF8(domainSeparator) || 0x00 || UTF8(exactCanonicalCreditText))",
+    "linkTreatment": "credit text hash excludes URL; safe destination URL is a separate typed field in the credit component and is covered by payloadHash",
+    "rendererBinding": "rendererRevision and locale are pinned; escaped channel output is covered by payloadHash, and any renderer/locale change requires a rebuild",
+    "retryRule": "retry may reuse payload only when payloadHash, creditManifestHash, rendererRevision, locale, notificationRevision, rightsDecisionRevision and attributionPolicyRevision all match the current authorized attempt"
+  },
+  "creditTextHashGoldenVectors": [
+    {
+      "name": "KOREAN_PRECOMPOSED",
+      "text": "출처: 합성 자료",
+      "expectedHash": "sha256:9232b51a0e19ea70e6c98c9716d3141db16d4e2cdad1f83b83450bb01b9fa5c1"
+    },
+    {
+      "name": "LATIN_NFC_E_ACUTE",
+      "text": "é",
+      "expectedHash": "sha256:fe40ab7cbfa30a2e738a0d88b39f17143a8a7da0a5f00c90454cf30a46e25a9e"
+    },
+    {
+      "name": "LATIN_NFD_E_ACUTE",
+      "text": "é",
+      "expectedHash": "sha256:19a7344ad1f631bd813a8472cdf89b8be30ff02fb8e73685bce35b79e804fb2f"
+    }
+  ],
+  "channelSerializerContract": {
+    "contractStatus": "PROPOSED_NOT_CURRENT_DISCLOSURE_ATTRIBUTION_RUNTIME",
+    "canonicalCredit": {
+      "stage": "AFTER_LOCALE_SELECTION_BEFORE_CHANNEL_ESCAPING",
+      "hashDomain": "KR-DISCLOSURE-CREDIT-TEXT-v1",
+      "normalization": "NONE_PRESERVE_CODE_POINTS"
+    },
+    "renderers": [
+      {
+        "channel": "WEB_PUSH",
+        "output": "versioned logical payload DTO",
+        "escaping": "JSON serializer only; no application-level mutation of credit text",
+        "lineBreak": "preserve explicit line breaks",
+        "link": "typed safe URL field; credential-bearing URL rejected or removed by URL policy before payload construction"
+      },
+      {
+        "channel": "DISCORD",
+        "output": "Discord webhook content markdown",
+        "escaping": "Discord-specific escaping is a renderer transform; retain canonical credit text and renderer revision separately",
+        "lineBreak": "preserve approved line breaks; reject control-character injection",
+        "link": "typed safe URL encoded as link markup; do not rewrite canonical credit text"
+      },
+      {
+        "channel": "PUBLIC_API",
+        "output": "versioned JSON DTO",
+        "escaping": "JSON string encoding at transport; canonical logical value remains unchanged",
+        "lineBreak": "preserve explicit line breaks",
+        "link": "typed safe URL field; payloadHash covers final DTO"
+      }
+    ],
+    "transformationOrder": [
+      "rights_and_surface_decision",
+      "locale_selection",
+      "canonical_credit_text_hash",
+      "typed_safe_link_resolution",
+      "channel_rendering",
+      "logical_payload_hash",
+      "transport_encoding"
+    ],
+    "acceptancePrinciple": "channel escaped output must not replace canonical creditTextHash input; exact rendered logical payload DTO and rendererRevision are independently bound into payloadHash"
+  },
+  "referenceRendererVectors": [
+    {
+      "id": "RRV-01-DISCORD-MARKDOWN-METACHARACTERS",
+      "channel": "DISCORD",
+      "rendererRevision": "DISCORD-SYN-1",
+      "canonicalCreditText": "출처: [합성] (자료)",
+      "expectedRenderedContent": "출처: \\[합성\\] \\(자료\\)",
+      "expectedDisposition": "RENDER",
+      "payloadHashDomainSeparator": "KR-DISCLOSURE-CHANNEL-PAYLOAD-v1",
+      "expectedPayloadHash": "sha256:8a4e39bc88da2851e2303fc3b1c74949e71a53ee67c467d817d7d1a5cfb6fc14",
+      "canonicalPayload": {
+        "channel": "DISCORD",
+        "rendererRevision": "DISCORD-SYN-1",
+        "content": "출처: \\[합성\\] \\(자료\\)"
+      }
+    },
+    {
+      "id": "RRV-02-CONTROL-CHARACTER-REJECTS",
+      "channel": "DISCORD",
+      "rendererRevision": "DISCORD-SYN-1",
+      "canonicalCreditText": "출처: 합성\u0001자료",
+      "expectedRenderedContent": null,
+      "expectedDisposition": "REJECT_CONTROL_CHARACTER"
+    },
+    {
+      "id": "RRV-03-NEWLINE-PRESERVATION",
+      "channel": "WEB_PUSH",
+      "rendererRevision": "PUSH-SYN-1",
+      "canonicalCreditText": "출처: 합성\n자료",
+      "expectedRenderedContent": "출처: 합성\n자료",
+      "expectedDisposition": "RENDER",
+      "payloadHashDomainSeparator": "KR-DISCLOSURE-CHANNEL-PAYLOAD-v1",
+      "expectedPayloadHash": "sha256:e2c700b9c943b66313428687d5b7c31cf4e74295d431b0fe8f17e107fed08b7d",
+      "canonicalPayload": {
+        "channel": "WEB_PUSH",
+        "rendererRevision": "PUSH-SYN-1",
+        "creditText": "출처: 합성\n자료"
+      }
+    },
+    {
+      "id": "RRV-04-SAFE-URL-IS-DTO-FIELD",
+      "channel": "PUBLIC_API",
+      "rendererRevision": "API-SYN-1",
+      "canonicalCreditText": "출처: 합성 자료",
+      "safeUrl": "https://example.invalid/source",
+      "expectedRenderedDto": {
+        "creditText": "출처: 합성 자료",
+        "sourceUrl": "https://example.invalid/source"
+      },
+      "expectedDisposition": "RENDER",
+      "payloadHashDomainSeparator": "KR-DISCLOSURE-CHANNEL-PAYLOAD-v1",
+      "expectedPayloadHash": "sha256:75ae7d5f48b4fbb24a2001e8ae6b3d53dbd0ab150f2dda4a82d923d9b089c4ce",
+      "canonicalPayload": {
+        "channel": "PUBLIC_API",
+        "rendererRevision": "API-SYN-1",
+        "creditText": "출처: 합성 자료",
+        "sourceUrl": "https://example.invalid/source"
+      }
+    }
+  ],
+  "officialSourceLinkPolicy": {
+    "status": "PROPOSED_DART_VIEWER_ONLY_KIND_VIEWER_TEMPLATE_UNRESOLVED",
+    "sourceEvidence": {
+      "officialGuide": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001",
+      "projectBuilder": "lib/dart-automation-mapper.ts"
+    },
+    "allowed": {
+      "scheme": "https:",
+      "hostname": "dart.fss.or.kr",
+      "pathname": "/dsaf001/main.do",
+      "query": "exactly one rcpNo parameter with exactly 14 ASCII digits",
+      "canonicalOutput": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo={14-digit-rcept-no}"
+    },
+    "reject": [
+      "non-HTTPS",
+      "userinfo",
+      "non-default port",
+      "host suffix/lookalike",
+      "unexpected path",
+      "duplicate or extra query keys",
+      "redirect/destination parameters",
+      "encoded or non-canonical query representation",
+      "fragment",
+      "missing/malformed/non-14-digit rcpNo"
+    ],
+    "handling": {
+      "validation": "parse only; do not fetch or follow redirects",
+      "output": "reconstruct canonical viewer URL from validated 14-digit rcpNo; never return original candidate URL",
+      "unknownSource": "UNRESOLVED_SUPPRESS_LINK",
+      "kind": "do not auto-allow until official KIND viewer URL contract and current code path are verified"
+    },
+    "browserUse": "Open only the reconstructed canonical direct viewer link; UI must not perform server-side link preview or redirect resolution"
+  },
+  "officialSourceLinkVectors": [
+    {
+      "id": "URL-01-DART-CANONICAL",
+      "input": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001",
+      "expectedDisposition": "ALLOW_CANONICAL",
+      "expectedCanonicalUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001"
+    },
+    {
+      "id": "URL-02-HTTP-SCHEME",
+      "input": "http://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001",
+      "expectedDisposition": "REJECT_SCHEME"
+    },
+    {
+      "id": "URL-03-USERINFO",
+      "input": "https://dart.fss.or.kr@evil.example/dsaf001/main.do?rcpNo=20261104000001",
+      "expectedDisposition": "REJECT_USERINFO"
+    },
+    {
+      "id": "URL-04-HOST-SUFFIX",
+      "input": "https://dart.fss.or.kr.evil.example/dsaf001/main.do?rcpNo=20261104000001",
+      "expectedDisposition": "REJECT_HOST"
+    },
+    {
+      "id": "URL-05-NONDEFAULT-PORT",
+      "input": "https://dart.fss.or.kr:8443/dsaf001/main.do?rcpNo=20261104000001",
+      "expectedDisposition": "REJECT_PORT"
+    },
+    {
+      "id": "URL-06-UNEXPECTED-PATH",
+      "input": "https://dart.fss.or.kr/redirect?rcpNo=20261104000001",
+      "expectedDisposition": "REJECT_PATH"
+    },
+    {
+      "id": "URL-07-REDIRECT-QUERY",
+      "input": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001&url=https%3A%2F%2Fevil.example",
+      "expectedDisposition": "REJECT_QUERY"
+    },
+    {
+      "id": "URL-08-DUPLICATE-RECEIPT",
+      "input": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001&rcpNo=20261104000002",
+      "expectedDisposition": "REJECT_QUERY"
+    },
+    {
+      "id": "URL-09-ENCODED-RECEIPT",
+      "input": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=%32%30%32%36%31%31%30%34%30%30%30%30%30%31",
+      "expectedDisposition": "REJECT_QUERY"
+    },
+    {
+      "id": "URL-10-FRAGMENT",
+      "input": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261104000001#other",
+      "expectedDisposition": "REJECT_FRAGMENT"
+    },
+    {
+      "id": "URL-11-MALFORMED-RECEIPT",
+      "input": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=2026110400000X",
+      "expectedDisposition": "REJECT_RECEIPT"
+    },
+    {
+      "id": "URL-12-KIND-TEMPLATE-UNRESOLVED",
+      "input": "https://kind.krx.co.kr/disclosure/example",
+      "expectedDisposition": "UNRESOLVED_SUPPRESS_LINK",
+      "source": "KIND"
+    }
+  ]
+}

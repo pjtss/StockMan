@@ -1,0 +1,462 @@
+{
+  "contractVersion": "rights-action-decision.v0",
+  "classification": "SYNTHETIC_POLICY_DESIGN_NOT_LEGAL_ADVICE_OR_RUNTIME_AUTHORIZATION",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredential": false,
+    "decisionsAreUnapprovedExamples": true
+  },
+  "policyStates": [
+    "UNRESOLVED",
+    "ALLOW",
+    "ALLOW_WITH_CONTROLS",
+    "DENY",
+    "EXPIRED",
+    "REVOKED"
+  ],
+  "actionAxes": [
+    "DISCOVER",
+    "FETCH",
+    "TRANSIENT_PARSE",
+    "PERSIST_RAW",
+    "PERSIST_DERIVATIVE",
+    "QUOTE",
+    "DISPLAY_METADATA",
+    "DISPLAY_DERIVATIVE",
+    "DISTRIBUTE_API",
+    "BACKUP",
+    "DELETE"
+  ],
+  "sourceClasses": [
+    "LIST_METADATA",
+    "STRUCTURED_API_FIELD",
+    "OFFICIAL_DOCUMENT_BODY",
+    "ATTACHMENT",
+    "USER_OR_DELIVERY_RECEIPT"
+  ],
+  "remediationStates": [
+    "DISCOVERY_INCOMPLETE",
+    "INVENTORY_COMPLETE",
+    "DISPOSITION_PENDING",
+    "ACTIONS_PENDING_VERIFICATION",
+    "RECONCILED"
+  ],
+  "descendantClasses": [
+    "SOURCE_BYTES",
+    "PARSED_TEXT_OR_TABLE",
+    "CLAIM_OR_SUMMARY",
+    "EVENT_DATE_SUBJECT_PUBLICATION",
+    "CACHE_OR_SEARCH_INDEX",
+    "EXPORT",
+    "NOTIFICATION_OR_DELIVERY",
+    "BACKUP_OR_RESTORE_COPY"
+  ],
+  "requiredRemediationFields": [
+    "remediationCaseId",
+    "triggerKind",
+    "sourceScopeFingerprint",
+    "priorDecisionRevision",
+    "currentEvidenceRevision",
+    "publicationEpoch",
+    "expectedDescendantSetDigest",
+    "discoveredDescendantSetDigest",
+    "expectedCountByClassAndLocation",
+    "discoveredCountByClassAndLocation",
+    "perDescendantDisposition",
+    "actionReceiptOrUnresolvedReason",
+    "restoreVerification",
+    "reviewDecisionRef",
+    "previousCaseRevision",
+    "caseRevision",
+    "scopeEpoch",
+    "discoveryWatermarkSetDigest",
+    "closureFingerprint",
+    "finalizationFence",
+    "previousCaseId"
+  ],
+  "requiredDecisionFields": [
+    "decisionId",
+    "revision",
+    "sourceProduct",
+    "sourceClass",
+    "endpointOrSurface",
+    "fieldScope",
+    "action",
+    "purpose",
+    "channel",
+    "retentionClass",
+    "policyEvidenceRefs",
+    "status",
+    "ownerRole",
+    "namedReviewer",
+    "effectiveFrom",
+    "effectiveUntil",
+    "reviewDue",
+    "affectedGates",
+    "previousRevision",
+    "decisionHash"
+  ],
+  "vectors": [
+    {
+      "id": "RAD-01-API-ACCESS-DOES-NOT-GRANT-RAW-RETENTION",
+      "input": {
+        "sourceClass": "OFFICIAL_DOCUMENT_BODY",
+        "action": "FETCH",
+        "apiCredentialValid": true,
+        "retentionDecision": "UNRESOLVED"
+      },
+      "expected": {
+        "fetch": "BLOCKED_UNTIL_ACTION_DECISION",
+        "persistRaw": "BLOCKED",
+        "credentialValidityIsAuthorization": false
+      }
+    },
+    {
+      "id": "RAD-02-METADATA-ALLOW-DOES-NOT-INHERIT-ATTACHMENT-RIGHTS",
+      "input": {
+        "sourceClass": "LIST_METADATA",
+        "action": "DISPLAY_METADATA",
+        "status": "ALLOW",
+        "childSourceClass": "ATTACHMENT"
+      },
+      "expected": {
+        "metadataAction": "ALLOW_WITHIN_EXACT_SCOPE",
+        "attachmentAction": "UNRESOLVED",
+        "rightsInheritance": false
+      }
+    },
+    {
+      "id": "RAD-03-TRANSIENT-PARSE-DOES-NOT-INHERIT-DERIVATIVE-PERSIST",
+      "input": {
+        "action": "TRANSIENT_PARSE",
+        "status": "ALLOW_WITH_CONTROLS",
+        "childAction": "PERSIST_DERIVATIVE",
+        "childDecision": "UNRESOLVED"
+      },
+      "expected": {
+        "transientParse": "CONTROLLED",
+        "persistDerivative": "BLOCKED",
+        "rightsInheritance": false
+      }
+    },
+    {
+      "id": "RAD-04-DISPLAY-DERIVATIVE-DOES-NOT-GRANT-API-DISTRIBUTION",
+      "input": {
+        "action": "DISPLAY_DERIVATIVE",
+        "channel": "FIRST_PARTY_UI",
+        "status": "ALLOW",
+        "childAction": "DISTRIBUTE_API",
+        "childChannel": "PUBLIC_API"
+      },
+      "expected": {
+        "firstPartyUi": "ALLOW_WITHIN_EXACT_SCOPE",
+        "publicApi": "UNRESOLVED",
+        "channelInheritance": false
+      }
+    },
+    {
+      "id": "RAD-05-EXPIRED-EVIDENCE-BLOCKS-CURRENT-ACTION",
+      "input": {
+        "status": "ALLOW",
+        "effectiveUntil": "PAST",
+        "reviewDue": "PAST",
+        "requestedAt": "NOW"
+      },
+      "expected": {
+        "effectiveStatus": "EXPIRED",
+        "action": "BLOCKED",
+        "staleApprovalFallback": false
+      }
+    },
+    {
+      "id": "RAD-06-REVOKE-PROPAGATES-TO-DESCENDANT-ARTIFACTS",
+      "input": {
+        "sourceDecision": "REVOKED",
+        "derivedArtifactCount": 4,
+        "backupCopies": 2
+      },
+      "expected": {
+        "newActions": "BLOCKED",
+        "descendantDisposition": "REVIEW_DELETE_OR_RESTRICT",
+        "auditLineage": "PRESERVED_MINIMUM_IF_ALLOWED"
+      }
+    },
+    {
+      "id": "RAD-07-ALLOW-WITH-CONTROLS-REQUIRES-ALL-CONTROLS",
+      "input": {
+        "status": "ALLOW_WITH_CONTROLS",
+        "requiredControls": [
+          "ATTRIBUTION",
+          "SHORT_RETENTION",
+          "NO_SOURCE_BODY"
+        ],
+        "satisfiedControls": [
+          "ATTRIBUTION"
+        ]
+      },
+      "expected": {
+        "action": "BLOCKED_CONTROLS_INCOMPLETE",
+        "missingControls": [
+          "SHORT_RETENTION",
+          "NO_SOURCE_BODY"
+        ]
+      }
+    },
+    {
+      "id": "RAD-08-UNKNOWN-POLICY-EVIDENCE-REMAINS-UNRESOLVED",
+      "input": {
+        "evidenceClasses": [
+          "TERMS",
+          "API_GUIDE"
+        ],
+        "dataProductLicense": "NOT_FOUND",
+        "legalDecision": null
+      },
+      "expected": {
+        "rightConclusion": "UNRESOLVED",
+        "action": "BLOCKED",
+        "licenseInferredFromGuide": false
+      }
+    },
+    {
+      "id": "RAD-09-DELETION-IS-AN-OWNED-ACTION-NOT-IMPLICIT",
+      "input": {
+        "sourceDecision": "REVOKED",
+        "retentionObligation": "UNRESOLVED",
+        "backupCopies": 1
+      },
+      "expected": {
+        "newUse": "BLOCKED",
+        "deleteExecution": "BLOCKED_UNTIL_RETENTION_AND_LEGAL_REVIEW",
+        "dataInventory": "REQUIRED"
+      }
+    },
+    {
+      "id": "RAD-10-NO-GENERIC-APPROVED-STATUS",
+      "input": {
+        "actions": [
+          "FETCH",
+          "PERSIST_RAW",
+          "DISPLAY_DERIVATIVE",
+          "DISTRIBUTE_API"
+        ],
+        "decidedActions": [
+          "FETCH"
+        ]
+      },
+      "expected": {
+        "fetch": "ACTION_SPECIFIC_STATE",
+        "otherActions": "UNRESOLVED",
+        "globalApprovedFlag": "FORBIDDEN"
+      }
+    },
+    {
+      "id": "RAD-11-CONFLICTING-CURRENT-DECISIONS-FAIL-CLOSED",
+      "input": {
+        "exactScopeMatches": 2,
+        "currentStatuses": [
+          "ALLOW",
+          "DENY"
+        ],
+        "sameScopeFingerprint": true
+      },
+      "expected": {
+        "effectiveStatus": "UNRESOLVED",
+        "action": "BLOCKED_DECISION_SCOPE_CONFLICT",
+        "lastWriteWins": false,
+        "reviewCase": "REQUIRED"
+      }
+    },
+    {
+      "id": "RAD-12-PARTIAL-OR-WILDCARD-SCOPE-CANNOT-AUTHORIZE",
+      "input": {
+        "decisionScope": {
+          "sourceProduct": "OPENDART",
+          "sourceClass": "LIST_METADATA",
+          "endpointOrSurface": "list.json",
+          "fieldScope": "*",
+          "action": "DISPLAY_METADATA",
+          "purpose": null,
+          "channel": "PUBLIC_API",
+          "retentionClass": null
+        }
+      },
+      "expected": {
+        "decisionMatches": false,
+        "effectiveStatus": "UNRESOLVED",
+        "action": "BLOCKED_INCOMPLETE_SCOPE",
+        "scopeWildcardAccepted": false
+      }
+    },
+    {
+      "id": "RAD-13-TERMS-REVISION-FENCES-DEPENDENT-APPROVAL",
+      "input": {
+        "approvedEvidenceRevision": "TERMS-1",
+        "observedEvidenceRevision": "TERMS-2",
+        "sameSourceProduct": true,
+        "sameActionScope": true,
+        "unrelatedScope": "DIFFERENT_PRODUCT"
+      },
+      "expected": {
+        "affectedDecision": "REVIEW_REQUIRED",
+        "newAffectedAction": "BLOCKED_UNTIL_REVIEW",
+        "staleApprovalFallback": false,
+        "unrelatedScopeInheritedChange": false
+      }
+    },
+    {
+      "id": "RAD-14-INCOMPLETE-DESCENDANT-INVENTORY-KEEPS-ROOT-SUPPRESSED",
+      "input": {
+        "expectedDescendants": 8,
+        "discoveredDescendants": 7,
+        "expectedSetDigest": "sha256:expected",
+        "discoveredSetDigest": "sha256:observed",
+        "restorePathInventory": "UNKNOWN"
+      },
+      "expected": {
+        "remediationState": "DISCOVERY_INCOMPLETE",
+        "rootSuppression": "ACTIVE",
+        "publicRead": "BLOCKED",
+        "rightsReconciliationComplete": false,
+        "unknownCountMeansZero": false
+      }
+    },
+    {
+      "id": "RAD-15-COMPLETE-INVENTORY-DOES-NOT-CLOSE-UNRESOLVED-DISPOSITION",
+      "input": {
+        "expectedDescendants": 8,
+        "discoveredDescendants": 8,
+        "setDigestMatches": true,
+        "dispositionsPendingCounsel": 2
+      },
+      "expected": {
+        "inventoryState": "INVENTORY_COMPLETE",
+        "remediationState": "DISPOSITION_PENDING",
+        "rootSuppression": "ACTIVE",
+        "rightsReconciliationComplete": false
+      }
+    },
+    {
+      "id": "RAD-16-MISSING-DERIVATIVE-LINEAGE-IS-NOT-EMPTY-IMPACT",
+      "input": {
+        "sourceObjectRetained": false,
+        "derivativeOutputExists": true,
+        "derivativeRightsDecisionRef": null,
+        "consumerReverseReferenceCoverage": "PARTIAL"
+      },
+      "expected": {
+        "remediationState": "DISCOVERY_INCOMPLETE",
+        "unknownDescendants": "NOT_ZERO",
+        "emptyImpactAccepted": false,
+        "rootSuppression": "ACTIVE"
+      }
+    },
+    {
+      "id": "RAD-17-COMPLETE-COVERAGE-DOES-NOT-RESOLVE-RIGHTS-REMEDIATION",
+      "input": {
+        "coverage": "CURRENT_COMPLETE",
+        "currentExactScopeReadRight": "ALLOW",
+        "remediationState": "DISPOSITION_PENDING",
+        "impactAttempt": "COMPLETE",
+        "expectedDescendants": 8,
+        "discoveredDescendants": 8
+      },
+      "expected": {
+        "coverageAssertion": "VALID_ENUMERATION_ONLY",
+        "publicRead": "BLOCKED",
+        "rootSuppression": "ACTIVE",
+        "staleArtifactReuse": false,
+        "remediationMayResolveFromCoverage": false
+      }
+    },
+    {
+      "id": "RAD-18-RECONCILED-DOES-NOT-GRANT-CURRENT-READ-RIGHT",
+      "input": {
+        "remediationState": "RECONCILED",
+        "currentExactScopeReadRight": "EXPIRED"
+      },
+      "expected": {
+        "publicRead": "BLOCKED_CURRENT_RIGHTS_GATE",
+        "remediationGrantsRights": false,
+        "rootSuppression": "ACTIVE"
+      }
+    },
+    {
+      "id": "RAD-19-CONCURRENT-RECONCILIATION-FINALIZERS-USE-CAS",
+      "input": {
+        "remediationCaseId": "CASE-SYNTH-1",
+        "caseRevision": 4,
+        "scopeEpoch": 9,
+        "finalizationFence": 12,
+        "finalizers": [
+          {
+            "observedCaseRevision": 4,
+            "closureFingerprint": "sha256:closure-a"
+          },
+          {
+            "observedCaseRevision": 4,
+            "closureFingerprint": "sha256:closure-a"
+          }
+        ]
+      },
+      "expected": {
+        "committedFinalizerCount": 1,
+        "losingFinalizer": "REJECTED_STALE_CAS_OR_IDEMPOTENT_NOOP",
+        "duplicateEpochAdvance": false,
+        "rootSuppressionUntilCommit": "ACTIVE"
+      }
+    },
+    {
+      "id": "RAD-20-LATE-DESCENDANT-BEFORE-CLOSURE-INVALIDATES-INVENTORY",
+      "input": {
+        "remediationState": "INVENTORY_COMPLETE",
+        "caseRevision": 6,
+        "observedDiscoveryWatermark": "W-18",
+        "currentDiscoveryWatermarkAtFinalize": "W-19",
+        "newDescendantObserved": true
+      },
+      "expected": {
+        "reconciliationCommit": "REJECTED_WATERMARK_MISMATCH",
+        "remediationState": "DISCOVERY_INCOMPLETE",
+        "rootSuppression": "ACTIVE",
+        "publicRead": "BLOCKED"
+      }
+    },
+    {
+      "id": "RAD-21-LATE-DESCENDANT-AFTER-RECONCILED-OPENS-LINKED-CASE",
+      "input": {
+        "priorCase": {
+          "remediationCaseId": "CASE-SYNTH-1",
+          "caseRevision": 8,
+          "state": "RECONCILED"
+        },
+        "newDescendantObserved": true,
+        "triggerKind": "POST_RECONCILIATION_DESCENDANT"
+      },
+      "expected": {
+        "priorCaseMutation": "FORBIDDEN",
+        "newCase": "REQUIRED_NEW_CASE_ID_LINKED_TO_PRIOR",
+        "newCaseInitialState": "DISCOVERY_INCOMPLETE",
+        "suppressionBeforeInventory": "ACTIVE",
+        "publicRead": "BLOCKED"
+      }
+    },
+    {
+      "id": "RAD-22-TERMS-REVISION-DURING-FINALIZATION-FENCES-CLOSURE",
+      "input": {
+        "caseRevision": 3,
+        "approvedEvidenceRevision": "TERMS-4",
+        "currentEvidenceRevisionAtFinalize": "TERMS-5",
+        "finalizationFence": 7
+      },
+      "expected": {
+        "reconciliationCommit": "REJECTED_STALE_EVIDENCE_CAS",
+        "priorApproval": "STALE",
+        "rootSuppression": "ACTIVE",
+        "publicRead": "BLOCKED"
+      }
+    }
+  ]
+}

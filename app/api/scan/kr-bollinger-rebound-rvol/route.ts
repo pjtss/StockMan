@@ -5,6 +5,7 @@ import { loadCachedKrDailyCandlesBulk } from "@/lib/kr-daily-price-cache";
 import { calculateKrBollingerBands } from "@/lib/kr-bollinger-band";
 import { detectBollingerRebound } from "@/lib/bollinger-rebound";
 import type { OHLCVCandle } from "@/lib/kis-chart";
+import { KR_MARKET_CAP_MAX_AGE_HOURS, loadKrMarketCapSnapshots, meetsKrMarketCapFloorKrw } from "@/lib/kr-market-cap";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ function recentRvols(candles: OHLCVCandle[], count = 5) {
     const rowIndex = rows.length - count + index;
     const baseline = rows.slice(Math.max(0, rowIndex - 20), rowIndex).map((item) => Number(item.volume));
     const average = baseline.length === 20 ? baseline.reduce((sum, value) => sum + value, 0) / baseline.length : null;
-    return { date: row.date, rvol: average && average > 0 ? Number((Number(row.volume) / average).toFixed(4)) : null };
+    return { date: row.date, fetchedAt: row.fetchedAt ?? null, rvol: average && average > 0 ? Number((Number(row.volume) / average).toFixed(4)) : null };
   });
 }
 
@@ -22,9 +23,11 @@ export async function GET() {
   const checkedAt = new Date().toISOString();
   try {
     const universe = await loadStoredKrInstrumentScopes();
-    const candles = await loadCachedKrDailyCandlesBulk(universe.scopes, 120, "D");
+    const marketCaps = await loadKrMarketCapSnapshots(universe.scopes);
+    const eligibleScopes = universe.scopes.filter((item) => meetsKrMarketCapFloorKrw(marketCaps.get(`${item.market}:${item.code}`) ?? null));
+    const candles = await loadCachedKrDailyCandlesBulk(eligibleScopes, 120, "D");
     const results = [];
-    for (const item of universe.scopes) {
+    for (const item of eligibleScopes) {
       const series = candles.get(`${item.market}:${item.code}`) ?? [];
       if (series.length < 41) continue;
       const bands = calculateKrBollingerBands(series, 20, 2);
@@ -33,10 +36,10 @@ export async function GET() {
       if (!rebound.qualifies || rvols.length !== 5 || rvols.some((point) => point.rvol === null || point.rvol < 1)) continue;
       const latest = bands.at(-1);
       if (!latest) continue;
-      results.push({ market: item.market, code: item.code, name: item.name, candleDate: latest.date, candleUpdatedAt: null, rvols, reboundState: rebound.state, breakoutIndex: rebound.breakoutIndex, retestDistancePercent: rebound.retestDistancePercent, band: latest });
+      results.push({ market: item.market, code: item.code, name: item.name, marketCap: marketCaps.get(`${item.market}:${item.code}`) ?? null, candleDate: latest.date, candleUpdatedAt: latest.fetchedAt ?? null, timeframeMeta: { daily: { date: latest.date, updatedAt: latest.fetchedAt ?? null } }, rvols, reboundState: rebound.state, breakoutIndex: rebound.breakoutIndex, retestDistancePercent: rebound.retestDistancePercent, band: latest });
     }
     results.sort((a, b) => (b.rvols.at(-1)?.rvol ?? 0) - (a.rvols.at(-1)?.rvol ?? 0) || a.code.localeCompare(b.code));
-    return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, criteria: { timeframe: "D", bollinger: "20-period close-based lower band, 2 standard deviations", rebound: "prior close below lower band within 3 trading days, latest close back within 0.5% above lower band", rvol: "each of the latest 5 trading days >= 1.0 using prior 20-day average volume" }, universeCount: universe.scopes.length, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });
+    return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, criteria: { timeframe: "D", bollinger: "20-period close-based lower band, 2 standard deviations", rebound: "prior close below lower band within 3 trading days, latest close back within 0.5% above lower band", rvol: "each of the latest 5 trading days >= 1.0 using prior 20-day average volume", marketCapFloorKrwExclusive: 30_000_000_000, marketCapSnapshotMaxAgeHours: KR_MARKET_CAP_MAX_AGE_HOURS, unknownOrStaleMarketCap: "excluded" }, universeCount: universe.scopes.length, marketCapEligibleCount: eligibleScopes.length, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });
   } catch (error) {
     return NextResponse.json({ ok: false, source: "local_db_daily_candles", checkedAt, error: safeErrorMetadata(error).errorCode }, { status: 503 });
   }

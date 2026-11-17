@@ -39,6 +39,21 @@ describe("WatchlistWorkbench", () => {
     expect(screen.getByText("AAPL · 해외")).toBeInTheDocument();
   });
 
+  it("keeps same-code Korean and US watchlist names in separate market scopes", async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/watchlist")) return jsonResponse({ items: [{ market: "KR", code: "AB1234" }, { market: "US", code: "AB1234" }] });
+      if (url.includes("/api/stock/lookup?market=KR")) return jsonResponse({ names: { "KR:AB1234": "국내 회사", AB1234: "국내 회사" } });
+      if (url.includes("/api/stock/lookup?market=US")) return jsonResponse({ names: { "US:AB1234": "미국 회사", AB1234: "미국 회사" } });
+      return jsonResponse({ ok: true });
+    });
+
+    render(<WatchlistWorkbench />);
+
+    expect(await screen.findByText("국내 회사")).toBeInTheDocument();
+    expect(await screen.findByText("미국 회사")).toBeInTheDocument();
+  });
+
   it("opens the shared modal with position, adjacent prefetch, and navigation callbacks", async () => {
     render(<WatchlistWorkbench />);
     await screen.findByText("삼성전자");

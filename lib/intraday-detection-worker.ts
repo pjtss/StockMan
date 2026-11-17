@@ -14,6 +14,8 @@ import { sendIntradayMvpAlerts, type IntradayMvpAlert } from "@/lib/discord-intr
 import { filterValidIntradayPoints, isSuccessfulMinuteQuoteResponse, minuteTradingValue } from "@/lib/intraday-turnover";
 import { saveIntradayTurnoverObservations, type IntradayTurnoverObservation } from "@/lib/intraday-turnover-repository";
 import { intradayTurnoverWriteBuffer } from "@/lib/intraday-turnover-write-buffer";
+import { filterActiveKrCommonStockRows } from "@/lib/instrument-eligibility";
+import { meetsKrMarketCapFloor } from "@/lib/kr-market-cap";
 
 export type IntradayWorkerStatus = "STOPPED" | "RUNNING" | "WARMING_UP" | "STOPPING" | "DEGRADED";
 export type IntradayWorkerSnapshot = { status: IntradayWorkerStatus; startedAt: number | null; lastTickAt: number | null; lastError: string | null; tickCount: number; lastAlertAt: number | null; lastAlertResult: "sent" | "webhook_not_configured" | "send_failed" | "no_qualified_items" | null; alertCount: number };
@@ -50,10 +52,19 @@ export async function runIntradayTick(now = Date.now()) {
       // The market feeds are independent. Fetch them concurrently so a slow
       // exchange does not delay the other market's candidate refresh.
       const [scopes, domestic] = await Promise.all([
-        usOpen ? loadUsTopRisingScopes() : Promise.resolve({ scopes: [], universe: { markets: [] } as any }),
+        usOpen ? loadUsTopRisingScopes().catch(() => ({ scopes: [], universe: { markets: [] } as any })) : Promise.resolve({ scopes: [], universe: { markets: [] } as any }),
         domesticOpen ? loadDomesticTopRising().catch(() => []) : Promise.resolve([]),
       ]);
-      if (scopes.scopes.length || domestic.length) intradayMemoryState.rotateSnapshot([...scopes.scopes.map((item) => ({ market: item.market, code: item.code, name: item.name, rank: item.rank, rate: item.changeRate ?? undefined, volume: item.rankingVolume ?? undefined, tradingValue: item.rankingTradeValue ?? undefined })), ...domestic]);
+      if (usOpen || domesticOpen) {
+        const currentItems = intradayMemoryState.snapshot().current;
+        const usItems = usOpen
+          ? scopes.scopes.map((item) => ({ market: item.market, code: item.code, name: item.name, rank: item.rank, rate: item.changeRate ?? undefined, volume: item.rankingVolume ?? undefined, tradingValue: item.rankingTradeValue ?? undefined }))
+          : currentItems.filter((item) => ["NAS", "AMS", "NYS"].includes(item.market));
+        const krItems = domesticOpen
+          ? domestic
+          : currentItems.filter((item) => item.market === "KOSPI" || item.market === "KOSDAQ");
+        intradayMemoryState.rotateSnapshot([...usItems, ...krItems]);
+      }
       for (const item of domestic) {
         const scored = scoreIntradayCandidate({ market: item.market, code: item.code, currency: "KRW", marketCap: item.marketCap, tradingValue: item.tradingValue, isTopRising: true, isNewEntry: false, rankChange: 0, rateChange: 0, volumeChange: 0, aboveVwap: false, now });
         intradayMemoryState.upsertCandidate({ ...(scored ?? item), mvpTracking: true } as any);
@@ -116,6 +127,8 @@ export async function runIntradayTick(now = Date.now()) {
             minuteTradingValue: Number.isFinite(latestBarValue) && latestBarValue >= 0 ? latestBarValue : 0,
             minuteTradingValueSource: latestBar.source,
             marketCap: candidate.marketCap ?? null,
+            marketCapObservedAt: candidate.marketCapObservedAt ? new Date(candidate.marketCapObservedAt) : null,
+            marketCapFetchedAt: candidate.marketCapFetchedAt ? new Date(candidate.marketCapFetchedAt) : null,
             rollingTradingValue: turnover.tradingValue,
             turnoverRatio: turnover.ratio,
             sourcePayload: latest?.raw ?? {},
@@ -129,7 +142,7 @@ export async function runIntradayTick(now = Date.now()) {
           const finalState = turnover.qualified && freshTimestamp && !["STALE", "DEGRADED"].includes(quality.state) ? "QUALIFIED" : quality.state;
           const transition = intradayMemoryState.recordQuality(candidate.market, candidate.code, finalState, now, quality.dataAgeSeconds ?? undefined);
           if (transition?.previousState !== finalState) transitions.push({ tickId, market: candidate.market, code: candidate.code, fromState: transition?.previousState, toState: finalState, observedAt: new Date(now), dedupeKey: `${candidate.market}:${candidate.code}:${finalState}:${new Date(now).toISOString().slice(0, 16)}` });
-          if (finalState === "QUALIFIED" && transition?.previousState !== "QUALIFIED" && turnover.ratio != null && candidate.marketCap) alerts.push({ market: candidate.market, code: candidate.code, marketCap: candidate.marketCap, rollingTradingValue: turnover.tradingValue, ratioPercent: turnover.ratio * 100, windowMinutes: policy.windowMinutes, observedAt: new Date(now).toISOString() });
+          if (finalState === "QUALIFIED" && transition?.previousState !== "QUALIFIED" && turnover.ratio != null && candidate.marketCap) alerts.push({ market: candidate.market, code: candidate.code, marketCap: candidate.marketCap, marketCapObservedAt: candidate.marketCapObservedAt ?? null, marketCapFetchedAt: candidate.marketCapFetchedAt ?? null, rollingTradingValue: turnover.tradingValue, ratioPercent: turnover.ratio * 100, windowMinutes: policy.windowMinutes, observedAt: new Date(now).toISOString() });
           intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now);
         } catch { failedCount += 1; intradayMemoryState.scheduleCandidate(candidate.market, candidate.code, now); }
       }));
@@ -176,7 +189,8 @@ export async function runIntradayTick(now = Date.now()) {
 async function loadDomesticTopRising() {
   const token = await getAccessToken(); if (!token) return [];
   const rows = await fetchDomesticFluctuation(token);
-  return rows.slice(0, 100).map((row: any, index) => {
+  const eligibleRows = await filterActiveKrCommonStockRows(rows, (row) => row.mksc_shrn_iscd ?? row.stck_shrn_iscd);
+  return eligibleRows.filter((row) => meetsKrMarketCapFloor(row as unknown as Record<string, unknown>, 300)).slice(0, 100).map((row: any, index) => {
     const market = String(row.rprs_mrkt_kor_name ?? "").includes("코스닥") ? "KOSDAQ" : "KOSPI";
     const code = String(row.mksc_shrn_iscd ?? row.stck_shrn_iscd ?? "").trim();
     const cap = Number(String(row.hts_avls ?? "").replace(/,/g, "")) * 100_000_000;

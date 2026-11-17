@@ -1,0 +1,1051 @@
+{
+  "contractVersion": "fact-correction-remediation.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsPersonalRecipientData": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "factLayers": [
+    "SOURCE_OBSERVATION",
+    "NORMALIZED_FACT",
+    "INTERPRETATION",
+    "INVESTMENT_EFFECT",
+    "PUBLICATION"
+  ],
+  "impactStates": [
+    "NO_DOWNSTREAM_IMPACT",
+    "STALE_SUPPRESSED",
+    "RECALCULATION_REQUIRED",
+    "REVIEW_REQUIRED",
+    "CORRECTED",
+    "UNRESOLVED"
+  ],
+  "requiredImpactDimensions": [
+    "claimId",
+    "priorRevisionId",
+    "newRevisionId",
+    "sourceRelationId",
+    "consumerType",
+    "consumerRevisionId",
+    "publicationEpoch",
+    "deliveryId",
+    "disposition",
+    "rationaleRef"
+  ],
+  "vectors": [
+    {
+      "id": "FCR-01-OBSERVATION-CORRECTION-DOES-NOT-AUTO-DECIDE-ECONOMIC-EFFECT",
+      "input": {
+        "sourceFactOld": "SYNTH-100",
+        "sourceFactNew": "SYNTH-80",
+        "revisionRelation": "RESOLVED_CORRECTS",
+        "cashReceiptProof": null
+      },
+      "expected": {
+        "sourceObservation": "SUPERSEDED",
+        "normalizedTerms": "RECALCULATE",
+        "actualCashImpact": "NOT_REPORTED",
+        "interpretation": "REVIEW_REQUIRED"
+      }
+    },
+    {
+      "id": "FCR-02-UNRESOLVED-RELATION-DOES-NOT-SUPERSEDE",
+      "input": {
+        "newFilingMarker": "CORRECTION",
+        "targetRelation": "UNRESOLVED",
+        "priorApproval": "APPROVED"
+      },
+      "expected": {
+        "relation": "UNRESOLVED",
+        "priorCurrentState": "STALE_SUPPRESSED",
+        "newValuePromotion": false,
+        "scope": "AFFECTED_DEPENDENTS_ONLY"
+      }
+    },
+    {
+      "id": "FCR-03-ONLY-DEPENDENT-CONSUMERS-ARE-INVALIDATED",
+      "input": {
+        "changedClaim": "CLAIM-SYN-A",
+        "dependents": [
+          "CASH-SYN-A",
+          "DATE-SYN-A"
+        ],
+        "independentClaim": "DATE-SYN-B"
+      },
+      "expected": {
+        "affected": [
+          "CASH-SYN-A",
+          "DATE-SYN-A"
+        ],
+        "independent": "RETAIN_IF_CURRENT_AND_VALID",
+        "missingEdge": "BROADER_SUPPRESSION"
+      }
+    },
+    {
+      "id": "FCR-04-ACTUAL-EFFECT-CHANGE-REQUIRES-RECOMPUTE-AND-REVIEW",
+      "input": {
+        "revisedCashClaim": "CHANGED",
+        "formulaVersion": "UNCHANGED",
+        "priorImpactRevision": "APPROVED"
+      },
+      "expected": {
+        "impactRevision": "NEW_IMMUTABLE_REVISION",
+        "calculation": "RECOMPUTE",
+        "priorApproval": "STALE_REVIEW",
+        "publication": "SUPPRESSED_UNTIL_REAPPROVED"
+      }
+    },
+    {
+      "id": "FCR-05-SAME-EFFECT-NEW-SOURCE-NEEDS-REVIEWED-NO-CHANGE",
+      "input": {
+        "sourceRevision": "CHANGED",
+        "normalizedEffect": "SAME_VALUE",
+        "independentEvidence": "PRESENT"
+      },
+      "expected": {
+        "sourceHistory": "APPEND",
+        "valueDiff": "NO_CHANGE",
+        "decision": "REVIEWED_NO_CHANGE_REQUIRED",
+        "priorEvidence": "PRESERVED"
+      }
+    },
+    {
+      "id": "FCR-06-USER-VISIBLE-PRIOR-SNAPSHOT-GETS-CORRECTION-LINK",
+      "input": {
+        "priorPublicationEpoch": 7,
+        "currentPublicationEpoch": 8,
+        "priorExposedClaim": true,
+        "impact": "MATERIAL"
+      },
+      "expected": {
+        "priorSnapshot": "IMMUTABLE_AUDIT",
+        "currentSnapshot": "CORRECTED_REVISION",
+        "correctionNotice": "ELIGIBLE_AFTER_RIGHTS_AND_RECIPIENT_GATES",
+        "exposureHistory": "LINKED"
+      }
+    },
+    {
+      "id": "FCR-07-PREVIOUSLY-DELIVERED-CLAIM-USES-DELIVERY-RECONCILIATION",
+      "input": {
+        "priorDeliveryExists": true,
+        "claimImpact": "MATERIAL",
+        "deliveryLedger": "INCOMPLETE"
+      },
+      "expected": {
+        "reconciliation": "BLOCKED_DELIVERY_SCOPE",
+        "priorDelivery": "NOT_ASSUMED_RETRACTED",
+        "openExposure": "EXPLICIT"
+      }
+    },
+    {
+      "id": "FCR-08-CORRECTION-NOT-INVESTMENT-RECOMMENDATION-REVERSAL",
+      "input": {
+        "priorDirection": "POSITIVE",
+        "correctedClaim": "CHANGED",
+        "effectsRecomputed": false
+      },
+      "expected": {
+        "currentDirection": "UNCERTAIN_OR_SUPPRESSED",
+        "buySellInstruction": "FORBIDDEN",
+        "reviewRequired": true
+      }
+    },
+    {
+      "id": "FCR-09-WRONG-ATTRIBUTION-TRACES-ALL-AFFECTED-SUBJECTS",
+      "input": {
+        "priorSubject": "ISSUER-A",
+        "correctedSubject": "ISSUER-B",
+        "downstreamRows": 3
+      },
+      "expected": {
+        "priorSubjectPublication": "SUPPRESSED",
+        "newSubjectPublication": "REVIEW_REQUIRED",
+        "affectedRowsReconciled": 3,
+        "unrelatedSubjects": "UNCHANGED"
+      }
+    },
+    {
+      "id": "FCR-10-REMEDIATION-COMPLETE-REQUIRES-DENOMINATOR-AND-OWNER",
+      "input": {
+        "manifestDependents": 4,
+        "terminalDispositions": 3,
+        "namedOwner": null,
+        "independentReviewer": null
+      },
+      "expected": {
+        "state": "INCOMPLETE",
+        "missingRows": 1,
+        "ownership": "UNASSIGNED",
+        "completion": false
+      }
+    },
+    {
+      "id": "FCR-11-DART-RECEIPT-IDENTITY-DOES-NOT-INFER-CORRECTION-LINK",
+      "input": {
+        "priorReceipt": "SYNTH-RCP-001",
+        "newReceipt": "SYNTH-RCP-002",
+        "sameCorpCode": true,
+        "titleMarker": "CORRECTION",
+        "explicitTargetReceipt": null,
+        "documentRights": "UNRESOLVED"
+      },
+      "expected": {
+        "receiptIdentity": "DISTINCT",
+        "sourceRelation": "UNRESOLVED",
+        "supersedesPrior": false,
+        "priorClaim": "STALE_SUPPRESSED_IF_MARKED_DEPENDENCY",
+        "bodyFetch": "BLOCKED_UNTIL_ACTION_DECISION"
+      }
+    },
+    {
+      "id": "FCR-12-RM_RETRACTION-MARKER-IS-NOT-EVENT-CANCELLATION-PROOF",
+      "input": {
+        "listRm": "WITHDRAWAL_MARKER",
+        "withdrawalFilingRelation": "UNRESOLVED",
+        "eventOutcomeEvidence": null
+      },
+      "expected": {
+        "sourceDisposition": "WITHDRAWAL_INDICATED",
+        "eventStatus": "UNRESOLVED",
+        "cancelledClaim": false,
+        "followUpSearchRequired": true
+      }
+    },
+    {
+      "id": "FCR-13-ATTACHMENT-CORRECTION-CHANGES-DOCUMENT-REVISION-NOT-ALL-CLAIMS",
+      "input": {
+        "sourceRelation": "RESOLVED_ATTACHMENT_CORRECTION",
+        "changedAttachmentHash": true,
+        "claimLocatorAttachment": "ATTACHMENT-A",
+        "unrelatedClaimLocator": "MAIN-DOCUMENT"
+      },
+      "expected": {
+        "documentRevision": "NEW_IMMUTABLE_REVISION",
+        "affectedClaim": "REVIEW_REQUIRED",
+        "unrelatedClaim": "RETAIN_IF_INDEPENDENT_EVIDENCE_CURRENT",
+        "wholeEventSuperseded": false
+      }
+    },
+    {
+      "id": "FCR-14-REPEATED-CORRECTION-CHAIN-KEEPS-ALL-RECEIPTS-AND-RELATIONS",
+      "input": {
+        "receipts": [
+          "SYNTH-RCP-001",
+          "SYNTH-RCP-002",
+          "SYNTH-RCP-003"
+        ],
+        "relations": [
+          "CORRECTS-001",
+          "CORRECTS-002"
+        ],
+        "latestRelationStatus": "RESOLVED"
+      },
+      "expected": {
+        "receiptCount": 3,
+        "relationCount": 2,
+        "latestCurrentCandidate": "SYNTH-RCP-003",
+        "priorRevisionsMutable": false,
+        "chronologyInferredFromReceiptNumber": false
+      }
+    },
+    {
+      "id": "FCR-15-CORRECTION-VIEWER-POINTS-TO-ITS-OWN-RECEIPT",
+      "input": {
+        "priorReceipt": "20261103000001",
+        "correctionReceipt": "20261104000002",
+        "titleMarker": "[기재정정]",
+        "explicitTargetReceipt": null
+      },
+      "expected": {
+        "currentViewerReceipt": "20261104000002",
+        "priorViewerLinkEmitted": false,
+        "sourceRelation": "UNRESOLVED",
+        "priorSuperseded": false
+      }
+    },
+    {
+      "id": "FCR-16-RM-CORRECTION-MARKER-DOES-NOT-SUPPLY-PREDECESSOR-ID",
+      "input": {
+        "rceptNo": "20261104000002",
+        "listRm": "정",
+        "reportNameMarker": "[첨부정정]",
+        "relatedReceiptField": null
+      },
+      "expected": {
+        "currentReceiptViewerAllowed": true,
+        "predecessorLink": "SUPPRESSED_UNRESOLVED",
+        "sourceRelation": "UNRESOLVED",
+        "titleAndRmAreRelationProof": false
+      }
+    },
+    {
+      "id": "FCR-17-EXPLICIT-RELATION-KEEPS-BOTH-RECEIPT-VIEWERS",
+      "input": {
+        "currentReceipt": "20261104000002",
+        "targetReceipt": "20261103000001",
+        "explicitRelationEvidence": "SYNTHETIC_OFFICIAL_RELATION"
+      },
+      "expected": {
+        "currentViewerReceipt": "20261104000002",
+        "targetViewerReceipt": "20261103000001",
+        "receiptRecordsMerged": false,
+        "sourceRelation": "RESOLVED_FROM_EXPLICIT_EVIDENCE"
+      }
+    },
+    {
+      "id": "FCR-18-INVALID-TARGET-LINK-DOES-NOT-ERASE-RELATION-EVIDENCE",
+      "input": {
+        "currentReceipt": "20261104000002",
+        "targetReceipt": "NOT_14_DIGITS",
+        "explicitRelationEvidence": "SYNTHETIC_OFFICIAL_RELATION"
+      },
+      "expected": {
+        "sourceRelation": "RESOLVED_FROM_EXPLICIT_EVIDENCE",
+        "targetViewerLink": "SUPPRESSED_INVALID_RECEIPT",
+        "currentViewerLink": "ALLOWED_CANONICAL"
+      }
+    },
+    {
+      "id": "FCR-19-RSS-LINK-RECEIPT-MUST-MATCH-ROW-RECEIPT",
+      "input": {
+        "rowReceipt": "20261104000002",
+        "candidateLinkReceipt": "20261103000001"
+      },
+      "expected": {
+        "candidateLinkDisposition": "REJECT_RECEIPT_MISMATCH",
+        "canonicalViewerReceipt": "20261104000002",
+        "untrustedCandidateUrlReused": false
+      }
+    },
+    {
+      "id": "FCR-20-RSS-AND-LIST-JOIN-ONLY-ON-EXACT-RECEIPT",
+      "input": {
+        "rssReceipt": "20261104000002",
+        "listReceipt": "20261104000002",
+        "rssObservationId": "RSS-OBS-1",
+        "listObservationId": "LIST-OBS-1"
+      },
+      "expected": {
+        "joinStatus": "EXACT_RECEIPT_MATCH",
+        "sourceObservationsPreserved": 2,
+        "sourcePayloadOverwrite": false,
+        "canonicalViewerReceipt": "20261104000002"
+      }
+    },
+    {
+      "id": "FCR-21-MALFORMED-RSS-RECEIPT-DOES-NOT-FALL-BACK-TO-TITLE",
+      "input": {
+        "rssLink": "https://dart.fss.or.kr.evil.example/dsaf001/main.do?rcpNo=20261104000002",
+        "title": "단일판매ㆍ공급계약체결",
+        "sameCompany": true
+      },
+      "expected": {
+        "joinStatus": "UNRESOLVED_INVALID_RSS_LINK",
+        "titleFallbackUsed": false,
+        "automatedCrossSourceMerge": false
+      }
+    },
+    {
+      "id": "FCR-22-DUPLICATE-LIST-RECEIPT-CONFLICT-IS-QUARANTINED",
+      "input": {
+        "rows": [
+          {
+            "rceptNo": "20261104000002",
+            "corpCode": "00000001",
+            "reportName": "A"
+          },
+          {
+            "rceptNo": "20261104000002",
+            "corpCode": "00000002",
+            "reportName": "B"
+          }
+        ]
+      },
+      "expected": {
+        "joinStatus": "DUPLICATE_RECEIPT_CONFLICT",
+        "lastWriteWins": false,
+        "publication": "QUARANTINED_REVIEW"
+      }
+    },
+    {
+      "id": "FCR-23-SAME-TITLE-COMPANY-DATE-DIFFERENT-RECEIPTS-STAY-DISTINCT",
+      "input": {
+        "left": {
+          "rceptNo": "20261104000002",
+          "title": "단일판매ㆍ공급계약체결",
+          "corpCode": "00000001",
+          "date": "20261104"
+        },
+        "right": {
+          "rceptNo": "20261104000003",
+          "title": "단일판매ㆍ공급계약체결",
+          "corpCode": "00000001",
+          "date": "20261104"
+        }
+      },
+      "expected": {
+        "joinStatus": "NO_IDENTITY_MATCH",
+        "recordsMerged": false,
+        "titleFallbackUsed": false
+      }
+    },
+    {
+      "id": "FCR-24-INCOMPLETE-LIST-COVERAGE-DOES-NOT-PROVE-NO-MATCH",
+      "input": {
+        "rssReceipt": "20261104000002",
+        "listContainsReceipt": false,
+        "listCoverage": "INCOMPLETE"
+      },
+      "expected": {
+        "joinStatus": "UNRESOLVED_COVERAGE",
+        "absenceClaim": "FORBIDDEN",
+        "rssObservationPreserved": true
+      }
+    },
+    {
+      "id": "FCR-25-METADATA-DRIFT-KEEPS-BOTH-OBSERVATIONS",
+      "input": {
+        "rssReceipt": "20261104000002",
+        "listReceipt": "20261104000002",
+        "rssTitle": "제목 A",
+        "listReportName": "[기재정정] 제목 A"
+      },
+      "expected": {
+        "joinStatus": "EXACT_RECEIPT_MATCH_METADATA_DRIFT",
+        "bothTitlesPreserved": true,
+        "automaticValueSelection": false,
+        "reviewRequired": true
+      }
+    },
+    {
+      "id": "FCR-26-RECONCILIATION-REPORT-IS-AGGREGATE-ONLY",
+      "input": {
+        "rssRawXmlPersisted": false,
+        "listRawRowsPersisted": false,
+        "apiKeyPersisted": false,
+        "aggregateCountsAvailable": true
+      },
+      "expected": {
+        "reportContainsRawSourceContent": false,
+        "reportContainsCredentials": false,
+        "reportAdmissible": true,
+        "retentionDecision": "UNRESOLVED_UNTIL_RIGHTS_ACTION_DECISION"
+      }
+    },
+    {
+      "id": "FCR-27-SINGLE-SOURCE-CAPTURE-IS-NOT-CROSS-SOURCE-MATCH",
+      "input": {
+        "rssCapturePresent": true,
+        "listCapturePresent": false,
+        "receipt": "20261104000002"
+      },
+      "expected": {
+        "joinStatus": "SINGLE_SOURCE_OBSERVATION",
+        "exactMatchCount": 0,
+        "absenceClaim": "FORBIDDEN"
+      }
+    },
+    {
+      "id": "FCR-28-CORP-CODE-DRIFT-BLOCKS-ISSUER-ATTRIBUTION",
+      "input": {
+        "rssReceipt": "20261104000002",
+        "listReceipt": "20261104000002",
+        "listCorpCode": "00000001",
+        "trustedCorpCode": "00000002"
+      },
+      "expected": {
+        "receiptJoin": "EXACT_RECEIPT_MATCH",
+        "issuerAttribution": "BLOCKED_IDENTITY_CONFLICT",
+        "automaticIssuerSelection": false,
+        "reviewRequired": true
+      }
+    },
+    {
+      "id": "FCR-29-ROW-COUNT-OR-PAGE-ECHO-MISMATCH-INVALIDATES-COVERAGE",
+      "input": {
+        "pagesDeclared": 3,
+        "pagesFetched": 3,
+        "pageEchoConsistent": false,
+        "rowsEnumerated": 248,
+        "totalCount": 250
+      },
+      "expected": {
+        "enumerationStatus": "ENUMERATION_INCOMPLETE",
+        "negativeMatchAllowed": false,
+        "coverageState": "SOURCE_SCOPE_UNVERIFIED"
+      }
+    },
+    {
+      "id": "FCR-30-PAGINATION-SWEEP-DRIFT-KEEPS-SNAPSHOT-STABILITY-UNKNOWN",
+      "input": {
+        "firstSweepReceiptSetHash": "sha256:SYNTH-A",
+        "secondSweepReceiptSetHash": "sha256:SYNTH-B",
+        "queryWindowSame": true
+      },
+      "expected": {
+        "snapshotStability": "SNAPSHOT_STABILITY_UNKNOWN",
+        "crossSweepUnionAsComplete": false,
+        "absenceClaim": "FORBIDDEN"
+      }
+    },
+    {
+      "id": "FCR-31-UNRESOLVED-COVERAGE-UI-DOES-NOT-CALL-IT-A-MISMATCH",
+      "input": {
+        "joinStatus": "UNRESOLVED_COVERAGE"
+      },
+      "expected": {
+        "userLabel": "대조 자료 불완전 · 불일치 판정 아님",
+        "crossSourceMismatchClaim": false,
+        "absenceClaim": "FORBIDDEN"
+      }
+    },
+    {
+      "id": "FCR-32-CONFLICT-STATES-HOLD-CROSS-SOURCE-INVESTMENT-OUTPUTS",
+      "input": {
+        "joinStatus": "IDENTITY_CONFLICT",
+        "crossSourceBullishScore": true,
+        "crossSourcePushAlert": true
+      },
+      "expected": {
+        "crossSourceClaim": "SUPPRESSED",
+        "bullishScorePublished": false,
+        "pushAlertSent": false,
+        "sourceSpecificObservationPreserved": true
+      }
+    },
+    {
+      "id": "FCR-33-EXACT-RECEIPT-MATCH-IS-NOT-ISSUER-OR-TICKER-VERIFICATION",
+      "input": {
+        "joinStatus": "EXACT_RECEIPT_MATCH",
+        "corpCodeMatches": true,
+        "activeCommonStockMasterVerified": false,
+        "directImpactEvidence": null
+      },
+      "expected": {
+        "documentIdentity": "MATCHED",
+        "issuerAttribution": "UNVERIFIED",
+        "tickerRecommendationAllowed": false
+      }
+    },
+    {
+      "id": "FCR-34-REVIEWED-LINKED-DOES-NOT-BYPASS-INVESTMENT-GATES",
+      "input": {
+        "reviewDecision": "RESOLVE_AS_LINKED",
+        "activeCommonStockMasterVerified": false,
+        "directImpactEvidence": null,
+        "rightsDecision": "UNRESOLVED"
+      },
+      "expected": {
+        "manualRelation": "REVIEWED_LINKED",
+        "crossSourceClaim": "HOLD",
+        "tickerRecommendationAllowed": false,
+        "sourceRightsBypassed": false
+      }
+    },
+    {
+      "id": "FCR-35-REVIEW-DECISION-IS-APPEND-ONLY-AND-REVISION-FENCED",
+      "input": {
+        "priorJoinRevision": "JOIN-REV-1",
+        "currentJoinRevision": "JOIN-REV-2",
+        "reviewExpectedRevision": "JOIN-REV-1"
+      },
+      "expected": {
+        "decisionWrite": "REJECT_STALE_EXPECTED_REVISION",
+        "priorDecisionMutable": false,
+        "reReviewRequired": true
+      }
+    },
+    {
+      "id": "FCR-36-REVIEWED-UNLINKED-PRESERVES-OBSERVATIONS-WITHOUT-CROSS-SOURCE-ALERT",
+      "input": {
+        "reviewDecision": "RESOLVE_AS_UNLINKED",
+        "rssObservationPresent": true,
+        "listObservationPresent": true
+      },
+      "expected": {
+        "sourceObservationsPreserved": 2,
+        "crossSourceAlertSent": false,
+        "recordsMerged": false
+      }
+    },
+    {
+      "id": "FCR-37-PUBLIC-FEED-DOES-NOT-LEAK-INTERNAL-JOIN-REVIEW-DATA",
+      "input": {
+        "publicFeedRequest": true,
+        "joinReviewState": "IDENTITY_CONFLICT"
+      },
+      "expected": {
+        "reviewerIdentityExposed": false,
+        "internalRationaleExposed": false,
+        "captureIdsExposed": false,
+        "publicDtoContainsOnlySourceSpecificAndUserSafeFields": true
+      }
+    },
+    {
+      "id": "FCR-38-ADMIN-REVIEW-READ-REQUIRES-SESSION-BEFORE-STORE-ACCESS",
+      "input": {
+        "adminSession": false,
+        "reviewStoreReadAttempted": true
+      },
+      "expected": {
+        "httpStatus": 401,
+        "storeRead": false,
+        "internalMetadataReturned": false
+      }
+    },
+    {
+      "id": "FCR-39-RIGHTS-UNRESOLVED-FILTERS-REVIEW-DETAIL-FIELDS",
+      "input": {
+        "adminSession": true,
+        "metadataRights": "UNRESOLVED",
+        "rawBodyRequested": true
+      },
+      "expected": {
+        "rawBodyReturned": false,
+        "restrictedMetadataReturned": false,
+        "rightsStatusShown": "UNRESOLVED"
+      }
+    },
+    {
+      "id": "FCR-40-SHARED-ADMIN-SESSION-CANNOT-FABRICATE-NAMED-REVIEWER",
+      "input": {
+        "adminSession": true,
+        "namedReviewerIdentity": null,
+        "reviewerRole": null
+      },
+      "expected": {
+        "decisionWrite": "BLOCKED_ACTOR_IDENTITY_UNRESOLVED",
+        "reviewerIdFabricated": false
+      }
+    },
+    {
+      "id": "FCR-41-REVIEW-DECISION-MUTATION-REQUIRES-APPROVED-CSRF-AND-ROLE-GATE",
+      "input": {
+        "adminSession": true,
+        "actorRolePolicy": "NOT_APPROVED",
+        "csrfValidation": "NOT_CONFIGURED"
+      },
+      "expected": {
+        "decisionWrite": "BLOCKED_POLICY_NOT_READY",
+        "decisionPersisted": false,
+        "joinRevisionMutated": false
+      }
+    },
+    {
+      "id": "FCR-42-SHARED-SESSION-IS-NOT-NAMED-ACTOR",
+      "input": {
+        "actorId": null,
+        "clientActorId": "user-entered",
+        "session": "VALID_SHARED_PASSWORD_SESSION"
+      },
+      "expected": {
+        "clientActorIgnored": true,
+        "reviewerAttribution": "UNAVAILABLE",
+        "decisionMutation": "REJECT"
+      }
+    },
+    {
+      "id": "FCR-43-REVIEW-DAL-AUTHORIZES-BEFORE-STORE-READ",
+      "input": {
+        "session": "INVALID",
+        "storeReadAttempted": true
+      },
+      "expected": {
+        "storeReads": 0,
+        "httpStatus": 401
+      }
+    },
+    {
+      "id": "FCR-44-SAMESITE-ALONE-DOES-NOT-AUTHORIZE-MUTATION",
+      "input": {
+        "csrfProof": null,
+        "origin": "SAME_ORIGIN",
+        "cookieSameSite": "LAX"
+      },
+      "expected": {
+        "mutation": "REJECT",
+        "reason": "CSRF_PROOF_REQUIRED"
+      }
+    },
+    {
+      "id": "FCR-45-VALIDATED-CSRF-AND-ROLE-REQUIRED",
+      "input": {
+        "csrf": "VALID",
+        "permission": "REVIEW_DECIDE",
+        "actorId": "actor-1",
+        "expectedRevision": 7,
+        "currentRevision": 7
+      },
+      "expected": {
+        "mutation": "ACCEPT_IF_SERVER_POLICY_APPROVES",
+        "audit": "APPEND_ONLY_WITH_SERVER_ACTOR"
+      }
+    },
+    {
+      "id": "FCR-46-STALE-REVIEW-REVISION-REJECTED",
+      "input": {
+        "csrf": "VALID",
+        "permission": "REVIEW_DECIDE",
+        "actorId": "actor-1",
+        "expectedRevision": 6,
+        "currentRevision": 7
+      },
+      "expected": {
+        "mutation": "REJECT",
+        "reason": "STALE_REVISION"
+      }
+    },
+    {
+      "id": "FCR-48-NO-IMPACT-REQUIRES-CLOSED-DEPENDENCY-DENOMINATOR",
+      "input": {
+        "correctionRevision": "REV-SYN-CORR-4",
+        "expectedDependencySet": ["CLAIM-SYN-A", "CLAIM-SYN-B", "DATE-SYN-A", "SECURITY-SYN-A"],
+        "observedDependencySet": ["CLAIM-SYN-A", "CLAIM-SYN-B", "DATE-SYN-A", "SECURITY-SYN-A"],
+        "unmappedDependencyCount": 0,
+        "sourcePageCoverage": "COMPLETE",
+        "reviewedImpactByNode": {
+          "CLAIM-SYN-A": "AFFECTED",
+          "CLAIM-SYN-B": "VERIFIED_UNAFFECTED",
+          "DATE-SYN-A": "AFFECTED",
+          "SECURITY-SYN-A": "VERIFIED_UNAFFECTED"
+        }
+      },
+      "expected": {
+        "noImpactAdmissible": true,
+        "claimBDisposition": "RETAIN_WITH_REVIEWED_NO_IMPACT_LINK",
+        "securityADisposition": "RETAIN_WITH_REVIEWED_NO_IMPACT_LINK",
+        "unresolvedDependencyCount": 0,
+        "unlistedConsumerTreatedAsUnaffected": false,
+        "unrelatedEventMutation": false
+      }
+    },
+    {
+      "id": "FCR-49-OPEN-IMPACT-DENOMINATOR-FORBIDS-NO-IMPACT-CLAIM",
+      "input": {
+        "correctionRevision": "REV-SYN-CORR-5",
+        "expectedDependencySet": ["CLAIM-SYN-A", "CLAIM-SYN-B", "DATE-SYN-A", "SECURITY-SYN-A"],
+        "observedDependencySet": ["CLAIM-SYN-A", "DATE-SYN-A", "SECURITY-SYN-A"],
+        "unmappedDependencyCount": 1,
+        "sourcePageCoverage": "INCOMPLETE",
+        "reviewedImpactByNode": {
+          "CLAIM-SYN-A": "AFFECTED",
+          "DATE-SYN-A": "AFFECTED",
+          "SECURITY-SYN-A": "UNKNOWN"
+        }
+      },
+      "expected": {
+        "noImpactAdmissible": false,
+        "claimBDisposition": "UNRESOLVED_NOT_NO_IMPACT",
+        "instrumentDisposition": "SUPPRESS_PENDING_RECONCILIATION",
+        "unresolvedDependencyCount": 1,
+        "unlistedConsumerTreatedAsUnaffected": false,
+        "unrelatedEventMutation": false
+      }
+    },
+    {
+      "id": "FCR-47-NULL-ORIGIN-REJECTED-UNLESS-ALTERNATE-CSRF-DEFENSE-PASSES",
+      "input": {
+        "referer": null,
+        "origin": "null",
+        "csrfProof": null
+      },
+      "expected": {
+        "mutation": "REJECT",
+        "reason": "NO_VALID_CSRF_OR_ORIGIN_PROOF"
+      }
+    }
+  ],
+  "receiptJoinContract": {
+    "identityKey": "DART:rcept_no",
+    "receiptPattern": "^[0-9]{14}$",
+    "joinRule": "exact receipt equality only",
+    "preservation": "immutable source observations are retained separately; a join creates a derived relation and never overwrites either source payload",
+    "metadataDrift": "retain both values; create REVIEW_REQUIRED; do not silently choose one source value",
+    "duplicateConflict": "same source and receipt with differing identity-critical fields is quarantined; no last-write-wins",
+    "negativeMatch": "absence may be reported only for a separately bounded query with complete verified coverage; otherwise NO_MATCH is UNRESOLVED",
+    "forbiddenFallbacks": [
+      "title similarity",
+      "company name",
+      "date proximity",
+      "receipt number chronology",
+      "regex rcpNo extraction without URL allowlist validation"
+    ],
+    "viewerLink": "canonical URL is rebuilt from the validated authoritative row receipt"
+  },
+  "receiptJoinEvaluationReport": {
+    "classification": "PROPOSED_AGGREGATE_ONLY_REPORT_NO_PERSISTED_SOURCE_SNAPSHOTS",
+    "runFields": [
+      "runId",
+      "scopeStart",
+      "scopeEnd",
+      "rssCaptureId",
+      "listCaptureId",
+      "listPagesDeclared",
+      "listPagesFetched",
+      "pageEchoConsistent",
+      "enumerationRowCount",
+      "reportedTotalCount",
+      "enumerationStatus",
+      "snapshotStability",
+      "finishedAt"
+    ],
+    "aggregateOnlyMetrics": [
+      "rssItemsObserved",
+      "rssValidReceiptCount",
+      "rssInvalidLinkCount",
+      "listRowsObserved",
+      "listValidReceiptCount",
+      "duplicateReceiptKeyCount",
+      "duplicateConflictCount",
+      "exactReceiptMatchCount",
+      "exactMatchMetadataDriftCount",
+      "rssOnlyObservedCount",
+      "listOnlyObservedCount",
+      "unresolvedCoverageCount"
+    ],
+    "rawDataPolicy": "Do not persist raw RSS XML, OpenDART list rows, report titles, company names, API keys, or viewer URLs in the reconciliation report. Compare values in-memory only under applicable rights decision; retain approved aggregate counts and capture metadata only.",
+    "negativeConclusion": "No unmatched/absent claim from RSS/list difference unless each declared capture coverage is independently complete and the query windows align; current feed/API snapshot guarantees are not sufficient for global absence claims",
+    "coverageStates": [
+      "ENUMERATION_COMPLETE_FOR_CAPTURE",
+      "ENUMERATION_INCOMPLETE",
+      "SNAPSHOT_STABILITY_UNKNOWN",
+      "SOURCE_SCOPE_UNVERIFIED"
+    ],
+    "retentionDecision": "UNRESOLVED_UNTIL_RIGHTS_ACTION_DECISION"
+  },
+  "receiptJoinReviewWorkflow": {
+    "contractStatus": "PROPOSED_NOT_CURRENT_UI_OR_RUNTIME",
+    "states": [
+      {
+        "state": "EXACT_RECEIPT_MATCH",
+        "label": "접수번호 일치 · 종목 귀속은 별도 확인",
+        "crossSourceClaim": "ELIGIBLE_FOR_SEPARATE_EVIDENCE_REVIEW",
+        "issuerAttribution": "UNVERIFIED_UNTIL_COMMON_STOCK_AND_DIRECT_IMPACT_GATES"
+      },
+      {
+        "state": "METADATA_DRIFT_REVIEW",
+        "label": "출처 메타데이터 차이 · 검토 필요",
+        "crossSourceClaim": "HOLD",
+        "issuerAttribution": "UNVERIFIED"
+      },
+      {
+        "state": "DUPLICATE_RECEIPT_CONFLICT",
+        "label": "동일 접수번호 충돌 · 자동 분석 보류",
+        "crossSourceClaim": "SUPPRESSED",
+        "issuerAttribution": "BLOCKED"
+      },
+      {
+        "state": "IDENTITY_CONFLICT",
+        "label": "제출 법인 식별 충돌 · 검토 필요",
+        "crossSourceClaim": "SUPPRESSED",
+        "issuerAttribution": "BLOCKED"
+      },
+      {
+        "state": "UNRESOLVED_COVERAGE",
+        "label": "대조 자료 불완전 · 불일치 판정 아님",
+        "crossSourceClaim": "HOLD",
+        "issuerAttribution": "UNVERIFIED"
+      },
+      {
+        "state": "SINGLE_SOURCE_OBSERVATION",
+        "label": "단일 출처 관측 · 교차 대조 전",
+        "crossSourceClaim": "NOT_CROSS_SOURCE_VERIFIED",
+        "issuerAttribution": "UNVERIFIED"
+      }
+    ],
+    "reviewActions": [
+      "OPEN_CURRENT_RECEIPT_VIEWER",
+      "COMPARE_SOURCE_METADATA",
+      "VERIFY_SUBMITTER_ENTITY",
+      "VERIFY_ACTIVE_COMMON_STOCK_MASTER",
+      "ATTACH_DIRECT_IMPACT_EVIDENCE",
+      "REVIEW_EXPLICIT_CORRECTION_RELATION",
+      "RESOLVE_AS_LINKED",
+      "RESOLVE_AS_UNLINKED",
+      "KEEP_UNRESOLVED"
+    ],
+    "reviewDecisionFields": [
+      "decisionId",
+      "priorJoinRevision",
+      "currentCaptureIds",
+      "receiptIds",
+      "decision",
+      "rationale",
+      "evidenceRefs",
+      "instrumentMasterSnapshot",
+      "reviewerId",
+      "reviewerRole",
+      "decidedAt",
+      "expectedRevision"
+    ],
+    "decisionRules": {
+      "exactReceiptDoesNotProveIssuer": true,
+      "issuerNeedsActiveCommonStockAndDirectImpactEvidence": true,
+      "reviewedLinkedDoesNotBypassRightsOrClaimApproval": true,
+      "reviewedUnlinkedPreservesBothSourceObservations": true,
+      "decisionAppendOnly": true,
+      "staleCaptureRequiresReReview": true
+    },
+    "scope": "Only cross-source-derived claim/score/recommendation/alert is gated here; a source-specific raw filing observation follows its own source rights and publication decisions.",
+    "ui": {
+      "page": "공시 연결 검토",
+      "queueColumns": [
+        "joinStatus",
+        "receiptIds",
+        "sourceCaptureIds",
+        "reasonCode",
+        "capturedAt",
+        "queueAge"
+      ],
+      "detail": "show RSS and OpenDART metadata side by side while preserving source labels and values",
+      "documentBody": "not included unless current source action decision separately permits display",
+      "actions": [
+        "OPEN_CURRENT_RECEIPT_VIEWER",
+        "COMPARE_SOURCE_METADATA",
+        "VERIFY_SUBMITTER_ENTITY",
+        "VERIFY_ACTIVE_COMMON_STOCK_MASTER",
+        "ATTACH_DIRECT_IMPACT_EVIDENCE",
+        "REVIEW_EXPLICIT_CORRECTION_RELATION",
+        "RESOLVE_AS_LINKED",
+        "RESOLVE_AS_UNLINKED",
+        "KEEP_UNRESOLVED"
+      ],
+      "unknownVsMismatch": "visually distinct states; unknown coverage is never rendered as mismatch or absence",
+      "slo": "NOT_SET_UNTIL_OWNER_APPROVES"
+    },
+    "wireframe": {
+      "status": "PROPOSED_TEXT_WIREFRAME_NOT_IMPLEMENTED",
+      "queue": {
+        "summary": [
+          "holdCountByState",
+          "oldestQueueAge",
+          "coverageUnresolvedCount"
+        ],
+        "filters": [
+          "joinStatus",
+          "KSTDateRange",
+          "sourcePair",
+          "queueAge"
+        ],
+        "columns": [
+          "userSafeJoinStatus",
+          "receiptNo",
+          "rssTitle",
+          "listReportName",
+          "submitter",
+          "corpCodeCheck",
+          "capturedAt",
+          "heldOutputTypes"
+        ],
+        "noResult": "show NO_MATCH only as not observed in the exact declared capture; never imply no official filing"
+      },
+      "detail": {
+        "header": [
+          "source-specific statuses",
+          "canonical current receipt viewer",
+          "join revision and capture references"
+        ],
+        "leftPanel": "DART RSS observation with its source identity and field-level rights visibility",
+        "rightPanel": "OpenDART list observation with its source identity and field-level rights visibility",
+        "comparison": "typed field-by-field delta; equal/missing/different/unavailable are distinct",
+        "decisionGates": [
+          "receipt identity",
+          "submitter identity",
+          "active COMMON_STOCK master",
+          "direct affected-issuer evidence",
+          "source rights/action",
+          "cross-source claim review"
+        ],
+        "history": "append-only prior join revisions and reviewer decisions"
+      },
+      "actions": [
+        "open current receipt",
+        "inspect field differences",
+        "verify issuer/instrument",
+        "attach evidence",
+        "resolve linked",
+        "resolve unlinked",
+        "keep unresolved"
+      ],
+      "visualState": "UNRESOLVED_COVERAGE and MISMATCH use distinct labels, colors, and accessible text"
+    },
+    "permissionsMatrix": [
+      {
+        "surface": "PUBLIC_DART_FEED",
+        "method": "GET",
+        "access": "PUBLIC",
+        "allowed": "existing source-specific feed DTO only",
+        "forbidden": [
+          "reviewer identity",
+          "internal rationale",
+          "source capture IDs",
+          "duplicate conflict details",
+          "rights evidence",
+          "join decision write"
+        ]
+      },
+      {
+        "surface": "ADMIN_REVIEW_PAGE",
+        "method": "GET",
+        "access": "ADMIN_SESSION_REQUIRED",
+        "allowed": "rights-filtered join observations and review queue",
+        "limitation": "current admin session is shared password boolean with no attributable person/role"
+      },
+      {
+        "surface": "ADMIN_REVIEW_API",
+        "method": "GET",
+        "access": "ADMIN_SESSION_REQUIRED_BEFORE_READ",
+        "allowed": "rights-filtered review DTO only",
+        "forbidden": [
+          "raw source document unless a separate action permits it",
+          "API credentials",
+          "unfiltered provider payload"
+        ]
+      },
+      {
+        "surface": "ADMIN_REVIEW_DECISION_API",
+        "method": "POST",
+        "access": "NOT_READY_UNTIL_ACTOR_AND_CSRF_POLICY_APPROVED",
+        "allowed": "append-only decision with expected revision and evidence refs",
+        "forbidden": [
+          "anonymous write",
+          "stale revision write",
+          "unattributed reviewer decision"
+        ]
+      }
+    ],
+    "authorizationGap": "requireAdminSession currently proves only a shared password session, not a named reviewer or role; reviewerId/reviewerRole cannot be honestly populated until identity attribution and mutation CSRF/permission contracts are approved",
+    "mutationSecurityContract": {
+      "status": "PROPOSED_FAIL_CLOSED_CONTRACT_NOT_IMPLEMENTED",
+      "reads": "Admin review reads must authorize at the data access boundary before retrieving review records and return a purpose-limited DTO.",
+      "writes": "Decision writes require an authenticated named actor, an explicit decision permission, server-side schema and expected-revision validation, and an append-only decision record.",
+      "csrf": {
+        "requiredForCookieAuthenticatedMutation": true,
+        "sameSiteIsDefenseInDepthOnly": true,
+        "acceptedApproach": "UNDECIDED_BY_SECURITY_OWNER",
+        "candidateControls": [
+          "SERVER_VALIDATED_SYNCHRONIZER_TOKEN",
+          "STRICT_ORIGIN_REFERER_VALIDATION_WITH_TOKEN_FALLBACK"
+        ],
+        "missingOrNullOrigin": "REJECT_UNLESS_ANOTHER_CONFIGURED_CSRF_DEFENSE_VALIDATES",
+        "safeMethodsMustNotMutate": true
+      },
+      "audit": "Record actor identity, role/permission decision, action, target revision, expected revision, decision timestamp and rationale reference; never trust client-supplied actor fields."
+    },
+    "officialSecurityBasis": [
+      {
+        "url": "https://nextjs.org/docs/app/guides/authentication",
+        "source": "Next.js Authentication guide",
+        "application": "Authorization belongs near data access; use purpose-limited DTOs; Route Handlers and Server Actions must authorize each access or mutation."
+      },
+      {
+        "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html",
+        "source": "OWASP CSRF Prevention Cheat Sheet",
+        "application": "SameSite is defense in depth; state-changing requests need validated CSRF protection and Origin/Referer fallback must fail closed when absent."
+      }
+    ]
+  }
+}

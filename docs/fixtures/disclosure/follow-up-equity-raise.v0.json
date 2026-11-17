@@ -1,0 +1,84 @@
+{
+  "contractVersion": "follow-up-equity-raise.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "requiredEnvelopeKeys": [
+    "contractVersion",
+    "caseRevisionId",
+    "snapshotId",
+    "asOf",
+    "publicationDisposition",
+    "stageComparisons",
+    "coverage",
+    "allowedPublicTextKeys",
+    "forbiddenPublicText",
+    "sourceClaimBindings"
+  ],
+  "vectors": [
+    {
+      "id": "FUER-01-PLAN-ONLY",
+      "input": { "planCommonShares": "1000000", "coverage": "NOT_CURRENT", "allotment": null, "payment": null, "issuance": null },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "PLAN": "EVIDENCE_OBSERVED", "ALLOTMENT": "UNVERIFIABLE", "PAYMENT": "UNVERIFIABLE", "ISSUANCE": "UNVERIFIABLE" }, "forbiddenPublicText": ["발행 완료", "자금 조달 완료", "희석 확정"] }
+    },
+    {
+      "id": "FUER-02-ALLOTMENT-PARTIAL",
+      "input": { "planCommonShares": "1000000", "allottedCommonShares": "700000", "payment": null, "issuance": null, "relation": "RESOLVED" },
+      "expected": { "publicationDisposition": "PUBLISHED", "stageStatuses": { "ALLOTMENT": "CONFIRMED_FOR_STAGE", "PAYMENT": "NOT_REPORTED", "ISSUANCE": "NOT_REPORTED" }, "comparison": "VALUE_CHANGED", "forbiddenPublicText": ["70% 완료", "납입 완료", "발행 완료"] }
+    },
+    {
+      "id": "FUER-03-PAYMENT-NOT-ISSUANCE",
+      "input": { "originalPlan": "1000000", "correctedPlan": "800000", "allotted": "700000", "paid": "650000", "issued": null, "relation": "RESOLVED" },
+      "expected": { "publicationDisposition": "PUBLISHED", "stageStatuses": { "ALLOTMENT": "CONFIRMED_FOR_STAGE", "PAYMENT": "CONFIRMED_FOR_STAGE", "ISSUANCE": "NOT_REPORTED" }, "forbiddenPublicText": ["650000주 발행", "발행 완료"] }
+    },
+    {
+      "id": "FUER-04-BASIS-MISMATCH",
+      "input": { "plan": { "value": "800000", "class": "COMMON", "unit": "SHARES", "basisDate": "2030-01-01" }, "observed": { "value": "800000", "class": "OTHER", "unit": "SHARES", "basisDate": "2030-02-01" } },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "ALLOTMENT": "CONFLICTED" }, "comparison": "NOT_COMPARABLE", "forbiddenPublicText": ["변경 없음"] }
+    },
+    {
+      "id": "FUER-05-UNRESOLVED-CORRECTION",
+      "input": { "marker": "rm=정", "candidateReceipt": "SYNTH-RECEIPT-02", "relation": "UNRESOLVED", "candidatePlan": "750000" },
+      "expected": { "publicationDisposition": "SUPPRESSED_REVIEW", "stageStatuses": { "PLAN": "CONFLICTED" }, "forbiddenPublicText": ["정정된 계획 750000"] }
+    },
+    {
+      "id": "FUER-06-VALID-EMPTY",
+      "input": { "queryWindow": ["2030-01-01", "2030-01-31"], "queryStatus": "VALID_EMPTY", "requiredHistoricalScope": "INCOMPLETE" },
+      "expected": { "publicationDisposition": "PUBLISHED_WITH_UNVERIFIED_FOLLOWUP", "stageStatuses": { "OUTCOME": "UNVERIFIABLE" }, "coverage": "VALID_EMPTY_SCOPE_ONLY", "forbiddenPublicText": ["후속 공시 없음", "미실행", "취소"] }
+    },
+    {
+      "id": "FUER-07-PARTIAL-COVERAGE",
+      "input": { "pagesExpected": 3, "pagesSucceeded": 2, "providerStatus": "QUOTA_ERROR" },
+      "expected": { "publicationDisposition": "SUPPRESSED_SOURCE_COVERAGE", "stageStatuses": { "OUTCOME": "UNVERIFIABLE" }, "coverage": "PARTIAL", "forbiddenPublicText": ["후속 결과 없음", "case 완료"] }
+    },
+    {
+      "id": "FUER-08-ISSUANCE-CONFIRMED-LISTING-UNKNOWN",
+      "input": { "issuedCommonShares": "650000", "listingEvidence": null, "followupFilingRead": true, "listingClaimPresentInReadFiling": false, "separateListingSearch": "NOT_RUN", "relation": "RESOLVED" },
+      "expected": { "publicationDisposition": "PUBLISHED", "stageStatuses": { "ISSUANCE": "CONFIRMED_FOR_STAGE", "LISTING": "NOT_REPORTED", "OUTCOME": "OUTCOME_NOT_VERIFIED" }, "forbiddenPublicText": ["거래 개시", "전체 완료", "추가상장되지 않음"] }
+    },
+    {
+      "id": "FUER-09-OTHER-STOCK-ONLY",
+      "input": { "observedOtherShares": "300000", "observedCommonShares": null, "masterCommonSubject": "UNRESOLVED" },
+      "expected": { "publicationDisposition": "SUPPRESSED_SUBJECT", "stageStatuses": { "COMMON_ISSUANCE": "NOT_REPORTED", "OTHER_STOCK": "EVIDENCE_OBSERVED" }, "forbiddenPublicText": ["보통주 300000주"] }
+    },
+    {
+      "id": "FUER-10-RIGHTS-BLOCKED",
+      "input": { "listMetadataRights": "APPROVED", "structuredFieldRights": "UNRESOLVED", "bodyRights": "NOT_APPROVED" },
+      "expected": { "publicationDisposition": "PUBLISHED_METADATA_ONLY", "stageStatuses": { "ALLOTMENT": "UNVERIFIABLE" }, "forbiddenPublicText": ["신주 수량", "원문 인용", "내부 권리 메모"] }
+    },
+    {
+      "id": "FUER-11-MASTER-CAP-STALE",
+      "input": { "eventEvidence": "SUPPORTED", "masterAssertion": "EXPIRED", "capEligibility": "STALE" },
+      "expected": { "publicationDisposition": "SUPPRESSED_SUBJECT", "stageStatuses": { "SUBJECT": "UNVERIFIABLE" }, "forbiddenPublicText": ["종목 공개", "최신 적격"] }
+    },
+    {
+      "id": "FUER-12-SNAPSHOT-MISMATCH",
+      "input": { "planSnapshot": "SYNTH-SNAPSHOT-01", "allotmentSnapshot": "SYNTH-SNAPSHOT-02", "uiRecomputesStatus": true },
+      "expected": { "publicationDisposition": "REJECT_RESPONSE", "stageStatuses": {}, "forbiddenPublicText": ["부분 결과", "이전 snapshot fallback"] }
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+﻿market,ticker,universeSide,issuerName,secTickerMatchCount,secCik,secIssuerName,secExchange,lastCompletedCloseUsd,lastCompletedTradingDate,meetsOneDollarAt20261020Close,recent30dLowUsd,recent30dHighUsd,dailyCandleCount,commonStockConfirmedBySec,note
+AMS,AMZE,KIS_MASTER_ONLY,AMAZE HOLDINGS INC,1,0001880343,"AMAZE HOLDINGS, INC.",OTC,0.0746,20261007,false,0.0711,0.151,13,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,RITR,KIS_MASTER_ONLY,REITAR LOGTECH HLDGS LTD,0,,,,0.0761,20260924,false,0.0761,0.0761,4,false,SEC ticker 매핑 없음 또는 중복; SEC 원문 검토 필요
+NYS,GETY,KIS_MASTER_ONLY,GETTY IMAGES HOLDINGS INC,1,0001898496,"Getty Images Holdings, Inc.",OTC,0.0829,20261006,false,0.0799,0.2465,12,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CAPS,KIS_MASTER_ONLY,CAPSTONE HOLDING CORP,1,0000887151,Capstone Holding Corp.,Nasdaq,2.61,20261020,false,2.331,6.855,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,SNYR,KIS_MASTER_ONLY,SYNERGY CHC CORP,0,,,,0.0905,20260925,false,0.0905,0.0905,5,false,SEC ticker 매핑 없음 또는 중복; SEC 원문 검토 필요
+NAS,LESL,KIS_MASTER_ONLY,LESLIES INC,1,0001821806,"Leslie's, Inc.",Nasdaq,0.102,20261013,false,0.09,0.4455,17,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,OBAI,KIS_MASTER_ONLY,OUR BOND INC,1,0001756064,"Our Bond, Inc.",Nasdaq,0.3383,20260819,false,,,0,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,FRGT,KIS_MASTER_ONLY,FREIGHT TECHNOLOGIES INC,1,0001687542,"Freight Technologies, Inc.",Nasdaq,1.48,20261020,false,1.25,7.4,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+AMS,VTAK,KIS_MASTER_ONLY,CATHETER PRECISION INC,1,0001716621,"Flyte Aviation, Inc.",NYSE,0.151,20261012,false,0.1288,0.163,16,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,GWH,KIS_MASTER_ONLY,ESS TECH INC,0,,,,0.1567,20261009,false,0.156,0.4329,15,false,SEC ticker 매핑 없음 또는 중복; SEC 원문 검토 필요
+NAS,ILLR,KIS_MASTER_ONLY,TRILLER GROUP INC,1,0001769624,Triller Group Inc.,OTC,0.177,20261014,false,0.1629,0.6646,18,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,SOBR,KIS_MASTER_ONLY,SOBR SAFE INC,1,0001425627,"SOBR Safe, Inc.",OTC,0.203,20260923,false,0.203,0.203,3,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,MBRX,KIS_MASTER_ONLY,MOLECULIN BIOTECH INC,1,0001659617,"Moleculin Biotech, Inc.",Nasdaq,6,20261020,false,4.42,14.66,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,GP,KIS_MASTER_ONLY,GREENPOWER MTR CO INC,1,0001584547,GREENPOWER MOTOR Co INC.,Nasdaq,1.45,20261020,false,0.964,4.2011,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,REVB,KIS_MASTER_ONLY,REVELATION BIOSCIENCES INC,1,0001810560,"REVELATION BIOSCIENCES, INC.",Nasdaq,3.75,20261020,false,3.08,7.1407,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,NVNI,KIS_MASTER_ONLY,NVNI GROUP LTD,1,0001965143,Nvni Group Ltd,Nasdaq,0.5313,20261016,false,0.5103,0.9836,20,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+AMS,BURU,KIS_MASTER_ONLY,NUBURU INC,1,0001814215,"Nuburu, Inc.",NYSE,0.0727,20260821,false,,,0,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,BLND,KIS_MASTER_ONLY,BLEND LABS INC,1,0001855747,"Blend Labs, Inc.",NYSE,1.0454,20261020,false,0.8813,1.27,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,FUFU,KIS_MASTER_ONLY,BITFUFU INC,1,0001921158,Bitfufu Inc.,Nasdaq,1.13,20261020,false,0.6412,1.61,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,DRCT,KIS_MASTER_ONLY,DIRECT DIGITAL HOLDINGS INC,1,0001880613,"Direct Digital Holdings, Inc.",OTC,0.91,20261012,false,0.67,1.8,16,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,BCDA,KIS_MASTER_ONLY,BIOCARDIA INC,1,0000925741,"BioCardia, Inc.",Nasdaq,1.02,20261020,false,0.87,1.19,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,YAAS,KIS_MASTER_ONLY,YOUXIN TECHNOLOGY LTD,1,0001964946,Youxin Technology Ltd,Nasdaq,1.04,20261020,false,0.95,1.41,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,TELA,KIS_MASTER_ONLY,TELA BIO INC,1,0001561921,"TELA Bio, Inc.",Nasdaq,1.09,20261020,false,0.93,1.5,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CAST,KIS_MASTER_ONLY,FREECAST INC,1,0001633369,"FreeCast, Inc.",Nasdaq,1.01,20261020,false,0.9537,1.515,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,HOWL,KIS_MASTER_ONLY,WEREWOLF THERAPEUTICS INC,1,0001785530,"Werewolf Therapeutics, Inc.",Nasdaq,1.09,20261020,false,0.88,1.1,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,INO,KIS_MASTER_ONLY,INOVIO PHARMACEUTICALS INC,1,0001055726,"INOVIO PHARMACEUTICALS, INC.",Nasdaq,1.0801,20261020,false,0.95,1.38,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,ORGO,KIS_MASTER_ONLY,ORGANOGENESIS HOLDINGS INC,1,0001661181,Organogenesis Holdings Inc.,Nasdaq,1.02,20261020,false,0.9286,1.495,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,DH,KIS_MASTER_ONLY,DEFINITIVE HEALTHCARE CORP,1,0001861795,Definitive Healthcare Corp.,Nasdaq,1.12,20261020,false,0.8882,1.21,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,NPWR,KIS_MASTER_ONLY,NET POWER INC,1,0001845437,Net Power Inc.,NYSE,1.0451,20261020,false,0.99,1.91,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,OXBR,KIS_MASTER_ONLY,OXBRIDGE RE HOLDINGS,1,0001584831,OXBRIDGE RE HOLDINGS Ltd,Nasdaq,1.01,20261020,false,0.921,1.54,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,NWGL,PROJECT_DB_ONLY,CL WORKSHOP GROUP LIMITED SPON ADS EACH REP 8 ORD,1,0001948294,CL Workshop Group Ltd,Nasdaq,0.1478,20261020,true,0.094,1.6,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,SCAG,PROJECT_DB_ONLY,SCAGE FUTURE SPON ADS EACH REPTS 1 SHS,1,0002000366,Scage Future,Nasdaq,0.1819,20261020,true,0.157,0.258,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+AMS,MYND,PROJECT_DB_ONLY,MYND AI INC SPON ADS EACH REP 10 ORD CL A SHS,1,0001708441,"Mynd.ai, Inc.",NYSE,0.1931,20261020,true,0.0001,0.4501,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CAN,PROJECT_DB_ONLY,CANAAN INC SPON ADS EACH REP 15 ORD SHS CL A,1,0001780652,Canaan Inc.,Nasdaq,0.238,20261020,true,0.22,0.45,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,UCL,PROJECT_DB_ONLY,UCLOUDLINK GROUP INC SPON ADS EACH REP 10 ORD SHS CL A,1,0001775898,uCloudlink Group Inc.,Nasdaq,0.2381,20261020,true,0.222,0.3943,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,INLF,PROJECT_DB_ONLY,INLIF LIMITED,1,0001991592,INLIF Ltd,Nasdaq,0.24,20261020,true,0.214,6.87,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,YOUL,PROJECT_DB_ONLY,YOULIFE GROUP INC SPON ADS EACH REP 1 CL A,1,0002028177,Youlife Group Inc.,Nasdaq,0.284,20261020,true,0.2515,0.5175,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,MREO,PROJECT_DB_ONLY,MEREO BIOPHARMA GROUP PLC SPON ADS EACH REP 5 ORD SHS,1,0001719714,Mereo BioPharma Group plc,Nasdaq,0.3153,20261020,true,0.2892,0.4232,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+AMS,DXF,PROJECT_DB_ONLY,EASON TECHNOLOGY LIMITED SPON ADR EA REP 60000 ORD (P/S),1,0001499494,Eason Technology Ltd,NYSE,0.3372,20261020,true,0.3234,0.54,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,MRM,PROJECT_DB_ONLY,MEDIROM HEALTHCARE TECHNOLOGIES INC SPON ADS EACH REP 1 ORD,1,0001819704,Medirom Healthcare Technologies Inc.,Nasdaq,0.37,20261020,true,0.245,0.8396,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,BDRX,PROJECT_DB_ONLY,BIODEXA PHARMACEUTICALS PLC SPON ADS EA RP 50 ORD SHS,1,0001643918,Biodexa Pharmaceuticals Plc,Nasdaq,0.3812,20261020,true,0.3371,0.7419,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,EYPT,PROJECT_DB_ONLY,EYEPOINT INC,1,0001314102,"EyePoint, Inc.",Nasdaq,0.4184,20261020,true,0.4,4.215,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,LOT,PROJECT_DB_ONLY,LOTUS TECHNOLOGY INC SPON ADR EACH REPRESENTING 1 ORD SHS,1,0001962746,Lotus Technology Inc.,Nasdaq,0.5094,20261020,true,0.4995,1.0458,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,RDHL,PROJECT_DB_ONLY,REDHILL BIOPHARMA LTD SPON ADR EACH REP 10000 ORD SHS (P/S),1,0001553846,RedHill Biopharma Ltd.,Nasdaq,0.5174,20261020,true,0.4352,0.6909,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,STKH,PROJECT_DB_ONLY,STEAKHOLDER FOODS LTD SPON ADS EACH REP 12000 ORD(R/S),1,0001828098,Steakholder Foods Ltd.,Nasdaq,0.53,20261020,true,0.4905,2.3,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,YMT,PROJECT_DB_ONLY,YIMUTIAN INC. SPON ADS EACH REP 6000 ORD CL A(R/S),1,0001991605,Yimutian Inc.,Nasdaq,0.591,20261020,true,0.561,2.64,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,GNTA,PROJECT_DB_ONLY,GENENTA SCIENCE SPA SPON ADS EACH REP 1 ORD SHS,1,0001838716,Genenta Science S.p.A.,Nasdaq,0.6298,20261020,true,0.61,0.85,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CJMB,PROJECT_DB_ONLY,CALLAN JMB INC,1,0002032545,CALLAN JMB INC.,Nasdaq,0.6329,20261020,true,0.6208,2.5196,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,POM,PROJECT_DB_ONLY,POMDOCTOR LIMITED SPON ADS EACH REP 3 CL A(R/S),1,0001877971,POMDOCTOR Ltd,Nasdaq,0.6379,20261020,true,0.433,1.06,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,LX,PROJECT_DB_ONLY,LEXINFINTECH HOLDINGS LTD EACH ADS REP 2 ORD SHS CLASS A,1,0001708259,LexinFintech Holdings Ltd.,Nasdaq,0.64,20261020,true,0.625,0.79,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,AACG,PROJECT_DB_ONLY,ATA CREATIVITY GLOBAL SPON ADS EACH REP 2 ORD SHS,1,0001420529,ATA Creativity Global,Nasdaq,0.6575,20261020,true,0.6,0.9543,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,SCNI,PROJECT_DB_ONLY,SCINAI IMMUNOTHERAPEUTICS LTD SPON ADS EACH REP 40000 SHS(R/,1,0001611747,Scinai Immunotherapeutics Ltd.,Nasdaq,0.6735,20261020,true,0.66,2.08,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CRMT,PROJECT_DB_ONLY,AMERICA S CAR-MART INC,1,0000799850,AMERICAS CARMART INC,Nasdaq,0.723,20261020,true,0.67,1.8,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,YRD,PROJECT_DB_ONLY,YIREN DIGITAL LTD SPON ADS EA REPR 2 ORD SHS,1,0001631761,Yiren Digital Ltd.,NYSE,0.7496,20261020,true,0.3551,1.05,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,TDTH,PROJECT_DB_ONLY,TRIDENT DIGITAL TECH HOLDINGS LTD,1,0001983550,Trident Digital Tech Holdings Ltd,Nasdaq,0.7693,20261020,true,0.6752,1.9798,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,TURB,PROJECT_DB_ONLY,TURBO ENERGY S A SPON ADS EACH REP 5 ORD SHS,1,0001963439,"Turbo Energy, S.A.",Nasdaq,0.8253,20261020,true,0.82,1.22,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,MSC,PROJECT_DB_ONLY,STUDIO CITY INTERNATIONAL HLDGS LTD SPON ADS EACH REP 4 ORD,1,0001713334,STUDIO CITY INTERNATIONAL HOLDINGS Ltd,NYSE,0.8375,20261020,true,0.7525,1.11,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,FRSX,PROJECT_DB_ONLY,FORESIGHT AUTONOMOUS HOLDINGS LTD SPON ADS EACH REP 90 (POST,1,0001691221,Foresight Autonomous Holdings Ltd.,Nasdaq,0.84,20261020,true,0.73,1.3,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+AMS,BATL,PROJECT_DB_ONLY,BATTALION OIL CORP,1,0001282648,BATTALION OIL CORP,NYSE,0.85,20261020,true,0.8,1.18,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,LU,PROJECT_DB_ONLY,LUFAX HLDG LTD SPON ADS EACH REP 2 ORD SHS CL A (R/S),1,0001816007,Lufax Holding Ltd,NYSE,0.8561,20261020,true,0.8415,1.3999,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,GMM,PROJECT_DB_ONLY,GLOBAL MOFY AI LIMITED,1,0001913749,Global Mofy AI Ltd,Nasdaq,0.873,20261020,true,0.873,2.17,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CNTB,PROJECT_DB_ONLY,CONNECT BIOPHARMA HLDGS LTD,1,0001835268,Connect Biopharma Holdings Ltd,Nasdaq,0.8752,20261020,true,0.8501,1.89,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,BRLS,PROJECT_DB_ONLY,BOREALIS FOODS INC,1,0001852973,Borealis Foods Inc.,Nasdaq,0.9101,20261020,true,0.91,1.45,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CBAT,PROJECT_DB_ONLY,CBAK ENERGY TECHNOLOGY INC,1,0002086841,CBAK Energy Technology Ltd,Nasdaq,0.9174,20261020,true,0.8501,1.55,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,GMEX,PROJECT_DB_ONLY,GMEX ROBOTICS CORPORATION,1,0001928581,GMEX Robotics Corp,Nasdaq,0.9209,20261020,true,0.775,4.05,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,IQ,PROJECT_DB_ONLY,IQIYI INC SPON EACH ADS REP 7 ORD SHS CLASS A,1,0001722608,"iQIYI, Inc.",Nasdaq,0.9253,20261020,true,0.9107,1.06,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,ICON,PROJECT_DB_ONLY,ICON ENERGY CORP,1,0001995574,Icon Energy Corp,Nasdaq,0.9256,20261020,true,0.725,1.04,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,IMRN,PROJECT_DB_ONLY,IMMURON LIMITED SPON ADR EACH REPR 40 ORD SHS,1,0001660046,Immuron Ltd,Nasdaq,0.9307,20261020,true,0.902,1.2995,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,UXIN,PROJECT_DB_ONLY,UXIN LIMITED SPON ADS EACH REP 300 ORD(POST SPLIT),1,0001729173,Uxin Ltd,Nasdaq,0.9392,20261020,true,0.9201,1.47,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,JF,PROJECT_DB_ONLY,J & FRIENDS HLDGS LTD SPON ADS EACH REP 35 ORD SHS A,1,0001716338,J & Friends Holdings Ltd,Nasdaq,0.94,20261020,true,0.9,1.03,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,NYXH,PROJECT_DB_ONLY,NYXOAH SA,1,0001857190,Nyxoah SA,Nasdaq,0.94,20261020,true,0.8999,1.6699,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,COCP,PROJECT_DB_ONLY,COCRYSTAL PHARMA INC,1,0001412486,"Cocrystal Pharma, Inc.",Nasdaq,0.9429,20261020,true,0.91,1.28,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,WETO,PROJECT_DB_ONLY,WETOUR ROBOTICS LTD,1,0001941158,Wetour Robotics Ltd,Nasdaq,0.944,20261020,true,0.8156,2.19,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,BENF,PROJECT_DB_ONLY,BENEFICIENT,1,0001775734,Beneficient,Nasdaq,0.951,20261020,true,0.4981,3.15,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,PDSB,PROJECT_DB_ONLY,PDS BIOTECHNOLOGY CORPORATION,1,0001472091,PDS Biotechnology Corp,Nasdaq,0.9667,20261020,true,0.7003,1.79,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,TVRD,PROJECT_DB_ONLY,TVARDI THERAPEUTICS INC,1,0001346830,"Tvardi Therapeutics, Inc.",Nasdaq,0.98,20261020,true,0.93,1.73,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,RADX,PROJECT_DB_ONLY,RADIOPHARM THERANOSTICS LIMITED SPON ADS EACH REP 300 ORD,1,0001949257,Radiopharm Theranostics Ltd,Nasdaq,0.9801,20261020,true,0.9001,1.8,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,CLLS,PROJECT_DB_ONLY,CELLECTIS ADS EACH REPR 1 ORD SPON,1,0001627281,Cellectis S.A.,Nasdaq,0.99,20261020,true,0.8808,1.62,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,FLL,PROJECT_DB_ONLY,FULL HOUSE RESORTS INC,1,0000891482,FULL HOUSE RESORTS INC,Nasdaq,0.9901,20261020,true,0.9529,1.96,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,XCUR,PROJECT_DB_ONLY,EXICURE INC,1,0001698530,"EXICURE, INC.",Nasdaq,0.9987,20261020,true,0.936,1.34,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,UZX,PROJECT_DB_ONLY,LINKAGE GLOBAL INC,1,0001969401,Linkage Global Inc,Nasdaq,0.9999,20261020,true,0.7505,1.88,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+AMS,STXS,PROJECT_DB_ONLY,STEREOTAXIS INC,1,0001289340,"Stereotaxis, Inc.",NYSE,1,20261020,true,0.95,1.4,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,NCNA,PROJECT_DB_ONLY,NUCANA PLC SPON ADS EACH REP 5000 ORD(P/S),1,0001709626,NuCana plc,Nasdaq,1,20261020,true,0.9484,1.44,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,TLSA,PROJECT_DB_ONLY,TIZIANA LIFE SCIENCES LTD,1,0001723069,Tiziana Life Sciences Ltd,Nasdaq,1,20261020,true,0.8702,1.2475,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NAS,VS,PROJECT_DB_ONLY,VERSUS SYSTEMS INC,1,0001701963,Versus Systems Inc.,Nasdaq,1,20261020,true,0.9861,1.17,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토
+NYS,GHG,PROJECT_DB_ONLY,GREENTREE HOSPITALITY GROUP LTD SPON ADS EACH REP 1 ORD SHS,1,0001724755,GreenTree Hospitality Group Ltd.,NYSE,1,20261020,true,0.91,1.15,22,false,SEC ticker/CIK 연결만 확인; 현행 상장 및 보통주 클래스는 filing 원문 미검토

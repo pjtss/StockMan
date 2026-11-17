@@ -4008,10 +4008,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 원본의 번역 상태·번역 제목·fallback·오류를 별도 호재 테이블에 함께 저장한다.
 
 ### 검증
-- `r`npm run typecheck` 통과.
-- `r`npx vitest run lib/market-rss-classifier.test.ts` 통과: 9개 테스트.
-- `r`npm run docs:check`는 최신 문서 항목 형식 보강 전 1회 실패했으며, 현재 항목에 필수 문서 계약을 반영했다.
-- `r`npm run build`를 2회 실행했으나 `r`next build` 시작 메시지 이후 2분 이상 출력·종료가 없어 중단했다. 배포와 운영 DB 마이그레이션은 실행하지 않았다.
+- 
+pm run typecheck` 통과.
+- 
+px vitest run lib/market-rss-classifier.test.ts` 통과: 9개 테스트.
+- 
+pm run docs:check`는 최신 문서 항목 형식 보강 전 1회 실패했으며, 현재 항목에 필수 문서 계약을 반영했다.
+- 
+pm run build`를 2회 실행했으나 
+ext build` 시작 메시지 이후 2분 이상 출력·종료가 없어 중단했다. 배포와 운영 DB 마이그레이션은 실행하지 않았다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-22-005
@@ -4049,22 +4054,27 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증 결과
 - 운영 cron은 `GOOGLE_TRANSLATION_API_KEY`가 있을 때만 Google Cloud Translation 경로를 사용한다.
-- 번역 대상은 `r`notifyEligible=true`이고 `isBacklog=false`인 항목이며, 현재 제목만 번역하고 요약·본문은 원문을 유지한다.
+- 번역 대상은 
+otifyEligible=true`이고 `isBacklog=false`인 항목이며, 현재 제목만 번역하고 요약·본문은 원문을 유지한다.
 - 번역 성공 시 Discord 제목은 번역문이고 원문 제목을 함께 표시한다.
 - API 키 없음, 월간 문자 한도 초과, 번역 API fallback 또는 실패 시 Discord 전송 자체는 계속되며 제목은 원문으로 표시된다. 이 경우 데이터에 `translationFallback`/상태가 남는다.
-- `r`notifyEligible=false` 또는 backlog 항목은 번역 단계에서 제외된다.
+- 
+otifyEligible=false` 또는 backlog 항목은 번역 단계에서 제외된다.
 - 관리자 RSS 미리보기의 `translateMarketRssItems()` 기본 인자는 아직 `LibreTranslateClient`다. LibreTranslate를 사용하지 않는 운영 기준과 불일치하므로 관리자 미리보기 결과는 운영 Discord 결과 검증 근거로 사용할 수 없다.
 
 ### 테스트
-- `r`npx vitest run lib/translate-market-rss-item.test.ts lib/cloud-translation-client.test.ts lib/libretranslate-client.test.ts` 통과: 3개 파일, 6개 테스트.
+- 
+px vitest run lib/translate-market-rss-item.test.ts lib/cloud-translation-client.test.ts lib/libretranslate-client.test.ts` 통과: 3개 파일, 6개 테스트.
 
 ### 결론 및 남은 위험
 - Discord에서 어떤 항목은 번역되고 어떤 항목은 원문인 현상은 현재 코드상 정상적인 fallback·대상 제외 결과일 수 있다. 다만 관리자 미리보기의 LibreTranslate 기본 경로는 별도 정리 대상이다.
-- 실제 운영 건별 판정에는 관리자 debug suite 또는 DB의 `translationStatus`, `translationFallback`, `translationError`, `r`notificationStatus` 값을 함께 확인해야 한다.
+- 실제 운영 건별 판정에는 관리자 debug suite 또는 DB의 `translationStatus`, `translationFallback`, `translationError`, 
+otificationStatus` 값을 함께 확인해야 한다.
 - 추가 로컬 DB 확인: `.env.local`에는 `DATABASE_URL`만 존재하고 `GOOGLE_TRANSLATION_API_KEY`는 없었다. `market_rss_articles` 전체 집계는 ETODAY 38, HANKYUNG 50, KRX_KIND 100, MK 50, NASDAQ 15, NEWSIS 100, SEC_EDGAR 99, STOCKTITAN 100건이 모두 `translation_status=PENDING`이었다. 최근 7일 행은 없으므로 이 DB 결과만으로 운영 Discord 이력을 확정할 수는 없지만, 현재 로컬 실행 환경에서는 번역이 시작되지 않는 상태다.
 - **수정**: LibreTranslate를 사용하지 않는 운영 정책과 관리자 미리보기의 기본 동작을 일치시키기 위해 `lib/translate-market-rss-item.ts`에서 LibreTranslate import 및 기본 클라이언트를 제거했다. 이제 명시적 클라이언트가 없으면 Cloud Translation 환경 키를 사용하고, 키가 없으면 운영 cron과 동일하게 원문 fallback한다.
 - **재발 방지**: 번역 미리보기·운영 cron 모두 번역 공급자를 암묵적으로 LibreTranslate로 선택하지 않으며, 공급자 테스트는 명시적 테스트 클라이언트를 주입한다.
-- **검증**: 번역 관련 Vitest 2개 파일·5개 테스트 통과, `r`npm run typecheck` 통과.
+- **검증**: 번역 관련 Vitest 2개 파일·5개 테스트 통과, 
+pm run typecheck` 통과.
 - 커밋·푸시·배포: 미실행.
 
 ### 목표
@@ -4099,16 +4109,20 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 `/api/kis/intraday-mvp`에서 TOP100 후보는 존재하지만 `worker=STOPPED`, `tickCount=0`으로 남아 알림 평가가 시작되지 않는 현상을 해결한다.
 
 ### 반영
-- **근본 원인**: standalone 운영 프로세스의 instrumentation hook이 `r`new Function()`으로 `@/lib/intraday-detection-worker` 별칭을 런타임 import해 `ERR_MODULE_NOT_FOUND`로 실패했고, 워커가 시작되지 않았다.
+- **근본 원인**: standalone 운영 프로세스의 instrumentation hook이 
+ew Function()`으로 `@/lib/intraday-detection-worker` 별칭을 런타임 import해 `ERR_MODULE_NOT_FOUND`로 실패했고, 워커가 시작되지 않았다.
 - `instrumentation.ts`에서 Node 전용 워커 import를 제거하고, `/api/kis/intraday-mvp`의 singleton 지연 기동을 유일한 워커 실행 경로로 사용한다. 이로써 instrumentation 번들에 `pg`/Node core 모듈이 포함되지 않는다.
 - `ensureIntradayDetectionWorker()`를 추가하고 상태 API 첫 조회에서 프로세스 singleton 워커를 보장 기동한다.
 - 개발 환경과 명시적 `INTRADAY_DETECTION_ENABLED=false` 긴급 중지 조건은 유지한다.
 - 운영에서 `mvpQualified=true`인데 `WARMING_UP` 상태 때문에 Discord 알림이 차단되던 상태 불일치를 수정했다. 신선한 관측은 MVP 거래대금 조건을 우선하고 `STALE`·`DEGRADED`만 차단한다.
 
 ### 검증
-- `r`npm.cmd test -- --run app/api/kis/intraday-mvp/route.test.ts lib/intraday-detection-worker.test.ts lib/intraday-memory-state.test.ts`: 3개 파일, 21개 테스트 통과.
-- `r`npm.cmd run typecheck`: 통과.
-- `r`npm.cmd run docs:check`: 통과.
+- 
+pm.cmd test -- --run app/api/kis/intraday-mvp/route.test.ts lib/intraday-detection-worker.test.ts lib/intraday-memory-state.test.ts`: 3개 파일, 21개 테스트 통과.
+- 
+pm.cmd run typecheck`: 통과.
+- 
+pm.cmd run docs:check`: 통과.
 - 배포 전 production build와 운영 API에서 `RUNNING`, `tickCount>0`, `lastTickAt` 갱신을 확인한다.
 
 ### 개선 과제
@@ -4143,9 +4157,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 응답에 종목·봉 기준·최신 봉일·DB 갱신 시각·원천(`OPERATING_DB_CACHE`)을 포함한다.
 
 ### 검증
-- `r`npm.cmd run typecheck`: 통과.
-- `r`npm.cmd test -- --run`: 163개 테스트 파일, 541개 테스트 통과.
-- `r`npm.cmd run verify`: 문서 계약 형식 오류로 중단됨.
+- 
+pm.cmd run typecheck`: 통과.
+- 
+pm.cmd test -- --run`: 163개 테스트 파일, 541개 테스트 통과.
+- 
+pm.cmd run verify`: 문서 계약 형식 오류로 중단됨.
 
 ### 개선 과제
 - 로컬 캐시 provider를 운영 API 호출 방식으로 전환한다.
@@ -4171,9 +4188,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 서버 릴리스 정적 청크 보존 및 HTML 재검증 설정은 직전 수정에서 반영했다.
 
 ### 검증
-- `r`npm.cmd test -- --run`: 158개 테스트 파일, 525개 테스트 통과.
-- `r`npm.cmd run typecheck`: 통과.
-- `r`npm.cmd run build`: 통과.
+- 
+pm.cmd test -- --run`: 158개 테스트 파일, 525개 테스트 통과.
+- 
+pm.cmd run typecheck`: 통과.
+- 
+pm.cmd run build`: 통과.
 
 ### 개선 과제
 - 운영 브라우저에서 청크 오류 발생 시 복구 시도 횟수와 성공 여부를 오류 로그에서 분리 집계한다.
@@ -4216,10 +4236,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - QUALIFIED 신규 전이 시 Discord 알림을 연결했다.
 
 ### 검증
-- `r`npm.cmd test -- --run`: 158개 테스트 파일, 525개 테스트 통과.
-- `r`npm.cmd run typecheck`: 통과.
-- `r`npm.cmd run build`: 통과.
-- `r`npm.cmd run deploy:verify`: 문서 게이트에서 기존 최신 로그 형식 오류로 중단됨. 해당 형식 오류를 본 항목으로 보완 후 재실행한다.
+- 
+pm.cmd test -- --run`: 158개 테스트 파일, 525개 테스트 통과.
+- 
+pm.cmd run typecheck`: 통과.
+- 
+pm.cmd run build`: 통과.
+- 
+pm.cmd run deploy:verify`: 문서 게이트에서 기존 최신 로그 형식 오류로 중단됨. 해당 형식 오류를 본 항목으로 보완 후 재실행한다.
 
 ### 개선 과제
 - 배포 후 관리자에서 1분·1%와 5분·5%를 각각 저장하고 `/api/kis/intraday-mvp`의 criteria 반영을 확인한다.
@@ -4442,7 +4466,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 관측 저장 및 chunking 회귀 테스트를 추가했다.
 
 ### 검증
-- `r`npm.cmd run deploy:verify` 통과: 빌드, 테스트 157개 파일/523개, 타입체크, 문서·범위·KIS·cron 감사, runtime smoke 모두 성공.
+- 
+pm.cmd run deploy:verify` 통과: 빌드, 테스트 157개 파일/523개, 타입체크, 문서·범위·KIS·cron 감사, runtime smoke 모두 성공.
 - `/charts` HTTP 200, 국내·해외 TOP 상승률 API JSON smoke 성공.
 - 관측 회귀 테스트 3개와 타입체크 통과.
 
@@ -4520,7 +4545,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 운영 `intraday_detection_ticks`에서 변경 전후 동일 세션의 tick `durationMs` p50/p95와 시장별 응답 지연을 비교해 효과를 확정한다.
 
 ### 검증
-- `r`npm.cmd test -- --run lib/intraday-detection-worker.test.ts` 통과(3 tests).
+- 
+pm.cmd test -- --run lib/intraday-detection-worker.test.ts` 통과(3 tests).
 - 전체 배포 전 검증을 시작해 테스트 156개 파일/520개 테스트와 타입체크·문서·감사 게이트까지 통과했다.
 - 관측 CTE 변경 후 worker 단위 테스트 3개와 타입체크를 통과했다.
 - 관측 회귀 테스트와 worker 테스트 4개를 통과했다.
@@ -4544,9 +4570,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Flyway 버전 조회는 테이블 목록 확인 이후에만 실행하는 의존성을 유지했다.
 
 ### 검증
-- `r`npm.cmd run typecheck` 통과.
-- `r`npx.cmd vitest run lib/schema-health.test.ts app/api/health/route.test.ts` 통과.
-- 전체 `r`npm.cmd run deploy:verify`에서 테스트·빌드·실행 스모크를 확인한다.
+- 
+pm.cmd run typecheck` 통과.
+- 
+px.cmd vitest run lib/schema-health.test.ts app/api/health/route.test.ts` 통과.
+- 전체 
+pm.cmd run deploy:verify`에서 테스트·빌드·실행 스모크를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-018
@@ -4571,7 +4600,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 결과 필드와 오류 시 best-effort 동작은 유지했다.
 
 ### 검증
-- `r`npm.cmd run deploy:verify`에서 전체 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
+- 
+pm.cmd run deploy:verify`에서 전체 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
 - 운영 전후 `/api/health` 응답시간을 비교 측정한다.
 
 ### 개선 과제
@@ -4597,8 +4627,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 `QUALIFIED`, `NO_TOP100`, `OBSERVING` 상태는 유지했다.
 
 ### 검증
-- `r`npx.cmd vitest run app/api/kis/intraday-mvp/route.test.ts`에서 기존 결과 계약 2건을 통과했다.
-- 전체 `r`npm.cmd run deploy:verify`에서 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
+- 
+px.cmd vitest run app/api/kis/intraday-mvp/route.test.ts`에서 기존 결과 계약 2건을 통과했다.
+- 전체 
+pm.cmd run deploy:verify`에서 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-016
@@ -4624,7 +4656,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증
 - `app/api/kis/intraday-mvp/route.test.ts`에서 충족·후보 이탈 상태를 확인한다.
-- 전체 `r`npm.cmd run deploy:verify`로 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
+- 전체 
+pm.cmd run deploy:verify`로 테스트·타입체크·문서·빌드·실행 스모크를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-015
@@ -4649,7 +4682,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증
 - `rg -n "INTRADAY_(WORKER|DETECTION)_ENABLED" instrumentation.ts docs/INTRADAY_KIS_MEMORY_DESIGN.md`로 실행 코드와 문서의 명칭을 대조한다.
-- `r`npm.cmd run docs:check`로 문서 계약과 마이그레이션 검사를 수행한다.
+- 
+pm.cmd run docs:check`로 문서 계약과 마이그레이션 검사를 수행한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-014
@@ -4701,7 +4735,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 기존 종료 루틴과 함께 부모-자식 수명주기를 일치시켜 잔류 Node 프로세스 가능성을 낮췄다.
 
 ### 검증
-- 전체 `r`npm.cmd run deploy:verify`를 실행해 빌드와 런타임 스모크 종료까지 확인한다.
+- 전체 
+pm.cmd run deploy:verify`를 실행해 빌드와 런타임 스모크 종료까지 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-012
@@ -4726,7 +4761,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `app/api/stock/chart/route.test.ts`에 파라미터 없이도 원본 회사명이 유지되는 회귀 검증을 추가했다.
 
 ### 검증
-- 관련 차트 API 테스트와 전체 `r`npm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임을 확인한다.
+- 관련 차트 API 테스트와 전체 
+pm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임을 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-011
@@ -4751,8 +4787,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 재시도 전체 시간 제한은 유지해 장애 시 빠르게 실패하고 원인을 출력하도록 했다.
 
 ### 검증
-- 단독 `r`npm.cmd run build`는 정상 종료했다.
-- 수정 후 전체 `r`npm.cmd run deploy:verify`를 실행해 요청 타임아웃과 런타임 스모크 종료를 확인한다.
+- 단독 
+pm.cmd run build`는 정상 종료했다.
+- 수정 후 전체 
+pm.cmd run deploy:verify`를 실행해 요청 타임아웃과 런타임 스모크 종료를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-010
@@ -4777,7 +4815,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 따라서 구조화된 API 오류는 계약 검증을 통과하고, HTML 404/504 응답은 계속 실패한다.
 
 ### 검증
-- 전체 `r`npm.cmd run deploy:verify`를 재실행해 로컬 5xx JSON 오탐 해소와 전체 품질 게이트를 확인한다.
+- 전체 
+pm.cmd run deploy:verify`를 재실행해 로컬 5xx JSON 오탐 해소와 전체 품질 게이트를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-009
@@ -4803,7 +4842,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `/api/stock/us/top-rising-chart`, `/api/stock/kr/top-rising-chart`를 검증 대상으로 추가했다.
 
 ### 검증
-- 전체 `r`npm.cmd run deploy:verify`로 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·HTML/JSON 런타임 스모크를 확인한다.
+- 전체 
+pm.cmd run deploy:verify`로 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·HTML/JSON 런타임 스모크를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-008
@@ -4853,7 +4893,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 누락 시 패키징 단계에서 즉시 실패해 운영 서버까지 잘못된 릴리스가 전달되지 않도록 했다.
 
 ### 검증
-- 전체 `r`npm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
+- 전체 
+pm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
 - workflow 패키징 경로와 실제 migration 파일명을 정적 대조했다.
 
 ### 개선 과제
@@ -4881,7 +4922,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - tar 생성 경로를 동일 release directory 기준으로 변경해 stale/누락 산출물 배포를 방지한다.
 
 ### 검증
-- 전체 `r`npm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
+- 전체 
+pm.cmd run deploy:verify`를 실행해 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
 - 배포 workflow의 패키징 경로와 검증 산출물 경로를 정적 대조한다.
 
 ### 개선 과제
@@ -4909,7 +4951,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 정상 응답 및 OpenDART 비즈니스 오류 코드 처리는 유지한다.
 
 ### 검증
-- 관련 KIS 테스트를 실행하고 전체 `r`npm.cmd run deploy:verify`로 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 검증한다.
+- 관련 KIS 테스트를 실행하고 전체 
+pm.cmd run deploy:verify`로 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 검증한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-004
@@ -4937,7 +4980,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증
 - `lib/kis.test.ts` 5개 테스트 통과.
-- 전체 `r`npm.cmd run deploy:verify`에서 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
+- 전체 
+pm.cmd run deploy:verify`에서 테스트·타입체크·문서·범위·KIS 경계·cron·빌드·런타임 스모크를 확인한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-09-17-003
@@ -4963,7 +5007,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 결과 필드·필터 조건·EMA/볼린저 정의는 변경하지 않았다.
 
 ### 검증
-- 관련 테스트 및 전체 `r`npm.cmd run deploy:verify`를 실행한다.
+- 관련 테스트 및 전체 
+pm.cmd run deploy:verify`를 실행한다.
 - 기존 사용자 산출물과 임시 파일은 변경·커밋하지 않는다.
 
 ### 개선 과제
@@ -5180,8 +5225,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증 및 실행 방법
 
-- `r`npm.cmd run typecheck` 통과.
-- 실행 예: `r`node_modules/tsx/dist/cli.mjs scripts/run-us-daily-1200-backfill.mjs`.
+- 
+pm.cmd run typecheck` 통과.
+- 실행 예: 
+ode_modules/tsx/dist/cli.mjs scripts/run-us-daily-1200-backfill.mjs`.
 - 실행 전 `US_DAILY_BACKFILL_TARGET`로 목표 개수를 1~1,200 범위에서 조정할 수 있다.
 - 커밋·푸시·배포: 미실행.
 
@@ -5228,7 +5275,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 배포 workflow에서 `public`과 `.next` 대상 디렉터리를 복사 전에 생성하도록 수정했다.
 
 ### 검증
-- `r`npm.cmd run deploy:verify`의 테스트 156개 파일·521개 테스트와 타입검사 통과. 문서 계약은 보완 후 재실행한다.
+- 
+pm.cmd run deploy:verify`의 테스트 156개 파일·521개 테스트와 타입검사 통과. 문서 계약은 보완 후 재실행한다.
 
 ### 다음 개선
 - 배포 workflow에 standalone 아카이브 내부 필수 파일 존재 검사를 추가한다.
@@ -5256,7 +5304,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - Docker PostgreSQL 통합 테스트 환경을 복구해 전체 검증을 재실행했다.
 
 ### 검증
-- `r`npm.cmd run verify` 통과.
+- 
+pm.cmd run verify` 통과.
 - 156개 테스트 파일·521개 테스트 통과.
 - 타입체크, 문서 검증, verify-scope, KIS boundary, OCI cron 검사 및 Next.js 프로덕션 빌드 통과.
 
@@ -5291,13 +5340,20 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 종목별 롤링 버퍼가 장시간 실행에도 최근 5개 1분 버킷으로 제한되는 메모리 상한 회귀 테스트를 추가했다.
 
 ### 검증
-- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts lib/intraday-candidate-priority.test.ts app/api/kis/intraday-mvp/route.test.ts lib/kis-us-minute-turnover.test.ts --run` 통과: 5개 파일·22개 테스트.
-- `r`npm.cmd run typecheck` 통과.
-- 추가 stale 결과 회귀 검증: `r`npx vitest run app/api/kis/intraday-mvp/route.test.ts lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 3개 파일·17개 테스트.
-- Docker Desktop의 `stockman-postgres-local` 컨테이너 기동 후 전체 `r`npm.cmd test -- --run` 통과: 156개 파일·521개 테스트.
-- `r`npm.cmd run typecheck` 실행 완료.
-- `r`npm.cmd run docs:check` 실행 완료.
-- `r`npm.cmd run build` 통과: Next.js 프로덕션 빌드 성공.
+- 
+px vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts lib/intraday-candidate-priority.test.ts app/api/kis/intraday-mvp/route.test.ts lib/kis-us-minute-turnover.test.ts --run` 통과: 5개 파일·22개 테스트.
+- 
+pm.cmd run typecheck` 통과.
+- 추가 stale 결과 회귀 검증: 
+px vitest run app/api/kis/intraday-mvp/route.test.ts lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 3개 파일·17개 테스트.
+- Docker Desktop의 `stockman-postgres-local` 컨테이너 기동 후 전체 
+pm.cmd test -- --run` 통과: 156개 파일·521개 테스트.
+- 
+pm.cmd run typecheck` 실행 완료.
+- 
+pm.cmd run docs:check` 실행 완료.
+- 
+pm.cmd run build` 통과: Next.js 프로덕션 빌드 성공.
 
 ### 다음 개선
 - 국내·해외 KIS 분봉 원천 payload fixture로 거래대금 필드와 후보 추적을 통합 검증한다.
@@ -5321,9 +5377,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 최신 봉 선택 회귀 테스트를 추가했다.
 
 ### 검증
-- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·13개 테스트.
-- `r`npm.cmd run typecheck` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·13개 테스트.
+- 
+pm.cmd run typecheck` 통과.
+- 
+pm.cmd run docs:check` 통과.
 
 ### 다음 개선
 - 국내·해외 KIS 분봉 원천 payload fixture를 추가해 날짜·시간 필드별 정렬을 통합 검증한다.
@@ -5346,9 +5405,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `QUALIFIED` 전환이 `intraday_detection_transitions` 관측 로그에 누락되지 않도록 정리했다.
 
 ### 검증
-- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
-- `r`npm.cmd run typecheck` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
+- 
+pm.cmd run typecheck` 통과.
+- 
+pm.cmd run docs:check` 통과.
 
 ### 다음 개선
 - 실제 KIS 응답 fixture를 사용한 확정 전환 통합 테스트를 추가한다.
@@ -5372,9 +5434,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `STALE`·`DEGRADED`·`WARMING_UP` 품질 상태에서는 5% 비율을 확정 탐지로 승격하지 않는다.
 
 ### 검증
-- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
-- `r`npm.cmd run typecheck` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·12개 테스트.
+- 
+pm.cmd run typecheck` 통과.
+- 
+pm.cmd run docs:check` 통과.
 
 ### 다음 개선
 - 실제 국내·해외 KIS 응답 fixture를 이용해 최신 1분봉 거래대금 필드 매핑을 통합 검증한다.
@@ -5399,9 +5464,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 디버깅 스냅샷에 종목별 1분 거래대금 버킷을 노출한다.
 
 ### 검증
-- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·11개 테스트.
-- `r`npm.cmd run typecheck` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·11개 테스트.
+- 
+pm.cmd run typecheck` 통과.
+- 
+pm.cmd run docs:check` 통과.
 
 ### 다음 개선
 - 운영 환경에서 실제 KIS 1분봉 시간 필드와 버킷 간격을 확인하는 통합 검증을 추가한다.
@@ -5427,9 +5495,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `intraday-detection-worker`가 매 tick의 최신 1분봉 거래대금만 rolling window에 넣도록 연결했다.
 
 ### 검증
-- `r`npx vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·8개 테스트.
-- `r`npm.cmd run typecheck` 통과.
-- `r`node --check scripts/verify-deploy.mjs` 통과.
+- 
+px vitest run lib/intraday-memory-state.test.ts lib/intraday-detection-worker.test.ts --run` 통과: 2개 파일·8개 테스트.
+- 
+pm.cmd run typecheck` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
 
 ### 다음 개선
 - 남은 위험: KIS 원천 응답의 최신 1분봉 시간 필드가 누락되면 수신 시각을 버킷 키로 사용하므로 운영 로그에서 시간 품질을 계속 감시해야 한다.
@@ -5458,8 +5529,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 검증 빌드 산출물은 `.next-deploy-verify`에 격리하며, 임시 TypeScript 경로가 `tsconfig.json`에 남지 않도록 확인 절차를 추가했다.
 
 ### 검증
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run deploy:verify`의 테스트 154개 파일·507개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사를 통과했다.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run deploy:verify`의 테스트 154개 파일·507개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사를 통과했다.
 - 격리 빌드 `NEXT_DIST_DIR=.next-deploy-isolated npm.cmd run build` 종료 코드 0 및 107개 페이지 생성 확인.
 - 빌드 후 `tsconfig.json`에서 임시 산출물 경로를 제거해 원래 설정을 유지했다.
 
@@ -5485,9 +5558,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - manifest 변경 diff에 승인 메타데이터가 함께 포함되는지 검사하는 명령을 등록했다.
 
 ### 검증
-- `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
-- `r`npm.cmd run audit:verify-scope` 통과: 현재 manifest 변경 없음.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/audit-verify-scope-change.mjs` 통과.
+- 
+pm.cmd run audit:verify-scope` 통과: 현재 manifest 변경 없음.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - GitHub Actions에서 manifest 변경 PR에 이 감사를 자동 실행한다.
@@ -5510,8 +5586,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 비교 도구가 승인 메타데이터와 승인 단계 목록의 유효성을 먼저 검사하도록 강화했다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - manifest 변경 diff에 승인 메타데이터 변경이 함께 있는지 자동 대조한다.
@@ -5534,8 +5612,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `compare:verify`가 manifest 미등록 단계를 `unapprovedStages`로 표시하고 실패 처리한다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - manifest 변경 시 변경 사유와 승인자를 기록하는 검증을 추가한다.
@@ -5558,8 +5638,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 신규 단계의 기준값이 승인되기 전까지 비교 결과를 실패 처리한다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 승인된 기준값을 별도 manifest로 관리하고 비교 도구가 자동으로 읽는다.
@@ -5578,12 +5660,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 검증 단계가 조용히 빠지거나 추가되어 성능 비교 기준이 바뀌는 문제를 방지한다.
 
 ### 반영
-- `compare:verify`가 `missingStages`와 `r`newStages`를 출력하도록 추가했다.
+- `compare:verify`가 `missingStages`와 
+ewStages`를 출력하도록 추가했다.
 - 기준 단계 누락은 비교 실패로 처리하고, 신규 단계는 범위 변경으로 표시한다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 신규 단계의 기준값 부재를 별도 승인 상태로 관리한다.
@@ -5606,8 +5691,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 환경이 다르면 신뢰도를 `LOW`로 표시하고 동일 환경 재측정을 권고한다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 두 결과의 누락 단계와 신규 단계를 비교해 검증 범위 변경도 경고한다.
@@ -5630,8 +5717,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 차이가 있으면 성능 판정과 분리된 `ENVIRONMENT_MISMATCH` 상태와 차이 목록을 JSON으로 출력한다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 환경 불일치 시 비교 신뢰도와 재측정 권고를 출력한다.
@@ -5654,8 +5743,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 민감정보와 명령 인자는 계속 저장하지 않는다.
 
 ### 검증
-- `r`node --check scripts/measure-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/measure-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 비교 도구가 환경 메타데이터가 다른 결과를 경고하도록 개선한다.
@@ -5679,8 +5770,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `package.json`에 `compare:verify` 명령을 등록했다.
 
 ### 검증
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 동일 환경이 아닌 실행 결과를 구분할 수 있도록 Node·OS·CPU 정보를 비식별 메타데이터로 추가한다.
@@ -5703,9 +5796,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 저장 결과에는 단계명·성공 여부·소요 시간만 포함하고 환경변수·명령 인자는 저장하지 않는다.
 
 ### 검증
-- `r`node --check scripts/measure-verify.mjs` 통과.
-- 기존 `r`npm.cmd run measure:verify` 전체 실행 통과 및 단계별 JSON 출력 확인.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+ode --check scripts/measure-verify.mjs` 통과.
+- 기존 
+pm.cmd run measure:verify` 전체 실행 통과 및 단계별 JSON 출력 확인.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 직전 결과 파일과 현재 결과를 비교해 단계별 회귀 임계치를 자동 판정한다.
@@ -5729,8 +5825,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `package.json`에 `measure:verify` 명령을 등록했다.
 
 ### 검증
-- `r`npm.cmd run verify` 통과: 테스트 152개 파일·502개 테스트, 타입체크, 문서, KIS 경계, cron, 빌드.
-- `r`npm.cmd run measure:verify` 통과: 전체 122,977ms, 테스트 64,508ms, 빌드 51,575ms 등 단계별 JSON 출력 확인.
+- 
+pm.cmd run verify` 통과: 테스트 152개 파일·502개 테스트, 타입체크, 문서, KIS 경계, cron, 빌드.
+- 
+pm.cmd run measure:verify` 통과: 전체 122,977ms, 테스트 64,508ms, 빌드 51,575ms 등 단계별 JSON 출력 확인.
 - Windows 실행기의 셸 경고를 발견해 명시적 셸 경로 사용으로 수정했다.
 
 ### 다음 개선
@@ -5754,7 +5852,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 전체 검증에서도 KIS 모듈·예외·테스트·경로·기능 registry가 검사되도록 보완했다.
 
 ### 검증
-- `r`npm.cmd run verify` 통과: 테스트 152개 파일·502개 테스트, 타입체크, 문서, KIS 경계, cron, Next 빌드.
+- 
+pm.cmd run verify` 통과: 테스트 152개 파일·502개 테스트, 타입체크, 문서, KIS 경계, cron, Next 빌드.
 - 빌드에서 정적 페이지 107개 생성 확인.
 
 ### 다음 개선
@@ -5778,8 +5877,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사 스크립트가 registry 함수가 실제 소스에 존재하는지 검사하도록 추가했다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 모듈·테스트·예외·경로·대표 함수 계약 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 모듈·테스트·예외·경로·대표 함수 계약 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 대표 함수별 응답 계약 필드와 테스트 케이스를 registry에 연결한다.
@@ -5802,8 +5903,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사 스크립트가 registry 경로가 실제 소스에 존재하는지 검사하도록 추가했다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 모듈 registry, 테스트 연결, 예외 범위, 대표 API 경로 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 모듈 registry, 테스트 연결, 예외 범위, 대표 API 경로 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - registry에 모듈별 대표 기능명과 API 응답 계약을 연결한다.
@@ -5826,8 +5929,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사가 등록된 모듈과 테스트 파일의 존재 여부를 함께 검증하도록 강화했다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: registry, 예외 경계, 핵심 모듈 테스트 연결 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: registry, 예외 경계, 핵심 모듈 테스트 연결 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - registry에 모듈별 허용 API 경로 패턴을 추가하고 실제 소스와 대조한다.
@@ -5850,8 +5955,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 감사 스크립트가 실제 모듈과 registry의 양방향 일치를 검사하도록 강화했다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 27개 KIS 모듈 registry 일치 및 요청 경계 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 27개 KIS 모듈 registry 일치 및 요청 경계 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - registry에 모듈별 허용 API 경로와 대표 테스트 파일을 추가한다.
@@ -5874,8 +5981,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 예외 파일·목적·엔드포인트가 아키텍처 문서에 모두 기록되는지 검사한다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 데이터 모듈 공통 경계 및 예외 엔드포인트 범위 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 데이터 모듈 공통 경계 및 예외 엔드포인트 범위 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 일반 데이터 모듈도 허용된 KIS API 경로와 기능명을 구조화해 감사한다.
@@ -5898,8 +6007,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 예외 파일과 목적이 아키텍처 문서에 모두 기록되어야 감사가 통과하도록 강화했다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 예외 파일 존재·목적 문서화·데이터 모듈 경계 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 예외 파일 존재·목적 문서화·데이터 모듈 경계 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 예외별 허용 엔드포인트 패턴까지 구조화해 검증한다.
@@ -5922,8 +6033,10 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 토큰 발급·Approval 예외 파일명을 아키텍처 문서에 명시했다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 예외 모듈 존재·문서 동기화 및 데이터 모듈 경계 검사.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 예외 모듈 존재·문서 동기화 및 데이터 모듈 경계 검사.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 - 초기 실행에서 감사 스크립트의 기준 경로 변수 누락을 발견해 수정 후 재검증했다.
 
 ### 다음 개선
@@ -5944,12 +6057,15 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 반영
 - `scripts/audit-kis-boundary.mjs` 추가.
-- `r`npm run verify`에 `audit:kis-boundary` 단계 연결.
+- 
+pm run verify`에 `audit:kis-boundary` 단계 연결.
 - 토큰 발급·Approval을 제외한 KIS 모듈의 공통 throttle 경계 사용을 검사한다.
 
 ### 검증
-- `r`npm.cmd run audit:kis-boundary` 통과: 모든 KIS 데이터 모듈이 공통 경계를 사용한다.
-- `r`npm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run audit:kis-boundary` 통과: 모든 KIS 데이터 모듈이 공통 경계를 사용한다.
+- 
+pm.cmd run docs:check` 통과: 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 직접 fetch가 추가된 파일을 diff 기준으로 더 빠르게 탐지한다.
@@ -5972,7 +6088,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `scripts/check-docs.mjs`가 해당 구조 문서와 핵심 계약 문구를 검사하도록 연결했다.
 
 ### 검증
-- `r`npm.cmd run docs:check` 통과: 외부 요청 경계 계약, 최신 기록 계약, ID 중복, 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run docs:check` 통과: 외부 요청 경계 계약, 최신 기록 계약, ID 중복, 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - KIS 모듈별 공통 프레임워크 사용 여부를 정적 검사하는 감사 스크립트를 추가한다.
@@ -5995,7 +6112,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 완료 상태에는 커밋 식별자가 필요하도록 규칙을 추가했다.
 
 ### 검증
-- `r`npm.cmd run docs:check` 통과: 배포 상태, 실행성 근거, 다음 개선, ID 중복, 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run docs:check` 통과: 배포 상태, 실행성 근거, 다음 개선, ID 중복, 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 완료 상태에서 푸시·배포 확인 URL 또는 배포 검증 결과까지 연결한다.
@@ -6018,7 +6136,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 다음 과제의 구체성 규칙을 반영했다.
 
 ### 검증
-- `r`npm.cmd run docs:check` 통과: 다음 개선 내용, 실행성 근거, ID 중복, 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run docs:check` 통과: 다음 개선 내용, 실행성 근거, ID 중복, 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 다음 단계에서 개선 과제 상태와 실제 배포 상태의 불일치를 자동 탐지한다.
@@ -6041,7 +6160,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 검증 근거를 기록해야 한다는 규칙을 반영했다.
 
 ### 검증
-- `r`npm.cmd run docs:check` 통과: 실행 명령 포함 여부, 최신 기록 계약, ID 중복, 필수 문서·Flyway 133개 검사.
+- 
+pm.cmd run docs:check` 통과: 실행 명령 포함 여부, 최신 기록 계약, ID 중복, 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 검증 명령의 종료 코드와 결과 요약을 구조화해 자동 비교한다.
@@ -6064,7 +6184,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서의 성과 판정 규칙에 근거 필수 원칙을 반영했다.
 
 ### 검증
-- `r`npm run docs:check` 통과: 최신 기록 계약, ID 중복, 성과 근거, 필수 문서·Flyway 133개 검사.
+- 
+pm run docs:check` 통과: 최신 기록 계약, ID 중복, 성과 근거, 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 근거가 실제 검증 명령 또는 측정 수치와 연결되는지 자동 검사한다.
@@ -6087,7 +6208,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 ID 고유성 규칙을 반영했다.
 
 ### 검증
-- `r`npm run docs:check` 통과: 최신 기록 계약, 전체 ID 중복, 필수 문서·Flyway 133개 검사.
+- 
+pm run docs:check` 통과: 최신 기록 계약, 전체 ID 중복, 필수 문서·Flyway 133개 검사.
 
 ### 다음 개선
 - 과거 성과 판정 변경 이력도 자동 검증한다.
@@ -6110,7 +6232,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 성과 판정은 `IMPROVED`, `UNCHANGED`, `REGRESSED`, `UNMEASURED`만 허용하도록 추가 검증했다.
 
 ### 검증
-- `r`npm run docs:check` 통과: 최신 로그 값, 필수 문서, Flyway 133개 검사.
+- 
+pm run docs:check` 통과: 최신 로그 값, 필수 문서, Flyway 133개 검사.
 
 ### 다음 개선
 - 과거 성과 판정 변경 이력도 검사한다.
@@ -6133,7 +6256,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 지속 개선 문서에 기록 계약과 배포 전 게이트를 연결했다.
 
 ### 검증
-- `r`npm run docs:check`로 최신 기록 계약과 필수 문서·Flyway 검사를 확인한다.
+- 
+pm run docs:check`로 최신 기록 계약과 필수 문서·Flyway 검사를 확인한다.
 
 ### 다음 개선
 - 향후 개선 과제 ID와 전후 성능 수치까지 자동 검증 대상으로 확장한다.
@@ -6156,7 +6280,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - 계약이 누락되면 `docs:check`가 실패해 배포 검증이 중단된다.
 
 ### 검증
-- `r`npm run docs:check` 통과: 문서 계약 및 Flyway 133개 검사.
+- 
+pm run docs:check` 통과: 문서 계약 및 Flyway 133개 검사.
 - 커밋·푸시·배포: 미실행.
 
 ## [2026-09-13] 지속 개선 검토 주기 구체화
@@ -6171,7 +6296,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `scripts/check-docs.mjs`가 검토 기준 문서의 존재를 확인하도록 했다.
 
 ### 검증
-- `r`npm run docs:check` 통과: 필수 문서 16개, Flyway 133개 확인.
+- 
+pm run docs:check` 통과: 필수 문서 16개, Flyway 133개 확인.
 - 커밋·푸시·배포: 미실행.
 
 ## [2026-09-13] 지속 개선 운영 루프 강화
@@ -6185,7 +6311,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 - `scripts/check-docs.mjs`가 지속 개선 운영 기준 문서의 존재를 검사하도록 했다.
 
 ### 검증
-- `r`npm run docs:check` 통과: 필수 문서 15개, Flyway 133개 확인.
+- 
+pm run docs:check` 통과: 필수 문서 15개, Flyway 133개 확인.
 - 커밋·푸시·배포: 미실행.
 
 ## [2026-09-13] 전 작업 문서화 규칙 확정
@@ -6281,7 +6408,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 다음 개선
 
-- 전체 `r`npm.cmd run verify`를 실행해 새 검증 단계가 기존 테스트·빌드 흐름과 함께 통과하는지 재확인한다.
+- 전체 
+pm.cmd run verify`를 실행해 새 검증 단계가 기존 테스트·빌드 흐름과 함께 통과하는지 재확인한다.
 
 ### 개선 과제
 
@@ -6374,7 +6502,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 다음 개선
 
-- 전체 `r`npm.cmd run verify`에 새 감사 단위 테스트가 포함되는지 확인하고, 테스트 실행 시간을 측정해 검증 파이프라인 비용을 기록한다.
+- 전체 
+pm.cmd run verify`에 새 감사 단위 테스트가 포함되는지 확인하고, 테스트 실행 시간을 측정해 검증 파이프라인 비용을 기록한다.
 
 ### 개선 과제
 
@@ -6389,12 +6518,14 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 반영
 
-- 새 감사 테스트가 `r`npm test -- --run`의 전체 Vitest 수집 대상에 포함됨을 확인했다.
+- 새 감사 테스트가 
+pm test -- --run`의 전체 Vitest 수집 대상에 포함됨을 확인했다.
 - 전체 검증 결과를 개선 로그의 재현 가능한 근거로 기록한다.
 
 ### 검증
 
-- `r`npm.cmd run verify` 통과.
+- 
+pm.cmd run verify` 통과.
 - 결과: 테스트 파일 153개·테스트 505개 통과, 타입체크 통과, 문서 18개 검사 통과, 검증 범위 감사 통과, KIS 경계 감사 통과, cron 18개 endpoint 검사 통과, Next.js 107개 정적 페이지 빌드 성공.
 
 근거: 표준 `verify` 명령이 종료 코드 0으로 완료됐으며 새 `audit-verify-scope` 단계와 새 단위 테스트가 모두 실행됐다.
@@ -6445,7 +6576,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 반영
 
-- `r`npm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13.json`을 실행했다.
+- 
+pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13.json`을 실행했다.
 - 측정 단계에 `verifyScope`가 실제 결과 JSON으로 기록됐다.
 - 측정 결과 파일을 후속 baseline 비교에 사용할 수 있도록 보존했다.
 
@@ -6509,9 +6641,12 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증
 
-- `r`npm.cmd run audit:verify-scope` 통과.
-- `r`npm.cmd run docs:check` 통과.
-- `r`npm.cmd run compare:verify -- reports/verify-baseline-2026-09-13.json reports/verify-measured-2026-09-13.json 0.2` 통과.
+- 
+pm.cmd run audit:verify-scope` 통과.
+- 
+pm.cmd run docs:check` 통과.
+- 
+pm.cmd run compare:verify -- reports/verify-baseline-2026-09-13.json reports/verify-measured-2026-09-13.json 0.2` 통과.
 - 결과: `scopeStatus: APPROVED`, `environmentStatus: MATCH`, `confidence: HIGH`, 신규·누락·미승인 단계 0건, 전 단계 `OK`.
 
 근거: 비교 도구가 종료 코드 0으로 완료됐고 7개 단계 모두 baseline 대비 변화율 0, 회귀 없음으로 판정했다.
@@ -6570,7 +6705,8 @@ Azure 포털의 Text Translation endpoint를 그대로 환경변수에 설정해
 
 ### 검증
 
-- `r`npm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-metadata.json` 통과.
+- 
+pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-metadata.json` 통과.
 - 결과: `ok: true`, 총 `118551ms`, 테스트 153개 파일·505개 테스트 통과, 타입체크·문서·KIS·cron·빌드 성공.
 - 결과 metadata: Git HEAD `48000fc037e20e05be1c56eeb761ce655d61e5fa`, `workingTreeDirty: true`.
 
@@ -6659,7 +6795,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 검증
 
-- `r`npm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-shell-fix.json` 통과.
+- 
+pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-shell-fix.json` 통과.
 - 결과: `ok: true`, 테스트 154개 파일·507개 테스트 통과, 타입체크·문서·verifyScope·KIS·cron·빌드 성공.
 - 총 소요 시간 `222333ms`, 테스트 `87430ms`, 빌드 `117223ms`.
 
@@ -6744,12 +6881,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 반영
 
-- `r`npm.cmd run deploy:verify`를 실행했다.
+- 
+pm.cmd run deploy:verify`를 실행했다.
 - 테스트 임시 저장소 경고가 최소화된 상태에서 배포 검증을 확인했다.
 
 ### 검증
 
-- `r`npm.cmd run deploy:verify` 통과.
+- 
+pm.cmd run deploy:verify` 통과.
 - 테스트 154개 파일·507개 테스트 통과.
 - 타입체크·문서 검사·cron 검사 통과.
 - Next.js 프로덕션 빌드 및 `http://localhost:3100/charts` smoke test 통과.
@@ -6788,7 +6927,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 다음 개선
 
-- `r`npm.cmd run deploy:verify`를 재실행해 추가 감사 단계가 실제 배포 검증과 production smoke test를 통과하는지 확인한다.
+- 
+pm.cmd run deploy:verify`를 재실행해 추가 감사 단계가 실제 배포 검증과 production smoke test를 통과하는지 확인한다.
 
 ### 개선 과제
 
@@ -6803,12 +6943,14 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 반영
 
-- `r`npm.cmd run deploy:verify`를 실행했다.
+- 
+pm.cmd run deploy:verify`를 실행했다.
 - 테스트·타입체크·문서·승인 범위 감사·KIS 경계 감사·cron 검사는 모두 통과했다.
 
 ### 검증
 
-- `r`npm.cmd run deploy:verify` 실행 중 quality gate 통과 확인.
+- 
+pm.cmd run deploy:verify` 실행 중 quality gate 통과 확인.
 - 테스트 154개 파일·507개 테스트 통과.
 - production build가 장시간 출력 없이 실행되어 정상 완료를 증명할 수 없어 프로세스를 안전하게 중단했다.
 - 종료 코드 1; runtime smoke test까지 도달하지 못했다.
@@ -6877,7 +7019,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 다음 개선
 
-- 실제 `r`npm.cmd run deploy:verify`를 실행해 진행 로그가 quality gate·build·runtime 단계에 표시되는지 확인한다.
+- 실제 
+pm.cmd run deploy:verify`를 실행해 진행 로그가 quality gate·build·runtime 단계에 표시되는지 확인한다.
 
 ### 개선 과제
 
@@ -6892,7 +7035,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 반영
 
-- `r`npm.cmd run deploy:verify`를 실행했다.
+- 
+pm.cmd run deploy:verify`를 실행했다.
 - 테스트·타입·문서·승인 범위·KIS 경계·cron 단계의 시작·완료 로그를 확인했다.
 - build 단계에서 30초 간격 진행 로그가 출력되도록 확인했다.
 
@@ -6939,7 +7083,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 다음 개선
 
-- `r`npm.cmd run deploy:verify`를 다시 실행해 전용 산출물 경계에서 build 완료와 `/charts` smoke test까지 확인한다.
+- 
+pm.cmd run deploy:verify`를 다시 실행해 전용 산출물 경계에서 build 완료와 `/charts` smoke test까지 확인한다.
 
 ### 개선 과제
 
@@ -6971,7 +7116,8 @@ Windows 측정 파이프라인의 shell 보안 경고 제거가 전체 실행에
 
 ### 다음 개선
 
-- `r`npm.cmd run deploy:verify`를 다시 실행해 동적 포트에서 production 서버 시작과 `/charts` 응답을 실제로 검증한다.
+- 
+pm.cmd run deploy:verify`를 다시 실행해 동적 포트에서 production 서버 시작과 `/charts` 응답을 실제로 검증한다.
 
 ### 개선 과제
 
@@ -6993,7 +7139,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증
 
-- `r`npm.cmd run deploy:verify`에서 quality gate·build 통과.
+- 
+pm.cmd run deploy:verify`에서 quality gate·build 통과.
 - 테스트 154개 파일·507개 테스트 통과.
 - production 서버 `http://localhost:56169` 시작 및 `/charts` smoke test 통과.
 - 배포 검증 성공 메시지 확인.
@@ -7031,7 +7178,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 다음 개선
 
-- production 서버를 동적 포트로 실행하는 `r`npm.cmd run deploy:verify`를 재실행해 HTML 본문 검증까지 통합 확인한다.
+- production 서버를 동적 포트로 실행하는 
+pm.cmd run deploy:verify`를 재실행해 HTML 본문 검증까지 통합 확인한다.
 
 ### 개선 과제
 
@@ -7044,7 +7192,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 근본 원인: `applyCommonMarketCapFilter`의 보완 조회 블록이 비어 있어 `marketCap`이 없는 후보가 항상 미상으로 남음.
 - 변경: `lib/us-top-rising-universe.ts`에서 시총 누락 후보의 거래소·티커만 일괄 조회하고, 기존 시총 값이 있는 후보에는 추가 DB 조회를 하지 않도록 수정. 조회 실패 시 보수적으로 필터링.
 - 재발 방지: 공통 필터는 후보별 DB 조회를 반복하지 않고 배치 조회하며, 시총 조건이 비활성화된 경우 즉시 반환한다. 관련 전체 테스트·타입체크·빌드·실행 검증을 커밋 전 수행한다.
-- 검증: `r`npm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
+- 검증: 
+pm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
 - 커밋·푸시·배포: 커밋·푸시 진행 예정; 운영 배포는 CI 성공 확인 후 상태를 갱신한다.
 
 ## 2026-09-17 — 해외 상승률 후보 시총 중복 조회 제거
@@ -7053,7 +7202,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 원인: 공통 필터가 `marketCap: null`(조회 완료했지만 시총 미상)과 필드 미설정(미조회)을 구분하지 못함.
 - 변경: `lib/us-top-rising-universe.ts`에서 `marketCap` 필드가 없는 후보만 보완 조회하도록 수정.
 - 재발 방지: 조회 완료 후 미상인 값은 보완 조회 대상으로 다시 넣지 않으며, 조건 비활성화 시 즉시 반환한다.
-- 검증: `r`npm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
+- 검증: 
+pm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
 - 커밋·푸시·배포: 검증 후 커밋·푸시 진행; 운영 배포는 CI 결과 확인 대상.
 
 ## 2026-09-17 — 국내 EMA10 포지션 유지 승률 탐색
@@ -7075,7 +7225,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 원인: KIS 호출 결과마다 snapshot DB 쓰기를 완료한 뒤 다음 티커의 요청을 시작하는 구조였음.
 - 변경: `app/api/kis/financial-ratios/route.ts`를 `Promise.all` 기반으로 변경. KIS 호출은 공용 throttle이 계속 직렬화하고, 각 결과의 snapshot 저장은 다음 호출과 겹쳐 수행한다.
 - 재발 방지: KIS rate limit 정책을 우회하는 개별 fetch 병렬화는 하지 않고, 공용 요청 경계를 유지한다. 결과 순서는 입력 티커 순서를 유지한다.
-- 검증: `r`npm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
+- 검증: 
+pm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
 - 커밋·푸시·배포: 검증 후 커밋·푸시 진행; 운영 배포는 CI 결과 확인 대상.
 
 ## 2026-09-17 — CSS 정렬 값 호환성 경고 제거
@@ -7083,7 +7234,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 목적: 빌드 로그의 반복적인 `autoprefixer` 경고 제거.
 - 원인: `align-items: end`가 브라우저별 혼합 지원 값으로 판정됨.
 - 변경: `app/globals.css`의 달력·공시 컨트롤을 표준 `flex-end`로 변경.
-- 검증: `r`npm.cmd run build` 성공, 기존 전체 테스트·타입체크·문서/범위/KIS 경계/cron 검사는 통과했다. standalone 실행 후 `/charts`·`/health-check`·국내/해외 top-rising API를 직접 호출해 HTML/JSON 응답을 확인했으며, 해외 API의 로컬 DB 미설정 502도 구조화 JSON으로 반환됨을 확인했다. 배포 검증 스크립트는 해외 API 대기 단계에서 장시간 지연되어 중단했으므로 해당 지연은 별도 개선 대상으로 남긴다.
+- 검증: 
+pm.cmd run build` 성공, 기존 전체 테스트·타입체크·문서/범위/KIS 경계/cron 검사는 통과했다. standalone 실행 후 `/charts`·`/health-check`·국내/해외 top-rising API를 직접 호출해 HTML/JSON 응답을 확인했으며, 해외 API의 로컬 DB 미설정 502도 구조화 JSON으로 반환됨을 확인했다. 배포 검증 스크립트는 해외 API 대기 단계에서 장시간 지연되어 중단했으므로 해당 지연은 별도 개선 대상으로 남긴다.
 - 재발 방지: 배포 게이트에 API별 응답 대기시간과 단계별 타임아웃을 기록하고, 외부 의존성 미설정 시에도 구조화 JSON 응답을 검증하는 실행 스모크를 유지한다.
 - 커밋·푸시·배포: 빌드·테스트·실행 확인 후 커밋·푸시 진행; 푸시 후 CI 배포를 확인한다.
 
@@ -7100,7 +7252,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ## 2026-09-17 — 개발 서버 자식 프로세스 실행 방식 경화
 
 - 목적: 로컬 실행 시 Node의 `shell` 보안 경고와 인자 문자열 재해석 위험을 제거한다.
-- 원인: `scripts/dev-server.mjs`가 `r`next` 명령을 `shell: true`로 실행하고 있었다.
+- 원인: `scripts/dev-server.mjs`가 
+ext` 명령을 `shell: true`로 실행하고 있었다.
 - 변경: 프로젝트의 Next 실행 파일을 `process.execPath`로 직접 실행하고 `shell: false` 및 시작 오류 처리를 적용했다.
 - 재발 방지: 로컬 실행은 `.env.local` 주입을 유지하면서 셸을 통하지 않는 고정 인자 배열만 사용한다.
 - 검증: 변경 후 전체 테스트·타입체크·문서·빌드·standalone 실행 스모크를 재실행한다.
@@ -7109,7 +7262,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ## 2026-09-17 — 스크리너 null 기준일 파라미터 오류 수정
 
 - 목적: 로컬 `/api/screener/run`의 조건 없는 해외 요청이 503으로 실패하는 오류를 수정한다.
-- 원인: `asOf`가 `r`null`일 때 SQL의 `$2 IS NULL` 표현식에 PostgreSQL 타입 정보가 없어 `could not determine data type of parameter $2`가 발생했다.
+- 원인: `asOf`가 
+ull`일 때 SQL의 `$2 IS NULL` 표현식에 PostgreSQL 타입 정보가 없어 `could not determine data type of parameter $2`가 발생했다.
 - 변경: `lib/db-screener.ts`의 기준일 비교식에 `$2::text`를 명시해 null·문자열 기준일 모두 동일하게 처리한다.
 - 검증: 로컬 실제 API에서 수정 전 503을 재현했고, 수정 후 해외 요청 200(`server-timing` 약 1.84초), 동일 요청 캐시 적중 200·약 1ms를 확인했다.
 - 재발 방지: 기준일이 없는 기본 스크리너 요청과 동일 fingerprint 캐시 적중을 API 실행 검증에 포함한다.
@@ -7118,7 +7272,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 ## 2026-09-17 — 기준일 스크리너 병목 실측
 
 - 목적: 추가 병목 후보를 실제 DB 실행계획으로 확인한다.
-- 확인: `r`npm.cmd run measure:screener-db` 5회 반복 결과, 해외 기준일 최신일 집계가 p50 약 1.26~1.33초·p95 최대 6.35초·약 20만 shared read blocks로 가장 큰 잔여 병목이었다. 최신 요약 테이블은 p50 1ms 미만 수준이었다.
+- 확인: 
+pm.cmd run measure:screener-db` 5회 반복 결과, 해외 기준일 최신일 집계가 p50 약 1.26~1.33초·p95 최대 6.35초·약 20만 shared read blocks로 가장 큰 잔여 병목이었다. 최신 요약 테이블은 p50 1ms 미만 수준이었다.
 - 판단: V113·V123의 기존 인덱스와 중복되는 인덱스는 추가하지 않는다. 기준일 스냅샷 저장 또는 hot path의 과거 기준일 요청 제한을 다음 설계 후보로 기록했다.
 - 문서: `docs/KIS_DB_PERFORMANCE_DESIGN.md`에 실측값과 다음 의사결정 조건을 추가했다.
 - 검증: 읽기 전용 측정 완료; DB 데이터·스키마 변경 없음.
@@ -7138,7 +7293,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: NYSE 보통주, 최근 301개 일봉, score≥75, RVOL(SMA20) 1.0~1.2, 다음 거래일 저가가 신호 종가 이하 재테스트, 다음 거래일 거래량이 신호일 이상, 다음 거래일 양봉 종가 진입, 이후 5거래일 동안 +1% 선행 도달 대 -1% 선행 도달 비교.
 - 결과: 진입 134건, 판정 132건, 승 59건, 승률 44.70%, 평균 손익 -0.1061%.
 - 비교: score≥95 동일 조합은 판정 72건, 승률 51.39%, 평균 +0.0278%였으나, score≥75로 표본을 늘리자 승률·기대값이 모두 악화됐다. 현재 조합은 표본 확장 시 강건한 우위로 볼 수 없다.
-- 검증: `r`node --env-file=.env.local scripts/validate-nys-pullback-volume-bullish-75.cjs` 실DB 읽기 검증 완료.
+- 검증: 
+ode --env-file=.env.local scripts/validate-nys-pullback-volume-bullish-75.cjs` 실DB 읽기 검증 완료.
 - 재발 방지: 다음 검증은 score 기준을 더 낮추는 대신 시계열 분할·거래비용·시장별 외부검증을 포함해 과적합 여부를 확인한다.
 - 커밋·푸시·배포: 없음.
 
@@ -7148,7 +7304,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 원인: 네 개의 대형 테이블 `COUNT(*)`를 순차 실행해 각 스캔 시간이 합산됨.
 - 변경: `app/api/admin/market-debug/route.ts`에서 테이블별 count를 `Promise.all`로 실행하고, 개별 실패 격리는 유지한다.
 - 재발 방지: 응답 구조와 정확한 count 의미는 유지하며, 독립적인 읽기 쿼리만 병렬화한다.
-- 검증: `r`npm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
+- 검증: 
+pm.cmd run deploy:verify` 통과 (156개 테스트 파일·521개 테스트, 타입체크, 문서/범위/KIS 경계/cron 검사, Next 빌드 및 런타임 smoke test).
 - 커밋·푸시·배포: 검증 후 커밋·푸시 진행; 운영 배포는 CI 결과 확인 대상.
 ## 2026-09-18 — EMA 중첩 가중치 방식 비교
 
@@ -7157,7 +7314,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 결과: 전체 후보 9,149건. 상위 10% 기준 단순 42.41%/평균 -0.1518%, 장기 선형 가중 41.88%/-0.1624%, 최근 역수 가중 43.08%/-0.1384%, 로그 장기 가중 42.22%/-0.1556%.
 - 상위 20% 기준 단순 42.48%/-0.1504%, 장기 선형 40.44%/-0.1912%, 최근 역수 42.83%/-0.1433%, 로그 장기 41.40%/-0.1720%.
 - 판단: 이 표본과 진입 규칙에서는 장기 EMA에 가중치를 줄수록 성과가 악화됐다. 최근 EMA 역수 가중이 네 방식 중 가장 높지만 절대 승률은 43% 수준이고 평균 손익도 음수라 실전 우위로 채택하지 않는다.
-- 검증: `r`node --env-file=.env.local scripts/analyze-us-ema-weighted-overlap.cjs` 실DB 읽기 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/analyze-us-ema-weighted-overlap.cjs` 실DB 읽기 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 근접도 가중 검증
 
@@ -7166,7 +7324,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 상위 10% 결과: 단순 개수 승률 49.60%·평균 -0.2560%, 근접도 가중 49.39%·-0.2591%, 최근 EMA 근접도 가중 50.66%·-0.2401%, 장기 EMA 근접도 가중 47.97%·-0.2805%.
 - 상위 20% 결과: 단순 48.56%·-0.2717%, 근접도 48.61%·-0.2709%, 최근 가중 49.86%·-0.2521%, 장기 가중 46.93%·-0.2961%.
 - 판단: 최근 EMA 근접도 가중만 승률 50%를 소폭 넘었지만 손익비를 반영한 평균 손익은 음수다. 장기 EMA 가중은 이번에도 가장 약했다. 승률만 높이는 방식과 기대값이 양수인 방식은 분리해서 판단해야 한다.
-- 검증: `r`node --env-file=.env.local scripts/analyze-us-ema-overlap-closeness.cjs` 실DB 읽기 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/analyze-us-ema-overlap-closeness.cjs` 실DB 읽기 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — 최근 EMA 근접도 점수 시계열 분할 검증
 
@@ -7174,7 +7333,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: NYSE 보통주, 종목별 최근 301개 일봉, EMA2~365 겹침 근접도에 1/√기간 가중, RVOL(SMA20) 1.0~1.2, 종가 아래 재테스트, 다음 거래일 시가 진입, 5거래일 +0.5% 대 -1% 선행 도달. 종목별 과거 60%와 최근 40% 분리 후 각 구간 상위 10%만 평가.
 - 결과: 전체 5,184건 중 판정 5,098건, 승률 44.33%, 평균 손익 -0.3350%. 학습 구간은 2,995건·45.28%·-0.3209%, 테스트 구간은 2,104건·42.92%·-0.3562%.
 - 판단: 최근 구간에서 성과가 더 악화되어 해당 가중 점수는 일반화된 승률 우위가 아니다. 향후 채택 후보에서 제외하고, 다른 신호와 결합할 때도 별도 검증 대상으로만 둔다.
-- 검증: `r`node --env-file=.env.local scripts/validate-us-ema-recent-weighted-split.cjs` 실DB 읽기 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/validate-us-ema-recent-weighted-split.cjs` 실DB 읽기 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 허용오차별 반등 검증
 
@@ -7182,7 +7342,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: NYSE 보통주, 일봉 최근 301개, EMA2~365, RVOL(SMA20) 1.0~1.2, 다음 거래일 고가가 신호 종가 대비 +0.5% 이상인지를 반등으로 정의. 각 허용오차별 겹침 점수 상위 10% 비교.
 - 결과: ±0.25% 45,381건 중 45,38건 평가·반등률 71.15%, ±0.5% 53,196건·72.23%, ±1.0% 63,178건·72.53%, ±1.5% 67,762건·73.24%, ±2.0% 69,581건·73.50%.
 - 판단: 허용오차를 넓힐수록 상위 점수군의 단순 다음날 고가 반등률은 높아졌지만, 이는 EMA가 많아지는 효과와 가격 범위 확장의 영향을 함께 받는다. 손절·거래비용을 포함한 전략 승률로 바로 해석하지 않으며, 좁은 겹침이 특별히 우월하다는 증거도 없다.
-- 검증: `r`node --env-file=.env.local scripts/analyze-us-ema-overlap-tolerance.cjs` 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/analyze-us-ema-overlap-tolerance.cjs` 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 상위군 캔들 구조 필터 검증
 
@@ -7190,7 +7351,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: NYSE 보통주, 일봉 최근 301개, EMA2~365 ±1% 겹침 점수 상위 10%, RVOL(SMA20) 1.0~1.2, 다음날 고가가 신호 종가 대비 +0.5% 이상이면 반등.
 - 결과: 필터 없음 6,317건·72.53%, 신호일 양봉 2,972건·70.66%, 종가가 고가·저가 중간값 이상 2,897건·70.07%, 두 조건 모두 2,373건·70.50%.
 - 판단: 캔들 양봉 및 상단 종가 필터는 단순 반등률을 개선하지 못했고 오히려 약화됐다. 해당 필터는 현재 방식에 추가하지 않는다.
-- 검증: `r`node --env-file=.env.local scripts/analyze-us-ema-overlap-candle-filter.cjs` 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/analyze-us-ema-overlap-candle-filter.cjs` 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 상위군 RVOL 구간 검증
 
@@ -7198,7 +7360,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: NYSE 보통주, 일봉 최근 301개, EMA2~365 ±1% 겹침 점수 상위 10%, RVOL(SMA20) 구간별, 다음날 고가가 신호 종가 대비 +0.5% 이상이면 반등.
 - 결과: RVOL 1.0~1.2는 6,317건·72.53%, 1.2~2.0은 7,004건·72.99%, 2.0 이상은 1,496건·66.31%.
 - 판단: 중간 수준의 거래량 증가는 소폭 개선됐지만 RVOL 2 이상 급증 구간은 반등률이 크게 낮아졌다. 거래량 급증을 무조건 강한 매수 신호로 사용하면 안 된다.
-- 검증: `r`node --env-file=.env.local scripts/analyze-us-ema-overlap-rvol-buckets.cjs` 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/analyze-us-ema-overlap-rvol-buckets.cjs` 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 반등의 종가 확인 검증
 
@@ -7206,7 +7369,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: NYSE 보통주, 일봉 최근 301개, EMA2~365 ±1% 겹침 점수 상위 10%, RVOL 구간별. 고가 반등은 다음날 고가가 신호 종가 대비 +0.5% 이상, 종가 확인은 다음날 종가가 신호 종가 초과.
 - 결과: RVOL 1.0~1.2는 고가 72.53%·종가 50.78%, 1.2~2.0은 고가 72.99%·종가 50.80%, 2.0 이상은 고가 66.31%·종가 49.93%.
 - 판단: 기존의 높은 반등률 대부분은 장중 고가 도달률이며 종가 기준 우위는 약 51%로 축소된다. `EMA 겹침 + RVOL 1.2~2.0`을 고승률 전략으로 확정할 근거는 부족하다.
-- 검증: `r`node --env-file=.env.local scripts/analyze-us-ema-overlap-close-confirm.cjs` 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/analyze-us-ema-overlap-close-confirm.cjs` 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 종가 상승률 신뢰구간 검증
 
@@ -7260,7 +7424,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: 미국 전체 거래소 보통주, 일봉 최근 301개, EMA2~365 ±1% 겹침 점수 상위 10%, RVOL 구간별, 다음 거래일 시가 진입, 5거래일 +1% 목표 대 -1% 손절.
 - 결과: RVOL 1.0~1.2는 12,624건 판정·승률 41.48%·평균 -0.1705%, 1.2~2.0은 15,095건·41.53%·-0.1694%, 2 이상은 4,378건·38.01%·-0.2398%.
 - 판단: 회복률 77%로 보였던 조건도 실제 목표·손절 기준에서는 모두 음수 기대값이다.RVOL 1.2~2.0이 상대적으로 낫지만 매매전략으로 채택할 수 없고, RVOL 2 이상 회피 결론은 손익 기준에서도 확인됐다.
-- 검증: `r`node --env-file=.env.local scripts/validate-us-ema-overlap-pnl.cjs` 실DB 읽기 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/validate-us-ema-overlap-pnl.cjs` 실DB 읽기 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침과 재테스트 확인 조건 결합 손익 검증
 
@@ -7268,7 +7433,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 조건: 미국 전체 거래소 보통주, 일봉 최근 301개, EMA2~365 ±1% 겹침 점수 상위 10%, RVOL 구간별, 다음날 저가가 신호 종가 이하·거래량이 신호일 이상·양봉인 경우 다음날 종가 진입, 이후 5거래일 +1% 대 -1%.
 - 결과: RVOL 1.0~1.2는 1,687건 판정·승률 39.66%·평균 -0.2069%, 1.2~2.0은 1,442건·36.89%·-0.2621%, 2 이상은 233건·30.47%·-0.3906%.
 - 판단: 해당 확인 조건은 이전 단일 점수95 NYSE 실험과 달리 전체 거래소·상위 겹침 점수에서는 성과를 악화시켰다. 표본·시장 범위·진입 시점에 따라 결과가 크게 달라지므로 일반화된 고승률 조건으로 채택하지 않는다.
-- 검증: `r`node --env-file=.env.local scripts/validate-us-ema-overlap-confirmed-pnl.cjs` 실DB 읽기 실행 완료.
+- 검증: 
+ode --env-file=.env.local scripts/validate-us-ema-overlap-confirmed-pnl.cjs` 실DB 읽기 실행 완료.
 - 커밋·푸시·배포: 없음.
 ## 2026-09-18 — EMA 겹침 중기 보유기간 검증
 
@@ -7492,13 +7658,16 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 
 ### 검증
 
-- `r`npm run typecheck` 통과.
-- `r`npm run docs:check` 통과.
+- 
+pm run typecheck` 통과.
+- 
+pm run docs:check` 통과.
 - 운영 `GET /api/kis/intraday-mvp`에서 워커 `RUNNING`, `lastTickAt` 갱신, TOP100 후보 관측을 확인했다.
 - 배포 실행 `35731972698`이 성공했고 운영 `/intraday` HTTP 200 및 API JSON 응답을 확인했다. 배포 직후 API는 워커 `WARMING_UP`·`detectionEnabled=true`·`explicitKillSwitch=false`로 반환됐다.
 - Discord 알림 결과가 기존에는 워커 내부에서 소실되던 문제를 확인해 보강했다. 웹훅 원문은 노출하지 않고 전송 성공·미설정·실패 상태만 런타임에 기록한다.
 - 로컬 `NEXT_DIST_DIR=.next-local-final npm run build` 성공. 운영 API에서 5샘플을 충족한 `QUALIFIED` 후보 6개를 확인했으며, 배포 후 `lastAlertResult`로 전송 결과를 확인한다.
-- 추가 원인: 후보가 없는 tick이 `lastAlertResult`를 `r`no_qualified_items`로 덮어써 실제 알림 tick의 결과가 사라졌다. 알림이 발생한 tick에서만 전송 결과를 유지하도록 수정했다.
+- 추가 원인: 후보가 없는 tick이 `lastAlertResult`를 
+o_qualified_items`로 덮어써 실제 알림 tick의 결과가 사라졌다. 알림이 발생한 tick에서만 전송 결과를 유지하도록 수정했다.
 
 ### 개선 과제
 
@@ -7622,7 +7791,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **SEC 원문 검토**: 9/17 F-1 및 9/23 F-1/A는 최대 6,000,000개 유닛의 best-efforts 공모와 유닛당 $1.33 가격을 기재한다. 공모 전 발행주식 1,582,111주, 공모 주식 최대 6,000,000주, 별도 보통주 워런트 기초주식 최대 6,000,000주이며 워런트는 zero-cash 행사 선택권을 포함한다. 전량 매각 및 무현금 행사 상한 12,000,000주는 공모 전 발행량 대비 계산치 약 758.5%로만 표기했다. 예비 등록서에는 최소 매각량이 없고 효력 발생·종결 날짜가 특정되지 않아 실제 10/7 이전 종결·발행을 확정하지 않고 `UNKNOWN`으로 분류했다.
 - **운영 반영·검증**: 입력 `.tmp/sec-risk-bmgl-20260930.json`; 운영 PATCH `HTTP 200`, `ok=true`, `count=1`. 사후 GET `HTTP 200`, `missing=[]`에서 riskId, `UNKNOWN`, observedAt 9/30, impactWindow 9/30~10/7, 원문·한국어, SEC evidence 2건 및 limitations 5건을 확인했다. 첫 사후검증 코드는 단수 응답 `item`을 기대해 빈 값을 표시했으나, 현재 구현은 단수 ticker 요청에도 `items[]`를 반환한다. 응답 구조를 확인한 뒤 재조회해 저장을 검증했다.
 - **API 한계 메모**: GET 결과는 개별 리스크 evidence 안의 SEC accession/URL은 보존하지만 최상위 `sourceAccessions`·`sourceUrls`와 시장가치·CIK 필드는 null/빈 배열이었다. 별도 제품/API 변경은 하지 않았으며 SEC 근거는 JSONB item에 존재한다.
-- **변경·검증**: 제품 코드 및 DB 스키마 변경 없음. 입력 JSON과 조사 스크립트는 `.tmp`에, 작업 이력은 본 로그에 기록. `r`npm run docs:check`를 실행한다. 커밋·푸시·배포 없음.
+- **변경·검증**: 제품 코드 및 DB 스키마 변경 없음. 입력 JSON과 조사 스크립트는 `.tmp`에, 작업 이력은 본 로그에 기록. 
+pm run docs:check`를 실행한다. 커밋·푸시·배포 없음.
 
 ## [2026-09-30] VNTG NYSE American 규정 공시 시점 교차검증
 
@@ -7640,7 +7810,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **IVF 근거·분류**: 운영 GET에서 NAS:IVF 미등록을 확인했다. 프로젝트 차트 API의 최신 이용 가능 값은 9/29 종가 $0.91, USD 시총 $4,399,194, 관측 2026-09-29T18:06:26.439Z다(실시간/9월30일 값이 아님). SEC 10-Q는 최대 $15M AMPA, 상호 서면합의 시 $50M 한도, 회사 재량의 매입 통지, 94%/97%/비적격시장 85% 할인 산식, 8월4일 등록 효력 및 거래소 19.99% 한도 초과 주주승인을 확인한다. 8/28 8-K는 효력 발생 뒤 그 시점까지 2,094,395주를 평균 약 $1.71에 매각해 약 $3.591M을 조달했다고 보고했다. 424B3는 최대 20M주 등록을 설명하고, 전량 발행 가정이 7/23 당시 발행주식의 약 89.7%라고 기재한다. 이는 최대 시나리오이지 현재 잔여 한도나 미래 발행 예상이 아니다. 운영 JSON은 지속 중인 시설을 `ACTIVE`, 잠재 희석과 조달 이익을 `MIXED`로 두고, 관찰창 내 매입 통지·발행 일정 미확인 및 최신 누계가 8/28에 한정됨을 기록했다. 10월 첫 주 이벤트 확정으로 표현하지 않았다.
 - **운영 반영·검증**: `.tmp/sec-risk-ivf-20260930.json` 작성. PATCH `HTTP 200`, `ok=true`, `count=1`. 사후 GET에서 `missing=[]`, riskId, ACTIVE, observedAt 9/30, impactWindow 9/30~10/7, 원문·한국어, SEC 근거 3건 및 한계 5개 확인. 운영 GET의 최상위 `marketCapUsd`/`marketCapObservedAt`은 null이므로 시총 스냅샷은 JSONB item의 limitation에 기록했고 API가 보존하지 않는 최상위 필드는 저장된 것으로 주장하지 않는다.
 - **공식 출처**: [SEC 2026-08-28 8-K](https://www.sec.gov/Archives/edgar/data/1417926/000149315226040504/form8-k.htm), [SEC 2026-08-17 10-Q](https://www.sec.gov/Archives/edgar/data/1417926/000149315226038528/form10-q.htm), [SEC 2026-08-07 424B3](https://www.sec.gov/Archives/edgar/data/1417926/000149315226036567/form424b3.htm).
-- **문서/코드 검증**: 리스크 JSON 파싱 및 근거 quote 길이 확인. 제품 코드·스키마 변경 없음. 다음 `r`npm run docs:check`로 문서 게이트를 실행한다. 커밋·푸시·배포 없음.
+- **문서/코드 검증**: 리스크 JSON 파싱 및 근거 quote 길이 확인. 제품 코드·스키마 변경 없음. 다음 
+pm run docs:check`로 문서 게이트를 실행한다. 커밋·푸시·배포 없음.
 
 ## [2026-09-30] DSS SEC 리스크 확인·시장코드 정정
 
@@ -7648,8 +7819,10 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **사전 조회**: 운영 리스크 API에서 `AMS:DSS`는 기존 리스크가 있었고 `NYS:DSS`는 미등록이었다. 운영 차트 API의 최신 이용 가능 값은 2026-09-29 종가 $0.682, USD 시가총액 $6,813,836(관측 `2026-09-29T18:06:37.802Z`)이다.
 - **SEC 근거·분류**: 2026-09-21 8-K(accession `0001493152-26-043561`)는 9/15 특수관계자 Alset의 $500,000 대여, 요구불·연 3% 약속어음, 주당 $0.50 전환, 최대 8,000,000주·주당 $0.55 워런트와 전환·행사 전 주주승인 조건을 공시한다. 계약서와 워런트 원문을 대조했다. 10/1~10/7 주주투표, 상환요구, 전환·행사 일정은 확인되지 않아 이를 확정 이벤트로 쓰지 않고 지속 중인 조건부 유동성·희석 익스포저로 표시했다. $500,000 자금 유입과 향후 상환·잠재 희석을 함께 반영해 MIXED로 분류했다.
 - **시장코드 오류와 복구**: 첫 저장에서 NYSE American DSS를 NYS로 잘못 매핑했다. 기존 운영 데이터 및 프로젝트 시장코드가 `AMS:DSS`임을 확인한 즉시 `AMS` 기존 DSS 항목을 갱신해 ACTIVE로 저장하고, API가 삭제 endpoint를 제공하지 않는 관계로 잘못 생성한 `NYS:DSS` 항목은 정정 목적의 `RESOLVED`로 표시했다. 사후 GET 양쪽에서 `AMS:DSS` ACTIVE, `NYS:DSS` RESOLVED를 검증했다. 다음 종목 저장 전 거래소/프로젝트 시장코드 사전 확인을 필수로 한다.
-- **변경·검증**: 조사 입력 `.tmp/sec-risk-dss-20260930.json`, 정정 입력 `.tmp/sec-risk-dss-market-correction-20260930.json`. 운영 PATCH 성공(2건), 사후 GET 성공. API의 최상위 시총 메타데이터는 null로 반환되므로 시총은 JSONB 설명·limitations와 로컬 차트 관측으로만 보고한다. 제품 코드·스키마 변경 없음. `r`npm.cmd run docs:check` 실행 예정. 커밋·푸시·배포 없음.
-- **후보 재대조 및 문서 게이트**: 당시 작업 후보 목록을 시장별 API 제한 이내로 재조회한 결과 AMS 5개 중 5개, NAS 94개 중 87개가 여전히 미등록이었다. 목록은 이전 스냅샷이므로 이후 저장된 7개가 반영되어 미등록 합계는 92개다. `r`npm.cmd run docs:check` 통과(18 entry points, migrations 143개, latest V143). 전체 후보 검토는 계속 진행 중이며 이번 배치만으로 완료 처리하지 않았다.
+- **변경·검증**: 조사 입력 `.tmp/sec-risk-dss-20260930.json`, 정정 입력 `.tmp/sec-risk-dss-market-correction-20260930.json`. 운영 PATCH 성공(2건), 사후 GET 성공. API의 최상위 시총 메타데이터는 null로 반환되므로 시총은 JSONB 설명·limitations와 로컬 차트 관측으로만 보고한다. 제품 코드·스키마 변경 없음. 
+pm.cmd run docs:check` 실행 예정. 커밋·푸시·배포 없음.
+- **후보 재대조 및 문서 게이트**: 당시 작업 후보 목록을 시장별 API 제한 이내로 재조회한 결과 AMS 5개 중 5개, NAS 94개 중 87개가 여전히 미등록이었다. 목록은 이전 스냅샷이므로 이후 저장된 7개가 반영되어 미등록 합계는 92개다. 
+pm.cmd run docs:check` 통과(18 entry points, migrations 143개, latest V143). 전체 후보 검토는 계속 진행 중이며 이번 배치만으로 완료 처리하지 않았다.
 
 ## [2026-09-30] SEC 신규 공시 재점검 및 BIYA 계속기업 위험 반영
 
@@ -7659,7 +7832,8 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **BIYA 판정·저장**: 2026-09-29 6-K(accession `0001213900-26-104687`) 및 Exhibit 99.1~99.3을 읽었다. 회사는 반기 재무제표에 향후 1년 내 계속기업 존속 능력에 상당한 의문이 있다고 명시했다. 6/30 현금 $1,181,159, 6개월 계속사업 영업현금 유출 $983,857, 총 순손실 $2,428,242, 운전자본 $26,385,663를 함께 기재했고, 전년 대비 손실 개선도 반대 근거로 보존했다. 이를 구체적 7일 내 부도·자금조달 사건으로 과장하지 않고 지속 위험 `HIGH/NEGATIVE/ACTIVE`로 운영 API에 저장했다. schemaVersion 2 JSONB에는 영어 원문·한국어·SEC 근거 3건·관찰일·관찰창·limitations를 담았다. PATCH 성공 후 GET에서 `missing=[]`, 해당 riskId와 `ACTIVE`를 검증했으며, 한국어 표기 오탈자를 추가 PATCH로 정정했다.
 - **신규 제출 검토**: LNAI Form 12b-25는 10-K 제출 연장기한이 10/13이므로 10/7 관찰창 밖이며 신규 7일 이벤트로 반영하지 않았다. ENSC 9/25 Certificate of Amendment는 Series C의 특정 현금상환 조항 삭제가 이미 효력 발생했다고 보고한다. MI Schedule 13G/A는 9/23 기준 기관 보유 4.9% 보고다. EHGO 6-K는 임시주총 위임장·정관 문서를 첨부한다고 알리며 본문에 일정·안건 상세를 싣지 않았다. LGHL 6-K는 $3m 담보 전환어음 거래를 기재하지만 서술된 종결일이 2025-09-28이고 첨부 어음 조건의 현재 잔액·만기 확인이 필요하다. 본문 외 첨부 자동조회는 SEC가 현재 요청을 미등록 자동화로 차단해 검증하지 못했다. 따라서 첨부만으로 확인해야 하는 EHGO 주총 일정 및 LGHL 현재 상환·전환조건은 저장하지 않았고, 해당 종목을 무위험이라고 단정하지 않는다.
 - **SEC 요청 한계와 재발 방지**: `.env.local`의 `SEC_USER_AGENT`는 현재 `Stockman/1.0` 식별자와 도메인만 포함하고 연락 이메일이 없어, SEC Archives 원문/첨부 요청이 자동화 미등록 메시지로 차단됐다. submissions GET은 성공했지만 `data.sec.gov` submissions 호스트를 Archives 호스트로 잘못 사용한 실험 5건은 HTTP 404였다. 공식 SEC 개발자 안내와 프로젝트 문서의 식별 규칙에 맞춰 실제 운영자 연락처가 포함된 User-Agent를 설정한 뒤 원문 재수집을 이어간다. 연락처를 추측해 설정하거나 403 응답을 반복 재시도하지 않는다. 이전 자동화 실패 산출물 `.tmp/sec-three-month-unregistered-date-matches-20260930.json`도 있으므로, 3개월 전체 원문 검토는 완료되지 않았다.
-- **변경·검증**: 제품 코드·DB schema 변경 없음. 운영 API에는 BIYA 1건 저장 및 한국어 표기 정정(PATCH 2회), 사후 GET 성공. 조사 산출물은 `.tmp/sec-risk-biya-20260930.json`, `.tmp/sec-risk-biya-post-verify-20260930.json`, `.tmp/sec-risk-unregistered-current-fundamentals-20260930.json`, `.tmp/sec-risk-unregistered-new-submissions-20260930.json`, `.tmp/sec-selected-filings-raw.json`에 둔다. `DEVELOPMENT_LOG.md` 갱신 후 `r`npm.cmd run docs:check`를 실행한다. 커밋·푸시·배포 없음.
+- **변경·검증**: 제품 코드·DB schema 변경 없음. 운영 API에는 BIYA 1건 저장 및 한국어 표기 정정(PATCH 2회), 사후 GET 성공. 조사 산출물은 `.tmp/sec-risk-biya-20260930.json`, `.tmp/sec-risk-biya-post-verify-20260930.json`, `.tmp/sec-risk-unregistered-current-fundamentals-20260930.json`, `.tmp/sec-risk-unregistered-new-submissions-20260930.json`, `.tmp/sec-selected-filings-raw.json`에 둔다. `DEVELOPMENT_LOG.md` 갱신 후 
+pm.cmd run docs:check`를 실행한다. 커밋·푸시·배포 없음.
 - **전체 운영 census 재검증**: 원래 163 ticker를 시장별 100개 이하 GET 4건으로 다시 조회했다. 응답 163/163, 누락 80, 오류 0, 저장 리스크 94건(`ACTIVE=53`,`UNKNOWN=40`,`RESOLVED=1`). BIYA 반영 전 대비 저장 1종목·리스크 1건 증가, 기존 미등록 81→80이다.census는 `.tmp/sec-risk-current-census-live-after-biya-20260930.json`에 저장했다. 현재 시총 1천만 달러 이하인 새 fundamental 확인군 80개 중에는 79개가 미등록이고 XCH는 시총 기준 초과다. 미등록은 무위험을 뜻하지 않는다.
 - **첨부 미확인 후속**: SEC Archives 직접 조회와 web 조회 모두 EHGO 위임장·정관 첨부 및 LGHL 어음 첨부에 접근할 수 없어 신규 리스크를 추측 추가하지 않았다. 연락 이메일이 포함된 적격 `SEC_USER_AGENT`를 실제 설정한 뒤 원문 재조회가 필요하다.
 
@@ -7676,14 +7850,16 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **제외/상태 검증**: FLYE 9/3 8-K(accession `0001213900-26-097254`)는 9/1 10-Q 제출 후 9/3 Nasdaq으로부터 compliance 확인을 받았다고 하므로 deficiency risk로 추가하지 않았다. ALP 9/25 6-K(accession `0001171843-26-006237`)는 9/9~9/23 11거래일 최저호가 준수로 회복을 확인하므로 저장하지 않았다. CNET 8/18 8-K도 8/17 최저호가 회복 공시가 있어 제외한다. CWD는 앞서 임시 제외 의견을 정정해 저장했다.
 - **운영 저장·전체 사후검증**: SCKT 1건, IPST/NXTS/RKDA batch 3건, CHAI/BTTC batch 2건, CWD 1건 등 이번 후속으로 총 7개 ticker에 PATCH했다(앞선 BIYA는 별도). 각 ticker GET에서 `ACTIVE`, 한·영 설명, SEC evidence, 기간을 확인했다. 원래 163 ticker 전체를 시장별 100 이하 read-only GET 4건으로 재집계: 저장 90, 미등록 73, 리스크 101건(`ACTIVE=60`,`UNKNOWN=40`,`RESOLVED=1`), 오류 0. 최종 집계는 `.tmp/sec-risk-current-census-live-after-latest-refresh-20260930.json`에 저장했다.
 - **문서 접근 한계**: 공식 `data.sec.gov/submissions`는 해당 7개 대상에서 정상 응답했고 최근 제출·form·날짜를 비교했다. `www.sec.gov/Archives` 원문 자동 요청은 현 `SEC_USER_AGENT`가 연락처 없는 도메인 식별자라 차단되어 9/29 이후 첨부 문서가 필요한 판단은 제한된다. 이미 확보된 제출본문·원문 발췌에서 근거가 충분한 위험만 반영했다. EHGO 최신 임시주총의 구체 안건·일정과 LGHL 9/24 exclusivity/전환어음 첨부 조건은 여전히 미확인이다.
-- **변경·검증**: 운영 DB만 SEC 리스크 API로 갱신; 제품 코드·마이그레이션 변경 없음. 입력 `.tmp/sec-risk-sckt-20260930.json`, `.tmp/sec-risk-ipst-nxts-rkda-20260930.json`, `.tmp/sec-risk-chai-bttc-20260930.json`, `.tmp/sec-risk-cwd-20260930.json`; 최신 제출 재검증 `.tmp/sec-latest-submissions-priority.json`. `DEVELOPMENT_LOG.md` 갱신 후 `r`npm.cmd run docs:check` 실행. 커밋·푸시·배포 없음.
+- **변경·검증**: 운영 DB만 SEC 리스크 API로 갱신; 제품 코드·마이그레이션 변경 없음. 입력 `.tmp/sec-risk-sckt-20260930.json`, `.tmp/sec-risk-ipst-nxts-rkda-20260930.json`, `.tmp/sec-risk-chai-bttc-20260930.json`, `.tmp/sec-risk-cwd-20260930.json`; 최신 제출 재검증 `.tmp/sec-latest-submissions-priority.json`. `DEVELOPMENT_LOG.md` 갱신 후 
+pm.cmd run docs:check` 실행. 커밋·푸시·배포 없음.
 
 ### 구현 반영
 
 - **변경 파일**: `scripts/sync-daily-cache-async.mjs`
 - **구현**: 운영 API 조회 워커와 로컬 DB 저장 워커를 bounded queue로 분리했다. 조회 동시성, 저장 동시성, 큐 최대 크기, batch 크기를 실행 인자로 제한할 수 있다.
 - **무결성**: 저장 워커는 batch 트랜잭션으로 upsert하고 commit 후 다음 작업을 처리한다. `--skip-fundamentals=true`로 시총 API 장애가 일봉 저장을 차단하지 않게 할 수 있다.
-- **검증**: `r`node --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에서 producer-consumer 종료 순서 문제를 확인해 consumer를 producer보다 먼저 시작하도록 수정했다. 전체 운영 동기화는 실행하지 않았다.
+- **검증**: 
+ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에서 producer-consumer 종료 순서 문제를 확인해 consumer를 producer보다 먼저 시작하도록 수정했다. 전체 운영 동기화는 실행하지 않았다.
 - **커밋·푸시·배포**: 없음.
 
 ### 완료 확인
@@ -9067,5 +9243,42 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 삭제 묶음 한 줄 요약: 운영·진단·캐시(7)는 제품 코드 연결이 없는 테스트/진단 작업이고, RSS·번역(7)은 현행 파이프라인의 import 경로에서 벗어난 개별 helper이며, SEC(3)는 route 없는 구형 API 지원 코드이고, 공통·개인화(5)는 현재 호출자가 없는 helper다.
 - 변경: 위 기준으로 runtime 모듈 22개와 직접 전용 테스트 14개 삭제, `sec-ai-pipeline.test.ts`의 payload regression 유지 및 evaluator 전용 테스트 제거, KIS registry의 삭제 모듈 항목 정리, 관심종목 설계 경로를 `lib/user-watchlist.ts`로 정정했다.
 - 검증: 최신 `origin/oci`의 tracked TS/JS 872개에서 재현 가능한 정적 참조 검사 완료. `npm ci`는 lockfile 기준 설치 완료(197 packages); 전체 개발 의존성 감사는 high 7건을 보고하며 해당 picomatch 4.0.7 노드는 lockfile상 dev-only다. 프로젝트의 배포 검사인 운영 의존성 감사(`npm audit --omit=dev`)는 0건. 정리 적용 후 `npm.cmd run deploy:verify` 전체 통과: Next production build, standalone HTTP 및 Chrome 데스크톱·모바일 smoke, 260개 테스트 파일 통과/1 skip(1,423 tests pass/3 skip), typecheck, docs/API, verify-scope, KIS boundary, Bearer auth, OCI cron 검사.
-- 커밋·푸시·배포: `04a367d3`를 `origin/oci`에 fast-forward push했다. GitHub Actions Deploy OCI run `44278025274`가 성공했으며 `Verify deployment`, 패키징, 업로드, `Activate release` 단계가 모두 success다. 원격 `oci` ref는 `04a367d3568719d0e485dbfdc6c10e4da212e7af`를 가리킨다.
-- 남은 위험/다음 단계: 정적 스캔은 런타임에서 조립하는 import 경로나 문서화되지 않은 외부 수동 호출을 완전히 증명하지 않는다. 개발 도구 의존성 picomatch는 upstream advisory가 high로 표시하지만 배포 운영 의존성에는 포함되지 않아 production audit 대상에서 제외된다. 이번 OCI workflow 활성화는 완료됐다. 정적 import 목록이 아닌 외부 수동 호출 의존성은 후속 운영 확인이 남는다.
+- 커밋·푸시·배포: 이번 정리 브랜치에 아직 수행하지 않았다.
+- 남은 위험/다음 단계: 정적 스캔은 런타임에서 조립하는 import 경로나 문서화되지 않은 외부 수동 호출을 완전히 증명하지 않는다. 개발 도구 의존성 picomatch는 upstream advisory가 high로 표시하지만 배포 운영 의존성에는 포함되지 않아 production audit 대상에서 제외된다. 커밋·푸시 후 OCI workflow 배포 완료와 운영 health를 확인한다.
+
+# [2026-11-18] 시총 경계 4개 발행사 산식 교차검산
+
+### 목적 및 범위
+- 작업 ID: US-TD-2026-11-18-004. 1조 달러 근처로 분류한 WMT, LLY, Berkshire, SpaceX의 포함 근거를 가격·주식수 산식으로 교차 점검하고 cohort README에 재현 가능한 계산을 남긴다.
+- 변경 대상: `docs/company-analysis/us/trillion-dollar/README.md`의 경계 교차검산 표 및 한계 설명.
+
+### 근거 및 계산
+- 종가 기준은 2026-11-17 U.S. close의 제3자 historical-data pages이며, SEC 최신 확인 filing cover-page shares를 사용했다. 가격과 주식수의 기준일은 다르므로 공식 market capitalization이 아닌 sanity check로 표시했다.
+- `WMT`: 127.52 × 7,933,746,241 (SEC 2026-08-26) = $1.0117T.
+- `LLY`: 1,415.55 × 940,745,031 (SEC 2026-10-26) = $1.3317T.
+- `BRK.B` 환산: 586.76 × (1,403,805,594 B + 480,476 A × 1,500) (SEC 2026-10-28) = $1.2466T. 1,500:1 equivalent convention is the company’s SEC-reported convention.
+- `SPCX`: 141.70 × (8,246,541,218 A + 5,334,522,491 B) (SEC 2026-10-15) = $1.9244T. All issued Class A/B common shares are included; unissued authorized Class C is excluded.
+
+### 한계, 검증 및 배포
+- WMT estimate is only about 1.2% above cutoff and must remain provisional until same-date official close and updated shares are paired. Across the four names, subsequent issuer actions after SEC share-count date and third-party closing-price methodology can change the result. No official market-cap claim is made.
+- The remaining eight companies and full market-wide universe have not been independently recalculated with this same method; the original 12-issuer screen remains third-party provisional discovery data.
+- Reviewed arithmetic and citations against the linked SEC cover pages and price-history pages; docs catalog and `npm run docs:check` results follow after synchronization.
+- 커밋·푸시·배포하지 않음.
+
+# [2026-11-18] OCI 배포 검증 및 원격 정렬
+
+### 목적 및 범위
+- 작업 목적: `oci` 브랜치의 승인된 코드 변경을 최신 원격 기준에 맞춰 검증하고 OCI 배포 가능한 상태로 정리한다.
+- 변경·확인 범위: RSS·일봉 동기화/API·문서 계약·OCI workflow 변경과 배포 검증 게이트. 별도 재무 분석 및 scratch 파일은 이번 배포 범위에서 제외한다.
+
+### 원인 및 수정
+- 원인: 문서/API 계약, 일봉 캐시 동기화, screener candle validity, workflow 패키징에서 문서 검사와 production build가 요구하는 계약 불일치가 발견됐다.
+- 수정: 공개 API 문서·fixture와 검사기를 실제 route 계약에 맞추고, DB URL/연결 오류 처리 및 원격 fundamentals payload 검증을 보강했다. valid OHLC candle CTE를 공용화하고 테스트 mock 판정을 보정했다. 문서 카탈로그 생성은 변경이 있을 때만 파일을 쓰도록 했다.
+- 원격 정렬: `origin/oci`의 `6e9b87aa` 문서 정리 커밋을 포함하도록 로컬 배포 커밋을 재배치 중이며, 양쪽 기록을 보존하기 위해 이 로그의 충돌을 해결했다.
+
+### 재발 방지·검증·배포
+- 같은 계약을 fixture, API/OpenAPI, docs checker에서 함께 검사하고 `npm run deploy:verify`를 배포 전 통합 게이트로 사용한다.
+- 검증 결과: production dependency audit 0 vulnerabilities, docs/API/migration/scope/KIS/auth/cron checks 통과, production build 및 standalone HTTP/Chrome desktop·mobile smoke 통과, typecheck 통과, Vitest 290 files 중 1 skipped 및 1,645 passed·3 skipped. 전체 `npm run deploy:verify` 종료코드 0.
+- `git diff --check` 통과. 재무 분석 자료와 대량 untracked scratch 산출물은 분리 보존하며 staging 대상에서 제외한다.
+- 커밋·푸시·배포: 아직 수행하지 않음. 최종 변경 범위 재검토 후 동일 상태에서 검증을 다시 실행하고 진행한다.
+- 남은 위험/다음 단계: 원격이 재배치 중 다시 갱신될 수 있으므로 push 직전 `origin/oci`를 재확인한다. GitHub Actions OCI workflow와 production health 확인을 완료한 뒤 이 항목을 갱신한다.

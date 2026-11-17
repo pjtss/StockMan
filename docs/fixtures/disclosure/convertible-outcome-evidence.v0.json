@@ -1,0 +1,265 @@
+{
+  "contractVersion": "convertible-outcome-evidence.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "sourceShapes": {
+    "CB_EXERCISE_NOTICE": "KRX filing shape: notice aggregate, daily claim rows, bond series, principal requested, conversion price, reported shares, expected or actual listing date, remaining convertible bond balance, related disclosures",
+    "BW_EXERCISE_NOTICE": "KRX filing shape: notice aggregate, daily exercise rows, bond series, exercise amount, exercise price, reported shares, expected or actual listing date, remaining warrant balance, related disclosures",
+    "EB_EXCHANGE_NOTICE": "KRX filing shape: notice aggregate, daily exchange rows, bond series, exchange amount/price/shares, remaining EB balance, target-share delivery path, related disclosures",
+    "ADDITIONAL_LISTING": "KRX separate additional-listing notice tied to security class, listing quantity and effective trading date",
+    "BW_SETTLEMENT_PROOF": "cash subscription/payment proof or bond cancellation evidence for in-kind payment; exact source locator and right-to-use status required"
+  },
+  "listingSearchPolicy": {
+    "coverageAssertionManifestRef": "disclosure-source-coverage.v0.json#/coverageAssertionManifestContract",
+    "requiredCoverageDimensions": ["sourceSurfaceAndEventCategory", "issuerIdentity", "securityClassAndSeriesWhenAvailable", "declaredDateWindow", "paginationAndProviderStatus", "correctionAndLateArrivalPass", "rightsDecisionScope", "asOfAndQueryManifest"],
+    "validEmptyDisposition": "NOT_FOUND_IN_SCOPE_DOES_NOT_PROVE_UNLISTED",
+    "partialOrUnauthorizedDisposition": "UNVERIFIABLE",
+    "overallOutcomeWhenListingNotFound": "OUTCOME_NOT_VERIFIED",
+    "implicitNegativeFact": false,
+    "unapprovedLookbackOrQuotaThreshold": "NOT_SET"
+  },
+  "vectors": [
+    {
+      "id": "FUEV-01-CB-EXERCISE-VS-LISTING",
+      "input": { "series": "CB-7", "exerciseReportedShares": "3500000", "listingDate": "2026-07-10", "listingDateKind": "PROPOSED", "additionalListingEvidence": null },
+      "expected": { "exercise": "CONFIRMED_FOR_NOTICE", "issuance": "REPORTED_NOT_INDEPENDENTLY_CONFIRMED", "listing": "NOT_REPORTED", "forbiddenPublicText": ["추가상장 완료", "상장 확정"] }
+    },
+    {
+      "id": "FUEV-02-CB-CURRENT-NOTICE-DEDUP",
+      "input": { "series": "CB-12", "noticeShares": "3500000", "dailyRowsSum": "3500000", "priorNoticeShares": "1200000", "noticeIdentity": "SYNTHETIC-RECEIPT-1", "sameNoticeRowsRepeated": true },
+      "expected": { "currentNoticeShares": "3500000", "priorNoticeSharesAddedAgain": false, "dedup": "NOTICE_IDENTITY", "forbiddenPublicText": ["누적 전환 4700000주"] }
+    },
+    {
+      "id": "FUEV-03-BW-EXERCISE-RESIDUAL",
+      "input": { "series": "BW-5", "exerciseAmount": "450000000", "reportedShares": "350000", "residualWarrantShares": "90000", "listingDateKind": "PROPOSED", "additionalListingEvidence": null },
+      "expected": { "exercise": "CONFIRMED_FOR_NOTICE", "remainingWarrant": "POST_NOTICE_OBSERVED", "listing": "NOT_REPORTED", "forbiddenPublicText": ["워런트 전량 행사", "신주 상장 완료"] }
+    },
+    {
+      "id": "FUEV-04-BW-CASH-VS-BOND-OFFSET",
+      "input": { "series": "BW-5", "exerciseReportedAmount": "450000000", "cashPaymentProof": null, "bondCancellationProof": null },
+      "expected": { "exercise": "CONFIRMED_FOR_NOTICE", "cashInflow": "UNVERIFIABLE", "debtOffset": "UNVERIFIABLE", "forbiddenPublicText": ["현금 4.5억원 유입", "사채 4.5억원 상환"] }
+    },
+    {
+      "id": "FUEV-05-EB-TREASURY-DELIVERY",
+      "input": { "series": "EB-2", "exchangeShares": "240000", "targetIssuer": "BOND_ISSUER", "deliverySource": "ISSUER_TREASURY", "newShareIssuance": false, "remainingEbShares": "0" },
+      "expected": { "exchange": "CONFIRMED_FOR_NOTICE", "newShareDilution": "NONE_FROM_THIS_EXCHANGE", "treasuryStock": "TRANSFERRED_IF_DELIVERY_CONFIRMED", "marketSupply": "MAY_INCREASE", "forbiddenPublicText": ["신주 24만주 발행", "주식수 변화 없음"] }
+    },
+    {
+      "id": "FUEV-06-EB-THIRD-PARTY-UNDERLYING",
+      "input": { "series": "EB-3", "bondIssuer": "ISSUER-A", "targetIssuer": "ISSUER-B", "exchangeShares": "70000", "deliverySource": "THIRD_PARTY_OWNED", "masterStatusTargetIssuer": "UNRESOLVED" },
+      "expected": { "exchange": "EVIDENCE_OBSERVED", "bondEventSubject": "ISSUER-A", "underlyingExposureSubject": "ISSUER-B_UNRESOLVED", "commonStockRecommendation": "SUPPRESSED_UNTIL_MASTER_CONFIRMED", "forbiddenPublicText": ["ISSUER-A 보통주 7만주 희석"] }
+    },
+    {
+      "id": "FUEV-07-CORRECTED-LISTING-DATE",
+      "input": { "series": "CB-4", "reportedExerciseShares": "800000", "originalListingDate": "2026-05-20", "correctedListingDate": "2026-05-23", "correctionRelation": "RESOLVED", "listingEvidence": null },
+      "expected": { "exercise": "UNCHANGED_CONFIRMED_FOR_NOTICE", "listingDate": "CORRECTED_PROPOSED", "listing": "NOT_REPORTED", "recountExerciseShares": false, "forbiddenPublicText": ["5월 23일 상장 완료"] }
+    },
+    {
+      "id": "FUEV-08-ADDITIONAL-LISTING-CONFIRMED",
+      "input": { "series": "BW-5", "exerciseReportedShares": "350000", "additionalListingShares": "350000", "securityClassMatch": true, "additionalListingStatus": "CONFIRMED", "listingEffectiveDate": "2026-04-17" },
+      "expected": { "exercise": "CONFIRMED_FOR_NOTICE", "listing": "CONFIRMED_FOR_MATCHED_QUANTITY", "basis": "SEPARATE_LISTING_EVIDENCE", "forbiddenPublicText": ["행사주식수보다 많은 수량 상장"] }
+    },
+    {
+      "id": "FUEV-09-NOTICE-CUMULATIVE-EXCLUDES-PRIOR-FILINGS",
+      "input": {
+        "series": "CB-SYN-12",
+        "noticeAggregateShares": "3500000",
+        "dailyRows": ["3500000"],
+        "priorNoticeShares": "1200000",
+        "aggregateQualifier": "CUMULATIVE_EXCLUDING_PREVIOUSLY_REPORTED_SHARES",
+        "sameReceiptDailyRowsIncludedInAggregate": true
+      },
+      "expected": {
+        "currentNoticeShares": "3500000",
+        "dailyRowsReconcileToNotice": true,
+        "priorNoticeSharesAddedAgain": false,
+        "lifetimeTotal": null,
+        "forbiddenPublicText": [
+          "4,700,000 cumulative conversion shares",
+          "notice aggregate plus same-notice daily rows"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-10-ISSUED-SHARES-DENOMINATOR-INCLUSION-IS-RECEIPT-SPECIFIC",
+      "input": {
+        "reports": [
+          { "receipt": "SYN-RECEIPT-CB", "noticeShares": "3500000", "reportedIssuedShares": "70000000", "denominatorQualifier": "EXCLUDES_CURRENT_NOTICE_SHARES" },
+          { "receipt": "SYN-RECEIPT-BW-INCLUDES", "noticeShares": "350000", "reportedIssuedShares": "36750000", "denominatorQualifier": "INCLUDES_CURRENT_NOTICE_SHARES" },
+          { "receipt": "SYN-RECEIPT-BW-EXCLUDES", "noticeShares": "410000", "reportedIssuedShares": "41000000", "denominatorQualifier": "EXCLUDES_CURRENT_NOTICE_SHARES" }
+        ],
+        "requestedCalculation": "NOTICE_SHARES_DIVIDED_BY_REPORTED_ISSUED_SHARES",
+        "displayRoundingPolicy": null
+      },
+      "expected": {
+        "denominatorBasis": "RECEIPT_SPECIFIC_SOURCE_QUALIFIER_REQUIRED",
+        "issuerWideDefaultQualifier": null,
+        "familyWideDefaultQualifier": null,
+        "sameFamilyHasConflictingQualifiers": true,
+        "reportedPercentageMayBePreservedAsSourceClaim": true,
+        "recomputedPercentage": null,
+        "calculationStatus": "NOT_COMPUTABLE_DISPLAY_POLICY_OR_INPUT_BASIS_UNAPPROVED",
+        "forbiddenPublicText": [
+          "apply one universal includes/excludes rule to all notices",
+          "recomputed percentage presented as the filing's reported percentage",
+          "unapproved rounding mode inferred from displayed percentage"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-11-PARTIAL-ONE-TO-MANY-LISTING-KEEPS-UNMATCHED-SHARES-UNRESOLVED",
+      "input": {
+        "issuerId": "ISSUER-SYN-1",
+        "securityClass": "COMMON",
+        "series": "CB-SYN-4",
+        "exerciseLines": [{ "lineId": "EX-SYN-1", "shares": "100000", "noticeId": "NOTICE-SYN-1" }],
+        "listingNotices": [
+          { "listingId": "LIST-SYN-A", "shares": "60000", "linkedExerciseLineIds": ["EX-SYN-1"], "relationStatus": "RESOLVED" },
+          { "listingId": "LIST-SYN-B", "shares": "40000", "linkedExerciseLineIds": ["EX-SYN-1"], "relationStatus": "RESOLVED" }
+        ],
+        "listingSearchCoverage": "COMPLETE_FOR_DECLARED_SCOPE"
+      },
+      "expected": {
+        "matchCardinality": "ONE_EXERCISE_LINE_TO_MULTIPLE_LISTING_NOTICES",
+        "reconciledListedShares": "100000",
+        "exerciseSharesCountedOnce": true,
+        "listingSharesCountedOnce": true,
+        "reconciliation": "MATCHED_FOR_DECLARED_SCOPE",
+        "forbiddenPublicText": [
+          "200000 listed shares by summing exercise and listing quantities",
+          "same exercise line counted once per listing notice"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-12-AGGREGATE-LISTING-NOTICE-DOES-NOT-INVENT-LINE-ALLOCATION",
+      "input": {
+        "issuerId": "ISSUER-SYN-2",
+        "securityClass": "COMMON",
+        "series": "BW-SYN-8",
+        "exerciseLines": [
+          { "lineId": "EX-SYN-2A", "shares": "120000", "noticeId": "NOTICE-SYN-2A" },
+          { "lineId": "EX-SYN-2B", "shares": "80000", "noticeId": "NOTICE-SYN-2B" }
+        ],
+        "listingNotices": [{ "listingId": "LIST-SYN-C", "shares": "200000", "linkedExerciseLineIds": ["EX-SYN-2A", "EX-SYN-2B"], "relationStatus": "RESOLVED" }]
+      },
+      "expected": {
+        "matchCardinality": "MULTIPLE_EXERCISE_LINES_TO_ONE_AGGREGATE_LISTING_NOTICE",
+        "aggregateListingShares": "200000",
+        "lineAllocation": "UNRESOLVED_WITHOUT_SOURCE_ALLOCATION",
+        "listedAggregateMayBeConfirmed": true,
+        "perLineListedShares": null,
+        "forbiddenPublicText": [
+          "allocate aggregate listing notice shares to exercise lines without evidence",
+          "count aggregate listing quantity once per linked exercise line"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-13-QUANTITY-MISMATCH-OR-UNRESOLVED-RELATION-DOES-NOT-CREATE-REMAINDER-FACT",
+      "input": {
+        "issuerId": "ISSUER-SYN-3",
+        "exerciseLine": { "lineId": "EX-SYN-3", "shares": "100000", "securityClass": "COMMON", "series": "CB-SYN-9" },
+        "listingNotice": { "listingId": "LIST-SYN-D", "shares": "99000", "securityClass": "COMMON", "series": "CB-SYN-9", "linkedExerciseLineIds": [], "relationStatus": "UNRESOLVED" },
+        "listingSearchCoverage": "PARTIAL"
+      },
+      "expected": {
+        "listingRelation": "UNRESOLVED",
+        "quantityReconciliation": "NOT_COMPUTABLE",
+        "unmatchedExerciseShares": "NOT_ESTABLISHED",
+        "confirmedListingSharesFromPair": null,
+        "remainderReason": "RELATION_AND_COVERAGE_INCOMPLETE",
+        "forbiddenPublicText": [
+          "1000 shares were never listed",
+          "listing notice matched by issuer/date proximity only"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-14-CORRECTED-LISTING-NOTICE-SUPERSEDES-DATE-WITHOUT-ADDING-SHARES",
+      "input": {
+        "exerciseLine": { "lineId": "EX-SYN-4", "shares": "75000", "series": "BW-SYN-3", "securityClass": "COMMON" },
+        "listingNotice": { "listingId": "LIST-SYN-E", "shares": "75000", "effectiveDate": "2026-08-14", "revision": "REV-1" },
+        "correctedListingNotice": { "listingId": "LIST-SYN-E", "shares": "75000", "effectiveDate": "2026-08-12", "revision": "REV-2", "relation": "CORRECTS_DATE_ONLY" }
+      },
+      "expected": {
+        "currentListingDate": "2026-08-12",
+        "supersededListingDate": "2026-08-14",
+        "currentListedShares": "75000",
+        "sharesAddedByCorrection": false,
+        "listingQuantityCountedOnce": true,
+        "forbiddenPublicText": [
+          "150000 listed shares after date correction",
+          "corrected date proves a second listing quantity"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-15-VALID-EMPTY-LISTING-SEARCH-IS-SCOPE-LIMITED",
+      "input": {
+        "exerciseStage": { "status": "CONFIRMED_FOR_NOTICE", "shares": "75000", "series": "CB-SYN-10", "securityClass": "COMMON" },
+        "listingSearch": {
+          "status": "VALID_EMPTY",
+          "sourceSurfaceAndEventCategory": "KRX_ADDITIONAL_LISTING",
+          "issuerIdentity": "ISSUER-SYN-4",
+          "seriesFilterAvailable": false,
+          "declaredDateWindow": ["2026-08-01", "2026-08-31"],
+          "pagination": { "expectedPages": 2, "successfulPages": 2 },
+          "correctionAndLateArrivalPass": "COMPLETE_FOR_DECLARED_SCOPE",
+          "rightsDecisionScope": "CURRENT_ALLOWED_FOR_SYNTHETIC_CASE",
+          "queryManifestId": "QUERY-SYN-LIST-15",
+          "asOf": "2026-09-01T00:00:00Z",
+          "resultDigest": "sha256:SYN-LIST-15-EMPTY"
+        }
+      },
+      "expected": {
+        "listingStageStatus": "NOT_FOUND_IN_SCOPE",
+        "confirmedListedShares": null,
+        "overallOutcome": "OUTCOME_NOT_VERIFIED",
+        "negativeFact": null,
+        "publicationEligibility": "STILL_SUBJECT_TO_OTHER_GATES",
+        "forbiddenPublicText": [
+          "the shares were never listed",
+          "issuance or listing was cancelled",
+          "no listing notice exists outside the declared scope"
+        ]
+      }
+    },
+    {
+      "id": "FUEV-16-PARTIAL-OR-UNAUTHORIZED-LISTING-SEARCH-IS-UNVERIFIABLE",
+      "input": {
+        "exerciseStage": { "status": "CONFIRMED_FOR_NOTICE", "shares": "75000", "series": "CB-SYN-10", "securityClass": "COMMON" },
+        "listingSearch": {
+          "status": "PARTIAL",
+          "sourceSurfaceAndEventCategory": "KRX_ADDITIONAL_LISTING",
+          "issuerIdentity": "ISSUER-SYN-5",
+          "declaredDateWindow": ["2026-08-01", "2026-08-31"],
+          "pagination": { "expectedPages": 3, "successfulPages": 2 },
+          "providerStatus": "QUOTA_OR_RESULT_LIMIT",
+          "rightsDecisionScope": "UNRESOLVED",
+          "queryManifestId": null,
+          "asOf": "2026-09-01T00:00:00Z",
+          "resultDigest": null
+        }
+      },
+      "expected": {
+        "listingStageStatus": "UNVERIFIABLE",
+        "queryResultDisposition": "PARTIAL",
+        "confirmedListedShares": null,
+        "overallOutcome": "OUTCOME_NOT_VERIFIED",
+        "negativeFact": null,
+        "publicationEligibility": "SUPPRESS_LISTING_OUTCOME_CLAIM",
+        "forbiddenPublicText": [
+          "no listing result found",
+          "remaining page contains no listing",
+          "shares were not listed"
+        ]
+      }
+    }
+  ]
+}

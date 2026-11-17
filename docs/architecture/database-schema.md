@@ -26,7 +26,7 @@ scanner·API·알림·관리자 화면
 
 ### 공시·알림·설정
 
-| 테이블 | 주요 구조 | 용도·키 |
+| 관계 | 주요 구조 | 용도·키 |
 |---|---|---|
 | `filings` | `id`, `source`, `external_id`, `company`, `title`, `judgment`, `form_type`, `keywords[]`, `summary`, `published_at`, `published_date_seoul`, `link`, `created_at`, `updated_at` | DART·SEC 공시 통합 이력. `(source, external_id)` 유일 |
 | `alert_events` | `id`, `source`, `external_id`, `created_at` | 공시 알림 중복 방지. `(source, external_id)` 유일 |
@@ -57,8 +57,8 @@ scanner·API·알림·관리자 화면
 
 | 테이블 | 주요 구조 | 용도·키 |
 |---|---|---|
-| `kr_instrument_universe` | `id`, `market`, `code`, `standard_code`, `name`, 분류 코드들, `enabled`, `is_etp`, `is_warrant`, `is_preferred`, `is_suspended`, `source_file`, `raw_payload`, `first_seen_at`, `last_seen_at`, `missing_runs`, `created_at`, `updated_at` | 국내 공식 종목 유니버스. `(market, code)` 유일 |
-| `us_instrument_universe` | `id`, `market`, `code`, `realtime_symbol`, `name`, `english_name`, `instrument_type`, `security_type`, `etp_type`, `currency`, `country_code`, `industry_code`, 상품·파생 플래그, `enabled`, 원본·관측 시각 필드 | 미국 종목 유니버스. `(market, code)` 유일 |
+| `kr_instrument_universe` (VIEW) | 국내 공식 종목 유니버스 호환 조회 view. `kr_common_stock_universe`와 `kr_special_instrument_universe`를 합친다. |
+| `us_instrument_universe` (VIEW) | 미국 유니버스 호환 조회 view. `us_common_stock_universe`와 `us_special_instrument_universe`를 합친다. |
 | `instrument_universe_sync_runs` | `id`, `scope`, `source_directory`, `status`, `source_count`, `inserted_count`, `updated_count`, `deactivated_count`, `excluded_count`, `error_count`, `error_summary`, `started_at`, `completed_at` | 유니버스 동기화 실행 이력 |
 | `us_turnover_watchlist` | `instrument_id`, `enabled`, `created_at`, `updated_at` | 미국 거래강도 감시 목록. `instrument_id` PK |
 | `us_turnover_watchlist_alert_state` | `instrument_id`, `last_sent_at`, `last_fingerprint`, `updated_at` | 감시 알림 상태. `instrument_id` PK |

@@ -39,7 +39,8 @@ export function calculateGoldenCross(candles: GoldenCandle[], input: GoldenCross
   return { qualifies, state, latestDate: rows[last].date, previousDate: rows[previous].date, latestUpdatedAt: rows[last].updatedAt ?? null, previousUpdatedAt: rows[previous].updatedAt ?? null, dataQuality: invalidInput ? "INVALID_INPUT" : "VALID", emaShort: round(latestShort), emaLong: round(latestLong), previousEmaShort: round(short[previous]), previousEmaLong: round(long[previous]), crossDate: crossIndex == null ? null : rows[crossIndex].date, obv: round(obv[last]), obvSignal: round(obvSignals[last]), adl: round(adl[last]), adlSignal: round(adlSignals[last]), obvAboveSignal, adlAboveSignal, candleCount: rows.length, reason };
 }
 
-export async function persistGoldenCrossResults(scope: "KR" | "US", results: GoldenCrossResult[]) {
+export async function persistGoldenCrossResults(scope: "KR" | "US", results: GoldenCrossResult[], options: { allowEmpty?: boolean } = {}) {
+  if (!Array.isArray(results) || (results.length === 0 && options.allowEmpty !== true)) throw new Error(`${scope}_GOLDEN_CROSS_CACHE_REFUSED_EMPTY_SCAN`);
   const timeframe = "D", qualified = results.filter((row) => row.qualifies);
   await writeKisCache(`daily-golden-cross:${scope}:${timeframe}`, { scope, timeframe, updatedAt: new Date().toISOString(), policy: { ema: "9/20", recentCrossLookback: 5, states: ["APPROACHING", "CROSSED_TODAY", "RECENT_CROSS"], requiredSignals: ["OBV > OBV Signal", "ADL > ADL Signal"] }, qualifiedCount: qualified.length, qualified, scannedCount: results.length });
   return { qualifiedCount: qualified.length, cached: true, cacheKey: `daily-golden-cross:${scope}:${timeframe}` };

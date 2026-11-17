@@ -102,7 +102,8 @@ export async function POST(request: Request) {
       const analysisRetries = await retryFailedSecCodexAnalyses();
       const ciks = configuredCiks;
       const { syncXbrl, discordBatch } = runtime;
-      const results = [];
+      type SubmissionSyncResult = Awaited<ReturnType<typeof syncSecCompany>>;
+      const results: Array<{ cik: string; ok: boolean; submissions?: SubmissionSyncResult; [key: string]: unknown }> = [];
       for (const cik of ciks) {
         try {
           const submissions = await syncSecCompany(cik);

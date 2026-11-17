@@ -10,3 +10,13 @@ describe("GET /api/disclosures hour validation", () => {
     }
   });
 });
+
+describe("GET /api/disclosures date validation", () => {
+  it("rejects dates that match YYYY-MM-DD but do not exist in the Gregorian calendar before database access", async () => {
+    for (const date of ["2026-02-29", "2026-02-30", "2026-04-31", "2026-13-01"]) {
+      const response = await GET(new Request(`http://localhost/api/disclosures?date=${date}`));
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ ok: false, error: "INVALID_DATE" });
+    }
+  });
+});

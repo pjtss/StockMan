@@ -73,6 +73,9 @@ describe("accumulation v2 math", () => {
     expect(() => features(accumulationCandles(40))).toThrow();
     expect(validTradingDate("20260230")).toBe(false);
     expect(validTradingDate("20260906")).toBe(false);
+    expect(validTradingDate("00960102")).toBe(true);
+    expect(validTradingDate("00990229")).toBe(false);
+    expect(validTradingDate("00000102")).toBe(false);
     expect(validOhlcv({ open: 2, close: 3, high: 2, low: 1, volume: 10 })).toBe(false);
   });
   it("retains zero-volume history, rejects zero baselines, and handles flat ranges", () => {

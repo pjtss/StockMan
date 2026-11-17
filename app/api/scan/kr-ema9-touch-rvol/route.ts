@@ -37,7 +37,7 @@ export async function GET() {
       const ema9 = ema(ordered.map((row) => Number(row.close)), 9);
       const rvols = recentRvols(ordered, 5);
       if (!latest || ema9 === null || !(Number(latest.low) <= ema9 && ema9 <= Number(latest.high)) || rvols.length !== 5 || rvols.some((point) => point.rvol === null || point.rvol < 1)) continue;
-      results.push({ market: item.market, code: item.code, name: item.name, candleDate: latest.date, ema9: Number(ema9.toFixed(4)), low: latest.low, high: latest.high, rvols });
+      results.push({ market: item.market, code: item.code, name: item.name, marketCap: item.marketCap, fundamentalObservedAt: item.fundamentalObservedAt ?? null, fundamentalFetchedAt: item.fundamentalUpdatedAt, candleDate: latest.date, ema9: Number(ema9.toFixed(4)), low: latest.low, high: latest.high, rvols });
     }
     results.sort((a, b) => (b.rvols.at(-1)?.rvol ?? 0) - (a.rvols.at(-1)?.rvol ?? 0) || a.code.localeCompare(b.code));
     return NextResponse.json({ ok: true, source: "local_db_daily_candles", checkedAt, candidateCount: results.length, tickers: results.map((item) => item.code).join(","), results });

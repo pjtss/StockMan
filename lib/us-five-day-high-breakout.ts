@@ -36,19 +36,55 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
   if (!code || !requestedMarket) throw new Error("code and market are required");
   const markets = [requestedMarket, ...["AMS", "NAS", "NYS"].filter((value) => value !== requestedMarket)];
   let lastFailure: UsFiveDayHighBreakoutResult | null = null;
+  const cacheLookupFailures: Array<{ market: string; errorName: string }> = [];
   for (const market of markets) {
-    const cachedCandles = market === requestedMarket && prefetchedCandles ? prefetchedCandles : await loadCachedUsDailyCandles(market, code, 10).catch(() => []);
+    let cachedCandles: UsDailyCandle[];
+    try {
+      cachedCandles = market === requestedMarket && prefetchedCandles
+        ? prefetchedCandles
+        : await loadCachedUsDailyCandles(market, code, 10);
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : "UnknownError";
+      cacheLookupFailures.push({ market, errorName });
+      lastFailure = {
+        ok: false,
+        code,
+        market,
+        currentPrice: null,
+        previousFiveDayHigh: null,
+        previousFiveTradingDays: [],
+        rate: null,
+        volume: null,
+        marketCap: null,
+        tradingValue: null,
+        turnoverRatio: null,
+        qualifies: false,
+        daily: {
+          ok: false,
+          status: 503,
+          candleCount: 0,
+          diagnostics: {
+            source: "DB_CACHE",
+            cacheLookup: "FAILED",
+            errorName,
+          },
+        },
+        price: { ok: false, status: 0 },
+        error: "DB daily candle cache lookup failed",
+      };
+      continue;
+    }
     const cachedPrevious = selectPreviousFiveTradingDays(cachedCandles, asOfDate);
     const daily = cachedPrevious.length >= 5
       ? { ok: true, status: 200, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE", parsedCandleCount: cachedCandles.length, firstDate: cachedCandles.at(-1)?.date ?? null, lastDate: cachedCandles[0]?.date ?? null } }
-      : { ok: false, status: 0, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", parsedCandleCount: cachedCandles.length } };
+      : { ok: false, status: 200, candles: cachedCandles, response: { rawText: "", parsed: null }, diagnostics: { source: "DB_CACHE_ONLY", cacheLookup: "AVAILABLE", parsedCandleCount: cachedCandles.length } };
     if (!daily) {
       lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "KIS access token unavailable" };
       continue;
     }
     const previous = selectPreviousFiveTradingDays(daily.candles, asOfDate);
     if (!daily.ok || previous.length < 5) {
-      const error = !daily.ok ? (daily.candles.length === 0 ? `DB daily candles unavailable (${daily.candles.length})` : `insufficient prior candles (${previous.length}/5)`) : `insufficient prior candles (${previous.length}/5)`;
+      const error = daily.candles.length === 0 ? "no cached daily candles" : `insufficient prior candles (${previous.length}/5)`;
       lastFailure = { ok: false, code, market, currentPrice: null, previousFiveDayHigh: previous.length ? Math.max(...previous.map((candle) => candle.high)) : null, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText.slice(0, 1000), diagnostics: daily.diagnostics }, price: { ok: false, status: 0 }, error };
       continue;
     }
@@ -61,7 +97,13 @@ export async function findUsFiveDayHighBreakout({ code: rawCode, market: rawMark
     }
     const today = currentCandle;
     const previousFiveDayHigh = Math.max(...previous.map((candle) => candle.high));
-    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: today.volume ?? null, marketCap: null, tradingValue: today.close != null && today.volume != null ? today.close * today.volume : null, turnoverRatio: null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText || undefined, diagnostics: { ...(daily.diagnostics as Record<string, unknown>), source: "DB_CACHE", comparison: "today_open_vs_previous_five_day_high", currentDate: today.date } }, price: { ok: true, status: 200, raw: { source: "DB_CACHE", field: "open" } } };
+    return { ok: true, code, market, currentPrice, previousFiveDayHigh, previousFiveTradingDays: previous.map((candle) => candle.date), rate: null, volume: today.volume ?? null, marketCap: null, tradingValue: today.close != null && today.volume != null ? today.close * today.volume : null, turnoverRatio: null, qualifies: currentPrice > previousFiveDayHigh, daily: { ok: daily.ok, status: daily.status, candleCount: daily.candles.length, rawText: daily.response.rawText || undefined, diagnostics: { ...(daily.diagnostics as Record<string, unknown>), source: "DB_CACHE", comparison: "today_open_vs_previous_five_day_high", currentDate: today.date, cacheLookupFailures } }, price: { ok: true, status: 200, raw: { source: "DB_CACHE", field: "open" } } };
+  }
+  if (lastFailure && cacheLookupFailures.length > 0) {
+    lastFailure.daily.diagnostics = {
+      ...(lastFailure.daily.diagnostics && typeof lastFailure.daily.diagnostics === "object" ? lastFailure.daily.diagnostics as Record<string, unknown> : {}),
+      cacheLookupFailures,
+    };
   }
   return lastFailure ?? { ok: false, code, market: requestedMarket, currentPrice: null, previousFiveDayHigh: null, previousFiveTradingDays: [], rate: null, volume: null, marketCap: null, tradingValue: null, turnoverRatio: null, qualifies: false, daily: { ok: false, status: 0, candleCount: 0 }, price: { ok: false, status: 0 }, error: "no market response" };
 }

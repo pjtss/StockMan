@@ -20,9 +20,15 @@ describe("accumulation repository", () => {
     const params = statement.values;
     expect(sql).toContain("u.daily_active=true"); expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LEFT JOIN LATERAL"); expect(sql).toContain("ROW_NUMBER() OVER (PARTITION BY c.market,c.code"); expect(sql).toContain("c.row_number <= $3");
+    expect(sql).toContain("c.high >= GREATEST(c.open, c.low, c.close)");
     expect(sql).not.toContain("c.volume>0"); expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/);
     expect(params[2]).toBe(120);
-    if (region === "KR") expect(sql).toContain("f.market_cap > 30000000000");
+    if (region === "KR") {
+      expect(sql).toContain("f.market_cap > 30000000000");
+      expect(sql).toContain("f.currency = 'KRW'");
+      expect(sql).toContain("f.fetched_at >= (to_date($2, 'YYYYMMDD') + INTERVAL '1 day' - INTERVAL '24 hours')");
+      expect(sql).toContain("f.fetched_at < (to_date($2, 'YYYYMMDD') + INTERVAL '1 day')");
+    }
     else { expect(sql).not.toContain("f.market_cap >"); expect(sql).toContain("NOT u.is_derivative"); }
   });
 });

@@ -32,6 +32,7 @@ export type AmsScoutCandidate = {
 export type AmsScoutResponse = {
   ok: boolean;
   status: number;
+  failedSymbols?: string[];
   request: {
     ranking: { url: string; headers: Record<string, string> };
     detail: { url: string; headers: Record<string, string> };
@@ -75,7 +76,7 @@ async function fetchJson(url: string, headers: Record<string, string>) {
 export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
   let activeToken = await getAccessToken();
   if (!activeToken) {
-    return { ok: false, status: 500, request: { ranking: { url: "", headers: {} }, detail: { url: "", headers: {} } }, candidates: [] };
+    return { ok: false, status: 500, failedSymbols: [], request: { ranking: { url: "", headers: {} }, detail: { url: "", headers: {} } }, candidates: [] };
   }
 
   const rankConfig = await loadKisApiConfig("us_updown_rate");
@@ -108,6 +109,19 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     `https://openapi.koreainvestment.com:9443/uapi/overseas-stock/v1/ranking/trade-pbmn` +
     `?AUTH=&EXCD=AMS&NDAY=0&VOL_RANG=0&PRC1=&PRC2=&KEYB=`;
   const rankingRes = await fetchJson(rankingUrl, baseHeaders);
+  const rankingOk = rankingRes.res.ok && String(rankingRes.parsed?.rt_cd ?? "") === "0";
+  if (!rankingOk) {
+    return {
+      ok: false,
+      status: rankingRes.res.ok ? 502 : rankingRes.res.status,
+      failedSymbols: [],
+      request: {
+        ranking: { url: rankingUrl, headers: { authorization: "Bearer <masked>", appkey: "<masked>", appsecret: "<masked>", tr_id: baseHeaders.tr_id, custtype: baseHeaders.custtype, tr_cont: baseHeaders.tr_cont } },
+        detail: { url: "https://openapi.koreainvestment.com:9443/uapi/overseas-price/v1/quotations/price-detail?AUTH=&EXCD=AMS&SYMB=<masked>", headers: { authorization: "Bearer <masked>", appkey: "<masked>", appsecret: "<masked>", tr_id: detailConfig.tr_id || "HHDFS76200200", custtype: "P", tr_cont: "" } },
+      },
+      candidates: [],
+    };
+  }
   const rankingOutput = rankingRes.parsed?.output2 ?? [];
   const rankingRows = Array.isArray(rankingOutput) ? rankingOutput.slice(0, topN) : [];
   const detailRequestHeaders = {
@@ -117,6 +131,7 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
   };
 
   const enriched: AmsScoutCandidate[] = [];
+  const failedSymbols: string[] = [];
 
   for (const row of rankingRows) {
     const symb = String(row.symb || "").trim();
@@ -158,6 +173,9 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
     }
 
     const detailRes = await detailPromise;
+    const detailOk = detailRes.res.ok && String(detailRes.parsed?.rt_cd ?? "") === "0";
+    const chartOk = chartRes.res.ok && String(chartRes.parsed?.rt_cd ?? "") === "0";
+    if (!detailOk || !chartOk) { failedSymbols.push(symb); continue; }
     const detail = pickDetailOutput(detailRes.parsed);
     const chartRows = Array.isArray(chartRes.parsed?.output2) ? chartRes.parsed.output2 : [];
     const minuteValues = chartRows.map((r: any) => {
@@ -221,8 +239,9 @@ export async function fetchAmsScoutCandidates(): Promise<AmsScoutResponse> {
   enriched.sort((a, b) => b.score - a.score);
 
   return {
-    ok: rankingRes.res.ok,
-    status: rankingRes.res.status,
+    ok: failedSymbols.length === 0,
+    status: failedSymbols.length > 0 ? 502 : rankingRes.res.status,
+    failedSymbols,
     request: {
       ranking: {
         url: rankingUrl,

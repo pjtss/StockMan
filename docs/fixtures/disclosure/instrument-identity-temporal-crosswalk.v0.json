@@ -1,0 +1,696 @@
+{
+  "contractVersion": "instrument-identity-temporal-crosswalk.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "identityLayers": [
+    "LEGAL_ENTITY_IDENTITY",
+    "SECURITY_INSTRUMENT_IDENTITY",
+    "MARKET_CODE_ALIAS",
+    "ELIGIBILITY_ASSERTION"
+  ],
+  "requiredAliasAssertionFields": [
+    "aliasAssertionId",
+    "instrumentId",
+    "market",
+    "code",
+    "securityClass",
+    "validFrom",
+    "validUntil",
+    "observedAt",
+    "masterSnapshotId",
+    "masterContentHash",
+    "sourceEvidenceRef",
+    "relationType",
+    "reviewState"
+  ],
+  "relationTypes": [
+    "IDENTIFIES",
+    "RENAMED_AS",
+    "REPLACED_BY",
+    "MERGED_INTO",
+    "SPLIT_INTO",
+    "CODE_REUSED_BY",
+    "CLASS_CHANGED_TO"
+  ],
+  "officialSourceRoles": [
+    "CURRENT_VENDOR_SUPPORTED_INSTRUMENT",
+    "LEGAL_ENTITY_OR_FILER_ID",
+    "EXCHANGE_LISTING_EFFECTIVE_STATUS",
+    "SECURITY_CLASS",
+    "PRICE_OBSERVATION_VENUE",
+    "SOURCE_COVERAGE"
+  ],
+  "requiredEvidenceEnvelopeFields": [
+    "fieldName",
+    "assertedValue",
+    "instrumentId",
+    "issuerRelation",
+    "venueId",
+    "securityClass",
+    "validFrom",
+    "validUntil",
+    "observedAt",
+    "sourceAuthority",
+    "sourceRecordRef",
+    "sourceContentHash",
+    "queryWindow",
+    "rowPageDenominator",
+    "sourceRevisionOrEffectiveNoticeTime",
+    "parserRevision",
+    "rightsUsePurposeState",
+    "reviewState"
+  ],
+  "crosswalkReviewRoles": [
+    "CANDIDATE_DISCOVERY",
+    "EVIDENCE_PREPARER",
+    "INSTRUMENT_REVIEWER",
+    "INDEPENDENT_REVIEWER",
+    "DECISION_OWNER",
+    "AUDITOR_READ_ONLY"
+  ],
+  "requiredCrosswalkReviewDecisionFields": [
+    "reviewDecisionId",
+    "revision",
+    "assertionId",
+    "assertionRevision",
+    "decision",
+    "reasonCode",
+    "reviewerActorId",
+    "reviewerRoleSnapshot",
+    "independentReviewerRef",
+    "evidencePacketId",
+    "evidencePacketHash",
+    "boundPolicyDecisionRevisions",
+    "sourceRightsRetentionScope",
+    "validFrom",
+    "validUntil",
+    "effectiveAt",
+    "recordedAt",
+    "expiryOrReopenCondition",
+    "expectedPriorRevision",
+    "precedingDecisionRef"
+  ],
+  "crosswalkReviewDecisionBindings": [
+    "KR-MASTER-SNAPSHOT-01",
+    "KR-EVENT-ATTRIBUTION-01",
+    "KR-OPERATIONAL-SECURITY-01",
+    "KR-RETENTION-01",
+    "KR-DART-RIGHTS-01",
+    "KR-MARKET-DATA-RIGHTS-01"
+  ],
+  "ownerDecisionPackageContractRef": "decision-register-lifecycle.v0.json",
+  "ownerDecisionPackageFieldsSource": "requiredDecisionRecordFields",
+  "reviewUiPolicyDecisionStates": [
+    "OPEN",
+    "EVIDENCE_READY",
+    "APPROVED",
+    "CLOSED",
+    "REJECTED",
+    "EXPIRED"
+  ],
+  "reviewUiAssertionStates": [
+    "DISCOVERED",
+    "EVIDENCE_INCOMPLETE",
+    "READY_FOR_REVIEW",
+    "IN_REVIEW",
+    "CONFLICT_UNRESOLVED",
+    "APPROVED_ASSERTION",
+    "REJECTED",
+    "REVIEW_REQUIRED",
+    "EXPIRED"
+  ],
+  "reviewUiActions": [
+    "ASSIGN_REVIEWER",
+    "REQUEST_EVIDENCE",
+    "MARK_EVIDENCE_READY",
+    "APPROVE_POLICY_SCOPE",
+    "APPROVE_ASSERTION",
+    "REJECT_WITH_REASON",
+    "RESOLVE_CONFLICT",
+    "REOPEN",
+    "EXPIRE"
+  ],
+  "eligibilityEvidenceFields": [
+    "instrumentId",
+    "effectiveAt",
+    "masterSnapshotId",
+    "instrumentType",
+    "activeState",
+    "marketCapValue",
+    "marketCapCurrency",
+    "marketCapObservedAt",
+    "decisionState"
+  ],
+  "vectors": [
+    {
+      "id": "ITC-01-DART-CORPORATION-CODE-IS-NOT-INSTRUMENT-IDENTITY",
+      "input": {
+        "corpCode": "SYNTH-CORP-A",
+        "stockCode": "123456",
+        "market": "KR"
+      },
+      "expected": {
+        "entityAndInstrumentSeparated": true,
+        "instrumentIdentityFromStockCodeAlone": false
+      }
+    },
+    {
+      "id": "ITC-02-MASTER-LATEST-CHANGE-DATE-IS-NOT-HISTORICAL-CROSSWALK",
+      "input": {
+        "masterSnapshot": "CURRENT_ONLY",
+        "eventEffectiveAt": "SYNTH-PAST",
+        "historicalAliasEvidence": null
+      },
+      "expected": {
+        "historicalMapping": "UNRESOLVED",
+        "inferFromCurrentAlias": false
+      }
+    },
+    {
+      "id": "ITC-03-REUSED-CODE-DOES-NOT-MERGE-TWO-INSTRUMENTS",
+      "input": {
+        "sameMarket": true,
+        "sameCode": true,
+        "validIntervalsDisjoint": true,
+        "instrumentIds": [
+          "SYNTH-INST-A",
+          "SYNTH-INST-B"
+        ]
+      },
+      "expected": {
+        "identityMerge": false,
+        "aliasRows": 2,
+        "codeReuseRelationRequired": true
+      }
+    },
+    {
+      "id": "ITC-04-RENAME-REQUIRES-EFFECTIVE-DATE-AND-CONTINUITY-EVIDENCE",
+      "input": {
+        "sameIssuerNameSimilarity": true,
+        "officialContinuityEvidence": false,
+        "validFrom": null
+      },
+      "expected": {
+        "sameInstrument": "UNRESOLVED",
+        "tickerNameSimilaritySufficient": false
+      }
+    },
+    {
+      "id": "ITC-05-MERGER-SUCCESSOR-IS-NOT-SILENTLY-THE-SAME-INSTRUMENT",
+      "input": {
+        "predecessorInstrumentId": "SYNTH-INST-A",
+        "successorInstrumentId": "SYNTH-INST-B",
+        "relation": "MERGED_INTO",
+        "reviewed": false
+      },
+      "expected": {
+        "instrumentIdentitySame": false,
+        "relationPending": true,
+        "eventSubjectRetargeted": false
+      }
+    },
+    {
+      "id": "ITC-06-SECURITY-CLASS-CHANGE-KEEPS-DISTINCT-INSTRUMENT-IDENTITY",
+      "input": {
+        "entityId": "SYNTH-ENTITY-A",
+        "oldClass": "PREFERRED",
+        "newClass": "COMMON",
+        "tickerCodeSame": true
+      },
+      "expected": {
+        "instrumentIdentitySame": false,
+        "commonStockEligibilityInherited": false
+      }
+    },
+    {
+      "id": "ITC-07-EVENT-TIME-ELIGIBILITY-USES-ALIGNED-MASTER-AND-CAP-SNAPSHOT",
+      "input": {
+        "eventEffectiveAt": "SYNTH-T0",
+        "masterObservedAt": "SYNTH-T1",
+        "capObservedAt": "SYNTH-T2",
+        "snapshotAligned": false
+      },
+      "expected": {
+        "eligibleAtEvent": "UNRESOLVED",
+        "currentMasterBackfillAllowed": false
+      }
+    },
+    {
+      "id": "ITC-08-WATCHLIST-SUCCESSOR-MATCH-IS-CONTEXT-ONLY-WITHOUT-APPROVED-RELATION",
+      "input": {
+        "eventSubjectInstrument": "SYNTH-INST-OLD",
+        "watchlistInstrument": "SYNTH-INST-NEW",
+        "successorEdgeApproved": false
+      },
+      "expected": {
+        "directWatchlistMatch": false,
+        "contextualSuccessorMatch": "UNRESOLVED",
+        "alertAllowed": false
+      }
+    },
+    {
+      "id": "ITC-09-OVERLAPPING-CONFLICTING-ALIASES-QUARANTINE-ONLY-AFFECTED-SUBJECT",
+      "input": {
+        "sameMarket": true,
+        "sameCode": true,
+        "validIntervalsOverlap": true,
+        "instrumentIds": [
+          "SYNTH-INST-A",
+          "SYNTH-INST-B"
+        ]
+      },
+      "expected": {
+        "mapping": "CONFLICTED",
+        "affectedSubject": "SUPPRESSED",
+        "unrelatedSubjectsChanged": false
+      }
+    },
+    {
+      "id": "ITC-10-PRICE-CONTINUITY-AND-IDENTITY-CONTINUITY-ARE-SEPARATE",
+      "input": {
+        "corporateAction": "SPLIT",
+        "adjustedPriceSeriesContinuous": true,
+        "identityRelationEvidence": false
+      },
+      "expected": {
+        "instrumentIdentityMerge": false,
+        "priceAdjustmentImpliesIdentity": false
+      }
+    },
+    {
+      "id": "ITC-11-UNVERIFIED-CODE-ALIAS-BLOCKS-COMMON-STOCK-RECOMMENDATION",
+      "input": {
+        "aliasReviewState": "UNRESOLVED",
+        "masterLookup": "FAILED",
+        "nameLooksLikeCommonStock": true
+      },
+      "expected": {
+        "recommendation": false,
+        "failClosed": true
+      }
+    },
+    {
+      "id": "ITC-12-MAPPING-CORRECTION-CREATES-NEW-ASSERTION-AND-INVALIDATES-DESCENDANTS",
+      "input": {
+        "priorAliasAssertion": "SYNTH-ALIAS-1",
+        "newEvidenceChangesEffectiveInterval": true
+      },
+      "expected": {
+        "oldAssertionImmutable": true,
+        "newAssertionRequired": true,
+        "affectedSubjectReviewRequired": true,
+        "oldApprovalReused": false
+      }
+    },
+    {
+      "id": "ITC-13-OPENDART-MODIFY-DATE-IS-NOT-HISTORICAL-SECURITY-ALIAS",
+      "input": {
+        "corpCode": "SYNTH-CORP-13",
+        "stockCode": "SYNTH-CODE-13",
+        "modifyDate": "SYNTH-OVERVIEW-LAST-CHANGE",
+        "eventEffectiveAt": "SYNTH-PRIOR-DATE",
+        "eventTimeSecurityEvidence": null
+      },
+      "expected": {
+        "corpCodeRole": "LEGAL_ENTITY_OR_FILER_ID",
+        "historicalAlias": "UNRESOLVED",
+        "modifyDatePromotedToListingEffectiveDate": false
+      }
+    },
+    {
+      "id": "ITC-14-KRX-LIMITED-ISSUE-VIEW-ABSENCE-DOES-NOT-PROVE-NO-LISTING",
+      "input": {
+        "source": "KRX_NEWLY_LISTED_ISSUE_VIEW",
+        "coverageWindow": "RECENT_TEN_YEARS",
+        "knownExcludedCases": [
+          "SPAC_MERGER_LISTING",
+          "TRANSFER_LISTING"
+        ],
+        "queryReturnedNoRow": true
+      },
+      "expected": {
+        "listingAbsenceConclusion": "UNVERIFIABLE_OUTSIDE_CONFIRMED_COVERAGE",
+        "coverageLimitRetained": true,
+        "securityIdentityDeleted": false
+      }
+    },
+    {
+      "id": "ITC-15-SEC-TICKER-EXCHANGE-FILE-IS-CANDIDATE-MAP-NOT-GUARANTEED-HISTORY",
+      "input": {
+        "cik": "SYNTH-CIK-15",
+        "ticker": "SYNTH-TICKER-15",
+        "exchange": "SYNTH-VENUE-15",
+        "secAccuracyScopeGuarantee": false,
+        "historicalEffectiveInterval": null
+      },
+      "expected": {
+        "filerIdentityRole": "LEGAL_ENTITY_OR_FILER_ID",
+        "mappingCandidateOnly": true,
+        "historicalListingApproved": false
+      }
+    },
+    {
+      "id": "ITC-16-KIS-FIRST-LAST-SEEN-ARE-OBSERVATION-TIMES-NOT-LISTING-EFFECTIVE-DATES",
+      "input": {
+        "firstSeenAt": "SYNTH-OBSERVED-1",
+        "lastSeenAt": "SYNTH-OBSERVED-2",
+        "officialListingNotice": null
+      },
+      "expected": {
+        "listingValidFrom": null,
+        "listingValidUntil": null,
+        "validityDerivedFromSeenTimes": false,
+        "historicalContinuity": "UNRESOLVED"
+      }
+    },
+    {
+      "id": "ITC-17-CONFLICTING-OFFICIAL-FIELDS-ARE-NOT-RESOLVED-BY-LATEST-WRITE",
+      "input": {
+        "fieldName": "LISTING_EFFECTIVE_DATE",
+        "sourceAssertions": [
+          "SYNTH-SOURCE-A",
+          "SYNTH-SOURCE-B"
+        ],
+        "valuesConflict": true,
+        "sourcePrecedencePolicy": "UNAPPROVED"
+      },
+      "expected": {
+        "assertionState": "CONFLICT_UNRESOLVED",
+        "latestValueAutoWins": false,
+        "identityReviewBlocked": true
+      }
+    },
+    {
+      "id": "ITC-18-INCOMPLETE-SOURCE-DENOMINATOR-CANNOT-SUPPORT-COVERAGE-OR-ABSENCE",
+      "input": {
+        "queryWindow": "SYNTH-WINDOW",
+        "rowPageDenominator": null,
+        "rightsUsePurposeState": "UNRESOLVED",
+        "emptyResult": true
+      },
+      "expected": {
+        "completeHistoryClaim": false,
+        "noAliasConclusion": "UNVERIFIABLE",
+        "publicationOrAggregate": false
+      }
+    },
+    {
+      "id": "ITC-19-CROSSWALK-CANDIDATE-DOES-NOT-ACTIVATE-ELIGIBILITY",
+      "input": {
+        "candidateState": "DISCOVERED",
+        "sourceSnapshotPinned": true,
+        "reviewDecision": null
+      },
+      "expected": {
+        "approvedAssertionCreated": false,
+        "eligibilityActivated": false,
+        "publicSubjectCreated": false
+      }
+    },
+    {
+      "id": "ITC-20-ASSERTION-APPROVAL-REQUIRES-FIELD-LEVEL-EVIDENCE-PACKET",
+      "input": {
+        "assertedFields": [
+          "ISSUER",
+          "SECURITY_CLASS",
+          "LISTING_EFFECTIVE_DATE"
+        ],
+        "evidenceFieldCoverage": {
+          "ISSUER": true,
+          "SECURITY_CLASS": true,
+          "LISTING_EFFECTIVE_DATE": false
+        },
+        "rightsUsePurposeState": "APPROVED"
+      },
+      "expected": {
+        "assertionState": "EVIDENCE_INCOMPLETE",
+        "partialFieldAutoApproval": false,
+        "unprovenEffectiveDate": null
+      }
+    },
+    {
+      "id": "ITC-21-CLASS-OR-HISTORY-CORRECTION-REQUIRES-INDEPENDENT-REVIEW",
+      "input": {
+        "changeKind": "SECURITY_CLASS_OR_HISTORICAL_RELATION_CORRECTION",
+        "preparerId": "PERSON-SYN-21-A",
+        "reviewerIds": [
+          "PERSON-SYN-21-A"
+        ],
+        "ownerDecision": "APPROVE"
+      },
+      "expected": {
+        "independentReviewSatisfied": false,
+        "assertionActivated": false,
+        "reviewState": "REVIEW_REQUIRED"
+      }
+    },
+    {
+      "id": "ITC-22-OVERLAPPING-ALIAS-CONFLICT-QUARANTINES-ONLY-RELATED-SCOPE",
+      "input": {
+        "candidateAlias": "ALIAS-SYN-22-A",
+        "existingAlias": "ALIAS-SYN-22-B",
+        "sameMarketCode": true,
+        "validIntervalsOverlap": true,
+        "otherUnrelatedCandidate": "ALIAS-SYN-22-C"
+      },
+      "expected": {
+        "candidateState": "CONFLICT_UNRESOLVED",
+        "affectedAliasQuarantined": true,
+        "unrelatedCandidateBlocked": false
+      }
+    },
+    {
+      "id": "ITC-23-CORRECTION-APPENDS-ASSERTION-AND-REOPENS-DEPENDENT-REVIEWS",
+      "input": {
+        "priorAssertionId": "ASSERTION-SYN-23-A",
+        "correctionEvidenceRef": "SOURCE-SYN-23-B",
+        "dependentConsumerRefs": [
+          "EVENT-SYN-23",
+          "THESIS-SYN-23"
+        ]
+      },
+      "expected": {
+        "priorAssertionMutable": false,
+        "newAssertionRevisionRequired": true,
+        "dependentReviews": "REVIEW_REQUIRED",
+        "automaticReapproval": false
+      }
+    },
+    {
+      "id": "ITC-24-RIGHTS-EXPIRY-CLOSES-ACTION-WITHOUT-DELETING-ASSERTION-HISTORY",
+      "input": {
+        "approvedAssertionId": "ASSERTION-SYN-24-A",
+        "rightsExpiryAt": "SYNTH-EXPIRY",
+        "currentTime": "SYNTH-AFTER-EXPIRY",
+        "historicalAssertionRetention": "APPROVED"
+      },
+      "expected": {
+        "sourceActionAllowed": false,
+        "priorAssertionImmutable": true,
+        "publicDescendantActive": false,
+        "rightsApprovalRenewalRequired": true
+      }
+    },
+    {
+      "id": "ITC-25-PREPARER-CANNOT-APPROVE-OWN-IDENTITY-ASSERTION",
+      "input": {
+        "preparerActorId": "ACTOR-SYN-25-A",
+        "reviewerActorId": "ACTOR-SYN-25-A",
+        "decision": "APPROVE",
+        "requiredIndependentReview": true
+      },
+      "expected": {
+        "selfApprovalAllowed": false,
+        "assertionState": "IN_REVIEW",
+        "approvalRecordCreated": false
+      }
+    },
+    {
+      "id": "ITC-26-REVOKED-OR-OUT-OF-SCOPE-ROLE-CANNOT-MUTATE-REVIEW",
+      "input": {
+        "actorRole": "INSTRUMENT_REVIEWER",
+        "assignedScope": "MARKET-A",
+        "targetScope": "MARKET-B",
+        "permissionRevoked": true,
+        "expectedPriorRevision": 4
+      },
+      "expected": {
+        "mutationAllowed": false,
+        "assertionRevisionChanged": false,
+        "reason": "AUTHORIZATION_SCOPE_OR_REVOCATION"
+      }
+    },
+    {
+      "id": "ITC-27-UNKNOWN-RIGHTS-BLOCK-PERSISTENCE-OF-SOURCE-BYTES-AND-HASH",
+      "input": {
+        "sourceRightsState": "UNRESOLVED",
+        "sourceBytesFetched": true,
+        "retentionDecision": "OPEN",
+        "contentHashProvenAllowed": false
+      },
+      "expected": {
+        "persistentSourceBytes": false,
+        "persistentContentHash": false,
+        "evidenceState": "EVIDENCE_INCOMPLETE",
+        "sourceActionAllowed": false
+      }
+    },
+    {
+      "id": "ITC-28-EDITED-EVIDENCE-PACKET-REQUIRES-NEW-REVIEW-REVISION",
+      "input": {
+        "priorPacketHash": "HASH-SYN-28-A",
+        "editedPacketHash": "HASH-SYN-28-B",
+        "priorApprovalRef": "DECISION-SYN-28-A"
+      },
+      "expected": {
+        "priorPacketMutable": false,
+        "newPacketRevisionRequired": true,
+        "priorApprovalCurrent": false,
+        "dependentState": "REVIEW_REQUIRED"
+      }
+    },
+    {
+      "id": "ITC-29-CONCURRENT-REVIEW-TRANSITIONS-USE-CAS-NOT-LAST-WRITE-WINS",
+      "input": {
+        "expectedPriorRevision": 7,
+        "currentRevision": 8,
+        "concurrentDecision": "REJECT"
+      },
+      "expected": {
+        "staleTransitionAccepted": false,
+        "result": "REVISION_CONFLICT",
+        "lastWriteWins": false,
+        "acceptedTransitionsForOneRevision": 1
+      }
+    },
+    {
+      "id": "ITC-30-AUDITOR-IS-READ-ONLY-AND-PENDING-CROSSWALK-IS-NOT-PUBLIC",
+      "input": {
+        "actorRole": "AUDITOR_READ_ONLY",
+        "mutationRequested": true,
+        "externalPublicGetRequested": true,
+        "assertionState": "IN_REVIEW"
+      },
+      "expected": {
+        "mutationAllowed": false,
+        "publicCandidateReturned": false,
+        "packetOrReviewerIdentityLeaked": false
+      }
+    },
+    {
+      "id": "ITC-31-EVIDENCE-READY-IS-REVIEWABLE-NOT-AN-AUTHORIZATION",
+      "input": {
+        "policyDecisionStatus": "EVIDENCE_READY",
+        "scopeEvidencePresent": true,
+        "namedReviewer": "REVIEWER-SYN-31",
+        "acceptanceResult": "NOT_RUN"
+      },
+      "expected": {
+        "reviewQueueEligible": true,
+        "policyScopeAuthorized": false,
+        "assertionActivationAllowed": false
+      }
+    },
+    {
+      "id": "ITC-32-PARTIAL-OWNER-APPROVAL-DOES-NOT-EXPAND-SOURCE-OR-ACTION-SCOPE",
+      "input": {
+        "approvedScope": {
+          "source": "SOURCE-SYN-32-A",
+          "action": "METADATA_READ"
+        },
+        "requestedScope": {
+          "source": "SOURCE-SYN-32-B",
+          "action": "BODY_RETAIN"
+        },
+        "decisionStatus": "APPROVED"
+      },
+      "expected": {
+        "scopeMatch": false,
+        "requestedActionAuthorized": false,
+        "scopeExpansionRequiresNewRevision": true
+      }
+    },
+    {
+      "id": "ITC-33-OWNER-DECISION-PACKAGE-REQUIRES-NAMED-OWNER-AND-PASSING-ACCEPTANCE",
+      "input": {
+        "decisionId": "KR-MASTER-SNAPSHOT-01",
+        "namedOwner": null,
+        "reviewer": "REVIEWER-SYN-33",
+        "acceptanceArtifact": "REPORT-SYN-33",
+        "acceptanceResult": "PASS",
+        "decisionRef": "DECISION-SYN-33",
+        "validUntil": "SYNTH-VALID-UNTIL"
+      },
+      "expected": {
+        "decisionTransitionToApproved": false,
+        "statusRemains": "OPEN",
+        "ownerRoleAloneIsAssignment": false
+      }
+    },
+    {
+      "id": "ITC-34-POLICY-APPROVAL-DOES-NOT-SKIP-ASSERTION-LEVEL-DECISION",
+      "input": {
+        "policyDecisionId": "KR-MASTER-SNAPSHOT-01",
+        "policyDecisionStatus": "APPROVED",
+        "policyScopeMatches": true,
+        "assertionReviewDecision": null
+      },
+      "expected": {
+        "policyScopeCurrent": true,
+        "assertionState": "IN_REVIEW",
+        "publicOrEligibilityActivation": false
+      }
+    },
+    {
+      "id": "ITC-35-EXPIRED-OR-STALE-OWNER-DECISION-REOPENS-DEPENDENT-ASSERTION",
+      "input": {
+        "priorPolicyRevision": 3,
+        "currentPolicyStatus": "EXPIRED",
+        "assertionApprovedUnderRevision": 3,
+        "dependentEventAndThesisRefs": [
+          "EVENT-SYN-35",
+          "THESIS-SYN-35"
+        ]
+      },
+      "expected": {
+        "priorAssertionDecisionMutable": false,
+        "currentAssertionState": "REVIEW_REQUIRED",
+        "dependentPublicDescendantsActive": false,
+        "newPolicyRevisionRequired": true
+      }
+    },
+    {
+      "id": "ITC-36-REVIEW-UI-KEEPS-POLICY-AND-ASSERTION-STATUS-AXES-SEPARATE",
+      "input": {
+        "policyDecisionStatus": "EVIDENCE_READY",
+        "assertionState": "EVIDENCE_INCOMPLETE",
+        "nextMissingField": "LISTING_EFFECTIVE_DATE"
+      },
+      "expected": {
+        "statusAxesCollapsed": false,
+        "nextAction": "REQUEST_EVIDENCE",
+        "approveAssertionActionEnabled": false
+      }
+    },
+    {
+      "id": "ITC-37-OWNER-PACKAGE-OMITS-SOURCE-BODY-WHEN-RIGHTS-DO-NOT-PERMIT-RETENTION",
+      "input": {
+        "sourceRightsState": "APPROVED_METADATA_ONLY",
+        "sourceBodyIncluded": false,
+        "sourceBytesPersisted": false,
+        "permittedLocatorAndHash": true,
+        "evidenceCoverageComplete": false
+      },
+      "expected": {
+        "bodyRetentionRequired": false,
+        "evidenceCompleteness": "INCOMPLETE",
+        "policyApprovalImpliesAssertionTruth": false
+      }
+    }
+  ]
+}

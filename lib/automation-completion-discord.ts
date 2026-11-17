@@ -13,6 +13,36 @@ const COMPLETION_MODULES = new Set<FeatureModuleKey>([
   "us-bollinger-middle-lower",
   "market-rss",
 ]);
+const MAX_COMPLETION_CONTENT_LENGTH = 1_900;
+
+function truncateText(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 0) return "";
+  if (maxLength === 1) return "…";
+  let end = maxLength - 1;
+  const lastCodeUnit = value.charCodeAt(end - 1);
+  if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
+  return `${value.slice(0, end)}…`;
+}
+
+function assembleCompletionContent(prefix: string[], optional: string[], suffix: string[]) {
+  const boundedPrefix = prefix.map((line, index) => truncateText(line, [180, 150, 60, 650][index] ?? 180));
+  const boundedSuffix = suffix.map((line, index) => truncateText(line, index === 0 ? 500 : 80));
+  const baseLength = [...boundedPrefix, ...boundedSuffix].join("\n").length;
+  let optionalBudget = Math.max(0, MAX_COMPLETION_CONTENT_LENGTH - baseLength);
+  const selectedOptional: string[] = [];
+  for (const line of optional) {
+    const cost = line.length + 1;
+    if (cost <= optionalBudget) {
+      selectedOptional.push(line);
+      optionalBudget -= cost;
+      continue;
+    }
+    if (optionalBudget >= 2) selectedOptional.push(truncateText(line, optionalBudget - 1));
+    break;
+  }
+  return [...boundedPrefix, ...selectedOptional, ...boundedSuffix].join("\n");
+}
 
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -25,15 +55,32 @@ function compact(value: unknown): string {
 }
 
 function resultSummary(summary: Record<string, unknown>) {
-  const preferred = ["instrumentCount", "successCount", "failureCount", "partialFailureCount", "translationFailureCount", "counterDataInvalid", "savedCandleCount", "processedCount", "sent", "skipped", "reason", "intervalSeconds", "elapsedSeconds", "latestRunStatus"];
+  const preferred = ["instrumentCount", "successCount", "failureCount", "partialFailureCount", "translationFailureCount", "counterDataInvalid", "degraded", "deliveryFailedCount", "retryQueuedCount", "savedCandleCount", "processedCount", "sent", "skipped", "reason", "intervalSeconds", "elapsedSeconds", "latestRunStatus"];
   const selected = Object.fromEntries(preferred.filter((key) => key in summary).map((key) => [key, summary[key]]));
+  const discord = summary.discord && typeof summary.discord === "object" ? summary.discord as Record<string, unknown> : null;
+  if (discord) selected.discordDelivery = discord.ok === false ? "FAILED" : discord.ok === true ? "SENT_OR_SKIPPED" : "UNKNOWN";
   if (Object.keys(selected).length) return compact(selected);
   return compact(summary.counts ?? summary.result ?? { ok: true });
 }
 
+function statusMessage(moduleKey: FeatureModuleKey, status: "SUCCESS" | "PARTIAL" | "FAILED" | "SKIPPED", summary: Record<string, unknown>) {
+  if (status === "SUCCESS") return "성공";
+  if (status === "SKIPPED") return "건너뜀";
+  if (status === "PARTIAL") {
+    const discord = summary.discord && typeof summary.discord === "object" ? summary.discord as Record<string, unknown> : null;
+    if (discord?.ok === false) return "부분 완료(Discord 알림 전송 실패)";
+    if (summary.degraded === true) return "부분 완료(일부 처리·전달·검증 단계 저하)";
+    if (moduleKey === "market-rss" && (asNumber(summary.partialFailureCount) ?? 0) > 0) return "부분 완료(RSS 수집/번역 일부 실패)";
+    if (moduleKey === "market-rss") return "부분 완료(RSS 처리·전달·검증 단계 저하)";
+    return "부분 완료(일부 종목 데이터 미수신)";
+  }
+  if (summary.degraded === true) return "실패(처리·전달·검증 단계 오류)";
+  return "실패";
+}
+
 function followupSummary(summary: Record<string, unknown>) {
   const lines: string[] = [];
-  if (summary.counterDataInvalid === true) lines.push("RSS 수집·번역 집계 카운터 오류 · 실제 실패 건수 확인 필요");
+  if (summary.counterDataInvalid === true) lines.push("counterDataInvalid: RSS 수집·번역 집계 카운터 오류 · 실제 실패 건수 확인 필요");
   const translated = summary.translated as Record<string, unknown> | undefined;
   if (translated && typeof translated === "object") {
     const reasons = translated.fallbackReasons && typeof translated.fallbackReasons === "object"
@@ -126,17 +173,24 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
 
   const durationMs = asNumber((summary.observability as Record<string, unknown> | undefined)?.durationMs);
   const label = getFeatureModule(moduleKey)?.label ?? moduleKey;
-  const lines = [
+  const failureCount = asNumber(summary.failureCount);
+  const failureMessage = status === "FAILED"
+    ? errorMessage ?? (failureCount != null && failureCount > 0 ? `${failureCount}개 종목 처리 실패` : "자동화 작업 전체 실패")
+    : null;
+  const prefixLines = [
     `${status === "SUCCESS" ? "✅" : status === "PARTIAL" ? "⚠️" : status === "SKIPPED" ? "⏭️" : "❌"} ${label} 자동화 완료`,
-    `상태: ${status === "SUCCESS" ? "성공" : status === "PARTIAL" ? moduleKey === "market-rss" ? "부분 완료(RSS 수집/번역 일부 실패)" : "부분 완료(일부 종목 데이터 미수신)" : status === "SKIPPED" ? "건너뜀" : "실패"}`,
+    `상태: ${statusMessage(moduleKey, status, summary)}`,
     durationMs == null ? null : `소요 시간: ${(durationMs / 1000).toFixed(2)}초`,
     `결과: ${resultSummary(summary)}`,
-    ...followupSummary(summary),
-    errorMessage ? `오류: ${errorMessage}` : null,
-    `완료 시각: ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
-  ].filter(Boolean).join("\n");
+  ].filter((line): line is string => Boolean(line));
+  const completedAtLine = `완료 시각: ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`;
+  const suffixLines = [
+    failureMessage ? `오류: ${failureMessage}` : null,
+    completedAtLine,
+  ].filter((line): line is string => Boolean(line));
+  const content = assembleCompletionContent(prefixLines, followupSummary(summary), suffixLines);
   try {
-    const delivered = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content: lines.slice(0, 1900), allowed_mentions: { parse: [] } }));
+    const delivered = await postCompletionWebhook(webhook, JSON.stringify({ username: "STOCKMAN 자동화", content, allowed_mentions: { parse: [] } }));
     if (!delivered.response.ok) throw new Error(`Discord HTTP ${delivered.response.status}`);
     return { sent: true, skipped: false, configured: true, attempts: delivered.attempts, deliveryDate };
   } catch (error) {

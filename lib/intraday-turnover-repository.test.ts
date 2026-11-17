@@ -16,6 +16,7 @@ describe("intraday turnover persistence", () => {
       market: "NAS", code: "TEST", sessionDate: "2026-09-25", observedAt, bucketAt,
       currency: "USD", price: 12.5, volume: 800, sourceTradingValue: 10_000,
       minuteTradingValue: 1_250, minuteTradingValueSource: "KIS_CUMULATIVE_DELTA", marketCap: 2_000_000,
+      marketCapObservedAt: new Date("2026-09-25T05:00:00.000Z"), marketCapFetchedAt: new Date("2026-09-25T05:00:10.000Z"),
       rollingTradingValue: 6_000, turnoverRatio: 0.003, sourcePayload: { last: "12.5", tamnt: "10000" },
     }])).resolves.toBe(1);
 
@@ -24,7 +25,8 @@ describe("intraday turnover persistence", () => {
     expect(query.mock.calls[0]?.[0]).toContain("ON CONFLICT (market,code,session_date,bucket_at) DO UPDATE");
     expect(query.mock.calls[0]?.[1]).toEqual([
       "NAS", "TEST", "2026-09-25", bucketAt, observedAt, "USD", 12.5, 800,
-      10_000, 1_250, "KIS_CUMULATIVE_DELTA", 2_000_000, 6_000, 0.003,
+      10_000, 1_250, "KIS_CUMULATIVE_DELTA", 2_000_000,
+      new Date("2026-09-25T05:00:00.000Z"), new Date("2026-09-25T05:00:10.000Z"), 6_000, 0.003,
       JSON.stringify({ last: "12.5", tamnt: "10000" }),
     ]);
   });
@@ -43,17 +45,17 @@ describe("intraday turnover persistence", () => {
       market: "NAS", code: `T${index}`, sessionDate: "2026-09-25", observedAt, bucketAt,
       currency: "USD" as const, price: 10, volume: 1, sourceTradingValue: 10,
       minuteTradingValue: 10, minuteTradingValueSource: "PRICE_VOLUME_FALLBACK" as const,
-      marketCap: 1000, rollingTradingValue: 10,
+      marketCap: 1000, marketCapObservedAt: null, marketCapFetchedAt: null, rollingTradingValue: 10,
       turnoverRatio: 0.01, sourcePayload: { last: "10" },
     }));
 
     await expect(saveIntradayTurnoverObservations(observations)).resolves.toBe(300);
 
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[0]?.[1]).toHaveLength(250 * 15);
-    expect(query.mock.calls[0]?.[0]).toContain("$3750::jsonb");
-    expect(query.mock.calls[1]?.[1]).toHaveLength(50 * 15);
-    expect(query.mock.calls[1]?.[0]).toContain("$750::jsonb");
+    expect(query.mock.calls[0]?.[1]).toHaveLength(250 * 17);
+    expect(query.mock.calls[0]?.[0]).toContain("$4250::jsonb");
+    expect(query.mock.calls[1]?.[1]).toHaveLength(50 * 17);
+    expect(query.mock.calls[1]?.[0]).toContain("$850::jsonb");
   });
 
   it("propagates persistence failures so the worker can mark its tick degraded", async () => {
@@ -64,7 +66,7 @@ describe("intraday turnover persistence", () => {
       observedAt: new Date("2026-09-25T01:00:00.000Z"), bucketAt: new Date("2026-09-25T01:00:00.000Z"),
       currency: "KRW" as const, price: 70000, volume: 10, sourceTradingValue: 700000,
       minuteTradingValue: 700000, minuteTradingValueSource: "PRICE_VOLUME_FALLBACK" as const,
-      marketCap: 1000000000, rollingTradingValue: 700000,
+      marketCap: 1000000000, marketCapObservedAt: null, marketCapFetchedAt: null, rollingTradingValue: 700000,
       turnoverRatio: 0.0007, sourcePayload: {},
     };
 

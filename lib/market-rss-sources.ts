@@ -3,7 +3,7 @@ import { fetchNasdaqRss } from "./nasdaq-rss";
 import { fetchNasdaqTraderRss } from "./nasdaq-trader-rss";
 import { fetchSecEdgarRss } from "./sec-edgar-rss";
 import { fetchStockTitanRss } from "./stocktitan-rss";
-import type { MarketRssFeed } from "./market-rss";
+import { getMarketRssFetchDiagnostics, type MarketRssFeed } from "./market-rss";
 import { fetchDomesticRss, DOMESTIC_RSS_SOURCES, type DomesticRssSource } from "./domestic-rss-sources";
 
 export const MARKET_RSS_SOURCES = ["GLOBENEWSWIRE", "NASDAQ", "NASDAQ_TRADER", "SEC_EDGAR", "STOCKTITAN"] as const;
@@ -35,7 +35,10 @@ export async function fetchAllMarketRss(enabledSources?: unknown) {
   const sources = normalizeMarketRssSources(enabledSources);
   const results = await Promise.all(sources.map(async (source) => {
     try { return { source, ok: true as const, feed: await fetchers[source]() }; }
-    catch (error) { return { source, ok: false as const, error: error instanceof Error ? error.message : String(error) }; }
+    catch (error) {
+      const diagnostics = getMarketRssFetchDiagnostics(error);
+      return { source, ok: false as const, error: diagnostics.errorCode, ...diagnostics };
+    }
   }));
   return { fetchedAt: new Date().toISOString(), results };
 }

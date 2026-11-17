@@ -77,8 +77,9 @@ export async function fetchKisUsTopRisingApi(request: KisUsTopRisingApiRequest =
 
   const responseResult = await kisRequest<any>({ url: prepared.url, token: prepared.token, trId: prepared.config.tr_id || "HHDFS76290000", headers: { "content-type": prepared.config.content_type || "application/json; charset=utf-8", custtype: prepared.config.custtype || "P", tr_cont: "" } });
   const { response, rawText } = responseResult;
+  const parsed = responseResult.parsed ?? parseResponse(rawText);
   return {
-    ok: response.ok,
+    ok: response.ok && parsed?.rt_cd === "0",
     status: response.status,
     url: prepared.url,
     request: {
@@ -95,7 +96,7 @@ export async function fetchKisUsTopRisingApi(request: KisUsTopRisingApiRequest =
     },
       response: {
       rawText,
-      parsed: responseResult.parsed ?? parseResponse(rawText),
+      parsed,
     },
   } satisfies KisUsTopRisingApiResponse;
 }

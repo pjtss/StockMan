@@ -1,0 +1,622 @@
+{
+  "contractVersion": "correction-delivery-reconciliation.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredentialsOrWebhookToken": false,
+    "identitiesAreSynthetic": true
+  },
+  "requiredDeliveryDimensions": [
+    "filingRevision",
+    "recipient",
+    "channel",
+    "deliveryAttempt",
+    "notificationRevision",
+    "publicationEpoch"
+  ],
+  "requiredAttributionLineageFields": [
+    "creditState",
+    "creditManifestHash",
+    "creditComponents",
+    "payloadHash",
+    "rendererRevision"
+  ],
+  "requiredDeliveryAttemptFields": ["candidateId", "targetIdentityHash", "targetIdentityKeyId", "attemptNumber", "creditState", "payloadHash", "creditManifestHash", "creditComponents", "rendererRevision", "locale", "notificationRevision", "rightsDecisionRevision", "attributionPolicyRevision", "publicationEpoch", "providerOutcome", "deviceDeliveryObservation"],
+  "targetIdentityHashContractRef": "DELIVERY-TARGET-HASH-v1",
+  "exposureDigestContract": {
+    "algorithm": "SHA-256",
+    "domainSeparator": "KR-DISCLOSURE-EXPOSURE-SET-v1",
+    "canonicalization": "RFC8785-JCS",
+    "setOrder": "sort by UTF-8 bytes of exposureId; reject duplicate exposureId before hashing",
+    "inputFields": ["exposureId", "exposureScope", "surfaceKind", "targetIdentityHash", "targetIdentityKeyId", "sourceRevision", "publicationEpoch", "disposition"],
+    "formula": "SHA256(UTF8(domainSeparator) || 0x00 || UTF8(JCS(sorted exposure objects with declared inputFields)))",
+    "sharedSurfaceControlDigestDomainSeparator": "KR-DISCLOSURE-SHARED-CONTROL-SET-v1",
+    "goldenVector": {
+      "exposures": [
+        { "disposition": "VISIBLE", "exposureId": "EXP-SYN-CARD-1", "exposureScope": "RECIPIENT_TARGET", "publicationEpoch": 8, "sourceRevision": "REV-SYN-2", "surfaceKind": "IN_APP_CARD", "targetIdentityHash": "hmac-sha256:SYNTH-USER-KEY-1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "targetIdentityKeyId": "SYNTH-USER-KEY-1" },
+        { "disposition": "PROVIDER_ACCEPTED", "exposureId": "EXP-SYN-PUSH-1", "exposureScope": "RECIPIENT_TARGET", "publicationEpoch": 8, "sourceRevision": "REV-SYN-2", "surfaceKind": "WEB_PUSH_ENDPOINT", "targetIdentityHash": "hmac-sha256:SYNTH-KEY-1:f33dcd1c1b720021198332282d4754909b0f3d6fa1f7caea2453141078328297", "targetIdentityKeyId": "SYNTH-KEY-1" }
+      ],
+      "expectedHash": "sha256:ff7e038c8415da349c2aac5a45ae05d19e4383cbb090d07abd916752df26eab9"
+    }
+  },
+  "requiredEvidenceStates": [
+    "NOT_ATTEMPTED",
+    "ATTEMPTED_UNKNOWN",
+    "PROVIDER_ACCEPTED",
+    "DEVICE_DELIVERY_UNOBSERVED",
+    "FAILED_RETRYABLE",
+    "DELIVERED_UNRETRACTABLE",
+    "EDIT_CONFIRMED",
+    "DELETE_CONFIRMED",
+    "SUPPRESSED_BEFORE_SEND"
+  ],
+  "vectors": [
+    {
+      "id": "CDR-01-AGGREGATE-DELIVERED-DOES-NOT-PROVE-CHANNEL-COVERAGE",
+      "input": {
+        "filingStatus": "delivered",
+        "expectedChannels": [
+          "WEB_PUSH",
+          "DISCORD"
+        ],
+        "storedRows": [
+          {
+            "channel": "DISCORD",
+            "status": "PROVIDER_ACCEPTED"
+          }
+        ]
+      },
+      "expected": {
+        "ledgerCompleteness": "INCOMPLETE",
+        "reconciliation": "BLOCKED_DELIVERY_SCOPE",
+        "forbiddenInference": "both channels delivered"
+      }
+    },
+    {
+      "id": "CDR-02-PUSH-ACCEPTANCE-IS-NOT-DEVICE-DELIVERY",
+      "input": {
+        "channel": "WEB_PUSH",
+        "providerAccepted": true,
+        "deviceReceipt": null,
+        "userOpened": null
+      },
+      "expected": {
+        "status": "DEVICE_DELIVERY_UNOBSERVED",
+        "deviceDelivery": "UNOBSERVED",
+        "userOpened": "UNOBSERVED"
+      }
+    },
+    {
+      "id": "CDR-03-DISCORD-WAIT-RESPONSE-ID-MUST-BE-LINKED",
+      "input": {
+        "waitTrue": true,
+        "responseMessageId": "SYNTHETIC-MESSAGE-7",
+        "persistedMessageId": null
+      },
+      "expected": {
+        "editDeleteTarget": "UNRESOLVABLE",
+        "retractionStatus": "DELIVERED_UNRETRACTABLE",
+        "ledgerCompleteness": "INCOMPLETE"
+      }
+    },
+    {
+      "id": "CDR-04-PROVIDER-TIMEOUT-AFTER-POST-IS-UNKNOWN-NOT-RETRY-SAFE",
+      "input": {
+        "requestStarted": true,
+        "responseReceived": false,
+        "providerMayHaveAccepted": true
+      },
+      "expected": {
+        "status": "ATTEMPTED_UNKNOWN",
+        "automaticDuplicateRetry": false,
+        "nextAction": "RECONCILE_OR_OPERATOR_REVIEW"
+      }
+    },
+    {
+      "id": "CDR-05-CORRECTION-ONLY-REACHES-AFFECTED-DELIVERIES",
+      "input": {
+        "priorNotificationIds": [
+          "N-SYN-1",
+          "N-SYN-2"
+        ],
+        "affected": {
+          "N-SYN-1": true,
+          "N-SYN-2": false
+        },
+        "correctionEpoch": 4
+      },
+      "expected": {
+        "correctionTargets": [
+          "N-SYN-1"
+        ],
+        "idempotencyIncludes": [
+          "recipient",
+          "channel",
+          "correctionEpoch",
+          "priorNotificationId",
+          "action"
+        ],
+        "unaffectedDelivery": "UNCHANGED"
+      }
+    },
+    {
+      "id": "CDR-06-NEW-CORRECTION-EPOCH-DOES-NOT-OVERWRITE-PRIOR-RECEIPT",
+      "input": {
+        "priorEpoch": 3,
+        "newEpoch": 4,
+        "sameFilingRoot": true,
+        "priorReceipt": "PROVIDER_ACCEPTED"
+      },
+      "expected": {
+        "priorReceipt": "PROVIDER_ACCEPTED",
+        "newAttemptRequired": true,
+        "priorRowMutation": false
+      }
+    },
+    {
+      "id": "CDR-07-OPT-OUT-OR-REVOKED-SUBSCRIPTION-SUPPRESSES-RENOTICE",
+      "input": {
+        "correctionDue": true,
+        "accountOptedOut": true,
+        "subscriptionRevoked": true
+      },
+      "expected": {
+        "personalCorrectionSend": false,
+        "ledgerDisposition": "SUPPRESSED_BY_CURRENT_PREFERENCE"
+      }
+    },
+    {
+      "id": "CDR-08-UNRESOLVED-CORRECTION-RELATION-BLOCKS-CLAIM-RELEASE",
+      "input": {
+        "filingCorrectionMarker": true,
+        "targetFilingRelation": "UNRESOLVED",
+        "priorClaimStatus": "APPROVED"
+      },
+      "expected": {
+        "priorClaimStatus": "STALE_SUPPRESSED",
+        "publication": "BLOCKED_REVIEW",
+        "eventDirectionInference": "FORBIDDEN"
+      }
+    },
+    {
+      "id": "CDR-09-RECONCILIATION-REQUIRES-EXPLICIT-DENOMINATOR",
+      "input": {
+        "manifestExpectedDeliveries": 2,
+        "observedDeliveryRows": 1,
+        "allRowsResolved": false
+      },
+      "expected": {
+        "terminalState": "BLOCKED_DELIVERY_SCOPE",
+        "complete": false,
+        "missingRows": 1
+      }
+    },
+    {
+      "id": "CDR-10-SECRET-FREE-RECEIPT-AND-AUDIT",
+      "input": {
+        "storedWebhookToken": false,
+        "storedEndpointCredential": false,
+        "storedMessageId": true,
+        "storedPayloadHash": true
+      },
+      "expected": {
+        "receiptAdmissible": true,
+        "credentialPersist": false
+      }
+    },
+    {
+      "id": "CDR-11-IMPACTED-INBOX-CARD-PINS-NEW-REVISION-AND-STALES-OLD-CLAIM",
+      "input": {
+        "priorCard": {
+          "eventRevision": "EVR-SYN-3",
+          "claimRevision": "CLR-SYN-8",
+          "readAt": "2026-11-03T10:00:00Z"
+        },
+        "correction": {
+          "eventRevision": "EVR-SYN-4",
+          "impact": "AFFECTED"
+        }
+      },
+      "expected": {
+        "priorCardImmutable": true,
+        "currentCardRevision": "EVR-SYN-4",
+        "priorClaimStatus": "STALE_SUPPRESSED",
+        "reReviewRequired": true,
+        "readAtPreserved": true
+      }
+    },
+    {
+      "id": "CDR-12-UNRELATED-CONSUMER-PERSONAL-STATE-IS-PRESERVED",
+      "input": {
+        "priorCard": {
+          "eventRevision": "EVR-SYN-3",
+          "saved": true,
+          "readAt": "2026-11-03T10:00:00Z",
+          "personalNoteRevision": "NOTE-SYN-2"
+        },
+        "correction": {
+          "impact": "VERIFIED_UNAFFECTED"
+        }
+      },
+      "expected": {
+        "eventStatusChanged": false,
+        "savedPreserved": true,
+        "readAtPreserved": true,
+        "personalNoteRetargeted": false,
+        "newCorrectionNotification": false
+      }
+    },
+    {
+      "id": "CDR-13-UNRESOLVED-IMPACT-KEEPS-CARD-AND-RETRACTION-STATE-EXPLICIT",
+      "input": {
+        "priorDelivery": "PROVIDER_ACCEPTED",
+        "impact": "UNRESOLVED",
+        "correctionRelation": "UNRESOLVED"
+      },
+      "expected": {
+        "oldDeliveryStatus": "DELIVERED_UNRETRACTABLE",
+        "currentCardStatus": "REVIEW_REQUIRED",
+        "freshness": "UNKNOWN",
+        "completionClaim": false,
+        "newDirectionClaim": false
+      }
+    },
+    {
+      "id": "CDR-14-CORRECTION-ARRIVING-DURING-PAGINATION-INVALIDATES-MIXED-SNAPSHOT",
+      "input": {
+        "pageOneEpoch": 7,
+        "pageTwoEpoch": 8,
+        "cursorEpoch": 7
+      },
+      "expected": {
+        "pageTwoAllowed": false,
+        "response": "RESTART_REQUIRED",
+        "mixedEpochItemsReturned": false
+      }
+    },
+    {
+      "id": "CDR-15-DUPLICATE-DELIVERY-RECEIPT-DOES-NOT-DUPLICATE-INBOX-CORRECTION",
+      "input": {
+        "sameCorrectionEpoch": 9,
+        "samePriorNotification": "N-SYN-5",
+        "providerReceipts": 2
+      },
+      "expected": {
+        "correctionCards": 1,
+        "deliveryAttemptsPreserved": true,
+        "duplicateSuppressed": true
+      }
+    },
+    {
+      "id": "CDR-16-CROSS-SURFACE-EXPOSURE-MANIFEST-IS-COMPLETE-ONLY-ON-SET-PARITY",
+      "input": {
+        "manifest": {
+          "expectedExposureIds": [
+            "EXP-CARD-1",
+            "EXP-PUSH-1",
+            "EXP-DISCORD-1"
+          ],
+          "observedExposureIds": [
+            "EXP-CARD-1",
+            "EXP-PUSH-1"
+          ],
+          "expectedBySurface": {
+            "IN_APP_CARD": 1,
+            "WEB_PUSH_ENDPOINT": 1,
+            "DISCORD_MESSAGE": 1
+          },
+          "observedBySurface": {
+            "IN_APP_CARD": 1,
+            "WEB_PUSH_ENDPOINT": 1
+          }
+        },
+        "scopes": {
+          "targeted": "RECIPIENT_TARGET",
+          "sharedControls": "SHARED_SURFACE"
+        },
+        "surfaceControlAssertions": {
+          "expected": [
+            "PUBLIC_DETAIL",
+            "PUBLIC_API_PAGE",
+            "PUBLIC_API_CURSOR",
+            "SHARED_CACHE"
+          ],
+          "observed": [
+            "PUBLIC_DETAIL",
+            "PUBLIC_API_PAGE",
+            "PUBLIC_API_CURSOR"
+          ],
+          "allCurrentEpoch": false
+        }
+      },
+      "expected": {
+        "coverageStatus": "INCOMPLETE",
+        "missingExposureIds": [
+          "EXP-DISCORD-1"
+        ],
+        "reconciliation": "BLOCKED_EXPOSURE_SCOPE",
+        "completeClaim": false,
+        "targetAndSharedSurfaceCountsSeparated": true,
+        "missingSurfaceControls": [
+          "SHARED_CACHE"
+        ],
+        "surfaceControlDisposition": "BLOCKED_OR_UNKNOWN"
+      }
+    },
+    {
+      "id": "CDR-17-AFFECTED-INBOX-CONTENT-IS-STALED-WITHOUT-ERASING-PERSONAL-STATE",
+      "input": {
+        "priorCard": {
+          "eventRevision": "EVR-SYN-4",
+          "saved": true,
+          "readAt": "2026-11-03T10:00:00Z",
+          "personalNoteRevision": "NOTE-SYN-2",
+          "deepLinkEpoch": 8
+        },
+        "correction": {
+          "impact": "AFFECTED",
+          "currentEpoch": 9,
+          "newEventRevision": "EVR-SYN-5"
+        }
+      },
+      "expected": {
+        "oldContent": "SUPPRESSED_STALE",
+        "savedPreserved": true,
+        "priorReadAtPreserved": true,
+        "noteRevisionPreserved": true,
+        "deepLink": "RESOLVE_CURRENT_GATE_NO_STALE_BODY",
+        "newCardRevision": "EVR-SYN-5",
+        "reReviewRequired": true
+      }
+    },
+    {
+      "id": "CDR-18-CORRECTION-ACCEPTANCE-DOES-NOT-PROVE-USER-RECEIPT-OR-OLD-MESSAGE-CONTROL",
+      "input": {
+        "correctionDelivery": {
+          "channel": "WEB_PUSH",
+          "status": "PROVIDER_ACCEPTED",
+          "deviceReceipt": null,
+          "userOpened": null
+        },
+        "priorDiscordExposure": {
+          "messageId": "UNRESOLVED",
+          "status": "PROVIDER_ACCEPTED"
+        }
+      },
+      "expected": {
+        "correctionUserReceipt": "UNOBSERVED",
+        "priorDiscordDisposition": "DELIVERED_UNRETRACTABLE_OR_UNKNOWN",
+        "allExposuresCorrected": false,
+        "reconciliation": "PARTIAL_DELIVERY_UNKNOWN",
+        "residualExposureExplicit": true
+      }
+    },
+    {
+      "id": "CDR-19-DELIVERY-ATTEMPT-PINS-EXACT-SOURCE-CREDIT-PAYLOAD",
+      "input": {
+        "attempt": {
+          "canonicalization": "RFC8785-JCS",
+          "creditManifestDomainSeparator": "KR-DISCLOSURE-CREDIT-MANIFEST-v1",
+          "expectedCreditManifestHash": "sha256:2bdd7370e26858224d11ae2570fe143f06b3ad6733fdc3c471eadcba0ebd6699",
+          "expectedCreditComponents": [
+            {
+              "deliveryOrder": 0,
+              "sourceAttributionProjectionId": "SAP-SYN-A",
+              "claimRevisionId": "CLAIM-SYN-A1",
+              "evidenceRevisionId": "EVIDENCE-SYN-A2",
+              "rightsDecisionRevision": "RIGHTS-SYN-A4",
+              "attributionPolicyRevision": "POLICY-SYN-A2",
+              "creditTextHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "deliveryOrder": 1,
+              "sourceAttributionProjectionId": "SAP-SYN-B",
+              "claimRevisionId": "CLAIM-SYN-B1",
+              "evidenceRevisionId": "EVIDENCE-SYN-B3",
+              "rightsDecisionRevision": "RIGHTS-SYN-B2",
+              "attributionPolicyRevision": "POLICY-SYN-B1",
+              "creditTextHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "observedCreditManifestHash": "sha256:5770c92df5b4b9df812109093491082b9051bb182e71619d0875eb0014498b13",
+          "observedCreditComponents": [
+            {
+              "deliveryOrder": 0,
+              "sourceAttributionProjectionId": "SAP-SYN-A",
+              "claimRevisionId": "CLAIM-SYN-A1",
+              "evidenceRevisionId": "EVIDENCE-SYN-A2",
+              "rightsDecisionRevision": "RIGHTS-SYN-A4",
+              "attributionPolicyRevision": "POLICY-SYN-A2",
+              "creditTextHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "attemptLineage": "MISMATCH",
+        "deliveryCreditCompletion": false,
+        "reconciliation": "BLOCKED_ATTRIBUTION_LINEAGE"
+      }
+    },
+    {
+      "id": "CDR-20-CREDIT-POLICY-CORRECTION-REOPENS-EXPOSURE-WITHOUT-REWRITING-FACT",
+      "input": {
+        "priorAttempt": {
+          "eventRevision": "EVR-SYN-5",
+          "creditPolicyRevision": "POLICY-1",
+          "payloadHash": "PAYLOAD-1",
+          "providerOutcome": "PROVIDER_ACCEPTED"
+        },
+        "currentProjection": {
+          "eventRevision": "EVR-SYN-5",
+          "creditPolicyRevision": "POLICY-2",
+          "rightsDecision": "UNRESOLVED",
+          "publicationEpoch": 10
+        }
+      },
+      "expected": {
+        "priorAttemptImmutable": true,
+        "currentContentDisposition": "STALE_SUPPRESSED_PENDING_REVIEW",
+        "claimOrEventFactRewritten": false,
+        "affectedExposureReviewRequired": true,
+        "providerAcceptanceMeansUserReceipt": false
+      }
+    },
+    {
+      "id": "CDR-22-CORRECTED-EVENT-IMPACT-REOPENS-INVESTMENT-THESIS-BY-DEPENDENCY",
+      "input": {
+        "priorDecision": {
+          "decisionId": "DEC-SYN-1",
+          "eventRevision": "EVR-SYN-5",
+          "claimRevision": "CLM-SYN-8",
+          "instrumentId": "COMMON-SYN-1",
+          "decision": "HOLD_PENDING_FILING"
+        },
+        "correction": {
+          "eventRevision": "EVR-SYN-6",
+          "changes": [
+            { "field": "contractValue", "materiality": "THESIS_CRITICAL", "prior": 100, "current": 20, "unit": "SYN_MILLION" },
+            { "field": "deliveryDate", "materiality": "CATALYST_TIMING", "prior": "2026-Q4", "current": null, "unit": "FISCAL_QUARTER", "certainty": "WITHDRAWN" },
+            { "field": "issuerRelationship", "materiality": "IDENTITY_SCOPE", "prior": "ISSUER-SYN-1", "current": "UNRESOLVED" }
+          ]
+        },
+        "dependencyGraph": [
+          { "nodeId": "CLM-SYN-8", "dependsOn": ["EVR-SYN-5"], "role": "CONTRACT_VALUE_THESIS" },
+          { "nodeId": "DATE-SYN-2", "dependsOn": ["EVR-SYN-5"], "role": "CATALYST_WINDOW" },
+          { "nodeId": "SECURITY-SYN-1", "dependsOn": ["ISSUER-SYN-1"], "role": "INSTRUMENT_ELIGIBILITY" }
+        ],
+        "portfolioContext": { "positionQuantity": 0, "watchlisted": true, "userAuthored" : true }
+      },
+      "expected": {
+        "priorDecisionImmutable": true,
+        "currentThesisStatus": "REVIEW_REQUIRED",
+        "contractValueClaimStatus": "STALE_SUPPRESSED",
+        "catalystStatus": "WITHDRAWN_NOT_UPCOMING",
+        "instrumentEligibility": "UNRESOLVED_BLOCKED",
+        "automaticBuySellRecommendation": false,
+        "portfolioContextPreserved": true,
+        "reReviewReasons": ["THESIS_CRITICAL_VALUE_CHANGED", "CATALYST_WITHDRAWN", "ISSUER_SCOPE_UNRESOLVED"]
+      }
+    },
+    {
+      "id": "CDR-23-INCOMPLETE-CORRECTION-COVERAGE-IS-NOT-SEMANTIC-DIRECTION",
+      "input": {
+        "observationCoverage": {
+          "sourceRevision": "COMPLETE",
+          "correctionRelation": "UNRESOLVED",
+          "affectedInstrument": "UNRESOLVED",
+          "pageSet": "INCOMPLETE"
+        },
+        "observedValueDifference": { "prior": 100, "current": 20, "unit": "SYN_MILLION" }
+      },
+      "expected": {
+        "assessmentState": "EVIDENCE_INCOMPLETE",
+        "claimDirection": "NOT_ASSESSED",
+        "investmentScore": "NOT_COMPUTED",
+        "publication": "SUPPRESS_PENDING_SOURCE_RECONCILIATION",
+        "observedDifferenceTreatedAsEconomicImpact": false
+      }
+    },
+    {
+      "id": "CDR-24-COMPLETE-COVERAGE-WITH-INCOMPARABLE-TERMS-REQUIRES-REVIEW",
+      "input": {
+        "observationCoverage": {
+          "sourceRevision": "COMPLETE",
+          "correctionRelation": "RESOLVED_CORRECTS",
+          "affectedInstrument": "VERIFIED_COMMON_STOCK",
+          "pageSet": "COMPLETE"
+        },
+        "comparisonBasis": {
+          "unitComparable": true,
+          "periodComparable": false,
+          "contractScopeComparable": false,
+          "executionAndTerminationTermsReviewed": false
+        }
+      },
+      "expected": {
+        "assessmentState": "REVIEW_REQUIRED",
+        "claimDirection": "NOT_ASSESSED",
+        "investmentScore": "NOT_COMPUTED",
+        "supportingAndCounterClaimsKeptSeparate": true,
+        "reviewReasons": ["PERIOD_NOT_COMPARABLE", "CONTRACT_SCOPE_NOT_COMPARABLE", "TERMS_NOT_REVIEWED"]
+      }
+    },
+    {
+      "id": "CDR-21-CREDIT-MANIFEST-ORDER-IS-PART-OF-CANONICAL-HASH",
+      "input": {
+        "canonicalization": "RFC8785-JCS",
+        "creditManifestDomainSeparator": "KR-DISCLOSURE-CREDIT-MANIFEST-v1",
+        "components": [
+          {
+            "deliveryOrder": 1,
+            "sourceAttributionProjectionId": "SAP-SYN-B",
+            "claimRevisionId": "CLAIM-SYN-B1",
+            "evidenceRevisionId": "EVIDENCE-SYN-B3",
+            "rightsDecisionRevision": "RIGHTS-SYN-B2",
+            "attributionPolicyRevision": "POLICY-SYN-B1",
+            "creditTextHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          {
+            "deliveryOrder": 0,
+            "sourceAttributionProjectionId": "SAP-SYN-A",
+            "claimRevisionId": "CLAIM-SYN-A1",
+            "evidenceRevisionId": "EVIDENCE-SYN-A2",
+            "rightsDecisionRevision": "RIGHTS-SYN-A4",
+            "attributionPolicyRevision": "POLICY-SYN-A2",
+            "creditTextHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "reversedCreditManifestHash": "sha256:6b46310a550d04a189fed83e024a9a4e58542cb4f4b70ea0bbf3a75f2cf9ff72"
+      },
+      "expected": {
+        "deliveryOrderValidation": "REJECT_NON_MONOTONIC",
+        "manifestHashChangesWhenOrderChanges": true,
+        "originalPayloadReusable": false
+      }
+    }
+  ],
+  "requiredExposureDimensions": [
+    "exposureId",
+    "exposureScope",
+    "surfaceKind",
+    "targetIdentityHash",
+    "targetIdentityKeyId",
+    "sourceRevision",
+    "publicationEpoch",
+    "disposition"
+  ],
+  "exposureScopes": [
+    "RECIPIENT_TARGET",
+    "SHARED_SURFACE"
+  ],
+  "exposureSurfaceKinds": [
+    "IN_APP_CARD",
+    "WEB_PUSH_ENDPOINT",
+    "DISCORD_MESSAGE",
+    "PUBLIC_DETAIL",
+    "PUBLIC_API_PAGE",
+    "PUBLIC_API_CURSOR",
+    "SHARED_CACHE"
+  ],
+  "requiredExposureManifestFields": [
+    "manifestId",
+    "manifestRevision",
+    "expectedExposureSetDigest",
+    "observedExposureSetDigest",
+    "expectedCountBySurface",
+    "observedCountBySurface",
+    "coverageStatus",
+    "expectedSharedSurfaceControlSetDigest",
+    "observedSharedSurfaceControlSetDigest"
+  ],
+  "requiredSharedSurfaceControlFields": [
+    "surfaceKind",
+    "scopeHash",
+    "priorEpoch",
+    "currentEpoch",
+    "gateResult",
+    "evidenceRef"
+  ]
+}

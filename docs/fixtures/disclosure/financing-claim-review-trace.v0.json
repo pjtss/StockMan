@@ -1,0 +1,531 @@
+{
+  "contractVersion": "financing-claim-review-trace.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "hashesAreSyntheticLabels": true
+  },
+  "traceStages": [
+    "SOURCE_REVISION",
+    "FIELD_OR_RELATION_JUDGMENT",
+    "REVIEWER_DECISION",
+    "CLAIM_REVISION",
+    "CALCULATION_FORMULA_REVISION",
+    "EFFECT_OR_ANALYSIS_REVISION",
+    "IMPACT_CONSUMER",
+    "ELIGIBILITY_AND_RIGHTS",
+    "PUBLICATION_SNAPSHOT"
+  ],
+  "vectors": [
+    {
+      "id": "FCT-01-COMPLETE-DATE-TRACE",
+      "input": {
+        "linkedStages": [
+          "SOURCE_REVISION",
+          "FIELD_OR_RELATION_JUDGMENT",
+          "REVIEWER_DECISION",
+          "CLAIM_REVISION",
+          "CALCULATION_FORMULA_REVISION",
+          "EFFECT_OR_ANALYSIS_REVISION",
+          "IMPACT_CONSUMER",
+          "ELIGIBILITY_AND_RIGHTS",
+          "PUBLICATION_SNAPSHOT"
+        ],
+        "allRevisionsCurrent": true
+      },
+      "expected": {
+        "publication": "ELIGIBLE_FOR_SAME_SNAPSHOT_GATE",
+        "traceGap": false,
+        "forbiddenPublicText": [
+          "reviewed date with a different source revision",
+          "mixed publication snapshot"
+        ]
+      }
+    },
+    {
+      "id": "FCT-02-MISSING-EDGE-SUPPRESSES-DEPENDENTS",
+      "input": {
+        "missingEdge": "REVIEWER_DECISION_TO_CLAIM",
+        "dependentConsumers": [
+          "DATE-A",
+          "CASH-A"
+        ],
+        "unrelatedConsumer": "DATE-B"
+      },
+      "expected": {
+        "dependentPublication": "SUPPRESSED",
+        "unrelatedConsumerRetained": true,
+        "forbiddenPublicText": [
+          "unreviewed claim publication",
+          "suppress unrelated date without dependency"
+        ]
+      }
+    },
+    {
+      "id": "FCT-03-REVOCATION-INVALIDATES-CASH-MEASURE",
+      "input": {
+        "measure": "CASH_RECEIVED_GROSS",
+        "proofClaim": "PAYMENT-PROOF-A",
+        "rightsState": "EXPIRED",
+        "unrelatedDateClaim": "DATE-B"
+      },
+      "expected": {
+        "cashMeasure": "SUPPRESSED",
+        "unrelatedDateClaim": "RETAIN_IF_INDEPENDENTLY_VALID",
+        "forbiddenPublicText": [
+          "prior rights approval silently reused",
+          "all event claims assumed invalid"
+        ]
+      }
+    },
+    {
+      "id": "FCT-04-CLASS-CHANGE-INVALIDATES-SHARE-CHILD",
+      "input": {
+        "subject": "ISSUER-A",
+        "instrumentClass": "UNRESOLVED",
+        "shareClaim": "SHARES-A",
+        "otherIssuerChild": "ISSUER-B"
+      },
+      "expected": {
+        "issuerASharePublication": "SUPPRESSED",
+        "issuerBChild": "EVALUATED_INDEPENDENTLY",
+        "forbiddenPublicText": [
+          "unresolved security class treated as common",
+          "all subjects automatically merged"
+        ]
+      }
+    },
+    {
+      "id": "FCT-05-SCENARIO-INPUT-STALE-RECOMPUTE",
+      "input": {
+        "scenarioRevision": "SCENARIO-1",
+        "inputClaim": "EXERCISE-PRICE-A",
+        "inputStatus": "CONTESTED",
+        "dependentFormulaRevision": "FORMULA-1"
+      },
+      "expected": {
+        "scenarioPublication": "SUPPRESSED_UNTIL_NEW_REVISION",
+        "actualMeasureChanged": false,
+        "forbiddenPublicText": [
+          "stale scenario retained as current",
+          "scenario update rewrites actual facts"
+        ]
+      }
+    },
+    {
+      "id": "FCT-06-UI-API-CANONICAL-PARITY",
+      "input": {
+        "uiClaimRevision": "CLAIM-2",
+        "apiClaimRevision": "CLAIM-2",
+        "uiConsumerIds": [
+          "DATE-A",
+          "CASH-A"
+        ],
+        "apiConsumerIds": [
+          "DATE-A",
+          "CASH-A"
+        ],
+        "uiVisibleTotal": "100",
+        "apiVisibleTotal": "100"
+      },
+      "expected": {
+        "parity": "PASS_FOR_FIXTURE",
+        "visibleAggregate": "100",
+        "forbiddenPublicText": [
+          "UI and API independently derived conflicting values",
+          "reviewer internal note in public response"
+        ]
+      }
+    },
+    {
+      "id": "FCT-07-BODY-NOT-RETAINABLE-REQUIRES-REACQUIRE",
+      "input": {
+        "rightsAction": "RETAIN_SOURCE_BODY",
+        "rightsStatus": "NEEDS_REVIEW",
+        "sourceBodyStored": false
+      },
+      "expected": {
+        "sourceDisposition": "SOURCE_REACQUIRE_REQUIRED",
+        "derivativePublication": "SUPPRESSED",
+        "forbiddenPublicText": [
+          "unapproved body retained",
+          "hash proves retention right"
+        ]
+      }
+    },
+    {
+      "id": "FCT-08-MIXED-EPOCH-REJECTS-RESPONSE",
+      "input": {
+        "reviewEpoch": "EPOCH-A",
+        "publicationEpoch": "EPOCH-B",
+        "eligibilityEpoch": "EPOCH-B"
+      },
+      "expected": {
+        "response": "REJECT_RESPONSE",
+        "fallbackToOldApprovedBody": false,
+        "forbiddenPublicText": [
+          "mixed review and publication epoch",
+          "stale approval restored by fallback"
+        ]
+      }
+    },
+    {
+      "id": "FCT-09-NUMERIC-EFFECT-REPRODUCES-FROM-CLAIM-REVISIONS",
+      "input": {
+        "subjectInstrumentId": "INST-SYN-COMMON-1",
+        "publicationEpoch": "EPOCH-SYN-12",
+        "claimSet": [
+          {
+            "claimId": "CLAIM-S0",
+            "claimRevision": "REV-S0-2",
+            "sourceObservationId": "OBS-S0",
+            "sourceRevisionHash": "sha256:SYN-S0",
+            "locator": "LOC-S0",
+            "value": "10000000",
+            "unit": "COMMON_SHARES",
+            "basisAsOf": "2026-10-30",
+            "securityClass": "COMMON"
+          },
+          {
+            "claimId": "CLAIM-T0",
+            "claimRevision": "REV-T0-1",
+            "sourceObservationId": "OBS-T0",
+            "sourceRevisionHash": "sha256:SYN-T0",
+            "locator": "LOC-T0",
+            "value": "1000000",
+            "unit": "COMMON_SHARES",
+            "basisAsOf": "2026-10-30",
+            "securityClass": "COMMON"
+          },
+          {
+            "claimId": "CLAIM-N",
+            "claimRevision": "REV-N-3",
+            "sourceObservationId": "OBS-N",
+            "sourceRevisionHash": "sha256:SYN-N",
+            "locator": "LOC-N",
+            "value": "1000000",
+            "unit": "COMMON_SHARES",
+            "basisAsOf": "2026-10-30",
+            "securityClass": "COMMON",
+            "stage": "PLANNED_NOT_ISSUED"
+          }
+        ],
+        "formula": {
+          "formulaId": "NEW-ISSUANCE-SHARE-OF-POST-ISSUANCE-OUTSTANDING",
+          "formulaRevision": "FORMULA-REV-2",
+          "expression": "N / ((S0 - T0) + N)",
+          "assumption": "FULL_PLANNED_ISSUANCE",
+          "rounding": "EXACT_RATIONAL"
+        },
+        "reviewDecisionRevision": "REVIEW-SYN-5",
+        "publicationSnapshot": "SNAPSHOT-SYN-12"
+      },
+      "expected": {
+        "calculationStatus": "CONDITIONAL_SCENARIO",
+        "intermediate": {
+          "preEventOutstandingExcludingTreasury": "9000000",
+          "postIssuanceOutstandingExcludingTreasury": "10000000"
+        },
+        "measure": {
+          "numerator": "1000000",
+          "denominator": "10000000",
+          "exactValue": "1/10",
+          "label": "전량 발행 가정의 발행 후 유통 기준 신주 비중"
+        },
+        "forbiddenMeasures": [
+          "existing holder ownership decline",
+          "EPS decrease",
+          "share-price impact"
+        ],
+        "traceFingerprintIncludes": [
+          "claim revisions and source locators",
+          "formula revision and assumption",
+          "exact output",
+          "review decision revision",
+          "publication epoch"
+        ],
+        "reviewedOutputHash": "sha256:SYN-CALC-OUT-1",
+        "uiOutputHash": "sha256:SYN-CALC-OUT-1",
+        "apiOutputHash": "sha256:SYN-CALC-OUT-1",
+        "publication": "ELIGIBLE_FOR_SAME_SNAPSHOT_GATE",
+        "forbiddenPublicText": [
+          "기존 주주 지분이 10% 감소",
+          "확정 발행/희석",
+          "formula input or reviewer note omitted"
+        ],
+        "calculationOutputHash": "sha256:SYN-CALC-OUT-1"
+      }
+    },
+    {
+      "id": "FCT-10-BASIS-MISMATCH-BLOCKS-NUMERIC-EFFECT-TRACE",
+      "input": {
+        "claimSet": [
+          {
+            "claimId": "CLAIM-S0",
+            "claimRevision": "REV-S0-2",
+            "value": "10000000",
+            "unit": "COMMON_SHARES",
+            "basisAsOf": "2026-10-30",
+            "securityClass": "COMMON"
+          },
+          {
+            "claimId": "CLAIM-T0",
+            "claimRevision": "REV-T0-1",
+            "value": "1000000",
+            "unit": "COMMON_SHARES",
+            "basisAsOf": "2026-09-30",
+            "securityClass": "COMMON"
+          },
+          {
+            "claimId": "CLAIM-N",
+            "claimRevision": "REV-N-3",
+            "value": "1000000",
+            "unit": "COMMON_SHARES",
+            "basisAsOf": "2026-10-30",
+            "securityClass": "COMMON"
+          }
+        ],
+        "requestedFormula": "N / ((S0 - T0) + N)"
+      },
+      "expected": {
+        "calculationStatus": "NOT_COMPUTABLE",
+        "reason": "BASIS_DATE_MISMATCH",
+        "outputValue": null,
+        "reviewDecision": "NOT_APPROVABLE_FOR_CALCULATION",
+        "dependentPublication": "SUPPRESSED",
+        "forbiddenPublicText": [
+          "10%",
+          "0% change",
+          "assume current treasury shares"
+        ]
+      }
+    },
+    {
+      "id": "FCT-11-REVIEWED-FORMULA-OUTPUT-MUST-MATCH-UI-AND-API-HASH",
+      "input": {
+        "reviewedFormulaRevision": "FORMULA-REV-2",
+        "reviewedOutputHash": "sha256:SYN-CALC-OUT-1",
+        "uiOutputHash": "sha256:SYN-CALC-OUT-1",
+        "apiOutputHash": "sha256:SYN-CALC-OUT-2",
+        "publicationEpoch": "EPOCH-SYN-12"
+      },
+      "expected": {
+        "parity": "FAIL",
+        "response": "REJECT_RESPONSE",
+        "uiApiIndependentRecomputation": "FORBIDDEN",
+        "fallbackToPriorApprovedOutput": false,
+        "reviewerApprovalForDifferentOutput": "REQUIRED_NEW_REVISION",
+        "forbiddenPublicText": [
+          "serve reviewed value from UI and recomputed value from API",
+          "reuse approval after output hash mismatch"
+        ]
+      }
+    },
+    {
+      "id": "FCT-12-ROUNDED-DISPLAY-REQUIRES-APPROVED-POLICY",
+      "input": {
+        "numerator": "1",
+        "denominator": "3",
+        "exactValue": "1/3",
+        "displayRoundingPolicyRevision": null
+      },
+      "expected": {
+        "calculationStatus": "EXACT_INTERNAL_RESULT",
+        "exactValue": "1/3",
+        "roundedDisplay": "WITHHELD_POLICY_UNAPPROVED",
+        "numericPublication": "BLOCKED_DISPLAY_POLICY",
+        "eventPublication": "MAY_PROCEED_WITHOUT_THIS_METRIC",
+        "noImplicitRoundingMode": true,
+        "forbiddenPublicText": [
+          "rounded percent without approved policy",
+          "hide unrelated event content"
+        ]
+      }
+    },
+    {
+      "id": "FCT-13-CURRENCY-MIX-REQUIRES-EXPLICIT-FX-CLAIM",
+      "input": {
+        "amountClaims": [
+          {
+            "claimId": "CASH-KRW",
+            "value": "1000000000",
+            "currency": "KRW",
+            "basisAsOf": "2026-10-30"
+          },
+          {
+            "claimId": "CASH-USD",
+            "value": "1000000",
+            "currency": "USD",
+            "basisAsOf": "2026-10-30"
+          }
+        ],
+        "fxClaimId": null
+      },
+      "expected": {
+        "calculationStatus": "NOT_COMPUTABLE",
+        "reason": "CURRENCY_BASIS_MISMATCH",
+        "fxRateInferred": false,
+        "convertedOutput": null,
+        "forbiddenPublicText": [
+          "infer FX rate from current market quote without approval",
+          "sum KRW and USD as if same currency"
+        ]
+      }
+    },
+    {
+      "id": "FCT-14-NONPOSITIVE-DENOMINATOR-BLOCKS-RATIO",
+      "input": {
+        "numerator": "100",
+        "formulaKind": "SHARE_COUNT_RATIO",
+        "denominatorCases": [
+          "0",
+          "-1"
+        ]
+      },
+      "expected": {
+        "calculationStatus": "NOT_COMPUTABLE",
+        "reason": "DENOMINATOR_NOT_POSITIVE",
+        "ratio": null,
+        "absoluteValueFallback": false,
+        "blockedDenominators": [
+          "0",
+          "-1"
+        ],
+        "forbiddenPublicText": [
+          "share-count ratio with zero or negative denominator",
+          "absolute denominator substitution"
+        ]
+      }
+    },
+    {
+      "id": "FCT-15-MISSING-COST-IS-NOT-ZERO-NET-CASH",
+      "input": {
+        "grossCash": "1000000000",
+        "feeClaim": {
+          "state": "NOT_RETURNED",
+          "value": null
+        },
+        "taxClaim": {
+          "state": "EXPLICIT_ZERO",
+          "value": "0"
+        },
+        "netFormula": "grossCash - fee - tax"
+      },
+      "expected": {
+        "grossCashStatus": "OBSERVED",
+        "netCashStatus": "UNVERIFIABLE",
+        "missingFeeCoercedToZero": false,
+        "explicitZeroTaxPreserved": true,
+        "netValue": null,
+        "forbiddenPublicText": [
+          "missing fee treated as zero",
+          "net cash asserted from gross cash only"
+        ]
+      }
+    },
+    {
+      "id": "FCT-16-ARITHMETIC-OVERFLOW-DOES-NOT-PUBLISH-PARTIAL-OR-STALE-RESULT",
+      "input": {
+        "calculationEngineOutcome": "OVERFLOW",
+        "priorApprovedOutputHash": "sha256:SYN-PRIOR-OUTPUT",
+        "partialIntermediateAvailable": true
+      },
+      "expected": {
+        "calculationStatus": "CALCULATION_OVERFLOW",
+        "currentOutput": null,
+        "partialIntermediatePublished": false,
+        "priorOutputFallback": false,
+        "dependentMetric": "SUPPRESSED",
+        "forbiddenPublicText": [
+          "partial intermediate published",
+          "prior approved output fallback after overflow"
+        ]
+      }
+    },
+    {
+      "id": "FCT-17-EPS-REQUIRES-PERIOD-WEIGHTED-AVERAGE-SHARES",
+      "input": {
+        "metricFamily": "EPS",
+        "profitBasis": "PROFIT_ATTRIBUTABLE_TO_ORDINARY_EQUITY_HOLDERS",
+        "shareInputs": [
+          { "shares": "10000000", "outstandingFrom": "2026-01-01", "outstandingUntil": "2026-06-30" },
+          { "shares": "12000000", "outstandingFrom": "2026-07-01", "outstandingUntil": "2026-12-31" }
+        ],
+        "period": { "from": "2026-01-01", "through": "2026-12-31", "dayCountConvention": "CALENDAR_DAYS" },
+        "dilutiveInstrumentInputs": null,
+        "requestedShortcut": "ENDING_SHARES"
+      },
+      "expected": {
+        "calculationStatus": "NOT_COMPUTABLE",
+        "reason": "EPS_NUMERATOR_OR_DILUTION_BASIS_INCOMPLETE",
+        "weightedAverageOrdinaryShares": null,
+        "endingSharesSubstituted": false,
+        "epsLabel": null,
+        "forbiddenPublicText": [
+          "EPS calculated using only ending shares",
+          "potentially dilutive instruments silently omitted",
+          "share issuance dilution equals EPS dilution"
+        ]
+      }
+    },
+    {
+      "id": "FCT-18-PLANNED-ISSUED-AND-LISTED-SHARES-ARE-DIFFERENT-STAGES",
+      "input": {
+        "quantityClaims": [
+          { "claimId": "Q-PLAN", "value": "1000000", "unit": "COMMON_SHARES", "stage": "PLANNED_NOT_ISSUED" },
+          { "claimId": "Q-ISSUED", "value": "600000", "unit": "COMMON_SHARES", "stage": "ISSUED_NOT_LISTED" },
+          { "claimId": "Q-LISTED", "value": "500000", "unit": "COMMON_SHARES", "stage": "LISTED" }
+        ],
+        "requestedMeasure": "CURRENT_MARKET_TRADABLE_INCREMENT"
+      },
+      "expected": {
+        "calculationStatus": "NOT_COMPUTABLE",
+        "reason": "STAGE_AND_QUANTITY_BASIS_MISMATCH",
+        "plannedEqualsIssued": false,
+        "issuedEqualsListed": false,
+        "partialStageQuantitiesRetainedSeparately": true,
+        "forbiddenPublicText": [
+          "planned amount reported as issued shares",
+          "issued amount reported as listed or freely tradable shares",
+          "sum all stage quantities as a single share count"
+        ]
+      }
+    },
+    {
+      "id": "FCT-19-FX-CONVERSION-REQUIRES-METRIC-PURPOSE-AND-RATE-DATE",
+      "input": {
+        "foreignCurrencyAmount": { "value": "1000000", "currency": "USD", "basisAsOf": "2026-10-30", "measurementKind": "CONTRACTUAL_PROCEEDS" },
+        "fxClaim": { "rate": "1300", "fromCurrency": "USD", "toCurrency": "KRW", "rateAsOf": null, "sourceLocator": "LOC-FX-SYN", "rightsDecision": "CURRENT_ALLOWED" },
+        "requestedMetric": "KRW_CONTRACTUAL_PROCEEDS",
+        "purpose": "INVESTMENT_EVENT_COMPARISON"
+      },
+      "expected": {
+        "calculationStatus": "NOT_COMPUTABLE",
+        "reason": "FX_RATE_DATE_OR_PURPOSE_BASIS_MISSING",
+        "fxClaimAccepted": false,
+        "spotRateInferredFromCurrentQuote": false,
+        "convertedAmount": null,
+        "forbiddenPublicText": [
+          "contract amount translated with an unrelated current quote",
+          "accounting functional-currency translation presented as realized cash"
+        ]
+      }
+    }
+  ],
+  "numericPolicy": {
+    "representation": "DECIMAL_STRING_OR_EXACT_RATIONAL",
+    "binaryFloatForFinancialCalculation": "FORBIDDEN",
+    "missingBlankAndExplicitZero": "DISTINCT_STATES",
+    "currencyConversion": "EXPLICIT_FX_CLAIM_AND_AS_OF_REQUIRED",
+    "aggregation": "EXACT_BEFORE_DISPLAY_ROUNDING",
+    "displayRounding": "OWNER_APPROVED_VERSIONED_POLICY_ONLY",
+    "ratioDenominator": "FORMULA_TYPED_DENOMINATOR_DOMAIN_REQUIRED",
+    "epsDenominator": "PERIOD_WEIGHTED_AVERAGE_ORDINARY_SHARES_AND_DILUTION_BASIS_REQUIRED",
+    "shareQuantityStage": "PLANNED_ISSUED_LISTED_SETTLED_ARE_SEPARATE_CLAIMS",
+    "fxPurposeAndRateDate": "METRIC_PURPOSE_AND_RATE_DATE_REQUIRED",
+    "overflow": "CALCULATION_OVERFLOW_NO_PARTIAL_OR_STALE_FALLBACK",
+    "numericRangeThreshold": "NOT_SET_UNTIL_OWNER_APPROVAL"
+  }
+}

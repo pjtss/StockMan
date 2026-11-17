@@ -31,9 +31,10 @@ beforeEach(() => {
   vi.mocked(fetchUsDailyPrice).mockReset().mockResolvedValue(null);
   poolQuery.mockImplementation(async (query: string, params: unknown[] = []) => {
     if (query.includes("FROM us_common_stock_universe")) return { rows: [{ market: params[1] ?? "NAS" }] };
+    if (query.includes("FROM kr_common_stock_universe")) return { rows: [{ market: params[1] ?? "KOSPI" }] };
     return { rows: [] };
   });
-  dbExecute.mockResolvedValue({ rows: [{ marketCap: 1000000000, tradingValue: 600000, volume: 1200, currency: "KRW", observedAt: "2026-08-28T00:00:00.000Z", fetchedAt: "2026-08-28T00:00:00.000Z", source: "TEST" }, ...Array.from({ length: 20 }, () => ({ tradingValue: 500000, volume: 1000 }))] });
+  dbExecute.mockResolvedValue({ rows: [{ marketCap: 1000000000, tradingValue: 600000, volume: 1200, currency: "KRW", observedAt: new Date().toISOString(), fetchedAt: new Date().toISOString(), source: "TEST" }, ...Array.from({ length: 20 }, () => ({ tradingValue: 500000, volume: 1000 }))] });
 });
 
 describe("chart fundamentals response", () => {
@@ -49,6 +50,50 @@ describe("chart fundamentals response", () => {
     expect(json.fundamentals.fetchedAt).not.toBe(json.candleDataUpdatedAt);
     expect(response.headers.get("server-timing")).toContain("kis;dur=");
     expect(response.headers.get("server-timing")).toContain("fundamentals;dur=");
+  });
+
+  it("keeps an explicitly selected Korean exchange on cached candles and fundamentals", async () => {
+    vi.mocked(fetchChartData).mockResolvedValueOnce(null);
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=005930&market=KR&exchange=KOSDAQ&timeframe=D"));
+    expect(response.status).toBe(503);
+    const queries = JSON.stringify(dbExecute.mock.calls);
+    expect(queries).toContain("KOSDAQ");
+    expect(queries).toContain("market");
+  });
+
+  it("fails closed when the requested Korean exchange does not match the active common-stock master", async () => {
+    poolQuery.mockImplementation(async (query: string) => query.includes("FROM kr_common_stock_universe")
+      ? { rows: [] }
+      : { rows: [] });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=005930&market=KR&exchange=KOSDAQ&timeframe=D"));
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ chartStatus: "UNAVAILABLE", eligibility: "FAIL_CLOSED" });
+    expect(fetchChartData).not.toHaveBeenCalled();
+    expect(loadRemoteDailyCandles).not.toHaveBeenCalled();
+  });
+
+  it("requires an exchange when a Korean code resolves to multiple active common-stock markets", async () => {
+    poolQuery.mockImplementation(async (query: string) => query.includes("FROM kr_common_stock_universe")
+      ? { rows: [{ market: "KOSPI" }, { market: "KOSDAQ" }] }
+      : { rows: [] });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=005930&market=KR&timeframe=D"));
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ chartStatus: "UNAVAILABLE", eligibility: "FAIL_CLOSED" });
+    expect(fetchChartData).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["stale", new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(), "KRW"],
+    ["future-dated", new Date(Date.now() + 60 * 60 * 1000).toISOString(), "KRW"],
+    ["wrong-currency", new Date().toISOString(), "USD"],
+  ])("does not expose domestic market cap from a %s snapshot", async (_label, fetchedAt, currency) => {
+    dbExecute.mockResolvedValue({ rows: [{ marketCap: 1000000000, tradingValue: 600000, volume: 1200, currency, observedAt: fetchedAt, fetchedAt, source: "TEST" }] });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=005930&market=KR&timeframe=D"));
+    const json = await response.json();
+    expect(response.status).toBe(200);
+    expect(json.fundamentals.marketCap).toBeNull();
+    expect(json.fundamentals.currency).toBe("KRW");
+    expect(json.fundamentals.status).toBe("STALE");
   });
 
   it("falls through to KIS when the configured remote candle cache has no data", async () => {
@@ -105,6 +150,26 @@ describe("chart fundamentals response", () => {
     expect(response.status).toBe(200);
     expect((await response.json()).candles).toHaveLength(1);
     expect(fetchUsDailyPrice).not.toHaveBeenCalled();
+  });
+
+  it("filters malformed cached US candles before building chart data", async () => {
+    poolQuery.mockImplementation(async (query: string, params: unknown[] = []) => {
+      if (query.includes("FROM us_common_stock_universe")) return { rows: [{ market: params[1] ?? "NAS" }] };
+      if (query.includes("FROM us_instrument_universe_candles")) return { rows: [
+        { date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100, fetchedAt: "2026-10-14T00:00:00.000Z" },
+        { date: "20261013", open: 10, high: 10.5, low: 9, close: 11, volume: 100, fetchedAt: "2026-10-13T00:00:00.000Z" },
+        { date: "20261012", open: 10, high: 12, low: 9, close: null, volume: 100, fetchedAt: "2026-10-12T00:00:00.000Z" },
+      ] };
+      return { rows: [] };
+    });
+    const response = await GET(new Request("http://localhost/api/stock/chart?code=US%3AAAPL&market=US&timeframe=D"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.candles).toHaveLength(1);
+    expect(body.candles[0]).toMatchObject({ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100 });
+    const candleQuery = poolQuery.mock.calls.find(([query]) => String(query).includes("FROM us_instrument_universe_candles"))?.[0] as string;
+    expect(candleQuery).toContain("high >= GREATEST(us_instrument_universe_candles.open, us_instrument_universe_candles.low, us_instrument_universe_candles.close)");
+    expect(JSON.stringify(dbExecute.mock.calls)).toContain("high >= GREATEST(c.open, c.low, c.close)");
   });
 
   it("fails closed without probing KIS when an active common stock cannot be confirmed", async () => {

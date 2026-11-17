@@ -59,20 +59,29 @@ export function PushProvider({ children }: { children?: ReactNode }) {
   async function refreshStatus() {
     try {
       const localStatus = await readLocalStatus();
-      const search = localStatus.endpoint ? `?endpoint=${encodeURIComponent(localStatus.endpoint)}` : "";
-      const response = await fetch(`/api/push/subscribe${search}`, { cache: "no-store" });
-      const data = await response.json();
+      const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
+      const response = subscription
+        ? await fetch("/api/push/subscribe", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({
+              ...subscription.toJSON(),
+            }),
+          })
+        : null;
+      const data = response ? await response.json() : {};
 
       const nextStatus: PushDebugStatus = {
         ...localStatus,
         currentDeviceSaved: data.currentDeviceSaved ?? false,
-        savedCount: data.savedCount ?? undefined,
-        lastSaved: data.latestUpdatedAt ?? undefined,
-        latestUserAgent: data.latestUserAgent ?? undefined,
-        enabled: data.enabled ?? true,
-        dartEnabled: data.dartEnabled ?? true,
-        intensityEnabled: data.intensityEnabled ?? true,
-        risingEnabled: data.risingEnabled ?? true,
+        enabled: data.enabled ?? false,
+        dartEnabled: data.dartEnabled ?? false,
+        intensityEnabled: data.intensityEnabled ?? false,
+        risingEnabled: data.risingEnabled ?? false,
+        previewMode: "GENERIC",
+        preferenceRevision: Number.isSafeInteger(data.preferenceRevision) ? data.preferenceRevision : 0,
         error: undefined,
       };
 
@@ -164,25 +173,28 @@ export function PushProvider({ children }: { children?: ReactNode }) {
           ...subscription.toJSON(),
           enabled: true,
           dartEnabled: true,
-          intensityEnabled: true,
-          risingEnabled: true,
+          intensityEnabled: false,
+          risingEnabled: false,
         }),
       });
       const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || "푸시 구독 저장 실패");
+      }
 
       const nextStatus: PushDebugStatus = {
         supported: true,
         permission,
         serviceWorkerRegistered: true,
         subscriptionExists: true,
-        currentDeviceSaved: result.currentDeviceSaved ?? true,
+        currentDeviceSaved: result.currentDeviceSaved ?? false,
         endpoint: subscription.endpoint,
-        lastSaved: result.latestUpdatedAt ?? undefined,
-        savedCount: result.savedCount ?? undefined,
-        enabled: result.enabled ?? true,
-        dartEnabled: result.dartEnabled ?? true,
-        intensityEnabled: result.intensityEnabled ?? true,
-        risingEnabled: result.risingEnabled ?? true,
+        enabled: result.enabled ?? false,
+        dartEnabled: result.dartEnabled ?? false,
+        intensityEnabled: result.intensityEnabled ?? false,
+        risingEnabled: result.risingEnabled ?? false,
+        previewMode: "GENERIC",
+        preferenceRevision: Number.isSafeInteger(result.preferenceRevision) ? result.preferenceRevision : 0,
         actionRequired: false,
       };
 
@@ -212,6 +224,11 @@ export function PushProvider({ children }: { children?: ReactNode }) {
     setSaving(true);
 
     try {
+      const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
+      if (!subscription || subscription.endpoint !== status.endpoint) {
+        throw new Error("PUSH_SUBSCRIPTION_PROOF_REQUIRED");
+      }
       const response = await fetch("/api/push/subscribe", {
         method: "PATCH",
         headers: {
@@ -219,10 +236,11 @@ export function PushProvider({ children }: { children?: ReactNode }) {
         },
         body: JSON.stringify({
           endpoint: status.endpoint,
-          enabled: next.enabled ?? status.enabled ?? true,
-          dartEnabled: next.dartEnabled ?? status.dartEnabled ?? true,
-          intensityEnabled: next.intensityEnabled ?? status.intensityEnabled ?? true,
-          risingEnabled: next.risingEnabled ?? status.risingEnabled ?? true,
+          keys: subscription.toJSON().keys,
+          enabled: next.enabled ?? status.enabled ?? false,
+          dartEnabled: next.dartEnabled ?? status.dartEnabled ?? false,
+          intensityEnabled: next.intensityEnabled ?? status.intensityEnabled ?? false,
+          risingEnabled: next.risingEnabled ?? status.risingEnabled ?? false,
         }),
       });
       const result = await response.json();
@@ -232,11 +250,12 @@ export function PushProvider({ children }: { children?: ReactNode }) {
 
       const nextStatus: PushDebugStatus = {
         ...(status ?? {}),
-        enabled: result.enabled ?? true,
-        dartEnabled: result.dartEnabled ?? true,
-        intensityEnabled: result.intensityEnabled ?? true,
-        risingEnabled: result.risingEnabled ?? true,
-        lastSaved: result.latestUpdatedAt ?? status.lastSaved,
+        enabled: result.enabled ?? false,
+        dartEnabled: result.dartEnabled ?? false,
+        intensityEnabled: result.intensityEnabled ?? false,
+        risingEnabled: result.risingEnabled ?? false,
+        previewMode: "GENERIC",
+        preferenceRevision: Number.isSafeInteger(result.preferenceRevision) ? result.preferenceRevision : 0,
       };
 
       window.__pushDebug = nextStatus;

@@ -3,7 +3,7 @@ import { createClosedCandleCheck, type AccumulationRegion } from "./accumulation
 
 export type AccumulationInstrument = {
   market: string; code: string; name: string; marketCap: number | null;
-  listedShares: number | null; fundamentalUpdatedAt: string | null;
+  listedShares: number | null; fundamentalObservedAt?: string | null; fundamentalUpdatedAt: string | null;
   candles: AccumulationCandle[];
 };
 export type AccumulationOptions = { limit?: number; minRvol?: number; minScore?: number; asOf?: Date };
@@ -27,6 +27,7 @@ function toResult(instrument: AccumulationInstrument, candles: AccumulationCandl
   return {
     market: instrument.market, exchange: instrument.market, code: instrument.code, name: instrument.name,
     status: "ACTIVE", marketCap: instrument.marketCap, listedShares: instrument.listedShares,
+    fundamentalObservedAt: instrument.fundamentalObservedAt ?? null,
     fundamentalUpdatedAt: instrument.fundamentalUpdatedAt, currency: region === "KR" ? "KRW" : "USD",
     logicVersion: ACCUMULATION_POLICY.version, candleDate: last.date, latestDate: last.date,
     candleFetchedAt: last.updatedAt, ...f, score, scoreBreakdown,

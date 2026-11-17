@@ -1,0 +1,72 @@
+{
+  "contractVersion": "opendart-official-evidence.v0",
+  "classification": "OFFICIAL_SOURCE_OBSERVATION_NOT_RIGHTS_DECISION",
+  "observedAt": "2026-11-04",
+  "dataPolicy": {
+    "containsSourceBody": false,
+    "containsCredential": false,
+    "containsRealFiling": false,
+    "grantsAnyAction": false,
+    "rightsDecision": "UNRESOLVED"
+  },
+  "observations": [
+    {
+      "id": "ODART-TERMS-10-16-23",
+      "sourceProduct": "OpenDART 이용약관",
+      "officialLocator": "https://opendart.fss.or.kr/intro/terms.do",
+      "effectiveDateShown": "2020-01-21",
+      "sections": ["제10조 제4항·제5항", "제16조 제1항·제4항", "제23조 제1항"],
+      "observedFacts": [
+        "API 이용량에 허용량 제한이 있고 변경 내용을 사전 게시하거나 통지할 수 있다.",
+        "OpenAPI 서비스 및 관련 프로그램의 저작권은 금융감독원에 있다고 기재한다.",
+        "약관에 명시되지 않은 저작권 사항은 저작권법과 공공데이터법을 따른다고 기재한다.",
+        "공시정보는 제출인 책임으로 작성되며 정확성·완전성을 보장하지 않는다고 기재한다."
+      ],
+      "notEstablished": [
+        "각 endpoint/field별 제품 이용허락",
+        "원문 또는 첨부의 장기 보존·백업·재배포 권한",
+        "파생 요약·인용·공개 API·Push/Discord 전송 권한",
+        "허용 보존기간·삭제 SLA·출처표시 문구"
+      ],
+      "rightsState": "UNRESOLVED"
+    },
+    {
+      "id": "ODART-LIST-GUIDE-2019001",
+      "sourceProduct": "OpenDART 공시검색 API",
+      "officialLocator": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001",
+      "observedEndpoint": "GET /api/list.json or /api/list.xml",
+      "observedFields": ["corp_code", "corp_cls", "corp_name", "stock_code", "report_nm", "rcept_no", "flr_nm", "rcept_dt", "rm"],
+      "observedFacts": [
+        "page_count는 1~100 범위로 안내한다.",
+        "last_reprt_at 기본값 N은 정정보고서를 포함한 제출 보고서 전체를 검색한다고 안내한다.",
+        "응답 안내에는 정상·데이터 없음·요청 제한 초과 등 상태 코드가 포함된다."
+      ],
+      "payloadClass": "LIST_METADATA",
+      "notEstablished": [
+        "API guide의 필드 정의만으로 제품의 persist/display/distribute/backup 권한을 승인하지 않는다.",
+        "공시목록의 정정 표지는 predecessor/successor receipt relation을 완전하게 증명하지 않는다."
+      ],
+      "rightsState": "UNRESOLVED"
+    },
+    {
+      "id": "ODART-OVERVIEW-ORIGINAL-XML",
+      "sourceProduct": "OpenDART 공시정보 활용 안내",
+      "officialLocator": "https://opendart.fss.or.kr/intro/main.do",
+      "observedFacts": [
+        "공시보고서 원문을 XML로 내려받아 자료를 추출해 사용할 수 있다고 안내한다.",
+        "주요공시·재무정보의 구조화 제공과 원문 XML 활용 안내를 구분해 설명한다."
+      ],
+      "notEstablished": [
+        "해당 안내만으로 원문·첨부의 보존, 재배포, 인용량, 외부 API 노출을 승인하지 않는다.",
+        "OpenAPI 계정 인증키 발급은 개별 제품 action의 권리 승인과 동일하지 않다."
+      ],
+      "rightsState": "UNRESOLVED"
+    }
+  ],
+  "requiredOwnerEvidence": [
+    "각 실제 surface의 source/product/endpoint/field/action/purpose/channel/retention 매핑",
+    "허용된 원문 snapshot 또는 정확한 locator, observedAt, effective interval 및 revision/hash",
+    "데이터·법무 owner와 독립 reviewer의 범위별 판정 및 출처표시 조건",
+    "변경·철회 모니터링 owner, 재검토 조건 및 하위 산출물 disposition"
+  ]
+}

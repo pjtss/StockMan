@@ -1,3 +1,5 @@
+import { isValidCompactCalendarDate } from "./calendar-date-quality.mjs";
+
 /** Pure, market-independent OHLCV heuristics. Scores are not probabilities. */
 export const ACCUMULATION_POLICY = {
   version: "2.0.0", minimumBars: 41, historyBars: 120,
@@ -44,7 +46,7 @@ export function calculateSma(values: number[], period: number): number[] {
 }
 
 export function validTradingDate(date: string): boolean {
-  if (!/^\d{8}$/.test(date)) return false;
+  if (!isValidCompactCalendarDate(date)) return false;
   const parsed = new Date(date.slice(0, 4) + "-" + date.slice(4, 6) + "-" + date.slice(6) + "T00:00:00Z");
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10).replaceAll("-", "") === date
     && ![0, 6].includes(parsed.getUTCDay());

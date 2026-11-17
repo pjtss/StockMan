@@ -21,7 +21,7 @@ describe("market RSS", () => {
     })));
     try {
       await expect(fetchMarketRss("GLOBENEWSWIRE", "https://example.com"))
-        .rejects.toThrow(/RSS 또는 Atom feed가 아닙니다/);
+        .rejects.toMatchObject({ name: "MarketRssFetchError", stage: "parse", errorCode: "RSS_FEED_FORMAT_INVALID", upstreamStatus: 200 });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -55,7 +55,7 @@ describe("market RSS", () => {
     vi.stubGlobal("fetch", vi.fn((_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
     })));
-    await expect(fetchMarketRss("TEST", "https://example.com")).rejects.toThrow("시간 초과");
+    await expect(fetchMarketRss("TEST", "https://example.com")).rejects.toMatchObject({ name: "MarketRssFetchError", stage: "timeout", errorCode: "RSS_FETCH_TIMEOUT" });
     vi.unstubAllGlobals();
   });
 });

@@ -1,0 +1,995 @@
+{
+  "contractVersion": "investment-thesis-journal.v0",
+  "classification": "SYNTHETIC_PRODUCT_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealUser": false,
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsPersonalThesisText": false,
+    "containsTransactionOrHoldingData": false,
+    "containsRealPriceSeries": false,
+    "identitiesAreSynthetic": true
+  },
+  "requiredThesisFields": [
+    "thesisId",
+    "ownerUserId",
+    "issuerOrInstrumentRef",
+    "createdAt",
+    "thesisRevision",
+    "statementRef",
+    "supportingClaimRevisionRefs",
+    "counterClaimRevisionRefs",
+    "reviewHorizonPolicyRevision",
+    "reviewTriggerSetHash",
+    "createdFromSnapshotId",
+    "visibility",
+    "retentionState"
+  ],
+  "requiredPropositionFields": [
+    "propositionId",
+    "propositionType",
+    "statementRef",
+    "asOf",
+    "subjectRef",
+    "supportingClaimRevisionRefs",
+    "counterClaimRevisionRefs",
+    "horizonRef",
+    "outcomeMeasureRef",
+    "conditionSetRef",
+    "parentThesisRevisionRef"
+  ],
+  "propositionTypes": [
+    "FACTUAL_CLAIM",
+    "FORECAST",
+    "CONDITIONAL_SCENARIO",
+    "MIXED_OR_UNCLEAR"
+  ],
+  "requiredForecastCohortFields": [
+    "forecastCohortId",
+    "ownerUserId",
+    "cohortPolicyRevision",
+    "membershipRuleRevision",
+    "cohortFrozenAt",
+    "evaluationInformationCutoffAt",
+    "windowStart",
+    "windowEnd",
+    "eligiblePropositionSetHash",
+    "duePropositionCount",
+    "dispositionCounts",
+    "completenessState",
+    "summaryRevision"
+  ],
+  "forecastCohortCompletenessStates": [
+    "NOT_APPROVED",
+    "COMPLETE",
+    "INCOMPLETE",
+    "DENOMINATOR_UNVERIFIABLE",
+    "REOPEN_REQUIRED"
+  ],
+  "requiredLateEvidenceFields": [
+    "sourceOccurrenceAt",
+    "sourceFirstAvailableAt",
+    "systemRetrievedAt",
+    "evaluationInformationCutoffAt",
+    "outcomeDataAsOf",
+    "priorEvidenceSnapshotRef",
+    "lateEvidenceDisposition",
+    "lateEvidenceReason"
+  ],
+  "lateEvidenceDispositions": [
+    "ON_TIME_FOR_CUTOFF",
+    "LATE_INGEST_ON_TIME_SOURCE",
+    "LATE_OUTCOME_EVIDENCE",
+    "LATE_PREMISE_CORRECTION",
+    "LATE_PRICE_REVISION",
+    "LATE_COHORT_MEMBER",
+    "UNRESOLVED_TIMING"
+  ],
+  "requiredEvaluationTimeFields": [
+    "sourceTimestampRaw",
+    "sourceTimezoneId",
+    "sourceTimezoneEvidenceRef",
+    "sourceTimePrecision",
+    "sourceTimestampOffset",
+    "cutoffAtUtc",
+    "cutoffTimezoneId",
+    "tzDatabaseVersion",
+    "marketCalendarId",
+    "marketCalendarRevision",
+    "sessionAssignment",
+    "assignmentReason"
+  ],
+  "requiredInstrumentAttributionFields": [
+    "instrumentRef",
+    "legalIssuerRef",
+    "instrumentClass",
+    "venueId",
+    "listingEpochStart",
+    "listingEpochEnd",
+    "instrumentMasterRevision",
+    "marketCalendarId",
+    "marketCalendarRevision",
+    "marketTimezoneId",
+    "securityIdentityEvidenceRef",
+    "identityAssertionId",
+    "identityAssertionRevision",
+    "identityDecisionRef",
+    "attributionDecisionRef",
+    "eligibilityDecisionRef",
+    "eventSubjectRef"
+  ],
+  "instrumentAttributionStates": [
+    "ACTIVE_COMMON_STOCK",
+    "DEPOSITARY_RECEIPT_EXCLUDED",
+    "INSTRUMENT_CLASS_UNRESOLVED",
+    "ISSUER_INSTRUMENT_CROSSWALK_UNRESOLVED",
+    "LISTING_EPOCH_UNRESOLVED"
+  ],
+  "timeResolutionStates": [
+    "EXACT_INSTANT",
+    "DATE_ONLY",
+    "UNKNOWN",
+    "AMBIGUOUS_DST",
+    "NONEXISTENT_LOCAL_TIME",
+    "SOURCE_CONFLICT",
+    "CALENDAR_UNKNOWN",
+    "CALENDAR_REVISION_CHANGED"
+  ],
+  "requiredReviewRecordFields": [
+    "reviewId",
+    "ownerUserId",
+    "thesisRevisionRef",
+    "reviewPolicyRevision",
+    "scheduledReviewAt",
+    "reviewedAt",
+    "evidenceRevisionRefs",
+    "outcomeObservationState",
+    "outcomeMeasureRef",
+    "userConclusionRef",
+    "limitations",
+    "supersedesReviewId",
+    "evaluationInformationCutoffAt",
+    "outcomeDataAsOf",
+    "lateEvidenceDisposition"
+  ],
+  "outcomeObservationStates": [
+    "NOT_DUE",
+    "NOT_OBSERVED",
+    "OBSERVED_AS_OF",
+    "RIGHTS_BLOCKED",
+    "SOURCE_UNAVAILABLE",
+    "INCOMPLETE_WINDOW",
+    "NOT_ATTRIBUTABLE"
+  ],
+  "decisionBindings": [
+    "KR-PERSONAL-THESIS-UX-01",
+    "KR-OPERATIONAL-SECURITY-01",
+    "KR-RETENTION-01",
+    "KR-API-UI-CONSISTENCY-01",
+    "KR-MARKET-DATA-RIGHTS-01",
+    "KR-END-TO-END-ACCEPTANCE-01",
+    "KR-MASTER-SNAPSHOT-01",
+    "KR-EVENT-ATTRIBUTION-01",
+    "KR-DART-RIGHTS-01",
+    "KR-CAP-FRESHNESS-01"
+  ],
+  "vectors": [
+    {
+      "id": "ITJ-01-EXPLICIT-OPT-IN-DOES-NOT-INFER-OWNERSHIP-OR-TRADES",
+      "input": {
+        "watchlisted": true,
+        "filingOpened": true,
+        "userOptIn": false,
+        "brokerDataAvailable": false
+      },
+      "expected": {
+        "thesisCreated": false,
+        "holdingOrTradeInferred": false,
+        "transactionDataRequired": false
+      }
+    },
+    {
+      "id": "ITJ-02-THESIS-REVISION-PINS-EXACT-SUPPORT-AND-COUNTERCLAIMS",
+      "input": {
+        "createdFromSnapshotId": "SNAP-SYN-2",
+        "supportingClaimRevisionRefs": [
+          "CLM-SYN-4"
+        ],
+        "counterClaimRevisionRefs": [
+          "CLM-SYN-5"
+        ],
+        "currentClaimRevisions": [
+          "CLM-SYN-6",
+          "CLM-SYN-5"
+        ]
+      },
+      "expected": {
+        "priorThesisImmutable": true,
+        "silentClaimRetarget": false,
+        "affectedEvidenceMarkedStale": true,
+        "unaffectedCounterclaimPreserved": true
+      }
+    },
+    {
+      "id": "ITJ-03-REVIEW-HORIZON-AND-INVALIDATION-CRITERIA-ARE-FROZEN-BEFORE-OUTCOME",
+      "input": {
+        "reviewHorizonPolicyRevision": null,
+        "reviewTriggerSetHash": null,
+        "outcomeAlreadyObserved": true
+      },
+      "expected": {
+        "confirmatoryOutcomeEvaluation": "BLOCKED_POST_HOC_CRITERIA",
+        "retroactiveCriteriaBackfill": false,
+        "exploratoryNoteAllowed": true
+      }
+    },
+    {
+      "id": "ITJ-04-THESIS-EDIT-APPENDS-REVISION-INSTEAD-OF-REWRITING-PAST",
+      "input": {
+        "priorThesisRevision": 1,
+        "editRequested": true,
+        "outcomeObserved": true
+      },
+      "expected": {
+        "newRevision": 2,
+        "priorRevisionMutable": false,
+        "outcomeHistoryRewritten": false
+      }
+    },
+    {
+      "id": "ITJ-05-CORRECTION-INVALIDATES-ONLY-DEPENDENT-THESIS-EVIDENCE",
+      "input": {
+        "changedClaimRevisionRefs": [
+          "CLM-SYN-4"
+        ],
+        "supportingClaimRevisionRefs": [
+          "CLM-SYN-4"
+        ],
+        "counterClaimRevisionRefs": [
+          "CLM-SYN-5"
+        ],
+        "impactDenominatorComplete": false
+      },
+      "expected": {
+        "thesisDisposition": "REVIEW_REQUIRED",
+        "missingImpactAssumedUnaffected": false,
+        "priorThesisRevisionPreserved": true,
+        "affectedPublicOutcomeClaimSuppressed": true
+      }
+    },
+    {
+      "id": "ITJ-06-PRICE-OUTCOME-REQUIRES-RIGHTS-AND-PREREGISTERED-MEASURE",
+      "input": {
+        "priceRightsDecision": "OPEN",
+        "priceSnapshot": "LATEST_REVISED_ONLY",
+        "reviewHorizonPolicyRevision": "HORIZON-SYN-6",
+        "benchmarkPolicyRevision": "BENCH-SYN-2"
+      },
+      "expected": {
+        "priceOutcome": "NOT_ATTRIBUTABLE",
+        "replayOrPublicPriceClaim": false,
+        "userThesisStatementRewritten": false
+      }
+    },
+    {
+      "id": "ITJ-07-USER-THESIS-IS-NOT-A-SYSTEM-RATING-OR-TRADE-RECOMMENDATION",
+      "input": {
+        "userThesisDirection": "USER_AUTHORED",
+        "claimEvidence": "PARTIAL",
+        "positionData": null
+      },
+      "expected": {
+        "systemRatingInferred": false,
+        "buySellRecommendation": false,
+        "personalThesisLabelRequired": true
+      }
+    },
+    {
+      "id": "ITJ-08-PRIVATE-THESIS-NEVER-ENTERS-PUBLIC-OR-CROSS-USER-PROJECTION",
+      "input": {
+        "thesisVisibility": "OWNER_ONLY",
+        "publicApiProjectionRequested": true,
+        "aggregateAnalyticsRequested": true
+      },
+      "expected": {
+        "publicProjection": "EXCLUDED",
+        "crossUserSearch": "EXCLUDED",
+        "aggregateUseRequiresSeparateConsent": true
+      }
+    },
+    {
+      "id": "ITJ-09-DELETE-AND-EXPORT-ARE-OWNER-SCOPED-AND-RETENTION-AWARE",
+      "input": {
+        "requestUserId": "USER-B",
+        "ownerUserId": "USER-A",
+        "deleteRequested": true,
+        "backupPolicy": "UNRESOLVED"
+      },
+      "expected": {
+        "crossUserMutation": "DENIED_OR_NOT_FOUND",
+        "canonicalEventChanged": false,
+        "backupPurgeClaim": false,
+        "exportDisclosure": "NOT_RETURNED_TO_NONOWNER"
+      }
+    },
+    {
+      "id": "ITJ-10-UNAVAILABLE-OUTCOME-IS-NOT-ZERO-OR-THESIS-FAILURE",
+      "input": {
+        "scheduledReviewAt": "2026-12-01T00:00:00Z",
+        "reviewedAt": "2026-12-02T00:00:00Z",
+        "priceRights": "DENIED",
+        "requiredPriceWindowComplete": false
+      },
+      "expected": {
+        "outcomeObservationState": "RIGHTS_BLOCKED",
+        "returnValue": null,
+        "thesisOutcomeLabel": "NOT_EVALUABLE",
+        "missingPriceTreatedAsZero": false
+      }
+    },
+    {
+      "id": "ITJ-11-OBSERVED-PRICE-METRIC-DOES-NOT-VERIFY-FACTUAL-THESIS",
+      "input": {
+        "outcomeObservationState": "OBSERVED_AS_OF",
+        "outcomeMeasureRef": "MEASURE-SYN-11",
+        "factualClaimEvidenceState": "UNREVIEWED",
+        "causalDesign": "NONE"
+      },
+      "expected": {
+        "priceMeasureReportedSeparately": true,
+        "factualClaimVerifiedByPrice": false,
+        "causalEffectClaim": false,
+        "systemThesisGrade": null
+      }
+    },
+    {
+      "id": "ITJ-12-REVIEW-ADDITION-DOES-NOT-MUTATE-THESIS-OR-PRIOR-REVIEW",
+      "input": {
+        "thesisRevisionRef": "THESIS-SYN-12-R1",
+        "priorReviewId": "REVIEW-SYN-12-1",
+        "newReviewRequested": true,
+        "sameOwner": true
+      },
+      "expected": {
+        "newReviewId": "REVIEW-SYN-12-2",
+        "thesisRevisionMutable": false,
+        "priorReviewMutable": false,
+        "supersedesReviewId": "REVIEW-SYN-12-1"
+      }
+    },
+    {
+      "id": "ITJ-13-FACTUAL-CLAIM-USES-SOURCE-EVIDENCE-NOT-PRICE-DIRECTION",
+      "input": {
+        "propositionType": "FACTUAL_CLAIM",
+        "sourceEvidenceState": "MISSING",
+        "priceReturn": 0.18,
+        "asOf": "2026-10-31"
+      },
+      "expected": {
+        "factualClaimStatus": "UNVERIFIED",
+        "priceDirectionAsFactProof": false,
+        "asOfRequired": true
+      }
+    },
+    {
+      "id": "ITJ-14-FORECAST-NEEDS-PREDECLARED-HORIZON-AND-MEASURE",
+      "input": {
+        "propositionType": "FORECAST",
+        "horizonRef": null,
+        "outcomeMeasureRef": null,
+        "outcomeAlreadyObserved": true
+      },
+      "expected": {
+        "confirmatoryEvaluation": "BLOCKED_POST_HOC_OR_UNDEFINED",
+        "metricInvented": false,
+        "originalForecastRewritten": false
+      }
+    },
+    {
+      "id": "ITJ-15-CONDITIONAL-SCENARIO-NOT-TRIGGERED-IS-NOT-FALSIFIED",
+      "input": {
+        "propositionType": "CONDITIONAL_SCENARIO",
+        "conditionSetRef": "COND-SYN-15",
+        "conditionState": "NOT_OCCURRED",
+        "consequenceObserved": false
+      },
+      "expected": {
+        "scenarioStatus": "NOT_TRIGGERED",
+        "falsified": false,
+        "conditionStateAndConsequenceSeparated": true
+      }
+    },
+    {
+      "id": "ITJ-16-MIXED-STATEMENT-REQUIRES-USER-DECOMPOSITION-BEFORE-EVALUATION",
+      "input": {
+        "propositionType": "MIXED_OR_UNCLEAR",
+        "autoDecompositionRequested": true,
+        "reviewRequested": true
+      },
+      "expected": {
+        "confirmatoryEvaluation": "BLOCKED_UNTIL_USER_DECOMPOSES",
+        "systemRewroteMeaning": false,
+        "sourceAndForecastCombined": false
+      }
+    },
+    {
+      "id": "ITJ-17-DECOMPOSED-PROPOSITIONS-KEEP-THE-SAME-THESIS-REVISION-LINEAGE",
+      "input": {
+        "parentThesisRevisionRef": "THESIS-SYN-17-R1",
+        "propositionTypes": [
+          "FACTUAL_CLAIM",
+          "FORECAST"
+        ],
+        "autoGeneratedByModel": false
+      },
+      "expected": {
+        "parentRevisionPreserved": true,
+        "eachPropositionHasIndependentReviewPolicy": true,
+        "legacyReviewBackfilled": false
+      }
+    },
+    {
+      "id": "ITJ-18-FORECAST-SUMMARY-KEEPS-ALL-DUE-OUTCOMES-IN-DENOMINATOR",
+      "input": {
+        "dueForecastCount": 12,
+        "observedCount": 7,
+        "notObservedCount": 2,
+        "rightsBlockedCount": 1,
+        "incompleteWindowCount": 2,
+        "userSelectedOnlyWinners": true
+      },
+      "expected": {
+        "eligibleDenominator": 12,
+        "completeCohort": false,
+        "accuracyOrWinRate": null,
+        "missingStatesOmitted": false
+      }
+    },
+    {
+      "id": "ITJ-19-FACTS-FORECASTS-AND-CONDITIONAL-SCENARIOS-USE-DIFFERENT-OUTCOME-RULES",
+      "input": {
+        "cohortPropositionTypes": [
+          "FACTUAL_CLAIM",
+          "FORECAST",
+          "CONDITIONAL_SCENARIO"
+        ],
+        "singleAggregateAccuracyRequested": true
+      },
+      "expected": {
+        "mixedTypeAccuracy": null,
+        "typeSpecificCohortsRequired": true,
+        "conditionNotOccurredCountedAsForecastMiss": false
+      }
+    },
+    {
+      "id": "ITJ-20-USER-WITHDRAWAL-IS-EXPLICITLY-COUNTED-NOT-SILENTLY-DROPPED",
+      "input": {
+        "propositionType": "FORECAST",
+        "withdrawnBeforeOutcome": true,
+        "outcomeObserved": false
+      },
+      "expected": {
+        "disposition": "USER_WITHDRAWN_BEFORE_OUTCOME",
+        "historicalReviewRewritten": false,
+        "silentDenominatorRemoval": false
+      }
+    },
+    {
+      "id": "ITJ-21-ERASURE-INVALIDATES-DERIVED-COHORT-SUMMARY",
+      "input": {
+        "ownerDeletionCompleted": true,
+        "derivedSummaryExists": true,
+        "anonymizedAggregateRetentionApproval": "UNRESOLVED"
+      },
+      "expected": {
+        "affectedSummary": "INVALIDATED",
+        "userTombstoneRetainedByDefault": false,
+        "completeAccuracyClaim": false
+      }
+    },
+    {
+      "id": "ITJ-22-POST-CUTOFF-FILING-DOES-NOT-REWRITE-FORECAST-INFORMATION-SET",
+      "input": {
+        "forecastCreatedAt": "2026-10-01T12:00:00Z",
+        "sourceOccurrenceAt": "2026-10-02T08:00:00Z",
+        "sourceFirstAvailableAt": "2026-10-03T10:00:00Z",
+        "evaluationInformationCutoffAt": "2026-10-02T00:00:00Z",
+        "systemRetrievedAt": "2026-10-03T10:05:00Z"
+      },
+      "expected": {
+        "lateEvidenceDisposition": "LATE_OUTCOME_EVIDENCE",
+        "forecastInformationSetRewritten": false,
+        "separateReviewRevisionRequired": true
+      }
+    },
+    {
+      "id": "ITJ-23-CORRECTED-PREMISE-CLAIM-STALES-DEPENDENCY-WITHOUT-REWRITING-FORECAST",
+      "input": {
+        "sourceFirstAvailableAt": "2026-09-01T09:00:00Z",
+        "correctionAvailableAt": "2026-11-15T09:00:00Z",
+        "evaluationInformationCutoffAt": "2026-10-01T00:00:00Z",
+        "pinnedClaimCorrection": true
+      },
+      "expected": {
+        "lateEvidenceDisposition": "LATE_PREMISE_CORRECTION",
+        "priorForecastMutable": false,
+        "dependentReviewState": "REVIEW_REQUIRED",
+        "priorReviewOverwritten": false
+      }
+    },
+    {
+      "id": "ITJ-24-LATE-PRICE-REVISION-CREATES-NEW-OUTCOME-SNAPSHOT",
+      "input": {
+        "priorPriceSnapshotRef": "PRICE-SYN-24-A",
+        "lateAdjustedSnapshotRef": "PRICE-SYN-24-B",
+        "revisionAvailableAt": "2026-11-16T09:00:00Z",
+        "evaluationInformationCutoffAt": "2026-11-10T00:00:00Z",
+        "rightsDecisionRevision": "RIGHTS-SYN-24-B"
+      },
+      "expected": {
+        "lateEvidenceDisposition": "LATE_PRICE_REVISION",
+        "priorSnapshotMutable": false,
+        "newReviewRevisionRequired": true,
+        "currentResultWithoutRightsRecheck": "SUPPRESSED"
+      }
+    },
+    {
+      "id": "ITJ-25-LATE-ELIGIBLE-FORECAST-REOPENS-COHORT-DENOMINATOR",
+      "input": {
+        "cohortFrozenAt": "2026-11-01T00:00:00Z",
+        "lateEligibleForecastDiscovered": true,
+        "priorDuePropositionCount": 20,
+        "currentDuePropositionCount": 21
+      },
+      "expected": {
+        "lateEvidenceDisposition": "LATE_COHORT_MEMBER",
+        "completenessState": "DENOMINATOR_UNVERIFIABLE",
+        "summaryClaim": "SUPPRESSED_UNTIL_RECONCILED",
+        "silentMembershipMutation": false
+      }
+    },
+    {
+      "id": "ITJ-26-OCCURRENCE-AVAILABILITY-AND-RETRIEVAL-TIMES-REMAIN-SEPARATE",
+      "input": {
+        "sourceOccurrenceAt": "2026-10-05T00:00:00Z",
+        "sourceFirstAvailableAt": "2026-10-07T00:00:00Z",
+        "systemRetrievedAt": "2026-10-09T00:00:00Z",
+        "evaluationInformationCutoffAt": "2026-10-08T00:00:00Z"
+      },
+      "expected": {
+        "lateEvidenceDisposition": "LATE_INGEST_ON_TIME_SOURCE",
+        "availabilityAtEvaluationCutoff": "AVAILABLE",
+        "retrievalWasLate": true,
+        "timesCollapsedToSingleDate": false,
+        "originalReviewPreserved": true,
+        "appendNewReviewRequired": true
+      }
+    },
+    {
+      "id": "ITJ-27-DST-FALLBACK-AMBIGUOUS-LOCAL-TIME-IS-NOT-ARBITRARILY-CONVERTED",
+      "input": {
+        "sourceTimestampRaw": "2026-11-01 01:30:00",
+        "sourceTimezoneId": "America/New_York",
+        "sourceTimePrecision": "LOCAL_SECOND",
+        "possibleUtcOffsets": [
+          "-04:00",
+          "-05:00"
+        ],
+        "foldDisambiguator": null
+      },
+      "expected": {
+        "timeResolutionState": "AMBIGUOUS_DST",
+        "normalizedInstant": null,
+        "sessionAssignment": "UNKNOWN",
+        "confirmatoryEvaluation": "BLOCKED_UNRESOLVED_TIMING"
+      }
+    },
+    {
+      "id": "ITJ-28-DST-SPRING-GAP-LOCAL-TIME-IS-NOT-INVENTED",
+      "input": {
+        "sourceTimestampRaw": "2026-03-08 02:30:00",
+        "sourceTimezoneId": "America/New_York",
+        "sourceTimePrecision": "LOCAL_MINUTE",
+        "timezoneRuleGap": true
+      },
+      "expected": {
+        "timeResolutionState": "NONEXISTENT_LOCAL_TIME",
+        "normalizedInstant": null,
+        "sourceTimestampRewritten": false,
+        "confirmatoryEvaluation": "BLOCKED_UNRESOLVED_TIMING"
+      }
+    },
+    {
+      "id": "ITJ-29-EARLY-CLOSE-AND-HOLIDAY-SESSION-USE-PINNED-EXCHANGE-CALENDAR",
+      "input": {
+        "marketCalendarId": "NASDAQ_US_EQUITIES",
+        "marketCalendarRevision": "CAL-SYN-29-A",
+        "sessionDate": "2026-11-27",
+        "officialEarlyCloseLocalTime": "13:00",
+        "sourceAvailableAtLocal": "13:15",
+        "timezoneId": "America/New_York"
+      },
+      "expected": {
+        "sessionAssignment": "AFTER_EARLY_CLOSE",
+        "calendarRevisionPinned": true,
+        "nextSessionDerivedFromCalendar": true,
+        "genericWeekdayHoursUsed": false
+      }
+    },
+    {
+      "id": "ITJ-30-CONFLICTING-ACCEPTANCE-AND-PUBLIC-AVAILABILITY-TIMES-REMAIN-UNRESOLVED",
+      "input": {
+        "filingAcceptedAt": "2026-10-10T12:00:00Z",
+        "firstPublicAvailabilityAt": "2026-10-10T12:20:00Z",
+        "timestampEvidenceConflict": true,
+        "sourcePrecedencePolicy": "UNAPPROVED"
+      },
+      "expected": {
+        "timeResolutionState": "SOURCE_CONFLICT",
+        "evaluationStartInstant": null,
+        "acceptanceTimeSubstitutedForPublicTime": false,
+        "confirmatoryEvaluation": "BLOCKED_UNRESOLVED_TIMING"
+      }
+    },
+    {
+      "id": "ITJ-31-TIMEZONE-OR-CALENDAR-RULE-REVISION-APPENDS-NEW-REVIEW",
+      "input": {
+        "priorReviewId": "REVIEW-SYN-31-A",
+        "priorTzDatabaseVersion": "TZ-SYN-31-A",
+        "currentTzDatabaseVersion": "TZ-SYN-31-B",
+        "priorMarketCalendarRevision": "CAL-SYN-31-A",
+        "currentMarketCalendarRevision": "CAL-SYN-31-B",
+        "sessionAssignmentChanged": true
+      },
+      "expected": {
+        "priorReviewMutable": false,
+        "newReviewRevisionRequired": true,
+        "priorAndCurrentAssignmentsBothRetained": true,
+        "silentRetiming": false
+      }
+    },
+    {
+      "id": "ITJ-32-DATE-ONLY-TIMESTAMP-DOES-NOT-GET-A-MARKET-SESSION-BY-INFERENCE",
+      "input": {
+        "sourceTimestampRaw": "2026-11-01",
+        "sourceTimePrecision": "DATE_ONLY",
+        "sourceTimezoneId": null,
+        "possibleSessions": [
+          "PREMARKET",
+          "REGULAR",
+          "AFTER_HOURS"
+        ]
+      },
+      "expected": {
+        "timeResolutionState": "DATE_ONLY",
+        "normalizedInstant": null,
+        "sessionAssignment": "UNKNOWN",
+        "KstMidnightAssumed": false
+      }
+    },
+    {
+      "id": "ITJ-33-TICKER-OR-ISSUER-MATCH-DOES-NOT-MERGE-INSTRUMENT-IDENTITY",
+      "input": {
+        "issuerRef": "ISSUER-SYN-33",
+        "instrumentRefs": [
+          "INSTRUMENT-SYN-33-A",
+          "INSTRUMENT-SYN-33-B"
+        ],
+        "sameTickerText": true,
+        "securityIdentityEvidenceRef": null
+      },
+      "expected": {
+        "automaticInstrumentMerge": false,
+        "outcomeAttribution": "NOT_ATTRIBUTABLE",
+        "explicitIdentityEvidenceRequired": true
+      }
+    },
+    {
+      "id": "ITJ-34-VENUE-TRANSFER-USES-TIME-EFFECTIVE-LISTING-EPOCH-AND-CALENDAR",
+      "input": {
+        "priorVenue": "VENUE-SYN-34-A",
+        "priorEpochEnd": "2026-10-31T20:00:00Z",
+        "newVenue": "VENUE-SYN-34-B",
+        "newEpochStart": "2026-11-01T00:00:00Z",
+        "priorCalendarRevision": "CAL-SYN-34-A",
+        "newCalendarRevision": "CAL-SYN-34-B"
+      },
+      "expected": {
+        "singleUnbrokenPriceSeriesInferred": false,
+        "bothVenueEpochsPinned": true,
+        "priorReviewRewritten": false,
+        "crossEpochMeasureRequiresApprovedMapping": true
+      }
+    },
+    {
+      "id": "ITJ-35-DEPOSITARY-RECEIPT-IS-EXCLUDED-AND-NEVER-SPLICED-TO-UNDERLYING-COMMON",
+      "input": {
+        "instrumentClass": "DEPOSITARY_RECEIPT",
+        "underlyingInstrumentRef": "INSTRUMENT-SYN-35-COMMON",
+        "depositRatio": "SYNTHETIC_RATIO",
+        "masterClassConfirmed": true
+      },
+      "expected": {
+        "eligibleAsCommonStock": false,
+        "priceOutcomeState": "RIGHTS_BLOCKED",
+        "underlyingPriceSplice": false,
+        "relationDoesNotGrantEligibility": true
+      }
+    },
+    {
+      "id": "ITJ-36-MULTIPLE-ACTIVE-COMMON-LISTINGS-REQUIRE-USER-INSTRUMENT-SELECTION",
+      "input": {
+        "activeCommonInstrumentRefs": [
+          "INSTRUMENT-SYN-36-A",
+          "INSTRUMENT-SYN-36-B"
+        ],
+        "userSelectedInstrumentRef": null,
+        "primaryVenueEvidenceRef": null
+      },
+      "expected": {
+        "instrumentSelectedByLiquidityOrTicker": false,
+        "outcomeAttribution": "NOT_ATTRIBUTABLE",
+        "explicitUserSelectionRequired": true
+      }
+    },
+    {
+      "id": "ITJ-37-ISSUER-CLASS-OR-LISTING-EPOCH-REVISION-APPENDS-REVIEW",
+      "input": {
+        "priorReviewId": "REVIEW-SYN-37-A",
+        "priorInstrumentMasterRevision": "MASTER-SYN-37-A",
+        "currentInstrumentMasterRevision": "MASTER-SYN-37-B",
+        "classOrVenueRelationChanged": true
+      },
+      "expected": {
+        "priorReviewMutable": false,
+        "affectedReviewState": "REVIEW_REQUIRED",
+        "newReviewRevisionRequired": true,
+        "unaffectedReviewMutation": false
+      }
+    },
+    {
+      "id": "ITJ-38-OUTCOME-PINS-EXACT-IDENTITY-AND-ATTRIBUTION-REVISIONS",
+      "input": {
+        "instrumentRef": "INSTRUMENT-SYN-38",
+        "identityAssertionId": "ASSERTION-SYN-38",
+        "identityAssertionRevision": 7,
+        "identityDecisionRef": "KR-MASTER-SNAPSHOT-01@3",
+        "attributionDecisionRef": "KR-EVENT-ATTRIBUTION-01@2",
+        "eligibilityDecisionRef": "ELIGIBILITY-SYN-38@4",
+        "eventSubjectRef": "SUBJECT-SYN-38",
+        "identityEvidenceRef": "EVIDENCE-SYN-38"
+      },
+      "expected": {
+        "allRevisionRefsPinned": true,
+        "latestOnlyReferenceAllowed": false,
+        "missingDecisionRefState": "NOT_ATTRIBUTABLE"
+      }
+    },
+    {
+      "id": "ITJ-39-FILER-IDENTITY-DOES-NOT-SUBSTITUTE-FOR-DIRECT-INSTRUMENT-IMPACT",
+      "input": {
+        "filingFilerRef": "ISSUER-SYN-39-A",
+        "eventSubjectRef": "ISSUER-SYN-39-B",
+        "instrumentIssuerRef": "ISSUER-SYN-39-C",
+        "directImpactClaimRef": null,
+        "instrumentMasterCurrent": true
+      },
+      "expected": {
+        "issuerClaimMayBeRecorded": true,
+        "priceOutcomeAttribution": "NOT_ATTRIBUTABLE",
+        "filerTickerFallbackAllowed": false
+      }
+    },
+    {
+      "id": "ITJ-40-EXPIRED-OR-SUPERSEDED-IDENTITY-ASSERTION-SUPPRESSES-OUTCOME",
+      "input": {
+        "thesisRevisionRef": "THESIS-SYN-40-R1",
+        "outcomeReviewRef": "REVIEW-SYN-40-R1",
+        "identityAssertionRevisionPinned": 5,
+        "currentIdentityAssertionRevision": 6,
+        "priorRevisionStatus": "SUPERSEDED"
+      },
+      "expected": {
+        "priorReviewMutable": false,
+        "currentOutcome": "NOT_ATTRIBUTABLE",
+        "newReviewRequiresCurrentAssertion": true,
+        "silentSuccessorRetargetAllowed": false
+      }
+    },
+    {
+      "id": "ITJ-41-MASTER-DECISION-APPROVAL-DOES-NOT-AUTO-APPROVE-CROSSWALK-ASSERTION",
+      "input": {
+        "masterPolicyDecisionStatus": "APPROVED",
+        "masterPolicyRevision": 3,
+        "identityAssertionState": "IN_REVIEW",
+        "eventAttributionState": "APPROVED_ASSERTION"
+      },
+      "expected": {
+        "identityEligibility": "UNRESOLVED",
+        "thesisOutcomeAttribution": "NOT_ATTRIBUTABLE",
+        "policyApprovalSubstitutesAssertionReview": false
+      }
+    },
+    {
+      "id": "ITJ-42-CORRECTION-IMPACTS-ONLY-DEPENDENT-THESIS-REVIEWS",
+      "input": {
+        "correctedAssertionId": "ASSERTION-SYN-42-A",
+        "dependencyIndexComplete": true,
+        "dependentReviewRefs": [
+          "REVIEW-SYN-42-A"
+        ],
+        "unrelatedReviewRefs": [
+          "REVIEW-SYN-42-B"
+        ]
+      },
+      "expected": {
+        "dependentReviewState": "REVIEW_REQUIRED",
+        "unrelatedReviewChanged": false,
+        "priorReviewsMutable": false
+      }
+    },
+    {
+      "id": "ITJ-43-UNRESOLVED-DEPENDENCY-DENOMINATOR-DOES-NOT-CLAIM-UNAFFECTED",
+      "input": {
+        "correctedAssertionId": "ASSERTION-SYN-43",
+        "dependencyIndexComplete": false,
+        "impactEnumeration": "PARTIAL"
+      },
+      "expected": {
+        "unaffectedConclusionAllowed": false,
+        "impactedOutcomeSummary": "SUPPRESSED",
+        "disposition": "REOPEN_REQUIRED"
+      }
+    },
+    {
+      "id": "ITJ-44-FILER-METADATA-ALONE-DOES-NOT-ATTRIBUTE-PRICE-OUTCOME",
+      "input": {
+        "corpCode": "ENTITY-SYN-44",
+        "stockCode": "CODE-SYN-44",
+        "submitterName": "PARTY-SYN-44",
+        "claimPartyRole": null,
+        "directImpactLocator": null
+      },
+      "expected": {
+        "reason": "FILER_ONLY",
+        "issuerFactAllowed": true,
+        "instrumentPriceOutcome": "NOT_ATTRIBUTABLE"
+      }
+    },
+    {
+      "id": "ITJ-45-PARTY-ROLE-IS-CLAIM-AND-SUBJECT-SCOPED",
+      "input": {
+        "filingId": "FILING-SYN-45",
+        "partyRefs": [
+          "PARTY-SYN-45-A",
+          "PARTY-SYN-45-B"
+        ],
+        "claimRefs": [
+          "CLAIM-SYN-45-A",
+          "CLAIM-SYN-45-B"
+        ],
+        "roles": [
+          "OBLIGOR",
+          "BENEFICIARY"
+        ],
+        "singleFilingLevelRoleRequested": true
+      },
+      "expected": {
+        "partyRoleEdgesPerClaim": true,
+        "roleLocatorRequired": true,
+        "roleCountPreserved": true,
+        "arbitraryRoleAssignment": false
+      }
+    },
+    {
+      "id": "ITJ-46-CLAIM-LOCATOR-OR-SOURCE-REVISION-CHANGE-REQUIRES-REVIEW",
+      "input": {
+        "priorDocumentRevision": "DOC-SYN-46-A",
+        "currentDocumentRevision": "DOC-SYN-46-B",
+        "priorContentHash": "HASH-SYN-46-A",
+        "claimLocatorReproduced": false
+      },
+      "expected": {
+        "reason": "CLAIM_LOCATOR_UNAVAILABLE",
+        "oldClaimRevisionReusable": false,
+        "newClaimReviewRequired": true,
+        "priorReviewMutable": false
+      }
+    },
+    {
+      "id": "ITJ-47-RIGHTS-BLOCKED-IS-NOT-EVIDENCE-ABSENCE",
+      "input": {
+        "sourceRights": "UNRESOLVED",
+        "sourceBodyVisible": false,
+        "searchCompleted": true,
+        "claimActuallyAbsent": false
+      },
+      "expected": {
+        "reason": "SOURCE_RIGHTS_UNRESOLVED",
+        "state": "SUPPRESSED_OR_NEUTRAL_STATUS",
+        "notReportedConclusion": false,
+        "claimFalsified": false
+      }
+    },
+    {
+      "id": "ITJ-48-UNRESOLVED-ROLE-REASONS-ARE-NOT-COLLAPSED",
+      "input": {
+        "reviewReasons": [
+          "PARTY_ROLE_UNRESOLVED",
+          "DIRECT_IMPACT_EVIDENCE_MISSING",
+          "POLICY_DECISION_OPEN"
+        ],
+        "onePrimaryReasonOnlyUi": true
+      },
+      "expected": {
+        "allApplicableReasonsPreserved": true,
+        "reasonPriorityHidesBlockers": false,
+        "tradeInstructionGenerated": false
+      }
+    },
+    {
+      "id": "ITJ-49-PRIVATE-NOTE-REFERENCES-CLAIM-WITHOUT-COPYING-RIGHT-BLOCKED-BODY",
+      "input": {
+        "userNoteCreated": true,
+        "bodyRights": "UNRESOLVED",
+        "canonicalClaimRevisionRef": "CLAIM-SYN-49-R2",
+        "sourceLinkPermitted": false,
+        "noteContainsSourceBodyExcerpt": true,
+        "noteVisibleToOtherUsers": false
+      },
+      "expected": {
+        "noteSaveAccepted": false,
+        "canonicalClaimCreatedFromNote": false,
+        "publicDossierIncludesNote": false,
+        "approvedFactStatusInferred": false,
+        "permittedReferenceOnlyFallback": true,
+        "otherUserReadAllowed": false
+      }
+    }
+  ],
+  "requiredClaimAttributionFields": [
+    "filingId",
+    "documentRevisionId",
+    "documentContentHash",
+    "claimId",
+    "claimRevision",
+    "claimKind",
+    "partyRef",
+    "partyRole",
+    "eventSubjectRef",
+    "exactSourceLocator",
+    "locatorType",
+    "sourceRightsDecisionRef",
+    "extractionStatus",
+    "reviewStatus"
+  ],
+  "partyRoles": [
+    "FILER",
+    "REGISTRANT",
+    "REPORTING_ISSUER",
+    "AGREEMENT_PARTY",
+    "OBLIGOR",
+    "BENEFICIARY",
+    "COUNTERPARTY",
+    "AFFECTED_ISSUER",
+    "SUBSIDIARY",
+    "UNDERLYING_ISSUER",
+    "OTHER_NAMED_PARTY",
+    "ROLE_UNRESOLVED"
+  ],
+  "attributionReviewReasons": [
+    "FILER_ONLY",
+    "PARTY_ROLE_UNRESOLVED",
+    "DIRECT_IMPACT_EVIDENCE_MISSING",
+    "CLAIM_LOCATOR_UNAVAILABLE",
+    "ENTITY_CROSSWALK_UNRESOLVED",
+    "INSTRUMENT_CROSSWALK_UNRESOLVED",
+    "POLICY_DECISION_OPEN",
+    "ASSERTION_REVIEW_PENDING",
+    "CONFLICTING_PARTIES_OR_CLAIMS",
+    "SOURCE_RIGHTS_UNRESOLVED",
+    "ELIGIBILITY_UNRESOLVED",
+    "DEPENDENCY_SNAPSHOT_STALE",
+    "IMPACT_DENOMINATOR_INCOMPLETE"
+  ]
+}

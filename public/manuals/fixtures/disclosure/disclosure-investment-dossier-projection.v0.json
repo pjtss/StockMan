@@ -1,0 +1,1281 @@
+{
+  "contractVersion": "disclosure-investment-dossier-projection.v0",
+  "classification": "SYNTHETIC_USER_DOSSIER_PROJECTION_NOT_RUNTIME_DTO_OR_INVESTMENT_ADVICE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsRealFinancialValues": false
+  },
+  "canonicalClaimFieldCrosswalk": {
+    "claimId": "FactClaim.claimId",
+    "claimType": "FactClaim.claimType",
+    "claimText": "FactClaim.text",
+    "issuerRole": "EventRevisionParty.role plus evidence-backed attribution status; never inferred from filing company label",
+    "sourceReceiptId": "FactClaim.evidenceRefs[].sourceRef.filingId -> source catalog externalId",
+    "documentRevisionId": "FactClaim.evidenceRefs[].sourceRef.documentRevisionId",
+    "evidenceLocator": "FactClaim.evidenceRefs[].sourceRef.locator",
+    "evidenceRelation": "FactClaim.evidenceRefs[].role: SUPPORTS | CONTRADICTS | CONTEXT",
+    "verificationState": "FactClaim.verificationStatus",
+    "rightsDecisionRevision": "FactClaim.evidenceRefs[].sourceRef.rightsDecisionId -> exact rights decision revision/snapshot",
+    "counterEvidenceRefs": "Separate FactClaim records connected by CONTRADICTS; do not hide them in rationale text",
+    "unknowns": "AnalysisRevision.unknowns[] with typed reason and declared review scope",
+    "reviewDecisionRef": "SummarySegment.reviewDecision and AnalysisRevision.review, kept as different approval targets"
+  },
+  "projectionEnvelope": {
+    "requiredSameSnapshotFields": [
+      "eventRevisionId",
+      "analysisRevisionId",
+      "projectionSnapshotId",
+      "asOf",
+      "publicationEpoch",
+      "rightsDecisionSetHash",
+      "capitalStateRevisionId",
+      "issuerRiskStateRevisionId",
+      "instrumentUniverseHash",
+      "subjectApplicabilityRevisionId"
+    ],
+    "requiredGateStates": [
+      "publicationDisposition",
+      "instrumentEligibility",
+      "sourceCoverage",
+      "documentAvailability",
+      "analysisReview",
+      "summaryReview",
+      "capitalReconciliation",
+      "issuerRiskTimeline",
+      "capitalCoverage",
+      "issuerStatusCoverage",
+      "subjectApplicability",
+      "instrumentFilterScope"
+    ],
+    "partialPayloadRule": "If a required gate suppresses a dossier, do not return body-derived claim cards, quantitative cards, analysis text, or a stale prior projection as fallback.",
+    "noRecommendationRule": "Dossier may explain reviewed facts and scenarios but may not emit an imperative buy/sell instruction or guaranteed-return claim."
+  },
+  "sourceCoverageBinding": {
+    "status": "PROPOSED_SYNTHETIC_BINDING_NOT_RUNTIME_DTO",
+    "contractRef": "disclosure-source-coverage.v0.json#/coverageAssertionManifestContract",
+    "queryScopeNormalizationRef": "disclosure-source-coverage.v0.json#/queryScopeNormalizationContract",
+    "publicStatusMappingRef": "disclosure-dossier-public-read.v0.json#/negativeEvidenceContract/publicCoverageStatusMapping",
+    "publicVocabularyRef": "disclosure-dossier-public-read.v0.json#/negativeEvidenceContract/publicCoverageMessageKo",
+    "requiredFields": [
+      "manifestId",
+      "manifestDigest",
+      "sourceProduct",
+      "endpointOrSurface",
+      "normalizedQueryHash",
+      "issuerId",
+      "instrumentId",
+      "securityClassAndSeriesScope",
+      "windowStart",
+      "windowEnd",
+      "correctionWatermarkAsOf",
+      "correctionWatermarkState",
+      "masterSnapshotId",
+      "subjectApplicabilityRevisionId",
+      "rightsDecisionSetHash",
+      "coveragePolicyRevision",
+      "coverageState"
+    ],
+    "sameProjectionFields": [
+      "projectionSnapshotId",
+      "asOf",
+      "publicationEpoch",
+      "subjectApplicabilityRevisionId",
+      "investmentAnalysisRevisionSetHash",
+      "investmentAnalysisLineageState"
+    ],
+    "aggregationRule": "Preserve one manifest reference per required sourceProduct × endpointOrSurface × normalizedQueryHash × declaredWindow × issuer/instrument scope; never collapse different sources or scopes into a single complete boolean.",
+    "negativeEvidenceRule": "NOT_FOUND_IN_SCOPE requires a digest-verified RECONCILED_AS_OF manifest for the exact requested source/query/window/subject scope, permitted action and current rights/master/applicability revisions; otherwise use UNVERIFIABLE, SUPPRESSED_RIGHTS, or NOT_SEARCHED.",
+    "publicStatusRule": "Project internal coverage states through the publicCoverageStatusMapping and approved Korean message keys; never expose internal state names or raw provider errors. NOT_FOUND_IN_SCOPE and NOT_REPORTED are result meanings, not coverage states.",
+    "partialExportRule": "Export includes per-source manifest references, coverage states, withheld counts, and declared scope; omitted or withheld subjects never imply no event.",
+    "notRuntimeProof": true
+  },
+  "sections": [
+    {
+      "id": "FILING_CONTEXT",
+      "order": 1,
+      "fields": [
+        "source",
+        "receiptId",
+        "reportTitle",
+        "filedDatePrecision",
+        "sourceCaptureAt",
+        "correctionRelationState"
+      ],
+      "metadataOnlyAllowed": true
+    },
+    {
+      "id": "DOSSIER_STATE",
+      "order": 2,
+      "fields": [
+        "outputState",
+        "publicationDisposition",
+        "sourceCoverage",
+        "documentAvailability",
+        "analysisReviewState",
+        "lastVerifiedAt"
+      ],
+      "metadataOnlyAllowed": true
+    },
+    {
+      "id": "AFFECTED_INSTRUMENT",
+      "order": 3,
+      "fields": [
+        "issuerRole",
+        "instrumentName",
+        "instrumentCode",
+        "commonStockEligibility",
+        "marketCapEligibility",
+        "directImpactEvidenceRefs"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "VERIFIED_FACTS",
+      "order": 4,
+      "fields": [
+        "claimId",
+        "claimText",
+        "verificationState",
+        "evidenceLocator",
+        "sourceReceiptId",
+        "documentRevisionId",
+        "rightsDecisionRevision"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "QUANTITATIVE_EFFECTS",
+      "order": 5,
+      "fields": [
+        "value",
+        "unit",
+        "currency",
+        "numeratorClaimRef",
+        "denominatorClaimRef",
+        "periodOrStage",
+        "formulaVersion",
+        "reportedOrDerived"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "SUPPORTING_AND_CONTRADICTING_EVIDENCE",
+      "order": 6,
+      "fields": [
+        "supportingClaimRefs",
+        "counterEvidenceRefs",
+        "contextRefs",
+        "conflictState"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "EVENT_AND_DATES",
+      "order": 7,
+      "fields": [
+        "eventType",
+        "eventStatus",
+        "dateKind",
+        "value",
+        "precision",
+        "certainty",
+        "status",
+        "certaintyBasisClaimIds"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "RISKS_AND_UNKNOWNS",
+      "order": 8,
+      "fields": [
+        "riskClaimRefs",
+        "riskReviewCoverage",
+        "unknownReasonCodes",
+        "declaredReviewScope",
+        "notAssessedFields"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "ISSUER_RISK_AND_MARKET_STATUS",
+      "order": 10,
+      "fields": [
+        "issuerRiskStateRevisionId",
+        "assertionState",
+        "legalOrRegulatoryProcessState",
+        "exchangeMarketActionState",
+        "authorityScope",
+        "affectedInstrumentIds",
+        "effectiveAt",
+        "observedAt",
+        "stateAsOf",
+        "coverageBySourceFamily",
+        "correctionState",
+        "conflictRefs"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "ISSUER_CAPITAL_STATE",
+      "order": 9,
+      "fields": [
+        "capitalStateAsOf",
+        "capitalObservedAt",
+        "capitalCoverage",
+        "reportedBaseSnapshotRef",
+        "linkedMovementRefs",
+        "securityClass",
+        "seriesOrTrancheRefs",
+        "issuedOutstandingListedMeasures",
+        "unresolvedAmountsAndReasons",
+        "reconciliationStatus",
+        "applicabilityScope",
+        "applicabilityInstrumentIds",
+        "directImpactEvidenceRefs"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "REVIEWED_INTERPRETATION",
+      "order": 11,
+      "fields": [
+        "direction",
+        "horizon",
+        "rationaleClaimIds",
+        "counterEvidenceRefs",
+        "limitations",
+        "impactAssessmentConfidence",
+        "reviewDecisionRef"
+      ],
+      "metadataOnlyAllowed": false
+    },
+    {
+      "id": "DIDP-41-MASTER-CLASS-CORRECTION-INVALIDATES-ELIGIBILITY-AND-REOPENS-DOSSIER",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-A",
+        "publishedEventSubject": true,
+        "priorMasterSnapshot": "MASTER-SYN-41-A",
+        "priorInstrumentClass": "COMMON_STOCK",
+        "currentMasterSnapshot": "MASTER-SYN-41-B",
+        "currentInstrumentClass": "PREFERRED_STOCK",
+        "effectiveAt": "SYNTH-EFFECTIVE-41",
+        "observedAt": "SYNTH-OBSERVED-41",
+        "priorProjectionSnapshot": "PROJECTION-SYN-41-A"
+      },
+      "expected": {
+        "historicalAssertionMutated": false,
+        "currentEligibility": "INELIGIBLE",
+        "currentPublicDescendantActive": false,
+        "historicalSnapshotRetainedAsOfPriorMaster": true,
+        "affectedInstrumentReview": "REQUIRED",
+        "unrelatedInstrumentProjectionChanged": false
+      }
+    },
+    {
+      "id": "DIDP-42-CAP-FRESHNESS-OR-FX-SCOPE-FAILURE-SUPPRESSES-DOMESTIC-ELIGIBILITY",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-B",
+        "instrumentType": "COMMON_STOCK",
+        "marketCapValue": "SYNTH-35000000000",
+        "marketCapCurrency": "USD",
+        "fxSourceDecision": "UNRESOLVED",
+        "marketCapObservedAt": "SYNTH-STALE-OBSERVATION",
+        "freshnessPolicyDecision": "OPEN"
+      },
+      "expected": {
+        "domesticCapEligibility": "UNVERIFIED",
+        "tickerOrDossierPublicationAllowed": false,
+        "staleValuePromotedByMagnitude": false,
+        "fxConvertedValuePublished": false
+      }
+    },
+    {
+      "id": "DIDP-43-PRICE-REVISION-INVALIDATES-DEPENDENT-DOSSIER-RESULTS-ACROSS-CONSUMERS",
+      "input": {
+        "priorProjectionSnapshot": "PROJECTION-SYN-43-A",
+        "priorAnalysisRun": {"runId": "RUN-SYN-43-A", "lineageState": "CURRENT", "dependencyClosure": ["PRICE-SNAPSHOT-SYN-43-A", "BENCHMARK-SYN-43-A"]},
+        "changedPriceDependency": "PRICE-SNAPSHOT-SYN-43-A",
+        "currentReplayInputAvailable": false,
+        "currentReplayRights": "UNRESOLVED",
+        "consumers": ["PUBLIC_API", "DOSSIER_UI", "USER_EXPORT", "NOTIFICATION", "CACHE_OR_CURSOR"],
+        "unrelatedRawFactRunDependsOnChangedPrice": false
+      },
+      "expected": {
+        "priorRunHistoryPreserved": true,
+        "analysisLineageState": "STALE_INPUT_REVISION",
+        "priceResultCurrentView": "SUPPRESSED",
+        "directionalSummaryOrInvestmentScore": "NOT_PUBLISHED",
+        "recomputeWithoutInputAndRights": false,
+        "sameSnapshotMarksPriceResultStale": true,
+        "allConsumersRevalidateSameLineageAndEpoch": true,
+        "notificationDispatchAllowed": false,
+        "unrelatedRawFactRunInvalidated": false,
+        "priorProjectionUsedAsCurrentFallback": false,
+        "internalReasonCodeExposed": false
+      }
+    }
+  ],
+  "emptyAndBlockedStateMap": {
+    "NOT_ASSESSED": "No review/search was performed for the declared field or risk class.",
+    "NOT_FOUND_IN_REVIEW_SCOPE": "A declared, sufficiently covered review scope was searched and no supporting item was located; this is not a universal absence claim.",
+    "NOT_DISCLOSED": "An allowed source explicitly states the value/information is not disclosed.",
+    "SOURCE_UNAVAILABLE": "The source/document could not be obtained or verified for this revision.",
+    "RIGHTS_BLOCKED": "The requested fetch/parse/display action is not authorized or unresolved; content judgment is NOT_RUN.",
+    "CONFLICT_UNRESOLVED": "Conflicting source claims remain visible as a conflict and no active normalized value is selected.",
+    "NOT_APPLICABLE": "The field does not apply under the versioned taxonomy, with its basis recorded.",
+    "EVIDENCE_INCOMPLETE": "Required evidence, attribution, or review gate is incomplete; do not interpret as absence or a negative conclusion."
+  },
+  "renderingRules": {
+    "emptyStatesAreExplicit": true,
+    "positiveAndCounterEvidenceUseSeparateCards": true,
+    "riskCoverageMustAccompanyNoRiskResult": true,
+    "unresolvedIssuerNeverShowsTickerAsAffectedSubject": true,
+    "rightsBlockedContentNeverFallsBackToPriorRevision": true,
+    "staleRevisionNeverAppearsAsCurrent": true,
+    "confidenceIsNotProbability": true,
+    "colorIsNotTheOnlyStatusSignal": true,
+    "factAndInterpretationAreVisuallyDistinct": true,
+    "capitalAndRiskStatesUseSeparateSections": true,
+    "capitalMovementDoesNotImplyFinancialDistressOrExchangeAction": true,
+    "issuerRiskObservationDoesNotImplyCapitalMovement": true,
+    "currentIssuerStatusRequiresAuthorityAndCoverage": true,
+    "historicalRiskAndCapitalAssertionsRemainVisibleAfterResolution": true,
+    "unknownCapitalAndRiskCoverageCannotRenderAsClear": true,
+    "issuerAndInstrumentScopesAreSeparate": true,
+    "seriesAndTrancheFactsAreNotIssuerWideByDefault": true,
+    "issuerContextIsNeverRenderedAsInstrumentClaim": true,
+    "instrumentFilterDoesNotSilentlyDropOrPromoteIssuerContext": true,
+    "everyRenderedClaimDeclaresApplicabilityScope": true,
+    "unresolvedSubjectScopeBlocksInstrumentRecommendation": true,
+    "conflictAndCoverageUnknownRenderAsDistinctStatuses": true,
+    "conflictOrUnknownSuppressesDirectionalSummary": true
+  },
+  "vectors": [
+    {
+      "id": "DIDP-01-TITLE-SIGNAL-ONLY-SHOWS-NO-INVESTMENT-CLAIM",
+      "input": {
+        "metadata": "AVAILABLE",
+        "body": "NOT_FETCHED",
+        "titleSignal": "BULLISH_CANDIDATE"
+      },
+      "expected": {
+        "visibleSections": [
+          "FILING_CONTEXT",
+          "DOSSIER_STATE"
+        ],
+        "investmentDirection": "NOT_ASSESSED",
+        "claimCards": 0
+      }
+    },
+    {
+      "id": "DIDP-02-RISK-NOT-ASSESSED-IS-NOT-NO-RISK",
+      "input": {
+        "riskSearch": "NOT_RUN",
+        "positiveFacts": 1
+      },
+      "expected": {
+        "riskState": "NOT_ASSESSED",
+        "phraseNoRisk": false,
+        "interpretation": "MIXED_OR_UNCERTAIN"
+      }
+    },
+    {
+      "id": "DIDP-03-NO-RISK-FOUND-REQUIRES-DECLARED-COVERAGE",
+      "input": {
+        "riskSearch": "COMPLETED",
+        "scopeCoverage": "PARTIAL",
+        "riskHits": 0
+      },
+      "expected": {
+        "riskState": "NOT_ASSESSED",
+        "phraseNoRisk": false
+      }
+    },
+    {
+      "id": "DIDP-04-RIGHTS-BLOCKED-DISTINCT-FROM-SOURCE-UNAVAILABLE",
+      "input": {
+        "bodyStatus": "FETCHED",
+        "displayRights": "UNRESOLVED"
+      },
+      "expected": {
+        "outputState": "RIGHTS_BLOCKED",
+        "contentJudgment": "NOT_RUN",
+        "bodyFallback": false
+      }
+    },
+    {
+      "id": "DIDP-05-COUNTEREVIDENCE-IS-NOT-HIDDEN-IN-FOOTNOTE",
+      "input": {
+        "supportingClaims": [
+          "SYNTH-A"
+        ],
+        "contradictingClaims": [
+          "SYNTH-B"
+        ]
+      },
+      "expected": {
+        "separateEvidenceGroups": true,
+        "bothGroupsVisible": true,
+        "singlePositiveHeadlineOnly": false
+      }
+    },
+    {
+      "id": "DIDP-06-CONFLICT-DOES-NOT-PICK-LATEST-VALUE",
+      "input": {
+        "claims": [
+          "SYNTH-100",
+          "SYNTH-80"
+        ],
+        "relation": "CONFLICT_UNRESOLVED"
+      },
+      "expected": {
+        "activeValue": null,
+        "conflictState": "CONFLICT_UNRESOLVED",
+        "bothClaimsVisible": true
+      }
+    },
+    {
+      "id": "DIDP-07-UNRESOLVED-ISSUER-DOES-NOT-SHOW-TICKER",
+      "input": {
+        "filingSubmitter": "SYNTH-ENTITY-A",
+        "affectedIssuer": "UNRESOLVED",
+        "tickerCandidate": "SYNTH-TICKER"
+      },
+      "expected": {
+        "filingContextVisible": true,
+        "affectedInstrumentSection": "SUPPRESSED",
+        "tickerVisibleAsAffectedSubject": false
+      }
+    },
+    {
+      "id": "DIDP-08-DERIVED-PERCENT-REQUIRES-DENOMINATOR-BASIS",
+      "input": {
+        "numerator": "SYNTH-N",
+        "denominator": null,
+        "period": "SYNTH-PERIOD"
+      },
+      "expected": {
+        "percentage": null,
+        "label": "NOT_COMPUTABLE",
+        "inventedValue": false
+      }
+    },
+    {
+      "id": "DIDP-09-PUBLICATION-SUPPRESSION-DOES-NOT-PARTIALLY-RETURN-DOSSIER",
+      "input": {
+        "publicationDisposition": "SUPPRESSED_RIGHTS",
+        "priorRevision": "APPROVED_STALE"
+      },
+      "expected": {
+        "bodyClaims": 0,
+        "summaryText": null,
+        "staleFallback": false,
+        "safeStatusOnly": true
+      }
+    },
+    {
+      "id": "DIDP-10-REVISION-AND-SNAPSHOT-MIX-REJECTED",
+      "input": {
+        "summaryAnalysisRevision": "REV-A",
+        "claimAnalysisRevision": "REV-B",
+        "snapshotIds": [
+          "SNAP-A",
+          "SNAP-B"
+        ]
+      },
+      "expected": {
+        "dossier": "REJECT",
+        "partialRowsReturned": false
+      }
+    },
+    {
+      "id": "DIDP-11-CONFIDENCE-IS-NOT-EVENT-PROBABILITY",
+      "input": {
+        "impactAssessmentConfidence": "HIGH",
+        "eventOutcomeProbability": null
+      },
+      "expected": {
+        "probabilityText": null,
+        "confidenceMeaning": "REVIEW_CONFIDENCE_ONLY"
+      }
+    },
+    {
+      "id": "DIDP-12-ACCESSIBLE-STATUS-DOES-NOT-RELY-ON-COLOR",
+      "input": {
+        "statusColor": "AMBER",
+        "statusText": null,
+        "accessibleLabel": null
+      },
+      "expected": {
+        "render": "REJECT_MISSING_TEXT_STATUS"
+      }
+    },
+    {
+      "id": "DIDP-13-CAPITAL-MOVEMENT-AND-EXCHANGE-ACTION-ARE-SEPARATE",
+      "input": {
+        "capitalMovement": "SYNTH-ISSUANCE",
+        "exchangeAction": "NOT_REPORTED"
+      },
+      "expected": {
+        "capitalSection": "SHOW_WITH_STAGE",
+        "exchangeAction": "NOT_REPORTED",
+        "inferredListing": "NONE"
+      }
+    },
+    {
+      "id": "DIDP-14-AUDIT-SIGNAL-DOES-NOT-BECOME-CAPITAL-CHANGE",
+      "input": {
+        "auditSignal": "SYNTH-GOING-CONCERN",
+        "capitalMovement": "NOT_FOUND_IN_SCOPE"
+      },
+      "expected": {
+        "riskSignal": "SHOW_AS_DISCLOSED",
+        "capitalChange": "NOT_FOUND_IN_SCOPE",
+        "crossInference": false
+      }
+    },
+    {
+      "id": "DIDP-15-INCOMPLETE-ISSUER-STATUS-COVERAGE-BLOCKS-CLEAR-HEADLINE",
+      "input": {
+        "financialCoverage": "FULL_DECLARED_WINDOW",
+        "courtCoverage": "PARTIAL",
+        "exchangeCoverage": "STALE"
+      },
+      "expected": {
+        "issuerCurrentStatus": "UNKNOWN",
+        "clearHeadline": false,
+        "riskAxesPreserved": true
+      }
+    },
+    {
+      "id": "DIDP-16-DOSSIER-REQUIRES-CAPITAL-AND-STATUS-SNAPSHOT-PARITY",
+      "input": {
+        "capitalStateRevisionId": "CAP-A",
+        "issuerRiskStateRevisionId": "RISK-B",
+        "snapshotIds": [
+          "SNAP-A",
+          "SNAP-A"
+        ]
+      },
+      "expected": {
+        "dossier": "REJECT",
+        "partialRowsReturned": false
+      }
+    },
+    {
+      "id": "DIDP-17-RESOLUTION-DOES-NOT-ERASE-HISTORIC-RISK-OR-CAPITAL",
+      "input": {
+        "priorRiskAction": "SYNTH-HALTED",
+        "currentRiskAction": "RESUMED",
+        "priorCapitalMovement": "SYNTH-LISTED"
+      },
+      "expected": {
+        "timelineRetained": true,
+        "latestStatusOnly": false,
+        "historyRewritten": false
+      }
+    },
+    {
+      "id": "DIDP-18-NONCOMMON-INSTRUMENT-DOES-NOT-LEAK-INTO-COMMON-STOCK-DOSSIER",
+      "input": {
+        "instrumentClass": "SYNTH-PREFERRED",
+        "issuerHasCommonStock": true
+      },
+      "expected": {
+        "affectedCommonStockLink": "UNRESOLVED_UNLESS_DIRECT_EVIDENCE_AND_MASTER",
+        "instrumentMerged": false
+      }
+    },
+    {
+      "id": "DIDP-19-ISSUER-FACT-IS-LABELED-CONTEXT-ON-INSTRUMENT-DOSSIER",
+      "input": {
+        "claimScope": "ISSUER_ENTITY",
+        "selectedInstrument": "SYNTH-COMMON-A",
+        "directInstrumentLink": null,
+        "includeIssuerContext": true
+      },
+      "expected": {
+        "renderedScope": "ISSUER_ENTITY",
+        "label": "CONTEXT_ONLY",
+        "instrumentClaim": false
+      }
+    },
+    {
+      "id": "DIDP-20-SERIES-CAPITAL-STATE-DOES-NOT-APPEAR-ON-ALL-ISSUER-SERIES",
+      "input": {
+        "capitalScope": "SERIES_OR_TRANCHE_A",
+        "selectedSeries": "SERIES_B",
+        "issuerSame": true
+      },
+      "expected": {
+        "capitalMovement": "SUPPRESSED_FOR_SELECTED_SERIES",
+        "issuerContextAllowed": true
+      }
+    },
+    {
+      "id": "DIDP-21-ISSUER-WIDE-AUDIT-OPINION-DOES-NOT-PROPAGATE-TO-SUBSIDIARY",
+      "input": {
+        "assertionScope": "ISSUER_ENTITY_A",
+        "selectedIssuer": "SUBSIDIARY_B",
+        "groupRelation": true,
+        "directEvidence": false
+      },
+      "expected": {
+        "instrumentOrIssuerAttribution": "UNRESOLVED",
+        "groupRelationSufficient": false
+      }
+    },
+    {
+      "id": "DIDP-22-INSTRUMENT-FILTER-AND-ISSUER-CONTEXT-ARE-EXPLICIT",
+      "input": {
+        "instrumentFilter": "SYNTH-COMMON-A",
+        "includeIssuerContext": false,
+        "issuerFactCount": 2,
+        "directInstrumentFactCount": 1
+      },
+      "expected": {
+        "directFacts": 1,
+        "issuerContextFacts": 0,
+        "omittedIssuerContextCount": 2,
+        "emptyIsNotNoRisk": true
+      }
+    },
+    {
+      "id": "DIDP-23-OVERLAPPING-TEMPORAL-ALIASES-SUPPRESS-ONLY-AFFECTED-SUBJECT",
+      "input": {
+        "aliasCrosswalk": "CONFLICTED",
+        "candidateInstruments": [
+          "SYNTH-A",
+          "SYNTH-B"
+        ],
+        "unrelatedInstrument": "SYNTH-C"
+      },
+      "expected": {
+        "affectedSubjects": [
+          "SYNTH-A",
+          "SYNTH-B"
+        ],
+        "unrelatedSubjectChanged": false,
+        "subjectClaimPublished": false
+      }
+    },
+    {
+      "id": "DIDP-24-MULTI-INSTRUMENT-RESPONSE-DECLARES-SUBJECT-COVERAGE",
+      "input": {
+        "instruments": [
+          "SYNTH-COMMON-A",
+          "SYNTH-COMMON-B"
+        ],
+        "scopeEvidence": {
+          "SYNTH-COMMON-A": "VERIFIED",
+          "SYNTH-COMMON-B": "PARTIAL"
+        }
+      },
+      "expected": {
+        "responseDisposition": "PARTIAL",
+        "perInstrumentScopeVisible": true,
+        "issuerContextMayBeShared": true,
+        "instrumentClaimsShared": false
+      }
+    },
+    {
+      "id": "DIDP-25-CONFLICT-AND-UNKNOWN-HAVE-DISTINCT-USER-STATUS",
+      "input": {
+        "conflictCase": {
+          "supportingClaims": 1,
+          "counterClaims": 1,
+          "sourceCoverage": "COMPLETE",
+          "relation": "CONFLICT_UNRESOLVED"
+        },
+        "unknownCase": {
+          "supportingClaims": 1,
+          "counterClaims": 0,
+          "sourceCoverage": "PARTIAL",
+          "relation": "UNRESOLVED"
+        }
+      },
+      "expected": {
+        "conflictCaseStatus": "CONFLICT_UNRESOLVED",
+        "unknownCaseStatus": "EVIDENCE_INCOMPLETE",
+        "statusesDiffer": true,
+        "conflictBothEvidenceGroupsVisible": true,
+        "unknownClaimsNotPromotedToVerified": true,
+        "directionalSummary": "NOT_PUBLISHED",
+        "netScore": "NOT_COMPUTED"
+      }
+    },
+    {
+      "id": "DIDP-26-CLAIM-STATUS-CARD-EXPOSES-WHY-CONCLUSION-IS-HELD",
+      "input": {
+        "claim": "CLAIM-SYN-9",
+        "status": "REVIEW_REQUIRED",
+        "reasonCodes": [
+          "PERIOD_NOT_COMPARABLE",
+          "COUNTEREVIDENCE_UNRESOLVED"
+        ],
+        "priorAnalysis": "APPROVED_STALE"
+      },
+      "expected": {
+        "claimAppearsCurrent": false,
+        "safeStatusVisible": true,
+        "reasonCodesVisible": true,
+        "priorAnalysisFallback": false,
+        "buySellInstruction": "NONE"
+      }
+    },
+    {
+      "id": "DIDP-27-FILER-ONLY-CLAIM-REMAINS-ISSUER-CONTEXT",
+      "input": {
+        "internalAttributionReasons": [
+          "FILER_ONLY"
+        ],
+        "issuerResolved": true,
+        "instrumentDirectImpactProven": false
+      },
+      "expected": {
+        "publicStatus": "EVIDENCE_INCOMPLETE",
+        "subjectProjection": "ISSUER_CONTEXT_ONLY",
+        "affectedTickerPublished": false,
+        "internalReasonCodeExposed": false
+      }
+    },
+    {
+      "id": "DIDP-28-UNRESOLVED-ATTRIBUTION-DOES-NOT-LOOK-LIKE-NO-RESULT",
+      "input": {
+        "internalAttributionReasons": [
+          "PARTY_ROLE_UNRESOLVED",
+          "DIRECT_IMPACT_EVIDENCE_MISSING"
+        ],
+        "sourceCoverage": "COMPLETE",
+        "claimVerified": false
+      },
+      "expected": {
+        "publicStatus": "UNVERIFIABLE",
+        "notFoundInScope": false,
+        "negativeConclusion": false,
+        "affectedInstrumentPublished": false
+      }
+    },
+    {
+      "id": "DIDP-29-RIGHTS-BLOCKED-ATTRIBUTION-WITHHOLDS-CONTENT",
+      "input": {
+        "internalAttributionReasons": [
+          "SOURCE_RIGHTS_UNRESOLVED"
+        ],
+        "priorAnalysis": "APPROVED_STALE",
+        "sourceMetadataAllowed": true
+      },
+      "expected": {
+        "publicStatus": "RIGHTS_BLOCKED",
+        "contentJudgment": "NOT_RUN",
+        "priorRevisionFallback": false,
+        "internalReasonCodeExposed": false
+      }
+    },
+    {
+      "id": "DIDP-30-POLICY-AND-REVIEW-QUEUE-DETAILS-ARE-NOT-PUBLIC",
+      "input": {
+        "internalAttributionReasons": [
+          "POLICY_DECISION_OPEN",
+          "ASSERTION_REVIEW_PENDING"
+        ],
+        "reviewerActor": "REVIEWER-SYN-30",
+        "policyDecisionId": "KR-EVENT-ATTRIBUTION-01"
+      },
+      "expected": {
+        "publicStatus": "EVIDENCE_INCOMPLETE",
+        "reviewerIdentityExposed": false,
+        "policyDecisionIdentityExposed": false,
+        "internalReasonCodeExposed": false
+      }
+    },
+    {
+      "id": "DIDP-31-STALE-OR-INCOMPLETE-ATTRIBUTION-SUPPRESSES-SUMMARY",
+      "input": {
+        "internalAttributionReasons": [
+          "DEPENDENCY_SNAPSHOT_STALE",
+          "IMPACT_DENOMINATOR_INCOMPLETE"
+        ],
+        "priorApprovedAnalysis": true,
+        "impactDenominator": "PARTIAL"
+      },
+      "expected": {
+        "staleFallback": false,
+        "completenessClaim": false,
+        "summaryState": "REVIEW_REQUIRED",
+        "unaffectedAssumed": false,
+        "directionalSummary": "NOT_PUBLISHED"
+      }
+    },
+    {
+      "id": "DIDP-32-API-AND-UI-USE-SAME-PROJECTION-SNAPSHOT",
+      "input": {
+        "apiProjectionSnapshot": "SNAP-SYN-32",
+        "uiProjectionSnapshot": "SNAP-SYN-32",
+        "samePublicationEpoch": true,
+        "sameRightsDecisionSet": true
+      },
+      "expected": {
+        "projectionParity": true,
+        "staleFallback": false,
+        "internalReasonCodeExposed": false
+      }
+    },
+    {
+      "id": "DIDP-33-EXPORT-PRESERVES-WITHHELD-AND-COVERAGE-STATE",
+      "input": {
+        "sourceCoverage": "PARTIAL",
+        "withheldSubjects": 2,
+        "internalReviewReasons": [
+          "POLICY_DECISION_OPEN"
+        ],
+        "exportRequested": true
+      },
+      "expected": {
+        "coverageAndWithheldStateIncluded": true,
+        "internalReasonCodeExposed": false,
+        "omittedSubjectsTreatedAsNoResult": false
+      }
+    },
+    {
+      "id": "DIDP-34-NOTIFICATION-REVALIDATES-CURRENT-EPOCH-AND-OPT-IN",
+      "input": {
+        "explicitSubscription": true,
+        "queuedPublicationEpoch": 4,
+        "currentPublicationEpoch": 5,
+        "instrumentAttribution": "UNRESOLVED",
+        "cachedBodyAvailable": true
+      },
+      "expected": {
+        "dispatchAllowed": false,
+        "affectedTickerIncluded": false,
+        "cachedBodyUsedAsFallback": false,
+        "safeGenericDisposition": "SUPPRESSED_OR_REVALIDATE"
+      }
+    },
+    {
+      "id": "DIDP-35-CACHE-AND-CURSOR-REJECT-REVOKED-PROJECTION",
+      "input": {
+        "cursorSnapshotId": "SNAP-SYN-35-A",
+        "currentSnapshotId": "SNAP-SYN-35-A",
+        "cursorPublicationEpoch": 2,
+        "currentPublicationEpoch": 3,
+        "cachedProjectionPresent": true
+      },
+      "expected": {
+        "cursorAccepted": false,
+        "cacheUsedAsCurrent": false,
+        "http304Allowed": false,
+        "restartRequired": true
+      }
+    },
+    {
+      "id": "DIDP-36-LEGACY-EXPORT-ALERTS-ARE-NOT-V2-DOSSIER-PROJECTIONS",
+      "input": {
+        "legacyMarketImpactRoute": true,
+        "dailyDisclosureJsonExport": true,
+        "genericDartPush": true,
+        "newDossierContractImplemented": false
+      },
+      "expected": {
+        "legacyDataPromotedToApprovedDossier": false,
+        "v2ParityClaimed": false,
+        "silentLegacyRouteMutation": false
+      }
+    },
+    {
+      "id": "DIDP-37-EXPORT-COVERAGE-REFERENCES-EXACT-SOURCE-SCOPE-MANIFESTS",
+      "input": {
+        "requestedSources": ["SYN-DART", "SYN-KIND"],
+        "manifests": [
+          {"sourceProduct": "SYN-DART", "scopeHash": "SYN-SCOPE-A", "coverageState": "RECONCILED_AS_OF", "digestVerified": true},
+          {"sourceProduct": "SYN-KIND", "scopeHash": "SYN-SCOPE-A", "coverageState": "PARTIAL", "digestVerified": true}
+        ],
+        "issuerId": "SYN-ISSUER-A",
+        "instrumentId": "SYN-INSTRUMENT-A",
+        "correctionWatermarkCurrent": true
+      },
+      "expected": {
+        "coverageBySourcePreserved": true,
+        "overallCoverage": "PARTIAL",
+        "kindSourceNegativeEvidence": "UNVERIFIABLE",
+        "dartNegativeEvidenceScope": "EXACT_MANIFEST_SCOPE_ONLY",
+        "omittedSubjectsTreatedAsNoResult": false,
+        "manifestDigestAndSameSnapshotFieldsRequired": true
+      }
+    },
+    {
+      "id": "DIDP-38-EMPTY-SOURCE-SCOPE-REQUIRES-CURRENT-RECONCILIATION-MANIFEST",
+      "input": {
+        "matchingStoredRows": 0,
+        "sourceRun": "SUCCESS_EMPTY",
+        "manifestCoverageState": "OBSERVED_STABLE",
+        "digestVerified": true,
+        "providerSnapshotCapability": "NONE",
+        "rightsDecisionSetHashCurrent": true,
+        "subjectApplicabilityRevisionCurrent": true
+      },
+      "expected": {
+        "publicNegativeEvidence": "UNVERIFIABLE",
+        "notFoundInScope": false,
+        "repeatObservedStablePromotedToProviderComplete": false
+      }
+    },
+    {
+      "id": "DIDP-39-RIGHTS-OR-IDENTITY-REVISION-INVALIDATES-COVERAGE-CLAIM",
+      "input": {
+        "manifestRightsDecisionSetHash": "SYN-RIGHTS-1",
+        "currentRightsDecisionSetHash": "SYN-RIGHTS-2",
+        "manifestSubjectApplicabilityRevisionId": "SYN-APP-1",
+        "currentSubjectApplicabilityRevisionId": "SYN-APP-2",
+        "cachedManifestDigestValid": true
+      },
+      "expected": {
+        "coverageCurrent": false,
+        "negativeEvidence": "SUPPRESSED_OR_UNVERIFIABLE",
+        "cachedManifestUsedAsCurrent": false,
+        "staleDossierFallback": false
+      }
+    },
+    {
+      "id": "DIDP-40-PUBLIC-COVERAGE-MESSAGES-DO-NOT-OVERSTATE-SCOPE",
+      "input": {
+        "internalState": "OBSERVED_STABLE",
+        "requestedScope": "SYNTHETIC_DART_ISSUER_WINDOW",
+        "providerSnapshotCapability": "NONE",
+        "rawProviderError": "SYNTHETIC_SECRET_OR_ERROR_DETAIL"
+      },
+      "expected": {
+        "publicStatus": "UNVERIFIABLE",
+        "publicMessageKey": "UNVERIFIABLE",
+        "notFoundInScope": false,
+        "internalStateExposed": false,
+        "rawProviderErrorExposed": false
+      }
+    },
+    {
+      "id": "DIDP-41-MASTER-CLASS-CORRECTION-INVALIDATES-ELIGIBILITY-AND-REOPENS-DOSSIER",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-A",
+        "publishedEventSubject": true,
+        "priorMasterSnapshot": "MASTER-SYN-41-A",
+        "priorInstrumentClass": "COMMON_STOCK",
+        "currentMasterSnapshot": "MASTER-SYN-41-B",
+        "currentInstrumentClass": "PREFERRED_STOCK",
+        "effectiveAt": "SYNTH-EFFECTIVE-41",
+        "observedAt": "SYNTH-OBSERVED-41",
+        "priorProjectionSnapshot": "PROJECTION-SYN-41-A"
+      },
+      "expected": {
+        "historicalAssertionMutated": false,
+        "currentEligibility": "INELIGIBLE",
+        "currentPublicDescendantActive": false,
+        "historicalSnapshotRetainedAsOfPriorMaster": true,
+        "affectedInstrumentReview": "REQUIRED",
+        "unrelatedInstrumentProjectionChanged": false
+      }
+    },
+    {
+      "id": "DIDP-42-CAP-FRESHNESS-OR-FX-SCOPE-FAILURE-SUPPRESSES-DOMESTIC-ELIGIBILITY",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-B",
+        "instrumentType": "COMMON_STOCK",
+        "marketCapValue": "SYNTH-35000000000",
+        "marketCapCurrency": "USD",
+        "fxSourceDecision": "UNRESOLVED",
+        "marketCapObservedAt": "SYNTH-STALE-OBSERVATION",
+        "freshnessPolicyDecision": "OPEN"
+      },
+      "expected": {
+        "domesticCapEligibility": "UNVERIFIED",
+        "tickerOrDossierPublicationAllowed": false,
+        "staleValuePromotedByMagnitude": false,
+        "fxConvertedValuePublished": false
+      }
+    },
+    {
+      "id": "DIDP-43-PRICE-REVISION-INVALIDATES-DEPENDENT-DOSSIER-RESULTS-ACROSS-CONSUMERS",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-B",
+        "priorProjectionSnapshot": "PROJECTION-SYN-43-A",
+        "analysisRunId": "ANALYSIS-SYN-43-A",
+        "analysisLineage": {
+          "priceSnapshotRevision": "PRICE-SYN-43-REV-1",
+          "benchmarkRevision": "BENCHMARK-SYN-43-REV-1",
+          "corporateActionRevision": "ACTION-SYN-43-REV-1"
+        },
+        "revisedPriceSnapshotRevision": "PRICE-SYN-43-REV-2",
+        "currentReplayInputAvailable": false,
+        "currentPriceRightsDecision": "UNRESOLVED",
+        "consumers": ["PUBLIC_API", "DOSSIER_UI", "USER_EXPORT", "NOTIFICATION", "CACHE_OR_CURSOR"],
+        "unrelatedRawFactDependency": "DISJOINT_FROM_PRICE_ANALYSIS"
+      },
+      "expected": {
+        "historicalAnalysisRunRetained": true,
+        "analysisLineageState": "STALE_INPUT_REVISION",
+        "priceResultCurrentView": "SUPPRESSED",
+        "directionalSummaryOrInvestmentScore": "NOT_PUBLISHED",
+        "recomputeAllowedWithoutInputAndRights": false,
+        "allConsumersRevalidateSameLineageAndEpoch": true,
+        "notificationDispatchAllowed": false,
+        "unrelatedRawFactRunInvalidated": false,
+        "priorProjectionUsedAsCurrentFallback": false,
+        "internalInvalidationReasonCodeExposed": false
+      }
+    },
+    {
+      "id": "DIDP-44-REPLAY-RECOVERY-REQUIRES-NEW-APPROVAL-AND-CONSUMER-SNAPSHOT",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-B",
+        "priorProjectionSnapshot": "PROJECTION-SYN-43-A",
+        "priorAnalysisRun": "ANALYSIS-SYN-43-A",
+        "priorAnalysisState": "STALE_INPUT_REVISION",
+        "newAnalysisRun": "ANALYSIS-SYN-44-B",
+        "currentInputRevisionSetHash": "INPUT-SET-SYN-44-B",
+        "newInterpretationReviewRevision": "REVIEW-SYN-44-B",
+        "publicationEpoch": 13,
+        "consumers": ["PUBLIC_API", "DOSSIER_UI", "USER_EXPORT", "NOTIFICATION", "CACHE_OR_CURSOR"]
+      },
+      "expected": {
+        "priorRunAndApprovalMutatedOrInherited": false,
+        "currentProjectionBindsNewRunAndReview": true,
+        "allConsumersShareSnapshotAndEpoch": true,
+        "publicationEpochAdvanceExactlyOnce": true,
+        "duplicateLogicalNotification": false,
+        "staleFallbackOrPartialConsumerPublication": false,
+        "historicalProjectionRemainsAuditable": true
+      }
+    },
+    {
+      "id": "DIDP-45-CONCURRENT-REPLAY-PUBLICATION-USES-ONE-IDEMPOTENT-SNAPSHOT",
+      "input": {
+        "instrumentId": "SYNTH-COMMON-C",
+        "publisherCount": 2,
+        "sameLogicalResultKey": true,
+        "sameInputRevisionSetHash": true,
+        "sameResultDigest": true,
+        "expectedPublicationEpoch": 14,
+        "consumers": ["PUBLIC_API", "DOSSIER_UI", "USER_EXPORT", "NOTIFICATION", "CACHE_OR_CURSOR"]
+      },
+      "expected": {
+        "oneCurrentProjectionSnapshot": true,
+        "oneEpochAdvance": true,
+        "allConsumersObserveSameSnapshotAndEpoch": true,
+        "oneLogicalNotification": true,
+        "duplicatePublisherIsIdempotentNoop": true,
+        "lastWriteWins": false,
+        "attemptAuditHistoryPreserved": true
+      }
+    },
+    {
+      "id": "DIDP-46-RIGHTS-REVOCATION-BEFORE-DISPATCH-SUPPRESSES-ALL-CURRENT-SURFACES",
+      "input": {
+        "projectionSnapshot": "PROJECTION-SYN-46-A",
+        "projectionEpochAtCommit": 15,
+        "rightsDecisionRevisionAtCommit": "RIGHTS-SYN-46-A",
+        "currentRightsDecisionRevision": "RIGHTS-SYN-46-B",
+        "currentRightsState": "REVOKED",
+        "queuedNotificationEpoch": 15,
+        "priorDeliveryExposureExists": true,
+        "reusedPropagationContracts": ["IRAP", "DUES"]
+      },
+      "expected": {
+        "currentApiUiExportCacheProjectionSuppressed": true,
+        "queuedNotificationDispatch": false,
+        "allConsumersRevalidateCurrentRightsAndEpoch": true,
+        "priorDeliveryExposureAssumedRetracted": false,
+        "deliveryReconciliationRequired": true,
+        "oldSnapshotFallbackOr304Allowed": false,
+        "newIndependentRevocationProtocolCreated": false
+      }
+    },
+    {
+      "id": "DIDP-47-RIGHTS-REGRANT-REQUIRES-NEW-ANALYSIS-REVIEW-AND-SUBSCRIPTION-GATES",
+      "input": {
+        "priorProjectionSnapshot": "PROJECTION-SYN-46-A",
+        "priorProjectionEpoch": 16,
+        "priorAnalysisRun": "ANALYSIS-SYN-46-A",
+        "currentRightsRevision": "RIGHTS-SYN-47-B",
+        "currentRightsState": "ALLOW",
+        "remediationComplete": true,
+        "currentInputsAvailable": true,
+        "currentEventSubscriptionOptIn": false,
+        "priorDeliveryState": "PROVIDER_ACCEPTED"
+      },
+      "expected": {
+        "priorProjectionOrApprovalResurrected": false,
+        "newAnalysisReviewAndProjectionRequired": true,
+        "newPublicationEpochRequired": true,
+        "notificationDispatchWithoutCurrentOptIn": false,
+        "priorDeliveryRecordRewrittenAsRetracted": false,
+        "regrantSatisfiesIndependentOpenGates": false
+      }
+    }
+  ],
+  "applicabilityContract": {
+    "levels": [
+      "ISSUER_ENTITY",
+      "SECURITY_CLASS",
+      "SERIES_OR_TRANCHE",
+      "INSTRUMENT"
+    ],
+    "scopeRule": "A fact is shown on a narrower subject only when source evidence or an approved temporal crosswalk explicitly supports that scope; issuer membership alone never implies instrument applicability.",
+    "aggregateRule": "Issuer-level observations stay issuer-scoped. They may be displayed as context beside an instrument, but are labeled CONTEXT_ONLY unless a direct applicable-instrument link is verified.",
+    "filterRule": "Instrument filters select directly applicable facts; issuer-level context is added only by an explicit includeIssuerContext filter and is visually labeled as context.",
+    "commonStockRule": "Issuer facts do not convert preferred/debt/underlying securities into COMMON_STOCK facts or eligibility; each instrument retains its master identity and event-time eligibility.",
+    "unknownRule": "Missing, ambiguous, overlapping, or stale scope crosswalk yields UNRESOLVED and suppresses instrument-level attribution without hiding the issuer-level observation."
+  },
+  "claimAttributionHoldProjection": {
+    "DEPENDENCY_SNAPSHOT_STALE": {
+      "publicStatus": "REVIEW_REQUIRED",
+      "subjectProjection": "NO_STALE_FALLBACK",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "CLAIM_LOCATOR_UNAVAILABLE": {
+      "publicStatus": "SOURCE_UNAVAILABLE",
+      "subjectProjection": "NO_VERIFIED_CLAIM",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "PARTY_ROLE_UNRESOLVED": {
+      "publicStatus": "UNVERIFIABLE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "IMPACT_DENOMINATOR_INCOMPLETE": {
+      "publicStatus": "UNVERIFIABLE",
+      "subjectProjection": "SUPPRESS_COMPLETENESS_CLAIM",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "DIRECT_IMPACT_EVIDENCE_MISSING": {
+      "publicStatus": "UNVERIFIABLE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "SOURCE_RIGHTS_UNRESOLVED": {
+      "publicStatus": "RIGHTS_BLOCKED",
+      "subjectProjection": "NO_BODY_OR_CLAIM",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "ENTITY_CROSSWALK_UNRESOLVED": {
+      "publicStatus": "UNVERIFIABLE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "CONFLICTING_PARTIES_OR_CLAIMS": {
+      "publicStatus": "CONFLICT_UNRESOLVED",
+      "subjectProjection": "SUPPRESS_AFFECTED_SUBJECT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "ELIGIBILITY_UNRESOLVED": {
+      "publicStatus": "UNVERIFIABLE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "FILER_ONLY": {
+      "publicStatus": "EVIDENCE_INCOMPLETE",
+      "subjectProjection": "ISSUER_CONTEXT_ONLY",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "ASSERTION_REVIEW_PENDING": {
+      "publicStatus": "EVIDENCE_INCOMPLETE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "INSTRUMENT_CROSSWALK_UNRESOLVED": {
+      "publicStatus": "UNVERIFIABLE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    },
+    "POLICY_DECISION_OPEN": {
+      "publicStatus": "EVIDENCE_INCOMPLETE",
+      "subjectProjection": "NO_AFFECTED_INSTRUMENT",
+      "exposeInternalReasonCode": false,
+      "exposeReviewerOrPolicyIdentity": false
+    }
+  },
+  "consumerSurfaceParity": {
+    "statusSource": "claimAttributionHoldProjection",
+    "surfaces": [
+      {
+        "id": "PUBLIC_API",
+        "contractRef": "disclosure-dossier-public-read.v0",
+        "bindingFields": [
+          "snapshotId",
+          "publicationEpoch",
+          "rightsDecisionSetHash",
+          "subjectApplicabilityRevisionId"
+        ],
+        "revalidateAtUse": true,
+        "internalHoldCodesExposed": false,
+        "staleFallback": false
+      },
+      {
+        "id": "DOSSIER_UI",
+        "contractRef": "disclosure-investment-dossier-projection.v0",
+        "bindingFields": [
+          "projectionSnapshotId",
+          "publicationEpoch",
+          "rightsDecisionSetHash",
+          "subjectApplicabilityRevisionId"
+        ],
+        "revalidateAtUse": true,
+        "internalHoldCodesExposed": false,
+        "staleFallback": false
+      },
+      {
+        "id": "USER_EXPORT",
+        "contractRef": "disclosure-investment-dossier-projection.v0",
+        "bindingFields": [
+          "projectionSnapshotId",
+          "publicationEpoch",
+          "rightsDecisionSetHash",
+          "sourceCoverage"
+        ],
+        "revalidateAtUse": true,
+        "internalHoldCodesExposed": false,
+        "staleFallback": false
+      },
+      {
+        "id": "NOTIFICATION",
+        "contractRef": "disclosure-user-event-subscription.v0",
+        "bindingFields": [
+          "eventRevisionId",
+          "subscriptionRevision",
+          "notificationPolicyRevision",
+          "publicationEpoch"
+        ],
+        "revalidateAtUse": true,
+        "internalHoldCodesExposed": false,
+        "staleFallback": false
+      },
+      {
+        "id": "CACHE_OR_CURSOR",
+        "contractRef": "disclosure-dossier-public-read.v0",
+        "bindingFields": [
+          "snapshotId",
+          "cursorScopeHash",
+          "publicationEpoch",
+          "rightsDecisionSetHash"
+        ],
+        "revalidateAtUse": true,
+        "internalHoldCodesExposed": false,
+        "staleFallback": false
+      }
+    ],
+    "legacyDisposition": "LEGACY_SURFACES_ARE_NOT_V2_DOSSIER_CONSUMERS"
+  }
+}

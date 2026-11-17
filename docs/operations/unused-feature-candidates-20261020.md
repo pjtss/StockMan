@@ -46,7 +46,7 @@
 V156 검토는 원격 snapshot `29d847b6`의 코드 근거를 사용했다. 현재 remote-tracking ref `8d0c0782`이며 로컬 후보 커밋과는 2개 ahead·6개 behind로 갈라져 있다.
 
 - `db/migration/V156__instrument_fundamental_attempt_timestamp.sql`: 미사용이 아니다. 원격 최신 `8d0c0782`에 migration이 있으며 `lib/instrument-fundamental-progress.ts`가 `last_attempt_at`을 갱신하고 진단 모듈이 읽는다. migration만 제외하면 progress update가 실패할 수 있어 V156을 원격에서 복원했다.
-- `lib/market-rss-discord-policy.ts`: 필수 운영 정책이다. `lib/discord-delivery-retry.ts`의 재시도 발송이 `SEC_EDGAR`·`STOCKTITAN` 외 출처를 건너뛴다. 신규 발송뿐 아니라 이미 큐에 들어간 과거 payload에도 allowlist를 적용하는 보호 경계다. 이 정책과 테스트 삭제는 미사용 정리가 아니다.
+- `lib/market-rss-discord-policy.ts`: 필수 운영 정책이다. 현재 신규 발송과 기존 큐 재시도 모두 `GLOBENEWSWIRE`·`STOCKTITAN`·`SEC_EDGAR` 세 출처만 허용한다. 이 정책과 테스트 삭제는 미사용 정리가 아니다.
 - `app/api/dart/details/route.ts` 및 `lib/opendart-details.ts`: route 내부에서 상세 조회를 직접 호출하고 기능 테스트가 다수 있다. 저장소 외부 호출 여부는 모른다. 내부 client가 없다는 점만으로 API가 미사용이라고 할 수 없다.
 - `lib/kis-us.ts`: 현재 소스에서 모듈을 import하는 경로는 찾지 못했다. 다만 파일 내용은 KIS 해외 상승률·체결강도 랭킹과 Yahoo Finance fallback을 포함해 사용자 노출 기능을 직접 구현한다. 현대 `kis-us-api.ts` 등으로 대체된 것으로 보일 수 있지만, `git grep`으로 정확한 import를 확인하고 API/관리자 호출 경로가 서로 다른지 확인한 뒤 제거해야 한다.
 - `lib/kis-ipo-listing-schedule.ts`: 현재 runtime import가 없고 `/api/listings`는 KRX KIND를 조회한다. 삭제된 어댑터의 boundary audit 매핑은 정리했으며, 외부 직접 호출자는 미확인이다.
@@ -119,3 +119,60 @@ DB 검사는 `.env.local`을 상위 환경보다 우선 적용하고 `BEGIN READ
 - 교차 확인: `daily-ma9`도 통합 route `/api/admin/daily-ma9-test?market=KR|US`는 있으나 관리자 테스트 목록은 오래된 `/api/admin/kr-daily-ma9-test`, `/api/admin/us-daily-ma9-test`를 가리킨다. 다만 두 market route 파일도 현재 존재하므로 이 둘은 미사용이나 깨진 endpoint로 분류하지 않았다.
 - API 검색만으로 호출자가 안 잡힌 `/api/admin/daily-candle-cache-debug`, `/api/admin/database-status`는 관리자 진단 API이므로 외부/운영 호출 여부를 알 수 없어 미사용으로 보지 않았다. 테스트 목록 endpoint를 route 존재 여부와 대조한 검사에서 추가 누락은 위 세 건뿐이었다.
 - 제품 코드, DB, 운영 배포를 변경하지 않았다. 정적 조사라 빌드·테스트·실행은 수행하지 않았다. 관리자가 이 세 테스트를 실제 사용하는지, route가 외부에서 제공되는지는 저장소 검사만으로 확정할 수 없다.
+
+## 2026-11-17 현재 트리 재확인
+
+- 범위: 현재 작업 트리의 `components/admin-api-tests.tsx`에 선언된 정적 관리자 테스트 endpoint 20개를 추출해 대응하는 `app/api/**/route.ts` 파일 존재 여부를 확인했다.
+- 결과: 20개 모두 대응 route가 존재한다. 2026-10-21 기록에 있던 `us_news_radar`, `us_news_ticker`, `us_news_radar_events`의 미존재 endpoint 항목은 현재 관리자 테스트 목록에서 확인되지 않아 현재 상태의 미해결 후보로 보지 않는다. 이는 기능 수정/복구 여부를 추정한 것이 아니라 현행 연결을 대조한 결과다.
+- 판정 한계: 파일 존재는 route의 정상 동작, 접근 권한, 실제 사용 여부를 증명하지 않는다. 외부 호출·사람의 수동 운영 여부는 별도 증거가 필요하다.
+- 제품 코드, DB, 운영 배포는 변경하지 않았다. 정적 파일 대조만 수행했으며 빌드·테스트·실행 및 commit/push/deploy는 하지 않았다.
+
+## 2026-11-17 runtime 도달성 재검사
+
+- 범위: TypeScript compiler가 읽는 `app`, `components`, `lib`, `scripts` 내 비테스트 TS/JS 파일 582개를 대상으로 앱 page/route/layout과 운영 스크립트 224개를 진입점으로 잡고 정적 import/export 및 문자열 literal dynamic import 경로를 추적했다. 현재 작업 트리에서 실행한 결과다.
+- 결과: `components/company-timeline.tsx`만 추가적인 제품 UI 고아 후보로 남았다. `CompanyTimeline` 선언 외의 import/호출 참조가 없고 app의 DART 화면에서도 사용하지 않는다. 이 컴포넌트는 `/api/dart/history`를 호출한다.
+- 추가 근거: `components/feed-page.test.tsx`는 제목에서 추출한 회사명을 클릭해도 `공시 역사 타임라인`을 표시하지 않는 동작을 명시적으로 확인한다. `docs/architecture/kr-disclosure-event-architecture.md`도 DART 제목상 회사명을 issuer 조회나 history 검색 입력으로 사용하지 않는다고 설명한다. 따라서 이 컴포넌트는 단순히 현재 화면에서 우연히 누락된 것보다 현행 UI 계약에서 의도적으로 분리된 레거시 후보로 보는 편이 근거에 맞다.
+- 별도 판정: `/api/dart/history` route는 컴포넌트 외부 사용 여부를 저장소만으로 알 수 없지만 `public/openapi.json`, `docs/api/route-inventory.json`, `public/api-reference.md`에 공개 읽기 API로 등록돼 있다. 따라서 API route와 계약은 미사용으로 보지 않는다. 후보 범위는 컴포넌트 UI에 한정한다.
+- 보존 근거: Telegram webhook은 별도 `/summary [종목명]` 명령으로 `filings`에서 최근 공시 5건을 읽는다. 이는 회사별 요약 기능 수요가 별도 채널에 존재할 수 있음을 보여주지만 `CompanyTimeline` 컴포넌트 자체의 importer는 아니다.
+- 제외: `app/manifest.ts`, `app/error.tsx`, `app/global-error.tsx`는 Next.js 파일 규약에 따라 메타데이터 manifest 및 오류 UI로 자동 인식되는 특수 파일이며 정적 import graph에 나타나지 않는 것이 정상이다 ([manifest](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/manifest), [error/global-error](https://nextjs.org/docs/app/api-reference/file-conventions/error)). `lib/accumulation-test-fixtures.ts`는 테스트 지원 목적이다. 둘 다 제품 미사용 후보로 세지 않았다.
+- 판정 한계: 정적 import 분석은 string-built dynamic loading, 외부에서 직접 참조하는 컴포넌트 경로, 수동 작업 경로를 증명하지 않는다. 삭제 또는 API 변경은 하지 않았다. 빌드·테스트·실행 및 commit/push/deploy도 하지 않았다.
+
+## 2026-11-17 기능 registry·호환 API 대조
+
+- `us-scanners`, `domestic-trade-intensity`, `intraday-mvp`는 `FEATURE_MODULES`에서 `NOT_SCHEDULED`지만 미사용은 아니다. 관리자 feature-module 화면에 등록되어 있고, scanner-hours/스캔 API·intraday API 및 worker 경로가 존재한다. `instrumentation-node.ts`는 `startIntradayDetectionWorker()`를 시작한다.
+- `us-daily-indicators`는 registry가 `OCI_CRON`으로 표시하고 cron route도 있으나 현재 `scripts/oci-cron.sh`에는 해당 route 호출이 없다. 이는 스케줄 표기와 실제 예약 경로의 불일치다. 관리자 테스트·설정 경로와 과거 실행 이력이 있어 미사용 코드 후보로 처리하지 않는다.
+- `/api/automation-settings`는 OpenAPI에 deprecated로 표시돼 있지만 `components/use-feed-data.ts`가 현재 DART polling 주기를 얻기 위해 호출한다. 해당 route는 `us-scanners` 설정값을 반환하고 새 feature-module 설정을 successor로 표기한다. 따라서 현시점 제거 후보가 아니라 내부 소비자 이전이 선행돼야 하는 호환 경로다.
+- 위 대조는 현재 저장소의 정적 참조에 한정한다. 운영 cron이 다른 외부 스케줄러에서 호출되는지, deprecated API의 외부 소비자가 있는지는 확인하지 않았다. 기능·설정·운영 상태 변경은 하지 않았다.
+
+## 2026-11-17 공개 API surface 검토
+
+- 현재 `docs/api/route-inventory.json`에는 180개 API route가 있고 `public/openapi.json`에는 공개 GET 45개가 명세돼 있다. 이 공개 GET은 외부 소비자 계약이므로 앱 내부에서 직접 호출하는 화면이 검색되지 않는다는 이유만으로 미사용 기능으로 분류하지 않는다.
+- 이번 경로 대조에서 공개 API의 내부 호출자 부재만으로 확정할 새 삭제 후보는 만들지 않았다. 외부 호출 통계/소유자 확인 없이는 API 계약의 실제 사용 여부를 판정할 수 없다.
+
+
+## 2026-11-17 제거 작업 결과
+
+- `/dart` 전용 사용자 화면과 전용 DART feed UI hook·company timeline을 삭제했다. 기존 통합 `/disclosures` 화면이 DART 자료를 소비하므로 DART API, 수집 자동화, 공시 통합 UI는 유지했다.
+- 관리자 페이지 및 `/api/admin/**`, `/api/debug/**` 경로와 관리자 전용 UI·인증 helper를 삭제했다. 사용자 인증·관심종목·공개 API·cron 자동화는 별도 범위로 유지했다.
+- 호출자가 없는 deprecated `/api/automation-settings`와 관리자 전용 `/api/scan/technical-entry-analysis`, `/api/us/sec-risks`를 제거했다. 기술 분석 라이브러리는 공개 다중 시간봉 추천 API에서 사용하므로 유지했다.
+- API inventory/OpenAPI를 재생성하고 문서 감사의 관리자 경로 직접 의존성을 현재 공개 health/schema 검증으로 옮겼다.
+- 검증: `npm run docs:check` 통과. `npm run typecheck`는 기존 `.next` 및 `.next-deploy-verify` 생성 타입 파일의 삭제된 라우트 참조로 실패했다. 테스트는 실행하지 않았다. commit/push/deploy는 하지 않았다.
+- 한계: 생성 타입 파일을 제거하거나 재생성하지 않아 typecheck 실패가 남아 있다. 기존 대규모 dirty worktree와 섞여 있으므로 이번 변경만의 전체 build/run 결과는 확인하지 않았다.
+
+## 2026-11-17 재검증 및 빌드 확인
+
+- 앞선 runtime 도달성 기록은 삭제 전 상태를 기술한 역사 기록이다. 그 후보였던 components/company-timeline.tsx와 DART 전용 feed UI는 이번 변경에서 삭제했다. 단 components/feed-page.module.css는 app/notifications/page.tsx에서도 import되는 활성 공유 스타일이라 복구했다.
+- DART 화면 제거 후 /notifications UI import 누락이 별도 production build에서 발견되어 스타일 파일을 복구하고 빌드를 통과시켰다.
+- stale Next route manifest가 삭제된 관리자 route를 계속 참조해 검증이 실패하던 상태를 확인했다. tsconfig.json의 중복/과거 generated-type 경로와 next-env.d.ts의 이전 .next-deploy-verify routes reference를 정리하고 별도 .next-clean-audit 경로에서 빌드해 재생성했다.
+- 최종 증거: NEXT_DIST_DIR=.next-clean-audit npm run build 통과. npm run typecheck 통과. npm run audit:api-surface 통과(104 routes, 44 public GETs). Next build route 목록에서 관리자 화면/API와 /dart page가 사라졌고 /disclosures, DART automation/API는 유지됐다. 테스트 suite는 실행하지 않았다.
+- 외부 직접 호출, 수동 운영 및 운영 배포 상태는 이 정적 코드/로컬 빌드로 입증하지 않았다. commit/push/deploy는 하지 않았다.
+
+
+## 2026-11-17 폐기 범위 정정 및 잔여 경로 확인
+
+- 앞선 2026-11-17 항목의 company-timeline 미사용 후보는 실제 삭제로 처리되었다. 단 feed-page.module.css는 notifications에서 공유 사용되어 복구했으므로 삭제 후보가 아니다.
+- 구간 상단의 /api/automation-settings 및 관리자 도달성 기록은 2026-11-17 제거 전 조사 결과를 기록한 역사 설명이다. 현행 코드에서는 관련 DART-only consumer와 endpoint가 삭제되었다.
+- 앱·컴포넌트·라이브러리·스크립트에서 관리자 route, 구형 automation-settings, 기술분석 전용 route, SEC risks route 및 /dart page 링크를 재검색했다. 남은 DART 문자열은 통합 /disclosures consumer, API/cron, 외부 공시 원문 URL과 테스트 fixture이며 삭제된 UI 호출자는 확인되지 않았다.
+- 잔여 연결로 확인한 PWA manifest의 /dart start_url, deploy verifier의 삭제 관리자 endpoint smoke, 삭제 SEC risks route를 여는 테스트 경로를 정리했다. /disclosures로 시작 경로를 변경하고 active checks에서 삭제 route 참조를 제거했다.
+- 현재 국내 일봉 runbook이 사라진 관리자 실행 절차를 운영 지침으로 안내하던 것을 cron-only 현재 경로와 과거 이력 표시로 바꿨다.
+- 최종 검증은 별도 production build, typecheck, API surface audit, docs:check 통과다. 외부 직접 호출과 운영 로그는 확인하지 않았고 tests 및 commit/push/deploy는 실행하지 않았다.

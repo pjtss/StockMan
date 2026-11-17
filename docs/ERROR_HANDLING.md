@@ -124,6 +124,68 @@
 4. 실패한 단일 종목 또는 단일 요청으로 재현한 뒤 전체 작업을 실행한다.
 5. 한글 로그와 문서는 UTF-8을 유지한다.
 
+원격 일봉 동기화의 `scripts/sync-daily-cache-from-remote.mjs`는 대상 universe가 비거나, 저장 검증 봉이 0건이거나, 요청 종목의 빈/누락 봉이 있을 때 성공으로 보고하지 않는다. 최상위 `ok`와 프로세스 exit code가 실패를 나타내고, 종목 누락은 `missingCount`와 `missingCodeSample`로 확인한다. 이전 batch가 이미 commit된 뒤 뒤쪽 batch에서 중단되면 그 저장은 유지되므로 재실행 전 로컬 최신 거래일과 coverage를 확인한다.
+
+같은 스크립트는 OHLC 가격의 유한성/양수 및 high-low 관계와 거래량의 유한성/비음수 조건을 확인한다. 현재 DB/API가 `double precision`과 JSON number를 사용하므로 안전 정수 범위를 넘는 값도 기존 계약에 따라 허용한다. 공개 API가 JSON 숫자로 내보내기 전 원천 정밀도를 잃을 수 있으며 이 손실은 로컬 동기화 단계에서 복구할 수 없다.
+
+동기화 결과에서 `received`는 원본 봉 응답 행, `saved`는 날짜 중복 정리 후 UPSERT 검증을 통과한 행이다. 같은 종목/거래일에 같은 OHLCV가 반복되면 한 행으로 저장하고 `duplicateCandleCount`에 반영한다. 같은 거래일의 OHLCV 값이 서로 다르면 last-write-wins로 고르지 말고 입력 batch를 거부해 원천 응답을 조사한다.
+
+각 `committed` 진행 로그는 하나의 시장별 batch transaction commit 이후에만 출력된다. 실패 뒤 재실행 전까지 저장 확정으로 볼 수 있는 진행 경계는 마지막 `committed` 로그이며, transaction 실패한 batch의 `saved`는 집계되지 않는다.
+
+universe 또는 batch 오류는 시장별 결과의 `ok=false`와 `failure` 객체(phase, market, offset, codeCount, 요약 오류)를 남긴다. DB 저장 전후 batch 오류에는 `failure.received`, `expectedSaveCount`, `duplicateCandleCount`, `missingCount`가 시도된 batch 기준으로 들어간다. 최종 집계의 counters는 commit 완료분만 포함하므로 이 실패 batch 수치를 합산해 committed totals로 오인하지 않는다. `--market=ALL`은 실패한 시장 결과를 보존하고 다른 요청 시장도 계속 조회한다. 최상위 exit code 1을 확인하고, 다시 실행하기 전에 각 시장의 마지막 committed 진행 로그와 로컬 coverage를 대조한다.
+
+DB save 중 `failure.transactionOutcome=COMMIT_UNKNOWN`이면 COMMIT 응답을 받지 못한 것이므로 write 반영 여부를 로그만으로 판단하지 않는다. 실행 전후 로컬 DB의 대상 market/code/timeframe coverage를 read-only로 재확인한다. ROLLBACK 실패 시 client/backend 연결은 pool에서 제거되어야 하며 오류 메시지에는 원래 write 오류와 rollback 오류가 함께 남아야 한다.
+
+`failure.errorDetails`는 nested `cause`와 AggregateError의 원본 errors를 최대 4단계까지 구조화해 보존한다. 각 AggregateError의 하위 errors는 배열 형식인지 확인한 뒤 최대 20개만 포함하고 나머지는 `errorsOmitted`로 표시한다. 배열 형식이 아니면 `errorsUnavailable`을 표시하며, 요약 중 예상치 못한 getter/형식 오류가 발생해도 `ErrorSummaryFailed`로 안전하게 반환한다. 최상위 `failure.error`만으로 원본 DB/network 오류가 숨겨지지 않게 사용하고 URI userinfo, 민감 query/`key=value` 값, Bearer 자격증명은 출력하지 않는다. Error 이름은 마스킹 후 100자, 오류 message는 500자로 제한한다. Error 객체, 문자열 throw, 실행 최상위 오류, pool 종료 오류도 공통 sanitizer로 요약하며 원문 message를 직접 내보내지 않는다.
+
+`npm run cron:check`는 error property 보호용 try/catch와 `AggregateError.errors` 배열 검증·폭 제한의 실행 순서도 검사한다.
+
+동기·비동기 동기화 초기화 시 `DAILY_CACHE_API_URL`은 trim 후 HTTP(S) absolute URL이며 userinfo가 없는지 검증한다. URL parser 오류는 설정 원문을 포함하지 않는 고정 메시지로 변환하며, 동기 스크립트는 PostgreSQL pool 생성의 동기 예외도 connection string을 노출하지 않는 고정 메시지로 변환한다. 비동기 스크립트의 daily-candles, fundamentals, chart 및 직접 KIS endpoint는 검증된 동일 base URL만 사용한다.
+
+비동기 일봉 동기화는 `persistParts(kind, parts)`에 시장 kind를 전달해 `refreshDailyCandleSummaries`에 명시한다. 이 인수가 누락되면 DB transaction에서 ReferenceError가 발생해 batch rollback될 수 있으므로 `npm run cron:check`가 저장 함수 시그니처·호출부·summary 갱신 연결을 확인한다.
+
+비동기 동기화 transaction에서 COMMIT 요청이 실패하면 결과를 `LOCAL_TRANSACTION_COMMIT_OUTCOME_UNKNOWN`으로 표시하고 client를 폐기한다. rollback도 실패하면 원래 transaction 오류와 rollback 오류를 함께 `AggregateError`로 보존하고 client를 폐기해 pool에 되돌리지 않는다. node-postgres 공식 문서상 `client.release(true)`는 client를 pool에 반환하는 대신 연결을 제거한다([Pool API](https://node-postgres.com/apis/pool)).
+
+비동기 동기화 PostgreSQL pool은 새 연결 대기를 10초로 제한한다. idle client의 background `error`는 uncaught 종료 대신 listener에서 횟수와 첫 오류의 sanitized name/message/code 및 nested causes를 보존한다. 최종 JSON은 `pool.end()`가 끝난 뒤 출력하며, 실행 fatal error·종료 error·background error 중 하나라도 있으면 `ok=false`, 해당 failure 요약 및 exit code 1로 보고한다. URI userinfo, query/fragment 자격증명, token/secret 계열 path segment, key-value 및 `password is ...` 표현, Bearer/Basic 자격증명을 마스킹하고 message 500자·cause depth 4·AggregateError child 20개로 제한한다. node-postgres 공식 문서는 connection timeout 기본값이 0(무제한)이고 idle client 오류 listener가 없으면 uncaught error가 될 수 있다고 설명한다([Pool API](https://node-postgres.com/apis/pool)).
+
+비동기 저장 batch에서 같은 market/code/date 봉이 여러 번 오면 숫자로 정규화한 OHLCV가 모두 같을 때만 하나로 합친다. 값이 다른 중복은 충돌 field와 종목·날짜를 오류에 표시해 transaction 전체를 rollback한다. 재발은 `npm run cron:check`에서 중복 비교와 실패 조건을 감시한다.
+
+중복 봉이 있는 정상 batch는 `saved`가 원본 `fetched`보다 작으므로, async 성공 판정은 시장별 commit 기준 `saved + duplicateCandleRows === fetched`를 사용한다. duplicate counter는 전체 transaction이 commit된 뒤에만 반영한다.
+
+비동기 fundamentals 응답은 저장 전에 요청 market/code와 대조하고, 미요청·중복 code 및 잘못된 nullable numeric/text/timestamp 필드를 거부한다. 응답 code는 요청 universe의 정규 code로 바꿔 저장한다. 누락 row는 public snapshot endpoint가 보유 row만 반환할 수 있으므로 허용한다.
+
+비동기 일봉 응답 envelope의 `market`과 `timeframe`도 요청값과 일치해야 한다. mismatch는 row 정규화와 DB 저장 전에 batch 오류로 종료한다. 직접 KIS 경로는 응답 원천을 검증한 뒤 동일한 요청 scope metadata를 envelope에 부여한다.
+
+비동기 sync는 허용된 option 목록을 적용하고 위치 인자·알 수 없는/중복 옵션·누락 값을 pool 생성 전에 거부한다. boolean은 문자열 `true`/`false`만 받고 bare boolean flag는 true로 처리한다. 정수 옵션(`limit`, `batch`, worker, queue, `max-instruments`)은 공백·쉼표·지수 표기 없이 정수 십진수 literal만 허용하고 safe integer 여부를 검사한 뒤 기존 bound로 clamp한다. 시총 옵션은 양의 십진수 literal만 허용한다. 특히 typo로 전체 시장 실행이 되는 경우, 0 consumer 또는 NaN queue capacity로 인한 대기를 방지한다.
+
+`--include-inactive-daily=true`는 US universe의 `daily_active` 제약을 제거한다. `--us-market-cap-under`로 추가 필터링할 때도 snapshot eligibility query에 같은 동적 filter를 써야 비활성 일봉 종목을 되살리지 않고, 반대로 명시적으로 포함한 종목을 다시 제외하지 않는다.
+
+US에서 `--only-missing-date=true`와 `--only-unrefreshed=true`를 함께 지정하면 둘 중 하나로 분기하지 않고 조건을 AND로 결합한다. 대상 날짜에 유효 봉이 없고 유효 latest summary가 30분 이상 stale이거나 없는 종목만 조회한다.
+
+`--only-unrefreshed=true` 단독 옵션도 US D봉에서만 유효하며, 다른 market/timeframe 조합은 실행 전에 오류 처리한다.
+
+이 공개 읽기 경로는 API URL userinfo를 허용하지 않는다. `.env.local`에서 주입된 로컬 DB/API URL은 앞뒤 공백을 제거한 동일 값으로 검증·사용하며, fundamentals 요청도 검증된 공개 API base URL을 재사용한다.
+
+로컬 PostgreSQL pool의 새 연결은 10초 후 timeout되며 무기한 기다리지 않는다. pool idle client의 `error` 이벤트 listener는 오류를 sanitized 구조로 보존하고 발생 수를 집계한다. 이런 오류가 한 번이라도 있으면 최종 JSON에 `poolBackgroundFailure`가 포함되고 전체 `ok=false`, exit code 1이어야 한다. node-postgres는 idle client에서 backend/network 오류가 발생할 수 있고 listener가 없으면 uncaught error로 프로세스가 종료될 수 있다고 설명한다([공식 Pool API](https://node-postgres.com/apis/pool)).
+
+동기화 최종 JSON은 pool 종료 뒤 출력한다. 최상위 `fatalFailure` 또는 `poolShutdownFailure`가 있으면 시장별 처리 결과가 전부 성공이어도 최상위 `ok`는 false이고 프로세스 exit code는 1이어야 한다.
+
+동기화 시작 전 `--limit`과 `--batch`는 안전한 정수여야 한다. 무효 CLI 값은 pool/API 실행 전에 명시 오류로 거부되어야 하며, 유효 정수의 경계 초과는 문서화된 범위(각각 1–300, 1–100)로 clamp한다.
+
+지원 인자는 `market`, `timeframe`, `limit`, `batch`, `skip-fundamentals`다. 중복/미지원 옵션, 위치 인자, 필수 값 누락, `skip-fundamentals`의 `true|false` 외 값은 실행 전 거부한다. 환경설정·CLI 오류는 pool 생성 전에 발생하므로 어떤 DB/API 호출도 시작하지 않는다.
+
+원격 응답은 envelope의 JSON object와 엄격한 `ok === true`, `items` 배열부터 확인한 후 row 구조와 집계를 처리한다. null 응답, null row, 비배열 candles는 일반 TypeError가 아니라 stage·market이 식별되는 형식 오류로 반환되어야 한다.
+
+동기화 실패의 `failure.phase`는 `daily-candles-request/http/body/json`, `daily-candles-envelope/items/normalize`, `instrument-fundamentals-request/http/body/json/envelope/items`, `database-save` 경계를 구별한다. body read timeout은 body phase, 응답 파싱 오류는 json phase로 보존되며 `failure.error`와 함께 병목 위치를 판정한다.
+
+같은 동기화 스크립트의 fundamentals snapshot API는 캐시에 존재하는 row만 반환할 수 있어 미보유 종목은 `fundamentalsMissingCount`와 `fundamentalsMissingCodeSample`로 별도 관찰하고 봉 적재 상태를 실패 처리하지 않는다. 누적 표본은 시장 접두사를 포함해 최대 20개이며 실패 batch 표본도 같은 `market:code` 형식을 사용한다. 다만 반환된 row의 market/code가 해당 요청 universe에 포함되는지와 중복 여부는 저장 전에 검증해야 한다.
+
+외부 `GET /api/public/instrument-fundamentals`도 snapshot 존재만으로 종목 자격을 판정하지 않는다. 요청 market alias를 정규 거래소로 해석하고 활성 `COMMON_STOCK` 마스터 및 ETF/ETP·워런트·파생·DR·우선주 플래그를 통과한 code만 snapshot과 조인한다. 미등록·비활성·분류 불가 코드는 fail-closed로 응답에서 제외한다.
+
+fundamentals snapshot의 nullable double precision 필드(`price`, `changeRate`, `open`, `high`, `low`, `volume`, `tradingValue`, `marketCap`, `listedShares`)는 응답에서 `null` 또는 유한 number여야 한다. 필드 자체가 빠지거나 문자열/비유한 숫자가 오면 batch를 저장하지 않고 `instrument-fundamentals-items` 단계의 field 명시 오류로 분류한다.
+
+같은 응답에서 `name`은 문자열, `currency`는 필수 키의 문자열/null, `observedAt`·`fetchedAt`은 필수 키의 유효 timestamp 문자열/null로 검사한다. timestamp null은 저장 SQL의 `COALESCE(..., NOW())` 경로를 유지하며 필드 누락은 `undefined` parameter 오류 전에 items 단계에서 거부한다.
+
 ## 2026-10-20 StockTitan 제목 이외 RSS 번역 범위 차단
 
 - **증상**: 번역 API 요구 범위는 StockTitan RSS 제목인데 다른 출처의 RSS 제목도 번역 provider로 전달될 수 있었다.
@@ -532,7 +594,15 @@
 ### `outside_schedule` 또는 `disabled`
 
 - cron 라우트의 운영 시간·활성화·간격 설정 결과다.
+- KR daily cache의 cron 응답 및 SKIPPED summary에는 `schedule` snapshot과 KST 평가시각이 포함된다. 5분 dedup은 같은 reason 및 같은 schedule 설정에만 적용하며 평가시각은 비교에서 제외한다. 설정이 바뀌면 dedup window 안에서도 새 이력을 기록한다.
 - 사용자가 수동 갱신을 요청한 경우 스케줄을 우회하는 인증된 수동 실행 경로를 사용한다.
+- 예약 cron이 실행 이력/cooldown 조회를 실패로 끝내면 각 route는 worker 실행 전 503으로 종료해야 한다. KR/US daily-cache 및 Bollinger/Golden Cross, US daily indicators/open-cache/breakout/분봉 scanners, US OBV divergence, SEC small-cap share facts는 `stage: interval-gate`와 route별 `*_INTERVAL_CHECK_UNAVAILABLE` 오류를 반환한다. KR/US Golden Cross의 running lookup 실패는 `stage: running-gate`로 종료한다. Instrument Fundamentals의 backoff skip 조회 실패는 `stage: backoff-gate`, `INSTRUMENT_FUNDAMENTALS_BACKOFF_CHECK_UNAVAILABLE`을 반환한다. 이력 DB 장애를 “이력 없음”으로 취급하면 sequential worker 실행이나 재시도가 cooldown을 우회할 수 있으므로, 조회를 복구한 뒤 다음 cron cycle에서 재시도한다. 관리자 KR 수동 실행은 별도 API 경로이며 해당 예약 gate를 거치지 않는다. SEC Company Facts는 조회 예외를 route 상위 catch에서 503/500으로 전파하며 계속 fail-closed해야 한다.
+
+### KR cron 호출이 KST 시간창 후반에 도달함
+
+- 원인: OCI 공통 cron은 endpoint를 순차 실행한다. KR daily cache가 시장 RSS 이후 여러 SEC/DART enrichment 작업 뒤에 있으면 앞선 호출 지연이 국내 schedule window를 소모할 수 있다.
+- 해결: `scripts/oci-cron.sh`에서 우선 SEC Facts, Discord retry, market RSS 및 US breaking-news forwarder를 보존한 뒤 KR daily cache를 실행하고, 나머지 DART/SEC enrichment 및 미국 full-universe cache보다 앞에 둔다. `scripts/check-oci-cron.mjs`가 이 순서를 검사한다.
+- 재발 감지: `stockman-cron.service` journal의 앞선 endpoint duration과 KR call start를 대조하고, API 응답의 `schedule.evaluatedAtKst`/`outside_schedule`을 확인한다.
 
 ### 전체 갱신이 지나치게 오래 걸림
 
@@ -541,6 +611,19 @@
 - 중단 시 이미 저장된 성공 캔들은 보존하며, 실패 항목은 retry queue에서 재처리한다.
 
 ## DB 오류
+
+### 재시도 큐의 현재 비대상 종목이 계속 PENDING으로 남음
+
+- **원인**: retry consumer는 실행 시점의 공식 종목 master에서 현재 대상인 종목만 claim한다. 비활성·보통주 아님·공식 위험 플래그 또는 master 누락 종목은 `PENDING`으로 남을 수 있다. DB retention도 진행 중 항목 유실 방지를 위해 `PENDING` 행은 기간 만료로 삭제하지 않는다.
+- **영향**: 처리할 수 없는 오래된 키가 pending count에 계속 포함될 수 있다. 자동 삭제나 재활성화는 사용자 확인 없이 수행하지 않는다.
+- **진단**: 관리자 일봉 캐시 진단 API의 `retries.pendingEligibility`에서 분류·타임프레임별 수, 0회 시도 수, 가장 이른 다음 시도 시각과 가장 오래된 생성 시각을 확인한다. 시각은 UTC 원본과 KST 필드를 함께 제공한다. `US_METADATA_ELIGIBLE_NAME_CHECK`는 별도의 공식명 JS 필터를 반영하지 않은 그룹이다.
+- **재발 감지/후속**: 분류별 count와 생성 경과를 정기 점검한다. 정책이 확정되면 별도 변경으로 PENDING 보존/종료 기준을 정하고, 보존 기간에 맞는 지표·감사 로그를 추가한다.
+
+### 재시도 timeframe 간 claim 편중
+
+- **원인/영향**: 여러 D/W/M lane을 선택해도 단일 `ORDER BY next_attempt_at LIMIT 500`은 due 행이 계속 많은 한 timeframe이 claim 상한을 점유해 다른 timeframe의 retry 처리를 지연시킬 수 있다.
+- **해결**: `lib/kr-daily-cache-job.ts`는 claim할 retry timeframe만 `dueRetryTimeframes`로 전달한다. `lib/candle-cache-retry.ts`는 실제 due lane별 quota를 전체 상한 안에서 나누고, 각 lane에서 가장 오래된 due 행을 `FOR UPDATE SKIP LOCKED`로 claim한다. stale cache만 존재하고 retry row가 없는 timeframe은 retry quota를 차지하지 않는다. 나머지 quota는 lane 입력 순서에 따라 한 건씩 배분하며 최대 claim 수는 호출 상한을 넘지 않는다.
+- **재발 감지/남은 위험**: KR job 결과의 timeframe별 retry 처리량과 `retries.pendingEligibility`의 age를 함께 확인한다. 각 실행의 lane 처리량은 공평해지지만 worker 실행량·시장 API 속도 차이로 backlog 해소 시각까지 같아지는 것은 아니다. 로컬 read-only EXPLAIN에서는 약 19,962 estimated rows/6 MB 테이블에 lane별 sequential scan이 계획됐다. 이 크기에서 별도 인덱스를 추가하지 않았으며 retry table이 커지거나 query latency가 증가하면 `EXPLAIN (ANALYZE, BUFFERS)`로 due index와 timeframe index 후보를 비교한다.
 
 ### `DATABASE_URL 환경변수가 설정되지 않았습니다.`
 
@@ -688,6 +771,10 @@ npm test -- --run
 - **환경 구분**: 로컬 `.env.local`의 DB는 localhost:5433이며 각 health 관련 SQL은 약 80–110ms였다. 이는 운영 DB와 다른 연결이므로 운영 SQL 성능의 근거로 사용하지 않는다.
 - **초기 판단**: 운영 DB 연결 자체가 완전히 불가능한 상태는 아니지만, 기존 진단 API는 전체 스냅샷을 기다려 어느 SQL 단계가 지연되는지 분리할 수 없었다. 후속 단계별 진단 결과와 원인 확정은 아래 automation_runs 조사 항목을 기준으로 한다.
 - **개선**: 관리자 전용 `/api/admin/health-diagnostics`를 추가한다. 동일 health 관련 SELECT들을 단계별로 실행하고 각 단계의 소요 시간·행 수·오류 코드와 DB pool 점유량만 반환한다. SQL 상세·행 데이터·환경변수 값은 노출하지 않는다. 단일 연결의 read-only transaction과 쿼리별 1.5초 `statement_timeout`을 사용해 느린 쿼리 하나가 전체 진단을 무기한 막지 않게 한다.
+- **2026-11-11 현재 응답 계약**: schema probe는 실패 원인 분류 코드와 함께 whitelist된 relation/column 이름을 최대 50개까지 반환하며, 성공한 Flyway probe는 version 문자열을 반환한다. Automation history의 `error_message`와 `summary`, 임의 SQL, 환경변수·credential 값은 응답하지 않는다. `detailsTruncated`는 whitelist 행이 50개를 넘을 때 표시한다.
+- **필수 relation 유형 판정**: `OPERATIONAL_SCHEMA_TABLES`는 `BASE TABLE`, `OPERATIONAL_SCHEMA_VIEWS`는 `VIEW`로 검사한다. `kr_instrument_universe`와 `us_instrument_universe`는 V85/V89 이후 legacy read path를 위한 compatibility view다. 핵심 schema health, 관리자 diagnostics, market-debug inventory와 migration audit은 명시한 relation 유형을 확인한다. retired relation 검사는 retired 이름의 객체가 어떤 relation type으로든 남아 있으면 계속 실패한다. [PostgreSQL 16 information_schema.tables 공식 문서](https://www.postgresql.org/docs/16/infoschema-tables.html).
+- **필수 컬럼 판정**: `information_schema.columns`도 table columns와 view columns를 모두 포함한다. 필수 컬럼 목록은 같은 schema의 필수 `BASE TABLE`에 있는 컬럼만 인정한다. 핵심 schema health와 관리자 diagnostics 모두 relation type을 확인한다. [PostgreSQL 16 information_schema.columns 공식 문서](https://www.postgresql.org/docs/16/infoschema-columns.html).
+- **timeout/savepoint 확인**: route는 read-only transaction 시작 직후 `set_config('statement_timeout', '1500ms', true)`를 실행하고 그 다음 각 probe의 savepoint를 만든다. `is_local=true` 설정은 transaction 종료까지 적용되며, 그보다 나중에 만든 savepoint로 rollback해도 설정은 취소되지 않는다. PostgreSQL은 `statement_timeout`을 각 statement 실행 한도로 정의한다. [PostgreSQL 16 set_config 공식 문서](https://www.postgresql.org/docs/16/functions-admin.html), [SET/savepoint 공식 문서](https://www.postgresql.org/docs/16/sql-set.html), [statement_timeout 공식 문서](https://www.postgresql.org/docs/16/runtime-config-client.html).
 - **재발 감지**: API 테스트가 비관리자 요청의 DB 접근 차단, read-only transaction, 쿼리 타임아웃 오류 코드의 안전한 노출, 후속 probe 진행을 확인한다. 운영에서는 `probes[].name`, `durationMs`, `errorCode`, `pool.waiting`으로 병목 구간을 판별한다.
 - **남은 위험**: pool 연결 획득 자체가 밀리면 진단은 3초 후 pool 상태와 함께 실패할 수 있다. 본 API 결과가 확인되기 전까지 운영 health 지연의 근본 원인은 미확정으로 유지한다.
 

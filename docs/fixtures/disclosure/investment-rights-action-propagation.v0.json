@@ -1,0 +1,330 @@
+{
+  "contractVersion": "investment-rights-action-propagation.v0",
+  "classification": "SYNTHETIC_CROSS_FIXTURE_NOT_RUNTIME_AUTHORIZATION_OR_LEGAL_ADVICE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "upstreamContracts": {
+    "rightsDecision": "rights-action-decision.v0",
+    "investmentProjection": "investment-effect-projection-bridge.v0",
+    "correctionRemediation": "fact-correction-remediation.v0",
+    "deliveryReconciliation": "correction-delivery-reconciliation.v0"
+  },
+  "decisionGateBindings": [
+    {
+      "decisionId": "KR-DART-RIGHTS-01",
+      "scope": "source product/component/action/purpose/channel/retention",
+      "requiredEvidence": [
+        "official terms or product-license snapshot hash",
+        "endpoint-field-action mapping",
+        "named reviewer and effective date"
+      ],
+      "defaultGate": "BLOCK_UNMATCHED_ACTION",
+      "requiredFor": [
+        "IRAP-01",
+        "IRAP-02",
+        "IRAP-03",
+        "IRAP-05",
+        "IRAP-06",
+        "IRAP-09",
+        "IRAP-10"
+      ]
+    },
+    {
+      "decisionId": "KR-RETENTION-01",
+      "scope": "source/derivative/backup retention, delete SLA, restore and access",
+      "requiredEvidence": [
+        "retention matrix",
+        "deletion and backup restore evidence",
+        "access policy approval"
+      ],
+      "defaultGate": "BLOCK_UNRESOLVED_PERSIST_DELETE_OR_RESTORE",
+      "requiredFor": [
+        "IRAP-02",
+        "IRAP-07",
+        "IRAP-08"
+      ]
+    },
+    {
+      "decisionId": "KR-OPERATIONAL-SECURITY-01",
+      "scope": "authorization/audit, retry/fencing, revocation/deletion, incident response, decision-ledger append authorization, detached checkpoint signing, independent anchor retention and key lifecycle",
+      "requiredEvidence": [
+        "threat/privacy model",
+        "access and deletion lineage",
+        "recovery rehearsal",
+        "retry/idempotency/fencing fixture",
+        "signed external checkpoint and key-lifecycle evidence"
+      ],
+      "defaultGate": "BLOCK_OPERATIONAL_EXECUTION",
+      "requiredFor": [
+        "IRAP-02",
+        "IRAP-05",
+        "IRAP-06",
+        "IRAP-08",
+        "IRAP-10"
+      ]
+    },
+    {
+      "decisionId": "KR-API-UI-CONSISTENCY-01",
+      "scope": "public projection snapshot/cache/revocation parity",
+      "requiredEvidence": [
+        "route/UI inventory",
+        "same-snapshot hash fixture",
+        "filter/page/revocation race acceptance",
+        "no-store/cache policy"
+      ],
+      "defaultGate": "BLOCK_PUBLICATION",
+      "requiredFor": [
+        "IRAP-05",
+        "IRAP-09",
+        "IRAP-10"
+      ]
+    },
+    {
+      "decisionId": "KR-END-TO-END-ACCEPTANCE-01",
+      "scope": "source-to-publication full denominator and rollback acceptance",
+      "requiredEvidence": [
+        "versioned gold set/hash",
+        "independent reviewer record",
+        "end-to-end run",
+        "approved threshold and rollback rehearsal"
+      ],
+      "defaultGate": "BLOCK_SHADOW_AND_RELEASE",
+      "requiredFor": [
+        "IRAP-01",
+        "IRAP-03",
+        "IRAP-04",
+        "IRAP-05",
+        "IRAP-09",
+        "IRAP-10"
+      ]
+    }
+  ],
+  "decisionStatusSemantics": {
+    "OPEN": "BLOCKED; no permission or execution implied",
+    "EVIDENCE_READY": "reviewable evidence only; still blocked",
+    "APPROVED": "decision scope only; dependent runtime/code gates remain separately closed until their acceptance evidence passes",
+    "CLOSED": "only after the decision lifecycle's required code gate and rollback evidence; does not grant broader source/action scope",
+    "REJECTED": "blocked until the recorded reopen condition is met and a new revision is reviewed",
+    "EXPIRED": "affected action and publication gates close until current evidence is reviewed"
+  },
+  "decisionGateEffects": {
+    "OPEN": "BLOCKED",
+    "EVIDENCE_READY": "BLOCKED",
+    "APPROVED": "DECISION_SCOPE_ONLY_DEPENDENT_GATES_CLOSED",
+    "CLOSED": "SCOPED_GATES_ONLY_AFTER_CODE_AND_ROLLBACK_EVIDENCE",
+    "REJECTED": "BLOCKED_UNTIL_REOPEN_CONDITION",
+    "EXPIRED": "BLOCKED_UNTIL_CURRENT_REVIEW"
+  },
+  "authorizationActions": [
+    "ANALYZE",
+    "PERSIST_DERIVATIVE",
+    "DISPLAY_PUBLIC_API",
+    "DISTRIBUTE_PUSH",
+    "DELETE"
+  ],
+  "approvalKinds": [
+    "SOURCE_CLAIM",
+    "QUANTITATIVE_CALCULATION",
+    "INTERPRETATION",
+    "PUBLICATION"
+  ],
+  "remediationDescendants": [
+    "SOURCE_BYTES",
+    "PARSED_TEXT_OR_TABLE",
+    "CLAIM_OR_SUMMARY",
+    "CACHE_OR_SEARCH_INDEX",
+    "EXPORT",
+    "NOTIFICATION_OR_DELIVERY",
+    "BACKUP_OR_RESTORE_COPY"
+  ],
+  "propagationRules": [
+    "Action rights are evaluated independently at each action boundary; a decision or approval for one action never grants another action.",
+    "A rights revision invalidates only approvals and artifacts whose immutable dependency bindings include the changed action decision revision or whose rights scope is otherwise affected.",
+    "New affected action attempts are blocked immediately; prior approval records remain immutable historical evidence and are marked stale for current use.",
+    "An internal claim or calculation may remain usable only when its own ANALYZE and PERSIST_DERIVATIVE decisions remain current and its source/dependency revisions remain valid.",
+    "If DISPLAY_PUBLIC_API is denied, expired, revoked, unresolved, or stale, suppress current public projection, API/cache/search/export copies and advance the publication suppression epoch; do not infer deletion permission.",
+    "If DISTRIBUTE_PUSH is no longer allowed, stop unsent work and reconcile attempted/provider-accepted/delivered notifications using delivery evidence; provider acceptance does not prove user receipt or retraction.",
+    "Enumerate stored descendants by expected and observed set digest and class/location counts; unknown or incomplete lineage is not zero impact and keeps suppression active.",
+    "Delete only under a separate current DELETE decision and applicable retention/legal disposition; preserve minimum audit lineage only when permitted.",
+    "Rights remediation completion does not re-grant current analysis, storage, display, or delivery authorization."
+  ],
+  "vectors": [
+    {
+      "id": "IRAP-01-PUBLIC-DISPLAY-REVOCATION-PRESERVES-VALID-INTERNAL-ANALYSIS",
+      "input": {
+        "analyze": "ALLOW",
+        "persistDerivative": "ALLOW",
+        "displayPublicApi": "REVOKED",
+        "sourceAndFormulaRevisions": "UNCHANGED",
+        "priorApprovals": [
+          "SOURCE_CLAIM:APPROVED",
+          "QUANTITATIVE_CALCULATION:APPROVED",
+          "INTERPRETATION:APPROVED",
+          "PUBLICATION:APPROVED"
+        ]
+      },
+      "expected": {
+        "internalClaimAndCalculation": "RETAIN_ONLY_IF_OWN_ACTION_RIGHTS_AND_DEPENDENCIES_REMAIN_CURRENT",
+        "sourceClaimApproval": "CURRENT_IF_DEPENDENCIES_MATCH",
+        "calculationApproval": "CURRENT_IF_DEPENDENCIES_MATCH",
+        "interpretationApproval": "CURRENT_IF_DEPENDENCIES_MATCH",
+        "publicationApproval": "STALE_FOR_CURRENT_USE",
+        "publicProjection": "SUPPRESSED",
+        "deletion": "NOT_IMPLIED"
+      }
+    },
+    {
+      "id": "IRAP-02-DERIVATIVE-PERSISTENCE-REVOCATION-QUARANTINES-STORED-OUTPUTS",
+      "input": {
+        "analyze": "ALLOW",
+        "persistDerivative": "REVOKED",
+        "existing": [
+          "CLAIM",
+          "CALCULATION",
+          "SUMMARY",
+          "SEARCH_INDEX"
+        ]
+      },
+      "expected": {
+        "newPersistence": "BLOCKED",
+        "existingDescendants": "REMEDIATION_INVENTORY_AND_DISPOSITION_REQUIRED",
+        "publicProjection": "SUPPRESSED",
+        "delete": "SEPARATE_DECISION_REQUIRED",
+        "unknownDescendantCount": "NOT_ZERO"
+      }
+    },
+    {
+      "id": "IRAP-03-ANALYSIS-REVOCATION-INVALIDATES-DERIVED-APPROVALS",
+      "input": {
+        "analyze": "REVOKED",
+        "persistDerivative": "ALLOW",
+        "displayPublicApi": "ALLOW",
+        "existingDerivedClaims": 2,
+        "existingCalculation": true
+      },
+      "expected": {
+        "newAnalysis": "BLOCKED",
+        "dependentSourceClaimApproval": "STALE",
+        "dependentCalculationApproval": "STALE",
+        "dependentInterpretationApproval": "STALE",
+        "publicProjection": "SUPPRESSED",
+        "storedDescendantRemediation": "REQUIRED"
+      }
+    },
+    {
+      "id": "IRAP-04-UNRELATED-ACTION-REVISION-DOES-NOT-STALE-INDEPENDENT-APPROVAL",
+      "input": {
+        "displayPublicApiRevisionChanged": true,
+        "analyzeRevisionChanged": false,
+        "internalAnalysisDependenciesMatch": true
+      },
+      "expected": {
+        "internalClaimApproval": "CURRENT_IF_STORAGE_RIGHTS_PERMIT",
+        "internalCalculationApproval": "CURRENT_IF_STORAGE_RIGHTS_PERMIT",
+        "publicationApproval": "STALE",
+        "globalApprovalReset": false
+      }
+    },
+    {
+      "id": "IRAP-05-PUBLICATION-REVOCATION-SUPPRESSES-ALL-PUBLIC-DERIVATIVE-SURFACES",
+      "input": {
+        "displayPublicApi": "EXPIRED",
+        "descendants": [
+          "API_RESPONSE",
+          "SHARED_CACHE",
+          "SEARCH_INDEX",
+          "EXPORT"
+        ]
+      },
+      "expected": {
+        "newPublicRead": "BLOCKED",
+        "suppressionEpoch": "ADVANCE_BEFORE_REUSE",
+        "descendantInventory": "REQUIRED",
+        "priorPublicSnapshotReuse": false,
+        "deletePermissionInferred": false
+      }
+    },
+    {
+      "id": "IRAP-06-PUSH-REVOCATION-USES-DELIVERY-EVIDENCE",
+      "input": {
+        "distributePush": "REVOKED",
+        "attemptStates": [
+          "ATTEMPTED_UNKNOWN",
+          "PROVIDER_ACCEPTED",
+          "DELIVERED_UNRETRACTABLE"
+        ]
+      },
+      "expected": {
+        "unsentWork": "SUPPRESSED",
+        "attemptedUnknown": "RECONCILE_WITH_PROVIDER_EVIDENCE",
+        "acceptedMeansDelivered": false,
+        "deliveredMeansRetracted": false,
+        "userReceiptClaim": "UNVERIFIED_UNLESS_EVIDENCED"
+      }
+    },
+    {
+      "id": "IRAP-07-DELETE-REQUIRES-SEPARATE-RETENTION-DISPOSITION",
+      "input": {
+        "displayPublicApi": "REVOKED",
+        "persistDerivative": "REVOKED",
+        "delete": "UNRESOLVED",
+        "backupCopies": 2
+      },
+      "expected": {
+        "newUse": "BLOCKED",
+        "deletion": "BLOCKED_UNTIL_DELETE_DECISION_AND_RETENTION_REVIEW",
+        "backupInventory": "REQUIRED",
+        "auditLineage": "PRESERVE_MINIMUM_IF_ALLOWED"
+      }
+    },
+    {
+      "id": "IRAP-08-INCOMPLETE-DESCENDANT-SET-KEEPS-PUBLICATION-SUPPRESSED",
+      "input": {
+        "expectedDescendants": 6,
+        "discoveredDescendants": 4,
+        "consumerLineage": "PARTIAL",
+        "remediationState": "DISCOVERY_INCOMPLETE"
+      },
+      "expected": {
+        "unknownImpact": "NOT_ZERO",
+        "publicProjection": "SUPPRESSED",
+        "remediationComplete": false,
+        "missingRowsTreatedAsDeleted": false
+      }
+    },
+    {
+      "id": "IRAP-09-CURRENT-ALLOW-AFTER-REMEDIATION-DOES-NOT-RESURRECT-STALE-APPROVAL",
+      "input": {
+        "remediationState": "RECONCILED",
+        "displayPublicApi": "ALLOW_NEW_REVISION",
+        "publicationApproval": "PRIOR_REVISION_STALE",
+        "dependenciesReReviewed": false
+      },
+      "expected": {
+        "automaticResurrection": false,
+        "newPublicationApproval": "REQUIRED",
+        "currentRightsGate": "RECHECK_REQUIRED",
+        "newSnapshotAndEpoch": "REQUIRED"
+      }
+    },
+    {
+      "id": "IRAP-10-TERMS-REVISION-DURING-PUBLICATION-FINALIZATION-FAILS-CLOSED",
+      "input": {
+        "approvedDisplayEvidence": "TERMS-A",
+        "currentDisplayEvidence": "TERMS-B",
+        "finalizerObservedRevision": "TERMS-A"
+      },
+      "expected": {
+        "publicationCommit": "REJECT_STALE_RIGHTS_REVISION",
+        "publicProjection": "SUPPRESSED",
+        "priorApprovalReuse": false,
+        "remediationCaseMutation": "APPEND_NEW_REVISION"
+      }
+    }
+  ]
+}

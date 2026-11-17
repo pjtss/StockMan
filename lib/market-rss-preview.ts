@@ -6,7 +6,7 @@ import type { TranslationClient } from "@/lib/translation-types";
 
 export type MarketRssFetchResult =
   | { source: string; ok: true; feed: MarketRssFeed }
-  | { source: string; ok: false; error: string };
+  | { source: string; ok: false; error: string; stage?: string; errorCode?: string; upstreamStatus?: number };
 
 export async function previewMarketRssResults(results: MarketRssFetchResult[], translate = false, client?: TranslationClient, onItemError?: MarketRssTranslationItemErrorHandler, onProviderFallback?: MarketRssTranslationFallbackHandler) {
   const preview = [];

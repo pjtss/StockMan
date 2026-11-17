@@ -13,7 +13,9 @@ OCI 인스턴스에 Docker를 설치해야 합니다. Flyway CLI나 Java는 호�
 먼저 적용하고, Flyway 컨테이너의 `migrate`가 성공한 경우에만 Stockman을 재시작합니다.
 배포 시 이력상 현재 버전보다 낮은 migration은 재실행하지 않습니다. 기존 스키마에
 이미 반영됐지만 Flyway 이력에서 누락된 과거 migration은 `*:ignored` 패턴으로
-검증에서 제외하고, 새 버전 migration은 순서대로 적용합니다. 과거 migration을
+검증에서 제외합니다. `migrate`의 낮은 version migration 처리와 이 검증 옵션은 서로
+다릅니다. Flyway의 `outOfOrder` 기본값은 `false`이므로 현재 버전보다 낮은 미적용
+migration은 기본적으로 적용되지 않습니다. 새 버전 migration은 순서대로 적용합니다. 과거 migration을
 뒤늦게 실행해 기존 relation과 충돌하는 일을 방지합니다.
 
 기존 런타임 bootstrap으로 이미 스키마가 생성된 데이터베이스는 최초 1회만
@@ -83,6 +85,16 @@ sudo systemctl enable --now stockman-rss.timer
 ```
 
 GitHub Actions가 배포 교체 작업만 수행할 수 있도록 `sudoers`에 다음을 추가합니다.
+
+활성화 스크립트는 archive 추출 전에 gzip/tar 전체 목록을 읽어 무결성을 검사합니다. 추출은 tar의 기본 경로 보호를 유지하고 `--absolute-names`/`-P`를 사용하지 않습니다. 검사에 실패하면 원본 archive를 유지하고 기존 release를 바꾸지 않습니다. 이후 기존 `/opt/stockman/current`를 옮기기 전에 새 release의 필수 server, timer/service, cron entry 파일, 버전형 Flyway SQL migration 및 Bash 문법을 확인합니다. 이 검증과 Flyway migration이 실패하면 현재 release는 그대로 유지되고 staging 디렉터리는 정리됩니다. `current`가 없고 `.previous`만 남아 있으면 배포 사전 검증 전에 이전 release를 복구합니다. release 디렉터리 교체 자체가 실패하거나 두 rename 사이에 HUP/INT/TERM으로 종료되면 `.previous` release를 기존 경로로 복구합니다. 복구 후에도 남은 staging 디렉터리는 제거합니다. 교체 후 systemd restart가 실패하면 이전 release는 `.previous`에 남아 수동 복구할 수 있으며 DB migration은 자동 rollback하지 않습니다. 서비스가 active가 된 뒤에는 localhost `/api/health`가 HTTP 200을 반환할 때까지 최대 60회 확인하며, endpoint는 DB 연결·스키마·Flyway 이력·필수 환경변수 상태를 반영합니다. systemd active만 되고 애플리케이션이 degraded/503이면 activation은 실패하고 상태/journal 진단을 남깁니다. GitHub Actions는 배포 workflow의 동시 실행은 직렬화하되, 원격 activation 도중 새 실행이 진행 중인 배포를 취소하지 않도록 설정합니다. activation 단계 제한 30분은 Flyway 최대 10분, HTTP readiness 재시도 최대 약 7분 및 서비스 설정 시간을 포함합니다.
+
+GitHub Actions는 archive 회귀 검사 전에 `tar --version`을 로그에 남기고 GNU tar가 아니면 workflow를 중단한다. `cron:check`는 그 runner의 GNU tar로 archive 무결성 및 staging 경로 containment 회귀를 수행한다.
+
+Flyway 실패 로그는 사전조건 확인을 `stage=flyway-preflight`, 실제 Docker/Flyway 실행을 `stage=flyway-migrate`로 구분한다. 운영 장애를 분류할 때 Docker CLI·`/etc/stockman/stockman.env`·`DATABASE_URL` 설정 문제와 migration 실행 실패를 이 단계값과 앞선 오류 메시지로 나눠 확인한다.
+
+`stage=service-restart` 실패 시 activation은 web/cron/RSS/fundamentals 서비스 및 timer 상태를 출력하고, 네 개 서비스 journal의 최근 40행을 함께 남긴다. 이 진단 명령 실패는 원래 activation 종료 코드를 덮지 않는다.
+
+애플리케이션 readiness는 systemd active와 별도로 `GET http://127.0.0.1:3000/api/health` HTTP 200을 요구한다. 이 공개 health route는 DB/schema/Flyway/필수 env 상태를 확인하고 비정상 시 503을 반환하므로, readiness 실패는 포트가 열렸지만 앱의 운영 의존성이 준비되지 않은 상태도 탐지한다.
 
 ```text
 ubuntu ALL=(root) NOPASSWD: /usr/local/sbin/stockman-activate *

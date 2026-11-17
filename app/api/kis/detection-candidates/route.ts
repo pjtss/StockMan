@@ -27,6 +27,9 @@ import {
 } from "@/lib/kis-investor-flow";
 import { writeKisSignalSnapshot } from "@/lib/kis-signal-snapshot";
 import { safeErrorMetadata, safeProviderCode } from "@/lib/error-diagnostics";
+import { getDb } from "@/lib/db";
+import { queryEligibleUniverse } from "@/lib/instrument-eligibility";
+import { meetsKrMarketCapFloor, parseKrMarketCapInBillionWon } from "@/lib/kr-market-cap";
 
 export const dynamic = "force-dynamic";
 
@@ -54,20 +57,19 @@ function applyDomesticMarketCapFloor(rows: ReturnType<typeof normalizeRows>) {
   const floorInBillionWon = 300;
   let eligible = 0;
   let excluded = 0;
+  let unknown = 0;
   const filtered = rows.filter((row) => {
     const sourceRow = row as Record<string, unknown>;
-    const raw = sourceRow.marketCap ?? sourceRow.stck_avls ?? sourceRow.mrkt_cap ?? sourceRow.market_cap;
-    if (raw === undefined || raw === null || String(raw).trim() === "") return true;
-    const marketCapInBillionWon = Number(String(raw).replace(/,/g, ""));
-    if (!Number.isFinite(marketCapInBillionWon)) return true;
-    if (marketCapInBillionWon <= floorInBillionWon) {
+    const cap = parseKrMarketCapInBillionWon(sourceRow);
+    if (!meetsKrMarketCapFloor(sourceRow, floorInBillionWon)) {
       excluded += 1;
+      if (cap === null) unknown += 1;
       return false;
     }
     eligible += 1;
     return true;
   });
-  return { rows: filtered, stats: { floorInBillionWon, eligible, excluded, totalBefore: rows.length, totalAfter: filtered.length } };
+  return { rows: filtered, stats: { floorInBillionWon, eligible, excluded, unknown, unknownMarketCap: "excluded", totalBefore: rows.length, totalAfter: filtered.length } };
 }
 
 export async function GET(request: Request) {
@@ -150,7 +152,17 @@ export async function GET(request: Request) {
                   : await fetchMarketValueRanking(token, url.searchParams.get("fiscalYear") ?? String(new Date().getFullYear() - 1), market, url.searchParams.get("metric") ?? "23", url.searchParams.get("quarter") ?? "3");
       result = { ok: flow.ok, rows: flow.rows as Record<string, unknown>[], diagnostics: { status: flow.status, rtCd: safeProviderCode(flow.rtCd), msgCd: safeProviderCode(flow.msgCd) } };
     }
-    const normalized = normalizeRows(result.rows, collectedAt);
+    let eligibleCodes = new Set<string>();
+    if (result.ok && result.rows.length > 0) {
+      try {
+        const officialUniverse = await queryEligibleUniverse(getDb(), "KR");
+        eligibleCodes = new Set(officialUniverse.rows.map((row: { code: unknown }) => String(row.code).trim()));
+      } catch {
+        return NextResponse.json({ ok: false, error: "COMMON_STOCK_UNIVERSE_UNAVAILABLE", source: "LOCAL_DB", market: "KR", signalType: source, eligibility: { failClosed: true } }, { status: 503 });
+      }
+    }
+    const normalized = normalizeRows(result.ok ? result.rows : [], collectedAt)
+      .filter((row) => row.code !== null && eligibleCodes.has(String(row.code)));
     const filtered = applyDomesticMarketCapFloor(normalized);
     const rows = filtered.rows;
     await writeKisSignalSnapshot({ market: "KR", code: "0000", signalType: `candidate_${source}`, status: result.ok ? "AVAILABLE" : "UNAVAILABLE", observedAt: new Date(collectedAt), payload: rows });

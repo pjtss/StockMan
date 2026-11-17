@@ -13,6 +13,8 @@
     "backfill:market-rss-normalized-summary": "node --experimental-strip-types scripts/backfill-market-rss-normalized-summary.mts",
     "audit:dependencies": "npm audit --omit=dev --audit-level=moderate",
     "audit:dependencies:all": "npm audit --audit-level=moderate",
+    "audit:daily-candles": "node scripts/audit-daily-candle-integrity.mjs",
+    "audit:flyway-local": "tsx scripts/audit-flyway-history.ts",
     "audit:kis-boundary": "node scripts/audit-kis-boundary.mjs",
     "audit:bearer-auth": "node scripts/audit-bearer-auth.mjs",
     "measure:verify": "node scripts/measure-verify.mjs",

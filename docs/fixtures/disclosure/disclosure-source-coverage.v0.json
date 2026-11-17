@@ -1,0 +1,1979 @@
+{
+  "contractVersion": "disclosure-source-coverage.v0",
+  "classification": "SYNTHETIC_DESIGN_FIXTURES_NOT_RUNTIME_ACCEPTANCE",
+  "dataPolicy": {
+    "containsRealFiling": false,
+    "containsRealIssuerOrTicker": false,
+    "containsSourceBody": false,
+    "containsCredentials": false,
+    "identitiesAreSynthetic": true
+  },
+  "sourceClasses": [
+    "OFFICIAL_DISCLOSURE",
+    "EXCHANGE_FEED",
+    "THIRD_PARTY_RSS"
+  ],
+  "queryStates": [
+    "DB_QUERY_COMPLETE",
+    "NO_MATCHING_STORED_ROWS",
+    "DB_QUERY_FAILED"
+  ],
+  "coverageStates": [
+    "ENUMERATED_PROVIDER_RESPONSE",
+    "PARTIAL",
+    "UNKNOWN"
+  ],
+  "requiredCoverageFields": [
+    "source",
+    "sourceClass",
+    "configuredState",
+    "runId",
+    "fetchState",
+    "persistState",
+    "observedAt",
+    "itemCount",
+    "pageCount",
+    "failureCode",
+    "lastSuccessfulPersistAt",
+    "rangeCoverage"
+  ],
+  "coverageAssertionManifestContract": {
+    "classification": "SYNTHETIC_RECONCILIATION_MANIFEST_PROPOSAL_NOT_RUNTIME_SCHEMA",
+    "oneManifestPer": "sourceProduct × endpoint × normalizedQueryScope × declaredWindow × reconciliationRun",
+    "requiredManifestFields": [
+      "manifestVersion",
+      "manifestId",
+      "sourceProduct",
+      "sourceClass",
+      "endpointOrSurface",
+      "normalizedQueryHash",
+      "issuerId",
+      "instrumentId",
+      "securityClassAndSeriesScope",
+      "windowStart",
+      "windowEnd",
+      "datePrecisionAndTimezone",
+      "requestedAt",
+      "completedAt",
+      "requestStatus",
+      "responseStatus",
+      "pageSizeRequested",
+      "expectedPageSet",
+      "observedPageSet",
+      "perPageObservations",
+      "expectedTotalRows",
+      "rawRowCount",
+      "validRowCount",
+      "uniqueReceiptCount",
+      "duplicateReceiptCount",
+      "invalidOrUnkeyedRowCount",
+      "rowSetDigest",
+      "metadataSetDigest",
+      "providerSnapshotCapability",
+      "reconciliationPassId",
+      "priorPassId",
+      "stabilityDisposition",
+      "correctionPolicyRevision",
+      "correctionWindowStart",
+      "correctionWindowEnd",
+      "correctionWatermarkAsOf",
+      "correctionWatermarkState",
+      "correctionDispositionDigest",
+      "masterSnapshotId",
+      "masterSnapshotHash",
+      "subjectApplicabilityRevisionId",
+      "crosswalkCoverageState",
+      "rightsDecisionSetHash",
+      "rightsDecisionRevisionRefs",
+      "requiredActionsAllowed",
+      "coveragePolicyRevision",
+      "coverageState",
+      "unresolvedReasons",
+      "manifestDigest"
+    ],
+    "perPageObservationFields": [
+      "requestedPageNo",
+      "responsePageNo",
+      "responsePageCount",
+      "responseTotalPages",
+      "responseTotalRows",
+      "responseStatus",
+      "rawRowCount",
+      "validReceiptCount",
+      "duplicateReceiptCount",
+      "invalidRowCount",
+      "firstReceiptNo",
+      "lastReceiptNo",
+      "rowSetDigest",
+      "metadataSetDigest"
+    ],
+    "states": [
+      "UNKNOWN",
+      "PARTIAL",
+      "PAGE_ENUMERATION_COMPLETE",
+      "OBSERVED_STABLE",
+      "RECONCILED_AS_OF",
+      "UNVERIFIABLE_COVERAGE_INCOMPLETE"
+    ],
+    "transitionRules": [
+      "PAGE_ENUMERATION_COMPLETE requires all expected pages and per-page status/echo/count reconciliation; it says nothing about later corrections or unobserved provider changes.",
+      "OBSERVED_STABLE requires comparable complete passes over the exact same canonical scope and equal receipt/metadata digests; it is not an immutable provider snapshot.",
+      "RECONCILED_AS_OF additionally requires approved lookback/freshness policy, current correction watermark, resolved issuer/instrument master and crosswalk scope, and exact current rights for required actions.",
+      "Any failed/omitted page, count mismatch, changed scope, unresolved identity, stale correction watermark, unapproved required rights action, or missing denominator prevents a complete/reconciled state.",
+      "Coverage is source-scope specific; one source's completion never fills another source's gap or proves the full universe complete."
+    ],
+    "publicProjectionMapping": {
+      "RECONCILED_AS_OF_WITH_ZERO_MATCHES": "NOT_FOUND_IN_SCOPE",
+      "documentReadAndExpectedAssertionAbsent": "NOT_REPORTED",
+      "UNKNOWN_OR_PARTIAL_OR_UNVERIFIABLE_COVERAGE": "UNVERIFIABLE",
+      "rightsDeniedOrUnresolved": "SUPPRESSED_RIGHTS",
+      "noSearchRun": "NOT_SEARCHED",
+      "conflictingEvidence": "CONFLICT_UNRESOLVED"
+    },
+    "consumerContractRefs": {
+      "issuerDossier": "disclosure-dossier-public-read.v0.json#/negativeEvidenceContract",
+      "investmentDossierProjection": "disclosure-investment-dossier-projection.v0.json#/sourceCoverageBinding",
+      "queryScopeNormalization": "#/queryScopeNormalizationContract",
+      "publicCoverageStatusMapping": "disclosure-dossier-public-read.v0.json#/negativeEvidenceContract/publicCoverageStatusMapping",
+      "publicCoverageVocabulary": "disclosure-dossier-public-read.v0.json#/negativeEvidenceContract/publicCoverageMessageKo",
+      "eventOutcomeFollowup": "event-schedule-notification.v0.json#ESN-15,ESN-18",
+      "convertibleListingOutcome": "convertible-outcome-evidence.v0.json#FUEV-15,FUEV-16"
+    },
+    "unapprovedPolicyValues": [
+      "lookback duration",
+      "max freshness age",
+      "required stable pass count/interval",
+      "quota budget",
+      "partial response rule",
+      "count disclosure policy"
+    ],
+    "notRuntimeProof": true
+  },
+  "queryScopeNormalizationContract": {
+    "contractVersion": "disclosure-query-scope-normalization.v0",
+    "classification": "SYNTHETIC_SOURCE_PROFILE_PROPOSAL_NOT_RUNTIME_HASH",
+    "canonicalization": "RFC8785_JCS_UTF8_THEN_SHA256_WITH_DISCLOSURE_SCOPE_DOMAIN_SEPARATOR",
+    "canonicalFields": ["sourceProduct", "endpointOrSurface", "profileRevision", "effectiveSemanticParameters", "datePrecisionAndTimezone"],
+    "secretFieldsNeverIncluded": ["crtfc_key", "api_key", "authorization", "cookie", "signed_url_query"],
+    "traversalFieldsSeparateFromSemanticQueryHash": ["page_no", "request_id", "retry_number"],
+    "traversalFieldsRetainedInManifest": ["pageSizeRequested", "expectedPageSet", "observedPageSet", "perPageObservations", "sort", "sort_mth"],
+    "defaultResolutionRule": "Apply a provider default only when the official endpoint guide documents it and the profile pins that guide revision; distinguish absent, explicit, and default-resolved values in canonical input.",
+    "profiles": {
+      "OPENDART_LIST_JSON": {
+        "sourceProduct": "OpenDART disclosure search list API",
+        "endpointOrSurface": "https://opendart.fss.or.kr/api/list.json",
+        "officialGuide": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001",
+        "semanticParameters": ["bgn_de", "end_de", "corp_code", "corp_cls", "pblntf_ty", "pblntf_detail_ty", "last_reprt_at"],
+        "documentedDefaults": {"last_reprt_at": "N", "sort": "date", "sort_mth": "desc", "page_no": "1", "page_count": "10"},
+        "currentRepositoryRequestProfile": {
+          "sourcePath": "lib/dart-opendart-client.ts",
+          "explicitParameters": ["bgn_de", "end_de", "sort", "sort_mth", "page_no", "page_count"],
+          "effectiveParameters": {"corp_code": null, "corp_cls": null, "pblntf_ty": null, "pblntf_detail_ty": null, "last_reprt_at": "N", "sort": "date", "sort_mth": "desc", "page_count": "100"},
+          "datePrecisionAndTimezone": "KST_RECEIPT_DATE_YYYYMMDD",
+          "pageSizeRequested": 100,
+          "pageNoExcludedFromSemanticHash": true,
+          "apiKeyExcludedFromCanonicalInput": true
+        },
+        "hashInvalidationFields": ["bgn_de", "end_de", "corp_code", "corp_cls", "pblntf_ty", "pblntf_detail_ty", "last_reprt_at", "sort", "sort_mth", "profileRevision"]
+      },
+      "UNPROFILED_RSS_OR_PROVIDER": {
+        "canonicalQueryHash": null,
+        "scopeDisposition": "UNRESOLVED",
+        "negativeEvidenceAllowed": false,
+        "rule": "Do not hash a raw URL containing credentials or infer provider parameter semantics. Require an owner-reviewed allowlisted parameter profile and rights scope first."
+      }
+    },
+    "responseValidationAndFailureContract": {
+      "classification": "SYNTHETIC_DESIGN_ACCEPTANCE_NOT_RUNTIME_IMPLEMENTATION",
+      "successStatus": "000",
+      "emptyStatus": "013",
+      "providerFailureStatuses": {"020": "QUOTA_EXCEEDED", "010": "AUTHENTICATION", "011": "AUTHORIZATION", "012": "REQUEST", "100": "MAINTENANCE", "101": "MAINTENANCE", "800": "MAINTENANCE"},
+      "successListShape": "ARRAY_REQUIRED",
+      "invalidSuccessListDisposition": "FAILED_OR_PARTIAL_NOT_EMPTY_SUCCESS",
+      "providerFailureDisposition": "PRESERVE_STATUS_AND_MESSAGE_AS_AUDIT_REASON; NEVER_EMPTY_SUCCESS",
+      "correctionReconciliation": "REQUERY_SAME_CANONICAL_SOURCE_QUERY_AND_WINDOW; REQUIRE_APPROVED_LOOKBACK_POLICY_FOR_WIDER_OVERLAP",
+      "priorAsOfHistory": "IMMUTABLE; INVALIDATE_CURRENT_COVERAGE_AND_DEPENDENT_NEGATIVE_EVIDENCE",
+      "notRuntimeProof": true
+    },
+    "notRuntimeProof": true
+  },
+  "storageOwnershipGapMatrix": {
+    "classification": "SYNTHETIC_CHECKED_IN_REPOSITORY_AUDIT_NOT_LIVE_DATABASE_EVIDENCE",
+    "checkedInEvidence": [
+      "db/migration",
+      "lib/schema.ts",
+      "lib/dart-opendart-client.ts",
+      "docs/fixtures/disclosure/decision-register.v0.json"
+    ],
+    "liveDatabaseCatalogState": "UNKNOWN_NOT_INSPECTED",
+    "currentCoveragePersistenceState": "NO_COVERAGE_ASSERTION_STORAGE_FOUND_IN_CHECKED_IN_MIGRATIONS_OR_SCHEMA",
+    "defaultConsumerGate": "NO_RECONCILED_AS_OF_OR_NEGATIVE_EVIDENCE_CLAIM_WITHOUT_CANONICAL_PERSISTED_MANIFEST_AND_REQUIRED_DECISIONS_APPROVED_FOR_EXACT_SCOPE",
+    "decisionGatePlan": {
+      "requiredBeforePersistenceDesign": [
+        "KR-DART-RIGHTS-01",
+        "KR-RETENTION-01",
+        "KR-DB-DRIFT-01",
+        "KR-OPERATIONAL-SECURITY-01"
+      ],
+      "requiredBeforeReconciledAsOf": [
+        "KR-RECONCILIATION-01",
+        "KR-MASTER-SNAPSHOT-01",
+        "KR-EVENT-ATTRIBUTION-01",
+        "KR-DART-RIGHTS-01"
+      ],
+      "requiredBeforePublicNegativeEvidence": [
+        "KR-API-UI-CONSISTENCY-01",
+        "KR-DOCUMENT-UX-01",
+        "KR-RECONCILIATION-01",
+        "KR-DART-RIGHTS-01",
+        "KR-RETENTION-01",
+        "KR-MASTER-SNAPSHOT-01",
+        "KR-EVENT-ATTRIBUTION-01"
+      ],
+      "statusSemantics": "Register scope/owner/acceptance requirements do not imply APPROVED. Current status is derived from the verified latest decision-evidence ledger revision; an empty ledger leaves all decisions OPEN.",
+      "reopenOn": [
+        "source terms or product revision changes",
+        "endpoint/field/action/purpose/channel/retention scope changes",
+        "coverage window/quota/freshness policy changes",
+        "schema drift or unreviewed external writer found",
+        "master/crosswalk revision or subject applicability changes",
+        "manifest digest or lineage verification fails"
+      ],
+      "gateRule": "A decision approval is necessary only for its exact registered scope; it is not sufficient by itself to activate persistence, reconciliation, or public consumers. Each consumer also requires its own implementation and acceptance gates."
+    },
+    "databaseDriftEvidencePackage": {
+      "classification": "SYNTHETIC_EVIDENCE_REQUEST_CONTRACT_NOT_ENVIRONMENT_OBSERVATION",
+      "decisionId": "KR-DB-DRIFT-01",
+      "currentRepositoryEvidence": [
+        {
+          "evidenceId": "DBE-REPO-01",
+          "source": "db/migration/",
+          "claim": "Checked-in ordered migration history is the repository migration source; latest tracked migration is V165.",
+          "limitations": "Does not prove any database environment has applied the full sequence or matches checksums."
+        },
+        {
+          "evidenceId": "DBE-REPO-02",
+          "source": "scripts/audit-flyway-history.ts and db/README.md",
+          "claim": "A read-only local audit compares Flyway success history with repository migration files and inspects selected destructive migration preconditions.",
+          "limitations": "The script permits localhost only, does not inspect production, does not repair history, and does not establish external writers or grants."
+        },
+        {
+          "evidenceId": "DBE-REPO-03",
+          "source": "app/api/health and db/README.md",
+          "claim": "Health output exposes flywayVersion, schemaReady, and missingTables for an accessed application/database pair.",
+          "limitations": "A health response is not a complete catalog, ownership, privilege, trigger, view, dynamic SQL, or backup inventory."
+        },
+        {
+          "evidenceId": "DBE-REPO-04",
+          "source": "docs/architecture/kr-disclosure-event-architecture.md section P5 current gaps",
+          "claim": "Local migration-history drift and destructive preconditions are documented as unresolved; automated migration/history repair is prohibited.",
+          "limitations": "Planning document does not replace a fresh environment snapshot or restoration rehearsal."
+        }
+      ],
+      "catalogQueryCoverage": {
+        "inventoryScopeKey": [
+          "environmentId",
+          "databaseInstanceFingerprint",
+          "databaseRole",
+          "schemaName",
+          "observationAt",
+          "catalogQuerySetRevision"
+        ],
+        "relationDenominator": {
+          "querySource": "pg_class joined to pg_namespace",
+          "requiredColumns": [
+            "oid",
+            "schema name",
+            "relation name",
+            "relkind",
+            "owner",
+            "persistence",
+            "partition parent/child relation"
+          ],
+          "scopeRule": "include every non-system schema and every relation kind; explicitly classify extensions and temporary objects",
+          "omissionDetection": "compare accessible namespaces and relation-kind totals with independent information_schema/pg_catalog summaries; record privilege-denied scopes and expected-but-absent relations"
+        },
+        "columnAndConstraintDenominator": {
+          "querySource": "pg_attribute, pg_constraint, pg_index and information_schema cross-check",
+          "requiredColumns": [
+            "relation",
+            "column ordinal/name/type/nullability/default/generated state",
+            "constraint type/definition/validated state",
+            "index definition/valid/ready/unique state"
+          ],
+          "omissionDetection": "per relation compare attribute/constraint/index counts and definition digests across catalog query revisions; inaccessible relation marks inventory incomplete"
+        },
+        "programmableObjectDenominator": {
+          "querySource": "pg_proc, pg_trigger, pg_views/pg_matviews",
+          "requiredColumns": [
+            "schema",
+            "object identity",
+            "owner",
+            "definition digest",
+            "enabled/valid state",
+            "dependent relations"
+          ],
+          "omissionDetection": "include disabled/internal triggers as classified rows; compare object counts by kind and explicit permission visibility; unresolved definitions keep drift UNKNOWN"
+        },
+        "privilegeDenominator": {
+          "querySource": "pg_roles, pg_namespace/pg_class ACLs, information_schema role grants and default privileges",
+          "requiredColumns": [
+            "role/principal",
+            "membership",
+            "relation/schema privilege",
+            "grantor/grantee",
+            "grant option",
+            "default privilege",
+            "role attributes"
+          ],
+          "omissionDetection": "run as an approved catalog auditor, include PUBLIC and inherited memberships, record visibility limitations and compare effective privileges with ACL source rows"
+        },
+        "queryManifestFields": [
+          "queryId",
+          "queryRevision",
+          "queryTextDigest",
+          "databaseRole",
+          "startedAt",
+          "completedAt",
+          "visibleSchemaSet",
+          "rowsReturned",
+          "expectedObjectKindCounts",
+          "observedObjectKindCounts",
+          "permissionDeniedScopes",
+          "resultDigest",
+          "completenessState"
+        ],
+        "completenessStates": [
+          "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+          "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+          "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+        ],
+        "rule": "Zero rows establish absence only inside a declared schema/object scope when query success, privilege visibility, independent counts and expected-set denominator reconcile; otherwise the result is UNKNOWN."
+      },
+      "writerDenominatorContract": {
+        "inventoryRoots": [
+          "repository route/action/cron/scheduled function entrypoints",
+          "migration-defined triggers/functions/jobs and dynamic SQL references",
+          "deployment scheduler and importer/backfill manifests",
+          "database login roles and effective write grants",
+          "owner-attested external service/operator integrations"
+        ],
+        "joinKeys": [
+          "environmentId",
+          "deploymentCommitOrArtifact",
+          "databaseRoleOrPrincipal",
+          "targetRelation",
+          "observationWindow"
+        ],
+        "completenessChecks": [
+          "every writable principal maps to at least one declared writer or an explicit unused/disabled disposition",
+          "every discovered write entrypoint maps to principal, relation and owner role",
+          "every scheduled/deployed task inventory is reconciled against repository and deployment manifests",
+          "dynamic SQL or unresolved relation targets remain UNKNOWN and block migration/import",
+          "independent DB owner attestation covers external services and manual/operator writers absent from repository"
+        ],
+        "states": [
+          "COMPLETE_ATTESTED_SCOPE",
+          "PARTIAL_REPOSITORY_ONLY",
+          "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+        ],
+        "rule": "Static repository scan is a lower bound. It cannot establish a complete writer denominator without deployment inventory, effective grants and owner attestation."
+      },
+      "databaseInventoryGoldenFixtureContract": {
+        "classification": "SYNTHETIC_ACCEPTANCE_CASES_NOT_DATABASE_OBSERVATIONS",
+        "schemaVersion": "database-inventory-golden-case.v0",
+        "schemaContract": {
+          "additionalProperties": false,
+          "caseFields": {
+            "required": [
+              "id",
+              "category",
+              "input",
+              "expected"
+            ],
+            "types": {
+              "id": "string",
+              "category": "enum",
+              "input": "object",
+              "expected": "object"
+            }
+          },
+          "inputFieldsByCategory": {
+            "valid-empty": {
+              "required": [
+                "querySucceeded",
+                "visibleSchemas",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches",
+                "writerState",
+                "declaredScope"
+              ],
+              "allowed": [
+                "querySucceeded",
+                "visibleSchemas",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches",
+                "writerState",
+                "declaredScope"
+              ]
+            },
+            "permission-gap": {
+              "required": [
+                "querySucceeded",
+                "visibleSchemas",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches",
+                "writerState",
+                "declaredScope"
+              ],
+              "allowed": [
+                "querySucceeded",
+                "visibleSchemas",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches",
+                "writerState",
+                "declaredScope"
+              ]
+            },
+            "count-mismatch": {
+              "required": [
+                "querySucceeded",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches"
+              ],
+              "allowed": [
+                "querySucceeded",
+                "permissionDeniedScopes",
+                "expectedRelationKinds",
+                "observedRelationKinds",
+                "independentSummaryMatches"
+              ]
+            },
+            "query-failure": {
+              "required": [
+                "querySucceeded",
+                "errorClass",
+                "rowsReturned",
+                "permissionDeniedScopes"
+              ],
+              "allowed": [
+                "querySucceeded",
+                "errorClass",
+                "rowsReturned",
+                "permissionDeniedScopes"
+              ]
+            },
+            "digest-integrity": {
+              "required": [
+                "canonicalizationRevision",
+                "sortedRows",
+                "duplicateRows",
+                "digestBefore",
+                "digestAfter"
+              ],
+              "allowed": [
+                "canonicalizationRevision",
+                "sortedRows",
+                "duplicateRows",
+                "digestBefore",
+                "digestAfter"
+              ]
+            },
+            "digest-canonicalization": {
+              "required": [
+                "canonicalizationRevision",
+                "orderedRows",
+                "reorderedRows",
+                "digestOrdered",
+                "digestReordered"
+              ],
+              "allowed": [
+                "canonicalizationRevision",
+                "orderedRows",
+                "reorderedRows",
+                "digestOrdered",
+                "digestReordered"
+              ]
+            },
+            "writer-gap": {
+              "required": [
+                "repositoryEntrypoints",
+                "writeCapablePrincipals",
+                "deploymentTasks",
+                "ownerAttestation",
+                "externalWriterInventoryState"
+              ],
+              "allowed": [
+                "repositoryEntrypoints",
+                "writeCapablePrincipals",
+                "deploymentTasks",
+                "ownerAttestation",
+                "externalWriterInventoryState"
+              ]
+            },
+            "writer-complete": {
+              "required": [
+                "repositoryEntrypoints",
+                "writeCapablePrincipals",
+                "deploymentTasks",
+                "externalWriterInventoryState",
+                "ownerAttestation",
+                "unresolvedDynamicTargets"
+              ],
+              "allowed": [
+                "repositoryEntrypoints",
+                "writeCapablePrincipals",
+                "deploymentTasks",
+                "externalWriterInventoryState",
+                "ownerAttestation",
+                "unresolvedDynamicTargets"
+              ]
+            },
+            "dynamic-target": {
+              "required": [
+                "writer",
+                "targetRelation",
+                "deploymentCommit",
+                "ownerRole"
+              ],
+              "allowed": [
+                "writer",
+                "targetRelation",
+                "deploymentCommit",
+                "ownerRole"
+              ]
+            },
+            "scope-drift": {
+              "required": [
+                "previousScope",
+                "currentScope",
+                "previousDigest",
+                "currentDigest"
+              ],
+              "allowed": [
+                "previousScope",
+                "currentScope",
+                "previousDigest",
+                "currentDigest"
+              ]
+            }
+          },
+          "expectedFields": {
+            "required": [
+              "catalogCompleteness",
+              "writerCompleteness",
+              "migrationGate",
+              "zeroMeansAbsent"
+            ],
+            "allowed": [
+              "catalogCompleteness",
+              "writerCompleteness",
+              "migrationGate",
+              "zeroMeansAbsent"
+            ]
+          },
+          "enums": {
+            "category": [
+              "valid-empty",
+              "permission-gap",
+              "count-mismatch",
+              "query-failure",
+              "digest-integrity",
+              "digest-canonicalization",
+              "writer-gap",
+              "writer-complete",
+              "dynamic-target",
+              "scope-drift"
+            ],
+            "catalogCompleteness": [
+              "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+              "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+              "UNKNOWN_NO_RECONCILABLE_DENOMINATOR"
+            ],
+            "writerCompleteness": [
+              "COMPLETE_ATTESTED_SCOPE",
+              "PARTIAL_REPOSITORY_ONLY",
+              "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+            ],
+            "migrationGate": [
+              "BLOCKED",
+              "OPEN_FOR_REVIEW_ONLY"
+            ],
+            "externalWriterInventoryState": [
+              "COMPLETE_ATTESTED_SCOPE",
+              "PARTIAL_REPOSITORY_ONLY",
+              "UNKNOWN_EXTERNAL_WRITER_COVERAGE"
+            ]
+          },
+          "types": {
+            "querySucceeded": "boolean",
+            "visibleSchemas": "string[]",
+            "permissionDeniedScopes": "string[]",
+            "expectedRelationKinds": "count-map",
+            "observedRelationKinds": "count-map",
+            "independentSummaryMatches": "boolean",
+            "writerState": "writer-completeness-enum",
+            "declaredScope": "string",
+            "errorClass": "string",
+            "rowsReturned": "non-negative-integer",
+            "ownerAttestation": "boolean",
+            "repositoryEntrypoints": "string[]",
+            "writeCapablePrincipals": "string[]",
+            "deploymentTasks": "string[]",
+            "unresolvedDynamicTargets": "string[]",
+            "canonicalizationRevision": "string",
+            "sortedRows": "row-tuple[]",
+            "duplicateRows": "row-tuple[]",
+            "orderedRows": "row-tuple[]",
+            "reorderedRows": "row-tuple[]",
+            "digestBefore": "string",
+            "digestAfter": "string",
+            "digestOrdered": "string",
+            "digestReordered": "string",
+            "writer": "string",
+            "targetRelation": "string",
+            "deploymentCommit": "string",
+            "ownerRole": "string",
+            "previousScope": "string",
+            "currentScope": "string",
+            "previousDigest": "string",
+            "currentDigest": "string",
+            "zeroMeansAbsent": "boolean"
+          }
+        },
+        "requiredCaseFields": [
+          "id",
+          "category",
+          "input",
+          "expected"
+        ],
+        "requiredOutcomeFields": [
+          "catalogCompleteness",
+          "writerCompleteness",
+          "migrationGate",
+          "zeroMeansAbsent"
+        ],
+        "cases": [
+          {
+            "id": "DBI-01-EMPTY-SCOPE-WITH-RECONCILED-PRIVILEGE",
+            "category": "valid-empty",
+            "input": {
+              "querySucceeded": true,
+              "visibleSchemas": [
+                "app"
+              ],
+              "permissionDeniedScopes": [],
+              "expectedRelationKinds": {
+                "table": 0,
+                "view": 0,
+                "materializedView": 0
+              },
+              "observedRelationKinds": {
+                "table": 0,
+                "view": 0,
+                "materializedView": 0
+              },
+              "independentSummaryMatches": true,
+              "writerState": "COMPLETE_ATTESTED_SCOPE",
+              "declaredScope": "schema:app"
+            },
+            "expected": {
+              "catalogCompleteness": "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+              "writerCompleteness": "COMPLETE_ATTESTED_SCOPE",
+              "migrationGate": "OPEN_FOR_REVIEW_ONLY",
+              "zeroMeansAbsent": true
+            }
+          },
+          {
+            "id": "DBI-02-EMPTY-ROWS-BUT-ROLE-CANNOT-SEE-OTHER-SCHEMA",
+            "category": "permission-gap",
+            "input": {
+              "querySucceeded": true,
+              "visibleSchemas": [
+                "app"
+              ],
+              "permissionDeniedScopes": [
+                "finance"
+              ],
+              "expectedRelationKinds": {
+                "table": 4
+              },
+              "observedRelationKinds": {
+                "table": 0
+              },
+              "independentSummaryMatches": false,
+              "writerState": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "declaredScope": "all-user-schemas"
+            },
+            "expected": {
+              "catalogCompleteness": "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-03-RELATION-KIND-DENOMINATOR-MISMATCH",
+            "category": "count-mismatch",
+            "input": {
+              "querySucceeded": true,
+              "permissionDeniedScopes": [],
+              "expectedRelationKinds": {
+                "table": 5,
+                "view": 2
+              },
+              "observedRelationKinds": {
+                "table": 5,
+                "view": 1
+              },
+              "independentSummaryMatches": false
+            },
+            "expected": {
+              "catalogCompleteness": "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-04-QUERY-FAILURE-IS-NOT-EMPTY",
+            "category": "query-failure",
+            "input": {
+              "querySucceeded": false,
+              "errorClass": "PERMISSION_OR_TIMEOUT",
+              "rowsReturned": 0,
+              "permissionDeniedScopes": [
+                "pg_proc"
+              ]
+            },
+            "expected": {
+              "catalogCompleteness": "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-05-DUPLICATE-CATALOG-ROW-CHANGES-DIGEST",
+            "category": "digest-integrity",
+            "input": {
+              "canonicalizationRevision": "SYN-JCS-1",
+              "sortedRows": [
+                [
+                  "app",
+                  "table",
+                  "filings"
+                ],
+                [
+                  "app",
+                  "table",
+                  "users"
+                ]
+              ],
+              "duplicateRows": [
+                [
+                  "app",
+                  "table",
+                  "filings"
+                ]
+              ],
+              "digestBefore": "SYN-DIGEST-A",
+              "digestAfter": "SYN-DIGEST-B"
+            },
+            "expected": {
+              "catalogCompleteness": "PARTIAL_PRIVILEGE_OR_QUERY_FAILURE",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-06-SAME-ROWS-DIFFERENT-ORDER-SAME-CANONICAL-DIGEST",
+            "category": "digest-canonicalization",
+            "input": {
+              "canonicalizationRevision": "SYN-JCS-1",
+              "orderedRows": [
+                [
+                  "app",
+                  "table",
+                  "filings"
+                ],
+                [
+                  "app",
+                  "view",
+                  "dossier"
+                ]
+              ],
+              "reorderedRows": [
+                [
+                  "app",
+                  "view",
+                  "dossier"
+                ],
+                [
+                  "app",
+                  "table",
+                  "filings"
+                ]
+              ],
+              "digestOrdered": "SYN-DIGEST-C",
+              "digestReordered": "SYN-DIGEST-C"
+            },
+            "expected": {
+              "catalogCompleteness": "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-07-EMPTY-WRITER-LIST-REPOSITORY-ONLY",
+            "category": "writer-gap",
+            "input": {
+              "repositoryEntrypoints": [],
+              "writeCapablePrincipals": [
+                "svc_job"
+              ],
+              "deploymentTasks": [],
+              "ownerAttestation": false,
+              "externalWriterInventoryState": "PARTIAL_REPOSITORY_ONLY"
+            },
+            "expected": {
+              "catalogCompleteness": "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+              "writerCompleteness": "PARTIAL_REPOSITORY_ONLY",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-08-EVERY-WRITER-PRINCIPAL-AND-ENTRYPOINT-RECONCILED",
+            "category": "writer-complete",
+            "input": {
+              "repositoryEntrypoints": [
+                "cron:sync"
+              ],
+              "writeCapablePrincipals": [
+                "app_writer"
+              ],
+              "deploymentTasks": [
+                "cron:sync"
+              ],
+              "externalWriterInventoryState": "COMPLETE_ATTESTED_SCOPE",
+              "ownerAttestation": true,
+              "unresolvedDynamicTargets": []
+            },
+            "expected": {
+              "catalogCompleteness": "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+              "writerCompleteness": "COMPLETE_ATTESTED_SCOPE",
+              "migrationGate": "OPEN_FOR_REVIEW_ONLY",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-09-UNRESOLVED-DYNAMIC-SQL-TARGET-BLOCKS",
+            "category": "dynamic-target",
+            "input": {
+              "writer": "admin:backfill",
+              "targetRelation": "DYNAMIC_UNRESOLVED",
+              "deploymentCommit": "SYN-COMMIT-1",
+              "ownerRole": "UNKNOWN"
+            },
+            "expected": {
+              "catalogCompleteness": "COMPLETE_WITHIN_DECLARED_PRIVILEGE_SCOPE",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          },
+          {
+            "id": "DBI-10-SCOPE-OR-CANONICALIZATION-REVISION-CHANGED",
+            "category": "scope-drift",
+            "input": {
+              "previousScope": "all-user-schemas@SYN-REV-1",
+              "currentScope": "public-only@SYN-REV-2",
+              "previousDigest": "SYN-DIGEST-D",
+              "currentDigest": "SYN-DIGEST-D"
+            },
+            "expected": {
+              "catalogCompleteness": "UNKNOWN_NO_RECONCILABLE_DENOMINATOR",
+              "writerCompleteness": "UNKNOWN_EXTERNAL_WRITER_COVERAGE",
+              "migrationGate": "BLOCKED",
+              "zeroMeansAbsent": false
+            }
+          }
+        ],
+        "schemaRef": "schema/database-inventory-golden-case.v0.schema.json",
+        "schemaDraft": "http://json-schema.org/draft-07/schema#"
+      },
+      "requiredEnvironmentBundleFields": [
+        "environmentId",
+        "observationAt",
+        "databaseInstanceFingerprint",
+        "databaseVersion",
+        "databaseRole",
+        "schemaInventoryDigest",
+        "flywayHistoryDigest",
+        "repositoryMigrationHead",
+        "pendingAndFailedMigrations",
+        "checksumMismatches",
+        "relationInventory",
+        "constraintsAndIndexesInventory",
+        "viewsFunctionsTriggersInventory",
+        "rolesGrantsAndDefaultPrivileges",
+        "writerAndImporterInventory",
+        "deploymentArtifactAndCommit",
+        "rowCountAndCanonicalDigestScope",
+        "backupSnapshotIdAndAsOf",
+        "restoreRehearsalReportRef",
+        "destructivePreconditionReport",
+        "additiveDryRunReport",
+        "ownerReview",
+        "evidenceManifestDigest"
+      ],
+      "environmentMatrix": [
+        {
+          "environment": "LOCALHOST_DB",
+          "evidenceState": "NOT_COLLECTED_THIS_TURN",
+          "collectionMethod": "npm exec tsx -- scripts/audit-flyway-history.ts (read-only; localhost restriction); attach generated report digest and exact repo HEAD",
+          "knownSafetyBoundary": "Do not execute Flyway migrate, repair, baseline, import, or destructive migration during inventory."
+        },
+        {
+          "environment": "DEPLOYED_DATABASES",
+          "evidenceState": "UNKNOWN_NO_ENVIRONMENT_CATALOG_OR_OWNER_BUNDLE",
+          "collectionMethod": "DB owner exports read-only catalog/history/privilege inventory through approved operations channel; bind deployment artifact/commit and observation time",
+          "knownSafetyBoundary": "Repository access, health checks, and local audit cannot prove deployed schema or enumerate unregistered external writers."
+        }
+      ],
+      "externalWriterInventory": {
+        "requiredClasses": [
+          "application routes and server actions",
+          "cron and scheduled functions",
+          "importers/backfills/manual scripts",
+          "database triggers/functions/jobs",
+          "external services and operator consoles"
+        ],
+        "recordFields": [
+          "writerId",
+          "environmentId",
+          "ownerRole",
+          "entryPointOrPrincipal",
+          "targetRelations",
+          "readWriteActions",
+          "deploymentOrScheduleRef",
+          "lastObservedAt",
+          "evidenceRef",
+          "inventoryDisposition"
+        ],
+        "unknownWriterDisposition": "BLOCK_MIGRATION_AND_IMPORT"
+      },
+      "acceptanceSequence": [
+        "capture immutable environment bundle and evidence digests",
+        "compare schema and flyway history with exact repository migration head/checksums",
+        "resolve failed/pending/checksum drift and destructive preconditions without automatic repair",
+        "enumerate principals, grants, functions, triggers and all application/external writers",
+        "verify backup snapshot and restore rehearsal against owner-approved RPO/RTO",
+        "run approved additive migration dry-run and row/hash reconciliation",
+        "obtain named DB owner approval for exact environment and artifact"
+      ],
+      "notEvidence": [
+        "repository migration list alone",
+        "health endpoint alone",
+        "unverified screenshot",
+        "missing row returned by an incomplete catalog query",
+        "empty writer inventory without owner attestation and source coverage",
+        "backup existence without successful restore rehearsal"
+      ],
+      "failClosedOutcomes": {
+        "incompleteEnvironmentInventory": "UNKNOWN",
+        "migrationOrChecksumDrift": "BLOCKED",
+        "unclassifiedWriterOrPrivilege": "BLOCKED",
+        "missingVerifiedBackupOrRestore": "BLOCKED",
+        "destructivePreconditionUnresolved": "BLOCKED",
+        "additiveDryRunMissing": "BLOCKED",
+        "ownerApprovalMissing": "OPEN"
+      }
+    },
+    "fieldOwnership": [
+      {
+        "field": "manifestVersion",
+        "fieldGroup": "manifest-identity",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼/공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DB-DRIFT-01"
+        ],
+        "evidence": "manifest contract only; no checked-in canonical coverage table or schema field",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "manifestId",
+        "fieldGroup": "manifest-identity",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼/공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DB-DRIFT-01"
+        ],
+        "evidence": "manifest contract only; no checked-in canonical coverage table or schema field",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "sourceProduct",
+        "fieldGroup": "source-scope",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "collector identifies OpenDART list path; source product×action rights binding is not persisted in a coverage assertion",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "sourceClass",
+        "fieldGroup": "source-scope",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "source types occur in existing ingestion contracts; no canonical assertion row found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "endpointOrSurface",
+        "fieldGroup": "source-scope",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "OpenDART list endpoint is called by collector; coverage-scoped endpoint evidence is not persisted",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "normalizedQueryHash",
+        "fieldGroup": "source-scope",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-OPERATIONAL-SECURITY-01"
+        ],
+        "evidence": "no canonical query-scope hash storage found in checked-in schema",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "issuerId",
+        "fieldGroup": "subject-scope",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "종목 데이터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01",
+          "KR-EVENT-ATTRIBUTION-01"
+        ],
+        "evidence": "filing rows may carry issuer/corp identity; temporal subject applicability is not bound to a coverage assertion",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "instrumentId",
+        "fieldGroup": "subject-scope",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "종목 데이터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01",
+          "KR-EVENT-ATTRIBUTION-01"
+        ],
+        "evidence": "no coverage assertion instrument identity/revision field found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "securityClassAndSeriesScope",
+        "fieldGroup": "subject-scope",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "종목 데이터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01",
+          "KR-EVENT-ATTRIBUTION-01"
+        ],
+        "evidence": "no coverage assertion class/series scope field found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "windowStart",
+        "fieldGroup": "query-window",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "fetchOpenDartToday derives a KST date, but no approved historical window assertion is persisted",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "windowEnd",
+        "fieldGroup": "query-window",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "fetchOpenDartToday derives a KST date, but no approved historical window assertion is persisted",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "datePrecisionAndTimezone",
+        "fieldGroup": "query-window",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "collector uses KST day semantics; no coverage manifest precision field is stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "requestedAt",
+        "fieldGroup": "request-observation",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "request timestamp is not stored as a canonical coverage observation",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "completedAt",
+        "fieldGroup": "request-observation",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "request completion timestamp is not stored as a canonical coverage observation",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "requestStatus",
+        "fieldGroup": "request-observation",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "collector success/error control flow exists; no durable per-request coverage status",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "responseStatus",
+        "fieldGroup": "request-observation",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "OpenDART response status is parsed in-process; response/page status history is not persisted",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "pageSizeRequested",
+        "fieldGroup": "pagination",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "collector requests page_count 100; no canonical run evidence row stores it",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "expectedPageSet",
+        "fieldGroup": "pagination",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "collector iterates total_page but no expected page set is persisted or reconciled",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "observedPageSet",
+        "fieldGroup": "pagination",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "pages are traversed in-process; observed page set/echo not persisted",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "perPageObservations",
+        "fieldGroup": "pagination",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "no page-level immutable observation storage found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "expectedTotalRows",
+        "fieldGroup": "row-denominators",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "collector parses total_count but does not compare it with collected rows or persist the denominator",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "rawRowCount",
+        "fieldGroup": "row-denominators",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no raw response row denominator stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "validRowCount",
+        "fieldGroup": "row-denominators",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no accepted valid-row denominator stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "uniqueReceiptCount",
+        "fieldGroup": "row-denominators",
+        "storageDisposition": "PARTIAL_RUNTIME_NOT_RECONCILIATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "collector deduplicates with an in-memory receipt map; unique count is not persisted as assertion evidence",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "duplicateReceiptCount",
+        "fieldGroup": "row-denominators",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "map replacement hides prior duplicate rows; no duplicate denominator is recorded",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "invalidOrUnkeyedRowCount",
+        "fieldGroup": "row-denominators",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no invalid/unkeyed row denominator stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "rowSetDigest",
+        "fieldGroup": "digests",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "no canonical coverage row-set digest stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "metadataSetDigest",
+        "fieldGroup": "digests",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "no canonical metadata digest stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "providerSnapshotCapability",
+        "fieldGroup": "provider-stability",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 수집 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no checked-in provider snapshot capability evidence tied to a run",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "reconciliationPassId",
+        "fieldGroup": "provider-stability",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no durable reconciliation pass entity found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "priorPassId",
+        "fieldGroup": "provider-stability",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no durable prior-pass link found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "stabilityDisposition",
+        "fieldGroup": "provider-stability",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no persisted same-scope pass comparison outcome found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "correctionPolicyRevision",
+        "fieldGroup": "correction-watermark",
+        "storageDisposition": "DECISION_GATED_NO_POLICY_APPROVED",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "lookback/cadence/freshness thresholds remain OPEN and no policy revision is approved",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "correctionWindowStart",
+        "fieldGroup": "correction-watermark",
+        "storageDisposition": "DECISION_GATED_NO_POLICY_APPROVED",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "approved correction lookback window is absent",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "correctionWindowEnd",
+        "fieldGroup": "correction-watermark",
+        "storageDisposition": "DECISION_GATED_NO_POLICY_APPROVED",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "approved correction lookback window is absent",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "correctionWatermarkAsOf",
+        "fieldGroup": "correction-watermark",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no persisted correction watermark per source scope found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "correctionWatermarkState",
+        "fieldGroup": "correction-watermark",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no persisted watermark validity state found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "correctionDispositionDigest",
+        "fieldGroup": "correction-watermark",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 도메인 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "no correction disposition set digest stored; rights for retained derivation remain unresolved",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "masterSnapshotId",
+        "fieldGroup": "master-crosswalk",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "종목 데이터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01"
+        ],
+        "evidence": "no coverage assertion reference to immutable official master snapshot found",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "masterSnapshotHash",
+        "fieldGroup": "master-crosswalk",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "종목 데이터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "no coverage-bound master snapshot hash found; retention scope awaits decision",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "subjectApplicabilityRevisionId",
+        "fieldGroup": "master-crosswalk",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 도메인·종목 마스터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01",
+          "KR-EVENT-ATTRIBUTION-01"
+        ],
+        "evidence": "no temporal subject applicability revision is linked from a coverage record",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "crosswalkCoverageState",
+        "fieldGroup": "master-crosswalk",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "공시 도메인·종목 마스터 책임자",
+        "decisionRefs": [
+          "KR-MASTER-SNAPSHOT-01",
+          "KR-EVENT-ATTRIBUTION-01"
+        ],
+        "evidence": "crosswalk design exists but no source-window assertion binding is stored",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "rightsDecisionSetHash",
+        "fieldGroup": "rights-decision",
+        "storageDisposition": "RIGHTS_GATED_NO_APPROVED_ACTION_SET",
+        "candidateOwnerRole": "데이터/법무 책임자",
+        "decisionRefs": [
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "rights inventory is design evidence; operational action authorization remains OPEN",
+        "consumerGate": "SUPPRESSED_RIGHTS"
+      },
+      {
+        "field": "rightsDecisionRevisionRefs",
+        "fieldGroup": "rights-decision",
+        "storageDisposition": "RIGHTS_GATED_NO_APPROVED_ACTION_SET",
+        "candidateOwnerRole": "데이터/법무 책임자",
+        "decisionRefs": [
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "no approved decision revision ledger entry authorizes manifest persistence/use",
+        "consumerGate": "SUPPRESSED_RIGHTS"
+      },
+      {
+        "field": "requiredActionsAllowed",
+        "fieldGroup": "rights-decision",
+        "storageDisposition": "RIGHTS_GATED_NO_APPROVED_ACTION_SET",
+        "candidateOwnerRole": "데이터/법무 책임자",
+        "decisionRefs": [
+          "KR-DART-RIGHTS-01",
+          "KR-RETENTION-01"
+        ],
+        "evidence": "fetch/parse/retain/derive/display/distribute permissions are unresolved by action and product",
+        "consumerGate": "SUPPRESSED_RIGHTS"
+      },
+      {
+        "field": "coveragePolicyRevision",
+        "fieldGroup": "coverage-policy",
+        "storageDisposition": "DECISION_GATED_NO_POLICY_APPROVED",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "no owner-approved policy revision or threshold set exists",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "coverageState",
+        "fieldGroup": "coverage-outcome",
+        "storageDisposition": "DERIVED_ONLY_NO_CANONICAL_ASSERTION",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01"
+        ],
+        "evidence": "consumer statuses are fixture vocabulary; runtime does not persist canonical manifest state",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "unresolvedReasons",
+        "fieldGroup": "coverage-outcome",
+        "storageDisposition": "DERIVED_ONLY_NO_CANONICAL_ASSERTION",
+        "candidateOwnerRole": "데이터 운영 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-DART-RIGHTS-01"
+        ],
+        "evidence": "no canonical assertion stores unresolved reason codes",
+        "consumerGate": "UNVERIFIABLE"
+      },
+      {
+        "field": "manifestDigest",
+        "fieldGroup": "digests",
+        "storageDisposition": "DESIGN_ONLY_NO_MIGRATION",
+        "candidateOwnerRole": "데이터 플랫폼 책임자",
+        "decisionRefs": [
+          "KR-RECONCILIATION-01",
+          "KR-OPERATIONAL-SECURITY-01"
+        ],
+        "evidence": "no canonical assertion digest/signature/checkpoint storage found",
+        "consumerGate": "UNVERIFIABLE"
+      }
+    ],
+    "persistenceBoundary": {
+      "persistCandidate": [
+        "counts",
+        "page observations",
+        "scope hashes",
+        "policy/revision refs",
+        "approved outcome digests",
+        "state/reason codes"
+      ],
+      "requiresRightsAndRetentionReview": [
+        "row or metadata digests",
+        "correction disposition digest",
+        "master snapshot hash",
+        "manifest digest"
+      ],
+      "neverStoreInManifest": [
+        "API credentials",
+        "unapproved raw filing body",
+        "source bytes without an applicable retention decision"
+      ],
+      "gate": "Rights and retention owners must approve the exact source product, field class, action, purpose, channel, and retention scope before persistence or downstream use."
+    }
+  },
+    "vectors": [
+    {
+      "id": "DSC-01-SUCCESSFUL-EMPTY-FEED-IS-NOT-MISSING-RUN",
+      "input": {
+        "source": "SRC-SYN-A",
+        "runState": "SUCCESS",
+        "providerItemCount": 0,
+        "storedRows": 0
+      },
+      "expected": {
+        "queryStatus": "NO_MATCHING_STORED_ROWS",
+        "coverage": "ENUMERATED_PROVIDER_RESPONSE",
+        "noDisclosureClaim": false
+      }
+    },
+    {
+      "id": "DSC-02-NO-SOURCE-RUN-MEANS-COVERAGE-UNKNOWN",
+      "input": {
+        "source": "SRC-SYN-A",
+        "runId": null,
+        "storedRows": 0
+      },
+      "expected": {
+        "coverage": "UNKNOWN",
+        "noDisclosureClaim": false
+      }
+    },
+    {
+      "id": "DSC-03-ADMIN-PREVIEW-DOES-NOT-COUNT-AS-PERSISTED-COVERAGE",
+      "input": {
+        "source": "SRC-SYN-A",
+        "mode": "PREVIEW",
+        "fetchSucceeded": true,
+        "persistAttempted": false
+      },
+      "expected": {
+        "fetchState": "SUCCESS",
+        "persistState": "NOT_RUN",
+        "lastSuccessfulPersistAt": null,
+        "coverage": "UNKNOWN"
+      }
+    },
+    {
+      "id": "DSC-04-FETCH-SUCCESS-PERSIST-FAILURE-IS-PARTIAL",
+      "input": {
+        "source": "SRC-SYN-A",
+        "fetchState": "SUCCESS",
+        "persistState": "FAILED",
+        "providerItemCount": 12,
+        "storedRows": 7
+      },
+      "expected": {
+        "coverage": "PARTIAL",
+        "queryStatus": "DB_QUERY_COMPLETE",
+        "allItemsStored": false
+      }
+    },
+    {
+      "id": "DSC-05-DISABLED-OR-UNCONFIGURED-IS-NOT-EMPTY-SUCCESS",
+      "input": {
+        "source": "SRC-SYN-A",
+        "configuredState": "DISABLED",
+        "fetchState": "SKIPPED",
+        "storedRows": 0
+      },
+      "expected": {
+        "coverage": "UNKNOWN",
+        "queryStatus": "NO_MATCHING_STORED_ROWS",
+        "zeroMeansNoSourceItems": false
+      }
+    },
+    {
+      "id": "DSC-06-RSS-FEED-WINDOW-DOES-NOT-PROVE-HISTORICAL-COMPLETENESS",
+      "input": {
+        "sourceClass": "EXCHANGE_FEED",
+        "feedResponseItems": 100,
+        "requestedHistoricalWindow": "WINDOW-SYN-A",
+        "providerWindowContract": null
+      },
+      "expected": {
+        "rangeCoverage": "UNKNOWN",
+        "allHistoricalDisclosuresCovered": false
+      }
+    },
+    {
+      "id": "DSC-07-DART-PAGE-COUNT-MISMATCH-IS-PARTIAL",
+      "input": {
+        "sourceClass": "OFFICIAL_DISCLOSURE",
+        "expectedTotalPages": 4,
+        "fetchedPages": 3,
+        "pageReceiptSetHashMatches": false
+      },
+      "expected": {
+        "coverage": "PARTIAL",
+        "completeEnumeration": false,
+        "publishCompleteLabel": false
+      }
+    },
+    {
+      "id": "DSC-08-DART-LAST-REPORT-ONLY-SETTING-CHANGES-DENOMINATOR",
+      "input": {
+        "source": "DART",
+        "lastReportOnly": true,
+        "correctionReceiptExists": true
+      },
+      "expected": {
+        "coverageScope": "LATEST_REPORTS_ONLY",
+        "correctionIncluded": false,
+        "allSubmissionsClaim": false
+      }
+    },
+    {
+      "id": "DSC-09-ARTICLE-UPDATED-AT-IS-NOT-PROVIDER-FETCH-TIME",
+      "input": {
+        "articleUpdatedAt": "2026-11-04T12:00:00Z",
+        "sourceResponseFetchedAt": null
+      },
+      "expected": {
+        "fetchedAt": null,
+        "sourceFreshness": "UNKNOWN",
+        "updatedAtAliasedAsFetchTime": false
+      }
+    },
+    {
+      "id": "DSC-10-ALL-SOURCES-PRESERVES-PER-SOURCE-FAILURE",
+      "input": {
+        "selectedSources": [
+          "SRC-SYN-A",
+          "SRC-SYN-B",
+          "SRC-SYN-C"
+        ],
+        "outcomes": [
+          "SUCCESS",
+          "FAILED",
+          "SKIPPED"
+        ]
+      },
+      "expected": {
+        "overallCoverage": "PARTIAL",
+        "successfulSourceRowsRetained": true,
+        "failedAndSkippedDistinguished": true
+      }
+    },
+    {
+      "id": "DSC-11-MANIFEST-BINDS-SOURCE-SCOPE-WINDOW-AND-SUBJECT-IDENTITY",
+      "input": {
+        "sourceProduct": "SYN-DART",
+        "window": [
+          "SYN-START",
+          "SYN-END"
+        ],
+        "issuerId": null,
+        "instrumentId": "SYN-INSTRUMENT",
+        "crosswalk": "UNRESOLVED"
+      },
+      "expected": {
+        "coverageState": "UNVERIFIABLE_COVERAGE_INCOMPLETE",
+        "negativeResult": "SUPPRESSED",
+        "scopeBorrowedFromOtherSubject": false
+      }
+    },
+    {
+      "id": "DSC-12-PAGE-AND-ROW-DENOMINATORS-MUST-RECONCILE",
+      "input": {
+        "expectedPages": [
+          1,
+          2,
+          3
+        ],
+        "observedPages": [
+          1,
+          3
+        ],
+        "expectedTotalRows": 250,
+        "rawRowCount": 150,
+        "uniqueReceiptCount": 149
+      },
+      "expected": {
+        "coverageState": "PARTIAL",
+        "enumerationComplete": false,
+        "zeroMatchClaim": false
+      }
+    },
+    {
+      "id": "DSC-13-CORRECTION-WATERMARK-MUST-COVER-APPROVED-LOOKBACK",
+      "input": {
+        "correctionPolicyRevision": "SYN-POLICY-1",
+        "requiredWindow": "SYN-WINDOW-A",
+        "watermarkWindow": "SYN-WINDOW-B",
+        "watermarkState": "STALE"
+      },
+      "expected": {
+        "coverageState": "UNVERIFIABLE_COVERAGE_INCOMPLETE",
+        "reconciledAsOf": false
+      }
+    },
+    {
+      "id": "DSC-14-MASTER-CROSSWALK-AND-RIGHTS-ARE-SAME-MANIFEST-DEPENDENCIES",
+      "input": {
+        "masterSnapshot": "SYN-MASTER-4",
+        "subjectApplicabilityRevision": null,
+        "rightsDecisionSetHash": "SYN-RIGHTS-2",
+        "requiredAction": "DISTRIBUTE_API",
+        "actionDecision": "UNRESOLVED"
+      },
+      "expected": {
+        "coverageState": "UNVERIFIABLE_COVERAGE_INCOMPLETE",
+        "publicSubjectEligible": false
+      }
+    },
+    {
+      "id": "DSC-15-REPEATED-PASS-STABILITY-IS-NOT-PROVIDER-SNAPSHOT",
+      "input": {
+        "passCount": 2,
+        "sameScope": true,
+        "sameReceiptAndMetadataDigest": true,
+        "providerSnapshotCapability": "NONE"
+      },
+      "expected": {
+        "stabilityDisposition": "OBSERVED_STABLE",
+        "immutableSnapshotClaim": false
+      }
+    },
+    {
+      "id": "DSC-16-COMPLETE-ONE-SOURCE-DOES-NOT-COMPLETE-OTHER-SOURCE",
+      "input": {
+        "sourceA": "RECONCILED_AS_OF",
+        "sourceB": "PARTIAL",
+        "requiredSources": [
+          "A",
+          "B"
+        ]
+      },
+      "expected": {
+        "overallRequiredSourceCoverage": "PARTIAL",
+        "sourceBGapPreserved": true
+      }
+    },
+    {
+      "id": "DSC-17-OPENDART-QUERY-HASH-EXCLUDES-SECRET-AND-PAGE-CURSOR",
+      "input": {
+        "profile": "OPENDART_LIST_JSON",
+        "crtfc_key": "SYNTHETIC_SECRET_A",
+        "bgn_de": "20261104",
+        "end_de": "20261104",
+        "page_no": 1,
+        "page_count": 100
+      },
+      "expected": {
+        "credentialInCanonicalInput": false,
+        "pageNoInSemanticQueryHash": false,
+        "pageSizeRetainedInManifest": 100,
+        "datePrecisionAndTimezone": "KST_RECEIPT_DATE_YYYYMMDD",
+        "effectiveLastReportOnly": "N"
+      }
+    },
+    {
+      "id": "DSC-18-OPENDART-FILTER-OR-CORRECTION-SETTING-CHANGES-SCOPE-HASH",
+      "input": {
+        "baseEffectiveParameters": {"bgn_de": "20261104", "end_de": "20261104", "last_reprt_at": "N", "pblntf_ty": null},
+        "changedEffectiveParameters": {"bgn_de": "20261104", "end_de": "20261104", "last_reprt_at": "Y", "pblntf_ty": null}
+      },
+      "expected": {
+        "semanticScopeHashesDiffer": true,
+        "correctionPopulationDifferencePreserved": true
+      }
+    },
+    {
+      "id": "DSC-19-UNPROFILED-RSS-URL-CANNOT-CLAIM-CANONICAL-SCOPE",
+      "input": {
+        "sourceProduct": "SYNTHETIC_RSS_PROVIDER",
+        "rawUrlContainsCredential": true,
+        "ownerReviewedParameterProfile": false,
+        "rowsReturned": 0
+      },
+      "expected": {
+        "normalizedQueryHash": null,
+        "scopeDisposition": "UNRESOLVED",
+        "publicNegativeEvidence": "UNVERIFIABLE",
+        "rawCredentialInDigestInput": false
+      }
+    },
+    {
+      "id": "DSC-20-JSON-EXPORT-PRESERVES-QUERY-AND-COVERAGE-CONTEXT",
+      "input": {
+        "queryStatus": "NO_MATCHING_STORED_ROWS",
+        "queryWindow": {
+          "kind": "KST_CALENDAR_DAY",
+          "from": "2026-11-04T00:00:00+09:00",
+          "to": "2026-11-05T00:00:00+09:00",
+          "endExclusive": true
+        },
+        "sourceCoverage": [
+          {"source": "SRC-SYN-A", "configuredState": "UNKNOWN", "latestAttempt": null, "lastSuccessfulPersistAt": null, "rangeCoverage": "UNKNOWN"}
+        ],
+        "items": []
+      },
+      "expected": {
+        "exportIncludesQueryStatus": true,
+        "exportIncludesExactQueryWindow": true,
+        "exportIncludesPerSourceCoverage": true,
+        "emptyResultMessageMeansNoSourceDisclosure": false,
+        "coveragePromotedFromMissingAttempt": false
+      }
+    },
+    {
+      "id": "DSC-21-URL-ONLY-COPY-IS-NOT-AN-ANALYSIS-EXPORT",
+      "input": {
+        "action": "COPY_SOURCE_URLS",
+        "fields": ["url"],
+        "queryStatus": "DB_QUERY_COMPLETE",
+        "queryWindow": "WINDOW-SYN-A",
+        "sourceCoverage": ["SRC-SYN-A"]
+      },
+      "expected": {
+        "payloadRemainsNewlineSeparatedUrls": true,
+        "queryMetadataAppended": false,
+        "describedAsFullJsonExport": false,
+        "dedicatedJsonDownloadOwnsContext": true
+      }
+    },
+    {
+      "id": "DSC-22-PER-SOURCE-UNKNOWN-IS-PRESERVED-IN-EXPORT",
+      "input": {
+        "selectedSource": "SRC-SYN-A",
+        "latestAttempt": null,
+        "otherSourceAttempt": "SUCCESS",
+        "queryStatus": "DB_QUERY_COMPLETE"
+      },
+      "expected": {
+        "selectedSourceCoverage": "UNKNOWN",
+        "borrowOtherSourceSuccess": false,
+        "overallQueryStatusImpliesSourceCompleteness": false
+      }
+    },
+    {
+      "id": "DSC-23-LATE-RECEIPT-OR-CORRECTION-REOPENS-PRIOR-STABLE-PASS",
+      "input": {
+        "source": "DART",
+        "normalizedQueryHash": "SYN-SCOPE-A",
+        "window": "SYN-KST-DAY-A",
+        "priorPasses": [
+          {"id": "PASS-SYN-23-A", "receiptDigest": "DIGEST-SYN-23-A", "metadataDigest": "META-SYN-23-A"},
+          {"id": "PASS-SYN-23-B", "receiptDigest": "DIGEST-SYN-23-A", "metadataDigest": "META-SYN-23-A"}
+        ],
+        "laterObservedReceipt": "RECEIPT-SYN-LATE-23",
+        "laterReportRelation": "CORRECTION_OR_LATE_SUBMISSION"
+      },
+      "expected": {
+        "priorPassImmutable": true,
+        "currentCoverageInvalidated": true,
+        "newReconciliationPassRequired": true,
+        "currentState": "PARTIAL_OR_UNVERIFIABLE",
+        "unrelatedSourceScopeInvalidated": false
+      }
+    },
+    {
+      "id": "DSC-24-WATERMARK-AS-OF-IS-NOT-FUTURE-COMPLETENESS",
+      "input": {
+        "correctionWatermarkAsOf": "SYN-WATERMARK-TIME-24",
+        "reconciledWindowEnd": "SYN-WINDOW-END-24",
+        "lateCorrectionEffectiveOrFiledAt": "SYN-AFTER-WATERMARK-24",
+        "priorCoverageState": "RECONCILED_AS_OF"
+      },
+      "expected": {
+        "priorAsOfAssertionRewritten": false,
+        "priorAssertionCurrent": false,
+        "dependentNegativeEvidenceAllowedAsCurrent": false,
+        "currentCoverage": "UNVERIFIABLE_COVERAGE_INCOMPLETE",
+        "reconciliationTriggerRecorded": true
+      }
+    },
+    {
+      "id": "DSC-25-OPENDART-STATUS-000-REQUIRES-ARRAY-LIST",
+      "input": {"profile": "OPENDART_LIST_JSON", "httpStatus": 200, "status": "000", "listShape": "OBJECT", "totalCount": 0, "totalPages": 1},
+      "expected": {"responseAccepted": false, "coverageState": "FAILED_OR_PARTIAL", "interpretedAsEmptySuccess": false, "negativeEvidenceAllowed": false}
+    },
+    {
+      "id": "DSC-26-OPENDART-QUOTA-020-PRESERVES-PROVIDER-FAILURE",
+      "input": {"profile": "OPENDART_LIST_JSON", "httpStatus": 200, "status": "020", "message": "SYNTHETIC_QUOTA_MESSAGE", "pagesFetched": 2, "expectedPages": 3},
+      "expected": {"failureClass": "QUOTA_EXCEEDED", "providerStatusPreserved": "020", "providerMessagePreserved": true, "coverageState": "PARTIAL", "interpretedAsEmptySuccess": false, "negativeEvidenceAllowed": false}
+    },
+    {
+      "id": "DSC-27-CORRECTION-REQUERY-KEEPS-SCOPE-AND-AS-OF-HISTORY",
+      "input": {"source": "DART", "normalizedQueryHash": "SYN-SCOPE-A", "window": "SYN-KST-DAY-A", "laterObservedReceipt": "RECEIPT-SYN-LATE-27", "approvedWiderLookbackPolicy": false, "priorAsOfAssertion": "RECONCILED_AS_OF"},
+      "expected": {"requerySameCanonicalQueryAndWindow": true, "widerOverlapAllowedWithoutApproval": false, "priorAsOfImmutable": true, "currentCoverageInvalidated": true, "dependentNegativeEvidenceCurrent": false, "unrelatedSourceScopeInvalidated": false}
+    }
+  ]
+}

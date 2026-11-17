@@ -68,7 +68,8 @@ function formatDailyObvResult(result: Awaited<ReturnType<typeof scanStoredUsDail
   return [`📊 **일봉 OBV 상승 후보**`, `기준: 최근 ${result.lookback}거래일 비교 · Signal EMA ${result.signalPeriod} · ${result.signalAboveDays}일 연속 상회 · 최근 ${result.signalCrossLookback}일 골든크로스`, `분석 종목 ${result.instrumentCount}개 · 조건 충족 ${result.qualified.length}개`, "", ...result.qualified.map((item) => [`**${item.market} ${item.code}**${item.name ? ` | ${item.name}` : ""}`, `OBV ${item.obv} · Signal ${item.obvSignal} · 괴리 ${item.signalGap}`, `OBV 변화 ${item.change} · Signal 상회 ${item.aboveSignalDays}일 · 골든크로스 ${item.signalCrossoverDate ?? "-"}`, `종가 ${item.lastClose} · 기준일 ${item.date}`].join("\n"))].join("\n\n");
 }
 function formatUsDailyCacheResult(result: Awaited<ReturnType<typeof warmUsDailyPriceCache>>) {
-  return [`✅ **해외 일봉 캐시 갱신 완료**`, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : "모든 종목의 해외 일봉 데이터가 DB에 저장되었습니다."].join("\n");
+  const title = result.ok ? "✅ **해외 일봉 캐시 갱신 완료**" : result.universeAvailable ? "⚠️ **해외 일봉 캐시 부분 실패**" : "❌ **해외 종목 유니버스를 사용할 수 없습니다**";
+  return [title, `대상 ${result.instrumentCount}개 · 성공 ${result.successCount}개 · 실패 ${result.failureCount}개`, `저장 캔들 ${result.savedCandleCount}개`, `시작 ${result.startedAt} · 완료 ${result.completedAt}`, result.failures.length ? `실패 원인 예시: ${result.failures.slice(0, 5).map((item) => `${item.market} ${item.code} (${item.error})`).join(", ")}` : result.ok ? "모든 종목의 해외 일봉 데이터가 DB에 저장되었습니다." : "유니버스 또는 cache 처리 상태를 확인해야 합니다."].join("\n");
 }
 function formatKrDailyCacheResult(result: Awaited<ReturnType<typeof runKrDailyCacheNow>>) {
   const failed = result.results.filter((item: any) => item.error).slice(0, 5);

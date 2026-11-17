@@ -73,7 +73,7 @@ export async function fetchKisUsTradeTrend(input: KisUsTradeTrendRequest): Promi
     if (isKisTokenExpiredResponse(result.response.status, result.raw)) { token = await refreshAccessToken(token); if (!token) return null; result = await once(token, exchange); }
     last = result; resolvedMarket = exchange;
     const parsed = parse(result.raw);
-    if (result.response.ok && result.raw?.rt_cd !== "1" && parsed.trades.length > 0) {
+    if (result.response.ok && result.raw?.rt_cd === "0" && parsed.trades.length > 0) {
       return { ok: true, status: result.response.status, code, market: exchange, day, trades: parsed.trades, raw: result.raw, rawText: result.rawText, diagnostics: { rt_cd: result.raw?.rt_cd ?? null, msg_cd: result.raw?.msg_cd ?? null, msg1: result.raw?.msg1 ?? null, outputKey: parsed.outputKey } };
     }
   }

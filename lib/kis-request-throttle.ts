@@ -24,12 +24,9 @@ export function classifyKisFailure(result: any): "RATE_LIMITED" | "TRANSIENT_HTT
   if (status === 429 || code === "EGW00201" || /초당 거래건수|rate.?limit|too many requests/i.test(message)) return "RATE_LIMITED";
   if (status === 500 || status === 502 || status === 503 || status === 504) return "TRANSIENT_HTTP";
   if (status >= 400) return "PERMANENT";
-  // KIS는 HTTP 200에서도 업무 오류를 rt_cd로 반환할 수 있다.
-  // 이를 성공으로 분류하면 호출 로그·재처리 판단이 왜곡된다.
-  if (parsed?.rt_cd != null && String(parsed.rt_cd) !== "0") return "PERMANENT";
-  // HTTP 성공 코드라도 KIS 응답은 JSON이어야 한다. HTML/깨진 응답을
-  // 성공으로 남기면 캐시 적재와 장애 분석이 모두 오염될 수 있다.
-  if (result?.rawText && parsed == null) return "PERMANENT";
+  // KIS 업무 API는 HTTP 200에서도 rt_cd로 업무 오류를 반환한다.
+  // 명시적인 성공 코드가 없는 응답도 정상 호출·adaptive throttle로 집계하면 안 된다.
+  if (parsed == null || String(parsed?.rt_cd ?? "") !== "0") return "PERMANENT";
   return null;
 }
 

@@ -30,8 +30,9 @@ async function getRows(path: string, trId: string, params: Record<string, string
     debug: { feature: "domestic-investor-flow", market: "KR" },
   });
   const data = parsed ?? {};
+  const ok = response.ok && data.rt_cd === "0";
   return {
-    ok: response.ok && data.rt_cd === "0",
+    ok,
     status: response.status,
     rows: Array.isArray(data.output) ? data.output as InvestorFlowRow[] : data.output && typeof data.output === "object" ? [data.output as InvestorFlowRow] : Array.isArray(data.output2) ? data.output2 as InvestorFlowRow[] : Array.isArray(data.output1) ? data.output1 as InvestorFlowRow[] : data.output2 && typeof data.output2 === "object" ? [data.output2 as InvestorFlowRow] : data.output1 && typeof data.output1 === "object" ? [data.output1 as InvestorFlowRow] : [],
     rtCd: data.rt_cd ?? null,

@@ -1,0 +1,49 @@
+{
+  "contractVersion": "investment-effect-projection-bridge.v0",
+  "classification": "SYNTHETIC_CROSS_FIXTURE_NOT_RUNTIME_ACCEPTANCE_OR_INVESTMENT_ADVICE",
+  "dataPolicy": { "containsRealFiling": false, "containsRealIssuerOrTicker": false, "containsRealFinancialValues": false, "containsSourceBody": false, "containsCredentials": false, "identitiesAreSynthetic": true },
+  "upstreamContracts": { "claimEvidenceGate": "disclosure-investment-evidence-gate.v0", "quantitativeTrace": "financing-claim-review-trace.v0", "userProjection": "disclosure-investment-dossier-projection.v0" },
+  "workflowStages": ["DISCOVERY_SIGNAL", "SOURCE_CLAIM_REVIEW", "QUANTITATIVE_CALCULATION", "INTERPRETATION_REVIEW", "PUBLIC_PROJECTION"],
+  "requiredDependencyBindings": ["sourceReceiptId", "documentRevisionId", "documentRevisionHash", "claimRevisionIds", "rightsDecisionRevisionByAction", "instrumentId", "eligibilityAssertionId", "formulaRevision", "calculationOutputHash", "interpretationReviewRevision", "publicationSnapshotId", "publicationEpoch", "projectionOutputHash"],
+  "stageStates": {
+    "claim": ["NOT_CREATED", "SUPPORTED", "CONTESTED", "UNRESOLVED", "RIGHTS_BLOCKED"],
+    "calculation": ["NOT_REQUESTED", "NOT_COMPUTABLE", "CONDITIONAL_SCENARIO", "REPRODUCIBLE"],
+    "interpretation": ["NOT_ASSESSED", "PENDING_REVIEW", "APPROVED_WITH_COUNTEREVIDENCE", "MIXED", "UNCERTAIN", "SUPPRESSED"],
+    "projection": ["TITLE_SIGNAL_ONLY", "EVIDENCE_INCOMPLETE", "VERIFIED_FACTS_WITH_COUNTEREVIDENCE", "REVIEWED_INVESTMENT_EFFECT", "SUPPRESSED_RIGHTS_OR_ELIGIBILITY"]
+  },
+  "transitionRules": [
+    { "from": "DISCOVERY_SIGNAL", "to": "SOURCE_CLAIM_REVIEW", "requires": ["source body or structured filing fields", "exact locator", "rights permit analysis"], "failureState": "TITLE_SIGNAL_ONLY" },
+    { "from": "SOURCE_CLAIM_REVIEW", "to": "QUANTITATIVE_CALCULATION", "requires": ["supported input claims", "compatible units/period/entity/security-class/basis", "formula revision and denominator"], "failureState": "NOT_COMPUTABLE" },
+    { "from": "QUANTITATIVE_CALCULATION", "to": "INTERPRETATION_REVIEW", "requires": ["reproducible exact output", "current calculation dependencies", "separate interpretation decision"], "failureState": "NOT_ASSESSED" },
+    { "from": "INTERPRETATION_REVIEW", "to": "PUBLIC_PROJECTION", "requires": ["approved supporting and counterevidence review", "DISPLAY_PUBLIC_API rights", "eligible affected instrument", "single current snapshot/epoch and matching output hash"], "failureState": "SUPPRESSED" }
+  ],
+  "invariants": {
+    "titleSignalDoesNotCreateClaim": true,
+    "supportedFactDoesNotApproveEffect": true,
+    "reproducibleCalculationDoesNotApproveDirection": true,
+    "interpretationConfidenceIsNotOutcomeProbability": true,
+    "analysisRightsDoNotImplyDisplayRights": true,
+    "eventSubmitterDoesNotImplyAffectedInstrument": true,
+    "conditionalScenarioDoesNotBecomeActualFact": true,
+    "publicationRequiresSingleSnapshotAndMatchingHashes": true,
+    "priceMovementDoesNotEstablishCausality": true,
+    "sameReceiptDoesNotMergeDifferentEventOrHorizonClaimGroups": true
+  },
+  "vectors": [
+    { "id": "IEPB-01-TITLE-SIGNAL-STOPS-BEFORE-SOURCE-CLAIM", "input": { "claimState": "NOT_CREATED", "titleClassifier": "BULLISH_CANDIDATE" }, "expected": { "projection": "TITLE_SIGNAL_ONLY", "investmentClaim": false, "direction": "NOT_ASSESSED" } },
+    { "id": "IEPB-02-SUPPORTED-FACT-DOES-NOT-IMPLY-QUANTIFIED-EFFECT", "input": { "claimState": "SUPPORTED", "calculationState": "NOT_REQUESTED", "interpretationState": "NOT_ASSESSED", "counterEvidenceReview": "COMPLETE_NO_MATERIAL_COUNTEREVIDENCE_FOUND" }, "expected": { "projection": "VERIFIED_FACTS_WITH_COUNTEREVIDENCE", "quantifiedEffect": null, "direction": "NOT_ASSESSED" } },
+    { "id": "IEPB-03-BASIS-MISMATCH-BLOCKS-DOWNSTREAM-EFFECT", "input": { "claimState": "SUPPORTED", "calculationState": "NOT_COMPUTABLE", "reason": "BASIS_DATE_MISMATCH", "priorOutputExists": true }, "expected": { "projection": "EVIDENCE_INCOMPLETE", "priorOutputReused": false, "directionFromNumber": false } },
+    { "id": "IEPB-04-CONDITIONAL-SCENARIO-REMAINS-NONACTUAL", "input": { "calculationState": "CONDITIONAL_SCENARIO", "assumption": "FULL_PLANNED_ISSUANCE", "actualIssueEvidence": null }, "expected": { "projection": "VERIFIED_FACTS_WITH_COUNTEREVIDENCE", "scenarioLabel": "CONDITIONAL_SCENARIO", "actualIssuedShares": null, "holderDilutionClaim": false } },
+    { "id": "IEPB-05-REPRODUCIBLE-CALCULATION-DOES-NOT-APPROVE-DIRECTION", "input": { "calculationState": "REPRODUCIBLE", "formulaReview": "APPROVED", "interpretationState": "NOT_ASSESSED" }, "expected": { "projection": "VERIFIED_FACTS_WITH_COUNTEREVIDENCE", "direction": "NOT_ASSESSED", "reviewedInvestmentEffect": false } },
+    { "id": "IEPB-06-PENDING-COUNTEREVIDENCE-REVIEW-BLOCKS-DIRECTION-PUBLICATION", "input": { "supportingClaims": ["SYNTH-SUPPORT"], "counterEvidenceClaims": ["SYNTH-RISK"], "counterEvidenceReview": "PENDING" }, "expected": { "projection": "EVIDENCE_INCOMPLETE", "directionPublished": false, "counterEvidenceHidden": false } },
+    { "id": "IEPB-07-SUPPORT-AND-COUNTEREVIDENCE-COEXIST-WITHOUT-NET-SCORE", "input": { "supportingClaims": ["SYNTH-SUPPORT"], "counterEvidenceClaims": ["SYNTH-RISK"], "bothReviews": "APPROVED" }, "expected": { "projection": "REVIEWED_INVESTMENT_EFFECT", "interpretation": "MIXED", "netScore": null, "bothEvidenceGroupsVisible": true } },
+    { "id": "IEPB-08-ANALYSIS-RIGHTS-DO-NOT-GRANT-DERIVATIVE-DISPLAY", "input": { "analyzeRights": "APPROVED", "displayPublicApiRights": "UNRESOLVED" }, "expected": { "projection": "SUPPRESSED_RIGHTS_OR_ELIGIBILITY", "derivedClaimPublic": false } },
+    { "id": "IEPB-09-UNRESOLVED-AFFECTED-INSTRUMENT-BLOCKS-TICKER-EFFECT", "input": { "claimState": "SUPPORTED", "affectedInstrument": "UNRESOLVED", "filingSubmitterTicker": "SYNTH-TICKER" }, "expected": { "projection": "SUPPRESSED_RIGHTS_OR_ELIGIBILITY", "tickerAsAffectedSubject": false, "effectPublished": false } },
+    { "id": "IEPB-10-DEPENDENCY-REVISION-CHANGE-STALES-APPROVAL-CHAIN", "input": { "reviewedDocumentHash": "HASH-A", "currentDocumentHash": "HASH-B", "priorCalculationApproval": "APPROVED" }, "expected": { "priorApproval": "STALE", "projection": "EVIDENCE_INCOMPLETE", "reReviewRequired": true } },
+    { "id": "IEPB-11-UI-API-SNAPSHOT-OR-OUTPUT-HASH-MISMATCH-REJECTS-PROJECTION", "input": { "uiOutputHash": "HASH-A", "apiOutputHash": "HASH-B", "publicationSnapshotId": "SNAP-A", "apiSnapshotId": "SNAP-B" }, "expected": { "projection": "REJECT_RESPONSE", "partialFallback": false, "priorApprovalReuse": false } },
+    { "id": "IEPB-12-PASSED-INVESTMENT-EFFECT-IS-NOT-TRADE-INSTRUCTION", "input": { "projection": "REVIEWED_INVESTMENT_EFFECT", "impactAssessmentConfidence": "HIGH", "eventOutcomeProbability": null }, "expected": { "eventOutcomeProbability": null, "tradeInstruction": "NONE", "returnGuarantee": false } },
+    { "id": "IEPB-13-POST-FILING-PRICE-MOVE-DOES-NOT-BECOME-CAUSAL-EFFECT", "input": { "priceMoveObserved": true, "confounderReview": "NOT_RUN" }, "expected": { "marketReaction": "SEPARATE_OBSERVATION", "causalAttribution": "NOT_ESTABLISHED", "investmentEffectSubstitution": false } },
+    { "id": "IEPB-14-UNVERIFIED-DENOMINATOR-BLOCKS-CROSS-ISSUER-COMPARISON", "input": { "numerator": "SYNTH-N", "denominator": null, "comparisonUniverse": "MULTI_ISSUER" }, "expected": { "comparableRatio": null, "ranking": "NOT_AVAILABLE", "inventedDenominator": false } },
+    { "id": "IEPB-15-ONE-RECEIPT-MULTI-EVENT-CLAIMS-REMAIN-SCOPED", "input": { "sourceReceiptId": "RECEIPT-SYN-15", "eventGroups": [{"eventId":"EVENT-SYN-15-A","horizon":"HORIZON-A","relation":"SUPPORTS"},{"eventId":"EVENT-SYN-15-B","horizon":"HORIZON-B","relation":"CONTRADICTS"}] }, "expected": { "eventGroupsPreserved": 2, "horizonsMerged": false, "singleNetDirection": "NOT_INFERRED", "receiptCountAsEventCount": false } }
+  ]
+}

@@ -183,14 +183,15 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
     result = await fetchOnce(token);
   }
 
-  const allPoints = [...parseUsMinuteTurnoverPoints(result.parsed)];
+  const initialResponseOk = result.response.ok && result.parsed?.rt_cd === "0";
+  const allPoints = initialResponseOk ? [...parseUsMinuteTurnoverPoints(result.parsed)] : [];
   let pageCount = 1;
-  let cursor = continuation(result.parsed);
+  let cursor = initialResponseOk ? continuation(result.parsed) : { next: "", more: "", hasMore: false };
   let next = cursor.hasMore ? cursor.next : "";
   while (next && pageCount < 10) {
     const page = await fetchOnce(token, next);
     const pagePoints = parseUsMinuteTurnoverPoints(page.parsed);
-    if (!page.response.ok || pagePoints.length === 0) break;
+    if (!page.response.ok || page.parsed?.rt_cd !== "0" || pagePoints.length === 0) break;
     allPoints.push(...pagePoints); pageCount += 1;
     const following = continuation(page.parsed);
     if (!following.hasMore || !following.next || following.next === next) { next = ""; break; }
@@ -204,7 +205,7 @@ export async function fetchUsMinuteTurnover({ code: rawCode, market: rawMarket =
   });
 
   return {
-    ok: result.response.ok,
+    ok: initialResponseOk,
     status: result.response.status,
     request: {
       method: "GET",
