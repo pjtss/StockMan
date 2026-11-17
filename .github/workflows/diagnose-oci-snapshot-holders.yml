@@ -39,6 +39,7 @@ jobs:
         env:
           OCI_HOST: ${{ secrets.OCI_HOST }}
           GITHUB_SHA: ${{ github.sha }}
+          OCI_DIAGNOSTIC_DOCKER_ID: ed2fc23955fc1e07ed079872720c9a8fea1c9d37a1b5770ed4d6e90b7ac667dd
         run: |
           set -euo pipefail
           diagnostic_script="/tmp/stockman-snapshot-diagnostics-${GITHUB_SHA}.mjs"

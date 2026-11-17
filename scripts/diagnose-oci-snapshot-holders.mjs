@@ -42,6 +42,11 @@ try {
   `);
   await client.query("COMMIT");
 
+  const targetDockerId = process.env.OCI_DIAGNOSTIC_DOCKER_ID ?? null;
+  if (targetDockerId && !/^[a-f0-9]{12,64}$/i.test(targetDockerId)) {
+    throw new Error("OCI_DIAGNOSTIC_DOCKER_ID must be a Docker hexadecimal ID");
+  }
+  const targetedDockerContainer = targetDockerId ? await inspectDockerContainer(targetDockerId) : null;
   const holders = await Promise.all(result.rows.map(async (row) => ({
     ...row,
     local_client_process: await inspectLocalClientProcess(row.client_addr, row.client_port),
@@ -50,6 +55,7 @@ try {
     diagnosticMode: "read-only",
     databaseHost: database.hostname,
     databaseEndpoint: endpoint.rows[0],
+    targetedDockerContainer,
     snapshotHolderCount: result.rowCount,
     holders,
   })}\n`);
@@ -99,16 +105,7 @@ async function inspectLocalProcess(pid) {
     return match ? [match[1]] : [];
   }) ?? [];
   const dockerId = cgroup?.join("\n").match(/docker-([a-f0-9]{64})\.scope/i)?.[1] ?? null;
-  let dockerContainer = null;
-  if (dockerId) {
-    const { stdout } = await execFileAsync("docker", ["ps", "--no-trunc", "--filter", `id=${dockerId}`, "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"], {
-      encoding: "utf8",
-      timeout: 5_000,
-      maxBuffer: 65_536,
-    }).catch(() => ({ stdout: "" }));
-    const [id, name, image, status] = stdout.trim().split("\t");
-    if (id) dockerContainer = { id: id.slice(0, 12), name, image, status };
-  }
+  const dockerContainer = dockerId ? await inspectDockerContainer(dockerId) : null;
   return {
     comm,
     pid_namespace_ids: pidNamespaceIds,
@@ -116,6 +113,16 @@ async function inspectLocalProcess(pid) {
     systemd_units: pidNamespaceIds.includes(String(pid)) ? [...new Set(systemdUnits)] : [],
     docker_container: dockerContainer,
   };
+}
+
+async function inspectDockerContainer(dockerId) {
+  const { stdout } = await execFileAsync("docker", ["ps", "--no-trunc", "--filter", `id=${dockerId}`, "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"], {
+    encoding: "utf8",
+    timeout: 5_000,
+    maxBuffer: 65_536,
+  }).catch(() => ({ stdout: "" }));
+  const [id, name, image, status] = stdout.trim().split("\t");
+  return id ? { id: id.slice(0, 12), name, image, status } : null;
 }
 
 function normalizeHost(value) {
