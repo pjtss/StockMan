@@ -77,12 +77,6 @@ for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.ser
   timeout --signal=TERM --kill-after=10s 30s systemctl stop "$unit"
 done
 
-stage="clear-old-snapshots"
-runuser -u stockman -- env \
-  OCI_PG_TERMINATION_APPROVED_SCOPE=client-snapshot-holders-over-30s \
-  DATABASE_URL="$DATABASE_URL" \
-  node "$TEMP_PATH/scripts/terminate-approved-oci-snapshot-holders.mjs"
-
 stage="flyway-migrate"
 preflight_output="$(runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
   node "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs" "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql")"

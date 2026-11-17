@@ -8924,3 +8924,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 운영 health 요청은 직전 점검에서 15초 timeout, NAS/KOSPI universe GET은 HTTP 400이었다. migration 실패 전 운영 release는 활성화되지 않았다.
 
 \r\n
+# 2026-11-17 V168 인덱스 대상 오류 수정
+
+- **목적/범위**: 승인된 RSS 24시간 보존 기능의 OCI 배포를 막은 V168 PostgreSQL migration 실패를 조사하고 재발 검사 추가.
+- **근본 원인**: Deploy OCI run `44004038768`에서 V168이 `us_trade_intensity_ticks`에 인덱스를 생성하려 했으나 해당 레거시 테이블은 V70에서 이미 삭제됐다.
+- **변경 파일**: `db/migration/V168__bounded_non_daily_data_retention.sql`에서 사용되지 않는 인덱스 제거; `scripts/check-oci-cron.mjs`에서 V168 대상 테이블의 과거 CREATE/DROP 순서 검사 및 자동 세션 종료 금지 검사 추가; `.github/workflows/deploy-oci.yml`, `deploy/oci/stockman-activate`에서 자동 세션 종료 제거; `docs/ERROR_HANDLING.md`에 증거·영향·재발 감지·잔여 위험 기록.
+- **검증**: `npm run deploy:verify` 통과. dependency audit 0 vulnerabilities, build, standalone runtime/browser/API smoke, 313개 테스트 통과·1개 파일 skip(1,644 pass·3 skip), typecheck, docs/API/auth/KIS/cron gates 통과. 추가 V168 static check는 OCI cron 검사에 포함.
+- **커밋/푸시/배포**: 검증 완료; 커밋·푸시 후 OCI 배포 실행 예정.
+- **추가 운영 범위 점검**: Deploy OCI run `44004038768` 로그에서 broad predicate로 PID `241173`과 `244461`이 자동 종료된 사실을 확인했다. 다음 배포는 세션을 임의 종료하지 않고 preflight fail-closed로 바꿔, 명시적 승인된 PID 이외의 세션을 건드리지 않는다.
+- **남은 위험/다음 단계**: 실패한 non-transactional V168은 일부 인덱스와 Flyway 실패 행을 남길 수 있다. 배포 preflight의 V168 한정 복구와 후속 V169/운영 상태 확인 필요.

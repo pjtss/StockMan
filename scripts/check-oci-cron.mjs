@@ -82,26 +82,27 @@ const indexSpecs = (sql) => [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX(?:\s+
     table: table.toLowerCase(),
     columns: columns.split(",").map((column) => column.trim().replace(/\s+(?:ASC|DESC)(?:\s+NULLS\s+(?:FIRST|LAST))?$/i, "").replace(/\s+/g, " ").toLowerCase()).join(","),
   }));
-const orderedMigrations = [...migrationFiles].sort((left, right) =>
-  Number(left.name.match(/^V(\d+)/)?.[1] ?? 0) - Number(right.name.match(/^V(\d+)/)?.[1] ?? 0),
-);
-for (const index of indexSpecs(retentionMigration)) {
-  let lastCreate = -1;
-  let lastDrop = -1;
-  orderedMigrations.forEach(({ name, sql }, migrationIndex) => {
-    const createsTable = new RegExp(`CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:public\\.)?${index.table}\\b`, "i").test(sql);
-    const dropsTable = new RegExp(`DROP\\s+TABLE(?:\\s+IF\\s+EXISTS)?\\s+(?:public\\.)?${index.table}\\b`, "i").test(sql);
-    if (createsTable) lastCreate = migrationIndex;
-    if (dropsTable) lastDrop = migrationIndex;
-  });
-  if (lastCreate < 0 || lastDrop > lastCreate) {
-    throw new Error(`V168 indexes ${index.table}, but migration history does not leave that table present`);
-  }
-}
 const earlierIndexSpecs = indexSpecs(migrationFiles.filter(({ name }) => name !== "V168__bounded_non_daily_data_retention.sql").map(({ sql }) => sql).join("\n"));
 for (const index of indexSpecs(retentionMigration)) {
   if (earlierIndexSpecs.some((existing) => existing.table === index.table && existing.columns === index.columns)) {
     throw new Error(`V168 adds a duplicate index on ${index.table} (${index.columns})`);
+  }
+}
+const migrationsBeforeV168 = migrationFiles
+  .filter(({ name }) => Number(name.match(/^V(\d+)__/i)?.[1] ?? Infinity) < 168)
+  .sort((left, right) => Number(left.name.match(/^V(\d+)__/i)?.[1]) - Number(right.name.match(/^V(\d+)__/i)?.[1]));
+const relationStateBeforeV168 = new Map();
+for (const { sql } of migrationsBeforeV168) {
+  for (const match of sql.matchAll(/\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/gi)) {
+    relationStateBeforeV168.set(match[1].toLowerCase(), "present");
+  }
+  for (const match of sql.matchAll(/\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/gi)) {
+    relationStateBeforeV168.set(match[1].toLowerCase(), "dropped");
+  }
+}
+for (const index of indexSpecs(retentionMigration)) {
+  if (relationStateBeforeV168.get(index.table) !== "present") {
+    throw new Error(`V168 cannot add an index to ${index.table}; migration history does not leave the table present before V168`);
   }
 }
 for (const [table, interval] of [
@@ -223,13 +224,12 @@ if (!workflow.includes("oci-flyway-v168-preflight.mjs")
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");
 }
-if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
-  || !activation.includes('stage="quiesce-services"')
+if (!activation.includes('stage="quiesce-services"')
   || !activation.includes('systemctl stop "$unit"')
-  || !activation.includes("clear-old-snapshots")
-  || !activation.includes("client-snapshot-holders-over-30s")
+  || activation.includes("terminate-approved-oci-snapshot-holders.mjs")
+  || activation.includes("pg_terminate_backend")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {
-  throw new Error("V168 activation must pause DB-producing services, clear old client snapshots, and restore services on failure");
+  throw new Error("V168 activation must pause DB-producing services, leave snapshot termination to explicit approval, and restore services on failure");
 }
 for (const required of ["oci-fundamentals-cron.sh", "stockman-fundamentals.service", "stockman-fundamentals.timer"]) {
   if (!workflow.includes(required)) throw new Error(`OCI release packaging is missing ${required}`);
