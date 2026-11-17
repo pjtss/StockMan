@@ -8953,6 +8953,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - `deploy/oci/stockman-activate`: preflight에 V170 migration을 전달하고, 실패한 V168/V170 history 복구를 허용하도록 반영. exact PID `260900`은 다음 실행 직전에도 client backend/snapshot/30초 초과 조건을 만족하는 경우에만 종료 후보로 지정.
 - `scripts/check-oci-cron.mjs`에서 migration 복구 범위와 PID allowlist를 자동 검사한다. 전체 `npm run deploy:verify` 완료 후 commit/push 및 새 OCI deploy를 진행한다.
 - 재발 시 `pg_stat_progress_create_index`와 current snapshot holder를 OCI에서 read-only 조회한다. 원인 확인 없이 migration timeout만 늘려 app downtime을 연장하지 않는다.
+- 후속 run `44047418291`은 preflight에서 V170 invalid index를 확인하고 `sec_submissions` 규모를 61,549행·38,199,296 bytes로 기록했다. 새 client PID `261867`이 `idle in transaction`/`ClientRead`로 snapshot을 4,112→4,143초 보유해 20회 재시도 후 fail-closed했다. 정확 PID allowlist와 자동 검사를 추가해 다음 배포에서 실행 직전 조건을 재검증하며, 맞을 때만 종료한다.
 
 \r\n
 # 2026-11-17 V168 인덱스 대상 오류 수정

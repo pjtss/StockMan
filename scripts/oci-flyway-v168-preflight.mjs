@@ -48,7 +48,7 @@ try {
   `, [indexNames, schema.rows[0].schema_name]);
   process.stderr.write(`V168/V170 preflight: SEC submission table/index state ${JSON.stringify({ table: tableStats.rows[0], indexes: indexStats.rows })}\n`);
   const oldSnapshots = await client.query(`
-    SELECT pid, backend_type, state, wait_event_type, wait_event,
+    SELECT pid, backend_type, application_name, usename, client_addr::text, state, wait_event_type, wait_event,
       FLOOR(EXTRACT(EPOCH FROM (NOW() - xact_start)))::integer AS transaction_age_seconds
     FROM pg_stat_activity
     WHERE datname = current_database()
