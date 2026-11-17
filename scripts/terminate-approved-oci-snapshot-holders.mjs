@@ -27,7 +27,7 @@ const client = new pg.Client({
 });
 
 const currentTargetsSql = `
-  SELECT pid, backend_type, state, wait_event_type, wait_event,
+  SELECT pid, backend_type, application_name, usename, client_addr::text, state, wait_event_type, wait_event,
     backend_xmin IS NOT NULL AS holds_snapshot,
     FLOOR(EXTRACT(EPOCH FROM (NOW() - xact_start)))::integer AS transaction_age_seconds
   FROM pg_stat_activity
