@@ -30,6 +30,7 @@ chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-rss-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs"
+chmod +x "$TEMP_PATH/scripts/terminate-approved-oci-snapshot-holders.mjs"
 # Keep hashed static assets from the previous release available for clients
 # that still hold an older HTML document during a browser/proxy cache transition.
 # New assets already present in the incoming release win.
@@ -76,6 +77,13 @@ done
 for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.service stockman.service; do
   timeout --signal=TERM --kill-after=10s 30s systemctl stop "$unit"
 done
+
+stage="terminate-explicitly-approved-snapshot-pid"
+runuser -u stockman -- env \
+  OCI_PG_TERMINATION_APPROVED_SCOPE=explicit-approved-pids \
+  OCI_PG_TERMINATION_APPROVED_PIDS=246213 \
+  DATABASE_URL="$DATABASE_URL" \
+  node "$TEMP_PATH/scripts/terminate-approved-oci-snapshot-holders.mjs"
 
 stage="flyway-migrate"
 preflight_output="$(runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \

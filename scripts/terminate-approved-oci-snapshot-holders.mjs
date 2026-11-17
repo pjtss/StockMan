@@ -1,10 +1,17 @@
 import pg from "pg";
 
 const MIN_SNAPSHOT_AGE_SECONDS = 30;
-const APPROVED_SCOPE = "client-snapshot-holders-over-30s";
+const APPROVED_SCOPE = "explicit-approved-pids";
+const approvedPids = [...new Set((process.env.OCI_PG_TERMINATION_APPROVED_PIDS ?? "")
+  .split(",")
+  .map((pid) => pid.trim())
+  .filter(Boolean))];
 
 if (process.env.OCI_PG_TERMINATION_APPROVED_SCOPE !== APPROVED_SCOPE) {
-  throw new Error("Explicit approval marker for client snapshot holders is required");
+  throw new Error("Explicit approval marker for the exact PID allowlist is required");
+}
+if (approvedPids.length === 0 || approvedPids.some((pid) => !/^\d+$/.test(pid) || Number(pid) <= 0)) {
+  throw new Error("OCI_PG_TERMINATION_APPROVED_PIDS must contain explicit positive PID values");
 }
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 const databaseHost = new URL(process.env.DATABASE_URL).hostname;
@@ -25,6 +32,7 @@ const currentTargetsSql = `
     FLOOR(EXTRACT(EPOCH FROM (NOW() - xact_start)))::integer AS transaction_age_seconds
   FROM pg_stat_activity
   WHERE datname = current_database()
+    AND pid = ANY($2::integer[])
     AND pid <> pg_backend_pid()
     AND backend_type = 'client backend'
     AND backend_xmin IS NOT NULL
@@ -34,10 +42,11 @@ const currentTargetsSql = `
 
 try {
   await client.connect();
-  const current = await client.query(currentTargetsSql, [MIN_SNAPSHOT_AGE_SECONDS]);
+  const current = await client.query(currentTargetsSql, [MIN_SNAPSHOT_AGE_SECONDS, approvedPids]);
   const candidatePids = current.rows.map(({ pid }) => pid);
   console.log(JSON.stringify({
     approvedScope: APPROVED_SCOPE,
+    approvedPids,
     minimumSnapshotAgeSeconds: MIN_SNAPSHOT_AGE_SECONDS,
     targets: current.rows,
   }));

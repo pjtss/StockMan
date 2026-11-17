@@ -224,12 +224,14 @@ if (!workflow.includes("oci-flyway-v168-preflight.mjs")
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");
 }
-if (!activation.includes('stage="quiesce-services"')
+if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
+  || !activation.includes('stage="quiesce-services"')
   || !activation.includes('systemctl stop "$unit"')
-  || activation.includes("terminate-approved-oci-snapshot-holders.mjs")
-  || activation.includes("pg_terminate_backend")
+  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213")
+  || !activation.includes("explicit-approved-pids")
+  || !activation.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {
-  throw new Error("V168 activation must pause DB-producing services, leave snapshot termination to explicit approval, and restore services on failure");
+  throw new Error("V168 activation must pause DB services, target only the explicitly approved PID, and restore services on failure");
 }
 for (const required of ["oci-fundamentals-cron.sh", "stockman-fundamentals.service", "stockman-fundamentals.timer"]) {
   if (!workflow.includes(required)) throw new Error(`OCI release packaging is missing ${required}`);
