@@ -8895,3 +8895,9 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 전용 workflow를 같은 명시 승인 PID 집합으로 갱신했다. 사전 조회 이후 종료 SQL에서도 현재 `client backend`, `active`, `backend_xmin` 보유, 60분 이상 조건을 재검사하고, 그 시점에 모두 부합하는 승인 PID 부분집합만 종료한다. 조건 미달 PID 및 parallel worker는 건너뛰며, 종료된 PID가 `pg_stat_activity`에서 사라졌는지 확인한다.
 - 자동 감지: 실행 직전 DB 상태 조회와 종료 SQL 내부 재검증이 각각 불일치 시 fail-closed하고, 워크플로 로그에 전체 승인 PID 중 관측·대상·종료 PID를 남긴다.
 - 남은 위험/다음 단계: 허용된 종료로도 모든 장기 snapshot이 해소되지 않으면 OCI 배포 preflight는 계속 중단된다. 종료 workflow 완료 후 Deploy OCI를 재시도하고 V168 migration 및 health check를 확인한다. 두 ㄷㅊㅇ snapshot 명령은 새 공개 API가 운영에 활성화되고 정상 응답한 다음 실행한다.
+
+### 배포 성공까지 추가 운영 조치 승인 — 2026-11-17
+- 사용자는 ㄷㅊㅇ5·ㄷㅊㅇ6 운영 배포 성공에 필요한 작업을 모두 승인했다. 새 PID 목록에 국한되지 않고, V168 preflight와 동일하게 실행 시점에 `backend_type='client backend'`, `state='active'`, `backend_xmin IS NOT NULL`, transaction age 30초 초과인 세션을 조회해 전부 종료하고 확인하도록 전용 작업을 갱신한다.
+- parallel worker와 inactive 세션은 종료하지 않는다. 후보 조회와 종료 SQL 모두 조건을 재확인하고, 후보 집합 전체가 유지되는 경우에만 신호를 보내며, 종료 PID들이 `pg_stat_activity`에서 사라졌음을 확인한다. OCI DB는 localhost 경유만 허용한다.
+- 재발 탐지: 같은 V168 preflight가 잔여 snapshot holder를 출력하면 종료 workflow를 다시 실행하기 전 상태를 재조회한다. 신규 세션 생성이 계속되면 허용된 client session만 반복 확인한다.
+- 남은 위험/다음 단계: 현재 활성 쿼리는 사용자 요청을 중단할 수 있다. preflight가 통과한 후에만 마이그레이션·재기동이 진행되며, 이후 health/public universe API와 ㄷㅊㅇ5·ㄷㅊㅇ6 실행 결과를 확인한다.
