@@ -773,6 +773,15 @@ npm test -- --run
 - **대응**: 502 또는 health 실패가 발생하면 전체 수집을 즉시 중지한다. 추가 universe/candle 요청을 하지 말고 health만 확인한다. 배포가 필요하면 승인된 OCI deploy workflow를 실행하고 성공 후 health를 재검증한다. 부분 수집 결과는 최종 JSON으로 승격하지 않는다.
 - **재발 자동 감지**: 전체 스냅샷 전 health, universe, 소량 일봉 요청을 확인하며 수집 중 실패도 기록한다. 후속 개선은 서버측 502 로그/DB 진단, checkpoint resume, 호출 부하 제한을 갖춘 수집 방식을 추가하고 운영에서 소량 검증한 후 전체 실행하는 것이다.
 - **남은 위험**: 전체 ㄷㅊㅇ5·ㄷㅊㅇ6 파일은 아직 생성·검증되지 않았다. 서버측 원인이 확인되고 안전한 재개 방식이 준비될 때까지 전체 운영 universe 수집을 반복하지 않는다.
+
+## V170 SEC materializer 인덱스 생성 timeout
+
+- **증상/근거**: OCI Deploy run `44039396985`는 V168 preflight를 통과하고 Flyway가 schema V169에서 V170 `sec materializer recent index`를 시작했다. 2,400초 뒤 `timeout`에 의해 프로세스가 종료(exit 137)됐다. activation error trap은 구 release app과 scheduler services를 복구했고 이후 `/health-check`는 HTTP 200이었다.
+- **관측된 blocker**: 첫 preflight에서 client backend PID `260900`이 active, snapshot 보유, transaction age 929초로 확인됐고 parallel worker PID `260901`, `260902`가 붙어 있었다. 30초 뒤 재검사에서는 snapshot이 사라져 이 PID는 종료되지 않았다. 이후 정확히 무엇이 V170 index build를 40분간 지연했는지는 현재 workflow 로그만으로 확정할 수 없다.
+- **복구 원인**: 기존 V168 전용 preflight는 Flyway 실패 이력을 V168만 복구 대상으로 허용했다. V170의 non-transactional concurrent index가 중단되면 failed history와 invalid index가 남을 수 있어 다음 배포도 거부되거나 `IF NOT EXISTS`가 invalid index를 잘못 건너뛸 위험이 있다.
+- **수정**: OCI preflight는 V168 및 V170 migration 파일의 정확한 concurrent index 이름만 점검한다. V170 failed history를 허용 목록에 추가하고, 둘 중 migration이 실패해 남긴 invalid index만 snapshot holder 확인 후 `DROP INDEX CONCURRENTLY`로 제거한다. 출력에 `sec_submissions` 추정 행 수·테이블 크기·대상 인덱스 validity를 기록한다. 그 외 failed migration은 계속 fail-closed한다. PID `260900`은 다음 실행 시점에도 client backend, snapshot 보유, 30초 초과일 때만 종료 후보가 되도록 정확 PID allowlist에 추가했다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`가 V168/V170 복구 범위, invalid index 정리, 승인 PID allowlist, preflight retry를 검사한다. Deploy 로그에서 V170 migration progress/timeout을 확인하고, health 200과 Flyway V170 성공이 모두 확인되기 전 완료로 처리하지 않는다.
+- **남은 위험/다음 단계**: 테이블 크기나 동시 인덱스 대기 원인은 아직 확인되지 않았다. 수정 배포 후 preflight 진단 통계와 V170 migration 결과를 확인한다. V170에서 재차 timeout되면 같은 인덱스 생성만 더 오래 반복하지 말고 OCI `pg_stat_progress_create_index`와 active snapshot holder를 읽기 전용으로 진단한다.
 # V168 snapshot blocker와 장기 OBV 조회
 
 - **증상/근거**: OCI read-only 진단 run `44020043575`에서 localhost `stockman` client backend가 1,235초 동안 active 상태로 snapshot을 유지하고 두 parallel worker를 보유했다. 당시 `application_name`은 비어 있고 OS client process mapping은 확인되지 않았다.

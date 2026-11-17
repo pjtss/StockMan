@@ -81,7 +81,7 @@ done
 stage="terminate-explicitly-approved-snapshot-pid"
 runuser -u stockman -- env \
   OCI_PG_TERMINATION_APPROVED_SCOPE=explicit-approved-pids \
-  OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038 \
+    OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038,260900 \
   DATABASE_URL="$DATABASE_URL" \
   node "$TEMP_PATH/scripts/terminate-approved-oci-snapshot-holders.mjs"
 
@@ -91,23 +91,25 @@ preflight_log="$TEMP_PATH/v168-preflight.log"
 preflight_attempt=1
 while true; do
   if preflight_output="$(runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
-    node "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs" "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql" 2>"$preflight_log")"; then
+    node "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs" \
+      "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql" \
+      "$TEMP_PATH/db/migration/V170__sec_materializer_recent_index.sql" 2>"$preflight_log")"; then
     cat "$preflight_log" >&2
     break
   else
     preflight_status=$?
     cat "$preflight_log" >&2
-    if ! grep -q "V168 preflight found old database snapshots" "$preflight_log" || [ "$preflight_attempt" -ge 20 ]; then
+    if ! grep -q "V168/V170 preflight found old database snapshots" "$preflight_log" || [ "$preflight_attempt" -ge 20 ]; then
       exit "$preflight_status"
     fi
-    echo "V168 preflight: old snapshots remain; retrying in 30 seconds (attempt ${preflight_attempt}/20)" >&2
+    echo "V168/V170 preflight: old snapshots remain; retrying in 30 seconds (attempt ${preflight_attempt}/20)" >&2
     sleep 30
     preflight_attempt=$((preflight_attempt + 1))
   fi
 done
 printf '%s\n' "$preflight_output"
 if [[ "$preflight_output" == *'"repairRequired":true'* ]]; then
-  stage="flyway-repair-v168"
+  stage="flyway-repair-v168-v170"
   timeout --signal=TERM --kill-after=30s 120s docker run --rm --network host \
     -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
     "$FLYWAY_IMAGE" \

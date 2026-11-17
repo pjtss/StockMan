@@ -219,7 +219,7 @@ for (const required of [
 }
 if (!workflow.includes("oci-flyway-v168-preflight.mjs")
   || !workflow.includes("ServerAliveInterval=30")
-  || !activation.includes("flyway-repair-v168")
+  || !activation.includes("flyway-repair-v168-v170")
   || !activation.includes("2400s docker run")
   || !/name: Activate release\s+timeout-minutes: 45/.test(workflow)
   || !flywayPreflight.includes("DROP INDEX CONCURRENTLY IF EXISTS")
@@ -227,8 +227,10 @@ if (!workflow.includes("oci-flyway-v168-preflight.mjs")
   || !flywayPreflight.includes("statement_timeout: 60_000")
   || !flywayPreflight.includes("pg_stat_activity")
   || !flywayPreflight.includes("old database snapshots")
+  || !flywayPreflight.includes("failedMigrationVersions")
+  || !flywayPreflight.includes("sec_submissions")
   || !flywayPreflight.includes("refusing automatic repair")) {
-  throw new Error("OCI Flyway activation must allow a long migration and recover only V168 failed history/invalid indexes");
+  throw new Error("OCI Flyway activation must allow a long migration and recover only approved V168/V170 failed history/invalid indexes");
 }
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");
@@ -238,9 +240,9 @@ if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('systemctl stop "$unit"')
   || !activation.includes('preflight_attempt" -ge 20')
   || !activation.includes('sleep 30')
-  || !activation.includes('V168 preflight found old database snapshots')
+  || !activation.includes('V168/V170 preflight found old database snapshots')
   || !activation.includes('preflight_attempt=$((preflight_attempt + 1))')
-  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038")
+  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038,260900")
   || !activation.includes("explicit-approved-pids")
   || !activation.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {

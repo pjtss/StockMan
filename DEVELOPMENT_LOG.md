@@ -8941,6 +8941,19 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 다음 개선: 공개 API 운영 로그와 DB 진단으로 502의 서버측 원인을 확인하고, 체크포인트/재개 및 호출 부하 제한을 갖춘 수집 방식이 검증되기 전에는 전체 운영 universe를 반복 요청하지 않는다.
 - 커밋/푸시: 신규 소스 변경은 없으며 이번 운영 작업으로 새 커밋·푸시하지 않았다. 이전 검증된 commit `3d5fcbb4`의 배포는 성공했다.
 
+## [2026-11-17] V170 SEC materializer index 배포 timeout 대응
+
+### 목표·운영 결과
+- 최신 원격 HEAD에 포함된 V170 SEC materializer 조회 index를 배포하고 migration 이력을 검증한다.
+- OCI Deploy run `44039396985`: verify/package/upload 성공, activation은 schema V169에서 V170 `CREATE INDEX CONCURRENTLY`를 시작했으나 2,400초 timeout 후 exit 137로 실패했다. error trap이 구 release app 및 scheduler services를 복구했고 `/health-check` HTTP 200을 확인했다.
+- 초기 preflight에서 client backend PID `260900` (active, snapshot 보유, 929초) 및 parallel worker `260901`, `260902`가 관측됐다. 30초 후 재검사에서는 모두 사라졌으므로 해당 PID는 종료하지 않았다. 이후 index가 40분 동안 지연된 확정 원인은 운영 DB progress 자료 없이 알 수 없다.
+
+### 수정 범위·검증·남은 위험
+- `scripts/oci-flyway-v168-preflight.mjs`: V168/V170 두 migration의 정확한 index 목록을 대상으로 failed Flyway history와 invalid concurrent index를 복구하고, `sec_submissions` 테이블 크기·추정 행 수 및 index state를 로그로 남기도록 보강.
+- `deploy/oci/stockman-activate`: preflight에 V170 migration을 전달하고, 실패한 V168/V170 history 복구를 허용하도록 반영. exact PID `260900`은 다음 실행 직전에도 client backend/snapshot/30초 초과 조건을 만족하는 경우에만 종료 후보로 지정.
+- `scripts/check-oci-cron.mjs`에서 migration 복구 범위와 PID allowlist를 자동 검사한다. 전체 `npm run deploy:verify` 완료 후 commit/push 및 새 OCI deploy를 진행한다.
+- 재발 시 `pg_stat_progress_create_index`와 current snapshot holder를 OCI에서 read-only 조회한다. 원인 확인 없이 migration timeout만 늘려 app downtime을 연장하지 않는다.
+
 \r\n
 # 2026-11-17 V168 인덱스 대상 오류 수정
 
