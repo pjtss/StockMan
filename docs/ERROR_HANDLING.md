@@ -765,3 +765,11 @@ npm test -- --run
 - **수정**: 배포의 자동 세션 일괄 종료를 제거한다. 현재 후속 승인으로 지정된 정확 PID `246213`, `246722`, `246903`, `247294`, `247463`, `247509`, `248010`, `248077`, `248691`, `248857`, `249223`, `249386`, `249548`, `249564`, `249815`, `249816`만 scope 환경변수의 명시적 allowlist에 넣고, 실행 직전 `client backend`·snapshot 보유·30초 초과를 다시 확인한다. PID가 사라졌거나 조건을 충족하지 않으면 해당 PID는 건너뛰고, 나머지 preflight blocker가 있으면 배포가 fail-closed한다. allowlist 밖 세션 및 parallel worker는 건드리지 않는다.
 - **재발 자동 감지**: `scripts/check-oci-cron.mjs`에서 artifact의 전용 runner 포함과 activation의 정확한 PID allowlist를 검사한다. runner는 allowlist 비어 있음/잘못된 PID에서 실패하고 SQL에서도 승인 PID 전체를 재검증한다. 진단에는 application name·DB user·client address를 포함하고 raw query text는 기록하지 않는다.
 - **남은 위험/다음 단계**: concurrent index가 다른 오래된 snapshot을 기다리면 배포는 실패하고 기존 서비스/timer 복구 경로가 작동한다. 그 세션은 별도 관측 및 승인 범위 없이 종료하지 않는다.
+
+## Deploy OCI #1310 후속 snapshot holder 진단
+
+- **증상/근거**: Deploy OCI #1310에서 allowlist의 현재 holder 3개를 종료한 뒤, preflight가 새 client backend 5개와 관련 parallel worker 4개를 발견해 migration 전에 중단됐다. client는 `stockman` user와 `127.0.0.1` 주소였지만 기존 preflight가 `application_name`과 OS service mapping을 출력하지 않아 생성 주체를 특정할 수 없다.
+- **조사 범위**: 별도 `codex/diagnose-oci-snapshot-holders` 브랜치용 read-only workflow를 준비한다. SQL은 `BEGIN READ ONLY`에서 activity metadata만 읽으며 쿼리 원문·비밀번호를 출력하지 않는다. PostgreSQL `client_port`와 `ss -tnpH`의 local ephemeral port를 대조해 실제 client process의 이름/systemd cgroup을 best-effort로 기록한다. `pg_stat_activity.pid`는 PostgreSQL 서버 backend PID이므로 client PID로 잘못 취급하지 않는다.
+- **안전 조건**: 진단 workflow는 배포 브랜치에서 실행되지 않으며 `pg_terminate_backend`, DDL, timer/service 변경을 하지 않는다.
+- **검증/다음 단계**: deploy verification 후 진단 결과를 보고 세션 발생 경로를 특정한다. PID 목록 자체만으로 세션을 종료하지 않는다.
+- **공식 근거/한계**: PostgreSQL 공식 [`pg_stat_activity` 문서](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW)에 따라 `application_name`, `usename`, `client_addr`, `client_port`, `backend_xmin`, wait event 및 age만 조회한다. DB 연결이 Unix socket이거나 `ss`가 소켓 소유자를 노출하지 않으면 client process mapping은 비어 있을 수 있다.

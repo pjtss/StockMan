@@ -10,6 +10,8 @@ if (!source.includes('run_cron_endpoint "db-retention" 60 "/api/cron/db-retentio
 }
 const retentionRoute = fs.readFileSync(path.resolve("app/api/cron/db-retention/route.ts"), "utf8");
 const healthProbeRoute = fs.readFileSync(path.resolve("app/api/cron/health-probe-snapshot/route.ts"), "utf8");
+const snapshotDiagnosticScript = fs.readFileSync(path.resolve("scripts/diagnose-oci-snapshot-holders.mjs"), "utf8");
+const snapshotDiagnosticWorkflow = fs.readFileSync(path.resolve(".github/workflows/diagnose-oci-snapshot-holders.yml"), "utf8");
 if (!healthProbeRoute.includes("DELETE FROM health_probe_history WHERE checked_at < NOW() - INTERVAL '14 days'")) {
   throw new Error("Health probe history must retain its existing 14-day cleanup path");
 }
@@ -232,6 +234,13 @@ if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {
   throw new Error("V168 activation must pause DB services, target only the explicitly approved PID, and restore services on failure");
+}
+if (!snapshotDiagnosticScript.includes('client.query("BEGIN READ ONLY")')
+  || /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\s/i.test(snapshotDiagnosticScript)
+  || snapshotDiagnosticScript.includes("pg_terminate_backend")
+  || !snapshotDiagnosticWorkflow.includes("branches:\n      - codex/diagnose-oci-snapshot-holders")
+  || !snapshotDiagnosticWorkflow.includes("permissions:\n  contents: read")) {
+  throw new Error("OCI snapshot diagnostics must stay read-only and isolated from the production deployment branch");
 }
 for (const required of ["oci-fundamentals-cron.sh", "stockman-fundamentals.service", "stockman-fundamentals.timer"]) {
   if (!workflow.includes(required)) throw new Error(`OCI release packaging is missing ${required}`);

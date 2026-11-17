@@ -8939,3 +8939,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **후속 blocker 4**: run `44013496931`은 PID `248010`(1577초)과 `248077`(1413초)을 종료했으나 V168 preflight에서 새 client PID `248691`(671초, parallel worker 보유), `248857`(381초, parallel worker 보유), `249223`(71초)이 확인돼 fail-closed했다. 다음 재시도는 이 정확한 세 client PID만 실행 직전 재검증한다.
 - **후속 blocker 5**: run `44015105176`은 PID `248691`(1491초), `248857`(1201초)을 종료했으나 V168 preflight에서 새 client PID `249386`(586초, parallel worker 보유), `249548`(236초, parallel worker 보유), `249564`(164초), `249815`(56초), `249816`(57초)이 확인돼 fail-closed했다. 다음 재시도는 이 다섯 정확 client PID만 실행 직전 재검증한다.
 - **남은 위험/다음 단계**: 실패한 non-transactional V168은 일부 인덱스와 Flyway 실패 행을 남길 수 있다. 배포 preflight의 V168 한정 복구와 후속 V169/운영 상태 확인 필요.
+
+# 2026-11-17 OCI snapshot holder 진단 보강
+
+- **목적/범위**: Deploy OCI #1310에서 명시 allowlist에 없는 새 snapshot holder가 preflight에서 반복 발견된 원인을 파악한다.
+- **근거**: #1310 preflight가 새 active client PID 250094, 250277, 250401, 250475, 250476 및 parallel worker 250095, 250096, 250403, 250404를 확인해 migration 전 중단했다. application_name과 Linux service unit 정보는 기존 로그에 없어 실행 주체를 판별할 수 없다.
+- **변경 파일**: `scripts/diagnose-oci-snapshot-holders.mjs`는 OCI-local PostgreSQL에 read-only transaction으로 연결해 SQL text나 자격증명을 기록하지 않고 세션 상태·age·application/user/address와 `/proc`의 process name/systemd cgroup을 기록한다. `.github/workflows/diagnose-oci-snapshot-holders.yml`은 전용 진단 브랜치 push에서만 실행하며 운영 DB를 읽기만 한다.
+- **검증**: `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone runtime/browser/API smoke, 313개 테스트 파일 통과·1개 skip(1,644 pass·3 skip), typecheck, docs/API/auth/KIS/cron gates. `node --check scripts/diagnose-oci-snapshot-holders.mjs`, `cron:check`, `git diff --check`, Prettier YAML parser/check 통과. 초기 runtime smoke는 설치된 Next 패키지에서 참조 파일 `cpu-profile.js` 누락으로 실패했으나 `npm install next@15.5.28 --no-save`로 현 worktree 설치를 복구한 후 성공했다. package lock은 변경하지 않았다.
+- **커밋/푸시/배포**: 검증 완료 후 진단용 비배포 브랜치에만 푸시한다. 진단 workflow 결과로 실제 OCI client process mapping을 확인할 예정이다.
+- **남은 위험/다음 단계**: process mapping이 보이지 않거나 세션이 이미 종료되면 원인을 확정할 수 없다. 이 진단 workflow는 session 종료, DDL, 배포를 수행하지 않는다.

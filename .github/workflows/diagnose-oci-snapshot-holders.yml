@@ -1,0 +1,49 @@
+name: Diagnose OCI PostgreSQL snapshot holders
+
+on:
+  push:
+    branches:
+      - codex/diagnose-oci-snapshot-holders
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnose-oci-snapshot-holders
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure SSH
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$OCI_HOST" || { echo "OCI_HOST secret is empty"; exit 1; }
+          test -n "$OCI_SSH_PRIVATE_KEY" || { echo "OCI_SSH_PRIVATE_KEY secret is empty"; exit 1; }
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -T 10 -H "$OCI_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          printf '%s\n' "$OCI_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/oci_key
+          chmod 600 ~/.ssh/oci_key
+          ssh-keygen -y -f ~/.ssh/oci_key > ~/.ssh/oci_key.pub
+
+      - name: Run read-only OCI diagnostics
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          diagnostic_script="/tmp/stockman-snapshot-diagnostics-${GITHUB_SHA}.mjs"
+          scp -i ~/.ssh/oci_key scripts/diagnose-oci-snapshot-holders.mjs \
+            "ubuntu@${OCI_HOST}:${diagnostic_script}"
+          ssh -i ~/.ssh/oci_key -o ServerAliveInterval=30 -o ServerAliveCountMax=5 \
+            "ubuntu@${OCI_HOST}" \
+            "sudo -n bash -lc 'set -euo pipefail; set -a; . /etc/stockman/stockman.env; set +a; runuser -u stockman -- env DATABASE_URL=\"\$DATABASE_URL\" STOCKMAN_RELEASE_PATH=/opt/stockman/current node ${diagnostic_script}'"
