@@ -8963,6 +8963,7 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - 검증·배포: snapshot 도구 변경 포함 `npm run deploy:verify` 통과(274 files/1 skipped, 1,483 passed/3 skipped, build/runtime/API/docs/auth/KIS/cron 검증 통과). commit `d1dba1a6` push 후 OCI Deploy run `44052281379` 성공. US 스냅샷은 NAS/NYS/AMS 활성 5,358종목 중 5,268종목, 627,078 candles, 누락 90종목; KR은 KOSPI/KOSDAQ 2,346종목, 270,629 candles, 누락 0. 양쪽 최신 candle date는 `20261116`이다.
 - 산출 검증: `docs/operations/daily-candles-us.json`, `docs/operations/daily-candles-kr.json`에서 summary count, exchange count, 중복 코드, 종목별 candle 수, 날짜/갱신 timestamp를 검증했다. 수집 후 `/api/health` HTTP 200. 실행용 임시 runner 및 URL-only `.env.local`은 제거했다.
 - US JSON이 100 MiB 초과이므로 두 스냅샷은 GitHub 공식 파일 제한을 지키기 위해 `.gitattributes`에서 Git LFS로 추적한다. GitHub 공식 문서: [large files](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github), [Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage).
+- 최종 결과 커밋 `c0fe3d71`에서 두 스냅샷을 Git LFS로 push했고 OCI Deploy run `44056806652` 성공. 배포 후 `/api/health`와 NAS universe 재확인도 HTTP 200.
 - 남은 개선: 앞선 대량 수집 중 관측된 HTTP 502의 서버측 원인은 별도 OCI 로그로 확정되지 않았고, 이번 20종목 단위 수집에서는 재현되지 않았다. 이번 실행 성공으로 snapshot 산출 및 배포 목표를 완료했다.
 
 \r\n
