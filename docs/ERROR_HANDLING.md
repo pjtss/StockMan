@@ -772,7 +772,8 @@ npm test -- --run
 - **근본 원인**: 확인되지 않았다. 요청 누적과 장애 발생 시각은 연관됐지만, 운영 애플리케이션/DB 진단 로그 없이 서버 과부하나 특정 조회 코드 경로를 원인으로 확정하지 않는다.
 - **대응**: 502 또는 health 실패가 발생하면 전체 수집을 즉시 중지한다. 추가 universe/candle 요청을 하지 말고 health만 확인한다. 배포가 필요하면 승인된 OCI deploy workflow를 실행하고 성공 후 health를 재검증한다. 부분 수집 결과는 최종 JSON으로 승격하지 않는다.
 - **재발 자동 감지**: 전체 스냅샷 전 health, universe, 소량 일봉 요청을 확인하며 수집 중 실패도 기록한다. 후속 개선은 서버측 502 로그/DB 진단, checkpoint resume, 호출 부하 제한을 갖춘 수집 방식을 추가하고 운영에서 소량 검증한 후 전체 실행하는 것이다.
-- **남은 위험**: 전체 ㄷㅊㅇ5·ㄷㅊㅇ6 파일은 아직 생성·검증되지 않았다. 서버측 원인이 확인되고 안전한 재개 방식이 준비될 때까지 전체 운영 universe 수집을 반복하지 않는다.
+- **해결 확인**: V170 snapshot blocker PID `261867` 종료 및 배포 성공 후, 20종목 단위와 최대 4회 재시도를 적용한 전체 수집이 재현 가능한 502 없이 완료됐다. `/api/health`는 수집 후 HTTP 200이었다. `daily-candles-us.json`은 5,268종목·627,078 candles·90 missing, `daily-candles-kr.json`은 2,346종목·270,629 candles·0 missing이며 두 파일 모두 latest date `20261116`. JSON summary, instrument counts, 중복 코드, candle count 및 날짜/갱신시각을 검증했다.
+- **남은 위험**: 최초 대량 수집 때의 nginx 502 원인은 서버측 로그/DB 진단 자료가 없어 독립적으로 확정되지 않았다. 20종목 배치와 재시도 설정은 현재 성공했으며 향후 수집도 health·universe·소량 조회 사전 확인을 유지한다.
 
 ## V170 SEC materializer 인덱스 생성 timeout
 
