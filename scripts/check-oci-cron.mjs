@@ -231,7 +231,7 @@ if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('sleep 30')
   || !activation.includes('V168 preflight found old database snapshots')
   || !activation.includes('preflight_attempt=$((preflight_attempt + 1))')
-  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751")
+  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038")
   || !activation.includes("explicit-approved-pids")
   || !activation.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {
