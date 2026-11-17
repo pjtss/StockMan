@@ -4,13 +4,12 @@ const state = vi.hoisted(() => ({ finished: [] as Array<{ status: string; summar
 
 vi.mock("@/lib/automation-run-repository", () => ({
   finishAutomationRun: async (_id: number, status: string, summary: Record<string, unknown>) => { state.finished.push({ status, summary }); },
-  recordDebugRunItems: async () => 0,
   startAutomationRun: async () => 1,
 }));
 vi.mock("@/lib/request-trace", () => ({ readRequestTrace: async () => null }));
 vi.mock("@/lib/automation-completion-discord", () => ({ notifyAutomationCompletion: async () => ({ sent: false, skipped: true }) }));
 
-import { compactAutomationSummary, extractDebugItems, withAutomationRun } from "./automation-run";
+import { compactAutomationSummary, withAutomationRun } from "./automation-run";
 
 beforeEach(() => { state.finished = []; });
 
@@ -70,26 +69,4 @@ describe("automation run summary compaction", () => {
     expect(value.raw.endsWith("…")).toBe(true);
   });
 
-  it("persists per-instrument failure samples as debug items with a stable error code", () => {
-    expect(extractDebugItems({ failureSamples: [
-      { market: "NAS", code: "AMRO", error: "KIS_EMPTY_OR_INVALID_PRICE (http=200, rt_cd=0)" },
-    ] })).toEqual([{
-      market: "NAS",
-      code: "AMRO",
-      timeframe: null,
-      status: "FAILED",
-      attemptCount: 0,
-      startedAt: null,
-      completedAt: null,
-      durationMs: null,
-      errorCategory: "PROCESSING",
-      errorCode: "KIS_EMPTY_OR_INVALID_PRICE",
-      errorMessage: "KIS_EMPTY_OR_INVALID_PRICE (http=200, rt_cd=0)",
-      metadata: { market: "NAS", code: "AMRO", error: "KIS_EMPTY_OR_INVALID_PRICE (http=200, rt_cd=0)", status: "FAILED" },
-    }]);
-  });
-
-  it("does not create debug items from aggregate failures without instrument identity", () => {
-    expect(extractDebugItems({ failureSamples: [{ error: "temporary upstream failure" }] })).toEqual([]);
-  });
 });

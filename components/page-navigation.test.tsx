@@ -20,13 +20,13 @@ describe('PageNavigation Component', () => {
   it('renders all links', () => {
     render(<PageNavigation current="home" />);
     expect(screen.getByText('홈')).toBeDefined();
-    expect(screen.getByText('DART')).toBeDefined();
-
+    expect(screen.getByText('티커 차트')).toBeDefined();
+    expect(screen.queryByText('DART')).toBeNull();
   });
 
   it('highlights the active link', () => {
-    const { container } = render(<PageNavigation current="dart" />);
+    const { container } = render(<PageNavigation current="disclosures" />);
     const activeLink = container.querySelector('.navActive');
-    expect(activeLink?.textContent).toBe('DART');
+    expect(activeLink?.textContent).toBe('일별 공시');
   });
 });

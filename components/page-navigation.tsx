@@ -6,7 +6,6 @@ import styles from "./page-navigation.module.css";
 
 type PageKey =
   | "home"
-  | "dart"
   | "watchlist"
   | "notifications"
   | "scanners-us"
@@ -33,10 +32,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
         <Link aria-current={current === "home" ? "page" : undefined} className={current === "home" ? styles.navActive : styles.navLink} href="/" prefetch={false}>
           홈
         </Link>
-        <Link aria-current={current === "dart" ? "page" : undefined} className={current === "dart" ? styles.navActive : styles.navLink} href="/dart" prefetch={false}>
-          DART
-        </Link>
-
         <Link aria-current={current === "charts" ? "page" : undefined} className={current === "charts" ? styles.navActive : styles.navLink} href="/charts" prefetch={false}>
           티커 차트
         </Link>

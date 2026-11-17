@@ -7,7 +7,6 @@ const publicRoutes = [
   "app/api/domestic-financial-export/route.ts",
   "app/api/stock/kr/top-rising-chart/route.ts",
   "app/api/scan/daytrade/route.ts",
-  "app/api/us/sec-risks/route.ts",
 ];
 
 describe("public API error boundary source audit", () => {

@@ -21,8 +21,7 @@ export async function POST(request: Request) {
     const settings = await loadFeatureModuleSettings("market-rss");
     if (!settings.enabled) { await recordSkippedAutomationRun("market-rss", "disabled"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "disabled" }); }
     // The dedicated RSS timer is responsible for keeping the feed current
-    // throughout the day. Other callers still honor the administrator's
-    // configured schedule.
+    // throughout the day. Other callers still honor the stored schedule.
     const dedicatedRssScheduler = request.headers.get("x-rss-scheduler") === "1";
     if (!dedicatedRssScheduler && !isWithinSchedule(settings, new Date())) { await recordSkippedAutomationRun("market-rss", "outside_schedule"); return NextResponse.json({ ok: true, mode: "COMMIT", skipped: true, reason: "outside_schedule" }); }
     const sources: MarketRssSource[] = ["GLOBENEWSWIRE", "STOCKTITAN", "SEC_EDGAR"];

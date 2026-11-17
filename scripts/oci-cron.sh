@@ -68,7 +68,7 @@ run_cron_endpoint "sync-filings" 50 "/api/cron/sync-filings"
 # while SEC Submissions is handled by the separate sec-edgar call.
 
 # The route resolves CIKs from the feature-module settings first and falls
-# back to SEC_SYNC_CIKS. Always call it so CIKs saved in the admin UI work
+# back to SEC_SYNC_CIKS. Always call it so stored CIK settings work
 # without requiring a duplicate environment-variable configuration.
 run_cron_endpoint "sec-edgar" 180 "/api/cron/sec-edgar"
 

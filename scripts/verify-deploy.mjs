@@ -292,8 +292,6 @@ async function verifyRuntime() {
         await waitForJson(`http://127.0.0.1:${port}/api/cron/us-obv-divergence-snapshot`, 30_000, 401, { method: "POST" });
         await waitForJson(`http://127.0.0.1:${port}/api/stock/us/top-rising-chart`);
         await waitForJson(`http://127.0.0.1:${port}/api/stock/kr/top-rising-chart`);
-        await waitForJson(`http://127.0.0.1:${port}/api/admin/health-probe-history`, 30_000, 401);
-        await waitForJson(`http://127.0.0.1:${port}/api/admin/kis-realtime-approval-metrics`, 30_000, 401);
         await waitForJson(`http://127.0.0.1:${port}/api/cron/health-probe-snapshot`, 30_000, 401, { method: "POST" });
       })(),
       childExit,

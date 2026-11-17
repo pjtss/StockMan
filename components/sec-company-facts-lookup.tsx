@@ -69,6 +69,6 @@ export function SecCompanyFactsLookup() {
       <div className={styles.actions}><a className={styles.apiLink} href={`/api/public/us-stock-metadata?ticker=${encodeURIComponent(lookup.mapping?.ticker || "")}`} target="_blank" rel="noreferrer" aria-label={`${lookup.mapping?.ticker || "종목"} 기본정보 API 열기`}>종목 기본정보 API 보기</a><button type="button" onClick={() => void loadSavedJson()} disabled={loadingJson}>{loadingJson ? "DB에서 불러오는 중…" : showJson ? "저장 JSON 새로고침" : "저장된 전체 JSON 보기"}</button>{snapshot && <><button type="button" onClick={() => void copyJson()}>전체 JSON 복사</button><button type="button" className={styles.secondary} onClick={downloadJson}>JSON 파일 다운로드</button></>}</div>
       {showJson && snapshot && <textarea className={styles.json} aria-label="저장된 전체 SEC Company Facts JSON" readOnly value={json} spellCheck={false} />}
     </div>}
-    <p className={styles.note}>이 조회·복사·다운로드 기능은 로그인 없이 이용할 수 있으며, 수동 SEC 조회에는 IP별·서비스 전체 요청 제한이 적용됩니다. 자동 갱신 대상과 스케줄은 관리자만 <code>/admin/modules/sec-company-facts</code>에서 설정할 수 있습니다.</p>
+    <p className={styles.note}>이 조회·복사·다운로드 기능은 로그인 없이 이용할 수 있으며, 수동 SEC 조회에는 IP별·서비스 전체 요청 제한이 적용됩니다. 자동 갱신은 서버 운영 스케줄에 따라 수행됩니다.</p>
   </section>;
 }

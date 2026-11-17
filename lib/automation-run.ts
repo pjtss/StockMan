@@ -1,4 +1,4 @@
-import { finishAutomationRun, recordDebugRunItems, startAutomationRun, type AutomationRunDimensions } from "@/lib/automation-run-repository";
+import { finishAutomationRun, startAutomationRun, type AutomationRunDimensions } from "@/lib/automation-run-repository";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { describeError } from "@/lib/error-diagnostics";
 import { readRequestTrace } from "@/lib/request-trace";
@@ -8,32 +8,6 @@ import { getAutomationRunResultStatus } from "@/lib/automation-run-result-status
 const SUMMARY_MAX_DEPTH = 4;
 const SUMMARY_MAX_STRING_LENGTH = 2_000;
 const SUMMARY_MAX_ARRAY_SAMPLE = 3;
-
-export function extractDebugItems(result: Record<string, unknown>) {
-  if (Array.isArray(result.debugItems)) return result.debugItems;
-  const candidates = ["results", "qualified", "items", "rows"].flatMap((key) => Array.isArray(result[key]) ? result[key] : []);
-  const failures = Array.isArray(result.failureSamples) ? result.failureSamples : [];
-  const failureItems = failures.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => ({ ...item, status: item.status ?? "FAILED" }));
-  return [...candidates, ...failureItems].filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && ("code" in item || "ticker" in item))).map((item) => {
-    const errorMessage = item.errorMessage ?? item.error ?? null;
-    const rawCode = typeof errorMessage === "string" ? errorMessage.match(/^([A-Z][A-Z0-9_]+)/)?.[1] : null;
-    const errorCode = item.errorCode ?? rawCode;
-    return {
-    market: item.market ?? null,
-    code: item.code ?? item.ticker ?? null,
-    timeframe: item.timeframe ?? result.timeframe ?? null,
-    status: item.status ?? "SUCCESS",
-    attemptCount: item.attemptCount ?? 0,
-    startedAt: item.startedAt ?? null,
-    completedAt: item.completedAt ?? null,
-    durationMs: item.durationMs ?? null,
-    errorCategory: item.errorCategory ?? (errorCode ? "PROCESSING" : null),
-    errorCode: errorCode ?? null,
-    errorMessage,
-    metadata: compactAutomationSummary(item),
-    };
-  });
-}
 
 /** Keep automation_runs useful for diagnosis without persisting full scanner payloads. */
 export function compactAutomationSummary(value: unknown, depth = 0, key = ""): unknown {
@@ -65,10 +39,6 @@ export async function withAutomationRun<T>(moduleKey: FeatureModuleKey, task: ()
   };
   try {
     const result = await task();
-    if (result && typeof result === "object") {
-      try { await recordDebugRunItems(runId, extractDebugItems(result as Record<string, unknown>)); }
-      catch (error) { console.warn(`[Automation] debug item persistence unavailable for ${moduleKey}:`, error instanceof Error ? error.message : error); }
-    }
     const summary: Record<string, unknown> = compactAutomationSummary(result && typeof result === "object" ? { ...(result as Record<string, unknown>) } : { result }) as Record<string, unknown>;
     summary.observability = { ...(summary.observability && typeof summary.observability === "object" ? summary.observability as Record<string, unknown> : {}), ...(trace || {}), durationMs: Date.now() - startedAt };
     // A worker can finish its loop while individual instruments failed. Persist

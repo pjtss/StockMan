@@ -20,10 +20,4 @@ describe("Bearer parser source audit", () => {
       { file: "cron/shared/route.ts", content: 'if (isCronRequestAuthorized(request)) {}' },
     ])).toEqual(["cron/new/route.ts"]);
   });
-
-  it("allows routes that only report whether CRON_SECRET is configured", () => {
-    expect(findNonCentralizedCronSecretRoutes([
-      { file: "admin/market-debug/route.ts", content: 'cronSecretConfigured: Boolean(process.env.CRON_SECRET)' },
-    ])).toEqual([]);
-  });
 });

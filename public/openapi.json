@@ -18,9 +18,6 @@
   "security": [],
   "tags": [
     {
-      "name": "automation-settings"
-    },
-    {
       "name": "collection-status"
     },
     {
@@ -58,49 +55,6 @@
     }
   ],
   "paths": {
-    "/api/automation-settings": {
-      "get": {
-        "tags": [
-          "automation-settings"
-        ],
-        "operationId": "getAutomationSettings",
-        "summary": "레거시 자동화 주기 설정(사용 중단)",
-        "description": "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. 인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/automation-settings/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
-        "parameters": [],
-        "security": [],
-        "responses": {
-          "200": {
-            "description": "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "입력값 검증 실패(해당 endpoint에 한함)."
-          },
-          "429": {
-            "description": "요청 제한 초과(해당 endpoint에 한함)."
-          },
-          "500": {
-            "description": "서버 내부 오류."
-          },
-          "502": {
-            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
-          },
-          "503": {
-            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
-          }
-        },
-        "x-code-path": "app/api/automation-settings/route.ts",
-        "x-access-classification": "public-read-candidate",
-        "deprecated": true
-      }
-    },
     "/api/collection-status": {
       "get": {
         "tags": [

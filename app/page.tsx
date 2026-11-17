@@ -1,14 +1,9 @@
 import { PageNavigation } from "@/components/page-navigation";
-import Link from "next/link";
 import styles from "./page.module.css";
 
 // The shell must not be served from a long-lived prerender cache after a release.
 // Otherwise clients can receive HTML that references chunks from an older build.
 export const dynamic = "force-dynamic";
-
-const destinations = [
-  { href: "/dart", label: "DART 공시 분석", description: "실시간 국내 공시와 상세 분석" },
-];
 
 export default function HomePage() {
   return (
@@ -27,24 +22,6 @@ export default function HomePage() {
         <section className={styles.statusBar} aria-label="서비스 상태">
           <div><span className={styles.statusDot} /> 시스템 정상</div>
           <span>실시간 데이터 모니터링</span>
-        </section>
-        <section className={styles.destinationSection} aria-labelledby="destination-title">
-          <div className={styles.sectionHeading}>
-            <h2 id="destination-title">빠른 진입</h2>
-            <span>{destinations.length} MODULES</span>
-          </div>
-          <div className={styles.destinationList}>
-            {destinations.map((destination, index) => (
-              <Link key={destination.href} href={destination.href} prefetch={false} className={styles.destination}>
-                <span className={styles.index}>{String(index + 1).padStart(2, "0")}</span>
-                <span className={styles.destinationCopy}>
-                  <strong>{destination.label}</strong>
-                  <small>{destination.description}</small>
-                </span>
-                <span className={styles.arrow} aria-hidden="true">→</span>
-              </Link>
-            ))}
-          </div>
         </section>
       </div>
     </main>

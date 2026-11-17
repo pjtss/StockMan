@@ -3,7 +3,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const invalidBearerWhitespace = String.raw`Bearer\\s`;
-const cronSecretConfigOnlyRoutes = new Set(["admin/market-debug/route.ts"]);
 
 export function findDoubleEscapedBearerParsers(files) {
   return files
@@ -14,8 +13,7 @@ export function findDoubleEscapedBearerParsers(files) {
 export function findNonCentralizedCronSecretRoutes(files) {
   return files
     .filter(({ file, content }) => content.includes("CRON_SECRET")
-      && !content.includes("isCronRequestAuthorized(request)")
-      && !cronSecretConfigOnlyRoutes.has(file.replaceAll("\\", "/")))
+      && !content.includes("isCronRequestAuthorized(request)"))
     .map(({ file }) => file);
 }
 

@@ -130,11 +130,6 @@ async function run(job: Job) {
       throw new Error(`KR daily candle refresh returned no usable candles for ${scopes.length} instruments`);
     }
     job.status = "COMPLETED";
-    (job as any).debugItems = job.results.flatMap((item: any) => ([
-      item.daily ? { market: item.market, code: item.code, timeframe: "D", status: Number(item.daily.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.daily.msg1 ?? null, metadata: item.daily } : null,
-      item.weekly ? { market: item.market, code: item.code, timeframe: "W", status: Number(item.weekly.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.weekly.msg1 ?? null, metadata: item.weekly } : null,
-      item.monthly ? { market: item.market, code: item.code, timeframe: "M", status: Number(item.monthly.parsedCandleCount ?? 0) > 0 ? "SUCCESS" : "FAILED", errorMessage: item.monthly.msg1 ?? null, metadata: item.monthly } : null,
-    ].filter(Boolean)));
     (job as any).dailySuccessCount = dailySuccessCount;
     (job as any).weeklyDerived = await upsertWeeklyFromDaily("KR", { runDailyTotal: scopes.length, runDailySuccess: dailySuccessCount });
     // Partial KIS failures must not block follow-up caches for instruments

@@ -41,34 +41,16 @@
 .statusBar div { display: inline-flex; align-items: center; gap: 8px; color: #00e79b; font-weight: 900; }
 .statusDot { width: 7px; height: 7px; background: #00e79b; box-shadow: 0 0 9px rgba(0, 231, 155, .7); }
 
-.destinationSection { padding: 22px 28px 28px; }
-.sectionHeading { min-height: 42px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid rgba(0, 231, 155, .65); }
-.sectionHeading h2 { margin: 0; color: #dce6ef; font-size: 14px; font-weight: 900; }
-.sectionHeading span { color: #6f849a; font-size: 11px; font-weight: 900; }
-.destinationList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.destination { min-height: 86px; padding: 15px 12px; display: flex; align-items: center; gap: 14px; color: #dce6ef; text-decoration: none; border-bottom: 1px solid rgba(130, 150, 175, .1); }
-.destination:nth-child(odd) { border-right: 1px solid rgba(130, 150, 175, .1); }
-.destination:hover { background: rgba(0, 231, 155, .055); }
-.index { color: #00e79b; font-size: 12px; font-weight: 900; }
-.destinationCopy { min-width: 0; display: grid; gap: 5px; }
-.destinationCopy strong { font-size: 14px; overflow-wrap: anywhere; }
-.destinationCopy small { color: #8497ab; font-size: 12px; line-height: 1.4; }
-.arrow { margin-left: auto; color: #6f849a; font-size: 20px; }
 
 :global([data-theme="light"]) .page { color: #0f172a; }
 :global([data-theme="light"]) .workspace { background: #ffffff; border-color: rgba(15,23,42,.12); box-shadow: 0 18px 48px rgba(15,23,42,.1); }
 :global([data-theme="light"]) .topBar { background: #f8fafc; border-color: rgba(15,23,42,.1); }
 :global([data-theme="light"]) .brand, :global([data-theme="light"]) .contentHeader h1 { color: #0f172a; }
-:global([data-theme="light"]) .description, :global([data-theme="light"]) .statusBar, :global([data-theme="light"]) .destinationCopy small { color: #475569; }
-:global([data-theme="light"]) .sectionHeading h2, :global([data-theme="light"]) .destination { color: #1e293b; }
-
+:global([data-theme="light"]) .description, :global([data-theme="light"]) .statusBar { color: #475569; }
 @media (max-width: 700px) {
   .page { width: min(100% - 16px, 1240px); padding-top: 8px; }
-  .topBar, .contentHeader, .statusBar, .destinationSection { padding-left: 16px; padding-right: 16px; }
   .topBar { min-height: 52px; gap: 10px; }
   .statusBar { min-height: 48px; padding-top: 10px; padding-bottom: 10px; align-items: flex-start; flex-wrap: wrap; }
   .statusBar > span { overflow-wrap: anywhere; }
   .contentHeader h1 { font-size: 26px; }
-  .destinationList { grid-template-columns: 1fr; }
-  .destination:nth-child(odd) { border-right: 0; }
 }

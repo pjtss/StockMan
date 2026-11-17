@@ -8959,3 +8959,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **재발 자동 감지**: `stockman-events-materializer.test.ts`가 세션 태그·timeout·LIMIT 정렬·accession filter와 client 해제를 검증한다. `check-oci-cron.mjs`와 OCI artifact assertion은 V170 설정/SQL 패키징을 검사한다.
 - **검증/배포**: focused tests 3/3 및 `npm run deploy:verify` 통과: audit 0 vulnerabilities, production build 108 pages, standalone runtime/browser/API smoke, Vitest 313 files passed/1 skipped (1,645 passed/3 skipped), typecheck, docs/API/catalog/migration, verify-scope/KIS/auth/cron gates. 기존 배포는 OCI #1313 attempt 2에서 성공했으며 이번 V170은 후속 배포 대상이다.
 - **남은 위험**: concurrent index 생성은 기존 오래된 snapshot이 있으면 대기한다. 조회 제한은 새 요청부터 적용하며 이미 열린 세션은 종료하지 않는다.
+
+## 2026-11-17 비활성 기능 및 관리자·DART 화면 제거
+
+- **목적 및 범위**: 참조되지 않고 사용되지 않는 기능을 코드와 테스트/UI에서 제거하고, 관리자 화면/API 및 DART 전용 `/dart` 사용자 화면을 제거한다. `/disclosures`의 DART 공시 기능과 DART API·수집 자동화는 유지한다.
+- **변경**: 관리자 페이지·API·전용 컴포넌트/테스트와 디버그 API 및 전용 실행 상세 저장 코드를 제거했다. `/health-check` 화면/테스트, 미사용 문의·공지·메모·투자 일정·상장 일정·국내 급등 기능의 UI/API/라이브러리/테스트를 제거했다. 홈/내비게이션에서 `/dart` 진입 링크를 없애고 PWA 시작 경로를 `/disclosures`로 바꿨다. `/disclosures`, DART API·수집 자동화, 예약 자동화에서 사용하는 공통 설정/실행 추적은 유지한다.
+- **문서화**: 운영 런북에서 제거된 관리자·디버그 경로를 지웠다. API route inventory와 문서 catalog는 `docs:check`/빌드에서 재생성한다.
+- **확인 대상**: 삭제 경로의 참조 잔존, API inventory/catalog, 빌드·테스트·실행 통합 검증을 확인한다.
+- **검증**: `npm run docs:check` 통과(106 route files, 46 public GET inventory, 139 documents). `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build/typecheck, standalone runtime 및 `/charts` desktop/mobile hydration/API smoke, Vitest 274 files passed/1 skipped (1,483 passed/3 skipped), docs/API/catalog/migration 및 KIS/auth/cron gates 통과. `git diff --check` 통과. Windows 공유 `node_modules` junction 때문에 standalone trace copy에 EPERM 경고가 있었으나 빌드 완료 후 standalone 서버 실행·smoke가 통과했다.
+- **커밋·푸시·배포**: 검증 완료 후 `oci` 브랜치에 커밋/푸시하여 Deploy OCI를 실행할 예정이다.
