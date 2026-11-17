@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 stage="initialise"
+SERVICES_QUIESCED=0
 on_error() {
   local code=$?
   echo "stockman-activate failed: stage=${stage} exit=${code}" >&2
+  if [ "$SERVICES_QUIESCED" = "1" ]; then
+    echo "Restoring application and scheduler services after failed activation" >&2
+    systemctl start stockman.service || true
+    systemctl start stockman-cron.timer stockman-rss.timer stockman-fundamentals.timer || true
+  fi
   if [ "$stage" = "service-restart" ]; then
     systemctl --no-pager --full status stockman.service stockman-cron.timer >&2 || true
     journalctl --no-pager -u stockman.service -n 40 >&2 || true
@@ -58,6 +64,25 @@ fi
 FLYWAY_USER="${DB_AUTH%%:*}"
 FLYWAY_PASSWORD="${DB_AUTH#*:}"
 FLYWAY_JDBC_URL="jdbc:postgresql://${DB_HOST_AND_NAME}"
+
+# Pause application and scheduled DB work while V168 builds concurrent indexes.
+# This prevents new application snapshots from continuously delaying the
+# migration. on_error restores the existing release and timers if migration fails.
+stage="quiesce-services"
+SERVICES_QUIESCED=1
+for unit in stockman-cron.timer stockman-rss.timer stockman-fundamentals.timer; do
+  timeout --signal=TERM --kill-after=10s 30s systemctl stop "$unit"
+done
+for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.service stockman.service; do
+  timeout --signal=TERM --kill-after=10s 30s systemctl stop "$unit"
+done
+
+stage="clear-old-snapshots"
+runuser -u stockman -- env \
+  OCI_PG_TERMINATION_APPROVED_SCOPE=active-client-snapshot-holders-over-30s \
+  DATABASE_URL="$DATABASE_URL" \
+  node "$TEMP_PATH/scripts/terminate-approved-oci-snapshot-holders.mjs"
+
 stage="flyway-migrate"
 preflight_output="$(runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
   node "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs" "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql")"
@@ -130,6 +155,7 @@ done
 systemctl is-active --quiet stockman-cron.timer
 systemctl is-active --quiet stockman-rss.timer
 systemctl is-active --quiet stockman-fundamentals.timer
+SERVICES_QUIESCED=0
 
 # Keep the reverse proxy upload limit in sync with the application release.
 if command -v nginx >/dev/null 2>&1 && [ -f "$DEPLOY_PATH/deploy/oci/nginx-stockman.conf" ]; then

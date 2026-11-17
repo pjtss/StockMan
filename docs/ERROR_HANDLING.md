@@ -739,3 +739,11 @@ npm test -- --run
 - **대응**: `lib/rss.ts`에서 XML/channel/date/URL을 검증하고 중복 receipt를 제거한다. fetch는 시간·크기·content-type 제한을 적용한다. `components/use-feed-data.ts`는 이전 요청을 취소하고 payload shape를 검사한다.
 - **재발 감지**: `lib/rss.test.ts`와 전체 Vitest suite에서 malformed/oversized/duplicate 입력과 polling 응답을 검증한다.
 - **운영 주의**: 실패한 RSS 항목은 정상 기사로 취급하지 않는다.
+
+## V168 concurrent index migration snapshot timeout
+
+- **증상/근거**: Deploy OCI run `43829487560`, attempt 9 passed the V168 snapshot preflight but Flyway remained at `Migrating schema "public" to version "168 - bounded non daily data retention"` until the 2,400-second migration timeout ended with exit 137. During earlier attempts, application and timer-created active client snapshots repeatedly reappeared.
+- **근본 원인**: `CREATE INDEX CONCURRENTLY` must wait for transactions holding older snapshots, while the app, cron, RSS, and fundamentals services continued opening DB work throughout migration.
+- **수정**: `deploy/oci/stockman-activate` stops the app and scheduler timers/services before migration, invokes the dedicated OCI-local runner for active client snapshot holders matching the same >30-second predicate as preflight, then reruns preflight and Flyway. If activation fails before successful completion, the error trap restarts the old app and timers. The dynamic runner excludes inactive sessions and parallel workers and rechecks the complete candidate set in the termination SQL.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs` asserts snapshot cleanup packaging, service quiescence and rollback. Deploy logs show stop, cleanup, V168 preflight and Flyway stages. PostgreSQL's official `CREATE INDEX` docs describe the wait for old snapshots: https://www.postgresql.org/docs/current/sql-createindex.html.
+- **검증/남은 위험**: the patch still requires `npm run deploy:verify`, push, a fresh OCI deployment, migration completion and runtime checks. Service downtime may last for the duration of V168/V169; if preflight still finds external client snapshots, failure rollback must restore app and timer services. Do not claim ㄷㅊㅇ5/ㄷㅊㅇ6 complete until the public universe APIs and both snapshot commands are verified.
