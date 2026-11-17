@@ -8933,4 +8933,5 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **커밋/푸시/배포**: 검증 완료; 커밋·푸시 후 OCI 배포 실행 예정.
 - **추가 운영 범위 점검**: Deploy OCI run `44004038768` 로그에서 broad predicate로 PID `241173`과 `244461`이 자동 종료된 사실을 확인했다. 다음 배포는 세션을 임의 종료하지 않고 preflight fail-closed로 바꿔, 명시적 승인된 PID 이외의 세션을 건드리지 않는다.
 - **추가 정확 범위 복구**: run `44007558527`은 active/idle client transaction 종료 없이 fail-closed했고 PID `246213`이 idle-in-transaction, snapshot 보유, 606초로 확인돼 롤백했다. 사용자의 후속 승인 범위에서 배포는 이 관측 PID 하나만 지정해 실행 직전 상태와 snapshot/age를 재확인하도록 제한한다. PID가 달라졌거나 조건이 다르면 종료하지 않고 preflight가 중단한다.
+- **후속 blocker**: run `44009100718`은 PID `246213`을 재검증 후 종료했으나 active snapshot client PID `246722`(681초), `246903`(406초), `247294`(63초) 및 관련 parallel worker가 남아 preflight에서 중단됐다. 재시도 allowlist를 이 세 정확 client PID까지 확장하고 parallel worker는 종료하지 않는다.
 - **남은 위험/다음 단계**: 실패한 non-transactional V168은 일부 인덱스와 Flyway 실패 행을 남길 수 있다. 배포 preflight의 V168 한정 복구와 후속 V169/운영 상태 확인 필요.
