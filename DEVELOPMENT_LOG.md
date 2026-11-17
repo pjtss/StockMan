@@ -8942,3 +8942,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **재시도 결과**: run `44018357320`에서 반복 preflight는 이전의 여러 snapshot client가 사라졌음을 확인했으나 PID `250751` client backend 하나(최초 423초)가 30초 간격 20회 동안 계속 active snapshot을 유지해 중단됐다. 승인 범위 내에서 이 정확 PID만 재검증 후 종료한다.
 - **후속 blocker 6 및 개선**: run `44016651680`은 PID `249386`(1313초), `249548`(964초), `249564`(892초)을 종료했지만 새 client PID `250094`(423초, parallel worker 보유), `250401`(120초, parallel worker 보유), `250277`(86초), `250475`(80초), `250476`(80초)이 생겨 preflight가 중단됐다. 승인 PID를 계속 추가하는 대신 서비스 중지 후 오래된 snapshot이 끝날 기회를 주도록 V168 preflight를 30초 간격 최대 20회 재시도한다. 허용 시간 내에도 남으면 계속 fail-closed한다.
 - **남은 위험/다음 단계**: 실패한 non-transactional V168은 일부 인덱스와 Flyway 실패 행을 남길 수 있다. 배포 preflight의 V168 한정 복구와 후속 V169/운영 상태 확인 필요.
+# 2026-11-17 조회 snapshot 장기 유지 방지
+
+- **목적/범위**: V168 배포 전 반복되는 PostgreSQL snapshot blocker에서 조회 오류와 장기 트랜잭션 가능 경로를 조사하고 OBV 스캔 세션의 수명을 제한한다.
+- **근거/원인 후보**: read-only OCI 진단 run `44020043575`에서 `stockman` localhost client backend 하나가 동일 쿼리와 snapshot을 1,235초 유지하고 두 parallel worker를 보유했으나 `application_name`이 비어 있었다. OBV 스캔은 전체 eligible 종목의 최근 최대 160개 봉을 한 조회로 읽고 앱에서 계산하며, DB statement/idle transaction timeout과 식별자가 없었다. 해당 경로가 일치하는 후보이나 PID의 OS process는 진단 당시 확인되지 않아 확정 원인으로 단정하지 않는다.
+- **변경 파일**: `lib/us-obv-divergence-scan.ts`, `lib/us-obv-divergence-snapshot.ts`, `app/api/cron/us-obv-divergence-snapshot/route.ts`, snapshot 회귀 테스트. 스캔 트랜잭션은 `application_name`을 설정하고 statement 15분, transaction idle 60초 상한을 적용한다. cron route 상한은 1,200초로 늘려 DB 쿼리 제한 이후 애플리케이션 정리가 끝날 여유를 둔다.
+- **검증**: focused test 3/3 통과. `npm run deploy:verify` 통과: audit 0 vulnerabilities, build 108 pages, standalone runtime/browser/API smoke, Vitest 313 files passed/1 skipped (1,645 passed/3 skipped), typecheck, docs/API/catalog/migration, verify-scope/KIS/auth/cron gates.
+- **커밋/푸시/배포**: full verification 완료 후 최신 `origin/oci` 기준 커밋 및 push; OCI 배포 workflow와 운영 health/V168 상태 확인 예정.
+- **남은 위험/다음 단계**: OS process mapping은 아직 확인되지 않았으므로 OBV 스캔은 근거 있는 원인 후보다. `application_name`은 다음 조회부터 식별성을 높인다. PostgreSQL query cancel 및 timeout 동작을 확인하고 다른 blocker가 지속되면 추가 조회 경로를 조사한다.

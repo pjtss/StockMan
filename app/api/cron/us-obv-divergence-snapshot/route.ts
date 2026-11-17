@@ -5,6 +5,8 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { loadLatestExecutedAutomationRun } from "@/lib/automation-run-repository";
 import { refreshUsObvDivergenceSnapshot } from "@/lib/us-obv-divergence-snapshot";
 
+export const maxDuration = 1_200;
+
 export async function POST(request: Request) {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   try {

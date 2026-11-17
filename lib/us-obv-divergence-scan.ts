@@ -12,6 +12,8 @@ import {
 const MIN_UNIVERSE_SIZE = 1_500;
 const MIN_MARKET_CAP_UNIVERSE_SIZE = 1_000;
 const MARKET_CAP_LIMIT_USD = 100_000_000;
+const SCAN_STATEMENT_TIMEOUT_MS = 15 * 60 * 1_000;
+const SCAN_IDLE_TRANSACTION_TIMEOUT_MS = 60 * 1_000;
 const MIN_EVALUATED_COVERAGE = 0.7;
 const EVALUATED_NO_SIGNAL = new Set([
   "NO_20D_PRICE_DOWN_OBV_UP", "NO_CONFIRMED_DIVERGENCE", "LOW_DOLLAR_LIQUIDITY",
@@ -91,6 +93,9 @@ export async function scanUsObvDivergenceWithClient(
   asOfEtDate: string,
   now = new Date(),
 ): Promise<UsObvDivergenceScanPayload> {
+  await client.query("SELECT set_config('application_name', 'stockman-us-obv-snapshot', true)");
+  await client.query("SELECT set_config('statement_timeout', $1, true)", [`${SCAN_STATEMENT_TIMEOUT_MS}ms`]);
+  await client.query("SELECT set_config('idle_in_transaction_session_timeout', $1, true)", [`${SCAN_IDLE_TRANSACTION_TIMEOUT_MS}ms`]);
   const universeResult = await client.query<{
     official_count: string; valid_us_market_cap_count: string; eligible_count: string;
   }>(
@@ -267,6 +272,9 @@ export async function scanUsObvDivergenceOnDemand(now = new Date()): Promise<UsO
   const client = await getPool().connect();
   try {
     await client.query("BEGIN READ ONLY");
+    await client.query("SELECT set_config('application_name', 'stockman-us-obv-snapshot', true)");
+    await client.query("SELECT set_config('statement_timeout', '900000ms', true)");
+    await client.query("SELECT set_config('idle_in_transaction_session_timeout', '60000ms', true)");
     const asOfEtDate = await findLatestCompletedUsDailyDate(client, clock.date);
     if (!asOfEtDate) throw new Error("NO_COMPLETED_US_DAILY_CANDLES");
     const payload = await scanUsObvDivergenceWithClient(client, asOfEtDate, now);
