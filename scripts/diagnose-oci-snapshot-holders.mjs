@@ -98,11 +98,23 @@ async function inspectLocalProcess(pid) {
     const match = entry.match(/(?:^|\/)([^/]+\.service|[^/]+\.scope)(?:$|\/)/);
     return match ? [match[1]] : [];
   }) ?? [];
+  const dockerId = cgroup?.join("\n").match(/docker-([a-f0-9]{64})\.scope/i)?.[1] ?? null;
+  let dockerContainer = null;
+  if (dockerId) {
+    const { stdout } = await execFileAsync("docker", ["ps", "--no-trunc", "--filter", `id=${dockerId}`, "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}"], {
+      encoding: "utf8",
+      timeout: 5_000,
+      maxBuffer: 65_536,
+    }).catch(() => ({ stdout: "" }));
+    const [id, name, image, status] = stdout.trim().split("\t");
+    if (id) dockerContainer = { id: id.slice(0, 12), name, image, status };
+  }
   return {
     comm,
     pid_namespace_ids: pidNamespaceIds,
     matches_local_pid: pidNamespaceIds.includes(String(pid)),
     systemd_units: pidNamespaceIds.includes(String(pid)) ? [...new Set(systemdUnits)] : [],
+    docker_container: dockerContainer,
   };
 }
 

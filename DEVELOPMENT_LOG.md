@@ -8949,3 +8949,4 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **커밋/푸시/배포**: 검증 완료 후 진단용 비배포 브랜치에만 푸시한다. 진단 workflow 결과로 실제 OCI client process mapping을 확인할 예정이다.
 - **남은 위험/다음 단계**: process mapping이 보이지 않거나 세션이 이미 종료되면 원인을 확정할 수 없다. 이 진단 workflow는 session 종료, DDL, 배포를 수행하지 않는다.
 - **후속 배포 결과**: run `44021996821` (#1313)은 snapshot holder `PID 253038`(idle in transaction, 928초)이 남아 V168 preflight를 20회 재시도한 뒤 fail-closed했다. 미승인 PID는 종료하지 않았다. 진단 코드의 socket endpoint 비교가 PostgreSQL `client_addr` CIDR suffix(`/32`)를 제거하지 않아 process mapping이 실패할 수 있음을 확인해 보정하고, root 권한에서 `/proc`/`ss` 정보만 읽도록 실행 주체를 바꾼다.
+- **후속 진단 결과**: run `44024793596`은 PID `253038`의 `application_name=PostgreSQL JDBC Driver`, `comm=java`, Docker scope `docker-ed2fc23955fc1e07ed079872720c9a8fea1c9d37a1b5770ed4d6e90b7ac667dd.scope`를 확인했다. 컨테이너명/이미지는 추가로 Docker metadata만 읽어 확인한다.
