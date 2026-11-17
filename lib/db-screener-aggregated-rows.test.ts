@@ -58,4 +58,39 @@ describe("database screener candle rows", () => {
     );
     expect(query.mock.calls[0][0]).not.toContain("JSON_AGG");
   });
+
+  it("runs broad US scans by exchange and applies ranking globally", async () => {
+    const records = {
+      NAS: { code: "AAA", name: "Alpha", marketCap: 300 },
+      NYS: { code: "BBB", name: "Bravo", marketCap: 500 },
+      AMS: { code: "CCC", name: "Charlie", marketCap: 400 },
+    } as const;
+    let exchangeIndex = 0;
+    query.mockImplementation(async () => {
+      const market = (["NAS", "NYS", "AMS"] as const)[exchangeIndex++ % 3];
+      const record = records[market];
+      return {
+        rows: makeCandles("D").map((candle) => ({
+          market,
+          code: record.code,
+          name: record.name,
+          market_cap: String(record.marketCap),
+          listed_shares: "1000000",
+          currency: "USD",
+          timeframe: "D",
+          ...candle,
+        })),
+      };
+    });
+
+    const results = await runDbScreener({
+      market: "US",
+      filters: [],
+      ranking: [{ field: "marketCap", direction: "DESC" }],
+      limit: 1,
+    });
+
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(results.map((result) => result.code)).toEqual(["BBB"]);
+  });
 });

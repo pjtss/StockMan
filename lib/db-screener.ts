@@ -77,6 +77,14 @@ async function runDbScreenerUncached(
     ]);
     return rankScreenerResults([...kr, ...us], request);
   }
+  if (request.market === "US" && !request.exchange?.length) {
+    const byExchange = await Promise.all(
+      ["NAS", "NYS", "AMS"].map((exchange) =>
+        runDbScreener({ ...request, exchange: [exchange] }),
+      ),
+    );
+    return rankScreenerResults(byExchange.flat(), request);
+  }
   const pool = getPool();
   const isUs = request.market === "US";
   const timeframe = request.timeframe ?? "D";
