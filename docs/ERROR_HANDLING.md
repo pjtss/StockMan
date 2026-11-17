@@ -773,3 +773,11 @@ npm test -- --run
 - **재발 자동 감지**: `lib/us-obv-divergence-snapshot.test.ts`에서 application name과 두 timeout 값을 검증한다. `npm run deploy:verify`가 build/runtime/browser/API smoke, 전체 테스트, typecheck, 문서 및 OCI cron gate를 실행한다. 운영 진단의 `pg_stat_activity.application_name`에서 향후 해당 세션을 구분한다.
 - **검증/남은 위험**: focused tests 3/3 및 전체 `deploy:verify` 통과(313 files, 1,645 passed/3 skipped). 기존 세션의 client OS process는 알아내지 못했으므로 다른 장기 조회 경로 가능성은 남는다. 신규 timeout은 이후 시작 세션에 적용된다.
 - **공식 근거**: PostgreSQL 공식 [`pg_stat_activity`](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW), [`statement_timeout` 및 `idle_in_transaction_session_timeout`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-STATEMENT-TIMEOUT) 문서.
+# SEC materializer 후보 조회가 오래된 snapshot 유지
+
+- **증상/근거**: read-only 진단 run `44028486909`에서 672초 active client snapshot PID `256094`를 확인했다. SQL 원문 대신 상수/주석을 마스킹한 shape가 `lib/stockman-events.ts`의 `materializeStockmanSecEvents` 후보 SELECT와 일치했고, client 프로세스는 `stockman.service`의 `next-server`였다. 두 parallel worker도 같은 query age로 대기했다.
+- **근본 원인**: full SEC materializer는 `acceptance_datetime` 정렬로 최대 500개 후보를 검색하지만 `sec_submissions.acceptance_datetime` 정렬 인덱스가 없었다. 따라서 제출 데이터와 공시 이벤트가 커지면 병렬 seq scan/sort가 장기화해 V168 concurrent index 작업의 snapshot 대기를 일으킬 수 있다.
+- **수정**: V170에 형식이 유효한 acceptance timestamp만 포함하는 partial concurrent index를 추가한다. SEC 후보 SELECT는 별도 `BEGIN READ ONLY` transaction에서 실행하며 `application_name=stockman-sec-event-materializer`, `statement_timeout=300000ms`, `idle_in_transaction_session_timeout=60000ms`를 설정한다. 조회 결과를 받아 즉시 COMMIT하고 후속 materialization/write는 snapshot이 없는 상태로 별도 실행한다.
+- **재발 자동 감지**: `lib/stockman-events-materializer.test.ts`는 쿼리 LIMIT/정렬 및 timeout/tag/client release를 확인한다. `scripts/check-oci-cron.mjs` 및 Deploy OCI tar assertion은 V170의 non-transactional concurrent index와 config 포함을 검사한다. 운영 진단은 SQL literal을 지운 query shape와 query id만 남긴다.
+- **검증/남은 위험**: OCI 배포 전 full `npm run deploy:verify` 및 V170 concurrent index 적용 필요. 마이그레이션은 다른 오래된 snapshot이 남아 있으면 fail-closed할 수 있다. 열린 세션은 자동 종료하지 않는다.
+- **공식 근거**: PostgreSQL 공식 [`CREATE INDEX` concurrent build](https://www.postgresql.org/docs/current/sql-createindex.html) 및 [`statement_timeout`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-STATEMENT-TIMEOUT) 문서.

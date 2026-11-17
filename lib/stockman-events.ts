@@ -212,12 +212,20 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
   const pool = getPool();
   const accessionValues = accessionFilters ?? (accessionFilter ? [accessionFilter] : null);
   const accessionClause = accessionValues ? "AND s.accession = ANY($3::text[])" : "";
-  const rows = await pool.query<{
+  type Candidate = {
     accession: string; cik: string; tickers: string[]; title: string; form: string; accepted: string | null; source_updated_at: Date;
     filing_url: string; category: string; direction: string; score: number; matched_terms: string[];
     primary_url: string | null; primary_text: string | null; analysis: Record<string, unknown> | null;
-  }>(
-    `SELECT s.accession,s.cik,c.tickers,COALESCE(s.primary_doc_description,s.form) AS title,s.form,s.acceptance_datetime AS accepted,
+  };
+  const client = await pool.connect();
+  let candidates: Candidate[];
+  try {
+    await client.query("BEGIN READ ONLY");
+    await client.query("SELECT set_config('application_name', 'stockman-sec-event-materializer', true)");
+    await client.query("SELECT set_config('statement_timeout', '300000ms', true)");
+    await client.query("SELECT set_config('idle_in_transaction_session_timeout', '60000ms', true)");
+    const result = await client.query<Candidate>(
+      `SELECT s.accession,s.cik,c.tickers,COALESCE(s.primary_doc_description,s.form) AS title,s.form,s.acceptance_datetime AS accepted,
             s.filing_url,e.category,e.direction,e.score,e.matched_terms,d.primary_url,d.primary_text,q.result AS analysis,
             GREATEST(s.updated_at,COALESCE(d.fetched_at,s.updated_at),COALESCE(q.analyzed_at,s.updated_at)) AS source_updated_at
      FROM sec_submissions s JOIN sec_companies c ON c.cik=s.cik JOIN sec_filing_events e ON e.accession=s.accession
@@ -228,12 +236,22 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
        OR GREATEST(s.updated_at,COALESCE(d.fetched_at,s.updated_at),COALESCE(q.analyzed_at,s.updated_at)) > COALESCE((SELECT x.source_updated_at FROM stockman_event_documents x WHERE x.source='SEC_EDGAR' AND x.external_id=s.accession),'-infinity'::timestamptz))
        AND s.acceptance_datetime ~ '^([0-9]{14}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z)$'
        AND EXISTS (SELECT 1 FROM us_common_stock_universe u WHERE u.enabled=TRUE AND u.instrument_type='COMMON_STOCK' AND UPPER(u.market)=ANY($2::text[]) AND UPPER(u.code)=ANY(SELECT UPPER(unnest(c.tickers))))
-     ORDER BY s.acceptance_datetime DESC NULLS LAST,s.accession LIMIT $1`, [Math.min(2000, Math.max(1, limit)), EXCHANGE_MARKETS, ...(accessionValues ? [accessionValues] : [])]);
+     ORDER BY s.acceptance_datetime DESC NULLS LAST,s.accession LIMIT $1`,
+      [Math.min(2000, Math.max(1, limit)), EXCHANGE_MARKETS, ...(accessionValues ? [accessionValues] : [])],
+    );
+    candidates = result.rows;
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
   let stored = 0;
   let unverified = 0;
   let failed = 0;
   const failureCodes: Record<string, number> = {};
-  for (const row of rows.rows) {
+  for (const row of candidates) {
     const acceptedAt = parseSecAcceptanceTimestamp(row.accepted);
     const ticker = await resolveActiveCommonTicker(row.tickers || [], row.cik);
     if (!ticker || !acceptedAt) { unverified++; continue; }
@@ -258,7 +276,7 @@ export async function materializeStockmanSecEvents(limit = 500, accessionFilter?
       stored++;
     } catch (error) { failed++; addFailureCode(failureCodes, error); }
   }
-  return { status: failed ? (stored ? "PARTIAL_SUCCESS" : "FAILED") : unverified ? (stored ? "PARTIAL_SUCCESS" : "UNVERIFIED") : "SUCCESS", fetched: rows.rows.length, stored, unverified, failed, failureCodes } as const;
+  return { status: failed ? (stored ? "PARTIAL_SUCCESS" : "FAILED") : unverified ? (stored ? "PARTIAL_SUCCESS" : "UNVERIFIED") : "SUCCESS", fetched: candidates.length, stored, unverified, failed, failureCodes } as const;
 }
 
 /** Historical RSS records remain unverified until an official issuer/SEC document is linked. */

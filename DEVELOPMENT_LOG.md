@@ -8951,3 +8951,11 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **검증**: focused test 3/3 통과. `npm run deploy:verify` 통과: audit 0 vulnerabilities, build 108 pages, standalone runtime/browser/API smoke, Vitest 313 files passed/1 skipped (1,645 passed/3 skipped), typecheck, docs/API/catalog/migration, verify-scope/KIS/auth/cron gates.
 - **커밋/푸시/배포**: full verification 완료 후 최신 `origin/oci` 기준 커밋 및 push; OCI 배포 workflow와 운영 health/V168 상태 확인 예정.
 - **남은 위험/다음 단계**: OS process mapping은 아직 확인되지 않았으므로 OBV 스캔은 근거 있는 원인 후보다. `application_name`은 다음 조회부터 식별성을 높인다. PostgreSQL query cancel 및 timeout 동작을 확인하고 다른 blocker가 지속되면 추가 조회 경로를 조사한다.
+# 2026-11-17 SEC materializer 장기 조회 제한
+
+- **목적/범위**: 배포 후 재관측한 장기 snapshot 조회의 원문 비노출 SQL shape를 로컬 코드와 대조해 병목 경로를 수정한다.
+- **근본 원인**: 진단 run `44028486909`에서 672초 active인 PID `256094`의 SQL shape가 `materializeStockmanSecEvents` 조회와 일치했다. SEC submissions 정렬/후보 선택은 `acceptance_datetime` B-tree 인덱스가 없고, SEC cron 전체 materializer가 최대 500행을 찾기 위해 병렬 seq scan할 수 있었다. client는 `stockman.service`의 Next.js였다.
+- **수정**: V170에 valid acceptance timestamp 부분 인덱스를 `CREATE INDEX CONCURRENTLY`로 추가한다. SEC 후보 조회에 `application_name`, statement 5분, idle transaction 60초 제한을 적용하고 후보 SELECT만 `READ ONLY` transaction으로 분리해 결과 처리/저장 전에 snapshot을 해제한다.
+- **재발 자동 감지**: `stockman-events-materializer.test.ts`가 세션 태그·timeout·LIMIT 정렬·accession filter와 client 해제를 검증한다. `check-oci-cron.mjs`와 OCI artifact assertion은 V170 설정/SQL 패키징을 검사한다.
+- **검증/배포**: focused tests 3/3 및 `npm run deploy:verify` 통과: audit 0 vulnerabilities, production build 108 pages, standalone runtime/browser/API smoke, Vitest 313 files passed/1 skipped (1,645 passed/3 skipped), typecheck, docs/API/catalog/migration, verify-scope/KIS/auth/cron gates. 기존 배포는 OCI #1313 attempt 2에서 성공했으며 이번 V170은 후속 배포 대상이다.
+- **남은 위험**: concurrent index 생성은 기존 오래된 snapshot이 있으면 대기한다. 조회 제한은 새 요청부터 적용하며 이미 열린 세션은 종료하지 않는다.
