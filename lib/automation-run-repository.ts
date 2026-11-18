@@ -14,6 +14,27 @@ const STALE_RUN_AFTER_SECONDS = 2 * 60 * 60;
 const FUNDAMENTALS_STALE_RUN_AFTER_SECONDS = 5 * 60 * 60;
 const SKIP_OBSERVATION_WINDOW_SECONDS = 5 * 60;
 
+export function buildStaleRunReconciliationQuery() {
+  return {
+    text: `UPDATE automation_runs
+          SET status = 'FAILED',
+              finished_at = COALESCE(finished_at, NOW()),
+              summary = jsonb_build_object(
+                'diagnostics', jsonb_build_object(
+                  'errorCode', 'AUTOMATION_RUN_STALE',
+                  'message', 'The worker stopped before finalizing the run'
+                )
+              ),
+              error_message = 'The worker stopped before finalizing the run'
+        WHERE status = 'RUNNING'
+          AND started_at < NOW() - (
+            CASE WHEN module_key = 'instrument-fundamentals' THEN $2::double precision ELSE $1::double precision END
+            * INTERVAL '1 second'
+          )`,
+    values: [STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS],
+  };
+}
+
 export type AutomationRunDimensions = {
   jobType?: string;
   market?: "KR" | "US" | string;
@@ -31,24 +52,8 @@ function inferRunDimensions(moduleKey: string, dimensions: AutomationRunDimensio
 /** Mark abandoned workers before creating a new run. */
 async function reconcileStaleRuns() {
   try {
-    await getPool().query(
-      `UPDATE automation_runs
-          SET status = 'FAILED',
-              finished_at = COALESCE(finished_at, NOW()),
-              summary = jsonb_build_object(
-                'diagnostics', jsonb_build_object(
-                  'errorCode', 'AUTOMATION_RUN_STALE',
-                  'message', 'The worker stopped before finalizing the run'
-                )
-              ),
-              error_message = 'The worker stopped before finalizing the run'
-        WHERE status = 'RUNNING'
-          AND started_at < NOW() - (
-            CASE WHEN module_key = 'instrument-fundamentals' THEN $2 ELSE $1 END
-            * INTERVAL '1 second'
-          )`,
-      [STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS],
-    );
+    const query = buildStaleRunReconciliationQuery();
+    await getPool().query(query.text, query.values);
   } catch (error) {
     // Observability recovery must never prevent the actual feature from
     // running (for example while the database is temporarily unavailable).

@@ -575,7 +575,7 @@ if (!rssRoute.includes("notifyPendingMarketRssArticles(notificationBatchSize)") 
 if (!fs.readFileSync(path.resolve("app/api/cron/instrument-fundamentals/route.ts"), "utf8").includes("MAX_FUNDAMENTALS_RUNNING_SECONDS = 5 * 60 * 60")) {
   throw new Error("Cron route duplicate-run guard must cover the full dedicated service lifetime");
 }
-if ((automationRuns.match(/CASE WHEN module_key = 'instrument-fundamentals' THEN \$[23] ELSE \$[12] END/g) ?? []).length < 2 ||
+if ((automationRuns.match(/CASE WHEN module_key = 'instrument-fundamentals' THEN \$[23](?:::(?:double precision|bigint|integer))? ELSE \$[12](?:::(?:double precision|bigint|integer))? END/g) ?? []).length < 2 ||
     !automationRuns.includes("[moduleKey, STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS]")) {
   throw new Error("Stale reconciliation and active-run detection must both use the module-specific timeout");
 }
