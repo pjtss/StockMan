@@ -946,4 +946,13 @@ npm test -- --run
 - **영향 범위**: V171 migration 트랜잭션은 롤백됐고 새 애플리케이션 릴리스는 활성화되지 않았다. Flyway가 V171 전에 성공 적용한 migration이 있다면 그 이력은 유지될 수 있으므로, 운영 DB의 실제 버전은 다음 health/Flyway 확인으로 대조한다. V171 자체는 인덱스 생성과 nullable 컬럼 추가 외 데이터 갱신·삭제를 하지 않는다.
 - **수정**: V171이 기존 테이블 정의와 인덱스를 `IF NOT EXISTS`로 보장한 다음 market-cap timestamp 컬럼을 추가하도록 forward repair로 보강한다. `scripts/check-docs.mjs`에 V171의 필수 runtime 컬럼 회귀 게이트를 추가한다.
 - **재발 자동 감지**: 배포 전 `npm run docs:check`/`npm run deploy:verify`가 V171에서 테이블 생성과 schema 계약 컬럼이 빠지면 실패한다. 배포 후에는 `/api/health`의 operational schema 결과와 Flyway 버전을 확인한다.
-- **검증/남은 위험**: 로컬 전체 검증과 새 OCI run, 서비스 readiness 및 운영 Flyway 버전을 다시 확인한다. V171 변경 전 checksum을 성공 저장한 다른 환경이 없는지 배포 전 이력도 확인하며, OCI에서는 이번 실행이 V171 실패·롤백으로 끝났다.
+- **검증/남은 위험**: run `44299058136`에서 수정된 V171/V172가 적용을 시작하고 Flyway가 V173까지 진행한 것을 확인했다. V171 최초 실패 run `44295118377`은 rollback으로 끝났다. 운영 Flyway 최신 버전과 서비스 readiness는 V173 timeout을 해결한 뒤 다시 확인한다.
+
+## 2026-11-18 — OCI Flyway V173 RSS 인덱스 migration timeout
+
+- **증상**: Deploy OCI run `44299058136`은 사전 검증·패키징·업로드까지 통과했다. Flyway는 운영 schema version 170에서 V171, V172를 시작한 뒤 V173 `market rss 72h retention indexes`의 `[non-transactional]` 실행에서 40분 timeout에 도달해 종료 코드 137로 중단됐다. 스크립트는 신규 release 활성화를 중단하고 이전 앱·예약 작업 서비스를 복구했다.
+- **근본 원인**: V173은 RSS 두 테이블에 `CREATE INDEX CONCURRENTLY`를 순차 실행했다. 이 방식은 여러 테이블 스캔과 기존 transaction/snapshot 대기를 수행할 수 있다. OCI 배포는 이 migration 전에 애플리케이션·예약 작업을 중지하므로 일반 인덱스 빌드로 유지보수 창에서 완료할 수 있지만, migration이 운영 중 데이터베이스 상태와 인덱스 크기를 기록하지 않아 대기 원인을 확인할 단서도 부족했다. PostgreSQL 공식 문서는 concurrent build가 여러 scan과 기존 transaction 종료 대기를 수행하고 일반 build는 쓰기를 잠그지만 읽기는 허용한다고 설명한다.
+- **영향 범위**: V171/V172는 Flyway 로그에서 V173보다 먼저 시작됐으며, V173 비트랜잭션 실행은 timeout으로 중단됐다. V173 인덱스가 일부만 valid 상태로 남았거나 Flyway 실패 이력이 남았을 수 있어 다음 실행 전 상태를 확인해야 한다. 새 애플리케이션 release는 활성화되지 않았으며 이전 서비스가 복구됐다.
+- **수정**: V173/V176 RSS 인덱스를 OCI quiesced maintenance window 안에서 실행되는 트랜잭션 `CREATE INDEX IF NOT EXISTS`로 바꾸고 비트랜잭션 설정을 제거한다. OCI preflight가 해당 인덱스 상태·RSS 테이블 크기·Flyway 실패 버전을 마스킹 없이 민감정보를 출력하지 않고 기록하며, 허용 목록 V168/V170/V173/V176의 invalid index와 실패 이력만 안전하게 정리한다. 다른 migration 실패는 계속 fail-closed한다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`와 `scripts/check-docs.mjs`가 V173/V176의 인덱스 수, 동시성 옵션 부재, transaction 설정 부재, 서비스 quiesce 순서 및 preflight repair 범위를 확인한다. OCI preflight 출력으로 다음 시도에서 대상 테이블 크기와 개별 인덱스 validity를 확인한다.
+- **검증/남은 위험**: 수정 후보를 clean worktree에서 전체 `npm run deploy:verify`로 확인했다. 의존성 감사 0건, docs/API/migration 게이트, production build, standalone browser/API smoke, 1,645 tests passed / 3 skipped, typecheck가 통과했다. `npm run cron:check`도 통과했다. 운영 재배포 후 V173/V176 완료, Flyway 최신 버전, `/api/health` HTTP 200을 확인해야 한다. 일반 인덱스 build도 테이블이 매우 크면 migration timeout을 넘을 수 있으므로 이번 preflight의 RSS 테이블 크기·row 추정치와 실행 결과를 검토한다.

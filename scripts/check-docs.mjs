@@ -5531,6 +5531,30 @@ if (!intradayTurnoverCreateTable || missingIntradayTurnoverForwardColumns.length
   console.error(`Intraday turnover forward-migration audit failed; V171 must recover a missing V138 table before adding its timestamp fields: ${missingIntradayTurnoverForwardColumns.join(", ") || "table DDL missing"}.`);
   process.exit(1);
 }
+const rssRetentionMigrations = ["173", "176"].map((version) => migrationSources.find(({ fileName }) => new RegExp(`^V${version}__`, "i").test(fileName)) ?? { fileName: "", contents: "" });
+const rssRetentionIndexCounts = rssRetentionMigrations.map(({ contents }) => [...contents.matchAll(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+[a-z_][a-z0-9_]*/gi)].length);
+const rssRetentionUsesConcurrentBuilds = rssRetentionMigrations.some(({ contents }) => /CREATE\s+INDEX\s+CONCURRENTLY\b/i.test(contents));
+const rssRetentionHasNonTransactionalConfig = migrations
+  .filter((fileName) => /^V(?:173|176)__.*\.sql$/i.test(fileName))
+  .some((fileName) => existsSync(join(migrationDir, fileName.replace(/\.sql$/i, ".sql.conf"))));
+const activationScriptSource = readFileSync(join(root, "deploy/oci/stockman-activate"), "utf8");
+const maintenanceWindowStarts = activationScriptSource.indexOf('stage="quiesce-services"');
+const migrationStageStarts = activationScriptSource.indexOf('stage="flyway-migrate"');
+const preflightScriptSource = readFileSync(join(root, "scripts/oci-flyway-v168-preflight.mjs"), "utf8");
+if (rssRetentionMigrations.some((migration) => !migration)
+  || rssRetentionIndexCounts[0] !== 2
+  || rssRetentionIndexCounts[1] !== 4
+  || rssRetentionUsesConcurrentBuilds
+  || rssRetentionHasNonTransactionalConfig
+  || maintenanceWindowStarts < 0
+  || migrationStageStarts <= maintenanceWindowStarts
+  || !activationScriptSource.includes("V173__market_rss_72h_retention_indexes.sql")
+  || !activationScriptSource.includes("V176__market_rss_query_order_indexes.sql")
+  || !preflightScriptSource.includes('new Set(["168", "170", "173", "176"])')
+  || !preflightScriptSource.includes("DROP INDEX ${concurrent}IF EXISTS")) {
+  console.error("RSS forward-index migration audit failed; V173/V176 must use the quiesced maintenance window, and OCI preflight must inspect/repair known partial indexes.");
+  process.exit(1);
+}
 const missingForwardIndexes = findMissingForwardOperationalIndexes(schemaHealthSource, migrationSources, 157);
 if (missingForwardIndexes.length) {
   console.error(`Forward operational index migration audit failed after V157: ${missingForwardIndexes.join(", ")}`);

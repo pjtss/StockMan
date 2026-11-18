@@ -18,6 +18,14 @@ OCI 인스턴스에 Docker를 설치해야 합니다. Flyway CLI나 Java는 호�
 migration은 기본적으로 적용되지 않습니다. 새 버전 migration은 순서대로 적용합니다. 과거 migration을
 뒤늦게 실행해 기존 relation과 충돌하는 일을 방지합니다.
 
+OCI 배포는 Flyway 실행 전에 Stockman과 예약 작업 서비스를 중지합니다. 이 유지보수
+구간에 적용하는 RSS 정렬·보존 인덱스(V173/V176)는 일반 트랜잭션 인덱스 빌드를
+사용합니다. `CREATE INDEX CONCURRENTLY`는 여러 번 테이블을 읽고 오래된 트랜잭션/스냅샷을
+기다릴 수 있어 이 운영 구간에서는 불필요한 대기를 만들 수 있습니다. 사전검사는 두
+migration의 인덱스 상태와 실패 이력을 기록하고, 승인된 V173/V176의 invalid 인덱스와
+실패 이력만 정리한 뒤 재시도합니다. 다른 버전의 failed migration은 자동 repair하지 않고
+배포를 중단합니다.
+
 기존 런타임 bootstrap으로 이미 스키마가 생성된 데이터베이스는 최초 1회만
 baseline 처리합니다.
 

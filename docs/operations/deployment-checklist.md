@@ -31,7 +31,7 @@
 - [ ] standalone 서버 실행 및 `/charts` HTML과 HTML이 참조한 실제 JavaScript 청크 전체 smoke test 성공 (HTTP 200·JavaScript content-type·본문 존재)
 - [ ] standalone artifact와 OCI archive의 configured `distDir/server/instrumentation.js`가 포함되어 production lifecycle hook이 보존됨
 - [ ] standalone smoke 서버는 `INTRADAY_DETECTION_ENABLED=false`로 실행해 검증 중 KIS/Discord background worker를 시작하지 않음
-- [ ] OCI archive 안에 신규 Flyway migration(이번 변경은 V171)이 포함됐는지 확인
+- [ ] OCI archive 안에 이번 배포 범위의 신규 Flyway migration이 포함됐는지 확인
 - [ ] Chrome 데스크톱·모바일에서 `/charts` 핵심 UI가 표시되고 국내↔해외 전환 상호작용, hydration 경고, 브라우저 런타임 예외 검증 통과
 - [ ] Next.js HTML은 재검증되고, 이전 릴리스의 해시 정적 청크 호환 보존 경로가 포함되어 있는지 확인
 

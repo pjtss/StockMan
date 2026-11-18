@@ -418,6 +418,19 @@ if (!/^executeInTransaction=false\s*$/m.test(rssRetentionMigrationConfig)
   || !deployWorkflow.includes("./db/migration/V169__rss_article_retention_indexes.sql.conf")) {
   throw new Error("V169 must ship concurrent RSS retention indexes outside a Flyway transaction");
 }
+const rssMaintenanceMigrations = ["V173__market_rss_72h_retention_indexes.sql", "V176__market_rss_query_order_indexes.sql"]
+  .map((name) => migrationFiles.find((migration) => migration.name === name) ?? { name: "", sql: "" });
+const rssMaintenanceIndexCounts = rssMaintenanceMigrations.map(({ sql }) => [...sql.matchAll(/CREATE INDEX IF NOT EXISTS/g)].length);
+const rssMaintenanceHasConcurrentIndexes = rssMaintenanceMigrations.some(({ sql }) => /CREATE INDEX CONCURRENTLY\b/.test(sql));
+const rssMaintenanceHasNonTransactionalConfig = rssMaintenanceMigrations.some(({ name }) =>
+  name && fs.existsSync(path.resolve("db/migration", name.replace(/\.sql$/i, ".sql.conf"))));
+if (rssMaintenanceMigrations.some((migration) => !migration.name)
+  || rssMaintenanceIndexCounts[0] !== 2
+  || rssMaintenanceIndexCounts[1] !== 4
+  || rssMaintenanceHasConcurrentIndexes
+  || rssMaintenanceHasNonTransactionalConfig) {
+  throw new Error("V173/V176 RSS indexes must use transactional builds inside OCI's quiesced maintenance window");
+}
 const secMaterializerMigrationConfig = fs.readFileSync(path.resolve("db/migration/V170__sec_materializer_recent_index.sql.conf"), "utf8");
 const secMaterializerMigration = migrationFiles.find(({ name }) => name === "V170__sec_materializer_recent_index.sql")?.sql ?? "";
 if (!/^executeInTransaction=false\s*$/m.test(secMaterializerMigrationConfig)
@@ -494,18 +507,20 @@ for (const required of [
 }
 if (!workflow.includes("oci-flyway-v168-preflight.mjs")
   || !workflow.includes("ServerAliveInterval=30")
-  || !activation.includes("flyway-repair-v168-v170")
+  || !activation.includes("flyway-repair-approved-indexes")
   || !activation.includes("2400s docker run")
   || !/name: Activate release\s+timeout-minutes: 45/.test(workflow)
-  || !flywayPreflight.includes("DROP INDEX CONCURRENTLY IF EXISTS")
+  || !flywayPreflight.includes("DROP INDEX ${concurrent}IF EXISTS")
   || !flywayPreflight.includes("connectionTimeoutMillis: 15_000")
   || !flywayPreflight.includes("statement_timeout: 60_000")
   || !flywayPreflight.includes("pg_stat_activity")
   || !flywayPreflight.includes("old database snapshots")
   || !flywayPreflight.includes("failedMigrationVersions")
+  || !flywayPreflight.includes('new Set(["168", "170", "173", "176"])')
+  || !flywayPreflight.includes("market_rss_articles")
   || !flywayPreflight.includes("sec_submissions")
   || !flywayPreflight.includes("refusing automatic repair")) {
-  throw new Error("OCI Flyway activation must allow a long migration and recover only approved V168/V170 failed history/invalid indexes");
+  throw new Error("OCI Flyway activation must log index diagnostics and repair only approved V168/V170/V173/V176 failures");
 }
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");
@@ -515,7 +530,7 @@ if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('systemctl stop "$unit"')
   || !activation.includes('preflight_attempt" -ge 20')
   || !activation.includes('sleep 30')
-  || !activation.includes('V168/V170 preflight found old database snapshots')
+  || !activation.includes('OCI index preflight found old database snapshots')
   || !activation.includes('preflight_attempt=$((preflight_attempt + 1))')
   || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038,260900,261867")
   || !activation.includes("explicit-approved-pids")

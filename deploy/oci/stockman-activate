@@ -129,23 +129,25 @@ while true; do
   if preflight_output="$(runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
     node "$TEMP_PATH/scripts/oci-flyway-v168-preflight.mjs" \
       "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql" \
-      "$TEMP_PATH/db/migration/V170__sec_materializer_recent_index.sql" 2>"$preflight_log")"; then
+      "$TEMP_PATH/db/migration/V170__sec_materializer_recent_index.sql" \
+      "$TEMP_PATH/db/migration/V173__market_rss_72h_retention_indexes.sql" \
+      "$TEMP_PATH/db/migration/V176__market_rss_query_order_indexes.sql" 2>"$preflight_log")"; then
     cat "$preflight_log" >&2
     break
   else
     preflight_status=$?
     cat "$preflight_log" >&2
-    if ! grep -q "V168/V170 preflight found old database snapshots" "$preflight_log" || [ "$preflight_attempt" -ge 20 ]; then
+    if ! grep -q "OCI index preflight found old database snapshots" "$preflight_log" || [ "$preflight_attempt" -ge 20 ]; then
       exit "$preflight_status"
     fi
-    echo "V168/V170 preflight: old snapshots remain; retrying in 30 seconds (attempt ${preflight_attempt}/20)" >&2
+    echo "OCI index preflight: old snapshots remain; retrying in 30 seconds (attempt ${preflight_attempt}/20)" >&2
     sleep 30
     preflight_attempt=$((preflight_attempt + 1))
   fi
 done
 printf '%s\n' "$preflight_output"
 if [[ "$preflight_output" == *'"repairRequired":true'* ]]; then
-  stage="flyway-repair-v168-v170"
+  stage="flyway-repair-approved-indexes"
   timeout --signal=TERM --kill-after=30s 120s docker run --rm --network host \
     -v "$TEMP_PATH/db/migration:/flyway/sql:ro" \
     "$FLYWAY_IMAGE" \
