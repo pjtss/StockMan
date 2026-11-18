@@ -921,6 +921,14 @@ npm test -- --run
 - **재발 자동 감지**: `lib/schema-health.test.ts`에서 query의 descending order 비교 생성을 검증하며 operational schema integrity 검사에서 실제 인덱스 방향을 확인한다.
 - **검증/남은 위험**: 변경 후 격리 DB에서 `schemaReady=true`, index issues 0개, `/api/health` HTTP 200을 확인했다. 사용 중인 기존 DB에서 인덱스 자체가 누락/잘못 생성된 경우에는 이 코드 변경만으로 해결되지 않는다.
 
+### 2026-11-19 OCI 재발 추적
+
+- **증상/근거**: OCI run `44400229361`에서 V178이 성공한 뒤 health는 세 인덱스를 `wrong_columns`로 계속 분류했다. run `44405986778`에서는 V179도 1.195초 만에 성공했지만 동일한 세 이슈가 유지되어 activation이 실패했다.
+- **근본 원인**: 기존 오류 기록의 DESC 보정이 현재 `lib/schema-health.ts` 구현에 반영되어 있지 않았다. `pg_get_indexdef(index, column, false)`의 단일 키 결과만 비교해 실제 내림차순 속성을 놓쳤다.
+- **수정**: 인덱스 키별 `pg_index_column_has_property(..., 'desc')`를 사용해 실제 내림차순 키에 `DESC`를 정규화해 붙인다. PostgreSQL 공식 문서는 이 속성이 전방 스캔에서 내림차순 정렬 여부를 나타낸다고 명시한다([System Information Functions and Operators](https://www.postgresql.org/docs/current/functions-info.html)). 회귀 테스트와 문서 정적 검사를 추가했다.
+- **검증/남은 위험**: 배포 검증 및 OCI 재배포 후 `/api/health` 200과 스케줄 타이머 활성 상태를 확인해야 한다. V178/V179는 운영 DB의 인덱스 재생성에 성공했으나, 이번 수정 전에는 runtime 비교기가 정상 스키마를 오진하고 있었다.
+- **커밋·푸시·배포**: 아직 미완료.
+
 ## 2026-11-18 — OCI clean-checkout 문서 검증 실패
 
 - **증상**: 커밋 `6d8f8896`의 GitHub Actions `Deploy OCI` run `44289579797`은 배포 전 `npm run deploy:verify`의 `docs:check`에서 실패했다. 패키징·업로드·서버 활성화는 실행되지 않았다.

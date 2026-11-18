@@ -5441,6 +5441,8 @@ const operationalIndexHealthComplete = schemaHealthSource.includes("KIS_RATE_LIM
   && schemaHealthSource.includes("buildOperationalIndexIntegrityQuery()")
   && healthSummarySource.includes("operationalIndexIssues: schema.operationalIndexIssues")
   && schemaHealthSource.includes("pg_get_indexdef(index_relation.oid, indexed_column.ordinal::int, false)")
+  && schemaHealthSource.includes("pg_index_column_has_property(index_relation.oid, indexed_column.ordinal::int, 'desc')")
+  && schemaHealthSource.includes("THEN ' DESC' ELSE '' END")
   && schemaHealthSource.includes("index_integrity.access_method IS DISTINCT FROM 'btree'")
   && schemaHealthSource.includes("index_integrity.is_unique IS DISTINCT FROM FALSE")
   && schemaHealthSource.includes("index_integrity.is_exclusion IS DISTINCT FROM FALSE")

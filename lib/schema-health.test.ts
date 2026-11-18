@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { CORE_SCHEMA_TABLES, KIS_RATE_LIMIT_EVENT_COLUMN_SHAPES, OPERATIONAL_SCHEMA_TABLES, OPERATIONAL_SCHEMA_VIEWS, RETIRED_SCHEMA_TABLES, REQUIRED_OPERATIONAL_COLUMNS, getMissingSchemaTables, inspectDatabaseSchema } from "./schema-health";
+import { buildOperationalIndexIntegrityQuery, CORE_SCHEMA_TABLES, KIS_RATE_LIMIT_EVENT_COLUMN_SHAPES, OPERATIONAL_SCHEMA_TABLES, OPERATIONAL_SCHEMA_VIEWS, RETIRED_SCHEMA_TABLES, REQUIRED_OPERATIONAL_COLUMNS, getMissingSchemaTables, inspectDatabaseSchema } from "./schema-health";
 
 describe("schema-health", () => {
+  it("includes descending index key order in operational integrity checks", () => {
+    const query = buildOperationalIndexIntegrityQuery();
+    expect(query.text).toContain("pg_index_column_has_property(index_relation.oid, indexed_column.ordinal::int, 'desc')");
+    expect(query.text).toContain("THEN ' DESC' ELSE '' END");
+    expect(query.values[2]).toEqual(expect.arrayContaining([
+      "occurred_at DESC",
+      "endpoint, occurred_at DESC",
+      "incident_id, occurred_at DESC",
+    ]));
+  });
+
   it("requires KIS retry/rate-limit telemetry tables for operational readiness", () => {
     expect(OPERATIONAL_SCHEMA_TABLES).toContain("debug_kis_calls");
     expect(OPERATIONAL_SCHEMA_TABLES).toContain("kis_rate_limit_events");

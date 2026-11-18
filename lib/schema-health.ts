@@ -81,7 +81,11 @@ export function buildOperationalIndexIntegrityQuery() {
                   LEFT JOIN pg_class indexed_table ON indexed_table.oid = index_state.indrelid
                   LEFT JOIN pg_am access_method ON access_method.oid = index_relation.relam
                   LEFT JOIN LATERAL (
-                    SELECT string_agg(pg_get_indexdef(index_relation.oid, indexed_column.ordinal::int, false), ', ' ORDER BY indexed_column.ordinal) AS actual_columns
+                    SELECT string_agg(
+                      pg_get_indexdef(index_relation.oid, indexed_column.ordinal::int, false)
+                      || CASE WHEN pg_index_column_has_property(index_relation.oid, indexed_column.ordinal::int, 'desc') THEN ' DESC' ELSE '' END,
+                      ', ' ORDER BY indexed_column.ordinal
+                    ) AS actual_columns
                     FROM generate_series(1, index_state.indnatts::int) AS indexed_column(ordinal)
                   ) AS index_definition ON TRUE`;
   const integrityWhere = `WHERE index_integrity.expected_table_exists IS DISTINCT FROM TRUE
