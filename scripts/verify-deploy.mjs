@@ -242,7 +242,7 @@ async function verifyRuntime() {
     const openApiResponse = await fetch(`http://127.0.0.1:${port}/openapi.json`, { signal: AbortSignal.timeout(smokeRequestTimeoutMs) });
     if (!openApiResponse.ok) throw new Error(`Standalone OpenAPI smoke failed: HTTP ${openApiResponse.status}`);
     const openApi = await openApiResponse.json();
-    if (openApi.openapi !== "3.1.1" || !openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]
+    if (openApi.openapi !== "3.1.1" || openApi.paths?.["/api/market-news"] || !openApi.paths?.["/api/public/daily-candles"]
       || !openApi.paths?.["/api/public/market-impact-events"]?.get
       || !openApi.paths?.["/api/public/us-stock-metadata"]?.get
       || !openApi.paths?.["/api/scan/us-obv-divergence"]?.get

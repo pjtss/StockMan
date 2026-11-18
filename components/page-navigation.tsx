@@ -10,7 +10,6 @@ type PageKey =
   | "notifications"
   | "scanners-us"
   | "charts"
-  | "market-news"
   | "disclosures"
   | "login"
   | "register"
@@ -37,9 +36,6 @@ export function PageNavigation({ current }: { current: PageKey }) {
         </Link>
         <Link aria-current={current === "watchlist" ? "page" : undefined} className={current === "watchlist" ? styles.navActive : styles.navLink} href="/watchlist" prefetch={false}>
           관심종목
-        </Link>
-        <Link aria-current={current === "market-news" ? "page" : undefined} className={current === "market-news" ? styles.navActive : styles.navLink} href="/market-news" prefetch={false}>
-          해외 뉴스
         </Link>
         <Link aria-current={current === "other" ? "page" : undefined} className={current === "other" ? styles.navActive : styles.navLink} href="/other" prefetch={false}>
           기타

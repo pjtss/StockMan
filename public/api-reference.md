@@ -14,7 +14,6 @@
 
 예시:
 
-    curl -sS 'https://<배포 호스트>/api/market-news?hours=6&pageSize=20&kind=NEWS'
 
 응답의 x-request-id를 요청 추적에 보존한다. 이 값은 인증 토큰이 아니다.
 
@@ -57,26 +56,6 @@ HTTP GET만 보고 읽기 전용이라고 판단하지 않는다. 외부 공개 
 - 빈 배열이나 null은 데이터 부재일 수 있다. 오류나 Mock 데이터로 바꾸지 않는다.
 
 ## 상세 API 계약
-
-### 미국 RSS/공시 뉴스 — GET /api/market-news
-
-저장된 미국 뉴스와 SEC filing을 조회한다. 시간 기준은 UTC. 첫 응답의 window 범위가 다음 cursor에 고정되므로 페이지 이동 시 필터와 hours를 바꾸지 않는다. 항목은 원문 제목, 조건을 만족한 경우의 한국어 번역 제목, 링크를 반환한다.
-
-| Query | 형식/기본 | 규칙 |
-|---|---|---|
-| hours | 정수, 1 | 1~24. cursor 요청에선 최초 값 유지. |
-| source | 문자열, ALL | ALL, SEC_EDGAR, NASDAQ, NASDAQ_TRADER, STOCKTITAN, GLOBENEWSWIRE. |
-| kind | 문자열, ALL | ALL, NEWS, FILING. FILING은 SEC EDGAR 기준. |
-| ticker | 문자열, 생략 가능 | 감지 티커 완전 일치. ^[A-Z][A-Z0-9.-]{0,9}$. |
-| pageSize | 정수, 50 | 1~100. 권장 필드. |
-| limit | 정수 | pageSize 하위 호환 별칭. pageSize가 없을 때 사용. |
-| cursor | opaque string | 이전 응답 page.nextCursor. 최대 1024자. 필터 불일치는 CURSOR_SCOPE_MISMATCH. |
-
-성공 응답 예:
-
-    {"ok":true,"schemaVersion":"us-market-rss.v1","scope":{"market":"US","sources":["SEC_EDGAR","NASDAQ","NASDAQ_TRADER","STOCKTITAN","GLOBENEWSWIRE"],"source":"ALL","kind":"NEWS","ticker":null,"window":{"hours":6,"from":"2026-10-28T00:00:00.000Z","to":"2026-10-28T06:00:00.000Z"},"timezone":"UTC"},"items":[{"title":{"original":"Example headline","ko":"예시 제목"},"link":"https://example.com/article"}],"page":{"pageSize":20,"returned":1,"nextCursor":null,"hasMore":false}}
-
-400 오류: INVALID_HOURS, INVALID_SOURCE, INVALID_KIND, INVALID_TICKER, INVALID_PAGE_SIZE, INVALID_CURSOR, CURSOR_SCOPE_MISMATCH. 저장소 오류: 503 MARKET_NEWS_UNAVAILABLE.
 
 ### 종목명 — GET /api/stock/lookup
 
@@ -157,7 +136,7 @@ KIS 공식 활성 `COMMON_STOCK` 마스터와 저장된 완료 일봉으로 사�
 다음 GET도 discovery OpenAPI에 포함한다. 각 operation의 query 이름/제약, 응답 유형, 소스 파일은 /openapi.json에서 확인한다. 스캐너별 데이터 최신성·시장 universe·응답 DTO가 다르므로 구조가 같다고 가정하지 않는다.
 
 - DART: /api/dart, /api/dart/ranking, /api/dart/history, /api/dart/contract
-- 공시·뉴스: /api/disclosures, /api/market-news, /api/stock/news, /api/stock/us/news, /api/stock/us/news-radar
+- 공시·뉴스: /api/disclosures, /api/stock/news, /api/stock/us/news, /api/stock/us/news-radar
 - 운영 캐시·공시 이벤트: /api/public/daily-candles, /api/public/instrument-fundamentals, /api/public/market-intelligence, /api/public/market-impact-events, /api/public/market-impact-events/guide, /api/public/us-smallcap-shares
 - KIS 수급: /api/kis/investor-flow, /api/kis/intraday-mvp
 - 국내 탐지: /api/scan/daytrade, /api/scan/kr-accumulation, /api/scan/kr-bollinger-rebound-ema9-rvol-avg, /api/scan/kr-bollinger-rebound-rvol, /api/scan/kr-ema9-rvol, /api/scan/kr-ema9-touch-rvol

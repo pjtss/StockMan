@@ -9050,3 +9050,12 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **확인 대상**: 삭제 경로의 참조 잔존, API inventory/catalog, 빌드·테스트·실행 통합 검증을 확인한다.
 - **검증**: `npm run docs:check` 통과(106 route files, 46 public GET inventory, 139 documents). `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build/typecheck, standalone runtime 및 `/charts` desktop/mobile hydration/API smoke, Vitest 274 files passed/1 skipped (1,483 passed/3 skipped), docs/API/catalog/migration 및 KIS/auth/cron gates 통과. `git diff --check` 통과. Windows 공유 `node_modules` junction 때문에 standalone trace copy에 EPERM 경고가 있었으나 빌드 완료 후 standalone 서버 실행·smoke가 통과했다.
 - **커밋·푸시·배포**: 검증 완료 후 `oci` 브랜치에 커밋/푸시하여 Deploy OCI를 실행할 예정이다.
+# 2026-11-18
+
+## `/market-news` 사용자 화면 및 전용 공개 API 제거
+
+- **목적/범위**: 사용자 요청에 따라 더 이상 제공하지 않는 `/market-news` 화면 및 전용 `/api/market-news` 읽기 API를 제거했다. RSS 수집·알림 파이프라인과 이를 공유하는 라이브러리 테스트는 보존했다.
+- **변경 대상**: 페이지·전용 API·전용 UI 컴포넌트 및 페이지 테스트, 상단 네비게이션, 공개 API 문서/route inventory/OpenAPI, 문서 카탈로그, 관련 운영 문서와 `scripts/verify-deploy.mjs` 검사.
+- **검증**: 최신 `origin/oci` 기준 `npm audit --omit=dev` 통과(취약점 0), 프로덕션 빌드 통과(라우트 목록에서 `/market-news` 및 `/api/market-news` 제외), standalone 런타임 smoke 통과(`/charts` 200 및 주요 API 검증, 브라우저 데스크톱/모바일 수화 확인), `npm run docs:check` 통과(105 route files, 공개 GET 45개, 문서 카탈로그 138개), `git diff --check` 통과. 실제 복사한 `node_modules` 환경에서 기본 병렬 설정의 `npm run deploy:verify`는 Vitest 워커가 과다 생성되어 9분간 출력 없이 대기해 중단했다. 원인을 분리해 `npx vitest run --maxWorkers=2 --reporter=verbose`로 재실행한 결과 274개 파일 통과, 1,483개 테스트 통과, 3개 skip(총 1,486개)을 확인했다.
+- **배포**: 커밋·푸시·배포하지 않음. 최신 원격 변경과 테스트 게이트 상태를 재확인한 뒤 진행해야 한다.
+- **남은 위험/다음 단계**: 이 Windows 환경에서 전체 Vitest 재실행 정체의 원인을 확인하고 전체 테스트가 완료되는지 재검증한다. 그 뒤 최신 `origin/oci`를 확인하고 사용자 요청 범위만 커밋·푸시하며, CI 및 운영 `/market-news`·`/api/market-news` 404를 확인한다.

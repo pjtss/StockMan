@@ -58,15 +58,6 @@ function titleFromPath(path) {
 function queryParameters(source, path) {
   const names = new Set([...source.matchAll(/(?:searchParams|params)\.(?:get|has)\(["']([^"']+)["']\)/g)].map((match) => match[1]));
   const manual = {
-    "/api/market-news": {
-      hours: { type: "integer", minimum: 1, maximum: 24, default: 1, description: "조회 시간 범위(1~24). cursor 사용 시 최초 요청과 동일하게 유지합니다." },
-      source: { type: "string", enum: ["ALL", "GLOBENEWSWIRE", "NASDAQ", "NASDAQ_TRADER", "SEC_EDGAR", "STOCKTITAN"], default: "ALL" },
-      kind: { type: "string", enum: ["ALL", "NEWS", "FILING"], default: "ALL" },
-      ticker: { type: "string", pattern: "^[A-Z][A-Z0-9.-]{0,9}$", description: "정확히 일치하는 감지 티커 필터." },
-      pageSize: { type: "integer", minimum: 1, maximum: 100, default: 50 },
-      limit: { type: "integer", minimum: 1, maximum: 100, description: "pageSize의 하위 호환 별칭." },
-      cursor: { type: "string", maxLength: 1024, description: "이전 응답 page.nextCursor. 같은 필터와 hours로 전달." },
-    },
     "/api/public/daily-candles": {
       market: { type: "string", enum: ["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NYS", "AMS"], required: true },
       universe: { type: "boolean", description: "true이면 운영 공식 활성 COMMON_STOCK 종목 목록을 페이지 조회합니다. code/codes와 함께 사용할 수 없습니다." },
@@ -206,7 +197,6 @@ function responseSchema(path) {
     "/api/reports/latest": { type: "object", required: ["ok", "reportType", "asOf", "timezone", "count", "markdown", "items"], properties: { ok: { const: true }, reportType: { type: "string" }, asOf: { type: "string", format: "date-time" }, timezone: { const: "Asia/Seoul" }, count: { type: "integer" }, markdown: { type: "string" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } },
     "/api/collection-status": { type: "object", required: ["ok", "asOf", "sources"], properties: { ok: { const: true }, asOf: { type: "string", format: "date-time" }, sources: { type: "array", items: { type: "object", additionalProperties: true } } } },
     "/api/health": { type: "object", required: ["status", "checkedAt", "responseTimeMs", "requestId"], properties: { status: { type: "string", enum: ["ok", "degraded"] }, checkedAt: { type: "string", format: "date-time" }, responseTimeMs: { type: "integer" }, requestId: { type: "string" } } },
-    "/api/market-news": { type: "object", required: ["ok", "schemaVersion", "scope", "items", "page"], properties: { ok: { const: true }, schemaVersion: { const: "us-market-rss.v1" }, scope: { type: "object", properties: { market: { const: "US" }, sources: { type: "array", items: { type: "string" } }, source: { type: "string" }, kind: { type: "string", enum: ["ALL", "NEWS", "FILING"] }, ticker: { type: ["string", "null"] }, window: { type: "object", properties: { hours: { type: "integer" }, from: { type: "string", format: "date-time" }, to: { type: "string", format: "date-time" } } }, timezone: { const: "UTC" } } }, items: { type: "array", items: { type: "object", properties: { title: { type: "object", properties: { original: { type: "string" }, ko: { type: ["string", "null"] } } }, link: { type: "string", format: "uri" } } } }, page: { type: "object", properties: { pageSize: { type: "integer" }, returned: { type: "integer" }, nextCursor: { type: ["string", "null"] }, hasMore: { type: "boolean" } } } } },
     "/api/stock/lookup": { type: "object", required: ["names"], properties: { names: { type: "object", additionalProperties: { type: "string" } } } },
     "/api/disclosures": { type: "object", properties: { ok: { type: "boolean" }, date: { type: ["string", "null"], format: "date" }, window: { type: ["object", "null"] }, source: { type: "string" }, sort: { const: "publishedAt_desc" }, page: { type: ["integer", "null"] }, pageSize: { type: ["integer", "null"] }, items: { type: "array", items: { type: "object", additionalProperties: true, properties: { source: { type: "string" }, sourceType: { type: "string" }, title: { type: "string" }, summary: { type: "string" }, link: { type: "string" }, publishedAt: { type: ["string", "null"], format: "date-time" }, companyNames: { type: "array", items: { type: "string" } }, tickers: { type: "array", items: { type: "string" } }, contentStatus: { type: "string", enum: ["FULL", "METADATA_ONLY"] } } } }, total: { type: "integer" }, hasMore: { type: "boolean" } } },
     "/api/dart/ranking": { type: "object", properties: { fetchedAt: { type: "string", format: "date-time" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } },
@@ -292,7 +282,6 @@ async function makeOpenApi(allRoutes) {
     "/api/health": "공개 서비스 상태 확인",
     "/api/kis/intraday-mvp": "국내 장중 탐지 요약 조회",
     "/api/kis/investor-flow": "국내 종목 수급 데이터 조회",
-    "/api/market-news": "미국 뉴스와 SEC filing 조회",
     "/api/public/daily-candles": "운영 저장 일·주·월봉 조회",
     "/api/public/instrument-fundamentals": "종목 기본정보 스냅샷 조회",
     "/api/public/us-stock-metadata": "미국 보통주 티커 기본정보 조회",

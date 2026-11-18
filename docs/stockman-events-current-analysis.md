@@ -53,7 +53,6 @@ Stockman에는 SEC 제출정보, SEC 공시 원문, RSS 원문/응답 스냅샷,
 | 경로 | 역할·현재 동작 |
 |---|---|
 | `GET /api/disclosures` (`app/api/disclosures/route.ts`) | 공개 무인증 조회 API. 저장된 RSS/DART 및 특정 조건의 SEC 제출정보 통합조회. `hours`는 1–24, `asOf`, 날짜, source, 검색, page/pageSize를 지원한다. RSS는 명시적 instant가 확인된 게시 timestamp를 rolling window에 포함하며 날짜 정밀도만 있는 항목은 시각창에서 제외한다. SEC 제출정보는 현재 시간창이 아니라 날짜 조건을 사용한다. SEC `acceptance_datetime`는 이 조회 응답/필터에 사용되지 않는다. |
-| `GET /api/market-news` (`app/api/market-news/route.ts`) | `market_rss_articles` 조회. hours 1–24, source, ticker, NEWS/FILING, cursor pagination 지원. 게시시각이 null이면 created_at을 fallback으로 쓴다. ticker 등급/검증 상태/이벤트 history를 조회하는 영구 이벤트 API는 아니다. |
 | `GET /api/public/document-catalog` | 정적 `public/document-catalog.json` 카탈로그 검색. DB 문서 원장과는 다른 기능이다. |
 | `GET /api/public/market-intelligence` | 저장된 market RSS bullish projection과 SEC 이벤트를 종목 정보와 함께 반환한다. 기존 공개 데이터 계약 재사용 가능성을 살핀다. |
 | `GET /api/bullish-rss` | `market_rss_bullish_articles` 목록 API. `POST`는 cron 인증을 검사한다. 세부 권한과 API contract는 route 파일에서 구현을 확인했다. |
@@ -73,7 +72,7 @@ Stockman에는 SEC 제출정보, SEC 공시 원문, RSS 원문/응답 스냅샷,
 
 - 테스트: Vitest (`vitest.config.ts`, `npm test`), API route 및 도메인 단위 테스트가 존재한다. RSS parser, dedupe, ingest outcome, timestamp precision, SEC parser/repository 인접 동작을 위한 테스트 파일이 확인됐다.
 - migration 정합성: `scripts/operational-schema-migration-audit.mjs` 및 테스트, `scripts/audit-flyway-history.ts`가 있다. DB README는 migration을 새 파일로 추가하고 운영 자동 적용을 금지한다고 명시한다.
-- 기존 API 호환성: `app/api/disclosures/route.test.ts`, `app/api/market-news` 관련 테스트와 API surface/doc audits를 확장 검증 대상으로 삼는다.
+- 기존 API 호환성: `app/api/disclosures/route.test.ts`와 API surface/doc audits를 확장 검증 대상으로 삼는다.
 - validation 상세와 제한은 아래 `8. 구현 및 검증 기록`의 최신 결과를 따른다. 전체 suite는 worker heap OOM을 피해 10개 파일씩 31개 순차 shard로 실행했다.
 
 ## 6. V166 적용 전 역할 공백 및 현재 처리

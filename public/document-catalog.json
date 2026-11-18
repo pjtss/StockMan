@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 140,
+  "documentCount": 138,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -469,17 +469,6 @@
       ]
     },
     {
-      "id": "architecture-us-market-rss-user-api-design",
-      "title": "미국 RSS 사용자 조회 API 설계안",
-      "category": "architecture",
-      "format": "md",
-      "description": "1. 사용자 RSS 조회는 위에 명시한 미국 5개 출처만 허용한다. 출처 미지정은 미국 출처 전체로 처리한다.",
-      "url": "/manuals/architecture/us-market-rss-user-api-design.md",
-      "relatedPaths": [],
-      "sourcePath": "docs/architecture/us-market-rss-user-api-design.md",
-      "related": []
-    },
-    {
       "id": "architecture-us-obv-divergence-api-design",
       "title": "미국 보통주 OBV 강세 다이버전스 API",
       "category": "architecture",
@@ -796,17 +785,6 @@
       "url": "/manuals/operations/market-api-debugging.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/market-api-debugging.md",
-      "related": []
-    },
-    {
-      "id": "operations-market-news-auto-refresh",
-      "title": "해외 뉴스 탭 자동 갱신",
-      "category": "operations",
-      "format": "md",
-      "description": "해외 뉴스 탭 자동 갱신 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/market-news-auto-refresh.md)",
-      "url": "/manuals/operations/market-news-auto-refresh.md",
-      "relatedPaths": [],
-      "sourcePath": "docs/operations/market-news-auto-refresh.md",
       "related": []
     },
     {
@@ -1630,7 +1608,6 @@
         "docs/operations/shortcuts.md",
         "docs/operations/market-rss-translation-debug-api.md",
         "docs/architecture/market-impact-events-design.md",
-        "docs/operations/market-news-auto-refresh.md",
         "docs/operations/continuous-improvement.md",
         "docs/operations/improvement-review.md",
         "docs/DEBUGGING_ARCHITECTURE.md",
@@ -1770,11 +1747,6 @@
           "title": "공시 기반 일별 주가 영향 이벤트",
           "url": "/manuals/architecture/market-impact-events-design.md",
           "sourcePath": "docs/architecture/market-impact-events-design.md"
-        },
-        {
-          "title": "해외 뉴스 탭 자동 갱신",
-          "url": "/manuals/operations/market-news-auto-refresh.md",
-          "sourcePath": "docs/operations/market-news-auto-refresh.md"
         },
         {
           "title": "지속 개선 운영 기준",

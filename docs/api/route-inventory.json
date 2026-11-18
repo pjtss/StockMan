@@ -503,14 +503,6 @@
       "source": "app/api/local/kis/us-trade-trend/route.ts"
     },
     {
-      "path": "/api/market-news",
-      "methods": [
-        "GET"
-      ],
-      "access": "public-read-candidate",
-      "source": "app/api/market-news/route.ts"
-    },
-    {
       "path": "/api/public/api-manual",
       "methods": [
         "GET"

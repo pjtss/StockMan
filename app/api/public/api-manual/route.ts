@@ -32,7 +32,7 @@ function categoryFor(path: string) {
   if (path === "/api/health") return "system";
   if (path.startsWith("/api/scan/") || /^\/api\/stock\/us\/(?:ams-scout|dmi|macd|mfi-oversold)$/.test(path)) return "screeners";
   if (path.includes("market-impact-events") || path === "/api/public/market-intelligence") return "market-events";
-  if (path.startsWith("/api/dart") || path === "/api/disclosures" || path === "/api/market-news" || /\/news(?:-radar)?$/.test(path)) return "disclosure-news";
+  if (path.startsWith("/api/dart") || path === "/api/disclosures" || /\/news(?:-radar)?$/.test(path)) return "disclosure-news";
   return "market-data";
 }
 

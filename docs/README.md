@@ -50,7 +50,6 @@
 - 대화 단축어와 운영 API 일봉 JSON 스냅샷 절차: [`operations/shortcuts.md`](./operations/shortcuts.md)
 - RSS 번역 상태 공개 검수 API: [`operations/market-rss-translation-debug-api.md`](./operations/market-rss-translation-debug-api.md)
 - 공시 기반 일별 주가 영향 이벤트 JSON·DB·API·작성 가이드 API: [`architecture/market-impact-events-design.md`](./architecture/market-impact-events-design.md)
-- 해외 뉴스 탭 10초 자동 갱신: [`operations/market-news-auto-refresh.md`](./operations/market-news-auto-refresh.md)
 - 지속 개선 운영 기준: [`operations/continuous-improvement.md`](./operations/continuous-improvement.md)
 - 지속 개선 검토 주기: [`operations/improvement-review.md`](./operations/improvement-review.md)
 - 프로젝트 전체 디버깅 구조: [`DEBUGGING_ARCHITECTURE.md`](./DEBUGGING_ARCHITECTURE.md)
