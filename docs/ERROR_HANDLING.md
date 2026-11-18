@@ -920,3 +920,12 @@ npm test -- --run
 - **근본 원인/수정**: `pg_get_indexdef(index, column, false)` 결과에 정렬 방향이 포함되지 않았다. 검사 query가 `pg_index.indoption`의 DESC bit를 반영해 내림차순 키를 비교하도록 변경했다.
 - **재발 자동 감지**: `lib/schema-health.test.ts`에서 query의 descending order 비교 생성을 검증하며 operational schema integrity 검사에서 실제 인덱스 방향을 확인한다.
 - **검증/남은 위험**: 변경 후 격리 DB에서 `schemaReady=true`, index issues 0개, `/api/health` HTTP 200을 확인했다. 사용 중인 기존 DB에서 인덱스 자체가 누락/잘못 생성된 경우에는 이 코드 변경만으로 해결되지 않는다.
+
+## 2026-11-18 — OCI clean-checkout 문서 검증 실패
+
+- **증상**: 커밋 `6d8f8896`의 GitHub Actions `Deploy OCI` run `44289579797`은 배포 전 `npm run deploy:verify`의 `docs:check`에서 실패했다. 패키징·업로드·서버 활성화는 실행되지 않았다.
+- **근본 원인**: `scripts/check-docs.mjs`가 JSON Schema 검증을 위해 `ajv`를 import하지만 `package-lock.json`에만 있고 `package.json`의 `devDependencies`에는 선언되지 않았다. 로컬 `node_modules`의 extraneous 설치가 이를 가려 GitHub의 clean `npm ci` 환경에서 module-not-found가 발생했다. 같은 예외 처리에서 schema validation 실패가 database inventory golden fixture 계약 실패로 함께 보고됐다.
+- **영향 범위**: CI의 사전 검증만 실패했으며 OCI 서버 배포와 운영 DB migration은 시작되지 않았다.
+- **수정**: `ajv`와 이미 lockfile 및 프로젝트 검사 명령에서 사용하는 `tsx`를 `devDependencies`에 선언해 clean install 입력을 package manifest와 일치시킨다. `npm ci` 후 `npm ls ajv tsx`와 전체 `deploy:verify`를 통과시킨다.
+- **재발 자동 감지**: 배포 workflow의 clean `npm ci` 및 `npm run deploy:verify`를 유지한다. CI에서만 사라지는 optional/lock-only dependency가 없도록 스크립트가 직접 import하는 패키지는 manifest에 직접 선언한다.
+- **남은 위험/다음 단계**: 새 커밋을 push해 Deploy OCI 재실행 후 workflow success와 운영 `/api/health` 응답을 확인한다. 이번 실패 run에서는 DB 상태나 서비스 버전이 바뀌지 않았다.
