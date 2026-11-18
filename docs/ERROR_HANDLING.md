@@ -938,3 +938,12 @@ npm test -- --run
 - **수정**: lifecycle 모듈을 tracked source로 추가한다. Node production runtime에서만 intraday detection worker를 시작하고 `INTRADAY_DETECTION_ENABLED=false`이면 시작하지 않는 기존 동작을 그대로 보존한다.
 - **재발 자동 감지**: CI의 clean checkout production build가 import 누락을 차단한다. tracked source의 상대 import를 대상으로 누락/미추적 모듈 정적 점검도 실행했다. 확인 결과 필수 untracked import는 이 모듈 하나였다.
 - **검증/남은 위험**: 변경 후 clean install 기반 전체 `npm run deploy:verify`를 다시 실행하고 다음 Deploy OCI run 및 운영 health를 확인한다. run `44292807064`의 실패는 build에서 중단됐고 운영에 반영된 변화는 없다.
+
+## 2026-11-18 — OCI Flyway V171의 누락된 intraday 관측 테이블 전제
+
+- **증상**: Deploy OCI run `44295118377`은 패키징과 업로드까지 성공했지만 Activate의 Flyway migrate가 V171에서 `relation "intraday_turnover_observations" does not exist`로 실패했다. 스크립트는 새 릴리스 활성화를 중단하고 앱·스케줄러 서비스를 복구했다.
+- **근본 원인**: 테이블 생성은 V138에만 있었고 V171은 해당 테이블에 컬럼만 추가했다. Flyway는 기본 `outOfOrder=false`로 현재 DB 버전보다 낮은 미적용 migration을 실행하지 않는다. 따라서 운영 DB의 과거 baseline/이력 순서에서 V138 효과가 누락된 경우 V171만으로는 테이블을 보장하지 못한다.
+- **영향 범위**: V171 migration 트랜잭션은 롤백됐고 새 애플리케이션 릴리스는 활성화되지 않았다. Flyway가 V171 전에 성공 적용한 migration이 있다면 그 이력은 유지될 수 있으므로, 운영 DB의 실제 버전은 다음 health/Flyway 확인으로 대조한다. V171 자체는 인덱스 생성과 nullable 컬럼 추가 외 데이터 갱신·삭제를 하지 않는다.
+- **수정**: V171이 기존 테이블 정의와 인덱스를 `IF NOT EXISTS`로 보장한 다음 market-cap timestamp 컬럼을 추가하도록 forward repair로 보강한다. `scripts/check-docs.mjs`에 V171의 필수 runtime 컬럼 회귀 게이트를 추가한다.
+- **재발 자동 감지**: 배포 전 `npm run docs:check`/`npm run deploy:verify`가 V171에서 테이블 생성과 schema 계약 컬럼이 빠지면 실패한다. 배포 후에는 `/api/health`의 operational schema 결과와 Flyway 버전을 확인한다.
+- **검증/남은 위험**: 로컬 전체 검증과 새 OCI run, 서비스 readiness 및 운영 Flyway 버전을 다시 확인한다. V171 변경 전 checksum을 성공 저장한 다른 환경이 없는지 배포 전 이력도 확인하며, OCI에서는 이번 실행이 V171 실패·롤백으로 끝났다.

@@ -13,6 +13,7 @@
 - [ ] 운영 환경변수와 비밀값을 로그에 출력하지 않는다.
 - [ ] DB 스키마 변경이 있으면 기존 운영 버전과 충돌하지 않는 새 버전을 사용한다.
 - [ ] 운영 Flyway 버전보다 낮은 migration에만 있는 필수 테이블/컬럼은 현재 운영 floor 이후의 forward repair migration으로 다시 보장한다. `npm run docs:check`가 운영 floor 기반 컬럼 회귀를 검사한다.
+- [ ] 테이블 선행 migration이 운영 이력에서 건너뛰어질 수 있으면, 후속 migration도 relation을 안전하게 보장하는지 `npm run docs:check` 게이트에서 확인한다. intraday turnover 관측은 V171이 V138 누락을 복구한다.
 - [ ] 변경 기능에 회귀 테스트가 있는지 확인한다.
 - [ ] 운영 데이터 import 전 `DATABASE_URL`이 운영 DB를 가리키는지 확인한다. 호스트/DB명만 마스킹해 승인된 운영 식별값과 대조하고, `localhost` 또는 개발 DB면 운영 import를 중단한다.
 - [ ] 데이터 단독 반영은 운영 branch의 importer와 schema migration으로 사전검증한 뒤 실행한다. 운영 연결에서 대상 relation 존재, 공식 종목 마스터 적격성, eventId·자연키 충돌을 확인하고, import 후 공개 API에서 레코드 수·시장·ticker 범위를 대조한다.

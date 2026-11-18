@@ -5515,6 +5515,22 @@ if (missingForwardTables.length) {
   console.error(`Forward operational table migration audit failed after V157: ${missingForwardTables.join(", ")}`);
   process.exit(1);
 }
+const intradayTurnoverForwardMigration = migrationSources.find(({ fileName }) => /^V171__/i.test(fileName))?.contents ?? "";
+const intradayTurnoverCreateTable = intradayTurnoverForwardMigration.match(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+intraday_turnover_observations\s*\(([\s\S]*?)\)\s*;/i)?.[1] ?? "";
+const intradayTurnoverForwardColumns = new Set([
+  ...[...intradayTurnoverCreateTable.matchAll(/^\s*([a-z_][a-z0-9_]*)\s+/gim)].map((match) => match[1].toLowerCase()),
+  ...[...intradayTurnoverForwardMigration.matchAll(/ALTER\s+TABLE\s+intraday_turnover_observations\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+([a-z_][a-z0-9_]*)/gi)].map((match) => match[1].toLowerCase()),
+]);
+const requiredIntradayTurnoverColumns = [
+  "market", "code", "session_date", "bucket_at", "observed_at", "currency", "price", "volume",
+  "source_trading_value", "minute_trading_value", "minute_trading_value_source", "market_cap",
+  "market_cap_observed_at", "market_cap_fetched_at", "rolling_trading_value", "turnover_ratio", "source", "source_payload",
+];
+const missingIntradayTurnoverForwardColumns = requiredIntradayTurnoverColumns.filter((column) => !intradayTurnoverForwardColumns.has(column));
+if (!intradayTurnoverCreateTable || missingIntradayTurnoverForwardColumns.length) {
+  console.error(`Intraday turnover forward-migration audit failed; V171 must recover a missing V138 table before adding its timestamp fields: ${missingIntradayTurnoverForwardColumns.join(", ") || "table DDL missing"}.`);
+  process.exit(1);
+}
 const missingForwardIndexes = findMissingForwardOperationalIndexes(schemaHealthSource, migrationSources, 157);
 if (missingForwardIndexes.length) {
   console.error(`Forward operational index migration audit failed after V157: ${missingForwardIndexes.join(", ")}`);
