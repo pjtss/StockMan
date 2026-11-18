@@ -929,3 +929,12 @@ npm test -- --run
 - **수정**: `ajv`와 이미 lockfile 및 프로젝트 검사 명령에서 사용하는 `tsx`를 `devDependencies`에 선언해 clean install 입력을 package manifest와 일치시킨다. `npm ci` 후 `npm ls ajv tsx`와 전체 `deploy:verify`를 통과시킨다.
 - **재발 자동 감지**: 배포 workflow의 clean `npm ci` 및 `npm run deploy:verify`를 유지한다. CI에서만 사라지는 optional/lock-only dependency가 없도록 스크립트가 직접 import하는 패키지는 manifest에 직접 선언한다.
 - **남은 위험/다음 단계**: 새 커밋을 push해 Deploy OCI 재실행 후 workflow success와 운영 `/api/health` 응답을 확인한다. 이번 실패 run에서는 DB 상태나 서비스 버전이 바뀌지 않았다.
+
+## 2026-11-18 — OCI clean-checkout 빌드의 Node instrumentation 모듈 누락
+
+- **증상**: dependency manifest 수정 뒤 Deploy OCI run `44292807064`은 docs gate를 통과했지만 production build가 `instrumentation.ts`의 `./instrumentation-node` import를 해석하지 못해 실패했다. 패키징·업로드·서버 활성화는 실행되지 않았다.
+- **근본 원인**: `instrumentation-node.ts`가 `instrumentation.ts`에서 정적으로 import되는 필수 lifecycle 모듈인데 Git 추적 대상이 아닌 로컬 untracked 파일이었다. 로컬 build는 해당 파일을 읽어 통과했지만 clean CI checkout에는 파일이 없었다.
+- **영향 범위**: OCI 서버 배포, DB migration, 서비스 전환은 수행되지 않았다. 현재 프로덕션 버전은 유지됐다.
+- **수정**: lifecycle 모듈을 tracked source로 추가한다. Node production runtime에서만 intraday detection worker를 시작하고 `INTRADAY_DETECTION_ENABLED=false`이면 시작하지 않는 기존 동작을 그대로 보존한다.
+- **재발 자동 감지**: CI의 clean checkout production build가 import 누락을 차단한다. tracked source의 상대 import를 대상으로 누락/미추적 모듈 정적 점검도 실행했다. 확인 결과 필수 untracked import는 이 모듈 하나였다.
+- **검증/남은 위험**: 변경 후 clean install 기반 전체 `npm run deploy:verify`를 다시 실행하고 다음 Deploy OCI run 및 운영 health를 확인한다. run `44292807064`의 실패는 build에서 중단됐고 운영에 반영된 변화는 없다.
