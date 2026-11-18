@@ -247,6 +247,8 @@ try {
   const healthProbeSyntax = spawnSync(process.execPath, ["--check", "-"], { input: healthProbeScript, encoding: "utf8" });
   if (healthProbeSyntax.error) throw healthProbeSyntax.error;
   if (healthProbeSyntax.status !== 0) throw new Error(`Inline Node health probe has invalid syntax: ${healthProbeSyntax.stderr}`);
+  if (activationSource.indexOf('if systemctl is-active --quiet stockman.service && probe_stockman_health') > activationSource.indexOf('systemctl enable stockman-cron.timer')) throw new Error("Activation must establish HTTP readiness before starting scheduled database work");
+  if (!healthProbeFunction[0].includes('GET /api/health returned HTTP ${response.status}')) throw new Error("Activation must report health response status in readiness diagnostics");
   const diagnosticCapturePath = path.join(tempRootResolved, "activation-error-diagnostics.txt");
   const diagnosticHarness = path.join(tempRootResolved, "activation-error-harness.sh");
   writeFileSync(diagnosticHarness, `set -Eeuo pipefail\nDIAGNOSTIC_CAPTURE='${shellPath(diagnosticCapturePath)}'\nSERVICES_QUIESCED=0\nsystemctl() { printf 'systemctl %s\\n' "$*" >> "$DIAGNOSTIC_CAPTURE"; }\njournalctl() { printf 'journalctl %s\\n' "$*" >> "$DIAGNOSTIC_CAPTURE"; }\n${diagnosticsFunction[0]}\n${errorHandler[0]}\ntrap on_error ERR\nstage="service-restart"\nfalse\n`, "utf8");

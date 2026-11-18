@@ -11,13 +11,17 @@ collect_service_diagnostics() {
   for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.service; do
     journalctl --no-pager -u "$unit" -n 40 >&2 || true
   done
+  journalctl --no-pager -u stockman.service -n 80 >&2 || true
 }
 
 probe_stockman_health() {
   timeout --signal=TERM --kill-after=2s 8s node -e '
 fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(6000) })
   .then((response) => {
-    if (response.status !== 200) process.exitCode = 1;
+    if (response.status !== 200) {
+      console.error(`GET /api/health returned HTTP ${response.status}: ${response.statusText}`);
+      process.exitCode = 1;
+    }
   })
   .catch(() => {
     process.exitCode = 1;
@@ -269,16 +273,6 @@ timeout --signal=TERM --kill-after=10s 30s systemctl daemon-reload
 # Next.js process to stop. The service is checked below after the restart job
 # has been queued, so a stuck process cannot make the deployment hang forever.
 timeout --signal=TERM --kill-after=10s 30s systemctl restart --no-block stockman.service
-systemctl enable stockman-cron.timer
-timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-cron.timer
-timeout --signal=TERM --kill-after=10s 30s systemctl enable stockman-rss.timer
-timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-rss.timer
-timeout --signal=TERM --kill-after=10s 30s systemctl enable stockman-fundamentals.timer
-timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-fundamentals.timer
-# Run one scheduler pass immediately after activation so a fresh deployment
-# never leaves the cache health view stale until the next calendar boundary.
-timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-cron.service
-timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-fundamentals.service
 for attempt in $(seq 1 60); do
   if systemctl is-active --quiet stockman.service && probe_stockman_health; then break; fi
   if [ "$attempt" -eq 60 ]; then
@@ -296,6 +290,16 @@ for attempt in $(seq 1 60); do
   retry_delay=$((attempt < 6 ? attempt * 2 : 10))
   sleep "$retry_delay"
 done
+systemctl enable stockman-cron.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-cron.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl enable stockman-rss.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-rss.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl enable stockman-fundamentals.timer
+timeout --signal=TERM --kill-after=10s 30s systemctl restart stockman-fundamentals.timer
+# Start the first scheduler passes only after app and database readiness are
+# established; otherwise fresh-release work can compete with health queries.
+timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-cron.service
+timeout --signal=TERM --kill-after=10s 30s systemctl start --no-block stockman-fundamentals.service
 systemctl is-active --quiet stockman-cron.timer
 systemctl is-active --quiet stockman-rss.timer
 systemctl is-active --quiet stockman-fundamentals.timer
