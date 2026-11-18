@@ -1,6 +1,6 @@
 import pg from "pg";
 
-const MIN_SNAPSHOT_AGE_SECONDS = 30;
+const MIN_SNAPSHOT_AGE_SECONDS = 3_600;
 const APPROVED_SCOPE = "explicit-approved-pids";
 const approvedPids = [...new Set((process.env.OCI_PG_TERMINATION_APPROVED_PIDS ?? "")
   .split(",")
@@ -35,6 +35,10 @@ const currentTargetsSql = `
     AND pid = ANY($2::integer[])
     AND pid <> pg_backend_pid()
     AND backend_type = 'client backend'
+    AND application_name = 'PostgreSQL JDBC Driver'
+    AND usename = 'stockman'
+    AND client_addr = inet '127.0.0.1'
+    AND state = 'idle in transaction'
     AND backend_xmin IS NOT NULL
     AND xact_start < NOW() - ($1::integer * INTERVAL '1 second')
   ORDER BY xact_start
@@ -64,6 +68,10 @@ try {
         AND pid = ANY($1::integer[])
         AND pid <> pg_backend_pid()
         AND backend_type = 'client backend'
+        AND application_name = 'PostgreSQL JDBC Driver'
+        AND usename = 'stockman'
+        AND client_addr = inet '127.0.0.1'
+        AND state = 'idle in transaction'
         AND backend_xmin IS NOT NULL
         AND xact_start < NOW() - ($2::integer * INTERVAL '1 second')
     ),

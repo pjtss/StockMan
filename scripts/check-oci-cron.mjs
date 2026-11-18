@@ -532,9 +532,12 @@ if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('sleep 30')
   || !activation.includes('OCI index preflight found old database snapshots')
   || !activation.includes('preflight_attempt=$((preflight_attempt + 1))')
-  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038,260900,261867")
+  || !activation.includes("OCI_PG_TERMINATION_APPROVED_PIDS=246213,246722,246903,247294,247463,247509,248010,248077,248691,248857,249223,249386,249548,249564,249815,249816,250094,250277,250401,250475,250476,250751,253038,260900,261867,308675")
   || !activation.includes("explicit-approved-pids")
   || !activation.includes("terminate-approved-oci-snapshot-holders.mjs")
+  || !fs.readFileSync(path.resolve("scripts/terminate-approved-oci-snapshot-holders.mjs"), "utf8").includes("const MIN_SNAPSHOT_AGE_SECONDS = 3_600;")
+  || !fs.readFileSync(path.resolve("scripts/terminate-approved-oci-snapshot-holders.mjs"), "utf8").includes("application_name = 'PostgreSQL JDBC Driver'")
+  || !fs.readFileSync(path.resolve("scripts/terminate-approved-oci-snapshot-holders.mjs"), "utf8").includes("state = 'idle in transaction'")
   || !activation.includes('if [ "$SERVICES_QUIESCED" = "1" ]')) {
   throw new Error("V168 activation must pause DB services, target only the explicitly approved PID, and restore services on failure");
 }

@@ -956,3 +956,11 @@ npm test -- --run
 - **수정**: V173/V176 RSS 인덱스를 OCI quiesced maintenance window 안에서 실행되는 트랜잭션 `CREATE INDEX IF NOT EXISTS`로 바꾸고 비트랜잭션 설정을 제거한다. OCI preflight가 해당 인덱스 상태·RSS 테이블 크기·Flyway 실패 버전을 마스킹 없이 민감정보를 출력하지 않고 기록하며, 허용 목록 V168/V170/V173/V176의 invalid index와 실패 이력만 안전하게 정리한다. 다른 migration 실패는 계속 fail-closed한다.
 - **재발 자동 감지**: `scripts/check-oci-cron.mjs`와 `scripts/check-docs.mjs`가 V173/V176의 인덱스 수, 동시성 옵션 부재, transaction 설정 부재, 서비스 quiesce 순서 및 preflight repair 범위를 확인한다. OCI preflight 출력으로 다음 시도에서 대상 테이블 크기와 개별 인덱스 validity를 확인한다.
 - **검증/남은 위험**: 수정 후보를 clean worktree에서 전체 `npm run deploy:verify`로 확인했다. 의존성 감사 0건, docs/API/migration 게이트, production build, standalone browser/API smoke, 1,645 tests passed / 3 skipped, typecheck가 통과했다. `npm run cron:check`도 통과했다. 운영 재배포 후 V173/V176 완료, Flyway 최신 버전, `/api/health` HTTP 200을 확인해야 한다. 일반 인덱스 build도 테이블이 매우 크면 migration timeout을 넘을 수 있으므로 이번 preflight의 RSS 테이블 크기·row 추정치와 실행 결과를 검토한다.
+
+## 2026-11-19 — OCI Flyway preflight의 JDBC idle transaction 차단
+
+- **증상/근거**: Deploy OCI run `44310441883`의 재시도에서도 PID `308675`가 `stockman` 사용자, `PostgreSQL JDBC Driver`, `127.0.0.1`, `idle in transaction`으로 보고됐다. 트랜잭션 나이는 약 4시간 41분까지 늘었고 20회 preflight 재시도 내내 유지돼 Flyway가 실행되지 않았다.
+- **근본 원인**: 운영 로컬 PostgreSQL의 오래된 JDBC 트랜잭션이 snapshot을 붙든 상태로 남았다. 해당 PID는 당시 명시적 종료 목록에 없어 배포 전 정리가 이뤄지지 않았다.
+- **조치**: PID `308675`를 명시적 목록에 추가하고 종료 도구가 `stockman`/loopback JDBC 연결, `idle in transaction`, snapshot 보유, 트랜잭션 나이 1시간 초과 조건을 모두 확인하도록 제한한다. 종료 직전에도 동일 조건을 재검증한다. PID 재사용 또는 상태 변경 시 종료하지 않고 기존 fail-closed 재시도를 유지한다.
+- **재발 자동 감지**: 사전 점검은 PID·계정·application·주소·상태·트랜잭션 나이를 기록한다. `scripts/check-oci-cron.mjs`는 명시적 PID 목록과 최소 나이/세션 식별 조건을 검사한다.
+- **검증/남은 위험**: 변경 후 `npm run deploy:verify`가 통과했다: dependency audit 0 vulnerabilities, production build, standalone browser/API smoke, 1,645 tests passed / 3 skipped, typecheck, docs/API/migration gates 및 OCI cron 검사. 재배포 로그에서 실제 종료 대상과 Flyway 적용 결과를 확인한다. 종료 시 열려 있던 트랜잭션은 rollback된다. Flyway 최신 버전과 운영 health 200을 확인하기 전까지 배포 완료로 간주하지 않는다.
