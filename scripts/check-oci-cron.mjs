@@ -451,6 +451,16 @@ if (fs.existsSync(path.resolve("db/migration/V178__repair_kis_rate_limit_event_i
   || !kisRateLimitRepairMigration.includes("ON kis_rate_limit_events (incident_id, occurred_at DESC)")) {
   throw new Error("V178 must replace the three KIS rate-limit event indexes transactionally inside OCI's quiesced maintenance window");
 }
+const publicKisRateLimitRepair = migrationFiles.find(({ name }) => name === "V179__repair_public_kis_rate_limit_event_indexes.sql")?.sql ?? "";
+if (!publicKisRateLimitRepair
+  || (publicKisRateLimitRepair.match(/DROP INDEX IF EXISTS public\./g) ?? []).length !== 3
+  || (publicKisRateLimitRepair.match(/CREATE INDEX [a-z_]+\s+ON public\.kis_rate_limit_events/g) ?? []).length !== 3
+  || /INDEX CONCURRENTLY/i.test(publicKisRateLimitRepair)
+  || !publicKisRateLimitRepair.includes("ON public.kis_rate_limit_events (occurred_at DESC)")
+  || !publicKisRateLimitRepair.includes("ON public.kis_rate_limit_events (endpoint, occurred_at DESC)")
+  || !publicKisRateLimitRepair.includes("ON public.kis_rate_limit_events (incident_id, occurred_at DESC)")) {
+  throw new Error("V179 must explicitly rebuild the three public KIS rate-limit indexes in the OCI maintenance window");
+}
 const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
 const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");
 const activationScript = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
@@ -527,11 +537,11 @@ if (!workflow.includes("oci-flyway-v168-preflight.mjs")
   || !flywayPreflight.includes("pg_stat_activity")
   || !flywayPreflight.includes("old database snapshots")
   || !flywayPreflight.includes("failedMigrationVersions")
-  || !flywayPreflight.includes('new Set(["168", "170", "173", "176", "178"])')
+  || !flywayPreflight.includes('new Set(["168", "170", "173", "176", "178", "179"])')
   || !flywayPreflight.includes("market_rss_articles")
   || !flywayPreflight.includes("sec_submissions")
   || !flywayPreflight.includes("refusing automatic repair")) {
-  throw new Error("OCI Flyway activation must log index diagnostics and repair only approved V168/V170/V173/V176/V178 failures");
+  throw new Error("OCI Flyway activation must log index diagnostics and repair only approved V168/V170/V173/V176/V178/V179 failures");
 }
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");

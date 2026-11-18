@@ -5541,6 +5541,7 @@ const kisRateLimitRepair = migrationSources.find(({ fileName }) => /^V178__/i.te
 const kisRateLimitRepairHasNonTransactionalConfig = migrations
   .filter((fileName) => /^V178__.*\.sql$/i.test(fileName))
   .some((fileName) => existsSync(join(migrationDir, fileName.replace(/\.sql$/i, ".sql.conf"))));
+const publicKisRateLimitRepair = migrationSources.find(({ fileName }) => /^V179__/i.test(fileName))?.contents ?? "";
 const activationScriptSource = readFileSync(join(root, "deploy/oci/stockman-activate"), "utf8");
 const maintenanceWindowStarts = activationScriptSource.indexOf('stage="quiesce-services"');
 const migrationStageStarts = activationScriptSource.indexOf('stage="flyway-migrate"');
@@ -5555,13 +5556,17 @@ if (rssRetentionMigrations.some((migration) => !migration)
   || (kisRateLimitRepair.match(/CREATE INDEX IF NOT EXISTS/g) ?? []).length !== 3
   || /INDEX CONCURRENTLY/i.test(kisRateLimitRepair)
   || kisRateLimitRepairHasNonTransactionalConfig
+  || !publicKisRateLimitRepair
+  || (publicKisRateLimitRepair.match(/DROP INDEX IF EXISTS public\./g) ?? []).length !== 3
+  || (publicKisRateLimitRepair.match(/CREATE INDEX [a-z_]+\s+ON public\.kis_rate_limit_events/g) ?? []).length !== 3
+  || /INDEX CONCURRENTLY/i.test(publicKisRateLimitRepair)
   || maintenanceWindowStarts < 0
   || migrationStageStarts <= maintenanceWindowStarts
   || !activationScriptSource.includes("V173__market_rss_72h_retention_indexes.sql")
   || !activationScriptSource.includes("V176__market_rss_query_order_indexes.sql")
-  || !preflightScriptSource.includes('new Set(["168", "170", "173", "176", "178"])')
+  || !preflightScriptSource.includes('new Set(["168", "170", "173", "176", "178", "179"])')
   || !preflightScriptSource.includes("DROP INDEX ${concurrent}IF EXISTS")) {
-  console.error("RSS forward-index migration audit failed; V173/V176 must use the quiesced maintenance window, and OCI preflight must inspect/repair known partial indexes.");
+  console.error("Operational index migration audit failed; V173/V176/V178/V179 must use the quiesced maintenance window, and OCI preflight must inspect/repair known partial indexes.");
   process.exit(1);
 }
 const missingForwardIndexes = findMissingForwardOperationalIndexes(schemaHealthSource, migrationSources, 157);

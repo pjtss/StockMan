@@ -31,7 +31,7 @@ try {
     WHERE success = false
     ORDER BY installed_rank
   `);
-  const repairableFailedVersions = new Set(["168", "170", "173", "176", "178"]);
+  const repairableFailedVersions = new Set(["168", "170", "173", "176", "178", "179"]);
   const unexpectedFailures = failedMigrations.rows.filter(({ version }) => !repairableFailedVersions.has(version));
   if (unexpectedFailures.length > 0) {
     throw new Error("Flyway history contains a failed migration outside the approved index repair set; refusing automatic repair");
