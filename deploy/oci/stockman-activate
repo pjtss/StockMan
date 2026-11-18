@@ -197,7 +197,8 @@ while true; do
       "$TEMP_PATH/db/migration/V168__bounded_non_daily_data_retention.sql" \
       "$TEMP_PATH/db/migration/V170__sec_materializer_recent_index.sql" \
       "$TEMP_PATH/db/migration/V173__market_rss_72h_retention_indexes.sql" \
-      "$TEMP_PATH/db/migration/V176__market_rss_query_order_indexes.sql" 2>"$preflight_log")"; then
+        "$TEMP_PATH/db/migration/V176__market_rss_query_order_indexes.sql" \
+        "$TEMP_PATH/db/migration/V178__repair_kis_rate_limit_event_indexes.sql" 2>"$preflight_log")"; then
     cat "$preflight_log" >&2
     break
   else

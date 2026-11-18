@@ -23,8 +23,10 @@ OCI 배포는 Flyway 실행 전에 Stockman과 예약 작업 서비스를 중지
 사용합니다. `CREATE INDEX CONCURRENTLY`는 여러 번 테이블을 읽고 오래된 트랜잭션/스냅샷을
 기다릴 수 있어 이 운영 구간에서는 불필요한 대기를 만들 수 있습니다. 사전검사는 두
 migration의 인덱스 상태와 실패 이력을 기록하고, 승인된 V173/V176의 invalid 인덱스와
-실패 이력만 정리한 뒤 재시도합니다. 다른 버전의 failed migration은 자동 repair하지 않고
-배포를 중단합니다.
+실패 이력만 정리한 뒤 재시도합니다. V178은 V172에서 이름만 존재하고 컬럼 정의가 잘못된
+KIS rate-limit 인덱스 세 개를 `DROP/CREATE INDEX CONCURRENTLY`로 교체합니다. 서비스가 중지된
+유지보수 구간에서 수행하며, 실패 시 preflight는 V178 실패 이력 및 invalid 인덱스만 승인해
+다음 시도에서 정리합니다. 다른 버전의 failed migration은 자동 repair하지 않고 배포를 중단합니다.
 
 기존 런타임 bootstrap으로 이미 스키마가 생성된 데이터베이스는 최초 1회만
 baseline 처리합니다.

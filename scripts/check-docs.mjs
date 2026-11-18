@@ -5550,7 +5550,7 @@ if (rssRetentionMigrations.some((migration) => !migration)
   || migrationStageStarts <= maintenanceWindowStarts
   || !activationScriptSource.includes("V173__market_rss_72h_retention_indexes.sql")
   || !activationScriptSource.includes("V176__market_rss_query_order_indexes.sql")
-  || !preflightScriptSource.includes('new Set(["168", "170", "173", "176"])')
+  || !preflightScriptSource.includes('new Set(["168", "170", "173", "176", "178"])')
   || !preflightScriptSource.includes("DROP INDEX ${concurrent}IF EXISTS")) {
   console.error("RSS forward-index migration audit failed; V173/V176 must use the quiesced maintenance window, and OCI preflight must inspect/repair known partial indexes.");
   process.exit(1);
