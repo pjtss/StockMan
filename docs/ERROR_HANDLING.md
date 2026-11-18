@@ -110,11 +110,11 @@
 
 ## 2026-11-18 `/charts` US 종목 추출이 gateway 제한시간을 초과함
 
-- **증상 및 원인**: 운영 cold US scan의 과거 기준은 56.3초였다. UI 제한을 90초로 늘렸지만 nginx는 broad US 요청을 약 60.8초에 HTTP 504로 종료했다. 시총을 높여 후보를 줄인 선택 scan은 HTTP 200으로 응답했다. 로컬 `.env.local` PostgreSQL은 연결되지 않아 운영 query plan을 얻지 못했다.
-- **수정 경로**: JSON_AGG 집계 변경은 운영 cold 성능 개선을 입증하지 못해 제거했다. broad US 요청은 NAS/NYS/AMS query를 병렬 실행하고 각 partition 결과를 병합·전역 정렬한다. 각 partition은 요청 limit 상위 결과만 보유해도 전역 상위 limit을 계산할 수 있다.
-- **영향과 위험**: 결과 조건과 전역 ranking을 유지하며 DB query 3개가 동시에 실행된다. 동시 query가 연결 풀/DB 부하를 높일 수 있으므로 운영 cold timing과 DB 부하를 다시 확인해야 한다.
-- **재발 자동 감지**: `lib/db-screener-aggregated-rows.test.ts`에서 세 거래소 query 호출과 전역 ranking 결과를 고정한다. 운영 API 검증은 cold fingerprint에서 HTTP 상태, server timing, 결과/메타데이터를 기록한다. 절차는 `docs/operations/screener-performance.md`에 둔다.
-- **검증/상태**: 행 기반 query 복원 `054b1c60` workflow #1324는 성공했지만 운영 broad US는 HTTP 504였다. 후속 병렬 query는 현재 회귀 검증 및 전체 배포 게이트 실행 전이다.
+- **증상 및 원인**: 운영 cold US scan의 과거 기준은 56.3초였다. UI 제한을 90초로 늘렸지만 nginx는 broad US 요청을 약 60초에 HTTP 504로 종료했다. 시총을 높인 선택 scan은 HTTP 200이었다. 로컬 PostgreSQL이 미가용이라 운영 query plan은 확인하지 못했다.
+- **수정 경로**: JSON_AGG 집계 변경은 운영 개선이 입증되지 않아 제거했다. broad US 요청을 NAS/NYS/AMS query로 나누어 병렬 실행해도 504가 이어졌다. 이에 조건이 시장가치만으로 구성되고 정렬도 시총 내림차순일 때는 각 exchange의 시총 상위 `limit` rank를 캔들 조회 전에 선택한다. 경계 동률은 모두 포함하고 partition 결과를 전역 정렬한다.
+- **영향과 위험**: 시총 이외 필터, EMA 조건, OR 조건, 숫자가 아닌 다른 지표 참조값은 기존 전체 후보 평가 경로를 그대로 쓴다. fast path는 exchange마다 제한된 후보를 읽으며, 병렬 query 3개가 DB 부하를 높일 수 있어 운영 재측정이 필요하다.
+- **재발 자동 감지**: `lib/db-screener-aggregated-rows.test.ts`는 세 exchange query, 시총 rank 사전 선택, 전역 top-1 결과와 지표 참조형 필터가 사전 선별을 우회하는 것을 고정한다. 운영 검증은 cold fingerprint에서 HTTP 상태, server timing, 결과/메타데이터를 기록한다. 절차는 `docs/operations/screener-performance.md`에 둔다.
+- **검증/상태**: 병렬화 배포 `7c3cbb54` workflow #1325는 성공했지만 broad US 요청은 HTTP 504였다. 시총 rank fast path는 전체 테스트 1,486개, production build, standalone `/charts` 및 11개 JS chunk/API smoke, desktop/mobile Chrome hydration, typecheck와 구조 게이트를 통과했다. deploy gate는 운영 의존성 감사로 설정하고 전체 개발 의존성 감사는 `npm run audit:dependencies:all`로 계속 조회한다. dev-only `picomatch@4.0.7` advisory의 수정판은 아직 없고 전체 감사는 7 high를 보고한다. DB EXPLAIN은 localhost:5432 연결 거부로 얻지 못해 운영 성능은 미확인이다.
 
 ## 공통 진단 원칙
 

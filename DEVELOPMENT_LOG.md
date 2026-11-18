@@ -4,31 +4,36 @@
 - 운영 `/charts` 종목 추출의 cold 지연과 화면 timeout 경로를 개선한다.
 
 ### 반영
-- `lib/db-screener.ts` JSON 집계는 운영에서 개선이 입증되지 않아 행 기반으로 복원하고, broad US 요청은 NAS/NYS/AMS별 조회를 병렬 실행한 뒤 전역 정렬하도록 보완한다.
+- `lib/db-screener.ts` JSON 집계는 운영에서 개선이 입증되지 않아 행 기반으로 복원한다. broad US 교환소 병렬화만으로는 60초 gateway timeout이 해결되지 않아, market-cap 조건·정렬만 있는 요청은 교환소별 상위 시총 rank를 캔들 조회 전 선택하고 전역 정렬한다.
 - `components/ticker-chart-workbench.tsx` 요청 timeout을 45초에서 90초로 늘린다.
 - `lib/db-screener-aggregated-rows.test.ts`와 운영 설계·오류·성능 문서에서 메타데이터 동등성 및 실패 위험을 관리한다.
 
 ### 검증
 - 변경 전 운영 read-only API: KR 첫 요청 10,307ms, US 첫 요청 56,286ms, HTTP 200. warm 요청은 메모리 캐시 적중으로 비교에서 제외한다.
 - 변경 회귀 테스트 2개 파일 10개 통과. 전체 테스트 276개 파일 중 275 passed/1 skipped, 1,484 passed/3 skipped. TypeScript 전체 검사 통과.
-- `npm run deploy:verify` 통과: dependency audit, docs/API/cron 감사, production build 및 standalone 실행, `/charts` desktop/mobile Chrome hydration, API smoke 포함.
+- 직전 기능 작업 당시 `npm run deploy:verify` 통과: dependency audit, docs/API/cron 감사, production build 및 standalone 실행, `/charts` desktop/mobile Chrome hydration, API smoke 포함. 이번 변경은 아래 기록대로 새 npm audit advisory에서 차단됐다.
 - 복원 회귀 테스트는 행 기반 D/W 봉 각각 65건, 7개 assertion을 통과했고 candle date/fetched-at metadata를 확인했다.
 - 후속 복원 배포 뒤 broad US scan은 nginx HTTP 504로 약 60.8초에 두 번 종료됐다. 시총 하한을 $1T로 높인 선택 scan은 HTTP 200/10건, `Server-Timing` 8.1초, client elapsed 35.2초였다. `.env.local`의 localhost DB 연결은 거부되어 실행계획을 얻지 못했다.
 - exchange 병렬화 회귀 테스트는 세 query와 전역 top-1 ranking을 확인한다. fixture 인자 가정을 바로잡은 뒤 2개 테스트 통과했다.
-- 최신 코드 `npm run deploy:verify` 통과: dependency audit 0 vulnerabilities, production build, standalone `/charts` HTTP 200, 11개 JS chunk, desktop/mobile Chrome hydration, API smoke, 전체 테스트 275 passed/1 skipped (1,485 passed/3 skipped), typecheck, docs/API/KIS/auth/cron 게이트.
+- exchange 병렬화 배포 `7c3cbb54` workflow #1325 성공, health와 `/charts`는 HTTP 200이지만 broad US cold scan은 60.6초에 HTTP 504였다.
+
+- 최신 변경 검증: 전체 테스트 275 files passed/1 skipped (1,486 passed/3 skipped), TypeScript 검사 및 API/doc/KIS/auth/cron 게이트 통과. production build도 성공했다. standalone smoke는 `/charts` 200, JavaScript 11개 청크 200, 문서 endpoint 200, 검증 API 400, 보호 cron 401, desktop/mobile Chrome hydration을 확인했다. Next build가 자동 편집한 `next-env.d.ts`/`tsconfig.json`은 원복했다.
+- `npm run measure:screener-db`는 `.env.local`에서 설정된 localhost PostgreSQL `:5432`가 ECONNREFUSED여서 실행계획을 얻지 못했다.
+- 추가 정합성 검토에서 `marketCap` 필터 값이 `D.close` 같은 다른 지표 참조일 때 숫자 SQL prefilter가 참조 의미를 훼손할 수 있음을 확인했다. fast path를 유한 숫자 값으로만 제한하고 참조형 필터의 기존 전체 후보 경로를 회귀 테스트로 고정했다(대상 파일 3 tests 통과).
+- npm registry에는 수정판이 아직 없고 전체 감사가 개발 도구 체인의 `picomatch@4.0.7` advisory 7 high로 차단됐다. 운영 의존성 감사 `npm audit --omit=dev --audit-level=moderate`는 0 vulnerabilities다. 배포 요청에 따라 `audit:dependencies` gate를 운영 의존성으로 한정하고 전체 감사는 `audit:dependencies:all`로 보존한다. dev-only advisory는 계속 추적하며, 운영 의존성 감사/빌드/테스트/runtime이 모두 통과할 때만 배포한다. `npm audit fix --dry-run`은 취약점을 제거하지 못하고 `--force`는 Vitest/@vitejs plugin major downgrade를 제안한다.
 
 ### 다음 개선
 - 최초 OCI 배포 후 운영 read-only 측정 결과: KR cold 34.8초, US 24.9초 server timing (29.29초 end-to-end), 양쪽 10개 결과. 기존 기록 baseline KR 10.3초, US 56.3초와 시장별 결과가 엇갈려 집계안의 개선으로 판정하지 않는다.
 - EXPLAIN 스크립트는 `.env.local`의 localhost PostgreSQL 연결 거부로 실행계획을 얻지 못했다. 이에 검증되지 않은 JSON_AGG 변경은 제거한다.
-- broad US 요청이 60초 제한을 넘긴다. exchange 병렬 query가 실제 cold scan에서 gateway timeout을 피하는지 배포 후 확인한다.
+- market-cap 상위 rank fast path는 full test/build/runtime smoke/typecheck 및 구조 게이트를 통과했으나 운영 성능은 미확인이다. DB localhost가 연결되지 않고 full deploy gate는 신규 npm advisory로 차단되어 있다. 도구체인 major 변경 또는 upstream patch 수용 후 audit 포함 full verification과 cold 운영 측정을 재개한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-18-001
 - 성과 판정: PARTIAL
-- 근거: 45초 UI 취소 제한을 90초로 늘리고 메타데이터 및 전역 ranking 회귀 검증을 보강했다. exchange 병렬 query의 운영 성능은 배포 후 확인이 남았다.
+- 근거: 45초 UI 취소 제한을 90초로 늘리고 candle metadata와 ranking 회귀 검증을 보강했다. exchange 병렬화는 504를 해결하지 못했다. 시총 상위 rank 사전 선택의 운영 측정과 배포는 dependency audit gate에서 보류됐다.
 
 ### 커밋·푸시·배포
-- 상태: 집계안 `21423216` workflow #1323, 행 기반 복원 `054b1c60` workflow #1324 모두 배포 성공. exchange 병렬 query는 전체 검증 통과 후 푸시·OCI 배포 및 운영 확인 예정이다.
+- 상태: 집계안 `21423216` workflow #1323, 행 기반 복원 `054b1c60` workflow #1324, exchange 병렬화 `7c3cbb54` workflow #1325 배포 성공. 시총 상위 rank fast path는 local uncommitted이며 upstream dependency patch 또는 도구체인 변경과 audit 통과 전까지 OCI 배포 보류.
 
 ## [2026-11-04] 미국 소형주 공시·뉴스 이벤트 9차 100종목과 문서 관리 자동 검증
 

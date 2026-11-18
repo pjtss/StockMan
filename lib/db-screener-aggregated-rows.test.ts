@@ -91,6 +91,36 @@ describe("database screener candle rows", () => {
     });
 
     expect(query).toHaveBeenCalledTimes(3);
+    expect(query.mock.calls[0][0]).toContain("RANK() OVER (PARTITION BY u.market ORDER BY f.market_cap DESC NULLS LAST)");
+    expect(query.mock.calls[0][1][5]).toBe(1);
     expect(results.map((result) => result.code)).toEqual(["BBB"]);
+  });
+
+  it("keeps metric-referenced market-cap filters on the full candidate path", async () => {
+    query.mockResolvedValue({
+      rows: makeCandles("D").map((candle) => ({
+        market: "NAS",
+        code: "AAA",
+        name: "Alpha",
+        market_cap: "40000000000",
+        listed_shares: "1000000",
+        currency: "USD",
+        timeframe: "D",
+        ...candle,
+      })),
+    });
+
+    const results = await runDbScreener({
+      market: "US",
+      exchange: ["NAS"],
+      filters: [{ field: "marketCap", operator: ">=", value: "D.close" }],
+      ranking: [{ field: "marketCap", direction: "DESC" }],
+      limit: 10,
+    });
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).not.toContain("RANK() OVER");
+    expect(results.map((result) => result.code)).toEqual(["AAA"]);
+    expect(results[0].conditions[0]).toMatchObject({ field: "marketCap", target: 164, passed: true });
   });
 });
