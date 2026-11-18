@@ -63,6 +63,7 @@ function run(command, args, options = {}) {
 
 async function verifyFastGates() {
   console.log("[deploy-verify] fast structural gates");
+  await run("node", ["scripts/test-oci-activation-preflight.mjs"]);
   await run(npm, ["run", "docs:check"]);
   await run(npm, ["run", "audit:verify-scope"]);
   await run(npm, ["run", "audit:kis-boundary"]);

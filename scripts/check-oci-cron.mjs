@@ -7,6 +7,7 @@ const dailyCacheSyncSource = fs.readFileSync(path.resolve("scripts/sync-daily-ca
 const asyncDailyCacheSyncSource = fs.readFileSync(path.resolve("scripts/sync-daily-cache-async.mjs"), "utf8");
 const dailyCandleFallbackSource = fs.readFileSync(path.resolve("lib/daily-candle-fallback.mjs"), "utf8");
 const dailyCacheSyncResultSource = fs.readFileSync(path.resolve("lib/daily-cache-sync-result.mjs"), "utf8");
+const deploymentVerifierSource = fs.readFileSync(path.resolve("scripts/verify-deploy.mjs"), "utf8");
 const apiUrlInitialization = dailyCacheSyncSource.match(/function createDailyCacheApiUrl\([\s\S]*?\n\}/)?.[0] ?? "";
 const poolInitialization = dailyCacheSyncSource.match(/let pool;\s*let poolBackgroundErrorCount = 0;\s*let firstPoolBackgroundError;\s*try \{\s*pool = new Pool\(\{ connectionString: localDatabaseUrl, connectionTimeoutMillis: databaseConnectionTimeoutMs \}\);\s*\}\s*catch \{\s*throw new Error\("LOCAL_DATABASE_URL could not initialize PostgreSQL pool"\);\s*\}/)?.[0] ?? "";
 const summarizeErrorSource = dailyCacheSyncSource.match(/function summarizeError\([\s\S]*?\n\}/)?.[0] ?? "";
@@ -524,6 +525,9 @@ if (!workflow.includes("oci-flyway-v168-preflight.mjs")
 }
 if (!activation.includes('chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"')) {
   throw new Error("Deployment activation must make the dedicated fundamentals runner executable");
+}
+if (!deploymentVerifierSource.includes('scripts/test-oci-activation-preflight.mjs')) {
+  throw new Error("Deployment verification must run the OCI activation preflight regression suite");
 }
 if (!workflow.includes("terminate-approved-oci-snapshot-holders.mjs")
   || !activation.includes('stage="quiesce-services"')

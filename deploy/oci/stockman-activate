@@ -2,6 +2,29 @@
 set -euo pipefail
 stage="initialise"
 SERVICES_QUIESCED=0
+collect_service_diagnostics() {
+  local unit
+  for unit in stockman.service stockman-cron.timer stockman-rss.timer stockman-fundamentals.timer \
+    stockman-cron.service stockman-rss.service stockman-fundamentals.service; do
+    systemctl --no-pager --full status "$unit" >&2 || true
+  done
+  for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.service; do
+    journalctl --no-pager -u "$unit" -n 40 >&2 || true
+  done
+}
+
+probe_stockman_health() {
+  timeout --signal=TERM --kill-after=2s 8s node -e '
+fetch("http://127.0.0.1:3000/api/health", { signal: AbortSignal.timeout(6000) })
+  .then((response) => {
+    if (response.status !== 200) process.exitCode = 1;
+  })
+  .catch(() => {
+    process.exitCode = 1;
+  });
+'
+}
+
 on_error() {
   local code=$?
   echo "stockman-activate failed: stage=${stage} exit=${code}" >&2
@@ -61,6 +84,45 @@ rm -rf "$TEMP_PATH"
 mkdir -p "$TEMP_PATH"
 stage="extract-release"
 tar -xzf "$RELEASE" -C "$TEMP_PATH"
+required_release_files=(
+  server.js
+  scripts/oci-cron.sh
+  scripts/oci-fundamentals-cron.sh
+  scripts/oci-rss-cron.sh
+  scripts/oci-flyway-v168-preflight.mjs
+  scripts/terminate-approved-oci-snapshot-holders.mjs
+  deploy/oci/stockman-cron.service
+  deploy/oci/stockman-cron.timer
+  deploy/oci/stockman-rss.service
+  deploy/oci/stockman-rss.timer
+  deploy/oci/stockman-fundamentals.service
+  deploy/oci/stockman-fundamentals.timer
+)
+for required_file in "${required_release_files[@]}"; do
+  if [ ! -f "$TEMP_PATH/$required_file" ]; then
+    echo "release is missing required file: $required_file" >&2
+    exit 1
+  fi
+done
+versioned_migration_found=0
+for migration_file in "$TEMP_PATH"/db/migration/*.sql; do
+  [ -f "$migration_file" ] || continue
+  migration_name="${migration_file##*/}"
+  if [[ "$migration_name" =~ ^V[0-9]+__[^/]+\.sql$ ]]; then
+    versioned_migration_found=1
+    break
+  fi
+done
+if [ "$versioned_migration_found" != "1" ]; then
+  echo "release contains no versioned Flyway SQL migrations: db/migration" >&2
+  exit 1
+fi
+for script_path in scripts/oci-cron.sh scripts/oci-fundamentals-cron.sh scripts/oci-rss-cron.sh; do
+  if ! bash -n "$TEMP_PATH/$script_path"; then
+    echo "release contains invalid Bash syntax: $script_path" >&2
+    exit 1
+  fi
+done
 chmod +x "$TEMP_PATH/scripts/oci-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-fundamentals-cron.sh"
 chmod +x "$TEMP_PATH/scripts/oci-rss-cron.sh"

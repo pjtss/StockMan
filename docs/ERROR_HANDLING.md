@@ -964,3 +964,12 @@ npm test -- --run
 - **조치**: PID `308675`를 명시적 목록에 추가하고 종료 도구가 `stockman`/loopback JDBC 연결, `idle in transaction`, snapshot 보유, 트랜잭션 나이 1시간 초과 조건을 모두 확인하도록 제한한다. 종료 직전에도 동일 조건을 재검증한다. PID 재사용 또는 상태 변경 시 종료하지 않고 기존 fail-closed 재시도를 유지한다.
 - **재발 자동 감지**: 사전 점검은 PID·계정·application·주소·상태·트랜잭션 나이를 기록한다. `scripts/check-oci-cron.mjs`는 명시적 PID 목록과 최소 나이/세션 식별 조건을 검사한다.
 - **검증/남은 위험**: 변경 후 `npm run deploy:verify`가 통과했다: dependency audit 0 vulnerabilities, production build, standalone browser/API smoke, 1,645 tests passed / 3 skipped, typecheck, docs/API/migration gates 및 OCI cron 검사. 재배포 로그에서 실제 종료 대상과 Flyway 적용 결과를 확인한다. 종료 시 열려 있던 트랜잭션은 rollback된다. Flyway 최신 버전과 운영 health 200을 확인하기 전까지 배포 완료로 간주하지 않는다.
+
+## 2026-11-19 — OCI activation readiness helper 누락
+
+- **증상/근거**: Deploy OCI run `44353409918`은 승인된 JDBC snapshot 세션 PID `308675`를 특정 조건으로 종료하고 preflight를 통과했다. Flyway는 V173~V177을 적용해 schema를 V177로 올렸지만, service restart 이후 `/api/health` readiness 확인에서 `probe_stockman_health: command not found`가 반복되어 activation이 exit 127로 실패했다.
+- **근본 원인**: activation script의 readiness loop와 ERR handler가 각각 `probe_stockman_health` 및 `collect_service_diagnostics`를 호출했으나 두 함수 정의가 파일에 없었다. `scripts/test-oci-activation-preflight.mjs`는 이 계약을 검증하도록 작성되어 있었지만 `npm run deploy:verify`에서 실행되지 않아 clean CI에 누락됐다.
+- **영향 범위**: Flyway schema V177과 market-impact-events import는 성공했다. 새 release 경로 교체 뒤 오류 trap은 앱/예약 작업 start 명령을 실행했으나 readiness 함수 누락으로 실제 runtime health 결과는 확인되지 않았다. DB migration은 자동 rollback하지 않으며 이전 릴리스 경로가 `.previous`에 남는다.
+- **수정**: activation에 Node fetch 기반 localhost health probe와 실패 시 systemd/journal diagnostics 함수를 추가하고 `scripts/verify-deploy.mjs`의 fast gates에서 activation preflight regression test를 실행한다.
+- **재발 자동 감지**: 배포 전 regression test가 health probe inline Node syntax, readiness 성공/실패 동작, failure diagnostics 및 archive safety를 실행한다. `npm run deploy:verify`가 이를 항상 수행하도록 연결한다.
+- **검증/남은 위험**: activation regression suite와 `npm run deploy:verify`가 통과했다: 289 test files passed / 1 skipped, 1,645 tests passed / 3 skipped, typecheck, docs/API/migration/OCI cron gates, production build, standalone browser/API smoke. 재배포에서 운영 Flyway V177 유지, 새 app `/api/health` HTTP 200 및 세 scheduler timer active를 확인해야 완료다.

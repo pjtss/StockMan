@@ -34,7 +34,14 @@ try {
   mkdirSync(path.join(deployPath), { recursive: true });
   mkdirSync(path.join(stagedRelease, "scripts"), { recursive: true });
   writeFileSync(path.join(deployPath, "release-marker.txt"), "existing-release-preserved\n", "utf8");
-  for (const filename of ["oci-cron.sh", "cron-response-classifier.sh", "oci-fundamentals-cron.sh", "oci-rss-cron.sh"]) {
+  for (const filename of [
+    "oci-cron.sh",
+    "cron-response-classifier.sh",
+    "oci-fundamentals-cron.sh",
+    "oci-rss-cron.sh",
+    "oci-flyway-v168-preflight.mjs",
+    "terminate-approved-oci-snapshot-holders.mjs",
+  ]) {
     cpSync(path.resolve("scripts", filename), path.join(stagedRelease, "scripts", filename));
   }
   const archive = path.join(tempRootResolved, "release-missing-server.tar.gz");
@@ -136,7 +143,14 @@ try {
   mkdirSync(path.join(migrationlessRelease, "scripts"), { recursive: true });
   mkdirSync(path.join(migrationlessRelease, "deploy", "oci"), { recursive: true });
   writeFileSync(path.join(migrationlessRelease, "server.js"), "// test release\n", "utf8");
-  for (const filename of ["oci-cron.sh", "cron-response-classifier.sh", "oci-fundamentals-cron.sh", "oci-rss-cron.sh"]) {
+  for (const filename of [
+    "oci-cron.sh",
+    "cron-response-classifier.sh",
+    "oci-fundamentals-cron.sh",
+    "oci-rss-cron.sh",
+    "oci-flyway-v168-preflight.mjs",
+    "terminate-approved-oci-snapshot-holders.mjs",
+  ]) {
     cpSync(path.resolve("scripts", filename), path.join(migrationlessRelease, "scripts", filename));
   }
   for (const filename of [
@@ -235,7 +249,7 @@ try {
   if (healthProbeSyntax.status !== 0) throw new Error(`Inline Node health probe has invalid syntax: ${healthProbeSyntax.stderr}`);
   const diagnosticCapturePath = path.join(tempRootResolved, "activation-error-diagnostics.txt");
   const diagnosticHarness = path.join(tempRootResolved, "activation-error-harness.sh");
-  writeFileSync(diagnosticHarness, `set -Eeuo pipefail\nDIAGNOSTIC_CAPTURE='${shellPath(diagnosticCapturePath)}'\nsystemctl() { printf 'systemctl %s\\n' "$*" >> "$DIAGNOSTIC_CAPTURE"; }\njournalctl() { printf 'journalctl %s\\n' "$*" >> "$DIAGNOSTIC_CAPTURE"; }\n${diagnosticsFunction[0]}\n${errorHandler[0]}\ntrap on_error ERR\nstage="service-restart"\nfalse\n`, "utf8");
+  writeFileSync(diagnosticHarness, `set -Eeuo pipefail\nDIAGNOSTIC_CAPTURE='${shellPath(diagnosticCapturePath)}'\nSERVICES_QUIESCED=0\nsystemctl() { printf 'systemctl %s\\n' "$*" >> "$DIAGNOSTIC_CAPTURE"; }\njournalctl() { printf 'journalctl %s\\n' "$*" >> "$DIAGNOSTIC_CAPTURE"; }\n${diagnosticsFunction[0]}\n${errorHandler[0]}\ntrap on_error ERR\nstage="service-restart"\nfalse\n`, "utf8");
   const diagnosticResult = runBash(["-lc", `bash '${shellPath(diagnosticHarness)}'`]);
   const diagnosticOutput = `${diagnosticResult.stdout}\n${diagnosticResult.stderr}`;
   if (diagnosticResult.status !== 1 || !diagnosticOutput.includes("stockman-activate failed: stage=service-restart exit=1")) {
