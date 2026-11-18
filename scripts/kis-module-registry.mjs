@@ -23,7 +23,6 @@ export const kisModuleRegistry = {
   "kis-us-api.ts": "overseas-ranking",
   "kis-us-condition-search.ts": "overseas-condition-search",
   "kis-us-daily-price.ts": "overseas-daily-price",
-  "kis-us-debug.ts": "overseas-debug",
   "kis-us-market-cap.ts": "overseas-market-cap",
   "kis-us-minute-turnover.ts": "overseas-minute-turnover",
   "kis-us-price-detail.ts": "overseas-price-detail",

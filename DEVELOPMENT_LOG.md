@@ -9059,3 +9059,13 @@ runtime smoke test가 잔류 서버를 잘못 성공 처리하지 않고, 이번
 - **검증**: 최신 `origin/oci` 기준 `npm audit --omit=dev` 통과(취약점 0), 프로덕션 빌드 통과(라우트 목록에서 `/market-news` 및 `/api/market-news` 제외), standalone 런타임 smoke 통과(`/charts` 200 및 주요 API 검증, 브라우저 데스크톱/모바일 수화 확인), `npm run docs:check` 통과(105 route files, 공개 GET 45개, 문서 카탈로그 138개), `git diff --check` 통과. 실제 복사한 `node_modules` 환경에서 기본 병렬 설정의 `npm run deploy:verify`는 Vitest 워커가 과다 생성되어 9분간 출력 없이 대기해 중단했다. 원인을 분리해 `npx vitest run --maxWorkers=2 --reporter=verbose`로 재실행한 결과 274개 파일 통과, 1,483개 테스트 통과, 3개 skip(총 1,486개)을 확인했다.
 - **배포**: 커밋·푸시·배포하지 않음. 최신 원격 변경과 테스트 게이트 상태를 재확인한 뒤 진행해야 한다.
 - **남은 위험/다음 단계**: 이 Windows 환경에서 전체 Vitest 재실행 정체의 원인을 확인하고 전체 테스트가 완료되는지 재검증한다. 그 뒤 최신 `origin/oci`를 확인하고 사용자 요청 범위만 커밋·푸시하며, CI 및 운영 `/market-news`·`/api/market-news` 404를 확인한다.
+
+## [2026-11-18] 최신 OCI 기준 미사용 코드 정리 및 배포 검증
+- 목적/범위: 사용 승인에 따라 최신 `origin/oci` 기준으로 미사용 후보를 재검토하고 삭제·배포 게이트를 확인한다.
+- 검토 방법: 최신 checkout의 tracked TS/JS 소스 872개에서 상대경로·alias 정적 import, 재수출, 동적 import/require를 검사하고 관련 문서·스크립트 문자열 참조도 대조했다.
+- 남긴 후보: `lib/daily-candle-summary.mjs`와 테스트는 `scripts/sync-daily-cache-async.mjs`에서 사용되어 삭제하지 않았다. SEC risk API route는 없는 반면 저장소 문서가 구현 상태로 남아 있어, route/repository 비활성 상태와 유지되는 migration·DB 데이터·수동 스크립트를 두 설계 문서에 기록했다.
+- 삭제 묶음 한 줄 요약: 운영·진단·캐시(7)는 제품 코드 연결이 없는 테스트/진단 작업이고, RSS·번역(7)은 현행 파이프라인의 import 경로에서 벗어난 개별 helper이며, SEC(3)는 route 없는 구형 API 지원 코드이고, 공통·개인화(5)는 현재 호출자가 없는 helper다.
+- 변경: 위 기준으로 runtime 모듈 22개와 직접 전용 테스트 14개 삭제, `sec-ai-pipeline.test.ts`의 payload regression 유지 및 evaluator 전용 테스트 제거, KIS registry의 삭제 모듈 항목 정리, 관심종목 설계 경로를 `lib/user-watchlist.ts`로 정정했다.
+- 검증: 최신 `origin/oci`의 tracked TS/JS 872개에서 재현 가능한 정적 참조 검사 완료. `npm ci`는 lockfile 기준 설치 완료(197 packages); 전체 개발 의존성 감사는 high 7건을 보고하며 해당 picomatch 4.0.7 노드는 lockfile상 dev-only다. 프로젝트의 배포 검사인 운영 의존성 감사(`npm audit --omit=dev`)는 0건. 정리 적용 후 `npm.cmd run deploy:verify` 전체 통과: Next production build, standalone HTTP 및 Chrome 데스크톱·모바일 smoke, 260개 테스트 파일 통과/1 skip(1,423 tests pass/3 skip), typecheck, docs/API, verify-scope, KIS boundary, Bearer auth, OCI cron 검사.
+- 커밋·푸시·배포: 이번 정리 브랜치에 아직 수행하지 않았다.
+- 남은 위험/다음 단계: 정적 스캔은 런타임에서 조립하는 import 경로나 문서화되지 않은 외부 수동 호출을 완전히 증명하지 않는다. 개발 도구 의존성 picomatch는 upstream advisory가 high로 표시하지만 배포 운영 의존성에는 포함되지 않아 production audit 대상에서 제외된다. 커밋·푸시 후 OCI workflow 배포 완료와 운영 health를 확인한다.
