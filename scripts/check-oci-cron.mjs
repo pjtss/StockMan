@@ -442,14 +442,14 @@ if (!/^executeInTransaction=false\s*$/m.test(secMaterializerMigrationConfig)
   throw new Error("V170 must package the concurrent SEC materializer ordering index outside a Flyway transaction");
 }
 const kisRateLimitRepairMigration = migrationFiles.find(({ name }) => name === "V178__repair_kis_rate_limit_event_indexes.sql")?.sql ?? "";
-const kisRateLimitRepairConfig = fs.readFileSync(path.resolve("db/migration/V178__repair_kis_rate_limit_event_indexes.sql.conf"), "utf8");
-if (!/^executeInTransaction=false\s*$/m.test(kisRateLimitRepairConfig)
-  || (kisRateLimitRepairMigration.match(/DROP INDEX CONCURRENTLY IF EXISTS/g) ?? []).length !== 3
-  || (kisRateLimitRepairMigration.match(/CREATE INDEX CONCURRENTLY IF NOT EXISTS/g) ?? []).length !== 3
+if (fs.existsSync(path.resolve("db/migration/V178__repair_kis_rate_limit_event_indexes.sql.conf"))
+  || (kisRateLimitRepairMigration.match(/DROP INDEX IF EXISTS/g) ?? []).length !== 3
+  || (kisRateLimitRepairMigration.match(/CREATE INDEX IF NOT EXISTS/g) ?? []).length !== 3
+  || /INDEX CONCURRENTLY/i.test(kisRateLimitRepairMigration)
   || !kisRateLimitRepairMigration.includes("ON kis_rate_limit_events (occurred_at DESC)")
   || !kisRateLimitRepairMigration.includes("ON kis_rate_limit_events (endpoint, occurred_at DESC)")
   || !kisRateLimitRepairMigration.includes("ON kis_rate_limit_events (incident_id, occurred_at DESC)")) {
-  throw new Error("V178 must concurrently replace the three KIS rate-limit event indexes outside a Flyway transaction");
+  throw new Error("V178 must replace the three KIS rate-limit event indexes transactionally inside OCI's quiesced maintenance window");
 }
 const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
 const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");

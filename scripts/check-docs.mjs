@@ -5537,6 +5537,10 @@ const rssRetentionUsesConcurrentBuilds = rssRetentionMigrations.some(({ contents
 const rssRetentionHasNonTransactionalConfig = migrations
   .filter((fileName) => /^V(?:173|176)__.*\.sql$/i.test(fileName))
   .some((fileName) => existsSync(join(migrationDir, fileName.replace(/\.sql$/i, ".sql.conf"))));
+const kisRateLimitRepair = migrationSources.find(({ fileName }) => /^V178__/i.test(fileName))?.contents ?? "";
+const kisRateLimitRepairHasNonTransactionalConfig = migrations
+  .filter((fileName) => /^V178__.*\.sql$/i.test(fileName))
+  .some((fileName) => existsSync(join(migrationDir, fileName.replace(/\.sql$/i, ".sql.conf"))));
 const activationScriptSource = readFileSync(join(root, "deploy/oci/stockman-activate"), "utf8");
 const maintenanceWindowStarts = activationScriptSource.indexOf('stage="quiesce-services"');
 const migrationStageStarts = activationScriptSource.indexOf('stage="flyway-migrate"');
@@ -5546,6 +5550,11 @@ if (rssRetentionMigrations.some((migration) => !migration)
   || rssRetentionIndexCounts[1] !== 4
   || rssRetentionUsesConcurrentBuilds
   || rssRetentionHasNonTransactionalConfig
+  || !kisRateLimitRepair
+  || (kisRateLimitRepair.match(/DROP INDEX IF EXISTS/g) ?? []).length !== 3
+  || (kisRateLimitRepair.match(/CREATE INDEX IF NOT EXISTS/g) ?? []).length !== 3
+  || /INDEX CONCURRENTLY/i.test(kisRateLimitRepair)
+  || kisRateLimitRepairHasNonTransactionalConfig
   || maintenanceWindowStarts < 0
   || migrationStageStarts <= maintenanceWindowStarts
   || !activationScriptSource.includes("V173__market_rss_72h_retention_indexes.sql")

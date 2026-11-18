@@ -10,7 +10,7 @@ const indexNames = [...sql.matchAll(/CREATE\s+INDEX(?:\s+CONCURRENTLY)?\s+IF\s+N
   .map((match) => match[1]);
 const concurrentIndexNames = new Set([...sql.matchAll(/CREATE\s+INDEX\s+CONCURRENTLY\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z_][a-zA-Z0-9_]*)/gi)]
   .map((match) => match[1]));
-if (indexNames.length === 0) throw new Error("No concurrent indexes found in V168 migration");
+if (indexNames.length === 0) throw new Error("No index targets found in OCI index migrations");
 
 const client = new pg.Client({
   connectionString: process.env.DATABASE_URL,
