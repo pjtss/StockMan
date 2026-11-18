@@ -28,7 +28,10 @@
 - 해당 배포의 `/charts`와 `/api/health`는 HTTP 200이었다. KR 요청은 10개 결과와 봉 거래일/갱신시각 metadata를 반환했다. US 요청은 HTTP 200, 10개 결과였고 server timing 24.9초였다.
 - 후속 행 기반 복원은 commit `054b1c60`, OCI workflow #1324로 배포됐다. health와 `/charts`는 HTTP 200이었으나 broad US scan은 HTTP 504로 실패했다.
 - exchange 병렬 조회만으로는 broad US 요청의 60초 504가 해결되지 않았다. market-cap 상위 rank 사전 선택 변경은 전체 테스트 1,485개, production build, standalone `/charts`/11개 청크 및 API smoke, typecheck와 API/doc/KIS/auth/cron 게이트를 통과했다. `npm run measure:screener-db`는 `.env.local` localhost PostgreSQL `:5432` 연결 거부로 실행계획을 내지 못했다.
-- 배포 audit은 production 의존성에 대해 `npm audit --omit=dev --audit-level=moderate`를 gate로 실행한다. 전체 의존성 감사는 `npm run audit:dependencies:all`로 별도 유지하며, 현재 dev-only `picomatch@4.0.7` advisory 7 high를 보고한다. 수정판이 나오면 전체 트리를 재감사한다. OCI 배포 후 동일 cold US scan을 재측정한다.
+- market-cap 상위 rank 변경은 commit `008b98c112bc84a02741fccfe43923bd4bace8bf`, OCI workflow #1326 (run `44219391877`)로 배포됐다. Verify/package/upload/activate가 모두 성공했고, `/charts` 및 `/api/health`는 HTTP 200, health `ok`였다.
+- 동일 broad US payload의 배포 후 첫 요청은 HTTP 200, 10건, 전체 33,692ms / server timing 20,298ms였다. 기존 56,286ms cold 기준보다 약 40% 짧은 단일 관측이다. 뒤이은 두 cache MISS 요청은 각각 전체/server 3,609/1,617ms 및 1,509/1,000ms였으나 실행 캐시가 warm된 뒤이므로 cold 비교에 섞지 않는다. 세 결과 모두 AAPL이 첫 종목이었고 D candle date `20261117`, fetchedAt `2026-11-17T22:20:26.783Z`를 반환했다.
+- 운영 cold 표본은 한 건이므로 p95 또는 지속적인 개선으로 일반화하지 않는다. 로컬 DB `localhost:5432` 연결 거부로 `EXPLAIN (ANALYZE, BUFFERS)`는 얻지 못했다.
+- 배포 audit은 production 의존성에 대해 `npm audit --omit=dev --audit-level=moderate`를 gate로 실행한다. 전체 의존성 감사는 `npm run audit:dependencies:all`로 별도 유지하며, 현재 dev-only `picomatch@4.0.7` advisory 7 high를 보고한다. 수정판이 나오면 전체 트리를 재감사한다.
 
 ## 재발 감지와 다음 단계
 
@@ -37,4 +40,4 @@
 - 시총 외 조건 또는 EMA 조건이 있거나 OR 조건인 요청에는 후보 상위 rank 최적화를 적용하지 않는다. 시총 동률 rank를 모두 유지하고 다른 요청은 기존 전체 후보 평가 경로를 쓴다.
 - 다른 지표를 참조하는 시장가치 필터는 숫자 SQL 경계로 축약하지 않는다. 회귀 테스트에서 이 요청은 rank CTE 없이 전체 후보 SQL을 사용한다.
 - 성능 회귀가 계속되면 운영 read-only DB 접근이 가능한 환경에서 PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)`와 Node 계산 시간을 분리 계측한다. 현재 로컬 DB 미가용 상태가 남은 제한이다.
-- 개선 과제 ID `CI-2026-11-18-001`은 후속 배포 측정 전까지 `PARTIAL`로 둔다.
+- 개선 과제 ID `CI-2026-11-18-001`은 배포 및 HTTP 200 실측까지 완료했으나, cold 단일 표본과 실행계획 미확인으로 성능 판정은 `PARTIAL`로 둔다.
