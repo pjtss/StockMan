@@ -61,6 +61,7 @@
 - 국내 보통주 공시 이벤트 구조 설계(검토 중, 구현 승인 아님): [`architecture/kr-disclosure-event-architecture.md`](./architecture/kr-disclosure-event-architecture.md)
 - 공시 투자분석 gold-set sampling/adjudication protocol: [ixtures/disclosure/disclosure-investment-gold-set-protocol.v0.json](./fixtures/disclosure/disclosure-investment-gold-set-protocol.v0.json) — filing 단위 sample frame 안에서 event별 party/claim/instrument 분리와 mixed evidence 비합산 사례 DIGSP-01~12
 - 공시 기반 투자 기획의 우선순위·의사결정·문서 연결 인덱스: [`architecture/kr-disclosure-investment-planning-index.md`](./architecture/kr-disclosure-investment-planning-index.md)
+- 개인 투자 thesis journal 설계 및 합성 acceptance fixture: [`architecture/investment-thesis-journal-design.md`](./architecture/investment-thesis-journal-design.md) · [`fixtures/disclosure/investment-thesis-journal.v0.json`](./fixtures/disclosure/investment-thesis-journal.v0.json)
 - 정정·철회 전달·사용자 공시함 revision 및 투자 thesis 영향 전파 합성 fixture: [`fixtures/disclosure/correction-delivery-reconciliation.v0.json`](./fixtures/disclosure/correction-delivery-reconciliation.v0.json)
 - 공시 기반 투자 기능의 연속 기획 백로그와 승인 의존 순서: [`architecture/kr-disclosure-event-architecture.md#기획-개선-운영판--2026-11-04`](./architecture/kr-disclosure-event-architecture.md#기획-개선-운영판--2026-11-04)
 - 유상증자 계획·이행 follow-up DTO synthetic golden vector v0 (runtime acceptance 아님): [`fixtures/disclosure/follow-up-equity-raise.v0.json`](./fixtures/disclosure/follow-up-equity-raise.v0.json)

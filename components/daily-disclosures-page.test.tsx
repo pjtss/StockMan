@@ -66,8 +66,8 @@ describe("DailyDisclosuresPage recent-hour filter", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<DailyDisclosuresPage />);
 
-    await waitFor(() => expect(screen.getByText("3건 전체 조회 완료")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "미국 RSS 링크 복사" }));
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: "미국 RSS 원문 링크 복사" }));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe("https://example.com/us");
@@ -85,8 +85,8 @@ describe("DailyDisclosuresPage recent-hour filter", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<DailyDisclosuresPage />);
 
-    await waitFor(() => expect(screen.getByText("3건 전체 조회 완료")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "전체 링크 복사" }));
+    await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: "원문 링크 복사" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     expect(writeText.mock.calls[0][0]).toBe("https://example.com/story\nhttps://example.com/filing");
   });

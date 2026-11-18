@@ -1,3 +1,13 @@
+## 2026-11-18 차트 종목 추출 정상 응답이 화면 timeout으로 실패
+
+- **증상**: `/api/screener/run`의 해외 첫 스캔이 HTTP 200으로 약 56초 뒤 완료되지만 `/charts` 요청은 45초에 abort되어 사용자에게 timeout으로 표시될 수 있었다.
+- **근본 원인**: 클라이언트 deadline이 운영 cold 응답시간보다 짧았고, DB는 종목별 최대 65개 봉을 행 단위로 반환해 약 5,300종목 기준 최대 약 34만 행의 전송 및 Node 객체 구성을 유발했다. 전체 `Server-Timing`만 있어 DB/Node 세부 병목 비율은 미확인이다.
+- **영향 범위**: 직접 조건 추출 UI의 KR/US 요청. 운영에서 확인한 두 요청은 HTTP 200과 결과 봉의 거래일시·갱신시각 메타데이터를 반환했다. 세부 변경 및 배포 상태는 [`screener-performance.md`](operations/screener-performance.md)에 연결한다.
+- **해결 위치**: `components/ticker-chart-workbench.tsx` deadline을 90초로 조정한다. `lib/db-screener.ts`는 DB가 종목·봉 주기별 JSON 배열로 묶어 반환하고 같은 봉을 기존 계산 경로에 복원한다.
+- **재발 자동 감지**: `lib/db-screener-aggregated-rows.test.ts`가 종목 결과와 D/W 거래일·갱신시각 복원을 확인한다. 운영 성능 측정은 매번 신규 조건 fingerprint의 cold 요청을 기록하고 `server-timing`을 비교한다.
+- **검증 결과**: 변경 관련 3개 테스트 파일 11개 통과, 변경 모듈 격리 TypeScript 검사는 오류 0건이다. 전체 테스트는 304개 파일·1,700개 테스트 중 5개 파일·13개 테스트 실패(1 skip, 3 test skip)이며 daily-disclosures UI, automation-run, filing-sync, schema-health 및 kis-investor-flow 등 스크리너 외 오류다. 전체 TypeScript 검사는 오래된 `.next-*` 타입 파일과 여러 스크리너 외 소스 오류로 실패했다. production compile은 통과했으나 기존 `app/api/public/instrument-fundamentals/route.ts`의 `MARKET_CONFIGS` 누락에서 빌드가 중단됐다. PostgreSQL plan 및 standalone runtime은 미검증이다.
+- **남은 위험 및 다음 개선**: 캔들 행 집계는 DB의 읽기 수를 줄이지 않으며 JSON serialization 오버헤드가 있을 수 있다. 배포 전 필수 게이트가 아직 완료되지 않았다. 운영 cold 시간이 계속 높으면 `EXPLAIN ANALYZE` 및 DB 조회/Node 계산의 단계별 계측으로 다음 최적화를 정한다.
+
 ## 2026-11-04 미국 소형주 배치 SEC 날짜 후보와 accession 상태 불일치
 
 - **증상**: b09 validator에서 SEC 미래 날짜 후보의 이벤트/제외 판정 집합과 filing ledger의 SEC event accession 집합 불일치가 감지됐다. SEC 원문 수집기가 실패 건수를 배열로 반환했는데 generator가 숫자 0으로만 처리해 완료된 스캔을 불완전으로 오판했다.
@@ -107,14 +117,6 @@
 - **남은 위험**: 재시도 payload에 기존 포맷 외의 제목 형태가 저장된 경우 제목 줄을 인식하지 못할 수 있다. 현재 파이프라인이 만드는 굵게 표시한 제목 및 링크 제목 형식을 회귀 테스트로 고정한다.
 
 이 문서는 RSS 프로젝트에서 반복적으로 발생할 수 있는 오류와 확인 순서를 관리한다. 모든 진단은 실제 응답·로그·DB 상태를 기준으로 하며, 추정만으로 토큰이나 캐시를 삭제하지 않는다.
-
-## 2026-11-18 `/charts` US 종목 추출이 gateway 제한시간을 초과함
-
-- **증상 및 원인**: 운영 cold US scan의 과거 기준은 56.3초였다. UI 제한을 90초로 늘렸지만 nginx는 broad US 요청을 약 60초에 HTTP 504로 종료했다. 시총을 높인 선택 scan은 HTTP 200이었다. 로컬 PostgreSQL이 미가용이라 운영 query plan은 확인하지 못했다.
-- **수정 경로**: JSON_AGG 집계 변경은 운영 개선이 입증되지 않아 제거했다. broad US 요청을 NAS/NYS/AMS query로 나누어 병렬 실행해도 504가 이어졌다. 이에 조건이 시장가치만으로 구성되고 정렬도 시총 내림차순일 때는 각 exchange의 시총 상위 `limit` rank를 캔들 조회 전에 선택한다. 경계 동률은 모두 포함하고 partition 결과를 전역 정렬한다.
-- **영향과 위험**: 시총 이외 필터, EMA 조건, OR 조건, 숫자가 아닌 다른 지표 참조값은 기존 전체 후보 평가 경로를 그대로 쓴다. fast path는 exchange마다 제한된 후보를 읽으며, 병렬 query 3개가 DB 부하를 높일 수 있다. 운영 cold 표본 1건은 33.692초 HTTP 200이었지만 EXPLAIN은 확보하지 못했고 p95 개선을 확정할 수 없다.
-- **재발 자동 감지**: `lib/db-screener-aggregated-rows.test.ts`는 세 exchange query, 시총 rank 사전 선택, 전역 top-1 결과와 지표 참조형 필터가 사전 선별을 우회하는 것을 고정한다. 운영 검증은 cold fingerprint에서 HTTP 상태, server timing, 결과/메타데이터를 기록한다. 절차는 `docs/operations/screener-performance.md`에 둔다.
-- **검증/상태**: 병렬화 배포 `7c3cbb54` workflow #1325는 성공했지만 broad US 요청은 HTTP 504였다. 수정 commit `008b98c1` OCI workflow #1326 (run `44219391877`)은 검증·패키징·업로드·활성화 성공으로 완료됐다. 사후 `/charts`와 `/api/health`는 HTTP 200, health `ok`; 동일 broad US scan 첫 요청은 10건, HTTP 200, 33.692초였다. 후속 warm cache MISS 요청은 3.609초와 1.509초였으며 cold 표본과 분리한다. 테스트 1,486 passed/3 skipped, production build, standalone `/charts` 및 11개 JS chunk/API smoke, desktop/mobile Chrome hydration, typecheck와 구조 게이트를 통과했다. deploy gate는 운영 의존성 감사로 설정하고 전체 개발 의존성 감사는 `npm run audit:dependencies:all`로 계속 조회한다. dev-only `picomatch@4.0.7` advisory 전체 감사 7 high를 보고한다. DB EXPLAIN은 localhost:5432 연결 거부로 얻지 못해 성능 개선 정도는 확정하지 않는다.
 
 ## 공통 진단 원칙
 
@@ -896,3 +898,25 @@ npm test -- --run
 - **재발 자동 감지**: `lib/stockman-events-materializer.test.ts`는 쿼리 LIMIT/정렬 및 timeout/tag/client release를 확인한다. `scripts/check-oci-cron.mjs` 및 Deploy OCI tar assertion은 V170의 non-transactional concurrent index와 config 포함을 검사한다. 운영 진단은 SQL literal을 지운 query shape와 query id만 남긴다.
 - **검증/남은 위험**: OCI 배포 전 full `npm run deploy:verify` 및 V170 concurrent index 적용 필요. 마이그레이션은 다른 오래된 snapshot이 남아 있으면 fail-closed할 수 있다. 열린 세션은 자동 종료하지 않는다.
 - **공식 근거**: PostgreSQL 공식 [`CREATE INDEX` concurrent build](https://www.postgresql.org/docs/current/sql-createindex.html) 및 [`statement_timeout`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-STATEMENT-TIMEOUT) 문서.
+
+## 2026-11-18 Flyway split preflight 증거 경계
+
+- **목적/범위**: V85/V89 instrument-universe split migration 사전 점검이 관찰한 relation shape와 migration 적용 이력을 혼동하지 않도록 근거 경계를 기록한다.
+- **확인 대상**: `lib/flyway-history-audit.ts`의 `auditUniverseSplitPreconditions`, `scripts/audit-flyway-history.ts`의 `splitMigrationPreflight` 결과, 이 문서의 V85/V89 compatibility view 설명.
+- **판정**: `postMigrationShapePresent`는 현재 relation kind/presence가 migration 이후 모양과 같은지 관찰한다. `structuralPreconditionsPass`는 source table/view 형태에 대한 구조 조건만 판정한다. shape가 일치해도 history, row 내용, 필터 결과, 제약조건, 손실 위험은 증명되지 않는다. migration 이력·데이터 완전성·적용 여부를 별도 읽기 전용 증거로 확인해야 한다.
+- **재발 자동 감지**: `scripts/check-docs.mjs`는 audit helper, CLI 결과 필드 및 한계 문구가 코드·운영 문서에 함께 남아 있는지 검사한다. `npm run audit:flyway-local` 결과는 연결된 데이터베이스의 실제 상태로만 해석한다.
+- **커밋·푸시·배포**: 이 문서 갱신을 포함해 현재 작업의 배포는 미완료다.
+## PostgreSQL Flyway concurrent index migration 대기
+
+- **증상/근거**: Flyway migration 168의 `CREATE INDEX CONCURRENTLY` 진행 중 Flyway JDBC session이 `idle in transaction` 상태로 남고, index session이 해당 virtual transaction을 기다려 migration이 완료되지 않았다.
+- **근본 원인**: Flyway PostgreSQL 기본 transactional advisory lock이 non-transactional concurrent index 실행과 대기 교착을 만들었다. Redgate 공식 설정은 이 경우 session-level lock을 위해 `flyway.postgresql.transactional.lock=false`를 지정하도록 안내한다.
+- **수정**: OCI activation의 Flyway migrate 컨테이너에 `FLYWAY_POSTGRESQL_TRANSACTIONAL_LOCK=false` 환경변수를 전달한다. `scripts/check-oci-cron.mjs`가 이 설정의 잔존을 검사한다.
+- **재발 자동 감지**: OCI cron/activation 회귀 테스트는 설정 누락 시 실패한다. 새 격리 PostgreSQL 16 DB에서 Flyway 13.3.0을 사용해 전체 177개 migration 적용과 `/api/health` readiness를 확인한다.
+- **검증/남은 위험**: 기본 설정으로 migration 168에서 실제 wait chain을 재현했고, 설정 적용 후 새 검증 DB가 V177까지 완료됐다. 사용자 기존 volume은 migration하지 않았다. 로컬 기존 DB는 V161이며 read-only migration audit에서 일부 pending index target이 없어 바로 승격하지 않았으므로 이 DB의 스키마는 여전히 최신 애플리케이션 런타임 기준과 다르다.
+
+## schema-health descending index order 오진
+
+- **증상/근거**: 정상적으로 생성된 3개 `kis_rate_limit_events` 인덱스가 실제 PostgreSQL definition에 `DESC`를 포함했지만 schema-health query가 컬럼 이름만 비교해 모두 `wrong_columns`로 표시하고 health를 503으로 낮췄다.
+- **근본 원인/수정**: `pg_get_indexdef(index, column, false)` 결과에 정렬 방향이 포함되지 않았다. 검사 query가 `pg_index.indoption`의 DESC bit를 반영해 내림차순 키를 비교하도록 변경했다.
+- **재발 자동 감지**: `lib/schema-health.test.ts`에서 query의 descending order 비교 생성을 검증하며 operational schema integrity 검사에서 실제 인덱스 방향을 확인한다.
+- **검증/남은 위험**: 변경 후 격리 DB에서 `schemaReady=true`, index issues 0개, `/api/health` HTTP 200을 확인했다. 사용 중인 기존 DB에서 인덱스 자체가 누락/잘못 생성된 경우에는 이 코드 변경만으로 해결되지 않는다.

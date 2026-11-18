@@ -348,6 +348,17 @@
         "description": "인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 app/api/disclosures/route.ts의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.",
         "parameters": [
           {
+            "name": "asOf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "UTC 기준 조회 시각."
+            },
+            "description": "UTC 기준 조회 시각."
+          },
+          {
             "name": "date",
             "in": "query",
             "required": false,
@@ -405,6 +416,17 @@
             "description": "limit 별칭."
           },
           {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "제목·요약·본문 발췌·회사명·티커·접수번호 검색어."
+            },
+            "description": "제목·요약·본문 발췌·회사명·티커·접수번호 검색어."
+          },
+          {
             "name": "source",
             "in": "query",
             "required": false,
@@ -445,7 +467,7 @@
                       "type": "string"
                     },
                     "sort": {
-                      "const": "publishedAt_desc"
+                      "const": "timestamp_precision_group_desc"
                     },
                     "page": {
                       "type": [
@@ -503,7 +525,29 @@
                             "type": "string",
                             "enum": [
                               "FULL",
+                              "EXCERPT",
                               "METADATA_ONLY"
+                            ]
+                          },
+                          "sourceSnapshotId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "fetchedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time",
+                            "description": "Verified source response fetch time; null when no linked fetch snapshot exists."
+                          },
+                          "filedAtPrecision": {
+                            "type": "string",
+                            "enum": [
+                              "DATE",
+                              "UNKNOWN"
                             ]
                           }
                         }
@@ -514,8 +558,158 @@
                     },
                     "hasMore": {
                       "type": "boolean"
+                    },
+                    "queryStatus": {
+                      "type": "string",
+                      "enum": [
+                        "DB_QUERY_COMPLETE",
+                        "NO_MATCHING_STORED_ROWS"
+                      ]
+                    },
+                    "sourceCoverage": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "source": {
+                            "type": "string"
+                          },
+                          "sourceClass": {
+                            "type": "string"
+                          },
+                          "configuredState": {
+                            "type": "string"
+                          },
+                          "latestAttempt": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "runId": {
+                                "type": "string"
+                              },
+                              "fetchState": {
+                                "type": "string"
+                              },
+                              "persistState": {
+                                "type": "string"
+                              },
+                              "fetchedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date-time",
+                                "description": "Source response fetch time from the feed adapter."
+                              },
+                              "observedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date-time"
+                              },
+                              "itemCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "rawItemCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "deduplicatedItemCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "upsertAffectedRowCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "snapshotStored": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "pageCount": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "failureCode": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            }
+                          },
+                          "lastSuccessfulPersistAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date-time"
+                          },
+                          "rangeCoverage": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "displayTimezone": {
+                      "const": "Asia/Seoul"
+                    },
+                    "queryWindow": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "from",
+                        "to"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "to": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "endExclusive": {
+                          "const": true
+                        }
+                      }
+                    },
+                    "sortTieBreak": {
+                      "const": "source_externalId_asc"
                     }
-                  }
+                  },
+                  "required": [
+                    "ok",
+                    "queryStatus",
+                    "sourceCoverage",
+                    "date",
+                    "displayTimezone",
+                    "queryWindow",
+                    "items",
+                    "total",
+                    "hasMore"
+                  ]
                 }
               }
             }
@@ -4208,6 +4402,16 @@
               "description": "쉼표 구분 최대 100개 코드."
             },
             "description": "쉼표 구분 최대 100개 코드."
+          },
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
+            },
+            "description": "요청 query parameter. 허용값과 기본값은 구현 파일을 확인하세요."
           },
           {
             "name": "market",

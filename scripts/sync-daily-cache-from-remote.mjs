@@ -272,15 +272,12 @@ async function syncMarket(kind, universeTable) {
       if (!fundamentalsResponse.ok) throw new Error(`운영 기본정보 API 실패: ${fundamentalsResponse.status} ${market}`);
       const fundamentalsPayload = await fundamentalsResponse.json();
       if (!fundamentalsPayload.ok || !Array.isArray(fundamentalsPayload.items)) throw new Error(`운영 기본정보 API 응답 형식 오류: ${market}`);
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-        for (const item of payload.items) for (const candle of item.candles ?? []) {
-          await client.query(`INSERT INTO ${table} (market, code, timeframe, candle_date, open, high, low, close, volume, source, fetched_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'OPERATING_DB_CACHE',NOW())
-            ON CONFLICT (market, code, timeframe, candle_date) DO UPDATE SET open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, close=EXCLUDED.close, volume=EXCLUDED.volume, source=EXCLUDED.source, fetched_at=EXCLUDED.fetched_at`,
-            [market, item.code, timeframe, candle.date, candle.open, candle.high, candle.low, candle.close, candle.volume]);
-          saved += 1;
+      const requestedFundamentalCodes = new Map(codes.map((code) => [String(code).trim().toUpperCase(), code]));
+      const returnedFundamentalCodes = new Set();
+      const fundamentalNumericFields = ["price", "changeRate", "open", "high", "low", "volume", "tradingValue", "marketCap", "listedShares"];
+      for (const item of fundamentalsPayload.items) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          throw new Error(`원격 기본정보 종목 응답 오류: market=${market} code=missing`);
         }
         const code = String(item.code ?? "").trim().toUpperCase();
         const itemMarket = String(item.market ?? "").trim().toUpperCase();

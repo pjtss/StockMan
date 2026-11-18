@@ -3,6 +3,21 @@ import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+const KR_COMMON_STOCK_ELIGIBILITY = "u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etp=false AND u.is_warrant=false AND u.is_preferred=false";
+const US_COMMON_STOCK_ELIGIBILITY = "u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false";
+const MARKET_CONFIGS: Record<string, { markets: string[]; universeTable: string; stockEligibility: string }> = {
+  KR: { markets: ["KOSPI", "KOSDAQ"], universeTable: "kr_common_stock_universe", stockEligibility: KR_COMMON_STOCK_ELIGIBILITY },
+  KOSPI: { markets: ["KOSPI"], universeTable: "kr_common_stock_universe", stockEligibility: KR_COMMON_STOCK_ELIGIBILITY },
+  KOSDAQ: { markets: ["KOSDAQ"], universeTable: "kr_common_stock_universe", stockEligibility: KR_COMMON_STOCK_ELIGIBILITY },
+  US: { markets: ["NAS", "NYS", "AMS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+  NAS: { markets: ["NAS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+  NASDAQ: { markets: ["NAS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+  NYS: { markets: ["NYS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+  NYSE: { markets: ["NYS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+  AMS: { markets: ["AMS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+  AMEX: { markets: ["AMS"], universeTable: "us_common_stock_universe", stockEligibility: US_COMMON_STOCK_ELIGIBILITY },
+};
+
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const market = (params.get("market") ?? "").trim().toUpperCase();

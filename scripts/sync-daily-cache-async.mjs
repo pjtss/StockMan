@@ -147,8 +147,16 @@ if ((marketCapUnder !== null || marketCapOver !== null) && ([marketCapUnder, mar
 if (marketCapUnder !== null && marketCapOver !== null && marketCapOver >= marketCapUnder) throw new Error("--market-cap-over는 --market-cap-under보다 작아야 합니다.");
 if (usMarketCapUnder !== null && (!Number.isFinite(usMarketCapUnder) || usMarketCapUnder <= 0 || marketArg !== "US" || timeframe !== "D")) throw new Error("--us-market-cap-under는 양수이며 --market=US --timeframe=D와 함께 사용해야 합니다.");
 
-const pool = new Pool({ connectionString: process.env.LOCAL_DATABASE_URL });
-const apiBase = new URL("/api/public/daily-candles", process.env.DAILY_CACHE_API_URL);
+const databaseConnectionTimeoutMs = 10_000;
+const pool = new Pool({ connectionString: process.env.LOCAL_DATABASE_URL, connectionTimeoutMillis: databaseConnectionTimeoutMs });
+let poolBackgroundErrorCount = 0;
+let firstPoolBackgroundError = null;
+pool.on("error", (error) => {
+  poolBackgroundErrorCount++;
+  if (firstPoolBackgroundError === null) firstPoolBackgroundError = summarizeRuntimeError(error);
+  console.error(`[async-sync] database pool background error: ${formatRuntimeError(error)}`);
+});
+const apiBase = new URL("/api/public/daily-candles", validatedDailyCacheApiBaseUrl);
 
 async function fetchJson(url) {
   const startedAt = performance.now();

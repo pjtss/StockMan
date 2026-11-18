@@ -126,8 +126,10 @@ function queryParameters(source, path) {
     "/api/dart/history": { company: { type: "string", minLength: 1, maxLength: 200, required: true } },
     "/api/disclosures": {
       date: { type: "string", format: "date", description: "hours 생략 시 서울 날짜 범위." },
+      asOf: { type: "string", format: "date-time", description: "UTC 기준 조회 시각." },
       hours: { type: "integer", minimum: 1, maximum: 24, description: "지정하면 date 대신 최근 시간 범위." },
       source: { type: "string", default: "ALL", description: "ALL, RSS, STOCKTITAN, NASDAQ, NASDAQ_TRADER, GLOBENEWSWIRE, SEC_EDGAR, KRX_KIND, NEWSIS, MK, HANKYUNG, ETODAY, DART, SEC." },
+      q: { type: "string", maxLength: 120, description: "제목·요약·본문 발췌·회사명·티커·접수번호 검색어." },
       page: { type: "integer", minimum: 1, default: 1 },
       pageSize: { type: "integer", minimum: 1, maximum: 500, description: "limit 별칭." },
       limit: { type: "integer", minimum: 1, maximum: 500, description: "pageSize 별칭." },
@@ -266,6 +268,41 @@ function responseSchema(path) {
       } } },
     },
   };
+  if (path === "/api/disclosures") {
+    const current = schemas[path];
+    schemas[path] = {
+      ...current,
+      required: ["ok", "queryStatus", "sourceCoverage", "date", "displayTimezone", "queryWindow", "items", "total", "hasMore"],
+      properties: {
+        ...current.properties,
+        queryStatus: { type: "string", enum: ["DB_QUERY_COMPLETE", "NO_MATCHING_STORED_ROWS"] },
+        sourceCoverage: { type: "array", items: { type: "object", additionalProperties: true, properties: {
+          source: { type: "string" }, sourceClass: { type: "string" }, configuredState: { type: "string" },
+          latestAttempt: { type: ["object", "null"], properties: {
+            runId: { type: "string" }, fetchState: { type: "string" }, persistState: { type: "string" },
+            fetchedAt: { type: ["string", "null"], format: "date-time", description: "Source response fetch time from the feed adapter." },
+            observedAt: { type: ["string", "null"], format: "date-time" }, itemCount: { type: ["integer", "null"] },
+            rawItemCount: { type: ["integer", "null"] }, deduplicatedItemCount: { type: ["integer", "null"] },
+            upsertAffectedRowCount: { type: ["integer", "null"] }, snapshotStored: { type: ["boolean", "null"] },
+            pageCount: { type: ["integer", "null"] }, failureCode: { type: ["string", "null"] },
+          } },
+          lastSuccessfulPersistAt: { type: ["string", "null"], format: "date-time" }, rangeCoverage: { type: "string" },
+        } } },
+        displayTimezone: { const: "Asia/Seoul" },
+        queryWindow: { type: "object", required: ["kind", "from", "to"], properties: {
+          kind: { type: "string" }, from: { type: "string", format: "date-time" }, to: { type: "string", format: "date-time" }, endExclusive: { const: true },
+        } },
+        items: { type: "array", items: { type: "object", additionalProperties: true, properties: {
+          ...current.properties.items.items.properties,
+          sourceSnapshotId: { type: ["string", "null"] },
+          fetchedAt: { type: ["string", "null"], format: "date-time", description: "Verified source response fetch time; null when no linked fetch snapshot exists." },
+          filedAtPrecision: { type: "string", enum: ["DATE", "UNKNOWN"] },
+          contentStatus: { type: "string", enum: ["FULL", "EXCERPT", "METADATA_ONLY"] },
+        } } },
+        sort: { const: "timestamp_precision_group_desc" }, sortTieBreak: { const: "source_externalId_asc" },
+      },
+    };
+  }
   return schemas[path] ?? generic;
 }
 
@@ -395,10 +432,14 @@ if (mode === "write") {
     mkdir(join(root, "public"), { recursive: true }),
   ]);
   const openApiOutput = await makeOpenApi(routes);
-  await Promise.all([
-    writeFile(inventoryPath, `${JSON.stringify({ generatedFrom: "app/api/**/route.ts", routes }, null, 2)}\n`, "utf8"),
-    writeFile(openApiPath, `${JSON.stringify(openApiOutput, null, 2)}\n`, "utf8"),
-  ]);
+  for (const [path, content] of [
+    [inventoryPath, `${JSON.stringify({ generatedFrom: "app/api/**/route.ts", routes }, null, 2)}\n`],
+    [openApiPath, `${JSON.stringify(openApiOutput, null, 2)}\n`],
+  ]) {
+    let current = null;
+    try { current = await readFile(path, "utf8"); } catch {}
+    if (current !== content) await writeFile(path, content, "utf8");
+  }
   console.log(`Wrote ${routes.length} API routes and ${Object.keys(openApiOutput.paths).length} public GET operations.`);
   process.exit(0);
 }

@@ -1,4 +1,4 @@
-import { finishAutomationRun, startAutomationRun, type AutomationRunDimensions } from "@/lib/automation-run-repository";
+import { finishAutomationRun, recordSkippedAutomationRun, startAutomationRun, type AutomationRunDimensions } from "@/lib/automation-run-repository";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { describeError } from "@/lib/error-diagnostics";
 import { readRequestTrace } from "@/lib/request-trace";
@@ -9,6 +9,14 @@ import { withAutomationLock } from "@/lib/automation-lock";
 const SUMMARY_MAX_DEPTH = 4;
 const SUMMARY_MAX_STRING_LENGTH = 2_000;
 const SUMMARY_MAX_ARRAY_SAMPLE = 3;
+
+function truncateSummaryString(value: string) {
+  if (value.length <= SUMMARY_MAX_STRING_LENGTH) return value;
+  let end = SUMMARY_MAX_STRING_LENGTH;
+  const lastCodeUnit = value.charCodeAt(end - 1);
+  if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
+  return `${value.slice(0, end)}…`;
+}
 
 /** Keep automation_runs useful for diagnosis without persisting full scanner payloads. */
 export function compactAutomationSummary(value: unknown, depth = 0, key = ""): unknown {

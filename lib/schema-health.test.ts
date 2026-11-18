@@ -44,14 +44,6 @@ describe("schema-health", () => {
       async query(text: string, values?: unknown[]) {
         calls.push({ text, values });
         if (text === "SELECT 1") return { rows: [{ "?column?": 1 }] };
-        if (text.includes("FROM information_schema.tables")) {
-          if (text.includes("table_type = 'VIEW'")) return { rows: OPERATIONAL_SCHEMA_VIEWS.map((table_name) => ({ table_name })) };
-          if (text.includes("table_type = 'BASE TABLE'")) {
-            const requiredTables = values?.[0] as string[];
-            return { rows: requiredTables.filter((table) => !RETIRED_SCHEMA_TABLES.includes(table as typeof RETIRED_SCHEMA_TABLES[number])).map((table_name) => ({ table_name })) };
-          }
-          return { rows: [] };
-        }
         if (text.includes("FROM information_schema.columns")) {
           const required = REQUIRED_OPERATIONAL_COLUMNS.map(([table_name, column_name]) => ({ table_name, column_name, data_type: "text", is_nullable: "YES", column_default: null }));
           const eventShapes = KIS_RATE_LIMIT_EVENT_COLUMN_SHAPES.map(([column_name, data_type, is_nullable, hasDefault]) => ({
@@ -62,6 +54,14 @@ describe("schema-health", () => {
             column_default: hasDefault ? "nextval('kis_rate_limit_events_id_seq'::regclass)" : null,
           }));
           return { rows: [...required, ...eventShapes] };
+        }
+        if (text.startsWith("SELECT table_name FROM information_schema.tables")) {
+          if (text.includes("table_type = 'VIEW'")) return { rows: OPERATIONAL_SCHEMA_VIEWS.map((table_name) => ({ table_name })) };
+          if (text.includes("table_type = 'BASE TABLE'")) {
+            const requiredTables = values?.[0] as string[];
+            return { rows: requiredTables.filter((table) => !RETIRED_SCHEMA_TABLES.includes(table as typeof RETIRED_SCHEMA_TABLES[number])).map((table_name) => ({ table_name })) };
+          }
+          return { rows: [] };
         }
         if (text.includes("SELECT required.table_name, required.column_name")) return { rows: [] };
         if (text.includes("SELECT index_integrity.*")) return { rows: [] };

@@ -179,9 +179,15 @@ if (mode === "write") {
     const relativePath = document.sourcePath.replace(/^docs[\\/]/, "");
     const target = join(manualsRoot, relativePath);
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, await readFile(join(root, document.sourcePath), "utf8"), "utf8");
+    const content = await readFile(join(root, document.sourcePath), "utf8");
+    let existingContent = null;
+    try { existingContent = await readFile(target, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    if (existingContent !== content) await writeFile(target, content, "utf8");
   }
-  await writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
+  const catalogContent = `${JSON.stringify(catalog, null, 2)}\n`;
+  let existingCatalogContent = null;
+  try { existingCatalogContent = await readFile(catalogPath, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  if (existingCatalogContent !== catalogContent) await writeFile(catalogPath, catalogContent, "utf8");
   console.log(`Wrote ${catalog.documents.length} documents across ${catalog.categories.length} categories and published them under public/manuals/.`);
   process.exit(0);
 }

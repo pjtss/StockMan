@@ -49,7 +49,7 @@ describe("GET /api/public/daily-candles market aliases", () => {
     }));
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body.candles).toEqual([{ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100, fetchedAt: "2026-10-14T01:00:00.000Z" }]);
+    expect(body.candles).toEqual([{ date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100, tradingValue: 1100, fetchedAt: "2026-10-14T01:00:00.000Z" }]);
     expect(body.metadata.returnedCount).toBe(1);
     expect(body.instrument).toEqual({ market: "NAS", code: "AAPL", name: "Apple Inc." });
     expect(body.metadata.dataUpdatedAt).toBe("2026-10-14T01:00:00.000Z");

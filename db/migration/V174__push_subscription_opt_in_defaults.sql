@@ -1,0 +1,5 @@
+ALTER TABLE push_subscriptions
+  ALTER COLUMN enabled SET DEFAULT FALSE,
+  ALTER COLUMN dart_enabled SET DEFAULT FALSE,
+  ALTER COLUMN intensity_enabled SET DEFAULT FALSE,
+  ALTER COLUMN rising_enabled SET DEFAULT FALSE;

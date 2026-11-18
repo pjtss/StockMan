@@ -10,6 +10,14 @@ SEC/DART 등 공시를 Codex가 직접 분석해 주가에 영향을 줄 가능�
 
 ## JSON 계약 v1
 
+## v1 수정 이력 한계와 revision-capable 전환 제안
+
+현재 v1은 동일 `eventId`를 다시 적재할 때 현재 JSON/DB 행을 덮어쓴다. 따라서 API의 `asOf`는 응답 생성 시각일 뿐이며, 과거 event payload를 재현하는 기준이 아니다. JSON에서 빠진 행은 취소로 해석하지 않고, Git에서 추적 가능한 과거 JSON은 그 파일의 출처 시점만 증명하며 실제 관측·승인 시점을 소급해서 증명하지 않는다.
+
+revision-capable 전환은 `eventRevisionId`와 불변 revision ordinal, 원문 snapshot hash, 분석 revision, content hash, 관측 시각, 승인 상태, publication generation을 추가하는 별도 제안이다. 전환 중 출처를 확인할 수 없는 기존 행은 `LEGACY_CURRENT_STATE_ONLY`로 남기며, 과거 revision이라고 가장하거나 추정 생성하지 않는다. shadow parity 불일치나 미승인·철회된 권리는 새 revision 공개를 막는다. 기존 v1 route는 현재 계약을 유지하고 외부 consumer inventory 확인 전에는 retirement하지 않는다. 사용자 note는 명시적으로 선택한 revision에만 pin한다.
+
+합성 acceptance 벡터는 [`legacy-event-revision-transition.v0.json`](../fixtures/disclosure/legacy-event-revision-transition.v0.json)의 LER-01–LER-10이며, 구현·승인된 운영 기능을 뜻하지 않는다.
+
 ## 종목·공시별 검토 원장 운영 규칙
 
 미국 소형주 이벤트 조사에서 세 파일은 서로 다른 책임을 갖는다.

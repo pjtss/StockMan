@@ -11,7 +11,7 @@ import { enqueueDiscordDelivery } from "./discord-delivery-queue";
 import { buildMarketRssQueueEnqueueFailureState, createDiscordHttpError, isRetryableDiscordError, marketRssDeliveryExternalId, withDiscordWaitParameter } from "./discord-delivery-policy";
 import { archiveMarketRssFeed } from "./source-payload-archive";
 import { dedupeMarketRssItems } from "./market-rss-dedupe";
-import { buildMarketRssTranslationRetryCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
+import { buildMarketRssTranslationCandidateCondition, buildMarketRssTranslationRetryCondition, getMarketRssTranslationRetryCriteria, makeMarketRssTranslationFailureFallback } from "./market-rss-translation-retry";
 import { buildMarketRssTranslationPersistence } from "./market-rss-translation-persistence";
 import { buildMarketRssDiscordNotificationPayload } from "./market-rss-notification-message";
 import { deliverMarketRssDiscordNotification } from "./market-rss-notification-delivery";

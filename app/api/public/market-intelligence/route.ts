@@ -3,6 +3,8 @@ import { getPool } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
+const FUNDAMENTAL_FRESHNESS_SECONDS = 24 * 60 * 60;
+
 function isoDate(value: string | null) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);

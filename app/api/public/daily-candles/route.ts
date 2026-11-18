@@ -5,12 +5,12 @@ import { isValidCompactCalendarDate } from "@/lib/calendar-date-quality.mjs";
 
 export const dynamic = "force-dynamic";
 
-type DailyCandle = { date: string; open: number; high: number; low: number; close: number; volume: number };
+type DailyCandle = { date: string; open: number; high: number; low: number; close: number; volume: number; tradingValue: number };
 
 function validDailyCandle(candle: DailyCandle) {
   const date = String(candle.date ?? "");
   return isValidCompactCalendarDate(date)
-    && [candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+    && [candle.open, candle.high, candle.low, candle.close, candle.volume, candle.tradingValue].every(Number.isFinite)
     && Math.min(candle.open, candle.high, candle.low, candle.close) > 0
     && candle.volume >= 0
     && candle.high >= Math.max(candle.open, candle.low, candle.close)
@@ -59,13 +59,13 @@ export async function GET(request: Request) {
     if (codes.length > 0) {
       const result = await getPool().query(`
         SELECT u.market, requested.code, u.name, cached.candle_date, cached.open, cached.high,
-               cached.low, cached.close, cached.volume, cached.fetched_at
+               cached.low, cached.close, cached.volume, cached.trading_value, cached.fetched_at
           FROM unnest($2::text[]) AS requested(code)
           JOIN ${universeTable} u ON u.code=requested.code AND ${marketPredicate} AND ${stockEligibility}
           CROSS JOIN LATERAL (
-            SELECT candle_date, open, high, low, close, volume, fetched_at
+            SELECT candle_date, open, high, low, close, volume, trading_value, fetched_at
               FROM (
-                SELECT c.market, c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.fetched_at,
+                SELECT c.market, c.candle_date, c.open, c.high, c.low, c.close, c.volume, COALESCE(c.trading_value, c.close * c.volume) AS trading_value, c.fetched_at,
                        ROW_NUMBER() OVER (PARTITION BY c.candle_date ORDER BY c.fetched_at DESC) AS rn
                   FROM ${table} c
                  WHERE c.market=u.market AND c.code = requested.code AND c.timeframe = $3
@@ -78,13 +78,13 @@ export async function GET(request: Request) {
          ORDER BY requested.code, cached.candle_date DESC`,
         [market, codes, timeframe, limit],
       );
-      const grouped = new Map<string, { market: string; code: string; name: string; candles: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number; fetchedAt: string }> }>();
+      const grouped = new Map<string, { market: string; code: string; name: string; candles: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number; tradingValue: number; fetchedAt: string }> }>();
       for (const row of result.rows as Array<Record<string, unknown>>) {
         const itemCode = String(row.code);
         const itemMarket = String(row.market);
         const key = `${itemMarket}:${itemCode}`;
         const item = grouped.get(key) ?? { market: itemMarket, code: itemCode, name: String(row.name ?? ""), candles: [] };
-        const candle = { date: String(row.candle_date), open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume) };
+        const candle = { date: String(row.candle_date), open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume), tradingValue: Number(row.trading_value ?? Number(row.close) * Number(row.volume)) };
         if (validDailyCandle(candle) && row.fetched_at) item.candles.push({ ...candle, fetchedAt: new Date(row.fetched_at as string | Date).toISOString() });
         grouped.set(key, item);
       }
@@ -104,14 +104,15 @@ export async function GET(request: Request) {
       low: string | number | null;
       close: string | number | null;
       volume: string | number | null;
+      trading_value: string | number | null;
       fetched_at: Date | string | null;
     }>(
-      `SELECT u.market, u.name, latest.candle_date, latest.open, latest.high, latest.low, latest.close, latest.volume, latest.fetched_at
+      `SELECT u.market, u.name, latest.candle_date, latest.open, latest.high, latest.low, latest.close, latest.volume, latest.trading_value, latest.fetched_at
          FROM ${universeTable} u
          LEFT JOIN LATERAL (
-           SELECT candle_date, open, high, low, close, volume, fetched_at
+           SELECT candle_date, open, high, low, close, volume, COALESCE(trading_value, close * volume) AS trading_value, fetched_at
              FROM (
-           SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.fetched_at,
+           SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.trading_value, c.fetched_at,
                   ROW_NUMBER() OVER (PARTITION BY c.candle_date ORDER BY c.fetched_at DESC) AS rn
              FROM ${table} c
             WHERE c.market=u.market AND c.code = u.code AND c.timeframe = $3
@@ -138,6 +139,7 @@ export async function GET(request: Request) {
       low: Number(row.low),
       close: Number(row.close),
       volume: Number(row.volume),
+      tradingValue: Number(row.trading_value ?? Number(row.close) * Number(row.volume)),
       fetchedAt: row.fetched_at ? new Date(row.fetched_at).toISOString() : null,
     })).filter(validDailyCandle).reverse();
     const fetchedAt = result.rows.reduce<string | null>((latest, row) => {

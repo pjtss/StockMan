@@ -15,6 +15,28 @@ export function screenerMarketCapFreshnessPredicate(isUs: boolean) {
   return isUs ? "" : "AND f.currency = 'KRW' AND f.fetched_at >= NOW() - INTERVAL '24 hours' AND f.fetched_at <= NOW()";
 }
 
+type InstrumentDailyLatestCteOptions = {
+  asOf: boolean;
+  universeTable: string;
+  candleTable: string;
+  latestSummaryTable: string;
+};
+
+export function buildInstrumentDailyLatestCtes({ asOf, universeTable, candleTable, latestSummaryTable }: InstrumentDailyLatestCteOptions) {
+  if (!/^(kr|us)_common_stock_universe$/.test(universeTable)
+    || !/^(kr|us)_instrument_universe_candles$/.test(candleTable)
+    || !/^(kr|us)_latest_daily_candles$/.test(latestSummaryTable)
+    || universeTable.slice(0, 2) !== candleTable.slice(0, 2)
+    || universeTable.slice(0, 2) !== latestSummaryTable.slice(0, 2)) {
+    throw new Error("INVALID_DAILY_LATEST_TABLE");
+  }
+  const valid = (alias: string) => `CASE WHEN ${alias}.candle_date ~ '^[0-9]{8}$' THEN ${alias}.open > 0 AND ${alias}.high > 0 AND ${alias}.low > 0 AND ${alias}.close > 0 AND ${alias}.volume >= 0 AND ${alias}.high >= GREATEST(${alias}.open, ${alias}.low, ${alias}.close) AND ${alias}.low <= LEAST(${alias}.open, ${alias}.high, ${alias}.close) ELSE FALSE END`;
+  if (asOf) {
+    return `instrument_daily_latest AS (SELECT u.market,u.code,latest.candle_date FROM ${universeTable} u JOIN LATERAL (SELECT c.candle_date FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe='D' AND ${valid("c")} AND c.candle_date <= $2 ORDER BY c.candle_date DESC LIMIT 1) latest ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1)), market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market)`;
+  }
+  return `market_latest AS (SELECT l.market, MAX(l.candle_date) AS candle_date FROM ${latestSummaryTable} l WHERE ${valid("l")} AND l.market=ANY($1) GROUP BY l.market), instrument_daily_latest AS (SELECT l.market,l.code,l.candle_date FROM ${latestSummaryTable} l WHERE ${valid("l")} AND l.market=ANY($1))`;
+}
+
 function screenerRequestKey(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(screenerRequestKey).join(",")}]`;
   if (value && typeof value === "object") {
@@ -148,16 +170,14 @@ async function runDbScreenerUncached(
   const latestSummaryTable = isUs
     ? "us_latest_daily_candles"
     : "kr_latest_daily_candles";
-  const latestCtes = asOf
-    ? `instrument_daily_latest AS (SELECT u.market, u.code, latest.candle_date FROM ${universeTable} u JOIN LATERAL (SELECT c.candle_date FROM ${candleTable} c WHERE c.market=u.market AND c.code=u.code AND c.timeframe='D' AND c.volume > 0 AND c.candle_date <= \$2 ORDER BY c.candle_date DESC LIMIT 1) latest ON true WHERE u.enabled=true AND u.daily_active=true AND u.instrument_type='COMMON_STOCK' AND u.market=ANY($1)), market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM instrument_daily_latest GROUP BY market)`
-    : `market_latest AS (SELECT market, MAX(candle_date) AS candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1) GROUP BY market), instrument_daily_latest AS (SELECT market,code,candle_date FROM ${latestSummaryTable} WHERE volume > 0 AND market=ANY($1))`;
+  const latestCtes = buildInstrumentDailyLatestCtes({ asOf: Boolean(asOf), universeTable, candleTable, latestSummaryTable });
   const candleLookups = requestedTimeframes
     .map(
       (requestedTimeframe, index) => `SELECT c${index}.candle_date,c${index}.fetched_at,c${index}.close,c${index}.high,c${index}.low,c${index}.volume,c${index}.timeframe
         FROM ${candleTable} c${index}
         WHERE c${index}.market=u.market AND c${index}.code=u.code
           AND c${index}.timeframe='${requestedTimeframe}'
-          AND c${index}.volume > 0
+          AND CASE WHEN c${index}.candle_date ~ '^[0-9]{8}$' THEN c${index}.open > 0 AND c${index}.high > 0 AND c${index}.low > 0 AND c${index}.close > 0 AND c${index}.volume >= 0 AND c${index}.high >= GREATEST(c${index}.open, c${index}.low, c${index}.close) AND c${index}.low <= LEAST(c${index}.open, c${index}.high, c${index}.close) ELSE FALSE END
           AND ($2::text IS NULL OR c${index}.candle_date <= $2::text)
         ORDER BY c${index}.candle_date DESC
         LIMIT 65`,

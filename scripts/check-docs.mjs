@@ -1825,7 +1825,7 @@ if (existsSync(krArchitecturePath)) {
   if (legacyPublicReadBaseline?.sourcePath !== "app/api/public/market-impact-events/route.ts"
     || legacyPublicReadBaseline?.access !== "public-read-candidate"
     || legacyPublicReadBaseline?.authentication !== "NONE"
-    || !isDeepStrictEqual(legacyPublicReadBaseline?.queryParameters, ["date", "from", "to", "market", "ticker", "limit"])
+    || !isDeepStrictEqual(legacyPublicReadBaseline?.queryParameters, ["date", "from", "to", "market", "ticker", "status", "eventType", "cursor", "limit"])
     || !isDeepStrictEqual(legacyQueryNames, [...legacyPublicReadBaseline.queryParameters].sort())
     || !isDeepStrictEqual(legacyBodyQueryNames, [...legacyPublicReadBaseline.queryParameters].sort())
     || legacyRouteEntry?.methods?.includes("GET") !== true
@@ -3504,8 +3504,8 @@ if (existsSync(krArchitecturePath)) {
   const pushSubscribeRouteSource = readFileSync(join(root, "app", "api", "push", "subscribe", "route.ts"), "utf8");
   const pushProviderSource = readFileSync(join(root, "components", "push-provider.tsx"), "utf8");
   const pushPreferenceSchemaSource = readFileSync(join(root, "lib", "schema.ts"), "utf8");
-  const pushPreferenceMigrationSource = readFileSync(join(root, "db", "migration", "V164__push_subscription_opt_in_defaults.sql"), "utf8");
-  const pushProjectionMigrationSource = readFileSync(join(root, "db", "migration", "V165__push_projection_revision.sql"), "utf8");
+  const pushPreferenceMigrationSource = readFileSync(join(root, "db", "migration", "V174__push_subscription_opt_in_defaults.sql"), "utf8");
+  const pushProjectionMigrationSource = readFileSync(join(root, "db", "migration", "V175__push_projection_revision.sql"), "utf8");
   const pushPreferenceStoreSafe = [
     "ALTER COLUMN enabled SET DEFAULT FALSE",
     "ALTER COLUMN dart_enabled SET DEFAULT FALSE",
@@ -4095,7 +4095,8 @@ if (existsSync(krArchitecturePath)) {
     || !disclosureApiSource.includes("includeSecRun ?")
     || !disclosureCoverageProjectionSource.includes("function projectSecCoverage")
     || !disclosureSecCronSource.includes("const submissionCoverage = {")
-    || !disclosureSecCronSource.includes("snapshotStoredCikCount: submissionFetchSuccesses.length")
+    || !disclosureSecCronSource.includes("fetchSuccessCikCount: successfulFetches.length")
+    || !disclosureSecCronSource.includes("insertedSubmissionCount: successfulFetches.reduce")
     || !disclosureSecCronSource.includes("submissionCoverage, smallcapUniverse")
     || !disclosureCoverageProjectionSource.includes('rangeCoverage: "UNKNOWN" as const')
     || !disclosureDartCronSource.includes("await runFilingSync()")
@@ -5179,7 +5180,7 @@ if (existsSync(krArchitecturePath)) {
     .filter((path) => /\.(?:mjs|cjs|js|ts|tsx|sql|sh|yml|yaml)$/.test(path) && !/\.(?:test|spec)\./.test(path) && path.replaceAll("\\", "/") !== join(root, "scripts", "check-docs.mjs").replaceAll("\\", "/"))
     .map((path) => ({ path: path.slice(root.length + 1).replaceAll("\\", "/"), source: readFileSync(path, "utf8") }));
   const marketImpactLiteralPaths = sourceInventory.filter(({ source }) => /\bmarket_impact_events\b/.test(source)).map(({ path }) => path).sort();
-  const marketImpactLiteralExpected = ["app/api/public/market-impact-events/route.ts", "db/migration/V163__market_impact_events.sql", "scripts/import-market-impact-events.mjs"].sort();
+  const marketImpactLiteralExpected = ["app/api/public/market-impact-event-occurrences/route.ts", "app/api/public/market-impact-events/route.ts", "db/migration/V163__market_impact_events.sql", "db/migration/V164__market_impact_event_identity.sql", "db/migration/V165__market_impact_event_query_order.sql", "lib/schema-health.ts", "scripts/import-market-impact-events.mjs"].sort();
   const calendarLiteralPaths = sourceInventory.filter(({ source }) => /\binvestment_calendar_events\b/.test(source)).map(({ path }) => path).sort();
   const calendarLiteralExpected = ["db/migration/V130__investment_calendar_events.sql", "db/migration/V151__ensure_investment_calendar_events.sql"].sort();
   const pathSource = (path) => sourceInventory.find((entry) => entry.path === path)?.source ?? "";
