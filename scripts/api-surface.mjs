@@ -204,7 +204,35 @@ function responseSchema(path) {
     "/api/dart/ranking": { type: "object", properties: { fetchedAt: { type: "string", format: "date-time" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } },
     "/api/dart/contract": { type: ["object", "null"], additionalProperties: true, description: "null means the filing has no matching contract details." },
     "/api/dart/history": { type: "array", items: { type: "object", properties: { title: { type: "string" }, judgment: { type: "string" }, publishedAt: { type: "string", format: "date-time" }, link: { type: "string" } } } },
-    "/api/public/daily-candles": { oneOf: [{ type: "object", required: ["ok", "source", "market", "code", "timeframe", "candles", "metadata"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, code: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, candles: { type: "array", items: { type: "object", required: ["date", "open", "high", "low", "close", "volume"], properties: { date: { type: "string", format: "date" }, open: { type: "number" }, high: { type: "number" }, low: { type: "number" }, close: { type: "number" }, volume: { type: "number" } } } }, metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } } } }, { type: "object", required: ["ok", "source", "market", "timeframe", "items"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, items: { type: "array", items: { type: "object", properties: { code: { type: "string" }, candles: { type: "array", items: { type: "object", additionalProperties: true } } } } } } }] },
+    "/api/public/daily-candles": {
+      oneOf: [
+        {
+          type: "object", required: ["ok", "source", "market", "code", "timeframe", "candles", "metadata"],
+          properties: {
+            ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, code: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] },
+            candles: { type: "array", items: { type: "object", required: ["date", "open", "high", "low", "close", "volume", "tradingValue", "fetchedAt"], properties: {
+              date: { type: "string", pattern: "^\\d{8}$", description: "거래일 YYYYMMDD" }, open: { type: "number" }, high: { type: "number" }, low: { type: "number" }, close: { type: "number" }, volume: { type: "number" },
+              tradingValue: { type: "number", description: "KR: KIS acml_tr_pbmn 원문 누적 거래대금(원). 원문 값이 없는 레거시 행은 close × volume 대체값." }, fetchedAt: { type: ["string", "null"], format: "date-time" }
+            } } },
+            metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } }
+          }
+        },
+        {
+          type: "object", required: ["ok", "source", "market", "timeframe", "items"],
+          properties: {
+            ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] },
+            items: { type: "array", items: { type: "object", properties: {
+              market: { type: "string" }, code: { type: "string" }, name: { type: "string" },
+              candles: { type: "array", items: { type: "object", required: ["date", "open", "high", "low", "close", "volume", "tradingValue", "fetchedAt"], properties: {
+                date: { type: "string", pattern: "^\\d{8}$", description: "거래일 YYYYMMDD" }, open: { type: "number" }, high: { type: "number" }, low: { type: "number" }, close: { type: "number" }, volume: { type: "number" },
+                tradingValue: { type: "number", description: "KR: KIS acml_tr_pbmn 원문 누적 거래대금(원). 원문 값이 없는 레거시 행은 close × volume 대체값." }, fetchedAt: { type: ["string", "null"], format: "date-time" }
+              } } },
+              metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } }
+            } } }
+          }
+        }
+      ]
+    },
     "/api/public/instrument-fundamentals": { type: "object", properties: { ok: { const: true }, source: { const: "OPERATING_DB_FUNDAMENTAL_SNAPSHOT" }, market: { type: "string" }, items: { type: "array", items: { type: "object", properties: { market: { type: "string" }, code: { type: "string" }, name: { type: ["string", "null"] }, price: {}, changeRate: {}, open: {}, high: {}, low: {}, volume: {}, tradingValue: {}, marketCap: {}, listedShares: {}, currency: { type: "string" }, source: { type: "string" }, observedAt: {}, fetchedAt: {} } } } } },
     "/api/public/us-stock-metadata": {
       type: "object", required: ["ok", "schemaVersion", "asOf", "ticker", "identity", "company", "financials", "marketSnapshot", "dataQuality"],

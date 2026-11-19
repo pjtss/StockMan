@@ -5,7 +5,7 @@
 - **영향 범위**: 국내 일·주·월 KIS 캔들 적재 및 공개 `daily-candles` 응답. 기존 raw payload가 유효하고 원본 필드가 있으면 마이그레이션에서 값을 복구한다.
 - **해결 위치**: `lib/kis-kr-daily-price.ts`가 `acml_tr_pbmn`을 파싱하고 `lib/kr-daily-price-cache.ts`가 구조화 저장·bulk cache 조회를 제공한다. V180에서 컬럼 추가 및 기존 raw payload 복구, public route에서는 저장값 우선/부재 시 계산 fallback을 적용한다.
 - **재발 자동 감지**: parser test가 공식 필드 파싱 및 누락/오류 nullable 동작을 확인하고, public route test가 저장값 우선과 fallback 식을 확인한다. migration/schema audit으로 런타임 스키마와 DDL 일치를 확인한다.
-- **검증 결과/상태**: 회귀 테스트 10개, `npm run typecheck`, `npm run docs:check`, `npm run build`가 통과했다. 운영 DB 마이그레이션 및 배포는 아직 하지 않았다.
+- **검증 결과/상태**: 전체 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 통과(282 files, 1,628 passed·3 skipped, build 및 standalone/browser smoke 포함). commit `66bdab36`, Deploy OCI run `44458292992`의 release activation 성공. 운영 `/api/health` 200 및 삼성전자 KOSPI 일봉 public GET에서 저장 `tradingValue=3,320,880,251,400`을 확인했다.
 - **남은 위험 및 다음 개선**: 잘못되었거나 비 JSON인 과거 raw payload는 backfill 대상이 아니다. 기존 행에 `acml_tr_pbmn`이 원래 없던 경우 값은 NULL로 남고 API에서 종가×거래량 fallback을 쓴다.
 
 ## 2026-11-19 미국 활성 보통주 유니버스에 ADR/ADS가 포함

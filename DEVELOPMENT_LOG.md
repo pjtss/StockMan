@@ -7501,7 +7501,7 @@ ode --env-file=.env.local scripts/validate-us-ema-overlap-confirmed-pnl.cjs` 실
 - **디버깅 API 접근성**: `/api/admin/debug-suite`는 HTTP 200으로 환경·스키마·자동화·RSS·SEC 상태를 반환했으나 intraday 전용 실행/알림 지표는 포함하지 않았다. `/api/debug/intraday-flow`는 cron secret만으로 HTTP 401이며 관리자 세션이 필요하다.
 - **근본 원인 및 재발 감지**: 탐지 기능 활성화 설정과 Discord 전송 경로가 분리되어 있고, 운영 종합 디버깅 API가 intraday 실행·qualified 전이·알림 전송 결과를 집계하지 않는다. 다음 게이트에서 `INTRADAY_DETECTION_ENABLED`, 워커 tick/qualified 수, webhook configured/sent/failed를 하나의 운영 스냅샷으로 검증해야 한다.
 - **남은 위험**: 현재 상태로는 후보가 조건을 충족해도 Discord 알림이 전달되지 않는다. 운영 환경에서 기능 활성화 전에는 알림 연결 및 전송 이력 검증이 필요하다.
-- **커밋·푸시·배포**: 미실행. 이번 작업은 운영 읽기 전용 검증 및 문서 기록이다.
+- **커밋·푸시·배포**: 검증 통과 후 `oci`에 push하고 문서 배포 여부를 운영 URL에서 확인한다. 이번 작업은 운영 읽기 전용 검증 및 문서 기록이다.
 ## [2026-09-18] 장중 TOP100 거래대금 탐지 관리자 정책·메모리 캐시
 
 - **목표**: 국내·미국 상승률 TOP100의 시총 대비 거래대금 탐지 구간과 임계 비율을 관리자 페이지에서 `최근 5분·5%` 또는 `최근 1분·1%`로 설정하고, 매 틱마다 DB를 조회하지 않도록 메모리 캐시한다.
@@ -9315,4 +9315,11 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **목적/근본 원인**: KIS 국내 기간별 시세 `output2`의 `acml_tr_pbmn`(누적 거래 대금)을 파서가 구조화하지 않아 공개 API가 `종가 × 거래량` 계산치만 반환했다. 원본 raw payload는 저장됐으나 캔들 테이블에는 거래대금 열이 없었다.
 - **수정 범위**: `lib/kis-kr-daily-price.ts`에서 필드 파싱, `lib/kr-daily-price-cache.ts` 및 `lib/schema.ts`에서 구조화 저장·bulk cache 반환, `V180__kr_daily_candle_trading_value.sql`에서 컬럼 추가 및 과거 raw payload backfill, public `daily-candles` API에서 저장된 공식값 우선 사용. 공식값이 누락된 과거/응답행은 기존과 같이 계산 fallback한다.
 - **문서/자동 감지**: parser와 route 회귀 검사를 확장하고 `docs/ERROR_HANDLING.md`에 원인·범위·재발 감지·잔여 위험을 연결했다.
-- **검증/반영 상태**: 최신 `origin/oci` (`38e544ac`) 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과: 의존성 취약점 0건, Vitest 282 files 중 281 passed·1 skipped 및 1,628 passed·3 skipped, typecheck, docs/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke 통과. 운영 DB 마이그레이션·실제 운영 health 확인은 아직이다. 이번 변경 커밋 및 `oci` push 후 OCI workflow 완료를 확인한다.
+- **검증/반영 상태**: 최신 `origin/oci` (`38e544ac`) 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과: 의존성 취약점 0건, Vitest 282 files 중 281 passed·1 skipped 및 1,628 passed·3 skipped, typecheck, docs/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke 통과. 커밋 `66bdab36`을 `oci`에 push했고 Deploy OCI run [`44458292992`](https://github.com/pjtss/StockMan/actions/runs/44458292992)이 Verify deployment·패키징·업로드·Activate release까지 성공했다. 배포 후 `/api/health` HTTP 200, 무인증 삼성전자 KOSPI 일봉 GET HTTP 200 및 저장 거래대금 3,320,880,251,400을 확인했다. 동일 봉 종가×거래량 3,331,898,393,500과 달라 계산 대체가 아닌 원본 거래대금이 노출됨을 검증했다. 배포 결과 문서 변경 후 추가 `deploy:verify`는 Next.js build의 `Collecting build traces` 단계에서 900,000ms timeout으로 종료됐다. 정적 페이지 생성은 끝났으나 전체 재검증이 완료되지 않아 이 후속 문서 변경은 커밋·푸시하지 않았다. 배포된 기능 코드에는 변경이 없다.
+
+### 2026-11-20 API 메뉴얼: 국내 캔들 거래대금 계약
+- **목적/범위**: 공개 `GET /api/public/daily-candles` 응답에 추가된 거래대금과 갱신시각을 호출자가 구분할 수 있도록 배포 API 매뉴얼 및 OpenAPI 응답 schema를 동기화.
+- **변경 파일**: `public/api-reference.md`, `scripts/api-surface.mjs`, 생성 산출물 `public/openapi.json`.
+- **문서 내용**: 국내 거래대금은 저장된 경우 KIS `acml_tr_pbmn` 원문(원 단위), 과거 행에서 원문이 없으면 `close × volume` fallback임을 표시. `fetchedAt`과 다중 코드 metadata도 설명.
+- **검증 결과**: `npm run docs:api:generate`와 `npm run audit:api-surface` 통과(105 route files, 45 public GET operations). OpenAPI JSON을 파싱하고 두 응답 형태의 candle schema에 `tradingValue` 및 `fetchedAt`이 포함됨을 확인. 전체 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 통과: Vitest 282 files 중 281 passed·1 skipped 및 1,628 passed·3 skipped, typecheck, docs/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke 완료.
+- **커밋·푸시·배포**: 미실행.
