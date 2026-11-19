@@ -69,9 +69,9 @@
       "surfaceId": "OPENDART_CONTRACT_DETAIL",
       "product": "OpenDART single-sale/supply-contract structured API",
       "officialLocator": "https://opendart.fss.or.kr/api/snglpnrsctrt.json",
-      "codeEvidence": ["lib/opendart.ts:getContractDetails", "app/api/dart/contract/route.ts:GET", "components/contract-badge.tsx"],
+      "codeEvidence": ["lib/opendart.ts:getContractDetails", "app/api/dart/contract/route.ts:GET"],
       "payloadClass": "STRUCTURED_API_FIELD",
-      "observedPath": ["GET from server", "in-memory corp-code cache", "public route JSON response", "client badge display"],
+      "observedPath": ["GET from server", "in-memory corp-code cache", "public route JSON response"],
       "actions": {
         "FETCH": "UNRESOLVED",
         "TRANSIENT_PARSE": "UNRESOLVED",

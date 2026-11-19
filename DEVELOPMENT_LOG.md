@@ -9298,3 +9298,12 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **검증/반영 상태**: 최종 필터 확장 포함 `npm run deploy:verify` 통과(0 취약점, production build, standalone HTTP/Chrome desktop·mobile, typecheck, docs/API/schema gates, Vitest 1,650 passed·3 skipped). `1120d3c6` push 및 Deploy OCI run `44438975616` 성공. 운영 daily-candles read API와 두 snapshot 생성/검증을 완료했다.
 - **최종 snapshot**: US eligible 5,050, instruments 4,964, candles 590,979, missing 86, latest `20261117`; KR eligible/instruments 2,345, candles 275,203, missing 0, latest `20261118`. Snapshot quality check는 중복 코드·형식 오류·미제외 ADR/ADS 0건, retrieved+missing=eligible를 확인했다.
 - **남은 위험/다음 단계**: US에는 캐시 일봉이 없는 86종목이 기록됐다. 다른 미국 종목 소비 API가 동일한 마스터 분류를 따르는지 별도 영향 점검이 남는다. 운영 DB 직접 조회나 쓰기는 수행하지 않았다.
+
+## [2026-11-19] 미사용 코드 정리 배포 후보 격리
+
+- **목적·범위**: 미커밋 미사용 코드 정리 변경을 최신 배포 커밋 위에서 분리해 재검증 가능한 후보로 만든다.
+- **변경 파일**: 미사용 helper/component 삭제와 참조 보정, 권리 surface fixture 및 검사 업데이트 등 총 43개 tracked 파일을 정리 후보에 포함했다. 수천 개 미추적 조사 산출물은 후보에서 제외했다. 미사용 코드 정리 자체는 최신 예탁증서 분류 파일을 수정하지 않는다.
+- **기준 커밋·배포 상태**: 후보는 `77c5cd2c`에서 시작한다. 해당 원격 커밋의 GitHub Actions OCI 검증·업로드·활성화는 성공했다.
+- **검증 결과**: 최신 기준 `77c5cd2c`에 적용한 후보에서 `npm run deploy:verify` 통과. 의존성 감사 0 취약점, build, standalone HTTP 및 Chrome desktop/mobile hydration smoke, typecheck, docs/API/schema/audit/cron 게이트가 모두 성공했다. Vitest는 281개 파일 통과·1개 건너뜀, 1,627개 테스트 통과·3개 건너뜀으로 완료됐다. Vitest 실행 시간은 약 699초였다.
+- **커밋·푸시·배포**: 정리 후보는 미커밋·미푸시 상태이며 운영 배포에 포함하지 않았다. 원격 `77c5cd2c` 배포와 별개다.
+- **다음 조치·남은 위험**: 후보는 검증 완료된 미커밋·미푸시 상태다. 원본 작업 트리의 미커밋 자료와 분리되어 있으며, 필요 시 이 후보에서 리뷰·배포 절차를 진행한다.

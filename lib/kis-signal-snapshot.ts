@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { kisSignalSnapshots } from "./schema";
 
@@ -24,11 +24,4 @@ export async function writeKisSignalSnapshot(input: KisSignalSnapshotInput) {
     payload: input.payload,
     rawPayload: input.rawPayload ?? "",
   });
-}
-
-export async function readLatestKisSignalSnapshot(market: string, code: string, signalType: string) {
-  const db = getDb();
-  if (!db) return null;
-  const rows = await db.select().from(kisSignalSnapshots).where(and(eq(kisSignalSnapshots.market, market), eq(kisSignalSnapshots.code, code), eq(kisSignalSnapshots.signalType, signalType))).orderBy(desc(kisSignalSnapshots.observedAt)).limit(1);
-  return rows[0] ?? null;
 }

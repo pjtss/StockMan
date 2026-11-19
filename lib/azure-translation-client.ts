@@ -9,21 +9,6 @@ type AzureError = Error & {
 };
 const PROVIDER = "azure-translator";
 
-export function getAzureTranslatorEndpointDiagnostics(endpoint = process.env.AZURE_TRANSLATOR_ENDPOINT?.trim() || "") {
-  if (!endpoint) return null;
-  try {
-    const url = new URL(endpoint);
-    return {
-      host: url.host,
-      path: url.pathname,
-      queryPresent: Boolean(url.search),
-      pathAlreadyContainsTranslate: /(?:^|\/)translate\/?$/i.test(url.pathname),
-    };
-  } catch {
-    return null;
-  }
-}
-
 function retryDelay(attempt: number, header: string | null) {
   const seconds = Number(header);
   return Number.isFinite(seconds) && seconds >= 0 ? Math.min(30_000, seconds * 1000) : Math.min(8_000, 500 * 2 ** (attempt - 1));

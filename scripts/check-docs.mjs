@@ -4187,7 +4187,6 @@ if (existsSync(krArchitecturePath)) {
   const disclosureFeedUiSource = readFileSync(join(root, "components", "daily-disclosures-page.tsx"), "utf8");
   const seoulDateHelperSource = readFileSync(join(root, "lib", "seoul-date.ts"), "utf8");
   const disclosureFeedApiContractSource = readFileSync(join(root, "scripts", "api-surface.mjs"), "utf8");
-  const dailyMarketRssExportSource = readFileSync(join(root, "lib", "daily-market-rss-export.ts"), "utf8");
   const kstDefaultDateImplementationMissing = !disclosureFeedApiSource.includes("getSeoulDateKey(now)")
     || !disclosureFeedApiSource.includes('url.searchParams.get("q")')
     || !disclosureFeedApiSource.includes('error: "INVALID_QUERY"')
@@ -4228,12 +4227,12 @@ if (existsSync(krArchitecturePath)) {
     || !disclosureFeedApiContractSource.includes('filedAtPrecision: { type: "string", enum: ["DATE", "UNKNOWN"] }')
     || !disclosureFeedApiContractSource.includes('endExclusive: { const: true }')
     || !disclosureFeedApiContractSource.includes('Verified source response fetch time; null when no linked fetch snapshot exists.')
-    || !dailyMarketRssExportSource.includes("publishedAt: null")
-    || !dailyMarketRssExportSource.includes('timePrecision: "DATE"')
-    || !dailyMarketRssExportSource.includes('sortBasis: "FILED_DATE"')
-    || !dailyMarketRssExportSource.includes("filedAt: row.filingDate")
-    || dailyMarketRssExportSource.includes('`${row.filingDate}T00:00:00.000Z`')
-    || dailyMarketRssExportSource.includes("publishedAtMs: row.updatedAt")
+    || !disclosureFeedApiSource.includes("publishedAt: null")
+    || !disclosureFeedApiSource.includes('filedAtPrecision: "DATE" as const')
+    || !disclosureFeedApiSource.includes('sortBasis: "FILED_DATE" as const')
+    || !disclosureFeedApiSource.includes("filedAt: row.filingDate")
+    || disclosureFeedApiSource.includes("publishedAt: new Date(row.filingDate)")
+    || disclosureFeedApiSource.includes("publishedAt: row.updatedAt")
     || !disclosureFeedArchitecture.includes("같은 함수를 사용한다")
     || !disclosureFeedArchitecture.includes("`lib/seoul-date.ts`의 `getSeoulDateKey()`")
     || !disclosureFeedArchitecture.includes("`displayTimezone`/`queryWindow` 구현을 완료했다");

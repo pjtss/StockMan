@@ -192,34 +192,3 @@ export async function saveUsDailyCandles(market: string, code: string, candles: 
   memoryCache.delete(cacheKeyFor(market, code, timeframe));
   return savedCandleCount;
 }
-
-/** Returns the cached historical daily series and calls KIS only when history is insufficient. */
-export async function fetchUsDailyPriceCached(request: { code: string; market: string; endDate?: string }, minimumCandles = 35): Promise<UsDailyPriceResponse | null> {
-  let cached: UsDailyCandle[] = [];
-  let cacheReadErrorName: string | null = null;
-  try {
-    cached = await loadCachedUsDailyCandles(request.market.trim().toUpperCase(), request.code.trim().toUpperCase(), 100);
-  } catch (error) {
-    cacheReadErrorName = error instanceof Error ? error.name : "UnknownError";
-  }
-  if (cached.length >= minimumCandles) {
-    return { ok: true, status: 200, request: { method: "GET", url: "db://us_instrument_universe_candles", headers: {} }, response: { rawText: "", parsed: null }, candles: cached, diagnostics: { source: "DB_CACHE", httpStatus: 200, kisOk: true, rtCd: "0", msgCd: "DB_CACHE", msg1: "DB cached daily candles", outputKey: null, rawOutputCount: cached.length, parsedCandleCount: cached.length, firstDate: cached.at(-1)?.date ?? null, lastDate: cached[0]?.date ?? null } };
-  }
-  const fresh = await fetchUsDailyPrice(request);
-  if (fresh && cacheReadErrorName) {
-    fresh.diagnostics.cacheLookup = "FAILED";
-    fresh.diagnostics.cacheLookupErrorName = cacheReadErrorName;
-  }
-  if (fresh?.ok && fresh.candles.length > 0) {
-    try {
-      const savedCandleCount = await saveUsDailyCandles(request.market.trim().toUpperCase(), request.code.trim().toUpperCase(), fresh.candles);
-      fresh.diagnostics.savedCandleCount = savedCandleCount;
-      fresh.diagnostics.discardedOrDuplicateCandleCount = Math.max(0, fresh.candles.length - savedCandleCount);
-      if (savedCandleCount === 0) fresh.diagnostics.saveError = "NO_CANDLES_SAVED";
-    } catch (error) {
-      fresh.diagnostics.savedCandleCount = 0;
-      fresh.diagnostics.saveError = error instanceof Error ? error.message : String(error);
-    }
-  }
-  return fresh;
-}
