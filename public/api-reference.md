@@ -86,7 +86,7 @@ hours(1~24) 또는 date(서울 기준 YYYY-MM-DD, 생략 시 오늘 UTC 날짜 �
 
 ### 저장 일·주·월봉 — GET /api/public/daily-candles
 
-market 필수: KR, US, KOSPI, KOSDAQ, NAS, NYS, AMS. code 단일 값 또는 codes 최대 100개. timeframe은 D/W/M, limit 기본 120·최대 300. 단일 코드 응답의 candles 배열과 metadata.latestCandleDate, dataUpdatedAt, returnedCount를 읽는다. 여러 코드는 각 item에 code와 candles가 있다. source는 OPERATING_DB_CACHE. 인증 없이 조회한다. 잘못된 query는 400 INVALID_QUERY, 저장소 장애는 503 DAILY_CACHE_UNAVAILABLE.
+market 필수: KR, US, KOSPI, KOSDAQ, NAS, NYS, AMS. code 단일 값 또는 codes 최대 100개. timeframe은 D/W/M, limit 기본 120·최대 300. 각 candle은 거래일(YYYYMMDD), OHLC, volume, tradingValue, fetchedAt을 제공한다. 국내(KR/KOSPI/KOSDAQ) tradingValue는 원 단위 거래대금이며, 수집된 KIS `acml_tr_pbmn` 값이 저장된 경우 해당 원문 값을 반환한다. 원문 값이 없는 과거 캐시 행은 `close × volume` 계산값으로 대체되므로 정확한 원문 거래대금과 구분해야 한다. fetchedAt은 해당 봉 데이터의 캐시 갱신 시각이다. 단일 코드 응답의 candles 배열과 metadata.latestCandleDate, dataUpdatedAt, returnedCount를 읽는다. 여러 코드는 각 item에 code, candles와 metadata가 있다. source는 OPERATING_DB_CACHE. 인증 없이 조회한다. 잘못된 query는 400 INVALID_QUERY, 저장소 장애는 503 DAILY_CACHE_UNAVAILABLE.
 
 ### 기본정보 스냅샷 — GET /api/public/instrument-fundamentals
 
