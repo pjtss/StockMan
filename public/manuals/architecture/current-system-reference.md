@@ -38,7 +38,7 @@
 | 지표·스캐너 | `lib/*indicator*.ts`, `lib/*scan*.ts`, `lib/screener-engine.ts` | EMA 규칙과 원본 봉 기준일을 명시하고 HTTP를 모름 |
 | 유니버스·상품 분류 | `lib/us-top-rising-universe.ts`, `lib/instrument-universe-import.ts`, 상품 분류 모듈 | 활성 보통주 판정과 랭킹 수집을 구분 |
 | RSS·공시 | `lib/market-rss*.ts`, `lib/stocktitan*.ts`, `lib/sec-*.ts`, `lib/dart-*.ts` | 수집→정규화→분류→저장→전송을 독립 단계로 유지 |
-| 인증·개인화 | `lib/auth*.ts`, `lib/watchlist.ts`, `lib/request-identity.ts` | 사용자별 관심종목과 전역 유니버스를 섞지 않음 |
+| 인증·개인화 | `lib/auth*.ts`, `lib/user-watchlist.ts`, `lib/request-identity.ts` | 사용자별 관심종목과 전역 유니버스를 섞지 않음 |
 | 전달 | `lib/discord*.ts`, `lib/discord-delivery-*.ts`, `lib/push.ts` | 전달 실패가 핵심 데이터 처리 실패로 전파되지 않음 |
 | 예약 작업 | `lib/*job*.ts`, `lib/*pipeline*.ts`, `app/api/cron/**` | cron 라우트는 application service 호출과 인증만 담당 |
 

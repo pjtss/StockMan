@@ -44,7 +44,7 @@
 | `etyp` | 3 | ETP 상세 유형 | `001` ETF, `002` ETN, `003` ETC, `004` Others, `005` VIX Underlying ETF, `006` VIX Underlying ETN |
 | `ttyp_sb` | 3 | Tick size 상세 유형 | 런던·제트라·유로넥스트 등 특수시장 |
 
-탭 필드 인덱스(0부터)는 `isdr=17`, `drcd=18`, `icod=19`, `sjong=20`, `ttyp=21`, `etyp=22`, `ttyp_sb=23`이다. 보통주 분류에서 DR 여부는 `isdr`(17)을, 산업 분류 코드는 `icod`(19)를 읽는다.
+탭 필드 인덱스(0부터)는 `isdr=17`, `drcd=18`, `icod=19`, `sjong=20`, `ttyp=21`, `etyp=22`, `ttyp_sb=23`이다. 보통주 분류에서 DR 여부는 `isdr`(17)을 읽되, 이 필드는 완전한 DR 식별자로 간주하지 않는다. KIS 공식 원본에서 `isdr=N`인 채 영문 상품명에 `SPON ADS` 또는 `SPON ADR`가 명시된 사례가 확인됐으므로, 공식 원본의 상품 설명도 함께 분류한다. 확인할 수 없는 상품 설명은 보통주로 추정하지 않는다.
 
 ### 해외 상품 분류 규칙
 
@@ -53,10 +53,11 @@ stis = 2                     → 주식 후보
 stis = 3                     → ETP 제외 후보
 stis = 4                     → 워런트·파생상품 제외 후보
 etyp in 001,002,003,005,006  → ETF/ETN/ETC/레버리지 계열 분류 재검증
-isdr = Y                     → ADR/DR 보조 분류
+isdr = Y                     → ADR/DR 분류 근거
+enam에 ADR/ADS/depositary security 명시 → isdr=N이어도 DR로 분류
 ```
 
-`stis`만으로 레버리지 여부를 확정하지 않고 `etyp`, 영문명, 원본 분류 필드를 함께 사용한다.
+`stis`만으로 레버리지 여부를 확정하지 않고 `etyp`, 영문명, 원본 분류 필드를 함께 사용한다. KIS 공식 헤더 구조는 [한국투자증권 공식 GitHub의 해외종목코드정보 헤더](https://github.com/koreainvestment/open-trading-api/blob/main/stocks_info/%ED%95%B4%EC%99%B8%EC%A2%85%EB%AA%A9%EC%BD%94%EB%93%9C%EC%A0%95%EB%B3%B4%28%EB%AF%B8%EA%B5%AD%2C%EC%A4%91%EA%B5%AD%2C%EC%9D%BC%EB%B3%B8%2C%ED%99%8D%EC%BD%A9%2C%EB%B2%A0%ED%8A%B8%EB%82%A8%29.h)에서 확인한다.
 
 ## 2. 국내 `kospi_code.mst`·`kosdaq_code.mst`
 

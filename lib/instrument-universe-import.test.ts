@@ -95,6 +95,18 @@ describe("KIS instrument master parsers", () => {
       .toMatchObject({ instrumentType: "DERIVATIVE", isDerivative: true });
   });
 
+  it("classifies official KIS ADR and ADS descriptions as depositary receipts when isdr is N", () => {
+    const base = { securityType: "2", etpType: "", isEtf: false, isLeveraged: false, isInverse: false, isWarrant: false, isDerivative: false, isDr: false };
+    expect(classifyUs({ ...base, code: "AACG", name: "ATA 크리에티비티 글로벌(ADR)", englishName: "ATA CREATIVITY GLOBAL SPON ADS EACH REP 2 ORD SHS" }))
+      .toMatchObject({ instrumentType: "DR", isDr: true });
+    expect(classifyUs({ ...base, code: "BABA", name: "알리바바 그룹 홀딩(ADR)", englishName: "ALIBABA GROUP HOLDING LTD SPON ADS EACH REP 8 ORD SHS" }))
+      .toMatchObject({ instrumentType: "DR", isDr: true });
+    expect(classifyUs({ ...base, code: "ABEV", name: "암베브(ADR)", englishName: "AMBEV SA SPON ADR EACH REP 1 ORD SHS" }))
+      .toMatchObject({ instrumentType: "DR", isDr: true });
+    expect(classifyUs({ ...base, code: "AAPL", name: "애플", englishName: "APPLE INC" }))
+      .toMatchObject({ instrumentType: "COMMON_STOCK", isDr: false });
+  });
+
   it("keeps ordinary class A/B shares eligible", () => {
     const base = { securityType: "2", etpType: "", isEtf: false, isLeveraged: false, isInverse: false, isWarrant: false, isDerivative: false, isDr: false };
     expect(classifyUs({ ...base, code: "BRK/B", name: "버크셔 해서웨이 클래스 B", englishName: "BERKSHIRE HATHAWAY INC CL B" }))

@@ -34,9 +34,9 @@
 | `missing_runs` | 연속 원천 갱신에서 누락된 횟수 | `0` |
 | `created_at`, `updated_at` | DB 생성·최종 변경 시각 | ISO timestamp |
 
-### `kr_common_stock_universe`, `kr_special_instrument_universe`, `kr_instrument_universe` (compatibility view)
+### `kr_common_stock_universe`, `kr_special_instrument_universe`, `kr_instrument_universe`
 
-세 relation은 아래 동일 필드를 사용한다. 첫 테이블은 국내 보통주, 두 번째는 특수상품 분리 보관, 세 번째는 두 테이블을 합친 읽기 호환 view다. 신규 쓰기는 분리 테이블에 수행한다.
+세 테이블은 아래 동일 필드를 사용한다. 첫 테이블은 국내 보통주, 두 번째는 특수상품 분리 보관, 세 번째는 호환·전체 유니버스 역할이다.
 
 | 필드명 | 정보와 의미 | 예시값 |
 |---|---|---|
@@ -50,6 +50,8 @@
 | `market_cap_scale` | 원천 시총 규모 구간 코드 | 원천 코드 |
 | `industry_large_code`, `industry_medium_code`, `industry_small_code` | KIS 종목 마스터의 지수 업종 분류 코드. 표준산업분류와 별도 원천 필드 | 원천 코드 |
 | `standard_industry_code`, `standard_industry_name` | KIS 주식기본조회(`CTPF1002R`)의 표준산업분류코드(`std_idst_clsf_cd`)와 분류명 | `032604`, `통신 및 방송 장비 제조업` |
+
+운영 국내 보통주 유니버스가 비어 있으면 `/api/admin/domestic-universe-import`에 KIS 공식 `kospi_code.mst`, `kosdaq_code.mst` 두 파일을 관리자 세션으로 올려 국내 시장만 구성한다. 이 경로는 미국 유니버스나 누락된 기존 종목을 갱신/비활성화하지 않는다. 이후 `/api/admin/domestic-industry-sync`가 활성 `COMMON_STOCK`만 대상으로 KIS `CTPF1002R` 응답을 검증하고 산업분류 컬럼을 저장한다.
 | `etp_product_class_code` | ETP 상품 분류 코드 | 빈 문자열 또는 코드 |
 | `preferred_class_code` | 우선주 분류 코드 | 빈 문자열 또는 코드 |
 | `trading_halt_code` | 거래정지 상태 코드 | 정상 상태 코드 |
@@ -64,7 +66,7 @@
 
 ### `us_instrument_universe`
 
-과거 호환 이름으로 유지되는 view이며 필드는 미국 유니버스와 동일하다. 신규 쓰기는 common/special 분리 테이블을 대상으로 한다.
+과거 호환 이름으로 유지되는 뷰/테이블이며 필드는 미국 유니버스와 동일하다. 신규 쓰기는 common/special 분리 테이블을 대상으로 한다.
 
 ## 2. 시세·봉 데이터
 
@@ -226,13 +228,12 @@
 
 | 필드명 | 정보와 의미 | 예시값 |
 |---|---|---|
-| `event_id` | JSON 원본에서 유지하는 안정적 이벤트 ID | `SEC:0000320193:000...:GUIDANCE` |
-| `event_date`, `market`, `ticker`, `company_name` | 이벤트 기준일·시장·종목 | `2026-10-30`, `US`, `AAPL` |
-| `event_type`, `status`, `direction`, `impact_horizon` | 유형·사실 상태·잠재 방향·영향 기간 | `GUIDANCE`, `REPORTED`, `MIXED`, `SHORT_TERM` |
-| `title`, `summary`, `rationale`, `confidence` | 사용자용 설명과 판단 근거·근거 신뢰도 | `MEDIUM` |
-| `source_type`, `source_id`, `source_url`, `published_at` | 원문 출처 및 발표 시각 | `SEC`, accession, HTTPS URL |
-| `evidence`, `risks`, `limitations`, `raw_event` | 근거·반대 요인·한계 및 원본 이벤트 전체 | JSONB |
-| `updated_at` | 마지막 JSON 적재 시각 | ISO timestamp |
+| `event_id`, `event_date`, `market`, `ticker`, `company_name` | 안정 이벤트 ID·기준일·KR/US·공식 보통주 티커·회사명 | `DART:...`, `2026-10-29`, `KR`, `034730`, `SK` |
+| `event_type`, `status`, `direction`, `impact_horizon`, `confidence` | 사건 유형·사실/일정 상태·잠재 방향·영향 기간·근거 신뢰도 | `STRATEGIC_RESTRUCTURING`, `REPORTED`, `MIXED`, `LONG_TERM`, `HIGH` |
+| `title`, `summary`, `rationale` | 사실 요약과 잠재 영향 해석 | 문자열 |
+| `source_type`, `source_id`, `source_url`, `published_at` | 공시 출처·접수/accn 식별자·원문 URL·확인된 공시 시각 | `DART`, 접수번호, URL, ISO timestamp |
+| `evidence`, `risks`, `limitations`, `raw_event` | 원문 인용/위치·반대 근거·한계·JSON 원본 이벤트 | JSONB |
+| `updated_at` | 마지막 upsert 시각 | ISO timestamp |
 
 ## 5. 뉴스·공시 기사
 
@@ -268,9 +269,7 @@
 
 ## 6. 일정·KIS 보조 데이터·분봉
 
-### `investment_calendar_events` (폐기된 기능의 보존 데이터)
-
-2026-10-26 투자 일정 기능의 화면·API·수집기를 제거했다. 기존 DB 데이터와 적용된 migration 이력은 보존하며 런타임에서는 이 테이블을 요구하거나 접근하지 않는다.
+### `investment_calendar_events`
 
 | 필드명 | 정보와 의미 | 예시값 |
 |---|---|---|
@@ -301,8 +300,6 @@
 | `channel`, `tr_id` | 실시간 채널·KIS 거래 ID | `H0STCNT0`, KIS TR ID |
 | `observed_at` | 이벤트 수신/관측 시각 | ISO timestamp |
 | `payload`, `raw_payload` | 파싱 JSON과 원천 응답 문자열 | JSON object/문자열 |
-
-이벤트는 관측 시각 기준 7일 보존한다. OCI 5분 주기 DB retention 작업이 테이블당 최대 3회, 회당 5,000행씩 삭제하며 한 실행에서 상한에 도달하면 응답의 `deferred`에 표시되어 다음 주기에 이어 정리한다.
 
 ### `kr_minute_candles`, `us_minute_candles`
 

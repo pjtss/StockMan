@@ -74,4 +74,15 @@ describe("GET /api/public/us-stock-metadata", () => {
     expect(body.financials).toMatchObject({ source: "SEC_COMPANY_FACTS", availableMetricCount: 1 });
     expect(body.financials.metrics.revenue).toMatchObject({ value: "1000000", periodEnd: "2025-03-31", form: "10-Q" });
   });
+
+  it("rejects an ADR/ADS descriptor even when the master says common stock and is_dr=false", async () => {
+    state.rows[0].code = "AACG";
+    state.rows[0].english_name = "ATA CREATIVITY GLOBAL SPON ADS EACH REP 2 ORD SHS";
+    state.rows[0].name = "ATA 크리에티비티 글로벌(ADR)";
+    const response = await GET(new Request("https://stockman.example/api/public/us-stock-metadata?ticker=AACG"));
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body).toMatchObject({ ok: false, error: "NOT_ACTIVE_COMMON_STOCK" });
+  });
 });

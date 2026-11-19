@@ -6,26 +6,28 @@
 
 SEC의 티커·CIK·거래소 매핑은 검색 편의 데이터이며 SEC가 정확성이나 범위를 보장하지 않는다. 따라서 입력 티커만으로 종목 적격성을 결정하지 않고, 프로젝트의 공식 활성 종목 마스터에서 `COMMON_STOCK`와 거래소·비보통주 제외 플래그를 확인해야 한다. SEC Company Facts는 XBRL 재무 사실을 제공하지만 모든 회사가 모든 항목을 보고하는 것은 아니다. 누락은 0으로 대체하지 않는다.
 
+SEC company ticker/exchange master는 일일 서버 cron에서 활성 공통주 마스터와 대조한 뒤 `sec_companies`에 저장한다. 이 동기화는 SEC CIK/name 조회 커버리지를 위한 내부 쓰기 작업이고 공개 GET에서는 실행하지 않는다. Company Facts 원본 동기화는 별도 설정 CIK만 계속 수집한다. SEC ticker master 미보장 범위와 KIS 활성 COMMON_STOCK 교차 검증을 함께 유지한다.
+
+`POST /api/sec/company-facts` 수동 갱신은 입력 티커/CIK를 활성 보통주로 검증한 뒤 해당 CIK의 SEC 전체 티커/거래소 매핑을 `sec_companies`에 즉시 저장하고 Company Facts 원본도 동기화한다. 이는 특정 발행사 한 곳에만 쓰며 전체 회사 마스터 갱신은 하지 않는다. 응답의 `companyMaster`에 갱신된 발행사·티커 수와 시각을 포함한다. 뒤이어 `GET /api/public/us-stock-metadata?ticker=...`를 호출하면 저장된 회사 식별과 Facts가 즉시 조회된다. 공개 GET은 계속 DB read-only다.
+
 ## 입력 및 식별 절차
 
 1. `ticker`를 trim/대문자화하고 길이·문자 집합을 검증한다. 점/대시 표기는 임의 변환하지 않는다.
 2. 미국 종목 마스터에서 canonical `code` 완전 일치 후보를 찾는다. `realtime_symbol`은 반환 정보로만 제공하고 검색 별칭으로 쓰지 않는다. 0건은 `INSTRUMENT_NOT_FOUND`, 복수 후보는 `AMBIGUOUS_TICKER`로 돌려보낸다.
 3. `enabled=true`, `instrument_type=COMMON_STOCK` 및 ETF/ETP·워런트·파생·DR·레버리지·인버스 플래그가 모두 확인되고 false인지 검사한다. 분류나 마스터를 확인할 수 없으면 fail-closed로 결과를 주지 않는다. 활성 보통주 마스터에 없지만 특수종목 마스터에서 확인된 코드는 422로 거부한다.
-4. 일치한 종목의 `market`, `code`, 이름을 내부 canonical key로 사용하고 SEC CIK를 연결한다. SEC 매핑은 보조 연결키이며 마스터 적격성을 대체하지 않는다.
+4. 일치한 종목의 `market`, `code`, 이름을 내부 canonical key로 사용하고 SEC CIK를 연결한다. SEC ticker/exchange 매핑을 우선 사용하며, 매핑이 없으면 공식 SEC SIC 동기화가 기록한 `SEC_EDGAR_SIC:<10자리 CIK>` provenance를 보조 연결키로 사용한다. 이 fallback은 식별정보·기존 Company Facts snapshot 연결에만 쓰며 마스터 적격성을 대체하지 않는다.
 
 ## 권장 응답 필드
 
 | 그룹 | 권장 필드 | 출처·정책 |
 |---|---|---|
-| 식별 | `ticker`, 
-ame`, `englishName`, `market`, `exchangeName`, `currency`, `countryCode` | 활성 종목 마스터. 티커는 입력 별칭이 아닌 canonical `code`를 반환 |
+| 식별 | `ticker`, `name`, `englishName`, `market`, `exchangeName`, `currency`, `countryCode` | 활성 종목 마스터. 티커는 입력 별칭이 아닌 canonical `code`를 반환 |
 | 보통주 판정 | `instrumentType`, `securityType`, `isCommonStock`, `isEtf`, `isWarrant`, `isDerivative`, `isDr`, `isLeveraged`, `isInverse`, `masterUpdatedAt`, `lastSeenAt` | 마스터 원본 분류. 제외 플래그가 누락되면 응답 중단 |
 | 회사 식별 | `cik`, `secName`, `sic`, `sicDescription`, `industryCode` | SEC 회사 맵·회사 마스터. 미연결 값은 null |
 | 회사 개요 | `description`, `website`, `headquarters`, `fiscalYearEnd`, `employees` | 회사 IR/공식 제출자료에서만 채우고 개별 출처·기준일 보존. 1차 응답에서 선택 필드 |
 | 최신 시장 스냅샷 | `price`, `changeRate`, `open`, `high`, `low`, `volume`, `tradingValue`, `marketCap`, `listedShares` | 기존 `instrument_fundamental_snapshots`; `currency`, `source`, `observedAt`, `fetchedAt`를 반드시 함께 반환 |
 | 주식 구조 | `sharesOutstanding`, `publicFloatShares`, `publicFloatPercent` | SEC 제출/Company Facts 및 공식 발행사 공시. 각 수치에 기준일·출처 링크·계산 여부 표기. 기존 `listedShares`와 의미가 다르므로 혼용 금지 |
-| 재무 요약 | `revenue`, `operatingIncome`, 
-etIncome`, `cashAndCashEquivalents`, `operatingCashFlow` | 저장된 SEC Company Facts의 US-GAAP/IFRS 표준 태그에서 제공. 값마다 기간, 제출일, form, accession, taxonomy, concept, unit을 함께 반환 |
+| 재무 요약 | `revenue`, `operatingIncome`, `netIncome`, `cashAndCashEquivalents`, `operatingCashFlow` | 저장된 SEC Company Facts의 US-GAAP/IFRS 표준 태그에서 제공. 값마다 기간, 제출일, form, accession, taxonomy, concept, unit을 함께 반환 |
 | 품질·갱신 | `masterUpdatedAt`, `marketDataObservedAt`, `financialPeriodEnd`, `financialFiledAt`, `dataQuality`, 필드별 `source` | 회사 프로필·시세·재무는 서로 다른 갱신 주기라 전역 단일 `updatedAt`으로 합치지 않음. 시세 관측 나이와 24시간 freshness 기준을 표시 |
 
 ## 현재 API 응답 예시
@@ -92,7 +94,7 @@ etIncome`, `cashAndCashEquivalents`, `operatingCashFlow` | 저장된 SEC Company
 
 ### 1단계: 현재 데이터만으로 기본 프로필 및 저장 재무 사실 (구현)
 
-마스터의 이름·시장·통화·분류와 기존 스냅샷의 quote/시총/주식수 및 시각·출처를 묶는다. SEC CIK/SIC를 ticker-exchange 매핑으로 연결하고 저장된 Company Facts에서 대표 5개 사실을 뽑아 보고기간과 공시 추적 메타데이터를 유지한다. 동일 지표는 가장 늦은 `end` 기간을 선택하고, 기간이 같으면 가장 최근 `filed` 공시를 선택한다. 기간을 합산하거나 독립 분기값으로 변환하지 않는다. DB 테이블을 변경하지 않고 단일 공개 GET으로 조회한다. 티커가 마스터에서 유일하게 검증되지 않거나 활성 COMMON_STOCK이 아니면 데이터를 반환하지 않는다. API는 현재 DB snapshot을 읽으므로 실시간 시세를 새로 조회한다고 표현하지 않는다. 표준 태그가 없거나 SEC 캐시가 없으면 해당 값은 null이다.
+마스터의 이름·시장·통화·분류와 기존 스냅샷의 quote/시총/주식수 및 시각·출처를 묶는다. SEC CIK/SIC는 일일 반영되는 ticker-exchange 매핑을 우선 연결하고, SEC SIC 출처에 10자리 CIK가 기록된 경우 그 provenance로 보완한다. 저장된 Company Facts에서 대표 5개 사실을 뽑아 보고기간과 공시 추적 메타데이터를 유지한다. 동일 지표는 가장 늦은 `end` 기간을 선택하고, 기간이 같으면 가장 최근 `filed` 공시를 선택한다. 기간을 합산하거나 독립 분기값으로 변환하지 않는다. DB 테이블을 변경하지 않고 단일 공개 GET으로 조회한다. 티커가 마스터에서 유일하게 검증되지 않거나 활성 COMMON_STOCK이 아니면 데이터를 반환하지 않는다. API는 현재 DB snapshot을 읽으므로 실시간 시세를 새로 조회한다고 표현하지 않는다. 표준 태그가 없거나 SEC 캐시가 없으면 해당 값은 null이다.
 
 ### 2단계: 추가 재무 항목
 
@@ -115,7 +117,7 @@ etIncome`, `cashAndCashEquivalents`, `operatingCashFlow` | 저장된 SEC Company
 
 - `us_common_stock_universe`: 종목명, 영어명, 거래소 코드, security 분류, 통화, 국가, industry code, 활성 상태와 비보통주 제외 플래그를 제공한다.
 - `instrument_fundamental_snapshots`: 가격·변동률·거래량·거래대금·시총·상장주식수와 통화·원천·관측/수집시각을 제공한다.
-- `sec_companies`: CIK, 회사명, 티커/거래소 배열, SIC 및 원본 갱신시각을 제공한다.
+- `sec_companies`: CIK, 회사명, 티커/거래소 배열, SIC 및 원본 갱신시각을 제공한다. 일일 SEC ticker/exchange master sync가 KIS 활성 COMMON_STOCK에서 확인한 issuer를 upsert하며, Company Facts 동기화 대상 CIK 설정과는 별개다.
 - `sec_xbrl_snapshots`: Company Facts 전체 snapshot을 읽어 표준 태그의 최근 관측값을 추출한다. 각 값의 taxonomy/concept/unit/기간/accession을 응답에 보존한다.
 - `/api/public/instrument-fundamentals`는 이미 market+codes 일괄 스냅샷을 반환하지만, 회사 프로필 조회와 티커 정규화 계약은 제공하지 않는다. 새 단건 계약을 만들 때 기존 endpoint의 의미를 바꾸지 않는다.
 - 단건 API는 `/api/public/us-stock-metadata?ticker=...`다. 오류는 잘못된 티커 400, 미등록 티커 404, 다중 거래소 모호성 409, 활성 보통주가 아닌 경우 422, 저장소 장애 503으로 구분한다.

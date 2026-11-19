@@ -9282,3 +9282,11 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - `git diff --check` 통과. 재무 분석 자료와 대량 untracked scratch 산출물은 분리 보존하며 staging 대상에서 제외한다.
 - 커밋·푸시·배포: 아직 수행하지 않음. 최종 변경 범위 재검토 후 동일 상태에서 검증을 다시 실행하고 진행한다.
 - 남은 위험/다음 단계: 원격이 재배치 중 다시 갱신될 수 있으므로 push 직전 `origin/oci`를 재확인한다. GitHub Actions OCI workflow와 production health 확인을 완료한 뒤 이 항목을 갱신한다.
+
+## [2026-11-19] ADR/ADS 보통주 snapshot API fail-closed 보완
+- **목적/근거**: `ㄷㅊㅇ5` 실행 전 운영 GET에서 AACG/BABA/ABEV가 `COMMON_STOCK`·`is_dr=false`로 반환됐지만 KIS 공식 영문 상품 설명은 `SPON ADS`/`SPON ADR`였다. 현재 repo에는 docs의 예전 설계에 적힌 `POST /api/admin/instrument-universe-import` 경로가 없어 운영 DB 마스터를 바로 재적재할 수 없음을 확인했다.
+- **수정 범위**: `lib/us-depositary-receipt-classification.ts`에 공식 상품 설명 문자열 판별 및 public daily-candles용 SQL predicate를 공유한다. `lib/instrument-universe-import.ts`와 `reconcileUsUniversePartitions`는 DR 분류/플래그 보존, `app/api/public/daily-candles/route.ts`는 NAS/NYS/AMS universe·single·bulk 조회에서 설명 기반 예탁증서를 fail-closed 제외, `app/api/public/us-stock-metadata/route.ts`는 같은 descriptor를 활성 보통주로 공개하지 않는다. 관련 importer·API regression tests 및 KIS master/shortcut/error 문서를 갱신했다.
+- **재발 감지**: 분류 테스트는 AACG/BABA/ABEV ADS/ADR와 AAPL 일반주를 비교한다. public daily-candles route 테스트는 미국 단일/유니버스 SQL의 descriptor 제외 조건을 확인한다. metadata route 테스트는 `is_dr=false`인 AACG의 `SPON ADS`를 422로 거부한다.
+- **격리/검증 상태**: 변경은 clean `codex/daily-candles-dr-filter` worktree에서 수행했으며 원래 workspace 파일은 덮어쓰지 않았다. `npm run deploy:verify` 통과: 운영 의존성 감사 0 취약점, 활성화 preflight, 문서/API surface/catalog 검사, build, standalone 서버 기동/API·Chrome desktop/mobile smoke, Vitest 290 files (1 skipped), 1,649 passed (3 skipped), typecheck 완료. 생성된 route inventory/OpenAPI/document catalog/manuals를 함께 갱신했다. `git diff --check`도 통과했다.
+- **남은 위험/다음 단계**: 운영에 반영되기 전까지 현재 public API와 2026-11-17 US JSON은 보통주 전용으로 보장되지 않는다. 배포 후 `/api/public/daily-candles`의 전체 유니버스에서 descriptor 제외·pagination total을 확인하고 US/KR JSON을 다시 생성·산출 검증한다.
+- **커밋·푸시·배포**: 아직 없음. 원격 반영 전 변경 범위와 최신 `origin/oci`를 확인한다.

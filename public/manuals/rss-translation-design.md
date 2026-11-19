@@ -24,10 +24,12 @@ Google 예비 provider는 `GOOGLE_TRANSLATION_API_KEY`를 사용한다. API key�
 
 | provider | 공식 무료 기준 | 애플리케이션 보호 상한 |
 |---|---|---|
-| Azure Translator F0 | 월 2,000,000자, 시간당 2,000,000자, 요청당 50,000자 | 월 1,800,000자, 이동 60분 1,800,000자, 요청 50,000자 |
-| Google Cloud Translation Basic | 월 첫 500,000자에 매월 $10 credit 적용(Basic/Advanced 공유) | 월 300,000자. 이동 60분 상한 300,000자 |
+| Azure Translator F0 | 월 2,000,000자(표준 번역과 Custom Translator 학습 합산), 시간당 2,000,000자, 요청당 50,000자 | 월 1,950,000자, 이동 60분 1,800,000자, 요청 50,000자 |
+| Google Cloud Translation Basic | 월 첫 500,000자 비용에 최대 월 $10 credit 적용(Basic/Advanced 공유, 이월 없음) | 월 450,000자. 이동 60분 상한 100,000자 |
 
 모든 provider 시도는 `translation_usage_monthly(provider, usage_month)` 및 `translation_usage_reservations`에서 원자적으로 예약한다. DB transaction advisory lock으로 월/rolling-hour 합계를 확인한 뒤 예약한다. 실제 provider가 외부에서 공유되면 앱 원장만으로 그 사용량을 알 수 없으므로 전용 프로젝트/resource를 사용해야 한다. Google의 비용 credit은 자동 사용량 차단이 아니며 Cloud Billing budget 알림도 hard cap이 아니다. 따라서 DB 사전 제한을 유일한 앱 호출 경로로 강제한다.
+
+Google 공식 가격표의 500,000자는 별도 API 무료 quota가 아니라 월 최대 $10 credit을 Basic/Advanced가 함께 소비하는 구조다. Basic text translation의 기본 단가는 1M input characters당 $20이므로 $10 credit 기준 500,000자에 해당한다. 앱은 50,000자 여유를 두고 월 450,000자로 제한한다. 이 보호 상한은 앱의 예약 원장에만 적용되므로 동일 Google Cloud project의 다른 사용량이 있으면 월 $10 credit을 넘을 수 있다. Azure F0의 무료 월 2M자와 시간당 2M자는 별도 제한이며, 앱은 월 50,000자 및 이동 60분 200,000자 여유를 둔다. 앱 제한은 다른 서비스가 같은 resource/project를 사용한 분량까지 예약 원장에 반영하지 못한다.
 
 Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제다. 앱은 월/시간 예산을 무료 제공량보다 10% 낮게 설정하며, 관리자 미리보기 역시 cron과 같은 quota-aware client를 사용한다.
 
@@ -39,11 +41,17 @@ Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제
 - 캐시 키는 원문 hash + 대상 언어 + provider로 구분해 Azure/Google 번역 품질 결과를 혼합하지 않는다.
 - 기존 월 원장은 `google-cloud-translation`으로 유지한다. V159에서 provider 복합키와 rolling reservation 테이블을 추가한다.
 
+## 운영 번역 검증
+
+관리자 전용 `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true&mode=PREVIEW`는 실제 RSS 제목 번역을 시험한다. `limit=1`을 지정하면 첫 항목만 처리해 provider 호출과 무료량 사용을 최소화한다. `diagnostics=true`는 이 PREVIEW 경로에서만 허용되며 항목 ID, 실패 단계, provider, 마스킹된 오류 요약을 반환한다. 번역 key·endpoint 값은 응답하지 않는다. `FETCH_ONLY`도 추적용 quota-aware client를 실제 번역 함수에 전달해 provider 호출량 통계가 실제 요청과 일치해야 한다.
+
 ## 검증·디버깅
 
 - `GET /api/admin/market-rss-test?source=STOCKTITAN&translate=true`는 실제 provider 요청을 할 수 있지만 운영 quota 원장을 똑같이 적용한다.
 - `/health-check` 및 관리자 debug suite는 Azure F0/Google 구성 여부와 선택 순서만 반환하며 key/endpoint 값은 노출하지 않는다.
 - 회귀 테스트는 Azure primary, F0 확인 없는 fail-closed, Google fallback, provider별 quota, retry 별도 예약, 제목 외 필드 미전송, API key 헤더를 검증한다.
+- quota 예약 SQL은 provider/월/요청 문자 수/상한 매개변수 타입을 각각 `text`/`bigint`로 명시하고 upsert 증가량은 `EXCLUDED.reserved_characters`를 사용한다. PostgreSQL 매개변수 타입 추론 충돌은 provider API를 호출하기 전에 `quota_reservation` 단계에서 실패하므로, 예약 성공 회귀 테스트와 단일 항목 운영 PREVIEW로 확인한다.
+- Azure primary 요청 자체가 실패하고 Google fallback도 quota로 차단되면, 관리자 `diagnostics=true` 응답에 `provider_fallback` 단계와 Azure의 마스킹된 오류 원인을 포함한다. 이 내부 진단은 public article DTO/DB에 복사하지 않으며, 영어 `API key`와 구분자 변형도 값 마스킹 테스트에 포함한다.
 - DB 원장은 외부에서 같은 Azure/Google 계정을 공유하는 사용량을 추적할 수 없으므로 프로젝트/resource 분리와 provider portal 사용량 확인은 운영 책임이다.
 
 ## 공식 문서
@@ -56,3 +64,4 @@ Azure 과금 보호는 전용 F0 resource 및 배포 환경 SKU 확인이 전제
 - Google Cloud Translation quotas and counting: https://docs.cloud.google.com/translate/quotas
 - Google API key security (`x-goog-api-key`): https://docs.cloud.google.com/docs/authentication/api-keys-best-practices
 - Cloud Billing budgets are alerts, not automatic caps: https://docs.cloud.google.com/billing/docs/how-to/budgets
+- 공식 요금/제한 수치 재확인: 2026-10-21. Google rolling-hour 100,000자는 공식 무료 제공량이 아니라 본 애플리케이션의 보수적 제한이다.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { summarizeSecCompanyFacts } from "@/lib/us-company-facts-summary";
+import { hasDepositaryReceiptDescriptor } from "@/lib/us-depositary-receipt-classification";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +116,7 @@ export async function GET(request: Request) {
     if (result.rowCount !== 1) return errorResponse("AMBIGUOUS_TICKER", 409);
 
     const row = result.rows[0];
-    if (row.instrument_type !== "COMMON_STOCK" || row.enabled !== true) return errorResponse("NOT_ACTIVE_COMMON_STOCK", 422);
+    if (row.instrument_type !== "COMMON_STOCK" || row.enabled !== true || hasDepositaryReceiptDescriptor(row.english_name)) return errorResponse("NOT_ACTIVE_COMMON_STOCK", 422);
     if (row.is_etf !== false || row.is_warrant !== false || row.is_derivative !== false || row.is_dr !== false || row.is_leveraged !== false || row.is_inverse !== false) {
       return errorResponse("NOT_ACTIVE_COMMON_STOCK", 422);
     }

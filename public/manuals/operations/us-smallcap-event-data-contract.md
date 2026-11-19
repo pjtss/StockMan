@@ -1,44 +1,77 @@
-# 미국 소형주 이벤트 검토 데이터 관리 기준
+# 미국 소형주 이벤트 자료 관리 기준
 
 ## 목적
 
-미국 보통주 100개 종목의 공시·뉴스 조사 구간, 원문 검토 상태, 이벤트 해석, accession 관계 및 운영 서버 확인값을 추적 가능하게 유지한다. 이 문서는 파일별 역할과 데이터 간 불변조건을 정의하며, 조사 결과를 추가할 때마다 적용한다.
+운영 서버의 미국 종목·뉴스 snapshot과 SEC 공시 자료를 조사 배치별로 보존하고, 확인된 사건만 공통 이벤트 원장에 반영한다. 배치 원본, 공시별 검토 상태, 이벤트 공개 자료는 서로 다른 책임을 가지며 고정 식별자로 연결한다.
 
-## 관리 파일
+## 자료 파일과 책임
 
-| 파일 | 권위 있는 내용 | 갱신 규칙 |
-|---|---|---|
-| `data/us-smallcap-event-review-20261031.json` | 100개 종목 유니버스, 티커/CIK, 공통 및 종목별 확인 구간, SEC submissions 사본, 운영 공개 GET snapshot, 이벤트 검토 행과 출처 상태 | 개별 종목 이벤트 추가·정정 시 canonical event와 같은 eventId/status/date를 기록한다. 운영 확인값은 GET 시각, instrument 유형/활성 여부, 시총·관측시각, 뉴스 건수, SEC 분류 이벤트 건수와 DB write 여부를 보존한다. |
-| `data/us-smallcap-filing-review-ledger-20261031.json` | issuer별 accession, SEC 제출 메타데이터, 원문 검토 상태, eventIds, filing 간 관계, 전체 원장 집계 | 이벤트를 직접 뒷받침하는 SEC accession마다 `eventIds`를 기록한다. 전문을 확인한 accession만 `FULL_PRIMARY_REVIEW`로 올리고, 미검토 제출은 inventory 상태를 유지한다. |
-| `data/market-impact-events.json` | 표준 조회용 canonical 이벤트 | SEC 공시·회사 뉴스의 사실, 일정 상태, 방향/확신도, 원문 인용, 위험과 한계를 단일 eventId로 유지한다. 일정 타깃과 발표일은 `eventDateRole`, `datePrecision`, `scheduleWindow`로 분리한다. |
-| `docs/operations/us-smallcap-event-review-20261031.md` | 사람이 읽는 범위·배치별 검토 결과와 주요 이벤트 표 | 조사 구간, 누계, 직접 검토 범위, 남은 확인과 데이터 한계를 구조화 JSON과 맞춘다. |
-| `DEVELOPMENT_LOG.md` | 작업 단위별 목적, 파일, 검증·미실행 항목, 남은 위험 | 모든 조사/수정 배치마다 원인 또는 발견, 반영, 검증, 커밋·푸시·배포 여부를 기록한다. |
+| 자료 | 책임 | 기본 식별자 |
+| --- | --- | --- |
+| `data/us-smallcap-event-review-YYYYMMDD[-bNN].json` | 배치 기준, 운영 종목 snapshot, 뉴스 결과, 종목별 검토 요약 및 직접 확인 이벤트 | `ticker`, `eventId` |
+| `data/us-smallcap-filing-review-ledger-YYYYMMDD[-bNN].json` | 배치 대상 issuer별 SEC submissions inventory와 개별 accession의 검토 상태 | `ticker`, `accession` |
+| `data/market-impact-events.json` | UI/API에 제공되는 정규 이벤트 원장 | `eventId` |
+| `docs/operations/us-smallcap-event-review-YYYYMMDD[-bNN].md` | 수집 범위, 근거 수준, 해석과 한계, 후속 조사 기록 | `ticker`, `accession`, `eventId` |
 
-## 관계 및 검토 상태 규칙
+배치 날짜는 조사 기준일이며 데이터의 최신 시각을 뜻하지 않는다. 각 종목의 운영 시총 관측 시각과 freshness를 그대로 보존한다.
 
-1. 같은 SEC 제출물이 여러 이벤트를 뒷받침할 수 있다. 이 경우 filing 행의 `eventIds`에는 각 이벤트 ID를 모두 기록하고 accession-event index는 이벤트마다 관계 행 하나를 둔다.
-2. SEC 이벤트의 `sourceId` accession은 동일 issuer의 제출 원장에 있어야 하며 해당 filing의 `eventIds`에 eventId를 포함해야 한다. SEC 원문 URL CIK와 종목 CIK가 달라지는 예외는 `relatedSourceUrls`로 명시하고 그 관계를 설명한다.
-3. `reviewedEvents`의 행과 canonical 이벤트는 `eventId`, ticker, event date, status가 같아야 한다. `PRIMARY_SOURCE_REVIEWED`/`FULL_PRIMARY_REVIEW_VERIFIED`는 직접 primary review, `TARGETED_SECTION_REVIEW`는 지정 부분만 확인한 검토다. 전체 발행사 coverage는 이 두 수준을 분리 집계하며, 복구 데이터의 재검증 전에는 `RECOVERED_PENDING_REVALIDATION`을 유지한다.
-4. filing ledger와 종목별 `secSubmissions.filings` 사본의 accession 집합, reviewStatus, eventIds 및 filing 관계는 일치해야 한다.
-5. 상태별 제출 수, 미국 이벤트 수, 직접 검토 종목 수, 재검증 대기 이벤트/종목 수, accession-event 관계 수는 원시 행에서 재계산해 두 데이터 문서의 요약 집계와 일치시킨다.
-6. 발행사 `reviewedEventIds`에는 해당 티커 canonical 이벤트 ID만 둘 수 있다. 직접(primary/full 또는 targeted) 검토 상태인 event row의 accession/source URL은 해당 티커의 CIK·SEC submissions와 일치해야 한다. 발행사 간 문서 링크는 `relatedSourceUrls`로 명시해 검토 source row에 설명 없이 섞지 않는다.
-7. 검토 행의 `validationNotes`에 SEC accession을 적으면 같은 issuer submissions, row `sourceIds`, 또는 canonical event의 명시적 related-source 관계 중 하나로 연결돼야 한다. 종목 간 공통 batch 메모 복사로 타 issuer accession/시총을 넣지 않는다.
-8. event status는 결과/일정의 진행 상태를 뜻한다. 회사가 공지한 목표일, ClinicalTrials.gov 추정 완료일, 제3자 예상 일정은 서로 출처와 date precision을 분리하고 확정 일정으로 승격하지 않는다.
-9. 뉴스/RSS 또는 자동 분류 결과는 후보 발견 근거로만 쓴다. 최종 해석·방향성·수치와 일정은 연결된 SEC 제출 원문, 회사 IR 또는 해당 공식 원문에서 확인한다.
+같은 조사일에 여러 100종목 배치를 만들면 날짜 뒤에 `-b02`, `-b03`처럼 2자리 순번을 붙인다. 첫 배치부터 순번을 붙이지 않은 기존 파일명은 호환성을 위해 유지한다. review JSON, accession ledger, 보고서와 validator 명령은 동일한 날짜·순번을 사용하며, 순번은 파일 간 조인이 아니라 파일 식별에만 쓴다. ticker·CIK·accession·eventId는 각 레코드의 관계 식별자로 유지한다.
 
-## 반복 검증
+## 연결 규칙
 
-이벤트나 filing 원장을 수정할 때 `node scripts/validate-us-smallcap-event-data.mjs`를 실행한다. 이 검증기는 이벤트 필수 필드와 controlled vocabulary, 중복·누락·cross-ticker ID, canonical/review parity, review-row SEC CIK, validation note accession의 issuer ownership, issuer별 filing 사본 parity, eventId별 accession 관계, 양방향 filing amendment 관계 및 모든 요약 집계를 검사한다. 수정한 JSON은 UTF-8로 저장하고 JSON parse를 확인한다. Primary-reviewed coverage와 targeted-section coverage도 분리 집계한다.
+- issuer는 SEC CIK와 ticker를 보관한다. 공식 운영 종목 마스터에서 active `COMMON_STOCK`임을 확인하고, 시장·통화·시총 기준을 같은 snapshot에서 기록한다. SEC ticker master의 CIK를 별도로 보관해 동일 issuer인지 교차 대조한다. 타입이나 상태를 확인할 수 없으면 제외한다.
+- filing은 SEC accession으로 유일하게 식별한다. SEC 공식 submissions에 있는 CIK, form, 접수일 및 accession 경로를 일치시킨다.
+- 이벤트는 불변 `eventId`를 사용한다. 검토 이벤트의 `eventId`와 ticker는 정규 원장 및 accession ledger의 연결과 일치해야 한다.
+- SEC 제출 이벤트는 SEC accession으로 accession ledger에 연결한다. 회사 IR에 직접 게시된 일정은 `sourceType: COMPANY_IR`, 고유 `IR:<ticker>:<key>` eventId, 공식 URL로 연결하며 존재하지 않는 SEC accession을 만들지 않는다. `PRIMARY_SOURCE_REVIEWED`는 직접 확인한 공식 primary URL을 보존하고, `TARGETED_SECTION_REVIEW`는 SEC accession과 제출 원문을 보존한다.
+- 이벤트의 공개 GET은 `eventDetails`만 일정 보충정보로 반환한다. 현지 시각이 확인된 이벤트는 `eventDetails.localDate`, `localTime`, `localTimezone`, `kstDate`, `kstTime`에 저장한다. 원문 시각이 없으면 시간·timezone·KST 3개 필드는 `null`로 보존하며 날짜를 임의로 시간대로 변환하지 않는다. review validator는 `localDate`가 canonical `eventDate`와 같고 지정/미확인 시간이 `eventDetails`와 일치하는지 검사한다.
+- accession 간 `relatedFilings`는 SEC 원문에서 amendment 관계를 직접 확인한 경우에만 상호 연결한다. 날짜·form 근접성만으로 amendment를 추정하지 않는다.
+- 미확인 뉴스나 추정 일정을 정규 이벤트에 올리지 않는다. 일정 상태는 실제 결과, 회사 확정 일정, 공식 추정치, 제3자 추정치가 구별되도록 둔다.
 
-운영 데이터 확인은 공개 read-only GET으로 수행하며 DB 변경을 하지 않는다. 조회 결과가 없거나 종목 분류를 확인할 수 없으면 보통주 적격성을 추정하지 않는다. 커밋 또는 푸시는 프로젝트 규칙에 따라 build·test·run을 각각 수행하고 결과가 확인된 뒤에만 진행한다.
+## 검토 상태
 
-## 현재 기준 레코드
+- `INVENTORY_ONLY`: 제출 메타데이터만 수집했으며 본문 검토를 뜻하지 않는다.
+- `TARGETED_SECTION_REVIEW`: 해당 사건 판단에 필요한 SEC 원문 구간을 확인했다. 첨부 exhibit 전체를 읽지 않았다면 보고서에 그 사실을 표시한다.
+- `PRIMARY_SOURCE_REVIEWED`: 회사 IR 등 SEC 이외의 공식 1차 출처를 직접 확인했다. canonical event와 review row에 공식 URL을 저장한다.
+- 기존 배치에서 쓰는 `FULL_PRIMARY_REVIEW`, `TRIAGE_EXCERPT` 등은 해당 배치 보고서의 정의를 따른다. 상태 이름만으로 다른 수준을 추정하지 않는다.
 
-- 조사 보고서: [`us-smallcap-event-review-20261031.md`](./us-smallcap-event-review-20261031.md)
-- 현재 데이터 검증기: [`../../scripts/validate-us-smallcap-event-data.mjs`](../../scripts/validate-us-smallcap-event-data.mjs)
-- 작업 이력: [`../../DEVELOPMENT_LOG.md`](../../DEVELOPMENT_LOG.md)
-- 각 종목의 SEC review window는 2025-10-31 포함~2026-11-01 미포함으로 저장되며, operating-server GET snapshot은 별도 시각을 보존한다.
+## 검증과 변경 절차
 
-### 운영 수량 불일치 기록
+1. 운영 공개 GET으로 종목 마스터·시총·뉴스를 읽고 수집 시각, 원본 경로, freshness를 저장한다. 운영 API/DB 쓰기를 수행하지 않는다.
+2. official SEC ticker/CIK 및 submissions를 대조하고, accession별 본문 확인 여부를 기록한다.
+3. 근거를 확인한 이벤트만 canonical 원장에 추가하고 review/ledger 양쪽에서 연결한다.
+4. `npm run validate:us-smallcap-event-data:<배치>`로 active COMMON_STOCK 상태, USD 시총 범위, 운영·SEC master CIK 일치, 종목 수, 제출 수, event parity, accession, 검토 상태 수, 공식 amendment 관계를 확인한다. 동일 날짜 복수 배치는 `YYYYMMDDbNN` 이름의 명령으로 각각 독립 검증한다.
+5. `npm run docs:check`가 각 배치 validator를 수행하도록 `package.json`에 등록한다. validator는 배치 ID·100 issuer·검토 event 수와 정규 이벤트/issuer/accession 간 관계를 검사한다. 새 배치 추가 시 검증 명령도 함께 추가하고 이 문서·보고서·`DEVELOPMENT_LOG.md`를 갱신한다. 날짜 배치 운영 보고서는 문서 카탈로그 생성기 명시 패턴으로 포함하고 catalog check 후 공개 manual 경로에서 도달할 수 있는지 확인한다.
+6. 배포 전에는 project deployment verification이 요구하는 build, full test, runtime smoke 및 audits를 통과시킨다. 커밋과 푸시는 순차 실행하고, 운영 배포 후 public GET으로 배치 이벤트를 재확인한다.
 
-운영 market data의 listed shares와 issuer SEC/IR의 issued-and-outstanding 수량이 다르면 출처와 관측시각을 각각 보존한다. 어느 값도 float 또는 대체 수량으로 간주하지 않고 차이를 해당 이벤트의 limitation 및 배치 보고서에 남긴다. 시장가치가 운영 API에서 제공된 경우 출처·기초 관측시각과 함께 보고하며, 주식수 차이를 reconcile하기 전 독립적으로 검증된 시총이라 표현하지 않는다.
+### 반복 배치 생성과 자동 점검
+
+- `scripts/generate-us-smallcap-event-batch.mjs`는 날짜 배치 ID를 인자로 받고 `SMALLCAP_BATCH_INDEX`, `SMALLCAP_PRIOR_BATCH`, `SMALLCAP_BATCH_EVENT_DEFS`로 운영 수집 묶음, 직전 원장, 사람이 검토한 SEC accession 또는 회사 IR 출처 이벤트 정의를 입력받는다. API 수집 결과, 검토 정의, issuer snapshot, accession ledger, canonical event를 서로 다른 파일로 유지한다.
+- `data/us-smallcap-event-defs-YYYYMMDD-bNN.json`은 원문 검토 후 이벤트 판정의 재현 입력이다. SEC 이벤트는 submissions accession 및 CIK와 대조하고, 회사 IR 이벤트는 공식 HTTPS source URL과 ticker별 고유 eventId를 검증한다.
+- 모든 신규 배치 validator는 6개 비보통주 분류 플래그(`is_etf`, `is_warrant`, `is_derivative`, `is_dr`, `is_leveraged`, `is_inverse`)를 검사한다. `--batch` 지정 시 reviewed filing의 reviewBatch와 SEC archive URL CIK가 issuer 원장과 일치하는지 fail-closed 검사한다.
+- SEC 429가 발생하면 요청을 동시 재시도하지 않는다. 간격을 둔 재수집에서 성공한 HTTP 200 응답이 확인되기 전까지 해당 filing은 review 완료로 올리지 않는다.
+
+## 정확성·한계
+
+- SEC submissions 전체 수는 filing 본문을 전수 검토했다는 의미가 아니다. inventory와 사건 직접 검토 수를 분리해 보고한다.
+- 주식 수는 발행주식 수와 유통주식 수를 구별한다. 공식 수치가 없으면 추정하지 않는다.
+- 임상 및 FDA 일정은 확정/추정 상태를 분리한다. 임의의 승인 확률·시장 규모·매출을 만들지 않는다.
+- cap snapshot이 stale이거나 조사와 배포 사이에 바뀌었을 수 있다. 이후 배치 선정 때 운영 마스터로 재검증한다.
+- 오류가 발견되면 잘못된 자료와 정규 이벤트 양쪽을 수정하고, 원인·영향·감지 방법·검증을 `DEVELOPMENT_LOG.md`에 기록한다.
+
+- 시총 snapshot이 24시간 freshness 기준을 넘으면 STALE을 유지하고, $100m 이하는 저장 시점 기준이라고 보고한다. 현재 적격성이 요구되면 stale 종목은 신규 확정 universe에서 제외하며 ticker를 임의 보충하지 않는다.
+- SEC master에서 ticker가 복수 거래소 행에 있으면 exchange 표기만으로 CIK를 추정하지 않는다. 운영 metadata CIK와 공식 SEC row의 동일 CIK가 유일할 때만 통과한다. operating CIK가 누락되면 별도 공식 identity 보강 전까지 제외한다.
+
+### 후보 universe 선택 분모와 coverage
+
+- 새 배치는 운영 후보 API가 선택적으로 제한된 목록을 돌려줄 수 있으므로 이를 전체 universe로 간주하지 않는다. localhost 활성 보통주 universe에서 요청한 fundamentals ticker 수와 정상 응답 ticker 수를 대조해 전체 범위가 일치해야 후보 순위를 확정한다.
+- `review.sourceMethodology.candidateCounts`에는 local universe 수, 반환 수, 이전 batch 제외 후 cap 후보 수, 운영 master metadata 검사 수, 이전 ticker 제외 수를 기록한다. 과거 batch에는 이 필드가 없어도 호환하지만 존재하면 validator가 정수·범위와 전체 응답 coverage를 검사한다.
+- 선택 issuer는 ticker 중복 없이 100개여야 한다. 보통주 분류 및 SEC CIK 검증 실패는 후보 순서대로 제외하고, 전체 후보 목록의 cap 정렬을 유지한다. 신규 배치 validator는 저장된 모든 날짜·순번 review JSON을 순회해 다른 배치 ticker와 교집합이 있으면 실패한다. 같은 조사일의 복수 배치뿐 아니라 다음 조사일에도 중복을 방지한다.
+- 운영 마스터의 `COMMON_STOCK` 값만으로 미국 ordinary/common share의 법적 유형을 확정하지 않는다. SEC 원문이 royalty trust unit, preferred certificate 또는 registered investment fund를 확인하면 운영 분류와 달라도 해당 issuer를 배치에서 제외하고, 예외·근거·제외 수를 보고서와 재현 selection metadata에 남긴다. 분류 불일치는 이름 추정으로 덮어쓰지 않는다.
+- 공시 1건이 둘 이상의 이벤트 정의를 뒷받침할 수 있다. 검토 accession 수는 이벤트 record 수가 아니라 `ticker|accession` 고유 집합과 비교하고, filing row의 eventIds·canonical event·review event 간 다대일 연결을 검사한다.
+- 배치 생성 재실행 때 동일 eventId가 이미 canonical 원장에 있으면 새 검토 정의를 upsert한다. 과거 위험 문구나 일정 요약이 새 정의를 덮어쓰지 못하게 한다.
+- 배치 재생성 때 이전 review가 가진 해당 배치 eventId를 먼저 제거한 후 재구성하고, 입력한 비-SEC source identity와 같지만 eventId가 다른 obsolete canonical 항목도 제거한다. validator는 importer와 동일한 `(market, sourceType, sourceId, ticker, eventType, eventKey)` 규칙으로 전체 US 원장의 identity 중복을 검사한다.
+- 최근 SEC 원문 자동 스캔 결과의 `failed` 필드는 수집기 버전에 따라 실패 목록 배열 또는 정수일 수 있다. generator는 양쪽을 지원하되 `requested`와 `succeeded`가 정수이며 같고 실패 수가 0인지 fail-closed 검사한다.
+- 날짜 추출기는 날짜 후보를 발견할 뿐 이벤트 여부를 판정하지 않는다. 배치 입력은 각 미래 날짜 accession을 이벤트 정의 또는 명시적 제외로 연결해야 한다. `SEC_EXPLICIT_EXCLUSION`은 수동 검토 후 이벤트가 아니라고 판정한 문서에만 쓰며 `exclusionReason`은 구체적인 사유여야 한다. 단순 보류/검토 필요 메모는 제외 완료로 통과할 수 없다.
+- `EXPLICITLY_EXCLUDED` filing은 제외 사유를 review 복사본과 ledger에 동일하게 저장하고 canonical event ID를 연결하지 않는다. accession-event relation count는 TARGETED_SECTION_REVIEW filing만 대상으로 하고, 한 accession이 여러 eventId를 뒷받침할 수 있다.
+- 여러 이벤트가 같은 ticker와 SEC accession, eventType을 공유하면 importer 허용 형식 `^[A-Z0-9._-]{1,64}$`의 `eventKey`를 배치·일정별로 고유하게 저장해 database identity를 분리한다. 구분자 콜론은 허용되지 않으며 eventId만 바꾸는 것은 importer 중복 방지에 충분하지 않다. canonical validator도 같은 형식으로 검사한다.
+- 문서 날짜, 표결 마감, 회계기간 종료, 조건부 베스팅처럼 자동 추출에 걸렸으나 별도 이벤트가 아닌 날짜도 재현 입력에서 accession별 제외 이유를 유지한다. 1차 출처가 없거나 시각이 확인되지 않은 정보는 임의로 채우지 않는다.

@@ -2,11 +2,11 @@
 
 ## 외부 배포 파일
 
-- LLM용 전체 문서 지도: [`/document-catalog.json`](../../public/document-catalog.json)
-- 문서 탐색 API: `GET /api/public/document-catalog?q=keyword&category=operations&limit=10`
-- Swagger식 공개 API 매뉴얼: `GET /api/public/api-manual?q=keyword&category=screeners&limit=10`
 - 사용자·AI용 상세 한국어 매뉴얼: [`/api-reference.md`](../../public/api-reference.md)
 - AI discovery index: [`/llms.txt`](../../public/llms.txt)
+- 구조화 문서 카탈로그: `GET /api/public/document-catalog` 및 [`/document-catalog.json`](../../public/document-catalog.json)
+- Swagger식 공개 API 계약 검색: `GET /api/public/api-manual`
+- 카탈로그 문서 원문: `/manuals/...` (빌드 시 `docs/`에서 생성)
 - OpenAPI 3.1.1 JSON: [`/openapi.json`](../../public/openapi.json)
 - 전체 route method/access/source 인벤토리: [`route-inventory.json`](./route-inventory.json)
 
@@ -16,7 +16,7 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
 ## 공개 범위 결정
 
-외부 AI 공개 범위는 읽기 API로 제한한다. GET method는 무변경을 보증하지 않으므로 라우트 본문에서 확인된 snapshot write, worker 시작 및 KIS realtime ticket 발급 route를 `read-with-side-effect`로 따로 분류한다. URL query에 서명 토큰을 싣는 다운로드 경로는 `signed-link`로 분류해 외부 AI 명세에서 제외한다. 로그인·개인정보, 관리자, debug, cron, internal, webhook, 쓰기/작업 실행 route는 public OpenAPI에 넣지 않는다. 경로/메서드 전체는 운영·개발자가 발견할 수 있게 inventory에 유지한다.
+외부 AI 공개 범위는 읽기 API로 제한한다. GET method는 무변경을 보증하지 않으므로 라우트 본문에서 확인된 snapshot write 및 KIS realtime ticket 발급 route를 `read-with-side-effect`로 따로 분류한다. URL query에 서명 토큰을 싣는 다운로드 경로는 `signed-link`로 분류해 외부 AI 명세에서 제외한다. 로그인·개인정보, 관리자, debug, cron, internal, webhook, 쓰기/작업 실행 route는 public OpenAPI에 넣지 않는다. 경로/메서드 전체는 운영·개발자가 발견할 수 있게 inventory에 유지한다.
 
 외부 공개 OpenAPI에 포함되는 모든 읽기 전용 GET은 무인증이어야 한다. 사용자·관리자 정보, 내부 진단, 쓰기·작업 실행 및 GET 부수효과가 있는 route는 공개 명세에서 제외한다. API surface 감사는 외부 GET의 Bearer 인증과 공개 후보 route의 요청자 인증 확인을 실패 처리한다.
 
@@ -25,6 +25,14 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 ## 생성·감사
 
 `scripts/api-surface.mjs`는 `app/api/**/route.ts`의 exported HTTP methods, path, 제한적 인증/side-effect 표식을 읽어 inventory와 public GET OpenAPI operation을 만든다.
+
+미국 OBV 다이버전스 공개 `GET /api/scan/us-obv-divergence`는 사전 계산 DB 스냅샷만 읽는다. 계산·쓰기 작업은 `POST /api/cron/us-obv-divergence-snapshot`에서 cron secret으로 보호하고 외부 OpenAPI에는 GET만 노출한다. 응답·query 계약은 [`public/api-reference.md`](../../public/api-reference.md)의 OBV 항목과 API surface generator의 응답 schema를 함께 갱신한다.
+
+공시 영향 이벤트의 분석·JSON 작성 계약은 무인증 `GET /api/public/market-impact-events/guide`에서 구조화 JSON으로 제공한다. `data/market-impact-event-guide.json`을 해당 응답의 단일 원본으로 관리하고, `guideVersion`과 `schemaVersion`을 분리해 안내 콘텐츠 변경과 응답 구조 변경을 구분한다. 이벤트 조회 API와 guide API는 모두 무인증 읽기 전용이며, 저장은 관리 JSON 변경 후 기존 배포 importer 경로로 운영 DB에 upsert한다.
+
+공시 이벤트 조회는 `status`·`eventType` 필터와 keyset `cursor` 페이지네이션을 제공한다. 다음 페이지 요청에는 같은 필터와 `limit`을 유지하고 응답 `nextCursor`를 전달한다. 응답 item은 `keyDates` 및 `eventDetails`도 포함한다. 개별 일정 발생일을 검색할 때는 `/api/public/market-impact-event-occurrences`를 사용한다. 이 API는 `keyDates`를 발생일별 row로 펼쳐 날짜·일정 상태·시장·티커·이벤트 유형 필터와 독립적인 keyset 페이지네이션을 제공한다.
+
+공시 영향 이벤트 중복 방지는 `eventId`와 별도의 자연 키 `(market, sourceType, sourceId, ticker, eventType, eventKey)`를 사용한다. importer는 입력 JSON 내 자연 키 중복 및 운영 DB의 다른 eventId와의 충돌을 쓰기 전에 거부하고, V164 unique index는 동시 importer 실행까지 막는다. 독립 사건 여러 개가 한 공시에 있으면 `eventKey`를 각각 명시한다.
 
     npm run docs:api:generate
     npm run audit:api-surface
@@ -39,9 +47,6 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 4. 새 API는 필요하면 OpenAPI operation의 manual schema 보강을 반영하고, OpenAPI spec을 OpenAPI 공식 문서 기준으로 확인한다.
 5. route 추가·변경·삭제 때 inventory와 OpenAPI를 재생성한 뒤 audit을 실행한다.
 6. `npm run deploy:verify`는 실제 standalone package에 discovery 파일을 복사해 HTTP로 읽을 수 있는지 검증한다.
-7. 문서 추가·이동·삭제 시 LLM 문서 카탈로그도 생성하고 `docs:check`에서 추적 문서와 설명·관련 링크의 최신성을 검증한다.
-
-미국 OBV 다이버전스의 공개 `GET /api/scan/us-obv-divergence`는 사전 계산 DB 스냅샷만 읽는다. 계산·쓰기 작업은 `POST /api/cron/us-obv-divergence-snapshot`에서 cron secret으로 보호하고, 외부 OpenAPI에는 GET만 노출한다. 응답·query 계약은 [`public/api-reference.md`](../../public/api-reference.md)의 OBV 항목과 `scripts/api-surface.mjs`의 명시 스키마를 함께 갱신한다.
 
 ## 현재 한계와 다음 개선
 

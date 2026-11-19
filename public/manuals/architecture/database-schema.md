@@ -30,7 +30,7 @@ scanner·API·알림·관리자 화면
 |---|---|---|
 | `filings` | `id`, `source`, `external_id`, `company`, `title`, `judgment`, `form_type`, `keywords[]`, `summary`, `published_at`, `published_date_seoul`, `link`, `created_at`, `updated_at` | DART·SEC 공시 통합 이력. `(source, external_id)` 유일 |
 | `alert_events` | `id`, `source`, `external_id`, `created_at` | 공시 알림 중복 방지. `(source, external_id)` 유일 |
-| `push_subscriptions` | `id`, `endpoint`, `p256dh`, `auth`, `user_agent`, `enabled`, `dart_enabled`, `intensity_enabled`, `rising_enabled`, `created_at`, `updated_at` | Web Push 구독. `endpoint` 유일 |
+| `push_subscriptions` | `id`, `endpoint`, `p256dh`, `auth`, `user_agent`, `enabled`, `dart_enabled`, `intensity_enabled`, `rising_enabled`, `preview_mode`, `preference_revision`, `created_at`, `updated_at` | Web Push 구독·선호도 세대. `endpoint` 유일; 기본 opt-in은 비활성 |
 | `telegram_subscribers` | `id`, `chat_id`, `enabled`, `created_at`, `updated_at` | Telegram 구독. `chat_id` 유일 |
 | `feature_module_settings` | `module_key`, `settings`, `updated_at` | 기능 모듈 JSON 설정. `module_key` PK |
 | `kis_api_configs` | `key`, `config`, `updated_at` | 관리자 KIS API 설정. `key` PK |
@@ -73,14 +73,14 @@ scanner·API·알림·관리자 화면
 | `us_breaking_news_discord_delivery` | `external_id`, `title`, `source`, `published_at`, `status`, `attempts`, `last_error`, `sent_at`, `updated_at` | 미국 속보 Discord 중복·전송 상태 |
 | `instrument_candle_cache_failures` | `id`, `market`, `code`, `timeframe`, `error`, `observed_at` | 캔들 캐시 실패 이력 |
 | `instrument_candle_cache_retries` | `id`, `market`, `code`, `timeframe`, `status`, `attempts`, `next_attempt_at`, `last_error`, `last_attempt_at`, `succeeded_at`, `created_at`, `updated_at` | 캔들 재시도 큐. `(market, code, timeframe)` 유일 |
-| `daily_bollinger_cache_retries` | `id`, `scope`, `zone`, `status`, `attempts`, `next_attempt_at`, `last_error`, `last_attempt_at`, `succeeded_at`, `created_at`, `updated_at` | BB 후속 캐시 재시도. `(scope, zone)` 유일 |
+| `daily_bollinger_cache_retries` | `id`, `scope`, `zone`, `status`, `attempts`, `next_attempt_at`, `last_error`, `last_attempt_at`, `succeeded_at`, `created_at`, `updated_at` | BB 후속 캐시 재시도. `(scope, zone)` 유일; scope/zone/status/attempts 허용값은 V177 CHECK 제약으로 제한 |
 | `us_news_radar_events` | `external_id`, `ticker`, `market`, `instrument_id`, `title`, `status`, `attempts`, `last_error`, `sent_at`, `updated_at` | 미국 뉴스 레이더 이벤트. `external_id` PK |
 
 ### RSS·SEC 원문 및 분석
 
 | 테이블 | 주요 구조 | 용도·키 |
 |---|---|---|
-| `market_rss_articles` | `id`, `source`, `external_id`, `title`, `summary`, `raw_payload`, `source_snapshot_id`, `detected_ticker`, 분류·번역·알림 상태 필드, `link`, 발행·생성·갱신 시각 | 시장 RSS 기사. `(source, external_id)` 유일 |
+| `market_rss_articles` | `id`, `source`, `external_id`, `title`, `summary`, `raw_payload`, `source_snapshot_id`, `detected_ticker`, 분류·번역·알림 상태 필드, `link`, 발행·생성·갱신 시각 | 시장 RSS 기사. `(source, external_id)` 유일; V176에서 발행일·source 정렬 인덱스 추가 |
 | `market_rss_fetch_snapshots` | `id`, `source`, `url`, `status`, `response_headers`, `raw_payload`, `content_hash`, `item_count`, `fetched_at`, `created_at` | RSS 원문 응답 보관. `(source, content_hash)` 유일 |
 | `sec_companies` | `cik`, `name`, `tickers[]`, `exchanges[]`, `sic`, `source_updated_at`, `updated_at` | SEC 회사 마스터. `cik` PK |
 | `sec_submissions` | `accession`, `cik`, `form`, `filing_date`, `report_date`, `primary_document`, `primary_doc_description`, `items`, `acceptance_datetime`, `filing_url`, `raw_payload`, 분류 결과 필드, `created_at`, `updated_at` | SEC 제출 메타데이터. `accession` PK |

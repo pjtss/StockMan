@@ -199,20 +199,31 @@ type DailyDisclosureItem = {
 
 ### 복사 기능
 
-- 선택 조건에 해당하는 원문 URL 문자열만 줄바꿈으로 구분해 복사한다. JSON 괄호·따옴표와 RSS DB 저장 시각, 조회 범위, 출처, 제목 등 다른 값은 클립보드에 넣지 않는다.
-- `원문 링크 복사` 버튼을 제공한다.
-- `미국 RSS 원문 링크 복사` 버튼은 현재 조회 조건에 포함된 항목 중 `SEC_EDGAR`, `NASDAQ`, `NASDAQ_TRADER`, `STOCKTITAN`, `GLOBENEWSWIRE` 출처의 원문 URL 문자열만 줄바꿈으로 복사한다.
-- 링크가 없는 항목은 복사 대상에서 제외한다.
+- 화면에는 목록을 표시하지 않고 선택 조건에 해당하는 원문 URL 문자열만 줄바꿈으로 구분해 복사한다. JSON 구문, RSS DB 저장 시각, 조회 범위, 출처, 제목 등 다른 값은 클립보드에 넣지 않는다.
+- `전체 링크 복사` 버튼을 제공한다.
+- `미국 RSS 링크 복사` 버튼은 현재 조회 조건에 포함된 항목 중 `SEC_EDGAR`, `NASDAQ`, `NASDAQ_TRADER`, `STOCKTITAN`, `GLOBENEWSWIRE` 출처의 원문 URL 문자열만 복사한다.
+- 원문 링크가 없는 항목은 복사 결과에서 제외한다.
 - `navigator.clipboard.writeText`를 우선 사용하고, 권한이 없거나 비보안 컨텍스트인 경우 선택 영역 기반 fallback을 사용한다.
 - 복사 성공·실패를 버튼 상태와 접근성 라이브 영역으로 알린다. 원문 HTML은 복사하지 않고 태그를 제거한 텍스트만 복사한다.
 
-### 2026-11-03 작업 기록
+### 2026-11-03 RSS 링크 필드 수정
 
-- **목적/범위**: 일별 공시 화면의 전체 및 미국 RSS 복사를 JSON 형식 없이 URL 문자열만 줄바꿈으로 복사하도록 변경했다.
+- **근본 원인**: `/api/disclosures`는 RSS 항목의 원문 주소를 `link` 필드로 반환하지만 복사 UI가 존재하지 않는 `url` 필드를 읽었다. 출처별 조회에는 항목이 있어도 복사 배열에서는 모든 URL이 걸러져 0건으로 표시됐다.
+- **수정/재발 방지**: 전체 링크 및 미국 RSS 링크 복사를 API 계약과 같이 `item.link`를 읽도록 수정하고 항목 타입에 `link`를 명시했다. 회귀 테스트 fixture도 운영 API와 동일한 `link` 형태만 사용한다.
+- **영향 범위**: 일별 공시 화면의 전체 링크 복사 및 미국 RSS 링크 복사. 조회·저장 API는 변경하지 않는다.
+- **운영 근거**: 운영 `/api/disclosures?hours=24&source=STOCKTITAN` read-only 조회에서 866건을 받았고 첫 항목은 `source=STOCKTITAN`, `link=https://...`를 포함하며 `url` 필드는 없었다.
+- **검증 결과**: 화면 회귀 테스트 1파일 4개 통과. `npm run deploy:verify` 통과: 전체 테스트 299파일 통과·1파일 제외, 1,541개 통과·3개 제외; 타입검사, 문서/API/인증/KIS/cron 감사, production build, standalone `/charts`·API smoke, Chrome 데스크톱·모바일 hydration 검증 통과.
+- **배포/운영 확인**: 커밋 `3e4ced86a143569a4e7a33a20f836b35ccce9384`를 `oci`에 push했다. GitHub Actions `Deploy OCI` run `41558892724` 성공. 배포 후 `/api/health`는 `ok`, `/disclosures`는 HTTP 200을 반환했다. 운영 StockTitan 조회에서 866건 모두 `link`가 있고 `url`은 0건임을 재확인했으며, 배포된 JavaScript에서도 `link` 매핑과 링크 건수 안내를 확인했다.
+- **커밋/푸시/배포**: 코드 수정과 문서화까지 완료했다. 후속 문서 기록 커밋도 배포 전에 전체 검증한다.
+- **남은 위험**: API 응답에 빈 `link`가 있는 개별 항목은 복사하지 않는다.
+
+### 2026-11-03 링크만 복사 배포
+
+- **목적/범위**: 일별 공시 화면의 복사 동작을 URL 문자열만 줄바꿈으로 전달하도록 바꾸고, 버튼 이름과 회귀 테스트를 일치시켰다.
 - **변경 파일**: `components/daily-disclosures-page.tsx`, `components/daily-disclosures-page.test.tsx`, 본 설계 문서.
-- **검증 결과**: `pnpm vitest run components/daily-disclosures-page.test.tsx` 통과(1파일, 4테스트). pnpm 실행 시 기존 다른 패키지 매니저 설치물을 재구성한다는 경고가 발생했다.
-- **빌드/실행**: 미실행. **커밋/푸시/배포**: 미실행.
-- **남은 위험/개선**: 일부 항목에 원문 링크가 없으면 해당 항목은 복사 결과에서 생략된다.
+- **검증 결과**: `npm run deploy:verify` 통과. 전체 테스트 299파일 통과·1파일 제외, 1,541개 통과·3개 제외; 타입검사, 문서/API/인증/KIS/cron 감사, production build, standalone `/charts`·API smoke 및 Chrome 데스크톱/모바일 hydration 검증 통과.
+- **배포 결과**: 커밋 `5a934c233c594c32ec7e6e5211623a92c3aa9b4e`를 `oci`에 push했다. GitHub Actions `Deploy OCI` 실행 `41552370280` 성공, 운영 `/api/health`는 `status=ok`, `/disclosures`는 HTTP 200이며 배포 JavaScript에서 `전체 링크 복사`·`미국 RSS 링크 복사` 문구를 확인했다.
+- **커밋/푸시/배포**: 수행 완료. 운영 health 응답은 현재 `status`와 요청 상태만 제공하므로 commit/build/Flyway 상세값은 이 endpoint에서 확인하지 않았다.
 
 ### 관리자·자동화
 

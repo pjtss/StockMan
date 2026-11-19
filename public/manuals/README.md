@@ -18,38 +18,8 @@
 
 ## 시작점
 
-- SEC·RSS 장기 이벤트 ledger의 코드 현황·확장 계획: [현재 분석](./stockman-events-current-analysis.md) · [아키텍처](./stockman-events-architecture.md) · [데이터 모델](./stockman-events-data-model.md) · [API](./stockman-events-api.md) · [운영](./stockman-events-operations.md).
-
-- **LLM이 기능별 문서를 찾는 단일 진입점**: [문서 카탈로그 JSON](../public/document-catalog.json) · [문서 검색 GET](../app/api/public/document-catalog/route.ts) · [LLM 안내](../public/llms.txt). 카탈로그에서 필요한 문서만 선택해 읽는다. 배포된 문서 원문은 `/manuals/...`에서 제공한다.
-- 공시 투자 T0 수치검토의 유상증자 후속 검증 벡터: [`follow-up-equity-raise.v0.json`](./fixtures/disclosure/follow-up-equity-raise.v0.json) · CB/BW/EB 조건 검증: [`convertible-securities.v0.json`](./fixtures/disclosure/convertible-securities.v0.json) · 실제 행사/교환·상장 결과 source-shape 검증: [`convertible-outcome-evidence.v0.json`](./fixtures/disclosure/convertible-outcome-evidence.v0.json) · 현금·부채·신주·유통공급 효과 분리: [`capital-impact-separation.v0.json`](./fixtures/disclosure/capital-impact-separation.v0.json) · 자금조달 일정·조건부 scenario 검증: [`financing-timeline-scenarios.v0.json`](./fixtures/disclosure/financing-timeline-scenarios.v0.json) · OpenDART DS005 CB/BW/EB 공식 field acceptance: [`ds005-financing-field-acceptance.v0.json`](./fixtures/disclosure/ds005-financing-field-acceptance.v0.json) · 실제 공시 reviewer adjudication package 계약: [`financing-adjudication-package.v0.json`](./fixtures/disclosure/financing-adjudication-package.v0.json) · claim→review→effect→publication 추적 경계: [`financing-claim-review-trace.v0.json`](./fixtures/disclosure/financing-claim-review-trace.v0.json) · stable consumer identity와 immutable revision 경계: [`consumer-identity-revision.v0.json`](./fixtures/disclosure/consumer-identity-revision.v0.json) · JCS byte/hash 및 generation FK acceptance runner 계약: [`consumer-identity-executable-acceptance.v0.json`](./fixtures/disclosure/consumer-identity-executable-acceptance.v0.json) · 단계별 acceptance report/격리 실행 경계: [`consumer-identity-acceptance-report.v0.json`](./fixtures/disclosure/consumer-identity-acceptance-report.v0.json)
-- 공시 근거 claim→수치 계산→투자 해석→사용자 dossier의 단계별 dependency/hash/state transition 통합 acceptance: [`investment-effect-projection-bridge.v0.json`](./fixtures/disclosure/investment-effect-projection-bridge.v0.json)
-- 투자 claim별 반대 근거 분모, reviewer governance, investment-effect bridge dependency 연결 acceptance: [DCR-01–18](./fixtures/disclosure/disclosure-counterevidence-review.v0.json) · [설계](./architecture/kr-disclosure-event-architecture.md#claim별-반대-근거-검토-manifest)
-- action 권리 revision이 기존 claim·계산·해석·공개 승인 및 저장/알림 descendant에 전파되는 범위: [`investment-rights-action-propagation.v0.json`](./fixtures/disclosure/investment-rights-action-propagation.v0.json)
-- IRAP 시나리오별 owner/evidence/차단 gate를 decision register/lifecycle과 정확히 대조하는 기준: 같은 [`investment-rights-action-propagation.v0.json`](./fixtures/disclosure/investment-rights-action-propagation.v0.json) 및 [`decision-register-lifecycle.v0.json`](./fixtures/disclosure/decision-register-lifecycle.v0.json)
-- 사용자 개인 검토를 공시 event/claim revision에 pin하면서 공개 projection과 격리하는 제안: [`personal-disclosure-review-note.v0.json`](./fixtures/disclosure/personal-disclosure-review-note.v0.json)
-- 사용자가 직접 기록한 투자 가설·반대 근거·사전 검토 horizon을 공시 revision에 연결하는 별도 journal 기획: [`investment-thesis-journal-design.md`](./architecture/investment-thesis-journal-design.md) · [합성 수용 fixture](./fixtures/disclosure/investment-thesis-journal.v0.json)
-- 사용자 thesis의 review trigger를 typed predicate·rights·coverage·cutoff에 결박하고, 관측 상태를 투자 판단·매매 지시와 분리하는 합성 수용 계약: [ITHR-01–14](./fixtures/disclosure/investment-thesis-review-trigger.v0.json) · [설계](./architecture/investment-thesis-journal-design.md#사용자-검토-trigger의-평가-경계)
-- OpenDART/KIND 원천 권리 결정을 action·purpose·channel·보존 등급별로 격리하고 scope 충돌·불완전 descendant 분모는 fail-closed하는 정책/remediation contract: [`rights-action-decision.v0.json`](./fixtures/disclosure/rights-action-decision.v0.json) · 정정 후 채널별 알림 reconciliation: [`correction-delivery-reconciliation.v0.json`](./fixtures/disclosure/correction-delivery-reconciliation.v0.json)
-- decision register의 합성 status·revision·scope·acceptance 경계: [`decision-register-lifecycle.v0.json`](./fixtures/disclosure/decision-register-lifecycle.v0.json)
-- 의사결정의 ID·owner·scope·기본 동작·수용 증거 canonical source와 검색용 catalog 항목: [`decision-register.v0.json`](./fixtures/disclosure/decision-register.v0.json) · 상태는 공개 catalog에서 제외한 controlled evidence ledger의 최신 유효 revision에서 계산
-- decision ledger 전체 파일 재작성·prefix replay를 막기 위한 미승인 외부 서명 checkpoint 설계와 DLCP-01~08 수용 분모: [`decision-ledger-checkpoint.v0.json`](./fixtures/disclosure/decision-ledger-checkpoint.v0.json) · 실제 알고리즘, KMS, 저장소, 주기와 key ownership은 `KR-OPERATIONAL-SECURITY-01` 승인 전 미결
-- 여러 공시의 CB/BW/EB·증자/감자·전환/상장 movement와 정기보고서 자본 snapshot을 issuer/series/as-of 축으로 조정하는 미승인 설계 및 중복 방지 수용 분모: [`issuer-capital-state-reconciliation.v0.json`](./fixtures/disclosure/issuer-capital-state-reconciliation.v0.json) · `KR-CAPITAL-RECONCILIATION-01` owner 승인 전 공개/운영 차단
-- issuer 재무·감사 신호·법원 절차·KRX 매매/상장 상태를 혼동 없이 연결하는 미승인 timeline fixture: [`issuer-risk-status-timeline.v0.json`](./fixtures/disclosure/issuer-risk-status-timeline.v0.json) · `KR-ISSUER-RISK-STATUS-01` 결정 전 현재 상태/해소 결론 공개 차단
-- 공시 dossier에 issuer 자본 상태와 위험/상장 상태를 분리 표시하고 issuer/instrument 적용범위·명시적 context 라벨·동일 snapshot을 요구하는 synthetic contract: [`disclosure-investment-dossier-projection.v0.json`](./fixtures/disclosure/disclosure-investment-dossier-projection.v0.json) · DIDP-13~24 보강
-- 기존 공시 이벤트 v1의 덮어쓰기·과거 revision 재현 한계와 vNext 전환 기준: [`market-impact-events-design.md`](./architecture/market-impact-events-design.md) · [`legacy-event-revision-transition.v0.json`](./fixtures/disclosure/legacy-event-revision-transition.v0.json)
-- 승인된 공시 claim의 정정·철회·첨부 교체·반복 정정 lineage와 영향 consumer를 바로잡는 설계 fixture: [`fact-correction-remediation.v0.json`](./fixtures/disclosure/fact-correction-remediation.v0.json)
-- 공시 후 시장반응 기술통계의 event time·봉 가격 관측시각·수정 revision·조정기준과 provider 권리 revision, 재실행·shadow gate를 연결하는 snapshot 기획: [`event-price-observation.v0.json`](./fixtures/disclosure/event-price-observation.v0.json) · `KR-MARKET-DATA-RIGHTS-01` / `KR-EVENT-STUDY-POLICY-01`
-- 확정·추정 일정과 event lifecycle을 분리하는 합성 수용 fixture: [`event-date-lifecycle.v0.json`](./fixtures/disclosure/event-date-lifecycle.v0.json)
-- 일정 reminder opt-in·revision fencing·정밀도·중복 방지·푸시 미리보기 개인정보 경계 합성 fixture: [`event-schedule-notification.v0.json`](./fixtures/disclosure/event-schedule-notification.v0.json)
-- 관심종목 relevance overlay, 사건별 explicit 구독, provider attempt·정정 lineage 및 target hash/retention fixture: [`disclosure-user-event-subscription.v0.json`](./fixtures/disclosure/disclosure-user-event-subscription.v0.json)
-- 푸시 카테고리 선호·OS 권한·device privacy mode·테스트 전송 범위 acceptance: [`push-preference-lockscreen.v0.json`](./fixtures/disclosure/push-preference-lockscreen.v0.json)
-- 테스트 푸시 authorization·CSRF·owner target·recipient cap·배포 ingress 증거 fixture: [`push-test-delivery-safety.v0.json`](./fixtures/disclosure/push-test-delivery-safety.v0.json)
-- 최종 push preview DTO·service worker 렌더링·OS/browser device QA privacy dataflow fixture: [`push-privacy-dataflow.v0.json`](./fixtures/disclosure/push-privacy-dataflow.v0.json)
-- 푸시 UI source label·preference·formatter·실제 production producer call-site 정합성 inventory: [`push-producer-catalog.v0.json`](./fixtures/disclosure/push-producer-catalog.v0.json)
-- 법인·증권 instrument·시점별 market/code alias·보통주/cap 적격성 crosswalk: [`instrument-identity-temporal-crosswalk.v0.json`](./fixtures/disclosure/instrument-identity-temporal-crosswalk.v0.json)
+- LLM 단일 discovery 경로: [문서 카탈로그](../public/document-catalog.json) · [기능 문서 검색 GET](../app/api/public/document-catalog/route.ts) · [Swagger식 API 메뉴얼 GET](../app/api/public/api-manual/route.ts) · [운영 문서 인덱스](../public/manuals/README.md) · [llms.txt](../public/llms.txt)
 - 외부 읽기 API 매뉴얼·OpenAPI·AI discovery: [`api/README.md`](./api/README.md) · [배포 매뉴얼](../public/api-reference.md) · [OpenAPI JSON](../public/openapi.json) · [llms.txt](../public/llms.txt)
-
-- 독립형 HTML 데이터 보고서 스타일·구성 기준: [`operations/html-data-report-style-guide.md`](./operations/html-data-report-style-guide.md)
 
 - 기업 분석 전체 인덱스: [`company-analysis/`](./company-analysis/README.md)
 - 다국가 뉴스 링크 분석 아카이브: [`company-analysis/rss/`](./company-analysis/rss/README.md) · 날짜별 결과는 사용자 분석 기록이며 공개 API/운영 RSS 보고서와 별도 관리
@@ -74,8 +44,8 @@
 
 - 시장 전체·업종별 거래대금 흐름 기능 기획안: [`architecture/market-money-flow-feature-plan.md`](./architecture/market-money-flow-feature-plan.md)
 - 현재 시스템 기준서: [`architecture/current-system-reference.md`](./architecture/current-system-reference.md)
-- 설계 문서 생명주기·갱신 기준과 템플릿: [`architecture/design-management.md`](./architecture/design-management.md) · [`architecture/design-template.md`](./architecture/design-template.md)
-- 미국 보통주 OBV 다이버전스 공개 GET API 구현 설계와 운영 개선 과제: [`architecture/us-obv-divergence-api-design.md`](./architecture/us-obv-divergence-api-design.md)
+- 설계 문서 관리 기준과 재사용 템플릿: [`architecture/design-management.md`](./architecture/design-management.md) · [`architecture/design-template.md`](./architecture/design-template.md)
+- 미국 보통주 OBV 다이버전스 API: [`설계·운영 개선 과제`](./architecture/us-obv-divergence-api-design.md)
 - 미국 상승률 TOP100 UI 데이터 품질·부분 응답·원천 시각·누락 방지 계약: [`US_TOP_RISING_UI_DATA_QUALITY.md`](./US_TOP_RISING_UI_DATA_QUALITY.md)
 
 - 상세 시스템 모듈 카탈로그·SRP 책임 지도: [`architecture/system-module-catalog.md`](./architecture/system-module-catalog.md)
@@ -91,6 +61,7 @@
 - 국내 보통주 공시 이벤트 구조 설계(검토 중, 구현 승인 아님): [`architecture/kr-disclosure-event-architecture.md`](./architecture/kr-disclosure-event-architecture.md)
 - 공시 투자분석 gold-set sampling/adjudication protocol: [ixtures/disclosure/disclosure-investment-gold-set-protocol.v0.json](./fixtures/disclosure/disclosure-investment-gold-set-protocol.v0.json) — filing 단위 sample frame 안에서 event별 party/claim/instrument 분리와 mixed evidence 비합산 사례 DIGSP-01~12
 - 공시 기반 투자 기획의 우선순위·의사결정·문서 연결 인덱스: [`architecture/kr-disclosure-investment-planning-index.md`](./architecture/kr-disclosure-investment-planning-index.md)
+- 개인 투자 thesis journal 설계 및 합성 acceptance fixture: [`architecture/investment-thesis-journal-design.md`](./architecture/investment-thesis-journal-design.md) · [`fixtures/disclosure/investment-thesis-journal.v0.json`](./fixtures/disclosure/investment-thesis-journal.v0.json)
 - 정정·철회 전달·사용자 공시함 revision 및 투자 thesis 영향 전파 합성 fixture: [`fixtures/disclosure/correction-delivery-reconciliation.v0.json`](./fixtures/disclosure/correction-delivery-reconciliation.v0.json)
 - 공시 기반 투자 기능의 연속 기획 백로그와 승인 의존 순서: [`architecture/kr-disclosure-event-architecture.md#기획-개선-운영판--2026-11-04`](./architecture/kr-disclosure-event-architecture.md#기획-개선-운영판--2026-11-04)
 - 유상증자 계획·이행 follow-up DTO synthetic golden vector v0 (runtime acceptance 아님): [`fixtures/disclosure/follow-up-equity-raise.v0.json`](./fixtures/disclosure/follow-up-equity-raise.v0.json)
@@ -98,12 +69,13 @@
 - 데이터베이스·전체 테이블 구조: [`architecture/database-schema.md`](./architecture/database-schema.md)
 - 전체 제품·데이터·자동화 구조: [`architecture/project-architecture.md`](./architecture/project-architecture.md)
 - 국내·해외 전체 종목 통합 유니버스 동기화 설계: [`architecture/instrument-universe-sync.md`](./architecture/instrument-universe-sync.md)
+- 미국 보통주 산업분류 코드(KIS ICOD 전용) 수집·저장 설계: [`architecture/us-industry-classification-data-design.md`](./architecture/us-industry-classification-data-design.md)
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 전체 전달 생명주기: [`development/delivery-lifecycle.md`](./development/delivery-lifecycle.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
-- 공시 이벤트를 ChatGPT 웹에서 분석하고 JSON으로 반영하는 절차: [`operations/market-impact-event-chatgpt-web-runbook.md`](./operations/market-impact-event-chatgpt-web-runbook.md)
-- 국내 보통주 일봉 캐시 관리자 로그인·수동 갱신·운영 검증 절차: [`operations/kr-daily-cache-refresh-runbook.md`](./operations/kr-daily-cache-refresh-runbook.md)
+- 대화 단축어와 운영 API 일봉 JSON 스냅샷 절차: [`operations/shortcuts.md`](./operations/shortcuts.md)
 - RSS 번역 상태 공개 검수 API: [`operations/market-rss-translation-debug-api.md`](./operations/market-rss-translation-debug-api.md)
+- 공시 기반 일별 주가 영향 이벤트 JSON·DB·API·작성 가이드 API: [`architecture/market-impact-events-design.md`](./architecture/market-impact-events-design.md)
 - 지속 개선 운영 기준: [`operations/continuous-improvement.md`](./operations/continuous-improvement.md)
 - 지속 개선 검토 주기: [`operations/improvement-review.md`](./operations/improvement-review.md)
 - 프로젝트 전체 디버깅 구조: [`DEBUGGING_ARCHITECTURE.md`](./DEBUGGING_ARCHITECTURE.md)
@@ -138,7 +110,8 @@
 - 2026-10-15 소형주 급등 후보 262개의 최근 3개월 SEC 공시 요약·coverage: [`reports/sec-edgar-analysis/cohorts/2026-10-15-risers/`](../reports/sec-edgar-analysis/cohorts/2026-10-15-risers/README.md)
 
 - [미사용 기능 후보 조사 (2026-10-20)](operations/unused-feature-candidates-20261020.md)
-- [공시 기반 투자 아키텍처 — acceptance 실행 manifest/report 격리 경계 제안](architecture/kr-disclosure-event-architecture.md) · [합성 report fixture](fixtures/disclosure/consumer-identity-acceptance-report.v0.json)
-- [공시 정정 이후 채널별 알림 reconciliation 기획 및 합성 수용 fixture](fixtures/disclosure/correction-delivery-reconciliation.v0.json)
-- 미국 보통주 $1 이하 현재 quote 및 SEC 기업사실 (2026-10-24 KST): [474개 SEC 확인 현재 표](./operations/us-common-stocks-under-1-live-20261024-current.md) · [CSV](./operations/us-common-stocks-under-1-live-20261024-current.csv) · [SEC-only/단타 필드 설계안](./operations/us-common-stocks-under-1-sec-design.md) · [보류·제외/가격 미확인 및 종목별 lock-up 자료는 현행 표의 참조 링크 확인]. 가격·30일 범위만 사용자 허용 시세 원천이며 SEC 기업사실은 SEC 근거만 사용한다.
-- 공시 dossier 공개 조회의 무인증 GET·issuer/instrument 필터·rights/master/cap gate·snapshot/cursor, source별 attribution 및 검색 부재 상태 구분 제안: [`disclosure-dossier-public-read.v0.json`](./fixtures/disclosure/disclosure-dossier-public-read.v0.json) · DPR-01~25, 미승인 synthetic fixture
+
+## 이벤트 ledger 작업 기록
+
+- 2026-11-06 — SEC·RSS 영구 이벤트 ledger 및 공개 무인증 이벤트 API 구현 결과는 [현황 분석](./stockman-events-current-analysis.md), [아키텍처](./stockman-events-architecture.md), [데이터 모델](./stockman-events-data-model.md), [API](./stockman-events-api.md), [운영 가이드](./stockman-events-operations.md)에 기록했다.
+- 검증: build·typecheck·docs/API/migration audit 및 격리 PostgreSQL idempotency 통과. 전체 Vitest는 worker 종료로 미완료. 운영 배포와 migration은 미실행.

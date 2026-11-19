@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { instrumentUniverseSyncRuns, krCommonStockUniverse, krSpecialInstrumentUniverse, usCommonStockUniverse, usSpecialInstrumentUniverse } from "@/lib/schema";
+import { hasDepositaryReceiptDescriptor } from "@/lib/us-depositary-receipt-classification";
 
 type KrRow = { market: "KOSPI" | "KOSDAQ"; code: string; standardCode: string; name: string; securityGroupCode: string; marketCapScale: string; industryLargeCode: string; industryMediumCode: string; industrySmallCode: string; etpProductClassCode: string; preferredClassCode: string; tradingHaltCode: string; liquidationCode: string; managedIssueCode: string; sourceFile: string; rawPayload: string };
 type UsRow = { market: "NAS" | "NYS" | "AMS"; code: string; realtimeSymbol: string; name: string; englishName: string; securityType: string; etpType: string; currency: string; countryCode: string; industryCode: string; isEtf: boolean; isLeveraged: boolean; isInverse: boolean; isWarrant: boolean; isDerivative: boolean; isDr: boolean; sourceFile: string; rawPayload: string };
@@ -88,6 +89,11 @@ export function classifyKr(row: KrRow) {
 
 export function classifyUs(row: Pick<UsRow, "code" | "name" | "englishName" | "securityType" | "etpType" | "isEtf" | "isLeveraged" | "isInverse" | "isWarrant" | "isDerivative" | "isDr">) {
   const descriptor = `${row.name} ${row.englishName}`;
+  // KIS's isdr field is not a complete ADR/ADS classifier: official master
+  // rows can carry an explicit sponsored ADS/ADR instrument description while
+  // isdr is N. Treat an explicit depositary-security descriptor as DR and
+  // keep it out of the common-stock universe.
+  const isDr = row.isDr || hasDepositaryReceiptDescriptor(descriptor);
   const hasEtpType = row.etpType.trim().length > 0;
   // Require acquisition-specific words rather than matching the substring
   // "spac" in ordinary names such as AEROSPACE or SPACEMOBILE.
@@ -104,15 +110,15 @@ export function classifyUs(row: Pick<UsRow, "code" | "name" | "englishName" | "s
   const isDerivative = row.isDerivative || row.isLeveraged || row.isInverse || isUnit || isPreferred || isWarrant || isRight || isConvertible || isDebtSecurity;
   const instrumentType = isDebtSecurity ? "DEBT_SECURITY"
     : isSpac ? "SPAC"
-    : isDerivative ? "DERIVATIVE"
-      : row.isEtf || row.securityType === "3" ? "ETF"
-        : row.isDr ? "DR"
-          : hasEtpType ? "ETP"
-            : row.securityType === "2" ? "COMMON_STOCK"
-            : row.securityType === "1" ? "INDEX"
-              : "NON_COMMON_SECURITY";
+      : isDerivative ? "DERIVATIVE"
+        : row.isEtf || row.securityType === "3" ? "ETF"
+          : isDr ? "DR"
+            : hasEtpType ? "ETP"
+              : row.securityType === "2" ? "COMMON_STOCK"
+                : row.securityType === "1" ? "INDEX"
+                  : "NON_COMMON_SECURITY";
 
-  return { instrumentType, isWarrant, isDerivative, isDebtSecurity };
+  return { instrumentType, isWarrant, isDerivative, isDebtSecurity, isDr };
 }
 
 type StoredUsRow = typeof usCommonStockUniverse.$inferSelect;
@@ -124,7 +130,7 @@ export function splitUsUniverseRows(rows: StoredUsRow[]) {
   for (const row of rows) {
     const classification = classifyUs(row);
     const item = { row, classification };
-    if (classification.instrumentType === "COMMON_STOCK" && !row.isEtf && !row.isWarrant && !classification.isDerivative && !row.isDr && !row.isLeveraged && !row.isInverse) common.push(item);
+    if (classification.instrumentType === "COMMON_STOCK" && !row.isEtf && !row.isWarrant && !classification.isDerivative && !classification.isDr && !row.isLeveraged && !row.isInverse) common.push(item);
     else special.push(item);
   }
   return { common, special };
@@ -162,7 +168,7 @@ export async function reconcileUsUniversePartitions({ apply = false }: { apply?:
     const now = new Date();
     const persisted = (item: ClassifiedStoredUsRow) => {
       const { id: _id, ...row } = item.row;
-      return { ...row, instrumentType: item.classification.instrumentType, isWarrant: item.classification.isWarrant, isDerivative: item.classification.isDerivative, enabled: true, updatedAt: now };
+      return { ...row, instrumentType: item.classification.instrumentType, isWarrant: item.classification.isWarrant, isDerivative: item.classification.isDerivative, isDr: item.classification.isDr, enabled: true, updatedAt: now };
     };
     const upsertCommon = async (items: ClassifiedStoredUsRow[]) => {
       for (let offset = 0; offset < items.length; offset += 250) {

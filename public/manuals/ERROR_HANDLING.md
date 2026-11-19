@@ -1,187 +1,112 @@
-## 국내 골든크로스 후속 캐시의 시총 필터 우회
+## 2026-11-19 미국 활성 보통주 유니버스에 ADR/ADS가 포함
 
-- **증상**: 일봉 캐시 갱신 직후 골든크로스 후속 작업이 정기 cron 결과와 달리 300억 원 이하 또는 오래된 시총 스냅샷 종목을 캐시에 포함할 수 있었다.
-- **근본 원인**: `refreshDailyGoldenCrossCache("KR")`가 저장된 전체 보통주 scope를 바로 캔들 조회 및 판정에 전달했고, 정기 cron에만 최신 KRW 시총 확인이 있었다. 필터 통과 종목이 없는 정상 조회에서도 빈 결과 저장을 거부하면 이전 후보 캐시가 계속 남는다.
-- **해결 및 재발 방지**: 후속 작업과 cron 모두 24시간 이내 KRW 시총이 300억 원을 초과하는 scope만 처리한다. 유니버스/시총 조회가 정상 완료됐으나 통과 종목이 없는 경우에는 의도된 빈 결과를 저장해 이전 추천을 제거한다. 유니버스 조회 실패나 snapshot 쿼리 예외는 기존처럼 실패로 처리하며 빈 캐시를 쓰지 않는다. `lib/daily-cache-followup.test.ts`는 정상 통과 필터와 0 eligible 빈 캐시 갱신을 확인한다.
-- **검증**: 전용 회귀 테스트 2개 및 `npm.cmd run typecheck` 통과. 운영 DB·KIS API 쓰기, commit/push/deploy 없음.
-- **남은 위험**: 기존 캐시는 새 성공 실행 전까지 유지되므로 fundamentals DB 조회 자체가 실패하면 마지막 정상 결과가 남는다. 해당 자동화 실패/재시도 상태를 모니터링하고, 캐시 소비부의 age 표시와 stale 결과 차단은 별도 후속 개선 항목이다.
+- **증상**: `ㄷㅊㅇ5`의 운영 공개 활성 보통주 목록에서 AACG, BABA, ABEV 등 공식 상품명이 `SPON ADS`/`SPON ADR`인 예탁증서가 `instrument_type=COMMON_STOCK`, `is_dr=false`로 반환됐다. 종목 메타데이터 GET에서도 같은 분류가 확인됐다.
+- **근본 원인**: 해외 KIS 마스터 파서는 `isdr` 필드만 DR 여부로 옮겼다. 하지만 KIS 마스터의 `isdr=N`이더라도 영문 상품명에는 거래 대상이 ADS/ADR임이 명시될 수 있다. 이 필드를 단독으로 신뢰해 활성 보통주 유니버스가 과대 포함됐다.
+- **영향 범위**: 미국 공통 종목 마스터 분류, 해당 마스터로 재조정되는 common/special partition, 공개 daily-candles universe/일봉 응답 및 이를 사용하는 추출·스냅샷. 기존 DB와 스냅샷에 ADR/ADS가 이미 포함됐을 수 있다.
+- **해결 위치**: 공통 판별 함수가 공식 영문 상품 설명의 ADR/ADS/depositary/depository 표기를 식별한다. `lib/instrument-universe-import.ts`는 이를 `DR`, `isDr=true`로 분류하고 재조정 시 special master에 보존한다. `app/api/public/daily-candles/route.ts`는 미국 목록 및 봉 조회 SQL에서 해당 설명을 제외해 기존 DB flag가 낡아도 snapshot에 유입되지 않게 한다. `app/api/public/us-stock-metadata/route.ts`도 해당 항목을 활성 보통주로 응답하지 않는다.
+- **재발 자동 감지**: 분류·daily-candles·US metadata regression tests가 공식 예탁증서 설명을 제외하고 AAPL 같은 보통주는 유지하는지 확인한다. 마스터 적재 기능이 복구되거나 운영 DB가 갱신될 때 `reconcileUsUniversePartitions` 결과도 다시 대조한다.
+- **검증 결과/상태**: 운영 GET은 AACG/BABA/ABEV에서 영문 상품명과 잘못된 DB 플래그를 확인했다. 분류기와 관련 API 회귀 검사를 추가했다. 새 테스트 및 전체 build/deploy verification, OCI 배포, `ㄷㅊㅇ5`·`ㄷㅊㅇ6` 재생성은 아직 진행 중이다.
+- **남은 위험 및 다음 개선**: 로컬 코드 수정만으로 운영 API는 바뀌지 않는다. 변경 격리 워킹트리에서 배포 게이트를 완료하고 배포 후 무인증 US universe 및 DR 표본 제외를 재확인한 다음 두 JSON을 다시 생성한다. `ㄷㅊㅇ` 경로 외 다른 미국 종목 API가 같은 DB flag를 사용하므로, 전체 보통주 데이터 사용 경로는 별도 영향 점검이 필요하다.
 
-## 국내 시총 snapshot 조회 시장키 불일치
+## 2026-11-18 차트 종목 추출 정상 응답이 화면 timeout으로 실패
 
-- **증상**: 국내 시총 하한을 적용한 스캐너와 export가 기본정보 snapshot이 존재해도 값을 찾지 못해 국내 종목을 모두 제외할 수 있다.
-- **근본 원인**: 기본정보 refresh는 `kr_common_stock_universe.market`의 `KOSPI`/`KOSDAQ`을 `instrument_fundamental_snapshots.market`에 그대로 저장하지만, 공통 cap reader가 canonical alias `KR`로만 필터하고 있었다. snapshot의 유일키도 `(market, code)`이므로 code만으로 여러 거래소를 합치면 중복 코드에서 cap을 잘못 연결할 수 있다.
-- **해결 및 재발 방지**: scope 기반 read는 정확한 `(market, code)`를 사용한다. provider 결과에 code만 있으면 enabled 공식 COMMON_STOCK master에서 market을 찾아 join하고, 거래소가 유일하게 해석되지 않는 코드는 fail-closed한다. scanners는 composite market+code key로 값을 찾는다. export·accumulation도 actual exchange snapshot을 조인하고, currency·cap floor·freshness를 함께 검사한다.
-- **추가 소비부**: 다중 시간봉 추천도 `KR` alias 하나만 조회하지 않고 KOSPI/KOSDAQ snapshot을 읽으며, 실제 거래소+코드 키를 cap snapshot과 연결한다. 기본 DB screener의 KRW snapshot freshness는 미래 timestamp도 거부한다.
-- **자동 감지**: `lib/kr-market-cap.test.ts`는 두 exchange의 동일 code, exact scope pair, code-only ambiguous lookup 및 KRW/freshness 조건을 검증한다. `lib/accumulation-repository.test.ts`와 export SQL test는 해당 소비부의 거래소 join과 freshness window를 확인하며, `lib/multi-timeframe-recommendations.test.ts`는 KR snapshot exchange filter와 24시간 freshness를 검증한다.
-- **검증/한계**: 관련 Vitest 및 typecheck 결과를 DEVELOPMENT_LOG에 기록한다. DB read-only 실제 분포 검사는 별도로 수행할 때만 운영 후보 복구 여부를 알 수 있으며 이 변경에서는 DB에 접속하지 않는다.
+- **증상**: `/api/screener/run`의 해외 첫 스캔이 HTTP 200으로 약 56초 뒤 완료되지만 `/charts` 요청은 45초에 abort되어 사용자에게 timeout으로 표시될 수 있었다.
+- **근본 원인**: 클라이언트 deadline이 운영 cold 응답시간보다 짧았고, DB는 종목별 최대 65개 봉을 행 단위로 반환해 약 5,300종목 기준 최대 약 34만 행의 전송 및 Node 객체 구성을 유발했다. 전체 `Server-Timing`만 있어 DB/Node 세부 병목 비율은 미확인이다.
+- **영향 범위**: 직접 조건 추출 UI의 KR/US 요청. 운영에서 확인한 두 요청은 HTTP 200과 결과 봉의 거래일시·갱신시각 메타데이터를 반환했다. 세부 변경 및 배포 상태는 [`screener-performance.md`](operations/screener-performance.md)에 연결한다.
+- **해결 위치**: `components/ticker-chart-workbench.tsx` deadline을 90초로 조정한다. `lib/db-screener.ts`는 DB가 종목·봉 주기별 JSON 배열로 묶어 반환하고 같은 봉을 기존 계산 경로에 복원한다.
+- **재발 자동 감지**: `lib/db-screener-aggregated-rows.test.ts`가 종목 결과와 D/W 거래일·갱신시각 복원을 확인한다. 운영 성능 측정은 매번 신규 조건 fingerprint의 cold 요청을 기록하고 `server-timing`을 비교한다.
+- **검증 결과**: 변경 관련 3개 테스트 파일 11개 통과, 변경 모듈 격리 TypeScript 검사는 오류 0건이다. 전체 테스트는 304개 파일·1,700개 테스트 중 5개 파일·13개 테스트 실패(1 skip, 3 test skip)이며 daily-disclosures UI, automation-run, filing-sync, schema-health 및 kis-investor-flow 등 스크리너 외 오류다. 전체 TypeScript 검사는 오래된 `.next-*` 타입 파일과 여러 스크리너 외 소스 오류로 실패했다. production compile은 통과했으나 기존 `app/api/public/instrument-fundamentals/route.ts`의 `MARKET_CONFIGS` 누락에서 빌드가 중단됐다. PostgreSQL plan 및 standalone runtime은 미검증이다.
+- **남은 위험 및 다음 개선**: 캔들 행 집계는 DB의 읽기 수를 줄이지 않으며 JSON serialization 오버헤드가 있을 수 있다. 배포 전 필수 게이트가 아직 완료되지 않았다. 운영 cold 시간이 계속 높으면 `EXPLAIN ANALYZE` 및 DB 조회/Node 계산의 단계별 계측으로 다음 최적화를 정한다.
 
-## 국내 차트의 거래소·종목 마스터 불일치
+## 2026-11-04 미국 소형주 배치 SEC 날짜 후보와 accession 상태 불일치
 
-- **증상**: 국내 차트가 거래소 선택값과 다른 시장의 종목·캔들·기본정보를 반환하거나 공식 활성 보통주 마스터 확인 없이 KIS 데이터를 요청할 수 있었다.
-- **근본 원인**: route의 exchange 값은 원격 cache key에만 반영됐고, 국내 마스터 검증은 없었다. 뒤이어 UI 경로를 추적하니 `ChartModal`도 거래소 query를 미국 종목에만 붙였으며 scanner result mapping은 국내 KOSPI/KOSDAQ 거래소 코드를 버리고 있었다. 분봉 chart는 `/api/kis/market-flow`로 분기하면서 exchange query를 버리고, 해당 route도 국내 보통주 master를 확인하지 않았다. DB fallback과 snapshot 조회도 code만 조회해 거래소가 섞일 수 있었다.
-- **해결 및 재발 방지**: chart route 시작 시 `kr_common_stock_universe`의 enabled COMMON_STOCK 및 거래정지·청산·관리 상태를 확인하고, exchange 미지정 코드는 유일한 거래소만 허용한다. 지정 거래소 불일치, 모호한 코드, 마스터 조회 장애는 각각 422/503으로 fail-closed한다. 검증된 거래소를 memory, remote/local cache, snapshot 조회까지 전달한다. ChartModal은 양 시장의 exchange를 일봉·분봉 요청에 전달하고, scanner chart list 및 인접 종목 prefetch도 actual market key를 보존한다. 국내 분봉 route도 간격 입력을 먼저 검증한 뒤 동일한 활성 보통주·거래소 검증을 거쳐 KIS를 호출한다. KIS 응답의 실제 봉 날짜·시간, 양수 OHLC, 비음수 거래량, OHLC 포함 관계를 확인한다. 업무 성공 코드만 있고 유효 봉이 없으면 성공 snapshot을 남기지 않고 UNAVAILABLE/502로 반환한다. 큰 간격 봉은 검증된 분봉만으로 OHLCV 집계한다. KIS 분봉 시장 분류(`J/NX/UN`)와 상장 거래소(KOSPI/KOSDAQ)는 다른 값이므로 exchange는 프로젝트 master validation에만 쓰고 KIS 시장 분류 필드에 직접 전달하지 않는다. 일반 ticker 입력과 거래소 정보가 없는 watchlist는 route가 master에서 unique exchange를 확인한다.
-- **해결 및 재발 방지**: chart route 시작 시 `kr_common_stock_universe`의 enabled COMMON_STOCK 및 거래정지·청산·관리 상태를 확인하고, exchange 미지정 코드는 유일한 거래소만 허용한다. 지정 거래소 불일치, 모호한 코드, 마스터 조회 장애는 각각 422/503으로 fail-closed한다. 검증된 거래소를 memory, remote/local cache, snapshot 조회까지 전달한다. ChartModal은 양 시장의 exchange를 일봉·분봉 요청에 전달하고, scanner chart list 및 인접 종목 prefetch도 actual market key를 보존한다. 국내 분봉 route도 간격 입력을 먼저 검증한 뒤 동일한 활성 보통주·거래소 검증을 거쳐 KIS를 호출한다. KIS 응답의 실제 달력 날짜·시간, 명시된 숫자 타입의 양수 OHLC, 명시된 숫자 타입의 비음수 거래량, OHLC 포함 관계를 확인한다. 빈 문자열·boolean은 숫자 0/1로 강제 변환하지 않는다. 업무 성공 코드만 있고 유효 봉이 없으면 성공 snapshot을 남기지 않고 UNAVAILABLE/502로 반환한다. 큰 간격 봉은 검증된 분봉만으로 OHLCV 집계한다. KIS 분봉 시장 분류(`J/NX/UN`)와 상장 거래소(KOSPI/KOSDAQ)는 다른 값이므로 exchange는 프로젝트 master validation에만 쓰고 KIS 시장 분류 필드에 직접 전달하지 않는다. 일반 ticker 입력과 거래소 정보가 없는 watchlist는 route가 master에서 unique exchange를 확인한다.
-- **재발 자동 감지**: chart route test는 거래소 scope/불일치/모호 코드를, `app/api/kis/market-flow/route.test.ts`는 국내 분봉 master 정상·불일치·모호·장애, invalid interval 선행 차단, 빈 응답, malformed OHLC, 빈 거래량, calendar-invalid date, invalid time 폐기, 5분 OHLCV 집계 및 거래일이 다른 동일 시각 봉의 분리 집계를 검사한다. `components/chart-modal.test.tsx`는 국내·미국 선택 거래소가 일봉·분봉 API 요청에 전달되는지 검사한다.
-- **미국 분봉 보통주 자격 및 성공 상태**: KIS를 호출하기 전에 `us_common_stock_universe`에서 거래소+종목 코드의 enabled, daily_active, `COMMON_STOCK` 및 ETP/워런트/파생/DR/레버리지/인버스 제외 조건을 확인한다. 마스터에 없거나 조회 장애면 각각 422/503으로 fail-closed한다. `rt_cd=0`이어도 `output1`/`output2` 행이 모두 비어 있으면 `AVAILABLE` snapshot이나 HTTP 200을 만들지 않고 `KIS_MINUTE_DATA_EMPTY_OR_INVALID`, `UNAVAILABLE`, HTTP 502로 반환한다. `app/api/kis/market-flow/route.test.ts`가 자격 검증과 빈 응답을 회귀 검사한다. 응답 구조는 한국투자증권 [공식 Open API 분봉 설정](https://github.com/koreainvestment/open-trading-api/blob/main/MCP/Kis%20Trading%20MCP/configs/overseas_stock.json)의 해외주식 분봉 `output1`/`output2` 규격을 따른다.
-- **차트 클라이언트 분봉 row 검증 및 재시도**: API 응답을 차트 데이터로 바꿀 때도 실재 달력 날짜, 4/6자리 유효 시각, 명시된 숫자 OHLCV 및 OHLC 관계를 재검증한다. 빈 값·boolean·잘못된 봉은 종가로 보정하거나 0으로 바꾸지 않고 폐기한다. 유효 봉이 하나도 없으면 사용자에게 오류를 표시하고 빈 변환 결과를 세션 메모리 캐시에 넣지 않아 다음 조회에서 재요청한다. `components/chart-modal.test.tsx`가 날짜·시각·거래량 타입·가격 범위 폐기, 빈 데이터 오류 표시 및 재시도를 검사한다.
-- **분봉 시간대 안정성**: KIS 해외 응답에 exchange-local `xymd`/`xhms`와 Korea-time `kymd`/`khms`가 함께 있으면 날짜·시각을 반드시 같은 pair로 읽는다. 해외 timestamp field가 일부만 존재하면 다른 기준의 날짜·시각으로 대체하지 않고 해당 row를 폐기한다. 차트 라이브러리에 전달하는 분봉 timestamp는 `Date.UTC`로 생성해 브라우저 로컬 시간대에 따라 축의 시각이 달라지지 않게 한다. 회귀 테스트는 날짜 경계 pair, 불완전 pair 배제 및 epoch 값을 확인한다. 필드 구조는 한국투자증권 [해외주식 분봉 공식 예제](https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/overseas_stock/inquire_time_itemchartprice/inquire_time_itemchartprice.py), timestamp/timezone 처리는 [Lightweight Charts 공식 시간대 문서](https://tradingview.github.io/lightweight-charts/docs/5.2/time-zones)를 기준으로 한다.
-- **차트 클라이언트 메모리 캐시**: 차트 데이터 cache entry는 60초 후 만료되고 최대 128개를 LRU 순서로 유지한다. 조회·저장 시 만료 entry를 먼저 정리해 stale entry가 새 데이터보다 먼저 LRU에서 제거되지 않게 한다. TTL·기준 시각·계산된 만료시각은 모두 유한한 양수/시각이어야 하며 유효하지 않은 조회 시각은 캐시 hit를 허용하지 않는다. trim 후 시장 접두사를 판별하고 시장·정규화한 종목코드·거래소·주기를 키로 사용해 같은 티커의 시장/거래소 간 오염을 막는다. 캐시 hit에서도 현재 호출의 코드·종목명을 반환한다. 빈/무효 분봉 응답은 캐시하지 않는다. `lib/chart-data-memory-cache.test.ts`가 TTL 만료·비유한 TTL/시각, 공백 포함 키 정규화, 시장/거래소 분리, 만료 선제 정리 및 최대 용량/LRU 제거를 검사한다.
-- **차트 응답 데이터 유효성**: cache entry는 정규화 후 사용할 캔들이 하나 이상이고 최신 가격·변동 문자열·지표 구조가 유효할 때만 저장한다. 일봉 API가 HTTP 200이어도 사용 가능한 캔들이 없거나 응답 계약이 깨졌으면 `INVALID_CHART_DATA` 오류로 표시하고 캐시하지 않아 재시도가 가능하게 한다. 일부 malformed 캔들은 정상 캔들이 남아 있으면 기존 정규화 동작대로 제외한다. API 요청, 모달 내부 종목명 조회·관심종목·수급·실시간 경로의 market 판별은 공백 제거 및 대소문자 무시 `US:` 접두사 규칙을 캐시 키와 공유하고, ticker code 정규화는 trim 후 접두사를 제거해야 한다. 형식이 다른 ticker 입력으로 국내 경로에 잘못 라우팅되거나 lookup/watchlist에 접두사가 남지 않는지 `lib/chart-data-memory-cache.test.ts`, `components/chart-modal.test.tsx`에서 검사한다.
-- **분봉 snapshot 저장 장애**: snapshot DB insert 실패가 KIS 차트 응답을 500으로 바꾸지 않도록 국내·미국 분봉 모두 best-effort 저장을 적용한다. HTTP는 KIS 데이터 유효성에 따라 유지하고 `snapshot.stored=false`, `warning=SIGNAL_SNAPSHOT_WRITE_FAILED`를 반환한다. 회귀 테스트는 저장 실패와 데이터 조회 성공을 분리해 확인한다.
-- **시총 snapshot 처리**: 차트 정보는 상세 조회이므로 300억 원 하한으로 종목을 숨기지 않는다. 다만 국내 시총 값은 KRW이며 24시간 이내이고 미래 timestamp가 아닌 snapshot만 노출한다. 오래되거나 통화가 다르거나 미래/누락 시각인 snapshot은 시총을 null 처리하고 상태를 STALE로 표시한다. 상세 candle에서 계산된 거래량/거래대금은 그대로 제공한다.
-- **자동 감지 및 공식 근거/검증 한계**: `app/api/stock/chart/route.test.ts`는 선택 거래소 scope, 거래소 불일치 차단, 모호한 코드 fail-closed, 오래된·미래·비KRW 국내 snapshot 거부를 검사한다. KIS 공식 [국내 기간별 시세 예제](https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/domestic_stock/inquire_daily_itemchartprice/inquire_daily_itemchartprice.py)와 [국내 당일 분봉 예제](https://github.com/koreainvestment/open-trading-api/blob/main/examples_llm/domestic_stock/inquire_time_itemchartprice/inquire_time_itemchartprice.py)를 기준으로 종목코드·시장 분류 인자를 확인했다. 활성 분류는 이 프로젝트의 공식 종목 마스터를 기준으로 한다. live API/운영 DB는 이 변경에서 조회하지 않는다.
+- **증상**: b09 validator에서 SEC 미래 날짜 후보의 이벤트/제외 판정 집합과 filing ledger의 SEC event accession 집합 불일치가 감지됐다. SEC 원문 수집기가 실패 건수를 배열로 반환했는데 generator가 숫자 0으로만 처리해 완료된 스캔을 불완전으로 오판했다.
+- **근본 원인**: 자동 날짜 추출, SEC keyword scan, 확정 이벤트, accession 상태를 같은 개수로 취급했고 filing 하나에서 다수 날짜 후보가 나올 수 있다는 점 및 legacy 배치에 강화 coverage 필드가 없다는 점을 반영하지 않았다.
+- **영향 범위**: 로컬 b09 review/ledger 생성 및 validator. 운영 조회는 read-only GET만 사용했고 운영 데이터 쓰기·refresh·알림 전송은 없다.
+- **해결 위치**: scripts/generate-us-smallcap-event-batch.mjs에서 failed 숫자/배열을 정상화하고 요청·성공 건수를 검사한다. 미래 날짜 accession은 원문 검토 후 이벤트 또는 해결된 SEC_EXPLICIT_EXCLUSION으로 연결한다. filing 상태와 event accession 집합을 재정렬한다. scripts/validate-us-smallcap-event-data.mjs는 review/ledger exclusion 사유 parity, event links 및 날짜 후보 coverage를 검증한다. 새 coverage 메타데이터가 없는 legacy batch는 강화 coverage 검사를 건너뛴다.
+- **재발 자동 감지**: npm run docs:check가 신규 batch validator를 실행한다. 원문 scan 누락, event/exclusion 미결정, 제외 사유 불일치, SEC accession relation 누락이면 fail-closed한다.
+- **검증 결과**: b09 100 issuers, 4,758 submissions, 35 events(SEC filing event 27건/26 accession, IR 8건), 12 excluded filings. SEC primary 362건 전부 HTTP 200, date candidate 73건 전부 결정 입력에 반영. docs:check, API surface, catalog 및 문서/migration 검사가 통과했다. build/test/runtime 및 배포 전.
+- **남은 위험 및 다음 개선**: 자동 날짜 추출은 문맥 판정을 대체하지 않는다. 다음 배치도 SEC/issuer primary text에서 일정 성격을 확인한다. 시총은 2026-11-02 STALE snapshot이다.
 
-## 종목 이름 lookup의 비보통주·거래소 모호성
+## 2026-11-04 OCI Activate에서 eventKey 형식 거부
 
-- **증상**: 차트/관심종목 이름 lookup이 국내 호환 전체 종목 view와 code-only `KR` snapshot을 함께 조회해 비보통주 이름 또는 다른 거래소 이름이 섞일 수 있었다. 반환 key가 code 하나라 거래소별 이름을 보존하지 못했다.
-- **근본 원인**: 조회 화면 표시용이라는 이유로 종목 유형 확인을 건너뛰고, `(market, code)` identity를 응답 구조에 반영하지 않았다.
-- **해결 및 재발 방지**: lookup은 KR/US common-stock universe의 `COMMON_STOCK` 행만 사용한다. 비활성 보통주는 기존 차트 표시 동작을 유지해 이름만 조회할 수 있지만 다른 상품 분류는 제외한다. `exchange` query가 있으면 해당 거래소만 반환한다. 결과는 `EXCHANGE:CODE` 및 시장 alias인 `KR:CODE`/`US:CODE` key로 제공하고, 표시명이 충돌하지 않을 때에만 code-only alias를 추가한다. ChartModal은 전달된 exchange로 lookup을 제한하고 exchange scoped key를 우선 사용한다. lookup effect의 dependency에 exchange를 포함해 종목코드와 회사명이 같아도 거래소 전환 후 이름을 다시 조회한다. Watchlist는 market scoped key를 우선해 동일 코드의 KR/US 이름을 분리한다. 관심종목 mutation 완료는 요청 당시의 market+code scope가 현재 종목과 같을 때만 UI state에 반영해 종목 이동 뒤 이전 요청 결과가 새 종목 표시를 덮지 않게 한다.
-- **재발 자동 감지**: `app/api/stock/lookup/route.test.ts`는 common-stock 필터, scoped names, 거래소 제한, 충돌 code alias 억제, provider 오류를 검사한다. `components/chart-modal.test.tsx`는 UI가 exchange-scoped 이름을 사용하고 query를 전달하는지, 같은 코드에서 거래소만 변경했을 때 재조회하는지, 관심종목 요청 도중 다른 종목으로 이동했을 때 이전 응답이 새 UI 상태를 바꾸지 않는지 확인한다.
-- **미국 실시간 구독 거래소 전달**: realtime approval route가 `exchange`를 받지 않으면 기본 NAS subscription을 만든다. ChartModal은 US ticker의 실제 거래소를 approval query에 전달하고 거래소 변경 시 재구독해야 한다. `components/chart-modal.test.tsx`는 NYS ticker에 `exchange=NYS`가 전달되는지 검사한다.
-- **KIS 실시간 연결 복구**: 복호화 key/IV 누락·AES 복호화 실패·승인 업무 오류·대기열 overflow·예상치 못한 정상/비정상 socket close/error는 현재 연결을 닫고 새 approval 및 subscription으로 재시도한다. 연속 성공 데이터 전 최대 3회 재시도하며 기본 backoff는 500ms, 1,000ms, 2,000ms이다. 승인 API가 HTTP 429와 `Retry-After` 초를 보내면 해당 지연(최대 60초)과 기본 backoff 중 긴 시간을 기다린다. 정상 데이터가 수신되면 실패 횟수를 초기화한다. retry exhaustion 뒤에는 `unavailable`로 멈춰 반복 호출을 제한한다. `components/chart-modal.test.tsx`는 key 누락과 queue overflow 뒤 새 socket approval/frame으로 복구되고, close code 1000도 재시도하며, 총 재시도 상한 뒤 추가 approval이 발생하지 않고 429 retry-after를 따르는지 검사한다.
-- **KIS 실시간 관측 POST**: 공개 `/api/kis/realtime/events`는 초당 최대 1건의 정상 클라이언트 저장 경로지만 임의 POST도 가능하므로 IP/전역 분당 제한, 24 KiB 전체 본문 제한, market/channel과 `tr_id` 일치, payload/raw payload 길이를 검증한다. 입력이 비정상일 때 저장하지 않고 400/413을 반환한다. 제한은 429와 `Retry-After`로 응답하며 DB 연결 부재·삽입 실패는 성공 처리하지 않고 안정된 503 오류로 반환한다. `app/api/kis/realtime/events/route.test.ts`, `lib/kis-realtime-event.test.ts`, limiter 테스트는 저장 전 거부·제한·장애 응답을 확인한다.
-- **KIS 실시간 이벤트 코드 정규화**: 미국 ticker는 저장 전에 `US:` 접두사 제거·공백 제거·대문자 변환을 하고 최신 이벤트 조회에도 같은 규칙을 적용한다. DB 저장 코드와 조회 key 불일치로 결과가 누락되지 않도록 `lib/kis-realtime-event.test.ts`에서 `us:ibm` 저장/조회가 `IBM` key로 일치하는지 검사한다.
-- **KIS 실시간 암호화 payload**: JSON subscription response의 해당 subscription `tr_id`, `header.encrypt === "Y"`, `body.output.key`/`iv`는 이후 해당 `tr_id` pipe-delimited payload의 AES-CBC/Base64 복호화 설정이다. PINGPONG 등 다른 JSON control frame은 이 상태를 덮어쓰지 않으며, 다른 subscription `tr_id`의 데이터 frame은 표시/저장하지 않는다. frame은 도착 순서로 직렬 처리하되 복호화 중 대기하는 동일 subscription 데이터 frame은 최신 1건만 보존해 과부하 시 오래된 시세를 폐기한다. control frame 대기열은 최대 32건이며 control-only overflow는 encryption state를 초기화하고 연결 상태를 `unavailable`로 fail-closed한다. 새 정상 subscription response를 받으면 복호화가 재개된다. 승인 JSON은 시장 데이터 row처럼 노출하지 않고, 복호화 키 또는 IV가 없거나 복호화가 실패하면 payload를 폐기한다. 복호화된 값만 UI와 realtime event payload로 전달한다. 기준은 한국투자증권 [공식 WebSocket 샘플](https://github.com/koreainvestment/open-trading-api/blob/main/examples_user/kis_auth.py)의 `system_resp`, `aes_cbc_base64_dec`, subscriber 처리 흐름이다. `lib/kis-realtime-payload.test.ts`는 AES-CBC 복호화를, `components/chart-modal.test.tsx`는 승인 metadata 분리·키 없는 암호화 frame 폐기·heartbeat 후 암호화 유지·잘못된 tr_id 폐기·복호화 대기 중 최신 frame 보존·control queue overflow fail-closed와 정상 subscription 재개를 검사한다.
-- **API 문서**: optional `exchange` query와 scoped response key 설명을 `scripts/api-surface.mjs`의 source schema에서 관리하며 generated OpenAPI와 route inventory를 검증한다.
-
-## 2026-11-12 전체 Vitest suite 불일치와 RSS 진단 표식 누락
-
-- **증상**: 전체 Vitest 실행에서 10건이 실패했다. 9건은 최근 repository/route SQL과 schema contract 변경을 기존 mock/기대값이 따라가지 못했고, RSS completion 알림은 `counterDataInvalid` 진단 식별자가 길이 제한으로 잘린 결과 JSON 안에만 들어가 사용자에게 보이지 않았다.
-- **근본 원인**: 테스트가 advisory unlock 반환 alias, timeframe lane별 claim quota, retry generation fencing 조건, intraday 시총 provenance 컬럼, retry aggregate snapshot 및 persistence schema 검사 전의 mock shape를 사용했다. 별도로 completion content builder는 큰 결과 JSON을 650자로 제한하면서 핵심 invalid-counter flag를 그 뒤에 배치했다.
-- **해결 및 재발 방지**: completion 알림에 `counterDataInvalid`를 제한된 결과 JSON과 별개인 우선 요약 줄로 출력한다. 테스트 fixture/기대 SQL을 현재 동작에 맞추고 unlock mock은 잠금과 해제 확인 결과를 각각 반환하며 provenance/schema 진단은 실제 query 순서를 명시적으로 모델링한다. 전체 Vitest suite와 해당 6개 파일 집중 테스트가 이를 자동 감지한다.
-- **검증**: 집중 테스트 34/34, UI 경고 재점검 36/36 통과. 전체 `npm.cmd test -- --reporter=dot`: 303개 test file 통과, 1개 skip; 1,553개 테스트 통과, 3개 skip. 테스트에서 복사 완료 상태와 메뉴 인증 조회 완료를 기다린 뒤 전체 실행에서도 React `act(...)` 경고가 사라졌다.
-- **원인 및 해결**: Vite native config loader가 `.ts` 설정 파일에서 ESM import를 CommonJS로 해석해 경고했다. 공식 Vite 문서의 ESM file detection과 Vitest의 `.mts` config 지원을 적용해 설정 파일을 `vitest.config.mts`로 옮기고 `__dirname` 대신 `fileURLToPath(import.meta.url)` 경로를 사용했다. `tsconfig.json` exclusion과 현재 개발 문서의 config 경로도 함께 갱신했다 ([Vite config](https://vite.dev/config/), [Vitest config](https://vitest.dev/config/)).
-- **검증**: 전체 suite는 Node 24.14와 Node 22.23.4 양쪽에서 303개 test file 통과, 1개 skip; 1,553개 테스트 통과, 3개 skip이었다. Node 22는 `npx.cmd --yes node@22 node_modules/vitest/vitest.mjs run --reporter=dot`로 실행했으며 두 환경 모두 Vite native config 경고 없이 자동 config discovery가 성공했다.
-- **남은 위험**: workflow가 지정한 Node 22 전체 suite는 로컬 Node 22.23.4로 확인했지만 GitHub Actions workflow 자체는 실행하지 않았다.
-
-## 2026-11-11 Pending Flyway index migration의 선행 relation 누락
-
-- **증상**: 로컬 pending migration은 table 누락 때문에 index 생성에서 실패할 가능성이 있다.
-- **후속 수정**: V70에서 삭제된 `us_trade_intensity_ticks`를 V167 인덱스 초안, DB retention route, OCI schema gate에서 제거했다. 이 테이블은 후속 source migration에서 재생성되지 않으므로 retention 대상에도 복귀시키지 않는다. 다른 older-unapplied creator 대상은 로컬 history만으로 source 결함이라 단정하지 않는다.
-- **남은 6개 index target 판정**: `intraday_detection_transitions`와 `intraday_detection_runs`의 source creator는 V132, `market_rss_translation_cache`는 V102, `market_rss_bullish_articles`는 V135다. 현재 source에는 이후 DROP이 없지만 로컬 이력은 이 creator를 `OLDER_UNAPPLIED`로 분류하고 실제 relation도 없다. Flyway `outOfOrder` 기본값은 false이므로 낮은 버전 migration은 기본 migrate에서 건너뛴다. 따라서 현재 로컬 pending V167–V169의 실행 차단은 정확하며, 이 로컬 상태만으로 다른 환경의 적용 여부를 단정할 수 없다 ([Flyway Out Of Order Setting](https://documentation.red-gate.com/fd/flyway-out-of-order-setting-277579015.html), [Flyway versioned migrations](https://documentation.red-gate.com/fd/versioned-migrations-273973333.html)). 과거 migration을 자동 실행하거나 V167–V169의 relation 요구를 추측으로 제거하지 않는다.
-- **근본 원인**: V167은 `us_trade_intensity_ticks`를 포함한 예전 telemetry relation들에 `CREATE INDEX CONCURRENTLY`를 실행한다. `us_trade_intensity_ticks`는 applied V70에서 제거됐고, V132의 `intraday_detection_*`, V102의 `market_rss_translation_cache`는 이 DB에서 `OLDER_UNAPPLIED`이며 후속 pending migration에 해당 parent table 재생성이 없다. V168/V169는 `market_rss_bullish_articles`를 참조하지만 해당 V135 relation도 현재 catalog에 없다. PostgreSQL의 `CREATE INDEX` 문법에서 `IF NOT EXISTS`는 기존 index 이름 충돌만 억제하고 `ON table_name` 대상 relation을 대체하지 않는다 ([공식 문서](https://www.postgresql.org/docs/16/sql-createindex.html)).
-- **영향 범위**: 현재 로컬의 V167 4개, V168 2개, V169 1개 index target에서 parent relation kind가 없다. 이 중 source에 table recreation이 없는 retired relation도 포함되므로 pending chain을 그대로 적용할 수 있다고 가정하면 안 된다.
-- **해결 및 진단**: `audit:flyway-local`은 현재 catalog와 higher-version pending source sequence를 함께 따라간다. 새 pending table, table rename, `ALTER TABLE ADD/DROP/RENAME COLUMN`을 시뮬레이션해 index parent와 간단한 identifier key columns를 점검한다. PostgreSQL 구문 `ON ONLY table`과 생략 가능한 index 이름도 index effect로 추적해 대상 relation 검사에서 빠지지 않게 한다. partitioned table에 `ON ONLY`로 생성한 parent index는 child index attach 전 invalid 상태이므로 `pendingPartitionedIndexOnlyUnverified` / `PENDING_PARTITIONED_INDEX_ONLY_UNVERIFIED`로 실패 처리한다. 현재 preflight는 모든 child attach 완료를 증명하지 않는다. 생략 이름은 PostgreSQL이 생성하므로 이름 충돌 검증은 생략하고 `pendingIndexNameUnverified` / `PENDING_MIGRATION_INDEX_NAME_UNVERIFIED`로 표시한다. table rename은 columns, constraints, index parent ownership 상태를 새 relation 이름으로 옮기며 missing source와 occupied target은 `pendingRelationRenameIssues` 및 `PENDING_MIGRATION_RELATION_RENAME_CONFLICT`로 반환한다. 미지원 expression/syntax는 `pendingIndexColumnUnverified`로 드러낸다. 누락 parent, column, index 이름 충돌은 각각 `PENDING_MIGRATION_INDEX_TARGET_MISSING`, `PENDING_MIGRATION_INDEX_COLUMN_MISSING`, `PENDING_MIGRATION_INDEX_NAME_CONFLICT` failure reason으로 반환한다. 이름 충돌 검사는 기존 비인덱스 relation, 다른 table의 index, 그리고 같은 이름을 이미 차지한 동일 table index에 대한 plain `CREATE INDEX` 재실행을 구분한다. 동일 이름의 기존 index를 의도적으로 재사용하는 `CREATE INDEX IF NOT EXISTS`는 catalog 정의가 source와 일치하는지 비교한다. constraint rename은 backing index 이름과 catalog index lookup도 함께 source-order 갱신한다. 같은 대상 table의 동명 index는 catalog `pg_get_indexdef` 및 `pg_index`의 key 순서, INCLUDE 컬럼, method, unique, `NULLS NOT DISTINCT`, predicate 유무와 단순 안전 정규화가 가능한 predicate expression, valid/ready 상태와 source를 대조한다. source의 `WITH (storage_parameter...)`와 `TABLESPACE`는 아직 catalog shape 비교를 지원하지 않아 동명 existing index가 있으면 `pendingIndexDefinitionUnverified`와 `PENDING_MIGRATION_INDEX_DEFINITION_UNVERIFIED`로 fail-closed한다. predicate가 있는 인덱스도 predicate expression은 source와 `pg_get_expr` 결과를 안전 정규화해 비교하며, dollar-quoted/escape string 또는 다른 decompile 형태는 미검증으로 남긴다. PostgreSQL의 `NULLS [ NOT ] DISTINCT` 옵션은 unique index에서 NULL 동등성 의미를 바꾸므로 동명 index shape 비교에 포함한다 ([공식 CREATE INDEX](https://www.postgresql.org/docs/current/sql-createindex.html)). `CREATE INDEX CONCURRENTLY` 또는 `DROP INDEX CONCURRENTLY`가 있는 pending migration은 parser의 comment/literal 제외 DDL effect를 기준으로 sibling `.sql.conf`에 주석을 제외한 `executeInTransaction=false` 설정이 정확히 하나 있는지 확인하고(중복 또는 다른 값과 혼재하면 fail-closed), migration SQL의 명시적 `BEGIN`/`START TRANSACTION` 안에서 명령이 실행되는 경우 `PENDING_CONCURRENT_INDEX_EXPLICIT_TRANSACTION_BLOCK`로 별도 실패시킨다. 두 PostgreSQL 명령은 transaction block에서 실행할 수 없으며 Flyway script configuration은 파일별 transaction 설정을 제공한다 ([공식 CREATE INDEX](https://www.postgresql.org/docs/18/sql-createindex.html), [DROP INDEX](https://www.postgresql.org/docs/18/sql-dropindex.html), [Flyway executeInTransaction](https://documentation.red-gate.com/fd/flyway-execute-in-transaction-setting-277578997.html)).
-- **CREATE TABLE 선행조건 진단**: pending CREATE TABLE이 같은 이름의 view/index/sequence 등 비-table relation과 충돌하는지, 기존 table에 source 선언 column이 빠져 있는지 검사하고, 새 pending table의 REFERENCES local columns와 parent relation/target columns가 생성 순서상 존재하며 target columns가 non-deferrable PK/UNIQUE constraint 또는 non-partial unique index로 보장되는지 검사한다. PostgreSQL은 참조 컬럼 집합을 unique key 컬럼 집합과 순서에 관계없이 매칭하므로 preflight도 순서에 의존하지 않는다. catalog 검사가 public schema 전용이므로 REFERENCES에서 명시한 non-public schema는 public relation으로 오인하지 않고 `pendingForeignKeyTargetUnverified`로 기록한다. 해당 issue는 각각 `PENDING_MIGRATION_CREATE_TABLE_RELATION_KIND_MISMATCH`, `PENDING_MIGRATION_CREATE_TABLE_COLUMNS_MISSING`로 실패 처리하고, catalog columns를 읽을 수 없는 경우 `pendingCreateTableColumnUnverified`로 노출한다. 이번 localhost 결과는 kind mismatch 0, missing column 0, FK local/target/key issue 0, FK target unverified 0이다. 누락 relation/column은 `pendingForeignKeyTargetIssues`, 불확정 참조는 `pendingForeignKeyTargetUnverified`로 노출한다. PostgreSQL 문서에 따르면 `IF NOT EXISTS`는 이름이 같은 relation을 만나면 기존 relation이 새 선언과 유사한지 보장하지 않는다 ([공식 CREATE TABLE](https://www.postgresql.org/docs/16/sql-createtable.html), [PostgreSQL tablecmds.c](https://github.com/postgres/postgres/blob/master/src/backend/commands/tablecmds.c#L13723-L13766)).
-- **기존 테이블의 inline FK 대조**: `CREATE TABLE IF NOT EXISTS`가 기존 테이블에 대해 구조를 보정하지 않는 점을 보완하기 위해, source REFERENCES와 기존 `pg_constraint` foreign key의 local/target relation·column, `convalidated`, MATCH, ON DELETE/UPDATE, deferrability, initially-deferred 및 `ON DELETE SET NULL/DEFAULT (column_list)`를 대조한다. 누락·미검증·동작 옵션 불일치는 `pendingCreateTableForeignKeyIssues` 및 `PENDING_MIGRATION_CREATE_TABLE_FOREIGN_KEY_MISSING`로 실패 처리한다. constraint 이름은 테이블 범위로 확인하며 이름만으로 일치 판정하지 않는다. 이번 localhost pending 대상에서 해당 검사는 0건이었다. PostgreSQL의 FK 구문과 catalog 코드는 공식 [CREATE TABLE](https://www.postgresql.org/docs/16/sql-createtable.html) 및 [`pg_constraint`](https://www.postgresql.org/docs/16/catalog-pg-constraint.html)를 따른다.
-- **기존 테이블의 PK/UNIQUE/CHECK 대조**: 기존 table이 `CREATE TABLE IF NOT EXISTS`를 통과할 때 source의 inline primary/unique key column order, deferrable/initially-deferred 상태, UNIQUE `NULLS NOT DISTINCT`, INCLUDE column과 CHECK expression/`NO INHERIT`를 catalog constraint와 대조한다. NULL 처리와 include payload는 backing index의 `indnullsnotdistinct`, `indnkeyatts`, `indkey`로 검사한다. CHECK 정의는 PostgreSQL `pg_get_constraintdef` decompile 결과와 비교하며 문자열 literal 대소문자/공백을 보존한다. source `IN (...)`가 catalog `= ANY (ARRAY[...])`로 복원되거나 catalog decompiler가 source에 없는 `::type` cast를 추가한 경우는 동등 여부를 추측하지 않고 unverified로 fail-closed한다. 아직 비교기가 없는 신규·기존 테이블의 EXCLUDE constraint 선언은 `pendingCreateTableConstraintUnverified`로 fail-closed한다. 누락·shape/식 불일치는 `pendingCreateTableConstraintIssues` 및 `PENDING_MIGRATION_CREATE_TABLE_CONSTRAINT_MISMATCH`, 해석 불가는 `pendingCreateTableConstraintUnverified` 및 `PENDING_MIGRATION_CREATE_TABLE_CONSTRAINT_UNVERIFIED`로 감사 종료를 실패시킨다. PostgreSQL 공식 [CREATE TABLE](https://www.postgresql.org/docs/16/sql-createtable.html)는 두 UNIQUE 옵션을 정의하고, [`pg_index`](https://www.postgresql.org/docs/16/catalog-pg-index.html)는 null treatment와 key/include 경계를 정의한다. CHECK definition 복원은 공식 [catalog](https://www.postgresql.org/docs/16/catalog-pg-constraint.html) 및 [system information functions](https://www.postgresql.org/docs/16/functions-info.html)를 따른다. 복잡한 decompile 형태는 unverified로 남는다.
-- **CREATE TABLE LIKE preflight 경계**: source가 `LIKE source_table`을 사용하면 table shape에 복사할 컬럼과 `INCLUDING`/`EXCLUDING` 옵션이 영향을 주므로 parser가 이를 빈 column list로 조용히 취급하지 않는다. 해당 statement는 `pendingCreateTableDefinitionUnverified` 및 `PENDING_MIGRATION_CREATE_TABLE_DEFINITION_UNVERIFIED`로 fail-closed한다. PostgreSQL 공식 [CREATE TABLE](https://www.postgresql.org/docs/16/sql-createtable.html)은 LIKE가 columns/not-null을 복사하고 DEFAULTS, CONSTRAINTS, INDEXES 등 옵션으로 추가 속성 복사 범위를 정한다고 설명한다. 현재 저장소의 LIKE 사용은 V85/V89 older-unapplied migration에만 있으며, higher-version pending preflight는 해당 상태를 실행 대상으로 가정하지 않는다.
-- **파생/상속 CREATE TABLE preflight 경계**: `CREATE [TEMP] TABLE ... AS`, `CREATE TABLE ... OF`, `PARTITION OF`, `PARTITION BY`, `INHERITS (...)`, `SELECT ... INTO`는 컬럼 형태·부모/파티션 관계·데이터가 query 결과, composite type 또는 parent relation에서 유래하므로 현재 source DDL parser가 완전 비교할 수 없다. pending migration에서는 `pendingCreateTableDefinitionUnverified`와 `PENDING_MIGRATION_CREATE_TABLE_DEFINITION_UNVERIFIED`로 fail-closed하며, inventory에는 SELECT INTO로 생성되는 relation도 포함한다. PostgreSQL 공식 [CREATE TABLE AS](https://www.postgresql.org/docs/16/sql-createtableas.html), [CREATE TABLE](https://www.postgresql.org/docs/16/sql-createtable.html), [SELECT INTO](https://www.postgresql.org/docs/16/sql-selectinto.html) 문법을 기준으로 한다. V57의 TEMP CTAS는 현재 적용 기준보다 오래된 migration이므로 현 pending audit에 추가 항목은 만들지 않는다.
-- **SELECT INTO statement 경계**: multi-statement 파일이나 WITH/CTE에서 임의의 첫 SELECT와 이후 INTO를 연결하면 생성 relation을 오인할 수 있다. 탐색은 top-level statement 및 parenthesis depth를 기준으로 하고, string/comment/dollar-quoted body masking 후 최상위 SELECT/INTO 토큰만 짝짓는다. 토큰 앞 경계도 확인해 `valueINTO` 같은 identifier suffix를 INTO로 해석하지 않는다. 세미콜론이 들어간 quoted identifier가 statement를 자르지 않도록 double-quote 경계를 추적하고, identifier name을 파싱할 때도 따옴표 안의 임의 문자를 허용한다. UNION이 있는 query에서도 INTO와 바로 앞 최상위 SELECT를 짝지어 중복 relation effect를 만들지 않는다. CTE 본문 SELECT, dollar-quoted procedural body 안의 세미콜론/키워드, 별도 SQL statement 사이의 잘못된 결합을 막는 회귀 테스트를 유지한다. 기준: PostgreSQL 공식 [Lexical Structure](https://www.postgresql.org/docs/16/sql-syntax-lexical.html).
-- **quoted identifier audit 비교**: quoted identifier는 case-sensitive이고 escaped double quote는 이름의 실제 문자이므로 source parser와 catalog map에서 이를 보존한다. 관계·컬럼·key/index term·constraint name 비교에서 일괄 소문자 변환을 하지 않는다. column/key list도 quote-aware로 나눠 `"a,b"`를 두 이름으로 오인하지 않고, ALTER TABLE의 quoted object name을 완전하게 읽는다. 관련 경계는 PostgreSQL 공식 [Lexical Structure](https://www.postgresql.org/docs/16/sql-syntax-lexical.html)에 따른다.
-- **ALTER 대상 진단**: pending migration source 순서에서 ALTER TABLE column/constraint effect가 현재 또는 앞선 pending table에 적용될 수 있는지 확인한다. `ADD CONSTRAINT ... FOREIGN KEY`는 local columns, target relation/columns 및 비지연 PK/UNIQUE 보장도 같은 source 순서에서 검사하며 target unique-key 비교는 컬럼 순서에 의존하지 않는다. catalog 검사가 public schema에 한정되므로 명시된 다른 schema 참조는 잘못 public relation으로 간주하지 않고 `pendingForeignKeyTargetUnverified`로 노출한다. PostgreSQL은 schema-qualified table name을 `schema.table`로 해석하므로 schema를 버리고 마지막 이름만 비교하지 않는다 ([공식 Schemas 문서](https://www.postgresql.org/docs/current/ddl-schemas.html), [PostgreSQL tablecmds.c](https://github.com/postgres/postgres/blob/master/src/backend/commands/tablecmds.c#L13723-L13766)). 누락 table은 `pendingAlterTargetIssues` 및 `PENDING_MIGRATION_ALTER_TARGET_MISSING`, FK 전제는 `pendingForeignKeyTargetIssues`/`pendingForeignKeyTargetUnverified`로 표시한다. 이번 localhost audit 결과 ALTER/FK target issue는 0건이며 DB는 변경하지 않았다.
-- **ALTER object 상태 진단**: pending ADD COLUMN/ADD CONSTRAINT가 이미 존재하는 이름을 재추가하거나, 일반 DROP COLUMN/DROP CONSTRAINT가 존재하지 않는 항목을 대상으로 하는 경우, RENAME의 이전/새 이름 상태, ALTER COLUMN이 참조하는 대상 컬럼과 ALTER/VALIDATE CONSTRAINT가 참조하는 constraint 존재 여부를 source 순서로 찾는다. pending CREATE TABLE에서 선언된 이름 있는 table constraint도 후속 source action의 상태 집합에 반영한다. `RENAME CONSTRAINT`는 unique/primary key 메타데이터의 constraint명과 backing index명을 함께 옮기므로 rename 후 DROP/REFERENCES가 이전 이름 상태를 잘못 사용하지 않는다. unique/primary constraint를 DROP하면 catalog의 owning index 이름을 통해 constraint key와 backing index key를 함께 가용 키 map에서 제거하므로 후속 FK가 사라진 키를 근거로 통과하지 않는다. DROP CONSTRAINT CASCADE의 추가 종속 객체 효과는 미모델링으로 unverified 처리한다. `IF NOT EXISTS` column 추가와 object/table 수준의 `IF EXISTS`는 해당 작업을 건너뛰는 조건으로 처리한다. ALTER COLUMN 정의값이나 constraint validation 상태 자체는 비교하지 않는다. 문제는 `pendingAlterObjectStateIssues` 및 `PENDING_MIGRATION_ALTER_OBJECT_STATE_CONFLICT`, catalog 확인 불가는 `pendingAlterObjectStateUnverified`로 출력한다. PostgreSQL 공식 `ALTER TABLE` 문서는 constraint rename을 정의하고, PostgreSQL source의 `rename_constraint_internal`은 unique/primary constraint rename 시 backing index도 함께 rename한다 ([공식 ALTER TABLE](https://www.postgresql.org/docs/current/sql-altertable.html), [PostgreSQL tablecmds.c](https://github.com/postgres/postgres/blob/master/src/backend/commands/tablecmds.c#L3949-L3956)).
-- **DROP INDEX schema/constraint/CASCADE 진단**: public 전용 catalog snapshot 밖의 schema-qualified DROP INDEX는 `pendingIndexSchemaUnverified` / `PENDING_MIGRATION_INDEX_SCHEMA_UNVERIFIED`로 보고하고 public relation/key map을 변경하지 않는다. catalog가 `pg_constraint.conindid`로 primary/unique/exclusion constraint 소유 index를 식별하면 기본 RESTRICT/drop 또는 CONCURRENTLY 경로는 `pendingIndexConstraintDropIssues` / `PENDING_MIGRATION_INDEX_OWNED_BY_CONSTRAINT`로 보고하고 source-order index/key 상태를 제거하지 않는다. standalone unique index가 FK의 참조 대상인 경우 `pendingIndexReferencedByForeignKeyIssues` / `PENDING_MIGRATION_INDEX_REFERENCED_BY_FOREIGN_KEY`로 DROP INDEX를 보류하고, unique/primary constraint drop이 이를 제거하려는 경우 `pendingUniqueConstraintDropDependencyIssues` / `PENDING_MIGRATION_UNIQUE_CONSTRAINT_REFERENCED_BY_FOREIGN_KEY`로 ALTER TABLE statement 전체를 보류한다. CASCADE는 종속 FK state를 제거하되 dependency 효과 미검증 gate를 유지한다. DROP INDEX의 여러 target은 한 SQL statement group으로 추적해 하나라도 public 범위 밖이거나 RESTRICT 제약으로 실행할 수 없으면 해당 statement의 public 상태를 부분 적용하지 않는다. PostgreSQL은 CONCURRENTLY에서 index name 하나만 허용하고 CASCADE도 지원하지 않으므로 다중 target은 `PENDING_MIGRATION_CONCURRENT_INDEX_DROP_MULTIPLE_TARGETS`, CONCURRENTLY와 CASCADE 조합은 `PENDING_MIGRATION_CONCURRENT_INDEX_DROP_CASCADE_UNSUPPORTED`, partitioned table의 index 대상은 `PENDING_MIGRATION_CONCURRENT_INDEX_DROP_PARTITIONED_TABLE_UNSUPPORTED`로 보고하며 해당 statement 상태 변경을 적용하지 않는다. 일반 DROP INDEX CASCADE는 소유 constraint도 삭제할 수 있으므로 알려진 unique key와 exclusion constraint owner state를 함께 제거하지만, 외부 종속 객체 전체는 목록화하지 않아 `pendingIndexCascadeUnverified` / `PENDING_MIGRATION_INDEX_CASCADE_UNVERIFIED`로 fail-closed한다. 먼저 owning constraint를 제거한 뒤 인덱스를 제거하는 migration 경로는 지원한다. PostgreSQL은 DROP INDEX가 schema-qualified index name을 받고 CASCADE가 의존 객체를 제거한다고 정의하며 CONCURRENTLY에는 CASCADE를 허용하지 않는다 ([공식 DROP INDEX](https://www.postgresql.org/docs/18/sql-dropindex.html), [`pg_constraint`](https://www.postgresql.org/docs/18/catalog-pg-constraint.html)는 exclusion constraint의 supporting index를 `conindid`에 기록하며, [CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)는 exclusion index가 constraint와 같은 이름이라고 정의한다).
-- **검증**: localhost read-only audit에서 parent issue 7개(V167 4, V168 2, V169 1), 단순 key column 누락 0개, unverified 문법 0개, index name conflict 0개, 동명 인덱스 정의 mismatch/unverified 0개, concurrent transaction config 누락 0개를 확인했다. V168의 기존 두 RSS listing index는 key 순서와 DESC/NULLS 옵션, btree, unique, predicate 유무, valid/ready 상태가 source와 일치했다. migration source, Flyway history, DB catalog는 수정하지 않았다.
-- **남은 위험**: parser는 일반적인 CREATE TABLE column definitions와 단순 index key만 인식하며 PostgreSQL 전체 문법을 검증하지 않는다. partial-index predicate는 안전 정규화 가능한 식만 비교하며 dollar-quoted/escape string 및 표현이 다른 decompile 결과, source storage parameter/tablespace shape는 아직 비교하지 않아 동명 기존 인덱스에서 `pendingIndexDefinitionUnverified`로 남긴다. 타입 호환성, 권한, lock 부하, concurrent build 중단 및 invalid index cleanup, data preconditions도 검사하지 않는다. 배포된 DB 이력은 별도 확인 대상이다. PostgreSQL은 IF NOT EXISTS에서 같은 이름 relation이 있으면 notice를 내고 기존 index가 새 정의와 같은 것을 보장하지 않는다고 명시한다 ([PostgreSQL CREATE INDEX](https://www.postgresql.org/docs/16/sql-createindex.html)). Flyway의 script config는 migration 파일과 같은 이름에 .conf를 붙이며 executeInTransaction을 설정한다 ([Flyway script configuration](https://documentation.red-gate.com/flyway/reference/script-configuration), [executeInTransaction](https://documentation.red-gate.com/fd/flyway-execute-in-transaction-setting-277578997.html)).
-## 2026-11-11 Flyway DDL inventory의 삭제 relation 하위 오탐
-
-- **증상**: 로컬 Flyway audit에서 applied migration이 생성한 오래된 컬럼·인덱스·제약이 catalog에 없다며 대량 mismatch로 나타났다.
-- **근본 원인**: 후속 V70 migration이 legacy 부모 테이블을 `DROP TABLE ... CASCADE`로 제거했지만 source inventory는 해당 부모가 최종적으로 없는 상태에서도 자식 컬럼·인덱스·제약의 존재를 요구했다.
-- **해결 및 진단**: final source relation effect가 absent인 경우 연결된 column/index/constraint effect는 검사 대상에서 빼고 `skippedParentAbsentObjectCount`와 항목 배열로 별도 노출한다. mismatch는 source migration 상태별로 집계해 applied와 미적용 역사 후보를 구분한다.
-- **검증**: read-only audit에서 V148 mismatch와 V85/V89 compatibility view mismatch가 사라졌다. V70 cascade 하위 객체와 view에 붙을 수 없는 인덱스/제약을 skipped로 기록하며 migration-state별 mismatch 집계를 유지한다.
-- **남은 위험**: parent table과 별도 소유 sequence, 함수, trigger 등 모든 dependency 종류를 추론하지 않는다. inventory는 heuristic이며 최종 객체 정의와 데이터 정합성은 별도 catalog/runtime 검사 범위다.
-## 2026-11-11 Flyway DDL inventory의 action 순서 오탐
-
-- **증상**: applied V148이 재생성한 `sec_smallcap_common_stock_shares_positive_cap` constraint 또는 V85/V89가 drop 후 같은 이름으로 만든 compatibility view가 DDL inventory에서 잘못된 상태로 표시됐다.
-- **근본 원인**: DDL 종류별 순회가 source의 전역 statement 순서를 보존하지 않았다. 같은 ALTER의 DROP→ADD와 V85의 DROP TABLE→CREATE VIEW가 반대 순서로 적용되어 최종 상태가 뒤집혔다.
-- **해결 및 진단**: DDL effect에 source 위치를 붙여 전역 statement 순으로 최종 상태를 계산한다. 최종 parent가 absent인 하위 컬럼/인덱스/제약과 regular view에 붙을 수 없는 인덱스/제약은 skipped로 별도 집계한다. `docs:check`는 source-order parser 및 view-parent skip 조건을 감시한다.
-- **남은 위험**: DDL inventory는 heuristic이며 inline CREATE TABLE constraints의 semantic definition, conditional/dynamic SQL 및 data-operation 결과는 증명하지 않는다. 일반 PostgreSQL lexer 기준은 [공식 lexical structure](https://www.postgresql.org/docs/16/sql-syntax-lexical.html)를 따른다.
-## 2026-11-11 rate-limit 이벤트 스키마의 누락·부분 생성 감지
-
-- **증상**: KIS 제한 이벤트가 `[Debug] KIS rate-limit history unavailable` 경고로 저장되지 않거나, 과거 관리자 `/api/admin/kis-rate-limits`가 503을 반환할 수 있었다. V131 파일이 저장소에 있어도 해당 DB의 history/catalog 상태가 일치한다고 볼 수 없다.
-- **근본 원인**: V131의 version이 이미 적용된 DB version보다 낮으면 Flyway 기본 `outOfOrder=false` 동작에서 뒤늦게 발견된 migration은 자동 적용되지 않을 수 있다([공식 Flyway 설정](https://documentation.red-gate.com/fd/flyway-out-of-order-setting-277579015.html)). 정확히 어느 bootstrap 경로에서 로컬 V131 이력이 빠졌는지는 미확인이다. 또한 `CREATE TABLE IF NOT EXISTS`는 동일 이름 relation이 이미 있을 때 기존 컬럼 구성을 보정하지 않는다.
-- **영향 범위**: KIS rate-limit event write queue, 관리자 요약·최근 이벤트 조회 및 `kis_rate_limit_events.occurred_at` 기준 90일 retention. 일반 KIS 호출 경로는 event insert 실패를 경고하고 계속 진행한다.
-- **해결 및 진단**: V172는 table과 세 forward index를 `IF NOT EXISTS`로 보장한다. runtime schema health는 writer/retention이 사용하는 컬럼을 필수 contract로 검사하고, table 누락과 기존 BASE TABLE의 partial-column 상태를 별도 보고한다. `npm run audit:flyway-local`은 source 선언·history·catalog readiness를 read-only 대조한다. `docs:check`는 rate-limit writer INSERT 필드 및 90일 retention 기준 컬럼을 required-column contract와 대조한다. lower-version history gap만으로 객체 누락을 단정하거나 Flyway history만 수동 정렬하지 않는다.
-- **재발 자동 감지**: `docs:check`가 V157 이후 forward CREATE/ALTER column 선언과 index 이름·테이블·키 정의를 검사한다. runtime `/api/health`는 필수 relation/column 누락 및 forward index 손상 시 readiness 실패를 반환한다. 관리자 diagnostics API는 2026-11-17 관리자 기능 폐기 시 제거되었다. 배포 후에는 `/api/health`를 확인한다.
-- **검사 기준**: PostgreSQL 16 `pg_index`의 `indisvalid`·`indisready`·`indislive`·`indisexclusion` 및 key/INCLUDE 메타데이터를 확인하고, `pg_get_indexdef(index_oid, column_number, false)`로 각 인덱스 컬럼 정의를 비교한다. PK는 `pg_constraint.conkey`의 컬럼 번호와 `pg_attribute.attname`을 조합해 단일 `id` 키인지 검사한다. system catalog 사용은 `information_schema`의 역할 권한 기반 행 노출에 진단이 좌우되지 않게 한다. V172의 `BIGSERIAL`은 PostgreSQL 문서의 bigint 자동 증가 serial 유형으로 shape 게이트에서 bigint와 생성 default 의미로 정규화한다 ([공식 pg_index catalog](https://www.postgresql.org/docs/16/catalog-pg-index.html), [공식 system information functions](https://www.postgresql.org/docs/16/functions-info.html), [pg_constraint](https://www.postgresql.org/docs/16/catalog-pg-constraint.html), [pg_attribute](https://www.postgresql.org/docs/16/catalog-pg-attribute.html), [numeric/serial types](https://www.postgresql.org/docs/16/datatype-numeric.html)).
-- **남은 위험**: runtime health는 필수 컬럼 이름과 rate-limit 이벤트의 컬럼 type·NULL 허용 여부·writer 생략 default, 단일 컬럼 `id` primary key, 세 forward index의 대상 테이블·키 정의·btree 방식·unique 여부·valid/ready/live 상태·exclusion/predicate/expression/include 여부와 컬럼별 인덱스 정의를 검사한다. check constraint와 다른 테이블 컬럼 shape는 검사하지 않는다. 대상 테이블 자체가 없으면 primary-key probe는 중복 오류를 만들지 않고 missing table 항목에 맡긴다. 현재 로컬 DB에는 V172를 적용하지 않았으므로 실제 table 복구와 post-deploy 검증은 미완료다. 배포된 대상에서 Flyway version과 `/api/health`를 확인한다. 관리자 diagnostics 경로는 폐기되어 사용할 수 없다.
-
-## 2026-11-04 DART 피드 GET의 중복 RSS 요청
-
-- **증상**: `/api/dart` 한 번의 GET이 동일한 DART RSS feed를 두 번 가져와 불필요한 upstream 요청을 만들 수 있었다.
-- **근본 원인**: route가 `syncDartAlerts()`의 반환값을 사용하지 않은 채 호출하고, 이어서 `getTodayDartBullishFeed()`를 호출했다. 두 함수 모두 내부에서 `fetchDartFeed()`를 실행한다. 예약 자동화는 별도의 `runFilingSync()` → `runDartAutomation()` 경로가 소유하므로 GET의 첫 결과는 피드 응답이나 지속 상태에 기여하지 않았다.
-- **영향 범위**: `/api/dart`가 feature/schedule gate를 통과한 요청마다 upstream DART RSS 조회 수가 중복됐다. 응답 DTO, DB 저장, 예약 자동화 및 alert 전달은 변경하지 않았다.
-- **해결 위치**: `app/api/dart/route.ts`에서 버려지는 `syncDartAlerts()` 호출과 import를 제거하고 `getTodayDartBullishFeed()`만 한 번 호출한다.
-- **재발 자동 감지**: `app/api/dart/route.test.ts`가 성공 GET의 feed 함수 호출 횟수를 정확히 1회로 확인한다.
-- **남은 위험**: 성공적인 화면 polling마다 upstream RSS를 여전히 조회한다. 캐시나 polling 주기 조정은 freshness·provider 조건을 확인해 별도로 결정해야 한다.
-
-## 2026-11-01 미국 이벤트 검토 집계의 수기 숫자 불일치
-
-- **증상**: 직접 검토 발행사·복구 이벤트 대기 수가 review event row의 실제 상태/티커 고유 집계와 보고서 숫자 사이에서 달라질 수 있다.
-- **근본 원인**: `eventReviewStatus`의 여러 과거 enum을 수기로 세고 `reviewedEvents[].sourceReviewStatus` 정본 집계와 대조하지 않았다.
-- **영향 범위**: 미국 소형주 원문 검토 coverage와 pending 재검토 현황을 나타내는 요약 메타데이터·보고서. 이벤트 원문 내용이나 SEC accession 관계에는 영향이 없다.
-- **해결 위치**: 검토 현황은 `reviewedEvents`에서 직접 검토 상태 및 ticker unique set을 계산한다. 운영 보고서의 batch 67/68 요약 수치를 canonical record 기반 값으로 수정했다.
-- **재발 자동 감지**: `scripts/validate-us-smallcap-event-data.mjs`가 `primarySourceReviewedIssuerCount`, `recoveredEventRevalidationPendingCount`, `recoveredEventRevalidationPendingIssuerCount`와 실제 review rows 간 parity를 검사한다.
-- **남은 위험**: event row 상태가 실제 원문 검토 행위를 대변하므로 상태 전환 시에는 원문 URL·검토근거도 함께 확인해야 한다.
-
-## 2026-11-01 이벤트 원문에 타 발행사 SEC 근거가 혼입되는 문제
-
-- **증상**: canonical 이벤트의 제목·종목은 맞지만 `evidence`가 다른 발행사 SEC 공시를 인용하거나 `sourceUrl` 경로에 다른 CIK가 들어갈 수 있다.
-- **근본 원인**: 종목별 이벤트를 연속 편집하는 과정에서 이전 이벤트의 분석·인용 내용을 복사했고, 검증기는 URL 발행사 정체성을 비교하지 않았다.
-- **영향 범위**: 인용문과 사실판정의 신뢰성, 같은 종목의 일정·상태·위험 설명. 운영 공개 GET은 읽기 전용이며 DB 변경은 수행하지 않았다.
-- **해결 위치**: 해당 이벤트를 SEC 공식 원문과 대조해 인용과 분석을 교체하고, `scripts/validate-us-smallcap-event-data.mjs`에 source/evidence CIK 대조를 추가했다. 교차 발행사 비교자료는 `relatedSourceUrls`에 명시된 경우만 통과한다.
-- **재발 자동 감지**: `npm run validate:us-smallcap-event-data`에서 SEC EDGAR URL CIK가 canonical ticker issuer CIK와 다르면 실패한다.
-- **남은 위험**: URL CIK가 맞아도 quote 내용의 문맥 적합성 자체는 자동 검증 불가이므로 정기 원문 직접 대조가 필요하다.
+- **증상**: OCI workflow #1260은 로컬 quality/build/runtime, remote verify, 패키징 및 업로드를 통과했으나 `Activate release`의 market-impact-events import에서 `events[375] has invalid eventKey`로 실패했다.
+- **근본 원인**: b09 generator가 batch와 event suffix를 콜론으로 연결했지만 운영 importer는 `^[A-Z0-9._-]{1,64}$`만 허용한다. 사전검증에서 거부되어 데이터베이스 transaction 전 중단됐다.
+- **영향 범위**: b09 event 원장 import 및 release 활성화. 운영 public GET은 기존 데이터(US event 377건)를 반환했고 신규 batch는 반영되지 않았다. 기존 운영 release와 DB는 유지됐다.
+- **해결 위치**: generator eventKey를 대문자 batch-suffix 하이픈 형식으로 변경하고 canonical 35건을 동일 형식으로 수정했다. validator에 importer와 동일한 허용문자/길이 검사를 추가하고 데이터 계약에 규칙을 명문화했다.
+- **재발 자동 감지**: `docs:check`의 전체 canonical validator가 모든 US eventKey를 importer regex로 검사한다. `deploy:verify`와 OCI import precheck가 배포 전 동일 데이터 형식을 추가 검증한다.
+- **검증 결과**: 원인은 GitHub Actions 로그 #1260에서 확인했다. 수정 후 9개 batch validator·`docs:check`, optimized build, runtime smoke/hydration, Vitest 1,542 passed/3 skipped, typecheck 및 전체 `deploy:verify`가 통과했다. 수정본 운영 재배포 및 GET 확인 대기 중이다. 운영 GET/refresh/DB write는 수행하지 않았다.
+- **남은 위험 및 다음 개선**: importer/validator의 필드 계약이 중복 구현되어 있으므로 가능하면 공유 schema 검증 모듈로 일원화한다. 이번 수정에서는 기존 importer를 임의 변경하지 않고 프로젝트 계약을 따랐다.
 
 # 오류 상황 및 해결 방법
 
-## 2026-11-11 미국 및 원격 일봉 적재의 중복·비정상 응답 행
+## 2026-11-06 운영 SEC/RSS 이벤트 원장 저장 실패 — 누락된 V141/V142 source-analysis tables
 
-- **증상**: 동일 종목·거래일이 중복된 응답은 PostgreSQL 한 UPSERT에서 동일 conflict key를 중복 갱신해 batch를 실패시킬 수 있다. 다른 한편으로 KIS 숫자 파서가 빈 값·문자열을 0으로 대체하면 누락된 거래량을 실제 0 거래량으로 오인할 수 있다. 미국 자동화는 DB 저장이 0건이어도 성공/retry 완료로 세던 경로가 있었다.
-- **근본 원인**: KR 저장 경로에만 중복 제거·OHLCV 검증을 적용했고, US KIS 저장 및 원격 일봉 적재 경로는 각각 응답 행을 바로 UPSERT하거나 파싱 수만으로 성공을 판정했다.
-- **영향 범위**: KR/US KIS 일봉·주봉·월봉 저장, US cache warm/open refresh 및 backfill, chart cache 보강 저장, `scripts/sync-daily-cache-async.mjs` 및 `scripts/sync-daily-cache-from-remote.mjs` 원격 캐시 적재.
-- **해결 위치**: `lib/kis-kr-daily-price.ts`·`lib/kis-us-daily-price.ts`는 누락/비정상 숫자를 NaN으로 보존한다. KR/US cache saver는 활성 공식 `COMMON_STOCK` master와 제외 분류를 확인한 뒤 유효 날짜·OHLCV 및 중복 키를 검증·정규화하고 UPSERT `RETURNING` 날짜 집합을 대조해 불일치 시 롤백한다. `lib/us-daily-price-cache-warm.ts`는 실제 저장 확인 건수만 성공/retry 완료로 반영하며 폐기·중복 수를 집계한다. `lib/us-daily-open-cache.ts` 및 `scripts/us-daily-1200-backfill.ts`도 실제 저장 건수가 0인 경우 성공으로 세지 않는다. 두 원격 동기화 스크립트는 active COMMON_STOCK scope에서 각 시장별 공식 제외 플래그를 거르고, 요청하지 않은 종목·응답 내 중복 종목을 거부하며 미응답/빈 봉 종목 수를 노출한다. invalid row는 저장 전에 거부하고 중복 종목·날짜 행은 한 건으로 정리한다. DB 저장 검증 건수가 기대값과 다르면 트랜잭션을 롤백한다.
-- **재발 자동 감지**: KIS diagnostics의 raw/parsed/saved/discarded count를 비교하고, US automation의 `failureCount`, `savedCandleCount`, `discardedOrDuplicateCandleCount`를 확인한다. 원격 async sync 결과의 `telemetry.duplicateCandleRows` 및 양 스크립트의 저장 행 검증 오류를 확인한다.
-- **남은 위험**: 캐시 저장 메서드의 단위 회귀 검증은 이번 작업에서 추가하거나 실행하지 않았다. 운영 적재 범위의 end-to-end coverage parity는 로컬 코드 점검만으로 확인되지 않는다.
+- **증상**: OCI workflow는 V166까지 성공했지만 `/api/collection-status`에서 `SCHEMA_TABLE_MISSING_MARKET_RSS_LLM_ANALYSES`와 `SCHEMA_TABLE_MISSING_SEC_CODEX_ANALYSIS_QUEUE`를 관측했다. 공개 SEC 저장 API accession 1건 재현도 같은 누락 queue 테이블에서 HTTP 503이었다. report/events GET은 DB 연결 및 V166 event 테이블 존재만으로 200/0건을 반환하므로 수집 성공을 증명하지 못했다.
+- **근본 원인**: 운영 migration 이력에 이후 버전이 적용된 상태에서도, 기존 SEC/RSS analysis migrations V141/V142가 만든 source table이 실제 schema에 없었다. 원장 materializer SQL은 source 분석을 `LEFT JOIN`하지만 PostgreSQL은 없는 relation도 오류로 처리해 이벤트 저장을 중단했다.
+- **영향 범위**: 기존 source fetch/import는 별도 경로로 수행될 수 있지만 SEC/RSS source analysis relation과 새 event materializer를 참조하는 동작이 실패한다. source archive와 V166 event data는 삭제되지 않았다. 실패한 수동 materialization은 transaction commit 없이 종료됐다.
+- **해결 위치**: `db/migration/V167__restore_missing_source_analysis_tables.sql`은 V141 `market_rss_llm_analyses`, state table, 인덱스 및 V142 `sec_codex_analysis_queue`와 인덱스를 `IF NOT EXISTS`로 복구한다. 기존 정의·unique/check/FK 계약을 재사용하며 존재 데이터는 덮어쓰지 않는다. Error classifier는 공개 진단에 고정 allowlist table code만 기록하고 raw DB message를 노출하지 않는다.
+- **재발 자동 감지**: `docs:check` 및 `deploy:verify`는 전체 migration 수와 operational relation contracts를 검사한다. 배포 뒤 `/api/collection-status`는 ledger status/count/error code를 반환하고, API `POST /api/events/collect`는 한정된 source ID에 대해서만 HTTP 503 안전 코드로 실패한다. 오류 코드에 원문 비밀이나 연결 문자열이 포함되지 않는 route test가 있다.
+- **검증 결과**: read-only 운영 API에서 두 누락 relation을 확인했다. PostgreSQL 16 임시 DB에서 V167 단독 2회 반복 적용과 기존 V141+V142 적용 뒤 V167 재적용을 모두 통과했다. 로컬 `npm run deploy:verify`도 테스트 1,600 passed/3 skipped와 V167 docs/migration check를 통과했다. V167 운영 배포와 자동 cron 저장 결과는 대기 중이다.
+- **남은 위험 및 다음 개선**: 운영 V141/V142 history와 실제 schema가 어긋난 이유는 공개 API만으로 확인되지 않았다. V167 적용 후 `market-rss` 및 `sec-realtime`가 실행 완료된 status와 idempotent source materialization을 확인하고, 다른 누락 relation이 나오면 원인별로 재현한다. 기존 source payload/analysis data가 없는 table은 빈 상태로 복구될 수 있다.
 
-## 2026-11-11 US EMA/RVOL 분석 입력 품질
+## 2026-11-04 이벤트 배치 재생성 후 OCI import identity 중복
 
-- **증상**: `analyze-us-rising-ema-rvol.cjs`의 EMA·RVOL 및 향후 5일 성과 분석 입력에 잘못된 달력 날짜/OHLCV가 포함될 수 있고, 공식 분류상 비보통주 일부가 표본에 섞일 수 있었다.
-- **근본 원인**: 원본 candle query가 timeframe과 `volume > 0`만 제한하고 공용 candle quality predicate와 전체 US 비보통주 제외 플래그를 적용하지 않았다.
-- **영향 범위**: 해당 연구 스크립트가 산출하는 RVOL 구간·EMA 중첩 점수·승률 표본. 운영 API/캐시 저장은 변경하지 않는다.
-- **해결 위치**: `scripts/analyze-us-rising-ema-rvol.cjs`가 `scripts/daily-candle-quality-sql.mjs`를 동적 import해 달력·유한 숫자·OHLC 관계를 필터링하고, ETF·warrant·derivative·DR·leveraged·inverse를 DB master flags로 제외한다. 분석 목적상 기존 `volume > 0` 기준은 유지한다.
-- **재발 자동 감지**: 파일 구문은 `node --check scripts/analyze-us-rising-ema-rvol.cjs`로 검사한다. 분석 쿼리에서 공용 predicate 호출 및 각 공식 분류 flag를 코드 리뷰 시 대조한다.
-- **남은 위험**: 이번 수정에서는 로컬 DB 연결 및 전체 분석 실행을 하지 않아 표본 수·통계치 변화는 산출하지 않았다.
+- **증상**: OCI workflow #1256의 Activate release 단계에서 `Duplicate market impact event identity` 오류가 발생해 운영 release가 활성화되지 않았다.
+- **근본 원인**: event definitions 변경으로 새 eventId를 만들 때 generator가 현재 검토 ID를 upsert했지만, 이전 동일 배치의 orphaned canonical eventId는 원장에 남았다. 회사 IR 일정의 sourceType/sourceId/ticker/eventType이 같아 importer identity 중복으로 판정됐다.
+- **영향 범위**: `market-impact-events.json` 배치 이벤트 import와 release 활성화. importer의 duplicate precheck는 DB transaction 전에 실행돼 DB 기록을 변경하지 않았으며 이전 운영 release가 유지됐다.
+- **해결 위치**: `scripts/generate-us-smallcap-event-batch.mjs`가 이전 동일 배치 review event ID를 제거한 뒤 재구성하고, 새 비-SEC source identity와 같지만 eventId가 다른 stale canonical 항목도 정리한다. `scripts/validate-us-smallcap-event-data.mjs`는 전체 US 원장을 importer와 동일한 identity tuple로 fail-closed 검사한다.
+- **재발 자동 감지**: `npm run docs:check`의 batch validator가 canonical 전체 identity 중복을 검사한다. OCI workflow는 `deploy:verify`와 import precheck를 수행한다. 서로 다른 의미의 이벤트가 동일 ticker/sourceId/eventType을 쓰면 고유 eventKey를 지정한다.
+- **검증 결과**: OCI #1256은 중복으로 activate에 실패했다. orphan 제거 후 canonical US 이벤트 374개, batch8 이벤트 31개 및 22 accession 연결 validator를 통과했다. 수정 commit `e20c7023` / OCI #1257과 `09f8ba12` / OCI #1258을 배포했다. 공개 events GET에서 31/31 eventId 및 FTCI의 08:30 EST / 22:30 KST `eventDetails`를 확인했고, UTF-8 보고서 HTTP 200 및 문서 catalog 등록도 확인했다. 배포 전 `npm run deploy:verify`가 통과했다.
+- **남은 위험 및 다음 개선**: 같은 공식 URL이 둘 이상의 실적 발표/상황을 담을 수 있어 identity 충돌이 가능하다. 같은 source URL·ticker·event type에 별도 event가 정의되면 정의 파일에서 stable eventKey를 지정하고 canonical validator에서 감지한다. 향후 배치에서 일정 필드 변경 시 canonical과 API 응답의 현지/KST 상세를 계속 대조한다.
 
-## 2026-11-11 US 일봉 scanner context 읽기 장애
+## 2026-10-28 종목 뉴스 요약에 RSS HTML 태그 노출
 
-- **증상**: 공통 US daily scan의 bulk candle read가 실패해도 scanner가 종목별 빈 캔들 결과로 완료될 수 있었다.
-- **근본 원인**: 원격 bulk endpoint의 non-2xx/비정상 payload가 `null`로 반환된 뒤 빈 Map으로 바뀌었고, `createUsDailyScanContext()`는 DB read rejection도 catch해 빈 Map으로 대체했다.
-- **영향 범위**: DB context를 공유하는 US indicators, breakout, Bollinger, golden-cross 및 daily follow-up. 데이터가 없는 정상 종목의 계산은 유지된다.
-- **해결 위치**: `lib/us-daily-price-cache.ts`는 설정된 remote endpoint의 bulk 실패를 요청 시장/timeframe/대상 수가 포함된 오류로 전파한다. `lib/us-daily-scan-context.ts`는 loader 예외를 숨기지 않아 route/automation/follow-up의 기존 error handling이 실패를 기록하도록 한다. 대상이 없는 정상 empty universe는 빈 Map을 유지한다.
-- **재발 자동 감지**: 원격 실패는 caller의 502/automation FAILED 또는 daily-followup retry 결과에 드러나야 한다. 운영 scanner 결과에서 다수 종목이 동시에 insufficient history로 전환되면 관리자 API의 context candle row count와 remote cache endpoint 상태를 대조한다.
-- **남은 위험**: 이 변경은 typecheck와 static diff 검사만 수행하며 원격 endpoint/DB 장애를 실제 재현하지 않았다.
-- **후속 caller 처리**: bulk remote consumer도 빈 데이터와 loader 장애를 구분해야 한다. KR/US bulk API는 대상이 있는 상태에서 remote endpoint가 non-2xx/비정상 응답을 주면 예외를 던진다. Discord `/ticker`는 실시간 quote를 유지하되 일봉 지표 상태를 `UNAVAILABLE`로 출력하고, cache가 정상 조회됐지만 해당 종목 봉이 없을 때만 `NO_DATA`를 표시한다. 일반 KR/US DB bulk query 오류도 전파된다.
-- **요청-응답 종목 parity**: remote bulk response가 `ok:true`여도 요청 code 일부 누락, 중복 code, 예상 밖 code, 비배열 `candles`가 있으면 실패로 간주한다. 정상적으로 봉이 없는 종목도 응답에 code와 빈 배열을 포함해야 한다. 회귀 감지 시 요청 market/code 집합과 응답 item 집합을 비교하며, upstream public route는 입력 code마다 item을 반환해야 한다.
+- **증상**: 종목 뉴스 요약에 `<b>` 등의 HTML 태그가 문자 그대로 보였다.
+- **근본 원인**: V161에서 정규화 요약 컬럼을 도입했지만 `/api/stock/news`는 raw `summary`만 조회해 반환했다. 차트 모달은 반환 요약을 표시하므로 SEC 피드의 HTML 메타데이터가 UI까지 전달됐다.
+- **영향 범위**: `/api/stock/news`를 사용하는 종목 뉴스 소비자. 운영 GET으로 10개 티커를 조회해 6건의 SEC 요약에서 태그를 재현했다.
+- **해결 위치**: API는 `normalized_summary`를 우선 사용하고, 과거 레코드에는 기존 `extractMarketRssCoreSummary`로 조회 시 정규화한다. 정규화 컬럼이 손상돼도 같은 경로로 안전하게 정리하고 DB 전용 필드는 응답에서 제외한다.
+- **재발 자동 감지**: `app/api/stock/news/route.test.ts`에서 정규화 우선, 과거 SEC 메타데이터 fallback, 손상된 정규화 값 제거를 확인한다. 각 사례의 직렬화 응답에 HTML 태그가 없고 `normalizedSummary` 속성이 노출되지 않아야 한다. `npm run deploy:verify`에 테스트/build/runtime smoke를 포함한다.
+- **검증 결과**: 운영 재현 6/10개 티커(10개 티커 샘플에서 6건), 수정 API 회귀 테스트 3건 통과. 전체 배포 게이트 및 배포 후 운영 재검증 대기.
+- **남은 위험 및 다음 개선**: 사용자 입력/출처별 특수한 태그 없는 메타데이터 변형은 계속 유입될 수 있으므로 운영 GET 표본 및 회귀 테스트로 감지한다. 기존 DB 행은 직접 수정하지 않으며 read-time fallback으로 보호한다.
 
-## 2026-11-11 국내 일봉 적재 배치 중복 날짜·비정상 OHLCV 방어
+## 2026-10-27 RSS 정규화 컬럼 추가 후 운영 health 오탐
 
-- **증상**: KIS 응답에 같은 거래일이 반복되면 단일 `INSERT ... ON CONFLICT`가 같은 키를 두 번 갱신하려다 트랜잭션 전체를 실패시킬 수 있고, 날짜·OHLCV 필드가 비정상이면 유효하지 않은 가격이 캐시에 들어갈 수 있다. 또한 지연된 과거 응답의 zero-volume 행이 그보다 최신인 캐시를 무시하고 종목을 비활성화할 수 있었다.
-- **근본 원인**: 저장 경로가 공급자 응답을 날짜 키로 정규화하거나 OHLCV 관계를 검사하지 않고 바로 UPSERT했다.
-- **영향 범위**: 국내 일봉·주봉·월봉 KIS 수집 저장. 정상 응답의 저장 결과는 유지하며, 중복 날짜는 마지막 응답 값 하나로 축약하고 검증 실패 행은 적재하지 않는다.
-- **해결 위치**: `lib/kr-daily-price-cache.ts`의 `saveKrDailyCandles`에서 실재하는 YYYYMMDD, 유한 숫자, 양수 가격, 비음수 거래량, high/low의 OHLC 포함 관계를 확인한 뒤 날짜별 한 행만 정렬 저장한다. UPSERT의 `RETURNING` 날짜 집합을 입력 날짜 집합과 비교해 빠진 행이 있으면 트랜잭션을 롤백한다. 활성 상태는 적재 후 DB 원본 일봉의 최대 날짜보다 최신이거나 같은 입력에서만 갱신해 과거 봉이 최근 상태를 뒤집지 않게 한다. `refreshKrDailyCandles`는 DB가 반환한 저장 건수와 폐기/중복 건수를 진단에 포함한다. KR automation의 성공·retry 완료·실패 이력·debug 상태는 파싱 건수가 아니라 DB 저장 확인 건수로 판정한다. 실행 후 활성 COMMON_STOCK 기준 시장별 최신일 coverage와 누락·지연 건수를 기록하고 gap이 있으면 automation run을 PARTIAL로 분류한다. 공통 automation wrapper는 반환 객체의 `status=FAILED`도 실패로 보존해 HTTP 작업이 성공 라벨로 기록되는 것을 막는다. latest 요약 및 활성 상태 판정도 정규화된 행을 기준으로 한다.
-- **재발 자동 감지**: `npm run audit:daily-candles`는 localhost DB에 read-only transaction으로 접속해 KR/US 일봉 및 latest summary의 비정상 OHLCV·달력상 불가능한 날짜·특수 숫자, 중복 키 및 최신일 coverage를 출력한다. 원본/요약 품질 위반이나 중복 키가 있으면 exit code 1로 종료한다. KIS 응답 진단의 `rawOutputCount`와 `parsedCandleCount`, 실행 후 `dailyCoverage[].gapCount`와 `partialFailureCount`도 함께 확인한다.
-- **추가 수집 경계 검증**: KIS 응답 파서가 저장 계층에 도달하기 전 실재하는 YYYYMMDD, 필수 5개 OHLCV 숫자, 양수 가격, 비음수 거래량, OHLC 포함 관계를 검사한다. 최근 감사에서 확인한 US 과거 602행은 별도 legacy cache 이슈이며 이번 파서 수정만으로 복구되지 않는다.
-- **조회 경계 보호**: KR/US local candle readers, 공통 원격 cache client, 공개 `/api/public/daily-candles` 응답도 같은 OHLCV·날짜 조건으로 필터링한다. DB 저장값을 0으로 보정해 정상처럼 보이게 하지 않으며, 유효하지 않은 과거 봉은 지표 계산에서 제외한다.
-- **직접 SQL 소비 경로**: 공통 `validDailyCandleSql()`은 실제 YYYYMMDD 달력 날짜(윤년 포함), 유한·양수 가격, 비음수 거래량, OHLC 포함 관계를 확인한다. 이를 화면 차트 및 public API, DB screener의 원본/최신 요약, accumulation, KR/US Bollinger 계열, multi-timeframe 추천, US OBV/ADL, 수집 freshness/backfill 조회, weekly projection 생성·coverage, 국내 financial export에 적용한다. 파생/선별 결과는 유효행만 가지고 최신 N개를 채우며, 경로별 회귀 테스트에서 SQL 조건을 검사한다.
-- **공개 일봉 API SQL alias**: `app/api/public/daily-candles`는 bulk/single 쿼리의 window ranking 전에 source alias `c`에 품질 필터를 적용한다. subquery 결과 alias를 source 조건으로 잘못 참조하지 않도록 route 회귀 테스트에서 확인한다.
-- **latest daily summary 복구**: KR/US 일봉 저장 후 summary를 원본 테이블에서 종목별 최신 유효 거래봉으로 다시 계산한다. 기존 invalid summary는 제거하고, stale 판단·coverage 집계는 summary의 품질 조건을 적용해 invalid 행이 freshness 완료로 취급되지 않도록 한다. 재발은 daily cache job SQL 및 `npm run audit:daily-candles`로 확인한다.
-- **원격 캐시 동기화 필터**: `scripts/sync-daily-cache-async.mjs`의 `--only-missing-date`는 같은 날짜의 invalid 원본봉을 결손으로 취급해 다시 수집하고, `--only-unrefreshed`는 invalid summary를 stale로 취급한다. D 봉 저장 후 summary는 영향받은 종목의 DB 원본에서 최신 유효 거래봉을 다시 골라 덮어쓰며 write 결과를 정확히 검증한다.
-- **원격 DB 적재의 summary 동기화**: `scripts/sync-daily-cache-from-remote.mjs`와 async sync는 공용 `refreshDailyCandleSummaries()`를 트랜잭션 안에서 실행한다. D 봉 저장 후 해당 종목의 최신 유효 원본 거래봉 기준으로 요약을 재작성하고 invalid summary를 제거하며, 실제 요약 row 날짜와 OHLCV 값을 입력 source와 대조한다. W/M 동기화는 일봉 summary를 갱신하지 않는다.
-- **운영 진단/스캔 스크립트**: `report-kr-daily-cache-status.cjs`의 summary coverage와 `scan-us-latest-under-010.cjs`의 가격 후보는 `scripts/daily-candle-quality-sql.mjs` predicate를 거친다. 상세 원본 row를 조사하는 전용 무결성 audit만 invalid row를 의도적으로 그대로 센다.
-- **DB 성능 점검 스크립트**: `db-performance-check.mjs`도 raw 일봉에서 summary를 직접 만들지 않고 공용 `refreshDailyCandleSummaries()`를 사용한다. summary 성능 측정은 품질 predicate를 적용해 invalid cache row가 결과·계획 측정을 오염시키지 않게 한다.
-- **미국 1,200봉 보정 작업 종료 상태**: `us-daily-1200-backfill.ts`는 숫자가 아닌 목표/동시성 설정, 빈 유니버스, provider 오류, 같은 날짜만 반복되는 pagination, 종목 일부 실패 또는 종목당 요청 상한 도달 시 비정상 종료한다. 반복 페이지는 중복 봉을 재저장하지 않고 중단하며, 앞서 저장한 유효 봉 수는 최종 진단에 포함한다.
-- **남은 위험**: 최초 감사에서 US 원본 일봉 602행이 OHLC 관계 위반이었고, 571행은 2023-06-05에 몰려 있었다. 그중 최근 180일의 2행은 2026-10-27이며 NAS latest summary에도 2행이 반영돼 있었다. KR은 0행, 두 시장 모두 중복 키 0건이었다. 해당 저장 행의 `raw_payload`도 동일 OHLC 값을 담았으며 source는 KIS다. 기존 잘못된 cache 행은 이 작업에서 수정/삭제하지 않았고, 일부 raw-table 직접 조회 스캐너가 이를 계속 소비할 수 있다. 과거 데이터 복구 또는 모든 소비 쿼리의 품질 필터 적용이 필요하다. coverage는 latest summary 기준이며 거래량 0 봉은 기존 summary 정의상 포함하지 않는다.
+- **증상**: RSS 정규화 V161 배포 workflow는 성공했지만 공개 `/api/health`가 `degraded`를 반환했다.
+- **근본 원인**: `normalized_summary`를 `REQUIRED_OPERATIONAL_COLUMNS`에 추가하면서 `inspectDatabaseSchema()`의 information_schema 조회는 네 개 컬럼 쌍만 하드코딩한 채 남아 있었다. 실제 DB에 새 컬럼이 있어도 검사 결과의 available 목록에 들어오지 않아 schema readiness가 false가 됐다.
+- **영향 범위**: readiness/health 보고가 잘못 degraded가 되며 실제 RSS ingest의 저장 컬럼과 Flyway migration에는 문제가 없었다. 사용자는 운영 health 상태를 신뢰할 수 없었다.
+- **해결 위치**: `lib/schema-health.ts`에서 필수 컬럼 목록을 `unnest($1::text[], $2::text[])` 입력으로 직접 조회하도록 바꿔 스키마 요구 목록과 조회 조건을 단일 기준으로 연결했다.
+- **재발 자동 감지**: `lib/schema-health.test.ts`는 조회 파라미터에 `normalized_summary`가 포함되고 모든 필수 컬럼이 조회되면 readiness가 true가 되는지 확인한다. 배포 검증은 전체 테스트, typecheck, build/runtime smoke를 포함한다.
+- **검증 결과**: `npm run deploy:verify` 재실행 후 운영 health 200 및 V161 확인 대기.
+- **남은 위험 및 다음 개선**: 수정 배포 완료 뒤 `/api/health`를 재조회한다. 이 공개 API는 상세 migration 번호를 숨기므로, HTTP 200은 전체 schema readiness 확인으로 쓰고 구체 Flyway 버전은 workflow migration 성공 로그 또는 인증된 health 진단으로 별도 확인한다.
 
-## 2026-10-28 미국 일봉 지정 거래일 fallback 누락
+## 2026-10-26 미국 산업별 거래대금 관리자 집계 API 조회 오류
 
-- **증상**: bulk 응답에 과거 봉은 포함되지만 요청한 최신 거래일 봉이 없는 종목은 기존 fallback 검사에서 정상 데이터가 있는 것으로 간주되어 단일 종목 chart 재조회가 생략될 수 있다.
-- **근본 원인**: `fillMissingDailyCandleItems`가 빈 배열/종목 미포함만으로 결손을 판정하고, 지정일 모드에서도 요청일 존재 여부를 확인하지 않았다.
-- **영향 범위**: `targetDate` 기반 국내·미국 일봉 보완. 지정일 봉이 누락된 bulk 응답은 단일 chart fallback 대상으로 재조회한다.
-- **해결 위치**: `lib/daily-candle-fallback.mjs`는 fallback 결과를 기존 bulk 봉 뒤에 합쳐 날짜 이력을 보존하고 각 봉의 출처를 구분한다. fallback 실패는 전체 실행 실패 수에 반영하되, 이미 수신한 유효 과거 봉은 `scripts/sync-daily-cache-async.mjs`가 저장한다. 원래 bulk items는 fallback 전에 요청 코드·중복·배열 구조를 검증해 helper가 malformed 응답을 조용히 숨기지 않게 한다.
-- **재발 자동 감지**: 로컬 DB 원본 `us_instrument_universe_candles`에서 활성 공식 COMMON_STOCK별 지정 날짜 행 존재 여부를 확인한다. `us_latest_daily_candles`는 거래량 0인 날을 제외할 수 있으므로 원본 테이블 날짜 집합을 기준으로 한다.
-- **남은 위험**: 2026-10-28 운영 API 재조회 당시 chart fallback 일부는 이전 마지막 거래일만 반환했고, 후속 요청은 HTTP 502로 실패했다. 클라이언트 fallback 정확성은 수정됐지만 공급원에 봉이 없거나 API 장애인 경우 해당 종목 데이터는 복구되지 않으므로 운영 정상화 뒤 재실행해야 한다.
+- **증상**: 배포된 `GET /api/admin/us-industry-turnover` 첫 운영 조회가 nginx `504 Gateway Time-out`으로 끝났다. 첫 쿼리 최적화 후에는 HTTP 200이었지만 `eligibleWithPeriodCandlesCount=0`으로 빈 표를 잘못 반환했다.
+- **근본 원인**: 운영 캔들 테이블의 `candle_date`는 TEXT의 `YYYYMMDD` 형식이다. 최초 쿼리의 `c.candle_date::date` 조건은 `(market, code, timeframe, candle_date)` 복합 인덱스 범위 탐색을 방해했고, 첫 최적화는 실제 `YYYYMMDD` 값에 ISO `YYYY-MM-DD` 경계를 비교해 모든 기간 캔들을 제외했다. 보통주별 최신일 탐색을 반복한 것도 첫 최적화 응답에 31초가 걸린 원인이었다.
+- **영향**: 조회 전부 읽기 전용이라 저장 변경은 없다. 첫 HTTP 200 응답은 5,163개 대상 종목 중 기간 캔들 0개 및 산업 그룹 0개를 반환했으며 거래대금 표로 사용하지 않았다.
+- **해결 위치**: `app/api/admin/us-industry-turnover/route.ts`에서 최신 날짜는 종목별 최신 일봉 요약 테이블에서 얻고, 전체 대상은 정렬된 200종목 페이지로 나누어 원본 기간 캔들과 조인한다. 첫 페이지에서만 전체 캔들 커버리지를 산출한다. 날짜 경계는 `TO_CHAR(date, 'YYYYMMDD')`로 실제 저장 형식에 맞춘다.
+- **재발 자동 감지**: API 회귀 테스트가 `YYYYMMDD` 범위, read-only SQL, 200개 상한과 offset 경계를 확인한다. 운영 페이지별 응답시간, 페이지 간 기준일/eligible 수 일치, 마지막 `nextOffset=null`, 기간 캔들 커버리지 및 원천별 합계를 확인하고, 운영 DB 직접 접속 없이 API 응답으로 진단한다.
+- **검증 결과**: 최초 504와 31,273ms 빈 응답은 운영 관리자 API로 관측했다. 전체 일괄 쿼리는 최적화 후에도 운영에서 504였다. 200개 종목 단위 offset 읽기로 다시 개선 중이며 route 회귀 테스트 5개와 전체 `npm run deploy:verify`(1,538 tests, build/runtime/browser smoke 포함)를 통과했다. 분할 버전은 배포 전이므로 운영 API 페이지별 응답 및 합계는 재검증해야 한다.
+- **남은 위험 및 다음 개선**: 단일 페이지가 504면 페이지 크기를 더 낮춰 재검증한다. 모든 페이지의 기준일·대상 수가 불일치하면 합산하지 않는다. `close × volume`은 `trading_value`가 없는 행의 대체 추정치로 표시한다.
+
+## 2026-10-25 KIS 미국 업종 동기화의 운영 universe 미정합
+
+- **증상**: KIS 업종 UPDATE 결과의 코드 불일치는 0이지만, KIS 보통주 후보 일부가 저장되지 않고 KIS 원본과 무관한 활성 `COMMON_STOCK` 행이 남아 전체 보통주 업종 저장을 보장할 수 없었다.
+- **근본 원인**: 기존 동기화가 양쪽 테이블 교집합에만 `industry_code`를 UPDATE했으며 KIS 후보를 신규 반영하거나 잘못 활성화된 common·특수상품 partition을 함께 정합화하지 않았다.
+- **해결 위치**: `lib/us-industry-code-sync.ts`의 KIS full sync에서 NAS/NYS/AMS 전체 후보 및 특수행 upsert, 외부 활성 common 비활성화, 사후검증을 단일 transaction/advisory lock으로 묶는다. `lib/instrument-universe-import.ts`는 KIS 비주식·ETP·알 수 없는 유형을 fail-closed 처리한다.
+- **재발 자동 감지**: 업로드 사후에 `missingCount=0`, `mismatchCount=0`, `activeDatabaseOnlyCount=0`, special source missing `0`을 transaction 안에서 강제하고, 운영 `mode=audit` read-only 결과로 다시 대조한다. KIS 원본 코드 `000`은 미분류로 보존한다.
+- **운영 검증 결과(2026-10-25)**: 배포 `f84c842f` 후 `.env.local` 관리자 인증으로 공식 마스터를 업로드했다. KIS 후보 common 5,358건 upsert, special 7,533건 upsert, 이전 후보 외 활성 common 1,436건 비활성화 후 독립 read-only audit에서 후보 누락·후보 외 활성 common·업종 코드 불일치가 모두 0이었다.
+- **영향 및 남은 위험**: 이전 common 행은 삭제하지 않고 비활성화해 이력을 보존한다. 후보 밖 148행은 KIS 마스터에서 확인할 수 없어 원인 미확정 상태로 비활성 유지한다. KIS 원본 `000` 2,724건은 유효 업종 코드가 아니며 이름이나 외부 공급자로 보정하지 않는다. KIS 마스터의 분류 범위 변경은 다음 full sync 때 동일한 전수 검증 기준으로 감지한다.
+
+## 2026-10-25 RSS 제목 숫자 번역과 backlog 배치 설정
+
+- **증상**: 운영 RSS가 Azure로 제목을 한국어 번역했지만 `Third Quarter`를 `3분기`로 바꾼 숫자를 미번역 숫자로 오인해 `translation_numeric_hallucination`으로 차단했다. 동시에 RSS timer 실행은 회당 세 건만 시도해 과거 대기열이 느리게 진행됐다.
+- **근본 원인**: 숫자 무결성 검사는 아라비아 숫자가 원문에 없으면 모두 환각으로 간주했다. 배치 설정은 Next.js 앱 프로세스의 `/etc/stockman/stockman.env` 값에 의존했으며, HTTP를 호출하는 RSS oneshot 서비스에 설정을 추가해도 이미 실행 중인 앱 프로세스에는 전달되지 않았다.
+- **해결 위치**: `lib/translate-market-rss-item.ts`는 원문에 있는 영어 기수·서수와 월 이름에 대응하는 숫자 변환만 허용하고, 원문과 무관한 숫자 및 새 금융 부호는 계속 차단한다. `app/api/cron/market-rss/route.ts`는 앱 환경변수와 무관하게 번역·알림 배치 크기를 20건으로 고정한다.
+- **재발 자동 감지**: `lib/translate-market-rss-item.test.ts`는 `Third Quarter` → `3분기`를 허용하고 출처에 없는 숫자를 계속 거부한다. `app/api/cron/market-rss/route.test.ts`는 batch 환경변수가 3이어도 20건을 전달하는지 검사하며, `scripts/check-oci-cron.mjs`는 RSS route의 batch 상수를 검사한다. 배포 후 최근 실행에서 `attempted=20`, `translated`·`notified.sent` 증가와 `backlogRemaining` 감소를 확인한다.
+- **영향 범위와 남은 위험**: 이번 원인으로 차단된 제목은 한국어 번역 검증 통과 전까지 Discord에 전송되지 않았다. Google 앱 월 한도는 300,000자 중 299,992자가 예약되어 fallback이 사실상 중단됐으며, Azure 사용 가능량은 진단 당시 약 1,518,453자였다. 불완전 번역 등 다른 품질 실패는 여전히 보류된다. 30일 운영 조회에서는 GlobeNewswire 20건, StockTitan 2,174건, SEC 3,028건의 PENDING이 확인됐으며, 30일보다 오래된 항목 수는 별도 집계되지 않았다.
+- **다음 개선**: 새 배포 후 세 출처의 실제 제목 번역 및 Discord 수신을 관찰하고, 30일을 넘은 backlog까지 완전히 소진됐는지 운영 상태에서 확인한다. 번역 서비스 한도는 사용자 승인 없이 높이지 않는다.
 
 ## 2026-10-20 RSS Discord 알림 출처 허용 목록 적용
 
@@ -883,420 +808,191 @@ npm test -- --run
 - **재발 방지**: 실패 주입 회귀 테스트가 automation query 실패와 마지막 성공 query 실패를 각각 재현하고 나머지 결과 보존을 확인한다. `/api/health` 공개 응답 계약은 history 가용성에 좌우되지 않게 유지한다.
 - **남은 위험**: DB 장애가 아닌 일시 query 지연도 이력 조회 실패로 표현되지만 SQL/DB 오류 상세는 공개 화면에 노출하지 않는다. 운영 진단 API와 함께 원인을 판별한다.
 
-
-## 2026-10-24 운영 미국 차트 API 거래소 파라미터 오진
-
-- **증상**: 누락 미국 종목의 운영 `/api/stock/chart` 표본 조회가 503을 반환해 운영 서버에 차트 데이터가 없다고 판단했다.
-- **근본 원인**: 라우트 계약은 `market=US&exchange=AMS|NAS|NYS`인데, 첫 요청에서 거래소 코드를 `market` 파라미터에 넣었다. 라우트는 이를 US로 인식하지 못해 다른 시장 경로로 처리했고, 이 503을 유효한 미국 차트 조회 실패로 해석했다.
-- **해결**: 올바른 파라미터로 재조회했다. 목표일 봉 누락 53개 중 31개는 활성 COMMON_STOCK 차트 봉 4,229건을 반환해 로컬에 저장했고, 22개는 세 거래소에서 활성 공통주 마스터를 확인하지 못해 fail-closed로 미저장했다. 운영 마스터와 로컬 마스터의 KHC 거래소 매핑도 NYS/NAS 불일치로 드러났다.
-- **재발 감지**: 미국 차트 API smoke는 알려진 US ticker에 `market=US`와 `exchange`를 분리해 보내고, HTTP 상태와 응답의 `eligibility`/`chartStatus`를 확인한다. 파라미터 오류(400/422), 활성 마스터 미확인, 실제 데이터 없음(503)을 구분한다.
-- **남은 위험**: 로컬 및 운영 종목 마스터가 거래소·활성 상태에서 어긋날 수 있다. 완전한 전 종목 동기화 전 운영 마스터와 로컬 마스터의 정식 동기화가 필요하다.
-
-
-# 2026-11-01 공시일·법적 효력일 혼동 및 발행주식수/운영 시총 불일치
-
-- **증상**: SHFS 1:12 역분할의 기존 복구 이벤트가 SEC 보고/증서일 2026-09-29를 법적 효력일처럼 표시하고, 효력시각을 9/29 00:01 EDT로 잘못 기록했다. 같은 종목의 운영 market-intelligence 응답은 listed_shares 1,027,746과 시총 $80,164를 반환했지만 SEC 10/30 8-K는 issued and outstanding 85,512,985주를 보고했다.
-- **근본 원인**: 복구 메모가 원문 Exhibit를 직접 대조하지 않고 보고서 날짜와 행사 효력 날짜를 하나의 eventDate로 취급했다. 시장 master의 listed_shares와 SEC가 보고한 발행·유통주식수의 기준·갱신시각을 교차 확인하지 않고 시총 snapshot을 확정값으로 간주할 위험이 있었다.
-- **수정**: SEC 8-K와 Certificate of Amendment에 따라 split eventDate를 2026-09-30으로 고치고 효력시각 00:01 EDT/13:01 KST를 기록했다. 발행·유통주식수 전후 절대값과 조정 거래 개시시각은 미공개로 남겼다. 운영 API 값과 SEC issued-and-outstanding 값을 별도 필드로 보존하고 약 83.2배 차이 및 혼합원천 단순 시총 산술치를 데이터 품질 한계로 표시했다.
-- **재발 자동 감지**: 역분할/병합 이벤트는 공시 접수일, 주주승인일, 법적 효력일, split-adjusted 거래 시작일을 별도 확인한다. 법적 효력시각이 00:01 현지시간이면 SEC 원문 시각대를 근거로 날짜를 먼저 확정하고 KST 변환을 별도 계산한다. 시총 검토에서는 운영 master의 share count와 최신 SEC issued/outstanding 값을 비교하되 float로 혼동하지 않고, 기준일·가격 원천이 다르면 파생값을 official market cap으로 기록하지 않는다.
-- **검증/남은 위험**: SEC 8-K 045183, Exhibit 3.1, 047774, 048425 및 048426/048427 원문을 재대조했다. 데이터 parity validator, UTF-8/JSON strict parse와 diff check 결과를 본 작업 로그에 기록한다. 운영 API의 listed_shares가 왜 SEC 발행주식수와 다른지는 확인되지 않았다. 후속 XXII 검사에서도 운영 713,994주와 SEC 10/23 outstanding 19,202,198주가 26.9배 차이로 관찰됐다. FGL 재검토에서는 Nasdaq 결정서 날짜(10/19), 회사 확인 기준일(10/9), 발표/SEC 접수일(10/23)을 분리해 이벤트 날짜와 제출 날짜를 혼동하지 않도록 했다. 최신 공급자 상장주식수 정의/갱신은 후속 운영 데이터 검토가 필요하다.
-## 2026-11-10 RSS 조회 정렬 인덱스 부재와 로컬 실측 범위
-
-- **증상**: `/api/market-news`는 기본 1시간, 최대 24시간의 기사 조회를 매번 수행하며 결과를 발행 시각 내림차순으로 정렬한다. RSS 테이블이 커질수록 해당 GET이 많은 행을 읽고 정렬할 수 있다.
-- **근본 원인**: `market_rss_articles`에는 알림 처리용 인덱스와 `(source, external_id)` 유니크 인덱스만 있고 `published_at DESC NULLS LAST, id DESC` 목록 정렬을 지원하는 인덱스가 없었다.
-- **영향 범위**: 공개 `/api/market-news`의 최근 목록 조회. 같은 기사 테이블을 조회하는 disclosures 경로도 이 인덱스를 사용할 수 있다. 기사 DTO·기간·페이지 커서 동작은 변경하지 않는다.
-- **해결 위치**: V168에서 전체 및 출처별 발행시각 정렬 인덱스를 `CREATE INDEX CONCURRENTLY`로 추가하고 Drizzle schema 정의를 동기화한다. 동일 migration은 `/api/bullish-rss` projection 목록의 정렬 인덱스도 포함한다.
-- **재발 자동 감지**: market-news/disclosures 쿼리의 `where/orderBy`와 schema·migration 인덱스 키를 함께 대조한다. 적용 뒤 실제 대표 source/ticker 조건에서 `EXPLAIN (ANALYZE, BUFFERS)` 및 요청 latency를 확인한다.
-- **로컬 검증**: 사용자가 지정한 5432 포트에서 `stockman-postgres-local`을 기동했다. 기존 named volume을 보존하고 compose의 host port를 5432로 맞췄다. 로컬 Flyway 이력은 161, source migration은 168이며 64개가 pending이고 schema drift도 확인됐다. 로컬에는 `market_rss_articles` 552행(최신 published_at 2026-09-04), `market_rss_bullish_articles` 테이블은 없다. 전체 migration은 실행하지 않고 `market_rss_articles`의 V168 두 인덱스만 concurrent로 생성했다.
-- **측정 결과**: 데이터가 있는 2026-09-03~04 구간의 101건 쿼리는 인덱스 전 0.54ms, 인덱스 생성 뒤 1.08ms였고 두 실행 모두 작은 테이블에 대한 Seq Scan + top-N sort를 선택했다. 현재 24시간 구간에는 일치 행이 없어 `/api/market-news?hours=24&pageSize=100` 로컬 개발 응답 20회가 HTTP 200/0건, p50 206.9ms/p95 367.3ms였다. 첫 compile/cold 요청은 측정치에서 제외했다. 이 작은·오래된 로컬 데이터는 인덱스 이득을 증명하지 못하며 production latency의 근거가 아니다.
-- **남은 위험/다음 확인**: V168 Flyway migration 전체와 bullish 인덱스는 로컬 schema drift 때문에 적용하지 않았다. 실제 대량 테이블에서 source별 `EXPLAIN (ANALYZE, BUFFERS)` 및 운영 API p50/p95를 확인해야 인덱스 효과를 확정할 수 있다. 운영 DB에는 연결하지 않았다.
-
-## 2026-11-10 RSS 기사 7일 보존기간 미적용
-
-- **증상**: 운영 자동 정리 API가 RSS fetch snapshot만 180일 뒤 삭제하고 `market_rss_articles` 기사 행은 정리하지 않았다. 기존 정적 게이트도 기사 삭제를 금지했다.
-- **근본 원인**: 과거 정책에서 기사별 본문을 장기 보존하도록 정리 route와 회귀 게이트가 설계됐다. 새 요구사항은 RSS 기사와 호재 projection의 7일 보존을 명시한다.
-- **영향 범위**: 일반 RSS 기사 및 분리 저장된 bullish RSS projection. RSS 원본 fetch snapshot(180일), SEC/DART 공시, 사용자 생성 데이터의 보존 정책은 변경하지 않는다. 발행시각이 없는 RSS 행은 `created_at`으로 만료를 계산한다. linked bullish projection을 parent보다 먼저 정리하고 FK cascade는 동시성 안전망으로 유지한다.
-- **해결 위치**: `/api/cron/db-retention`에서 두 테이블을 5,000행 단위 최대 3회씩 삭제하고 `V169`에 null 발행시각 행 검색용 concurrent partial index를 추가한다. 연결된 bullish projection을 parent RSS보다 먼저 만료 parent 관계까지 포함해 직접 정리하고, 독립 입력 projection도 별도 cleanup 대상으로 둔다. 기존 OCI cron에서 retention API를 매 주기 호출한다. `scripts/check-oci-cron.mjs`가 두 7일 정책과 migration 설정을 점검한다.
-- **남은 위험/다음 확인 (2026-11-10 기록 시점)**: 당시 로컬 schema는 Flyway 161이고 `market_rss_bullish_articles`가 누락돼 전체 cleanup 실행을 검증할 수 없었다. 이때 적용한 정책은 이후 2026-11-15 기록에서 72시간으로 단축됐다. RSS fetch snapshot은 계속 별도 180일 정책을 사용한다.
-
-## 2026-11-15 RSS 보존 기간 72시간 단축 및 목록 응답 경량화
-
-- **요구사항/영향 범위**: 자동 정리 대상인 `market_rss_articles`와 `market_rss_bullish_articles`를 7일 대신 72시간 이후 삭제한다. RSS fetch snapshots 및 다른 테이블 보존 기간은 변경하지 않는다.
-- **변경 위치**: `/api/cron/db-retention`의 두 RSS expiry predicate를 72시간으로 맞췄다. 조회 API는 목록 요청에서 작은 화면용 컬럼만 선택하고 상세 요청에서만 단일 행의 큰 원문/번역 컬럼을 읽는다.
-- **인덱스 점검/개선**: 기존 V168 `published_at` 및 `(source, published_at)` 목록 인덱스는 날짜/source 조회를 지원하고, V169 partial `created_at` 인덱스는 `published_at IS NULL` 정리를 지원한다. V173은 `published_at IS NOT NULL` 영역의 `(published_at, created_at)` partial index 두 개를 concurrent 생성하여 72시간 retention scan의 날짜 조건과 만료 순서를 지원한다. 기존 bullish `source_article_id` unique index는 부모 기사 연결 정리를 지원한다.
-- **자동 감지**: OCI cron checker는 RSS 두 테이블의 `published_at`/fallback `created_at` 기준이 72시간인지 검사하고, V173의 concurrent index·Flyway transaction 설정·배포 archive 포함을 확인한다.
-- **검증/남은 위험**: `npm.cmd run typecheck`, StockTitan route 13개 회귀, `node scripts/check-oci-cron.mjs`, 전체 `npm.cmd run cron:check`, `npm.cmd run docs:check` 통과. benchmark script는 localhost DB에서 전체 select와 목록 projection의 p50/p95·JSON bytes·EXPLAIN BUFFERS를 비교한다. PostgreSQL 문서상 `EXPLAIN ANALYZE`는 쿼리를 실제 실행하고 버퍼 I/O도 보여 주므로 대표 데이터에서 계획과 버퍼를 비교해야 한다. 벤치마크 실행은 `::1:5432`와 `127.0.0.1:5432` 모두 ECONNREFUSED였고 Docker Desktop 서비스도 OS 권한으로 시작되지 않아 수치 측정과 V173 적용은 미완료다. 운영 DB에는 접속하지 않았다. [PostgreSQL EXPLAIN 문서](https://www.postgresql.org/docs/16/using-explain.html), [B-tree 정렬/인덱스 문서](https://www.postgresql.org/docs/16/indexes-ordering.html). commit/push/deploy 없음.
-
-## 2026-11-11 JS 달력 검증의 연도 0001~0099 처리
-
-- **원인**: `Date.UTC(year, month, day)`는 연도가 0~99이면 1900~1999년으로 보정한다. ISO 연도를 그대로 넣는 왕복 검증은 이 범위의 실제 유효 날짜를 거부할 수 있다.
-- **영향**: 일봉 수집 파서, 캐시 저장·조회, 공개 API 및 운영 스크립트의 날짜 판정이 달라질 수 있었다.
-- **해결 위치**: `lib/calendar-date-quality.mjs`의 ISO·YYYYMMDD 검증기를 관련 일봉 처리 경로에서 공통 사용한다. 연도 0000은 제외하고 실제 달력 날짜를 검증한다.
-- **재발 자동 감지**: `lib/calendar-date-quality.test.mjs`에서 0001년 및 윤년 0096년 허용, 0000년·0099년 비윤일·불가능 날짜 거부를 검증한다. 관련 Vitest suite와 타입 검사를 수행한다.
-- **남은 위험**: 관련 일봉·시장 경로만 검색·검증했으며 다른 도메인의 별도 날짜 해석 규칙은 범위 밖이다.
-
-## 2026-11-11 일봉 활성 상태의 손상 요약 데이터 의존
-
-- **원인**: `syncDailyActivityStatus()`가 시장 최신일과 종목별 최근 일자를 latest summary의 `volume > 0` 조건으로만 골랐다.
-- **영향**: 잘못된 OHLCV 또는 불가능 날짜가 든 summary가 일봉 유니버스 `daily_active` 상태 계산을 오염시킬 수 있었다.
-- **해결 위치**: `lib/daily-activity-status.ts`의 시장 및 종목 데이터 CTE 모두 `validDailyCandleSql()`을 적용한다.
-- **재발 자동 감지**: `lib/candle-sql-quality.test.ts`가 predicate의 날짜/OHLCV 조건을 고정한다. 이 작업에서는 추가 활성상태 mock 테스트 없이 기존 SQL predicate suite와 TypeScript 검사를 수행했다.
-- **재발 자동 감지**: `lib/daily-activity-status.test.ts`가 시장별 SQL predicate 적용, 요청 시장 범위, DB 오류 전파 및 오류 후 재시도를 확인한다.
-- **남은 위험**: 상태 동기화의 데이터베이스 통합 동작은 이번에 실행하지 않았다.
-- **추가 캐시 격리**: pool override를 허용하는 테스트/진단 호출도 기존 production TTL 및 in-flight cache를 공유했다. override 사용 시 캐시를 우회하고, 일일 상태 테스트에서 오류 응답 이후의 병렬 query 결과도 명시적으로 검증한다.
-- **추가 유니버스 경계 결함**: 시장 최신일은 전체 summary에서 집계됐고 상태 갱신 대상도 enabled/common-stock 및 공식 제외 플래그로 제한되지 않았다. 비대상 상품의 날짜가 시장 기준일에 섞이거나 그 상품의 `daily_active`까지 바뀔 수 있었다. 활성 COMMON_STOCK 유니버스를 먼저 구성해 최신일·봉 판정·UPDATE에 공통 적용하고 `lib/daily-activity-status.test.ts`에 KR/US master 필터 회귀 검사를 추가했다.
-
-## 2026-11-11 관리자 일봉 cache debug freshness 집계
-
-- **원인**: 관리자 진단 route가 US latest summary와 KR 일봉 raw table의 전체 집계를 품질 조건 없이 계산했다.
-- **영향**: invalid row의 거래일·갱신일시가 freshness 수치를 앞당기거나 row count에 포함될 수 있었다.
-- **해결 위치**: `app/api/admin/daily-candle-cache-debug/route.ts`의 두 집계에 `validDailyCandleSql()`을 적용한다.
-- **재발 자동 감지**: `app/api/admin/daily-candle-cache-debug/route.test.ts`가 두 쿼리 모두 달력/OHLC predicate를 포함하는지 확인한다.
-- **남은 위험**: route 테스트는 SQL 생성 여부를 확인하며, 운영 DB 결과값은 조회하지 않았다.
-- **추가 진단 집계**: `app/api/admin/screener-debug/route.ts`의 일봉 count도 invalid row를 포함하고 zero-volume 정상 row를 제외했다. 공통 candle predicate로 바꾸고 route 테스트가 그 조건과 volume threshold 부재를 확인한다.
-
-## 2026-11-11 정상 거래량 0 봉과 freshness 요약 기준 불일치
-
-- **원인**: daily summary 재구축과 KR 주봉·월봉 stale 판정이 유효 OHLCV 조건에 더해 `volume > 0`까지 요구했다.
-- **영향**: 정상적인 거래량 0 봉이 최신일이면 요약 캐시 날짜가 그보다 오래된 거래일에 머물 수 있다. 거래량 0 봉을 보존한다는 기존 데이터 정책과 freshness 판단이 불일치했다.
-- **해결 위치**: `scripts/daily-candle-summary-sync.mjs`, `lib/kr-daily-price-cache.ts`, `lib/us-daily-price-cache.ts`, `lib/kr-daily-cache-job.ts`에서 freshness/summary는 유효 OHLCV를 기준으로 최신 봉을 선택한다. 별도의 signal volume threshold는 유지한다.
-- **재발 자동 감지**: `scripts/daily-candle-summary-sync.test.mjs`가 0-volume 최신 봉이 summary 날짜와 값으로 저장되는 것을 확인한다.
-- **남은 위험**: 로컬 mock 테스트만 수행했으며, 운영 시장의 0-volume 봉 패턴 및 DB 통합 동작은 조회하지 않았다.
-- **추가 확인**: `lib/db-screener.ts`의 latest-day CTE도 summary 및 as-of raw 모두 volume 양수만 허용하고 있었다. market 기준일을 정하는 latest CTE에서는 공통 OHLCV 검증만 적용하며, 실제 signal candle 조회의 volume 조건은 그대로 둔다. `lib/db-screener.test.ts`가 두 CTE 생성 경로를 검증한다.
-
-## 2026-11-11 누적 스크리너 날짜 검증 연도 경계
-
-- **원인**: `validTradingDate()`가 문자열 날짜를 JS `Date`로 파싱해 왕복 비교하면서 연도 0001~0099 경계에 동일 보정 문제가 발생할 수 있었다.
-- **영향**: 날짜상 유효한 이른 연도의 평일 일봉을 누적 스크리너와 세션 체크가 invalid로 제외할 수 있었다.
-- **해결 위치**: `lib/accumulation-screener-core.ts`에서 `isValidCompactCalendarDate()`를 재사용하고 기존 주말 제외 규칙을 유지한다.
-- **재발 자동 감지**: accumulation 및 공용 calendar unit tests가 저연도 윤년 허용, 비윤일·연도 0000·주말 거부를 확인한다.
-- **검증/위험**: 관련 17개 테스트와 타입 검사를 통과했다. 운영 데이터에서 해당 연도 봉이 존재하는지는 조사하지 않았다.
-- **공용 helper 경계 테스트**: compact/ISO 모두 연도 0001 허용, 연도 0000·잘못된 자릿수·비문자열 입력 거부를 검증한다. 관련 validator 호출부 점검에서는 날짜-only `Date.parse` 정규화에 기대는 추가 우회 경로를 발견하지 않았다.
-
-## 2026-11-11 국내 일중 거래대금 분석 CLI 날짜 범위
-
-- **원인**: CLI가 `YYYYMMDD` 자릿수와 lexical 순서만 확인해 2월 30일 같은 존재하지 않는 날짜를 통과시켰다.
-- **영향**: 잘못된 날짜 범위로 출력 폴더를 만들고 KIS 조회를 시도할 수 있었다.
-- **해결 위치**: `scripts/analyze-kr-industry-turnover-kis.ts`에서 공용 `isValidCompactCalendarDateRange()`를 호출해 시작·종료일 모두 실제 달력 날짜이며 순서가 맞는지 확인한다.
-- **재발 자동 감지**: `lib/calendar-date-quality.test.mjs`가 정상·역순·불가능 날짜 range를 검사한다.
-- **남은 위험**: 실제 KIS 호출과 결과 파일 생성 경로는 실행하지 않았다.
-
-## 2026-11-11 캔들 retry 큐 read failure 처리
-
-- **원인**: `loadDueCandleCacheRetries()`가 데이터베이스 오류를 catch하고 `[]`를 반환해 실제 empty queue와 구분하지 못했다.
-- **영향**: explicit retry가 stale 조건과 일치하지 않으면 갱신이 생략되며 job이 정상처럼 진행할 수 있었다.
-- **해결 위치**: `lib/candle-cache-retry.ts`에서 조회 실패를 caller에 전파한다. KR worker는 상위 catch에서 job FAILED로 기록하고, US warm은 rejection을 caller에 전달한다.
-- **재발 자동 감지**: `lib/candle-cache-retry.test.ts`가 정상 due row 반환과 DB read error 전파를 확인한다.
-- **남은 위험**: 실제 retry table outage 시 운영 배치가 실패 처리되는 end-to-end 동작은 staging에서 실행하지 않았다. success marker 오류는 pending 상태가 남아 재시도되는 보수적 경로다.
-- **추가 enqueue 관측**: enqueue 함수가 예외를 숨겨 실패 이력 기록 함수가 `true`를 반환할 수 있었다. enqueue 오류를 상위 함수까지 올려 `false`로 표시하고 KR의 `retryQueueFailures`, US의 `failures[].retryQueued=false`에 나타낸다. `lib/candle-cache-failure-history.test.ts`가 이 결과를 고정한다.
-- **운영 표시**: `/api/admin/kr-daily-cache-test` status는 job fields를 그대로 JSON에 포함하고 관리자 API 테스트 화면은 polling 결과를 보존한다. `lib/candle-cache-retry-display.ts`가 KR/US 응답 차이를 정규화하며 retry 기록 실패가 있으면 UI에 alert를 렌더링한다. 관련 component suite 및 summarizer tests 통과.
-- **claim/backoff 경쟁 조건 수정**: 단순 retry SELECT는 여러 worker의 중복 처리를 막지 않았고 attempts/last_attempt_at가 갱신되지 않았다. active universe pair 제한, `FOR UPDATE SKIP LOCKED` claim, attempt 횟수별 5/15/60/3600분 지연, 30분 PROCESSING lease, attempts generation 기반 성공 fencing을 적용했다. 실패 enqueue는 현재 처리 lease의 예약 backoff를 유지한다.
-- **KR lane 우선순위 처리**: worker가 D/W/M retry를 모두 claim하고 나중에 D 우선 정책으로 W/M 실행을 제외하면, 실제 호출되지 않은 row가 30분 PROCESSING lease를 점유할 수 있다. due timeframe은 제한 없는 `DISTINCT` 조회로 lane 우선순위를 결정하고, 최종 lane의 row만 기본 최대 500개 claim한다. claim limit 이후의 row는 claim되지 않아 다음 job에서 처리한다. 재발 자동 감지는 retry unit test에서 timeframe 조회가 `LIMIT`/UPDATE/lock을 사용하지 않는지와 claim query의 timeframe filter를 검사하고, 관리자 debug API의 PROCESSING count/list로 운영 상태를 확인한다.
-- **retry 성공 상태 기록 검증**: 실제 candle 저장에 성공해도 retry row가 현재 `PROCESSING` generation과 다르거나 DB update가 실패하면 queue 상태는 완료되지 않는다. success marker가 affected row 여부를 반환하고 KR/US 결과에 queue marker 실패를 남기도록 한다. KR의 종목 성공 집계에서도 이를 실패로 본다. 회귀 테스트는 `rowCount=0`과 DB exception을 모두 `false`로 확인한다. 남은 위험은 운영 debug API에서 stuck PROCESSING을 관찰하고 lease가 만료된 다음 worker가 재수행해야 한다는 점이다.
-- **실패 후속 저장 오류 격리**: KIS/저장 실패 이후 failure-history 또는 retry enqueue가 예외를 던지면 공유 lane/worker가 중단되어 나머지 이미 claim된 row가 lease까지 대기할 수 있다. KR/US는 각 종목의 persistence 예외를 결과에 기록하고 다음 종목 처리를 계속한다. 장애 중 persistence 자체는 보장할 수 없으므로 관리자 결과의 `retryQueueFailures`/`retryQueued=false`를 확인하고 원인 복구 뒤 due/lease retry가 재수행되는지 확인한다.
-- **retry timeframe 허용 목록**: retry table에 timeframe CHECK 제약이 없으므로 queue에 `D/W/M` 외 값이 들어갈 수 있다. due timeframe 조회와 claim 모두 지원값을 SQL에서 제한하고 함수 입력도 런타임 필터링한다. 회귀 테스트는 잘못된 값 제거와 유효값 없는 경우 DB 접근 생략을 확인한다. 기존 잘못된 row는 자동 삭제하지 않으며 지원 timeframe에 포함되지 않아 worker가 처리하지 않는다.
-- **늦은 이전 attempt 실패의 lease 변경 방지**: 오래 걸린 구 worker가 lease 만료 뒤 새 worker가 claim한 row에 실패 enqueue를 늦게 실행하면, 기존 upsert가 새 PROCESSING claim을 PENDING으로 되돌려 중복 처리를 만들 수 있었다. claimed retry의 `attempts` generation을 failure persistence까지 전달하고, 현재 row가 PROCESSING이며 generation도 같을 때만 upsert한다. stale generation에서 실패 기록은 retry 상태를 바꾸지 않고 worker 결과에 persistence/fencing 실패로 노출한다. 별도 stale refresh도 generation 없이 기존 PROCESSING row를 덮지 않으며, 이 경우 enqueue `rowCount=0`을 caller에 실패로 보고한다. 단위 테스트가 generation 조건과 거부 결과를 고정한다.
-- **공식 문법 확인**: PostgreSQL 공식 SELECT 및 UPDATE/RETURNING 문서와 claim CTE 문법을 대조했다. 30분 넘게 남은 PROCESSING 또는 `last_attempt_at IS NULL` row를 회수한다.
-- **관리자 관측**: `daily-candle-cache-debug`는 이제 retry status summary 외에 최대 100개의 PROCESSING row key, timeframe, attempts 및 KST last-attempt/next-attempt 시각을 제공해 lease 고착을 운영자가 특정할 수 있다. route test가 응답 형식을 확인한다.
-- **남은 위험**: claim CTE의 운영 PostgreSQL runtime은 이번에 실행하지 않았다. 30분 lease보다 오래 걸리는 유효 요청은 중복 실행될 수 있으나 generation fencing으로 늦은 결과가 최신 row를 완료 처리하지 못한다.
-
-# Remote 일봉 bulk 요청 상한
-
-`GET /api/public/daily-candles`는 명시된 market만 받고, 비어 있지 않은 최대 32자 종목 코드와 `codes` query parameter당 최대 100개 코드를 허용한다. 쉼표는 구분자이므로 종목 코드에 포함될 수 없다. Remote bulk 호출부는 요청 전 scope를 검증하고, 큰 유니버스는 100개씩 나누며, 각 배치 응답의 종목 코드가 요청과 일치하는지 확인해야 한다. 큰 scope의 중복 제거에는 Set을 사용한다. 공개 route 계약을 바꾸면 remote loader의 검증과 배치 크기도 함께 조정한다. 요청 실패 또는 누락·중복·미요청 종목 응답은 명시적인 캐시 조회 실패로 남겨야 하며 빈 캔들 Map으로 변환하면 안 된다.
-
-단건 `market=US|KR` 조회는 활성 COMMON_STOCK 마스터와 비보통주 제외 플래그를 통과한 종목만 반환한다. code가 복수 거래소에 일치하면 HTTP 409 `AMBIGUOUS_INSTRUMENT`와 `exchanges`를 반환하므로 호출자는 `NAS`, `NYS`, `AMS`, `KOSPI`, `KOSDAQ` 중 정확한 거래소로 재요청한다. `codes` 응답은 종목명·거래소·봉별 `fetchedAt`과 종목별 coverage metadata를 포함하며, ticker가 거래소마다 중복되어도 `(market, code)`를 키로 보존한다.
-
-재발 점검: `lib/remote-daily-candle-cache.ts`의 배치 크기와 `app/api/public/daily-candles/route.ts`의 `codes.length > 100` 검증을 대조한다. 100개 초과 scope를 대상으로 모든 배치가 병합되고 배치별 종목 코드 parity가 유지되는지 확인한다.
-
-## US 5일 고점 돌파의 캐시 조회 장애
-
-`lib/us-five-day-high-breakout.ts`는 DB 캐시에 실제로 봉이 없을 때와 DB 조회가 실패했을 때를 구분해야 한다. 조회 예외를 빈 배열로 바꾸면 `DB daily candles unavailable (0)` 또는 이력 부족으로 오분류할 수 있다. 예외는 해당 거래소 결과의 `daily.status=503`, `diagnostics.cacheLookup=FAILED`로 남기고, 원문 오류 문자열은 응답에 포함하지 않는다. 다른 거래소의 캐시 fallback 탐색은 이어간다.
-
-재발 점검: cache loader가 정상적으로 빈 배열을 반환하는 경우에는 no-data/이력 부족 상태여야 하며, 예외를 던지는 경우에는 503 cache lookup 실패 상태여야 한다. 두 경우를 구분해 확인한다.
-
-정상적으로 조회된 빈 cache는 `daily.status=200`, `diagnostics.cacheLookup=AVAILABLE`, `error=no cached daily candles`로 표현한다. 봉은 있으나 cutoff 기준 직전 5거래일이 모자라면 `insufficient prior candles (n/5)`로 구분한다. `DB daily candles unavailable` 문구는 사용하지 않는다.
-
-단일 종목 loader `loadCachedUsDailyCandles`도 remote 응답 실패 또는 DB 연결 설정 부재를 빈 배열로 바꾸면 안 된다. 조회 실패는 예외로 전달해 breakout 소비자가 503 장애 진단을 남기게 한다. `fetchUsDailyPriceCached`처럼 실시간 KIS fallback이 있는 경로는 cache 장애 후에도 KIS 조회를 진행할 수 있지만, 성공 응답 diagnostics에 cache lookup 실패 상태를 함께 보존한다.
-
-breakout이 동일 티커의 다른 거래소 cache를 이어 조회할 때 앞 거래소에서 발생한 cache 예외가 뒤 거래소의 무데이터 결과에 의해 사라지지 않도록, 최종 응답의 `daily.diagnostics.cacheLookupFailures`에 실패 market과 오류 클래스명을 모두 보존한다. fallback 성공 결과에도 이 진단을 포함한다.
-
-관리자 요약 응답은 종목별 `results`를 제거하므로 자동화 집계의 `cacheLookupFailureCount`와 `cacheLookupFailuresByMarket`을 확인한다. 이 집계는 fallback으로 최종 종목 판정이 성공한 경우의 cache 장애도 포함한다.
-
-US breakout의 scan `ok`는 종목별 실패와 fallback cache lookup 실패가 없을 때만 true다. cron/admin 실행 응답은 이 scan 상태와 Discord 전송 상태를 함께 반영한다. 전체 종목 실패는 `failureCount`로 FAILED, 일부 종목 실패 또는 보조 거래소 cache 조회 실패는 `partialFailureCount`로 PARTIAL 상태에 반영한다.
-
-통합 US 지표 관리자 진단의 `settle.ok`는 함수 실행 예외 여부이고 scanner 데이터의 성공 여부와 별개다. 최상위/summary `ok`를 계산할 때는 모듈 결과의 명시적 `ok=false`, 양수 `failureCount`, 양수 `partialFailureCount`도 실패/부분 상태로 취급한다.
-
-US MFI/DMI/MACD/OBV scanner의 공통 cache context 조회가 성공한 뒤 특정 종목 봉이 비었거나 최소 이력보다 짧으면 DB/API 장애가 아니다. 행 단위 결과는 `cacheLookup=AVAILABLE`와 HTTP status 200으로 남기고, `no cached daily candles` 또는 필요한 봉 수가 포함된 `insufficient daily candles (n/required)` 사유를 기록한다. 공통 context 자체의 DB/remote 실패는 scan 전체 실패로 전달한다.
-
-통합 관리자 summary는 행 배열을 제거하므로 MFI/DMI/MACD/OBV 결과의 `failureReasons` 카운트를 함께 확인한다. 이 카운트는 `NO_CACHED_DAILY_CANDLES`, `INSUFFICIENT_CANDLE_HISTORY`, `ROW_PROCESSING_ERROR`의 고정 category로 집계한다. 개별 종목의 정확한 오류 문구는 행별 `error` 필드에 남으며 summary map key에는 가변 종목별 숫자가 포함되지 않는다.
-
-OBV에서 `change`가 null이면 결과 `failureCount`에도 포함되는 계산 실패다. 해당 행은 `OBV change could not be calculated`를 기록해 failureReasons 집계에서 빠지지 않게 한다.
-
-각 scanner의 `failureReasons`는 `failureCount`와 같은 metric-null 조건으로 실패 행을 먼저 선택한다. 선택된 행에 error가 비어 있거나 타입이 다르면 기본 `ROW_PROCESSING_ERROR`로 집계해 원인 집계 합계가 행 실패 수보다 작아지지 않게 한다.
-
-MFI, DMI(+DI/-DI/ADX), MACD/Signal/Histogram, OBV change는 모두 finite number일 때만 성공으로 센다. `NaN`/Infinity는 응답 metric을 null 처리하고 행의 구체 오류와 `ROW_PROCESSING_ERROR`에 집계한다.
-
-US 저장 유니버스 조회에서 DB 미구성은 빈 배열로 가장하지 않고 예외로 전달한다. DB 조회가 성공해도 활성 `COMMON_STOCK` scope가 0이면 `universe.ok=false`, `NO_ACTIVE_COMMON_STOCKS`다. `isUsDailyScanComplete`는 유니버스 가용, 양수 종목 수, success/instrument counter parity 및 zero failure/partial failure를 요구하며, standalone indicator APIs와 통합 관리자 요약에 공통 적용한다. 예약 US daily-indicators 작업은 6개 scanner 결과와 indicator/trend Discord 결과를 함께 판정하고 합산 카운터를 automation history에 기록한다.
-
-일봉 followup은 Bollinger/Golden Cross scan 결과가 비었거나 universe unavailable이면 cache persist와 retry-success marker를 실행하지 않는다. Bollinger는 `ok`, `universeAvailable`, 양수 `instrumentCount`를 확인한다. Golden Cross는 KR/US scope가 비어 있지 않은지 확인한다. 거부/예외는 retry queue로 전달되어 기존 유효 캐시를 빈 결과로 덮어쓰지 않는다. ADL 관리자 응답과 `daily-filter-refresh`도 공통 scan completeness 및 webhook 성공 상태를 최종 `ok` 판정에 반영한다.
-
-같은 persist 함수를 직접 부르는 cron 경로도 별도로 확인한다. `persistDailyBollingerResults`와 `persistGoldenCrossResults` 자체가 0개 scan을 거부해 모든 caller에 공통 보호를 제공하며, cron은 입력 universe/scope를 persist 전에 검증한다. KR Bollinger cron 응답은 automation result의 `ok`를 바깥 wrapper가 덮어쓰지 않도록 한다.
-
-Bollinger persist는 양수 scan count만으로 충분하다고 간주하지 않는다. US에는 공통 `isUsDailyScanComplete`를 적용하고, KR은 명시적인 universe success 및 카운터 정합성/실패 0을 요구한다. 거부 시 retry를 enqueue한다. retry success marker는 SUCCESS UPSERT query가 정상 완료돼야 성공이며, DB 오류면 cache API도 성공을 반환하지 않는다. Golden Cross는 빈 결과를 거부한다(정상 `INSUFFICIENT_HISTORY`는 진단 데이터로 유지).
-
-Bollinger retry enqueue 자체가 DB 오류를 숨겨서는 안 된다. enqueue helper의 boolean 결과를 저장 API에서 검사하고, retry를 생성할 수 없는 경우 성공 cache 상태를 보고하지 않는다. Golden Cross는 유효한 종목 단위 `dataQuality` 진단을 보존하므로, 단일 `INVALID_INPUT` 행을 이유로 전체 snapshot 저장을 거부하지 않는다.
-
-`daily_bollinger_cache_retries`에는 현재 due-row consumer가 없다. 재실행은 네 Bollinger cron의 module interval 정책에 따른 정기 실행이 맡고, `next_attempt_at`은 실제 cron 실행을 지연시키지 않는 진단용 backoff metadata다. 이 테이블을 worker queue처럼 취급하거나 due 처리 완료를 전제해선 안 된다. 실제 개별 due retry가 필요하면 claim/lease 및 중복 실행 fencing을 포함한 consumer를 별도 구현해야 한다.
-
-Bollinger cron과 candle followup은 같은 cache key에 겹쳐 쓸 수 있다. scanner는 작업 시작 시각을 `sourceCheckedAt`, 완료 시각을 `checkedAt`으로 분리해 보존한다. `writeKisCacheIfSourceIsNewer`의 단일 PostgreSQL UPSERT는 기존 source 시각보다 엄격히 최신일 때만 교체하므로 늦게 끝난 오래된 scan과 동일 밀리초 tie는 기존 캐시를 보존한다. 거부는 최신 payload가 이미 있다는 정상 no-op으로 반환하며 retry 성공 기록은 계속 수행한다. cache write가 stale no-op으로 판정되면 KR/US Bollinger 네 cron은 해당 scan의 Discord 알림도 보내지 않고 `reason: "stale_scan"`으로 보고한다.
-
-retry 성공 UPSERT도 scan `sourceCheckedAt`을 generation token으로 사용한다. 기존 `last_attempt_at`이 이 scan 시작보다 나중이면 새 실패 상태가 이미 기록된 것이므로 success marker는 `SUPERSEDED`를 반환하고 행을 바꾸지 않는다. 이 상태를 재-enqueue하지 않아 최신 `last_error`와 attempts를 보존하며 해당 scan의 cron 호출은 성공으로 처리하지 않는다.
-
-retry failure enqueue도 generation을 받으면 동일한 fencing을 적용한다. 기존 `last_attempt_at`이 enqueue generation보다 최신일 때는 stale failure가 최신 `last_error`, attempts, next-attempt metadata를 갱신하지 않는다. cron wrapper는 작업 진입 시 DB generation을 확보하고, persist의 scan-originated 오류는 scanner가 반환한 `sourceCheckedAt`을 사용한다. DB generation을 확보하지 못한 scanner 단계 오류는 기존 fallback enqueue가 가능하므로 DB clock 장애 중에는 엄격한 순서 보장이 제한된다.
-
-`enqueueDailyBollingerRetry`의 boolean은 새 row가 실제 insert/update됐다는 뜻이 아니라 DB enqueue statement가 오류 없이 완료됐다는 뜻이다. generation fence가 stale enqueue를 거부해도 더 최신 retry row를 보존한 정상 no-op이므로 true가 반환된다. 호출부는 이 값을 insert count로 집계하지 않는다.
-
-일봉 Bollinger Discord sender 호출자는 cron route 네 곳이다. 모든 route는 persist 결과의 `staleScanSkipped`를 확인한 후에만 전송한다. 관리자 Bollinger test job과 candle followup은 해당 일봉 알림 sender를 호출하지 않는다.
-
-`refreshDailyBollingerCaches`는 zone별 persist 성공을 `ok: true`로, 실패를 `ok: false`로 명시하며 `{ ok, staleScanSkippedCount, zones }`를 반환한다. `staleScanSkippedCount`는 scan 자체 실패가 아니라 이미 더 최신 cache가 존재해 해당 세대 쓰기가 생략된 수다. 전체 zone persist가 끝난 경우 followup retry success를 반영한다.
-followup retry enqueue와 SUCCESS marker는 DB 오류를 boolean false로 호출부에 전달한다. 따라서 `retryQueued`는 실제 enqueue query 성공을 의미하고, `retryMarkerOk: false`이면 cache 갱신 성공과 관계없이 followup 전체 `ok`는 false다. Golden Cross도 success marker 실패를 오류로 처리하고 failure enqueue 성공 여부를 반환한다.
-
-`daily_cache_followup_retries`에는 due-row claim/consumer가 없다. 실패는 enabled/schedule 조건을 만족하는 KR/US daily-cache cron의 다음 실행에서 followup이 다시 시도한다. 테이블의 `next_attempt_at`은 현재 그 재실행 시점을 예약하지 않는 관측 metadata이므로 이를 독립 worker의 backoff로 해석하면 안 된다.
-
-KR daily-cache job의 최상위 `status`와 US warm의 최상위 `ok`는 candle refresh/universe 상태를 나타낸다. Bollinger와 Golden Cross followup은 별도 `bollingerCache`/`goldenCrossCache` 필드다. followup 장애는 해당 객체의 `ok: false`, zone 오류, `retryQueued: false` 또는 `retryMarkerOk: false`로 확인하며 최상위 candle 상태만으로 indicator followup 완료를 추론하지 않는다.
-Bollinger cache의 `updatedAt`은 cache write 시 PostgreSQL `clock_timestamp()`로 만든 UTC 마이크로초 문자열이고 `sourceCheckedAt`은 scan 시작 때 같은 DB 시계로 읽은 generation이다. 앱 서버 시계 차이로 완료/시작 순서가 뒤집히지 않게 두 값의 clock source를 통일한다. daily cache diagnostic API 및 Discord cache 조회는 두 시각을 함께 노출해 늦게 끝난 scan이 cache에 반영됐는지 운영자가 대조할 수 있어야 한다.
-timestamp JSON 생성식은 PostgreSQL 17 공식 [date/time functions](https://www.postgresql.org/docs/17/functions-datetime.html) 및 [formatting functions](https://www.postgresql.org/docs/17/functions-formatting.html)을 기준으로 한다. localhost에서 동일한 timestamp/`jsonb_set` expression을 `BEGIN READ ONLY` transaction으로 확인했다. 조건부 UPSERT 전체의 DB 실행과 동시성 검증은 별도다.
-Bollinger cache 네 key의 현 payload shape(object, `qualified` array, timestamp string)를 localhost read-only 조회로 확인했다. 전체 UPSERT 구문은 `EXPLAIN`으로 계획만 검증했으며 실행·동시성은 별도다.
-Discord 응답은 `sendDailyCacheResponses`에 넘기기 전에 `splitDailyCacheCommand`로 1,900자 단위 분할한다. source 시각 표시는 slash command의 이름·등록·cache key 계약을 변경하지 않는다.
-
-generation timestamp와 retry attempt timestamp는 모두 PostgreSQL에서 가져온다. scanner 시작 시 `clock_timestamp()`를 UTC 마이크로초 문자열로 직접 조회하고 Node `Date` 변환을 거치지 않아 PostgreSQL의 마이크로초 정밀도를 cache UPSERT와 retry marker까지 보존한다. 공통 persist는 `sourceCheckedAt` 누락·오류 시 `checkedAt`이나 앱 시각으로 대체하지 않고 retry 기록 후 거부한다. retry enqueue/success의 `last_attempt_at`은 DB `NOW()`를 사용하므로 앱 서버 clock skew가 fencing 순서를 바꾸지 않는다. DB 시간 조회 실패는 scan 오류로 처리한다. 이 timestamp 경로의 DB 동시 실행 검증은 아직 수행하지 않았다.
-각 cron은 retry wrapper가 한 번 확보한 generation을 scanner에도 전달한다. 같은 시도에서 cache payload, success marker, 실패 enqueue가 서로 다른 시작 세대를 기록하지 않도록 한다. 직접 scanner 호출은 기존처럼 scanner 내부에서 timestamp를 확보한다.
-`daily_bollinger_cache_retries.last_attempt_at`은 PostgreSQL `TIMESTAMPTZ(6)` 정밀도를 사용한다. 로컬 read-only 확인에서 1µs 차이 timestamp의 strict ordering을 확인했다.
-cache UPSERT와 retry failure enqueue는 strictly newer (`<`) 조건을 사용한다. retry success marker는 더 최신 generation만 상태를 바꾸며, 동일 generation이 이미 SUCCESS면 idempotent 성공으로 허용하고 동일 generation의 PENDING failure는 덮지 않는다. timestamp 동률은 기존 실패 상태를 보존한다.
-retry success marker가 성공하면 과거 `last_error`를 비우고 `next_attempt_at`을 DB 현재 시각으로 정리한다. `attempts`는 누적 시도 수라 성공 때 reset하지 않는다.
-새 failure enqueue는 상태를 PENDING으로 바꾸면서 기존 `succeeded_at`도 NULL로 초기화한다. SUCCESS의 `succeeded_at`이 다음 실패 이후에도 남지 않게 한다.
-이 UPSERT clear-field/fence 조합은 localhost read-only `EXPLAIN`으로 계획만 검증했으며, 실제 row transition은 실행하지 않았다.
-운영 점검 시 `bollingerRetries.states`에서 PENDING은 `last_error`/NULL `succeeded_at`, SUCCESS는 NULL `last_error`/`succeeded_at` 및 완료 기준의 `next_attempt_at`을 확인한다. `attempts`는 두 상태 사이에 누적된다.
-로컬 상태 점검은 status별 row 수, attempts 합, `last_error` 존재 수, 미래 `next_attempt_at` 수만 집계해 오류 본문을 출력하지 않는다. 0행이면 cleanup DML은 실행하지 않는다.
-관리자 `daily-candle-cache-debug`는 허용된 KR/US × 두 Bollinger zone 조합만 조회하고 `LIMIT 4`로 제한해 `bollingerRetries.states`로 반환한다. SUCCESS의 누적 attempts, `succeeded_at`, NULL `last_error`, 정리된 `next_attempt_at`을 PENDING 상세와 함께 확인할 수 있다. retry table에 DB CHECK 제약은 없어 응답 query 자체가 scope를 제한해야 한다.
-로컬 read-only `EXPLAIN`에서 detail SELECT가 `(scope, zone)` unique index와 LIMIT 계획을 사용하고 success UPSERT가 fence 및 cleanup assignment를 갖는 것을 확인했다. 이는 SQL 계획 검증이며 실제 row 전이 검증은 아니다.
-`byScopeZoneStatus`는 전체 retry table 집계이고 `states`는 유효한 네 조합만 반환한다. 둘의 scope 차이를 감추지 않도록 `invalidScopeZone`에서 허용 조합 밖 행 수와 attempts 합계를 확인한다.
-해당 aggregate filter는 로컬 read-only `EXPLAIN`으로 확인했으며, 이 계획 검사는 실제 상태 행 검증을 대체하지 않는다.
-scope/zone은 migration 및 현재 localhost schema에서 NOT NULL이라 invalid-key filter의 `NOT (...)` 조건이 NULL UNKNOWN으로 행을 누락하지 않는다.
-V170은 retry row의 scope, zone, status 값과 `attempts >= 0`을 DB CHECK로 제한한다. 로컬 read-only 조회에서는 migration 전 retry table이 0행이며 CHECK 제약이 없음을 확인했다. V170 DDL을 로컬 DB의 임시 트랜잭션에 실행해 네 제약이 validated로 생성되고 정상 값은 허용, 각 금지 값은 거부됨을 확인한 뒤 전체 rollback했다. 후속 조회에서 영구 제약이 남지 않았고 데이터도 변경되지 않았다. migration/schema 선언은 정합화했지만 V170은 아직 적용하지 않았으므로 운영 DB 보호는 migration 배포 후부터 유효하다. 배포 전후 admin diagnostic의 `invalidScopeZone`은 잘못된 키 조합을, `invalidState`는 미지원 status와 음수 attempts를 계수한다. synthetic row 3건으로 count 3, invalid status 2, negative attempts 2, 합계 -4를 확인했고, 혼합 3건에서는 합계 4294967294, invalid key 1건, invalid state 1건 집계를 확인했다. 모든 Bollinger retry aggregate의 attempts 합계는 numeric을 문자열로 직렬화해 integer cast overflow를 피한다. `invalidState` 집계 쿼리 실패는 0으로 위장하지 않고 endpoint 실패로 반환한다.
-모든 Bollinger retry 상세 및 aggregate 조회는 개별 쿼리 오류를 빈 배열/0건으로 치환하지 않는다. 하나라도 실패하면 `daily-candle-cache-debug`의 공통 503 응답을 반환해 불완전 진단을 정상 결과로 오인하지 않게 한다.
-일반 candle retry의 `byStatus`, `pending`, `processing`도 같은 실패 정책을 쓴다. 세 section은 한 SQL statement snapshot에서 읽으며, 전체 건수와 최대 100행의 반환 수를 구분한다. 합계 attempts는 numeric 문자열이다. 이 endpoint의 503은 retry 조회 중 하나 이상을 완료하지 못했다는 뜻이므로 0건으로 해석하지 않는다.
-일반 retry 전이의 `transitionIntegrity`는 SUCCESS에 남은 `last_error`, SUCCESS인데 `succeeded_at`이 없는 행, PENDING/PROCESSING인데 `succeeded_at`이 남은 행을 count-only로 집계한다. SQL aggregate는 scalar subquery가 단일 JSON 객체를 반환하도록 `json_build_object`를 사용한다. 성공 marker는 `last_error`를 지우고 `next_attempt_at`을 현재 시각으로 정리하며, 새 실패 enqueue는 이전 `succeeded_at`을 지운다. 과거 상태는 자동 수정하지 않는다.
-retry status summary에는 `earliest_next_attempt_at`, `oldest_created_at`, `oldest_updated_at`, `latest_updated_at`과 KST 변환값이 포함된다. 오래된 due와 stale update를 구분해 queue consumer 미실행 여부를 파악한다. KR daily job은 daily-first stale refresh를 유지하되 due retry timeframe 전체를 claim 대상으로 유지해 D retry 반복 실패가 W/M retry를 영구 차단하지 않게 한다.
-현재 공식 유니버스 eligibility에서 제외된 종목의 PENDING retry는 KR/US cache consumer의 입력 scope에서 빠져 자동 claim되지 않을 수 있다. 운영자는 먼저 status summary의 오래된 due/update 시각, automation run history, 현재 공식 universe eligibility를 대조한다. 해당 행을 임의로 다시 eligible 처리하거나 cache를 갱신하지 말고, 별도 정책이 승인되기 전까지 DB에서 수동 삭제하지 않는다.
-`retries.pendingEligibility`는 PENDING을 timeframe 및 현재 저장 master metadata 기준으로 분류한다: KR master 누락/비활성/non-common/risk flag, KR currently eligible, US master 누락/비활성·daily-inactive/non-common/product flag, unsupported market. US metadata를 통과한 행은 저장된 name/englishName의 JS 정규식 제외 필터까지 SQL로 재판정하지 않아 `US_METADATA_ELIGIBLE_NAME_CHECK`로 별도 표시한다. 이 aggregate는 종목 코드를 반환하지 않으며 행 수와 attempts 0 수만 제공한다.
-2026-11-11 로컬 `.env.local` DB read-only 점검에서는 일반 candle retry PENDING 7,352건이 모두 attempts 0이었고, 전체 due 최솟값은 2026-08-24, oldest update 2026-08-26, latest update 2026-09-18이었다. 현재 KR eligible key에 해당하는 PENDING은 D/W/M 각 2,184/2,257/2,257건, 현재 universe에서 제외된 키는 654건이었다. automation 이력상 마지막 실제 worker는 2026-08-26 서버 재시작으로 중단됐고 이후 최신 이력은 2026-09-02 `outside_schedule` skip이다. 이는 조사 시점의 로컬 DB 관측이며 운영 DB 상태로 일반화하지 않는다. KR daily job의 D 우선 필터가 due retry lane에도 적용되어 W/M retry를 굶길 수 있던 코드를 수정했으며, 과거 retry/error 행은 변경하지 않았다. 현재 universe에서 제외된 오래된 PENDING의 정리 정책은 별도 검토가 남아 있다.
-Bollinger retry 상세 `pending`은 최대 100행만 반환한다. `pendingCount` 전체 수와 `pendingReturnedCount` 상세 배열 길이는 한 SQL statement snapshot에서 함께 읽어 동시 status 변경으로 두 값이 서로 다른 시점 기준이 되지 않게 한다. 둘을 혼동하지 않는다.
-failure enqueue에 scan generation이 없는 경우도 조건을 우회하지 않는다. row의 `last_attempt_at`과 enqueue SQL의 DB `NOW()` fallback을 strict compare해 늦거나 동률인 failure write를 막는다.
-localhost read-only `EXPLAIN`에서 retry enqueue/success UPSERT의 unique arbiter와 fence 조건이 계획되는 것을 확인했다. 이는 SQL 계획 검증이며 실제 row 상태 전이나 동시 실행 결과 검증은 아니다.
-
-정상 Bollinger cache 갱신을 retry enqueue로 시작하지 않는다. 정상 실행 때마다 attempts를 올리면 retry 횟수와 PENDING 상태가 실제 실패와 무관하게 오염된다. 정상 scan 후 cache write와 success upsert를 수행하고, scan 불완전 또는 저장/marker 오류에서만 retry를 enqueue한다.
-
-US 1분 OBV/ADL은 상승률 유니버스의 `ok`와 `complete`, 행 실패 0을 확인한 경우만 기존 cache를 갱신한다. 시장 일부 응답 누락이나 종목 처리 실패가 있으면 이전 qualified 결과를 유지하고 Discord 알림을 건너뛴다. 정책 필터 결과가 0개여도 소스 유니버스 전체가 정상 확인되면 유효한 무신호 결과로 저장한다.
-
-US 1분 OBV/ADL cron은 비교 기준 cache 조회 자체가 DB 오류로 실패하면 전체 후보를 신규 자격 종목으로 오인해 Discord 알림을 재전송할 수 있으므로 scan 전에 실패를 전파한다. 실제 cache row가 없는 최초 실행은 기존 동작대로 신규 후보 비교를 수행한다.
-
-`npm run cron:check`는 모든 cron route의 실행 이력/running/backoff 조회가 `.catch(() => null)`로 무시되는지 검사하고, baseline `readKisCache` 실패를 빈 집합으로 대체하는 패턴도 막는다. 이 source audit는 코드 패턴 재발을 탐지하며 실제 DB 장애/Discord 전송을 실행하지 않는다.
-
-interval gate가 있는 cron은 설정 interval이 지났더라도 worker가 아직 `RUNNING`이면 재진입을 건너뛰고 `already_running`을 기록해야 한다. `loadRunningAutomationRun`은 공통 2시간 stale cutoff 이후의 고아 run을 active로 취급하지 않으며, Fundamentals의 5시간 cutoff와 daily cache/SEC 작업별 DB advisory lock은 별도 concurrency 제어 예외다. read-then-start race를 막기 위해 KR/US Bollinger, Golden Cross, breakout, daily indicators/open-cache, minute scans, OBV divergence는 `withExclusiveAutomationRun`의 `automation-run:<moduleKey>` DB session advisory lock으로 실행 구간을 원자적으로 보호한다. lock 경합 시 신규 `RUNNING` 실행은 시작하지 않고 `already_running` skip을 반환/기록한다. `cron:check`는 interval route에 active-run guard 또는 명시된 독립 제어가 있고, 지정 scan route가 exclusive wrapper를 사용하는지 검사한다.
-
-SEC EDGAR 이벤트 알림과 US breaking-news 전달도 `withExclusiveAutomationRun`으로 check/send/persist 전체를 직렬화한다. 두 파이프라인 모두 DB 상태를 검사한 뒤 외부 Discord를 호출하고 상태를 갱신하므로, 단순 row 상태 upsert만으로는 동시 요청 중복 전송을 막지 못한다. 재발 방지 source audit는 두 endpoint의 exclusive wrapper 사용을 요구한다.
-
-`cron:check`는 exclusive wrapper의 존재만 확인하지 않고 각 보호 route의 첫 번째 module key가 해당 automation 이름과 일치하는지도 확인한다. route를 복사해 잘못된 key를 넘기면 서로 다른 route가 같은 lock을 공유하거나 동일 route 경합이 lock을 피해 갈 수 있으므로 검증 실패로 처리한다.
-
-cron 인증은 설정 기반 DB gate보다 먼저 수행한다. global daily automation gate를 인증 전에 호출하면 무인증 요청이 DB 조회를 유발하고, 비활성일 때 응답을 구별해 설정 상태를 추론할 수 있다. `cron:check`는 특정 route 목록에 의존하지 않고, 해당 gate를 호출하는 모든 cron route에서 auth 순서를 검사한다.
-
-`app/api/cron/**/route.ts`의 모든 route는 직접 `isCronRequestAuthorized(request)`를 호출하거나 명시적인 `authorized(request)` 위임 guard를 호출해야 한다. `cron:check`는 재귀 route inventory 전체에서 인증 호출이 빠진 endpoint를 탐지한다.
-
-자동화 run 결과는 최상위 `status: "PARTIAL"` 또는 `degraded: true`도 성공으로 기록하지 않는다. 결과에 `discord.ok === false`가 있으면 자동화 run도 불완전 상태로 기록한다. SEC EDGAR route는 CIK 실패를 표준 `instrumentCount`/`failureCount`로, 이벤트 원장 부분·전체 실패를 `partialFailureCount`와 `degraded`로 노출한다. `cron:check`는 공통 판정기와 SEC EDGAR·Discord 전달 결과 계약을 검사한다.
-
-US breaking-news forwarder는 직송 실패를 재시도 queue에 안전하게 넣어도 해당 실행을 완전한 전송 성공으로 보고하지 않는다. 결과의 `deliveryFailedCount`/`retryQueuedCount`와 `partialFailureCount`/`degraded`를 확인해 직송 실패와 재시도 대기 상태를 구분한다.
-
-관리자 진단의 `effectiveStatus` 산출도 실행 저장과 동일하게 명시적 `FAILED`/`PARTIAL`, `degraded`, `discord.ok === false`, 표준 카운터를 반영해야 한다. 새로운 실패 신호를 공통 run 판정에 추가할 때 `getAutomationRunResultStatus`와 진단 API의 evidence 감지 조건도 함께 갱신한다.
-
-완료 Discord 알림의 상태 설명은 실제 실패 유형을 반영한다. 중첩 Discord 전달 실패를 종목 데이터 미수신으로 표현하지 않으며, 실패 수량을 알 수 없는 전체 실패에서 `undefined개 종목 처리 실패` 같은 메시지를 만들지 않는다. 재시도 대기·저하 카운터도 결과 요약에서 확인할 수 있어야 한다.
-
-완료 Discord 본문은 1,900자 예산 안에서 상태·결과·실패·완료 시각을 우선 보존하고, fallback 등 부가 설명만 남은 길이에 맞춰 줄인다. 최종 문자열을 뒤에서 단순 절단해 진단에 필요한 필드가 사라지지 않게 한다.
-
-automation summary compaction은 Date를 ISO 시각으로, Error를 이름·메시지로 변환한 뒤 객체를 축약한다. JavaScript 내장 객체의 비열거 필드가 빈 객체로 사라지지 않게 유지한다.
-
-공통 automation wrapper는 종목 실패 수가 유효한 양수일 때만 수량 메시지를 전달한다. 실패 코드만 있고 카운터가 없는 전체 실패는 알림 포맷터가 일반 실패 문구를 사용한다. RSS의 수집·번역 카운터 실패와 전달·원장 저하는 별도 상태 문구를 사용한다.
-
-`withAutomationLock`은 session advisory lock을 사용하므로 acquire 응답에 boolean이 없거나 client를 풀에 반환하기 전에 `pg_advisory_unlock` 결과가 `true`인지 확인할 수 없으면 해당 client를 `release(true)`로 폐기한다. 이렇게 lock 상태가 불명확한 backend session이 pool에서 재사용되지 않게 한다. PostgreSQL은 session advisory lock을 명시적으로 해제하거나 session이 종료될 때까지 유지하며, node-postgres의 `release(true)`는 해당 client/backend를 pool에서 제거한다 ([PostgreSQL advisory locks](https://www.postgresql.org/docs/current/functions-admin.html), [node-postgres pool client release](https://node-postgres.com/apis/pool)). `cron:check`는 이 cleanup invariant를 검사한다.
-
-모든 `app/api/cron/**/route.ts`는 요청 handler 본문 첫 구간에서 `request` 인증 guard를 실행하고 DB/worker/외부 호출보다 먼저 반환해야 한다. `npm run cron:check`는 recursive route inventory의 `GET`/`POST`/`handle` handler 본문을 확인해 guard의 존재와 처리 호출 전 순서를 점검한다. handler 구조나 인증 위임 방식을 바꾸면 이 audit 규칙도 함께 갱신한다. 정적 검사는 언어 제어흐름 전체를 증명하지 않으므로 보안 동작 확인은 실제 환경 HTTP 검증이 별도로 필요하다.
-
-US 1분 Bollinger도 원천 유니버스의 `ok`/`complete`, DB 유니버스 동기화 성공, 종목 처리 실패 0을 최종 상태에 포함한다. 미완료 scan은 cron Discord 전송을 하지 않는다. 필터 정책으로 선택 대상이 0개인 경우는 완전한 소스 유니버스와 무오류가 확인되면 유효한 빈 후보 결과로 취급한다.
-
-US 1분 Bollinger 및 OBV/ADL의 결과 상태는 원천 universe 불가용 또는 전체 행 실패 때 `FAILED`, 일부 행 실패 때 `PARTIAL`, 정상 완료(필터 결과 0건 포함) 때 `COMPLETED`다. 결과 캐시·알림은 complete 성공일 때만 수행한다.
-
-일봉 KR/US Bollinger의 process-local TTL 결과 캐시는 완전한 scan(`universeAvailable`, 양수 대상, 전 행 성공)만 저장·재사용한다. 유니버스 unavailable/0종목 또는 전 행 실패는 `FAILED`, 일부 행 실패·이력 부족은 `PARTIAL`, 전 행 처리 성공은 `COMPLETED`다. incomplete scan은 TTL에 보관하지 않는다. 캐시 키에는 정규화 정책과 정렬된 `market:code` 목록을 함께 넣어 universe membership 변경 후 이전 캐시가 재사용되지 않게 한다.
-
-`technical-entry-analysis`는 추천 조건 불충족과 입력 데이터 누락을 구분한다. 필수 봉 이력 부족, 최신 일봉 날짜 coverage 불일치, 최신 거래량 무효 건수를 각각 보고한다. eligible scope가 0이면 FAILED, 일부 입력 coverage 누락이면 PARTIAL이며 기존 캐시를 갱신하지 않는다. 모든 scope 입력이 충분하면 추천 종목 0개도 정상 결과로 캐시할 수 있다.
-
-Flyway DDL audit의 statement boundary를 바꿀 때는 `parseFlywayDdlEffects`가 SQL 주석, 문자열 literal, dollar-quoted body를 먼저 mask한 뒤 quoted-identifier-aware semicolon splitter를 호출하는 순서를 유지한다. Dollar-quote tag는 PostgreSQL unquoted identifier의 Unicode 문자 규칙을 반영하고, 앞선 identifier에 붙은 `$tag$`는 여는 delimiter로 오인하지 않는다. DO body나 nested/block/line comment의 세미콜론과 DDL 유사 텍스트가 바깥 statement 또는 catalog effect로 새지 않는 회귀 테스트를 함께 갱신한다.
-
-PostgreSQL unquoted identifier는 ASCII에 한정되지 않는다. CREATE TABLE shape/effect, SELECT INTO target, LIKE/REFERENCES target, ALTER TABLE column/constraint/rename, CREATE VIEW/DROP TABLE, CREATE/DROP INDEX, CREATE SEQUENCE 및 DML target matcher는 Unicode letter/number/mark 규칙을 공유한다. 키워드 앞뒤 경계도 같은 continuation 문자 집합으로 판정해 `한글CREATE`/`SELECT이름`, column 이름 `한글UNIQUE`/`한글REFERENCES`, FK target column `한글DEFERRABLE`을 SQL keyword나 constraint option으로 잘못 분리하지 않는다. boundary 검사에서는 UTF-16 surrogate pair로 표현되는 supplementary code point도 하나의 identifier 문자로 검사한다. `ALTER TABLE IF EXISTS`, `RENAME [ COLUMN ] old TO new`, `RENAME CONSTRAINT old TO new` 및 `RENAME TO new`를 파싱하고, rename은 이전 object absent 다음 새 object present 순서로 inventory에 기록한다. pending table rename은 column/constraint/index parent 상태를 새 relation name으로 옮기며, 원본 누락과 대상 이름 충돌을 별도 preflight issue로 보고한다. IF EXISTS table rename은 원본 table이 없으면 no-op으로 판정한다. `ALTER [ COLUMN ] name SET/DROP/TYPE/ADD/RESET` 동작은 정의값을 비교하지 않지만 참조한 컬럼의 존재를 inventory 및 pending preflight에서 확인한다. 비라틴 테이블·컬럼·index/sequence 이름 회귀를 유지해 UTF-8 migration DDL/DML이 inventory에서 조용히 누락되지 않게 한다. 기준: [PostgreSQL Lexical Structure](https://www.postgresql.org/docs/current/sql-syntax-lexical.html), [ALTER TABLE](https://www.postgresql.org/docs/current/sql-altertable.html).
-
-Qualified name의 schema dot 주위 SQL whitespace는 토큰 공백이므로 parser가 `schema . table`도 `schema.table`과 동일하게 매칭한다. 정규화 시 quoted component 내부 whitespace/dot은 그대로 두고, quote 밖의 schema separator 주변 공백만 제거한다. CREATE/ALTER/INDEX/REFERENCES fixture가 whitespace와 quoted schema/table 이름을 함께 확인한다. 근거: [PostgreSQL Lexical Structure](https://www.postgresql.org/docs/current/sql-syntax-lexical.html).
-
-Unicode-escaped quoted identifier `U&"..."`는 기본 backslash 및 `UESCAPE` 사용자 지정 문자를 해석해 catalog identifier로 decode한다. 일반 quoted identifier 안에 문자 그대로 들어 있는 `U&"` 시퀀스는 escape 문법으로 재해석하지 않는다. masker는 `UESCAPE` literal을 바로 앞에 닫힌 실제 `U&"..."` identifier가 있을 때만 보존하고, 다른 문맥의 같은 단어 뒤 string은 계속 mask한다. CREATE TABLE/column, CHECK constraint name, REFERENCES relation/columns, index key, sequence, ALTER TABLE table/column/constraint rename의 이전·새 이름, 사용자 지정 escape 및 surrogate-pair decode 경계를 parser fixture에서 유지한다. 근거: [PostgreSQL Lexical Structure](https://www.postgresql.org/docs/current/sql-syntax-lexical.html).
-
-US sideways OBV/ADL scanner는 종목별 30개 미만 일봉을 조용히 제외하지 않는다. `insufficientHistoryCount`/`analyzedCount`로 coverage를 반환하며 universe 0건 또는 전체 이력 부족은 FAILED, 부분 부족은 PARTIAL, 전체 입력 분석 완료는 COMPLETED다. 정상 입력에서 qualified 0건은 성공이다.
-
-재발 점검: 후속 cache 저장 경로에서 scan/context를 persist하기 전에는 universe가 사용 가능하고 대상 수가 양수인지 확인한다. `mark*RetrySuccess`는 해당 persist가 정상 완료된 경우에만 호출한다. 관리자/Discord 자동화는 함수가 예외 없이 반환됐다는 사실만으로 scan 성공을 보고하지 않는다.
-
-저장 US universe consumer인 daily cache warm, open-cache, MA9도 빈 universe를 성공 처리하면 안 된다. warm은 종목이 존재하고 갱신 대상 lane이 없는 경우만 정상 no-op이며, empty/unavailable universe는 `ok=false/status=FAILED`다. open-cache도 동일한 universe gate를 적용한다. MA9 `BOTH`는 KR/US 각 선택 universe를 따로 확인하므로 한 market이 비면 전체 scan `ok=false`로 보고한다.
-
-관리자 비동기 US daily cache job은 실행 완료와 데이터 작업 완료를 구분한다. warm 결과가 정상 universe에서 일부 종목 실패를 반환하면 job status는 `PARTIAL`, 모든 대상 실패 또는 universe unavailable이면 `FAILED`, 실패 없이 처리되거나 정상 no-op이면 `COMPLETED`다. Discord 수동 갱신 메시지는 같은 warm 결과 상태를 표시한다.
-
-
-- **quoted relation matcher 경계**: quoted comma 포함 table 이름도 CREATE/ALTER TABLE matcher가 전체 identifier로 읽는다. schema-qualified 이름은 quoted dot을 보존하고 마지막 component를 canonical catalog name으로 사용한다.
-- **quoted constraint clause 경계**: UNIQUE/PRIMARY KEY/FOREIGN KEY와 INHERITS 목록에서 identifier 안의 comma 및 괄호를 list separator/boundary로 오인하지 않도록 quoted identifier 영역을 건너뛰고 괄호 깊이를 추적한다. 미지원 clause는 catalog 일치로 조용히 통과시키지 않고 preflight unverified 경계를 유지한다.
-- **escape string 렉싱 경계**: PostgreSQL E 문자열 내부의 escaped quote 및 comma/괄호/세미콜론이 DDL token, list separator 또는 command boundary로 처리되지 않게 `maskSqlCommentsAndLiterals`의 E-string 처리를 테스트한다. string/comment mask 이후 실제 UNIQUE clause와 다음 statement가 정상 인식되어야 한다.
-- **ALTER TABLE statement 경계**: 한 파일에서 여러 ALTER가 순서대로 나타나거나 quoted table/column/constraint name에 세미콜론이 포함되어도 action body를 statement별로 분리한다. 마스킹된 SQL에서 double-quote 경계를 따라 terminator를 찾고 source 순서대로 column/constraint effect를 inventory한다.
-
-Pending `CREATE TABLE` source의 inline `REFERENCES`도 FK constraint 이름(있는 경우), 참조 relation, matching unique key의 backing index와 함께 dependency inventory에 연결한다. named source unique/primary key는 선언 이름을 backing index로 보존한다. backing index 이름을 알 수 없는 dependency는 referenced table 기준으로 추적해 해당 table의 index drop을 보수적으로 차단한다. relation rename은 FK의 referencing/referenced table 상태를 함께 옮긴다. PostgreSQL FK는 참조 대상의 고유 constraint/index를 사용하며 `DROP INDEX RESTRICT`는 의존성을 보존하므로, pending source에서도 같은 순서 제약을 유지한다 ([CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html), [DROP INDEX](https://www.postgresql.org/docs/18/sql-dropindex.html), [`pg_constraint`](https://www.postgresql.org/docs/18/catalog-pg-constraint.html)).
-`ALTER TABLE DROP CONSTRAINT`의 FK preflight도 backing index 이름이 알려진 key에만 의존하지 않는다. backing index를 모르는 named unique/primary key는 dependency map의 `referencedTable`로 참조 FK를 찾아 같은 statement를 차단한다. 참조 table이 주어진 경우에만 fallback을 적용해 다른 table의 FK를 잘못 차단하지 않도록 한다.
-`DROP TABLE`의 기본 `RESTRICT`도 FK dependency inventory와 대조한다. 현재 relation을 참조하는 외부 FK가 있고 해당 referencing table이 같은 DROP 문에 포함되지 않으면 `PENDING_MIGRATION_RELATION_REFERENCED_BY_FOREIGN_KEY`로 보고하고, 해당 DROP 문 전체의 source state 변경을 적용하지 않는다. 같은 문에 함께 나열된 referencing table은 공동 제거 대상으로 제외한다. PostgreSQL 공식 문서는 참조 table을 제거하려면 CASCADE가 필요하고, CASCADE는 referencing table이 아니라 FK constraint만 제거한다고 명시한다 ([DROP TABLE](https://www.postgresql.org/docs/18/sql-droptable.html)).
-`ALTER TABLE DROP COLUMN`도 FK dependency map의 local/referenced column 목록을 사용한다. 다른 table의 FK가 삭제 대상 column을 참조하고 같은 관계 제약조건이 먼저 source order에서 제거되지 않았다면 `PENDING_MIGRATION_COLUMN_REFERENCED_BY_FOREIGN_KEY`로 해당 ALTER statement 전체를 차단한다. column이 FK의 referencing 쪽 local column이면 해당 local FK dependency를 제거하고, 외부 참조는 `CASCADE`로 제거될 때 dependency state에서도 제거한다. `CASCADE`는 다른 table의 FK를 자동으로 제거할 수 있지만 그 효과는 별도 cascade-unverified gate로 남긴다. 근거: [PostgreSQL 18 ALTER TABLE](https://www.postgresql.org/docs/18/sql-altertable.html), [Modifying Tables](https://www.postgresql.org/docs/18/ddl-alter.html).
-ALTER TABLE의 같은 statement 안에 있는 `DROP COLUMN ... CASCADE`는 해당 컬럼을 참조하던 FK dependency를 제거하므로, 그 자체를 RESTRICT FK blocker로 계산하지 않는다. 여러 DROP action이 있으면 parser의 action 순서에 맞춰 CASCADE의 알려진 FK 제거를 적용한 뒤 뒤따르는 RESTRICT action을 평가한다. public-only audit 범위 밖 schema는 FK blocker로 오판하지 않고 기존 schema-unverified 진단에 맡긴다. PostgreSQL 18 공식 문서는 CASCADE 여부가 dependent object 제거에 영향을 주고 여러 subcommand의 효과가 명령 순서를 따를 수 있음을 설명한다 ([ALTER TABLE](https://www.postgresql.org/docs/18/sql-altertable.html)).
-ALTER constraint drop FK preflight는 statement 시작 시의 catalog state만으로 모든 DROP을 독립 평가하지 않는다. FK constraint 제거, unique-key CASCADE 제거를 복제 dependency map에 action 순서대로 투영한 뒤 이후 unique/primary constraint RESTRICT drop을 판정한다. 따라서 self-referencing FK를 먼저 제거한 다음 참조 key를 제거하는 같은 ALTER 문은 통과하고, 역순은 FK dependency 진단으로 차단한다. 이 투영은 source-order simulator만 변경하며 실제 DB에는 쓰지 않는다.
-
-### Next.js instrumentation 빌드가 Node 전용 의존성을 Edge에 포함하는 경우
-
-- **증상**: `next build`가 `pg-connection-string`의 `fs`, 또는 `pgpass`의 `path`/`stream`을 찾지 못한다고 실패한다. import trace가 `instrumentation.ts`에서 DB를 사용하는 worker까지 이어질 수 있다.
-- **원인**: Next.js instrumentation은 Node.js와 Edge 양쪽에서 실행될 수 있다. root instrumentation 안에 Node 전용 worker를 동적 import하면 런타임 guard가 있어도 번들러가 두 런타임의 의존성을 따라갈 수 있다.
-- **대응**: worker/DB 진입을 별도 `instrumentation-node.ts`에 두고 root `instrumentation.ts`에서 `process.env.NEXT_RUNTIME === "nodejs"`일 때만 그 파일을 동적 import한다. production 및 feature kill-switch 조건은 Node 파일에서 유지한다. 의존성 목록이나 route handler로 worker를 옮겨 공개 GET의 부수효과를 만들지 않는다.
-- **검증**: `npm run build`를 실행해 Node builtins compile 오류가 사라지고 production build가 끝나는지 확인한다. 회귀 시 `npm run verify`의 build 단계에서 감지한다. 공식 패턴은 [Next.js Instrumentation guide](https://nextjs.org/docs/app/guides/instrumentation)를 따른다.
-
-## Flyway split migration의 사후 relation 모양과 실행 전제 구분
-
-- `auditUniverseSplitPreconditions`의 `postMigrationShapePresent`는 V85/V89의 현재 실행 전제조건과 관측된 사후 relation 모양을 별도 표시한다. 사후 모양은 compatibility view, candle relation, common/special 물리 테이블, 미국 legacy physical table의 존재/type만 본다. 이것이 있으면 과거 migration이 정상 완료됐다는 뜻이 아니며, history, row 내용, 필터 결과, 제약조건, 손실 위험은 증명되지 않는다.
-- 현재 로컬 감사는 두 market 모두 사후 모양 존재로 관측되지만 source는 view이므로 재실행 structural precondition은 false다. migration 이력에는 해당 낮은 version이 적용됐다고 나타나지 않는다. 재실행이나 history 수동 조정 대신 환경별 이력과 데이터 근거를 별도로 대조한다.
-- **자동 게이트**: `scripts/check-docs.mjs`는 split preflight에 사후 relation shape, 실행 structural preconditions, 그리고 history/data 검증 한계 설명이 모두 유지되는지 검사한다. relation shape 단위 테스트와 함께 출력 계약 변경을 감지한다.
-- CLI 출력 경계도 검사한다. `scripts/audit-flyway-history.ts`가 `splitMigrationPreflight`를 최종 report에 실어야 내부 계산과 사용자가 보는 감사 결과가 분리되지 않는다.
-
-## KIS 해외 체결추이의 `rt_cd` 누락 오판
-
-- **증상**: `fetchKisUsTradeTrend`가 HTTP 200과 체결 행을 받았다는 이유만으로 성공 처리해, 응답의 `rt_cd`가 없는 비정상 envelope도 `ok: true`가 될 수 있었다.
-- **근본 원인**: `rt_cd !== "1"`로 실패 코드 한 가지만 제외했다. KIS 공식 샘플의 `APIResp.isOK()`는 `rt_cd == "0"`일 때만 성공을 반환한다 ([한국투자증권 공식 open-trading-api 예제](https://github.com/koreainvestment/open-trading-api/blob/main/examples_user/kis_auth.py)).
-- **수정/영향**: 체결추이 성공 조건을 HTTP 성공 + `rt_cd === "0"` + 체결 행 존재로 제한했다. 실패 envelope에도 원시 응답과 파싱된 행은 진단용으로 유지하되 성공으로 표시하지 않는다.
-- **재발 자동 감지**: `lib/kis-us-trade-trend.test.ts`가 `rt_cd="0"` 성공과 `rt_cd` 누락 시 실패 판정을 함께 검사한다.
-
-## 미국 TOP 상승률의 KIS business error 성공 오판
-
-- **증상**: `/api/stock/us/top-rising` upstream KIS가 HTTP 200으로 `rt_cd="1"`을 보내도 helper가 `ok: true`로 표시하고 route가 종목 배열과 HTTP 200을 돌려줄 수 있었다. `rt_cd`가 없는 오류 envelope도 같은 문제가 있었다.
-- **근본 원인**: `fetchKisUsTopRisingApi`가 HTTP 상태만 검사했으며 KIS 응답 코드 확인을 생략했다. 한국투자증권 공식 예제의 `APIResp.isOK()`는 `rt_cd == "0"`만 성공으로 본다 ([공식 예제](https://github.com/koreainvestment/open-trading-api/blob/main/examples_user/kis_auth.py)).
-- **수정/영향**: helper 성공은 HTTP 2xx와 `parsed.rt_cd === "0"`을 모두 요구한다. 공개 route는 upstream 오류에 데이터 행 대신 `{ ok: false, error: "KIS_UPSTREAM_ERROR", upstreamStatus }`를 502로 반환하며, 토큰 부재 503과 성공 배열 200은 유지한다.
-- **재발 자동 감지**: `lib/kis-us-api.test.ts`는 rt_cd 0, rt_cd 1, rt_cd 누락 응답을 검사하고, `app/api/stock/us/top-rising/route.test.ts`는 HTTP 200 provider error의 502 처리와 성공 배열 응답을 검사한다.
-## KIS 미국 시세 응답의 업무 성공과 HTTP 성공 혼동
-
-- **증상**: HTTP 200이더라도 KIS rt_cd가 "1"이거나 빠진 응답의 output 행을 분봉 조회기가 유효한 points로 반환할 수 있었다. 가격 상세 조회는 rt_cd가 없으면 기본값 "0"으로 처리해 성공·가격 유효 여부를 잘못 보고할 수 있었다.
-- **근본 원인**: 분봉 ok는 HTTP 상태만 확인했고 페이지네이션은 continuation 페이지의 KIS code를 검사하지 않았다. 가격 상세는 rt_cd 누락을 성공으로 대체했다.
-- **수정/영향**: 분봉은 첫 응답을 HTTP 2xx + rt_cd === "0"일 때만 points로 파싱하고, continuation도 같은 성공 코드를 확인한 뒤 누적한다. 가격 상세 ok도 HTTP와 명시적 KIS 성공 코드를 모두 요구하며, 오류 raw payload는 진단에 남기되 정상 quote/cache로 쓰지 않는다.
-- **재발 자동 감지**: lib/kis-us-minute-turnover.test.ts가 KIS business error, rt_cd 누락, 실패 continuation page의 행 폐기를 확인한다. lib/kis-us-price-detail.test.ts는 HTTP 200 + business error 및 rt_cd 누락에 대해 ok:false와 저장 금지를 확인한다. 성공 코드 기준은 한국투자증권 [공식 APIResp 예제](https://github.com/koreainvestment/open-trading-api/blob/main/examples_user/kis_auth.py)를 따른다.
-
-## KIS HTTP 200 업무 성공 코드 누락을 성공으로 기록하는 문제
-
-- **증상**: 공통 KIS 요청 계층이 HTTP 200과 `rt_cd`가 없는 JSON 응답을 성공 호출로 계측하고 정상 응답으로 adaptive throttle의 성공 횟수에 반영할 수 있었다. 빈 본문과 비 JSON 응답도 같은 프로토콜 문제다.
-- **근본 원인**: 기존 분류기는 `rt_cd`가 존재하면서 `"0"`이 아닌 경우만 실패로 처리해, 누락된 업무 성공 코드와 JSON 파싱 실패를 통과시켰다.
-- **수정/영향**: `lib/kis-request-throttle.ts`는 KIS 요청 결과의 파싱 payload가 존재하고 `rt_cd`를 문자열화한 값이 `"0"`일 때만 성공으로 분류한다. 오류 계측과 throttle 성공 횟수가 응답 계약 누락으로 오염되지 않는다.
-- **재발 자동 감지**: `lib/kis-request-throttle.test.ts`가 rt_cd 누락 JSON, 숫자형 0, 빈 본문, 비 JSON 본문 및 업무 오류 코드를 검사한다.
-
-## AMS 스캐너의 KIS 업무 오류 데이터 점수화
-
-- **증상**: AMS 스캐너가 HTTP 200 + KIS 업무 오류 응답의 ranking rows를 후보로 사용하고, 상세·분봉 업무 오류의 필드 누락을 0으로 바꿔 점수화할 수 있었다.
-- **근본 원인**: ranking 응답은 HTTP 상태만 보고 rows를 추출했으며, 개별 상세/분봉 응답에서는 HTTP와 `rt_cd` 성공 여부를 검사하지 않았다. 숫자 변환의 기본값 0이 오류 데이터를 정상 지표처럼 보이게 했다.
-- **수정/영향**: ranking은 HTTP 성공과 `rt_cd === "0"`일 때만 소비하며 실패 시 빈 candidates와 오류 상태(HTTP 오류 또는 502)를 반환한다. 상세와 분봉 응답 중 하나라도 실패하면 해당 심볼을 후보·점수에서 제외하고 `failedSymbols`와 HTTP 502로 부분 실패를 알린다.
-- **재발 자동 감지**: `lib/kis-ams-scout.test.ts`가 HTTP 200 ranking business error 및 detail/chart business error rows가 후보로 들어가지 않는지 검사한다.
-
-## 국내 통합 탐지 스캔의 오류 행 사용 및 volume-power 라우팅
-
-- **증상**: `/api/kis/detection-scan`은 `getRows` 기반 source의 `ok:false`를 무시해 오류 응답 rows를 합산하고 snapshot을 `AVAILABLE`로 저장할 수 있었다. 또한 허용 목록에 있는 `volume-power` source가 전용 API가 아니라 마지막 `market-value` 분기로 잘못 전달됐다. 단일 source route도 실패 응답의 rows를 그대로 내보낼 수 있었고 두 탐지 route 모두 활성 보통주 마스터와 대조하지 않았다.
-- **근본 원인**: 통합 스캔이 개별 source의 성공 여부를 추적하지 않았고, `volume-power` 분기 및 endpoint 호출이 빠져 있었다. 단일 route는 결과 상태와 무관하게 `result.rows`를 정규화했다. 거래소 순위 응답을 official common-stock classification으로 오인했다.
-- **수정/영향**: `lib/kis-investor-flow.ts` 공통 `getRows`는 HTTP와 KIS 업무코드가 모두 성공일 때만 rows를 내보낸다. 두 route는 활성 `COMMON_STOCK` 공식 종목 마스터 코드에 속한 결과만 반환하며 마스터 조회 실패 시 503 fail-closed한다. 단일 route는 실패 시 rows를 비우고 snapshot을 UNAVAILABLE로 기록한다. 통합 route는 각 flow source 성공 여부를 검사해 실패 rows를 제외하고 `failedSources`, 전체 `ok:false`, HTTP 502와 UNAVAILABLE snapshot을 반환한다. `volume-power`는 전용 KIS API를 호출한다.
-- **재발 자동 감지**: `lib/kis-investor-flow.test.ts`는 HTTP 200 업무 오류 rows 폐기를 검사한다. `app/api/kis/detection-candidates/route.test.ts`는 오류 rows 차단, active common-stock 필터 및 마스터 장애 fail-closed를 검사한다. `app/api/kis/detection-scan/route.test.ts`는 실패 source 차단, volume-power 라우팅, 마스터 필터와 장애 fail-closed를 검사한다.
-
-## 국내 상승률·장중·legacy KIS scanner의 보통주 마스터 누락
-
-- **증상**: 국내 top-rising API와 장중 worker가 KIS ranking rows를 공식 활성 `COMMON_STOCK` master와 대조하지 않고 제공/추적할 수 있었다. `kis.ts`의 legacy scanners도 KIS 결과와 오래된 DB 캐시를 그대로 반환해 비보통주가 화면 후보로 남을 수 있었다.
-- **근본 원인**: ranking API의 stock-like output을 공통주·활성 분류의 공식 근거로 간주했다. 기존 cache fallback 역시 현재 master 상태를 재검증하지 않았다.
-- **수정/영향**: `filterActiveKrCommonStockRows`가 queryEligibleUniverse의 공식 KR active common-stock 코드 집합과 대조한다. `/api/stock/kr/top-rising-chart`는 메모리 snapshot과 KIS fallback 모두를 필터링하고, worker는 국내 후보를 적재하기 전에 필터링한다. 열린 시장의 후보 refresh가 실패하면 그 시장의 이전 snapshot을 비워 오래된 국내 코드가 계속 처리되지 않게 한다. `kis.ts`의 다섯 국내 스캐너는 live ranking 결과를 부가 API 조회·cache write 전에 필터링하며, 캐시 반환 시에도 재확인한다. 마스터 조회 실패는 빈 후보 또는 503 fail-closed로 처리한다.
-- **재발 자동 감지**: `lib/instrument-eligibility.test.ts`는 active master filtering과 master 조회 실패를 검사한다. `app/api/stock/kr/top-rising-chart/route.test.ts`는 memory/live 소스 필터 및 503 동작을 검사한다. worker의 domestic candidate loader와 `kis.ts` scanner/cache filtering은 typecheck 및 관련 module regression suite에서 확인한다.
-## 2026-11-14 RSS 조회 DB 오류와 원문 fetch 진단 부족
-
-- **증상**: 관리자 RSS 조회의 DB 장애가 HTTP 400 입력 오류로 표시되고, 원문 피드 fetch 실패에서 source/stage 정보가 부족했다.
-- **근본 원인**: 날짜 필터 검사와 DB 조회가 같은 예외 경계에 있었고, catch에서 DB/select 실패를 입력 오류와 구분하지 않았다. 원문 단일 source fetch catch도 공통 최상위 오류 경계만 제공했다.
-- **해결**: 날짜/시간 검증을 DB 조회 전에 수행해 잘못된 입력은 400으로 유지한다. 실제 기사 SELECT 실패는 안전한 `describeError` 코드와 DB 객체 식별자를 반환하는 HTTP 503/no-store로 분리한다. 원문 source 조회 실패는 `source`, `fetch_or_parse` 단계를 응답에 포함한다.
-- **재발 자동 감지**: `app/api/admin/stocktitan-rss/route.test.ts`가 invalid date 400과 SQLSTATE 42P01의 503·구조화 진단을 검증한다. `app/api/admin/market-rss-test/route.test.ts`가 source 단계별 오류 응답을 검증한다.
-- **남은 위험/검증**: API level source 조회는 fetch와 XML parse를 단일 `fetch_or_parse` 단계로 보고한다. 외부 응답 본문/헤더 전문과 인증값은 노출하지 않는다. 실제 운영 오류 재현은 하지 않았고, 이번 변경 검증은 mock 테스트로 한정한다.
-
-
-### 원문 RSS 단계별 실패 코드
-
-- `fetchMarketRss`는 HTTP 요청, timeout, non-2xx, response body read, XML/feed parse를 서로 다른 `stage`/`errorCode`로 분류한다. multi-source 조회와 관리자 signal test는 raw exception 대신 해당 코드와 HTTP upstream status만 제공한다. 관리자 단일-source 응답도 이 구조화 결과를 사용하며 provider/DB 예외 응답은 free-form message를 반환하지 않는다.
-- `lib/market-rss.test.ts`의 timeout 기대값과 관리자 조회 응답 검증을 새 진단 계약에 맞춰 갱신했다. 이번 연속 수정 뒤 `npm.cmd run typecheck`는 통과했다. 테스트 실행 및 실제 provider/운영 재현은 이번 연속 수정에서 하지 않았다.
-
-### RSS 호재 진단이 source fetch 실패를 성공으로 표시
-
-- **증상/원인**: `/api/admin/market-rss-signal-test`는 개별 RSS source 실패를 results에만 넣고 최상위 `ok:true`/HTTP 200을 반환해 API 테스트 패널의 실패 경고를 발생시키지 않았다. 보조 ticker/body catch는 비정제 예외 메시지를 반환할 수 있었다.
-- **해결/재발 방지**: source 실패 source 목록/count를 최상위에 올리고 HTTP 502와 `RSS_SOURCE_FETCH_FAILED`를 반환한다. 성공한 source 분석 결과는 함께 유지한다. ticker/body 오류는 `safeErrorMetadata`의 단계 및 코드만 노출한다. 테스트 패널은 실패 source 이름을 경고에 표시한다.
-- **검증/남은 위험**: typecheck 통과. 외부 RSS/SEC 요청과 UI runtime은 미실행. market reaction resolver 실패는 이번 변경 범위 밖이다.
-
-### 관리자 단일 source RSS FETCH_ONLY 번역 추적 client 누락
-
-- **원인/영향**: 번역 테스트 route가 추적 client를 생성하고도 단일-source FETCH_ONLY 변환 함수에 전달하지 않았다. provider 선택과 usage metrics가 PREVIEW/multi-source 경로와 달라질 수 있었다.
-- **해결/재발 방지**: `withTranslation`에서 선택된 client를 `translateMarketRssItems`에 전달한다. 외부 provider 연결은 요청된 테스트 실행에서만 일어나도록 유지한다.
-- **검증/한계**: typecheck 통과. route 테스트와 실제 provider 호출은 미실행이므로 사용량 metrics runtime 결과는 미확인이다.
-
-### 관리자 RSS 번역 실패에서 provider 계측 누락
-
-- **원인/영향**: provider 설정과 usage tracker가 try-local 변수여서 번역 실패 catch가 실행되면 오류코드 외 configuration 및 호출량을 반환하지 못했다.
-- **해결/재발 방지**: route 상태를 catch에서 사용할 수 있게 두고 생성된 configuration과 `getMetrics()`를 오류 응답에 포함한다. 오류 메시지·비밀 설정 값은 노출하지 않는다.
-- **검증/한계**: typecheck 통과. 번역 provider 호출 및 route runtime은 미실행이다.
-
-### 단일 RSS fetch 실패 응답에서 번역 진단 metadata 누락
-
-- **원인/영향**: 번역 test route가 feed fetch 전에 설정하는 provider configuration 및 usage tracker를 fetch 실패 경로에서 반환하지 않아 번역 debug 요청에서 설정/계측 상태를 확인하기 어려웠다.
-- **해결**: fetch 오류 응답은 translation 요청 여부와 이미 만들어진 configuration/usage를 유지한다. 단 fetch가 실패하면 provider usage는 해당 시점까지 관측된 값만 나타내며, raw error message는 노출하지 않는다.
-- **검증/한계**: typecheck 통과. 실제 provider 및 upstream 요청은 미실행이다.
-
-### RSS parser 오류 계약 변경 뒤 이전 message 기대 테스트
-
-- **증상/원인**: HTTP 200 HTML response 테스트가 parser의 원문 한국어 message를 기대했지만 fetch boundary는 이를 `MarketRssFetchError`의 안정 코드와 단계로 변환했다.
-- **해결**: 회귀 기대를 `parse` / `RSS_FEED_FORMAT_INVALID` / upstream 200 구조에 맞췄다. fetch 오류 응답의 안정·비밀 비노출 계약을 유지한다.
-- **검증/한계**: 실행 당시 관련 26개 중 25개 통과하고 이 assertion만 불일치했다. 수정 후 재실행하지 않아 최종 green 결과는 아직 없다.
-
-- **후속 검증 (2026-11-14)**: parser 진단 assertion 수정 후 RSS 관련 4개 테스트 파일 26개 모두 통과했다. 이 결과는 mock 기반으로 upstream/외부 provider 동작을 증명하지 않는다.
-
-### RSS 신호 테스트 market-reaction raw 오류 응답
-
-- **원인/영향**: 보조 KIS market reaction resolver가 raw exception을 `error` 문자열로 담아 반환할 수 있었고 관리자 signal test는 이를 그대로 serialize했다.
-- **해결**: route response는 raw `error` 필드를 버리고 machine-code 형태 문자열은 유지하며 자유 형식 오류는 `safeErrorMetadata`의 코드로 치환한다.
-- **검증/한계**: typecheck 통과. resolver API test와 UI runtime/실제 KIS 호출은 미실행이다.
-
-### RSS signal test 보조 resolver 실패가 성공 상태로 숨겨짐
-
-- **증상/원인**: top-level `ok`가 feed source 상태만 집계해 ticker resolution, SEC body 및 KIS reaction 오류가 있어도 전체 테스트가 성공처럼 보일 수 있었다. 관리 패널은 HTTP status만 확인해 HTTP 200 + `ok:false`를 실패로 취급하지 않았다.
-- **해결**: route가 각 resolver 실패를 단계별 집계하고 `ok:false`, 실패 단계/count를 반환한다. source upstream 실패는 502, 보조 분석 단계 실패는 결과 데이터 보존을 위해 HTTP 200과 `ok:false`로 반환한다. API test panel은 application-level `ok:false`도 사용자 경고로 표시한다.
-- **검증/한계**: typecheck 통과. 실제 UI 및 외부 resolver 실행은 미검증이다.
-## DART RSS 조회 오류
-
-- **증상**: DART RSS 응답이 HTML/잘린 XML/과대 본문이면 빈 결과처럼 표시되거나 파서 예외가 API의 일반 503으로만 묶일 수 있다. 같은 영수증이 중복 노출되거나 클라이언트 polling 요청이 겹칠 수도 있다.
-- **진단 순서**: `/api/dart`의 HTTP 상태와 서버 로그의 오류 메시지를 확인한다. 업스트림 상태 코드, Content-Type, XML 구문, 본문 제한 초과를 구분한다. 클라이언트는 응답 `source/items/fetchedAt` 구조와 visibility 기반 polling 상태를 확인한다. 자격증명·RSS 원문을 로그에 기록하지 않는다.
-- **재발 방지**: 조회는 10초 timeout, 2 MiB 본문 제한, 허용 Content-Type 검사, XML validator 및 RSS channel 검사로 fail-closed한다. 파서도 날짜 키·본문 크기·유효 XML을 확인하고 영수증 번호를 기준으로 중복을 제거한다. UI는 요청 중복을 막고 unmount 시 취소하며 polling 주기를 10~300초로 제한한다.
-- **자동 감지**: `lib/rss.test.ts`는 잘못된 XML/날짜, 크기 제한, 중복 영수증, 비 XML 응답 및 잘못된 성공 응답을 회귀 검사한다. `use-feed-data.ts`의 클라이언트 검증/요청 직렬화는 feed-page 통합 검증 시 확인한다.
-
-## OCI standalone `distDir` 경로 불일치
-
-- **증상**: production build는 성공하지만 배포 검증에서 instrumentation 파일을 찾지 못하거나, 배포 뒤 새 HTML의 JS 청크가 404가 될 수 있다.
-- **근본 원인**: 배포 검증은 격리 빌드 디렉터리 `.next-deploy-verify`를 쓰는데 standalone 산출물의 실제 구조는 `standalone/.next-deploy-verify/{server,static}`이다. verifier·GitHub Actions packaging·이전 릴리스 자산 보존이 기본 `.next`를 가정하면 검사와 실제 runtime 경로가 어긋난다.
-- **해결/재발 방지**: `scripts/verify-deploy.mjs`, `.github/workflows/deploy-oci.yml`, `deploy/oci/stockman-activate`가 같은 configured `distDir` 아래 instrumentation 및 hashed static 자산을 확인·복사·보존한다. distDir 변경 시 standalone smoke와 OCI archive 경로 검사를 함께 갱신한다.
-- **자동 감지**: `npm run deploy:verify`는 standalone instrumentation 존재, 서버 실행, `/charts` 정적 청크 응답과 브라우저 hydration을 확인한다. workflow archive step은 instrumentation과 static chunk 경로를 tar 목록에서 검사한다.
-
+## 2026-11-04 accession·event 다대일 검증 불일치
+
+- **증상**: 공시 한 건이 주주총회와 후속 이사회 재량 실행기한처럼 서로 다른 이벤트를 근거로 제공하면, 신규 배치 검증기가 `TARGETED_SECTION_REVIEW` 공시 수와 event record 수를 비교해 올바른 batch를 실패 처리했다.
+- **근본 원인**: accession과 event의 관계를 일대일로 가정했다. 실제 스키마는 하나의 accession에서 여러 eventId를 허용한다.
+- **영향 범위**: `validate-us-smallcap-event-data.mjs`의 신규 배치 사전 검사. 저장 데이터나 운영 서버에는 영향이 없다.
+- **해결 위치**: 검토 accession과 이벤트 source accession을 `ticker|accession` 고유 집합으로 각각 만들고 집합 동등성을 비교한다. accession–event 다대일 연결은 ledger의 각 filing eventIds와 coverageSummary가 추가 검증한다.
+- **재발 자동 감지**: batch validator는 검토 accession 집합의 일치, filing/eventId 역방향 연결, 제출 수, 검토 상태 수를 검사한다. 같은 공시에서 복수 이벤트를 생성하는 케이스를 배치 regression input으로 보존하고 전체 `npm run deploy:verify`에서 재검증한다.
+- **검증 결과**: 2026-11-04-b07 validator가 100 issuer, 4,182 filing, 14 event, 14 accession-event relation, 13 targeted filing으로 통과했다. 전체 docs/deploy 게이트는 진행 중.
+- **남은 위험 및 다음 개선**: 현재 fixture는 하나의 accession이 복수 이벤트를 제공하는 사례 하나다. future fixture에서 여러 이벤트 유형을 확장하고도 고유 source ID가 정확히 연결되는지 계속 검사한다.
+
+- **남은 위험 및 다음 개선**: preflight는 V168이 만드는 인덱스명에 한정해 무효 객체를 제거한다. V168에 포함되지 않은 실패 이력이 있으면 자동 repair 없이 실패하므로 별도 수동 조사 대상이다.
+- 재발 감지는 OCI activation의 GitHub timeout, Flyway migration 단계 로그 및 배포 후 schema version 확인으로 수행한다.
+
+## 2026-11-10 RSS 기사 7일 자동 보존정책 누락
+
+- **증상**: `/api/cron/db-retention`은 raw RSS fetch snapshot을 180일 뒤 정리하지만 `market_rss_articles` 기사와 `market_rss_bullish_articles` projection은 만료시키지 않았다.
+- **근본 원인**: 기존 운영정책은 RSS snapshot만 180일 보존 대상으로 두고, 기사 행은 장기 보존하며 article-level DELETE를 정적 cron gate가 금지했다.
+- **영향 범위**: RSS 기사와 bullish RSS projection. `market_rss_fetch_snapshots`의 180일, SEC/DART 공시, 사용자 생성 데이터 정책은 변경하지 않는다. `published_at`이 없으면 `created_at`으로 7일을 계산한다.
+- **해결 위치**: 공통 retention job에 두 RSS 테이블의 7일 batch-delete를 추가한다. bullish row는 expired source article 연결도 조건에 포함해 parent보다 먼저 정리하며 FK cascade는 동시성 안전망으로 유지한다. V169는 published-date 및 null-date 만료 경로 인덱스를 concurrent로 추가한다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`가 두 table의 정확한 7일 predicate, bullish parent 관계 조건, V169 partial indexes와 migration 배포 포함 여부를 검사한다.
+- **검증 및 영향 확인**: 사용자가 지정한 로컬 PostgreSQL 5432에 직접 연결해 데이터베이스명 `stockman`, PostgreSQL 16.15, Flyway 161을 확인했다. `market_rss_articles`에는 만료 published row 552개와 null-date fallback row 0개가 있으며, local schema에는 `market_rss_bullish_articles`가 없다. 쿼리는 read-only로 수행했고 RSS 행은 삭제하지 않았다. 따라서 로컬에서 전체 retention endpoint를 실행하지 않았다.
+- **DB 위치 정정**: 운영 DB는 Supabase가 아니라 OCI 운영 서버 내부 PostgreSQL이다. `localhost:5432`는 사용자의 노트북에서 Docker로 실행 중인 별도 개발 DB이므로 운영 상태 확인에 사용하지 않는다. OCI deployment workflow는 SSH로 서버에 접속한 뒤 `/etc/stockman/stockman.env`의 `DATABASE_URL`로 운영 DB를 조회한다.
+- **최신 운영 blocker**: 2026-11-11 Deploy OCI #1296은 V168 preflight에서 중단됐다. 사용자 승인 후 OCI recovery workflow가 PID 4178222의 `idle in transaction` 상태와 snapshot 보유를 재확인하고 `pg_terminate_backend` 성공을 받았다. 다른 snapshot holder는 그대로다. 새 Deploy OCI preflight 이후에만 V168/V169 적용 여부를 확정할 수 있다.
+- **남은 위험/다음 단계**: 승인된 PID 4178222에는 terminate signal이 전달됐지만 다른 active/snapshot holder가 계속 보일 수 있다. Deploy OCI 재실행에서 V168 preflight가 남은 blocker를 fail-closed하는지 확인한다. V168/V169 적용과 5분 cron의 RSS `deleted`/`failed` 결과가 확인되기 전까지 자동 삭제 활성화로 판정하지 않는다. 추가 세션 종료는 별도 승인 없이 하지 않는다.
+## OCI standalone 정적 자산 경로 불일치
+
+- **원인**: CI가 Next `distDir`를 `.next-deploy-verify`로 지정했지만 verifier, package archive, activation 보존 경로는 기본 `.next/`를 가정했다. 이 경우 서버 instrumentation 또는 JS chunk가 누락될 수 있다.
+- **수정**: `scripts/verify-deploy.mjs`, `.github/workflows/deploy-oci.yml`, `deploy/oci/stockman-activate`에서 설정된 distDir을 일치시키고 CI archive 검사에서 instrumentation 및 hashed chunk를 요구한다.
+- **재발 자동 감지**: `npm run deploy:verify` standalone runtime smoke와 `Deploy OCI` package assertions.
+- **검증**: `deploy:verify` 통과, 실제 standalone `/charts`와 JavaScript chunk HTTP 200.
+- **남은 위험**: OCI activation health check에서 실제 운영 결과를 확인한다.
+
+## RSS XML 입력 또는 화면 polling 실패
+
+- **원인 후보**: 잘못된 XML, 비정상적인 DART channel/item, 과도한 응답 크기, 잘못된 기사 응답 형식, 겹치는 polling 요청.
+- **대응**: `lib/rss.ts`에서 XML/channel/date/URL을 검증하고 중복 receipt를 제거한다. fetch는 시간·크기·content-type 제한을 적용한다. `components/use-feed-data.ts`는 이전 요청을 취소하고 payload shape를 검사한다.
+- **재발 감지**: `lib/rss.test.ts`와 전체 Vitest suite에서 malformed/oversized/duplicate 입력과 polling 응답을 검증한다.
+- **운영 주의**: 실패한 RSS 항목은 정상 기사로 취급하지 않는다.
+
+## V168 concurrent index migration snapshot timeout
+
+- **증상/근거**: Deploy OCI run `43829487560`, attempt 9 passed the V168 snapshot preflight but Flyway remained at `Migrating schema "public" to version "168 - bounded non daily data retention"` until the 2,400-second migration timeout ended with exit 137. During earlier attempts, application and timer-created active client snapshots repeatedly reappeared.
+- **근본 원인**: `CREATE INDEX CONCURRENTLY` must wait for transactions holding older snapshots, while the app, cron, RSS, and fundamentals services continued opening DB work throughout migration. After quiescing them, an `idle in transaction` client still retained an old snapshot.
+- **수정**: `deploy/oci/stockman-activate` stops the app and scheduler timers/services before migration, then runs preflight and Flyway. It does not terminate database sessions; any remaining snapshot holder causes preflight to fail closed. If activation fails before successful completion, the error trap restarts the old app and timers. Snapshot termination is handled only by a separately scoped, explicitly approved recovery operation.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs` asserts service quiescence, absence of automatic `pg_terminate_backend`, and rollback on failure. Deploy logs show stop, V168 preflight and Flyway stages. PostgreSQL's official `CREATE INDEX` docs describe the wait for old snapshots: https://www.postgresql.org/docs/current/sql-createindex.html.
+- **운영 재확인**: Deploy OCI run `44001959780` stopped the app and timers; preflight then found a separate `idle in transaction` PID `241173` holding a snapshot for 3,848 seconds. Activation failed closed and logs confirmed the app and timers were restarted. Deploy run `44004038768` later terminated PID `241173` and `244461` using a broad predicate. That automatic cleanup behavior is removed after confirming it exceeded the separately approved PID scope.
+- **검증/남은 위험**: V168/V169, release activation and runtime checks remain pending until a fresh OCI deployment succeeds. Service downtime may last for the duration of V168/V169; if preflight still finds external client snapshots, failure rollback must restore app and timer services. Do not claim ㄷㅊㅇ5/ㄷㅊㅇ6 complete until the public universe APIs and both snapshot commands are verified.
+
+## V168 인덱스 생성 대상 테이블이 이전 마이그레이션에서 삭제됨
+
+- **증상/근거**: Deploy OCI run `44004038768`은 snapshot preflight를 통과하고 V168 실행을 시작했지만, `us_trade_intensity_ticks`가 없다는 PostgreSQL 오류로 중단됐다. 로그상 V168의 첫 concurrent index 생성은 완료된 뒤 다음 테이블에서 실패했다.
+- **근본 원인**: V70이 구형 `us_trade_intensity_ticks` 테이블을 `DROP TABLE ... CASCADE`로 제거했지만 V168이 해당 테이블의 retention 인덱스를 다시 만들려고 했다. 마이그레이션 오류는 장기 snapshot 문제와 별개의 정적 대상 오류였다.
+- **수정**: V168에서 삭제된 테이블 인덱스 정의를 제거하고, `scripts/check-oci-cron.mjs`가 V168 직전까지 순서대로 적용되는 마이그레이션에서 삭제된 테이블을 대상으로 하는 인덱스를 추가하면 실패하도록 보강했다.
+- **재발 자동 감지**: `npm run deploy:verify`의 OCI cron/migration 구조 검사가 이전 CREATE/DROP TABLE 순서를 반영해 V168 인덱스 대상을 검사한다.
+- **영향 범위**: 실패한 V168 시도는 Flyway 실패 상태 및 일부 앞선 concurrent index 생성 결과를 남길 수 있다. 배포 preflight는 V168 failed history와 V168 인덱스만 점검/복구하며, 재배포 전 현재 DB 상태를 다시 확인한다.
+- **검증/남은 위험**: 코드 검증 후 OCI 재배포가 필요하다. V168/V169, release 전환, 시간별 retention timer 및 RSS 삭제 결과는 성공 로그와 운영 상태 확인 전까지 미완료로 둔다.
+
+## OCI 배포의 자동 DB 세션 종료 범위
+
+- **증상/근거**: Deploy OCI run `44004038768`의 activation 단계가 명시된 PID 승인 목록 대신 30초 이상 snapshot을 가진 client 세션 전체를 동적으로 종료했다. 로그에는 PID `241173`과 `244461`이 종료됐다고 기록됐다.
+- **근본 원인**: 운영 배포 스크립트가 범위형 환경변수 하나를 승인으로 간주하고, 조건을 만족하는 모든 세션을 자동으로 찾고 종료했다. 이는 단일 PID·상태·최소 60분 조건으로 받은 별도 승인의 범위를 넘어설 수 있다.
+- **수정**: 배포의 자동 세션 일괄 종료를 제거한다. 현재 후속 승인으로 지정된 정확 PID `246213`, `246722`, `246903`, `247294`, `247463`, `247509`, `248010`, `248077`, `248691`, `248857`, `249223`, `249386`, `249548`, `249564`, `249815`, `249816`, `250094`, `250277`, `250401`, `250475`, `250476`, `250751`, `253038`만 scope 환경변수의 명시적 allowlist에 넣고, 실행 직전 `client backend`·snapshot 보유·30초 초과를 다시 확인한다. PID가 사라졌거나 조건을 충족하지 않으면 해당 PID는 건너뛴다. 서비스 중지 이후에도 다른 오래된 snapshot이 있으면 V168 preflight를 30초 간격 최대 20회 재시도하고, 계속 남으면 fail-closed한다. allowlist 밖 세션 및 parallel worker는 건드리지 않는다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`에서 artifact의 전용 runner 포함과 activation의 정확한 PID allowlist를 검사한다. runner는 allowlist 비어 있음/잘못된 PID에서 실패하고 SQL에서도 승인 PID 전체를 재검증한다. 진단에는 application name·DB user·client address를 포함하고 raw query text는 기록하지 않는다.
+- **남은 위험/다음 단계**: concurrent index가 다른 오래된 snapshot을 기다리면 배포는 실패하고 기존 서비스/timer 복구 경로가 작동한다. 그 세션은 별도 관측 및 승인 범위 없이 종료하지 않는다.
+
+## 운영 공개 일봉 API가 대량 스냅샷 수집 중 502를 반환함
+
+- **증상/근거**: OCI deploy run `44024922650` 성공 뒤 `/health-check`, NAS universe, 1종목 및 20종목 일봉 조회가 HTTP 200이었다. 전체 US 스냅샷 순차 수집 중 NAS 162배치 완료 후 NYS 50/94배치 시점부터 HTTP 502가 반복됐다. 이어 health와 universe도 nginx 502를 반환했다. 스냅샷 JSON은 완성되지 않아 기존 결과를 덮지 않았다. deploy activation 재실행 후 health는 HTTP 200으로 복구됐다.
+- **근본 원인**: 확인되지 않았다. 요청 누적과 장애 발생 시각은 연관됐지만, 운영 애플리케이션/DB 진단 로그 없이 서버 과부하나 특정 조회 코드 경로를 원인으로 확정하지 않는다.
+- **대응**: 502 또는 health 실패가 발생하면 전체 수집을 즉시 중지한다. 추가 universe/candle 요청을 하지 말고 health만 확인한다. 배포가 필요하면 승인된 OCI deploy workflow를 실행하고 성공 후 health를 재검증한다. 부분 수집 결과는 최종 JSON으로 승격하지 않는다.
+- **재발 자동 감지**: 전체 스냅샷 전 health, universe, 소량 일봉 요청을 확인하며 수집 중 실패도 기록한다. 후속 개선은 서버측 502 로그/DB 진단, checkpoint resume, 호출 부하 제한을 갖춘 수집 방식을 추가하고 운영에서 소량 검증한 후 전체 실행하는 것이다.
+- **해결 확인**: V170 snapshot blocker PID `261867` 종료 및 배포 성공 후, 20종목 단위와 최대 4회 재시도를 적용한 전체 수집이 재현 가능한 502 없이 완료됐다. `/api/health`는 수집 후 HTTP 200이었다. `daily-candles-us.json`은 5,268종목·627,078 candles·90 missing, `daily-candles-kr.json`은 2,346종목·270,629 candles·0 missing이며 두 파일 모두 latest date `20261116`. JSON summary, instrument counts, 중복 코드, candle count 및 날짜/갱신시각을 검증했다.
+- **남은 위험**: 최초 대량 수집 때의 nginx 502 원인은 서버측 로그/DB 진단 자료가 없어 독립적으로 확정되지 않았다. 20종목 배치와 재시도 설정은 현재 성공했으며 향후 수집도 health·universe·소량 조회 사전 확인을 유지한다.
+
+## V170 SEC materializer 인덱스 생성 timeout
+
+- **증상/근거**: OCI Deploy run `44039396985`는 V168 preflight를 통과하고 Flyway가 schema V169에서 V170 `sec materializer recent index`를 시작했다. 2,400초 뒤 `timeout`에 의해 프로세스가 종료(exit 137)됐다. activation error trap은 구 release app과 scheduler services를 복구했고 이후 `/health-check`는 HTTP 200이었다.
+- **관측된 blocker**: 첫 preflight에서 client backend PID `260900`이 active, snapshot 보유, transaction age 929초로 확인됐고 parallel worker PID `260901`, `260902`가 붙어 있었다. 30초 뒤 재검사에서는 snapshot이 사라져 이 PID는 종료되지 않았다. 이후 정확히 무엇이 V170 index build를 40분간 지연했는지는 현재 workflow 로그만으로 확정할 수 없다.
+- **복구 원인**: 기존 V168 전용 preflight는 Flyway 실패 이력을 V168만 복구 대상으로 허용했다. V170의 non-transactional concurrent index가 중단되면 failed history와 invalid index가 남을 수 있어 다음 배포도 거부되거나 `IF NOT EXISTS`가 invalid index를 잘못 건너뛸 위험이 있다.
+- **수정**: OCI preflight는 V168 및 V170 migration 파일의 정확한 concurrent index 이름만 점검한다. V170 failed history를 허용 목록에 추가하고, 둘 중 migration이 실패해 남긴 invalid index만 snapshot holder 확인 후 `DROP INDEX CONCURRENTLY`로 제거한다. 출력에 `sec_submissions` 추정 행 수·테이블 크기·대상 인덱스 validity를 기록한다. 그 외 failed migration은 계속 fail-closed한다. PID `260900`은 다음 실행 시점에도 client backend, snapshot 보유, 30초 초과일 때만 종료 후보가 되도록 정확 PID allowlist에 추가했다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`가 V168/V170 복구 범위, invalid index 정리, 승인 PID allowlist, preflight retry를 검사한다. Deploy 로그에서 V170 migration progress/timeout을 확인하고, health 200과 Flyway V170 성공이 모두 확인되기 전 완료로 처리하지 않는다.
+- **남은 위험/다음 단계**: 테이블 크기나 동시 인덱스 대기 원인은 아직 확인되지 않았다. 수정 배포 후 preflight 진단 통계와 V170 migration 결과를 확인한다. V170에서 재차 timeout되면 같은 인덱스 생성만 더 오래 반복하지 말고 OCI `pg_stat_progress_create_index`와 active snapshot holder를 읽기 전용으로 진단한다.
+- **후속 증거·정밀 조치**: run `44047418291`에서 V170 invalid index가 확인됐다. `sec_submissions`는 추정 61,549행·38,199,296 bytes였으며, preflight 시 client PID `261867`이 `idle in transaction`, `ClientRead`, snapshot 보유 상태로 4,112→4,143초 유지됐다. preflight는 허용 목록 밖 PID를 종료하지 않고 20회 재시도 후 중단했다. 정확 PID `261867`은 실행 직전 client backend·snapshot 보유·최소 30초를 재검증해 조건이 맞는 경우에만 종료되도록 승인 allowlist에 추가한다. 이후 invalid V170 index만 정리하고 Flyway 실패 이력을 repair한다.
+- **해결 확인**: run `44050453172`에서 PID `261867`은 실행 직전 4,739초·snapshot 보유 조건으로 다시 확인되어 종료됐다. 이때 V170 index는 이미 valid/ready였고 Flyway 실패 이력도 없어, `IF NOT EXISTS`가 기존 인덱스를 확인하며 V170 및 release activation을 성공 완료했다. `/api/health`와 NAS universe가 HTTP 200이었다. 이 관측으로 V170 40분 timeout의 blocker는 오래된 snapshot PID `261867`로 확인됐다. 이후 동일 유형이 보이면 검증된 exact PID 범위와 실행 직전 조건 확인을 그대로 적용한다.
+# V168 snapshot blocker와 장기 OBV 조회
+
+- **증상/근거**: OCI read-only 진단 run `44020043575`에서 localhost `stockman` client backend가 1,235초 동안 active 상태로 snapshot을 유지하고 두 parallel worker를 보유했다. 당시 `application_name`은 비어 있고 OS client process mapping은 확인되지 않았다.
+- **조사/원인 후보**: `lib/us-obv-divergence-scan.ts`는 공식 보통주 universe 전체의 최근 최대 160개 일봉을 한 쿼리로 가져온 뒤 애플리케이션에서 계산한다. `statement_timeout`과 `idle_in_transaction_session_timeout`이 없어 요청/프로세스 정체 시 오래된 snapshot이 concurrent index migration을 막을 수 있다. 현재 증거만으로 해당 PID가 이 경로라고 확정할 수는 없다.
+- **수정**: OBV 스캔 transaction에 `application_name=stockman-us-obv-snapshot`, 15분 `statement_timeout`, 60초 `idle_in_transaction_session_timeout`을 설정한다. cron route의 상한은 1,200초로 설정해 DB 쿼리 중단 및 정리 시간보다 짧지 않게 한다. 일반 DB pool 전역에는 적용하지 않는다.
+- **재발 자동 감지**: `lib/us-obv-divergence-snapshot.test.ts`에서 application name과 두 timeout 값을 검증한다. `npm run deploy:verify`가 build/runtime/browser/API smoke, 전체 테스트, typecheck, 문서 및 OCI cron gate를 실행한다. 운영 진단의 `pg_stat_activity.application_name`에서 향후 해당 세션을 구분한다.
+- **검증/남은 위험**: focused tests 3/3 및 전체 `deploy:verify` 통과(313 files, 1,645 passed/3 skipped). 기존 세션의 client OS process는 알아내지 못했으므로 다른 장기 조회 경로 가능성은 남는다. 신규 timeout은 이후 시작 세션에 적용된다.
+- **공식 근거**: PostgreSQL 공식 [`pg_stat_activity`](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW), [`statement_timeout` 및 `idle_in_transaction_session_timeout`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-STATEMENT-TIMEOUT) 문서.
+# SEC materializer 후보 조회가 오래된 snapshot 유지
+
+- **증상/근거**: read-only 진단 run `44028486909`에서 672초 active client snapshot PID `256094`를 확인했다. SQL 원문 대신 상수/주석을 마스킹한 shape가 `lib/stockman-events.ts`의 `materializeStockmanSecEvents` 후보 SELECT와 일치했고, client 프로세스는 `stockman.service`의 `next-server`였다. 두 parallel worker도 같은 query age로 대기했다.
+- **근본 원인**: full SEC materializer는 `acceptance_datetime` 정렬로 최대 500개 후보를 검색하지만 `sec_submissions.acceptance_datetime` 정렬 인덱스가 없었다. 따라서 제출 데이터와 공시 이벤트가 커지면 병렬 seq scan/sort가 장기화해 V168 concurrent index 작업의 snapshot 대기를 일으킬 수 있다.
+- **수정**: V170에 형식이 유효한 acceptance timestamp만 포함하는 partial concurrent index를 추가한다. SEC 후보 SELECT는 별도 `BEGIN READ ONLY` transaction에서 실행하며 `application_name=stockman-sec-event-materializer`, `statement_timeout=300000ms`, `idle_in_transaction_session_timeout=60000ms`를 설정한다. 조회 결과를 받아 즉시 COMMIT하고 후속 materialization/write는 snapshot이 없는 상태로 별도 실행한다.
+- **재발 자동 감지**: `lib/stockman-events-materializer.test.ts`는 쿼리 LIMIT/정렬 및 timeout/tag/client release를 확인한다. `scripts/check-oci-cron.mjs` 및 Deploy OCI tar assertion은 V170의 non-transactional concurrent index와 config 포함을 검사한다. 운영 진단은 SQL literal을 지운 query shape와 query id만 남긴다.
+- **검증/남은 위험**: OCI 배포 전 full `npm run deploy:verify` 및 V170 concurrent index 적용 필요. 마이그레이션은 다른 오래된 snapshot이 남아 있으면 fail-closed할 수 있다. 열린 세션은 자동 종료하지 않는다.
+- **공식 근거**: PostgreSQL 공식 [`CREATE INDEX` concurrent build](https://www.postgresql.org/docs/current/sql-createindex.html) 및 [`statement_timeout`](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-STATEMENT-TIMEOUT) 문서.
+
+## 2026-11-18 Flyway split preflight 증거 경계
+
+- **목적/범위**: V85/V89 instrument-universe split migration 사전 점검이 관찰한 relation shape와 migration 적용 이력을 혼동하지 않도록 근거 경계를 기록한다.
+- **확인 대상**: `lib/flyway-history-audit.ts`의 `auditUniverseSplitPreconditions`, `scripts/audit-flyway-history.ts`의 `splitMigrationPreflight` 결과, 이 문서의 V85/V89 compatibility view 설명.
+- **판정**: `postMigrationShapePresent`는 현재 relation kind/presence가 migration 이후 모양과 같은지 관찰한다. `structuralPreconditionsPass`는 source table/view 형태에 대한 구조 조건만 판정한다. shape가 일치해도 history, row 내용, 필터 결과, 제약조건, 손실 위험은 증명되지 않는다. migration 이력·데이터 완전성·적용 여부를 별도 읽기 전용 증거로 확인해야 한다.
+- **재발 자동 감지**: `scripts/check-docs.mjs`는 audit helper, CLI 결과 필드 및 한계 문구가 코드·운영 문서에 함께 남아 있는지 검사한다. `npm run audit:flyway-local` 결과는 연결된 데이터베이스의 실제 상태로만 해석한다.
+- **커밋·푸시·배포**: 이 문서 갱신을 포함해 현재 작업의 배포는 미완료다.
+## PostgreSQL Flyway concurrent index migration 대기
+
+- **증상/근거**: Flyway migration 168의 `CREATE INDEX CONCURRENTLY` 진행 중 Flyway JDBC session이 `idle in transaction` 상태로 남고, index session이 해당 virtual transaction을 기다려 migration이 완료되지 않았다.
+- **근본 원인**: Flyway PostgreSQL 기본 transactional advisory lock이 non-transactional concurrent index 실행과 대기 교착을 만들었다. Redgate 공식 설정은 이 경우 session-level lock을 위해 `flyway.postgresql.transactional.lock=false`를 지정하도록 안내한다.
+- **수정**: OCI activation의 Flyway migrate 컨테이너에 `FLYWAY_POSTGRESQL_TRANSACTIONAL_LOCK=false` 환경변수를 전달한다. `scripts/check-oci-cron.mjs`가 이 설정의 잔존을 검사한다.
+- **재발 자동 감지**: OCI cron/activation 회귀 테스트는 설정 누락 시 실패한다. 새 격리 PostgreSQL 16 DB에서 Flyway 13.3.0을 사용해 전체 177개 migration 적용과 `/api/health` readiness를 확인한다.
+- **검증/남은 위험**: 기본 설정으로 migration 168에서 실제 wait chain을 재현했고, 설정 적용 후 새 검증 DB가 V177까지 완료됐다. 사용자 기존 volume은 migration하지 않았다. 로컬 기존 DB는 V161이며 read-only migration audit에서 일부 pending index target이 없어 바로 승격하지 않았으므로 이 DB의 스키마는 여전히 최신 애플리케이션 런타임 기준과 다르다.
+
+## schema-health descending index order 오진
+
+- **증상/근거**: 정상적으로 생성된 3개 `kis_rate_limit_events` 인덱스가 실제 PostgreSQL definition에 `DESC`를 포함했지만 schema-health query가 컬럼 이름만 비교해 모두 `wrong_columns`로 표시하고 health를 503으로 낮췄다.
+- **근본 원인/수정**: `pg_get_indexdef(index, column, false)` 결과에 정렬 방향이 포함되지 않았다. 검사 query가 `pg_index.indoption`의 DESC bit를 반영해 내림차순 키를 비교하도록 변경했다.
+- **재발 자동 감지**: `lib/schema-health.test.ts`에서 query의 descending order 비교 생성을 검증하며 operational schema integrity 검사에서 실제 인덱스 방향을 확인한다.
+- **검증/남은 위험**: 변경 후 격리 DB에서 `schemaReady=true`, index issues 0개, `/api/health` HTTP 200을 확인했다. 사용 중인 기존 DB에서 인덱스 자체가 누락/잘못 생성된 경우에는 이 코드 변경만으로 해결되지 않는다.
+
+### 2026-11-19 OCI 재발 추적
+
+- **증상/근거**: OCI run `44400229361`에서 V178이 성공한 뒤 health는 세 인덱스를 `wrong_columns`로 계속 분류했다. run `44405986778`에서는 V179도 1.195초 만에 성공했지만 동일한 세 이슈가 유지되어 activation이 실패했다.
+- **근본 원인**: 기존 오류 기록의 DESC 보정이 현재 `lib/schema-health.ts` 구현에 반영되어 있지 않았다. `pg_get_indexdef(index, column, false)`의 단일 키 결과만 비교해 실제 내림차순 속성을 놓쳤다.
+- **수정**: 인덱스 키별 `pg_index_column_has_property(..., 'desc')`를 사용해 실제 내림차순 키에 `DESC`를 정규화해 붙인다. PostgreSQL 공식 문서는 이 속성이 전방 스캔에서 내림차순 정렬 여부를 나타낸다고 명시한다([System Information Functions and Operators](https://www.postgresql.org/docs/current/functions-info.html)). 회귀 테스트와 문서 정적 검사를 추가했다.
+- **검증/남은 위험**: 배포 검증 및 OCI 재배포 후 `/api/health` 200과 스케줄 타이머 활성 상태를 확인해야 한다. V178/V179는 운영 DB의 인덱스 재생성에 성공했으나, 이번 수정 전에는 runtime 비교기가 정상 스키마를 오진하고 있었다.
+- **커밋·푸시·배포**: 아직 미완료.
+
+## 2026-11-18 — OCI clean-checkout 문서 검증 실패
+
+- **증상**: 커밋 `6d8f8896`의 GitHub Actions `Deploy OCI` run `44289579797`은 배포 전 `npm run deploy:verify`의 `docs:check`에서 실패했다. 패키징·업로드·서버 활성화는 실행되지 않았다.
+- **근본 원인**: `scripts/check-docs.mjs`가 JSON Schema 검증을 위해 `ajv`를 import하지만 `package-lock.json`에만 있고 `package.json`의 `devDependencies`에는 선언되지 않았다. 로컬 `node_modules`의 extraneous 설치가 이를 가려 GitHub의 clean `npm ci` 환경에서 module-not-found가 발생했다. 같은 예외 처리에서 schema validation 실패가 database inventory golden fixture 계약 실패로 함께 보고됐다.
+- **영향 범위**: CI의 사전 검증만 실패했으며 OCI 서버 배포와 운영 DB migration은 시작되지 않았다.
+- **수정**: `ajv`와 이미 lockfile 및 프로젝트 검사 명령에서 사용하는 `tsx`를 `devDependencies`에 선언해 clean install 입력을 package manifest와 일치시킨다. `npm ci` 후 `npm ls ajv tsx`와 전체 `deploy:verify`를 통과시킨다.
+- **재발 자동 감지**: 배포 workflow의 clean `npm ci` 및 `npm run deploy:verify`를 유지한다. CI에서만 사라지는 optional/lock-only dependency가 없도록 스크립트가 직접 import하는 패키지는 manifest에 직접 선언한다.
+- **남은 위험/다음 단계**: 새 커밋을 push해 Deploy OCI 재실행 후 workflow success와 운영 `/api/health` 응답을 확인한다. 이번 실패 run에서는 DB 상태나 서비스 버전이 바뀌지 않았다.
+
+## 2026-11-18 — OCI clean-checkout 빌드의 Node instrumentation 모듈 누락
+
+- **증상**: dependency manifest 수정 뒤 Deploy OCI run `44292807064`은 docs gate를 통과했지만 production build가 `instrumentation.ts`의 `./instrumentation-node` import를 해석하지 못해 실패했다. 패키징·업로드·서버 활성화는 실행되지 않았다.
+- **근본 원인**: `instrumentation-node.ts`가 `instrumentation.ts`에서 정적으로 import되는 필수 lifecycle 모듈인데 Git 추적 대상이 아닌 로컬 untracked 파일이었다. 로컬 build는 해당 파일을 읽어 통과했지만 clean CI checkout에는 파일이 없었다.
+- **영향 범위**: OCI 서버 배포, DB migration, 서비스 전환은 수행되지 않았다. 현재 프로덕션 버전은 유지됐다.
+- **수정**: lifecycle 모듈을 tracked source로 추가한다. Node production runtime에서만 intraday detection worker를 시작하고 `INTRADAY_DETECTION_ENABLED=false`이면 시작하지 않는 기존 동작을 그대로 보존한다.
+- **재발 자동 감지**: CI의 clean checkout production build가 import 누락을 차단한다. tracked source의 상대 import를 대상으로 누락/미추적 모듈 정적 점검도 실행했다. 확인 결과 필수 untracked import는 이 모듈 하나였다.
+- **검증/남은 위험**: 변경 후 clean install 기반 전체 `npm run deploy:verify`를 다시 실행하고 다음 Deploy OCI run 및 운영 health를 확인한다. run `44292807064`의 실패는 build에서 중단됐고 운영에 반영된 변화는 없다.
+
+## 2026-11-18 — OCI Flyway V171의 누락된 intraday 관측 테이블 전제
+
+- **증상**: Deploy OCI run `44295118377`은 패키징과 업로드까지 성공했지만 Activate의 Flyway migrate가 V171에서 `relation "intraday_turnover_observations" does not exist`로 실패했다. 스크립트는 새 릴리스 활성화를 중단하고 앱·스케줄러 서비스를 복구했다.
+- **근본 원인**: 테이블 생성은 V138에만 있었고 V171은 해당 테이블에 컬럼만 추가했다. Flyway는 기본 `outOfOrder=false`로 현재 DB 버전보다 낮은 미적용 migration을 실행하지 않는다. 따라서 운영 DB의 과거 baseline/이력 순서에서 V138 효과가 누락된 경우 V171만으로는 테이블을 보장하지 못한다.
+- **영향 범위**: V171 migration 트랜잭션은 롤백됐고 새 애플리케이션 릴리스는 활성화되지 않았다. Flyway가 V171 전에 성공 적용한 migration이 있다면 그 이력은 유지될 수 있으므로, 운영 DB의 실제 버전은 다음 health/Flyway 확인으로 대조한다. V171 자체는 인덱스 생성과 nullable 컬럼 추가 외 데이터 갱신·삭제를 하지 않는다.
+- **수정**: V171이 기존 테이블 정의와 인덱스를 `IF NOT EXISTS`로 보장한 다음 market-cap timestamp 컬럼을 추가하도록 forward repair로 보강한다. `scripts/check-docs.mjs`에 V171의 필수 runtime 컬럼 회귀 게이트를 추가한다.
+- **재발 자동 감지**: 배포 전 `npm run docs:check`/`npm run deploy:verify`가 V171에서 테이블 생성과 schema 계약 컬럼이 빠지면 실패한다. 배포 후에는 `/api/health`의 operational schema 결과와 Flyway 버전을 확인한다.
+- **검증/남은 위험**: run `44299058136`에서 수정된 V171/V172가 적용을 시작하고 Flyway가 V173까지 진행한 것을 확인했다. V171 최초 실패 run `44295118377`은 rollback으로 끝났다. 운영 Flyway 최신 버전과 서비스 readiness는 V173 timeout을 해결한 뒤 다시 확인한다.
+
+## 2026-11-18 — OCI Flyway V173 RSS 인덱스 migration timeout
+
+- **증상**: Deploy OCI run `44299058136`은 사전 검증·패키징·업로드까지 통과했다. Flyway는 운영 schema version 170에서 V171, V172를 시작한 뒤 V173 `market rss 72h retention indexes`의 `[non-transactional]` 실행에서 40분 timeout에 도달해 종료 코드 137로 중단됐다. 스크립트는 신규 release 활성화를 중단하고 이전 앱·예약 작업 서비스를 복구했다.
+- **근본 원인**: V173은 RSS 두 테이블에 `CREATE INDEX CONCURRENTLY`를 순차 실행했다. 이 방식은 여러 테이블 스캔과 기존 transaction/snapshot 대기를 수행할 수 있다. OCI 배포는 이 migration 전에 애플리케이션·예약 작업을 중지하므로 일반 인덱스 빌드로 유지보수 창에서 완료할 수 있지만, migration이 운영 중 데이터베이스 상태와 인덱스 크기를 기록하지 않아 대기 원인을 확인할 단서도 부족했다. PostgreSQL 공식 문서는 concurrent build가 여러 scan과 기존 transaction 종료 대기를 수행하고 일반 build는 쓰기를 잠그지만 읽기는 허용한다고 설명한다.
+- **영향 범위**: V171/V172는 Flyway 로그에서 V173보다 먼저 시작됐으며, V173 비트랜잭션 실행은 timeout으로 중단됐다. V173 인덱스가 일부만 valid 상태로 남았거나 Flyway 실패 이력이 남았을 수 있어 다음 실행 전 상태를 확인해야 한다. 새 애플리케이션 release는 활성화되지 않았으며 이전 서비스가 복구됐다.
+- **수정**: V173/V176 RSS 인덱스를 OCI quiesced maintenance window 안에서 실행되는 트랜잭션 `CREATE INDEX IF NOT EXISTS`로 바꾸고 비트랜잭션 설정을 제거한다. OCI preflight가 해당 인덱스 상태·RSS 테이블 크기·Flyway 실패 버전을 마스킹 없이 민감정보를 출력하지 않고 기록하며, 허용 목록 V168/V170/V173/V176의 invalid index와 실패 이력만 안전하게 정리한다. 다른 migration 실패는 계속 fail-closed한다.
+- **재발 자동 감지**: `scripts/check-oci-cron.mjs`와 `scripts/check-docs.mjs`가 V173/V176의 인덱스 수, 동시성 옵션 부재, transaction 설정 부재, 서비스 quiesce 순서 및 preflight repair 범위를 확인한다. OCI preflight 출력으로 다음 시도에서 대상 테이블 크기와 개별 인덱스 validity를 확인한다.
+- **검증/남은 위험**: 수정 후보를 clean worktree에서 전체 `npm run deploy:verify`로 확인했다. 의존성 감사 0건, docs/API/migration 게이트, production build, standalone browser/API smoke, 1,645 tests passed / 3 skipped, typecheck가 통과했다. `npm run cron:check`도 통과했다. 운영 재배포 후 V173/V176 완료, Flyway 최신 버전, `/api/health` HTTP 200을 확인해야 한다. 일반 인덱스 build도 테이블이 매우 크면 migration timeout을 넘을 수 있으므로 이번 preflight의 RSS 테이블 크기·row 추정치와 실행 결과를 검토한다.
+
+## 2026-11-19 — OCI Flyway preflight의 JDBC idle transaction 차단
+
+- **증상/근거**: Deploy OCI run `44310441883`의 재시도에서도 PID `308675`가 `stockman` 사용자, `PostgreSQL JDBC Driver`, `127.0.0.1`, `idle in transaction`으로 보고됐다. 트랜잭션 나이는 약 4시간 41분까지 늘었고 20회 preflight 재시도 내내 유지돼 Flyway가 실행되지 않았다.
+- **근본 원인**: 운영 로컬 PostgreSQL의 오래된 JDBC 트랜잭션이 snapshot을 붙든 상태로 남았다. 해당 PID는 당시 명시적 종료 목록에 없어 배포 전 정리가 이뤄지지 않았다.
+- **조치**: PID `308675`를 명시적 목록에 추가하고 종료 도구가 `stockman`/loopback JDBC 연결, `idle in transaction`, snapshot 보유, 트랜잭션 나이 1시간 초과 조건을 모두 확인하도록 제한한다. 종료 직전에도 동일 조건을 재검증한다. PID 재사용 또는 상태 변경 시 종료하지 않고 기존 fail-closed 재시도를 유지한다.
+- **재발 자동 감지**: 사전 점검은 PID·계정·application·주소·상태·트랜잭션 나이를 기록한다. `scripts/check-oci-cron.mjs`는 명시적 PID 목록과 최소 나이/세션 식별 조건을 검사한다.
+- **검증/남은 위험**: 변경 후 `npm run deploy:verify`가 통과했다: dependency audit 0 vulnerabilities, production build, standalone browser/API smoke, 1,645 tests passed / 3 skipped, typecheck, docs/API/migration gates 및 OCI cron 검사. 재배포 로그에서 실제 종료 대상과 Flyway 적용 결과를 확인한다. 종료 시 열려 있던 트랜잭션은 rollback된다. Flyway 최신 버전과 운영 health 200을 확인하기 전까지 배포 완료로 간주하지 않는다.
+
+## 2026-11-19 — OCI activation readiness helper 누락
+
+- **증상/근거**: Deploy OCI run `44353409918`은 승인된 JDBC snapshot 세션 PID `308675`를 특정 조건으로 종료하고 preflight를 통과했다. Flyway는 V173~V177을 적용해 schema를 V177로 올렸지만, service restart 이후 `/api/health` readiness 확인에서 `probe_stockman_health: command not found`가 반복되어 activation이 exit 127로 실패했다.
+- **근본 원인**: activation script의 readiness loop와 ERR handler가 각각 `probe_stockman_health` 및 `collect_service_diagnostics`를 호출했으나 두 함수 정의가 파일에 없었다. `scripts/test-oci-activation-preflight.mjs`는 이 계약을 검증하도록 작성되어 있었지만 `npm run deploy:verify`에서 실행되지 않아 clean CI에 누락됐다.
+- **영향 범위**: Flyway schema V177과 market-impact-events import는 성공했다. 새 release 경로 교체 뒤 오류 trap은 앱/예약 작업 start 명령을 실행했으나 readiness 함수 누락으로 실제 runtime health 결과는 확인되지 않았다. DB migration은 자동 rollback하지 않으며 이전 릴리스 경로가 `.previous`에 남는다.
+- **수정**: activation에 Node fetch 기반 localhost health probe와 실패 시 systemd/journal diagnostics 함수를 추가하고 `scripts/verify-deploy.mjs`의 fast gates에서 activation preflight regression test를 실행한다.
+- **재발 자동 감지**: 배포 전 regression test가 health probe inline Node syntax, readiness 성공/실패 동작, failure diagnostics 및 archive safety를 실행한다. `npm run deploy:verify`가 이를 항상 수행하도록 연결한다.
+- **검증/남은 위험**: activation regression suite와 `npm run deploy:verify`가 통과했다: 289 test files passed / 1 skipped, 1,645 tests passed / 3 skipped, typecheck, docs/API/migration/OCI cron gates, production build, standalone browser/API smoke. 재배포에서 운영 Flyway V177 유지, 새 app `/api/health` HTTP 200 및 세 scheduler timer active를 확인해야 완료다.
+- **후속 배포 결과(2026-11-18)**: commit `c1d178a8`는 CI verification과 Flyway validation을 통과했고 운영 schema는 V177/up-to-date였다. 그러나 `stockman.service`가 active인 동안 60회 readiness 확인에서 HTTP 200을 얻지 못했고, 공개 `/api/health`는 503 degraded를 반환했다. 세 timer는 readiness 전에 시작됐으며 첫 cron/fundamentals 실행도 readiness 통과 전에 시작되어 fundamentals 요청은 connection reset으로 실패했다. timer와 최초 작업이 DB 부하를 일으켜 health를 악화했을 가능성은 있으나 원인은 아직 확정되지 않았다. 후속 수정은 app health 통과 후 scheduler timer와 최초 작업을 시작하도록 순서를 바꾸고 app journal 및 HTTP 상태 코드를 diagnostics에 포함한다. 다음 배포에서도 실패하면 journal의 `[Health]` 오류와 DB readiness 세부 항목을 확인한다. 현재 운영 health 503이므로 배포 완료가 아니다.
+- **세 번째 배포 결과 및 DB 오류 원인(2026-11-18)**: commit `52977dfd`에서도 `/api/health`는 60회 모두 HTTP 503이었으므로 scheduler 순서 변경만으로 복구되지 않았다. Flyway는 schema V177 up-to-date였다. app journal은 매분 `[Automation] stale-run reconciliation failed: operator does not exist: text * interval`을 기록했다. `lib/automation-run-repository.ts`에서 PostgreSQL 파라미터를 명시적 숫자 타입으로 바꾸고 단위 회귀 테스트를 추가한다. 이 오류의 발생은 확인됐으나 `/api/health` 503을 직접 유발했는지는 아직 확인되지 않았다. 후속 배포는 이 오류가 사라지는지와 `/api/health` 200을 별도로 확인해야 한다.
+- **후속 결과(2026-11-19)**: 진단 로그에서 DB 연결, 필수 환경변수, Flyway V177은 정상이었지만 `database.schemaReady=false`였고 `kis_rate_limit_events_occurred_idx`, `_endpoint_idx`, `_incident_idx` 세 인덱스가 모두 `wrong_columns`로 표시됐다. V172의 `CREATE INDEX IF NOT EXISTS`는 같은 이름으로 이미 존재하는 잘못된 정의를 교체하지 않는다. 최초 V178 수정은 `DROP/CREATE INDEX CONCURRENTLY`를 사용했으나 OCI run `44385856200`에서 migration이 시작된 후 40분 제한으로 종료 코드 137을 받았다. 사전검사에서는 오래된 snapshot이 관측되지 않았고 invalid index도 없었다. 따라서 OCI가 앱과 scheduler를 정지한 유지보수 구간의 이 migration은 일반 `DROP/CREATE INDEX`로 수행하도록 교체한다. `check-docs`와 `check-oci-cron`이 V178의 세 인덱스 정의, transactional 설정, 동시 빌드 부재를 검사한다. 다음 시도에서 V178 성공, schema health 및 서비스 복구를 확인한다. 이번 실패는 Flyway 단계라 공개 health 502가 지속되는 현재 운영상태는 미복구다.
+- **후속 배포 결과(2026-11-19)**: 일반 DDL로 바꾼 commit `e96a1560`은 CI 배포 검증을 통과했으나, activation 중 PID `321998`의 PostgreSQL JDBC 세션이 `stockman`/loopback/`idle in transaction`/snapshot 보유/3,378초 조건으로 남아 V178 전에 preflight가 중단됐다. 기존 종료 스크립트의 정확한 조건과 1시간 초과 기준을 그대로 적용해 이 관측 PID를 명시적 allowlist에 추가한다. 다음 재시도에서 동일 조건을 종료 직전에 다시 검사하고, 중복/상태 변경/미일치 시 종료하지 않는다. 성공 기준은 Flyway V178, `/api/health` 200, 세 scheduler timer active이며 현재 운영 상태는 여전히 복구 전이다.
+- **후속 배포 결과(2026-11-19)**: commit `c3139382`에서 PID `321998` 종료가 완료됐고 Flyway는 V178을 0.299초에 성공 적용했지만 activation은 readiness 검사에서 실패했다. 새 프로세스는 Flyway V178을 인식했으나 공개 schema의 세 rate-limit 인덱스를 계속 `wrong_columns`로 보고했다. 기존 preflight 출력은 인덱스 validity만 기록하고 실제 컬럼/스키마를 기록하지 않아 원인을 직접 구분할 수 없었다. V179는 index와 table 모두 `public`으로 명시해 search_path 의존을 제거한다. `check-docs`와 `check-oci-cron`이 그 명시적 한정과 세 정의를 검사한다. 재배포 후 V179와 `/api/health` 200, scheduler 활성화를 확인해야 한다. 현재 운영 readiness는 미복구다.

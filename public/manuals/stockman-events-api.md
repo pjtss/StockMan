@@ -7,18 +7,19 @@
 | Method/경로 | 기능 |
 |---|---|
 | `GET /api/events` | 이벤트 목록. `hours=1|12|24|168`, `from`, `to`, `ticker`, `eventType`, `grade`, `verificationStatus`, `dilutionRisk`, `sort=latest|importance`, `page`, `pageSize`를 지원. 시각창은 SEC `accepted_at`, 뉴스 `published_at` 기준. |
+| `GET /api/events?view=report&hours=12` | 동일 공개 라우트에서 Markdown 호재 보고서를 생성. 보고서 `type`, `date`, `ticker` 필터도 지원하며 `view=report` 생략 시 기존 이벤트 목록 응답을 유지. |
 | `GET /api/events/{id}` | 상세와 원문 메타데이터, 분석 revision, metric 목록. 원문 body는 포함하지 않음. |
 | `GET /api/events/{id}/history` | append-only 상태 변경 이력. |
-| `GET /api/reports/latest` | 현재 시각 기준 최근 12시간의 검증된 A/B/C 호재를 DB에서 Markdown으로 재생성. |
+| `GET /api/reports?hours=12` | 현재 시각 기준 최근 12시간의 검증된 A/B/C 호재를 DB에서 Markdown으로 재생성. 배포 호환 경로로 `/api/events?view=report&hours=12`도 제공. |
 | `GET /api/reports?type=bullish&hours=1|12|24|168` | 기간별 검증 호재 보고서. 기본 type=bullish, hours=12. |
 | `GET /api/reports?type=daily&date=YYYY-MM-DD` | KST 달력일 기준 일간 검증 호재 보고서. date 생략 시 현재 KST 날짜. |
 | `GET /api/reports?type=ticker&ticker=INO` | 종목별 영구 이벤트 이력 보고서. ticker 필수, hours를 주면 최근 기간으로 제한. |
 | `GET /api/reports?type=dilution&hours=168` | 희석 위험이 기록된 이벤트 보고서. hours 생략 시 전체 보존 이력. |
 | `GET /api/reports?type=collection` | DB에 저장된 SEC/RSS 수집 및 원장 materialization 상태 보고서. |
-| `GET /api/collection-status` | 최신 RSS/SEC automation run의 제한된 상태 정보. |
+| `GET /api/collection-status` | RSS, `sec-realtime`, `sec-edgar`의 최신 non-SKIPPED automation run 상태, 실행 시각, fetched/stored/unverified/failed 집계 및 제한된 error code. `sourceStatus`는 원본 수집, `eventLedgerStatus`는 이벤트 정규화/저장 결과로 분리한다. `sourceCoverage`는 RSS source/failure/insert 집계 또는 SEC 설정 CIK 및 `sec-edgar` RSS 후보 조회·성공·실패 CIK, SEC 최근 Submissions와 일치하지 않은 accession, 제출/저장 집계를 제공해 검증된 0건과 수집 실패를 구분한다. 예약 schedule 밖 SKIPPED 이력은 마지막 실제 실행의 상태를 가리지 않는다. SEC RSS 보강은 최근 90일 source article에서 활성 미국 보통주 마스터와 매칭되는 issuer/accession만 실행당 제한된 수로 조회한다. 전체 CIK 과거 제출 JSON은 이 후보 경로에서 내려받지 않는다. RSS 시각은 SEC acceptance 시각으로 사용하지 않는다. 원문 오류 메시지·비밀값은 반환하지 않는다. |
 | `POST /api/events/collect` | 이미 저장된 원본 SEC 접수 또는 지원 RSS 레코드 하나를 이벤트 ledger로 멱등 반영. 무인증이며 원본 제목·티커·등급·분석 본문 입력은 받지 않음. |
 
-목록 기본 정렬은 최신순, 중요도순은 등급·priority 후 최신순이다. `pageSize`는 1–100, offset은 최대 1,000,000으로 제한한다. 전체 날짜 범위는 과거 이력 검색에 쓰며 `hours`와 동시에 사용할 수 없다. 정확한 상·하한 시각은 inclusive다.
+목록 기본 정렬은 최신순, 중요도순은 등급·priority 후 최신순이다. `pageSize`는 1–100, offset은 최대 1,000,000으로 제한한다. 전체 날짜 범위는 과거 이력 검색에 쓰며 `hours`와 동시에 사용할 수 없다. 정확한 상·하한 시각은 inclusive다. SEC 이벤트 시간창은 `accepted_at`만, 기업/RSS 뉴스 시간창은 `published_at`만 사용한다. SEC feed 게시시각만 있고 공식 Accepted 시각이 없으면 최근 시간창에 억지로 포함하지 않으며 상세의 두 시각 필드는 별도로 보존한다.
 
 예시: `/api/events?hours=12&verificationStatus=VERIFIED&grade=A&page=1&pageSize=50&sort=importance`, `/api/reports?type=daily&date=2026-11-06`, `/api/reports?type=ticker&ticker=INO`.
 
@@ -33,3 +34,5 @@
 ## 응답/오류
 
 성공 응답은 `{ok:true,...}`; 검증 오류는 HTTP 400, 없는 ID는 404, 저장소 장애는 민감한 상세 없이 503 표준 오류 코드를 반환한다. 페이지 필터 및 cursor는 동일 API 버전 범위에서 유지한다. 신규 GET 경로는 API discovery/manual/route inventory와 `scripts/api-surface.mjs` 감사 대상이다.
+
+저장소 오류 코드는 `DATABASE_UNAVAILABLE`, `DATABASE_ERROR`, `SCHEMA_TABLE_MISSING[_<KNOWN_TABLE>]`, `SCHEMA_COLUMN_MISSING`, `UNIQUE_CONFLICT`, `FOREIGN_KEY_CONFLICT`, `INVALID_SOURCE_DATA` 중 하나다. 알려진 relation 이름은 고정 allowlist에서만 반환하고 DB 오류 메시지나 연결 문자열은 공개하지 않는다.

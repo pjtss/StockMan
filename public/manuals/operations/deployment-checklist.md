@@ -13,10 +13,12 @@
 - [ ] 운영 환경변수와 비밀값을 로그에 출력하지 않는다.
 - [ ] DB 스키마 변경이 있으면 기존 운영 버전과 충돌하지 않는 새 버전을 사용한다.
 - [ ] 운영 Flyway 버전보다 낮은 migration에만 있는 필수 테이블/컬럼은 현재 운영 floor 이후의 forward repair migration으로 다시 보장한다. `npm run docs:check`가 운영 floor 기반 컬럼 회귀를 검사한다.
+- [ ] 테이블 선행 migration이 운영 이력에서 건너뛰어질 수 있으면, 후속 migration도 relation을 안전하게 보장하는지 `npm run docs:check` 게이트에서 확인한다. intraday turnover 관측은 V171이 V138 누락을 복구한다.
 - [ ] 변경 기능에 회귀 테스트가 있는지 확인한다.
 - [ ] 운영 데이터 import 전 `DATABASE_URL`이 운영 DB를 가리키는지 확인한다. 호스트/DB명만 마스킹해 승인된 운영 식별값과 대조하고, `localhost` 또는 개발 DB면 운영 import를 중단한다.
 - [ ] 데이터 단독 반영은 운영 branch의 importer와 schema migration으로 사전검증한 뒤 실행한다. 운영 연결에서 대상 relation 존재, 공식 종목 마스터 적격성, eventId·자연키 충돌을 확인하고, import 후 공개 API에서 레코드 수·시장·ticker 범위를 대조한다.
 - [ ] 서버 접속·운영 DB 연결이 없으면 migration/import를 완료한 것으로 기록하지 않는다. OCI 배포 workflow의 `Deploy OCI` 결과와 운영 health/Flyway 상태를 확인한다.
+- [ ] 번역 quota 예약 SQL은 매개변수 타입을 명시하고 `translation-cache.test.ts`의 예약 성공 회귀 테스트를 통과한다.
 
 ## 자동 게이트
 
@@ -29,7 +31,7 @@
 - [ ] standalone 서버 실행 및 `/charts` HTML과 HTML이 참조한 실제 JavaScript 청크 전체 smoke test 성공 (HTTP 200·JavaScript content-type·본문 존재)
 - [ ] standalone artifact와 OCI archive의 configured `distDir/server/instrumentation.js`가 포함되어 production lifecycle hook이 보존됨
 - [ ] standalone smoke 서버는 `INTRADAY_DETECTION_ENABLED=false`로 실행해 검증 중 KIS/Discord background worker를 시작하지 않음
-- [ ] OCI archive 안에 신규 Flyway migration(이번 변경은 V171)이 포함됐는지 확인
+- [ ] OCI archive 안에 이번 배포 범위의 신규 Flyway migration이 포함됐는지 확인
 - [ ] Chrome 데스크톱·모바일에서 `/charts` 핵심 UI가 표시되고 국내↔해외 전환 상호작용, hydration 경고, 브라우저 런타임 예외 검증 통과
 - [ ] Next.js HTML은 재검증되고, 이전 릴리스의 해시 정적 청크 호환 보존 경로가 포함되어 있는지 확인
 
@@ -46,3 +48,4 @@
 ## 재발 방지 원칙
 
 검증 실패를 경고로 취급하지 않는다. 특히 마이그레이션 충돌, 테스트 실패, 타입 오류, 빌드 실패, runtime smoke test 실패 중 하나라도 있으면 패키징·업로드·활성화로 진행하지 않는다.
+배포 아카이브의 standalone 정적 파일은 설정된 Next distDir(`.next-deploy-verify`) 아래 `static/`과 `server/instrumentation.js` 경로를 포함해야 한다. 패키지 단계에서 이 두 경로를 확인한다.

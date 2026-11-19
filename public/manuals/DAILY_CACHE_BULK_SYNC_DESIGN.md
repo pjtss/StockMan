@@ -10,14 +10,9 @@
 
 - 동기화 스크립트는 실행 시 프로젝트 `.env.local`을 읽는다. 로컬 PostgreSQL은 `DATABASE_URL`을 사용하고, 운영 URL은 `DAILY_CACHE_API_URL`, `PUBLIC_BASE_URL`, `RSS_BULLISH_REPORT_API_BASE_URL` 순으로 찾는다. 별도 셸 환경변수 설정은 필요하지 않다.
 - 캔들·기본정보 API는 인증 없이 조회한다. API 주소만 있으면 되며, 운영 환경의 인증 키 설정 여부와 무관하게 같은 공개 읽기 계약을 유지한다.
-- 기본정보 GET은 KR/US 및 거래소 alias를 정규 거래소로 해석하고 활성 `COMMON_STOCK` 공식 마스터와 비보통주 제외 플래그를 통과한 snapshot만 반환한다. 종목명은 공식 마스터에서 제공한다.
-- `DAILY_CACHE_API_URL`은 HTTP(S) absolute URL이어야 하며 userinfo(username/password)는 허용하지 않는다. 외부 읽기 GET에 URL 자격증명을 붙이지 않고, 환경변수 양끝 공백을 제거한 검증값을 두 endpoint 모두에 사용한다.
-- 비동기 동기화도 같은 base URL을 실행 초기에 trim·검증하고, 일봉·fundamentals·chart 및 직접 KIS 경로에서 검증된 값만 사용한다. 설정 오류는 URL 원문을 포함하지 않는 고정 메시지로 종료한다.
 
 1. 운영 `GET /api/public/daily-candles`
    - 인증 헤더 없이 시장·종목 목록·기간·봉 개수를 받아 종목별 최근 봉을 반환한다.
-   - 활성 `COMMON_STOCK` 마스터와 비보통주 플래그를 확인한다. 단건 응답과 각 다건 item에 거래소·종목코드·종목명을 싣고, 각 candle에 거래일자와 `fetchedAt`, 각 item에 최신 봉일·최신 갱신시각·반환 건수를 포함한다.
-   - `market=US` 또는 `market=KR`의 단건 ticker가 둘 이상의 거래소에 있으면 봉을 합치지 않고 HTTP 409 `AMBIGUOUS_INSTRUMENT`와 거래소 목록을 반환한다. 거래소를 명시한 market 값으로 다시 요청한다.
    - 다종목 조회는 `unnest(codes) + LATERAL LIMIT`으로 종목별 인덱스를 사용한다. 윈도 함수로 전체 시장 캔들 테이블을 먼저 스캔하지 않는다.
    - 동기화 스크립트는 봉/기본정보 요청 및 본문 읽기에 각각 35초 timeout을 적용하고, timeout·HTTP·본문 읽기·JSON 오류에 stage와 market을 표시한다. 요청 URL과 자격증명은 오류에 포함하지 않는다. Node.js의 `AbortSignal.timeout()` 동작은 [공식 문서](https://nodejs.org/api/globals.html#static-method-abortsignaltimeoutdelay)를 따른다.
 2. 로컬 `scripts/sync-daily-cache-async.mjs`

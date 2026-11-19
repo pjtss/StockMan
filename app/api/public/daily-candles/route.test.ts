@@ -33,6 +33,7 @@ describe("GET /api/public/daily-candles market aliases", () => {
     expect(query).toContain("c.candle_date");
     expect(query).toContain("latest.open");
     expect(query).toContain(`market IN ('${firstExchange}', '${secondExchange}'`);
+    if (market === "US") expect(query).toContain("COALESCE(u.english_name, '') !~*");
     expect(body.instrument).toEqual({ market: firstExchange, code, name: "Example Corp" });
     expect(body.candles[0].fetchedAt).toBe("2026-10-14T01:00:00.000Z");
     expect(values).toEqual([market, code, "D", 120]);
@@ -54,6 +55,7 @@ describe("GET /api/public/daily-candles market aliases", () => {
     expect(body.instrument).toEqual({ market: "NAS", code: "AAPL", name: "Apple Inc." });
     expect(body.metadata.dataUpdatedAt).toBe("2026-10-14T01:00:00.000Z");
     expect(queryMock.mock.calls[0][0]).toContain("u.instrument_type='COMMON_STOCK'");
+    expect(queryMock.mock.calls[0][0]).toContain("COALESCE(u.english_name, '') !~*");
   });
 
   it("returns instrument identity and shared candle freshness metadata for bulk items", async () => {
@@ -103,6 +105,7 @@ describe("GET /api/public/daily-candles market aliases", () => {
     expect(query).toContain("u.enabled=true");
     expect(query).toContain("u.instrument_type='COMMON_STOCK'");
     expect(query).toContain("u.is_etf=false");
+    expect(query).toContain("COALESCE(u.english_name, '') !~*");
     expect(values).toEqual(["NAS", 2, 0]);
   });
 

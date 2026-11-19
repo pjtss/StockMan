@@ -1,3 +1,13 @@
+## 2026-11-19 미국 활성 보통주 유니버스에 ADR/ADS가 포함
+
+- **증상**: `ㄷㅊㅇ5`의 운영 공개 활성 보통주 목록에서 AACG, BABA, ABEV 등 공식 상품명이 `SPON ADS`/`SPON ADR`인 예탁증서가 `instrument_type=COMMON_STOCK`, `is_dr=false`로 반환됐다. 종목 메타데이터 GET에서도 같은 분류가 확인됐다.
+- **근본 원인**: 해외 KIS 마스터 파서는 `isdr` 필드만 DR 여부로 옮겼다. 하지만 KIS 마스터의 `isdr=N`이더라도 영문 상품명에는 거래 대상이 ADS/ADR임이 명시될 수 있다. 이 필드를 단독으로 신뢰해 활성 보통주 유니버스가 과대 포함됐다.
+- **영향 범위**: 미국 공통 종목 마스터 분류, 해당 마스터로 재조정되는 common/special partition, 공개 daily-candles universe/일봉 응답 및 이를 사용하는 추출·스냅샷. 기존 DB와 스냅샷에 ADR/ADS가 이미 포함됐을 수 있다.
+- **해결 위치**: 공통 판별 함수가 공식 영문 상품 설명의 ADR/ADS/depositary/depository 표기를 식별한다. `lib/instrument-universe-import.ts`는 이를 `DR`, `isDr=true`로 분류하고 재조정 시 special master에 보존한다. `app/api/public/daily-candles/route.ts`는 미국 목록 및 봉 조회 SQL에서 해당 설명을 제외해 기존 DB flag가 낡아도 snapshot에 유입되지 않게 한다. `app/api/public/us-stock-metadata/route.ts`도 해당 항목을 활성 보통주로 응답하지 않는다.
+- **재발 자동 감지**: 분류·daily-candles·US metadata regression tests가 공식 예탁증서 설명을 제외하고 AAPL 같은 보통주는 유지하는지 확인한다. 마스터 적재 기능이 복구되거나 운영 DB가 갱신될 때 `reconcileUsUniversePartitions` 결과도 다시 대조한다.
+- **검증 결과/상태**: 운영 GET은 AACG/BABA/ABEV에서 영문 상품명과 잘못된 DB 플래그를 확인했다. 분류기와 관련 API 회귀 검사를 추가했다. 새 테스트 및 전체 build/deploy verification, OCI 배포, `ㄷㅊㅇ5`·`ㄷㅊㅇ6` 재생성은 아직 진행 중이다.
+- **남은 위험 및 다음 개선**: 로컬 코드 수정만으로 운영 API는 바뀌지 않는다. 변경 격리 워킹트리에서 배포 게이트를 완료하고 배포 후 무인증 US universe 및 DR 표본 제외를 재확인한 다음 두 JSON을 다시 생성한다. `ㄷㅊㅇ` 경로 외 다른 미국 종목 API가 같은 DB flag를 사용하므로, 전체 보통주 데이터 사용 경로는 별도 영향 점검이 필요하다.
+
 ## 2026-11-18 차트 종목 추출 정상 응답이 화면 timeout으로 실패
 
 - **증상**: `/api/screener/run`의 해외 첫 스캔이 HTTP 200으로 약 56초 뒤 완료되지만 `/charts` 요청은 45초에 abort되어 사용자에게 timeout으로 표시될 수 있었다.
