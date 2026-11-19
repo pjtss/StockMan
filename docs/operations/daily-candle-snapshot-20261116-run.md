@@ -53,3 +53,13 @@
 - KR JSON은 실패 시 원자 교체되지 않아 이전 파일 그대로 보존됐다. KR 일봉 query를 `close * volume`으로 계산하도록 코드 수정과 회귀 검증을 추가해 재배포 후 재실행한다.
 - 검증/반영: DR 제외 수정의 `npm run deploy:verify` 및 Deploy OCI workflow 성공. KR schema compatibility 및 표시명 ADR/ADS exclusion 변경은 route/importer/metadata targeted tests 21/21, 전체 `npm run deploy:verify`(1,650 passed, 3 skipped; build/runtime smoke/typecheck/docs 포함)를 통과했다. 후속 code push/deploy 뒤 US/KR JSON을 모두 다시 생성해 최종 수치를 검증한다.
 - 후속 품질 점검에서 첫 US snapshot에 공식 영문 설명상 일반 보통주로 보이지만 표시명에는 ADR/ADS descriptor가 남은 12종목을 확인했다. US eligibility를 `english_name`과 `name` 모두 기준으로 제한하도록 확장했으며, 이 변경의 전체 검증과 OCI 배포 후 US JSON을 다시 생성해야 최종본이 된다. 현재 US JSON은 임시 산출물로 취급한다.
+
+## 최종 스냅샷 — 2026-11-19
+
+- `1120d3c6` Deploy OCI run `44438975616` 성공 후 `/api/health` HTTP 200 확인.
+- DR 표본 ASML, ASND, BVC, CNTB, POM, QH, TDTH, AEG, CANG, MT, STM, TTE, AACG, BABA, ABEV는 `/api/public/us-stock-metadata`에서 HTTP 422, AAPL은 200. NAS 표본 candle 조회에서 ASML/BVC는 응답 items 0이며, NAS universe total은 3,053으로 표시명 DR 7개가 앞선 배포 대비 제외됐다.
+- KOSPI/KOSDAQ 일봉 bulk GET은 모두 HTTP 200이며 2종목씩 시험 응답에서 총 4 candle을 확인했다.
+- `daily-candles-us.json`: eligible 5,050, instruments 4,964, candles 590,979, missing 86. NAS 3,053/2,993/60 missing; NYS 1,749/1,740/9 missing; AMS 248/231/17 missing. 세 거래소 latest candle date는 `20261117`.
+- `daily-candles-kr.json`: eligible/instruments 2,345, candles 275,203, missing 0. KOSPI 754/754, KOSDAQ 1,591/1,591; both latest candle date `20261118`.
+- 두 JSON 독립 검증: source `OPERATING_PUBLIC_API`, retrieved+missing=eligible, 거래소별 코드 중복 0, item/date/fetchedAt 오류 0. US 표시명 ADR/ADS/depositary/depository descriptor 잔존 0.
+- 운영 DB 직접 읽기/쓰기는 하지 않았다. API 변경 commit `1120d3c6` 및 OCI 배포 이후 스냅샷은 이 작업의 artifact commit 후 반영된다.

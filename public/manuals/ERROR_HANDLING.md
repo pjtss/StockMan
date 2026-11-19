@@ -5,8 +5,8 @@
 - **영향 범위**: 미국 공통 종목 마스터 분류, 해당 마스터로 재조정되는 common/special partition, 공개 daily-candles universe/일봉 응답 및 이를 사용하는 추출·스냅샷. 기존 DB와 스냅샷에 ADR/ADS가 이미 포함됐을 수 있다.
 - **해결 위치**: 공통 판별 함수가 공식 마스터의 영문 상품 설명과 표시 종목명에서 ADR/ADS/depositary/depository 표기를 식별한다. `lib/instrument-universe-import.ts`는 이를 `DR`, `isDr=true`로 분류하고 재조정 시 special master에 보존한다. `app/api/public/daily-candles/route.ts`는 두 이름 필드의 표기를 미국 목록 및 봉 조회에서 제외해 기존 DB flag가 낡아도 snapshot에 유입되지 않게 한다. `app/api/public/us-stock-metadata/route.ts`도 두 필드를 확인해 해당 항목을 활성 보통주로 응답하지 않는다.
 - **재발 자동 감지**: 분류·daily-candles·US metadata regression tests가 공식 예탁증서 설명을 제외하고 AAPL 같은 보통주는 유지하는지 확인한다. 마스터 적재 기능이 복구되거나 운영 DB가 갱신될 때 `reconcileUsUniversePartitions` 결과도 다시 대조한다.
-- **검증 결과/상태**: 분류/API 회귀 검사, 전체 build/runtime/test/typecheck gate, OCI 배포가 통과했다. 운영 health 200과 NAS universe를 확인하고 US snapshot을 갱신했다. 상세 수치는 [`daily-candle-snapshot-20261116-run.md`](operations/daily-candle-snapshot-20261116-run.md)에 기록한다.
-- **남은 위험 및 다음 개선**: KR cache query의 별도 스키마 호환 문제를 수정·검증 중이며 후속 OCI 배포 뒤 ㄷㅊㅇ6을 완료한다. 첫 US snapshot 검토에서 현지화 표시명으로만 ADR/ADS가 드러나는 12종목을 확인해 필터를 이름 필드 두 곳으로 확장했다. 후속 배포와 US snapshot 재생성으로 최종 제외를 확인한다. `ㄷㅊㅇ` 경로 외 다른 미국 종목 API가 같은 DB flag를 사용하므로, 전체 보통주 데이터 사용 경로는 별도 영향 점검이 필요하다.
+- **검증 결과/상태**: 분류/API 회귀 검사, 전체 build/runtime/test/typecheck gate, OCI 배포가 통과했다. 운영 health 200, DR 표본 metadata 422/AAPL 200 및 KOSPI/KOSDAQ 일봉 200을 확인했다. ㄷㅊㅇ5·ㄷㅊㅇ6 snapshot을 각각 `daily-candles-us.json`, `daily-candles-kr.json`에 갱신하고 상세 수치·품질 검증을 [`daily-candle-snapshot-20261116-run.md`](operations/daily-candle-snapshot-20261116-run.md)에 기록했다.
+- **남은 위험 및 다음 개선**: ㄷㅊㅇ5·ㄷㅊㅇ6 public snapshot 경로는 이름 기반 ADR/ADS 제외와 국내 candle schema fallback까지 검증됐다. 다른 미국 종목 소비 API는 같은 DB classification fields를 활용할 수 있으므로 별도 영향 점검이 필요하다. US snapshot에서 candle cache 누락은 86개이며 향후 캐시가 채워지면 재생성한다.
 
 ## 2026-11-19 — KR daily-candles API가 국내 스키마에 없는 `trading_value`를 참조
 - **증상/영향**: KOSPI/KOSDAQ universe GET은 성공하지만 국내 종목 일봉 GET이 `503 DAILY_CACHE_UNAVAILABLE`를 반환해 `ㄷㅊㅇ6` snapshot을 만들 수 없다.
