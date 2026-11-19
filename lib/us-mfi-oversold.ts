@@ -1,6 +1,3 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
-import { getDb } from "@/lib/db";
-import { usInstrumentUniverse } from "@/lib/schema";
 import { createUsDailyScanContext, type UsDailyScanContext } from "@/lib/us-daily-scan-context";
 import { latestMfi } from "@/lib/us-mfi";
 import { summarizeUsDailyScanFailures } from "@/lib/us-daily-scan-failure-reasons";
@@ -9,7 +6,6 @@ import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 
 export const DEFAULT_MFI_PERIOD = 14;
 export const DEFAULT_MFI_OVERSOLD_THRESHOLD = 30;
-const US_MARKETS = ["NAS", "NYS", "AMS"] as const;
 
 export type MfiOversoldResult = {
   market: string;
@@ -28,15 +24,6 @@ export type MfiOversoldResult = {
   dailyDiagnostics?: unknown;
   error?: string;
 };
-
-export async function listStoredUsInstruments() {
-  const db = getDb();
-  if (!db) return [];
-  return db.select({ id: usInstrumentUniverse.id, market: usInstrumentUniverse.market, code: usInstrumentUniverse.code, name: usInstrumentUniverse.name })
-    .from(usInstrumentUniverse)
-    .where(and(eq(usInstrumentUniverse.enabled, true), inArray(usInstrumentUniverse.market, [...US_MARKETS]), eq(usInstrumentUniverse.isEtf, false), eq(usInstrumentUniverse.isLeveraged, false), eq(usInstrumentUniverse.isInverse, false), eq(usInstrumentUniverse.isWarrant, false), eq(usInstrumentUniverse.isDerivative, false)))
-    .orderBy(asc(usInstrumentUniverse.market), asc(usInstrumentUniverse.code));
-}
 
 export async function scanStoredUsMfiOversold(options: { period?: number; threshold?: number; concurrency?: number; context?: UsDailyScanContext } = {}) {
   const period = options.period ?? DEFAULT_MFI_PERIOD;

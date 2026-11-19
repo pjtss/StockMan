@@ -117,11 +117,6 @@ export async function loadRecentAutomationRuns(moduleKey: FeatureModuleKey, limi
   return db.select().from(automationRuns).where(eq(automationRuns.moduleKey, moduleKey)).orderBy(desc(automationRuns.startedAt)).limit(limit);
 }
 
-export async function loadLatestAutomationRun(moduleKey: FeatureModuleKey) {
-  const rows = await loadRecentAutomationRuns(moduleKey, 1);
-  return rows[0] || null;
-}
-
 /**
  * Return the latest actual execution while ignoring schedule observations.
  * A scheduler may record many SKIPPED rows between executions; those rows

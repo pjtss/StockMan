@@ -82,7 +82,3 @@ export function parseKisRealtimeEnvelope(raw: string) {
     return { kind: "data" as const, encrypted: encrypted === "1", trId: trId ?? "", values: payload ? payload.split("^") : [] };
   }
 }
-
-export function makeRealtimeClientId() {
-  return crypto.randomUUID();
-}

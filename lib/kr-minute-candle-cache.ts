@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { krMinuteCandles, krMinuteFetchLogs } from "@/lib/schema";
 import { getAccessToken } from "@/lib/kis";
@@ -28,4 +28,3 @@ export async function fetchKrMinuteCandles(code: string, minutes = 30, market = 
   return rows.sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)).slice(0, limit);
 }
 export async function saveKrMinuteCandles(market: string, code: string, rows: any[]) { if (!rows.length) return 0; await getDb().insert(krMinuteCandles).values(rows.map((r) => ({ market, code, candleDate: r.date, candleTime: r.time, open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume, source: "KIS" }))).onConflictDoUpdate({ target: [krMinuteCandles.market, krMinuteCandles.code, krMinuteCandles.candleDate, krMinuteCandles.candleTime], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, fetchedAt: new Date() } }); return rows.length; }
-export async function loadKrMinuteCandles(market: string, code: string, limit = 100) { return getDb().select().from(krMinuteCandles).where(and(eq(krMinuteCandles.market, market), eq(krMinuteCandles.code, code))).orderBy(desc(krMinuteCandles.candleDate), desc(krMinuteCandles.candleTime)).limit(limit); }

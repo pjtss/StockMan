@@ -32,5 +32,3 @@ export async function fetchSecJson<T>(path: string, init: RequestInit = {}): Pro
 
 export function submissionsUrl(cik: string) { return `/submissions/CIK${cik.replace(/\D/g, "").padStart(10, "0")}.json`; }
 export function companyFactsUrl(cik: string) { return `/api/xbrl/companyfacts/CIK${cik.replace(/\D/g, "").padStart(10, "0")}.json`; }
-export function companyConceptUrl(cik: string, taxonomy: string, tag: string) { return `/api/xbrl/companyconcept/CIK${cik.replace(/\D/g, "").padStart(10, "0")}/${encodeURIComponent(taxonomy)}/${encodeURIComponent(tag)}.json`; }
-export function xbrlFrameUrl(taxonomy: string, tag: string, unit: string, frame: string) { return `/api/xbrl/frames/${encodeURIComponent(taxonomy)}/${encodeURIComponent(tag)}/${encodeURIComponent(unit)}/${encodeURIComponent(frame)}.json`; }

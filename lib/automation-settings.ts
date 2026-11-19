@@ -1,4 +1,4 @@
-import { loadFeatureModuleSettings, saveFeatureModuleSettings } from "./feature-module-settings";
+import { loadFeatureModuleSettings } from "./feature-module-settings";
 
 export const DEFAULT_MFI_THRESHOLD = 30;
 export const DEFAULT_OBV_SIGNAL_PERIOD = 9;
@@ -12,19 +12,6 @@ export async function getMfiThreshold() {
   } catch {
     return DEFAULT_MFI_THRESHOLD;
   }
-}
-
-export async function saveMfiThreshold(threshold: number) {
-  const value = Math.max(0, Math.min(100, Math.round(threshold)));
-  const settings = await loadFeatureModuleSettings("us-daily-indicators");
-  await saveFeatureModuleSettings("us-daily-indicators", {
-    ...settings,
-    featureSettings: {
-      ...settings.featureSettings,
-      evaluation: { ...settings.featureSettings?.evaluation, mfiThreshold: value },
-    },
-  });
-  return value;
 }
 
 export type UsDailyObvSignalPolicy = {

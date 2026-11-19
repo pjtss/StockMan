@@ -20,5 +20,3 @@ export async function recordIntradayTransitions(inputs: IntradayTransition[]) {
     }
   } catch (e) { console.warn("[Intraday] transition history unavailable:", e instanceof Error ? e.message : e); }
 }
-
-export async function recordIntradayTransition(input: IntradayTransition) { return recordIntradayTransitions([input]); }

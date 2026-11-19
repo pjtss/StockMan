@@ -31,39 +31,6 @@ function toAlertItem(item: DartItem | SecItem): AlertItem {
 }
 */
 
-export async function markAlertsDelivered(alerts: AlertItem[]) {
-  // DB 기능 주석 처리
-  /*
-  if (alerts.length === 0) {
-    return;
-  }
-
-  const client = await getPool().connect();
-
-  try {
-    await client.query("BEGIN");
-
-    for (const alert of alerts) {
-      await client.query(
-        `
-          INSERT INTO alert_events (source, external_id)
-          VALUES ($1, $2)
-          ON CONFLICT (source, external_id) DO NOTHING
-        `,
-        [alert.source, alert.externalId],
-      );
-    }
-
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-  */
-}
-
 /*
 async function loadNewAlerts(source: "DART" | "SEC", todayInSeoul: string): Promise<AlertItem[]> {
   const client = await getPool().connect();

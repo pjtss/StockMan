@@ -249,13 +249,3 @@ export async function retryFailedSecCodexAnalyses(maxAttempts = 3, limit = 100) 
   }
   return { retried: accessions.length, accessions };
 }
-export async function loadSecTickerSnapshot(ticker: string) {
-  const value = ticker.toUpperCase();
-  const companies = await getDb().select().from(secCompanies);
-  const company = companies.find((row) => row.tickers.includes(value));
-  if (!company) return null;
-  const submissions = await getDb().select().from(secSubmissions).where(eq(secSubmissions.cik, company.cik)).orderBy(desc(secSubmissions.filingDate), desc(secSubmissions.createdAt)).limit(20);
-  const events = await getDb().select().from(secFilingEvents).where(eq(secFilingEvents.cik, company.cik)).orderBy(desc(secFilingEvents.updatedAt)).limit(20);
-  const facts = await getDb().select().from(secXbrlSnapshots).where(eq(secXbrlSnapshots.cik, company.cik)).limit(1);
-  return { company, submissions, events, facts: facts[0] || null };
-}

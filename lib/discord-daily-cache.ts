@@ -57,10 +57,6 @@ function displayName(item: CacheRecord) {
   return `${market} ${code}${name}`;
 }
 
-export function formatDailyCacheCommand(result: Awaited<ReturnType<typeof loadDailyCacheCommand>>) {
-  return splitDailyCacheCommand(result).join("\n");
-}
-
 export function splitDailyCacheCommand(result: Awaited<ReturnType<typeof loadDailyCacheCommand>>) {
   if (!result.payload) return [`📭 **${result.title} 캐시 없음**\n아직 갱신된 캐시가 없습니다. 일봉 캐시와 탐지 작업을 먼저 실행해 주세요.`];
   const payload = result.payload;
