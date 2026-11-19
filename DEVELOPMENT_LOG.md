@@ -9350,3 +9350,9 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **재발 자동 감지·남은 위험**: route inventory, cron retention 감사와 전체 배포 검증으로 라우트·보존 참조를 감지한다. V181이 운영 DB에 적용되기 전까지 기존 테이블/데이터가 남는다. 과거 V97/V105/V133 migration은 Flyway checksum 이력을 위해 보존한다.
 - **검증 결과·한계**: `npm run deploy:verify` 통과. production build, standalone runtime, Chrome desktop/mobile hydration 및 API smoke, typecheck, route/docs/cron/auth 검사 성공; Vitest 278 files (278 passed, 1 skipped), 1,620 tests passed (3 skipped). 초기 runtime smoke는 상위 체크아웃의 불완전한 Next.js 설치 때문에 시작 실패했으나 격리 worktree에서 lockfile 오프라인 설치 후 재검증해 통과했다. 운영 적용 결과는 workflow 확인 후 기재한다.
 - **커밋·푸시·배포**: 진행 예정.
+
+
+## [2026-11-20] 국내 캔들 거래대금 API 매뉴얼 보강
+- 목적/범위: 공개 GET /api/public/daily-candles의 국내 거래대금 출처와 과거 캐시 대체 규칙을 명시하고 OpenAPI 응답 schema를 일치시킨다.
+- 변경: public/api-reference.md에서 KIS acml_tr_pbmn 원문(원)과 close × volume fallback, fetchedAt 및 bulk metadata를 설명한다. scripts/api-surface.mjs schema를 갱신해 생성 OpenAPI에도 단일·다중 코드 캔들 필드를 명시한다.
+- 검증 결과: docs:api:generate, audit:api-surface 및 전체 VITEST_MAX_WORKERS=8 npm run deploy:verify 통과. 280 test files 중 279 passed·1 skipped, 1,624 passed·3 skipped; typecheck, production build, standalone runtime/API smoke, Chrome desktop/mobile smoke 통과.
