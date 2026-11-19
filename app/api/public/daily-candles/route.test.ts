@@ -33,7 +33,14 @@ describe("GET /api/public/daily-candles market aliases", () => {
     expect(query).toContain("c.candle_date");
     expect(query).toContain("latest.open");
     expect(query).toContain(`market IN ('${firstExchange}', '${secondExchange}'`);
-    if (market === "US") expect(query).toContain("COALESCE(u.english_name, '') !~*");
+    if (market === "US") {
+      expect(query).toContain("COALESCE(u.english_name, '') !~*");
+      expect(query).toContain("COALESCE(u.name, '') !~*");
+    }
+    if (market === "KR") {
+      expect(query).toContain("c.close * c.volume AS trading_value");
+      expect(query).not.toContain("c.trading_value");
+    }
     expect(body.instrument).toEqual({ market: firstExchange, code, name: "Example Corp" });
     expect(body.candles[0].fetchedAt).toBe("2026-10-14T01:00:00.000Z");
     expect(values).toEqual([market, code, "D", 120]);
@@ -56,6 +63,19 @@ describe("GET /api/public/daily-candles market aliases", () => {
     expect(body.metadata.dataUpdatedAt).toBe("2026-10-14T01:00:00.000Z");
     expect(queryMock.mock.calls[0][0]).toContain("u.instrument_type='COMMON_STOCK'");
     expect(queryMock.mock.calls[0][0]).toContain("COALESCE(u.english_name, '') !~*");
+    expect(queryMock.mock.calls[0][0]).toContain("COALESCE(u.name, '') !~*");
+  });
+
+  it("uses close times volume for KR daily cache trading value without referencing a missing column", async () => {
+    queryMock.mockResolvedValue({ rows: [{ market: "KOSPI", code: "005930", name: "Samsung Electronics", candle_date: "20261014", open: 10, high: 12, low: 9, close: 11, volume: 100, fetched_at: "2026-10-14T01:00:00.000Z" }] });
+    const response = await GET(new Request("http://localhost/api/public/daily-candles?market=KOSPI&codes=005930&timeframe=D&limit=120"));
+    const body = await response.json();
+    const [query] = queryMock.mock.calls[0] as [string, unknown[]];
+
+    expect(response.status).toBe(200);
+    expect(body.items[0].candles[0].tradingValue).toBe(1100);
+    expect(query).toContain("c.close * c.volume AS trading_value");
+    expect(query).not.toContain("c.trading_value");
   });
 
   it("returns instrument identity and shared candle freshness metadata for bulk items", async () => {
@@ -106,6 +126,7 @@ describe("GET /api/public/daily-candles market aliases", () => {
     expect(query).toContain("u.instrument_type='COMMON_STOCK'");
     expect(query).toContain("u.is_etf=false");
     expect(query).toContain("COALESCE(u.english_name, '') !~*");
+    expect(query).toContain("COALESCE(u.name, '') !~*");
     expect(values).toEqual(["NAS", 2, 0]);
   });
 

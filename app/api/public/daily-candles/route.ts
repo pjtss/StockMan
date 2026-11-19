@@ -39,6 +39,7 @@ export async function GET(request: Request) {
   }
 
   const isKrMarket = market === "KR" || market === "KOSPI" || market === "KOSDAQ";
+  const dailyTradingValueSql = isKrMarket ? "c.close * c.volume" : "COALESCE(c.trading_value, c.close * c.volume)";
   const table = isKrMarket
     ? "kr_instrument_universe_candles"
     : "us_instrument_universe_candles";
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
           CROSS JOIN LATERAL (
             SELECT candle_date, open, high, low, close, volume, trading_value, fetched_at
               FROM (
-                SELECT c.market, c.candle_date, c.open, c.high, c.low, c.close, c.volume, COALESCE(c.trading_value, c.close * c.volume) AS trading_value, c.fetched_at,
+                SELECT c.market, c.candle_date, c.open, c.high, c.low, c.close, c.volume, ${dailyTradingValueSql} AS trading_value, c.fetched_at,
                        ROW_NUMBER() OVER (PARTITION BY c.candle_date ORDER BY c.fetched_at DESC) AS rn
                   FROM ${table} c
                  WHERE c.market=u.market AND c.code = requested.code AND c.timeframe = $3
@@ -111,9 +112,9 @@ export async function GET(request: Request) {
       `SELECT u.market, u.name, latest.candle_date, latest.open, latest.high, latest.low, latest.close, latest.volume, latest.trading_value, latest.fetched_at
          FROM ${universeTable} u
          LEFT JOIN LATERAL (
-           SELECT candle_date, open, high, low, close, volume, COALESCE(trading_value, close * volume) AS trading_value, fetched_at
+           SELECT candle_date, open, high, low, close, volume, trading_value, fetched_at
              FROM (
-           SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume, c.trading_value, c.fetched_at,
+           SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume, ${dailyTradingValueSql} AS trading_value, c.fetched_at,
                   ROW_NUMBER() OVER (PARTITION BY c.candle_date ORDER BY c.fetched_at DESC) AS rn
              FROM ${table} c
             WHERE c.market=u.market AND c.code = u.code AND c.timeframe = $3

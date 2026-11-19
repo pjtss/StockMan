@@ -44,3 +44,12 @@
 - V168 migration, 운영 health 정상, 공개 universe API 및 ㄷㅊㅇ5·ㄷㅊㅇ6 스냅샷 생성은 여전히 미확인/미완료다. 최신 활성 세션 다섯 PID에 대해 별도 조치 범위를 확인 중이며, 기존 승인 범위 밖 신호는 발송하지 않았다.
 
 - 이어진 승인 workflow 재실행(job `133202860068`, 09:22 UTC)은 PID `221753`만 현재 active snapshot holder이며 60분 이상임을 확인해 종료했고, `pg_stat_activity`에서 사라짐을 확인했다. 바로 뒤 배포 run `43829487560` attempt 7도 V168 preflight에서 차단됐다. 신규 holder와 60분 미만 holder는 이전 문단의 목록과 같았으며 종료되지 않았다.
+
+## ㄷㅊㅇ5·ㄷㅊㅇ6 재실행 — 2026-11-19
+
+- `0aa444bb` push 이후 Deploy OCI run `44429863700`은 배포 검증·패키징·업로드·activation을 모두 통과했다. 운영 `/api/health` HTTP 200, NAS universe total 3,060을 확인했다.
+- `ㄷㅊㅇ5` US snapshot 생성 성공: eligible NAS/NYS/AMS 3,060/1,754/248, 결과 3,000/1,745/231, candle 592,419, missing 86, latest 거래일 `20261117`. 기존 US JSON은 보통주-only public API 기준으로 교체됐다.
+- `ㄷㅊㅇ6`은 universe pagination 뒤 국내 candle API가 KOSPI 단일 batch에서 HTTP 503 `DAILY_CACHE_UNAVAILABLE`를 반환해 중단했다. KOSPI/KOSDAQ universe GET은 각각 HTTP 200이다. 프로젝트 V67 테이블 정의에서 국내 candle table은 `trading_value`를 갖지 않지만 API SQL이 해당 컬럼을 읽는 것을 원인으로 확인했다.
+- KR JSON은 실패 시 원자 교체되지 않아 이전 파일 그대로 보존됐다. KR 일봉 query를 `close * volume`으로 계산하도록 코드 수정과 회귀 검증을 추가해 재배포 후 재실행한다.
+- 검증/반영: DR 제외 수정의 `npm run deploy:verify` 및 Deploy OCI workflow 성공. KR schema compatibility 및 표시명 ADR/ADS exclusion 변경은 route/importer/metadata targeted tests 21/21, 전체 `npm run deploy:verify`(1,650 passed, 3 skipped; build/runtime smoke/typecheck/docs 포함)를 통과했다. 후속 code push/deploy 뒤 US/KR JSON을 모두 다시 생성해 최종 수치를 검증한다.
+- 후속 품질 점검에서 첫 US snapshot에 공식 영문 설명상 일반 보통주로 보이지만 표시명에는 ADR/ADS descriptor가 남은 12종목을 확인했다. US eligibility를 `english_name`과 `name` 모두 기준으로 제한하도록 확장했으며, 이 변경의 전체 검증과 OCI 배포 후 US JSON을 다시 생성해야 최종본이 된다. 현재 US JSON은 임시 산출물로 취급한다.

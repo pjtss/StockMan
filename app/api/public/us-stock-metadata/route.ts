@@ -116,7 +116,7 @@ export async function GET(request: Request) {
     if (result.rowCount !== 1) return errorResponse("AMBIGUOUS_TICKER", 409);
 
     const row = result.rows[0];
-    if (row.instrument_type !== "COMMON_STOCK" || row.enabled !== true || hasDepositaryReceiptDescriptor(row.english_name)) return errorResponse("NOT_ACTIVE_COMMON_STOCK", 422);
+    if (row.instrument_type !== "COMMON_STOCK" || row.enabled !== true || hasDepositaryReceiptDescriptor(row.english_name) || hasDepositaryReceiptDescriptor(row.name)) return errorResponse("NOT_ACTIVE_COMMON_STOCK", 422);
     if (row.is_etf !== false || row.is_warrant !== false || row.is_derivative !== false || row.is_dr !== false || row.is_leveraged !== false || row.is_inverse !== false) {
       return errorResponse("NOT_ACTIVE_COMMON_STOCK", 422);
     }

@@ -3,10 +3,18 @@
 - **증상**: `ㄷㅊㅇ5`의 운영 공개 활성 보통주 목록에서 AACG, BABA, ABEV 등 공식 상품명이 `SPON ADS`/`SPON ADR`인 예탁증서가 `instrument_type=COMMON_STOCK`, `is_dr=false`로 반환됐다. 종목 메타데이터 GET에서도 같은 분류가 확인됐다.
 - **근본 원인**: 해외 KIS 마스터 파서는 `isdr` 필드만 DR 여부로 옮겼다. 하지만 KIS 마스터의 `isdr=N`이더라도 영문 상품명에는 거래 대상이 ADS/ADR임이 명시될 수 있다. 이 필드를 단독으로 신뢰해 활성 보통주 유니버스가 과대 포함됐다.
 - **영향 범위**: 미국 공통 종목 마스터 분류, 해당 마스터로 재조정되는 common/special partition, 공개 daily-candles universe/일봉 응답 및 이를 사용하는 추출·스냅샷. 기존 DB와 스냅샷에 ADR/ADS가 이미 포함됐을 수 있다.
-- **해결 위치**: 공통 판별 함수가 공식 영문 상품 설명의 ADR/ADS/depositary/depository 표기를 식별한다. `lib/instrument-universe-import.ts`는 이를 `DR`, `isDr=true`로 분류하고 재조정 시 special master에 보존한다. `app/api/public/daily-candles/route.ts`는 미국 목록 및 봉 조회 SQL에서 해당 설명을 제외해 기존 DB flag가 낡아도 snapshot에 유입되지 않게 한다. `app/api/public/us-stock-metadata/route.ts`도 해당 항목을 활성 보통주로 응답하지 않는다.
+- **해결 위치**: 공통 판별 함수가 공식 마스터의 영문 상품 설명과 표시 종목명에서 ADR/ADS/depositary/depository 표기를 식별한다. `lib/instrument-universe-import.ts`는 이를 `DR`, `isDr=true`로 분류하고 재조정 시 special master에 보존한다. `app/api/public/daily-candles/route.ts`는 두 이름 필드의 표기를 미국 목록 및 봉 조회에서 제외해 기존 DB flag가 낡아도 snapshot에 유입되지 않게 한다. `app/api/public/us-stock-metadata/route.ts`도 두 필드를 확인해 해당 항목을 활성 보통주로 응답하지 않는다.
 - **재발 자동 감지**: 분류·daily-candles·US metadata regression tests가 공식 예탁증서 설명을 제외하고 AAPL 같은 보통주는 유지하는지 확인한다. 마스터 적재 기능이 복구되거나 운영 DB가 갱신될 때 `reconcileUsUniversePartitions` 결과도 다시 대조한다.
-- **검증 결과/상태**: 운영 GET은 AACG/BABA/ABEV에서 영문 상품명과 잘못된 DB 플래그를 확인했다. 분류기와 관련 API 회귀 검사를 추가했다. 새 테스트 및 전체 build/deploy verification, OCI 배포, `ㄷㅊㅇ5`·`ㄷㅊㅇ6` 재생성은 아직 진행 중이다.
-- **남은 위험 및 다음 개선**: 로컬 코드 수정만으로 운영 API는 바뀌지 않는다. 변경 격리 워킹트리에서 배포 게이트를 완료하고 배포 후 무인증 US universe 및 DR 표본 제외를 재확인한 다음 두 JSON을 다시 생성한다. `ㄷㅊㅇ` 경로 외 다른 미국 종목 API가 같은 DB flag를 사용하므로, 전체 보통주 데이터 사용 경로는 별도 영향 점검이 필요하다.
+- **검증 결과/상태**: 분류/API 회귀 검사, 전체 build/runtime/test/typecheck gate, OCI 배포가 통과했다. 운영 health 200과 NAS universe를 확인하고 US snapshot을 갱신했다. 상세 수치는 [`daily-candle-snapshot-20261116-run.md`](operations/daily-candle-snapshot-20261116-run.md)에 기록한다.
+- **남은 위험 및 다음 개선**: KR cache query의 별도 스키마 호환 문제를 수정·검증 중이며 후속 OCI 배포 뒤 ㄷㅊㅇ6을 완료한다. 첫 US snapshot 검토에서 현지화 표시명으로만 ADR/ADS가 드러나는 12종목을 확인해 필터를 이름 필드 두 곳으로 확장했다. 후속 배포와 US snapshot 재생성으로 최종 제외를 확인한다. `ㄷㅊㅇ` 경로 외 다른 미국 종목 API가 같은 DB flag를 사용하므로, 전체 보통주 데이터 사용 경로는 별도 영향 점검이 필요하다.
+
+## 2026-11-19 — KR daily-candles API가 국내 스키마에 없는 `trading_value`를 참조
+- **증상/영향**: KOSPI/KOSDAQ universe GET은 성공하지만 국내 종목 일봉 GET이 `503 DAILY_CACHE_UNAVAILABLE`를 반환해 `ㄷㅊㅇ6` snapshot을 만들 수 없다.
+- **근본 원인**: 공용 API 쿼리가 `kr_instrument_universe_candles`에도 `trading_value`가 있다고 가정했지만, V67 국내 테이블 정의와 프로젝트 스키마 문서는 해당 컬럼이 없음을 명시한다. PostgreSQL 쿼리 오류가 공통 503으로 변환돼 외부에서 원인이 숨겨졌다.
+- **수정/영향 범위**: `app/api/public/daily-candles/route.ts`에서 KR 일봉의 거래대금 표시값을 `close * volume`으로 계산하고, US는 기존의 `trading_value` 우선 및 fallback 동작을 유지한다. 단일/복수 종목 및 단일 종목 쿼리 모두 동일한 거래대금 별칭을 쓴다.
+- **재발 자동 감지**: route regression test는 KR SQL에 `c.trading_value` 참조가 없고 `c.close * c.volume AS trading_value`를 포함하는지 검사한다. 관련 API 테스트 및 typecheck/build/deploy verification에 포함한다.
+- **남은 위험/다음 조치**: 수정 배포 후 KOSPI/KOSDAQ 각각 daily-candles GET과 전체 `ㄷㅊㅇ6` snapshot을 다시 실행한다. 누락 목록은 API가 반환한 빈 캐시/종목을 분리 기록한다.
+- **커밋·푸시·배포**: 원인 수정은 작업 중이며, 전체 검증 통과 후 별도 commit/push 및 OCI 활성화를 확인한다.
 
 ## 2026-11-18 차트 종목 추출 정상 응답이 화면 timeout으로 실패
 

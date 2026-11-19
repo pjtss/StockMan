@@ -78,11 +78,17 @@ describe("GET /api/public/us-stock-metadata", () => {
   it("rejects an ADR/ADS descriptor even when the master says common stock and is_dr=false", async () => {
     state.rows[0].code = "AACG";
     state.rows[0].english_name = "ATA CREATIVITY GLOBAL SPON ADS EACH REP 2 ORD SHS";
-    state.rows[0].name = "ATA 크리에티비티 글로벌(ADR)";
+    state.rows[0].name = "ATA Creativity Global";
     const response = await GET(new Request("https://stockman.example/api/public/us-stock-metadata?ticker=AACG"));
     const body = await response.json();
 
     expect(response.status).toBe(422);
     expect(body).toMatchObject({ ok: false, error: "NOT_ACTIVE_COMMON_STOCK" });
+
+    state.rows[0].code = "ASML";
+    state.rows[0].english_name = "ASML HOLDING NV EUR0.09 NY REGISTRY SHS 2012";
+    state.rows[0].name = "ASML 홀딩(ADR)";
+    const localizedResponse = await GET(new Request("https://stockman.example/api/public/us-stock-metadata?ticker=ASML"));
+    expect(localizedResponse.status).toBe(422);
   });
 });
