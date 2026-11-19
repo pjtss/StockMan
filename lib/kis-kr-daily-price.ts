@@ -11,7 +11,7 @@ function num(value: unknown) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 export function parseKrDailyPriceRows(rows: unknown[]): Array<OHLCVCandle & { raw: unknown }> {
-  return rows.map((value: any) => ({ date: String(value?.stck_bsop_date ?? ""), open: num(value?.stck_oprc), high: num(value?.stck_hgpr), low: num(value?.stck_lwpr), close: num(value?.stck_clpr), volume: num(value?.acml_vol), raw: value })).filter((row: OHLCVCandle & { raw: unknown }) => {
+  return rows.map((value: any) => ({ date: String(value?.stck_bsop_date ?? ""), open: num(value?.stck_oprc), high: num(value?.stck_hgpr), low: num(value?.stck_lwpr), close: num(value?.stck_clpr), volume: num(value?.acml_vol), tradingValue: Number.isFinite(num(value?.acml_tr_pbmn)) ? num(value?.acml_tr_pbmn) : null, raw: value })).filter((row: OHLCVCandle & { raw: unknown }) => {
     const date = row.date;
     return isValidCompactCalendarDate(date)
       && [row.open, row.high, row.low, row.close, row.volume].every(Number.isFinite)

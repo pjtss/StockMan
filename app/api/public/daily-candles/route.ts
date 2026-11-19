@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   }
 
   const isKrMarket = market === "KR" || market === "KOSPI" || market === "KOSDAQ";
-  const dailyTradingValueSql = isKrMarket ? "c.close * c.volume" : "COALESCE(c.trading_value, c.close * c.volume)";
+  const dailyTradingValueSql = "COALESCE(c.trading_value, c.close * c.volume)";
   const table = isKrMarket
     ? "kr_instrument_universe_candles"
     : "us_instrument_universe_candles";

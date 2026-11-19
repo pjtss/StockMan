@@ -36,9 +36,9 @@ async function loadCachedKrDailyCandlesBulkUncached(items: Array<{ market: strin
   params.push(timeframe, limit);
   const timeframeParam = params.length - 1;
   const limitParam = params.length;
-  const rows = (await getPool().query(`SELECT v.market, v.code, c.candle_date AS "candleDate", c.open, c.high, c.low, c.close, c.volume, c.fetched_at AS "fetchedAt"
+  const rows = (await getPool().query(`SELECT v.market, v.code, c.candle_date AS "candleDate", c.open, c.high, c.low, c.close, c.volume, c.trading_value AS "tradingValue", c.fetched_at AS "fetchedAt"
     FROM (VALUES ${values}) AS v(market, code)
-    CROSS JOIN LATERAL (SELECT candle_date, open, high, low, close, volume, fetched_at
+    CROSS JOIN LATERAL (SELECT candle_date, open, high, low, close, volume, trading_value, fetched_at
       FROM kr_instrument_universe_candles c
       WHERE c.market = v.market AND c.code = v.code AND c.timeframe = $${timeframeParam}
         AND ${validDailyCandleSql("c")}
@@ -47,7 +47,7 @@ async function loadCachedKrDailyCandlesBulkUncached(items: Array<{ market: strin
   for (const row of rows) {
     const key = `${row.market}:${row.code}`;
     const candles = result.get(key) ?? [];
-    const candle = { date: String(row.candleDate), open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume), fetchedAt: row.fetchedAt ? new Date(row.fetchedAt).toISOString() : null };
+    const candle = { date: String(row.candleDate), open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume), tradingValue: row.tradingValue == null ? null : Number(row.tradingValue), fetchedAt: row.fetchedAt ? new Date(row.fetchedAt).toISOString() : null };
     if (candles.length < limit && isValidCachedCandle(candle)) candles.push(candle);
     result.set(key, candles);
   }
@@ -111,7 +111,7 @@ export async function saveKrDailyCandles(market: string, code: string, candles: 
     if (!common.length) return 0;
   }
   const savedCandleCount = await db.transaction(async (tx) => {
-    const savedRows = await tx.insert(krInstrumentUniverseCandles).values(validCandles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, candleTime: null, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, rawPayload: JSON.stringify(candle.raw ?? {}), source: "KIS" }))).onConflictDoUpdate({ target: [krInstrumentUniverseCandles.market, krInstrumentUniverseCandles.code, krInstrumentUniverseCandles.timeframe, krInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, rawPayload: sql`excluded.raw_payload`, fetchedAt: new Date() } }).returning({ candleDate: krInstrumentUniverseCandles.candleDate });
+    const savedRows = await tx.insert(krInstrumentUniverseCandles).values(validCandles.map((candle) => ({ market, code, timeframe, candleDate: candle.date, candleTime: null, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, tradingValue: candle.tradingValue ?? null, rawPayload: JSON.stringify(candle.raw ?? {}), source: "KIS" }))).onConflictDoUpdate({ target: [krInstrumentUniverseCandles.market, krInstrumentUniverseCandles.code, krInstrumentUniverseCandles.timeframe, krInstrumentUniverseCandles.candleDate], set: { open: sql`excluded.open`, high: sql`excluded.high`, low: sql`excluded.low`, close: sql`excluded.close`, volume: sql`excluded.volume`, tradingValue: sql`excluded.trading_value`, rawPayload: sql`excluded.raw_payload`, fetchedAt: new Date() } }).returning({ candleDate: krInstrumentUniverseCandles.candleDate });
     const savedDates = new Set(savedRows.map((row) => row.candleDate));
     if (savedRows.length !== validCandles.length || validCandles.some((candle) => !savedDates.has(candle.date))) {
       throw new Error(`KR candle UPSERT verification mismatch: market=${market} code=${code} timeframe=${timeframe} expected=${validCandles.length} returned=${savedRows.length}`);
