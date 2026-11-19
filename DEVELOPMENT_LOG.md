@@ -9334,3 +9334,10 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **최종 검증 결과**: 최신 `origin/oci` 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과. dependency audit 0 vulnerabilities, OCI activation preflight, docs/API/catalog/scope/KIS/auth/cron audits, production build 및 typecheck, standalone HTTP/API/Chrome desktop·mobile smoke, Vitest 282 files (281 passed, 1 skipped), 1,627 tests passed (3 skipped). UTF-8 strict decode, document catalog check 및 `git diff --check` 통과.
 - **재발 방지/남은 위험**: 공유 Windows에서는 worker 시작 timeout이 간헐적으로 발생했으나, 공식 `VITEST_MAX_WORKERS` 환경변수로 8개로 제한한 전체 실행은 성공했다. CI Linux OCI workflow 및 운영 health 확인도 배포 후 확인한다. 외부 저장소에서 직접 import하는 consumer 및 런타임 동적 import는 정적 검색만으로 완전히 배제할 수 없어 관련성이 남은 설정 저장 및 제품 API는 보존했다.
 - **커밋·푸시·배포 기록**: 최신 `origin/oci` revision `77c5cd2c` 위에서 cleanup 전용 커밋을 만들고 OCI workflow 및 운영 health 확인 후 결과를 갱신한다.
+
+## [2026-11-19] KIS 국내 캔들 거래대금 구조화 저장
+
+- **목적/근본 원인**: KIS 국내 기간별 시세 `output2`의 `acml_tr_pbmn`(누적 거래 대금)을 파서가 구조화하지 않아 공개 API가 `종가 × 거래량` 계산치만 반환했다. 원본 raw payload는 저장됐으나 캔들 테이블에는 거래대금 열이 없었다.
+- **수정 범위**: `lib/kis-kr-daily-price.ts`에서 필드 파싱, `lib/kr-daily-price-cache.ts` 및 `lib/schema.ts`에서 구조화 저장·bulk cache 반환, `V180__kr_daily_candle_trading_value.sql`에서 컬럼 추가 및 과거 raw payload backfill, public `daily-candles` API에서 저장된 공식값 우선 사용. 공식값이 누락된 과거/응답행은 기존과 같이 계산 fallback한다.
+- **문서/자동 감지**: parser와 route 회귀 검사를 확장하고 `docs/ERROR_HANDLING.md`에 원인·범위·재발 감지·잔여 위험을 연결했다.
+- **검증/반영 상태**: 최신 `origin/oci` (`38e544ac`) 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과: 의존성 취약점 0건, Vitest 282 files 중 281 passed·1 skipped 및 1,628 passed·3 skipped, typecheck, docs/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke 통과. 운영 DB 마이그레이션·실제 운영 health 확인은 아직이다. 이번 변경 커밋 및 `oci` push 후 OCI workflow 완료를 확인한다.

@@ -8,6 +8,7 @@ const valid = {
   stck_lwpr: "9",
   stck_clpr: "11",
   acml_vol: "100",
+  acml_tr_pbmn: "1234567",
 };
 
 describe("KIS KR daily price row validation", () => {
@@ -20,7 +21,12 @@ describe("KIS KR daily price row validation", () => {
       { ...valid, acml_vol: "-1" },
     ];
     expect(parseKrDailyPriceRows([valid, ...invalid])).toEqual([
-      { date: "20261110", open: 10, high: 12, low: 9, close: 11, volume: 100, raw: valid },
+      { date: "20261110", open: 10, high: 12, low: 9, close: 11, volume: 100, tradingValue: 1234567, raw: valid },
     ]);
+  });
+
+  it("keeps daily trading value nullable when KIS omits or malforms the source field", () => {
+    expect(parseKrDailyPriceRows([{ ...valid, acml_tr_pbmn: undefined }])[0].tradingValue).toBeNull();
+    expect(parseKrDailyPriceRows([{ ...valid, acml_tr_pbmn: "not-a-number" }])[0].tradingValue).toBeNull();
   });
 });

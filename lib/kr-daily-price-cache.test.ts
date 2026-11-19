@@ -24,11 +24,13 @@ describe("KR bulk daily candle cache", () => {
       low: "90",
       close: "105",
       volume: "1000",
+      tradingValue: "105321",
       fetchedAt: "2026-11-11T07:00:00.000Z",
     }] });
 
     const result = await loadCachedKrDailyCandlesBulk([{ market: "KOSPI", code: "005930" }], 1, "D");
     expect(query.mock.calls[0][0]).toContain('c.candle_date AS "candleDate"');
+    expect(query.mock.calls[0][0]).toContain('c.trading_value AS "tradingValue"');
     expect(query.mock.calls[0][0]).toContain('c.fetched_at AS "fetchedAt"');
     expect(result.get("KOSPI:005930")).toEqual([{
       date: "20261111",
@@ -37,6 +39,7 @@ describe("KR bulk daily candle cache", () => {
       low: 90,
       close: 105,
       volume: 1000,
+      tradingValue: 105321,
       fetchedAt: "2026-11-11T07:00:00.000Z",
     }]);
   });
