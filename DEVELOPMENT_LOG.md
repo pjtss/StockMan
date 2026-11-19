@@ -9356,3 +9356,4 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 목적/범위: 공개 GET /api/public/daily-candles의 국내 거래대금 출처와 과거 캐시 대체 규칙을 명시하고 OpenAPI 응답 schema를 일치시킨다.
 - 변경: public/api-reference.md에서 KIS acml_tr_pbmn 원문(원)과 close × volume fallback, fetchedAt 및 bulk metadata를 설명한다. scripts/api-surface.mjs schema를 갱신해 생성 OpenAPI에도 단일·다중 코드 캔들 필드를 명시한다.
 - 검증 결과: docs:api:generate, audit:api-surface 및 전체 VITEST_MAX_WORKERS=8 npm run deploy:verify 통과. 280 test files 중 279 passed·1 skipped, 1,624 passed·3 skipped; typecheck, production build, standalone runtime/API smoke, Chrome desktop/mobile smoke 통과.
+- 커밋/배포: PR #3을 OCI에 병합한 commit 11138ba07b11858d8308bd6524877052d751719c로 push. Deploy OCI run 44637756237 성공. 운영 /api/health HTTP 200, /api-reference.md HTTP 200(원문 필드 및 fallback 설명), /openapi.json 단일·다중 candle schema의 tradingValue를 확인했다.
