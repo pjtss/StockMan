@@ -1,4 +1,4 @@
-# 문의 게시판 및 요청 식별 설계
+# 문의 게시판 설계
 
 > **폐기됨 (2026-10-26)**: 문의 페이지, API, 저장소 및 전용 테스트를 제거했다. 아래는 과거 설계 이력이다.
 
@@ -12,19 +12,10 @@
 - 댓글 작성
 - 조회수 증가
 - 좋아요 토글 및 중복 방지
-- 페이지·API 요청의 원본 IP와 User-Agent 저장
-
-## 식별 및 노출
-
-IP와 User-Agent 조합으로 짧은 해시 식별자를 생성한다. 원본은 DB에 저장하지만 일반 사용자 화면과 API에는 마스킹 IP 및 브라우저/OS 요약만 전달한다.
-
-## 요청 로그
-
-미들웨어가 정적 리소스를 제외한 페이지·API 요청을 내부 비동기 수집 엔드포인트로 전달한다. 요청 본문·쿠키·Authorization은 저장하지 않는다. `REQUEST_LOG_SECRET` 환경변수가 없는 환경에서는 내부 저장을 거부한다.
 
 ## 데이터
 
-`inquiries`, `inquiry_comments`, `inquiry_likes`, `request_logs` 테이블을 사용한다. 문의글과 댓글 삭제 시 종속 좋아요·댓글은 cascade로 정리한다.
+`inquiries`, `inquiry_comments`, `inquiry_likes` 테이블을 사용한다. 문의글과 댓글 삭제 시 종속 좋아요·댓글은 cascade로 정리한다.
 
 ## 경로
 
@@ -32,4 +23,3 @@ IP와 User-Agent 조합으로 짧은 해시 식별자를 생성한다. 원본은
 - `/inquiries/new`
 - `/inquiries/[id]`
 - `/api/inquiries/*`
-- `/api/internal/request-log` (내부 미들웨어 전용)

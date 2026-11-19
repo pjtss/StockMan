@@ -33,7 +33,6 @@ function batchedDelete(table: string, predicate: string, orderBy: string): Clean
 const RETENTION_JOBS: CleanupJob[] = [
   batchedDelete("kr_minute_candles", "candle_date < to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')", "candle_date, candle_time"),
   batchedDelete("us_minute_candles", "candle_date < to_char(NOW() - INTERVAL '30 days', 'YYYY-MM-DD')", "candle_date, candle_time"),
-  batchedDelete("request_logs", "created_at < NOW() - INTERVAL '30 days'", "created_at"),
   batchedDelete(
     "market_rss_bullish_articles",
     "published_at < NOW() - INTERVAL '24 hours' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '24 hours') OR source_article_id IN (SELECT id FROM market_rss_articles WHERE published_at < NOW() - INTERVAL '24 hours' OR (published_at IS NULL AND created_at < NOW() - INTERVAL '24 hours'))",

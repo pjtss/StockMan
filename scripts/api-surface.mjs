@@ -8,8 +8,8 @@ const inventoryPath = join(root, "docs", "api", "route-inventory.json");
 const openApiPath = join(root, "public", "openapi.json");
 const methodsPattern = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=/g;
 const excludedPath = /\/(?:admin|debug|cron|internal|local)(?:\/|$)/i;
-const userPath = /\/(?:auth|watchlist|user-activity|push)(?:\/|$)/i;
-const requestAuthenticationPattern = /(?:headers\.get\(["'](?:authorization|x-api-key|x-daily-cache-key|cookie)["']\)|cookies\s*\(\s*\)|getServerSession|requireAdminSession|isCronRequestAuthorized|DAILY_CACHE_READ_API_KEY|REQUEST_LOG_SECRET|verifyBbExportToken|(?:is)?authorized\s*\(|requireApiAuth\s*\(|requireAuth\s*\(|verifyApiKey\s*\(|validateApiKey\s*\()/i;
+const userPath = /\/(?:auth|watchlist|push)(?:\/|$)/i;
+const requestAuthenticationPattern = /(?:headers\.get\(["'](?:authorization|x-api-key|x-daily-cache-key|cookie)["']\)|cookies\s*\(\s*\)|getServerSession|requireAdminSession|isCronRequestAuthorized|DAILY_CACHE_READ_API_KEY|verifyBbExportToken|(?:is)?authorized\s*\(|requireApiAuth\s*\(|requireAuth\s*\(|verifyApiKey\s*\(|validateApiKey\s*\()/i;
 
 async function routeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -39,7 +39,6 @@ function accessFor(path, source, methods) {
   if (path === "/api/events/collect") return requestAuthenticationPattern.test(source) ? "internal-or-operator" : "public-write-source-materialization";
   if (/requireAdminSession/.test(source)) return "admin-session";
   if (/isCronRequestAuthorized/.test(source)) return "cron-guarded";
-  if (/x-request-log-secret|REQUEST_LOG_SECRET/.test(source)) return "internal-secret";
   if (/DAILY_CACHE_READ_API_KEY/.test(source)) return "service-bearer";
   if (excludedPath.test(path)) return "internal-or-operator";
   if (userPath.test(path)) return "user-session-or-user-data";

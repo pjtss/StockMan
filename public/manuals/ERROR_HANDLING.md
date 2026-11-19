@@ -568,13 +568,13 @@ fundamentals snapshot의 nullable double precision 필드(`price`, `changeRate`,
 - 조치: ID를 사전 검증하고 DB 장애를 도메인별 `503` JSON 응답으로 변환한다. 기존 상세 조회의 `404` 계약은 유지했다.
 - 검증: 관련 API 테스트 6개, `npm run typecheck`, `npm run docs:check` 통과.
 
-### 스캐너·관리자 활동 조회 query 파라미터
+### 스캐너 query 파라미터
 
-- 원인: `limit`, `hours`에 `NaN`, 소수, 음수, 과대값이 들어와 내부 조회 함수까지 전달될 수 있었다. 관리자 활동 조회 DB 예외도 별도 응답 처리가 없었다.
-- 영향: 비정상 조회 범위, DB 쿼리 오류, 관리자 화면의 JSON 파싱 실패 가능성이 있었다.
-- 수정 위치: `app/api/scan/multi-timeframe-recommendations/route.ts`, `app/api/admin/user-activity/route.ts`.
-- 조치: 정수 변환·최소/최대 범위 검증과 기본값을 적용하고, 관리자 활동 DB 장애는 `503 USER_ACTIVITY_UNAVAILABLE`로 변환한다.
-- 검증: 관련 테스트 7개, `npm run typecheck` 통과.
+- 원인: `limit`, `hours`에 `NaN`, 소수, 음수, 과대값이 들어와 내부 조회 함수까지 전달될 수 있었다.
+- 영향: 비정상 조회 범위와 DB 쿼리 오류 가능성이 있었다.
+- 수정 위치: `app/api/scan/multi-timeframe-recommendations/route.ts`.
+- 조치: 정수 변환·최소/최대 범위 검증과 기본값을 적용한다.
+- 검증: 관련 스캐너 입력 테스트, `npm run typecheck` 통과.
 
 ### 해외 MFI 스캐너 입력값
 
@@ -680,11 +680,6 @@ fundamentals snapshot의 nullable double precision 필드(`price`, `changeRate`,
 
 ## 프론트엔드 오류
 
-### 내부 요청 로그 수집 실패
-
-- 요청 로그 수집은 관측용 best-effort 기능이므로 지역 추론 실패가 로그 저장을 중단시키지 않도록 한다.
-- 요청 ID·경로·User-Agent·IP는 저장 전에 길이를 제한해 비정상적으로 큰 헤더나 본문으로 인한 로그 오염을 방지한다.
-- DB 저장 실패는 구조화된 `REQUEST_LOG_UNAVAILABLE` 503으로 반환하고, 인증되지 않은 요청은 DB에 접근하기 전에 401로 종료한다.
 - 내부 KIS 디버그 로그 API도 관리자 세션을 요구하며, 커서 값은 음수가 아닌 안전한 정수만 허용한다.
 - 관리자 디버그 조회와 종목명 조회의 DB 오류는 예외·SQL을 노출하지 않고 기능별 503 오류 코드로 반환한다. 종목명 조회 코드는 최대 100개로 제한한다.
 - 관리자 분봉 일괄 갱신의 작업량·동시성은 유한한 정수 범위로 정규화하고, 수집 실패는 `KR_MINUTE_REFRESH_FAILED`로 반환한다.

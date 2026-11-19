@@ -221,9 +221,6 @@ source client → raw parser → normalized item → classifier/grade
 | 관리자 인증 | `admin-auth.ts`, admin layout/API | 관리자 세션과 일반 세션 분리 |
 | 사용자 인증 | `user-auth.ts`, auth routes | username/password와 cookie session |
 | 관심종목 | `watchlist.ts`, `user-watchlist.ts` | 사용자별 데이터 |
-| 요청 신원 | `request-identity.ts` | IP/UA/session 추출 |
-| 기능 로그 | `request-trace.ts`, request-log config/routes | 사용자가 요청한 기능 중심 |
-| 지역 추론 | `ip-geolocation.ts` | 원본 IP와 추론 정책 분리 |
 | 문의/공지 | `inquiries.ts`, `notices.ts` | 권한·soft-delete·댓글/좋아요 |
 
 개인화 저장소는 사용자 ID를 필수 키로 삼고 전역 유니버스와 섞지 않는다. 관리자는 권한 경계 뒤에서만 집계한다.

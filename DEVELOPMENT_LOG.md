@@ -9343,3 +9343,10 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **수정 범위**: `lib/kis-kr-daily-price.ts`에서 필드 파싱, `lib/kr-daily-price-cache.ts` 및 `lib/schema.ts`에서 구조화 저장·bulk cache 반환, `V180__kr_daily_candle_trading_value.sql`에서 컬럼 추가 및 과거 raw payload backfill, public `daily-candles` API에서 저장된 공식값 우선 사용. 공식값이 누락된 과거/응답행은 기존과 같이 계산 fallback한다.
 - **문서/자동 감지**: parser와 route 회귀 검사를 확장하고 `docs/ERROR_HANDLING.md`에 원인·범위·재발 감지·잔여 위험을 연결했다.
 - **검증/반영 상태**: 최신 `origin/oci` (`38e544ac`) 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과: 의존성 취약점 0건, Vitest 282 files 중 281 passed·1 skipped 및 1,628 passed·3 skipped, typecheck, docs/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke 통과. 운영 DB 마이그레이션·실제 운영 health 확인은 아직이다. 이번 변경 커밋 및 `oci` push 후 OCI workflow 완료를 확인한다.
+## [2026-11-19] 사용자 행동 이벤트 및 요청 로그 수집 제거
+- **목적/범위**: 명시적 사용자 행동 이벤트와 모든 요청별 사용자 진단 수집 기능을 제거했다.
+- **변경 파일·자료**: `/api/user-activity`, `/api/internal/request-log`, 관리자 활동 데이터 경로의 잔여 참조, 공시 화면 이벤트 전송, middleware 로그 전송, 요청 신원/IP 위치 모듈 및 테스트를 삭제했다. `request_logs` 보존 작업과 API inventory를 제거했고 `V181__remove_user_action_event_metadata.sql`에서 기존 기록을 포함한 테이블 전체를 삭제한다. 관련 아키텍처·운영 문서를 정리하고 문서 카탈로그/공개 매뉴얼을 재생성했다.
+- **근본 원인·영향 범위**: UI 행동 이벤트와 일반 요청 진단이 동일 테이블에 혼합 저장되어 사용자의 API 경로 및 식별 정보를 기록했다. 수집/저장/보존 경로를 제거하고 요청 추적 응답 헤더는 저장 없이 유지한다.
+- **재발 자동 감지·남은 위험**: route inventory, cron retention 감사와 전체 배포 검증으로 라우트·보존 참조를 감지한다. V181이 운영 DB에 적용되기 전까지 기존 테이블/데이터가 남는다. 과거 V97/V105/V133 migration은 Flyway checksum 이력을 위해 보존한다.
+- **검증 결과·한계**: `npm run deploy:verify` 통과. production build, standalone runtime, Chrome desktop/mobile hydration 및 API smoke, typecheck, route/docs/cron/auth 검사 성공; Vitest 278 files (278 passed, 1 skipped), 1,620 tests passed (3 skipped). 초기 runtime smoke는 상위 체크아웃의 불완전한 Next.js 설치 때문에 시작 실패했으나 격리 worktree에서 lockfile 오프라인 설치 후 재검증해 통과했다. 운영 적용 결과는 workflow 확인 후 기재한다.
+- **커밋·푸시·배포**: 진행 예정.

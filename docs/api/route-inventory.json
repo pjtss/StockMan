@@ -366,14 +366,6 @@
       "source": "app/api/health/route.ts"
     },
     {
-      "path": "/api/internal/request-log",
-      "methods": [
-        "POST"
-      ],
-      "access": "internal-secret",
-      "source": "app/api/internal/request-log/route.ts"
-    },
-    {
       "path": "/api/kis/detection-candidates",
       "methods": [
         "GET"
@@ -840,14 +832,6 @@
       ],
       "access": "provider-webhook",
       "source": "app/api/telegram/webhook/route.ts"
-    },
-    {
-      "path": "/api/user-activity",
-      "methods": [
-        "POST"
-      ],
-      "access": "user-session-or-user-data",
-      "source": "app/api/user-activity/route.ts"
     },
     {
       "path": "/api/watchlist",

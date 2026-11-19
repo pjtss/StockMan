@@ -298,7 +298,7 @@ if (!retentionRoute.includes("const DELETE_BATCH_SIZE = 5_000")
 }
 const retentionSchemaRequirements = {
   kr_minute_candles: ["candle_date", "candle_time"], us_minute_candles: ["candle_date", "candle_time"],
-  request_logs: ["created_at"], market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id", "published_at", "created_at"],
+  market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id", "published_at", "created_at"],
   market_rss_bullish_articles: ["published_at", "created_at"],
   sec_source_snapshots: ["source_type", "source_key", "fetched_at", "id"], kis_signal_snapshots: ["fetched_at"],
   discord_delivery_queue: ["status", "updated_at"], kr_minute_fetch_logs: ["fetched_at"], debug_kis_calls: ["observed_at"],
@@ -381,7 +381,7 @@ for (const index of indexSpecs(retentionMigration)) {
   }
 }
 for (const [table, interval] of [
-  ["kr_minute_candles", "30 days"], ["us_minute_candles", "30 days"], ["request_logs", "30 days"],
+  ["kr_minute_candles", "30 days"], ["us_minute_candles", "30 days"],
   ["automation_runs", "90 days"], ["discord_delivery_queue", "30 days"], ["kis_signal_snapshots", "365 days"],
   ["instrument_fundamental_history", "90 days"], ["kis_rate_limit_events", "90 days"],
   ["market_rss_translation_cache", "180 days"], ["us_top_rising_snapshots", "30 days"],

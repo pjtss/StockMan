@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 152,
+  "documentCount": 151,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -320,17 +320,6 @@
       "url": "/manuals/architecture/investment-thesis-journal-design.md",
       "relatedPaths": [],
       "sourcePath": "docs/architecture/investment-thesis-journal-design.md",
-      "related": []
-    },
-    {
-      "id": "architecture-ip-geolocation",
-      "title": "IP 기반 지역 추론 설계",
-      "category": "architecture",
-      "format": "md",
-      "description": "요청 로그의 IP에서 국가·지역·도시·시간대·ASN을 대략 추정해 관리자 화면에서 확인한다. IP 위치는 실제 주소나 사용자의 정확한 위치가 아니며, 조회 실패 시 unknown으로 저장한다.",
-      "url": "/manuals/architecture/ip-geolocation.md",
-      "relatedPaths": [],
-      "sourcePath": "docs/architecture/ip-geolocation.md",
       "related": []
     },
     {
@@ -1721,7 +1710,7 @@
     },
     {
       "id": "inquiry-board-design",
-      "title": "문의 게시판 및 요청 식별 설계",
+      "title": "문의 게시판 설계",
       "category": "project-guide",
       "format": "md",
       "description": "누구나 문의글을 작성·조회하고 댓글과 좋아요를 남길 수 있는 최소 게시판이다. 제목과 내용만 작성 입력으로 받는다.",
