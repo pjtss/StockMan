@@ -1499,10 +1499,10 @@
     },
     {
       "id": "automation-observability",
-      "title": "자동화 공통 실행 진단 API",
+      "title": "자동화 진단",
       "category": "project-guide",
       "format": "md",
-      "description": "운영 도메인에서 모든 기능의 실행 통계, 실행 커버리지, 최근 실행, 실패 원인과 단계별 summary를 한 번에 확인한다. 관리자 세션 쿠키 또는 x-cron-secret 중 하나가 필요하다.",
+      "description": "US 일봉 캐시의 실행 상태와 시장별 최신 봉 coverage를 확인하는 내부 read-only API다. cron secret 인증이 필요하다.",
       "url": "/manuals/automation-observability.md",
       "relatedPaths": [],
       "sourcePath": "docs/automation-observability.md",

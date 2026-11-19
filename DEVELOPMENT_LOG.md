@@ -1,3 +1,28 @@
+# [2026-11-19] US 일봉 갱신 진단 API 복구
+
+### 목표
+- 운영 US 최신 일봉이 거래일 대비 뒤처질 때 캐시 상태만 보지 않고 자동화 실행 결과와 시장별 coverage를 한 번에 확인할 수 있도록 한다.
+
+### 반영
+- 11월 17일 정리 커밋에서 전체 자동화 진단 route가 제거된 상태를 확인했다. 무거운 전체 집계 API/UI는 되살리지 않고, cron 인증 read-only `GET /api/debug/us-daily-cache-status`를 추가했다.
+- 공식 활성 COMMON_STOCK만 대상으로 거래소별 eligible/cache/최신 봉일 coverage와 fetched 시각, US 일봉 최근 10회 실행 상태/기간/안전한 수치 및 error code 요약, 모듈 enabled/schedule/interval 상태를 제공한다. 원문 오류 메시지·비밀값은 제외하고 `no-store`를 적용한다.
+- `docs/automation-observability.md`, 공개 매뉴얼 사본, 문서 카탈로그, `docs/api/route-inventory.json`을 새 내부 endpoint에 맞춰 갱신했다. 외부 OpenAPI에는 넣지 않는다.
+
+### 검증
+- 진단 route 회귀 테스트 3/3 통과(미인증 거부/DB 미조회, coverage·민감정보 제거, 안전한 503 응답).
+- `node scripts/api-surface.mjs check` 통과: 106 route 파일, 공개 GET 45개. 내부 route는 `cron-guarded`이며 OpenAPI에 추가하지 않았다.
+- `node scripts/check-docs.mjs` 통과(문서 entry 28개, migration 179개, 운영 테이블/뷰 30/2).
+- 전체 `npm run deploy:verify` 통과: 운영 의존성 감사(취약점 0), activation preflight, API/docs/scope/KIS/auth/cron gates, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke, typecheck, 전체 Vitest 282 files (1 skipped), 1,630 passed (3 skipped).
+- `npm run audit:bearer-auth`, `npm run cron:check`, `npm run audit:api-surface`, `node docs/api/document-catalog.mjs check`, `git diff --check` 통과.
+
+### 결과 및 위험
+- 운영 진단 API가 제거되어 전체 자동화 이력을 확인하지 못하던 상태를 US 전용 경로로 개선했다. 운영에 반영되기 전에는 기존 운영 404 동작이 바뀌지 않는다.
+- endpoint 배포 후 최근 run이 `SKIPPED`/`FAILED`인지, 자동화 기록 자체가 없는지 확인할 수 있다. OCI systemd journal까지 원격 API가 대신 보여주지는 않으므로 기록이 없는 경우에는 호스트 journal 확인이 필요하다.
+- 코드/문서 변경이며 운영 캐시·설정 변경이나 cron 수동 실행은 하지 않았다.
+
+### 커밋·푸시·배포
+- 배포 요청 접수. 전체 검증 통과 후 커밋 및 `oci` push를 진행하고 OCI workflow 결과를 확인한다.
+
 # [2026-11-18] 차트 종목 추출 응답 병목과 timeout 개선
 
 ### 목표
