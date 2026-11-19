@@ -14,14 +14,16 @@
 - `node scripts/check-docs.mjs` 통과(문서 entry 28개, migration 179개, 운영 테이블/뷰 30/2).
 - 전체 `npm run deploy:verify` 통과: 운영 의존성 감사(취약점 0), activation preflight, API/docs/scope/KIS/auth/cron gates, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke, typecheck, 전체 Vitest 282 files (1 skipped), 1,630 passed (3 skipped).
 - `npm run audit:bearer-auth`, `npm run cron:check`, `npm run audit:api-surface`, `node docs/api/document-catalog.mjs check`, `git diff --check` 통과.
+- 원격 `oci` 동시 변경 통합 후 재검증도 `npm run deploy:verify` 전체 통과: migration 180, production build/standalone desktop·mobile smoke, typecheck, 282 files (1 skipped), 1,631 passed (3 skipped), docs/API/scope/KIS/auth/cron gates.
 
 ### 결과 및 위험
-- 운영 진단 API가 제거되어 전체 자동화 이력을 확인하지 못하던 상태를 US 전용 경로로 개선했다. 운영에 반영되기 전에는 기존 운영 404 동작이 바뀌지 않는다.
-- endpoint 배포 후 최근 run이 `SKIPPED`/`FAILED`인지, 자동화 기록 자체가 없는지 확인할 수 있다. OCI systemd journal까지 원격 API가 대신 보여주지는 않으므로 기록이 없는 경우에는 호스트 journal 확인이 필요하다.
-- 코드/문서 변경이며 운영 캐시·설정 변경이나 cron 수동 실행은 하지 않았다.
+- 운영 진단 API가 제거되어 전체 자동화 이력을 확인하지 못하던 상태를 US 전용 경로로 개선했다. 운영에서 인증 GET 200, 미인증 GET 401, `/api/health` 200을 확인했다.
+- 배포 후 설정은 enabled, gate=true, 06:00–08:00 KST, 월~토, 1시간 간격이다. 운영 최신 US 봉은 여전히 `20261117`; 최근 10회 실행은 모두 `SKIPPED/outside_schedule`이며 마지막 기록은 2026-11-18 13:10 UTC (22:10 KST)다. 다음 06:00–08:00 KST 실행 창에 해당하는 기록이 없다.
+- 현재 증거로는 예약 창에 cron API 실행 기록이 생성되지 않은 상태까지 확인했다. OCI `stockman-cron` systemd journal을 조회할 수 없어 timer 미실행과 API 도달 전 실패 중 직접 원인은 미확정이다. 운영 캐시 갱신이나 cron 수동 실행은 하지 않았다.
 
 ### 커밋·푸시·배포
-- 배포 요청 접수. 전체 검증 통과 후 커밋 및 `oci` push를 진행하고 OCI workflow 결과를 확인한다.
+- 기능 커밋 `7f11a882`, 원격 `oci`의 동시 변경 `66bdab36` 통합 merge commit `7bb7bd74`; `oci` push 완료.
+- Deploy OCI workflow run [`44463148126`](https://github.com/pjtss/StockMan/actions/runs/44463148126) 성공, release upload/activate 성공. Workflow가 DB schema 180을 확인했다.
 
 # [2026-11-18] 차트 종목 추출 응답 병목과 timeout 개선
 

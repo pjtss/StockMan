@@ -120,4 +120,12 @@
 
 - 전체 자동화 진단 API가 관리자 기능 정리 커밋에서 제거된 점을 확인하고, US 일봉에 집중한 cron 인증 read-only `GET /api/debug/us-daily-cache-status`를 추가했다. 응답은 최신 DB 상태와 최근 10회 automation run 및 모듈 스케줄을 반환하고 민감정보와 원문 오류 메시지는 제외한다.
 - route tests 3/3, `node scripts/api-surface.mjs check`, `node scripts/check-docs.mjs`, `npm run typecheck` 통과. 문서/route inventory 및 공개 매뉴얼 사본을 갱신했다.
-- OCI 호스트 journal, 운영 DB 직접 접속정보는 확인할 수 없어 cron 프로세스의 실제 exit 상태는 여전히 별도 운영 호스트 증거가 필요하다. 개선 코드는 아직 커밋·푸시·배포하지 않았다.
+- 당시 구현 단계에서는 OCI 호스트 journal과 운영 DB 직접 접속정보를 확인하지 못해 cron 프로세스의 실제 exit 상태가 미확정이었다. 아래 운영 배포 후 진단 결과를 추가한다.
+
+### 2026-11-19 운영 배포 및 live 진단
+
+- 기능 commit `7f11a882`와 동시 원격 변경 `66bdab36`을 통합한 `7bb7bd74`를 `oci`에 push했다. Deploy OCI run `44463148126` 성공, release upload/activate 성공을 확인했다. Workflow 로그의 Flyway 검증은 180개 migration과 schema version 180 up-to-date를 확인했다.
+- 배포 후 운영 `/api/health`는 HTTP 200/`ok`, 새 진단 API의 미인증 요청은 HTTP 401, cron secret 헤더를 포함한 read-only 요청은 HTTP 200/`ok`였다.
+- 진단 조회 시각 `2026-11-19T05:17:43Z` (14:17 KST). 설정은 `enabled=true`, global gate=true, 매일 06:00–08:00 KST, 월~토, 3,600초 간격이다. AMS/NAS/NYS 모두 최신 봉은 `20261117`; 마지막 fetched 시각은 2026-11-17 22:31:04–22:31:25 UTC다.
+- 최근 10개 자동화 기록은 전부 `SKIPPED`, 사유 `outside_schedule`; 최신 기록은 2026-11-18 13:10:04 UTC (22:10 KST)다. 다음 허용 창인 2026-11-19 06:00–08:00 KST (2026-11-18 21:00–23:00 UTC)에 해당하는 automation 기록이 없다. 따라서 해당 창에 애플리케이션 cron 실행 기록이 생기지 않았다는 점은 확인했으나, timer 미실행인지 API 도달 전 네트워크/서비스 오류인지는 OCI systemd journal 없이 확정하지 않는다.
+- 배포된 진단 API는 문제를 관찰 가능하게 만들었지만 US 캐시를 갱신하지는 않았다. 운영 설정 변경·수동 cron 실행은 하지 않았다. 남은 다음 확인은 운영 호스트의 `stockman-cron.timer`/`.service` 활성 상태와 해당 시각 journal이다.
