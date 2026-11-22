@@ -8,6 +8,8 @@
 
 기능 정책·캐시 freshness·retry 설계는 [CANDLE_REFRESH_DESIGN.md](../CANDLE_REFRESH_DESIGN.md), cron 호출 순서와 운영 구성은 [runbook.md](runbook.md)를 참고합니다.
 
+2026-11-22 OCI cron 누락 원인 및 수정 기록은 [daily-candle-cache-refresh-diagnosis.md](daily-candle-cache-refresh-diagnosis.md)를 참고합니다.
+
 ## 과거 진단 자료
 
 이 문서의 2026-10-25 기록과 이전 관리자 API 응답 예시들은 당시 실행의 역사 기록입니다. 현재 endpoint로 호출하지 마십시오. 현재 코드의 저장 검증은 kr_common_stock_universe 활성 COMMON_STOCK와 kr_latest_daily_candles를 종목 코드·시장 기준으로 대조하는 read-only 운영 DB 절차를 사용합니다.

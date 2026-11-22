@@ -12,6 +12,7 @@ export default defineConfig({
     globals: true,
     setupFiles: './vitest.setup.ts',
     testTimeout: 30000,
+    maxWorkers: 4,
     exclude: ['node_modules/**', 'node_modules.install-partial/**', 'dist/**', 'scratch/**', '.worktrees/**', '.deploy-worktree/**'],
   },
   resolve: {

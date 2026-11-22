@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 151,
+  "documentCount": 152,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -812,6 +812,17 @@
       "related": []
     },
     {
+      "id": "operations-daily-candle-cache-refresh-diagnosis",
+      "title": "국내·미국 일봉 캐시 갱신 지연 진단 및 개선",
+      "category": "operations",
+      "format": "md",
+      "description": "국내·미국 일봉 캐시 갱신 지연 진단 및 개선 문서입니다. 세부 내용과 적용 범위는 원문을 확인하세요. (operations/daily-candle-cache-refresh-diagnosis.md)",
+      "url": "/manuals/operations/daily-candle-cache-refresh-diagnosis.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/daily-candle-cache-refresh-diagnosis.md",
+      "related": []
+    },
+    {
       "id": "operations-deployment-checklist",
       "title": "배포 전 체크리스트",
       "category": "operations",
@@ -980,7 +991,8 @@
       "url": "/manuals/operations/kr-daily-cache-refresh-runbook.md",
       "relatedPaths": [
         "docs/CANDLE_REFRESH_DESIGN.md",
-        "docs/operations/runbook.md"
+        "docs/operations/runbook.md",
+        "docs/operations/daily-candle-cache-refresh-diagnosis.md"
       ],
       "sourcePath": "docs/operations/kr-daily-cache-refresh-runbook.md",
       "related": [
@@ -993,6 +1005,11 @@
           "title": "운영 런북",
           "url": "/manuals/operations/runbook.md",
           "sourcePath": "docs/operations/runbook.md"
+        },
+        {
+          "title": "국내·미국 일봉 캐시 갱신 지연 진단 및 개선",
+          "url": "/manuals/operations/daily-candle-cache-refresh-diagnosis.md",
+          "sourcePath": "docs/operations/daily-candle-cache-refresh-diagnosis.md"
         }
       ]
     },

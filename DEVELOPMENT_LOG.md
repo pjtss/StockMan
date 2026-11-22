@@ -9357,3 +9357,18 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 변경: public/api-reference.md에서 KIS acml_tr_pbmn 원문(원)과 close × volume fallback, fetchedAt 및 bulk metadata를 설명한다. scripts/api-surface.mjs schema를 갱신해 생성 OpenAPI에도 단일·다중 코드 캔들 필드를 명시한다.
 - 검증 결과: docs:api:generate, audit:api-surface 및 전체 VITEST_MAX_WORKERS=8 npm run deploy:verify 통과. 280 test files 중 279 passed·1 skipped, 1,624 passed·3 skipped; typecheck, production build, standalone runtime/API smoke, Chrome desktop/mobile smoke 통과.
 - 커밋/배포: PR #3을 OCI에 병합한 commit 11138ba07b11858d8308bd6524877052d751719c로 push. Deploy OCI run 44637756237 성공. 운영 /api/health HTTP 200, /api-reference.md HTTP 200(원문 필드 및 fallback 설명), /openapi.json 단일·다중 candle schema의 tradingValue를 확인했다.
+# [2026-11-22] 국내·미국 일봉 캐시 OCI 호출 경로 개선
+
+### 목적·진단
+- 국내·미국 일봉 캐시 지연 원인을 확인하고 OCI 자동 호출 경로와 재발 검사를 보강한다.
+- 국내 일봉 호출이 OCI cron에 없었고, 미국 일봉은 장시간 선행 작업 뒤에 배치돼 KST schedule window를 놓칠 수 있었다.
+- 운영 read-only 점검에서 KR 표본 최신 거래일은 `20261118`, US NAS/NYS는 `20261117`이었다. US run 최근 10건은 모두 `SKIPPED/outside_schedule`이었다. 운영 timer 자체의 미실행 여부는 OCI host journal을 직접 조회하지 못해 미확정이다.
+
+### 변경 및 검증
+- `scripts/oci-cron.sh`: 국내·미국 일봉 endpoint를 health probe 직후에 실행하도록 이동/추가.
+- `scripts/check-oci-cron.mjs`: 두 endpoint 존재와 장시간 작업 전 순서를 검사.
+- `vitest.config.mts`: 전체 배포 검증의 첫 테스트 시도가 15분 제한을 넘겼다. Vitest 기본 worker 수가 머신의 전체 병렬 수를 사용해 로컬에서 과도한 프로세스 경합을 유발했으므로, 공식 `maxWorkers` 옵션을 4로 제한한다.
+- `docs/operations/daily-candle-cache-refresh-diagnosis.md`, `docs/operations/kr-daily-cache-refresh-runbook.md`: 근거, 개선, 배포 후 확인 절차와 잔여 위험 기록. 진단 파일은 문서 카탈로그의 날짜 보관 문서 제외 규칙과 충돌하지 않도록 안정적인 이름을 사용한다.
+- `npm run cron:check`, `node scripts/test-oci-cron-package.mjs` 통과. 첫 `npm run deploy:verify`는 production dependency audit에서 Next.js 15.5.28 advisory로 실패했다. lockfile만 패치된 15.5.29로 올려 audit 0건을 확인했다. Vitest 기본 worker 병렬성에서 15분 timeout 후 `maxWorkers: 4`로 제한했다.
+- 최신 원격 `oci` 기준(`09523322`)으로 재배치 후 최종 `npm run deploy:verify` 통과: production dependency audit 0 vulnerabilities, OCI activation preflight, docs/API/catalog/migration, scope/KIS/auth/cron audits, production build, standalone HTTP/Chrome desktop·mobile smoke, 전체 Vitest 280 files (279 passed/1 skipped, 1,624 passed/3 skipped), TypeScript 검사.
+- commit/push/deploy 여부: 검증 완료, 한국어 상세 커밋 후 `oci` push로 배포 workflow를 실행할 예정.

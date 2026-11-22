@@ -472,6 +472,14 @@ if (!/OnCalendar=hourly/.test(sharedCronTimer) || !/Persistent=true/.test(shared
   throw new Error("Database retention must be reachable from the persistent hourly OCI cron timer after activation");
 }
 const obvSnapshotCall = 'run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"';
+const krDailyCacheCall = 'run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"';
+const usDailyCacheCall = 'run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"';
+const dbRetentionCall = 'run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"';
+if (!source.includes(krDailyCacheCall) || !source.includes(usDailyCacheCall)
+  || source.indexOf(krDailyCacheCall) > source.indexOf(dbRetentionCall)
+  || source.indexOf(usDailyCacheCall) > source.indexOf(dbRetentionCall)) {
+  throw new Error("KR and US daily candle refreshes must run before long-running hourly OCI cron work");
+}
 if (!source.includes(obvSnapshotCall)
   || source.indexOf(obvSnapshotCall) < source.indexOf('run_cron_endpoint "us-daily-cache"')
   || !source.includes('US_OBV_REFRESH_MINUTES >= 18 * 60 + 10')) {
