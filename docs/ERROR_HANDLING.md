@@ -3,8 +3,9 @@
 - **증상**: `GET /api/disclosures?hours=1&source=all`은 0건인데 14~36초, DART 단독 7.7초, SEC 단독 3.5초였고 RSS source 단독은 56~281ms였다.
 - **근본 원인 후보**: 하나의 REPEATABLE READ transaction 안에서 `automation_runs`의 market-rss/DART/SEC latest run을 별도 Drizzle 요청으로 조회했다. 단일 Pg client의 쿼리들은 동시 실행이 되지 않으므로 세 왕복이 누적될 수 있다. 서버 로그/DB 실행계획이 없어 latency 귀속은 운영 측정과 함께 확인한다.
 - **해결**: 결과 projection이 소비하는 module key만 선택하고 `DISTINCT ON (module_key) ORDER BY module_key, started_at DESC` 한 번으로 latest coverage row를 가져온다. 결과에 쓰이지 않는 source는 run 조회에서 제외한다.
-- **재발 자동 감지**: docs checker가 필요한 module 조건과 DISTINCT ON 경계를 확인한다. 동일 `hours=1&source=all` 및 source 분할 조회의 운영 latency와 item count를 함께 기록한다.
-- **남은 위험**: production query의 14~36초는 empty result라 원인 귀속을 확정할 수 없다. 이번 변경 뒤 동일 조건 요청과 DART/SEC/RSS 단독을 재측정한다.
+- **검증 결과**: OCI run 45105548471 성공. `hours=24&source=all&page=1&pageSize=100`은 배포 전 10,668ms/24건 1회, 배포 후 2,070~2,200ms/24건 5회(중앙값 2,097ms). `hours=1&source=all`은 배포 후 418~1,472ms/0건 5회였다. health API HTTP 200/ok.
+- **재발 자동 감지**: docs checker가 필요한 module 조건과 DISTINCT ON 경계를 확인한다. 동일 API latency와 item count를 함께 기록한다.
+- **남은 위험**: pre-deploy ALL 24h 기준은 1회뿐이며, `hours=1` 결과는 0행이다. 전체 최적화 효과의 통계적 신뢰도와 remaining DB time은 실행계획/DB 계측으로 후속 확인한다.
 ## RSS 조회가 비정상적으로 느릴 때 raw payload 재파싱 방지 (2026-11-23)
 
 - **증상**: /api/disclosures 저장 RSS 조회가 느리다.

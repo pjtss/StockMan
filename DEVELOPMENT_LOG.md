@@ -12,19 +12,20 @@
 ### 검증
 - `npm test -- --run app/api/disclosures/route.test.ts lib/disclosure-timestamp-precision.test.ts`: 2 files, 8 tests 통과.
 - `npm run typecheck`: 통과.
-- 최종 `npm run deploy:verify` 통과: production audit(0 vulnerabilities), activation smoke, docs/API/scope/KIS/auth/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke, typecheck, 279 test files(1 skipped), 1,624 tests(3 skipped).
-- 느린 `hours=1&source=all` 운영 조회는 HTTP 200, total=0, 약 39초였다. 선행 7건과 결과 건수가 달라 비교 불가다. `hours=1&source=NASDAQ&page=1&pageSize=100`의 market-rss run 제거 전 4회는 HTTP 200/0건, 231/152/60/55ms(중앙값 106ms)였고 제거 후 6회는 HTTP 200/0건, 308/166/60/58/59/55ms(중앙값 59.5ms)였다. 동일 건수에서 중앙값은 약 44% 감소했지만 empty-result latency이므로 일반화하지 않는다. Source 분할: NASDAQ 0.28s, STOCKTITAN 0.16s, SEC_EDGAR 0.06s, DART 7.66s, SEC 3.49s, ALL 14.20s(재요청 36.09s)로 coverage 경로가 큰 비용 후보임을 확인했다. `/api/health` HTTP 200/ok.
+- `npm run deploy:verify` 통과: production audit(0 vulnerabilities), OCI activation smoke, docs/API/scope/KIS/auth/cron audits, build, standalone HTTP + Chrome desktop/mobile smoke, typecheck, 279 files(1 skipped), 1,624 tests(3 skipped). CI run 45105548471 성공.
+- `hours=1&source=all&page=1&pageSize=100`: 배포 전 느린 표본은 14.2초/0행, 36.1초/0행(앞서 약 39초); 배포 후 5회는 1,472/618/497/577/418ms, 모두 HTTP 200/0행/12 coverage rows(중앙값 577ms). 앞서 7행 표본은 최근 window 행 수가 달라 비교에서 제외한다. `hours=1&source=NASDAQ` run query 제거 전 중앙값 106ms/0행(4회), 후 59.5ms/0행(6회)로 약 44% 감소. `hours=24&source=STOCKTITAN`은 제거 전 중앙값 232.5ms/13행(4회), 후 55–60ms/13행(5회).
+- `hours=24&source=all&page=1&pageSize=100`: 통합 전 10,668ms/24행(1회), 배포 후 2,081/2,070/2,105/2,200/2,097ms(5회), 전부 HTTP 200/24행/12 coverage rows. 중앙값 2,097ms로 단일 기준 대비 약 80% 감소. `/api/health` HTTP 200/ok.
 
 ### 다음 개선
-- 단일 DISTINCT ON 배포 후 동일 `hours=1&source=all`과 DART/SEC/RSS split을 다시 재측정한다. ALL 결과 건수, p50/p95, health를 기록해 run-query aggregation의 실제 운영 효과를 평가한다.
+- 운영 read-only DB 계측 권한이 마련되면 `EXPLAIN (ANALYZE, BUFFERS)`로 잔여 2.1초의 쿼리별 비용을 확인하고, 동일 query를 5회 이상으로 p50/p95 재검증한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-23-002
-- 성과 판정: UNMEASURED
-- 근거: 쿼리 구성에서 불필요한 run 조회를 제거했으나 동일 데이터 건수의 운영 전후 latency 표본은 아직 없다.
+- 성과 판정: IMPROVED
+- 근거: ALL 24h 동일 쿼리/24행에서 배포 후 중앙값 2.097초, 배포 전 단일 기준 10.668초. 이전 표본 n=1이므로 개선율 일반화에 한계가 있다.
 
 ### 커밋·푸시·배포
-- eabde176 및 20b84763 커밋·푸시·배포 성공(run 45101393472, 45103109736). DISTINCT ON coverage query 변경은 전체 deploy:verify 및 docs:check 통과, commit/push/deploy 미실행.
+- 커밋 `4581b530`은 전체 로컬 `npm run deploy:verify` 및 CI run 45105548471 통과, 배포 완료. 동일 결과 수 운영 성능 측정도 완료.
 ## [2026-11-23] RSS 조회의 요청별 payload 파싱 제거
 
 ### 목표
