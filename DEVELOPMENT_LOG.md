@@ -9444,3 +9444,10 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **문서·감사**: `public/api-reference.md`, `public/llms.txt`, `docs/api/README.md`, 국내 캐시 런북과 진단 문서를 갱신했다. `scripts/api-surface.mjs`는 지정된 두 경로만 `public-action`으로 분류하고 POST 단독, route 존재, 인증 검사 부재, 최소 cooldown 및 cron/action lock 공유를 감사한다. 읽기 전용 OpenAPI에는 작업 경로를 등록하지 않는다.
 - **검증·배포**: 초기 구현에서 `npm run audit:api-surface`, 타입 검사, 문서 검사 및 `npm run deploy:verify`가 통과했다(의존성 취약점 0, OCI activation preflight, API/docs/scope/KIS/auth/cron 감사, production build, standalone HTTP·Chrome desktop/mobile smoke, Vitest 280 files 중 279 passed/1 skipped, 1,624 passed/3 skipped). 커밋 `0412e993` 배포 후 운영 무인증 국내 POST는 앞단 nginx에서 504가 났고, 직후 두 번째 POST가 `already_running` 202를 반환해 작업 중 DB lock 유지가 확인됐다. Next.js 공식 self-hosted 지원 `after()` 방식 및 cron/action 공용 lock으로 보완한 후 최종 `npm run deploy:verify`도 통과했다(같은 전체 1,624 passed/3 skipped 포함). 비동기 보완분은 다음 상세 커밋·푸시로 배포할 예정이다.
 - **남은 위험**: 공개 호출은 시장별 최소 1시간 cooldown과 DB lock으로 제한하지만 누구나 갱신을 요청할 수 있다. 202는 작업 접수만 의미하며 완료 성공 여부가 아니다. 완료 여부는 `GET /api/public/daily-candles`, automation_runs, 서버 로그의 최신 거래일·실행 결과·universe coverage로 확인한다.
+
+## [2026-11-23] 미사용 코드 정리 OCI 배포 완료
+- **목적·범위**: 미사용 helper/component 정리를 최신 원격 `oci` 이력과 통합해 운영 배포했다.
+- **반영**: merge commit `48287620536eb6c30d15373a152a9a7fa143b395`를 `oci`에 fast-forward push했다. 미사용 모듈 정리 커밋과 원격 최신 20개 커밋을 포함한다.
+- **검증**: 로컬 `npm run deploy:verify` 통과(의존성 감사 0 취약점, OCI activation preflight, 문서/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke, Vitest 280 files 중 279 passed·1 skipped, 1,624 passed·3 skipped, typecheck).
+- **배포 후 확인**: GitHub Actions Deploy OCI run `45132995688` 성공. 활성화 로그에서 Flyway schema version 182, migration up-to-date, 410개 event upsert 성공을 확인했다. `GET /api/health`는 2026-11-23 07:50:01 UTC에 `status=ok`를 반환했다. 공개 health route는 상세 commit/build/Flyway 정보를 노출하지 않으므로 workflow 로그를 migration 근거로 사용한다.
+- **남은 위험·다음 단계**: 없음. 커밋·푸시·배포 완료.
