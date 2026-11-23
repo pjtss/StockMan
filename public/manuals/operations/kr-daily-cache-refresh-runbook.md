@@ -4,7 +4,7 @@
 
 ## 현재 실행 경로
 
-국내 일봉 캐시는 OCI cron의 /api/cron/kr-daily-cache 예약 경로로 갱신됩니다. 수동 관리자 실행 경로는 없습니다. 자동 실행 여부와 실패 사유는 운영 서버의 stockman-cron.service journal 및 automation_runs 기록을 확인합니다. 공개 상태 확인에는 GET /api/health를 사용합니다.
+국내 일봉 캐시는 OCI cron의 `/api/cron/kr-daily-cache` 예약 경로로 갱신됩니다. 관리자 수동 실행 UI는 없으며, 무인증 공개 갱신이 필요하면 `POST /api/public/daily-cache/kr/refresh`를 호출할 수 있습니다. 이 공개 요청은 시장별 최소 1시간 간격과 DB 분산 잠금으로 중복 실행을 막고, 운영자가 기능을 비활성화한 경우 실행하지 않습니다. 자동 실행 여부와 실패 사유는 운영 서버의 stockman-cron.service journal 및 automation_runs 기록을 확인합니다. 공개 상태 확인에는 GET /api/health를 사용합니다.
 
 기능 정책·캐시 freshness·retry 설계는 [CANDLE_REFRESH_DESIGN.md](../CANDLE_REFRESH_DESIGN.md), cron 호출 순서와 운영 구성은 [runbook.md](runbook.md)를 참고합니다.
 

@@ -10,6 +10,11 @@ const methodsPattern = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DEL
 const excludedPath = /\/(?:admin|debug|cron|internal|local)(?:\/|$)/i;
 const userPath = /\/(?:auth|watchlist|push)(?:\/|$)/i;
 const requestAuthenticationPattern = /(?:headers\.get\(["'](?:authorization|x-api-key|x-daily-cache-key|cookie)["']\)|cookies\s*\(\s*\)|getServerSession|requireAdminSession|isCronRequestAuthorized|DAILY_CACHE_READ_API_KEY|verifyBbExportToken|(?:is)?authorized\s*\(|requireApiAuth\s*\(|requireAuth\s*\(|verifyApiKey\s*\(|validateApiKey\s*\()/i;
+const publicDailyCacheActionPaths = new Set([
+  "/api/public/daily-cache/kr/refresh",
+  "/api/public/daily-cache/us/refresh",
+]);
+const publicDailyCacheActionHelper = "lib/public-daily-cache-refresh.ts";
 
 async function routeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -36,6 +41,7 @@ function apiPath(file) {
 }
 
 function accessFor(path, source, methods) {
+  if (publicDailyCacheActionPaths.has(path)) return "public-action";
   if (path === "/api/events/collect") return requestAuthenticationPattern.test(source) ? "internal-or-operator" : "public-write-source-materialization";
   if (/requireAdminSession/.test(source)) return "admin-session";
   if (/isCronRequestAuthorized/.test(source)) return "cron-guarded";
@@ -423,6 +429,24 @@ for (const file of await routeFiles(apiRoot)) {
   });
 }
 routes.sort((a, b) => a.path.localeCompare(b.path, "en"));
+
+for (const path of publicDailyCacheActionPaths) {
+  const route = routes.find((item) => item.path === path);
+  if (!route) {
+    routePolicyFailures.push(`Required public daily-cache action is missing: ${path}`);
+    continue;
+  }
+  if (JSON.stringify(route.methods) !== JSON.stringify(["POST"]) || route.access !== "public-action") {
+    routePolicyFailures.push(`Public daily-cache action must expose only unauthenticated POST: ${path}`);
+  }
+  const source = `${await readFile(join(root, route.source), "utf8")}\n${await readFile(join(root, publicDailyCacheActionHelper), "utf8")}`;
+  if (requestAuthenticationPattern.test(source)) {
+    routePolicyFailures.push(`Public daily-cache action must not inspect caller authentication: ${path}`);
+  }
+  if (!source.includes("withAutomationLock") || !source.includes("loadLatestExecutedAutomationRun") || !source.includes("PUBLIC_REFRESH_MIN_INTERVAL_SECONDS = 3_600")) {
+    routePolicyFailures.push(`Public daily-cache action must preserve the distributed lock and minimum cooldown: ${path}`);
+  }
+}
 
 const mode = process.argv[2] ?? "check";
 if (routePolicyFailures.length) {

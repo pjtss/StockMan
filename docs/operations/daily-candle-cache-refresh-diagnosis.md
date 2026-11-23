@@ -15,9 +15,18 @@
 - 두 route의 인증, schedule 및 DB 기반 interval gate는 유지한다.
 - `scripts/check-oci-cron.mjs`에 두 호출의 존재와 장시간 작업 전 실행 순서를 검사하는 자동 조건을 추가했다.
 
+## 무인증 공개 갱신 API
+
+- 일봉 갱신을 외부에서 직접 요청할 수 있도록 `POST /api/public/daily-cache/kr/refresh`와 `POST /api/public/daily-cache/us/refresh`를 제공한다. HTTP 작업 실행이므로 조회 전용 GET API와 분리했다.
+- 두 endpoint는 호출자 인증을 검사하지 않는다. 단, 운영자가 각 기능을 비활성화하면 409, 최근 실행 후 최소 1시간(설정 interval이 더 크면 해당 간격) 내에는 429와 `Retry-After`, 이미 실행 중에는 202를 돌려준다.
+- 시장별 DB advisory lock과 `automation_runs` 실행 간격 확인을 적용해 동시 요청과 반복 요청으로 인한 전체 시장 작업 중복을 억제한다. scheduler 시간창은 무인증 직접 호출에는 적용하지 않는다.
+- 공개 action은 읽기 전용 OpenAPI에 포함하지 않고, `public/api-reference.md`의 별도 작업 API 섹션과 전체 route inventory에서만 문서화한다. API surface 감사는 허용된 두 POST만 `public-action`으로 인정하고 인증 검사 회귀를 실패 처리한다.
+- 작업 결과는 대상·성공·실패 종목 수와 저장 봉 수를 반환한다. 공개 endpoint는 전체 universes를 처리할 수 있으므로 자동화 연동은 429의 `Retry-After`를 준수하고 같은 시장을 반복 호출하지 않는다.
+
 ## 재발 감지 및 운영 확인
 
 - `npm run cron:check`에서 국내·미국 endpoint 호출 누락 또는 순서 역전을 감지한다.
+- `npm run audit:api-surface`에서 무인증 공개 갱신 API 두 개의 존재, POST 전용 메서드, 호출자 인증 검사 부재 및 공개 action 분류를 확인한다.
 - 배포 후 `journalctl -u stockman-cron.service`에서 `[Cron] kr-daily-cache`와 `[Cron] us-daily-cache`의 success/skip/failure 및 duration을 확인한다. HTTP 성공만으로 실제 갱신을 판정하지 말고 응답의 `skipped`와 처리 건수를 확인한다.
 - `automation_runs`의 최신 실행과 운영 캐시별 최신 거래일/갱신시각을 대조한다. `outside_schedule`이 반복되면 OCI timer 실행 시각과 DB의 enabled, activeDays, KST 시간창, interval을 대조한다.
 

@@ -11,6 +11,7 @@
 - HTTPS와 UTF-8 JSON을 사용한다. API base path는 /api다.
 - 외부 서버/AI backend에서 호출할 때 브라우저 CORS는 필요하지 않다. 브라우저에서 직접 호출하는 외부 origin은 지원한다고 보장하지 않는다.
 - 외부 공개 읽기 전용 GET API는 별도 인증 없이 호출한다. 종목·시장 정보와 저장된 캔들 조회를 포함한다.
+- 일봉 캐시 갱신은 별도 명시된 공개 POST 작업 API이며, 호출자 인증 없이 사용할 수 있다. 부하 방지를 위해 시장별 최소 1시간 간격, 운영 활성화 설정, 분산 잠금을 적용한다.
 
 예시:
 
@@ -38,8 +39,11 @@ LLM은 각 작업에서 라이브 OpenAPI·메뉴얼·카탈로그를 다시 조
 | user-session-or-user-data | 금지 | 사용자 세션 또는 개인정보에 연결. |
 | admin-session, internal-or-operator, internal-secret | 금지 | 관리자·진단·내부 관측 전용. |
 | cron-guarded, provider-webhook, write-or-action | 금지 | 예약 실행, callback, 변경/작업 실행 경계. |
+| public-action | 별도 명시된 무인증 POST만 허용 | 이 문서의 일봉 캐시 갱신 API 두 경로에만 적용하며 OpenAPI 읽기 명세에는 포함하지 않는다. |
 
 HTTP GET만 보고 읽기 전용이라고 판단하지 않는다. 외부 공개 데이터 GET은 사용자·관리자 정보에 접근하지 않고 호출에 따른 DB 쓰기나 작업 실행이 없어야 한다. 관리자·cron 인증을 외부 AI에 넘겨 실행하지 않는다. 새 외부 데이터 GET은 인증 없이 구현하고 `node scripts/api-surface.mjs write` 및 `npm run audit:api-surface`로 무인증 계약을 갱신·검증한다. service-bearer GET은 API surface 검증에서 실패한다.
+
+일봉 캐시 갱신은 사용자가 명시적으로 요청한 공개 작업 기능이다. GET 안전 의미를 유지하기 위해 POST로만 제공하며, 정확히 국내/미국 경로 두 개만 route inventory에서 `public-action`으로 분류한다. 각 시장에서 최소 1시간 동안 한 번만 실행되고, 이미 실행 중이면 중복 작업을 시작하지 않는다.
 
 ## 인증
 
@@ -56,6 +60,24 @@ HTTP GET만 보고 읽기 전용이라고 판단하지 않는다. 외부 공개 
 - 빈 배열이나 null은 데이터 부재일 수 있다. 오류나 Mock 데이터로 바꾸지 않는다.
 
 ## 상세 API 계약
+
+### 국내 일봉 캐시 갱신 — POST /api/public/daily-cache/kr/refresh
+
+요청 본문과 인증 헤더가 필요 없다. 요청하면 운영 DB의 국내 활성 COMMON_STOCK 유니버스 중 갱신 대상 일봉 데이터를 처리하고 결과 요약을 반환한다. scheduler 시간창은 적용하지 않지만 운영자가 기능을 비활성화하면 HTTP 409로 거절한다. 같은 시장의 최근 실행 후 최소 1시간(설정 interval이 더 크면 해당 간격) 동안은 HTTP 429와 `Retry-After`를 반환한다. 작업이 이미 실행 중이면 HTTP 202 `already_running`을 반환한다. 처리 결과에는 상태, 대상·성공·실패 종목 수, 저장 봉 수 및 국내 시장별 coverage가 포함된다. DB 또는 실행 준비 장애는 HTTP 503이다.
+
+```sh
+curl -X POST https://<host>/api/public/daily-cache/kr/refresh
+```
+
+### 미국 일봉 캐시 갱신 — POST /api/public/daily-cache/us/refresh
+
+요청 본문과 인증 헤더가 필요 없다. 요청하면 운영 DB의 미국 활성 COMMON_STOCK 유니버스에서 갱신 대상 일봉 데이터를 처리하고 결과 요약을 반환한다. 국내 경로와 같은 활성화 설정, 시장별 최소 1시간 실행 간격, 분산 잠금 및 HTTP 202/409/429/503 의미를 사용한다. 완료 응답에는 상태, 처리·성공·실패 종목 수와 저장 봉 수가 포함된다.
+
+```sh
+curl -X POST https://<host>/api/public/daily-cache/us/refresh
+```
+
+이 두 POST는 외부 읽기 전용 OpenAPI 문서에 들어가지 않으며, 쓰기·작업 실행 API 중 문서에서 별도로 명시한 유일한 무인증 경로다.
 
 ### 종목명 — GET /api/stock/lookup
 

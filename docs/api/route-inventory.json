@@ -511,6 +511,22 @@
       "source": "app/api/public/api-manual/route.ts"
     },
     {
+      "path": "/api/public/daily-cache/kr/refresh",
+      "methods": [
+        "POST"
+      ],
+      "access": "public-action",
+      "source": "app/api/public/daily-cache/kr/refresh/route.ts"
+    },
+    {
+      "path": "/api/public/daily-cache/us/refresh",
+      "methods": [
+        "POST"
+      ],
+      "access": "public-action",
+      "source": "app/api/public/daily-cache/us/refresh/route.ts"
+    },
+    {
       "path": "/api/public/daily-candles",
       "methods": [
         "GET"

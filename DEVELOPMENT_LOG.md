@@ -9372,3 +9372,11 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - `npm run cron:check`, `node scripts/test-oci-cron-package.mjs` 통과. 첫 `npm run deploy:verify`는 production dependency audit에서 Next.js 15.5.28 advisory로 실패했다. lockfile만 패치된 15.5.29로 올려 audit 0건을 확인했다. Vitest 기본 worker 병렬성에서 15분 timeout 후 `maxWorkers: 4`로 제한했다.
 - 최신 원격 `oci` 기준(`09523322`)으로 재배치 후 최종 `npm run deploy:verify` 통과: production dependency audit 0 vulnerabilities, OCI activation preflight, docs/API/catalog/migration, scope/KIS/auth/cron audits, production build, standalone HTTP/Chrome desktop·mobile smoke, 전체 Vitest 280 files (279 passed/1 skipped, 1,624 passed/3 skipped), TypeScript 검사.
 - commit/push/deploy 여부: 검증 완료, 한국어 상세 커밋 후 `oci` push로 배포 workflow를 실행할 예정.
+
+### 2026-11-23 — 무인증 공개 국내·미국 일봉 갱신 API
+- **목적**: 운영 자동화 외부에서도 누구나 국내 또는 미국 전체 활성 보통주 일봉 캐시 갱신을 요청할 수 있도록 공개 호출 경로를 제공한다.
+- **원인·설계**: 기존 `/api/cron/*-daily-cache`는 cron secret을 요구해 외부 사용자가 호출할 수 없었다. 갱신은 DB write와 공급자 요청을 수행하므로 RFC 9110의 POST semantics에 따라 무인증 POST로 분리하고 기존 읽기 전용 GET OpenAPI에는 섞지 않았다.
+- **변경**: `POST /api/public/daily-cache/kr/refresh`, `POST /api/public/daily-cache/us/refresh`와 공통 `lib/public-daily-cache-refresh.ts`를 추가했다. 호출자 인증 없이 작동하며 scheduler 시간창은 건너뛰되, 운영 enabled 설정을 존중하고 시장별 최소 1시간 cooldown(설정 interval이 더 크면 이를 적용), DB 분산 lock, `automation_runs` cooldown 확인을 둔다. 완료 응답은 실행 상태와 bounded 요약을 제공하며 cooldown은 429/Retry-After, 이미 실행 중은 202, 운영 비활성화는 409로 반환한다.
+- **문서·감사**: `public/api-reference.md`, `public/llms.txt`, `docs/api/README.md`, 국내 캐시 런북과 진단 문서를 갱신했다. `scripts/api-surface.mjs`는 지정된 두 경로만 `public-action`으로 분류하고 POST 단독, route 존재 및 인증 검사 부재를 감사한다. 읽기 전용 OpenAPI에는 작업 경로를 등록하지 않는다.
+- **검증·배포**: `npm run audit:api-surface` 통과(106 route, 읽기 GET 45개), `npm run typecheck` 통과, `node scripts/check-docs.mjs` 통과, `npm run deploy:verify` 전체 통과(의존성 취약점 0, OCI activation preflight, API/docs/scope/KIS/auth/cron 감사, production build, standalone HTTP 및 Chrome desktop/mobile smoke, Vitest 280 files 중 279 passed/1 skipped, 1,624 passed/3 skipped, TypeScript 검사). 현재 검증된 변경은 로컬 worktree에 있으며, 상세 한국어 커밋 후 `oci` push가 배포를 시작한다.
+- **남은 위험**: API는 전체 시장 작업이 길어질 수 있어 호출자가 충분한 HTTP timeout을 설정해야 한다. 공개 호출 빈도는 시장별 cooldown과 DB lock으로 제어한다. 운영 health/read-only API 확인만으로 실제 전체 종목 최신 거래일을 증명할 수 없으므로 실제 갱신 후 run 결과 및 universe coverage를 대조한다.

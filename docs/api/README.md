@@ -16,9 +16,9 @@ API path는 현재 `/api`이며 major version prefix는 없다. OpenAPI `info.ve
 
 ## 공개 범위 결정
 
-외부 AI 공개 범위는 읽기 API로 제한한다. GET method는 무변경을 보증하지 않으므로 라우트 본문에서 확인된 snapshot write 및 KIS realtime ticket 발급 route를 `read-with-side-effect`로 따로 분류한다. URL query에 서명 토큰을 싣는 다운로드 경로는 `signed-link`로 분류해 외부 AI 명세에서 제외한다. 로그인·개인정보, 관리자, debug, cron, internal, webhook, 쓰기/작업 실행 route는 public OpenAPI에 넣지 않는다. 경로/메서드 전체는 운영·개발자가 발견할 수 있게 inventory에 유지한다.
+외부 AI 공개 범위는 읽기 API를 기본으로 한다. GET method는 무변경을 보증하지 않으므로 라우트 본문에서 확인된 snapshot write 및 KIS realtime ticket 발급 route를 `read-with-side-effect`로 따로 분류한다. URL query에 서명 토큰을 싣는 다운로드 경로는 `signed-link`로 분류해 외부 AI 명세에서 제외한다. 로그인·개인정보, 관리자, debug, cron, internal, webhook, 일반 쓰기/작업 실행 route는 public OpenAPI에 넣지 않는다. 사용자가 명시적으로 요청한 국내·미국 일봉 캐시 갱신 POST 두 경로만 `public-action`으로 별도 허용하고 `public/api-reference.md`에 계약을 문서화한다. 경로/메서드 전체는 운영·개발자가 발견할 수 있게 inventory에 유지한다.
 
-외부 공개 OpenAPI에 포함되는 모든 읽기 전용 GET은 무인증이어야 한다. 사용자·관리자 정보, 내부 진단, 쓰기·작업 실행 및 GET 부수효과가 있는 route는 공개 명세에서 제외한다. API surface 감사는 외부 GET의 Bearer 인증과 공개 후보 route의 요청자 인증 확인을 실패 처리한다.
+외부 공개 OpenAPI에 포함되는 모든 읽기 전용 GET은 무인증이어야 한다. 사용자·관리자 정보, 내부 진단, 쓰기·작업 실행 및 GET 부수효과가 있는 route는 공개 명세에서 제외한다. 일봉 갱신 POST는 읽기 OpenAPI 밖에서만 문서화하며, 시장별 최소 1시간 cooldown, 분산 실행 잠금, 운영 활성화 설정을 적용한다. API surface 감사는 외부 GET의 Bearer 인증과 공개 후보 route의 요청자 인증 확인, 그리고 허용목록 밖의 공개 action을 실패 처리한다.
 
 인벤토리의 `service-bearer`는 내부·운영 전용 분류로만 남길 수 있으며 외부 읽기 전용 GET 명세에 포함할 수 없다.
 
