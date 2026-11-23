@@ -1,3 +1,86 @@
+## [2026-11-23] RSS 조회 hot path 추가 분리
+
+### 목표
+- RSS/공시 조회의 운영 응답시간을 줄이고 느린 query 구성 요소를 제거한다.
+
+### 반영
+- 재검사에서 RSS 단일 source 조회가 응답에서 쓰지 않는 DART/SEC run 조회를 실행하고, NASDAQ 등 RSS 결과가 없는 source 필터에서도 market-rss run coverage를 조회하는 구조를 확인했다.
+- `/api/disclosures`는 DART/SEC run을 해당 source 요청 때만 포함한다. RSS run은 coverage 소비 source에서만 조회하고, automation_runs 필요한 module rows를 DISTINCT ON 단일 SELECT로 가져온다. NASDAQ 등 run coverage가 없는 source는 제외하며 sourceCoverage 응답은 보존한다.
+- 재발 자동 감지: route 회귀 테스트, deploy:verify, 동일 query 및 item count를 함께 기록하는 운영 반복 측정을 수행한다.
+- 범위: `app/api/disclosures/route.ts`, 이 로그 및 daily disclosure 설계 문서.
+
+### 검증
+- `npm test -- --run app/api/disclosures/route.test.ts lib/disclosure-timestamp-precision.test.ts`: 2 files, 8 tests 통과.
+- `npm run typecheck`: 통과.
+- `npm run deploy:verify` 통과: production audit(0 vulnerabilities), OCI activation smoke, docs/API/scope/KIS/auth/cron audits, build, standalone HTTP + Chrome desktop/mobile smoke, typecheck, 279 files(1 skipped), 1,624 tests(3 skipped). CI run 45105548471 성공.
+- `hours=1&source=all&page=1&pageSize=100`: 배포 전 느린 표본은 14.2초/0행, 36.1초/0행(앞서 약 39초); 배포 후 5회는 1,472/618/497/577/418ms, 모두 HTTP 200/0행/12 coverage rows(중앙값 577ms). 앞서 7행 표본은 최근 window 행 수가 달라 비교에서 제외한다. `hours=1&source=NASDAQ` run query 제거 전 중앙값 106ms/0행(4회), 후 59.5ms/0행(6회)로 약 44% 감소. `hours=24&source=STOCKTITAN`은 제거 전 중앙값 232.5ms/13행(4회), 후 55–60ms/13행(5회).
+- `hours=24&source=all&page=1&pageSize=100`: 통합 전 10,668ms/24행(1회), 배포 후 2,081/2,070/2,105/2,200/2,097ms(5회), 전부 HTTP 200/24행/12 coverage rows. 중앙값 2,097ms로 단일 기준 대비 약 80% 감소. `/api/health` HTTP 200/ok.
+
+### 다음 개선
+- 운영 read-only DB 계측 권한이 마련되면 `EXPLAIN (ANALYZE, BUFFERS)`로 잔여 2.1초의 쿼리별 비용을 확인하고, 동일 query를 5회 이상으로 p50/p95 재검증한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-23-002
+- 성과 판정: IMPROVED
+- 근거: ALL 24h 동일 쿼리/24행에서 배포 후 중앙값 2.097초, 배포 전 단일 기준 10.668초. 이전 표본 n=1이므로 개선율 일반화에 한계가 있다.
+
+### 커밋·푸시·배포
+- 커밋 `4581b530`은 전체 로컬 `npm run deploy:verify` 및 CI run 45105548471 통과, 배포 완료. 동일 결과 수 운영 성능 측정도 완료.
+## [2026-11-23] RSS 조회의 요청별 payload 파싱 제거
+
+### 목표
+- 운영 RSS 조회 cold 지연을 줄이고 원문 payload의 요청별 반복 전송·분류를 제거한다.
+
+### 반영
+- 근본 원인: /api/disclosures가 raw_payload를 SQL 정규식으로 정밀도 분류하고 같은 payload를 Node에서 JSON parse했다.
+- ingest 시 rss_timestamp_precision/rss_published_date를 저장하고 query/response는 요약 필드만 사용한다. V182는 기존 행 backfill과 date-only/instant 부분 인덱스를 추가한다. API 응답 의미는 유지한다.
+- 배포 전 production dependency gate가 next@15.5.28 advisory로 실패하여 next@15.5.29로 패치했다. Next.js [공식 지원 정책](https://nextjs.org/support-policy)에 따라 유지보수 15.x 최신 patch를 사용하며 audit 0건을 확인했다.
+- 재발 자동 감지: timestamp classifier tests, docs checker의 ingest/query 경계 확인, 운영 GET latency/결과 건수 비교를 유지한다.
+- 범위: disclosures route/schema/ingest, V182 migration, docs checker, RSS 오류·설계 기록, Next dependency lock.
+
+### 검증
+- 변경 전 운영 GET hours=1/source=all/page=1/pageSize=100: 27s/HTTP 200/7 items 1회. NASDAQ/SEC_EDGAR 분리 GET 482/399ms, 0건. 추가 all-source GET은 61.5s 뒤 JSON parse 실패(상태/본문 미기록). 표본이 적어 cold 기준을 일반화하지 않는다.
+- synthetic microbenchmark (25,000행×5회): JSON parse/classify 74.5ms, persisted precision lookup 2.0ms. 행당 815 bytes payload를 DB에서 가져오지 않으며 25,000행의 가상 payload는 20.4 MB다. 운영 API latency 개선율로 해석하지 않는다.
+- 최신 `origin/oci` HEAD에 재적용한 전체 검증 통과: OCI activation preflight; docs/API/scope/KIS/Bearer/cron audits; Next.js 15.5.29 production build; standalone HTTP/API smoke와 Chrome desktop/mobile hydration; typecheck; full Vitest 279 files (1 skipped), 1,624 passed (3 skipped). `docs:check`에서 migration 182개 및 운영 schema 30 tables/2 views 확인.
+
+### 다음 개선
+- 배포 후 동일 운영 GET을 cold/warm 각각 반복해 p50/p95와 item count를 확인하고 Flyway V182 backfill 시간을 측정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-23-001
+- 성과 판정: 운영 동일 쿼리 결과 건수를 비교하고 반복 latency 개선으로 확정한다. 합성 microbenchmark는 구조 개선 참고치다.
+- 근거: feed timestamp 정밀도는 ingest 시 정해져 있으므로 조회마다 raw payload를 처리할 필요가 없다.
+
+### 커밋·푸시·배포
+- 상태: 검증 완료, push 후 OCI workflow 및 운영 성능 GET 확인 대기.
+
+# [2026-11-19] US 일봉 갱신 진단 API 복구
+
+### 목표
+- 운영 US 최신 일봉이 거래일 대비 뒤처질 때 캐시 상태만 보지 않고 자동화 실행 결과와 시장별 coverage를 한 번에 확인할 수 있도록 한다.
+
+### 반영
+- 11월 17일 정리 커밋에서 전체 자동화 진단 route가 제거된 상태를 확인했다. 무거운 전체 집계 API/UI는 되살리지 않고, cron 인증 read-only `GET /api/debug/us-daily-cache-status`를 추가했다.
+- 공식 활성 COMMON_STOCK만 대상으로 거래소별 eligible/cache/최신 봉일 coverage와 fetched 시각, US 일봉 최근 10회 실행 상태/기간/안전한 수치 및 error code 요약, 모듈 enabled/schedule/interval 상태를 제공한다. 원문 오류 메시지·비밀값은 제외하고 `no-store`를 적용한다.
+- `docs/automation-observability.md`, 공개 매뉴얼 사본, 문서 카탈로그, `docs/api/route-inventory.json`을 새 내부 endpoint에 맞춰 갱신했다. 외부 OpenAPI에는 넣지 않는다.
+
+### 검증
+- 진단 route 회귀 테스트 3/3 통과(미인증 거부/DB 미조회, coverage·민감정보 제거, 안전한 503 응답).
+- `node scripts/api-surface.mjs check` 통과: 106 route 파일, 공개 GET 45개. 내부 route는 `cron-guarded`이며 OpenAPI에 추가하지 않았다.
+- `node scripts/check-docs.mjs` 통과(문서 entry 28개, migration 179개, 운영 테이블/뷰 30/2).
+- 전체 `npm run deploy:verify` 통과: 운영 의존성 감사(취약점 0), activation preflight, API/docs/scope/KIS/auth/cron gates, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke, typecheck, 전체 Vitest 282 files (1 skipped), 1,630 passed (3 skipped).
+- `npm run audit:bearer-auth`, `npm run cron:check`, `npm run audit:api-surface`, `node docs/api/document-catalog.mjs check`, `git diff --check` 통과.
+- 원격 `oci` 동시 변경 통합 후 재검증도 `npm run deploy:verify` 전체 통과: migration 180, production build/standalone desktop·mobile smoke, typecheck, 282 files (1 skipped), 1,631 passed (3 skipped), docs/API/scope/KIS/auth/cron gates.
+
+### 결과 및 위험
+- 운영 진단 API가 제거되어 전체 자동화 이력을 확인하지 못하던 상태를 US 전용 경로로 개선했다. 운영에서 인증 GET 200, 미인증 GET 401, `/api/health` 200을 확인했다.
+- 배포 후 설정은 enabled, gate=true, 06:00–08:00 KST, 월~토, 1시간 간격이다. 운영 최신 US 봉은 여전히 `20261117`; 최근 10회 실행은 모두 `SKIPPED/outside_schedule`이며 마지막 기록은 2026-11-18 13:10 UTC (22:10 KST)다. 다음 06:00–08:00 KST 실행 창에 해당하는 기록이 없다.
+- 현재 증거로는 예약 창에 cron API 실행 기록이 생성되지 않은 상태까지 확인했다. OCI `stockman-cron` systemd journal을 조회할 수 없어 timer 미실행과 API 도달 전 실패 중 직접 원인은 미확정이다. 운영 캐시 갱신이나 cron 수동 실행은 하지 않았다.
+
+### 커밋·푸시·배포
+- 기능 커밋 `7f11a882`, 원격 `oci`의 동시 변경 `66bdab36` 통합 merge commit `7bb7bd74`; `oci` push 완료.
+- Deploy OCI workflow run [`44463148126`](https://github.com/pjtss/StockMan/actions/runs/44463148126) 성공, release upload/activate 성공. Workflow가 DB schema 180을 확인했다.
+
 # [2026-11-18] 차트 종목 추출 응답 병목과 timeout 개선
 
 ### 목표
@@ -9297,6 +9380,8 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **재발 감지**: route regression test는 국내 쿼리에 없는 컬럼 참조를 금지하고 계산식/반환값을 확인한다. route test 7개와 전체 deployment verification을 통과했다.
 - **검증/반영 상태**: 최종 필터 확장 포함 `npm run deploy:verify` 통과(0 취약점, production build, standalone HTTP/Chrome desktop·mobile, typecheck, docs/API/schema gates, Vitest 1,650 passed·3 skipped). `1120d3c6` push 및 Deploy OCI run `44438975616` 성공. 운영 daily-candles read API와 두 snapshot 생성/검증을 완료했다.
 - **최종 snapshot**: US eligible 5,050, instruments 4,964, candles 590,979, missing 86, latest `20261117`; KR eligible/instruments 2,345, candles 275,203, missing 0, latest `20261118`. Snapshot quality check는 중복 코드·형식 오류·미제외 ADR/ADS 0건, retrieved+missing=eligible를 확인했다.
+- **artifact 배포 상태**: snapshot/docs commit `77c5cd2c`를 `oci`에 push했고 Deploy OCI run `44443286997` 성공을 확인했다. 배포 후 health 200, NAS universe 3,053, KOSPI 1종목 일봉 GET 200을 재확인했다. 최신 artifact worktree HEAD와 원격 `oci` tip은 `77c5cd2c`다.
+- **마지막 검증 재시도**: runbook/log 보강 상태에서 `npm run deploy:verify`가 production build, standalone HTTP/Chrome desktop·mobile smoke, typecheck, docs/API/schema/auth/KIS/cron gates까지 통과했으나 전체 suite에서 기존 `components/watchlist-workbench.test.tsx` 1건이 이름 resolver timing으로 실패했다. 직전 시도의 KIS Retry-After 경계 assertion(기대 60, 실제 59) 실패도 캔들 경로와 무관했다. 이어서 별도 전체 `npm test -- --run`이 290 files (1 skipped), 1,650 passed (3 skipped)로 통과했다. 코드/JSON 변경은 없다.
 - **남은 위험/다음 단계**: US에는 캐시 일봉이 없는 86종목이 기록됐다. 다른 미국 종목 소비 API가 동일한 마스터 분류를 따르는지 별도 영향 점검이 남는다. 운영 DB 직접 조회나 쓰기는 수행하지 않았다.
 
 ## [2026-11-19] 미사용 코드 정리 배포 후보 격리
@@ -9307,3 +9392,55 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **검증 결과**: 최신 기준 `77c5cd2c`에 적용한 후보에서 `npm run deploy:verify` 통과. 의존성 감사 0 취약점, build, standalone HTTP 및 Chrome desktop/mobile hydration smoke, typecheck, docs/API/schema/audit/cron 게이트가 모두 성공했다. Vitest는 281개 파일 통과·1개 건너뜀, 1,627개 테스트 통과·3개 건너뜀으로 완료됐다. Vitest 실행 시간은 약 699초였다.
 - **커밋·푸시·배포**: 정리 후보는 미커밋·미푸시 상태이며 운영 배포에 포함하지 않았다. 원격 `77c5cd2c` 배포와 별개다.
 - **다음 조치·남은 위험**: 후보는 검증 완료된 미커밋·미푸시 상태다. 원본 작업 트리의 미커밋 자료와 분리되어 있으며, 필요 시 이 후보에서 리뷰·배포 절차를 진행한다.
+## [2026-11-19] 미사용 코드 정리 및 OCI 배포
+- **목적/범위**: 앱 및 운영 경로에서 참조되지 않는 runtime helper·과거 모듈을 정리하고, 테스트·문서 게이트 및 OCI 배포 검증 후 `oci` 브랜치에 반영한다.
+- **변경**: orphan 모듈과 전용 테스트를 삭제하고, 호출처가 없는 export helper와 테스트 전용 reset 함수를 제거했다. `/api/dart/contract` route는 유지하고 권리 surface fixture를 갱신했다. 문서 검사 assertion은 삭제된 RSS export helper 대신 현재 `/api/disclosures` route를 검사하도록 조정했다. 테스트 회귀 계약에서 참조가 드러난 RSS translation review CSV export/eligibility 및 KIS US industry sync helper와 전용 테스트는 삭제 대상에서 제외해 보존했다.
+- **근본 원인/재발 방지**: 기능 제거 뒤에도 고립 모듈·전용 테스트·오래된 검사 기준이 남아 있었다. 정리 시 실제 앱/운영 import graph, 테스트 참조, route contract 및 문서 검사를 함께 대조한다. 이름 기반 export probe의 raw 결과는 내부 참조 오탐이 있어 개별 확인 없이 삭제 근거로 사용하지 않는다.
+- **검증 실패 및 수정**: 첫 build에서 `krMinuteCandles` 미정의 오류가 발생했다. 조회 helper 제거 시 같은 파일의 저장 함수에 필요한 schema import까지 제거한 것이 원인이었으며, `saveKrMinuteCandles` 참조를 재확인해 import를 복구했다. 두 번째 전체 테스트에서 삭제한 모듈을 직접 import하는 3개 suite가 확인돼 관련 helper 및 industry sync 테스트를 복구했다.
+- **최종 검증 결과**: 최신 `origin/oci` 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과. dependency audit 0 vulnerabilities, OCI activation preflight, docs/API/catalog/scope/KIS/auth/cron audits, production build 및 typecheck, standalone HTTP/API/Chrome desktop·mobile smoke, Vitest 282 files (281 passed, 1 skipped), 1,627 tests passed (3 skipped). UTF-8 strict decode, document catalog check 및 `git diff --check` 통과.
+- **재발 방지/남은 위험**: 공유 Windows에서는 worker 시작 timeout이 간헐적으로 발생했으나, 공식 `VITEST_MAX_WORKERS` 환경변수로 8개로 제한한 전체 실행은 성공했다. CI Linux OCI workflow 및 운영 health 확인도 배포 후 확인한다. 외부 저장소에서 직접 import하는 consumer 및 런타임 동적 import는 정적 검색만으로 완전히 배제할 수 없어 관련성이 남은 설정 저장 및 제품 API는 보존했다.
+- **커밋·푸시·배포 기록**: 최신 `origin/oci` revision `77c5cd2c` 위에서 cleanup 전용 커밋을 만들고 OCI workflow 및 운영 health 확인 후 결과를 갱신한다.
+
+## [2026-11-19] KIS 국내 캔들 거래대금 구조화 저장
+
+- **목적/근본 원인**: KIS 국내 기간별 시세 `output2`의 `acml_tr_pbmn`(누적 거래 대금)을 파서가 구조화하지 않아 공개 API가 `종가 × 거래량` 계산치만 반환했다. 원본 raw payload는 저장됐으나 캔들 테이블에는 거래대금 열이 없었다.
+- **수정 범위**: `lib/kis-kr-daily-price.ts`에서 필드 파싱, `lib/kr-daily-price-cache.ts` 및 `lib/schema.ts`에서 구조화 저장·bulk cache 반환, `V180__kr_daily_candle_trading_value.sql`에서 컬럼 추가 및 과거 raw payload backfill, public `daily-candles` API에서 저장된 공식값 우선 사용. 공식값이 누락된 과거/응답행은 기존과 같이 계산 fallback한다.
+- **문서/자동 감지**: parser와 route 회귀 검사를 확장하고 `docs/ERROR_HANDLING.md`에 원인·범위·재발 감지·잔여 위험을 연결했다.
+- **검증/반영 상태**: 최신 `origin/oci` (`38e544ac`) 기준 `VITEST_MAX_WORKERS=8 npm run deploy:verify` 전체 통과: 의존성 취약점 0건, Vitest 282 files 중 281 passed·1 skipped 및 1,628 passed·3 skipped, typecheck, docs/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke 통과. 운영 DB 마이그레이션·실제 운영 health 확인은 아직이다. 이번 변경 커밋 및 `oci` push 후 OCI workflow 완료를 확인한다.
+## [2026-11-19] 사용자 행동 이벤트 및 요청 로그 수집 제거
+- **목적/범위**: 명시적 사용자 행동 이벤트와 모든 요청별 사용자 진단 수집 기능을 제거했다.
+- **변경 파일·자료**: `/api/user-activity`, `/api/internal/request-log`, 관리자 활동 데이터 경로의 잔여 참조, 공시 화면 이벤트 전송, middleware 로그 전송, 요청 신원/IP 위치 모듈 및 테스트를 삭제했다. `request_logs` 보존 작업과 API inventory를 제거했고 `V181__remove_user_action_event_metadata.sql`에서 기존 기록을 포함한 테이블 전체를 삭제한다. 관련 아키텍처·운영 문서를 정리하고 문서 카탈로그/공개 매뉴얼을 재생성했다.
+- **근본 원인·영향 범위**: UI 행동 이벤트와 일반 요청 진단이 동일 테이블에 혼합 저장되어 사용자의 API 경로 및 식별 정보를 기록했다. 수집/저장/보존 경로를 제거하고 요청 추적 응답 헤더는 저장 없이 유지한다.
+- **재발 자동 감지·남은 위험**: route inventory, cron retention 감사와 전체 배포 검증으로 라우트·보존 참조를 감지한다. V181이 운영 DB에 적용되기 전까지 기존 테이블/데이터가 남는다. 과거 V97/V105/V133 migration은 Flyway checksum 이력을 위해 보존한다.
+- **검증 결과·한계**: `npm run deploy:verify` 통과. production build, standalone runtime, Chrome desktop/mobile hydration 및 API smoke, typecheck, route/docs/cron/auth 검사 성공; Vitest 278 files (278 passed, 1 skipped), 1,620 tests passed (3 skipped). 초기 runtime smoke는 상위 체크아웃의 불완전한 Next.js 설치 때문에 시작 실패했으나 격리 worktree에서 lockfile 오프라인 설치 후 재검증해 통과했다. 운영 적용 결과는 workflow 확인 후 기재한다.
+- **커밋·푸시·배포**: 진행 예정.
+
+
+## [2026-11-20] 국내 캔들 거래대금 API 매뉴얼 보강
+- 목적/범위: 공개 GET /api/public/daily-candles의 국내 거래대금 출처와 과거 캐시 대체 규칙을 명시하고 OpenAPI 응답 schema를 일치시킨다.
+- 변경: public/api-reference.md에서 KIS acml_tr_pbmn 원문(원)과 close × volume fallback, fetchedAt 및 bulk metadata를 설명한다. scripts/api-surface.mjs schema를 갱신해 생성 OpenAPI에도 단일·다중 코드 캔들 필드를 명시한다.
+- 검증 결과: docs:api:generate, audit:api-surface 및 전체 VITEST_MAX_WORKERS=8 npm run deploy:verify 통과. 280 test files 중 279 passed·1 skipped, 1,624 passed·3 skipped; typecheck, production build, standalone runtime/API smoke, Chrome desktop/mobile smoke 통과.
+- 커밋/배포: PR #3을 OCI에 병합한 commit 11138ba07b11858d8308bd6524877052d751719c로 push. Deploy OCI run 44637756237 성공. 운영 /api/health HTTP 200, /api-reference.md HTTP 200(원문 필드 및 fallback 설명), /openapi.json 단일·다중 candle schema의 tradingValue를 확인했다.
+# [2026-11-22] 국내·미국 일봉 캐시 OCI 호출 경로 개선
+
+### 목적·진단
+- 국내·미국 일봉 캐시 지연 원인을 확인하고 OCI 자동 호출 경로와 재발 검사를 보강한다.
+- 국내 일봉 호출이 OCI cron에 없었고, 미국 일봉은 장시간 선행 작업 뒤에 배치돼 KST schedule window를 놓칠 수 있었다.
+- 운영 read-only 점검에서 KR 표본 최신 거래일은 `20261118`, US NAS/NYS는 `20261117`이었다. US run 최근 10건은 모두 `SKIPPED/outside_schedule`이었다. 운영 timer 자체의 미실행 여부는 OCI host journal을 직접 조회하지 못해 미확정이다.
+
+### 변경 및 검증
+- `scripts/oci-cron.sh`: 국내·미국 일봉 endpoint를 health probe 직후에 실행하도록 이동/추가.
+- `scripts/check-oci-cron.mjs`: 두 endpoint 존재와 장시간 작업 전 순서를 검사.
+- `vitest.config.mts`: 전체 배포 검증의 첫 테스트 시도가 15분 제한을 넘겼다. Vitest 기본 worker 수가 머신의 전체 병렬 수를 사용해 로컬에서 과도한 프로세스 경합을 유발했으므로, 공식 `maxWorkers` 옵션을 4로 제한한다.
+- `docs/operations/daily-candle-cache-refresh-diagnosis.md`, `docs/operations/kr-daily-cache-refresh-runbook.md`: 근거, 개선, 배포 후 확인 절차와 잔여 위험 기록. 진단 파일은 문서 카탈로그의 날짜 보관 문서 제외 규칙과 충돌하지 않도록 안정적인 이름을 사용한다.
+- `npm run cron:check`, `node scripts/test-oci-cron-package.mjs` 통과. 첫 `npm run deploy:verify`는 production dependency audit에서 Next.js 15.5.28 advisory로 실패했다. lockfile만 패치된 15.5.29로 올려 audit 0건을 확인했다. Vitest 기본 worker 병렬성에서 15분 timeout 후 `maxWorkers: 4`로 제한했다.
+- 최신 원격 `oci` 기준(`09523322`)으로 재배치 후 최종 `npm run deploy:verify` 통과: production dependency audit 0 vulnerabilities, OCI activation preflight, docs/API/catalog/migration, scope/KIS/auth/cron audits, production build, standalone HTTP/Chrome desktop·mobile smoke, 전체 Vitest 280 files (279 passed/1 skipped, 1,624 passed/3 skipped), TypeScript 검사.
+- commit/push/deploy 여부: 검증 완료, 한국어 상세 커밋 후 `oci` push로 배포 workflow를 실행할 예정.
+
+### 2026-11-23 — 무인증 공개 국내·미국 일봉 갱신 API
+- **목적**: 운영 자동화 외부에서도 누구나 국내 또는 미국 전체 활성 보통주 일봉 캐시 갱신을 요청할 수 있도록 공개 호출 경로를 제공한다.
+- **원인·설계**: 기존 `/api/cron/*-daily-cache`는 cron secret을 요구해 외부 사용자가 호출할 수 없었다. 갱신은 DB write와 공급자 요청을 수행하므로 RFC 9110의 POST semantics에 따라 무인증 POST로 분리하고 기존 읽기 전용 GET OpenAPI에는 섞지 않았다.
+- **변경**: `POST /api/public/daily-cache/kr/refresh`, `POST /api/public/daily-cache/us/refresh`와 공통 `lib/public-daily-cache-refresh.ts`를 추가했다. 호출자 인증 없이 작동하며 scheduler 시간창은 건너뛰되, 운영 enabled 설정을 존중하고 시장별 최소 1시간 cooldown(설정 interval이 더 크면 이를 적용), DB 분산 lock, `automation_runs` cooldown 확인을 둔다. 외부 reverse proxy 응답 제한을 넘는 작업은 Next.js `after()`로 넘겨 HTTP 202를 즉시 반환하며, cron 경로와 공개 호출이 동일한 시장 advisory lock을 공유한다. cooldown은 429/Retry-After, 이미 실행 중은 accepted:false인 202, 운영 비활성화는 409로 반환한다.
+- **문서·감사**: `public/api-reference.md`, `public/llms.txt`, `docs/api/README.md`, 국내 캐시 런북과 진단 문서를 갱신했다. `scripts/api-surface.mjs`는 지정된 두 경로만 `public-action`으로 분류하고 POST 단독, route 존재, 인증 검사 부재, 최소 cooldown 및 cron/action lock 공유를 감사한다. 읽기 전용 OpenAPI에는 작업 경로를 등록하지 않는다.
+- **검증·배포**: 초기 구현에서 `npm run audit:api-surface`, 타입 검사, 문서 검사 및 `npm run deploy:verify`가 통과했다(의존성 취약점 0, OCI activation preflight, API/docs/scope/KIS/auth/cron 감사, production build, standalone HTTP·Chrome desktop/mobile smoke, Vitest 280 files 중 279 passed/1 skipped, 1,624 passed/3 skipped). 커밋 `0412e993` 배포 후 운영 무인증 국내 POST는 앞단 nginx에서 504가 났고, 직후 두 번째 POST가 `already_running` 202를 반환해 작업 중 DB lock 유지가 확인됐다. Next.js 공식 self-hosted 지원 `after()` 방식 및 cron/action 공용 lock으로 보완한 후 최종 `npm run deploy:verify`도 통과했다(같은 전체 1,624 passed/3 skipped 포함). 비동기 보완분은 다음 상세 커밋·푸시로 배포할 예정이다.
+- **남은 위험**: 공개 호출은 시장별 최소 1시간 cooldown과 DB lock으로 제한하지만 누구나 갱신을 요청할 수 있다. 202는 작업 접수만 의미하며 완료 성공 여부가 아니다. 완료 여부는 `GET /api/public/daily-candles`, automation_runs, 서버 로그의 최신 거래일·실행 결과·universe coverage로 확인한다.

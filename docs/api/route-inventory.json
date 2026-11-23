@@ -294,6 +294,14 @@
       "source": "app/api/dart/ranking/route.ts"
     },
     {
+      "path": "/api/debug/us-daily-cache-status",
+      "methods": [
+        "GET"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/debug/us-daily-cache-status/route.ts"
+    },
+    {
       "path": "/api/disclosures",
       "methods": [
         "GET"
@@ -356,14 +364,6 @@
       ],
       "access": "public-read-candidate",
       "source": "app/api/health/route.ts"
-    },
-    {
-      "path": "/api/internal/request-log",
-      "methods": [
-        "POST"
-      ],
-      "access": "internal-secret",
-      "source": "app/api/internal/request-log/route.ts"
     },
     {
       "path": "/api/kis/detection-candidates",
@@ -509,6 +509,22 @@
       ],
       "access": "public-read-candidate",
       "source": "app/api/public/api-manual/route.ts"
+    },
+    {
+      "path": "/api/public/daily-cache/kr/refresh",
+      "methods": [
+        "POST"
+      ],
+      "access": "public-action",
+      "source": "app/api/public/daily-cache/kr/refresh/route.ts"
+    },
+    {
+      "path": "/api/public/daily-cache/us/refresh",
+      "methods": [
+        "POST"
+      ],
+      "access": "public-action",
+      "source": "app/api/public/daily-cache/us/refresh/route.ts"
     },
     {
       "path": "/api/public/daily-candles",
@@ -832,14 +848,6 @@
       ],
       "access": "provider-webhook",
       "source": "app/api/telegram/webhook/route.ts"
-    },
-    {
-      "path": "/api/user-activity",
-      "methods": [
-        "POST"
-      ],
-      "access": "user-session-or-user-data",
-      "source": "app/api/user-activity/route.ts"
     },
     {
       "path": "/api/watchlist",

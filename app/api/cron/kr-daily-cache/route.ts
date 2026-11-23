@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
+import { acquireAutomationLock } from "@/lib/automation-lock";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { runKrDailyCacheNow } from "@/lib/kr-daily-cache-job";
@@ -8,8 +9,11 @@ import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/l
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 
 export async function POST(request: Request) {
+  let lease: Awaited<ReturnType<typeof acquireAutomationLock>> = null;
   try {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  lease = await acquireAutomationLock("public-daily-cache-refresh:kr-daily-cache");
+  if (lease === null) return NextResponse.json({ ok: true, skipped: true, reason: "already_running" }, { status: 202, headers: { "retry-after": "60" } });
   const settings = await loadFeatureModuleSettings("kr-daily-cache");
   const evaluatedAt = new Date();
   const intervalSeconds = Math.max(60, settings.intervalSeconds ?? 3_600);
@@ -34,4 +38,5 @@ export async function POST(request: Request) {
   const result = await withAutomationRun("kr-daily-cache", runKrDailyCacheNow);
   return NextResponse.json({ ok: true, intervalSeconds, ...result });
   } catch (error) { console.error("[API /cron/kr-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "kr-daily-cache-cron", error: "KR_DAILY_CACHE_FAILED" }, { status: 502 }); }
+  finally { await lease?.release(); }
 }

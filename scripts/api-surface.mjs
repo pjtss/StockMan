@@ -8,8 +8,17 @@ const inventoryPath = join(root, "docs", "api", "route-inventory.json");
 const openApiPath = join(root, "public", "openapi.json");
 const methodsPattern = /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*\(|export\s+const\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*=/g;
 const excludedPath = /\/(?:admin|debug|cron|internal|local)(?:\/|$)/i;
-const userPath = /\/(?:auth|watchlist|user-activity|push)(?:\/|$)/i;
-const requestAuthenticationPattern = /(?:headers\.get\(["'](?:authorization|x-api-key|x-daily-cache-key|cookie)["']\)|cookies\s*\(\s*\)|getServerSession|requireAdminSession|isCronRequestAuthorized|DAILY_CACHE_READ_API_KEY|REQUEST_LOG_SECRET|verifyBbExportToken|(?:is)?authorized\s*\(|requireApiAuth\s*\(|requireAuth\s*\(|verifyApiKey\s*\(|validateApiKey\s*\()/i;
+const userPath = /\/(?:auth|watchlist|push)(?:\/|$)/i;
+const requestAuthenticationPattern = /(?:headers\.get\(["'](?:authorization|x-api-key|x-daily-cache-key|cookie)["']\)|cookies\s*\(\s*\)|getServerSession|requireAdminSession|isCronRequestAuthorized|DAILY_CACHE_READ_API_KEY|verifyBbExportToken|(?:is)?authorized\s*\(|requireApiAuth\s*\(|requireAuth\s*\(|verifyApiKey\s*\(|validateApiKey\s*\()/i;
+const publicDailyCacheActionPaths = new Set([
+  "/api/public/daily-cache/kr/refresh",
+  "/api/public/daily-cache/us/refresh",
+]);
+const publicDailyCacheActionHelper = "lib/public-daily-cache-refresh.ts";
+const publicDailyCacheCronPaths = [
+  "app/api/cron/kr-daily-cache/route.ts",
+  "app/api/cron/us-daily-cache/route.ts",
+];
 
 async function routeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -36,10 +45,10 @@ function apiPath(file) {
 }
 
 function accessFor(path, source, methods) {
+  if (publicDailyCacheActionPaths.has(path)) return "public-action";
   if (path === "/api/events/collect") return requestAuthenticationPattern.test(source) ? "internal-or-operator" : "public-write-source-materialization";
   if (/requireAdminSession/.test(source)) return "admin-session";
   if (/isCronRequestAuthorized/.test(source)) return "cron-guarded";
-  if (/x-request-log-secret|REQUEST_LOG_SECRET/.test(source)) return "internal-secret";
   if (/DAILY_CACHE_READ_API_KEY/.test(source)) return "service-bearer";
   if (excludedPath.test(path)) return "internal-or-operator";
   if (userPath.test(path)) return "user-session-or-user-data";
@@ -191,6 +200,7 @@ function queryParameters(source, path) {
 
 function responseSchema(path) {
   const generic = { type: "object", additionalProperties: true };
+  const dailyCandle = { type: "object", required: ["date", "open", "high", "low", "close", "volume", "tradingValue", "fetchedAt"], properties: { date: { type: "string", pattern: "^\\d{8}$", description: "거래일 YYYYMMDD" }, open: { type: "number" }, high: { type: "number" }, low: { type: "number" }, close: { type: "number" }, volume: { type: "number" }, tradingValue: { type: "number", description: "KR: KIS acml_tr_pbmn 원문 누적 거래대금(원). 원문 값이 없는 레거시 행은 close × volume 대체값." }, fetchedAt: { type: ["string", "null"], format: "date-time" } } };
   const schemas = {
     "/api/events": { oneOf: [{ type: "object", required: ["ok", "query", "timezone", "items", "total", "page", "pageSize", "hasMore"], properties: { ok: { const: true }, query: { type: "object", additionalProperties: true }, timezone: { type: "string" }, items: { type: "array", items: { type: "object", required: ["id", "title", "eventType", "verificationStatus", "sourceUrl"], properties: { id: { type: "string" }, ticker: { type: ["string", "null"] }, title: { type: "string" }, eventType: { type: "string" }, publishedAt: { type: ["string", "null"], format: "date-time" }, acceptedAt: { type: ["string", "null"], format: "date-time" }, bullishGrade: { type: ["string", "null"], enum: ["A", "B", "C", "EXCLUDED", null] }, verificationStatus: { type: "string", enum: ["VERIFIED", "UNVERIFIED", "REJECTED"] }, sourceUrl: { type: "string", format: "uri" } } } }, total: { type: "integer" }, page: { type: "integer" }, pageSize: { type: "integer" }, hasMore: { type: "boolean" } } }, { type: "object", required: ["ok", "reportType", "asOf", "timezone", "count", "markdown", "items"], properties: { ok: { const: true }, reportType: { type: "string" }, asOf: { type: "string", format: "date-time" }, timezone: { const: "Asia/Seoul" }, count: { type: "integer" }, markdown: { type: "string" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } }] },
     "/api/events/{id}": { type: "object", required: ["ok", "event"], properties: { ok: { const: true }, event: { type: "object", additionalProperties: true } } },
@@ -204,7 +214,10 @@ function responseSchema(path) {
     "/api/dart/ranking": { type: "object", properties: { fetchedAt: { type: "string", format: "date-time" }, items: { type: "array", items: { type: "object", additionalProperties: true } } } },
     "/api/dart/contract": { type: ["object", "null"], additionalProperties: true, description: "null means the filing has no matching contract details." },
     "/api/dart/history": { type: "array", items: { type: "object", properties: { title: { type: "string" }, judgment: { type: "string" }, publishedAt: { type: "string", format: "date-time" }, link: { type: "string" } } } },
-    "/api/public/daily-candles": { oneOf: [{ type: "object", required: ["ok", "source", "market", "code", "timeframe", "candles", "metadata"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, code: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, candles: { type: "array", items: { type: "object", required: ["date", "open", "high", "low", "close", "volume"], properties: { date: { type: "string", format: "date" }, open: { type: "number" }, high: { type: "number" }, low: { type: "number" }, close: { type: "number" }, volume: { type: "number" } } } }, metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } } } }, { type: "object", required: ["ok", "source", "market", "timeframe", "items"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, items: { type: "array", items: { type: "object", properties: { code: { type: "string" }, candles: { type: "array", items: { type: "object", additionalProperties: true } } } } } } }] },
+    "/api/public/daily-candles": { oneOf: [
+      { type: "object", required: ["ok", "source", "market", "code", "timeframe", "candles", "metadata"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, code: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, candles: { type: "array", items: dailyCandle }, metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } } } },
+      { type: "object", required: ["ok", "source", "market", "timeframe", "items"], properties: { ok: { const: true }, source: { const: "OPERATING_DB_CACHE" }, market: { type: "string" }, timeframe: { type: "string", enum: ["D", "W", "M"] }, items: { type: "array", items: { type: "object", properties: { market: { type: "string" }, code: { type: "string" }, name: { type: "string" }, candles: { type: "array", items: dailyCandle }, metadata: { type: "object", properties: { latestCandleDate: { type: ["string", "null"], format: "date" }, dataUpdatedAt: { type: ["string", "null"], format: "date-time" }, returnedCount: { type: "integer" } } } } } } } }
+    ] },
     "/api/public/instrument-fundamentals": { type: "object", properties: { ok: { const: true }, source: { const: "OPERATING_DB_FUNDAMENTAL_SNAPSHOT" }, market: { type: "string" }, items: { type: "array", items: { type: "object", properties: { market: { type: "string" }, code: { type: "string" }, name: { type: ["string", "null"] }, price: {}, changeRate: {}, open: {}, high: {}, low: {}, volume: {}, tradingValue: {}, marketCap: {}, listedShares: {}, currency: { type: "string" }, source: { type: "string" }, observedAt: {}, fetchedAt: {} } } } } },
     "/api/public/us-stock-metadata": {
       type: "object", required: ["ok", "schemaVersion", "asOf", "ticker", "identity", "company", "financials", "marketSnapshot", "dataQuality"],
@@ -420,6 +433,34 @@ for (const file of await routeFiles(apiRoot)) {
   });
 }
 routes.sort((a, b) => a.path.localeCompare(b.path, "en"));
+
+for (const path of publicDailyCacheActionPaths) {
+  const route = routes.find((item) => item.path === path);
+  if (!route) {
+    routePolicyFailures.push(`Required public daily-cache action is missing: ${path}`);
+    continue;
+  }
+  if (JSON.stringify(route.methods) !== JSON.stringify(["POST"]) || route.access !== "public-action") {
+    routePolicyFailures.push(`Public daily-cache action must expose only unauthenticated POST: ${path}`);
+  }
+  const source = `${await readFile(join(root, route.source), "utf8")}\n${await readFile(join(root, publicDailyCacheActionHelper), "utf8")}`;
+  if (requestAuthenticationPattern.test(source)) {
+    routePolicyFailures.push(`Public daily-cache action must not inspect caller authentication: ${path}`);
+  }
+  if (!source.includes("acquireAutomationLock") || !source.includes("loadLatestExecutedAutomationRun") || !source.includes("PUBLIC_REFRESH_MIN_INTERVAL_SECONDS = 3_600")) {
+    routePolicyFailures.push(`Public daily-cache action must preserve the distributed lock and minimum cooldown: ${path}`);
+  }
+  if (!source.includes("after(async") || !source.includes("lease.release()") || !source.includes("maxDuration = 5_400")) {
+    routePolicyFailures.push(`Public daily-cache action must return before its bounded background refresh and release its lock: ${path}`);
+  }
+}
+
+for (const sourcePath of publicDailyCacheCronPaths) {
+  const source = await readFile(join(root, sourcePath), "utf8");
+  if (!source.includes("acquireAutomationLock") || !source.includes("public-daily-cache-refresh:")) {
+    routePolicyFailures.push(`Scheduled and public daily-cache requests must share the same market lock: ${sourcePath}`);
+  }
+}
 
 const mode = process.argv[2] ?? "check";
 if (routePolicyFailures.length) {

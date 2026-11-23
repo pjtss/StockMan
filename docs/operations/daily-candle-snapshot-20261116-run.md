@@ -62,4 +62,4 @@
 - `daily-candles-us.json`: eligible 5,050, instruments 4,964, candles 590,979, missing 86. NAS 3,053/2,993/60 missing; NYS 1,749/1,740/9 missing; AMS 248/231/17 missing. 세 거래소 latest candle date는 `20261117`.
 - `daily-candles-kr.json`: eligible/instruments 2,345, candles 275,203, missing 0. KOSPI 754/754, KOSDAQ 1,591/1,591; both latest candle date `20261118`.
 - 두 JSON 독립 검증: source `OPERATING_PUBLIC_API`, retrieved+missing=eligible, 거래소별 코드 중복 0, item/date/fetchedAt 오류 0. US 표시명 ADR/ADS/depositary/depository descriptor 잔존 0.
-- 운영 DB 직접 읽기/쓰기는 하지 않았다. API 변경 commit `1120d3c6` 및 OCI 배포 이후 스냅샷은 이 작업의 artifact commit 후 반영된다.
+- 운영 DB 직접 읽기/쓰기는 하지 않았다. API 변경 commit `1120d3c6` 이후 snapshots/docs는 artifact commit `77c5cd2c`로 push했다. Deploy OCI run `44443286997` 성공 및 최종 health/universe/KR candle GET을 확인했다.

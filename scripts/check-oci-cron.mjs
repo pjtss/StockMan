@@ -298,7 +298,7 @@ if (!retentionRoute.includes("const DELETE_BATCH_SIZE = 5_000")
 }
 const retentionSchemaRequirements = {
   kr_minute_candles: ["candle_date", "candle_time"], us_minute_candles: ["candle_date", "candle_time"],
-  request_logs: ["created_at"], market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id", "published_at", "created_at"],
+  market_rss_fetch_snapshots: ["fetched_at"], market_rss_articles: ["source_snapshot_id", "published_at", "created_at"],
   market_rss_bullish_articles: ["published_at", "created_at"],
   sec_source_snapshots: ["source_type", "source_key", "fetched_at", "id"], kis_signal_snapshots: ["fetched_at"],
   discord_delivery_queue: ["status", "updated_at"], kr_minute_fetch_logs: ["fetched_at"], debug_kis_calls: ["observed_at"],
@@ -381,7 +381,7 @@ for (const index of indexSpecs(retentionMigration)) {
   }
 }
 for (const [table, interval] of [
-  ["kr_minute_candles", "30 days"], ["us_minute_candles", "30 days"], ["request_logs", "30 days"],
+  ["kr_minute_candles", "30 days"], ["us_minute_candles", "30 days"],
   ["automation_runs", "90 days"], ["discord_delivery_queue", "30 days"], ["kis_signal_snapshots", "365 days"],
   ["instrument_fundamental_history", "90 days"], ["kis_rate_limit_events", "90 days"],
   ["market_rss_translation_cache", "180 days"], ["us_top_rising_snapshots", "30 days"],
@@ -472,6 +472,14 @@ if (!/OnCalendar=hourly/.test(sharedCronTimer) || !/Persistent=true/.test(shared
   throw new Error("Database retention must be reachable from the persistent hourly OCI cron timer after activation");
 }
 const obvSnapshotCall = 'run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"';
+const krDailyCacheCall = 'run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"';
+const usDailyCacheCall = 'run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"';
+const dbRetentionCall = 'run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"';
+if (!source.includes(krDailyCacheCall) || !source.includes(usDailyCacheCall)
+  || source.indexOf(krDailyCacheCall) > source.indexOf(dbRetentionCall)
+  || source.indexOf(usDailyCacheCall) > source.indexOf(dbRetentionCall)) {
+  throw new Error("KR and US daily candle refreshes must run before long-running hourly OCI cron work");
+}
 if (!source.includes(obvSnapshotCall)
   || source.indexOf(obvSnapshotCall) < source.indexOf('run_cron_endpoint "us-daily-cache"')
   || !source.includes('US_OBV_REFRESH_MINUTES >= 18 * 60 + 10')) {

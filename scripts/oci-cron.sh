@@ -78,6 +78,11 @@ run_cron_endpoint() {
 if [[ "${CRON_SCRIPT_SOURCE_ONLY:-0}" != "1" ]]; then
 # Start each cycle with health and retention checks before time-sensitive work.
 run_cron_endpoint "health-probe-snapshot" 20 "/api/cron/health-probe-snapshot"
+# Run daily candle jobs before long-running maintenance and news tasks. Their
+# API routes enforce market-specific KST windows, so late calls can miss the
+# only hourly invocation that falls inside the configured window.
+run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
+run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
 run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"
 run_cron_endpoint "sec-company-facts" 900 "/api/cron/sec-company-facts"
 
@@ -98,9 +103,6 @@ run_cron_endpoint "sec-edgar" 180 "/api/cron/sec-edgar"
 
 run_cron_endpoint "sec-smallcap-share-facts" 900 "/api/cron/sec-smallcap-share-facts"
 
-# Full-universe US refresh can take longer than five minutes; keep its request
-# alive so the automation run can finalize and retry state is persisted.
-run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
 US_OBV_REFRESH_WEEKDAY="$(TZ=America/New_York date +%u)"
 US_OBV_REFRESH_HHMM="$(TZ=America/New_York date +%H%M)"
 US_OBV_REFRESH_MINUTES=$((10#${US_OBV_REFRESH_HHMM:0:2} * 60 + 10#${US_OBV_REFRESH_HHMM:2:2}))

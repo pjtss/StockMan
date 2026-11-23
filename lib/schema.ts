@@ -163,6 +163,8 @@ export const marketRssArticles = pgTable(
     normalizedSummary: text("normalized_summary").notNull().default(""),
     content: text("content").notNull().default(""),
     rawPayload: text("raw_payload"),
+    rssTimestampPrecision: text("rss_timestamp_precision").notNull().default("UNKNOWN"),
+    rssPublishedDate: text("rss_published_date"),
     sourceSnapshotId: bigint("source_snapshot_id", { mode: "number" }),
     detectedTicker: text("detected_ticker"),
     eventDirection: text("event_direction").notNull().default("NEUTRAL"),
@@ -270,7 +272,7 @@ export const usInstrumentUniverseCandles = pgTable("us_instrument_universe_candl
 }, (table) => [uniqueIndex("us_instrument_universe_candles_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("us_instrument_universe_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate), index("us_instrument_universe_candles_refresh_idx").on(table.timeframe, table.fetchedAt, table.market, table.code), index("us_instrument_universe_candles_latest_date_idx").on(table.timeframe, table.candleDate)]);
 
 export const krInstrumentUniverseCandles = pgTable("kr_instrument_universe_candles", {
-  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), candleTime: timestamp("candle_time", { withTimezone: true }), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), close: doublePrecision("close"), volume: doublePrecision("volume"), rawPayload: text("raw_payload").notNull().default(""), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  id: bigserial("id", { mode: "number" }).primaryKey(), market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(), candleTime: timestamp("candle_time", { withTimezone: true }), open: doublePrecision("open"), high: doublePrecision("high"), low: doublePrecision("low"), close: doublePrecision("close"), volume: doublePrecision("volume"), tradingValue: doublePrecision("trading_value"), rawPayload: text("raw_payload").notNull().default(""), source: text("source").notNull().default("KIS"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [uniqueIndex("kr_instrument_universe_candles_unique").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_instrument_universe_candles_lookup_idx").on(table.market, table.code, table.timeframe, table.candleDate), index("kr_instrument_universe_candles_refresh_idx").on(table.timeframe, table.fetchedAt, table.market, table.code), index("kr_instrument_universe_candles_latest_date_idx").on(table.timeframe, table.candleDate)]);
 
 export const krLatestDailyCandles = pgTable("kr_latest_daily_candles", {

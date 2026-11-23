@@ -1,3 +1,29 @@
+## 전체 공시 조회에서 자동화 coverage run을 반복 조회하지 않기 (2026-11-23)
+
+- **증상**: `GET /api/disclosures?hours=1&source=all`은 0건인데 14~36초, DART 단독 7.7초, SEC 단독 3.5초였고 RSS source 단독은 56~281ms였다.
+- **근본 원인 후보**: 하나의 REPEATABLE READ transaction 안에서 `automation_runs`의 market-rss/DART/SEC latest run을 별도 Drizzle 요청으로 조회했다. 단일 Pg client의 쿼리들은 동시 실행이 되지 않으므로 세 왕복이 누적될 수 있다. 서버 로그/DB 실행계획이 없어 latency 귀속은 운영 측정과 함께 확인한다.
+- **해결**: 결과 projection이 소비하는 module key만 선택하고 `DISTINCT ON (module_key) ORDER BY module_key, started_at DESC` 한 번으로 latest coverage row를 가져온다. 결과에 쓰이지 않는 source는 run 조회에서 제외한다.
+- **검증 결과**: OCI run 45105548471 성공. `hours=24&source=all&page=1&pageSize=100`은 배포 전 10,668ms/24건 1회, 배포 후 2,070~2,200ms/24건 5회(중앙값 2,097ms). `hours=1&source=all`은 배포 후 418~1,472ms/0건 5회였다. health API HTTP 200/ok.
+- **재발 자동 감지**: docs checker가 필요한 module 조건과 DISTINCT ON 경계를 확인한다. 동일 API latency와 item count를 함께 기록한다.
+- **남은 위험**: pre-deploy ALL 24h 기준은 1회뿐이며, `hours=1` 결과는 0행이다. 전체 최적화 효과의 통계적 신뢰도와 remaining DB time은 실행계획/DB 계측으로 후속 확인한다.
+## RSS 조회가 비정상적으로 느릴 때 raw payload 재파싱 방지 (2026-11-23)
+
+- **증상**: /api/disclosures 저장 RSS 조회가 느리다.
+- **근본 원인**: GET에서 각 raw_payload를 SQL 정규식 및 Node JSON parse로 반복 분류했다.
+- **해결**: ingest 시 precision/date를 저장하고 V182에서 기존 RSS row를 backfill한다. 조회는 메타데이터만 읽는다.
+- **재발 자동 감지**: classifier 단위 테스트 및 docs checker의 ingest/query 경계 검증, 배포 후 동일 API 성능 측정을 유지한다.
+- **남은 위험**: V182 기존 데이터 backfill은 배포 migration에서 DB write 부하를 만들 수 있으며 migration duration을 관측한다.
+
+## 2026-11-19 국내 일봉 거래대금이 종가×거래량으로 대체됨
+
+- **증상**: 국내 `daily-candles` API가 KIS가 제공하는 `acml_tr_pbmn` 대신 종가×거래량을 거래대금으로 반환했다.
+- **근본 원인**: 일봉 파서는 원본 JSON은 보존했지만 거래대금을 구조화하지 않았고, KR 캔들 테이블에도 `trading_value` 컬럼이 없었다.
+- **영향 범위**: 국내 일·주·월 KIS 캔들 적재 및 공개 `daily-candles` 응답. 기존 raw payload가 유효하고 원본 필드가 있으면 마이그레이션에서 값을 복구한다.
+- **해결 위치**: `lib/kis-kr-daily-price.ts`가 `acml_tr_pbmn`을 파싱하고 `lib/kr-daily-price-cache.ts`가 구조화 저장·bulk cache 조회를 제공한다. V180에서 컬럼 추가 및 기존 raw payload 복구, public route에서는 저장값 우선/부재 시 계산 fallback을 적용한다.
+- **재발 자동 감지**: parser test가 공식 필드 파싱 및 누락/오류 nullable 동작을 확인하고, public route test가 저장값 우선과 fallback 식을 확인한다. migration/schema audit으로 런타임 스키마와 DDL 일치를 확인한다.
+- **검증 결과/상태**: 회귀 테스트 10개, `npm run typecheck`, `npm run docs:check`, `npm run build`가 통과했다. 운영 DB 마이그레이션 및 배포는 아직 하지 않았다.
+- **남은 위험 및 다음 개선**: 잘못되었거나 비 JSON인 과거 raw payload는 backfill 대상이 아니다. 기존 행에 `acml_tr_pbmn`이 원래 없던 경우 값은 NULL로 남고 API에서 종가×거래량 fallback을 쓴다.
+
 ## 2026-11-19 미국 활성 보통주 유니버스에 ADR/ADS가 포함
 
 - **증상**: `ㄷㅊㅇ5`의 운영 공개 활성 보통주 목록에서 AACG, BABA, ABEV 등 공식 상품명이 `SPON ADS`/`SPON ADR`인 예탁증서가 `instrument_type=COMMON_STOCK`, `is_dr=false`로 반환됐다. 종목 메타데이터 GET에서도 같은 분류가 확인됐다.
@@ -558,13 +584,13 @@ fundamentals snapshot의 nullable double precision 필드(`price`, `changeRate`,
 - 조치: ID를 사전 검증하고 DB 장애를 도메인별 `503` JSON 응답으로 변환한다. 기존 상세 조회의 `404` 계약은 유지했다.
 - 검증: 관련 API 테스트 6개, `npm run typecheck`, `npm run docs:check` 통과.
 
-### 스캐너·관리자 활동 조회 query 파라미터
+### 스캐너 query 파라미터
 
-- 원인: `limit`, `hours`에 `NaN`, 소수, 음수, 과대값이 들어와 내부 조회 함수까지 전달될 수 있었다. 관리자 활동 조회 DB 예외도 별도 응답 처리가 없었다.
-- 영향: 비정상 조회 범위, DB 쿼리 오류, 관리자 화면의 JSON 파싱 실패 가능성이 있었다.
-- 수정 위치: `app/api/scan/multi-timeframe-recommendations/route.ts`, `app/api/admin/user-activity/route.ts`.
-- 조치: 정수 변환·최소/최대 범위 검증과 기본값을 적용하고, 관리자 활동 DB 장애는 `503 USER_ACTIVITY_UNAVAILABLE`로 변환한다.
-- 검증: 관련 테스트 7개, `npm run typecheck` 통과.
+- 원인: `limit`, `hours`에 `NaN`, 소수, 음수, 과대값이 들어와 내부 조회 함수까지 전달될 수 있었다.
+- 영향: 비정상 조회 범위와 DB 쿼리 오류 가능성이 있었다.
+- 수정 위치: `app/api/scan/multi-timeframe-recommendations/route.ts`.
+- 조치: 정수 변환·최소/최대 범위 검증과 기본값을 적용한다.
+- 검증: 관련 스캐너 입력 테스트, `npm run typecheck` 통과.
 
 ### 해외 MFI 스캐너 입력값
 
@@ -670,11 +696,6 @@ fundamentals snapshot의 nullable double precision 필드(`price`, `changeRate`,
 
 ## 프론트엔드 오류
 
-### 내부 요청 로그 수집 실패
-
-- 요청 로그 수집은 관측용 best-effort 기능이므로 지역 추론 실패가 로그 저장을 중단시키지 않도록 한다.
-- 요청 ID·경로·User-Agent·IP는 저장 전에 길이를 제한해 비정상적으로 큰 헤더나 본문으로 인한 로그 오염을 방지한다.
-- DB 저장 실패는 구조화된 `REQUEST_LOG_UNAVAILABLE` 503으로 반환하고, 인증되지 않은 요청은 DB에 접근하기 전에 401로 종료한다.
 - 내부 KIS 디버그 로그 API도 관리자 세션을 요구하며, 커서 값은 음수가 아닌 안전한 정수만 허용한다.
 - 관리자 디버그 조회와 종목명 조회의 DB 오류는 예외·SQL을 노출하지 않고 기능별 503 오류 코드로 반환한다. 종목명 조회 코드는 최대 100개로 제한한다.
 - 관리자 분봉 일괄 갱신의 작업량·동시성은 유한한 정수 범위로 정규화하고, 수집 실패는 `KR_MINUTE_REFRESH_FAILED`로 반환한다.

@@ -94,3 +94,38 @@
 - **한국:** 기본 일봉 cache는 월요일 run 당시 2,350/2,350이며 요청된 세 갱신은 성공했다. 다만 운영 activeDays에서 화요일이 빠져 화요일에는 자동 갱신이 실행되지 않는다. 확인 시점 표본은 `20261109`여서 하루 지연 상태다. 따라서 “매 거래일 적재” 요구 기준으로는 정상이라고 할 수 없고, 원인은 스케줄 설정의 요일 누락이다.
 - 운영 schedule은 수정하지 않았다. 사용자는 진단을 요청했으며 운영 설정 변경은 요청하지 않았다. 화요일 자동 갱신을 원하면 KR `activeDays`에 `2`를 포함해야 한다.
 - 코드·cache DB·운영 module 설정 변경 없음. 인증된 운영 GET, public cache GET만 수행했다. 커밋·푸시·배포 없음. 이 결론은 미국 성공과 한국 schedule 결함의 진단 완료를 기록한다.
+
+## 2026-11-19 US 최신 거래일 지연 후속 진단
+
+### 목적 및 범위
+
+사용자가 US 최신 일봉 거래일이 2026-11-17인 이유를 확인해 달라고 요청했다. 공개 운영 API에서 미국 거래소별 대표 종목을 재조회하고, NYSE 공식 거래 캘린더 및 현재 소스의 cron 경로를 대조했다. 모든 요청은 read-only GET 또는 저장소 읽기였으며, POST cron 실행·캐시 적재·설정 변경은 하지 않았다.
+
+### 확인 결과
+
+- 2026-11-19 12:18 KST경 운영 `GET /api/public/daily-candles` 응답에서 NAS(AAPL, MSFT, NVDA), NYS(KO, IBM, GE, UBER), AMS(USAS) 표본의 최신 봉 날짜는 모두 `20261117`이었다. 각 표본의 `dataUpdatedAt`은 2026-11-17 22:11–22:29 UTC 범위였다. 이는 전체 유니버스 전수 조사가 아니라 세 거래소 대표 표본이다.
+- NYSE의 공식 2026 휴장일 표에는 11월 18일이 포함되지 않는다. 11월 18일을 휴장으로 보아 17일 데이터를 정상 최신이라고 할 수 없다. 근거: [NYSE Holidays & Trading Hours](https://www.nyse.com/trade/hours-calendars).
+- 저장소의 `scripts/oci-cron.sh`는 `us-daily-cache`를 `/api/cron/us-daily-cache`로 호출하고, `app/api/cron/us-daily-cache/route.ts`는 인증, 글로벌 자동화 gate, DB 모듈 enabled/schedule, 1시간 interval gate를 통과해야 수집기를 호출한다. 이는 현재 코드의 의도된 경로일 뿐 운영 호스트에서 cron이 실제 호출됐다는 증거는 아니다.
+- 문서화된 read-only `GET /api/debug/automation-runs?module=us-daily-cache...`를 운영 도메인에서 `.env.local`의 `CRON_SECRET`을 메모리에서 주입해 호출했으나 HTTP 404 HTML을 받았다. secret은 출력·기록하지 않았다. 현재 checkout에도 `app/api/debug/automation-runs` 구현이 없어 문서와 배포 라우트 사이에 차이가 있다.
+- 공개 `GET /api/health`가 200이어도 자동화 실행 상태는 노출하지 않는다. 로컬 `.env.local`의 DB URL은 localhost PostgreSQL을 가리키며 운영 DB 직접 조회 접속정보가 없어 운영 설정 및 `automation_runs`를 독립적으로 확인할 수 없다.
+
+### 판정, 원인 및 다음 확인
+
+- **확정:** 운영 캐시 표본은 11월 17일 이후 최신 봉/갱신시각이 없으며 11월 18일 장 휴장은 원인이 아니다.
+- **미확정:** OCI cron 호출 누락, 모듈 schedule/enable 또는 글로벌 gate skip, cron 인증/HTTP 실패, 실행 중 수집기/KIS 실패 중 어느 것이 직접 원인인지 판별할 운영 실행 이력과 호스트 journal이 없다. 따라서 “cron이 멈췄다” 또는 “KIS가 실패했다”고 단정하지 않는다.
+- **재발 감지/다음 개선:** 운영 GET 진단 API 또는 대체 read-only 관리자 진단을 복구해 최근 `us-daily-cache` run의 status·skip reason·summary(대상/성공/실패/저장 수)와 OCI cron 마지막 exit 결과를 함께 조회 가능하게 해야 한다. 미국 거래일이 지난 뒤에도 public cache sample 최신 거래일/`dataUpdatedAt`이 갱신되지 않으면 경보하도록 연결한다. 공개 응답 하나만으로 전수 커버리지 경보를 만들지 않는다.
+- 이번 추가 조사에서 코드·캐시·운영 설정은 바꾸지 않았고, cron을 수동 실행하지 않았다. 검증은 public GET, 인증된 GET 시도(404), 코드·문서 대조로 한정했으며 빌드/테스트는 실행하지 않았다. 커밋·푸시·배포 없음.
+
+### 2026-11-19 진단 경로 개선
+
+- 전체 자동화 진단 API가 관리자 기능 정리 커밋에서 제거된 점을 확인하고, US 일봉에 집중한 cron 인증 read-only `GET /api/debug/us-daily-cache-status`를 추가했다. 응답은 최신 DB 상태와 최근 10회 automation run 및 모듈 스케줄을 반환하고 민감정보와 원문 오류 메시지는 제외한다.
+- route tests 3/3, `node scripts/api-surface.mjs check`, `node scripts/check-docs.mjs`, `npm run typecheck` 통과. 문서/route inventory 및 공개 매뉴얼 사본을 갱신했다.
+- 당시 구현 단계에서는 OCI 호스트 journal과 운영 DB 직접 접속정보를 확인하지 못해 cron 프로세스의 실제 exit 상태가 미확정이었다. 아래 운영 배포 후 진단 결과를 추가한다.
+
+### 2026-11-19 운영 배포 및 live 진단
+
+- 기능 commit `7f11a882`와 동시 원격 변경 `66bdab36`을 통합한 `7bb7bd74`를 `oci`에 push했다. Deploy OCI run `44463148126` 성공, release upload/activate 성공을 확인했다. Workflow 로그의 Flyway 검증은 180개 migration과 schema version 180 up-to-date를 확인했다.
+- 배포 후 운영 `/api/health`는 HTTP 200/`ok`, 새 진단 API의 미인증 요청은 HTTP 401, cron secret 헤더를 포함한 read-only 요청은 HTTP 200/`ok`였다.
+- 진단 조회 시각 `2026-11-19T05:17:43Z` (14:17 KST). 설정은 `enabled=true`, global gate=true, 매일 06:00–08:00 KST, 월~토, 3,600초 간격이다. AMS/NAS/NYS 모두 최신 봉은 `20261117`; 마지막 fetched 시각은 2026-11-17 22:31:04–22:31:25 UTC다.
+- 최근 10개 자동화 기록은 전부 `SKIPPED`, 사유 `outside_schedule`; 최신 기록은 2026-11-18 13:10:04 UTC (22:10 KST)다. 다음 허용 창인 2026-11-19 06:00–08:00 KST (2026-11-18 21:00–23:00 UTC)에 해당하는 automation 기록이 없다. 따라서 해당 창에 애플리케이션 cron 실행 기록이 생기지 않았다는 점은 확인했으나, timer 미실행인지 API 도달 전 네트워크/서비스 오류인지는 OCI systemd journal 없이 확정하지 않는다.
+- 배포된 진단 API는 문제를 관찰 가능하게 만들었지만 US 캐시를 갱신하지는 않았다. 운영 설정 변경·수동 cron 실행은 하지 않았다. 남은 다음 확인은 운영 호스트의 `stockman-cron.timer`/`.service` 활성 상태와 해당 시각 journal이다.

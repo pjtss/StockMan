@@ -1681,12 +1681,15 @@
                               "high",
                               "low",
                               "close",
-                              "volume"
+                              "volume",
+                              "tradingValue",
+                              "fetchedAt"
                             ],
                             "properties": {
                               "date": {
                                 "type": "string",
-                                "format": "date"
+                                "pattern": "^\\d{8}$",
+                                "description": "거래일 YYYYMMDD"
                               },
                               "open": {
                                 "type": "number"
@@ -1702,6 +1705,17 @@
                               },
                               "volume": {
                                 "type": "number"
+                              },
+                              "tradingValue": {
+                                "type": "number",
+                                "description": "KR: KIS acml_tr_pbmn 원문 누적 거래대금(원). 원문 값이 없는 레거시 행은 close × volume 대체값."
+                              },
+                              "fetchedAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date-time"
                               }
                             }
                           }
@@ -1762,14 +1776,84 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "market": {
+                                "type": "string"
+                              },
                               "code": {
+                                "type": "string"
+                              },
+                              "name": {
                                 "type": "string"
                               },
                               "candles": {
                                 "type": "array",
                                 "items": {
                                   "type": "object",
-                                  "additionalProperties": true
+                                  "required": [
+                                    "date",
+                                    "open",
+                                    "high",
+                                    "low",
+                                    "close",
+                                    "volume",
+                                    "tradingValue",
+                                    "fetchedAt"
+                                  ],
+                                  "properties": {
+                                    "date": {
+                                      "type": "string",
+                                      "pattern": "^\\d{8}$",
+                                      "description": "거래일 YYYYMMDD"
+                                    },
+                                    "open": {
+                                      "type": "number"
+                                    },
+                                    "high": {
+                                      "type": "number"
+                                    },
+                                    "low": {
+                                      "type": "number"
+                                    },
+                                    "close": {
+                                      "type": "number"
+                                    },
+                                    "volume": {
+                                      "type": "number"
+                                    },
+                                    "tradingValue": {
+                                      "type": "number",
+                                      "description": "KR: KIS acml_tr_pbmn 원문 누적 거래대금(원). 원문 값이 없는 레거시 행은 close × volume 대체값."
+                                    },
+                                    "fetchedAt": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "format": "date-time"
+                                    }
+                                  }
+                                }
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "properties": {
+                                  "latestCandleDate": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "format": "date"
+                                  },
+                                  "dataUpdatedAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "format": "date-time"
+                                  },
+                                  "returnedCount": {
+                                    "type": "integer"
+                                  }
                                 }
                               }
                             }
