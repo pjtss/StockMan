@@ -4051,6 +4051,8 @@ if (existsSync(krArchitecturePath)) {
     || !disclosureApiSource.includes('fetchedAt: sql<Date | null>`NULL::timestamptz`')
     || !disclosureApiSource.includes("projectMarketRssSourceCoverage") || !disclosureApiSource.includes("sourceCoverage,")
     || !disclosureApiSource.includes("const automationRunWindow = and(")
+    || !disclosureApiSource.includes('const includeMarketRssRun = source === "ALL" || source === "RSS" || source === "STOCKTITAN" || source === "SEC_EDGAR" || source === "GLOBENEWSWIRE";')
+    || !disclosureApiSource.includes("includeMarketRssRun ? tx.select(")
     || !disclosureApiSource.includes("isNull(automationRuns.finishedAt)")
     || !disclosureCoverageProjectionSource.includes("function runOverlapsQueryWindow")
     || !disclosureApiSource.includes("from(secSubmissions)")

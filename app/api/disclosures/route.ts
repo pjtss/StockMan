@@ -65,6 +65,7 @@ export async function GET(request: Request) {
     return await db.transaction(async (tx) => {
     const domesticSources = ["KRX_KIND", "NEWSIS", "MK", "HANKYUNG", "ETODAY"];
     const includeRss = source === "ALL" || source === "RSS" || source === "STOCKTITAN" || source === "NASDAQ" || source === "NASDAQ_TRADER" || source === "GLOBENEWSWIRE" || source === "SEC_EDGAR" || domesticSources.includes(source);
+    const includeMarketRssRun = source === "ALL" || source === "RSS" || source === "STOCKTITAN" || source === "SEC_EDGAR" || source === "GLOBENEWSWIRE";
     const includeFilings = hours === null && (source === "ALL" || source === "DART");
     const includeSecSubmissions = hours === null && (source === "ALL" || source === "SEC");
     const includeDartRun = source === "ALL" || source === "DART";
@@ -87,7 +88,7 @@ export async function GET(request: Request) {
       includeRss ? tx.select({ total: count() }).from(marketRssArticles).where(rssWhere) : [{ total: 0 }],
       includeFilings ? tx.select({ total: count() }).from(filings).where(filingWhere) : [{ total: 0 }],
       includeSecSubmissions ? tx.select({ total: count() }).from(secSubmissions).leftJoin(secCompanies, eq(secCompanies.cik, secSubmissions.cik)).leftJoin(secFilingEvents, eq(secFilingEvents.accession, secSubmissions.accession)).where(secSubmissionWhere) : [{ total: 0 }],
-      includeRss ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "market-rss"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
+      includeMarketRssRun ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "market-rss"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
       includeDartRun ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "dart-realtime"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
       includeSecRun ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "sec-realtime"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
     ]);
