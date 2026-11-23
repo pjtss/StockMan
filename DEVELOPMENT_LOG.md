@@ -1,3 +1,30 @@
+## [2026-11-23] RSS 조회 hot path 추가 분리
+
+### 목표
+- RSS/공시 조회의 운영 응답시간을 줄이고 느린 query 구성 요소를 제거한다.
+
+### 반영
+- 재검사에서 RSS 단일 source 조회가 응답에서 쓰지 않는 DART/SEC run 조회를 실행하고, RSS 결과가 없는 source 필터에서도 market-rss run coverage를 조회하는 구조를 확인했다.
+- `/api/disclosures`는 DART/SEC run을 해당 source 요청 때만 조회하고, RSS run 및 coverage projection은 RSS 조회가 포함될 때만 수행한다. sourceCoverage projection은 모든 source에 유지하며 불필요한 자동화 run 조회만 조건부로 제거한다. count/data 쿼리는 유지한다.
+- 재발 자동 감지: route 회귀 테스트, deploy:verify, 동일 query 및 item count를 함께 기록하는 운영 반복 측정을 수행한다.
+- 범위: `app/api/disclosures/route.ts`, 이 로그 및 daily disclosure 설계 문서.
+
+### 검증
+- `npm test -- --run app/api/disclosures/route.test.ts lib/disclosure-timestamp-precision.test.ts`: 2 files, 8 tests 통과.
+- `npm run typecheck`: 통과.
+- `npm run deploy:verify`: 최종 보완 후 production dependency audit(0 vulnerabilities), activation smoke, docs/API/scope/KIS/auth/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke, typecheck, 279 test files(1 skipped), 1,624 tests(3 skipped) 통과.
+- 느린 `hours=1&source=all` 운영 조회는 HTTP 200, total=0, 약 39초였다. 선행 7건과 결과 건수가 달라 비교 불가다. 동일 결과 수 비교용 기준으로 `hours=24&source=STOCKTITAN&page=1&pageSize=100`을 4회 요청했으며 모두 HTTP 200/13건, 454/272/94/193ms(중앙값 232.5ms)였다. `/api/health` HTTP 200/ok, 기존 배포 run 45097996201 성공.
+
+### 다음 개선
+- push 후 `hours=24&source=STOCKTITAN&page=1&pageSize=100` 동일 URL을 cold/warm 반복해 result count와 p50/p95를 비교하고, 39초 all-source query의 원인 분해도 진행한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-23-002
+- 성과 판정: UNMEASURED
+- 근거: 쿼리 구성에서 불필요한 run 조회를 제거했으나 동일 데이터 건수의 운영 전후 latency 표본은 아직 없다.
+
+### 커밋·푸시·배포
+- 추가 변경 커밋·푸시·배포: 미실행. deploy:verify 통과 상태이며 RSS 데이터가 있는 동일 조건의 운영 성능 측정 후 진행한다.
 ## [2026-11-23] RSS 조회의 요청별 payload 파싱 제거
 
 ### 목표
