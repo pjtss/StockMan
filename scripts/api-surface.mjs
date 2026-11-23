@@ -15,6 +15,10 @@ const publicDailyCacheActionPaths = new Set([
   "/api/public/daily-cache/us/refresh",
 ]);
 const publicDailyCacheActionHelper = "lib/public-daily-cache-refresh.ts";
+const publicDailyCacheCronPaths = [
+  "app/api/cron/kr-daily-cache/route.ts",
+  "app/api/cron/us-daily-cache/route.ts",
+];
 
 async function routeFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -443,8 +447,18 @@ for (const path of publicDailyCacheActionPaths) {
   if (requestAuthenticationPattern.test(source)) {
     routePolicyFailures.push(`Public daily-cache action must not inspect caller authentication: ${path}`);
   }
-  if (!source.includes("withAutomationLock") || !source.includes("loadLatestExecutedAutomationRun") || !source.includes("PUBLIC_REFRESH_MIN_INTERVAL_SECONDS = 3_600")) {
+  if (!source.includes("acquireAutomationLock") || !source.includes("loadLatestExecutedAutomationRun") || !source.includes("PUBLIC_REFRESH_MIN_INTERVAL_SECONDS = 3_600")) {
     routePolicyFailures.push(`Public daily-cache action must preserve the distributed lock and minimum cooldown: ${path}`);
+  }
+  if (!source.includes("after(async") || !source.includes("lease.release()") || !source.includes("maxDuration = 5_400")) {
+    routePolicyFailures.push(`Public daily-cache action must return before its bounded background refresh and release its lock: ${path}`);
+  }
+}
+
+for (const sourcePath of publicDailyCacheCronPaths) {
+  const source = await readFile(join(root, sourcePath), "utf8");
+  if (!source.includes("acquireAutomationLock") || !source.includes("public-daily-cache-refresh:")) {
+    routePolicyFailures.push(`Scheduled and public daily-cache requests must share the same market lock: ${sourcePath}`);
   }
 }
 

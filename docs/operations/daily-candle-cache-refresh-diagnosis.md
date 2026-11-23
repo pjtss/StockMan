@@ -18,10 +18,11 @@
 ## 무인증 공개 갱신 API
 
 - 일봉 갱신을 외부에서 직접 요청할 수 있도록 `POST /api/public/daily-cache/kr/refresh`와 `POST /api/public/daily-cache/us/refresh`를 제공한다. HTTP 작업 실행이므로 조회 전용 GET API와 분리했다.
-- 두 endpoint는 호출자 인증을 검사하지 않는다. 단, 운영자가 각 기능을 비활성화하면 409, 최근 실행 후 최소 1시간(설정 interval이 더 크면 해당 간격) 내에는 429와 `Retry-After`, 이미 실행 중에는 202를 돌려준다.
-- 시장별 DB advisory lock과 `automation_runs` 실행 간격 확인을 적용해 동시 요청과 반복 요청으로 인한 전체 시장 작업 중복을 억제한다. scheduler 시간창은 무인증 직접 호출에는 적용하지 않는다.
-- 공개 action은 읽기 전용 OpenAPI에 포함하지 않고, `public/api-reference.md`의 별도 작업 API 섹션과 전체 route inventory에서만 문서화한다. API surface 감사는 허용된 두 POST만 `public-action`으로 인정하고 인증 검사 회귀를 실패 처리한다.
-- 작업 결과는 대상·성공·실패 종목 수와 저장 봉 수를 반환한다. 공개 endpoint는 전체 universes를 처리할 수 있으므로 자동화 연동은 429의 `Retry-After`를 준수하고 같은 시장을 반복 호출하지 않는다.
+- 두 endpoint는 호출자 인증을 검사하지 않는다. 단, 운영자가 각 기능을 비활성화하면 409, 최근 실행 후 최소 1시간(설정 interval이 더 크면 해당 간격) 내에는 429와 `Retry-After`, 이미 실행 중에는 `accepted:false`인 202를 돌려준다. 새 실행은 Next.js `after()` 백그라운드 작업으로 접수 즉시 202를 반환한다.
+- 시장별 DB advisory lock lease와 `automation_runs` 실행 간격 확인을 적용해 동시 요청과 반복 요청으로 인한 전체 시장 작업 중복을 억제한다. cron 경로도 동일한 시장 lock을 사용한다. scheduler 시간창은 무인증 직접 호출에는 적용하지 않는다.
+- 공개 action은 읽기 전용 OpenAPI에 포함하지 않고, `public/api-reference.md`의 별도 작업 API 섹션과 전체 route inventory에서만 문서화한다. API surface 감사는 허용된 두 POST만 `public-action`으로 인정하고 인증 검사 회귀 및 cron/action lock 분리를 실패 처리한다.
+- 접수 응답은 갱신 결과가 아니다. 응답의 `accepted:true`는 작업이 시작되었음을 뜻하며, 완료 데이터는 공개 `GET /api/public/daily-candles`에서 확인한다. 작업 결과·대상·성공·실패 종목 수는 `automation_runs` 및 서버 로그에서 확인한다. 자동화 연동은 429의 `Retry-After`를 준수한다.
+- 2026-11-23 운영 검증에서 동기 응답이 nginx 504로 끝나도 두 번째 무인증 POST가 `already_running` 202를 반환해 백엔드 lock이 유지된 것을 확인했다. 이에 요청자가 끝까지 연결을 유지하지 않아도 되도록 Next.js `after()` 기반 즉시 접수 방식으로 개선했다.
 
 ## 재발 감지 및 운영 확인
 

@@ -43,7 +43,7 @@ LLM은 각 작업에서 라이브 OpenAPI·메뉴얼·카탈로그를 다시 조
 
 HTTP GET만 보고 읽기 전용이라고 판단하지 않는다. 외부 공개 데이터 GET은 사용자·관리자 정보에 접근하지 않고 호출에 따른 DB 쓰기나 작업 실행이 없어야 한다. 관리자·cron 인증을 외부 AI에 넘겨 실행하지 않는다. 새 외부 데이터 GET은 인증 없이 구현하고 `node scripts/api-surface.mjs write` 및 `npm run audit:api-surface`로 무인증 계약을 갱신·검증한다. service-bearer GET은 API surface 검증에서 실패한다.
 
-일봉 캐시 갱신은 사용자가 명시적으로 요청한 공개 작업 기능이다. GET 안전 의미를 유지하기 위해 POST로만 제공하며, 정확히 국내/미국 경로 두 개만 route inventory에서 `public-action`으로 분류한다. 각 시장에서 최소 1시간 동안 한 번만 실행되고, 이미 실행 중이면 중복 작업을 시작하지 않는다.
+일봉 캐시 갱신은 사용자가 명시적으로 요청한 공개 작업 기능이다. GET 안전 의미를 유지하기 위해 POST로만 제공하며, 정확히 국내/미국 경로 두 개만 route inventory에서 `public-action`으로 분류한다. 각 시장에서 최소 1시간 동안 한 번만 실행되고, 이미 실행 중이면 중복 작업을 시작하지 않는다. 처리 시간이 외부 reverse proxy의 요청 제한보다 길어질 수 있어 POST는 요청을 접수하면 HTTP 202를 즉시 반환하고, Next.js `after()`가 self-hosted Node 서버에서 백그라운드 작업을 이어간다([공식 문서](https://nextjs.org/docs/15/app/api-reference/functions/after)).
 
 ## 인증
 
@@ -63,7 +63,7 @@ HTTP GET만 보고 읽기 전용이라고 판단하지 않는다. 외부 공개 
 
 ### 국내 일봉 캐시 갱신 — POST /api/public/daily-cache/kr/refresh
 
-요청 본문과 인증 헤더가 필요 없다. 요청하면 운영 DB의 국내 활성 COMMON_STOCK 유니버스 중 갱신 대상 일봉 데이터를 처리하고 결과 요약을 반환한다. scheduler 시간창은 적용하지 않지만 운영자가 기능을 비활성화하면 HTTP 409로 거절한다. 같은 시장의 최근 실행 후 최소 1시간(설정 interval이 더 크면 해당 간격) 동안은 HTTP 429와 `Retry-After`를 반환한다. 작업이 이미 실행 중이면 HTTP 202 `already_running`을 반환한다. 처리 결과에는 상태, 대상·성공·실패 종목 수, 저장 봉 수 및 국내 시장별 coverage가 포함된다. DB 또는 실행 준비 장애는 HTTP 503이다.
+요청 본문과 인증 헤더가 필요 없다. 요청을 접수하면 HTTP 202 `{ok:true, market:"KR", accepted:true, status:"RUNNING", requestedAt, intervalSeconds}`를 즉시 반환한 뒤 운영 DB의 국내 활성 COMMON_STOCK 유니버스 중 갱신 대상 일봉 데이터를 처리한다. 완료된 데이터는 `GET /api/public/daily-candles`에서 확인한다. scheduler 시간창은 적용하지 않지만 운영자가 기능을 비활성화하면 HTTP 409로 거절한다. 같은 시장의 최근 실행 후 최소 1시간(설정 interval이 더 크면 해당 간격) 동안은 HTTP 429와 `Retry-After`를 반환한다. 작업이 이미 실행 중이면 HTTP 202 `{accepted:false, skipped:true, reason:"already_running"}`을 반환한다. 처리 결과와 실패 요약은 `automation_runs` 및 서버 로그에 기록한다. DB 또는 실행 준비 장애는 HTTP 503이다.
 
 ```sh
 curl -X POST https://<host>/api/public/daily-cache/kr/refresh
@@ -71,7 +71,7 @@ curl -X POST https://<host>/api/public/daily-cache/kr/refresh
 
 ### 미국 일봉 캐시 갱신 — POST /api/public/daily-cache/us/refresh
 
-요청 본문과 인증 헤더가 필요 없다. 요청하면 운영 DB의 미국 활성 COMMON_STOCK 유니버스에서 갱신 대상 일봉 데이터를 처리하고 결과 요약을 반환한다. 국내 경로와 같은 활성화 설정, 시장별 최소 1시간 실행 간격, 분산 잠금 및 HTTP 202/409/429/503 의미를 사용한다. 완료 응답에는 상태, 처리·성공·실패 종목 수와 저장 봉 수가 포함된다.
+요청 본문과 인증 헤더가 필요 없다. 요청을 접수하면 HTTP 202를 즉시 반환한 뒤 운영 DB의 미국 활성 COMMON_STOCK 유니버스에서 갱신 대상 일봉 데이터를 처리한다. 국내 경로와 같은 활성화 설정, 시장별 최소 1시간 실행 간격, 분산 잠금 및 HTTP 202/409/429/503 의미를 사용한다. 완료 데이터는 `GET /api/public/daily-candles`에서 확인하고, 처리·성공·실패 종목 수와 저장 봉 수는 `automation_runs` 및 서버 로그에 기록한다.
 
 ```sh
 curl -X POST https://<host>/api/public/daily-cache/us/refresh

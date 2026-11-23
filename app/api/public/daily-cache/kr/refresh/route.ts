@@ -1,5 +1,7 @@
 import { handlePublicDailyCacheRefresh } from "@/lib/public-daily-cache-refresh";
 
+export const maxDuration = 5_400;
+
 export async function POST() {
   try {
     return await handlePublicDailyCacheRefresh("KR");
