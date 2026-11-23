@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { marketRssArticles } from "./schema";
+import { classifyRssTimestamp } from "./disclosure-timestamp-precision";
 import { fetchAllMarketRss, type MarketRssSource } from "./market-rss-sources";
 import { MARKET_RSS_TRANSLATION_CONCURRENCY, translateMarketRssItem } from "./translate-market-rss-item";
 import { classifyMarketRssItem } from "./market-rss-classifier";
@@ -96,6 +97,8 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
         const notifyEligible = item.source !== "SEC_EDGAR" || isSecRssDiscordItemAllowed(item);
         const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null;
         const isBacklog = false;
+        const rawPayload = item.raw == null ? null : JSON.stringify(item.raw);
+        const rssTimestamp = classifyRssTimestamp(rawPayload);
         return {
           source: item.source,
           externalId: item.id,
@@ -103,7 +106,9 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
           summary: item.summary,
           normalizedSummary: item.normalizedSummary ?? extractMarketRssCoreSummary(item.summary, item.title),
           content: item.content ?? "",
-          rawPayload: item.raw == null ? null : JSON.stringify(item.raw),
+          rawPayload,
+          rssTimestampPrecision: rssTimestamp.precision,
+          rssPublishedDate: rssTimestamp.date,
           sourceSnapshotId,
           detectedTicker: classification.ticker || mappedTicker,
           eventDirection: classification.direction,
@@ -120,7 +125,7 @@ export async function ingestMarketRssArticles(options?: { sources?: MarketRssSou
       });
       if (values.length === 0) return { duplicateCount, deduplicatedItemCount: 0, upsertAffectedRowCount: 0 };
       const rows = await db.insert(marketRssArticles).values(values).onConflictDoUpdate({ target: [marketRssArticles.source, marketRssArticles.externalId], set: {
-        title: sql`excluded.title`, summary: sql`excluded.summary`, normalizedSummary: sql`excluded.normalized_summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
+        title: sql`excluded.title`, summary: sql`excluded.summary`, normalizedSummary: sql`excluded.normalized_summary`, content: sql`excluded.content`, rawPayload: sql`excluded.raw_payload`, rssTimestampPrecision: sql`excluded.rss_timestamp_precision`, rssPublishedDate: sql`excluded.rss_published_date`, sourceSnapshotId: sql`excluded.source_snapshot_id`, detectedTicker: sql`excluded.detected_ticker`, eventDirection: sql`excluded.event_direction`, matchedTerms: sql`excluded.matched_terms`, financingAmountUsd: sql`excluded.financing_amount_usd`, dilutionRisk: sql`excluded.dilution_risk`,
         ...buildMarketRssTranslationUpsertReset(),
         link: buildMarketRssLinkUpsertValue(),
         publishedAt: sql`COALESCE(${marketRssArticles.publishedAt}, excluded.published_at)`,

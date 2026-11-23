@@ -163,6 +163,8 @@ export const marketRssArticles = pgTable(
     normalizedSummary: text("normalized_summary").notNull().default(""),
     content: text("content").notNull().default(""),
     rawPayload: text("raw_payload"),
+    rssTimestampPrecision: text("rss_timestamp_precision").notNull().default("UNKNOWN"),
+    rssPublishedDate: text("rss_published_date"),
     sourceSnapshotId: bigint("source_snapshot_id", { mode: "number" }),
     detectedTicker: text("detected_ticker"),
     eventDirection: text("event_direction").notNull().default("NEUTRAL"),

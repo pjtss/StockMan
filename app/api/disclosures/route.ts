@@ -5,7 +5,6 @@ import { automationRuns, filings, marketRssArticles, marketRssFetchSnapshots, se
 import { createRssTimeWindow, parseRssHours } from "@/lib/rss-time-window";
 import { getSeoulDateKey } from "@/lib/seoul-date";
 import { projectMarketRssSourceCoverage } from "@/lib/disclosure-source-coverage";
-import { classifyRssTimestamp } from "@/lib/disclosure-timestamp-precision";
 
 export const dynamic = "force-dynamic";
 
@@ -71,18 +70,13 @@ export async function GET(request: Request) {
     const includeDartRun = source === "ALL" || source === "DART";
     const includeSecRun = source === "ALL" || source === "SEC";
     const containsText = (column: SQLWrapper) => sql<boolean>`position(lower(${searchQuery}) in lower(coalesce(${column}, ''))) > 0`;
-    const rssRawTimestamp = sql<string>`COALESCE(
-      substring(${marketRssArticles.rawPayload} from '"pubDate"[[:space:]]*:[[:space:]]*"([^"]*)"'),
-      substring(${marketRssArticles.rawPayload} from '"published"[[:space:]]*:[[:space:]]*"([^"]*)"'),
-      substring(${marketRssArticles.rawPayload} from '"updated"[[:space:]]*:[[:space:]]*"([^"]*)"'),
-      ''
-    )`;
-    const rssDateOnly = sql<boolean>`(${rssRawTimestamp} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')`;
-    const rssHasExplicitInstant = sql<boolean>`(${rssRawTimestamp} ~* '([T ][0-9]{1,2}:[0-9]{2}).*(Z|[+-][0-9]{2}:?[0-9]{2}|GMT|UTC)$')`;
     const rssTimeRange = and(gte(marketRssArticles.publishedAt, range.start), lt(marketRssArticles.publishedAt, range.end));
     const rssWindowWhere = hours === null
-      ? or(and(rssDateOnly, sql`${rssRawTimestamp} = ${date}`), and(sql`NOT ${rssDateOnly}`, rssTimeRange))
-      : and(rssTimeRange, rssHasExplicitInstant);
+      ? or(
+          and(eq(marketRssArticles.rssTimestampPrecision, "DATE"), eq(marketRssArticles.rssPublishedDate, date)),
+          and(sql`${marketRssArticles.rssTimestampPrecision} <> 'DATE'`, rssTimeRange),
+        )
+      : and(rssTimeRange, eq(marketRssArticles.rssTimestampPrecision, "INSTANT"));
     const rssSearchWhere = searchQuery ? or(containsText(marketRssArticles.title), containsText(marketRssArticles.summary), containsText(marketRssArticles.content), containsText(marketRssArticles.detectedTicker)) : undefined;
     const filingSearchWhere = searchQuery ? or(containsText(filings.title), containsText(filings.summary), containsText(filings.company), containsText(filings.externalId)) : undefined;
     const secSearchWhere = searchQuery ? or(containsText(secSubmissions.accession), containsText(secSubmissions.cik), containsText(secSubmissions.form), containsText(secSubmissions.primaryDocDescription), containsText(secCompanies.name), sql<boolean>`position(lower(${searchQuery}) in lower(coalesce(array_to_string(${secCompanies.tickers}, ' '), ''))) > 0`, containsText(secFilingEvents.bodyExcerpt)) : undefined;
@@ -99,12 +93,12 @@ export async function GET(request: Request) {
     ]);
     const sourceCoverage = projectMarketRssSourceCoverage(marketRssRunRows[0] ?? null, source, dartRunRows[0] ?? null, secRunRows[0] ?? null, queryWindow);
     const total = Number(rssCount[0]?.total ?? 0) + Number(filingCount[0]?.total ?? 0) + Number(secSubmissionCount[0]?.total ?? 0);
-    type RssDisclosureRow = { id: number; sourceSnapshotId: number | null; rawPayload: string | null; source: string; externalId: string; title: string; summary: string; content: string; link: string; publishedAt: Date | null; detectedTicker: string | null; fetchedAt: Date | null };
+    type RssDisclosureRow = { id: number; sourceSnapshotId: number | null; rssTimestampPrecision: string; rssPublishedDate: string | null; source: string; externalId: string; title: string; summary: string; content: string; link: string; publishedAt: Date | null; detectedTicker: string | null; fetchedAt: Date | null };
     type FilingDisclosureRow = { id: number; source: string; externalId: string; title: string; summary: string; link: string; publishedAt: Date; filedAt: string; company: string; fetchedAt: Date | null };
     type SecDisclosureRow = { accession: string; cik: string; form: string; filingDate: string; primaryDocDescription: string | null; filingUrl: string; companyName: string | null; tickers: string[] | null; bodyExcerpt: string | null; snapshotId: string | null; fetchedAt: Date | null };
     const readRssBatch = async (take: number, skip: number): Promise<RssDisclosureRow[]> => {
       if (!includeRss) return [];
-      return tx.select({ id: marketRssArticles.id, sourceSnapshotId: marketRssArticles.sourceSnapshotId, rawPayload: marketRssArticles.rawPayload, source: marketRssArticles.source, externalId: marketRssArticles.externalId, title: marketRssArticles.title, summary: marketRssArticles.summary, content: marketRssArticles.content, link: marketRssArticles.link, publishedAt: marketRssArticles.publishedAt, detectedTicker: marketRssArticles.detectedTicker, fetchedAt: marketRssFetchSnapshots.fetchedAt }).from(marketRssArticles).leftJoin(marketRssFetchSnapshots, eq(marketRssArticles.sourceSnapshotId, marketRssFetchSnapshots.id)).where(rssWhere).orderBy(desc(marketRssArticles.publishedAt), asc(marketRssArticles.externalId)).limit(take).offset(skip);
+      return tx.select({ id: marketRssArticles.id, sourceSnapshotId: marketRssArticles.sourceSnapshotId, rssTimestampPrecision: marketRssArticles.rssTimestampPrecision, rssPublishedDate: marketRssArticles.rssPublishedDate, source: marketRssArticles.source, externalId: marketRssArticles.externalId, title: marketRssArticles.title, summary: marketRssArticles.summary, content: marketRssArticles.content, link: marketRssArticles.link, publishedAt: marketRssArticles.publishedAt, detectedTicker: marketRssArticles.detectedTicker, fetchedAt: marketRssFetchSnapshots.fetchedAt }).from(marketRssArticles).leftJoin(marketRssFetchSnapshots, eq(marketRssArticles.sourceSnapshotId, marketRssFetchSnapshots.id)).where(rssWhere).orderBy(desc(marketRssArticles.publishedAt), asc(marketRssArticles.externalId)).limit(take).offset(skip);
     };
     const readFilingBatch = async (take: number, skip: number): Promise<FilingDisclosureRow[]> => {
       if (!includeFilings) return [];
@@ -161,10 +155,9 @@ export async function GET(request: Request) {
     }
     const merged = [
       ...rssRows.map(row => {
-        const { rawPayload, ...publicRow } = row;
-        const timestamp = classifyRssTimestamp(rawPayload);
-        const sortBasis = row.publishedAt && timestamp.precision === "INSTANT" ? "PUBLISHED_INSTANT" as const : "UNKNOWN" as const;
-        return { ...publicRow, id: `${row.source}:${row.externalId}`, sourceSnapshotId: row.sourceSnapshotId === null ? null : String(row.sourceSnapshotId), sourceType: "RSS" as const, publishedAt: timestamp.precision === "INSTANT" ? row.publishedAt : null, filedAt: timestamp.date, filedAtPrecision: timestamp.precision === "DATE" ? "DATE" as const : "UNKNOWN" as const, sortBasis, companyNames: [], tickers: row.detectedTicker ? [row.detectedTicker] : [], contentStatus: row.content ? "FULL" as const : "METADATA_ONLY" as const };
+        const { rssTimestampPrecision, rssPublishedDate, ...publicRow } = row;
+        const sortBasis = row.publishedAt && rssTimestampPrecision === "INSTANT" ? "PUBLISHED_INSTANT" as const : "UNKNOWN" as const;
+        return { ...publicRow, id: `${row.source}:${row.externalId}`, sourceSnapshotId: row.sourceSnapshotId === null ? null : String(row.sourceSnapshotId), sourceType: "RSS" as const, publishedAt: rssTimestampPrecision === "INSTANT" ? row.publishedAt : null, filedAt: rssPublishedDate, filedAtPrecision: rssTimestampPrecision === "DATE" ? "DATE" as const : "UNKNOWN" as const, sortBasis, companyNames: [], tickers: row.detectedTicker ? [row.detectedTicker] : [], contentStatus: row.content ? "FULL" as const : "METADATA_ONLY" as const };
       }),
       ...filingRows.map(row => ({ ...row, id: `${row.source}:${row.externalId}`, sourceSnapshotId: null, publishedAt: null, sourceType: "DART" as const, filedAtPrecision: "DATE" as const, sortBasis: "FILED_DATE" as const, companyNames: [row.company], tickers: [], content: null, contentStatus: "METADATA_ONLY" as const })),
       ...secRows.map(row => ({ id: `SEC:${row.accession}`, source: "SEC", sourceType: "SEC_EDGAR" as const, externalId: row.accession, title: row.primaryDocDescription || row.form, summary: null, content: row.bodyExcerpt || null, contentStatus: row.bodyExcerpt ? "EXCERPT" as const : "METADATA_ONLY" as const, link: row.filingUrl, publishedAt: null, filedAt: row.filingDate, filedAtPrecision: "DATE" as const, sortBasis: "FILED_DATE" as const, fetchedAt: row.fetchedAt, sourceSnapshotId: row.snapshotId, companyNames: row.companyName ? [row.companyName] : [], tickers: row.tickers || [], formType: row.form })),

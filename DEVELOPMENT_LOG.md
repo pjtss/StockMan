@@ -1,3 +1,31 @@
+## [2026-11-23] RSS 조회의 요청별 payload 파싱 제거
+
+### 목표
+- 운영 RSS 조회 cold 지연을 줄이고 원문 payload의 요청별 반복 전송·분류를 제거한다.
+
+### 반영
+- 근본 원인: /api/disclosures가 raw_payload를 SQL 정규식으로 정밀도 분류하고 같은 payload를 Node에서 JSON parse했다.
+- ingest 시 rss_timestamp_precision/rss_published_date를 저장하고 query/response는 요약 필드만 사용한다. V182는 기존 행 backfill과 date-only/instant 부분 인덱스를 추가한다. API 응답 의미는 유지한다.
+- 배포 전 production dependency gate가 next@15.5.28 advisory로 실패하여 next@15.5.29로 패치했다. Next.js [공식 지원 정책](https://nextjs.org/support-policy)에 따라 유지보수 15.x 최신 patch를 사용하며 audit 0건을 확인했다.
+- 재발 자동 감지: timestamp classifier tests, docs checker의 ingest/query 경계 확인, 운영 GET latency/결과 건수 비교를 유지한다.
+- 범위: disclosures route/schema/ingest, V182 migration, docs checker, RSS 오류·설계 기록, Next dependency lock.
+
+### 검증
+- 변경 전 운영 GET hours=1/source=all/page=1/pageSize=100: 27s/HTTP 200/7 items 1회. NASDAQ/SEC_EDGAR 분리 GET 482/399ms, 0건. 추가 all-source GET은 61.5s 뒤 JSON parse 실패(상태/본문 미기록). 표본이 적어 cold 기준을 일반화하지 않는다.
+- synthetic microbenchmark (25,000행×5회): JSON parse/classify 74.5ms, persisted precision lookup 2.0ms. 행당 815 bytes payload를 DB에서 가져오지 않으며 25,000행의 가상 payload는 20.4 MB다. 운영 API latency 개선율로 해석하지 않는다.
+- 최신 `origin/oci` HEAD에 재적용한 전체 검증 통과: OCI activation preflight; docs/API/scope/KIS/Bearer/cron audits; Next.js 15.5.29 production build; standalone HTTP/API smoke와 Chrome desktop/mobile hydration; typecheck; full Vitest 279 files (1 skipped), 1,624 passed (3 skipped). `docs:check`에서 migration 182개 및 운영 schema 30 tables/2 views 확인.
+
+### 다음 개선
+- 배포 후 동일 운영 GET을 cold/warm 각각 반복해 p50/p95와 item count를 확인하고 Flyway V182 backfill 시간을 측정한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-23-001
+- 성과 판정: 운영 동일 쿼리 결과 건수를 비교하고 반복 latency 개선으로 확정한다. 합성 microbenchmark는 구조 개선 참고치다.
+- 근거: feed timestamp 정밀도는 ingest 시 정해져 있으므로 조회마다 raw payload를 처리할 필요가 없다.
+
+### 커밋·푸시·배포
+- 상태: 검증 완료, push 후 OCI workflow 및 운영 성능 GET 확인 대기.
+
 # [2026-11-19] US 일봉 갱신 진단 API 복구
 
 ### 목표

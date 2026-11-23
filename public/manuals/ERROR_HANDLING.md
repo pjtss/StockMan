@@ -1,3 +1,11 @@
+## RSS 조회가 비정상적으로 느릴 때 raw payload 재파싱 방지 (2026-11-23)
+
+- **증상**: /api/disclosures 저장 RSS 조회가 느리다.
+- **근본 원인**: GET에서 각 raw_payload를 SQL 정규식 및 Node JSON parse로 반복 분류했다.
+- **해결**: ingest 시 precision/date를 저장하고 V182에서 기존 RSS row를 backfill한다. 조회는 메타데이터만 읽는다.
+- **재발 자동 감지**: classifier 단위 테스트 및 docs checker의 ingest/query 경계 검증, 배포 후 동일 API 성능 측정을 유지한다.
+- **남은 위험**: V182 기존 데이터 backfill은 배포 migration에서 DB write 부하를 만들 수 있으며 migration duration을 관측한다.
+
 ## 2026-11-19 국내 일봉 거래대금이 종가×거래량으로 대체됨
 
 - **증상**: 국내 `daily-candles` API가 KIS가 제공하는 `acml_tr_pbmn` 대신 종가×거래량을 거래대금으로 반환했다.
