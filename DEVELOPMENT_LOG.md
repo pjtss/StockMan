@@ -5,18 +5,18 @@
 
 ### 반영
 - 재검사에서 RSS 단일 source 조회가 응답에서 쓰지 않는 DART/SEC run 조회를 실행하고, NASDAQ 등 RSS 결과가 없는 source 필터에서도 market-rss run coverage를 조회하는 구조를 확인했다.
-- `/api/disclosures`는 DART/SEC run을 해당 source 요청 때만 조회하고, RSS run은 결과 coverage에 쓰이는 ALL/RSS 및 세 scheduled RSS source(STOCKTITAN/SEC_EDGAR/GLOBENEWSWIRE)에서만 조회한다. DART/SEC run은 해당 source 요청 때만 조회한다. NASDAQ 등 run coverage가 없는 RSS source에서는 해당 쿼리를 생략하며 sourceCoverage projection 자체는 모든 source에 유지한다. count/data 쿼리는 유지한다.
+- `/api/disclosures`는 DART/SEC run을 해당 source 요청 때만 포함한다. RSS run은 coverage 소비 source에서만 조회하고, automation_runs 필요한 module rows를 DISTINCT ON 단일 SELECT로 가져온다. NASDAQ 등 run coverage가 없는 source는 제외하며 sourceCoverage 응답은 보존한다.
 - 재발 자동 감지: route 회귀 테스트, deploy:verify, 동일 query 및 item count를 함께 기록하는 운영 반복 측정을 수행한다.
 - 범위: `app/api/disclosures/route.ts`, 이 로그 및 daily disclosure 설계 문서.
 
 ### 검증
 - `npm test -- --run app/api/disclosures/route.test.ts lib/disclosure-timestamp-precision.test.ts`: 2 files, 8 tests 통과.
 - `npm run typecheck`: 통과.
-- `npm run deploy:verify`: 최종 보완 후 production dependency audit(0 vulnerabilities), activation smoke, docs/API/scope/KIS/auth/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke, typecheck, 279 test files(1 skipped), 1,624 tests(3 skipped) 통과.
-- 느린 `hours=1&source=all` 운영 조회는 HTTP 200, total=0, 약 39초였다. 선행 7건과 결과 건수가 달라 비교 불가다. `hours=1&source=NASDAQ&page=1&pageSize=100`의 market-rss run 쿼리 제거 전 4회 기준은 HTTP 200/0건, 231/152/60/55ms(중앙값 83.5ms, sorted 55/60/152/231)였다. 동일 결과 수 비교용 기준으로 `hours=24&source=STOCKTITAN&page=1&pageSize=100`을 4회 요청했으며 모두 HTTP 200/13건, 454/272/94/193ms(중앙값 232.5ms)였다. `/api/health` HTTP 200/ok, 기존 배포 run 45097996201 성공.
+- 최종 `npm run deploy:verify` 통과: production audit(0 vulnerabilities), activation smoke, docs/API/scope/KIS/auth/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke, typecheck, 279 test files(1 skipped), 1,624 tests(3 skipped).
+- 느린 `hours=1&source=all` 운영 조회는 HTTP 200, total=0, 약 39초였다. 선행 7건과 결과 건수가 달라 비교 불가다. `hours=1&source=NASDAQ&page=1&pageSize=100`의 market-rss run 제거 전 4회는 HTTP 200/0건, 231/152/60/55ms(중앙값 106ms)였고 제거 후 6회는 HTTP 200/0건, 308/166/60/58/59/55ms(중앙값 59.5ms)였다. 동일 건수에서 중앙값은 약 44% 감소했지만 empty-result latency이므로 일반화하지 않는다. Source 분할: NASDAQ 0.28s, STOCKTITAN 0.16s, SEC_EDGAR 0.06s, DART 7.66s, SEC 3.49s, ALL 14.20s(재요청 36.09s)로 coverage 경로가 큰 비용 후보임을 확인했다. `/api/health` HTTP 200/ok.
 
 ### 다음 개선
-- push 후 `hours=24&source=STOCKTITAN&page=1&pageSize=100` 동일 URL을 cold/warm 반복해 result count와 p50/p95를 비교하고, 39초 all-source query의 원인 분해도 진행한다.
+- 단일 DISTINCT ON 배포 후 동일 `hours=1&source=all`과 DART/SEC/RSS split을 다시 재측정한다. ALL 결과 건수, p50/p95, health를 기록해 run-query aggregation의 실제 운영 효과를 평가한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-23-002
@@ -24,7 +24,7 @@
 - 근거: 쿼리 구성에서 불필요한 run 조회를 제거했으나 동일 데이터 건수의 운영 전후 latency 표본은 아직 없다.
 
 ### 커밋·푸시·배포
-- eabde176 커밋·푸시·배포(run 45101393472) 성공. source-specific run 조건 변경: 전체 deploy:verify 및 8 targeted tests 통과, 추가 commit/push/deploy 미실행.
+- eabde176 및 20b84763 커밋·푸시·배포 성공(run 45101393472, 45103109736). DISTINCT ON coverage query 변경은 전체 deploy:verify 및 docs:check 통과, commit/push/deploy 미실행.
 ## [2026-11-23] RSS 조회의 요청별 payload 파싱 제거
 
 ### 목표

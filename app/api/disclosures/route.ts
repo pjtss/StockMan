@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, asc, count, desc, eq, gte, isNull, lt, or, sql, type SQLWrapper } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, or, sql, type SQLWrapper } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { automationRuns, filings, marketRssArticles, marketRssFetchSnapshots, secCompanies, secFilingEvents, secSourceSnapshots, secSubmissions } from "@/lib/schema";
 import { createRssTimeWindow, parseRssHours } from "@/lib/rss-time-window";
@@ -70,6 +70,11 @@ export async function GET(request: Request) {
     const includeSecSubmissions = hours === null && (source === "ALL" || source === "SEC");
     const includeDartRun = source === "ALL" || source === "DART";
     const includeSecRun = source === "ALL" || source === "SEC";
+    const coverageModuleKeys = [
+      ...(includeMarketRssRun ? ["market-rss"] : []),
+      ...(includeDartRun ? ["dart-realtime"] : []),
+      ...(includeSecRun ? ["sec-realtime"] : []),
+    ];
     const containsText = (column: SQLWrapper) => sql<boolean>`position(lower(${searchQuery}) in lower(coalesce(${column}, ''))) > 0`;
     const rssTimeRange = and(gte(marketRssArticles.publishedAt, range.start), lt(marketRssArticles.publishedAt, range.end));
     const rssWindowWhere = hours === null
@@ -84,15 +89,15 @@ export async function GET(request: Request) {
     const rssWhere = and(rssWindowWhere, source === "ALL" ? undefined : eq(marketRssArticles.source, source), rssSearchWhere);
     const filingWhere = and(eq(filings.source, "DART"), eq(filings.publishedDateSeoul, date), filingSearchWhere);
     const secSubmissionWhere = and(eq(secSubmissions.filingDate, date), secSearchWhere);
-    const [rssCount, filingCount, secSubmissionCount, marketRssRunRows, dartRunRows, secRunRows] = await Promise.all([
+    const [rssCount, filingCount, secSubmissionCount, coverageRunRows] = await Promise.all([
       includeRss ? tx.select({ total: count() }).from(marketRssArticles).where(rssWhere) : [{ total: 0 }],
       includeFilings ? tx.select({ total: count() }).from(filings).where(filingWhere) : [{ total: 0 }],
       includeSecSubmissions ? tx.select({ total: count() }).from(secSubmissions).leftJoin(secCompanies, eq(secCompanies.cik, secSubmissions.cik)).leftJoin(secFilingEvents, eq(secFilingEvents.accession, secSubmissions.accession)).where(secSubmissionWhere) : [{ total: 0 }],
-      includeMarketRssRun ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "market-rss"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
-      includeDartRun ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "dart-realtime"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
-      includeSecRun ? tx.select({ id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(eq(automationRuns.moduleKey, "sec-realtime"), automationRunWindow)).orderBy(desc(automationRuns.startedAt)).limit(1) : [],
+      coverageModuleKeys.length > 0 ? tx.selectDistinctOn([automationRuns.moduleKey], { moduleKey: automationRuns.moduleKey, id: automationRuns.id, status: automationRuns.status, startedAt: automationRuns.startedAt, finishedAt: automationRuns.finishedAt, summary: automationRuns.summary }).from(automationRuns).where(and(inArray(automationRuns.moduleKey, coverageModuleKeys), automationRunWindow)).orderBy(asc(automationRuns.moduleKey), desc(automationRuns.startedAt)) : [],
     ]);
-    const sourceCoverage = projectMarketRssSourceCoverage(marketRssRunRows[0] ?? null, source, dartRunRows[0] ?? null, secRunRows[0] ?? null, queryWindow);
+    const latestRunByModule = new Map<string, (typeof coverageRunRows)[number]>();
+    for (const run of coverageRunRows) if (!latestRunByModule.has(run.moduleKey)) latestRunByModule.set(run.moduleKey, run);
+    const sourceCoverage = projectMarketRssSourceCoverage(latestRunByModule.get("market-rss") ?? null, source, latestRunByModule.get("dart-realtime") ?? null, latestRunByModule.get("sec-realtime") ?? null, queryWindow);
     const total = Number(rssCount[0]?.total ?? 0) + Number(filingCount[0]?.total ?? 0) + Number(secSubmissionCount[0]?.total ?? 0);
     type RssDisclosureRow = { id: number; sourceSnapshotId: number | null; rssTimestampPrecision: string; rssPublishedDate: string | null; source: string; externalId: string; title: string; summary: string; content: string; link: string; publishedAt: Date | null; detectedTicker: string | null; fetchedAt: Date | null };
     type FilingDisclosureRow = { id: number; source: string; externalId: string; title: string; summary: string; link: string; publishedAt: Date; filedAt: string; company: string; fetchedAt: Date | null };
