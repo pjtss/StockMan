@@ -9465,4 +9465,4 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - route의 기본값 구현과 런북 문구를 대조하고 운영 read-only 조회를 수행했다. 이 변경은 문서만 수정하며 API 동작은 바꾸지 않는다.
 - 다른 RSS source의 미수집/coverage UNKNOWN 상태는 기존 문서에 기록된 별도 수집 범위 문제이며 이번 조회 기본 날짜 수정 범위에서는 변경하지 않았다.
 - `npm ci --no-audit --no-fund`와 `npm run deploy:verify` 통과. 전체 테스트 279개 파일 통과·1개 skipped, 1,624 passed·3 skipped; 타입 검사, 문서/API 감사, production build, standalone runtime/API smoke 및 Chrome 데스크톱·모바일 hydration smoke 통과.
-- commit/push로 OCI 배포 workflow 실행 예정이며, 운영 health와 RSS 조회는 push 후 확인한다.
+- 커밋 `62c60b9d`를 `oci`에 push했고 GitHub Actions `Deploy OCI` run `45138724333` 성공을 확인했다. 배포 후 `GET /api/health`는 `status=ok`; `GET /api/disclosures?date=2026-11-23&source=STOCKTITAN&page=1&pageSize=1`은 HTTP 200, `ok=true`, `DB_QUERY_COMPLETE`, `total=32`이며 날짜와 출처가 요청과 일치했다.
