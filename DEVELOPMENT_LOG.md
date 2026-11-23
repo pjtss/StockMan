@@ -9451,3 +9451,18 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - **검증**: 로컬 `npm run deploy:verify` 통과(의존성 감사 0 취약점, OCI activation preflight, 문서/API/catalog/migration/scope/KIS/auth/cron 감사, production build, standalone HTTP/API 및 Chrome desktop/mobile smoke, Vitest 280 files 중 279 passed·1 skipped, 1,624 passed·3 skipped, typecheck).
 - **배포 후 확인**: GitHub Actions Deploy OCI run `45132995688` 성공. 활성화 로그에서 Flyway schema version 182, migration up-to-date, 410개 event upsert 성공을 확인했다. `GET /api/health`는 2026-11-23 07:50:01 UTC에 `status=ok`를 반환했다. 공개 health route는 상세 commit/build/Flyway 정보를 노출하지 않으므로 workflow 로그를 migration 근거로 사용한다.
 - **남은 위험·다음 단계**: 없음. 커밋·푸시·배포 완료.
+# [2026-11-23] RSS 조회 기본 날짜 안내 정정
+
+### 목적·범위
+- RSS 조회 기능의 날짜 선택 오류 가능성을 검토하고, 운영 API 구현과 상충하는 런북 안내를 바로잡는다.
+
+### 확인 및 반영
+- `/api/disclosures`는 생략한 `date`를 `getSeoulDateKey(now)`로 계산해 Asia/Seoul 오늘을 사용한다. RSS 런북은 UTC 기반 기본값이라고 잘못 안내해 KST 오전 실행 시 날짜를 잘못 예상하게 만들 수 있었다.
+- `docs/operations/llm-rss-bullish-report-runbook.md`의 날짜 설명을 실제 코드 동작에 맞추고, 재현 가능한 조회를 위해 날짜 명시를 유지하도록 정정했다.
+- 운영 `GET /api/disclosures?date=2026-11-23&source=all&page=1&pageSize=1`은 HTTP 200, `ok=true`, `total=95`를 반환했다. 응답의 최근 GLOBENEWSWIRE·STOCKTITAN·SEC_EDGAR 작업은 fetch/persist SUCCESS였고, RSS source coverage가 완전성을 뜻하지 않는다는 기존 설계 문서의 한계와 일치했다.
+
+### 검증·잔여 과제
+- route의 기본값 구현과 런북 문구를 대조하고 운영 read-only 조회를 수행했다. 이 변경은 문서만 수정하며 API 동작은 바꾸지 않는다.
+- 다른 RSS source의 미수집/coverage UNKNOWN 상태는 기존 문서에 기록된 별도 수집 범위 문제이며 이번 조회 기본 날짜 수정 범위에서는 변경하지 않았다.
+- `npm ci --no-audit --no-fund`와 `npm run deploy:verify` 통과. 전체 테스트 279개 파일 통과·1개 skipped, 1,624 passed·3 skipped; 타입 검사, 문서/API 감사, production build, standalone runtime/API smoke 및 Chrome 데스크톱·모바일 hydration smoke 통과.
+- commit/push로 OCI 배포 workflow 실행 예정이며, 운영 health와 RSS 조회는 push 후 확인한다.
