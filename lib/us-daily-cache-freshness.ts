@@ -8,6 +8,9 @@ export type UsDailyMarketFreshness = {
   market: string;
   sourceLatestCandleDate: string;
   cacheLatestCandleDate: string | null;
+  eligibleCount: number;
+  atSourceLatestDateCount: number;
+  missingAtSourceLatestDateCount: number;
   stale: boolean;
 };
 
@@ -26,24 +29,33 @@ export function isUsPostCloseWeekday(value = new Date()) {
 export function compareUsDailyMarketFreshness(
   sourceByMarket: Map<string, string>,
   cacheByMarket: Map<string, string>,
+  coverageByMarket: Map<string, { eligibleCount: number; atSourceLatestDateCount: number }>,
 ): UsDailyMarketFreshness[] {
+  for (const market of MARKETS) {
+    if (!sourceByMarket.get(market)) throw new Error(`US_DAILY_FRESHNESS_SOURCE_UNAVAILABLE:${market}`);
+  }
   return MARKETS.map((market) => {
     const sourceLatestCandleDate = sourceByMarket.get(market);
     if (!sourceLatestCandleDate) throw new Error(`US_DAILY_FRESHNESS_SOURCE_UNAVAILABLE:${market}`);
     const cacheLatestCandleDate = cacheByMarket.get(market) ?? null;
+    const coverage = coverageByMarket.get(market);
+    if (!coverage) throw new Error(`US_DAILY_FRESHNESS_COVERAGE_UNAVAILABLE:${market}`);
+    const missingAtSourceLatestDateCount = Math.max(0, coverage.eligibleCount - coverage.atSourceLatestDateCount);
     return {
       market,
       sourceLatestCandleDate,
       cacheLatestCandleDate,
-      stale: cacheLatestCandleDate === null || cacheLatestCandleDate < sourceLatestCandleDate,
+      ...coverage,
+      missingAtSourceLatestDateCount,
+      stale: cacheLatestCandleDate === null || cacheLatestCandleDate < sourceLatestCandleDate || missingAtSourceLatestDateCount > 0,
     };
   });
 }
 
 /**
- * Outside the configured KST window, probe official active common stocks after
- * the New York close. If KIS has a newer daily candle than the operating cache,
- * the caller can safely start the normal full-universe warm job as a catch-up.
+ * Outside the configured KST window, compare official source dates with both
+ * the cache maximum and per-symbol coverage at that date. A market MAX alone
+ * cannot prove that every active common stock received its latest candle.
  */
 export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]> {
   const pool = getPool();
@@ -103,5 +115,34 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
   for (const row of cacheResult.rows) {
     if (row.latest_date) cacheByMarket.set(row.market, row.latest_date);
   }
-  return compareUsDailyMarketFreshness(sourceByMarket, cacheByMarket);
+  const coverageResult = await pool.query<{ market: string; eligible_count: number | string; at_source_latest_date_count: number | string }>(
+    `SELECT u.market,
+            COUNT(*) AS eligible_count,
+            COUNT(*) FILTER (
+              WHERE c.candle_date = CASE u.market
+                WHEN 'NAS' THEN $1::text
+                WHEN 'NYS' THEN $2::text
+                WHEN 'AMS' THEN $3::text
+              END
+                AND ${validDailyCandleSql("c")}
+            ) AS at_source_latest_date_count
+       FROM us_common_stock_universe u
+       LEFT JOIN us_latest_daily_candles c ON c.market = u.market AND c.code = u.code
+      WHERE u.enabled = true
+        AND u.instrument_type = 'COMMON_STOCK'
+        AND COALESCE(u.is_etf, false) = false
+        AND COALESCE(u.is_warrant, false) = false
+        AND COALESCE(u.is_derivative, false) = false
+        AND COALESCE(u.is_dr, false) = false
+        AND COALESCE(u.is_leveraged, false) = false
+        AND COALESCE(u.is_inverse, false) = false
+        AND u.market IN ('NAS', 'NYS', 'AMS')
+      GROUP BY u.market`,
+    [sourceByMarket.get("NAS"), sourceByMarket.get("NYS"), sourceByMarket.get("AMS")],
+  );
+  const coverageByMarket = new Map(coverageResult.rows.map((row) => [row.market, {
+    eligibleCount: Number(row.eligible_count),
+    atSourceLatestDateCount: Number(row.at_source_latest_date_count),
+  }]));
+  return compareUsDailyMarketFreshness(sourceByMarket, cacheByMarket, coverageByMarket);
 }

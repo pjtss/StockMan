@@ -12,13 +12,30 @@ describe("US daily cache freshness probes", () => {
     const result = compareUsDailyMarketFreshness(
       new Map([["NAS", "20261123"], ["NYS", "20261123"], ["AMS", "20261123"]]),
       new Map([["NAS", "20261120"], ["NYS", "20261123"], ["AMS", "20261120"]]),
+      new Map([["NAS", { eligibleCount: 3, atSourceLatestDateCount: 3 }], ["NYS", { eligibleCount: 3, atSourceLatestDateCount: 3 }], ["AMS", { eligibleCount: 3, atSourceLatestDateCount: 3 }]]),
     );
     expect(result.map(({ market, stale }) => [market, stale])).toEqual([
       ["NAS", true], ["NYS", false], ["AMS", true],
     ]);
   });
 
+  it("detects missing per-instrument candles even when market MAX is current", () => {
+    const result = compareUsDailyMarketFreshness(
+      new Map([["NAS", "20261123"], ["NYS", "20261123"], ["AMS", "20261123"]]),
+      new Map([["NAS", "20261123"], ["NYS", "20261123"], ["AMS", "20261123"]]),
+      new Map([["NAS", { eligibleCount: 100, atSourceLatestDateCount: 65 }], ["NYS", { eligibleCount: 80, atSourceLatestDateCount: 80 }], ["AMS", { eligibleCount: 20, atSourceLatestDateCount: 19 }]]),
+    );
+    expect(result.map(({ market, stale, missingAtSourceLatestDateCount }) => [market, stale, missingAtSourceLatestDateCount])).toEqual([
+      ["NAS", true, 35], ["NYS", false, 0], ["AMS", true, 1],
+    ]);
+  });
+
   it("fails closed when an exchange source date cannot be established", () => {
-    expect(() => compareUsDailyMarketFreshness(new Map([["NAS", "20261123"]]), new Map())).toThrow("US_DAILY_FRESHNESS_SOURCE_UNAVAILABLE:NYS");
+    const source = new Map([["NAS", "20261123"]]);
+    expect(() => compareUsDailyMarketFreshness(source, new Map(), new Map())).toThrow("US_DAILY_FRESHNESS_SOURCE_UNAVAILABLE:NYS");
+    source.set("NYS", "20261123");
+    expect(() => compareUsDailyMarketFreshness(source, new Map(), new Map())).toThrow("US_DAILY_FRESHNESS_SOURCE_UNAVAILABLE:AMS");
+    source.set("AMS", "20261123");
+    expect(() => compareUsDailyMarketFreshness(source, new Map(), new Map())).toThrow("US_DAILY_FRESHNESS_COVERAGE_UNAVAILABLE:NAS");
   });
 });
