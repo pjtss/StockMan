@@ -9,22 +9,23 @@
 - 장후 probe가 원천 MAX와 거래소 캐시 MAX뿐 아니라 활성 COMMON_STOCK별 원천 최신일 coverage도 비교하도록 확장했다. 누락 종목이 하나라도 있으면 기존 전체 유니버스 warm 경로를 비동기 catch-up으로 접수한다. coverage 조회 실패는 fail-closed 처리한다.
 - 백그라운드 202 접수, 분산 잠금 유지, 고아 RUNNING 복구 및 회귀 테스트를 추가했다. 상세 운영 근거와 점검 절차는 docs/operations/us-daily-cache-freshness-runbook.md에 기록한다.
 - 운영 확인 중 감지기와 실제 cache warm universe가 서로 달라 241개 종목이 오래된 상태로 남을 수 있음을 발견했다. 감지기와 보호된 상태 API를 `daily_active`, 공식 상품 제외 플래그, 동일한 preferred/notes/bonds/units 등 상품명 제외 규칙으로 맞춰 비활성·제외 종목을 반복 백필 대상으로 세지 않도록 수정했다.
+- 적격 universe 조정 뒤에도 5개 누락과 장시간 RUNNING이 지속됐다. 확인된 구조적 병목은 catch-up이 주봉·월봉 lane까지 순차 수행하는 전체 warm 경로를 공유한다는 점이다(운영 run 455259/455350이 어느 lane에서 멈췄는지는 run summary가 없어 미확인). post-close catch-up은 D lane만 실행하도록 제한하고, 보호된 status API에 누락 ticker 코드를 포함해 복구 대상·미해결 종목을 직접 확인할 수 있게 한다. 정기 schedule warm은 기존 D/W/M 전체 실행을 유지한다.
 
 ### 검증
 - 이전 비동기 구현: npm run deploy:verify 통과(빌드·standalone/브라우저 스모크·전체 1,631 tests·타입·문서·보안/cron 감사). GitHub Deploy OCI run 45314191777 성공, commit f581164f.
-- 새 종목별 coverage 구현 후 npm run deploy:verify 통과: 빌드·standalone/브라우저 스모크, 전체 281개 파일(1 skip)·1,632 tests(3 skip), typecheck, 문서/API/보안/cron 감사. 적격 universe 일치 수정 후 같은 전체 검증을 재통과했다.
+- 새 종목별 coverage 구현 후 npm run deploy:verify 통과: 빌드·standalone/브라우저 스모크, 전체 281개 파일(1 skip)·1,632 tests(3 skip), typecheck, 문서/API/보안/cron 감사. 적격 universe 일치 수정 후 같은 전체 검증을 재통과했다. 이번 일봉 전용 catch-up 및 누락 코드 응답은 관련 테스트 8개 및 전체 deploy:verify 통과(282 files, 1 skipped; 1,633 tests passed, 3 skipped; build, standalone/browser smoke, typecheck, docs/security/cron audits).
 - 운영 GET/POST는 읽기·보정 접수 목적으로 수행했다. 운영 DB 직접 변경은 하지 않았다.
 
 ### 다음 개선
-- universe 일치 수정 배포 후 2026-11-24T04:35Z 기준 적격 5,122종목 중 5종목이 11/23 일봉을 보유하지 않았다(NAS 1, NYS 4, AMS 0). 시장 최신일은 모두 11/23이고 AAPL/MSFT/JPM 공개 GET도 11/23을 반환한다. 자동화 run 455259은 여전히 RUNNING, 마지막 데이터 갱신은 03:50Z다. 잔여 5개 종목 코드와 거래 여부 및 작업 종료를 확인해야 한다.
+- universe 일치 수정 배포 후 2026-11-24T04:45Z 기준 적격 5,122종목 중 5종목이 11/23 일봉을 보유하지 않았다(NAS 1, NYS 4, AMS 0). 시장 최신일은 모두 11/23이고 AAPL/MSFT/JPM 공개 GET도 11/23을 반환한다. 자동화 run 455259 및 455350은 RUNNING, 마지막 데이터 갱신은 03:50Z다. 일봉 전용 catch-up을 배포한 뒤 누락 코드·개별 최신일 및 run 종료를 확인해야 한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-24-005
 - 성과 판정: PARTIAL
-- 근거: 장후 자동 감지, 개별 종목 coverage, warm universe와 탐지기 적격 범위 일치를 구현·검증하고 `14ce99d9` 배포 workflow의 검증 및 activation 성공을 확인했다. 시장별 최신 거래일 및 대표 종목은 11/23이나, 5,122개 적격 종목 중 5개 봉 누락과 automation run 455259 미종료가 남아 전체 최신성은 미완료다.
+- 근거: 장후 자동 감지, 개별 종목 coverage, warm universe와 탐지기 적격 범위 일치를 구현·배포했다. 시장별 최신 거래일 및 대표 종목은 11/23이나, 적격 종목 5개 봉 누락과 두 automation run의 미종료가 남았다. 일봉 전용 catch-up 및 누락 코드 진단 수정은 구현·전체 검증을 마쳤으며, 배포 후 이 누락이 해소되고 실제 run이 완료되는지 확인해야 한다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 완료. universe 수정 `4ef1635a` 및 문서 게이트 정정 `14ce99d9`를 `oci`에 푸시했다. 최종 GitHub Actions deploy run `45325840944`에서 전체 검증과 activation 단계 성공, `/api/health` 정상 응답을 확인했다. 최종 종목별 5개 누락 해소는 미완료.
+- 이전 universe 수정은 완료(`4ef1635a`, `14ce99d9`); GitHub Actions run `45325840944` 검증·activation 성공, `/api/health` 정상 응답 확인. 현재 일봉 전용 catch-up 및 누락 코드 공개 수정의 커밋·푸시·배포는 미실행(전체 검증 대기); 적격 universe 5개 누락 해소도 미완료.
 ## [2026-11-24] 미국 일봉 캐시 장후 freshness probe 및 자동 catch-up
 
 ### 목표

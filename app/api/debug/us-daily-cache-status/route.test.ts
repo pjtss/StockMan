@@ -17,7 +17,7 @@ describe("GET /api/debug/us-daily-cache-status", () => {
     mocks.authorized = true;
     mocks.query.mockReset();
     mocks.query.mockImplementation(async (sql: string) => {
-      if (sql.includes("us_common_stock_universe")) return { rows: [{ market: "NAS", eligible_count: 3, cached_count: 3, latest_candle_date: "20261117", at_latest_date_count: 2, latest_fetched_at: "2026-11-17T22:20:00.000Z" }] };
+      if (sql.includes("us_common_stock_universe")) return { rows: [{ market: "NAS", eligible_count: 3, cached_count: 3, latest_candle_date: "20261117", at_latest_date_count: 2, missing_codes: ["MSFT"], latest_fetched_at: "2026-11-17T22:20:00.000Z" }] };
       return { rows: [{ id: 1, status: "PARTIAL", started_at: "2026-11-18T22:00:00.000Z", finished_at: "2026-11-18T22:02:00.000Z", duration_ms: 120000, summary: { savedCandleCount: 2, failureCount: 1, diagnostics: { errorCode: "KIS_AUTH_ERROR", message: "do not expose raw error" }, credentials: "secret", webhookUrl: "private" } }] };
     });
   });
@@ -39,7 +39,7 @@ describe("GET /api/debug/us-daily-cache-status", () => {
     expect(body).toMatchObject({
       ok: true,
       automation: { module: "us-daily-cache", cronPath: "/api/cron/us-daily-cache", expectedIntervalSeconds: 3600, enabled: true },
-      markets: [{ market: "NAS", eligibleCount: 3, cachedCount: 3, latestCandleDate: "20261117", atLatestDateCount: 2, missingAtLatestDateCount: 1 }],
+      markets: [{ market: "NAS", eligibleCount: 3, cachedCount: 3, latestCandleDate: "20261117", atLatestDateCount: 2, missingAtLatestDateCount: 1, missingAtLatestDateCodes: ["MSFT"] }],
       recentRuns: [{ status: "PARTIAL", summary: { savedCandleCount: 2, failureCount: 1, "diagnostics.errorCode": "KIS_AUTH_ERROR" } }],
     });
     expect(JSON.stringify(body)).not.toContain("secret");

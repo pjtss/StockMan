@@ -23,6 +23,8 @@ cron 타이머의 매시 호출과 DB가 설정한 좁은 KST 실행창이 서�
 - OCI cron 정적 검사는 health probe 다음 세 작업이 health probe → 국내 일봉 → 미국 일봉 순서인지 확인한다. 다른 hourly 작업이 이보다 앞서 오면 검증을 실패시킨다.
 
 - 장후 원천일 또는 종목별 coverage 불일치 시 전체 warm은 Next.js `after()` 백그라운드 작업으로 넘기고 빠르게 HTTP 202 접수 응답을 반환한다. 분산 잠금은 작업 완료 시 해제한다. 실행 이력이 고아 `RUNNING`으로 남아 있어도 새 잠금을 획득했다면 freshness 검사를 진행한다. Route 최대 실행 시간은 5,400초로 선언한다.
+- 장후 catch-up은 거래일 갭 복구가 목적이므로 일봉(`D`) lane만 실행한다. 주봉·월봉 lane은 기존 구성 시간 cron에서 계속 갱신한다. 이를 통해 catch-up이 주봉·월봉 작업에 묶이지 않게 한다.
+- 보호된 status API는 시장별 누락 ticker 코드를 `missingAtLatestDateCodes`로 최대 50개 반환한다. 누락 수와 코드 목록을 대조하고, 개별 공개 일봉 GET으로 원천/캐시 날짜를 확인한다.
 
 ## 검증 및 배포 확인
 

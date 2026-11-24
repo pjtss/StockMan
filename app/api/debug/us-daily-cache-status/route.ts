@@ -72,6 +72,7 @@ export async function GET(request: Request) {
                 COUNT(l.code)::int AS cached_count,
                 MAX(md.latest_candle_date) AS latest_candle_date,
                 COUNT(*) FILTER (WHERE l.candle_date = md.latest_candle_date)::int AS at_latest_date_count,
+                ARRAY_AGG(e.code ORDER BY e.code) FILTER (WHERE l.code IS NULL OR l.candle_date IS DISTINCT FROM md.latest_candle_date) AS missing_codes,
                 MAX(l.fetched_at) AS latest_fetched_at
            FROM eligible e
            LEFT JOIN us_latest_daily_candles l ON l.market = e.market AND l.code = e.code
@@ -113,6 +114,7 @@ export async function GET(request: Request) {
         latestCandleDate: row.latest_candle_date == null ? null : String(row.latest_candle_date),
         atLatestDateCount: Number(row.at_latest_date_count ?? 0),
         missingAtLatestDateCount: Math.max(0, Number(row.eligible_count ?? 0) - Number(row.at_latest_date_count ?? 0)),
+        missingAtLatestDateCodes: Array.isArray(row.missing_codes) ? row.missing_codes.slice(0, 50).map(String) : [],
         latestFetchedAt: timestamp(row.latest_fetched_at),
       })),
       recentRuns: runResult.rows.map((row) => ({

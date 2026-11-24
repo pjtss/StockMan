@@ -12,7 +12,8 @@ import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 let activeWarm: Promise<Awaited<ReturnType<typeof executeWarm>>> | null = null;
 
 export type WarmProgress = { processedCount: number; totalCount: number; successCount: number; failureCount: number; savedCandleCount: number; lastCode?: string; elapsedMs: number; etaMs: number | null };
-async function executeWarm(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {
+type WarmOptions = { concurrency?: number; onProgress?: (progress: WarmProgress) => void; timeframes?: ReadonlyArray<"D" | "W" | "M"> };
+async function executeWarm(options: WarmOptions = {}) {
   const startedAt = new Date().toISOString();
   const universe = await loadStoredUsInstrumentScopes();
   const instruments = universe.scopes;
@@ -24,7 +25,8 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   const retryRows = await loadDueCandleCacheRetries(instruments);
   const retryKeys = new Set(retryRows.map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}:${row.timeframe}`));
   const retryTimeframes = new Set(retryRows.map((row) => row.timeframe));
-  const timeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
+  const allTimeframes = Object.keys(freshness) as Array<keyof typeof freshness>;
+  const timeframes = options.timeframes ? allTimeframes.filter((timeframe) => options.timeframes?.includes(timeframe)) : allTimeframes;
   const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
   // The refresh indexes support these three bounded scans. Keep the lanes
   // sequential to respect the upstream quota, but determine all due sets in
@@ -192,7 +194,7 @@ async function executeWarm(options: { concurrency?: number; onProgress?: (progre
   return { ok: universeAvailable && failures.length === 0, status: universeAvailable ? undefined : "FAILED", universeAvailable, universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, discardedOrDuplicateCandleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
 }
 
-export function warmUsDailyPriceCache(options: { concurrency?: number; onProgress?: (progress: WarmProgress) => void } = {}) {
+export function warmUsDailyPriceCache(options: WarmOptions = {}) {
   if (!activeWarm) activeWarm = withAutomationLock("us-daily-cache-worker", async () => {
     const result = await executeWarm(options);
     return result;

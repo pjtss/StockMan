@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   recordSkipped: vi.fn(async () => undefined),
   detectLag: vi.fn(),
   automationRun: vi.fn(),
+  warm: vi.fn(),
 }));
 
 vi.mock("next/server", async (importOriginal) => {
@@ -25,7 +26,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 vi.mock("@/lib/cron-auth", () => ({ isCronRequestAuthorized: () => mocks.authorized }));
 vi.mock("@/lib/automation-lock", () => ({ acquireAutomationLock: async () => ({ release: mocks.release }) }));
-vi.mock("@/lib/us-daily-price-cache-warm", () => ({ warmUsDailyPriceCache: vi.fn() }));
+vi.mock("@/lib/us-daily-price-cache-warm", () => ({ warmUsDailyPriceCache: mocks.warm }));
 vi.mock("@/lib/automation-run", () => ({ withAutomationRun: mocks.automationRun }));
 vi.mock("@/lib/feature-module-settings", () => ({ loadFeatureModuleSettings: async () => mocks.settings }));
 vi.mock("@/lib/us-daily-global-gate", () => ({ isDailyCandleAutomationEnabled: async () => mocks.enabled }));
@@ -61,6 +62,7 @@ describe("POST /api/cron/us-daily-cache", () => {
     mocks.recordSkipped.mockClear();
     mocks.detectLag.mockReset().mockResolvedValue(mocks.freshness);
     mocks.automationRun.mockReset().mockResolvedValue({ ok: true, successCount: 3, failureCount: 0, instrumentCount: 3, savedCandleCount: 3 });
+    mocks.warm.mockReset().mockResolvedValue({ ok: true, successCount: 1, failureCount: 0, instrumentCount: 1, savedCandleCount: 1 });
   });
 
   it("returns 202 and transfers the lock for a post-close stale-cache catch-up", async () => {
@@ -74,7 +76,20 @@ describe("POST /api/cron/us-daily-cache", () => {
     expect(mocks.release).not.toHaveBeenCalled();
     await mocks.afterCallback?.();
     expect(mocks.automationRun).toHaveBeenCalledOnce();
+    const task = mocks.automationRun.mock.calls[0][1] as () => Promise<unknown>;
+    await task();
+    expect(mocks.warm).toHaveBeenCalledWith({ timeframes: ["D"] });
     expect(mocks.release).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the full timeframe warm for the configured schedule", async () => {
+    mocks.withinSchedule = true;
+    const response = await POST(request());
+    expect(response.status).toBe(202);
+    await mocks.afterCallback?.();
+    const task = mocks.automationRun.mock.calls[0][1] as () => Promise<unknown>;
+    await task();
+    expect(mocks.warm).toHaveBeenCalledWith(undefined);
   });
 
   it("reports a clear outside-schedule skip when source dates match the cache", async () => {

@@ -59,7 +59,8 @@ export async function POST(request: Request) {
   const trigger = withinSchedule ? "configured_schedule" : "post_close_stale_cache_catchup";
   after(async () => {
     try {
-      const result = await withAutomationRun("us-daily-cache", warmUsDailyPriceCache, { triggerType: trigger === "configured_schedule" ? "AUTOMATION" : "POST_CLOSE_CATCHUP", market: "US", timeframe: "D", jobType: "daily-cache" });
+      const warmOptions = trigger === "configured_schedule" ? undefined : { timeframes: ["D"] as const };
+      const result = await withAutomationRun("us-daily-cache", () => warmUsDailyPriceCache(warmOptions), { triggerType: trigger === "configured_schedule" ? "AUTOMATION" : "POST_CLOSE_CATCHUP", market: "US", timeframe: "D", jobType: "daily-cache" });
       const status = result.failureCount > 0 ? result.successCount > 0 ? "PARTIAL" : "FAILED" : result.ok ? "SUCCESS" : "FAILED";
       console.info(`[API /cron/us-daily-cache] deferred refresh completed trigger=${trigger} status=${status} instruments=${result.instrumentCount} saved=${result.savedCandleCount} failures=${result.failureCount}`);
     } catch (error) {
