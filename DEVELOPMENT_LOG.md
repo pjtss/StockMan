@@ -24,7 +24,7 @@
 - 근거: 장후 자동 감지 및 개별 종목 coverage, 실제 warm universe 일치 수정은 구현·검증했다. `abef5f2e` 버전 배포는 성공했지만 원시 coverage 차이를 보고 백필은 장시간 RUNNING으로 남았다. 적격 universe 수정은 현재 전체 검증만 마쳤으며, 배포와 최종 운영 coverage 확인은 남았다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 현재 universe 수정 revision은 전체 검증 통과, 커밋·푸시 대기. 앞선 `abef5f2e`는 `oci`에 배포됐고 GitHub Actions `45317170446` 성공.
+- 커밋·푸시·배포: 커밋·푸시 완료(`4ef1635a`), GitHub Actions `45324688342` 배포 실패. 실패 단계는 workflow의 `npm run deploy:verify`; Actions job log 접근은 repository admin rights 요구로 거부되어 상세 메시지는 미확인. 로컬 재실행에서 문서 게이트가 이 항목의 정규화된 `완료/실패/미실행/차단` 상태 단어 누락을 검출했다. 규칙에 맞춰 기록을 고친 뒤 전체 검증과 배포를 재시도한다.
 ## [2026-11-24] 미국 일봉 캐시 장후 freshness probe 및 자동 catch-up
 
 ### 목표
