@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 153,
+  "documentCount": 154,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1277,6 +1277,17 @@
           "sourcePath": "docs/architecture/sec-ticker-disclosure-analysis-design.md"
         }
       ]
+    },
+    {
+      "id": "operations-us-exchange-status-sync",
+      "title": "미국 거래소 거래·상장 상태 자동 수집",
+      "category": "operations",
+      "format": "md",
+      "description": "미국 종목은 KIS 해외주식 상품 마스터만으로 거래정지·상장폐지를 판정할 수 없다. KIS 해외 마스터는 상품 분류에 사용하고, 거래 상태는 거래소가 제공하는 자료를 별도로 보관한다.",
+      "url": "/manuals/operations/us-exchange-status-sync.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-exchange-status-sync.md",
+      "related": []
     },
     {
       "id": "operations-us-industry-turnover-report",

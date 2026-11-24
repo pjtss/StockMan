@@ -99,14 +99,14 @@ export function classifyUs(row: Pick<UsRow, "code" | "name" | "englishName" | "s
   // "spac" in ordinary names such as AEROSPACE or SPACEMOBILE.
   const isSpac = /(?:\bSPAC\b|\bACQ\b|\bACQUISITIONS?\b|\bBLANK\s*CHECK\b|ACQUISITIONS?(?:\s+CORP(?:ORATION)?\b)|스팩|기업인수목적|애퀴지션)/i.test(descriptor);
   const isUnit = /\bUNITS?\b|(?:\/UN|\/U|\.U)$/i.test(`${descriptor} ${row.code}`);
-  const isPreferred = /(?:우선주|\bPREFERRED\b|\bPREF(?:ERRED)?\b|\bPFD\b|\bDEP(?:OSITARY)?\s+SHS\b|\bTRUST\s+PRF\b)/i.test(descriptor);
+  const isPreferred = /(?:우선주|\bPREFERRED\b|\bPREF(?:ERRED)?\b|\bPFD\b|\bPRF\b|\bDEP(?:OSITARY)?\s+SHS\b|\bTRUST\s+PRF\b)/i.test(descriptor);
   const isWarrant = row.isWarrant || /\bWARRANTS?\b|\bC\/WTS\b|\bWTS\b|(?:\/WS[A-Z]?|\.WS[A-Z]?|\/W)$/i.test(`${descriptor} ${row.code}`);
   const isRight = /\bRIGHTS?\b|(?:\/RT|\.R)$/i.test(`${descriptor} ${row.code}`);
   const isConvertible = /\bCONVERTIBLE\b|전환사채|전환우선/i.test(descriptor);
   // KIS's overseas master marks some listed debt issues as security type 2.
   // Treat explicit coupon/note descriptors as debt so they cannot enter the
   // common-stock universe or stock-only refresh/scanner work.
-  const isDebtSecurity = /\b\d+(?:\.\d+)?%\s+(?:(?:SENIOR|SNR|SECURED|SUBORDINATED|SUBORD|JUNIOR|JNR)\s+)*(?:NOTES?|NTS?|DEB(?:ENTURES?)?|OBLIG(?:ATIONS?)?)\b|\b\d+(?:\.\d+)?%\s+SNR\b|\b(?:SENIOR|SUBORDINATED|SUBORD|JUNIOR|JNR)\s+(?:NOTES?|NTS?|DEB(?:ENTURES?)?|OBLIG(?:ATIONS?)?)\b|\b(?:SENIOR\s+)?(?:NOTES?|NTS?)\s+(?:DUE|MATURING)\b|\bDEB(?:ENTURES?)?\b|\bOBLIG(?:ATIONS?)\b|\bBONDS?\s+DUE\b/i.test(descriptor);
+  const isDebtSecurity = /\b\d+(?:\.\d+)?%\s+(?:(?:SENIOR|SNR|SECURED|SUBORDINATED|SUBORD|JUNIOR|JNR)\s+)*(?:NOTES?|NTS?|DEB(?:ENTURES?)?|OBLIG(?:ATIONS?)?)\b|\b\d+(?:\.\d+)?%\s+SNR\b|\b(?:SENIOR|SUBORDINATED|SUBORD|JUNIOR|JNR)\s+(?:NOTES?|NTS?|DEB(?:ENTURES?)?|OBLIG(?:ATIONS?)?)\b|\b(?:SENIOR\s+)?(?:NOTES?|NTS?)\s+(?:DUE|MATURING)\b|\bDEB(?:ENTURES?)?\b|\bOBLIG(?:ATIONS?)\b|\bBONDS?\s+DUE\b|\bTRUST\s+CERTIFICATES?\b/i.test(descriptor);
   const isDerivative = row.isDerivative || row.isLeveraged || row.isInverse || isUnit || isPreferred || isWarrant || isRight || isConvertible || isDebtSecurity;
   const instrumentType = isDebtSecurity ? "DEBT_SECURITY"
     : isSpac ? "SPAC"

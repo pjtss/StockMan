@@ -148,6 +148,12 @@ describe("KIS instrument master parsers", () => {
       .toMatchObject({ instrumentType: "DEBT_SECURITY", isDerivative: true, isDebtSecurity: true });
     expect(classifyUs({ ...base, code: "TRIN", name: "트리니티 캐피털", englishName: "TRINITY CAPITAL INC COMMON STOCK" }))
       .toMatchObject({ instrumentType: "COMMON_STOCK", isDerivative: false, isDebtSecurity: false });
+    expect(classifyUs({ ...base, code: "PYT", name: "프리퍼드플러스 트러스트", englishName: "PPLUS TRUST CERTIFICATE 6.345% PRF 15/02/34 SER GSC-2 USD25" }))
+      .toMatchObject({ instrumentType: "DEBT_SECURITY", isDerivative: true, isDebtSecurity: true });
+    for (const code of ["AKO/B", "GGB", "ITUB"]) {
+      expect(classifyUs({ ...base, code, name: code, englishName: `${code} SPON ADR EACH REP 1 PRF SHS NPV` }))
+        .toMatchObject({ isDr: true });
+    }
   });
 
   it("routes leveraged and inverse products away from the common-stock universe", () => {

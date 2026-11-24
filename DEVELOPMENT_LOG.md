@@ -9522,3 +9522,28 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 다른 RSS source의 미수집/coverage UNKNOWN 상태는 기존 문서에 기록된 별도 수집 범위 문제이며 이번 조회 기본 날짜 수정 범위에서는 변경하지 않았다.
 - `npm ci --no-audit --no-fund`와 `npm run deploy:verify` 통과. 전체 테스트 279개 파일 통과·1개 skipped, 1,624 passed·3 skipped; 타입 검사, 문서/API 감사, production build, standalone runtime/API smoke 및 Chrome 데스크톱·모바일 hydration smoke 통과.
 - 커밋 `62c60b9d`를 `oci`에 push했고 GitHub Actions `Deploy OCI` run `45138724333` 성공을 확인했다. 배포 후 `GET /api/health`는 `status=ok`; `GET /api/disclosures?date=2026-11-23&source=STOCKTITAN&page=1&pageSize=1`은 HTTP 200, `ok=true`, `DB_QUERY_COMPLETE`, `total=32`이며 날짜와 출처가 요청과 일치했다.
+# [2026-11-24] 미국 거래소 상태 자동 반영 및 상품 재분류
+
+## 목적 및 범위
+- 미국 일봉 cache에서 최신 거래일 봉이 빠진 5개 심볼이 거래정지/상장폐지인지와 KIS에서 확인할 수 있는 범위를 공식 자료 기준으로 점검하고, 거래소 상태를 주기적으로 DB에 기록한다.
+
+## 근본 원인 및 변경
+- 근본 원인: KIS 해외 상품 마스터는 거래정지/상장폐지 상태를 제공하지 않고, 로컬 마스터 내 상품명 파싱에서 `PRF` 약어와 `TRUST CERTIFICATE`를 놓쳤다. 이로 인해 ADR/우선주/신탁증서가 활성 보통주 partition에 남을 수 있었다.
+- `lib/us-exchange-status-sync.ts`, `app/api/cron/us-exchange-status/route.ts`, `db/migration/V183__us_exchange_trading_status.sql`을 추가해 Nasdaq Trader halt RSS 및 상장 디렉터리를 매시간 읽고 원천, 사유코드, source payload, 관측시각을 DB에 저장하도록 한다. 구조가 올바른 빈 halt RSS는 현재 정지 없음으로 처리하고, 잘못된 RSS/HTTP 오류/빈 종목 디렉터리는 기존 상태를 바꾸지 않고 실패 처리한다. Eastern timestamp는 DST를 반영해 UTC로 저장한다.
+- `scripts/oci-cron.sh`에 보호된 상태 갱신 endpoint를 등록했다. 신규 기능은 read-only 공개 GET이 아니라 cron 쓰기 작업이며 OpenAPI 공개 대상이 아니다.
+- 상품 분류 규칙에서 `PRF`, `TRUST CERTIFICATE`를 인식하고 재분류 transaction을 상태 수집과 연계한다. 기존 캔들/이력은 유지한다.
+- 자동 수집 범위의 한계: 현재 모든 거래소를 포괄하는 확정 상장폐지 OpenAPI는 찾지 못했다. Nasdaq 목록 부재만으로 delisted 처리하지 않으며, NYSE의 pending delisting 화면은 아직 자동 동기화하지 않는다.
+
+## 5개 심볼 판정
+- `PRFX`: Nasdaq directory financial status `D`는 상장요건 미달 경고다. SEC 제출 회사 공시는 hearing 요청이 suspension/delisting을 유예하고 Nasdaq Capital Market 거래가 계속된다고 명시한다. 거래정지/상장폐지 확정으로 기록하면 안 된다.
+- `AKO/B`, `GGB`, `ITUB`: 거래소 목록에서 확인되는 상품이다. 저장된 KIS 영문명은 ADR/예탁증서 및 선호주 기초주식을 가리키므로 보통주 전용 범위에서 제외한다.
+- `PYT`: SEC 제출 문서는 NYSE의 PPlus Trust Series GSC-2 trust certificate로 명시한다. 보통주가 아니지만 해당 문서만으로 거래불가/상장폐지를 뜻하지 않는다.
+
+## 재발 자동 감지 및 운영 위험
+- 매시간 cron 결과와 `us_exchange_trading_status.observed_at`으로 소스 freshness를 확인한다. stale/실패 상태에서는 거래 가능 여부를 최신으로 단정하지 않는다.
+- Nasdaq Trader halt feed는 거래일 중 분당 한 번 갱신되므로 현재 수집 주기는 장중 초단위 대응이 아닌 hourly 점검이다.
+- `LISTING_ISSUE`는 D/E/Q/K 금융상태 경고이고 거래정지와 구분한다. halt 미관측/목록 부재만으로 `DELISTED`를 만들지 않는다. 다음 개선은 NYSE Form 25 pending delisting 목록의 정식 구조/API와 effective date 검증 및 알림 소비 경로다.
+
+## 검증
+- `lib/us-exchange-status-sync.test.ts` 및 `lib/instrument-universe-import.test.ts`: 2개 파일 16 tests 통과. 최종 `npm run deploy:verify` 통과: 의존성 감사 0 취약점, production build, standalone + Chrome 데스크톱/모바일 smoke, 283개 테스트 파일 중 282개 통과·1개 skip (1,637 passed·3 skipped), typecheck, Flyway/docs/API/security/cron 감사.
+- 커밋·푸시·운영 배포: 미실행.

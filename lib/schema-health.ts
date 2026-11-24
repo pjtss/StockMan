@@ -18,6 +18,7 @@ export const OPERATIONAL_SCHEMA_TABLES = [
   "kr_common_stock_universe",
   "us_common_stock_universe",
   "us_special_instrument_universe",
+  "us_exchange_trading_status",
   "kr_instrument_universe_candles",
   "us_instrument_universe_candles",
   "us_obv_divergence_snapshot",

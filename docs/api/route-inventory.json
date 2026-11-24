@@ -222,6 +222,14 @@
       "source": "app/api/cron/us-daily-open-cache/route.ts"
     },
     {
+      "path": "/api/cron/us-exchange-status",
+      "methods": [
+        "POST"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/cron/us-exchange-status/route.ts"
+    },
+    {
       "path": "/api/cron/us-golden-cross",
       "methods": [
         "POST"

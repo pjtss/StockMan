@@ -83,6 +83,7 @@ run_cron_endpoint "health-probe-snapshot" 20 "/api/cron/health-probe-snapshot"
 # only hourly invocation that falls inside the configured window.
 run_cron_endpoint "kr-daily-cache" 3600 "/api/cron/kr-daily-cache"
 run_cron_endpoint "us-daily-cache" 3600 "/api/cron/us-daily-cache"
+run_cron_endpoint "us-exchange-status" 120 "/api/cron/us-exchange-status"
 run_cron_endpoint "db-retention" 60 "/api/cron/db-retention"
 run_cron_endpoint "sec-company-facts" 900 "/api/cron/sec-company-facts"
 
