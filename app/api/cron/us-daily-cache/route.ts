@@ -7,6 +7,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
+import { detectUsDailyCacheLag, isUsPostCloseWeekday, type UsDailyMarketFreshness } from "@/lib/us-daily-cache-freshness";
 
 export async function POST(request: Request) {
   let lease: Awaited<ReturnType<typeof acquireAutomationLock>> = null;
@@ -16,10 +17,11 @@ export async function POST(request: Request) {
   if (lease === null) return NextResponse.json({ ok: true, skipped: true, reason: "already_running" }, { status: 202, headers: { "retry-after": "60" } });
   if (!(await isDailyCandleAutomationEnabled())) return NextResponse.json({ ok: true, skipped: true, reason: "daily_automation_disabled" });
   const moduleSettings = await loadFeatureModuleSettings("us-daily-cache");
-  if (!moduleSettings.enabled || !isWithinSchedule(moduleSettings)) {
-    await recordSkippedAutomationRun("us-daily-cache", moduleSettings.enabled ? "outside_schedule" : "disabled");
-    return NextResponse.json({ ok: true, skipped: true, reason: "disabled_or_outside_schedule", intervalSeconds: moduleSettings.intervalSeconds ?? 3_600, schedule: "DB schedule, hourly" });
+  if (!moduleSettings.enabled) {
+    await recordSkippedAutomationRun("us-daily-cache", "disabled");
+    return NextResponse.json({ ok: true, skipped: true, reason: "disabled", intervalSeconds: moduleSettings.intervalSeconds ?? 3_600 });
   }
+  const withinSchedule = isWithinSchedule(moduleSettings);
   const intervalSeconds = Math.max(60, moduleSettings.intervalSeconds ?? 3_600);
   let latest;
   try {
@@ -32,9 +34,27 @@ export async function POST(request: Request) {
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
   if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
     await recordSkippedAutomationRun("us-daily-cache", "outside_interval", { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds) });
-    return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), schedule: "DB schedule, hourly" });
+    return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), freshnessCheck: null });
   }
-  return NextResponse.json(await withAutomationRun("us-daily-cache", warmUsDailyPriceCache));
+  let freshnessCheck: UsDailyMarketFreshness[] | null = null;
+  if (!withinSchedule) {
+    if (!isUsPostCloseWeekday()) {
+      await recordSkippedAutomationRun("us-daily-cache", "outside_schedule");
+      return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule", scheduleTimezone: "Asia/Seoul", startTime: moduleSettings.startTime, endTime: moduleSettings.endTime, activeDays: moduleSettings.activeDays, freshnessCheck: null });
+    }
+    try {
+      freshnessCheck = await detectUsDailyCacheLag();
+    } catch (error) {
+      console.error("[API /cron/us-daily-cache] post-close freshness probe failed:", error instanceof Error ? error.name : "unknown error");
+      return NextResponse.json({ ok: false, stage: "post-close-freshness-probe", error: "US_DAILY_CACHE_FRESHNESS_PROBE_FAILED" }, { status: 503 });
+    }
+    if (!freshnessCheck.some((market) => market.stale)) {
+      await recordSkippedAutomationRun("us-daily-cache", "outside_schedule", { freshnessCheck });
+      return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule_cache_current", scheduleTimezone: "Asia/Seoul", startTime: moduleSettings.startTime, endTime: moduleSettings.endTime, activeDays: moduleSettings.activeDays, freshnessCheck });
+    }
+  }
+  const result = await withAutomationRun("us-daily-cache", warmUsDailyPriceCache);
+  return NextResponse.json({ ...result, freshnessCheck, trigger: withinSchedule ? "configured_schedule" : "post_close_stale_cache_catchup" });
   } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
   finally { await lease?.release(); }
 }

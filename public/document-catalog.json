@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 152,
+  "documentCount": 153,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1086,9 +1086,17 @@
       "format": "md",
       "description": "1. GitHub Actions Deploy OCI가 성공인지 확인합니다.",
       "url": "/manuals/operations/runbook.md",
-      "relatedPaths": [],
+      "relatedPaths": [
+        "docs/operations/us-daily-cache-freshness-runbook.md"
+      ],
       "sourcePath": "docs/operations/runbook.md",
-      "related": []
+      "related": [
+        {
+          "title": "미국 일봉 캐시 최신성 지연 진단 및 보정 — 2026-11-24",
+          "url": "/manuals/operations/us-daily-cache-freshness-runbook.md",
+          "sourcePath": "docs/operations/us-daily-cache-freshness-runbook.md"
+        }
+      ]
     },
     {
       "id": "operations-screener-performance",
@@ -1221,6 +1229,17 @@
       "url": "/manuals/operations/us-common-stocks-under-1-sec-design.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/us-common-stocks-under-1-sec-design.md",
+      "related": []
+    },
+    {
+      "id": "operations-us-daily-cache-freshness-runbook",
+      "title": "미국 일봉 캐시 최신성 지연 진단 및 보정 — 2026-11-24",
+      "category": "operations",
+      "format": "md",
+      "description": "운영 미국 보통주 일봉 캐시가 기대 거래일보다 늦게 남는 원인을 추적하고, 스케줄 창을 놓쳐도 원천 데이터가 앞서 있으면 자동 보정하도록 개선했다.",
+      "url": "/manuals/operations/us-daily-cache-freshness-runbook.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/us-daily-cache-freshness-runbook.md",
       "related": []
     },
     {
@@ -1936,6 +1955,7 @@
         "docs/development/conventions.md",
         "docs/development/delivery-lifecycle.md",
         "docs/operations/runbook.md",
+        "docs/operations/us-daily-cache-freshness-runbook.md",
         "docs/operations/shortcuts.md",
         "docs/operations/market-rss-translation-debug-api.md",
         "docs/operations/continuous-improvement.md",
@@ -2107,6 +2127,11 @@
           "title": "운영 런북",
           "url": "/manuals/operations/runbook.md",
           "sourcePath": "docs/operations/runbook.md"
+        },
+        {
+          "title": "미국 일봉 캐시 최신성 지연 진단 및 보정 — 2026-11-24",
+          "url": "/manuals/operations/us-daily-cache-freshness-runbook.md",
+          "sourcePath": "docs/operations/us-daily-cache-freshness-runbook.md"
         },
         {
           "title": "대화 단축어",

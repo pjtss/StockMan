@@ -1,3 +1,31 @@
+## [2026-11-24] 미국 일봉 캐시 장후 freshness probe 및 자동 catch-up
+
+### 목표
+- 운영 미국 보통주 일봉 캐시가 2026-11-23 거래일로 갱신되지 않은 원인을 확인하고, 장후 최신성 자동 감지·보정 후 배포한다.
+
+### 반영
+- 원인: 11/23 16:06Z 스냅샷은 미 동부 11:06, 정규장 마감 전 자료였다. 11/24 01:44Z 운영 GET에서도 AAPL/MSFT/JPM은 11/20 봉이었다. 동시각 protected cron POST는 HTTP 200 skipped=true, reason=disabled_or_outside_schedule을 반환했다. 기존 11/22 운영 진단은 US KST 06:00–08:00 시간창과 outside_schedule 반복 기록을 남겼다. 기존 응답은 disabled/outside-schedule을 구분하지 않고, 시간창 밖 KIS 원천 최신일과 캐시를 비교하지 않았다.
+- 장후(미 동부 평일 18:00 이후) 활성 COMMON_STOCK 마스터에서 거래소별 최대 3개 기준 종목의 KIS 최신일과 캐시 MAX 일자를 비교한다. 원천 날짜가 캐시보다 앞서면 기존 전체 유니버스 warm 경로를 catch-up 실행하고, probe 실패는 HTTP 503으로 나타낸다. 비활성 설정 및 1시간 interval gate는 유지한다.
+- cron 응답에 명확한 skip 사유·시간창·freshnessCheck·trigger를 포함하고, 정적 cron 검사는 health probe 직후 KR/US 일봉 호출 순서를 강제한다.
+- 운영 runbook, 문서 인덱스, 카탈로그와 공개 manuals를 갱신한다.
+
+### 검증
+- `npx vitest run lib/us-daily-cache-freshness.test.ts`: 1 file, 3 tests 통과. `npm run cron:check`, `npm run typecheck`, `npm run docs:check` 통과.
+- `npm test -- --run`: 280 files 통과, 1 skipped; 1,627 tests 통과, 3 skipped.
+- 첫 `npm run deploy:verify`에서 DEVELOPMENT_LOG 최신 항목 계약이 요구하는 섹션/ID/전달 상태가 빠져 문서 gate가 실패했다. 로그 구조를 보완한 뒤 전체 배포 검증을 다시 실행한다.
+- `npm ci --no-audit --no-fund` 완료. 운영 DB에 직접 쓰지는 않았다.
+
+### 다음 개선
+- 배포 후 OCI cron journal과 운영 일봉 GET을 대조하고, 실제 `post_close_stale_cache_catchup` 결과가 NAS/NYS/AMS 모두 기대 거래일을 반영했는지 확인한다. 3개 기준 종목이 모두 일시적으로 응답하지 않는 경우의 대체 기준 종목 정책을 run 결과에 따라 검토한다.
+
+### 개선 과제
+- 개선 과제 ID: CI-2026-11-24-001
+- 성과 판정: PARTIAL
+- 근거: 운영 캐시 지연과 skip 응답을 재현·확인했고, 최신일 불일치 시 장후 catch-up이 수행되도록 구현했다. 전체 테스트는 통과했으나 production deployment 및 11/23 봉 반영 확인 전이라 운영 결과는 미측정이다.
+
+### 커밋·푸시·배포
+- 커밋·푸시·배포: 미실행 (분리 작업 트리에서 검증 중).
+
 ## [2026-11-23] RSS 조회 hot path 추가 분리
 
 ### 목표

@@ -10,6 +10,7 @@
 ## 자동화 장애 확인
 
 - OCI RSS freshness: `systemctl status stockman-rss.timer`, `journalctl -u stockman-rss.service -n 50 --no-pager`를 대조합니다. timer의 active만으로 RSS 실행 성공을 판단하지 않습니다.
+- 미국 일봉 캐시 최신성: `systemctl status stockman-cron.timer`, `journalctl -u stockman-cron.service -n 80 --no-pager`, 운영 `/api/public/daily-candles` 거래소별 최신일을 함께 확인합니다. `us-daily-cache`의 HTTP 200 skip 응답에서 `reason`, `freshnessCheck`, `trigger`를 확인하고, `post_close_stale_cache_catchup`이면 전체 보통주 catch-up이 끝난 뒤 `latestCandleDate`를 다시 조회합니다. 상세 절차는 [미국 일봉 캐시 최신성 지연 진단](./us-daily-cache-freshness-runbook.md)을 따릅니다.
 - 로컬 migration history/source drift 점검: `npm run audit:flyway-local` (읽기 전용; 운영 DB 불가)
 
 ## RSS 번역 스키마 복구
