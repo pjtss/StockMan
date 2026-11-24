@@ -5,7 +5,7 @@
 - 공식 근거: Apple HIG의 모달 가이드상 전체 화면은 집중이 필요한 복합 작업에 적합하고, iOS Chrome은 Chrome 공식 문서 기준 WebKit을 사용한다. WebKit의 동적 뷰포트 단위와 안전 영역 지침을 계속 적용한다. TradingView 공식 Supercharts 문서의 주기·종목 정보·보조 기능 역할 분리도 정보 구조 참고로 삼았다.
 - 검증: `npm run deploy:verify` 통과. 전체 282개 테스트 파일 중 282개 통과, 1,638개 테스트 통과·3개 skip; 타입 검사·문서 검사·최적화 빌드와 standalone runtime smoke 통과(`/charts` HTTP 200, Chrome 데스크톱/모바일 hydration). 별도 로컬 화면 확인에서 390×844 CSS px 모달은 390×844, 분봉 버튼은 4열로 줄바꿈했고 44px 높이·88.5px 너비를 유지했다. 이 검증 브라우저는 데스크톱 Chrome의 모바일 에뮬레이션으로 iOS Chrome 실기기는 아니다.
 - 재발 감지/남은 위험: `npm run deploy:verify` 및 모바일 화면의 390px 전체 간격 가시성, 가로 overflow, 44px 버튼 높이를 확인한다. 배포 후 iPhone 12 Pro 실기기에서 동적 주소창·노치/홈 인디케이터·가로 모드 확인을 후속 항목으로 둔다.
-- Git·배포: 검증 후 별도 작업 브랜치에서 수행 예정.
+- Git·배포: 코드·설계 문서 변경을 `7bbc5647`로 커밋하고 `origin/oci`에 푸시했다. OCI Actions run #1381 성공. 운영 `/api/health` HTTP 200, `/charts`에서 신규 주기 그룹 및 4열 분봉 CSS 확인. 실기기 확인은 미수행.
 
 ### 2026-11-24 — iPhone 12 Pro iOS Chrome 차트 모달 모바일 최적화
 - 목적/범위: iPhone 12 Pro의 세로 390 CSS px 폭과 iOS Chrome(WebKit) 환경을 기준으로 차트 모달 반응형 레이아웃을 조정했다. 기존 viewport device-width/viewport-fit=cover 설정을 확인하고 유지했다.
