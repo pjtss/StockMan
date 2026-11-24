@@ -331,13 +331,6 @@
 .newsItem a:hover { text-decoration: underline; }
 .empty { padding: 32px 12px; color: #94a3b8; text-align: center; }
 
-.rsiOverbought { color: #ff4d4d; }
-.rsiOversold { color: #00ffa3; }
-.rsiNeutral { color: #e2e8f0; }
-
-.macdPositive { color: #00ffa3; }
-.macdNegative { color: #ff4d4d; }
-
 /* ── BB 배지 ── */
 .bbBadge {
   display: inline-block;

@@ -218,6 +218,9 @@ describe("ChartModal", () => {
     expect(await screen.findByText(/EMA 9/)).toBeInTheDocument();
     expect(screen.getByText(/EMA 20/)).toBeInTheDocument();
     expect(screen.getByText(/EMA 60/)).toBeInTheDocument();
+    for (const removedIndicator of ["RSI (14)", "MFI (14)", "MACD", "MACD Signal", "+DI", "-DI", "Stochastic"]) {
+      expect(screen.queryByText(removedIndicator, { exact: true })).not.toBeInTheDocument();
+    }
     expect(screen.getByRole("button", { name: "닫기" })).toBeInTheDocument();
 
     await waitFor(() => expect(chartMocks.createChart).toHaveBeenCalledTimes(1));

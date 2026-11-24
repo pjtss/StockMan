@@ -133,22 +133,6 @@ export async function fetchChartData(code: string, company: string, timeframe: C
   return normalized;
 }
 
-/** RSI 해석 */
-function rsiLabel(rsi: number | null): { text: string; cls: string } {
-  if (rsi === null) return { text: "N/A", cls: "" };
-  if (rsi >= 70) return { text: "과매수 ⚠", cls: styles.rsiOverbought };
-  if (rsi <= 30) return { text: "과매도 ✅", cls: styles.rsiOversold };
-  return { text: "중립", cls: styles.rsiNeutral };
-}
-
-/** BB 해석 */
-function bbLabel(close: number, upper: number | null, lower: number | null): { text: string; cls: string } {
-  if (!upper || !lower) return { text: "-", cls: styles.bbNormal };
-  if (close >= upper) return { text: "상단 돌파 ⚠", cls: styles.bbOverBought };
-  if (close <= lower) return { text: "하단 이탈 ✅", cls: styles.bbOverSold };
-  return { text: "밴드 내", cls: styles.bbNormal };
-}
-
 export function chartTime(date: string) {
   if (!/^\d{14}$/.test(date)) return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}` as any;
   // Lightweight Charts treats UTCTimestamp values as UTC and has no built-in timezone.
@@ -157,11 +141,6 @@ export function chartTime(date: string) {
 }
 
 type IndicatorLine = { label: string; color: string; values: Array<number | null> };
-
-function rollingAverage(values: number[], period: number, index: number) {
-  if (index < period - 1) return null;
-  return values.slice(index - period + 1, index + 1).reduce((sum, value) => sum + value, 0) / period;
-}
 
 function emaSeries(values: number[], period: number): Array<number | null> {
   values = values.map(Number);
@@ -179,41 +158,20 @@ function emaSeries(values: number[], period: number): Array<number | null> {
 
 function indicatorLines(candles: OHLCVCandle[]): IndicatorLine[] {
   const closes = candles.map((c) => c.close);
-  const highs = candles.map((c) => c.high);
-  const lows = candles.map((c) => c.low);
   const volumes = candles.map((c) => c.volume);
-  const rsi: Array<number | null> = [], mfi: Array<number | null> = [], macd: Array<number | null> = [], macdSignal: Array<number | null> = [];
-  const dmiPlus: Array<number | null> = [], dmiMinus: Array<number | null> = [], stochastic: Array<number | null> = [];
   const obv: number[] = [], adl: number[] = [];
   let obvValue = 0, adlValue = 0;
-  const ema = (values: number[], period: number) => { const result: number[] = []; const k = 2 / (period + 1); values.forEach((value, i) => { result.push(i === 0 ? value : value * k + result[i - 1] * (1 - k)); }); return result; };
-  const ema12 = ema(closes, 12), ema26 = ema(closes, 26), macdRaw = closes.map((_, i) => ema12[i] - ema26[i]), signalRaw = ema(macdRaw, 9);
   for (let i = 0; i < candles.length; i++) {
     if (i === 0) obvValue = volumes[i]; else obvValue += closes[i] > closes[i - 1] ? volumes[i] : closes[i] < closes[i - 1] ? -volumes[i] : 0;
-    const range = highs[i] - lows[i]; adlValue += range > 0 ? (((closes[i] - lows[i]) - (highs[i] - closes[i])) / range) * volumes[i] : 0;
+    const range = candles[i].high - candles[i].low; adlValue += range > 0 ? (((closes[i] - candles[i].low) - (candles[i].high - closes[i])) / range) * volumes[i] : 0;
     obv.push(obvValue); adl.push(adlValue);
-    const rsiStart = Math.max(1, i - 13);
-    const rsiDiffs = closes.slice(rsiStart, i + 1).map((value, j) => value - closes[rsiStart + j - 1]);
-    const gains = rsiDiffs.map((v) => Math.max(v, 0)), losses = rsiDiffs.map((v) => Math.max(-v, 0));
-    const avgGain = gains.reduce((a, b) => a + b, 0) / 14, avgLoss = losses.reduce((a, b) => a + b, 0) / 14;
-    rsi.push(i < 14 ? null : avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss));
-    const typical = candles.slice(Math.max(0, i - 14), i + 1).map((c) => (c.high + c.low + c.close) / 3);
-    let positive = 0, negative = 0;
-    for (let j = 1; j < typical.length; j++) { const flow = typical[j] * candles[Math.max(0, i - 14) + j].volume; if (typical[j] > typical[j - 1]) positive += flow; else if (typical[j] < typical[j - 1]) negative += flow; }
-    mfi.push(i < 14 ? null : negative === 0 ? 100 : 100 - 100 / (1 + positive / negative));
-    macd.push(macdRaw[i]); macdSignal.push(signalRaw[i]);
-    const dmiStart = Math.max(1, i - 13); let trSum = 0, plusSum = 0, minusSum = 0;
-    for (let j = dmiStart; j <= i; j++) { const tr = Math.max(highs[j] - lows[j], Math.abs(highs[j] - closes[j - 1]), Math.abs(lows[j] - closes[j - 1])); const upMove = highs[j] - highs[j - 1], downMove = lows[j - 1] - lows[j]; trSum += tr; plusSum += upMove > downMove && upMove > 0 ? upMove : 0; minusSum += downMove > upMove && downMove > 0 ? downMove : 0; }
-    dmiPlus.push(i < 14 ? null : trSum ? (plusSum / trSum) * 100 : 0); dmiMinus.push(i < 14 ? null : trSum ? (minusSum / trSum) * 100 : 0);
-    const low14 = Math.min(...lows.slice(Math.max(0, i - 13), i + 1)), high14 = Math.max(...highs.slice(Math.max(0, i - 13), i + 1));
-    stochastic.push(i < 13 || high14 === low14 ? null : ((closes[i] - low14) / (high14 - low14)) * 100);
   }
-  return [{ label: "RSI (14)", color: "#f59e0b", values: rsi }, { label: "MFI (14)", color: "#a78bfa", values: mfi }, { label: "MACD", color: "#38bdf8", values: macd }, { label: "MACD Signal", color: "#f97316", values: macdSignal }, { label: "+DI", color: "#22c55e", values: dmiPlus }, { label: "-DI", color: "#ef4444", values: dmiMinus }, { label: "Stochastic", color: "#e879f9", values: stochastic }, { label: "OBV", color: "#14b8a6", values: obv }, { label: "ADL", color: "#60a5fa", values: adl }];
+  return [{ label: "OBV", color: "#14b8a6", values: obv }, { label: "ADL", color: "#60a5fa", values: adl }];
 }
 
 function IndicatorCharts({ candles }: { candles: OHLCVCandle[] }) {
   const lines = useMemo(() => indicatorLines(candles), [candles]);
-  const groups = [[lines[0], lines[1]], [lines[2], lines[3]], [lines[4], lines[5]], [lines[6]], [lines[7]], [lines[8]]];
+  const groups = [[lines[0]], [lines[1]]];
   return <div className={styles.indicatorCharts}>{groups.map((group, groupIndex) => { const all = group.flatMap((line) => line.values).filter((v): v is number => v !== null && Number.isFinite(v)); const min = Math.min(...all), max = Math.max(...all), span = max - min || 1; return <div className={styles.indicatorPlot} key={groupIndex}><div className={styles.plotLegend}>{group.map((line) => <span key={line.label} style={{ color: line.color }}>● {line.label}</span>)}</div><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-label={group.map((line) => line.label).join(", ")}><line x1="0" y1="14" x2="100" y2="14" stroke="rgba(148,163,184,.12)" />{group.map((line) => { const points = line.values.map((value, i) => value === null ? null : `${(i / Math.max(1, line.values.length - 1)) * 100},${28 - ((value - min) / span) * 24 - 2}`).filter(Boolean).join(" "); return <polyline key={line.label} points={points} fill="none" stroke={line.color} strokeWidth="0.8" vectorEffect="non-scaling-stroke" />; })}</svg></div>; })}</div>;
 }
 
@@ -846,10 +804,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
     };
   }, []);
 
-  const indicators = data?.indicators;
   const normalizedCandles = useMemo(() => normalizeOHLCVCandles(data?.candles ?? []), [data?.candles]);
-  const rsiInfo = rsiLabel(indicators?.rsi14 ?? null);
-  const bbInfo = bbLabel(data?.latestPrice ?? 0, indicators?.bbUpper ?? null, indicators?.bbLower ?? null);
   const isUp = data?.latestChangeRate?.startsWith("+") ?? false;
   const isMinuteTimeframe = !["D", "W", "M"].includes(timeframe);
 

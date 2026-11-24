@@ -1,3 +1,12 @@
+### 2026-11-25 — 차트 모달 지표 정리 및 모바일 Chrome 회귀 검사
+- 목적/범위: 차트 모달에서 RSI·MFI·MACD·DMI·Stochastic 보조 그래프를 제거하고 iPhone 12 Pro 크기(390×844 CSS px)와 Chrome 데스크톱에서 모달 표시를 자동 점검한다.
+- 변경: `components/chart-modal.tsx`에서 지정 지표 계산·그래프를 제거하고 OBV·ADL 그래프는 유지했다. `components/chart-modal.module.css`에서 사용되지 않는 지표 상태 스타일을 정리했다. `components/chart-modal.test.tsx`에 제거 지표 비노출 회귀 검사를 추가했다. `scripts/charts-browser-smoke.mjs`가 고정 차트 응답으로 모달을 열어 모바일 뷰포트 넘침, 닫기 버튼 크기, 차트 크기와 닫힘을 검사하도록 확장했다.
+- 근본 원인/영향: 모바일 검증은 기존 `/charts` 페이지 hydration만 확인하고 모달을 열지 않아 모달 viewport 레이아웃 회귀를 감지하지 못했다. 기존 Lightweight Charts와 ResizeObserver 동작을 그대로 사용하며 변경 영향은 차트 모달 지표 렌더링·배포 Chrome smoke에 한정된다.
+- 공식 기준: [MDN viewport meta](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meta/name/viewport), [MDN CSS length/dvh](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/length), [MDN safe-area env()](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/env), [Chrome responsive design guidance](https://developer.chrome.com/docs/modern-web-guidance/guides/css/responsive-design?hl=en). 기존 `viewport-fit=cover`, `dvh`, safe-area CSS 설정을 확인하고 유지했다.
+- 검증: 수정 후 `components/chart-modal.test.tsx` 28개 통과. 분리 worktree에서 `npm run deploy:verify` 전체 통과: Vitest 282개 파일/1,638개 통과·3개 skip, 타입 검사, 문서/API/KIS/cron 감사, production build, standalone HTTP/정적 청크 smoke 및 Chrome 모달 smoke(데스크톱·390×844 모바일). 기존 공유 작업 트리의 미추적 `db/migration/V180__remove_user_action_event_metadata.sql` 때문에 최초 게이트가 migration 중복으로 중단됐으나, 해당 미추적 파일을 배포 내용에 섞지 않은 분리 worktree에서는 migration 검사와 전체 게이트가 정상 통과했다. Windows node_modules junction으로 standalone trace 복사 경고(EPERM)가 있었지만 standalone 서버가 정상 기동하고 모든 runtime smoke가 통과했다.
+- 재발 감지/남은 위험: 배포 게이트의 Chrome smoke가 `/charts`에서 실제 차트 모달을 열고 390px 뷰포트 기준을 계속 확인한다. 시뮬레이션은 실기기 iOS Chrome을 대체하지 않으며 노치·주소창 전환의 실제 기기 검증은 남아 있다.
+- 커밋·푸시·배포: 전체 배포 게이트 통과 후 원격 oci 기준 갱신 및 코드 푸시·OCI workflow 완료 대기.
+
 ### 2026-11-24 — iPhone 12 Pro Chrome 차트 모달 주기 선택 재설계
 - 목적/범위: 앞선 모바일 차트 모달의 주기 선택이 한 줄에 길게 나열되어 화면 폭에서 간격이 가려지고 조작 영역이 작아지는 문제를 재검토했다. 사용 환경을 iPhone 12 Pro 세로 390 CSS px, iOS Chrome(WebKit)으로 구체화했다.
 - 근본 원인: 전체 화면 모달 자체보다 일·주·월·분 간격을 동급 버튼으로 한 줄에 배치한 정보 구조가 문제였다. 국내 분봉 8개 버튼을 390px 폭에 배열하면 각 버튼 너비가 약 40px로 좁아지는 레이아웃이다.
