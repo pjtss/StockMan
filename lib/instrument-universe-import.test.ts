@@ -134,6 +134,8 @@ describe("KIS instrument master parsers", () => {
 
   it("excludes listed debt notes from the common-stock universe", () => {
     const base = { securityType: "2", etpType: "", isEtf: false, isLeveraged: false, isInverse: false, isWarrant: false, isDerivative: false, isDr: false };
+    expect(classifyUs({ ...base, code: "PRFX", name: "PRF 테크놀로지스 보통주", englishName: "PRF TECHNOLOGIES LTD ORDINARY SHARES" }))
+      .toMatchObject({ instrumentType: "COMMON_STOCK", isDerivative: false, isDr: false });
     expect(classifyUs({ ...base, code: "TRINI", name: "트리니티 캐피털 선순위채권", englishName: "TRINITY CAPITAL INC 7.875% NTS 30/09/2029" }))
       .toMatchObject({ instrumentType: "DEBT_SECURITY", isDerivative: true, isDebtSecurity: true });
     expect(classifyUs({ ...base, code: "TRINZ", name: "트리니티 캐피털 채권", englishName: "TRINITY CAPITAL INC 7.875% NOTES DUE 2029" }))

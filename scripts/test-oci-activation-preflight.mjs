@@ -200,6 +200,30 @@ try {
   writeFileSync(path.join(switchPreviousPath, "release-marker.txt"), "stale-previous-release\n", "utf8");
   writeFileSync(path.join(switchTempPath, "release-marker.txt"), "incoming-release\n", "utf8");
   const activationSource = readFileSync(activationScript, "utf8");
+  const marketImportStart = activationSource.indexOf('if [ -f "$TEMP_PATH/data/market-impact-events.json" ]');
+  const marketImportEnd = activationSource.indexOf('rm -f "$RELEASE"', marketImportStart);
+  if (marketImportStart < 0 || marketImportEnd <= marketImportStart) throw new Error("Unable to locate market-impact import gate for deployment regression coverage");
+  const importDeployPath = path.join(tempRootResolved, "unchanged-events-current");
+  const importTempPath = `${importDeployPath}.incoming`;
+  mkdirSync(path.join(importDeployPath, "data"), { recursive: true });
+  mkdirSync(path.join(importTempPath, "data"), { recursive: true });
+  writeFileSync(path.join(importDeployPath, "data", "market-impact-events.json"), "unchanged source\n", "utf8");
+  writeFileSync(path.join(importTempPath, "data", "market-impact-events.json"), "unchanged source\n", "utf8");
+  const importHarness = path.join(tempRootResolved, "market-impact-import-harness.sh");
+  const importBlock = activationSource.slice(marketImportStart, marketImportEnd);
+  const importHarnessPrefix = `set -euo pipefail\nDEPLOY_PATH='${shellPath(importDeployPath)}'\nTEMP_PATH='${shellPath(importTempPath)}'\nRELEASE='${shellPath(path.join(tempRootResolved, "release-marker"))}'\nDATABASE_URL='postgres://test'\n`;
+  writeFileSync(importHarness, `${importHarnessPrefix}${importBlock}\n`, "utf8");
+  const unchangedImportResult = runBash(["-lc", `bash '${shellPath(importHarness)}'`]);
+  if (unchangedImportResult.status !== 0 || !unchangedImportResult.stdout.includes("Skipping market-impact event import: packaged source is unchanged")) {
+    throw new Error(`Unchanged market-impact source should skip the existing-DB product verification: ${unchangedImportResult.stderr || unchangedImportResult.stdout}`);
+  }
+  writeFileSync(path.join(importTempPath, "data", "market-impact-events.json"), "changed source\n", "utf8");
+  writeFileSync(importHarness, `${importHarnessPrefix}runuser() { printf 'market-impact import invoked\\n'; }\n${importBlock}\n`, "utf8");
+  const changedImportResult = runBash(["-lc", `bash '${shellPath(importHarness)}'`]);
+  if (changedImportResult.status !== 0 || !changedImportResult.stdout.includes("market-impact import invoked")) {
+    throw new Error(`Changed market-impact source must still invoke the official-product import gate: ${changedImportResult.stderr || changedImportResult.stdout}`);
+  }
+
   const switchStart = activationSource.indexOf("had_previous_release=0");
   const switchEnd = activationSource.indexOf("chown -R stockman:stockman", switchStart);
   if (switchStart < 0 || switchEnd <= switchStart) throw new Error("Unable to locate release switch block for runtime regression coverage");

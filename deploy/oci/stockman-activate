@@ -240,8 +240,13 @@ timeout --signal=TERM --kill-after=30s 2400s docker run --rm --network host \
   migrate
 if [ -f "$TEMP_PATH/data/market-impact-events.json" ]; then
   stage="market-impact-events-import"
-  runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
-    node "$TEMP_PATH/scripts/import-market-impact-events.mjs" "$TEMP_PATH/data/market-impact-events.json"
+  if [ -f "$DEPLOY_PATH/data/market-impact-events.json" ] \
+    && cmp -s "$TEMP_PATH/data/market-impact-events.json" "$DEPLOY_PATH/data/market-impact-events.json"; then
+    echo "Skipping market-impact event import: packaged source is unchanged"
+  else
+    runuser -u stockman -- env DATABASE_URL="$DATABASE_URL" \
+      node "$TEMP_PATH/scripts/import-market-impact-events.mjs" "$TEMP_PATH/data/market-impact-events.json"
+  fi
 fi
 rm -f "$RELEASE"
 stage="activate-files"

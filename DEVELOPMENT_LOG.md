@@ -9557,3 +9557,7 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 1차 구현 커밋 `24996459`를 `oci`에 push. GitHub Deploy OCI run `45337340106` 성공; `/api/health`는 2026-11-24T06:09:00Z `status=ok`.
 - 배포 후 보호된 `/api/cron/us-exchange-status`를 2026-11-24T06:09:35Z 실행해 DB upsert 및 상품 파티션 재조정을 확인했다. 응답: 활성 HALTED 0, 정상 halt feed row 0, 거래소 directory 8,816, Nasdaq listing issue 357, 재분류 347. 정상 빈 RSS는 현재 활성 halt 없음으로 저장된다.
 - 운영 DB 직접 읽기 권한은 없어 다섯 ticker의 SQL row별 저장 결과는 별도 SELECT로 확인하지 못했다. 성공 응답 및 transaction 구현을 통해 쓰기 작업 성공을 확인했으나 ticker별 readback은 미검증이다. 다음 단계는 NYSE pending delisting feed 자동화와 read-only status 조회 경로를 추가하는 것이다.
+- 2026-11-24T06:26Z 보호된 US 일봉 상태 GET은 새 보통주 유니버스 4,820개 전부에서 11/23 최신 봉을 확인했다. 이전 5,122개에서 347개 partition 재조정 후 적격 수가 감소한 결과라, 이를 원래 5개 봉이 전부 복구된 것으로 해석하지 않는다.
+- 후속 분류 감사에서 `PRFX`의 정상 회사명 `PRF Technologies`가 일반 `\bPRF\b` 조건과 겹쳐 우선주로 오분류되는 오류를 찾았다. `PRF SHS/stock/날짜`처럼 증권 종류 문맥에 한해 우선주로 판단하도록 좁히고 PRFX ordinary-share 회귀 사례를 추가했다.
+- 문서 전용 배포 run `45339258847`은 Flyway V183 검증 후, 배포마다 변경이 없는 `market-impact-events.json`까지 다시 import하며 공식 COMMON_STOCK guard에 `QNRX, MRM, TKLF, FENG`가 걸려 실패했다. activation은 release path 교체 전에 실패해 기존 서비스 복구를 완료했고 health는 `ok`였다. 동일한 JSON 소스가 이미 배포된 release와 byte-identical이면 재 import를 생략하고, source가 달라진 경우에는 기존 official-stock gate를 계속 실행하도록 activation을 보강했다.
+- 후속 fix의 `npm run deploy:verify` 통과(1,637 tests passed/3 skipped, build, standalone+Chrome desktop/mobile smoke, typecheck, docs/Flyway/API/security/cron audits). Fix 커밋·푸시 및 후속 운영 배포: 대기.

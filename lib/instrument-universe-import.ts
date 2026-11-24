@@ -99,7 +99,7 @@ export function classifyUs(row: Pick<UsRow, "code" | "name" | "englishName" | "s
   // "spac" in ordinary names such as AEROSPACE or SPACEMOBILE.
   const isSpac = /(?:\bSPAC\b|\bACQ\b|\bACQUISITIONS?\b|\bBLANK\s*CHECK\b|ACQUISITIONS?(?:\s+CORP(?:ORATION)?\b)|스팩|기업인수목적|애퀴지션)/i.test(descriptor);
   const isUnit = /\bUNITS?\b|(?:\/UN|\/U|\.U)$/i.test(`${descriptor} ${row.code}`);
-  const isPreferred = /(?:우선주|\bPREFERRED\b|\bPREF(?:ERRED)?\b|\bPFD\b|\bPRF\b|\bDEP(?:OSITARY)?\s+SHS\b|\bTRUST\s+PRF\b)/i.test(descriptor);
+  const isPreferred = /(?:우선주|\bPREFERRED\b|\bPREF(?:ERRED)?\b|\bPFD\b|\bPRF(?=\s+(?:SHS?\b|SHARES?\b|STOCK\b|\d{1,2}[/-]\d))|\bDEP(?:OSITARY)?\s+SHS\b|\bTRUST\s+PRF\b)/i.test(descriptor);
   const isWarrant = row.isWarrant || /\bWARRANTS?\b|\bC\/WTS\b|\bWTS\b|(?:\/WS[A-Z]?|\.WS[A-Z]?|\/W)$/i.test(`${descriptor} ${row.code}`);
   const isRight = /\bRIGHTS?\b|(?:\/RT|\.R)$/i.test(`${descriptor} ${row.code}`);
   const isConvertible = /\bCONVERTIBLE\b|전환사채|전환우선/i.test(descriptor);
