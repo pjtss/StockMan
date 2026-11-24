@@ -34,5 +34,6 @@ cron 타이머의 매시 호출과 DB가 설정한 좁은 KST 실행창이 서�
 
 - 장후 기준은 미국 동부 시간대로 계산하며 KIS가 기준 종목의 일봉을 제공하지 않으면 보정은 fail-closed로 503 처리된다. 거래소별 세 기준 종목이 모두 일시 장애·정지 상태인 경우가 드물게 가능하다.
 - 전체 유니버스 warm 실행 중 일부 KIS 요청이 실패하면 기존 재시도 큐가 처리한다. 운영 최신일과 automation run 응답을 함께 확인해야 한다.
-- 비동기 catch-up 배포 후 운영에서는 시장 MAX가 11/23인 동안 1,879개 종목 누락이 확인됐다. 새 종목별 coverage 코드 배포 후 보호된 cron의 freshnessCheck에서 `missingAtSourceLatestDateCount=0`인지, status API에서 `missingAtLatestDateCount=0`인지 확인한다.
+- 비동기 catch-up 배포 후 운영에서는 시장 MAX가 11/23인 동안 1,879개 원시 universe 종목 누락이 확인됐다. 이는 실제 cache warm 대상과 맞지 않을 수 있어 coverage 감지기와 상태 API를 `daily_active` 및 보통주 상품명/유형 제외 기준까지 동일하게 조정했다. 적격 coverage 기준으로 0 누락인지 확인한다.
+- 2026-11-24T04:04Z status 조회 당시 자동화 run `455259`가 `RUNNING`이었고 status API는 NAS/NYS/AMS 각각 134/82/25개 누락을 보였다. 이 값은 적격 universe 기준 변경 전의 원시 enabled COMMON_STOCK 기준이며, 최종 실제 누락 수로 간주하지 않는다. 새 수정은 전체 배포 검증은 통과했으나 아직 배포 전이다. 배포 후 status API에서 적격 count와 누락 count, 자동화 종료 상태를 확인한다.
 

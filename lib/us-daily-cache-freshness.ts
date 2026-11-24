@@ -1,5 +1,6 @@
 import { getPool } from "@/lib/db";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
+import { EXCLUDED_US_OFFICIAL_NAME } from "@/lib/us-top-rising-universe";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 
 const MARKETS = ["NAS", "NYS", "AMS"] as const;
@@ -68,6 +69,7 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
              FROM us_common_stock_universe u
              JOIN us_latest_daily_candles c ON c.market = u.market AND c.code = u.code
             WHERE u.enabled = true
+              AND u.daily_active = true
               AND u.instrument_type = 'COMMON_STOCK'
               AND COALESCE(u.is_etf, false) = false
               AND COALESCE(u.is_warrant, false) = false
@@ -75,6 +77,7 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
               AND COALESCE(u.is_dr, false) = false
               AND COALESCE(u.is_leveraged, false) = false
               AND COALESCE(u.is_inverse, false) = false
+              AND NOT (COALESCE(u.name, '') || ' ' || COALESCE(u.english_name, '') ~* '${EXCLUDED_US_OFFICIAL_NAME.source}')
          ) candidates
         WHERE rn <= 3
         ORDER BY market, code`,
@@ -129,6 +132,7 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
        FROM us_common_stock_universe u
        LEFT JOIN us_latest_daily_candles c ON c.market = u.market AND c.code = u.code
       WHERE u.enabled = true
+        AND u.daily_active = true
         AND u.instrument_type = 'COMMON_STOCK'
         AND COALESCE(u.is_etf, false) = false
         AND COALESCE(u.is_warrant, false) = false
@@ -136,6 +140,7 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
         AND COALESCE(u.is_dr, false) = false
         AND COALESCE(u.is_leveraged, false) = false
         AND COALESCE(u.is_inverse, false) = false
+        AND NOT (COALESCE(u.name, '') || ' ' || COALESCE(u.english_name, '') ~* '${EXCLUDED_US_OFFICIAL_NAME.source}')
         AND u.market IN ('NAS', 'NYS', 'AMS')
       GROUP BY u.market`,
     [sourceByMarket.get("NAS"), sourceByMarket.get("NYS"), sourceByMarket.get("AMS")],

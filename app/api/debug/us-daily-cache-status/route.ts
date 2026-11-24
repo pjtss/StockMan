@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { EXCLUDED_US_OFFICIAL_NAME } from "@/lib/us-top-rising-universe";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isWithinSchedule } from "@/lib/schedule-time";
@@ -54,7 +55,12 @@ export async function GET(request: Request) {
       getPool().query<Row>(
         `WITH eligible AS (
            SELECT market, code FROM us_common_stock_universe
-            WHERE enabled = TRUE AND instrument_type = 'COMMON_STOCK' AND market IN ('NAS', 'NYS', 'AMS')
+            WHERE enabled = TRUE AND daily_active = TRUE AND instrument_type = 'COMMON_STOCK'
+              AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false
+              AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false
+              AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false
+              AND NOT (COALESCE(name, '') || ' ' || COALESCE(english_name, '') ~* '${EXCLUDED_US_OFFICIAL_NAME.source}')
+              AND market IN ('NAS', 'NYS', 'AMS')
          ), market_dates AS (
            SELECT market, MAX(candle_date) AS latest_candle_date
              FROM us_latest_daily_candles

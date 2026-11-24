@@ -8,22 +8,23 @@
 - 원인 2: 첫 freshness probe는 거래소별 MAX 날짜만 비교했다. 2026-11-24T02:49Z 운영 확인에서 NAS/NYS/AMS MAX는 모두 2026-11-23이었지만, 활성 보통주 중 그 날짜 봉이 없는 종목은 각각 1,107/665/107개(총 1,879개)였다. AAPL은 11/23이지만 MSFT·JPM은 11/20이었다.
 - 장후 probe가 원천 MAX와 거래소 캐시 MAX뿐 아니라 활성 COMMON_STOCK별 원천 최신일 coverage도 비교하도록 확장했다. 누락 종목이 하나라도 있으면 기존 전체 유니버스 warm 경로를 비동기 catch-up으로 접수한다. coverage 조회 실패는 fail-closed 처리한다.
 - 백그라운드 202 접수, 분산 잠금 유지, 고아 RUNNING 복구 및 회귀 테스트를 추가했다. 상세 운영 근거와 점검 절차는 docs/operations/us-daily-cache-freshness-runbook.md에 기록한다.
+- 운영 확인 중 감지기와 실제 cache warm universe가 서로 달라 241개 종목이 오래된 상태로 남을 수 있음을 발견했다. 감지기와 보호된 상태 API를 `daily_active`, 공식 상품 제외 플래그, 동일한 preferred/notes/bonds/units 등 상품명 제외 규칙으로 맞춰 비활성·제외 종목을 반복 백필 대상으로 세지 않도록 수정했다.
 
 ### 검증
 - 이전 비동기 구현: npm run deploy:verify 통과(빌드·standalone/브라우저 스모크·전체 1,631 tests·타입·문서·보안/cron 감사). GitHub Deploy OCI run 45314191777 성공, commit f581164f.
-- 새 종목별 coverage 구현 후 npm run deploy:verify 통과: 빌드·standalone/브라우저 스모크, 전체 281개 파일(1 skip)·1,632 tests(3 skip), typecheck, 문서/API/보안/cron 감사. 이 커버리지 수정의 재배포와 운영 전체 종목 확인은 남아 있다.
+- 새 종목별 coverage 구현 후 npm run deploy:verify 통과: 빌드·standalone/브라우저 스모크, 전체 281개 파일(1 skip)·1,632 tests(3 skip), typecheck, 문서/API/보안/cron 감사. 적격 universe 일치 수정 후 같은 전체 검증을 재통과했다.
 - 운영 GET/POST는 읽기·보정 접수 목적으로 수행했다. 운영 DB 직접 변경은 하지 않았다.
 
 ### 다음 개선
-- coverage 보정 배포 뒤 cron이 202를 반환하는지 확인하고, 모든 NAS/NYS/AMS 활성 보통주에서 `missingAtLatestDateCount=0`까지 완료되는지 검증한다.
+- universe 일치 수정 배포 뒤 status API의 적격 종목별 coverage가 0 누락으로 수렴하는지 확인한다. 기존 백필은 2026-11-24T03:15Z 시작 후 04:04Z에도 RUNNING이며 데이터 갱신 시각은 03:50Z에 멈춰 있다. 실제 누락 수렴과 백필 종료는 미확인이다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-24-005
 - 성과 판정: PARTIAL
-- 근거: 두 원인을 운영에서 확인하고 누락 coverage 감지를 보완했으나 새 수정의 배포와 전체 종목 11/23 봉 반영은 미검증이다.
+- 근거: 장후 자동 감지 및 개별 종목 coverage, 실제 warm universe 일치 수정은 구현·검증했다. `abef5f2e` 버전 배포는 성공했지만 원시 coverage 차이를 보고 백필은 장시간 RUNNING으로 남았다. 적격 universe 수정은 현재 전체 검증만 마쳤으며, 배포와 최종 운영 coverage 확인은 남았다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 미실행 (coverage 수정 후 전체 검증 대기).
+- 커밋·푸시·배포: 현재 universe 수정 revision은 전체 검증 통과, 커밋·푸시 대기. 앞선 `abef5f2e`는 `oci`에 배포됐고 GitHub Actions `45317170446` 성공.
 ## [2026-11-24] 미국 일봉 캐시 장후 freshness probe 및 자동 catch-up
 
 ### 목표
