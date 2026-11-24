@@ -16,15 +16,15 @@
 - 운영 GET/POST는 읽기·보정 접수 목적으로 수행했다. 운영 DB 직접 변경은 하지 않았다.
 
 ### 다음 개선
-- universe 일치 수정 배포 뒤 status API의 적격 종목별 coverage가 0 누락으로 수렴하는지 확인한다. 기존 백필은 2026-11-24T03:15Z 시작 후 04:04Z에도 RUNNING이며 데이터 갱신 시각은 03:50Z에 멈춰 있다. 실제 누락 수렴과 백필 종료는 미확인이다.
+- universe 일치 수정 배포 후 2026-11-24T04:35Z 기준 적격 5,122종목 중 5종목이 11/23 일봉을 보유하지 않았다(NAS 1, NYS 4, AMS 0). 시장 최신일은 모두 11/23이고 AAPL/MSFT/JPM 공개 GET도 11/23을 반환한다. 자동화 run 455259은 여전히 RUNNING, 마지막 데이터 갱신은 03:50Z다. 잔여 5개 종목 코드와 거래 여부 및 작업 종료를 확인해야 한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-24-005
 - 성과 판정: PARTIAL
-- 근거: 장후 자동 감지 및 개별 종목 coverage, 실제 warm universe 일치 수정은 구현·검증했다. `abef5f2e` 버전 배포는 성공했지만 원시 coverage 차이를 보고 백필은 장시간 RUNNING으로 남았다. 적격 universe 수정은 현재 전체 검증만 마쳤으며, 배포와 최종 운영 coverage 확인은 남았다.
+- 근거: 장후 자동 감지, 개별 종목 coverage, warm universe와 탐지기 적격 범위 일치를 구현·검증하고 `14ce99d9` 배포 workflow의 검증 및 activation 성공을 확인했다. 시장별 최신 거래일 및 대표 종목은 11/23이나, 5,122개 적격 종목 중 5개 봉 누락과 automation run 455259 미종료가 남아 전체 최신성은 미완료다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 커밋·푸시 완료(`4ef1635a`), GitHub Actions `45324688342` 배포 실패. 실패 단계는 workflow의 `npm run deploy:verify`; Actions job log 접근은 repository admin rights 요구로 거부되어 상세 메시지는 미확인. 로컬 재실행에서 문서 게이트가 이 항목의 정규화된 `완료/실패/미실행/차단` 상태 단어 누락을 검출했다. 규칙에 맞춰 기록을 고친 뒤 전체 검증과 배포를 재시도한다.
+- 커밋·푸시·배포: 완료. universe 수정 `4ef1635a` 및 문서 게이트 정정 `14ce99d9`를 `oci`에 푸시했다. 최종 GitHub Actions deploy run `45325840944`에서 전체 검증과 activation 단계 성공, `/api/health` 정상 응답을 확인했다. 최종 종목별 5개 누락 해소는 미완료.
 ## [2026-11-24] 미국 일봉 캐시 장후 freshness probe 및 자동 catch-up
 
 ### 목표
