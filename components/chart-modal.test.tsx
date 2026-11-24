@@ -512,7 +512,7 @@ describe("ChartModal", () => {
     expect(await screen.findByText("KIS_MINUTE_DATA_EMPTY_OR_INVALID")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "일봉" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "일봉" })).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "일봉" })).toHaveAttribute("aria-pressed", "true"));
     fireEvent.click(screen.getByRole("button", { name: "1분봉 차트 보기" }));
     await waitFor(() => {
       const minuteRequests = vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes("/api/kis/market-flow?") && String(input).includes("minute=1"));
@@ -531,7 +531,7 @@ describe("ChartModal", () => {
     render(<ChartModal code={code} company="테스트 종목" onClose={vi.fn()} />);
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "일봉" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "일봉" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => {
       const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
       expect(requests.some((url) => url.includes("/api/stock/chart?") && url.includes("timeframe=D"))).toBe(true);

@@ -857,7 +857,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
       <div ref={modalRef} className={`${styles.modal} ${isFullscreen ? styles.modalFullscreen : ""}`} role="dialog" aria-modal="true" tabIndex={-1}>
         {/* 헤더 */}
         <div className={styles.header}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
+          <div className={styles.headerInfo} style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
             <div className={styles.titleBlock}>
               <span className={styles.company}>{resolvedCompany || normalizeTickerCode(code)}</span>
               <span className={styles.code}>{code}</span>
@@ -879,11 +879,11 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
               </div>
             )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className={styles.headerActions} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {position && <span className={styles.code}>{position.current} / {position.total}</span>}
-            <button type="button" onClick={onPrevious} disabled={!onPrevious} aria-label="이전 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>←</button>
-            <button type="button" onClick={onNext} disabled={!onNext} aria-label="다음 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>→</button>
-            <button type="button" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "전체화면 종료" : "전체화면"} style={{ padding: "8px 11px", borderRadius: "8px" }}>{isFullscreen ? "⤢" : "⛶"}</button>
+            <button className={styles.headerActionButton} type="button" onClick={onPrevious} disabled={!onPrevious} aria-label="이전 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>←</button>
+            <button className={styles.headerActionButton} type="button" onClick={onNext} disabled={!onNext} aria-label="다음 종목" style={{ padding: "8px 11px", borderRadius: "8px" }}>→</button>
+            <button className={styles.headerActionButton} type="button" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "전체화면 종료" : "전체화면"} style={{ padding: "8px 11px", borderRadius: "8px" }}>{isFullscreen ? "⤢" : "⛶"}</button>
             <button className={styles.closeBtn} onClick={onClose} aria-label="닫기">✕</button>
           </div>
         </div>
@@ -893,16 +893,14 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
 
         {/* 바디 */}
         <div className={styles.body}>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }} role="tablist" aria-label="차트 주기">
+          <div className={styles.timeframeControls} role="group" aria-label="차트 주기">
             {([["D", "일봉"], ["W", "주봉"], ["M", "월봉"]] as const).map(([value, label]) => (
-              <button key={value} type="button" onClick={() => setTimeframe(value)} aria-selected={timeframe === value}
-                style={{ padding: "8px 14px", borderRadius: "8px", background: timeframe === value ? "#00ffa3" : "rgba(148,163,184,.16)", color: timeframe === value ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
+              <button key={value} className={`${styles.timeframeButton} ${timeframe === value ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => setTimeframe(value)} aria-pressed={timeframe === value}>
                 {label}
               </button>
             ))}
             {(isUsChart ? [1, 5, 10, 15, 30, 60] : [1, 2, 3, 5, 10, 15, 30, 60]).map((minute) => (
-              <button key={minute} type="button" onClick={() => { setActiveTab("chart"); setTimeframe(String(minute) as ChartTimeframe); }} aria-label={`${minute}분봉 차트 보기`}
-                style={{ marginLeft: minute === 1 ? "auto" : undefined, padding: "8px 14px", borderRadius: "8px", background: activeTab === "chart" && timeframe === String(minute) ? "#00ffa3" : "rgba(148,163,184,.16)", color: activeTab === "chart" && timeframe === String(minute) ? "#020617" : "#cbd5e1", fontWeight: 700 }}>
+              <button key={minute} className={`${styles.timeframeButton} ${activeTab === "chart" && timeframe === String(minute) ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => { setActiveTab("chart"); setTimeframe(String(minute) as ChartTimeframe); }} aria-pressed={activeTab === "chart" && timeframe === String(minute)} aria-label={`${minute}분봉 차트 보기`}>
                 {minute}분봉
               </button>
             ))}

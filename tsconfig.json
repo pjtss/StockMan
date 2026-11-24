@@ -29,7 +29,6 @@
     }
   },
   "include": [
-    ".next-clean-audit/types/**/*.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
     "components/**/*.ts",
@@ -43,7 +42,7 @@
     "next.config.ts",
     "scripts/**/*.ts",
     "scripts/**/*.tsx",
-    ".next-deploy-verify/types/**/*.ts"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -1,3 +1,10 @@
+### 2026-11-24 — iPhone 12 Pro iOS Chrome 차트 모달 모바일 최적화
+- 목적/범위: iPhone 12 Pro의 세로 390 CSS px 폭과 iOS Chrome(WebKit) 환경을 기준으로 차트 모달 반응형 레이아웃을 조정했다. 기존 viewport device-width/viewport-fit=cover 설정을 확인하고 유지했다.
+- 변경: components/chart-modal.module.css, components/chart-modal.tsx에서 모바일 모달을 동적 뷰포트 높이 기반 전체 화면으로 전환하고 노치·홈 인디케이터 및 가로 모드 좌우 안전 영역을 반영했다. 종목명/가격과 조작부를 모바일 헤더에서 정돈하고 키보드 전용 힌트를 숨겼다. 봉 주기 선택은 터치 가능한 가로 스크롤 바로 바꾸고 44px 최소 터치 크기, 뷰포트 높이에 비례하는 차트 영역, 스크롤 가능한 범례를 적용했다. 선택 주기는 버튼 그룹과 aria-pressed로 표현하고 components/chart-modal.test.tsx의 접근성 쿼리를 이에 맞췄다.
+- 근본 원인/영향: 기존 95vh 하단 시트와 한 줄에 섞인 다수의 주기 버튼은 iPhone 폭에서 차트 가시 영역을 줄이고 조작을 빽빽하게 만들 수 있었다. 첫 빌드 검사에서는 tsconfig.json이 과거 .next-clean-audit/.next-deploy-verify 타입 산출물까지 포함해 삭제된 임시 라우트를 검사했다. 이 경로를 제거하고 현재 .next/types만 유지했다. 변경 영향은 차트 모달 모바일 표현과 Next.js 타입 검사 입력 범위에 한정된다.
+- 검증: `npm test` 통과(282개 파일, 1,637개 테스트 통과, 3개 skip), `npm run build` 통과, `npm run start -- --port 3100` 실행 후 `/charts`와 `/api/public/document-catalog` 모두 HTTP 200, `git diff --check` 통과. 최초 빌드는 위의 오래된 임시 타입 경로 때문에 실패했고 설정 정리 후 재검증에서 통과했다. 로컬 앱 로그에 `intraday_detection_runs` 테이블 부재 경고가 있었으며 화면/API 확인은 통과했다. 실기기 실행은 하지 않았다.
+- 재발 감지/남은 위험: 390×844 CSS px 세로 및 가로 화면에서 Chrome iOS 실기기 확인을 후속 체크리스트로 둔다. 구형 iOS/WebKit의 동적 뷰포트 동작은 100vh fallback으로 보완했으나 실기기 확인 전까지 실제 주소창 전환·노치 영역 렌더링은 미검증이다. 타입 검사 입력은 `.next/types/**/*.ts`만 포함하는지 유지 확인한다. 로컬 DB에서 `intraday_detection_runs` 누락 경고가 지속되면 스키마 상태를 별도 점검한다. 커밋·푸시·배포 상태는 후속 기록한다.
+
 ## [2026-11-24] 미국 일봉 캐시 거래소별·종목별 최신성 보정
 
 ### 목표
