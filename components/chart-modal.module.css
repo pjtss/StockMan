@@ -387,6 +387,10 @@
   margin-bottom: 12px;
 }
 
+.timeframePrimaryControls,
+.minuteTimeframeControls { display: contents; }
+.minuteModeButton { display: none; }
+
 .timeframeButton {
   min-height: 40px;
   flex: 0 0 auto;
@@ -509,22 +513,34 @@
     position: sticky;
     top: -10px;
     z-index: 5;
+    display: grid;
     gap: 6px;
-    overflow-x: auto;
+    overflow: visible;
     margin: -10px -12px 0;
     padding: 8px 12px;
     background: rgba(10, 14, 26, .98);
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
   }
-  .timeframeControls::-webkit-scrollbar { display: none; }
-  .timeframeButton { min-height: 44px; padding-inline: 14px; }
+  .timeframePrimaryControls {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .minuteModeButton { display: inline-flex; align-items: center; justify-content: center; }
+  .minuteTimeframeControls {
+    display: none;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(148, 163, 184, .16);
+  }
+  .timeframeControlsMinuteActive .minuteTimeframeControls { display: grid; }
+  .timeframeButton { min-width: 0; min-height: 44px; padding-inline: 4px; font-size: 12px; }
+  .minuteTimeframeControls .timeframeButton { padding-inline: 2px; font-size: 11px; }
   .minuteControls { gap: 6px; }
   .minuteControls button { flex: 1 1 120px; min-height: 44px; }
   .indicatorValue { overflow-wrap: anywhere; }
   .chartWrap { height: clamp(260px, 40dvh, 340px); }
-  .chartLegend { flex-wrap: nowrap; overflow-x: auto; gap: 10px; white-space: nowrap; scrollbar-width: none; }
-  .chartLegend::-webkit-scrollbar { display: none; }
+  .chartLegend { flex-wrap: wrap; gap: 8px 10px; white-space: normal; }
   .closeBtn {
     top: calc(env(safe-area-inset-top) + 8px);
     right: 10px;

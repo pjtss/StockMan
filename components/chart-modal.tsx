@@ -851,6 +851,7 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
   const rsiInfo = rsiLabel(indicators?.rsi14 ?? null);
   const bbInfo = bbLabel(data?.latestPrice ?? 0, indicators?.bbUpper ?? null, indicators?.bbLower ?? null);
   const isUp = data?.latestChangeRate?.startsWith("+") ?? false;
+  const isMinuteTimeframe = !["D", "W", "M"].includes(timeframe);
 
   return createPortal(
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -893,17 +894,24 @@ export function ChartModal({ code, company, exchange, onClose, onPrevious, onNex
 
         {/* 바디 */}
         <div className={styles.body}>
-          <div className={styles.timeframeControls} role="group" aria-label="차트 주기">
-            {([["D", "일봉"], ["W", "주봉"], ["M", "월봉"]] as const).map(([value, label]) => (
-              <button key={value} className={`${styles.timeframeButton} ${timeframe === value ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => setTimeframe(value)} aria-pressed={timeframe === value}>
-                {label}
+          <div className={`${styles.timeframeControls} ${isMinuteTimeframe ? styles.timeframeControlsMinuteActive : ""}`} role="group" aria-label="차트 주기">
+            <div className={styles.timeframePrimaryControls}>
+              {([["D", "일봉"], ["W", "주봉"], ["M", "월봉"]] as const).map(([value, label]) => (
+                <button key={value} className={`${styles.timeframeButton} ${timeframe === value ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => setTimeframe(value)} aria-pressed={timeframe === value}>
+                  {label}
+                </button>
+              ))}
+              <button className={`${styles.timeframeButton} ${styles.minuteModeButton} ${isMinuteTimeframe ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => { setActiveTab("chart"); if (!isMinuteTimeframe) setTimeframe("1"); }} aria-pressed={isMinuteTimeframe}>
+                분봉
               </button>
-            ))}
-            {(isUsChart ? [1, 5, 10, 15, 30, 60] : [1, 2, 3, 5, 10, 15, 30, 60]).map((minute) => (
-              <button key={minute} className={`${styles.timeframeButton} ${activeTab === "chart" && timeframe === String(minute) ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => { setActiveTab("chart"); setTimeframe(String(minute) as ChartTimeframe); }} aria-pressed={activeTab === "chart" && timeframe === String(minute)} aria-label={`${minute}분봉 차트 보기`}>
-                {minute}분봉
-              </button>
-            ))}
+            </div>
+            <div className={styles.minuteTimeframeControls} role="group" aria-label="분봉 간격">
+              {(isUsChart ? [1, 5, 10, 15, 30, 60] : [1, 2, 3, 5, 10, 15, 30, 60]).map((minute) => (
+                <button key={minute} className={`${styles.timeframeButton} ${activeTab === "chart" && timeframe === String(minute) ? styles.timeframeButtonActive : ""}`} type="button" onClick={() => { setActiveTab("chart"); setTimeframe(String(minute) as ChartTimeframe); }} aria-pressed={activeTab === "chart" && timeframe === String(minute)} aria-label={`${minute}분봉 차트 보기`}>
+                  {minute}분
+                </button>
+              ))}
+            </div>
           </div>
           {loading && (
             <div className={styles.chartWrap}>

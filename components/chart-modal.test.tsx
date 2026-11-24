@@ -520,6 +520,18 @@ describe("ChartModal", () => {
     });
   });
 
+  it("groups minute intervals under an explicit minute mode", async () => {
+    render(<ChartModal code="005930" company="삼성전자" exchange="KOSDAQ" onClose={vi.fn()} />);
+
+    const minuteMode = await screen.findByRole("button", { name: "분봉" });
+    expect(minuteMode).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(minuteMode);
+
+    expect(minuteMode).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "1분봉 차트 보기" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "60분봉 차트 보기" })).toBeInTheDocument();
+  });
+
   it.each([
     { storedValue: "null", code: "000660" },
     { storedValue: "[]", code: "000661" },

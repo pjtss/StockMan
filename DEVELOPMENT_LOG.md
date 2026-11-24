@@ -1,3 +1,12 @@
+### 2026-11-24 — iPhone 12 Pro Chrome 차트 모달 주기 선택 재설계
+- 목적/범위: 앞선 모바일 차트 모달의 주기 선택이 한 줄에 길게 나열되어 화면 폭에서 간격이 가려지고 조작 영역이 작아지는 문제를 재검토했다. 사용 환경을 iPhone 12 Pro 세로 390 CSS px, iOS Chrome(WebKit)으로 구체화했다.
+- 근본 원인: 전체 화면 모달 자체보다 일·주·월·분 간격을 동급 버튼으로 한 줄에 배치한 정보 구조가 문제였다. 국내 분봉 8개 버튼을 390px 폭에 배열하면 각 버튼 너비가 약 40px로 좁아지는 레이아웃이다.
+- 변경: `components/chart-modal.tsx`에서 일봉·주봉·월봉과 분봉 모드를 분리하고, 분봉 간격은 선택 상태에서만 보이도록 그룹화했다. `components/chart-modal.module.css`에서 분 간격을 4열 2행으로 배치하고 버튼 높이 44px, 범례 줄바꿈을 유지했다. 차트 모달 설계 원칙을 `docs/MOBILE_UI_UX_DESIGN.md`와 공개 매뉴얼 사본에 기록했으며, 분봉 모드 접근성 회귀 테스트를 추가했다.
+- 공식 근거: Apple HIG의 모달 가이드상 전체 화면은 집중이 필요한 복합 작업에 적합하고, iOS Chrome은 Chrome 공식 문서 기준 WebKit을 사용한다. WebKit의 동적 뷰포트 단위와 안전 영역 지침을 계속 적용한다. TradingView 공식 Supercharts 문서의 주기·종목 정보·보조 기능 역할 분리도 정보 구조 참고로 삼았다.
+- 검증: `npm run deploy:verify` 통과. 전체 282개 테스트 파일 중 282개 통과, 1,638개 테스트 통과·3개 skip; 타입 검사·문서 검사·최적화 빌드와 standalone runtime smoke 통과(`/charts` HTTP 200, Chrome 데스크톱/모바일 hydration). 별도 로컬 화면 확인에서 390×844 CSS px 모달은 390×844, 분봉 버튼은 4열로 줄바꿈했고 44px 높이·88.5px 너비를 유지했다. 이 검증 브라우저는 데스크톱 Chrome의 모바일 에뮬레이션으로 iOS Chrome 실기기는 아니다.
+- 재발 감지/남은 위험: `npm run deploy:verify` 및 모바일 화면의 390px 전체 간격 가시성, 가로 overflow, 44px 버튼 높이를 확인한다. 배포 후 iPhone 12 Pro 실기기에서 동적 주소창·노치/홈 인디케이터·가로 모드 확인을 후속 항목으로 둔다.
+- Git·배포: 검증 후 별도 작업 브랜치에서 수행 예정.
+
 ### 2026-11-24 — iPhone 12 Pro iOS Chrome 차트 모달 모바일 최적화
 - 목적/범위: iPhone 12 Pro의 세로 390 CSS px 폭과 iOS Chrome(WebKit) 환경을 기준으로 차트 모달 반응형 레이아웃을 조정했다. 기존 viewport device-width/viewport-fit=cover 설정을 확인하고 유지했다.
 - 변경: components/chart-modal.module.css, components/chart-modal.tsx에서 모바일 모달을 동적 뷰포트 높이 기반 전체 화면으로 전환하고 노치·홈 인디케이터 및 가로 모드 좌우 안전 영역을 반영했다. 종목명/가격과 조작부를 모바일 헤더에서 정돈하고 키보드 전용 힌트를 숨겼다. 봉 주기 선택은 터치 가능한 가로 스크롤 바로 바꾸고 44px 최소 터치 크기, 뷰포트 높이에 비례하는 차트 영역, 스크롤 가능한 범례를 적용했다. 선택 주기는 버튼 그룹과 aria-pressed로 표현하고 components/chart-modal.test.tsx의 접근성 쿼리를 이에 맞췄다.
