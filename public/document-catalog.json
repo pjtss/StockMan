@@ -1238,9 +1238,17 @@
       "format": "md",
       "description": "운영 미국 보통주 일봉 캐시가 기대 거래일보다 늦게 남는 원인을 추적하고, 스케줄 창을 놓쳐도 원천 데이터가 앞서 있으면 자동 보정하도록 개선했다.",
       "url": "/manuals/operations/us-daily-cache-freshness-runbook.md",
-      "relatedPaths": [],
+      "relatedPaths": [
+        "docs/operations/us-exchange-status-sync.md"
+      ],
       "sourcePath": "docs/operations/us-daily-cache-freshness-runbook.md",
-      "related": []
+      "related": [
+        {
+          "title": "미국 거래소 거래·상장 상태 자동 수집",
+          "url": "/manuals/operations/us-exchange-status-sync.md",
+          "sourcePath": "docs/operations/us-exchange-status-sync.md"
+        }
+      ]
     },
     {
       "id": "operations-us-delisted-common-stock-refresh-design",
