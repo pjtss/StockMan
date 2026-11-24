@@ -52,8 +52,9 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
       `SELECT market, code
          FROM (
            SELECT u.market, u.code,
-                  ROW_NUMBER() OVER (PARTITION BY u.market ORDER BY u.code) AS rn
+                  ROW_NUMBER() OVER (PARTITION BY u.market ORDER BY c.volume DESC, u.code) AS rn
              FROM us_common_stock_universe u
+             JOIN us_latest_daily_candles c ON c.market = u.market AND c.code = u.code
             WHERE u.enabled = true
               AND u.instrument_type = 'COMMON_STOCK'
               AND COALESCE(u.is_etf, false) = false
@@ -89,7 +90,10 @@ export async function detectUsDailyCacheLag(): Promise<UsDailyMarketFreshness[]>
     for (const code of codes) {
       const response = await fetchUsDailyPrice({ code, market, timeframe: "D" });
       const date = response?.ok ? response.candles.reduce<string | null>((latest, candle) => !latest || candle.date > latest ? candle.date : latest, null) : null;
-      if (date && (!latestDate || date > latestDate)) latestDate = date;
+      if (date) {
+        latestDate = date;
+        break;
+      }
     }
     if (!latestDate) throw new Error(`US_DAILY_FRESHNESS_PROBE_FAILED:${market}`);
     sourceByMarket.set(market, latestDate);

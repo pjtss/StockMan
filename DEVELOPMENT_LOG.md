@@ -1,31 +1,30 @@
-## [2026-11-24] 미국 일봉 캐시 장후 freshness probe 및 자동 catch-up
+## [2026-11-24] 미국 일봉 캐시 장후 freshness 및 비동기 catch-up
 
 ### 목표
-- 운영 미국 보통주 일봉 캐시가 2026-11-23 거래일로 갱신되지 않은 원인을 확인하고, 장후 최신성 자동 감지·보정 후 배포한다.
+- 장후 거래일 봉이 캐시에 반영되지 않는 원인을 규명하고 감지·복구를 개선해 운영에 배포한다.
 
 ### 반영
-- 원인: 11/23 16:06Z 스냅샷은 미 동부 11:06, 정규장 마감 전 자료였다. 11/24 01:44Z 운영 GET에서도 AAPL/MSFT/JPM은 11/20 봉이었다. 동시각 protected cron POST는 HTTP 200 skipped=true, reason=disabled_or_outside_schedule을 반환했다. 기존 11/22 운영 진단은 US KST 06:00–08:00 시간창과 outside_schedule 반복 기록을 남겼다. 기존 응답은 disabled/outside-schedule을 구분하지 않고, 시간창 밖 KIS 원천 최신일과 캐시를 비교하지 않았다.
-- 장후(미 동부 평일 18:00 이후) 활성 COMMON_STOCK 마스터에서 거래소별 최대 3개 기준 종목의 KIS 최신일과 캐시 MAX 일자를 비교한다. 원천 날짜가 캐시보다 앞서면 기존 전체 유니버스 warm 경로를 catch-up 실행하고, probe 실패는 HTTP 503으로 나타낸다. 비활성 설정 및 1시간 interval gate는 유지한다.
-- cron 응답에 명확한 skip 사유·시간창·freshnessCheck·trigger를 포함하고, 정적 cron 검사는 health probe 직후 KR/US 일봉 호출 순서를 강제한다.
-- 운영 runbook, 문서 인덱스, 카탈로그와 공개 manuals를 갱신한다.
+- 원인: 운영 KST 06:00–08:00 시간창 밖의 미국 장후 cron은 `outside_schedule`로 건너뛰었다. 수동 보정 요청은 동기 전체 warm 때문에 기본 nginx 프록시 제한 약 54초에서 504가 났고, 자동화 이력은 `RUNNING`으로 남았다.
+- 장후 활성 COMMON_STOCK 종목 기준으로 KIS 원천일과 NAS/NYS/AMS 캐시 최신일을 비교해, 불일치 시 전체 캐시 갱신을 `after()` 백그라운드 작업으로 접수하고 HTTP 202를 반환한다. 분산 잠금은 백그라운드 완료까지 유지하며, 잠금은 획득됐지만 실행 이력만 고아 RUNNING인 경우 interval gate가 복구를 막지 않게 했다.
+- 기준 후보는 캐시 거래량 순으로 최대 3개를 확인하고 첫 정상 KIS 응답으로 probe 시간을 줄인다. `maxDuration`과 cron 순서·진단 정보를 정비하고 회귀 테스트 및 운영 런북을 추가했다.
+- 재발 감지: `npm run cron:check`, route/freshness 테스트, 장후 KIS 원천일 대 캐시 최신일 대조, 운영 automation run 상태를 확인한다.
+- 범위: 미국 일봉 freshness/cron 코드·테스트, 운영 런북, 인덱스·문서 카탈로그, DEVELOPMENT_LOG.
 
 ### 검증
-- `npx vitest run lib/us-daily-cache-freshness.test.ts`: 1 file, 3 tests 통과. `npm run cron:check`, `npm run typecheck`, `npm run docs:check` 통과.
-- `npm test -- --run`: 280 files 통과, 1 skipped; 1,627 tests 통과, 3 skipped.
-- 첫 `npm run deploy:verify`에서 DEVELOPMENT_LOG 최신 항목 계약이 요구하는 섹션/ID/전달 상태가 빠져 문서 gate가 실패했다. 로그 구조를 보완한 뒤 전체 배포 검증을 다시 실행한다.
-- `npm ci --no-audit --no-fund` 완료. 운영 DB에 직접 쓰지는 않았다.
+- `npm run deploy:verify` 통과: 0 production dependency vulnerabilities, OCI activation smoke, docs/API/scope/KIS/auth/cron audits, production build, standalone runtime·HTTP·Chrome 데스크톱/모바일 smoke, 전체 테스트 281 files(1 skipped), 1,631 tests(3 skipped), typecheck.
+- 운영 증거: 2026-11-24T01:49Z `outside_schedule` skip, 02:21Z 보정 요청 504, run 455198 RUNNING. 새 비동기 경로의 실제 운영 봉 반영은 재배포 후 확인한다.
+- 로컬 운영 DB 변경 없음. 공식 KIS 응답 일자와 기존 캐시 읽기만 freshness 비교에 사용한다.
 
 ### 다음 개선
-- 배포 후 OCI cron journal과 운영 일봉 GET을 대조하고, 실제 `post_close_stale_cache_catchup` 결과가 NAS/NYS/AMS 모두 기대 거래일을 반영했는지 확인한다. 3개 기준 종목이 모두 일시적으로 응답하지 않는 경우의 대체 기준 종목 정책을 run 결과에 따라 검토한다.
+- 배포 후 보호된 status GET과 공개 API의 NAS/NYS/AMS 일자를 재조회하고, 기준 후보 3개가 모두 응답하지 않는 상황을 계측한다.
 
 ### 개선 과제
 - 개선 과제 ID: CI-2026-11-24-001
-- 성과 판정: PARTIAL
-- 근거: 운영 캐시 지연과 skip 응답을 재현·확인했고, 최신일 불일치 시 장후 catch-up이 수행되도록 구현했다. 전체 테스트는 통과했으나 production deployment 및 11/23 봉 반영 확인 전이라 운영 결과는 미측정이다.
+- 성과 판정: IMPROVED
+- 근거: 기존 KST 시간창 누락 및 프록시 504 복구 경로를 운영 증거로 확인했다. 거래소별 장후 freshness 감지, 백그라운드 202 접수, lock/고아 RUNNING 복구와 회귀 테스트를 구현하고 전체 배포 검증을 통과했다. 운영 재배포 후 11/23 봉 반영은 별도 확인 대상이다.
 
 ### 커밋·푸시·배포
-- 커밋·푸시·배포: 미실행 (분리 작업 트리에서 검증 중).
-
+- 커밋·푸시·배포: 미실행 (검증 완료, Git 전달 직전).
 ## [2026-11-23] RSS 조회 hot path 추가 분리
 
 ### 목표
@@ -6508,12 +6507,16 @@ pm run docs:check` 통과: 필수 문서 15개, Flyway 133개 확인.
 
 ### 검증
 
-- `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
-- `r`npm.cmd run audit:verify-scope` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/audit-verify-scope-change.mjs` 통과.
+- 
+pm.cmd run audit:verify-scope` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
-- `r`npm.cmd run verify` 통과: 152개 테스트 파일·502개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사, Next.js 프로덕션 빌드 성공.
+- 
+pm.cmd run verify` 통과: 152개 테스트 파일·502개 테스트, 타입체크, 문서 검사, 검증 범위 감사, KIS 경계 감사, cron 검사, Next.js 프로덕션 빌드 성공.
 
 근거: 표준 `verify` 명령 정의에 감사 단계가 포함되고, 개별 감사·문서·diff 검증이 모두 종료 코드 0으로 완료됐다.
 
@@ -6572,9 +6575,12 @@ pm.cmd run verify`를 실행해 새 검증 단계가 기존 테스트·빌드 �
 
 ### 검증
 
-- `r`node --check scripts/audit-verify-scope-change.mjs` 통과.
-- `r`npm.cmd run audit:verify-scope` 통과: 새 manifest 승인 메타데이터 확인.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/audit-verify-scope-change.mjs` 통과.
+- 
+pm.cmd run audit:verify-scope` 통과: 새 manifest 승인 메타데이터 확인.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6604,8 +6610,10 @@ pm.cmd run verify`를 실행해 새 검증 단계가 기존 테스트·빌드 �
 
 ### 검증
 
-- `r`npx vitest run scripts/audit-verify-scope-change.test.mjs --run` 통과: 3개 테스트.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run scripts/audit-verify-scope-change.test.mjs --run` 통과: 3개 테스트.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6663,8 +6671,10 @@ pm.cmd run verify` 통과.
 
 ### 검증
 
-- `r`npm.cmd run audit:verify-scope` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+pm.cmd run audit:verify-scope` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6723,8 +6733,10 @@ pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13.json`을 �
 
 ### 검증
 
-- `r`npm.cmd run audit:verify-scope` 통과: manifest 변경 승인 메타데이터 확인.
-- `r`npm.cmd run docs:check` 통과.
+- 
+pm.cmd run audit:verify-scope` 통과: manifest 변경 승인 메타데이터 확인.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6786,9 +6798,12 @@ pm.cmd run compare:verify -- reports/verify-baseline-2026-09-13.json reports/ver
 
 ### 검증
 
-- `r`node --check scripts/measure-verify.mjs` 통과.
-- `r`node --check scripts/compare-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/measure-verify.mjs` 통과.
+- 
+ode --check scripts/compare-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6846,8 +6861,10 @@ pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-metadata.j
 
 ### 검증
 
-- `r`npx vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6877,8 +6894,10 @@ Windows 검증 실행에서 shell 보안 경고를 제거하고, 측정 파이�
 ### 검증
 
 - Windows `cmd.exe /d /s /c npm.cmd run audit:verify-scope` 실행 성공.
-- `r`node --check scripts/measure-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/measure-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6935,9 +6954,12 @@ pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-shell-fix.
 
 ### 검증
 
-- `r`npx vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
-- `r`node --check scripts/measure-verify.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+px vitest run scripts/compare-verify.test.mjs scripts/audit-verify-scope-change.test.mjs --run` 통과: 2개 파일·5개 테스트.
+- 
+ode --check scripts/measure-verify.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -6966,8 +6988,10 @@ pm.cmd run measure:verify -- --out reports/verify-measured-2026-09-13-shell-fix.
 
 ### 검증
 
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - `git check-ignore reports/verify-measured-2026-09-13-shell-fix.json` 통과.
@@ -7029,8 +7053,10 @@ pm.cmd run deploy:verify` 통과.
 
 ### 검증
 
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -7121,8 +7147,10 @@ pm.cmd run deploy:verify` 실행 중 quality gate 통과 확인.
 
 ### 검증
 
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -7184,8 +7212,10 @@ pm.cmd run deploy:verify`를 실행했다.
 
 ### 검증
 
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - `.next-*/` ignore 규칙이 `.next-deploy-verify`에 적용됨을 확인.
@@ -7217,8 +7247,10 @@ pm.cmd run deploy:verify`를 다시 실행해 전용 산출물 경계에서 buil
 
 ### 검증
 
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 - 기존 배포 검증에서 발견된 `EADDRINUSE` false positive 원인을 코드 경로로 재현·해결했다.
@@ -7280,8 +7312,10 @@ pm.cmd run deploy:verify`에서 quality gate·build 통과.
 
 ### 검증
 
-- `r`node --check scripts/verify-deploy.mjs` 통과.
-- `r`npm.cmd run docs:check` 통과.
+- 
+ode --check scripts/verify-deploy.mjs` 통과.
+- 
+pm.cmd run docs:check` 통과.
 - git diff --check 통과.
 - 1차 `npm.cmd run deploy:verify`는 build·runtime·전체 테스트(302개 파일 중 302 passed/1 skipped, 1,526 tests passed/3 skipped) 통과 후 `docs:check`에서 최신 개선 문구의 부정 표현을 구체적 다음 작업으로 오인해 실패했다. 문서 계약에 맞게 개선 과제를 명시한 뒤 다시 검증한다.
 
@@ -9494,3 +9528,5 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 다른 RSS source의 미수집/coverage UNKNOWN 상태는 기존 문서에 기록된 별도 수집 범위 문제이며 이번 조회 기본 날짜 수정 범위에서는 변경하지 않았다.
 - `npm ci --no-audit --no-fund`와 `npm run deploy:verify` 통과. 전체 테스트 279개 파일 통과·1개 skipped, 1,624 passed·3 skipped; 타입 검사, 문서/API 감사, production build, standalone runtime/API smoke 및 Chrome 데스크톱·모바일 hydration smoke 통과.
 - 커밋 `62c60b9d`를 `oci`에 push했고 GitHub Actions `Deploy OCI` run `45138724333` 성공을 확인했다. 배포 후 `GET /api/health`는 `status=ok`; `GET /api/disclosures?date=2026-11-23&source=STOCKTITAN&page=1&pageSize=1`은 HTTP 200, `ok=true`, `DB_QUERY_COMPLETE`, `total=32`이며 날짜와 출처가 요청과 일치했다.
+
+

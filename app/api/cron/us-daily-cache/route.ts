@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
 import { acquireAutomationLock } from "@/lib/automation-lock";
 import { warmUsDailyPriceCache } from "@/lib/us-daily-price-cache-warm";
@@ -9,8 +9,11 @@ import { isWithinSchedule } from "@/lib/schedule-time";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { detectUsDailyCacheLag, isUsPostCloseWeekday, type UsDailyMarketFreshness } from "@/lib/us-daily-cache-freshness";
 
+export const maxDuration = 5_400;
+
 export async function POST(request: Request) {
   let lease: Awaited<ReturnType<typeof acquireAutomationLock>> = null;
+  let leaseTransferredToBackground = false;
   try {
   if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   lease = await acquireAutomationLock("public-daily-cache-refresh:us-daily-cache");
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
   }
   const latestStartedAt = latest?.started_at ? new Date(latest.started_at).getTime() : null;
   const elapsedSeconds = latestStartedAt == null ? null : Math.max(0, (Date.now() - latestStartedAt) / 1000);
-  if (elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
+  if (latest?.status !== "RUNNING" && elapsedSeconds != null && elapsedSeconds < intervalSeconds) {
     await recordSkippedAutomationRun("us-daily-cache", "outside_interval", { intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds) });
     return NextResponse.json({ ok: true, skipped: true, reason: "outside_interval", intervalSeconds, elapsedSeconds: Math.round(elapsedSeconds), freshnessCheck: null });
   }
@@ -53,8 +56,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, skipped: true, reason: "outside_schedule_cache_current", scheduleTimezone: "Asia/Seoul", startTime: moduleSettings.startTime, endTime: moduleSettings.endTime, activeDays: moduleSettings.activeDays, freshnessCheck });
     }
   }
-  const result = await withAutomationRun("us-daily-cache", warmUsDailyPriceCache);
-  return NextResponse.json({ ...result, freshnessCheck, trigger: withinSchedule ? "configured_schedule" : "post_close_stale_cache_catchup" });
-  } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
-  finally { await lease?.release(); }
+  const trigger = withinSchedule ? "configured_schedule" : "post_close_stale_cache_catchup";
+  after(async () => {
+    try {
+      const result = await withAutomationRun("us-daily-cache", warmUsDailyPriceCache, { triggerType: trigger === "configured_schedule" ? "AUTOMATION" : "POST_CLOSE_CATCHUP", market: "US", timeframe: "D", jobType: "daily-cache" });
+      const status = result.failureCount > 0 ? result.successCount > 0 ? "PARTIAL" : "FAILED" : result.ok ? "SUCCESS" : "FAILED";
+      console.info(`[API /cron/us-daily-cache] deferred refresh completed trigger=${trigger} status=${status} instruments=${result.instrumentCount} saved=${result.savedCandleCount} failures=${result.failureCount}`);
+    } catch (error) {
+      console.error("[API /cron/us-daily-cache] deferred refresh failed:", error instanceof Error ? error.name : "unknown error");
+    } finally {
+      await lease?.release();
+      lease = null;
+    }
+  });
+  leaseTransferredToBackground = true;
+  return NextResponse.json({ ok: true, market: "US", accepted: true, status: "RUNNING", trigger, freshnessCheck, deferred: { accepted: true } }, { status: 202, headers: { "cache-control": "no-store", "retry-after": String(intervalSeconds) } });
+  } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.name : "unknown error"); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
+  finally { if (!leaseTransferredToBackground) await lease?.release(); }
 }
