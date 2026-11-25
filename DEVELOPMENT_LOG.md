@@ -5,7 +5,7 @@
 - 공식 기준: [MDN viewport meta](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meta/name/viewport), [MDN CSS length/dvh](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/length), [MDN safe-area env()](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/env), [Chrome responsive design guidance](https://developer.chrome.com/docs/modern-web-guidance/guides/css/responsive-design?hl=en). 기존 `viewport-fit=cover`, `dvh`, safe-area CSS 설정을 확인하고 유지했다.
 - 검증: 수정 후 `components/chart-modal.test.tsx` 28개 통과. 분리 worktree에서 `npm run deploy:verify` 전체 통과: Vitest 282개 파일/1,638개 통과·3개 skip, 타입 검사, 문서/API/KIS/cron 감사, production build, standalone HTTP/정적 청크 smoke 및 Chrome 모달 smoke(데스크톱·390×844 모바일). 기존 공유 작업 트리의 미추적 `db/migration/V180__remove_user_action_event_metadata.sql` 때문에 최초 게이트가 migration 중복으로 중단됐으나, 해당 미추적 파일을 배포 내용에 섞지 않은 분리 worktree에서는 migration 검사와 전체 게이트가 정상 통과했다. Windows node_modules junction으로 standalone trace 복사 경고(EPERM)가 있었지만 standalone 서버가 정상 기동하고 모든 runtime smoke가 통과했다.
 - 재발 감지/남은 위험: 배포 게이트의 Chrome smoke가 `/charts`에서 실제 차트 모달을 열고 390px 뷰포트 기준을 계속 확인한다. 시뮬레이션은 실기기 iOS Chrome을 대체하지 않으며 노치·주소창 전환의 실제 기기 검증은 남아 있다.
-- 커밋·푸시·배포: 전체 배포 게이트 통과 후 원격 oci 기준 갱신 및 코드 푸시·OCI workflow 완료 대기.
+- 커밋·푸시·배포: `74926cf7`을 `origin/oci`에 푸시했다. GitHub Deploy OCI run `45513749204` (#1383) 검증·패키징·업로드·활성화 성공. 운영 `https://stockman.r-e.kr/api/health`와 `/charts` HTTP 200, 운영 Chrome 모달 smoke(데스크톱·390×844 모바일) 통과.
 
 ### 2026-11-24 — iPhone 12 Pro Chrome 차트 모달 주기 선택 재설계
 - 목적/범위: 앞선 모바일 차트 모달의 주기 선택이 한 줄에 길게 나열되어 화면 폭에서 간격이 가려지고 조작 영역이 작아지는 문제를 재검토했다. 사용 환경을 iPhone 12 Pro 세로 390 CSS px, iOS Chrome(WebKit)으로 구체화했다.
