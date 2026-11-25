@@ -8,6 +8,7 @@ import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { detectUsDailyCacheLag, isUsPostCloseWeekday, type UsDailyMarketFreshness } from "@/lib/us-daily-cache-freshness";
+import { notifyDailyCacheRefreshIssue } from "@/lib/automation-completion-discord";
 
 export const maxDuration = 5_400;
 
@@ -72,6 +73,6 @@ export async function POST(request: Request) {
   });
   leaseTransferredToBackground = true;
   return NextResponse.json({ ok: true, market: "US", accepted: true, status: "RUNNING", trigger, freshnessCheck, deferred: { accepted: true } }, { status: 202, headers: { "cache-control": "no-store", "retry-after": String(intervalSeconds) } });
-  } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.name : "unknown error"); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
+  } catch (error) { console.error("[API /cron/us-daily-cache] Error:", error instanceof Error ? error.name : "unknown error"); await notifyDailyCacheRefreshIssue("US", "cron-handler", "US_DAILY_CACHE_FAILED").catch(() => undefined); return NextResponse.json({ ok: false, stage: "us-daily-cache-cron", error: "US_DAILY_CACHE_FAILED" }, { status: 502 }); }
   finally { if (!leaseTransferredToBackground) await lease?.release(); }
 }

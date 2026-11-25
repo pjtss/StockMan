@@ -75,12 +75,12 @@ export async function handlePublicDailyCacheRefresh(market: PublicDailyCacheMark
       );
     }
 
-    const dimensions = { triggerType: "PUBLIC_API", market, timeframe: "D", jobType: "daily-cache" } as const;
+    const dimensions = { triggerType: "MANUAL", market, timeframe: "D", jobType: "daily-cache" } as const;
     after(async () => {
       try {
         const result = market === "KR"
-          ? await withAutomationRun(moduleKey, runKrDailyCacheNow, dimensions)
-          : await withAutomationRun(moduleKey, warmUsDailyPriceCache, dimensions);
+          ? await withAutomationRun(moduleKey, () => runKrDailyCacheNow({ timeframes: ["D"] }), dimensions)
+          : await withAutomationRun(moduleKey, () => warmUsDailyPriceCache({ timeframes: ["D"] }), dimensions);
         const summary = summarizeResult(market, result as unknown as Record<string, unknown>);
         console.info(`[PublicDailyCacheRefresh] completed market=${market} status=${summary.status} instruments=${summary.instrumentCount ?? 0} success=${summary.successCount ?? 0} failures=${summary.failureCount ?? 0} saved=${summary.savedCandleCount ?? 0}`);
       } catch (error) {

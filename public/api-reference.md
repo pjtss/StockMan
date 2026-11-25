@@ -43,7 +43,7 @@ LLM은 각 작업에서 라이브 OpenAPI·메뉴얼·카탈로그를 다시 조
 
 HTTP GET만 보고 읽기 전용이라고 판단하지 않는다. 외부 공개 데이터 GET은 사용자·관리자 정보에 접근하지 않고 호출에 따른 DB 쓰기나 작업 실행이 없어야 한다. 관리자·cron 인증을 외부 AI에 넘겨 실행하지 않는다. 새 외부 데이터 GET은 인증 없이 구현하고 `node scripts/api-surface.mjs write` 및 `npm run audit:api-surface`로 무인증 계약을 갱신·검증한다. service-bearer GET은 API surface 검증에서 실패한다.
 
-일봉 캐시 갱신은 사용자가 명시적으로 요청한 공개 작업 기능이다. GET 안전 의미를 유지하기 위해 POST로만 제공하며, 정확히 국내/미국 경로 두 개만 route inventory에서 `public-action`으로 분류한다. 각 시장에서 최소 1시간 동안 한 번만 실행되고, 이미 실행 중이면 중복 작업을 시작하지 않는다. 처리 시간이 외부 reverse proxy의 요청 제한보다 길어질 수 있어 POST는 요청을 접수하면 HTTP 202를 즉시 반환하고, Next.js `after()`가 self-hosted Node 서버에서 백그라운드 작업을 이어간다([공식 문서](https://nextjs.org/docs/15/app/api-reference/functions/after)).
+일봉 캐시 갱신은 사용자가 명시적으로 요청한 공개 작업 기능이다. GET 안전 의미를 유지하기 위해 POST로만 제공하며, 정확히 국내/미국 경로 두 개만 route inventory에서 `public-action`으로 분류한다. 각 시장에서 최소 1시간 동안 한 번만 실행되고, 이미 실행 중이면 중복 작업을 시작하지 않는다. 수동 POST는 요청에 따라 D 봉만 갱신한다. 예약 cron은 기존 timeframe freshness 정책을 유지한다. 처리 시간이 외부 reverse proxy의 요청 제한보다 길어질 수 있어 POST는 요청을 접수하면 HTTP 202를 즉시 반환하고, Next.js `after()`가 self-hosted Node 서버에서 백그라운드 작업을 이어간다([공식 문서](https://nextjs.org/docs/15/app/api-reference/functions/after)).
 
 ## 인증
 
@@ -76,6 +76,8 @@ curl -X POST https://<host>/api/public/daily-cache/kr/refresh
 ```sh
 curl -X POST https://<host>/api/public/daily-cache/us/refresh
 ```
+
+완료 여부는 `GET /api/public/daily-candles`와 automation run 결과를 확인한다. 운영 진단자는 cron 인증을 사용해 `GET /api/debug/daily-cache-status?market=KR|US`에서 거래소별 최신 거래일·coverage·retry/failure 분류·최근 실행 요약을 읽을 수 있다. 기본 진단은 KIS 호출과 데이터 변경을 하지 않으며, 선택형 `probeSource=true`는 거래소별 최대 3개 종목을 KIS에서 읽어 캐시 최신일과 대조한다. 실제 완료·부분 실패·실패 및 stale worker 감지 알림은 module별 Discord debug webhook 설정을 우선 사용하고, 없으면 `STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL`을 사용한다.
 
 이 두 POST는 외부 읽기 전용 OpenAPI 문서에 들어가지 않으며, 쓰기·작업 실행 API 중 문서에서 별도로 명시한 유일한 무인증 경로다.
 

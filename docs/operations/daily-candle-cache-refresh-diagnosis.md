@@ -36,3 +36,15 @@
 - 매시 timer가 실제 설정 시간창 안에 실행되지 않으면 endpoint는 계속 skip할 수 있다. 배포 후 timer 시각과 양 시장 run 상태를 확인해야 한다.
 - 전체 유니버스 작업이 1시간을 넘으면 systemd service가 다음 timer invocation과 겹치거나 생략될 수 있다. 운영 duration과 missed-run 로그를 확인하고 작업 분할이나 timer 주기는 evidence가 확보된 후 조정한다.
 - 이 코드는 cron 경로를 복구하지만 캐시에 저장된 과거 누락 봉을 강제로 backfill하진 않는다. 배포 후 다음 정상 예약 실행의 결과 및 universe coverage를 확인한다.
+
+## 2026-11-25 재진단 및 디버깅 개선
+
+- 무인증 snapshot GET과 운영 공개 일봉 GET은 국내 KOSPI/KOSDAQ 및 미국 NAS/NYS/AMS 모두 최신 일자가 `20261123`임을 보였다. 국내 표본의 `fetchedAt`은 11월 23일 00:44–00:52 UTC, 미국 표본은 11월 24일 03:31–03:49 UTC였다.
+- 인증된 운영 `/api/debug/us-daily-cache-status` 조회에서는 US 설정이 enabled, KST 06:00–08:00, 월~토, 1시간 간격이었다. 최근 실제 실행 3건이 모두 `FAILED/AUTOMATION_RUN_STALE`로 2시간 만에 정리됐고, 중간·후속 호출은 `outside_schedule`로 skip됐다. 운영 cache coverage는 NAS 2,926/2,926, NYS 1,671/1,671, AMS 223/223 종목이 모두 같은 11월 23일 봉만 보유했다.
+- 코드상 두 worker는 D/W/M 신선도를 별도로 평가하며 일봉 우선 처리를 한다. 운영 `automation_runs` 요약을 통해 stale run에서 실제 선택된 timeframe 및 실패 단계가 공개되지 않아 W/M 요청이 11월 24일 일봉 부재의 원인이라고 확정할 수 없다. 이번 변경은 예약 실행의 W/M 정책을 보존하고 무인증 수동 POST만 명시적으로 D timeframe을 실행하도록 했다.
+- 최신 운영 debug 응답에는 2026-11-24 05:04 UTC 이후 약 24시간 동안 새 US 실행 기록이 없었다. 이 시각은 확인된 KST 06:00–08:00 schedule window 밖이다. 운영 `/api/cron/us-daily-cache` endpoint가 해당 window 동안 호출되지 않았거나 호출자 인증이 실패했을 가능성이 있으며, 둘은 host `stockman-cron.service` journal 없이는 구분할 수 없다. cron timer 자체 원인은 미확정이다.
+- 무인증 POST 수동 갱신은 이미 존재하는 `/api/public/daily-cache/kr/refresh`, `/api/public/daily-cache/us/refresh`를 유지한다. 두 경로는 D만 처리하고, 시장별 1시간 최소 간격·운영 enabled 설정·cron 공용 advisory lock을 보존한다.
+- 새 인증 진단 `GET /api/debug/daily-cache-status?market=KR|US`는 enabled/schedule, 거래소별 유니버스 대비 캐시·최신 거래일 coverage, 최근 14일 거래일별 저장 건수, retry queue, 최근 24시간 오류 분류, 최근 automation 실행과 제한된 요약을 함께 반환한다. `locks.refresh`와 `locks.worker`는 각각 cron/manual 공용 refresh advisory lock 및 worker advisory lock의 보유 여부, holder 세션 상태·대기 이벤트·backend/transaction 경과 초를 read-only로 확인한다. `held=true`인데 run이 장시간 RUNNING이면 lock holder 상태를 추가로 조사한다. 기본 요청은 KIS를 호출하지 않는다. 선택형 `probeSource=true`는 거래소별 최대 3개 종목의 KIS 일봉 GET을 수행해 source/cache 최신일을 대조하며 DB 변경은 하지 않는다. 두 모드 모두 오류 원문·자격증명·webhook URL은 반환하지 않는다.
+- 자동화 완료 Discord는 기존 module debug webhook (`featureSettings.discordFormat.debugWebhookUrl`) 또는 `STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL` fallback을 사용한다. 완료·부분 실패·실패 메시지에 거래소별 최신일·coverage·fetchedAt을 포함하고, 후속 실행에서 `AUTOMATION_RUN_STALE`이 정리될 때 일봉 stale 실패를 같은 디버깅 webhook으로 알린다. webhook 주소와 원문 오류는 메시지에 넣지 않는다.
+- 운영 실행 이력 근거는 US만 얻었다. KR 상태 진단은 새 endpoint 배포 후 조회해야 한다. OCI systemd journal과 cron 요청 HTTP status를 확인하기 전까지 timer 미실행과 인증 실패를 구분할 수 없다. 실제 운영 POST 실행과 배포는 하지 않았다.
+- 운영 공개 US API를 2026-11-25T06:02Z 재조회한 결과 최신 거래일은 세 거래소 모두 2026-11-23, eligible 대비 최신일 coverage는 100%였고, 최신 실행 기록은 2026-11-24T05:04Z `outside_schedule`이었다. 그 앞의 세 run은 `AUTOMATION_RUN_STALE`로 정리됐다. OCI timer/service journal이 없으므로 호출 누락과 인증 실패는 구분하지 않았다. 새 `locks` 진단은 이번 코드 변경 후 배포되어야 사용할 수 있다.

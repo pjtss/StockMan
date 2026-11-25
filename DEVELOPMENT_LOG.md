@@ -1,3 +1,13 @@
+### 2026-11-25 — 국내·미국 일봉 갱신 진단·수동 실행·Discord 알림 보강
+- 목적/범위: 2026-11-24 국내·미국 일봉 부재 원인을 조사하고 기존 무인증 수동 POST 경로, 일봉 worker, 운영 진단 및 Discord 디버깅 알림을 개선했다.
+- 원인 근거: 운영 read-only US 진단 GET에서 KST 06:00–08:00 실행창, 최근 3회 `AUTOMATION_RUN_STALE` 실패, 뒤이은 `outside_schedule` skip, NAS/NYS/AMS 전 종목 최신 거래일 2026-11-23을 확인했다. 최신 기록 이후 약 24시간 추가 실행이 없었다. 시간창 내 cron 호출 누락 또는 인증 실패 가능성이 있으나 OCI systemd journal/HTTP 응답 로그가 없어 구분할 수 없다. KR의 동일 기간 automation 이력도 확인할 수 없어 해당 원인은 미확정이다.
+- 변경 파일: 예약 cron의 기존 D/W/M refresh 정책은 보존했다. 기존 무인증 POST 수동 API 두 경로는 D만 처리하고 `MANUAL` trigger로 기록한다. `GET /api/debug/daily-cache-status?market=KR|US`를 추가해 인증된 읽기 전용 진단으로 schedule/enabled, 거래소별 universe·cache coverage/latest date/fetchedAt, 최근 14일 일자별 건수, retry queue, 24시간 오류 분류, 최근 run 요약, cron/manual 공용 및 worker advisory lock 보유 세션 상태·경과 초를 제공한다. 선택형 `probeSource=true`는 거래소별 최대 3종목의 KIS 일봉 GET으로 원천/캐시 최신일을 비교한다.
+- Discord: 기존 feature별 debug webhook 및 `STOCKMAN_DEBUG_DISCORD_WEBHOOK_URL` fallback을 재사용한다. cache completion 알림에 latest date·coverage·fetchedAt을 추가하고, cache 완료 설정이 비활성인 경우에도 debug webhook 알림을 보내며, stale run 정리 및 cron/manual 준비 단계 실패도 오류 코드 중심으로 알린다. URL·자격증명·오류 원문은 알림/진단 응답에 포함하지 않는다.
+- 문서/인덱스: 진단·운영 runbook 및 공개 POST API reference를 갱신하고 route inventory를 재생성했다.
+- 검증: npm run deploy:verify 통과. 전체 Vitest 282개 파일 중 282 passed·1 skipped, 1,638 passed·3 skipped; typecheck, 문서·API·권한·KIS·cron 게이트, production build, standalone runtime smoke(Chrome desktop/mobile 포함) 모두 성공했다.
+- 문서 gate: docs:check 통과(154개 문서, 7개 분류; migration 183개, 최신 V183). route inventory 및 document catalog 생성/검증도 통과했다.
+- 운영 확인: 운영 DB 쓰기, 무인증 갱신 POST, Discord webhook 실제 전송은 하지 않았다. 사용자가 배포를 승인해 검증 완료 후 oci 반영 및 GitHub Actions 배포를 진행한다.
+- 2026-11-25 06:02 UTC 재조회: 운영 US 진단 GET은 정상(HTTP 200), AMS/NAS/NYS 최신 봉이 모두 `20261123`이고 eligible coverage 누락은 0이었다. schedule은 enabled, global gate enabled, KST 06:00–08:00, 월~토, 1시간 간격이며 조사 시각은 실행창 밖이었다. 마지막 실행 이력은 11-24 05:04Z `outside_schedule`; 직전 세 RUNNING 작업은 약 2시간 뒤 `AUTOMATION_RUN_STALE`로 정리됐다. 이 최신 조회까지 실행 이력이 추가되지 않아 캐시 갱신이 계속 정체된 상태다. 신규 수동 API POST는 운영 캐시를 변경하므로 호출하지 않았다. OCI systemd/HTTP 로그 없이 timer 미호출, 인증 실패, 장기 DB 세션 중 어느 쪽인지 확정하지 않는다.
 ### 2026-11-25 — 차트 모달 지표 정리 및 모바일 Chrome 회귀 검사
 - 목적/범위: 차트 모달에서 RSI·MFI·MACD·DMI·Stochastic 보조 그래프를 제거하고 iPhone 12 Pro 크기(390×844 CSS px)와 Chrome 데스크톱에서 모달 표시를 자동 점검한다.
 - 변경: `components/chart-modal.tsx`에서 지정 지표 계산·그래프를 제거하고 OBV·ADL 그래프는 유지했다. `components/chart-modal.module.css`에서 사용되지 않는 지표 상태 스타일을 정리했다. `components/chart-modal.test.tsx`에 제거 지표 비노출 회귀 검사를 추가했다. `scripts/charts-browser-smoke.mjs`가 고정 차트 응답으로 모달을 열어 모바일 뷰포트 넘침, 닫기 버튼 크기, 차트 크기와 닫힘을 검사하도록 확장했다.

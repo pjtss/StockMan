@@ -3,6 +3,7 @@ import { getDb, getPool } from "@/lib/db";
 import { automationRuns } from "@/lib/schema";
 import type { FeatureModuleKey } from "@/lib/feature-modules";
 import { readRequestTrace } from "@/lib/request-trace";
+import { notifyAutomationCompletion } from "@/lib/automation-completion-discord";
 
 // Daily candle jobs legitimately run longer than 15 minutes on the full
 // universe. Keep stale recovery above the cron request ceiling so an active
@@ -30,7 +31,8 @@ export function buildStaleRunReconciliationQuery() {
           AND started_at < NOW() - (
             CASE WHEN module_key = 'instrument-fundamentals' THEN $2::double precision ELSE $1::double precision END
             * INTERVAL '1 second'
-          )`,
+          )
+        RETURNING module_key, market, timeframe, started_at`,
     values: [STALE_RUN_AFTER_SECONDS, FUNDAMENTALS_STALE_RUN_AFTER_SECONDS],
   };
 }
@@ -53,7 +55,21 @@ function inferRunDimensions(moduleKey: string, dimensions: AutomationRunDimensio
 async function reconcileStaleRuns() {
   try {
     const query = buildStaleRunReconciliationQuery();
-    await getPool().query(query.text, query.values);
+    const result = await getPool().query<{ module_key: string; market: string | null; timeframe: string | null; started_at: string | Date }>(query.text, query.values);
+    for (const stale of result.rows) {
+      if (stale.module_key !== "kr-daily-cache" && stale.module_key !== "us-daily-cache") continue;
+      try {
+        await notifyAutomationCompletion(stale.module_key, "FAILED", {
+          diagnostics: { errorCode: "AUTOMATION_RUN_STALE" },
+          market: stale.market,
+          timeframe: stale.timeframe,
+          startedAt: stale.started_at instanceof Date ? stale.started_at.toISOString() : stale.started_at,
+          staleAfterSeconds: STALE_RUN_AFTER_SECONDS,
+        }, "AUTOMATION_RUN_STALE: 일봉 작업이 제한 시간 내 완료 상태를 기록하지 못했습니다.");
+      } catch (notificationError) {
+        console.warn(`[Automation] stale completion notification failed for ${stale.module_key}:`, notificationError instanceof Error ? notificationError.message : notificationError);
+      }
+    }
   } catch (error) {
     // Observability recovery must never prevent the actual feature from
     // running (for example while the database is temporarily unavailable).

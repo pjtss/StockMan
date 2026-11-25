@@ -57,6 +57,24 @@ function compact(value: unknown): string {
 function resultSummary(summary: Record<string, unknown>) {
   const preferred = ["instrumentCount", "successCount", "failureCount", "partialFailureCount", "translationFailureCount", "counterDataInvalid", "degraded", "deliveryFailedCount", "retryQueuedCount", "savedCandleCount", "processedCount", "sent", "skipped", "reason", "intervalSeconds", "elapsedSeconds", "latestRunStatus"];
   const selected = Object.fromEntries(preferred.filter((key) => key in summary).map((key) => [key, summary[key]]));
+  const coverage = Array.isArray(summary.dailyCoverage) ? summary.dailyCoverage : [];
+  if (coverage.length) {
+    selected.dailyCoverage = coverage.slice(0, 5).map((value) => {
+      const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+      return {
+        market: row.market,
+        latestDate: row.latestMarketDate ?? row.latestDate,
+        latestDateCount: row.latestDateCount,
+        eligibleCount: row.eligibleCount,
+        gapCount: row.gapCount,
+        latestFetchedAt: row.latestFetchedAt,
+      };
+    });
+  }
+  if (summary.dueTimeframes) selected.dueTimeframes = summary.dueTimeframes;
+  if (summary.skippedTimeframes) selected.skippedTimeframes = summary.skippedTimeframes;
+  if (summary.dailySuccessCount != null) selected.dailySuccessCount = summary.dailySuccessCount;
+  if (summary.dailySavedCandleCount != null) selected.savedCandleCount = summary.dailySavedCandleCount;
   const discord = summary.discord && typeof summary.discord === "object" ? summary.discord as Record<string, unknown> : null;
   if (discord) selected.discordDelivery = discord.ok === false ? "FAILED" : discord.ok === true ? "SENT_OR_SKIPPED" : "UNKNOWN";
   if (Object.keys(selected).length) return compact(selected);
@@ -154,7 +172,8 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
   try {
     const settings = await loadFeatureModuleSettings(moduleKey);
     const completion = settings.featureSettings?.automationCompletion as { enabled?: boolean; webhookUrl?: string } | undefined;
-    if (completion?.enabled === false) return { sent: false, skipped: true, reason: "disabled" };
+    const cacheDiagnosticsRequired = moduleKey === "kr-daily-cache" || moduleKey === "us-daily-cache";
+    if (completion?.enabled === false && !cacheDiagnosticsRequired) return { sent: false, skipped: true, reason: "disabled" };
     // Cache execution results are operational diagnostics: prefer the
     // module's existing debug channel, while retaining the completion webhook
     // as a fallback for installations that have not configured one.
@@ -196,4 +215,16 @@ export async function notifyAutomationCompletion(moduleKey: FeatureModuleKey, st
   } catch (error) {
     throw error;
   }
+}
+
+/** Report failures that happen before a daily-cache worker can create its run record. */
+export async function notifyDailyCacheRefreshIssue(market: "KR" | "US", stage: string, errorCode: string) {
+  const moduleKey = market === "KR" ? "kr-daily-cache" : "us-daily-cache";
+  const safeStage = /^[a-z0-9_-]{1,48}$/i.test(stage) ? stage : "unknown-stage";
+  const safeErrorCode = /^[a-z0-9_-]{1,80}$/i.test(errorCode) ? errorCode : "DAILY_CACHE_REFRESH_FAILED";
+  return notifyAutomationCompletion(moduleKey, "FAILED", {
+    diagnostics: { errorCode: safeErrorCode, stage: safeStage },
+    market,
+    timeframe: "D",
+  }, `${market} 일봉 갱신 실패: ${safeStage} (${safeErrorCode})`);
 }

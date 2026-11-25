@@ -7,6 +7,7 @@ import { runKrDailyCacheNow } from "@/lib/kr-daily-cache-job";
 import { withAutomationRun } from "@/lib/automation-run";
 import { loadLatestExecutedAutomationRun, recordSkippedAutomationRun } from "@/lib/automation-run-repository";
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
+import { notifyDailyCacheRefreshIssue } from "@/lib/automation-completion-discord";
 
 export async function POST(request: Request) {
   let lease: Awaited<ReturnType<typeof acquireAutomationLock>> = null;
@@ -37,6 +38,6 @@ export async function POST(request: Request) {
   }
   const result = await withAutomationRun("kr-daily-cache", runKrDailyCacheNow);
   return NextResponse.json({ ok: true, intervalSeconds, ...result });
-  } catch (error) { console.error("[API /cron/kr-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); return NextResponse.json({ ok: false, stage: "kr-daily-cache-cron", error: "KR_DAILY_CACHE_FAILED" }, { status: 502 }); }
+  } catch (error) { console.error("[API /cron/kr-daily-cache] Error:", error instanceof Error ? error.message.slice(0, 1000) : "unknown error"); await notifyDailyCacheRefreshIssue("KR", "cron-handler", "KR_DAILY_CACHE_FAILED").catch(() => undefined); return NextResponse.json({ ok: false, stage: "kr-daily-cache-cron", error: "KR_DAILY_CACHE_FAILED" }, { status: 502 }); }
   finally { await lease?.release(); }
 }

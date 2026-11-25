@@ -302,6 +302,14 @@
       "source": "app/api/dart/ranking/route.ts"
     },
     {
+      "path": "/api/debug/daily-cache-status",
+      "methods": [
+        "GET"
+      ],
+      "access": "cron-guarded",
+      "source": "app/api/debug/daily-cache-status/route.ts"
+    },
+    {
       "path": "/api/debug/us-daily-cache-status",
       "methods": [
         "GET"

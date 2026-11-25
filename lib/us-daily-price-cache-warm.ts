@@ -1,4 +1,4 @@
-import { loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
+import { EXCLUDED_US_OFFICIAL_NAME, loadStoredUsInstrumentScopes } from "@/lib/us-top-rising-universe";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { saveUsDailyCandles } from "@/lib/us-daily-price-cache";
 import { sql } from "drizzle-orm";
@@ -191,7 +191,37 @@ async function executeWarm(options: WarmOptions = {}) {
   const [bollingerCache, goldenCrossCache] = followupBlocked
     ? [skippedFollowup, skippedFollowup]
     : await Promise.all([refreshDailyBollingerCaches("US"), refreshDailyGoldenCrossCache("US")]);
-  return { ok: universeAvailable && failures.length === 0, status: universeAvailable ? undefined : "FAILED", universeAvailable, universe: universe.universe, dueTimeframes, dailySuccessCount, weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, discardedOrDuplicateCandleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
+  const coverageResult = await getDb().execute(sql.raw(`WITH eligible AS (
+    SELECT market, code FROM us_common_stock_universe
+     WHERE enabled = true AND daily_active = true AND instrument_type = 'COMMON_STOCK'
+       AND COALESCE(is_etf, false) = false AND COALESCE(is_warrant, false) = false
+       AND COALESCE(is_derivative, false) = false AND COALESCE(is_dr, false) = false
+       AND COALESCE(is_leveraged, false) = false AND COALESCE(is_inverse, false) = false
+       AND NOT (COALESCE(name, '') || ' ' || COALESCE(english_name, '') ~* '${EXCLUDED_US_OFFICIAL_NAME.source}')
+       AND market IN ('NAS', 'NYS', 'AMS')
+  ), market_latest AS (
+    SELECT market, MAX(candle_date) AS latest_date FROM us_latest_daily_candles
+     WHERE ${validDailyCandleSql("us_latest_daily_candles")} GROUP BY market
+  )
+  SELECT e.market, COUNT(*)::int AS eligible_count,
+         COUNT(c.code)::int AS cached_count,
+         COUNT(*) FILTER (WHERE c.candle_date = ml.latest_date)::int AS latest_date_count,
+         COUNT(*) FILTER (WHERE c.code IS NULL OR c.candle_date < ml.latest_date)::int AS gap_count,
+         ml.latest_date AS latest_market_date, MAX(c.fetched_at) AS latest_fetched_at
+    FROM eligible e
+    LEFT JOIN us_latest_daily_candles c ON c.market = e.market AND c.code = e.code AND ${validDailyCandleSql("c")}
+    LEFT JOIN market_latest ml ON ml.market = e.market
+   GROUP BY e.market, ml.latest_date ORDER BY e.market`)).catch((error) => {
+    console.warn("[US_DAILY_REFRESH] coverage diagnostics query failed:", error instanceof Error ? error.name : "unknown error");
+    return { rows: [] as Array<Record<string, unknown>> };
+  });
+  const dailyCoverage = (coverageResult.rows as Array<Record<string, unknown>>).map((row) => ({
+    market: String(row.market), eligibleCount: Number(row.eligible_count), cachedCount: Number(row.cached_count),
+    latestDateCount: Number(row.latest_date_count), gapCount: Number(row.gap_count),
+    latestMarketDate: row.latest_market_date == null ? null : String(row.latest_market_date),
+    latestFetchedAt: row.latest_fetched_at == null ? null : new Date(row.latest_fetched_at as string | Date).toISOString(),
+  }));
+  return { ok: universeAvailable && failures.length === 0, status: universeAvailable ? undefined : "FAILED", universeAvailable, universe: universe.universe, dueTimeframes, dailySuccessCount, dailyCoverage, dailyCoverageStatus: dailyCoverage.length ? "AVAILABLE" : "UNAVAILABLE", weeklyDerived, backfillDailyCount: underfilledDaily.size, skippedTimeframes: (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !dueTimeframes.includes(timeframe)), startedAt, completedAt, durationMs, durationSeconds: Number((durationMs / 1000).toFixed(2)), instrumentCount: instruments.length, concurrency, successCount, failureCount: failures.length, savedCandleCount: candleCount, discardedOrDuplicateCandleCount, dbWriteDurationMs, failures, bollingerCache, goldenCrossCache };
 }
 
 export function warmUsDailyPriceCache(options: WarmOptions = {}) {

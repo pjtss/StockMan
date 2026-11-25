@@ -12,6 +12,7 @@ import { withAutomationLock } from "@/lib/automation-lock";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 
 type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
+type KrDailyCacheOptions = { timeframes?: ReadonlyArray<"D" | "W" | "M"> };
 type Job = {
   jobId: string;
   status: JobStatus;
@@ -38,7 +39,7 @@ function trimJobs() {
   while (jobs.size > MAX_RETAINED_JOBS) jobs.delete(jobs.keys().next().value as string);
 }
 
-async function run(job: Job) {
+async function run(job: Job, options: KrDailyCacheOptions = {}) {
   job.status = "PROCESSING";
   const progressStartedAt = Date.now();
   try {
@@ -49,8 +50,9 @@ async function run(job: Job) {
     // frequently while keeping weekly/monthly traffic bounded.
     // 일봉·주봉은 매일 1회, 월봉은 주 1회 갱신한다. 실패한 캔들은 retry queue가 우선한다.
     const freshness = { D: 60 * 60 * 1000, W: 24 * 60 * 60 * 1000, M: 7 * 24 * 60 * 60 * 1000 } as const;
+    const selectedTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => !options.timeframes || options.timeframes.includes(timeframe));
     const staleKeysByTimeframe = new Map<keyof typeof freshness, Set<string>>();
-    await Promise.all((Object.keys(freshness) as Array<keyof typeof freshness>).map(async (timeframe) => {
+    await Promise.all(selectedTimeframes.map(async (timeframe) => {
       const stale = await getDb().execute(timeframe === "D" ? sql`SELECT u.market, u.code
         FROM kr_common_stock_universe u
         LEFT JOIN kr_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code AND ${sql.raw(validDailyCandleSql("latest"))}
@@ -73,7 +75,7 @@ async function run(job: Job) {
             OR latest.candle_date < (SELECT MAX(c2.candle_date) FROM kr_instrument_universe_candles c2 WHERE c2.timeframe = ${timeframe} AND ${sql.raw(validDailyCandleSql("c2"))}))`);
       staleKeysByTimeframe.set(timeframe, new Set((stale.rows as Array<{ market: string; code: string }>).map((row) => `${row.market.toUpperCase()}:${row.code.toUpperCase()}`)));
     }));
-    const dueTimeframes = (Object.keys(freshness) as Array<keyof typeof freshness>).filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);
+    const dueTimeframes = selectedTimeframes.filter((timeframe) => (staleKeysByTimeframe.get(timeframe)?.size ?? 0) > 0);
     // Recover the primary daily dataset first. Fetching D/W/M for every
     // instrument in one worker pass made a cold production database spend
     // hours on weekly/monthly requests before any daily candles were usable.
@@ -81,7 +83,7 @@ async function run(job: Job) {
     if (dueTimeframes.includes("D") && dueTimeframes.length > 1) {
       dueTimeframes.splice(0, dueTimeframes.length, "D");
     }
-    const dueRetryTimeframes = await listDueCandleCacheRetryTimeframes(scopes);
+    const dueRetryTimeframes = (await listDueCandleCacheRetryTimeframes(scopes)).filter((timeframe) => selectedTimeframes.includes(timeframe));
     for (const timeframe of dueRetryTimeframes) if (!dueTimeframes.includes(timeframe)) dueTimeframes.push(timeframe);
     // Daily-first applies to refreshing stale universes, not to persistent
     // retry rows. Keep all due retry lanes selected so repeated D failures
@@ -165,7 +167,8 @@ async function run(job: Job) {
       COUNT(latest.code)::int AS cached_count,
       COUNT(*) FILTER (WHERE latest.candle_date = market_latest.latest_date)::int AS latest_date_count,
       COUNT(*) FILTER (WHERE latest.code IS NULL OR latest.candle_date < market_latest.latest_date)::int AS gap_count,
-      market_latest.latest_date AS latest_market_date
+      market_latest.latest_date AS latest_market_date,
+      MAX(latest.fetched_at) AS latest_fetched_at
     FROM kr_common_stock_universe u
     LEFT JOIN kr_latest_daily_candles latest ON latest.market = u.market AND latest.code = u.code AND ${sql.raw(validDailyCandleSql("latest"))}
     LEFT JOIN market_latest ON market_latest.market = u.market
@@ -179,6 +182,7 @@ async function run(job: Job) {
       latestDateCount: Number(row.latest_date_count),
       gapCount: Number(row.gap_count),
       latestMarketDate: row.latest_market_date == null ? null : String(row.latest_market_date),
+      latestFetchedAt: row.latest_fetched_at == null ? null : new Date(row.latest_fetched_at as string | Date).toISOString(),
     }));
     job.partialFailureCount = job.dailyCoverage.reduce((total, market) => total + market.gapCount, 0);
     job.status = "COMPLETED";
@@ -225,11 +229,11 @@ function createJob(): Job {
 }
 
 /** Synchronous application-service entry point used by OCI cron. */
-export async function runKrDailyCacheNow() {
+export async function runKrDailyCacheNow(options: KrDailyCacheOptions = {}) {
   const job = createJob();
   jobs.set(job.jobId, job);
   trimJobs();
-  const result = await withAutomationLock("kr-daily-cache-worker", () => run(job));
+  const result = await withAutomationLock("kr-daily-cache-worker", () => run(job, options));
   if (result === null) {
     job.status = "FAILED";
     job.error = "KR daily cache job is already running";
