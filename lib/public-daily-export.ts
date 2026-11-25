@@ -83,8 +83,13 @@ export async function getPublicDailyExport(market: ExportMarket) {
              d.data_updated_at,
              COALESCE(d.returned_count, 0)::int AS returned_count
         FROM ${universeTable} u
-        LEFT JOIN instrument_fundamental_snapshots f
-          ON f.market = u.market AND f.code = u.code
+        LEFT JOIN LATERAL (
+          SELECT snapshot.market_cap, snapshot.currency, snapshot.observed_at, snapshot.fetched_at
+            FROM instrument_fundamental_snapshots snapshot
+           WHERE snapshot.market = u.market AND snapshot.code = u.code
+           ORDER BY snapshot.observed_at DESC NULLS LAST, snapshot.fetched_at DESC NULLS LAST
+           LIMIT 1
+        ) f ON TRUE
         LEFT JOIN LATERAL (
           SELECT jsonb_agg(
                    jsonb_build_object(

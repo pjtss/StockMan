@@ -1,4 +1,11 @@
-### 2026-11-26 — 국내·미국 보통주 gzip 일봉 다운로드 배포 준비
+### 2026-11-26 — 공개 gzip 일봉 API 스냅샷 조인 성능 수정
+- 목적/범위: 운영 공개 KR/US gzip 일봉 API의 504 재현을 바탕으로 종목별 시가총액 조회를 최신 스냅샷 1행으로 한정했다.
+- 근본 원인: `instrument_fundamental_snapshots`를 `(market, code)`로 직접 조인해 과거 스냅샷 행마다 동일 종목의 최대 20봉 LATERAL 조회가 반복될 수 있었다. 기존 `(market, code, observed_at DESC, fetched_at DESC)` 인덱스를 이용해 최신 1행만 고른다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그.
+- 재발 자동 감지: API 회귀 테스트가 최신 관측/수집시각 정렬과 `LIMIT 1` SQL 계약을 확인한다.
+- 검증: API 테스트 5개 통과. `npm run deploy:verify` 통과(283 test files passed/1 skipped, 1,643 tests passed/3 skipped, typecheck/build/docs/audits/runtime smoke 통과). 앞선 운영 GET에서 KR은 간헐적 200 후 KR/US 모두 nginx 504(약 60초)를 반환했다. 수정 이후 운영 검증은 재배포 뒤 진행한다.
+- 남은 위험/다음 개선: 수정 배포 뒤 두 운영 GET을 반복 호출해 200, gzip 해제, 20봉 상한 및 응답시간을 확인한다. 실패 시 SQL EXPLAIN ANALYZE와 DB 인덱스/연결 상태를 확인한다.
+- 커밋·푸시·배포: 수정 커밋·푸시·운영 확인 전.### 2026-11-26 — 국내·미국 보통주 gzip 일봉 다운로드 배포 준비
 - 목적/범위: 무인증 공개 국내·미국 GET 다운로드를 추가했다. 각 호출은 active COMMON_STOCK master, 저장 시가총액, 최근 최대 20개 일봉을 한 번의 read-only DB query로 읽어 `ticker`, `marketCap`, `daily` 세 가지 항목만 포함한 gzip level 9 `.json.gz`를 생성한다. response/file cache 없이 `no-store`로 전달한다.
 - 변경 파일: `app/api/public/daily-export/kr/route.ts`, `app/api/public/daily-export/us/route.ts`, `app/api/public/daily-export/kr/route.test.ts`, `lib/public-daily-export.ts`, `scripts/api-surface.mjs`, `docs/api/route-inventory.json`, `public/openapi.json`, `public/api-reference.md`, `public/document-catalog.json` 및 생성 manuals.
 - 분리 배포: 원래 작업 트리에 다수의 무관한 staged/unstaged/untracked 작업이 있고 local `oci` branch는 원격보다 6 commits 뒤여서 이를 배포하지 않도록 최신 `origin/oci` (`322ea9fc`)에서 전용 worktree를 만들었다. 이번 API와 필요한 문서만 복사·재생성했다.
