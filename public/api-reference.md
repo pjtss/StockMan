@@ -108,6 +108,24 @@ hours(1~24) 또는 date(서울 기준 YYYY-MM-DD, 생략 시 오늘 UTC 날짜 �
 - GET /api/dart/contract?rceptNo=<14자리>: 상세 object, 데이터 부재는 null, 잘못된 번호는 400, 공급자 장애는 503.
 - GET /api/dart/history?company=<회사명>: 저장된 공시 최대 50개. 빈 결과는 [].
 
+### 국내 활성 보통주 일봉 gzip 다운로드 — GET /api/public/daily-export/kr
+
+인증·query parameter 없이 호출한다. 호출할 때마다 활성 COMMON_STOCK 마스터, 최신 저장 시가총액 스냅샷, 저장된 최근 일봉을 조회하고 공식 [Node.js zlib 압축 옵션](https://nodejs.org/api/zlib.html#zlib_class_options) 범위의 최대 gzip level 9로 새 `.json.gz` 파일을 만든다. 응답 압축 파일이나 API 결과를 캐싱하지 않으며 외부 시세 API를 호출하거나 DB에 쓰지 않는다. 모든 활성 국내 보통주를 포함하고 종목별 일봉은 최대 20개다. 시가총액 스냅샷이 없으면 `marketCap.value`와 시각 필드는 null일 수 있고, 일봉 캐시가 없으면 `daily.candles`는 빈 배열이다.
+
+압축 해제 후 JSON은 종목 객체 배열이다. 각 항목의 최상위 필드는 `ticker`, `marketCap`, `daily` 세 가지다. ticker는 market/code/name, marketCap은 value/currency/observedAt/fetchedAt, daily는 candles와 latestCandleDate/dataUpdatedAt/returnedCount metadata를 제공한다. 각 봉에는 거래일(YYYYMMDD), OHLC, volume, tradingValue, fetchedAt이 있다. 국내 tradingValue는 공식 저장 컬럼이 있으면 그 값을 쓰고, 구형 스키마에서 컬럼이 없으면 `close × volume`을 사용한다. 파일 이름은 `daily-candles-kr.json.gz`, media type은 `application/gzip`이다. DB 또는 gzip 생성 실패는 503 `DAILY_EXPORT_UNAVAILABLE`이다.
+
+```sh
+curl -L https://<host>/api/public/daily-export/kr --output daily-candles-kr.json.gz
+```
+
+### 미국 활성 보통주 일봉 gzip 다운로드 — GET /api/public/daily-export/us
+
+국내 endpoint와 같은 응답·압축·오류 계약으로 미국 활성 COMMON_STOCK 전체를 반환한다. US 마스터의 상품 분류·DR 설명 제외 규칙을 적용한다. 파일 이름은 `daily-candles-us.json.gz`다.
+
+```sh
+curl -L https://<host>/api/public/daily-export/us --output daily-candles-us.json.gz
+```
+
 ### 저장 일·주·월봉 — GET /api/public/daily-candles
 
 market 필수: KR, US, KOSPI, KOSDAQ, NAS, NYS, AMS. code 단일 값 또는 codes 최대 100개. timeframe은 D/W/M, limit 기본 120·최대 300. 각 candle은 거래일(YYYYMMDD), OHLC, volume, tradingValue, fetchedAt을 제공한다. 국내(KR/KOSPI/KOSDAQ) tradingValue는 원 단위 거래대금이며, 수집된 KIS `acml_tr_pbmn` 값이 저장된 경우 해당 원문 값을 반환한다. 원문 값이 없는 과거 캐시 행은 `close × volume` 계산값으로 대체되므로 정확한 원문 거래대금과 구분해야 한다. fetchedAt은 해당 봉 데이터의 캐시 갱신 시각이다. 단일 코드 응답의 candles 배열과 metadata.latestCandleDate, dataUpdatedAt, returnedCount를 읽는다. 여러 코드는 각 item에 code, candles와 metadata가 있다. source는 OPERATING_DB_CACHE. 인증 없이 조회한다. 잘못된 query는 400 INVALID_QUERY, 저장소 장애는 503 DAILY_CACHE_UNAVAILABLE.

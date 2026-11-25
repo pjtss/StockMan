@@ -1,3 +1,11 @@
+### 2026-11-26 — 국내·미국 보통주 gzip 일봉 다운로드 배포 준비
+- 목적/범위: 무인증 공개 국내·미국 GET 다운로드를 추가했다. 각 호출은 active COMMON_STOCK master, 저장 시가총액, 최근 최대 20개 일봉을 한 번의 read-only DB query로 읽어 `ticker`, `marketCap`, `daily` 세 가지 항목만 포함한 gzip level 9 `.json.gz`를 생성한다. response/file cache 없이 `no-store`로 전달한다.
+- 변경 파일: `app/api/public/daily-export/kr/route.ts`, `app/api/public/daily-export/us/route.ts`, `app/api/public/daily-export/kr/route.test.ts`, `lib/public-daily-export.ts`, `scripts/api-surface.mjs`, `docs/api/route-inventory.json`, `public/openapi.json`, `public/api-reference.md`, `public/document-catalog.json` 및 생성 manuals.
+- 분리 배포: 원래 작업 트리에 다수의 무관한 staged/unstaged/untracked 작업이 있고 local `oci` branch는 원격보다 6 commits 뒤여서 이를 배포하지 않도록 최신 `origin/oci` (`322ea9fc`)에서 전용 worktree를 만들었다. 이번 API와 필요한 문서만 복사·재생성했다.
+- 근본 원인/보완: 앞선 로컬 smoke에서 국내 개발 DB에 `trading_value` column이 없어 SQL이 실패했다. `to_jsonb(c)->>'trading_value'`로 column이 있는 스키마에서는 저장 공식값을 사용하고, 구형 스키마에서는 `close × volume` fallback을 사용한다. 미국은 활성 보통주 flag 및 ADR/ADS descriptor exclusion을 적용한다. 회귀 테스트는 gzip 해제, level 9, 20봉 상한, 인증 없는 두 시장 경로, no-store, 호출당 재조회, 분류 predicate를 검증한다.
+- 검증: `npm ci --no-audit --no-fund` 성공. `npm run deploy:verify` 성공: 의존성 취약점 0, OCI activation preflight, docs/API/migration checks, production build, standalone·Chrome desktop/mobile smoke, typecheck, KIS/Bearer/cron audits, 283 test files 통과·1 skip, 1,643 tests 통과·3 skip. 앞서 dev-server HTTP smoke에서 KR 2,352종목/1,192,036B gzip/7.6초, US 5,012종목/2,799,835B gzip/11.9초로 200 및 압축해제 계약을 확인했다. 해당 실측은 local DB/dev 환경이며 운영 p95를 보증하지 않는다.
+- 문서·API 계약: 두 path를 무인증 공개 OpenAPI에 `application/gzip` binary response로 추가하고 route inventory 및 catalog를 생성·검증했다. 콘텐츠는 gzip 파일 자체라 `Content-Encoding` 없이 반환한다.
+- 커밋·푸시·배포: 검증 완료. 이번 전용 커밋을 `oci`에 push하면 OCI workflow가 실행된다. push 및 운영 GET 확인은 아직 진행 전이다.
 ### 2026-11-25 — 국내·미국 일봉 갱신 진단·수동 실행·Discord 알림 보강
 - 목적/범위: 2026-11-24 국내·미국 일봉 부재 원인을 조사하고 기존 무인증 수동 POST 경로, 일봉 worker, 운영 진단 및 Discord 디버깅 알림을 개선했다.
 - 원인 근거: 운영 read-only US 진단 GET에서 KST 06:00–08:00 실행창, 최근 3회 `AUTOMATION_RUN_STALE` 실패, 뒤이은 `outside_schedule` skip, NAS/NYS/AMS 전 종목 최신 거래일 2026-11-23을 확인했다. 최신 기록 이후 약 24시간 추가 실행이 없었다. 시간창 내 cron 호출 누락 또는 인증 실패 가능성이 있으나 OCI systemd journal/HTTP 응답 로그가 없어 구분할 수 없다. KR의 동일 기간 automation 이력도 확인할 수 없어 해당 원인은 미확정이다.

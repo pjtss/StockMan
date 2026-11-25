@@ -1886,6 +1886,90 @@
         "x-access-classification": "public-read-candidate"
       }
     },
+    "/api/public/daily-export/kr": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicDailyExportKr",
+        "summary": "국내 활성 보통주 티커·시가총액·최근 20일봉 gzip 다운로드",
+        "description": "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. JSON은 ticker, marketCap, daily 세 필드로 구성되고 종목별 일봉은 최대 20개입니다.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "다운로드 가능한 gzip 압축 JSON 파일. 압축 해제 후 각 종목 항목에는 ticker, marketCap, daily만 포함됩니다.",
+            "content": {
+              "application/gzip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/daily-export/kr/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
+    "/api/public/daily-export/us": {
+      "get": {
+        "tags": [
+          "public"
+        ],
+        "operationId": "getPublicDailyExportUs",
+        "summary": "미국 활성 보통주 티커·시가총액·최근 20일봉 gzip 다운로드",
+        "description": "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. JSON은 ticker, marketCap, daily 세 필드로 구성되고 종목별 일봉은 최대 20개입니다.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "다운로드 가능한 gzip 압축 JSON 파일. 압축 해제 후 각 종목 항목에는 ticker, marketCap, daily만 포함됩니다.",
+            "content": {
+              "application/gzip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "입력값 검증 실패(해당 endpoint에 한함)."
+          },
+          "429": {
+            "description": "요청 제한 초과(해당 endpoint에 한함)."
+          },
+          "500": {
+            "description": "서버 내부 오류."
+          },
+          "502": {
+            "description": "상위 데이터 제공자 오류(해당 endpoint에 한함)."
+          },
+          "503": {
+            "description": "서비스 또는 데이터 저장소를 사용할 수 없음."
+          }
+        },
+        "x-code-path": "app/api/public/daily-export/us/route.ts",
+        "x-access-classification": "public-read-candidate"
+      }
+    },
     "/api/public/document-catalog": {
       "get": {
         "tags": [

@@ -551,6 +551,22 @@
       "source": "app/api/public/daily-candles/route.ts"
     },
     {
+      "path": "/api/public/daily-export/kr",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/daily-export/kr/route.ts"
+    },
+    {
+      "path": "/api/public/daily-export/us",
+      "methods": [
+        "GET"
+      ],
+      "access": "public-read-candidate",
+      "source": "app/api/public/daily-export/us/route.ts"
+    },
+    {
       "path": "/api/public/document-catalog",
       "methods": [
         "GET"
