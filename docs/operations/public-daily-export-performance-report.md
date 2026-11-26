@@ -394,7 +394,16 @@ Node stream의 `write()` callback은 chunk가 처리된 뒤 호출된다. 기존
 
 동일 DB batch 기준 예상 stream write 횟수는 KR 약48→5회, US 약101→11회다. 임시 joined string의 대표 최대 크기는 KR1,656,605B, US1,711,333B로, 요청당 약1.7MB의 추가 peak 문자열 메모리가 예상된다. 1,000개 묶음은 US median 745ms로 500개 후보보다 느렸고, 500개 DB batch를 넘어가면 앞선 batch의 stream 전달을 늦출 수 있어 채택하지 않았다. US gzip level1은 median 688→715ms, gzip 3,491,027→3,581,992B로 느리고 커져 기각했다. concurrency11, SQL `string_agg`, 200개 묶음은 반복 성능 이득이 500개보다 작거나 일관되지 않아 제외했다.
 
-판정은 500개 묶음을 유지하는 것이다. KR 응답과 stream phase가 반복해서 짧아졌고 US stream phase도 짧아졌으며, payload와 gzip bytes는 동일했다. 추가 peak memory가 남은 위험이다. 배포 뒤 운영 GET 시간, 502 여부, health와 memory/프로세스 안정성을 함께 점검한다.
+판정은 500개 묶음을 유지하는 것이다. KR 응답과 stream phase가 반복해서 짧아졌고 US stream phase도 짧아졌으며, payload와 gzip bytes는 동일했다. 추가 peak memory가 남은 위험이다.
+
+`npm run deploy:verify` 전체 성공(283 test files pass/1 skip, 1,651 passed/3 skipped, typecheck, build, runtime/browser smoke, 문서/API/security/cron 감사) 뒤 commit `17f63513`, OCI run `45870683076`을 배포했다. 운영 health는 HTTP200이었다. 배포 후 공개 API를 시장별 3회 순차 호출했고 모두 HTTP200, `application/gzip`, Content-Encoding 없음, no-store, XFL0, gunzip/JSON/필드/returnedCount/max20 검증을 통과했으며 502는 없었다.
+
+| 시장 | 운영 응답 시간 | median | gzip bytes | raw bytes | ticker 수 |
+|---|---|---:|---:|---:|---:|
+| KR | 13.466 / 16.289 / 5.487초 | 13.466초 | 1,524,637–1,524,957 | 8,907,188 | 2,337 |
+| US | 52.013 / 40.076 / 38.445초 | 40.076초 | 3,542,655–3,543,009 | 18,964,448 | 5,011 |
+
+직전 운영 실측 median(KR11.657초, US40.711초)과 비교해 KR은 느렸고 US는 약간 짧았다. API/network/DB 부하가 통제되지 않았으므로 이 후보의 운영 end-to-end 속도 효과는 입증하지 않는다. gzip 해제 payload 계약은 동일했고 실패/502도 발생하지 않았다. 다음에는 장시간 누적 요청의 process RSS와 동시 요청을 관찰해 요청당 약1.7MB의 추가 임시 문자열이 운영 메모리에 미치는 영향을 확인한다.
 ### 2026-11-27 — KR 일봉 turnover 유효성 변환 제거, 티커 선조회 후보 기각
 - 목적/범위: 운영 KR gzip 일봉 API 처리 시간을 줄이기 위해 봉별 `trading_value::text` 변환/정규식 대신 기존 숫자 finite bounds를 적용했다. V180 스키마에서 KR `trading_value`는 `DOUBLE PRECISION`; US는 V92 기준 `NUMERIC`이므로 US validation SQL은 유지한다. ticker, 시총, daily JSON, gzip level과 batch 설정은 바꾸지 않았다.
 - 후보 기각 근거: batch별 universe/fundamental 조인과 자격 predicate를 제거하고 request 시작 시 티커 metadata를 한 번 읽어 보내는 후보도 비교했다. baseline→candidate warmed full API 중앙값 Block A KR368→367ms, US650→722ms(+11.1%); Block B KR346.5→319ms, US735→750.5ms(+2.1%). Gunzip 원문은 같고 gzip size 불변이었으나 US가 두 블록 모두 느려져 해당 metadata 이동 후보를 기각하고 기준 SQL로 복구했다.
