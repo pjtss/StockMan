@@ -1,3 +1,11 @@
+### 2026-11-26 — US 일봉 export batch 크기와 동시성 재측정 후보
+- 목적/범위: 운영 US gzip API 완료시간을 줄이기 위해 US만 ticker batch를 500에서 1,000으로 늘리고 동시 query 상한을 10에서 6으로 낮추는 후보를 로컬 API에서 비교했다. KR은 기존 batch500/concurrency5를 유지한다.
+- 근거: US 적격 ticker 5,011개는 기존 batch500에서 query 11개가 필요했고 concurrency10은 2 wave다. batch1,000/concurrency6이면 query 6개가 한 wave로 실행되고 공유 pool max10 중 4개 연결을 남긴다.
+- 로컬 반복: 동시성 시장별 코드(기준 US500/10)에서 first/cold 제외 warmed US 5회 663/700/703/720/780ms, median 703ms. US1,000/6 후보 첫 반복 703ms 및 warmed 5회 671/672/696/702/677ms(median677ms); hot reload 이후 재측정은 첫 958ms 제외 warmed 5회 667/678/646/634/647ms(median647ms)다. 마지막 paired local run은 약 8.0% 짧았다. gzip 파일은 3,403,223B로 동일, 5,012 local ticker, 최대20봉, HTTP 200과 gunzip/JSON 검증 성공. KR은 별도 500/5 5회 warmed median412ms 대비 batch1,000/5 median428ms로 약간 느려 KR 설정은 유지한다.
+- 자동 회귀 감지: route test가 KR batch500 분할, US batch1,000 분할 `[1000,1000,501]`, US 동시 query peak6, KR peak5를 검증한다. 대상 테스트 11개 통과. 전체 `npm run deploy:verify`도 통과: 283개 테스트 파일 통과/1 skip, 1,649 passed/3 skipped, typecheck, docs/API/security/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke.
+- 위험/다음 검증: local benchmark는 단일 PostgreSQL의 warmed 처리 결과이며 production network/DB latency를 대표하지 않는다. batch 하나의 결과 row/JSON 크기는 2배가 되어 per-query latency·buffer 부담이 커질 수 있다. 운영 3회 sequential US와 동시 KR+US request를 측정하고 gzip 계약/20봉/응답시간을 확인한다. 운영에서 median improvement가 재현되지 않으면 US500/10으로 되돌린다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. 검증 완료 상태를 commit/push하고 OCI 배포 뒤 운영 GET으로 채택 여부를 평가한다.
+
 ### 2026-11-26 — 공개 일봉 gzip API 운영 성능 보고서 제출
 - 목적/범위: 두 차례 운영 배포 결과를 통합해 KR/US 순차·동시 운영 API 완료 시간, 응답 크기, JSON/gzip 계약, 비교 한계를 보고서로 작성했다. 문서 관리 규칙에 따라 운영 문서 카탈로그와 `docs/README.md` 인덱스에도 연결했다.
 - 보고서: [`docs/operations/public-daily-export-performance-report.md`](docs/operations/public-daily-export-performance-report.md). baseline `87059c21`, 5/5 후보 `0ffb7903`, KR5/US10 후보 `edeea6ba`의 배포 run 및 측정 결과를 표로 정리했다. 최신 timestamped operating check는 2026-11-26 `05:41:16Z–05:43:01Z`; KR 19.441초·US 39.686초, 동시 KR 18.141초·US 45.152초. HTTP 200, gzip XFL=0, no-store, gzip 해제·JSON 계약·20봉 상한·ticker counts를 확인했다.
