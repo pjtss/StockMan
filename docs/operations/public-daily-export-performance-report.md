@@ -380,7 +380,11 @@ Relative to the immediately preceding three-call operating sample (KR median11.0
 
 동일 로컬 DB/API에서 기존 기준선 8회와 후보 8회를 순차 측정하고 첫 cold 호출을 제외했다. KR 중앙값은 331ms에서 326ms로 1.5% 짧아졌고, US는 740ms에서 662ms로 10.5% 짧아졌다. 각 시장 후보 8개 gzip 응답의 해제 JSON은 기준 파일과 전부 바이트 단위로 동일했다. 후보 gzip 크기는 KR 1,506,865B, US 3,491,027B였으며 각 2,352/5,012 ticker, ticker/marketCap/daily 구조와 일봉 최대20개를 확인했다. 목표 테스트 15개가 통과했다. HTTP 전체 응답 반복 결과는 로컬 환경 한정이며 운영 회귀 여부는 배포 후 별도 측정한다.
 
-변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `DEVELOPMENT_LOG.md`, 본 보고서. full `npm run deploy:verify`, commit, OCI 배포 및 운영 반복 측정 결과는 후속 기록에 추가한다.
+`npm run deploy:verify`는 성공했다(283개 테스트 파일 통과/1 skip, 1,651 passed/3 skipped, typecheck, build, runtime/browser smoke 및 문서/API/security/cron 감사). commit `d51023e8`의 OCI run `45864690217`도 성공했고 운영 health GET은 HTTP200이었다.
+
+배포 후 운영 GET을 시장별 3회씩 순차 측정했다. KR 응답은 21.653/11.657/3.154초(median11.657초), US는 40.101/45.557/40.711초(median40.711초)였다. 모든 호출 HTTP200, `application/gzip`, `Content-Encoding` 없음, `no-store`; gunzip/JSON 및 ticker/marketCap/daily, returnedCount, 최대20봉, gzip XFL0 검증을 통과했다. KR 2,337 ticker/raw8,907,188B/gzip1,524,637–1,525,028B, US 5,011 ticker/raw18,964,448B/gzip3,542,337–3,542,761B였다. 이전 운영 표본 중앙값(KR21.57초, US58.75초)보다 낮았지만 부하와 시간대를 통제하지 않았으므로 코드 변경만의 인과효과로 단정하지 않는다.
+
+변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `DEVELOPMENT_LOG.md`, 본 보고서. 코드는 commit `d51023e8` 및 OCI run `45864690217`로 배포 완료했다. 이번 운영 측정 결과를 반영한 문서는 다음 문서 기록 커밋/배포에서 전체 검증을 거친다.
 ### 2026-11-27 — KR 일봉 turnover 유효성 변환 제거, 티커 선조회 후보 기각
 - 목적/범위: 운영 KR gzip 일봉 API 처리 시간을 줄이기 위해 봉별 `trading_value::text` 변환/정규식 대신 기존 숫자 finite bounds를 적용했다. V180 스키마에서 KR `trading_value`는 `DOUBLE PRECISION`; US는 V92 기준 `NUMERIC`이므로 US validation SQL은 유지한다. ticker, 시총, daily JSON, gzip level과 batch 설정은 바꾸지 않았다.
 - 후보 기각 근거: batch별 universe/fundamental 조인과 자격 predicate를 제거하고 request 시작 시 티커 metadata를 한 번 읽어 보내는 후보도 비교했다. baseline→candidate warmed full API 중앙값 Block A KR368→367ms, US650→722ms(+11.1%); Block B KR346.5→319ms, US735→750.5ms(+2.1%). Gunzip 원문은 같고 gzip size 불변이었으나 US가 두 블록 모두 느려져 해당 metadata 이동 후보를 기각하고 기준 SQL로 복구했다.

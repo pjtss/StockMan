@@ -9887,5 +9887,6 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 ### 2026-11-27 — 공개 일봉 batch SQL prepared statement 재사용
 - 목적/범위: 반복 공개 gzip export의 batch 쿼리에 이름 있는 `node-postgres` query config를 지정해 연결별 prepared statement를 재사용한다. 공식 근거는 https://node-postgres.com/features/queries. 응답 schema, gzip 및 일봉 상한은 변경하지 않는다.
 - 측정/검증: 같은 로컬 DB 기준/후보 각 8회 순차 호출에서 첫 cold 제외 median은 KR 331→326ms(-1.5%), US 740→662ms(-10.5%)였다. 후보 gzip 해제 JSON 8회/시장 모두 기준선과 바이트 단위 동일; gzip KR1,506,865B/US3,491,027B, ticker 2,352/5,012, daily 최대20. 관련 테스트 15개 통과.
-- 근본 원인/판정/위험: 매 요청의 동일 복합 SQL이 pool 연결에서 반복 parse/plan되는 비용을 줄이는 후보로 채택한다. 연결별 문장 캐시는 서버 프로세스가 재시작되면 다시 준비되며, 운영 부하 차이는 로컬 비교로 확정할 수 없다. full `deploy:verify` 및 운영 배포 GET에서 출력과 속도를 재확인하고 이 문서에 결과를 후속 기록한다.
-- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 성능 보고서, 본 로그. 아직 commit/push/deploy 전.
+- 근본 원인/판정/위험: 매 요청의 동일 복합 SQL이 pool 연결에서 반복 parse/plan되는 비용을 줄이는 후보를 채택했다. 연결별 문장 캐시는 서버 프로세스 재시작 후 다시 준비된다. `npm run deploy:verify` 성공(283개 테스트 파일 통과/1 skip, 1,651 passed/3 skipped, typecheck, build, runtime/browser smoke 및 감사); commit `d51023e8`, OCI run `45864690217` 성공.
+- 운영 검증: 운영 health HTTP200. 공개 API를 시장별 3회 순차 호출해 모두 HTTP200, `application/gzip`, Content-Encoding 없음, no-store를 확인했다. KR 21.653/11.657/3.154초(median11.657초), 2,337 ticker, raw8,907,188B, gzip1,524,637–1,525,028B. US 40.101/45.557/40.711초(median40.711초), 5,011 ticker, raw18,964,448B, gzip3,542,337–3,542,761B. 전부 gunzip/JSON, ticker/marketCap/daily, returnedCount, 최대20봉과 XFL0 검증 통과. 직전 운영 표본 대비 완료시간이 줄었지만 시간대/부하 통제 및 표본이 부족해 코드 변경의 인과효과로 해석하지 않는다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 성능 보고서, 본 로그. 코드 및 보고서 모두 커밋/푸시됨; 운영 배포 run 성공.
