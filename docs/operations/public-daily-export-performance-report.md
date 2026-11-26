@@ -373,6 +373,14 @@ Relative to the immediately preceding three-call operating sample (KR median11.0
 배포 후 동일 공개 host에서 KR 전체 gzip 다운로드를 3회, US를 2회 성공적으로 완료했다. 모두 HTTP200, `application/gzip`, `Content-Encoding` 없음, `no-store`, gunzip/JSON 파싱, ticker/marketCap/daily, `returnedCount` 일치와 최대20봉을 확인했다. KR은 2,337 ticker, raw 8,907,188B, gzip 1,524,873/1,524,637/1,524,956B, 시간 21.57/22.79/6.15초(median21.57초). US는 5,011 ticker, raw 18,964,448B, gzip 3,542,699/3,542,606B, 시간 57.51/59.99초(median58.75초). 연속 US 추가 요청 중 세 건은 HTTP502로 완료되지 않았고, 20초 간격 후 재시도는 성공했다. 오류 호출은 성능 표본에 넣지 않았다.
 
 운영 표본은 작고 API/네트워크 부하가 통제되지 않아 numeric 문자열 변환 제거의 운영 속도 효과는 입증되지 않았다. 502는 성공 측정과 별도 가용성 신호로 남긴다. SQL은 NUMERIC 상한 비교로 유지하고, 후속 운영 반복에서는 간격을 둬 502 발생률과 완료시간을 함께 본다. 테스트는 다섯 숫자 열 각각의 Infinity 상한을 검사하도록 보강했다. 보고서 변경 커밋 전 전체 `deploy:verify`를 다시 수행한다.
+
+### 2026-11-27 — 공개 일봉 batch SQL 준비 문장 재사용
+
+`lib/public-daily-export.ts`에서 반복 batch 쿼리를 `node-postgres`의 이름 있는 query config로 실행하도록 변경했다. 동일한 SQL은 연결별로 준비 문장을 재사용할 수 있다. 근거: [node-postgres 공식 query 문서](https://node-postgres.com/features/queries). 시장별 고정 이름은 `public-daily-export-kr-batch-v1` 및 `public-daily-export-us-batch-v1`이다. API 데이터와 압축 설정은 변경하지 않았다.
+
+동일 로컬 DB/API에서 기존 기준선 8회와 후보 8회를 순차 측정하고 첫 cold 호출을 제외했다. KR 중앙값은 331ms에서 326ms로 1.5% 짧아졌고, US는 740ms에서 662ms로 10.5% 짧아졌다. 각 시장 후보 8개 gzip 응답의 해제 JSON은 기준 파일과 전부 바이트 단위로 동일했다. 후보 gzip 크기는 KR 1,506,865B, US 3,491,027B였으며 각 2,352/5,012 ticker, ticker/marketCap/daily 구조와 일봉 최대20개를 확인했다. 목표 테스트 15개가 통과했다. HTTP 전체 응답 반복 결과는 로컬 환경 한정이며 운영 회귀 여부는 배포 후 별도 측정한다.
+
+변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `DEVELOPMENT_LOG.md`, 본 보고서. full `npm run deploy:verify`, commit, OCI 배포 및 운영 반복 측정 결과는 후속 기록에 추가한다.
 ### 2026-11-27 — KR 일봉 turnover 유효성 변환 제거, 티커 선조회 후보 기각
 - 목적/범위: 운영 KR gzip 일봉 API 처리 시간을 줄이기 위해 봉별 `trading_value::text` 변환/정규식 대신 기존 숫자 finite bounds를 적용했다. V180 스키마에서 KR `trading_value`는 `DOUBLE PRECISION`; US는 V92 기준 `NUMERIC`이므로 US validation SQL은 유지한다. ticker, 시총, daily JSON, gzip level과 batch 설정은 바꾸지 않았다.
 - 후보 기각 근거: batch별 universe/fundamental 조인과 자격 predicate를 제거하고 request 시작 시 티커 metadata를 한 번 읽어 보내는 후보도 비교했다. baseline→candidate warmed full API 중앙값 Block A KR368→367ms, US650→722ms(+11.1%); Block B KR346.5→319ms, US735→750.5ms(+2.1%). Gunzip 원문은 같고 gzip size 불변이었으나 US가 두 블록 모두 느려져 해당 metadata 이동 후보를 기각하고 기준 SQL로 복구했다.

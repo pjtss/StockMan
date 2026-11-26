@@ -9884,3 +9884,8 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 | US | 35.07 / 54.66 / 63.93초 | 54.66초 | 5,011 / 18,964,448B | 3,542,403 / 3,543,019 / 3,542,756B | 3/3 |
 
 직전 운영 표본(KR 21.57초 중앙값, US 58.75초 중앙값)과 비교하면 관측 중앙값이 각각 약38.9%, 7.0% 짧다. 직전 표본은 KR 3회·US 2회였고 이번 역시 운영 부하와 경로 상태를 제어하지 않았으므로 인과 성능 개선률은 확정하지 않는다. 크기와 raw payload는 유지되었고 502는 이번 6회에서 재현되지 않았다. 로컬 KR warmed 중앙값은 354ms→315.5ms로 약10.9% 줄었다. 변경은 KR의 double precision turnover validation 하나에 한정하고 US regex는 보존한다. 더 많은 운영 반복과 서버 단계 timing을 모아 효과 및 502 재발 여부를 추적한다.
+### 2026-11-27 — 공개 일봉 batch SQL prepared statement 재사용
+- 목적/범위: 반복 공개 gzip export의 batch 쿼리에 이름 있는 `node-postgres` query config를 지정해 연결별 prepared statement를 재사용한다. 공식 근거는 https://node-postgres.com/features/queries. 응답 schema, gzip 및 일봉 상한은 변경하지 않는다.
+- 측정/검증: 같은 로컬 DB 기준/후보 각 8회 순차 호출에서 첫 cold 제외 median은 KR 331→326ms(-1.5%), US 740→662ms(-10.5%)였다. 후보 gzip 해제 JSON 8회/시장 모두 기준선과 바이트 단위 동일; gzip KR1,506,865B/US3,491,027B, ticker 2,352/5,012, daily 최대20. 관련 테스트 15개 통과.
+- 근본 원인/판정/위험: 매 요청의 동일 복합 SQL이 pool 연결에서 반복 parse/plan되는 비용을 줄이는 후보로 채택한다. 연결별 문장 캐시는 서버 프로세스가 재시작되면 다시 준비되며, 운영 부하 차이는 로컬 비교로 확정할 수 없다. full `deploy:verify` 및 운영 배포 GET에서 출력과 속도를 재확인하고 이 문서에 결과를 후속 기록한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 성능 보고서, 본 로그. 아직 commit/push/deploy 전.

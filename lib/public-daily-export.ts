@@ -187,7 +187,9 @@ export async function getPublicDailyExport(market: ExportMarket) {
         const chunkPromises = chunks.slice(offset, offset + concurrency).map(async (keys) => {
           const queryStartedAt = performance.now();
           try {
-            return await pool.query<ExportRow>(`
+            return await pool.query<ExportRow>({
+              name: `public-daily-export-${market.toLowerCase()}-batch-v1`,
+              text: `
       WITH requested AS (
         SELECT market, code
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
@@ -249,7 +251,9 @@ export async function getPublicDailyExport(market: ExportMarket) {
         ) payload
        WHERE ${eligibility}
        ORDER BY u.market, u.code
-    `, [JSON.stringify(keys)]);
+              `,
+              values: [JSON.stringify(keys)],
+            });
           } finally {
             const queryDurationMs = performance.now() - queryStartedAt;
             metrics.batchQueryCount += 1;

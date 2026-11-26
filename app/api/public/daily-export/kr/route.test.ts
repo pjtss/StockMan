@@ -56,7 +56,9 @@ describe("public gzip daily export", () => {
     const compressed = Buffer.from(await response.arrayBuffer());
     const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
     const [eligibilitySql] = queryMock.mock.calls[0] as [string];
-    const [sql, requestParameter] = queryMock.mock.calls[1] as [string, string];
+    const [batchQuery] = queryMock.mock.calls[1] as [{ name: string; text: string; values: [string] }];
+    const { name, text: sql, values } = batchQuery;
+    const requestParameter = values[0];
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/gzip");
@@ -90,6 +92,7 @@ describe("public gzip daily export", () => {
     expect(eligibilitySql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("FROM jsonb_to_recordset($1::jsonb)");
     expect(JSON.stringify(requestParameter)).toContain(code);
+    expect(name).toBe(`public-daily-export-${market.toLowerCase()}-batch-v1`);
     expect(sql).toContain(`JOIN ${universeTable} u`);
     expect(sql).toContain(`FROM ${candleTable} c`);
     expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
@@ -175,7 +178,7 @@ describe("public gzip daily export", () => {
 
     const response = await getKrExport();
     await response.arrayBuffer();
-    const [sql] = queryMock.mock.calls[1] as [string];
+    const [{ text: sql }] = queryMock.mock.calls[1] as [{ text: string }];
 
     expect(response.status).toBe(200);
     expect(sql).toContain("c.close * c.volume AS trading_value");
@@ -192,8 +195,8 @@ describe("public gzip daily export", () => {
 
     const response = await getKrExport();
     await response.arrayBuffer();
-    const batchSizes = queryMock.mock.calls.slice(1).map(([, parameters]) =>
-      JSON.parse((parameters as [string])[0]).length,
+    const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
+      JSON.parse((query as { values: [string] }).values[0]).length,
     );
 
     expect(response.status).toBe(200);
@@ -210,8 +213,8 @@ describe("public gzip daily export", () => {
 
     const response = await getUsExport();
     await response.arrayBuffer();
-    const batchSizes = queryMock.mock.calls.slice(1).map(([, parameters]) =>
-      JSON.parse((parameters as [string])[0]).length,
+    const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
+      JSON.parse((query as { values: [string] }).values[0]).length,
     );
 
     expect(response.status).toBe(200);
