@@ -59,7 +59,7 @@
       "description": "문서 인덱스, 시스템 기준과 프로젝트별 지침"
     }
   ],
-  "documentCount": 154,
+  "documentCount": 155,
   "documents": [
     {
       "id": "api-kis-us-condition-search",
@@ -1080,6 +1080,17 @@
       "related": []
     },
     {
+      "id": "operations-public-daily-export-performance-report",
+      "title": "공개 일봉 gzip API 운영 성능 보고서",
+      "category": "operations",
+      "format": "md",
+      "description": "KR/US 공개 일봉 gzip API의 동시 DB 조회 조정, OCI 배포별 운영 실측, 응답 계약 및 측정 한계를 기록합니다.",
+      "url": "/manuals/operations/public-daily-export-performance-report.md",
+      "relatedPaths": [],
+      "sourcePath": "docs/operations/public-daily-export-performance-report.md",
+      "related": []
+    },
+    {
       "id": "operations-runbook",
       "title": "운영 런북",
       "category": "operations",
@@ -1974,6 +1985,7 @@
         "docs/development/conventions.md",
         "docs/development/delivery-lifecycle.md",
         "docs/operations/runbook.md",
+        "docs/operations/public-daily-export-performance-report.md",
         "docs/operations/us-daily-cache-freshness-runbook.md",
         "docs/operations/shortcuts.md",
         "docs/operations/market-rss-translation-debug-api.md",
@@ -2146,6 +2158,11 @@
           "title": "운영 런북",
           "url": "/manuals/operations/runbook.md",
           "sourcePath": "docs/operations/runbook.md"
+        },
+        {
+          "title": "공개 일봉 gzip API 운영 성능 보고서",
+          "url": "/manuals/operations/public-daily-export-performance-report.md",
+          "sourcePath": "docs/operations/public-daily-export-performance-report.md"
         },
         {
           "title": "미국 일봉 캐시 최신성 지연 진단 및 보정 — 2026-11-24",

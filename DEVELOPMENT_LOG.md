@@ -1,3 +1,10 @@
+### 2026-11-26 — 공개 일봉 gzip API 운영 성능 보고서 제출
+- 목적/범위: 두 차례 운영 배포 결과를 통합해 KR/US 순차·동시 운영 API 완료 시간, 응답 크기, JSON/gzip 계약, 비교 한계를 보고서로 작성했다. 문서 관리 규칙에 따라 운영 문서 카탈로그와 `docs/README.md` 인덱스에도 연결했다.
+- 보고서: [`docs/operations/public-daily-export-performance-report.md`](docs/operations/public-daily-export-performance-report.md). baseline `87059c21`, 5/5 후보 `0ffb7903`, KR5/US10 후보 `edeea6ba`의 배포 run 및 측정 결과를 표로 정리했다. 최신 timestamped operating check는 2026-11-26 `05:41:16Z–05:43:01Z`; KR 19.441초·US 39.686초, 동시 KR 18.141초·US 45.152초. HTTP 200, gzip XFL=0, no-store, gzip 해제·JSON 계약·20봉 상한·ticker counts를 확인했다.
+- 해석: 반복 운영 응답시간이 넓게 흔들려 동시성 변경의 확정적 인과 효과를 단정하지 않는다. US sequential은 이전 기준보다 짧은 표본이 반복됐으나 KR은 느린 표본을 포함한다. 현재 코드 KR5/US10으로 운영 중이며 다음 단계는 DB/query와 gzip/전송 시간을 분리 측정한다.
+- 검증: 최신 보고서가 자동 `public/document-catalog.json`·`public/manuals/README.md`에 155번째 문서로 연결됨을 확인했다. `npm run deploy:verify` 전체 통과: 283개 테스트 파일 통과/1 skip, 1,648개 테스트 통과/3 skip, typecheck, 155개 문서 카탈로그 및 docs/API/security/cron 감사, production build, standalone HTTP 및 Chrome desktop/mobile smoke.
+- 변경 파일: `docs/operations/public-daily-export-performance-report.md`, `docs/README.md`, `public/document-catalog.json`, `public/manuals/README.md`, 본 로그. 문서-only 커밋/OCI 배포 후 API 문서 링크와 배포 상태를 확인한다.
+
 ### 2026-11-26 — 일봉 gzip API DB batch 동시성 상향 후보
 - 목적/범위: 사용자 지시에 따라 단일 gzip API 완료 시간을 줄이기 위해 KR/US export의 DB batch 동시성을 5에서 10으로 조정하는 후보를 실측했다. gzip level, payload 필드, no-store, batch 크기 500, 종목 자격, 20봉 상한은 유지한다.
 - 근본 원인/개선: US 활성 종목은 로컬 5,012개로 500개씩 총 11 query다. 동시성 5에서는 3 wave지만 10에서는 2 wave가 된다. 공유 `pg` Pool 기본 max는 10이므로 후보는 한 요청에서 pool보다 많은 query를 동시에 점유하지 않는다.

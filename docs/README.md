@@ -73,6 +73,7 @@
 - 개발 규칙: [`development/conventions.md`](./development/conventions.md)
 - 전체 전달 생명주기: [`development/delivery-lifecycle.md`](./development/delivery-lifecycle.md)
 - 운영 런북: [`operations/runbook.md`](./operations/runbook.md)
+- 공개 일봉 gzip API 속도 개선·운영 실측 보고서: [`operations/public-daily-export-performance-report.md`](./operations/public-daily-export-performance-report.md)
 - 미국 일봉 캐시 최신성 지연 진단·장후 catch-up 개선 (2026-11-24): [`operations/us-daily-cache-freshness-runbook.md`](./operations/us-daily-cache-freshness-runbook.md)
 - 대화 단축어와 운영 API 일봉 JSON 스냅샷 절차: [`operations/shortcuts.md`](./operations/shortcuts.md)
 - RSS 번역 상태 공개 검수 API: [`operations/market-rss-translation-debug-api.md`](./operations/market-rss-translation-debug-api.md)
