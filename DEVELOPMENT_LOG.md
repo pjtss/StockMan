@@ -1,3 +1,7 @@
+### 2026-11-26 — zlib 출력 버퍼 크기 성능 후보 기각
+- 목적/범위: 응답 gzip 형식과 API payload를 유지하면서 zlib 출력 callback을 줄이기 위해 Node 공식 기본 chunkSize 16 KiB와 후보 64 KiB를 비교했다. 구현은 임시 수정 후 즉시 16 KiB 기본값으로 복구했다.
+- 측정/검증: 로컬 Next API/DB 전체 응답 각각 5회에서 후보 warmed median은 KR357ms/US735ms, 기준은 KR350ms/US706ms로 약2.0%/4.1% 느렸다. 압축/원본 크기는 KR1,506,947/8,985,808B, US3,493,095/19,399,949B로 동일했다. HTTP200, gunzip/JSON, ticker·marketCap·daily, returnedCount 일치, 최대20봉, XFL0을 검증했다.
+- 판정/위험/다음: 후보 기각, 기능 코드는 기본 설정으로 복구했고 운영 배포하지 않는다. 로컬 결과에서 큰 slab의 개선은 나타나지 않았다. 운영 API가 KR32.342초·US75.861초였던 점과 로컬 1초 미만 결과의 차이는 운영 network/server context 병목 가능성을 시사하지만 원인은 미확인이다. OCI Nginx request/upstream/bytes 로그 또는 완료 구조화 timing 로그를 회수해 분리 측정한다. 변경 파일은 성능 보고서와 DEVELOPMENT_LOG.md다. 공식 참조: Node.js zlib API (https://nodejs.org/api/zlib.html).
 ### 2026-11-26 — gzip write 실험 배포 후 운영 API 확인
 - 커밋·배포: 실험/기각 기록 커밋 `c3ac04f3`를 `oci`에 push했다. OCI run `45818683801`의 verify, standalone packaging, upload, activation 모두 success로 확인했다. 기능 코드는 write 묶음 50으로 복구되어 있어 배포 동작은 코드 성능 변경을 포함하지 않는다.
 - 운영 확인: 활성화 후 공개 API 전체 응답을 GET해 gzip 해제 및 ticker·marketCap·daily, 최대20봉, HTTP200/application-gzip/Content-Encoding 없음/no-store/XFL0을 검사했다. KR 32.342초/1,525,055B gzip/8,925,884B raw/2,337 ticker, US 75.861초/3,543,788B gzip/19,004,536B raw/5,011 ticker였다. Health API도 HTTP200.
