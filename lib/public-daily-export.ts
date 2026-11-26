@@ -177,7 +177,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {
         const waveStartedAt = performance.now();
-        const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map(async (keys) => {
+        const chunkPromises = chunks.slice(offset, offset + concurrency).map(async (keys) => {
           const queryStartedAt = performance.now();
           try {
             return await pool.query<ExportRow>(`
@@ -249,14 +249,23 @@ export async function getPublicDailyExport(market: ExportMarket) {
             metrics.batchQueryDurationMs += queryDurationMs;
             metrics.maxBatchQueryMs = Math.max(metrics.maxBatchQueryMs, queryDurationMs);
           }
-        }));
-        metrics.batchQueryWallMs += performance.now() - waveStartedAt;
-        metrics.batchWaveCount += 1;
-        for (const result of chunkResults) {
+        });
+        const waveResults = Promise.all(chunkPromises);
+        void waveResults.then(() => {
+          metrics.batchQueryWallMs += performance.now() - waveStartedAt;
+          metrics.batchWaveCount += 1;
+        }, () => undefined);
+
+        // Preserve the public market/code order while emitting each completed
+        // batch as soon as all preceding batches are ready. The remaining DB
+        // queries in this wave continue concurrently during gzip streaming.
+        for (const resultPromise of chunkPromises) {
+          const result = await resultPromise;
           for (const row of result.rows) {
             yield row.item_json;
           }
         }
+        await waveResults;
       }
     })();
 

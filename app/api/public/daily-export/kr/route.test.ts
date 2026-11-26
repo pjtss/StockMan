@@ -284,6 +284,40 @@ describe("public gzip daily export", () => {
     expect(payload[0].ticker.code).toBe("005930");
   });
 
+  it("streams an earlier completed batch while a later concurrent batch is still pending", async () => {
+    let batchIndex = 0;
+    queryMock
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 501 }, (_, index) => ({ market: "KOSPI", code: `T${String(index).padStart(4, "0")}`, has_trading_value: true })),
+      })
+      .mockImplementation(async () => {
+        const index = batchIndex++;
+        if (index === 1) await new Promise((resolve) => setTimeout(resolve, 4_000));
+        return { rows: Array.from({ length: index === 0 ? 500 : 1 }, (_, rowIndex) => makeRow("KOSPI", `T${String(index * 500 + rowIndex).padStart(4, "0")}`, "KRW")) };
+      });
+
+    const response = await getKrExport();
+    const reader = response.body!.getReader();
+    const firstChunk = await reader.read();
+    const waitingSince = Date.now();
+    const firstBatchChunk = await reader.read();
+
+    expect(firstChunk.done).toBe(false);
+    expect(firstBatchChunk.done).toBe(false);
+    expect(Date.now() - waitingSince).toBeLessThan(3_000);
+
+    const chunks = [Buffer.from(firstChunk.value!), Buffer.from(firstBatchChunk.value!)];
+    for (;;) {
+      const part = await reader.read();
+      if (part.done) break;
+      chunks.push(Buffer.from(part.value));
+    }
+    const payload = JSON.parse(gunzipSync(Buffer.concat(chunks)).toString("utf8"));
+    expect(payload).toHaveLength(501);
+    expect(payload[0].ticker.code).toBe("T0000");
+    expect(payload.at(-1).ticker.code).toBe("T0500");
+  });
+
   it("returns 503 when the read-only export query fails", async () => {
     queryMock.mockResolvedValue({ rows: null });
     vi.spyOn(console, "error").mockImplementation(() => undefined);

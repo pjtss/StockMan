@@ -265,3 +265,18 @@ Commit `43f000a8` deployed through OCI workflow `45827914492`, with verify, stan
 | US | 62.37 / 44.54 / 75.82 | 3,542,002–3,542,764 | 18,964,448 | 5,011 | 20 | 3/3 | 0 |
 
 All six responses were HTTP200, `application/gzip`, no `Content-Encoding`, no-store, XFL0. Full gunzip and JSON parsing confirmed top-level ticker/marketCap/daily fields, returnedCount consistency and a 20-candle maximum. Median completion times are KR12.51s and US62.37s. Compared with the three-response current-SQL baseline (KR14.187s/US60.649s), KR median is 11.8% lower and US 2.8% higher. This small, noisy operating sample does not establish an across-market end-to-end speed improvement; it also does not show a material US regression. The candidate is retained for the confirmed 1.18%/1.47% smaller local gzip output, while speed benefit remains unproven. Continue collecting same-client operating measurements; investigate server-side phase logs when accessible.
+
+## Completed-batch streaming overlap candidate
+
+The exporter previously awaited `Promise.all` for every DB query in a concurrency wave before yielding any of the wave's rows to gzip. A slow query in the wave therefore held back earlier batches that had already completed; gzip encoding and transmission could not overlap the remaining query work. The candidate still starts at most 5 KR / 10 US queries concurrently and preserves the public `(market, code)` order, but awaits batch promises and yields rows in batch order. Faster earlier batches can now be compressed and sent while later promises continue. Wave DB wall timing is captured when all queries settle, independent of how long downstream streaming takes.
+
+Local `scripts/dev-server.mjs` API comparison on the same DB and ticker universe, six sequential calls per market, first cold/compile call excluded:
+
+| Market | Before warmed times (s) | Candidate warmed times (s) | Median before → candidate | Change | gzip bytes |
+|---|---|---|---:|---:|---:|
+| KR | 0.45 / 0.37 / 0.33 / 0.42 / 0.35 | 0.36 / 0.34 / 0.31 / 0.34 / 0.30 | 0.37 → 0.34 | -8.1% | 1,506,865 (unchanged) |
+| US | 0.76 / 0.77 / 0.83 / 0.73 / 0.71 | 0.79 / 0.67 / 0.71 / 0.68 / 0.84 | 0.76 → 0.71 | -6.6% | 3,491,027 (unchanged) |
+
+Completed-response server stream medians were KR 290ms→266ms and US 577ms→528ms, about 8.3%/8.5% lower. The DB wave timings were similar, consistent with better overlap rather than fewer DB operations. Candidate gzip outputs were fully decompressed and parsed: 2,352 KR/5,012 US tickers, required fields present, returnedCount matched candles, max20, XFL0. Route tests pass 13/13, including a delayed later batch proving that an earlier completed batch reaches the stream before that delay finishes, and the sorted output remains intact.
+
+This local dataset is smaller than operating production, and it does not prove an operational speed gain. The change is a viable candidate for deployment and same-client repeat measurement; keep it only if operator results improve without API-contract violations or a meaningful total-time regression. Failed downloads are excluded and recorded separately. No DB schema/index or output contract changes are part of the candidate.
