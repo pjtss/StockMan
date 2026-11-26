@@ -161,12 +161,35 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
-  it("keeps batch lookups within the 10-connection pool ceiling", async () => {
+  it("keeps US batch lookups within the 10-connection pool ceiling", async () => {
     let active = 0;
     let peakActive = 0;
     queryMock
       .mockResolvedValueOnce({
-        rows: Array.from({ length: 5_501 }, (_, index) => ({ market: "KOSPI", code: `T${index}`, has_trading_value: true })),
+        rows: Array.from({ length: 5_501 }, (_, index) => ({ market: "NAS", code: `T${index}`, has_trading_value: true })),
+      })
+      .mockImplementation(async () => {
+        active += 1;
+        peakActive = Math.max(peakActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active -= 1;
+        return { rows: [makeRow("NAS", "AAPL", "USD")] };
+      });
+
+    const response = await getUsExport();
+    await response.arrayBuffer();
+
+    expect(response.status).toBe(200);
+    expect(queryMock).toHaveBeenCalledTimes(13);
+    expect(peakActive).toBe(10);
+  });
+
+  it("keeps KR batch lookups at five concurrent queries", async () => {
+    let active = 0;
+    let peakActive = 0;
+    queryMock
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "KOSPI", code: `T${index}`, has_trading_value: true })),
       })
       .mockImplementation(async () => {
         active += 1;
@@ -180,8 +203,8 @@ describe("public gzip daily export", () => {
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
-    expect(queryMock).toHaveBeenCalledTimes(13);
-    expect(peakActive).toBe(10);
+    expect(queryMock).toHaveBeenCalledTimes(7);
+    expect(peakActive).toBe(5);
   });
 
   it("keeps the gzip response flowing while a database batch is pending", async () => {

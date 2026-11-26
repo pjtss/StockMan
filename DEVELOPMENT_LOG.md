@@ -4,8 +4,10 @@
 - 로컬 API 측정: 같은 Next dev API 및 DB에서 동시성 5 warmed 순차 KR은 403/356/328ms(median 356ms), US는 825/751/747ms(median 751ms)였다. 동시성 10 후보는 KR 359/308/360/372ms(median 359.5ms), US 701/690/688/680ms(median 689ms)로 관측됐다. KR 변화는 혼합/거의 없음, US는 약 8% 단축.
 - 동시 API 측정: KR+US 병렬 완료시간은 동시성 5에서 955/998/1045/961ms (median 979.5ms; 첫 1,093ms 제외), 동시성 10에서 867/928/886ms (median 886ms; 첫 1,076ms 제외)로 약 9.5% 짧았다. 표본이 작고 단일 로컬 PostgreSQL 환경이라 배포 효과를 보장하지 않는다.
 - 자동 회귀 감지: route test에 5,501 ticker/12 lookup batch 입력을 추가해 peak active DB lookups가 10인지를 검증했다. 대상 테스트 9개 통과. `npm run deploy:verify` 전체 통과: 283개 파일 통과/1 skip, 테스트 1,647 passed/3 skipped, typecheck, docs/API/security/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke.
-- 남은 위험: 한 export 요청이 공유 pool의 최대 10개 연결을 모두 바쁘게 할 수 있어, 동시 사용자 요청 및 다른 API와의 경쟁에서 tail latency가 나빠질 수 있다. 운영 배포 후 KR/US 단일 및 동시 요청의 완료시간을 측정하고, 이전 production 기준(KR 8.558초, US 71.051초)과 비교해 채택 여부를 결정한다. 개선이 없거나 악화되면 동시성을 5로 복구한다.
-- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. 전체 검증 후 commit/push하고 운영 API에서 단일·동시 요청을 측정해 후보의 채택 여부를 후속 기록한다.
+- 1차 운영 배포/측정: commit `0ffb7903`, Deploy OCI run `45759426955` 성공. 순차 KR 14.085/10.922/8.779초(median 10.922초), US 38.829/51.744/42.882초(median 42.882초)였다. 이전 운영 기준 중앙값 KR 8.558초, US 71.051초 대비 KR 약 27.6% 느리고 US 약 39.6% 빨랐다. 2회 KR+US 동시 호출에서 US 57.040/59.467초, KR 27.121/15.860초로 pool 경합 위험을 관측했다. 모든 응답 200, XFL=0, gzip/no-store, gunzip/JSON 계약, 티커수 KR 2,337·US 5,011, daily max20 통과. 시점별 서버 부하가 통제되지 않아 단일 표본 중앙값 비교는 인과 증거가 아니다.
+- 후속 최적화: 모든 요청에서 pool 10개를 점유하지 않도록 KR 동시성은 5로 복구하고 US만 10으로 유지한다. API 테스트에서 US peak10 및 KR peak5를 각각 검증한다. 이 수정도 전체 검증·OCI 재배포 후 반복 운영 측정한다.
+- 남은 위험: US 단일 호출의 운영 개선폭이 실제로 batch wave 감소에서 비롯된 것인지 환경 변동과 아직 분리하지 못했다. KR+US 동시 호출 및 타 API 동시 부하에서 US 10개 쿼리의 영향도 검증이 필요하다. 운영 측정에서 개선이 재현되지 않으면 US도 5로 복구한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. market-specific 동시성 변경을 검증 후 다음 배포한다.
 
 ### 2026-11-26 — gzip JSON compact serializer 실험 및 속도 기준 기각
 - 목적/범위: 사용자 요청대로 응답 속도를 최우선으로 두고 SQL `row_to_json`/`array_to_json` 직렬화가 기존 `json_build_object`보다 종단 간 속도를 개선하는지 조사했다. ticker/시가총액/일봉 계약, gzip 단일 응답, 20봉 제한은 변경하지 않는다.

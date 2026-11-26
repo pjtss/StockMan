@@ -116,7 +116,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     for (let index = 0; index < eligible.rows.length; index += chunkSize) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
     }
-    const concurrency = 10;
+    const concurrency = market === "US" ? 10 : 5;
     const tradingValueExpression = eligible.rows[0].has_trading_value
       ? `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
                THEN c.trading_value::double precision
