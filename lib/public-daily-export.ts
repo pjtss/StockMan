@@ -161,7 +161,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     };
     if (eligible.rows.length === 0) return errorResponse();
 
-    const chunkSize = 500;
+    const chunkSize = market === "US" ? 750 : 500;
     const chunks: ExportKey[][] = [];
     for (let index = 0; index < eligible.rows.length; index += chunkSize) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));

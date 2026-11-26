@@ -193,7 +193,7 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
-  it("splits US ticker universes into bounded 500-ticker lookup batches", async () => {
+  it("splits US ticker universes into bounded 750-ticker lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
         rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "NAS", code: `T${index}`, has_trading_value: true })),
@@ -207,7 +207,7 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([500, 500, 500, 500, 500, 1]);
+    expect(batchSizes).toEqual([750, 750, 750, 251]);
   });
 
   it("keeps US batch lookups within ten concurrent queries", async () => {
@@ -215,7 +215,7 @@ describe("public gzip daily export", () => {
     let peakActive = 0;
     queryMock
       .mockResolvedValueOnce({
-        rows: Array.from({ length: 5_501 }, (_, index) => ({ market: "NAS", code: `T${index}`, has_trading_value: true })),
+        rows: Array.from({ length: 8_001 }, (_, index) => ({ market: "NAS", code: `T${index}`, has_trading_value: true })),
       })
       .mockImplementation(async () => {
         active += 1;
@@ -229,7 +229,7 @@ describe("public gzip daily export", () => {
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
-    expect(queryMock).toHaveBeenCalledTimes(13);
+    expect(queryMock).toHaveBeenCalledTimes(12);
     expect(peakActive).toBe(10);
   });
 

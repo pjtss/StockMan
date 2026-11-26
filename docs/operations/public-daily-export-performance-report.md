@@ -211,3 +211,9 @@ level3 운영 중앙값(KR12.358초/US56.361초)과 비교하면 level2는 KR 12
 이 환경에서는 OCI SSH 자격증명 및 journald 읽기 도구가 없어 운영 구조화 로그의 개별 단계 숫자를 직접 회수하지 못했다. 따라서 이번 운영 API 완료시간은 직전 표본과 인과 비교하지 않으며 DB batch 동시성/query 변경도 보류한다. 운영 로그 접근이 확보되면 `market=KR/US` 완료 로그를 회수해 DB batch wall/query 최대시간과 stream elapsed의 분포를 보고 다음 병목 후보를 선정한다.
 
 동일 배포 코드의 로컬 `scripts/dev-server.mjs`/로컬 DB 응답으로 새 계측이 동작하는지 확인했다. KR은 2,352 ticker/5 batch/1 wave, universe query 63ms, batch query wall 1,075ms(개별 query 누적5,108ms·max1,074ms), time-to-first-gzip-byte 70ms, stream 1,203ms, 내부 total 1,268ms, gzip1,506,947B였다. US는 5,012 ticker/11 batch/2 waves, universe149ms, batch wall1,630ms(누적14,692ms·max1,602ms), first byte151ms, stream1,876ms, internal total2,026ms, gzip3,493,095B였다. 클라이언트 경과시간은 KR3.210초/US2.492초였으나 최초 요청 Next dev compile이 포함되어 운영 기준으로 사용하지 않는다. 이 측정은 계측 구현과 로컬 개발 데이터 경로 검증이며 운영 DB 단계별 결과를 대체하지 않는다.
+
+### US ticker batch 500→750 운영 후보
+
+로컬 계측으로 US의 500개 batch 기준을 새로 5회 측정한 뒤 batch 크기만 750으로 바꾸고 같은 API/DB 경로에서 5회 반복했다. 500개 기준의 첫 컴파일 요청을 제외한 client warmed median은 0.752초, 내부 `totalElapsedMs` median 713.5ms, `batchQueryWallMs` median 352ms였다. 750개 후보는 각각 0.673초/640ms/316.5ms로 약 10.5%/10.3%/10.1% 짧았다. 후보는 5,012 ticker를 11개 batch/2 wave에서 7개 batch/1 wave로 바꾸며, DB query concurrency 상한 10과 KR batch500은 유지한다. 로컬 gzip bytes와 raw bytes는 기준과 후보 모두 3,493,095B/19,399,949B다.
+
+이전 batch1,000/concurrency6 운영 후보가 로컬 약 8% 개선에도 운영 약 11% 악화되어 복구된 이력이 있다. 따라서 750은 운영 이득이 확인되기 전인 후보로만 취급한다. 동일한 공개 API 운영 5회 및 gzip/JSON/최대20 계약 검증 후 완료시간이 악화되거나 신뢰할 수 있는 이득이 없으면 batch500으로 복구한다.
