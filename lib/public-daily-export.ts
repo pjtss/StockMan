@@ -99,12 +99,15 @@ export async function getPublicDailyExport(market: ExportMarket) {
     `);
     if (eligible.rows.length === 0) return errorResponse();
 
-    const chunkSize = 1_250;
+    const chunkSize = 250;
     const chunks: ExportKey[][] = [];
     for (let index = 0; index < eligible.rows.length; index += chunkSize) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
     }
-    const chunkResults = await Promise.all(chunks.map((keys) => pool.query<ExportRow>(`
+    const rows: ExportRow[] = [];
+    const concurrency = 5;
+    for (let offset = 0; offset < chunks.length; offset += concurrency) {
+      const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`
       WITH requested AS (
         SELECT market, code
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
@@ -157,7 +160,8 @@ export async function getPublicDailyExport(market: ExportMarket) {
        WHERE ${eligibility}
        ORDER BY u.market, u.code
     `, [JSON.stringify(keys)])));
-    const rows = chunkResults.flatMap((result) => result.rows);
+      rows.push(...chunkResults.flatMap((result) => result.rows));
+    }
     if (rows.length === 0) return errorResponse();
 
     const items = rows.map((row) => {

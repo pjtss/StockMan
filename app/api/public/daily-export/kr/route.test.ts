@@ -116,7 +116,7 @@ describe("public gzip daily export", () => {
   it("splits large ticker universes into bounded lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
-        rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "KOSPI", code: `T${index}` })),
+        rows: Array.from({ length: 501 }, (_, index) => ({ market: "KOSPI", code: `T${index}` })),
       })
       .mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
@@ -126,7 +126,7 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([1_250, 1_250, 1]);
+    expect(batchSizes).toEqual([250, 250, 1]);
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
