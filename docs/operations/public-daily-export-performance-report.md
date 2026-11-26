@@ -478,3 +478,14 @@ Node.js v22 공식 zlib 문서에서 `createGzip`의 `chunkSize` 기본값은16K
 `createGzip({ level: 9, chunkSize: 64 * 1024 })` 후보를 실제 Next API 경로로 6회/시장 검증했다. 첫 compile/cold 호출을 제외한 전체 HTTP 완료시간 중앙값은 KR614ms, US1,008ms였다. 직전 16KB level9 로컬 기준 중앙값 KR629ms, US1,202ms 대비 각각 약2.4%,16.1% 짧았다. gzip 크기는 KR1,201,818B/US2,828,164B로 그대로였고 raw payload KR8,966,992B/US19,359,853B, ticker2,352/5,012, 각 필수 ticker·marketCap·daily 필드, `returnedCount`, 최대20봉 계약도 확인했다. 로컬 DB/API라 운영 속도에 일반화할 수 없고 개선폭은 특히 KR에서 작다. 64KB 출력 slab은 연결별 메모리를 기본보다48KB 늘리므로 높은 동시 요청의 메모리 영향은 운영 관찰 대상이다.
 
 선택: 64KB 설정은 현재 level9 압축률과 gzip 파일 바이트를 유지하면서 로컬 API 속도를 양쪽에서 개선해 배포 후보로 채택한다. 전체 검증 및 OCI 배포 후 운영 GET을 시장별 반복 측정한다. 운영 실측에서 개선이 재현되지 않거나 회귀하면 16KB로 복구한다. 공식 근거: [Node.js v22 zlib Options](https://nodejs.org/download/release/latest-v22.x/docs/api/zlib.html#class-options).
+
+### gzip 64KB 청크 OCI 배포 후 실측
+
+커밋 `b327ab57`의 [OCI run 45884140595](https://github.com/pjtss/StockMan/actions/runs/45884140595)은 성공했고 운영 활성화가 완료됐다. 배포 후 KR·US 공개 API를 각각 5회 순차 호출했다. 10개 모두 HTTP200, `application/gzip`, Content-Encoding 없음, gzip XFL=2, gunzip/JSON 및 ticker·marketCap·daily 필드 존재, returnedCount 일치와 최대20봉을 통과했다.
+
+| 시장 | 전체 완료 시간 | 중앙값 | 첫 바이트 중앙값 | gzip bytes 범위 | raw bytes | 티커 |
+|---|---|---:|---:|---:|---:|---:|
+| KR | 11.365 / 6.805 / 3.908 / 4.162 / 4.367초 | 4.367초 | 0.209초 | 1,243,447–1,244,017 | 8,907,188 | 2,337 |
+| US | 51.713 / 45.181 / 44.797 / 40.143 / 42.547초 | 44.797초 | 0.400초 | 2,844,472–2,845,348 | 18,964,448 | 5,011 |
+
+바로 이전 level9 기본 16KB chunk의 운영 5회 중앙값은 KR8.003초, US42.947초였다. 이번 표본은 KR45.4% 짧고 US4.3% 길었다. Gzip 크기는 사실상 동일하고, 변경 전후 운영 네트워크·서버 부하가 통제되지 않았으므로 KR 개선을 인과 효과로 확정하거나 US 결과로 회귀를 판정할 수 없다. 로컬 실제 API에서는 기본16KB 대비 64KB 전체 응답 median이 KR629→614ms, US1,202→1,008ms였고 gzip bytes는 같았다. 따라서 64KB를 유지하고 더 많은 배포 표본으로 양 시장 결과를 추적한다. US에서 4.08초 첫-byte outlier가 하나 있어 해당 회차의 51.713초 전체시간은 다른 네 표본과 구분해 해석한다. 운영 DB/stream 내부 timing 접근은 현재 불가능하다.

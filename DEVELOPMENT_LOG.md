@@ -1,3 +1,9 @@
+### gzip 64KB 청크 후보 배포 후 운영 확인
+- 커밋 `b327ab57`, OCI Deploy OCI run `45884140595` 성공 및 release 활성화 완료. 코드 변경은 `createGzip` 출력 chunkSize 64KB 하나다.
+- 운영 API 결과: KR 5회 11.365/6.805/3.908/4.162/4.367초, median4.367초, first-byte median0.209초, gzip1,243,447–1,244,017B, raw8,907,188B, 2,337 ticker. US 51.713/45.181/44.797/40.143/42.547초, median44.797초, first-byte median0.400초, gzip2,844,472–2,845,348B, raw18,964,448B, 5,011 ticker. 모두 HTTP200/application-gzip, Content-Encoding 없음, XFL2 및 gunzip/JSON/필수 필드/returnedCount/최대20봉을 통과했다.
+- 비교: 직전 level9 기본16KB 5회 median KR8.003초/US42.947초 대비 관측 KR45.4% 짧고 US4.3% 길다. 통제되지 않은 운영 부하로 원인 효과 판정 불가. Local full API median은 KR629→614ms, US1,202→1,008ms였고 gzip size 불변. 로컬 zlib direct stream에서는 level9 CPU median KR341.99→337.24ms, US578.16→571.89ms, data event median KR110→53/US247→117이었다.
+- 위험/다음: chunkSize 증가로 요청당 output slab 48KB 추가. US 첫 byte 4.079초 outlier를 포함한 이번 sample은 운영 지연이 여전히 네트워크/서버 부하 영향을 받음을 보여준다. 64KB 코드는 두 시장 로컬 반복 개선과 unchanged gzip bytes를 이유로 유지하되, 이후 운영 sample에서 US 회귀가 반복되면 16KB로 복구 또는 시장별 설정을 실험한다. 운영 단계 로그 접근이 가능해지면 DB/query·gzip stream·transfer를 별도로 추적한다. 전체 배포 검증은 통과했고 운영 API는 배포 후 확인 완료.
+- 보고서 `docs/operations/public-daily-export-performance-report.md`에 deploy run·전체 표본·비교 한계를 추가했다.
 ### 2026-11-27 — 공개 gzip API zlib 출력 청크 64KB 후보
 - 목적/변경: gzip level9와 출력 형식을 유지하며 기본 zlib output chunkSize 16KB를64KB로 높여 변환과 Web stream enqueue 호출 수를 줄였다. 변경은 `lib/public-daily-export.ts`의 `createGzip` 옵션 한 곳이다. 공식 [Node.js v22 zlib 문서](https://nodejs.org/download/release/latest-v22.x/docs/api/zlib.html#class-options)는 chunkSize 기본값16KB를 명시한다.
 - 직접 압축 실험: 운영 gzip 본문 raw 입력, level3/9 × chunkSize16/64/128KB, 조합별 5회. level9 16→64KB 중앙 CPU시간 KR341.99→337.24ms, US578.16→571.89ms; gzip bytes 동일; output chunk event 중앙값 KR110→53, US247→117. 128KB는 KR 개선은 더 컸지만 US level3가112.06→131.71ms로 느려져 시장 공통 후보에서 제외했다.
