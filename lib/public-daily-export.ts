@@ -5,6 +5,8 @@ import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receip
 
 type ExportMarket = "KR" | "US";
 
+const EXPORT_BATCH_SIZE = 500;
+
 type ExportRow = { item_json: string };
 
 type ExportKey = { market: string; code: string; has_trading_value: boolean };
@@ -108,7 +110,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 2 | 3, metrics: Exp
         };
         for await (const item of items) {
           pending.push(item);
-          if (pending.length === 50) await writePending();
+          if (pending.length === EXPORT_BATCH_SIZE) await writePending();
         }
         await writePending();
         activeCompressor.end("]");
@@ -161,10 +163,9 @@ export async function getPublicDailyExport(market: ExportMarket) {
     };
     if (eligible.rows.length === 0) return errorResponse();
 
-    const chunkSize = 500;
     const chunks: ExportKey[][] = [];
-    for (let index = 0; index < eligible.rows.length; index += chunkSize) {
-      chunks.push(eligible.rows.slice(index, index + chunkSize));
+    for (let index = 0; index < eligible.rows.length; index += EXPORT_BATCH_SIZE) {
+      chunks.push(eligible.rows.slice(index, index + EXPORT_BATCH_SIZE));
     }
     metrics.batchCount = chunks.length;
     const concurrency = market === "US" ? 10 : 5;

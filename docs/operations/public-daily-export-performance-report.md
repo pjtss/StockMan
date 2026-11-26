@@ -385,6 +385,16 @@ Relative to the immediately preceding three-call operating sample (KR median11.0
 배포 후 운영 GET을 시장별 3회씩 순차 측정했다. KR 응답은 21.653/11.657/3.154초(median11.657초), US는 40.101/45.557/40.711초(median40.711초)였다. 모든 호출 HTTP200, `application/gzip`, `Content-Encoding` 없음, `no-store`; gunzip/JSON 및 ticker/marketCap/daily, returnedCount, 최대20봉, gzip XFL0 검증을 통과했다. KR 2,337 ticker/raw8,907,188B/gzip1,524,637–1,525,028B, US 5,011 ticker/raw18,964,448B/gzip3,542,337–3,542,761B였다. 이전 운영 표본 중앙값(KR21.57초, US58.75초)보다 낮았지만 부하와 시간대를 통제하지 않았으므로 코드 변경만의 인과효과로 단정하지 않는다.
 
 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `DEVELOPMENT_LOG.md`, 본 보고서. 코드는 commit `d51023e8` 및 OCI run `45864690217`로 배포 완료했다. 이번 운영 측정 결과를 반영한 문서는 다음 문서 기록 커밋/배포에서 전체 검증을 거친다.
+
+### 2026-11-27 — gzip stream write 묶음 크기 조정 후보
+
+Node stream의 `write()` callback은 chunk가 처리된 뒤 호출된다. 기존 구현은 ticker JSON을 50개씩 묶어 매번 callback을 기다렸다. Node 공식 [Writable stream 문서](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)에 설명된 chunk 처리 동작을 근거로, write 묶음을 DB query batch와 동일한 500개로 맞춰 callback과 join 횟수를 줄였다. API payload, gzip level, DB 동시성은 그대로다. 회귀 보호는 route 테스트의 `streams an earlier completed batch while a later concurrent batch is still pending` 사례가 각 완료 batch의 streaming을 검사한다.
+
+같은 로컬 DB와 dev API로 기준 50개 / 후보 500개를 반복 교차 측정했다. 한 측정 블록의 첫 cold 호출을 제외한 HTTP median은 KR 343→300ms(12.5% 단축), US 730→719ms(1.5% 단축)이었다. 다른 블록에서는 US 기준 696ms, 후보 698ms로 사실상 동률이었고 KR 기준 317ms, 후보 291ms(8.2% 단축)였다. 내부 performance timing에서는 stream duration median이 KR 297.5→251.5ms(15.5% 단축), US 545→518.5ms(4.9% 단축)이었다. 다른 블록에선 US HTTP median이 791→679ms였으나 반복 블록 간 편차가 있어 그 개선률을 일반화하지 않는다. gzip bytes는 KR1,506,865B/US3,491,027B로 그대로였고, 기준 및 후보 각 6개 응답의 gunzip 원문은 완전히 일치했다. 계약은 로컬 KR2,352/US5,012 ticker, 최대20봉을 만족했다.
+
+동일 DB batch 기준 예상 stream write 횟수는 KR 약48→5회, US 약101→11회다. 임시 joined string의 대표 최대 크기는 KR1,656,605B, US1,711,333B로, 요청당 약1.7MB의 추가 peak 문자열 메모리가 예상된다. 1,000개 묶음은 US median 745ms로 500개 후보보다 느렸고, 500개 DB batch를 넘어가면 앞선 batch의 stream 전달을 늦출 수 있어 채택하지 않았다. US gzip level1은 median 688→715ms, gzip 3,491,027→3,581,992B로 느리고 커져 기각했다. concurrency11, SQL `string_agg`, 200개 묶음은 반복 성능 이득이 500개보다 작거나 일관되지 않아 제외했다.
+
+판정은 500개 묶음을 유지하는 것이다. KR 응답과 stream phase가 반복해서 짧아졌고 US stream phase도 짧아졌으며, payload와 gzip bytes는 동일했다. 추가 peak memory가 남은 위험이다. 배포 뒤 운영 GET 시간, 502 여부, health와 memory/프로세스 안정성을 함께 점검한다.
 ### 2026-11-27 — KR 일봉 turnover 유효성 변환 제거, 티커 선조회 후보 기각
 - 목적/범위: 운영 KR gzip 일봉 API 처리 시간을 줄이기 위해 봉별 `trading_value::text` 변환/정규식 대신 기존 숫자 finite bounds를 적용했다. V180 스키마에서 KR `trading_value`는 `DOUBLE PRECISION`; US는 V92 기준 `NUMERIC`이므로 US validation SQL은 유지한다. ticker, 시총, daily JSON, gzip level과 batch 설정은 바꾸지 않았다.
 - 후보 기각 근거: batch별 universe/fundamental 조인과 자격 predicate를 제거하고 request 시작 시 티커 metadata를 한 번 읽어 보내는 후보도 비교했다. baseline→candidate warmed full API 중앙값 Block A KR368→367ms, US650→722ms(+11.1%); Block B KR346.5→319ms, US735→750.5ms(+2.1%). Gunzip 원문은 같고 gzip size 불변이었으나 US가 두 블록 모두 느려져 해당 metadata 이동 후보를 기각하고 기준 SQL로 복구했다.
