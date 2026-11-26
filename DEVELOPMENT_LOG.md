@@ -1,3 +1,20 @@
+### 2026-11-26 — 일봉 gzip API DB batch 동시성 상향 후보
+- 목적/범위: 사용자 지시에 따라 단일 gzip API 완료 시간을 줄이기 위해 KR/US export의 DB batch 동시성을 5에서 10으로 조정하는 후보를 실측했다. gzip level, payload 필드, no-store, batch 크기 500, 종목 자격, 20봉 상한은 유지한다.
+- 근본 원인/개선: US 활성 종목은 로컬 5,012개로 500개씩 총 11 query다. 동시성 5에서는 3 wave지만 10에서는 2 wave가 된다. 공유 `pg` Pool 기본 max는 10이므로 후보는 한 요청에서 pool보다 많은 query를 동시에 점유하지 않는다.
+- 로컬 API 측정: 같은 Next dev API 및 DB에서 동시성 5 warmed 순차 KR은 403/356/328ms(median 356ms), US는 825/751/747ms(median 751ms)였다. 동시성 10 후보는 KR 359/308/360/372ms(median 359.5ms), US 701/690/688/680ms(median 689ms)로 관측됐다. KR 변화는 혼합/거의 없음, US는 약 8% 단축.
+- 동시 API 측정: KR+US 병렬 완료시간은 동시성 5에서 955/998/1045/961ms (median 979.5ms; 첫 1,093ms 제외), 동시성 10에서 867/928/886ms (median 886ms; 첫 1,076ms 제외)로 약 9.5% 짧았다. 표본이 작고 단일 로컬 PostgreSQL 환경이라 배포 효과를 보장하지 않는다.
+- 자동 회귀 감지: route test에 5,501 ticker/12 lookup batch 입력을 추가해 peak active DB lookups가 10인지를 검증했다. 대상 테스트 9개 통과. `npm run deploy:verify` 전체 통과: 283개 파일 통과/1 skip, 테스트 1,647 passed/3 skipped, typecheck, docs/API/security/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke.
+- 남은 위험: 한 export 요청이 공유 pool의 최대 10개 연결을 모두 바쁘게 할 수 있어, 동시 사용자 요청 및 다른 API와의 경쟁에서 tail latency가 나빠질 수 있다. 운영 배포 후 KR/US 단일 및 동시 요청의 완료시간을 측정하고, 이전 production 기준(KR 8.558초, US 71.051초)과 비교해 채택 여부를 결정한다. 개선이 없거나 악화되면 동시성을 5로 복구한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. 전체 검증 후 commit/push하고 운영 API에서 단일·동시 요청을 측정해 후보의 채택 여부를 후속 기록한다.
+
+### 2026-11-26 — gzip JSON compact serializer 실험 및 속도 기준 기각
+- 목적/범위: 사용자 요청대로 응답 속도를 최우선으로 두고 SQL `row_to_json`/`array_to_json` 직렬화가 기존 `json_build_object`보다 종단 간 속도를 개선하는지 조사했다. ticker/시가총액/일봉 계약, gzip 단일 응답, 20봉 제한은 변경하지 않는다.
+- 실험 결과: 로컬 전체 응답 payload 기준 gzip 크기는 KR 1,506,947B에서 1,465,078B로 2.8% 감소, US 3,403,223B에서 3,306,774B로 2.8% 감소했다. 이는 압축 전 JSON의 불필요한 공백 감소에 따른 크기 이점이다. US는 Node `JSON.stringify` 출력과 값/텍스트가 일치했고 KR은 float8 시가총액의 지수 표기만 달라 JSON 파싱 수치는 동일했다. 압축 전 수치 타입을 바꾸는 추가 변환은 double 정밀도를 손상할 수 있어 배제한다.
+- 속도 판단: 직전 SQL 사전 직렬화 구현의 warmed 로컬 median(KR 390ms, US 957ms)보다 후보의 검증 가능한 전체 호출 median 및 운영 개선 근거를 확보하지 못했다. 운영 배포본을 1회씩 read-only GET한 결과 KR 1,524,715B/US 3,464,687B, gzip XFL=0, HTTP 다운로드 성공이었다. 해제 JSON은 각각 2,337/5,011 종목, 봉 0–20개(국내는 20개), gzip 해제 후 파싱 성공. 한 번의 운영 표본만으로 후보의 속도 효과를 비교할 수 없고, 다운로드 크기 절감만으로 속도 우선 목표를 입증하지 못하므로 compact serializer 코드는 기각하고 기존 SQL 직렬화 구현을 유지한다.
+- 회귀/검증: `app/api/public/daily-export/kr/route.test.ts`의 기대값을 실제 `json_build_object` 경로로 복구하고 대상 테스트 8개 통과, `git diff --check` 통과. 개발 서버를 종료하고 생성 파일은 HEAD 내용으로 복원했다.
+- 남은 위험/다음 개선: 운영 응답 표본이 시장별 1회라 p50/p95와 서버 부하 영향을 분리하지 못한다. 다음 속도 개선은 압축 크기만으로 채택하지 않고, 같은 시점의 반복 종단 간 측정 또는 DB/직렬화/압축 단계별 계측으로 이득을 입증한다. 배포 코드 변경이 없으므로 이번 실험은 커밋·푸시·배포하지 않는다.
+- 변경 파일: `app/api/public/daily-export/kr/route.test.ts`, 본 로그. 기능 코드는 배포본과 동일하게 복원됨.
+
 ### 2026-11-26 — gzip 일봉 API 속도 우선 최적화와 운영 측정
 - 목적/범위: 사용자 지시에 따라 종단 간 응답 속도를 우선 최적화한다. 무캐시·gzip 단일 파일·공개 무인증·ticker/marketCap/daily 필드·종목당 일봉 최대 20개와 활성 COMMON_STOCK 필터는 유지했다.
 - 구현: `lib/public-daily-export.ts`에서 gzip 레벨을 9에서 3으로 낮추고, 종목 50개 JSON write 묶음과 500 ticker DB batch를 적용했다. 동시 DB query 5개, 5초 heartbeat flush를 유지했고 50종목마다 수행하던 강제 flush를 제거했다. 레벨 1은 같은 API payload에서 압축을 조금 더 빨리 했으나 파일이 커졌다. level 3는 level 1 대비 압축 시간이 KR 6.32ms, US 23.15ms 늘고 gzip 크기를 KR 75,939B(4.9%), US 157,664B(4.6%) 줄였다. Node.js 공식 zlib 문서는 낮은 압축 레벨일수록 더 빠르지만 압축률이 낮다고 설명한다.

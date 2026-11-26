@@ -96,6 +96,7 @@ describe("public gzip daily export", () => {
     expect(sql).toContain("c.trading_value::text ~");
     expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
+    expect(sql).not.toContain("row_to_json(export_item)");
     expect(sql).toContain("AS item_json");
     expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LIMIT 20");
@@ -158,6 +159,29 @@ describe("public gzip daily export", () => {
     expect(response.status).toBe(200);
     expect(batchSizes).toEqual([500, 500, 1]);
     expect(queryMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps batch lookups within the 10-connection pool ceiling", async () => {
+    let active = 0;
+    let peakActive = 0;
+    queryMock
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 5_501 }, (_, index) => ({ market: "KOSPI", code: `T${index}`, has_trading_value: true })),
+      })
+      .mockImplementation(async () => {
+        active += 1;
+        peakActive = Math.max(peakActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active -= 1;
+        return { rows: [makeRow("KOSPI", "005930", "KRW")] };
+      });
+
+    const response = await getKrExport();
+    await response.arrayBuffer();
+
+    expect(response.status).toBe(200);
+    expect(queryMock).toHaveBeenCalledTimes(13);
+    expect(peakActive).toBe(10);
   });
 
   it("keeps the gzip response flowing while a database batch is pending", async () => {
