@@ -280,3 +280,14 @@ Local `scripts/dev-server.mjs` API comparison on the same DB and ticker universe
 Completed-response server stream medians were KR 290ms→266ms and US 577ms→528ms, about 8.3%/8.5% lower. The DB wave timings were similar, consistent with better overlap rather than fewer DB operations. Candidate gzip outputs were fully decompressed and parsed: 2,352 KR/5,012 US tickers, required fields present, returnedCount matched candles, max20, XFL0. Route tests pass 13/13, including a delayed later batch proving that an earlier completed batch reaches the stream before that delay finishes, and the sorted output remains intact.
 
 This local dataset is smaller than operating production, and it does not prove an operational speed gain. The change is a viable candidate for deployment and same-client repeat measurement; keep it only if operator results improve without API-contract violations or a meaningful total-time regression. Failed downloads are excluded and recorded separately. No DB schema/index or output contract changes are part of the candidate.
+
+### Completed-batch streaming overlap deployment measurement
+
+Commit `51ba4782` deployed through OCI workflow `45832024763`; verify, standalone packaging, upload, and activation succeeded. After deployment, five valid full-response downloads per market were collected from the same public host. Every successful response returned HTTP200 and `application/gzip`, omitted `Content-Encoding`, decompressed as gzip, parsed as the expected ticker/marketCap/daily array, had matching `returnedCount`, and stayed at or below 20 candles. Ticker counts were KR2,337 and US5,011; raw sizes were 8,907,188B and 18,964,448B.
+
+| Market | Before times (s), 3 valid | Candidate times (s), 5 valid | Median before → candidate | Median change | Candidate gzip range | Failed attempts |
+|---|---|---|---:|---:|---:|---:|
+| KR | 22.36 / 12.51 / 8.10 | 40.88 / 14.75 / 9.73 / 4.68 / 8.21 | 12.51 → 9.73 | -22.2% | 1,524,637–1,525,025B | 0 |
+| US | 62.37 / 44.54 / 75.82 | 41.38 / 44.16 / 55.09 / 54.83 / 43.41 | 62.37 → 44.16 | -29.2% | 3,542,645–3,543,073B | 1: connection terminated after 60.31s; retry succeeded |
+
+This is a strong positive operating signal consistent with the local warmed improvement (KR -8.1%, US -6.6%) and lower server stream timing, while response sizes remained essentially unchanged. The before sample has only three valid calls, operating load is uncontrolled, and one US candidate call failed; therefore the percentages are observed medians, not a controlled causal estimate or availability improvement. Keep the candidate deployed, continue gathering repeated same-client measurements, and treat connection termination as a separate reliability issue. Response schema, ordering, gzip level, concurrency, DB batch size, and candle limit were not changed.
