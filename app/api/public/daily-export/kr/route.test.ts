@@ -204,7 +204,7 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
-  it("splits US ticker universes into bounded 500-ticker lookup batches", async () => {
+  it("splits US ticker universes into bounded 1,000-ticker lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
         rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "NAS", code: `T${index}`, has_trading_value: true })),
@@ -218,10 +218,10 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([500, 500, 500, 500, 500, 1]);
+    expect(batchSizes).toEqual([1_000, 1_000, 501]);
   });
 
-  it("keeps US batch lookups within ten concurrent queries", async () => {
+  it("keeps US batch lookups in one wave below ten concurrent queries", async () => {
     let active = 0;
     let peakActive = 0;
     queryMock
@@ -240,8 +240,8 @@ describe("public gzip daily export", () => {
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
-    expect(queryMock).toHaveBeenCalledTimes(13);
-    expect(peakActive).toBe(10);
+    expect(queryMock).toHaveBeenCalledTimes(7);
+    expect(peakActive).toBe(6);
   });
 
   it("keeps KR batch lookups at five concurrent queries", async () => {
@@ -327,6 +327,40 @@ describe("public gzip daily export", () => {
     expect(payload).toHaveLength(501);
     expect(payload[0].ticker.code).toBe("T0000");
     expect(payload.at(-1).ticker.code).toBe("T0500");
+  });
+
+  it.each([
+    ["KR", getKrExport, "KOSPI", "KRW", 500],
+    ["US", getUsExport, "NAS", "USD", 1_000],
+  ] as const)("uses the configured %s public export batch size", async (market, getExport, exchange, currency, batchSize) => {
+    const universeRows = Array.from({ length: batchSize + 1 }, (_, index) => ({
+      market: exchange,
+      code: `T${String(index).padStart(5, "0")}`,
+      has_trading_value: true,
+    }));
+    let offset = 0;
+    queryMock
+      .mockResolvedValueOnce({ rows: universeRows })
+      .mockImplementation(async () => {
+        const batch = universeRows.slice(offset, offset + batchSize);
+        offset += batchSize;
+        return { rows: batch.map(({ market: itemMarket, code }) => makeRow(itemMarket, code, currency)) };
+      });
+
+    const response = await getExport();
+    const compressed = Buffer.from(await response.arrayBuffer());
+    const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
+    const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
+      JSON.parse((query as { values: [string] }).values[0]).length,
+    );
+
+    expect(response.status).toBe(200);
+    expect(payload).toHaveLength(batchSize + 1);
+    expect(batchSizes).toEqual([batchSize, 1]);
+    expect(payload.every((item: { ticker: { market: string }; marketCap: unknown; daily: { candles: unknown[] } }) =>
+      item.ticker.market === exchange && item.marketCap && item.daily.candles.length <= 20,
+    )).toBe(true);
+    expect(market).toBe(exchange === "KOSPI" ? "KR" : "US");
   });
 
   it("returns 503 when the read-only export query fails", async () => {

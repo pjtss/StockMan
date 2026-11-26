@@ -525,3 +525,19 @@ Node.js v22 `createGzip`는 `strategy` 옵션을 지원하고 [zlib 공식 설�
 8쌍마다 응답 HTTP200, gzip 해제·JSON parse, 필수 필드·returnedCount·최대20봉을 확인했다. level8은 KR에서 3.4% 느렸고 US의 0.8% 개선은 작은 노이즈 범위라 두 시장 공통 속도 개선으로 판정하지 않는다. gzip 크기도 같아 전송 이득이 없다. RFC1952 XFL은 level9에서2, level8에서0이므로 gzip 형식/압축해제는 유지되지만 기존 XFL2 테스트 단언은 level8 후보에 호환되지 않는다.
 
 판정은 level8 기각, 배포 없음이다. 기능 파일은 배포 HEAD 상태로 되돌렸고 `git diff --check`를 통과했다. 이 로컬 DB 측정은 OCI 운영 속도의 증거가 아니므로 기존 운영 기준(level9 + filtered + chunk64KB)을 유지한다. 더 큰 개선 기회는 API 로그의 DB query·stream timing을 분석해 실제 병목을 식별하는 것이며, 요청당 gzip 코드를 바꾸기 전에 동일 계약으로 대조 검증한다.
+## 2026-11-27 — 미국 batch 500→1,000 후보 로컬 실측 및 운영 확인 대기
+
+현재 운영 코드의 batch500은 5,012개 미국 ticker를 11개 query로 분리해 동시성10의 2 wave로 실행한다. 국내 ticker 2,352개는 기존 500 batch로 한 wave다. 미국만 1,000으로 설정하면 6개 query가 한 wave 안에서 끝나며, gzip level9·Z_FILTERED·64KB chunk와 공개 payload 계약은 유지된다.
+
+`npm run dev`가 `.env.local`을 주입하는 같은 로컬 DB에서 전체 GET을 반복했다. Baseline은 KR/US 5회, 후보 KR500/US1000은 각6회이며 첫 compile 호출은 client median에서 제외했다.
+
+| 시장 | 설정 전 median | KR500/US1000 후보 median | gzip bytes | raw JSON bytes | 티커 |
+|---|---:|---:|---:|---:|---:|
+| KR | 586.0ms | 577.4ms | 1,178,244 | 8,966,992 | 2,352 |
+| US | 1,016.6ms | 989.5ms | 2,797,603 | 19,359,853 | 5,012 |
+
+KR 변경은 없으며 1.5% 시간 차이는 노이즈 범위다. US 후보는 2.7% 단축 신호다. 앱 내부 로그 기준 US batch query wall 중앙값은 약379→312ms, query 수 11→6, wave 2→1, totalElapsed 중앙값 약927→876.5ms였다. raw JSON 및 gzip 크기는 그대로다. 모든 비교 응답 HTTP200이었고 gzip 해제, JSON parse, ticker/marketCap/daily 필드, returnedCount, 최대20봉이 확인됐다. 독립적인 이전 1,000 batch 측정에서는 US 5회 median이 949ms였으나 공정한 paired production 비교가 아니므로 방향 참고만 한다.
+
+US 동시 query 수는 10 이하로 유지되며 이 workload에서 6개 chunk가 한 wave다. 큰 요청 parameter가 각 query의 per-query CPU/메모리를 높일 수 있으므로 운영 DB 영향은 아직 확인이 필요하다. 전체 `deploy:verify`를 통과시킨 후 OCI에 후보를 배포하고, 운영 KR/US를 각각 5회 이상 다시 다운로드해 상태 코드·계약·gzip bytes·전체시간·first byte를 기록한다. 운영 US 속도 개선이 재현되지 않거나 DB 부담/응답 지연이 증가하면 batch500으로 되돌려 재검증·재배포한다.
+
+`app/api/public/daily-export/kr/route.test.ts`는 KR500/US1000의 입력 경계를, 미국 5,501 ticker에서 6개 query만 동시에 실행되는 점을 회귀 게이트로 검증한다 (대상 15 tests 통과). 구현과 보고서 변경 파일: `lib/public-daily-export.ts`, 해당 route test, 본 보고서, `DEVELOPMENT_LOG.md`.
