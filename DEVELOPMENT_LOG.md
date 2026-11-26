@@ -1,3 +1,9 @@
+### 2026-11-27 — public daily export gzip windowBits 15→14 후보
+- 공식문서/목적: Node.js v24 zlib 문서는 deflate 메모리에서 windowBits가 2의 거듭제곱으로 비용에 반영되고 작은 window가 일반적으로 압축률을 낮출 수 있다고 안내한다. level9/Z_FILTERED/chunk64KB/gzip API 계약은 유지하고 actual API 전체 응답 속도가 빨라지는지 측정했다. local Node는 v24.14.0, deploy workflow production runtime은 Node22라 운영 확인 필요.
+- 두 순서 A/B, 각 시장/버전 9 warmed GET: baseline→candidate median KR638→450ms, US1,127→910ms; reversed candidate→baseline KR448→609ms, US926→1,081ms. gzip bytes는 KR1,178,244→1,171,044(-0.61%), US2,797,603→2,807,759(+0.36%). 모든 응답 HTTP200/XFL2, gunzip, JSON schema/max20 통과; raw JSON SHA-256 동일.
+- 판정/위험: 양 순서·양 시장에서 local API median이 후보 우세라 운영 후보로 채택한다. US gzip은 약10KB 늘 수 있으며 운영 저속 회선에서 전송 지연이 상쇄할 수 있다. windowBits만 15→14로 변경했다. 압축 크기와 API latency를 함께 운영에서 측정하며, 정확한 효과는 Node22 OCI 운영 측정에 의존한다.
+- 파일/검증/배포: lib/public-daily-export.ts. route test 15/15는 candidate 적용 상태에서 통과. 전체 deploy:verify 후 코드 배포, OCI activate, 운영 KR/US 반복 GET 및 보고서 갱신 예정이다. OCI 배포 전 미확정; operating 결과가 회귀/이득 부재면 원복하고 다시 전체 검증·배포한다.
+
 ### 2026-11-27 — 일봉 export 요청 키 인코딩·정렬 성능 후보 기각
 - 목적/범위: 실제 PostgreSQL batch path의 직렬화/정렬 비용을 줄이는 두 후보를 배포 HEAD와 같은 local API/DB에서 반복 비교했다. 각 market의 첫 warm-up 요청 제외 후 7회, 전체 gzip 응답 gunzip·JSON·ticker/marketCap/daily/max20 계약 검사.
 - jsonb_to_recordset → unnest candidate: 대상 API 테스트 15/15, KR/US output gzip bytes는 각각 1,178,244/2,797,603B로 동일. median은 KR629→644ms(+2.4%), US1,103→1,533ms(+39.0%)로 회귀해 기각. 세 배열 parameter 처리/계획 비용 가운데 원인은 별도 계측하지 않아 미확정. 코드 복원, 운영 배포 없음.

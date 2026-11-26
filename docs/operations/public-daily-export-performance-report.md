@@ -602,3 +602,19 @@ US 동시 query 수는 10 이하로 유지되며 이 workload에서 6개 chunk�
 | US | 1,185 / 1,190 / 1,159 / 1,415 / 1,184 / 1,104 / 1,202ms | 1,334 / 1,155 / 1,223 / 1,230 / 1,267 / 1,195 / 1,173ms | 1,185→1,223ms (+3.2%) | 2,797,603, 불변 |
 
 두 후보 모두 로컬 실제 API에서 이득이 없거나 명확한 회귀를 보여 배포하지 않았다. 현재 코드와 회귀 테스트는 배포된 market/code 정렬 및 JSONB 입력으로 복구했다. 이후 SQL 변경은 mock route test 외에 실제 DB API GET을 먼저 실행해 쿼리 문법·alias·필드 누락을 잡고, 전체 응답 중앙값이 양 시장에서 나아지는 경우에만 운영 후보로 삼는다. 이 실험 결과와 미배포 상태를 DEVELOPMENT_LOG.md에 기록했다.
+
+
+## 2026-11-27 — gzip windowBits 15→14 속도 후보
+
+Node.js v24.14.0 local API/DB에서 gzip level9, Z_FILTERED, output chunk64KB를 유지하고 deflate windowBits만 기본15에서14로 바꿨다. 공식 [Node.js v24 zlib 문서](https://nodejs.org/download/release/v24.20.0/docs/api/zlib.html#memory-usage-tuning)는 압축 메모리의 windowBits 항이 2의 거듭제곱으로 변하며 작은 window가 일반적으로 압축률을 떨어뜨릴 수 있다고 설명한다. 운영 workflow의 production runtime은 Node22이므로 동일 효과는 OCI 배포 후 검증 전까지 미확정이다.
+
+같은 DB/Next.js API에서 순서를 바꾼 두 비교 block을 실행했다. 각 block/market/version 10회 중 첫 warm-up을 제외해 9개 전체 응답을 측정했다. 모두 HTTP200, gzip XFL2, gunzip/JSON, ticker·marketCap·daily 및 최대20봉을 통과했다. 기준과 후보의 decompress된 raw JSON은 시장별 SHA-256이 같았다.
+
+| 비교 순서 | 시장 | 기준 windowBits15 median | 후보 windowBits14 median | 변화 | gzip bytes 기준→후보 |
+|---|---|---:|---:|---:|---:|
+| 기준→후보 | KR | 638ms | 450ms | -29.5% | 1,178,244→1,171,044 (-0.61%) |
+| 기준→후보 | US | 1,127ms | 910ms | -19.3% | 2,797,603→2,807,759 (+0.36%) |
+| 후보→기준 | KR | 609ms | 448ms | -26.4% | 1,178,244→1,171,044 (-0.61%) |
+| 후보→기준 | US | 1,081ms | 926ms | -14.3% | 2,797,603→2,807,759 (+0.36%) |
+
+candidate full API median이 양쪽 순서에서 줄고 DB query wall은 비슷했으며 gzip payload 크기 변화는 KR 감소/US +0.36%였다. local signal은 일관되나 개발 서버와 production Node 버전/하드웨어가 다르다. windowBits14를 OCI 운영 후보로 배포하고 동일 public GET을 시장별 최소5회 실행해 전체완료시간·first byte·gzip bytes·gzip 해제 계약을 확인한다. 운영에서 속도 이득이 사라지거나 US 전송 지연이 늘면 기본15로 원복하고 재검증·재배포한다. 현재 candidate 변경은 lib/public-daily-export.ts 한 파일이며 아직 커밋·배포하지 않았다.
