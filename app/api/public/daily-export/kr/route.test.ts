@@ -47,7 +47,8 @@ describe("public gzip daily export", () => {
     const response = await getExport();
     const compressed = Buffer.from(await response.arrayBuffer());
     const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
-    const [sql] = queryMock.mock.calls[0] as [string];
+    const [eligibilitySql] = queryMock.mock.calls[0] as [string];
+    const [sql, requestParameter] = queryMock.mock.calls[1] as [string, string];
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/gzip");
@@ -75,7 +76,11 @@ describe("public gzip daily export", () => {
       },
     }]);
     expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
-    expect(sql).toContain(`FROM ${universeTable} u`);
+    expect(eligibilitySql).toContain(`FROM ${universeTable} u`);
+    expect(eligibilitySql).toContain("u.instrument_type='COMMON_STOCK'");
+    expect(sql).toContain("FROM jsonb_to_recordset($1::jsonb)");
+    expect(JSON.stringify(requestParameter)).toContain(code);
+    expect(sql).toContain(`JOIN ${universeTable} u`);
     expect(sql).toContain(`FROM ${candleTable} c`);
     expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
     expect(sql).toContain("to_jsonb(c)->>'trading_value'");
@@ -86,7 +91,7 @@ describe("public gzip daily export", () => {
       expect(sql).toContain("COALESCE(u.english_name, '') !~*");
       expect(sql).toContain("COALESCE(u.name, '') !~*");
     }
-    expect(queryMock).toHaveBeenCalledTimes(1);
+    expect(queryMock).toHaveBeenCalledTimes(2);
   });
 
   it("returns 503 when the official active common-stock universe is empty", async () => {
@@ -105,7 +110,24 @@ describe("public gzip daily export", () => {
 
     expect(first.headers.get("cache-control")).toContain("no-store");
     expect(second.headers.get("cache-control")).toContain("no-store");
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("splits large ticker universes into bounded lookup batches", async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "KOSPI", code: `T${index}` })),
+      })
+      .mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
+
+    const response = await getKrExport();
+    const batchSizes = queryMock.mock.calls.slice(1).map(([, parameters]) =>
+      JSON.parse((parameters as [string])[0]).length,
+    );
+
+    expect(response.status).toBe(200);
+    expect(batchSizes).toEqual([1_250, 1_250, 1]);
+    expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
   it("returns 503 when the read-only export query fails", async () => {

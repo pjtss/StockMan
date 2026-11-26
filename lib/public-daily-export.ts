@@ -30,6 +30,8 @@ type ExportRow = {
   returned_count: number | string | null;
 };
 
+type ExportKey = { market: string; code: string };
+
 const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
   candleTable: string;
@@ -88,7 +90,25 @@ function errorResponse() {
 export async function getPublicDailyExport(market: ExportMarket) {
   const { universeTable, candleTable, eligibility } = EXPORT_CONFIG[market];
   try {
-    const result = await getPool().query<ExportRow>(`
+    const pool = getPool();
+    const eligible = await pool.query<ExportKey>(`
+      SELECT u.market, u.code
+        FROM ${universeTable} u
+       WHERE ${eligibility}
+       ORDER BY u.market, u.code
+    `);
+    if (eligible.rows.length === 0) return errorResponse();
+
+    const chunkSize = 1_250;
+    const chunks: ExportKey[][] = [];
+    for (let index = 0; index < eligible.rows.length; index += chunkSize) {
+      chunks.push(eligible.rows.slice(index, index + chunkSize));
+    }
+    const chunkResults = await Promise.all(chunks.map((keys) => pool.query<ExportRow>(`
+      WITH requested AS (
+        SELECT market, code
+          FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
+      )
       SELECT u.market, u.code, u.name,
              f.market_cap,
              COALESCE(NULLIF(f.currency, ''), CASE WHEN u.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END) AS market_cap_currency,
@@ -98,7 +118,8 @@ export async function getPublicDailyExport(market: ExportMarket) {
              d.latest_candle_date,
              d.data_updated_at,
              COALESCE(d.returned_count, 0)::int AS returned_count
-        FROM ${universeTable} u
+        FROM requested r
+        JOIN ${universeTable} u ON u.market = r.market AND u.code = r.code
         LEFT JOIN instrument_fundamental_snapshots f
           ON f.market = u.market AND f.code = u.code
         LEFT JOIN LATERAL (
@@ -135,11 +156,11 @@ export async function getPublicDailyExport(market: ExportMarket) {
         ) d ON TRUE
        WHERE ${eligibility}
        ORDER BY u.market, u.code
-    `);
+    `, [JSON.stringify(keys)])));
+    const rows = chunkResults.flatMap((result) => result.rows);
+    if (rows.length === 0) return errorResponse();
 
-    if (result.rows.length === 0) return errorResponse();
-
-    const items = result.rows.map((row) => {
+    const items = rows.map((row) => {
       const rawMarketCap = row.market_cap === null ? null : Number(row.market_cap);
       const marketCapValue = rawMarketCap !== null && Number.isFinite(rawMarketCap) && rawMarketCap > 0
         ? rawMarketCap

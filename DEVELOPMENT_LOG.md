@@ -1,4 +1,12 @@
-### 2026-11-26 — 공개 gzip 일봉 API 응답 스트리밍 개선
+### 2026-11-26 — 공개 gzip 일봉 운영 조회 병렬 분할
+- 목적/범위: gzip 스트리밍 배포 후 운영에서 KR 약 49초 200, US 약 60초 504가 재현돼 시장별 일봉 조회를 종목 1,250개 단위로 나누고 병렬 처리한다. 데이터 계약과 gzip level 9, 20봉 상한, 무캐시, 종목분류 정책은 유지한다.
+- 원인 근거: 첫 응답 헤더까지 US 약 60초가 걸려 지연이 응답 본문 gzip 전이 아닌 초기 DB 조회/결과 처리 구간에 있음을 확인했다. DB 서버 내부의 정확한 원인(스토리지, CPU, 실행 계획)은 아직 미확인이다.
+- 구현: 활성 COMMON_STOCK universe key를 먼저 읽고, key 집합을 JSON recordset으로 1,250개씩 최대 5개 DB query에 나눠 병렬 조회한다. 각 쿼리는 기존 복합인덱스 기반 종목별 최신 20봉 조회를 유지한다. 이전 set-based 전체 candle scan 시험은 로컬에서 US 65초로 느려 최종 변경에 채택하지 않았다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그.
+- 재발 자동 감지: API 테스트는 2단계 조회, 대상 ticker 전달, no-store gzip level9, 무인증 경로 및 20봉 한계를 검사한다.
+- 검증: 로컬 PostgreSQL 실제 데이터 dev-server smoke에서 KR 2,352종목/1,215,865B/최대 20봉/1.4초, US 5,012종목/2,853,893B/최대 20봉/2.5초. 스트리밍만 적용한 직전 운영 배포에서는 KR 2,337종목/1,254,399B/최대 20봉/49.1초 200, US는 60.4초 504로 실패했다. 병렬 분할 수정 후 API 테스트 6개와 typecheck 통과. 전체 `npm run deploy:verify` 통과(283 test files passed/1 skipped, 1,644 tests passed/3 skipped; production build, standalone·Chrome smoke, docs/audits 포함). 운영 재배포 및 GET 검증은 커밋 이후 수행한다.
+- 남은 위험/다음 개선: 수정 배포 후 운영 KR·US 각 응답상태, 헤더 도착, 전체 다운로드 시간, 종목수, gzip 해제, daily bar 상한을 측정한다. 계속 느리면 운영 PostgreSQL 실행계획/IO 및 app CPU 관측이 필요하다.
+- 커밋·푸시·배포: 전체 로컬 검증 완료. 병렬 분할 커밋·푸시와 운영 재검증 대기.### 2026-11-26 — 공개 gzip 일봉 API 응답 스트리밍 개선
 - 목적/범위: 운영 KR/US API에서 관측된 약 60초 nginx 504를 줄이기 위해 gzip level 9 응답을 메모리에 전부 만든 뒤 전송하던 방식을 스트리밍으로 변경했다. JSON 응답 필드, 일봉 20개 상한, 매 호출 DB 재조회는 유지한다.
 - 원인 근거: 기존 응답은 전체 DB 결과를 모아 gzip `Buffer` 생성이 끝날 때까지 응답 헤더/본문을 반환하지 않았다. 운영에서 KR 200/약 31초 및 KR·US 504/약 60초가 관측됐다. 프록시가 응답 시작 전 기다리는 시간이 한 원인일 수 있다는 추론이며, DB·CPU별 지연 분해자료는 미확인이다.
 - 가설 정정: 시가총액 snapshots 테이블은 migration V72에서 `(market, code)` UNIQUE이므로 과거 스냅샷 중복 조인 가설은 틀렸다. 그 가설로 추가한 lateral join은 되돌렸다. 스키마나 인덱스는 변경하지 않았다.
