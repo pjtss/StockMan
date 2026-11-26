@@ -365,3 +365,11 @@ Relative to the immediately preceding three-call operating sample (KR median11.0
 동일한 로컬 API/DB의 기준·후보 gzip 응답을 각 시장 6회 수집했다. 모든 12개 응답은 gunzip 후 원본 JSON 바이트가 기준과 일치했다. KR 2,352 ticker/8,966,992 raw bytes/1,506,865 gzip bytes, US 5,012 ticker/19,359,853 raw bytes/3,491,027 gzip bytes다. 응답 행마다 ticker, marketCap, daily 필드, `returnedCount`와 candle 개수 일치, 최대20봉을 검사했다. 대상 품질 predicate와 공개 KR/US route 테스트 15개가 통과했다. 이 반복 비교에서 candidate 전체 응답 시간 샘플을 보존하지 못해 개선률은 보고하지 않는다. 이전 기준 warmed median은 KR310ms, US720ms였다. 따라서 성능 이득은 미확정이다.
 
 운영 배포 PostgreSQL major 버전과 로컬 `DATABASE_URL`은 확인할 수 없었다. 실제 SQL 연산은 NUMERIC 리터럴 비교이며 배포 후 양쪽 공개 API 호출이 호환 여부를 확인한다. 운영 중 예외 또는 데이터 계약 실패가 발생하면 조건 변경을 복구한다. 다음 단계는 전체 배포 검증 뒤 운영 API를 시장별 반복 호출해 HTTP/gzip/JSON/20봉 계약과 시간을 측정하는 것이다.
+
+### 공개 일봉 numeric 필터 배포 및 운영 확인
+
+커밋 `ccce3836`의 OCI `Deploy OCI` 실행 `45851910904`는 GitHub run 화면에서 `completed successfully`로 확인했다. 로컬 `npm run deploy:verify`는 283개 테스트 파일 통과/1개 skip, 1,651 passed/3 skipped, typecheck, 문서/API/security/cron 감사, production build, standalone HTTP 및 Chrome desktop/mobile smoke를 통과했다. 운영 health GET은 HTTP200이다.
+
+배포 후 동일 공개 host에서 KR 전체 gzip 다운로드를 3회, US를 2회 성공적으로 완료했다. 모두 HTTP200, `application/gzip`, `Content-Encoding` 없음, `no-store`, gunzip/JSON 파싱, ticker/marketCap/daily, `returnedCount` 일치와 최대20봉을 확인했다. KR은 2,337 ticker, raw 8,907,188B, gzip 1,524,873/1,524,637/1,524,956B, 시간 21.57/22.79/6.15초(median21.57초). US는 5,011 ticker, raw 18,964,448B, gzip 3,542,699/3,542,606B, 시간 57.51/59.99초(median58.75초). 연속 US 추가 요청 중 세 건은 HTTP502로 완료되지 않았고, 20초 간격 후 재시도는 성공했다. 오류 호출은 성능 표본에 넣지 않았다.
+
+운영 표본은 작고 API/네트워크 부하가 통제되지 않아 numeric 문자열 변환 제거의 운영 속도 효과는 입증되지 않았다. 502는 성공 측정과 별도 가용성 신호로 남긴다. SQL은 NUMERIC 상한 비교로 유지하고, 후속 운영 반복에서는 간격을 둬 502 발생률과 완료시간을 함께 본다. 테스트는 다섯 숫자 열 각각의 Infinity 상한을 검사하도록 보강했다. 보고서 변경 커밋 전 전체 `deploy:verify`를 다시 수행한다.

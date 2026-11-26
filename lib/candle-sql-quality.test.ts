@@ -11,8 +11,9 @@ describe("daily candle SQL quality predicate", () => {
     expect(predicate).toContain("c.high >= GREATEST(c.open, c.low, c.close)");
     expect(predicate).toContain("c.low <= LEAST(c.open, c.high, c.close)");
     expect(predicate).toContain("c.volume >= 0");
-    expect(predicate).toContain("c.open < 'Infinity'::numeric");
-    expect(predicate).toContain("c.volume < 'Infinity'::numeric");
+    for (const column of ["open", "high", "low", "close", "volume"]) {
+      expect(predicate).toContain(`c.${column} < 'Infinity'::numeric`);
+    }
     expect(predicate).not.toContain("::text NOT IN ('NaN','Infinity','-Infinity')");
   });
 
