@@ -1,3 +1,9 @@
+### 미국 batch1,000 OCI 운영 결과
+- 코드 commit `43145d2e`, OCI Deploy run `45895497067` 성공 및 release activation 완료.
+- 배포 직후 운영 KR/US 공개 GET 각각 5회. 모두 HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL2, gzip 해제·JSON 파싱, ticker·marketCap·daily 필드, returnedCount 일치, 최대20봉 계약 통과.
+- KR 완료시간22.651/7.363/4.229/4.193/7.739초(median7.363), first body byte median0.201초, gzip median1,219,867B, raw8,907,188B, 2,337 ticker. US49.507/53.533/57.860/42.701/47.198초(median49.507), first body byte median0.377초, gzip median2,819,277B, raw18,964,448B, 5,011 ticker.
+- 직전 Z_FILTERED 운영 5회 median KR13.904초/US48.347초와 비교 시 이번 KR/US 완료시간은 더 짧거나 약간 길지만 운영부하·전송률이 통제되지 않아 인과 결론은 보류한다. US 첫 body byte median은0.814→0.377초로 낮았으나 total 다운로드는49.507초였고 후반 전송이 지배했다. 미국 batch 11 queries/2 waves→6/1 wave 로컬 신호는 유지하되 운영 latency 개선은 아직 입증되지 않았다. 계속 관측하고 회귀가 반복되면 batch500으로 복구한다.
+- 배포 후 API 데이터와 gzip 용량은 기존 수준이며 응답 계약 위반/502는 이번 10회에서 없었다. 관련 상세 표는 운영 성능 보고서에 기록했다.
 ### 2026-11-27 — 미국 일봉 export batch 크기 500→1,000 후보
 - 근본 병목/목적: 실제 로컬 API timing에서 미국은 5,012 ticker라 batch500 기준 11개 candle 조회가 2 wave로 실행됐다. gzip stream은 DB 조회와 동시에 내려가지만 두 번째 wave 대기가 남는다. 미국에 한해 batch1,000이면 6개 쿼리를 1 wave로 완료할 수 있어 운영 GET 시간을 줄이는 후보로 평가했다. 국내 2,352 ticker는 500 설정을 그대로 유지한다.
 - 로컬 실측: `scripts/dev-server.mjs` + `.env.local`의 로컬 DB에서 baseline KR/US 각 5회, 최종 config KR500/US1000 각 6회 GET. 첫 호출 제외 client median KR586→577.4ms(-1.5%; 국내 설정·데이터는 동일해 노이즈 범위), US1,016.6→989.5ms(-2.7%). US raw JSON 19,359,853B와 gzip 2,797,603B 불변, 5,012 ticker. paired 일부 실행 중 source reload 등 로컬 조건 변동이 있으므로 이를 운영 효과로 간주하지 않는다.

@@ -541,3 +541,15 @@ KR 변경은 없으며 1.5% 시간 차이는 노이즈 범위다. US 후보는 2
 US 동시 query 수는 10 이하로 유지되며 이 workload에서 6개 chunk가 한 wave다. 큰 요청 parameter가 각 query의 per-query CPU/메모리를 높일 수 있으므로 운영 DB 영향은 아직 확인이 필요하다. 전체 `deploy:verify`를 통과시킨 후 OCI에 후보를 배포하고, 운영 KR/US를 각각 5회 이상 다시 다운로드해 상태 코드·계약·gzip bytes·전체시간·first byte를 기록한다. 운영 US 속도 개선이 재현되지 않거나 DB 부담/응답 지연이 증가하면 batch500으로 되돌려 재검증·재배포한다.
 
 `app/api/public/daily-export/kr/route.test.ts`는 KR500/US1000의 입력 경계를, 미국 5,501 ticker에서 6개 query만 동시에 실행되는 점을 회귀 게이트로 검증한다 (대상 15 tests 통과). 구현과 보고서 변경 파일: `lib/public-daily-export.ts`, 해당 route test, 본 보고서, `DEVELOPMENT_LOG.md`.
+### 미국 batch1,000 OCI 운영 배포 후 실측
+
+코드 commit `43145d2e`의 [OCI Deploy run 45895497067](https://github.com/pjtss/StockMan/actions/runs/45895497067)은 Verify deployment, standalone 패키징, release upload 및 Activate release까지 성공했다. 공개 KR/US endpoint를 활성화 뒤 각각 5회 순차 다운로드했다. 전체 10회가 HTTP200, `application/gzip`, `Content-Encoding` 없음, `no-store`, gzip XFL2, gunzip 및 JSON parse를 통과했고 각 항목의 ticker·marketCap·daily, `returnedCount`, 최대20봉 계약을 확인했다.
+
+| 시장 | 전체 완료 시간 | 중앙값 | first-body-byte median | gzip median | raw bytes | ticker |
+|---|---|---:|---:|---:|---:|---:|
+| KR | 22.651 / 7.363 / 4.229 / 4.193 / 7.739초 | 7.363초 | 0.201초 | 1,219,867B | 8,907,188 | 2,337 |
+| US | 49.507 / 53.533 / 57.860 / 42.701 / 47.198초 | 49.507초 | 0.377초 | 2,819,277B | 18,964,448 | 5,011 |
+
+직전 level9+`Z_FILTERED`+64KB 운영 표본 중앙값(KR13.904초/US48.347초, first body byte KR0.273초/US0.814초) 대비 US full download는 약2.4% 길었고 first body byte는 약53.7% 짧았다. 압축 bytes와 raw bytes는 같은 수준이다. 서로 다른 시점의 비통제 서버/네트워크 표본이므로 두 시간 차이를 batch 설정의 인과 효과로 보지 않는다. API 완료시간은 first byte 뒤 수신 시간이 대부분을 차지한다.
+
+판정: 미국 1,000 batch는 DB query를 11개 두 wave에서 6개 한 wave로 줄이고 로컬 내부 DB wall timing 개선을 보였지만, 운영 full-download 이득은 아직 확인되지 않았다. 공개 JSON/gzip 계약 회귀와 오류는 없다. 현 설정을 유지하며 다음 반복 표본에서 US 전체시간과 first byte를 함께 추적한다. 개선 신호가 재현되지 않거나 운영 지연이 반복 상승하면 미국 batch500 복구 변경을 다시 전체 검증·배포한다. KR batch500은 변경하지 않았다.
