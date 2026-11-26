@@ -100,6 +100,8 @@ describe("public gzip daily export", () => {
     expect(sql).toContain('AS "marketCap"');
     expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LIMIT 20");
+    expect(sql).toMatch(/ORDER BY c\.candle_date DESC\s+LIMIT 20/);
+    expect(sql).not.toContain("ORDER BY c.candle_date DESC, c.fetched_at DESC");
     if (market === "US") {
       expect(sql).toContain("u.is_dr=false");
       expect(sql).toContain("COALESCE(u.english_name, '') !~*");

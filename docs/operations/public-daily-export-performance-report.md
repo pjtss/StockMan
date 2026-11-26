@@ -291,3 +291,63 @@ Commit `51ba4782` deployed through OCI workflow `45832024763`; verify, standalon
 | US | 62.37 / 44.54 / 75.82 | 41.38 / 44.16 / 55.09 / 54.83 / 43.41 | 62.37 → 44.16 | -29.2% | 3,542,645–3,543,073B | 1: connection terminated after 60.31s; retry succeeded |
 
 This is a strong positive operating signal consistent with the local warmed improvement (KR -8.1%, US -6.6%) and lower server stream timing, while response sizes remained essentially unchanged. The before sample has only three valid calls, operating load is uncontrolled, and one US candidate call failed; therefore the percentages are observed medians, not a controlled causal estimate or availability improvement. Keep the candidate deployed, continue gathering repeated same-client measurements, and treat connection termination as a separate reliability issue. Response schema, ordering, gzip level, concurrency, DB batch size, and candle limit were not changed.
+
+## Sliding DB batch scheduling candidate rejected
+
+The current deployed code emits completed DB batches in market/code order and runs no more than the market concurrency. A candidate used a fixed pool of workers to start the next batch as soon as any query slot freed up, rather than waiting until all queries in a 10-query group completed before starting the final US batch. Output ordering and the 10-query limit were preserved. A targeted delayed-query test passed 14/14 overall and showed the final batch starting before the slower first-group queries finished.
+
+For an apples-to-apples local `scripts/dev-server.mjs` comparison, the same local database was measured in two baseline/candidate blocks, six sequential full API responses per market per block, first compile/cold response excluded:
+
+| Block | KR baseline → candidate median | US baseline → candidate median |
+|---|---:|---:|
+| A | 0.37s → 0.40s | 0.71s → 0.73s |
+| B | 0.37s → 0.41s | 0.71s → 0.73s |
+
+Gzip output sizes were unchanged (KR1,506,865B, US3,491,027B). Because full-response times were consistently not faster in either market, despite the queued batch starting earlier, the candidate was rejected and the implementation was restored to the existing fixed-wave scheduler. The candidate route suite passed 14/14 including its temporary scheduling assertion; that assertion was removed with the rejected candidate. Final route test after rollback passed 13/13. This scheduling candidate was not deployed; the already-deployed completed-batch streaming change remains. The experiment suggests that the small final DB batch is not the dominant client completion bottleneck in the local dataset. The retained regression suite continues to check bounded concurrency and ordered streaming contracts.
+
+## Covering-index split candidate rejected (2026-11-26)
+
+The existing candle covering indexes have a `volume > 0` partial predicate, while the public export's validity predicate also admits zero-volume candles. A candidate split recent-candle lookup into positive and zero-volume branches to let the first branch use that index while preserving zero-volume output. Read-only PostgreSQL `EXPLAIN (ANALYZE,BUFFERS)` confirmed that the baseline US lookup chose the regular lookup index (AAPL execution 0.179ms in one warm-cache sample) and a positive-only lookup could choose the covering index (0.230ms in one sample); the zero-volume branch fell back to the regular index and took 4.570ms for that ticker. These single-ticker plans were only a hypothesis, not evidence of whole-request improvement.
+
+Local full API baseline after excluding the first warmed call used the same database and 2,352 KR / 5,012 US symbols. Seven sequential baseline requests measured KR 0.44/0.34/0.31/0.30/0.34/0.39/0.30s and US 0.72/0.68/0.70/0.69/0.72/0.72/0.69s; medians 0.34s and 0.70s. Gzip output stayed 1,506,865B KR and 3,491,027B US.
+
+The first candidate implementation caused PostgreSQL syntax errors at `UNION` for both routes (HTTP500); this was visible in actual route calls and was corrected with parenthesized limited branches. The next candidate run exposed that the US branch also needed to carry the source `trading_value` field used by the existing serializer (HTTP500); this was corrected without changing the response contract. With both branches executing successfully, seven warmed US candidate calls measured 1.48/1.47/1.15/1.24/1.28/1.22s, median 1.26s (about 80% slower than the 0.70s baseline); first request 3.32s excluded. KR successful candidate calls after syntax correction were 0.45/0.14/0.14/0.23/0.12/0.11s after the first 0.86s compile/cold call, but that speed signal is not accepted because US regressed materially. Both outputs retained the exact baseline gzip sizes. Candidate was reverted before any deployment. Baseline source was restored; no schema or response change deployed.
+
+Cause: the extra per-ticker union and merge/order work outweighed the partial-index benefit at full request scale; local single-ticker plans did not predict the broad batched query workload. Detection: keep an actual full API contract and repeated warmed comparison as the gate for query plan changes; current route tests alone mock database execution and did not catch SQL syntax/column errors. Risk/next: local data/host differs from OCI production; pursue candidates that reduce completed end-to-end latency for both markets and validate PostgreSQL execution on real route traffic before considering deployment. No commit/push/deploy was performed for this rejected candidate.
+
+## Initial gzip flush removal candidate rejected (2026-11-26)
+
+The stream writes `[` then performs `Z_SYNC_FLUSH` before waiting for database rows. I removed only this initial flush temporarily so the opening bracket could share the first item write; gzip compression remained one gzip stream at KR level3 / US level2. Same local Next API and database, six sequential calls per market per version, with first cold/compile request excluded:
+
+| Market | Baseline warmed full API (s), median | No-initial-flush candidate warmed (s), median | Baseline → candidate gzip bytes |
+|---|---|---|---|
+| KR | 0.40 / 0.33 / 0.31 / 0.30 / 0.34; 0.33 | 0.36 / 0.29 / 0.29 / 0.30 / 0.30; 0.30 | 1,506,865 → 1,506,858 |
+| US | 0.65 / 0.69 / 0.65 / 0.70 / 0.75; 0.69 | 0.69 / 0.72 / 0.67 / 0.66 / 1.10; 0.69 | 3,491,027 → 3,491,020 |
+
+The complete candidate gzip responses decompressed and parsed: KR2,352 / US5,012 records; every record had ticker, marketCap and daily fields, daily candles arrays within 20, and `daily.metadata.returnedCount` equal to candle count. Candidate response sizes were seven bytes smaller per market. Server timing showed KR warmed stream median approximately289→261ms, but US 546→562ms; warmed client median US was unchanged. Removing the flush did not materially improve both-market completion speed, and KR's small difference is within local timing noise. Candidate was rejected and the original initial flush restored before deployment. No code/schema change deployed.
+
+The initial flush sends a tiny gzip prefix before DB results arrive; keeping it preserves immediate stream-start behavior. Detection/next: compare median full-response completion and server phase values, not first-byte or byte count alone; avoid reworking this flush unless a repeatable end-to-end gain appears without a market regression. The initial-flush control itself is not currently asserted by the mocked route suite.
+
+## 2026-11-26 operating API baseline refresh
+
+Downloaded the current deployed public endpoints sequentially through `PUBLIC_BASE_URL`, saving the complete gzip bodies. Three full downloads per market completed: KR 11.01/10.43/14.24s (median11.01s), US55.73/48.49/52.94s (median52.94s). Gzip sizes were KR1,524,948/1,524,954/1,524,637B and US3,542,658/3,542,680/3,542,756B. Every saved body decompressed and parsed as the established contract: 2,337 KR / 5,011 US ticker records, raw bytes8,907,188/18,964,448, ticker/marketCap/daily fields, returnedCount matches candle count, and max20 candles. A `-PassThru` confirmation request per market explicitly returned HTTP200 and `application/gzip`; no `Content-Encoding` was present, and cache policy was `no-store` (plus existing no-cache directives).
+
+The first two PowerShell measurements per market initially appeared as failed because `Invoke-WebRequest -OutFile` returns no response object by default; accessing `$response.Headers` then threw after the full body had already been saved. This was a measurement-harness classification error, not an HTTP failure. The saved files were independently gzip-decoded and validated, and a follow-up with `-PassThru` captured status and headers. Future `-OutFile` samples must use `-PassThru` to inspect headers, and classify completion from both request outcome and file/body validation.
+
+Compared with the earlier five-response deployed sample (KR median9.73s, US44.16s), these observed medians are 13.2% and19.9% higher. The sample is small and server load/network path are uncontrolled, so it does not establish a regression or cause. OCI host phase logs remain inaccessible in this environment (`~/.oci/config` absent; SSH directory contains only known-host files and no SSH keys); local PostgreSQL/Next timings cannot explain the operating transfer difference. Current production source is unchanged; this is a measurement refresh only. Next priority is obtaining accessible server timing/logs or a production-side repeat with controlled client/network conditions before selecting a code change from this gap.
+
+## Removed a redundant candle sort key (2026-11-26)
+
+The per-ticker candle query selected the latest rows using `ORDER BY candle_date DESC, fetched_at DESC`, but both daily-candle tables enforce `UNIQUE (market, code, timeframe, candle_date)`. For a given ticker/timeframe there cannot be two rows with the same date, and the response's candle array is separately ordered by date ascending. Thus `fetched_at DESC` could never resolve a tie or affect output. PostgreSQL nevertheless planned an Incremental Sort with this extra key. Removing it lets the existing `(market, code, timeframe, candle_date DESC)` lookup index satisfy the top-20 ordering directly.
+
+Actual read-only local PostgreSQL plans changed from `Incremental Sort -> Index Scan` to `Index Scan` with no sort. One warm AAPL plan reported 0.515ms total with the old order and 0.146ms with date-only order; cache state differed, so this per-ticker figure is illustrative, not causal. Full API comparison used two sequential blocks, six calls per market per version, excluding each first post-change/cold response:
+
+| Block | KR baseline → date-only median | US baseline → date-only median |
+|---|---:|---:|
+| A | 0.32s → 0.34s | 0.74s → 0.71s |
+| B | 0.33s → 0.31s | 0.72s → 0.69s |
+| Combined warmed median | 0.325s → 0.315s (-3.1%) | 0.73s → 0.69s (-5.5%) |
+
+The per-block KR difference changed direction, indicating a small/noisy signal. US improved by about4% in both blocks; combined medians improved in both markets. Gzip output bytes were identical (KR1,506,865B; US3,491,027B). Full candidate gzip responses decompressed and parsed and were byte-for-byte identical to their same-data baseline counterparts: 2,352 KR / 5,012 US tickers, matching raw bytes, required ticker/marketCap/daily fields, returnedCount equality, and <=20 candles. Route tests passed 13/13; an assertion now guards the date-only `ORDER BY`. Both tables' live PostgreSQL unique constraints were verified, and migration V67 defines the same constraint.
+
+This is an algebraically safe ordering simplification and a positive local full-response signal, not yet proof of OCI performance. `npm run deploy:verify` passed: production build, standalone/runtime and Chrome smoke, all 283 test files passed with 1 skipped (1,651 tests passed, 3 skipped), typecheck, documentation/API/security/cron audits. Deployment and operating API verification are next. If operating duration regresses materially, restore the tie-breaker and redeploy after the full gate.

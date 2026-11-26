@@ -215,7 +215,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
                  AND c.code = u.code
                  AND c.timeframe = 'D'
                  AND ${validDailyCandleSql("c")}
-               ORDER BY c.candle_date DESC, c.fetched_at DESC
+               ORDER BY c.candle_date DESC
                LIMIT 20
             ) recent
         ) d ON TRUE
