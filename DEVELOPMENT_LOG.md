@@ -9765,3 +9765,10 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - level3 기준(동일 운영 반복): KR median12.358초, US56.361초. level2는 KR 12.3% 느리고 US7.4% 빠르다. 양 시장 gzip bytes는 약2.5% 커졌다. 시간 표본은 부하 통제가 없어 인과효과를 확정할 수 없고 중간 종료가 있었음을 함께 기록한다.
 - 다음 후보: 시장별 `gzipLevel`로 KR3/US2 설정. 로컬 API smoke 5회씩에서 KR median warmed347ms/ gzip1,506,947B/XFL0, US median warmed658ms/3,493,095B/XFL0였다. 운영 속도는 다음 배포 실측으로 판정한다.
 - 변경 파일: `lib/public-daily-export.ts`, 성능 보고서, 본 로그. 전체 검증/커밋/푸시는 다음.
+
+### 2026-11-26 — gzip 시장별 설정 배포 및 운영 재검증
+- 목적/범위: 공개 일봉 gzip API의 완료시간을 줄이기 위해 로컬 및 앞선 운영 관측에서 각각 빠른 후보였던 KR level3, US level2를 배포하고 API별 5회 검증한다.
+- 변경 및 배포: `lib/public-daily-export.ts`에서 시장별 gzip 레벨을 적용했다. 커밋 `4bce6a68`, OCI run `45794000840`의 검증·패키징·업로드·활성화가 모두 성공했다. 헬스체크는 HTTP 200.
+- 운영 실측: 전체 gzip 응답을 순차로 각각 5회 다운로드/해제했다. KR 시간 10.807/5.950/8.705/3.760/3.339초(median5.950), gzip1,524,715–1,525,055B/raw8,925,884B, 2,337 ticker·20봉. US 45.406/60.268/63.608/36.412/50.560초(median50.560), gzip3,542,946–3,543,067B/raw19,004,536B, 5,011 ticker·0–20봉. 모두 HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL0, JSON array/티커/시가총액/일봉/returnedCount/max20 계약 통과.
+- 판정/남은 위험: 직전 양시장 level2 운영 중앙값 KR13.877초/US52.211초와 단순 비교해 각각 57.1%/3.2% 짧았다. 부하를 통제하지 않아 gzip 레벨 변경의 인과 효과로 단정하지 않는다. gzip 크기와 payload 계약은 유지됐고 현 시장별 조합은 유지한다. 속도 자동 회귀 감지를 위해서는 DB 쿼리·gzip CPU·첫/마지막 byte 시간을 분리한 계측 및 동일 조건 반복이 남아 있다.
+- 문서/변경 파일: `lib/public-daily-export.ts`는 기존 코드 커밋에 포함; 운영 성능 보고서와 본 로그에 측정/배포 내용을 추가했다. 문서 수정은 `npm run deploy:verify` 후 별도 커밋·푸시·배포 예정.
