@@ -1,3 +1,7 @@
+### 2026-11-26 — zlib memLevel 성능 후보 기각
+- 목적/범위: 공식 Node.js zlib의 메모리 tradeoff를 근거로 기본 `memLevel: 8`에서9로 높이는 속도 후보를 로컬 API에서 비교했다. 구현은 임시 수정 후 `createGzip({ level })` 기본 설정으로 복구했다.
+- 측정/검증: 로컬 API 시장별 6회 요청, 첫 cold/compile 제외한 5회 warmed median KR344ms/US862ms였다. 같은 경로 기본값 baseline KR350ms/US706ms 대비 KR1.7% 짧지만 US22.1% 길었다. gzip 크기 KR1,506,947→1,504,980B, US3,493,095→3,488,107B; raw bytes/종목 수(2,352/5,012)/JSON fields/returnedCount/max20/XFL0은 유지됐다.
+- 판정/위험/다음: US 회귀와 미미한 크기 이득, 동시 요청당 약128 KiB 추가 메모리 비용 때문에 후보를 기각했고 운영 배포하지 않았다. 코드 기본 설정을 복구했다. 운영 DB/network 구간 시간을 읽을 수 있는 OCI 로그 접근이나 동일 조건 운영 반복을 확보해 compression CPU와 전송 영향을 분리한다. 보고서에 결과를 기록했다. 공식 근거: Node.js v22 zlib memory usage tuning (https://nodejs.org/download/release/latest-jod/docs/api/zlib.html#memory-usage-tuning).
 ### 2026-11-26 — zlib 출력 버퍼 크기 성능 후보 기각
 - 목적/범위: 응답 gzip 형식과 API payload를 유지하면서 zlib 출력 callback을 줄이기 위해 Node 공식 기본 chunkSize 16 KiB와 후보 64 KiB를 비교했다. 구현은 임시 수정 후 즉시 16 KiB 기본값으로 복구했다.
 - 측정/검증: 로컬 Next API/DB 전체 응답 각각 5회에서 후보 warmed median은 KR357ms/US735ms, 기준은 KR350ms/US706ms로 약2.0%/4.1% 느렸다. 압축/원본 크기는 KR1,506,947/8,985,808B, US3,493,095/19,399,949B로 동일했다. HTTP200, gunzip/JSON, ticker·marketCap·daily, returnedCount 일치, 최대20봉, XFL0을 검증했다.

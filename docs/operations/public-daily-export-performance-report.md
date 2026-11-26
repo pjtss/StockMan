@@ -240,3 +240,8 @@ write 묶음 후보를 기각하고 코드 변경 없이 기록한 커밋 `c3ac0
 Node.js 공식 zlib API에서 스트림 `chunkSize` 기본값은 16 KiB다. 출력 callback/ReadableStream enqueue 호출을 줄일 수 있는지 64 KiB를 임시 적용하고 `scripts/dev-server.mjs`의 로컬 DB/API에서 시장별 5회 전체 응답을 측정했다. 후보 warmed 값은 KR 0.367/0.418/0.347/0.324초(중앙값0.357초), US 0.749/0.753/0.721/0.720초(중앙값0.735초)였다. 기존 16 KiB 기준 warmed 중앙값 KR0.350초/US0.706초보다 약 2.0%/4.1% 느렸다. 압축 전/후 bytes와 데이터 건수는 변하지 않았고 HTTP200, gzip 해제, ticker·marketCap·daily, returnedCount, 최대20봉 계약이 통과했다. XFL은0이었다.
 
 후보는 기각하고 공식 기본 `chunkSize`를 사용하도록 복구했다. 운영 배포하지 않았다. 더 큰 출력 slab이 이벤트 횟수를 줄이더라도 이 환경에선 zlib/stream 처리시간 또는 변동을 상쇄하지 못했다. 실제 운영 전송이 KR32.342초·US75.861초인 동안 로컬 endpoint는 1초 미만이어서 네트워크/운영 실행 환경 차이가 지배할 수 있지만, 운영 phase 로그를 직접 읽지 못해 원인은 아직 inference다. 다음 최적화는 운영 Nginx `$request_time`·`$upstream_response_time`·`$bytes_sent` 또는 앱 구조화 timing 로그를 확보해 server time과 클라이언트 전체 수신시간을 분리하는 것이다. 출처: [Node.js zlib 공식 문서](https://nodejs.org/api/zlib.html).
+### zlib memLevel 8→9 로컬 후보 기각
+
+Node.js 공식 zlib 문서는 더 큰 메모리 설정이 한 번의 write에서 더 많은 입력을 처리해 호출 수를 줄이고 속도를 높일 수 있다고 설명하며, 메모리 증가를 비용으로 든다. 현재 gzip stream의 `memLevel` 기본값 8을 9로 임시 변경해 로컬 API에서 시장별 6회 전체 요청을 수행했다. 첫 compile/cold 요청을 제외한 5회 warmed 중앙값은 KR0.344초, US0.862초였다. 같은 로컬 DB/API의 기본 설정 직전 warmed 중앙값(KR0.350초/US0.706초)과 비교하면 KR은 약1.7% 짧고 US는 약22.1% 길었다. gzip bytes는 KR1,506,947→1,504,980(-0.13%), US3,493,095→3,488,107(-0.14%)로 조금 줄었고 raw bytes와 ticker 수/봉 계약은 동일했다.
+
+시장별 결과가 엇갈리고 US 지연 회귀가 커 후보를 기각해 기본 `memLevel: 8`로 복구했으며 운영 배포하지 않았다. Node 공식 문서의 메모리 산식 기준으로 기본 memLevel8의 deflate 메모리는 약256 KiB이고 9는 약384 KiB여서 동시 요청당 약128 KiB가 추가될 수 있다. 근거: [Node.js v22 zlib 메모리 튜닝](https://nodejs.org/download/release/latest-jod/docs/api/zlib.html#memory-usage-tuning). 다음 최적화는 압축 설정의 로컬 차이를 운영 전송 개선으로 간주하지 않고, 단계별 운영 timing 또는 다회 운영 표본을 확보해 판단한다.
