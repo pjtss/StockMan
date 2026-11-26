@@ -31,7 +31,7 @@ function gzipJsonStream(items: AsyncIterable<string>) {
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      const activeCompressor = createGzip({ level: 3 });
+      const activeCompressor = createGzip({ level: 4 });
       compressor = activeCompressor;
       let ended = false;
       let flushing = false;
