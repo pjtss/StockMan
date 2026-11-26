@@ -107,5 +107,11 @@ scripts/dev-server.mjs 로컬 API에서 변경 전 US warmed 완료 시간은 0.
 - `edeea6ba`: KR 5 / US 10으로 시장별 상한 적용, OCI run `45761566890` 성공.
 - `662680cb`: US batch1,000/concurrency6 실험 배포. 운영 개선이 재현되지 않아 후속 커밋에서 US batch500/concurrency10으로 복구하고 실측·배포 결과를 기록한다.
 - `1790f95b`: US batch500/concurrency10 복구, OCI run `45770981889` 전체 성공. 운영 KR/US gzip GET을 각 2회 검증했다.
-- 컬럼 부재 fallback의 `to_jsonb(c)` 제거 후보는 현재 로컬 검증만 완료했다. 전체 검증, OCI 배포, 운영 실측 결과는 [`DEVELOPMENT_LOG.md`](../../DEVELOPMENT_LOG.md)에 추가 기록한다.
+- `690607e7`: `trading_value` 컬럼 부재 fallback에서 per-candle `to_jsonb(c)` 변환을 제거하고 동일한 `close * volume` fallback을 직접 사용한다. 전체 검증 및 OCI run `45774860704` 성공.
+
+### 2026-11-26 구형 candle schema fallback 최적화 확인
+
+V67 기준 US 봉 테이블에는 `trading_value` 컬럼이 없다. 컬럼 부재 분기에서 기존 쿼리는 각 봉을 `to_jsonb(c)`로 변환해 키를 검사한 뒤 없는 경우 `close * volume`을 사용했다. commit `690607e7`는 컬럼 존재 여부 조회를 유지하면서 부재가 확인된 경우 같은 계산을 직접 수행한다. 이 변경은 ticker/marketCap/daily 구조와 ticker 수를 바꾸지 않고, 컬럼이 있는 스키마에서 기존 공식 turnover 읽기/검증을 유지한다.
+
+로컬 warmed API 중앙값은 기존 715ms에서 변경 후 691ms였으며 gzip bytes는 양쪽 3,403,223으로 같았다. 배포 run `45774860704` 후 운영 GET은 KR 두 번 12.371/10.566초와 US 다섯 번 45.618/59.056/36.585/45.042/36.746초(median45.042초)였다. 이전 복구 배포 후 측정된 US 표본 34.304/42.522초보다 수치상 높지만 비교군이 2회뿐이고 운영 부하를 제어하지 않았으므로 인과적 회귀로 판정할 수 없다. 모든 운영 응답은 HTTP200, gzip XFL0, no-store, gzip 해제 후 JSON 구조와 최대20봉을 통과했고 payload ticker 수/원본 bytes도 KR 2,337/8,925,884B, US 5,011/19,004,536B였다. 따라서 의미상 동일한 낮은 연산량 경로는 유지하되 운영 완료시간 개선은 아직 입증하지 않은 상태로 둔다.
 - 문서·회귀 테스트 변경 후 최종 검증 및 문서 커밋/배포 결과는 [`DEVELOPMENT_LOG.md`](../../DEVELOPMENT_LOG.md)에 기록한다.
