@@ -9747,3 +9747,16 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 변경/검증: `lib/public-daily-export.ts` gzip `level: 4`를 3으로 복구. 로컬 변경 후 warmed 5회 모두 HTTP200/XFL0; KR 281–410ms/1,506,947B, US 672–766ms/3,403,223B. 배포 후 운영 GET을 각 시장 5회 반복하고 20봉/JSON/gzip 계약과 완료시간을 비교한다.
 - 남은 위험/다음 단계: 운영 지연 변동폭이 크므로 5회도 확정 인과 효과/p95가 아니다. 복구 배포 후 속도 회복을 확인하고, query/first byte/last byte/GZIP CPU를 분리 계측할 수 있는 candidate를 별도 설계한다. DB 실행 계획을 확인하지 못한 상태에서 인덱스나 query concurrency를 임의 변경하지 않는다.
 - 변경 파일: `lib/public-daily-export.ts`, 성능 보고서, 본 로그. 로컬 검증: `npm run deploy:verify` 및 후속 commit/push/deploy는 대기.
+### 2026-11-26 — gzip level3 복귀 배포 운영 실측
+- 목적/범위: gzip level4를 속도 우선 원칙에 따라 level3로 되돌려 배포하고, 운영 API를 시장별 5회 측정해 level4 반복 기준과 비교한다.
+- 배포: commit `586fb91d`, Deploy OCI run `45787463222` 성공. 변경은 `lib/public-daily-export.ts`의 gzip level 4→3이다.
+- 운영 결과: KR 5회 15.748/10.934/12.358/9.994/16.840초(median12.358), gzip 1,524,715–1,525,103B/raw8,925,884B, 2,337 ticker·20봉. US 유효 5회 56.361/62.293/61.286/53.865/50.032초(median56.361), gzip3,464,597–3,465,388B/raw19,004,536B, 5,011 ticker·0–20봉. US 다섯 번째 원 시도는 스트림 종료 오류로 제외하고 재시도했으며 재시도 응답은 HTTP200 및 gzip/JSON/data 계약을 통과했다. 모든 유효 응답은 HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL0, ticker/marketCap/daily 필드, returnedCount 일치, max20을 검증했다.
+- 속도 판정: level4 각 5회 중앙값 KR10.826/US62.285초와 비교하면 level3 KR은 14.2% 느리고 US는 9.5% 빠르다. 서버 부하와 네트워크 상태를 제어하지 않아 운영 시간의 차이는 인과적으로 확정할 수 없다. 동일 로컬 DB/Next API 측정에서 level3는 level4보다 KR21.9%/US5.5% 짧았고 압축 CPU도 낮았다. 크기는 level4가 더 작다. 속도 우선으로 level3를 유지하되 KR의 운영 지연 개선은 확인되지 않았다고 보고한다.
+- 남은 위험/다음 단계: 운영 총시간에는 DB query 대기·gzip·전송이 함께 포함되고 편차가 크다. 다음 candidate에서 로컬 gzip level1/2/3을 비교했다. warmed 4회 중앙값 기준 level1은 KR323.5ms/US655.5ms, level2는 KR299.5ms/US644ms, level3는 KR303ms/US737.5ms였다. gzip level2는 기존 XFL0/header contract를 유지하면서 US에서 level3보다 약12.7% 빨라 운영 배포 후보로 선택했다. level2의 deploy:verify·커밋·운영 배포 및 시장별 5회 반복은 다음 작업이다. `npm run deploy:verify`는 level3 candidate에서 통과했고, 이 실측 문서 변경의 검증/배포는 대기다.
+- 변경 파일: `lib/public-daily-export.ts`, `docs/operations/public-daily-export-performance-report.md`, 본 로그.
+### 2026-11-26 — gzip level2 운영 속도 후보 선정
+- 목적/범위: level3 복귀 후 더 빠른 gzip level1/2가 기존 단일 gzip contract 안에서 운영시간을 줄일 가능성을 로컬 DB/API로 비교한다.
+- 실험: 동일 scripts/dev-server.mjs 및 local DB에서 level3/2/1을 각각 5회 순차 호출했다. 첫 request 제외 warmed 4회 median: level3 KR303ms/US737.5ms, 1 KR323.5ms/US655.5ms, 2 KR299.5ms/US644ms. gzip bytes (KR/US): level3 1,506,947/3,403,223; level1 1,585,372/3,584,665; level2 1,552,305/3,493,095. level2 US는 level3보다 12.7% 빠르고 bytes +2.64%; KR median은 1.2% 빠르다. level1 XFL4이고 level2/3 XFL0이다.
+- 결정/변경: `lib/public-daily-export.ts` gzip level을 2로 둔 후보. 기존 API는 단일 gzip 유지, XFL0 및 payload/max20/no-store 무변경. level2가 양 시장에서 level3보다 로컬상 같거나 빨랐고 US 이득이 더 커 운영 후보로 선택한다.
+- 남은 위험/다음 단계: 로컬 표본은 운영부하 및 운영 network와 다르므로 속도 개선은 운영 미확인. 전체 `npm run deploy:verify` 후 배포, 운영 KR/US 각 5회 gzip decompress/JSON contract 검증을 거쳐 채택 또는 복귀 결정한다.
+- 변경 파일: `lib/public-daily-export.ts`, `docs/operations/public-daily-export-performance-report.md`, 본 로그. 검증/커밋/푸시/배포 대기.
