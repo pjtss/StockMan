@@ -14,11 +14,11 @@ export function validDailyCandlePredicate(alias: string) {
         ELSE 31 END
     ELSE false END
     AND ${alias}.open > 0 AND ${alias}.high > 0 AND ${alias}.low > 0 AND ${alias}.close > 0 AND ${alias}.volume >= 0
-    AND ${alias}.open::text NOT IN ('NaN','Infinity','-Infinity')
-    AND ${alias}.high::text NOT IN ('NaN','Infinity','-Infinity')
-    AND ${alias}.low::text NOT IN ('NaN','Infinity','-Infinity')
-    AND ${alias}.close::text NOT IN ('NaN','Infinity','-Infinity')
-    AND ${alias}.volume::text NOT IN ('NaN','Infinity','-Infinity')
+    AND ${alias}.open < 'Infinity'::numeric
+    AND ${alias}.high < 'Infinity'::numeric
+    AND ${alias}.low < 'Infinity'::numeric
+    AND ${alias}.close < 'Infinity'::numeric
+    AND ${alias}.volume < 'Infinity'::numeric
     AND ${alias}.high >= GREATEST(${alias}.open, ${alias}.low, ${alias}.close)
     AND ${alias}.low <= LEAST(${alias}.open, ${alias}.high, ${alias}.close)`;
 }

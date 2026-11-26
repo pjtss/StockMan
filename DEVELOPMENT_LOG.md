@@ -1,3 +1,8 @@
+### 2026-11-27 — 일봉 품질 조건 숫자 문자열 변환 제거 후보
+- 목적/범위: 공개 gzip 일봉 API의 ticker별 PostgreSQL 품질 필터에서 NUMERIC 5개 열을 `::text`로 바꿔 NaN/Infinity 문자열을 제외하던 변환을 숫자 상한 비교로 교체했다. `> 0`/`>= 0` 하한은 그대로 두고 상한은 `< 'Infinity'::numeric`으로 설정해 유한 양수/0 범위를 유지한다. API payload와 압축 설정은 변경하지 않았다.
+- 검증: PostgreSQL 공식 NUMERIC 문서는 Infinity/NaN 지원과 NaN 정렬을 기술한다(https://www.postgresql.org/docs/16/datatype-numeric.html). 로컬 API 양 시장 기준/후보 파일은 각 6회씩 gunzip 원문 바이트가 전부 동일했다(KR 8,966,992B/2,352 ticker, US 19,359,853B/5,012 ticker; gzip KR 1,506,865B, US 3,491,027B). 후보 JSON은 모든 행의 ticker/marketCap/daily, returnedCount 일치, 최대20봉을 만족했다. 관련 route/unit 테스트 15개 통과. 기준 API 측정(첫 cold 제외): KR median310ms, US720ms. 이 후보 응답시간 수치는 원본 benchmark 출력에서 복원되지 않아 개선률을 제시하지 않는다.
+- 판정/위험/다음: 의미 동일성과 전 API 계약은 확인했으나, 이 반복 비교에서 HTTP 전체 응답 시간이나 DB query 계획 개선을 뒷받침하는 보존 측정치가 없어 이득을 확정하지 않는다. 로컬 DB의 server version은 환경에서 읽을 수 없었고 배포 DB 버전도 확인되지 않았다. SQL은 PostgreSQL NUMERIC literal/cast 연산을 사용하므로 운영 schema/version compatibility는 배포 후 GET으로 검증한다. 재발 감지 테스트는 다섯 열 모두 Infinity 상한과 기존 문자열 변환 제거를 고정한다. 전체 deploy:verify/운영 측정/배포 결과는 후속 항목으로 갱신한다.
+- 변경 파일: `lib/candle-sql-quality.ts`, 해당 테스트, 운영 성능 보고서, 본 로그. 전체 검증 및 배포 결과는 후속 운영 기록에 추가한다.
 ### 2026-11-26 — zlib memLevel 성능 후보 기각
 - 목적/범위: 공식 Node.js zlib의 메모리 tradeoff를 근거로 기본 `memLevel: 8`에서9로 높이는 속도 후보를 로컬 API에서 비교했다. 구현은 임시 수정 후 `createGzip({ level })` 기본 설정으로 복구했다.
 - 측정/검증: 로컬 API 시장별 6회 요청, 첫 cold/compile 제외한 5회 warmed median KR344ms/US862ms였다. 같은 경로 기본값 baseline KR350ms/US706ms 대비 KR1.7% 짧지만 US22.1% 길었다. gzip 크기 KR1,506,947→1,504,980B, US3,493,095→3,488,107B; raw bytes/종목 수(2,352/5,012)/JSON fields/returnedCount/max20/XFL0은 유지됐다.

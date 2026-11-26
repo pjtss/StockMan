@@ -357,3 +357,11 @@ This is an algebraically safe ordering simplification and a positive local full-
 Three sequential full downloads per market all returned HTTP200 and `application/gzip`, with no `Content-Encoding` header and `no-store` cache policy. Every body decompressed and parsed. KR timings were 9.97/7.69/3.20s (median7.69s), gzip1,524,637B per call, raw8,907,188B, 2,337 tickers. US timings were 41.86/59.97/43.70s (median43.70s), gzip3,542,614–3,543,019B, raw18,964,448B, 5,011 tickers. All records had ticker/marketCap/daily fields, `daily.metadata.returnedCount` matched candle count, and maximum candles was20.
 
 Relative to the immediately preceding three-call operating sample (KR median11.01s, US52.94s), observed medians were 30.2% and17.4% lower. The gzip medians decreased only about0.02%/0.001%, so this was not a payload-size reduction. The before/after samples were small and operating load/network conditions uncontrolled; treat the faster observed completion as a positive signal consistent with the local query-plan change, not a causal estimate. Continue measuring and restore the prior order if a material repeatable regression appears.
+
+### 2026-11-27 — 숫자 품질 필터 변환 제거 후보
+
+공개 일봉 SQL은 `NUMERIC` 가격/거래량 5개를 문자열로 변환한 뒤 `NaN`, `Infinity`, `-Infinity`와 비교했다. 기존 양수 가격 및 비음수 거래량 조건은 `-Infinity`를 배제한다. PostgreSQL NUMERIC에서 `NaN`은 일반 숫자보다 큰 값으로 정렬되고 `Infinity`는 최댓값이므로 `< 'Infinity'::numeric`을 추가해 기존에 허용되지 않던 값이 결과에 들어오지 않게 하면서 text 변환을 제거했다. [PostgreSQL NUMERIC 공식 문서](https://www.postgresql.org/docs/16/datatype-numeric.html).
+
+동일한 로컬 API/DB의 기준·후보 gzip 응답을 각 시장 6회 수집했다. 모든 12개 응답은 gunzip 후 원본 JSON 바이트가 기준과 일치했다. KR 2,352 ticker/8,966,992 raw bytes/1,506,865 gzip bytes, US 5,012 ticker/19,359,853 raw bytes/3,491,027 gzip bytes다. 응답 행마다 ticker, marketCap, daily 필드, `returnedCount`와 candle 개수 일치, 최대20봉을 검사했다. 대상 품질 predicate와 공개 KR/US route 테스트 15개가 통과했다. 이 반복 비교에서 candidate 전체 응답 시간 샘플을 보존하지 못해 개선률은 보고하지 않는다. 이전 기준 warmed median은 KR310ms, US720ms였다. 따라서 성능 이득은 미확정이다.
+
+운영 배포 PostgreSQL major 버전과 로컬 `DATABASE_URL`은 확인할 수 없었다. 실제 SQL 연산은 NUMERIC 리터럴 비교이며 배포 후 양쪽 공개 API 호출이 호환 여부를 확인한다. 운영 중 예외 또는 데이터 계약 실패가 발생하면 조건 변경을 복구한다. 다음 단계는 전체 배포 검증 뒤 운영 API를 시장별 반복 호출해 HTTP/gzip/JSON/20봉 계약과 시간을 측정하는 것이다.
