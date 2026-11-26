@@ -1,3 +1,10 @@
+### 2026-11-27 — 일봉 export 요청 키 인코딩·정렬 성능 후보 기각
+- 목적/범위: 실제 PostgreSQL batch path의 직렬화/정렬 비용을 줄이는 두 후보를 배포 HEAD와 같은 local API/DB에서 반복 비교했다. 각 market의 첫 warm-up 요청 제외 후 7회, 전체 gzip 응답 gunzip·JSON·ticker/marketCap/daily/max20 계약 검사.
+- jsonb_to_recordset → unnest candidate: 대상 API 테스트 15/15, KR/US output gzip bytes는 각각 1,178,244/2,797,603B로 동일. median은 KR629→644ms(+2.4%), US1,103→1,533ms(+39.0%)로 회귀해 기각. 세 배열 parameter 처리/계획 비용 가운데 원인은 별도 계측하지 않아 미확정. 코드 복원, 운영 배포 없음.
+- 문자열 market/code ORDER BY → WITH ORDINALITY candidate: 초기 실제 DB 검증에서 PostgreSQL 42601 (WITH ORDINALITY와 column-definition-list 조합 오류), 이후 CTE ordinal 누락으로 42703. ROWS FROM(...) WITH ORDINALITY 및 ordinal 전달을 수정하고 실제 KR/US HTTP200 gzip API 계약 + route test15/15 통과 후 측정했다. market/code 기준 median KR644→728ms(+13.0%), US1,185→1,223ms(+3.2%); gzip bytes 변화 없음. 양 시장 느려져 기각, 배포 없음.
+- 재발 감지/절차: mock SQL assertions는 PostgreSQL 문법/실제 column resolution을 검증하지 못한다. SQL 최적화는 endpoint 전체 A/B 전에 로컬 실제 DB GET으로 syntax·alias·field 검증을 먼저 수행하고, 오류 응답은 timing 표본에서 제외한다. 이후 full-response 양 시장 반복 median을 통과 조건으로 유지한다.
+- 문서화 파일: docs/operations/public-daily-export-performance-report.md, DEVELOPMENT_LOG.md. candidate 코드/test 변경은 모두 배포 HEAD로 복구했고 DB/운영 API 데이터 변경 없음. 이 조사에서 코드 개선은 배포되지 않았다.
+
 ### 2026-11-27 — 일봉 export 배치 조회의 종목 마스터 재조인 제거 후보
 - 목적/원인: 기존 경로는 eligibility 쿼리에서 자격을 확인한 뒤 각 candle batch가 동일 universe 테이블을 다시 조인하고 보통주/ETF/DR 필터를 다시 평가했다. 첫 조회 결과의 market/code/name을 batch 입력에 전달하고 반복 조인을 없애 조회 비용을 줄이는 후보를 구현했다. 첫 조회의 fail-closed 공식 종목 분류 조건은 그대로 두고 응답 데이터 계약, gzip 단일형식, level9+Z_FILTERED+64KB, max20, KR500/US1000은 바꾸지 않았다.
 - 로컬 측정: 실제 local API/DB, warmed GET 기준 버전 KR/US 각각 6회, 후보 각각 5회. 중앙값은 KR634→591ms(-6.8%), US1,162→1,101ms(-5.2%); gzip bytes는 KR1,178,244/US2,797,603으로 동일했다. 표본이 작고 로컬 DB 부하를 통제하지 않아 개선 신호로만 판정한다. 후보 응답은 HTTP200, gunzip/JSON 및 ticker·marketCap·daily·20봉 상한을 통과했다.

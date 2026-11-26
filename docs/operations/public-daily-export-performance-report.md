@@ -582,3 +582,23 @@ US 동시 query 수는 10 이하로 유지되며 이 workload에서 6개 chunk�
 직전 운영 표본(동일 batch 설정, 변경 전 코드)은 KR 중앙값7.363초/first byte0.201초, US49.507초/first byte0.377초였다. 이번 완료시간은 KR 약7.6% 짧고 US 약20.5% 길다. raw/gzip 크기는 거의 같고 US first byte 중앙값도 같다. 따라서 US 차이는 전송 구간의 흔들림과 구분되지 않으며, 운영에서 반복 join 제거에 따른 종단간 속도 이득은 확인되지 않았다. 로컬 같은 API/DB A/B는 KR634→591ms, US1,162→1,101ms의 개선 신호였으나 표본이 작고 운영에서 재현되지 않아 인과 효과로 주장하지 않는다. payload 계약 오류는 없었다.
 
 판정: 변경은 활성 상태로 유지하되 운영 속도 효과는 미확정이다. 이후 각 운영 측정에서 TTFB와 전체 다운로드를 분리해서 계속 추적한다. DB 단계 timing이나 여러 배포에 걸친 일관된 개선이 없으면 이 변경을 되돌리는 A/B 배포를 검토한다. 이번 결과의 최종 로그는 `DEVELOPMENT_LOG.md`에 기록했다.
+
+
+## 2026-11-27 — request key 입력 및 batch 정렬 후보 기각
+
+실제 API/DB의 반복 병목을 줄일 수 있는 두 후보를 jsonb_to_recordset 기반 현재 배포본과 비교했다. 모두 KR2,352/US5,012 ticker의 전체 gzip API 응답을 받아 gunzip·JSON parse·ticker/marketCap/daily 필드·최대20봉을 확인했다. 첫 warm-up 요청은 중앙값에서 제외했고 시장별로 각7개 값을 기록했다.
+
+### JSONB request set을 PostgreSQL 배열 unnest로 대체 — 기각
+
+각 batch에서 JSON.stringify한 object 배열을 보내는 대신 market/code/name 배열 세 개를 파라미터로 전달했다. 대상 route test 15/15가 통과했고 gzip 크기는 기준과 동일(KR1,178,244B/US2,797,603B)이었다. 그러나 실제 local API 중앙값은 KR629→644ms(+2.4%), US1,103→1,533ms(+39.0%)로 느려졌다. SQL parameter 처리나 계획 비용 가운데 원인이 무엇인지는 분리 계측하지 않아 추정하지 않는다. 이 후보는 폐기했고 파일을 배포 HEAD로 복구했으며 운영 배포하지 않았다.
+
+### 문자열 market/code 정렬을 WITH ORDINALITY 순서로 대체 — 기각
+
+이미 정렬된 universe 입력의 batch별 순서를 ordinal로 전달해 텍스트 키 정렬을 줄이는 후보였다. 첫 실제 DB 요청은 WITH ORDINALITY에 column-definition-list를 직접 결합해 SQL 42601, 다음 시도는 CTE에서 ordinal을 전달하지 않아 42703으로 실패했다. ROWS FROM(...) WITH ORDINALITY와 CTE column을 바로잡은 뒤 KR/US API GET이 HTTP200 및 전체 payload 계약 검증을 통과했고 route test 15/15도 통과했다. 오류는 후보 SQL을 실제 DB에 실행하면서 발견·수정했으며 잘못된 시도는 성능 표본에서 제외했다.
+
+| 시장 | 기존 market/code 정렬 7회 | ordinal 후보 7회 | 중앙값 변화 | gzip bytes |
+|---|---|---|---:|---:|
+| KR | 621 / 692 / 671 / 644 / 618 / 617 / 719ms | 671 / 728 / 624 / 842 / 681 / 843 / 739ms | 644→728ms (+13.0%) | 1,178,244, 불변 |
+| US | 1,185 / 1,190 / 1,159 / 1,415 / 1,184 / 1,104 / 1,202ms | 1,334 / 1,155 / 1,223 / 1,230 / 1,267 / 1,195 / 1,173ms | 1,185→1,223ms (+3.2%) | 2,797,603, 불변 |
+
+두 후보 모두 로컬 실제 API에서 이득이 없거나 명확한 회귀를 보여 배포하지 않았다. 현재 코드와 회귀 테스트는 배포된 market/code 정렬 및 JSONB 입력으로 복구했다. 이후 SQL 변경은 mock route test 외에 실제 DB API GET을 먼저 실행해 쿼리 문법·alias·필드 누락을 잡고, 전체 응답 중앙값이 양 시장에서 나아지는 경우에만 운영 후보로 삼는다. 이 실험 결과와 미배포 상태를 DEVELOPMENT_LOG.md에 기록했다.
