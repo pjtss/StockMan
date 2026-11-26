@@ -131,3 +131,11 @@ commit 9948d0b4의 Deploy OCI run 45779156775는 2026-11-26에 CI 검증 및 Act
 | US | 69.459 | 3,244,621 | 19,004,536 | 5,011 | 0–20 |
 
 두 응답은 HTTP 200, application/gzip, Content-Encoding 없음, Cache-Control: no-store, XFL=0을 확인했다. US 응답은 gzip 해제 및 JSON 파싱 후 5,011 ticker, 각 항목의 ticker/marketCap/daily 필드, returnedCount 일치, 최대20봉을 확인했다. KR 두 응답도 gzip 해제 및 JSON 검증 후 2,337 ticker, 필드·returnedCount 일치, 20봉을 확인했다. 운영 gzip 크기는 level3 표본 대비 KR 약 6.0%, US 약 6.3% 감소했다. 완료 시간은 서버 부하 통제 및 충분한 반복이 없어 level4의 인과적 속도 효과를 판정할 수 없다. 이번 완료 시간은 KR 23.113/10.722초, US 69.459초였고 level3 대비 속도 개선은 입증되지 않았다. 따라서 결과는 전송 용량 개선으로 기록하고 end-to-end 속도 개선으로 표현하지 않는다.
+
+## 다음 속도 개선의 측정 게이트
+
+- 현재 쿼리는 ticker universe를 읽은 뒤 500개씩 나누고 US 10개/KR 5개 query를 `Promise.all`로 실행한다. 5,011개 US ticker면 11개 batch를 2개 wave로 처리하고, 마지막 wave는 1개 query다. 속도 후보는 batch 크기나 동시 query 수를 함께 변경하지 말고 한 번에 하나만 바꾼다.
+- 후보 비교는 같은 배포 호스트·같은 시장·같은 API 응답 계약으로 기준/후보를 번갈아 최소 5회씩 측정한다. 전체 응답 완료시간, gzip bytes, 첫 body byte 시각, 응답 크기, HTTP 결과를 기록한다. 각 JSON 응답을 gzip 해제해 ticker 수, 최대 20봉, `returnedCount` 일치와 주요 필드를 확인한다. 시간 개선이 측정 편차를 넘어서 재현되지 않으면 채택하지 않는다.
+- 쿼리 병목을 고칠 때는 운영 DB의 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` 결과를 read-only 트랜잭션에서 얻고, 유효 ticker/candle 행 수와 선택된 인덱스를 함께 기록한다. 운영 DB에 통계 초기화, 설정 변경, 인덱스 생성/삭제, 쓰기 쿼리를 실행하지 않는다. `EXPLAIN ANALYZE`가 부담스럽거나 허가된 read-only 경로가 없으면 로컬 복제 스키마에서만 실험하고 운영 원인으로 확대 해석하지 않는다.
+- API 단계별 구분은 instrumented candidate에서 universe query, batch DB query 누적/최대 지연, gzip transform의 CPU 경과, 첫 byte, 마지막 byte를 계측한다. 계측이 배포 응답 계약이나 payload를 바꾸지 않는지 테스트하고, 계측 오버헤드도 report에 명시한다.
+- 2026-11-26 작업에서 로컬 psql 실행 경로를 찾지 못했고 공개 US GET이 20초 안에 완료되지 않았다. 운영 level4 결과는 이전 level3 비교보다 충분한 반복을 포함하지 않는다. 그러므로 현재 동시성·batch 설정의 최적성은 미확정이며 추가 변경 근거로 사용하지 않는다.
