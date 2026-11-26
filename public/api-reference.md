@@ -110,20 +110,22 @@ hours(1~24) 또는 date(서울 기준 YYYY-MM-DD, 생략 시 오늘 UTC 날짜 �
 
 ### 국내 활성 보통주 일봉 gzip 다운로드 — GET /api/public/daily-export/kr
 
-인증·query parameter 없이 호출한다. 호출할 때마다 활성 COMMON_STOCK 마스터, 최신 저장 시가총액 스냅샷, 저장된 최근 일봉을 조회하고 공식 [Node.js zlib 압축 옵션](https://nodejs.org/api/zlib.html#zlib_class_options) 범위의 최대 gzip level 9로 새 `.json.gz` 파일을 만든다. 응답 압축 파일이나 API 결과를 캐싱하지 않으며 외부 시세 API를 호출하거나 DB에 쓰지 않는다. 모든 활성 국내 보통주를 포함하고 종목별 일봉은 최대 20개다. 시가총액 스냅샷이 없으면 `marketCap.value`와 시각 필드는 null일 수 있고, 일봉 캐시가 없으면 `daily.candles`는 빈 배열이다.
+인증 없이 호출한다. 선택 query `format`은 `full`(기본) 또는 `compact`다. 호출할 때마다 활성 COMMON_STOCK 마스터, 최신 저장 시가총액 스냅샷, 저장된 최근 일봉을 조회하고 공식 [Node.js zlib 압축 옵션](https://nodejs.org/api/zlib.html#zlib_class_options) 범위의 최대 gzip level 9로 새 `.json.gz` 파일을 만든다. 응답 압축 파일이나 API 결과를 캐싱하지 않으며 외부 시세 API를 호출하거나 DB에 쓰지 않는다. 모든 활성 국내 보통주를 포함하고 종목별 일봉은 최대 20개다. 시가총액 스냅샷이 없으면 `marketCap.value`와 시각 필드는 null일 수 있고, 일봉 캐시가 없으면 `daily.candles`는 빈 배열이다.
 
-압축 해제 후 JSON은 종목 객체 배열이다. 각 항목의 최상위 필드는 `ticker`, `marketCap`, `daily` 세 가지다. ticker는 market/code/name, marketCap은 value/currency/observedAt/fetchedAt, daily는 candles와 latestCandleDate/dataUpdatedAt/returnedCount metadata를 제공한다. 각 봉에는 거래일(YYYYMMDD), OHLC, volume, tradingValue, fetchedAt이 있다. 국내 tradingValue는 공식 저장 컬럼이 있으면 그 값을 쓰고, 구형 스키마에서 컬럼이 없으면 `close × volume`을 사용한다. 파일 이름은 `daily-candles-kr.json.gz`, media type은 `application/gzip`이다. DB 또는 gzip 생성 실패는 503 `DAILY_EXPORT_UNAVAILABLE`이다.
+압축 해제 후 JSON은 종목 객체 배열이다. 각 항목의 최상위 필드는 `ticker`, `marketCap`, `daily` 세 가지다. `format=full`에서 ticker는 market/code/name, marketCap은 value/currency/observedAt/fetchedAt, daily는 candles와 latestCandleDate/dataUpdatedAt/returnedCount metadata를 제공한다. 각 봉에는 거래일(YYYYMMDD), OHLC, volume, tradingValue, fetchedAt이 있다. `format=compact`에서는 동일한 최상위 필드와 시가총액·daily metadata를 유지하고, `daily.candles`의 각 봉을 `[date, open, high, low, close, volume, tradingValue, fetchedAt]` tuple로 반환한다. tuple 순서는 `daily.candleFields`가 정의하며 `daily.candleEncoding`은 `tuple-v1`이다. 국내 tradingValue는 공식 저장 컬럼이 있으면 그 값을 쓰고, 구형 스키마에서 컬럼이 없으면 `close × volume`을 사용한다. 파일 이름은 각각 `daily-candles-kr.json.gz`와 `daily-candles-kr-compact.json.gz`, media type은 `application/gzip`이다. 알 수 없는 format은 400 `INVALID_FORMAT`, DB 또는 gzip 생성 실패는 503 `DAILY_EXPORT_UNAVAILABLE`이다.
 
 ```sh
 curl -L https://<host>/api/public/daily-export/kr --output daily-candles-kr.json.gz
+curl -L 'https://<host>/api/public/daily-export/kr?format=compact' --output daily-candles-kr-compact.json.gz
 ```
 
 ### 미국 활성 보통주 일봉 gzip 다운로드 — GET /api/public/daily-export/us
 
-국내 endpoint와 같은 응답·압축·오류 계약으로 미국 활성 COMMON_STOCK 전체를 반환한다. US 마스터의 상품 분류·DR 설명 제외 규칙을 적용한다. 파일 이름은 `daily-candles-us.json.gz`다.
+국내 endpoint와 같은 응답·압축·오류 계약으로 미국 활성 COMMON_STOCK 전체를 반환한다. US 마스터의 상품 분류·DR 설명 제외 규칙을 적용하며 `format=compact`도 지원한다. 파일 이름은 `daily-candles-us.json.gz` 또는 compact 모드의 `daily-candles-us-compact.json.gz`다.
 
 ```sh
 curl -L https://<host>/api/public/daily-export/us --output daily-candles-us.json.gz
+curl -L 'https://<host>/api/public/daily-export/us?format=compact' --output daily-candles-us-compact.json.gz
 ```
 
 ### 저장 일·주·월봉 — GET /api/public/daily-candles

@@ -4,6 +4,7 @@ import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
 
 type ExportMarket = "KR" | "US";
+export type PublicDailyExportFormat = "full" | "compact";
 
 const EXPORT_BATCH_SIZE = 500;
 
@@ -13,6 +14,7 @@ type ExportKey = { market: string; code: string; name: string; has_trading_value
 
 type ExportPerformanceMetrics = {
   market: ExportMarket;
+  format: PublicDailyExportFormat;
   requestStartedAt: number;
   tickerCount: number;
   batchCount: number;
@@ -86,6 +88,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
         const completedAt = performance.now();
         console.info(`[API /public/daily-export/${metrics.market.toLowerCase()}] performance`, {
           market: metrics.market,
+          format: metrics.format,
           tickerCount: metrics.tickerCount,
           batchCount: metrics.batchCount,
           universeQueryMs: Math.round(metrics.universeQueryMs),
@@ -140,7 +143,7 @@ function errorResponse() {
   });
 }
 
-export async function getPublicDailyExport(market: ExportMarket) {
+export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "full") {
   const requestStartedAt = performance.now();
   const { universeTable, candleTable, eligibility, batchSize } = EXPORT_CONFIG[market];
   try {
@@ -161,6 +164,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     `);
     const metrics: ExportPerformanceMetrics = {
       market,
+      format,
       requestStartedAt,
       tickerCount: eligible.rows.length,
       batchCount: 0,
@@ -192,6 +196,31 @@ export async function getPublicDailyExport(market: ExportMarket) {
                  ELSE c.close * c.volume
             END`
       : `c.close * c.volume`;
+    const candleJsonExpression = format === "compact"
+      ? `json_build_array(
+                     recent.candle_date,
+                     recent.open,
+                     recent.high,
+                     recent.low,
+                     recent.close,
+                     recent.volume,
+                     recent.trading_value,
+                     to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+                   )`
+      : `json_build_object(
+                     'date', recent.candle_date,
+                     'open', recent.open,
+                     'high', recent.high,
+                     'low', recent.low,
+                     'close', recent.close,
+                     'volume', recent.volume,
+                     'tradingValue', recent.trading_value,
+                     'fetchedAt', to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+                   )`;
+    const compactCandleSchema = format === "compact"
+      ? `, 'candleEncoding', 'tuple-v1',
+                   'candleFields', json_build_array('date', 'open', 'high', 'low', 'close', 'volume', 'tradingValue', 'fetchedAt')`
+      : "";
     const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {
         const waveStartedAt = performance.now();
@@ -199,7 +228,9 @@ export async function getPublicDailyExport(market: ExportMarket) {
           const queryStartedAt = performance.now();
           try {
             return await pool.query<ExportRow>({
-              name: `public-daily-export-${market.toLowerCase()}-batch-v1`,
+              name: format === "full"
+                ? `public-daily-export-${market.toLowerCase()}-batch-v1`
+                : `public-daily-export-${market.toLowerCase()}-compact-batch-v1`,
               text: `
       WITH requested AS (
         SELECT market, code, name
@@ -210,18 +241,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
         LEFT JOIN instrument_fundamental_snapshots f
           ON f.market = r.market AND f.code = r.code
         LEFT JOIN LATERAL (
-          SELECT json_agg(
-                   json_build_object(
-                     'date', recent.candle_date,
-                     'open', recent.open,
-                     'high', recent.high,
-                     'low', recent.low,
-                     'close', recent.close,
-                     'volume', recent.volume,
-                     'tradingValue', recent.trading_value,
-                     'fetchedAt', to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-                   ) ORDER BY recent.candle_date ASC
-                 ) AS candles,
+          SELECT json_agg(${candleJsonExpression} ORDER BY recent.candle_date ASC) AS candles,
                  MAX(recent.candle_date) AS latest_candle_date,
                  MAX(recent.fetched_at) AS data_updated_at,
                  COUNT(*)::int AS returned_count
@@ -251,7 +271,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
                  'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
                  ) AS "marketCap",
                  json_build_object(
-                 'candles', COALESCE(d.candles, '[]'::json),
+                 'candles', COALESCE(d.candles, '[]'::json)${compactCandleSchema},
                  'metadata', json_build_object(
                    'latestCandleDate', d.latest_candle_date,
                    'dataUpdatedAt', CASE WHEN d.data_updated_at IS NULL THEN NULL ELSE to_char(d.data_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
@@ -289,7 +309,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
       }
     })();
 
-    const filename = `daily-candles-${market.toLowerCase()}.json.gz`;
+    const filename = `daily-candles-${market.toLowerCase()}${format === "compact" ? "-compact" : ""}.json.gz`;
     const gzipLevel = 9;
     return new Response(gzipJsonStream(items, gzipLevel, metrics), {
       status: 200,
@@ -307,4 +327,14 @@ export async function getPublicDailyExport(market: ExportMarket) {
     console.error(`[API /public/daily-export/${market.toLowerCase()}] Error:`, error instanceof Error ? error.message : "unknown error");
     return errorResponse();
   }
+}
+
+export function getPublicDailyExportFromRequest(market: ExportMarket, requestedFormat: string | null) {
+  if (requestedFormat !== null && requestedFormat !== "full" && requestedFormat !== "compact") {
+    return Response.json({ ok: false, error: "INVALID_FORMAT" }, {
+      status: 400,
+      headers: { "cache-control": "no-store" },
+    });
+  }
+  return getPublicDailyExport(market, requestedFormat === "compact" ? "compact" : "full");
 }

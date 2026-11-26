@@ -630,3 +630,25 @@ candidate full API median이 양쪽 순서에서 줄고 DB query wall은 비슷�
 | US | 49.896 / 45.863 / 57.260 / 43.422 / 52.223초 | 49.896초 | 0.385초 | 2,816,126B | 18,964,448 | 5,011 |
 
 직전 windowBits15 운영 표본 median(KR6.807초/US59.633초, first byte0.405/0.377초, gzip1,219,867/2,819,256B)과 단순 비교하면 완료시간은 KR10.6%, US16.3% 짧았고 gzip bytes는 KR0.64%, US0.11% 감소했다. US first-byte 중앙값은 사실상 동일했다. 각 표본 5회, 운영부하·전송률 비통제이므로 개선율은 관측치이지 통제된 인과 추정은 아니다. 그래도 양 시장 로컬 A/B와 운영 median이 같은 방향이고 계약 회귀가 없어 windowBits14를 유지한다. 향후 운영 표본에서 미국의 반복 지연 또는 payload 팽창이 관측되면 windowBits15 복원 A/B를 실행한다.
+
+
+## 2026-11-27 — 공개 일봉 compact tuple 응답 속도 후보
+
+### 운영 청크 계측 및 쿼리 배치 후보 기각
+
+운영 US endpoint를 Node fetch로 1회 읽어 body 청크 시각을 기록했다. HTTP200, gzip 2,816,058B, 첫 body byte 7.319초, 완료 48.912초, 730 reader chunks였다. 첫 4,090B 이후 38.984초 동안 새 청크가 없었고 나머지가 도착했다. 이전 운영 5회 중앙값 및 다른 클라이언트 측정과 통제 비교가 아닌 한 건의 관측이라 서버 DB 대기라고 확정하지 않는다. 다만 단순 압축 CPU보다 중간 응답 정체가 1차 조사 대상임을 보여준다. OCI 로그에 접근할 수 없어 해당 요청의 서버 batchQueryWall/max와 대조하지 못했다.
+
+대량 JSONB request set을 하나의 6,000-ticker query로 합치는 후보를 실제 local DB/API 8회 측정했다. 운영 universe 5,012개를 한 query로 만들 때 전체 응답 median은 0.956초→1.406초(+47.1%)였고 warmed batch query wall median도 0.316→0.768초로 늘어 후보를 기각했다. US concurrency 10→3은 median 0.956→1.003초(+5.0%), 1,000→2,500 batch는 0.956→1.064초(+11.3%)로 각각 느렸다. concurrency 10, batch1,000으로 배포 HEAD를 복원했다. gzip bytes는 모든 배치 후보에서 동일했다.
+
+### self-describing tuple-v1 compact 형식 후보
+
+동일 ticker·시가총액·metadata·봉 값을 보존하면서 봉 객체의 반복 key 문자열을 제거했다. 무인증 Next.js GET에서 `format=compact`를 선택하면 기존 top-level `ticker`, `marketCap`, `daily`를 유지한다. `daily.candles`는 `[date, open, high, low, close, volume, tradingValue, fetchedAt]` 배열이며 `daily.candleFields`가 순서를, `daily.candleEncoding="tuple-v1"`이 형식을 나타낸다. 미지정 또는 `format=full`은 기존 object 배열을 유지한다. gzip level9/windowBits14/Z_FILTERED/chunk64KB, no-store, 보통주 필터 및 최대20봉은 같다. 구현은 Next.js 공식 [Route Handler request/response API](https://nextjs.org/docs/15/app/getting-started/route-handlers-and-middleware)의 `GET(request: Request)` query 접근을 따른다.
+
+실제 local DB/API에서 full/compact를 교차 8쌍 실행했다. 각 compact tuple을 객체로 복원한 뒤 같은 쌍의 full 응답 ticker, marketCap, daily metadata와 모든 봉을 깊은 동등성 검사했다. 모든 응답은 HTTP200, gzip 해제/JSON, ticker·시장가치, returnedCount 및 최대20봉을 통과했다.
+
+| 시장 | ticker | 전체 완료 median full→compact | 압축 해제 JSON bytes full→compact | gzip bytes full→compact |
+|---|---:|---:|---:|---:|
+| KR | 2,352 | 0.450→0.340초 (-24.4%) | 8,966,992→5,181,748 (-42.2%) | 1,171,044→1,023,102 (-12.6%) |
+| US | 5,012 | 0.831→0.659초 (-20.7%) | 19,359,853→11,351,119 (-41.4%) | 2,807,759→2,429,301 (-13.5%) |
+
+US paired 측정에서는 JSON/gzip 처리 뒤 JSON parse median도 133.1→59.9ms로 감소했다. KR 첫 full 호출은 개발 서버/DB cold 영향이 있어 중앙값에서는 견고한 절사 처리를 하지 않았고 paired 중앙값은 유지했다. 운영 network에서의 지연 감소는 아직 미확인이다. 다운로드 크기 감소는 전송 속도에 따라 이득이 달라지고 compact consumer는 `candleFields`를 따라 tuple을 해석해야 한다. 기존 소비자를 깨지 않도록 `format=full` 기본값과 현 API JSON 객체 계약을 유지하고, 빠른 LLM 다운로드가 명시적으로 `?format=compact`를 사용하도록 문서와 OpenAPI에 추가했다. 해당 후보는 OCI 배포 후 양 시장 full/compact 운영 API의 gzip bytes, first byte, 전체 다운로드 시간과 완전 복원 동등성을 최소 5회 확인한 뒤 유지 여부를 결정한다.

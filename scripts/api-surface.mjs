@@ -77,6 +77,12 @@ function queryParameters(source, path) {
       timeframe: { type: "string", enum: ["D", "W", "M"], default: "D" },
       limit: { type: "integer", minimum: 1, maximum: 300, default: 120 },
     },
+    "/api/public/daily-export/kr": {
+      format: { type: "string", enum: ["full", "compact"], default: "full", description: "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다." },
+    },
+    "/api/public/daily-export/us": {
+      format: { type: "string", enum: ["full", "compact"], default: "full", description: "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다." },
+    },
     "/api/public/instrument-fundamentals": {
       market: { type: "string", enum: ["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NASDAQ", "NYS", "NYSE", "AMS", "AMEX"] },
       codes: { type: "string", description: "쉼표 구분 1~100개 종목 코드." },
@@ -376,13 +382,13 @@ async function makeOpenApi(allRoutes) {
       description: route.path === "/api/public/us-stock-metadata"
         ? "인증 없는 읽기 전용 티커 조회입니다. 공식 활성 COMMON_STOCK 마스터에서 ticker를 검증하고 회사 식별정보, 캐시된 SEC Company Facts, 저장된 시세 스냅샷과 freshness를 반환합니다. 요청 중 외부 시세 조회나 DB 쓰기는 하지 않습니다."
         : route.path.startsWith("/api/public/daily-export/")
-          ? "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. JSON은 ticker, marketCap, daily 세 필드로 구성되고 종목별 일봉은 최대 20개입니다."
+          ? "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. format=full(기본)은 기존 객체형 JSON이고 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 종목별 일봉은 최대 20개입니다."
         : `${route.path === "/api/automation-settings" ? "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. " : ""}인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 ${source}의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.`,
       parameters: queryParameters(await readFile(join(root, source), "utf8"), route.path),
       security: [],
       responses: {
         "200": route.path.startsWith("/api/public/daily-export/")
-          ? { description: "다운로드 가능한 gzip 압축 JSON 파일. 압축 해제 후 각 종목 항목에는 ticker, marketCap, daily만 포함됩니다.", content: { "application/gzip": { schema: { type: "string", format: "binary" } } } }
+          ? { description: "다운로드 가능한 gzip 압축 JSON 파일. 압축 해제 후 각 종목 항목에는 ticker, marketCap, daily가 포함됩니다. format=compact이면 daily.candleEncoding은 tuple-v1이며 daily.candleFields 배열이 각 봉 tuple의 열 순서를 정의합니다.", content: { "application/gzip": { schema: { type: "string", format: "binary" } } } }
           : { description: route.path === "/api/public/us-stock-metadata" ? "종목 식별·보통주 분류·회사 연결·저장 시세 스냅샷 및 데이터 신선도 반환." : "요청 성공. 일부 endpoint는 route별 응답 schema를 제공하며, 전체 DTO는 현재 구현을 기준으로 합니다.", content: { "application/json": { schema: responseSchema(route.path) } } },
         "400": { description: "입력값 검증 실패(해당 endpoint에 한함)." },
         "429": { description: "요청 제한 초과(해당 endpoint에 한함)." },

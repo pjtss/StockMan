@@ -1,8 +1,9 @@
-import { getPublicDailyExport } from "@/lib/public-daily-export";
+import { getPublicDailyExportFromRequest } from "@/lib/public-daily-export";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
-  return getPublicDailyExport("US");
+export async function GET(request: Request) {
+  const format = new URL(request.url).searchParams.get("format");
+  return getPublicDailyExportFromRequest("US", format);
 }

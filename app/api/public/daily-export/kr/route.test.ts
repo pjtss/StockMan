@@ -40,6 +40,10 @@ function makeRow(market: string, code: string, currency: string) {
   };
 }
 
+function fullRequest() {
+  return new Request("http://localhost/api/public/daily-export/test");
+}
+
 describe("public gzip daily export", () => {
   beforeEach(() => queryMock.mockReset());
   afterEach(() => vi.restoreAllMocks());
@@ -52,7 +56,7 @@ describe("public gzip daily export", () => {
       .mockResolvedValueOnce({ rows: [{ market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock", has_trading_value: true }] })
       .mockResolvedValue({ rows: [makeRow(market === "KR" ? "KOSPI" : "NAS", code, currency)] });
 
-    const response = await getExport();
+    const response = await getExport(fullRequest());
     const compressed = Buffer.from(await response.arrayBuffer());
     const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
     const [eligibilitySql] = queryMock.mock.calls[0] as [string];
@@ -123,9 +127,54 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(2);
   });
 
+  it("returns compact daily candles as documented tuples and preserves the full-data fields", async () => {
+    const compactItem = JSON.parse(makeRow("KOSPI", "005930", "KRW").item_json);
+    compactItem.daily = {
+      ...compactItem.daily,
+      candleEncoding: "tuple-v1",
+      candleFields: ["date", "open", "high", "low", "close", "volume", "tradingValue", "fetchedAt"],
+      candles: compactItem.daily.candles.map((entry: Record<string, unknown>) =>
+        ["date", "open", "high", "low", "close", "volume", "tradingValue", "fetchedAt"].map((field) => entry[field]),
+      ),
+    };
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true }] })
+      .mockResolvedValueOnce({ rows: [{ item_json: JSON.stringify(compactItem) }] });
+
+    const response = await getKrExport(new Request("http://localhost/api/public/daily-export/kr?format=compact"));
+    const compressed = Buffer.from(await response.arrayBuffer());
+    const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
+    const sql = (queryMock.mock.calls[1]?.[0] as { text: string }).text;
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/gzip");
+    expect(response.headers.get("content-disposition")).toContain("daily-candles-kr-compact.json.gz");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("content-encoding")).toBeNull();
+    expect(compressed[8]).toBe(2);
+    expect(payload).toHaveLength(1);
+    expect(payload[0].ticker).toEqual({ market: "KOSPI", code: "005930", name: "Example Common Stock" });
+    expect(payload[0].marketCap).toMatchObject({ value: 123456789000, currency: "KRW" });
+    expect(payload[0].daily.candleEncoding).toBe("tuple-v1");
+    expect(payload[0].daily.candleFields).toEqual(["date", "open", "high", "low", "close", "volume", "tradingValue", "fetchedAt"]);
+    expect(payload[0].daily.candles).toEqual([["20261124", 100, 110, 95, 105, 1_000, 105_000, "2026-11-24T07:00:00.000Z"]]);
+    expect(payload[0].daily.metadata.returnedCount).toBe(payload[0].daily.candles.length);
+    expect(payload[0].daily.candles.length).toBeLessThanOrEqual(20);
+    expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
+    expect(sql).toContain("json_agg(json_build_array(");
+  });
+
+  it("rejects unsupported daily export formats without querying the DB", async () => {
+    const response = await getKrExport(new Request("http://localhost/api/public/daily-export/kr?format=unknown"));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ ok: false, error: "INVALID_FORMAT" });
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
   it("returns 503 when the official active common-stock universe is empty", async () => {
     queryMock.mockResolvedValue({ rows: [] });
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ ok: false, error: "DAILY_EXPORT_UNAVAILABLE" });
@@ -134,9 +183,9 @@ describe("public gzip daily export", () => {
   it("reads and recompresses the database snapshot on every request", async () => {
     queryMock.mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
-    const first = await getKrExport();
+    const first = await getKrExport(fullRequest());
     await first.arrayBuffer();
-    const second = await getKrExport();
+    const second = await getKrExport(fullRequest());
     await second.arrayBuffer();
 
     expect(first.headers.get("cache-control")).toContain("no-store");
@@ -150,7 +199,7 @@ describe("public gzip daily export", () => {
       .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true }] })
       .mockResolvedValueOnce({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
     await response.arrayBuffer();
 
     const performanceLog = infoSpy.mock.calls.find(([message]) =>
@@ -180,7 +229,7 @@ describe("public gzip daily export", () => {
       .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: false }] })
       .mockResolvedValueOnce({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
     await response.arrayBuffer();
     const [{ text: sql }] = queryMock.mock.calls[1] as [{ text: string }];
 
@@ -197,7 +246,7 @@ describe("public gzip daily export", () => {
       })
       .mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
     await response.arrayBuffer();
     const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
       JSON.parse((query as { values: [string] }).values[0]).length,
@@ -215,7 +264,7 @@ describe("public gzip daily export", () => {
       })
       .mockResolvedValue({ rows: [makeRow("NAS", "AAPL", "USD")] });
 
-    const response = await getUsExport();
+    const response = await getUsExport(fullRequest());
     await response.arrayBuffer();
     const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
       JSON.parse((query as { values: [string] }).values[0]).length,
@@ -240,7 +289,7 @@ describe("public gzip daily export", () => {
         return { rows: [makeRow("NAS", "AAPL", "USD")] };
       });
 
-    const response = await getUsExport();
+    const response = await getUsExport(fullRequest());
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
@@ -263,7 +312,7 @@ describe("public gzip daily export", () => {
         return { rows: [makeRow("KOSPI", "005930", "KRW")] };
       });
 
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
@@ -278,7 +327,7 @@ describe("public gzip daily export", () => {
         setTimeout(() => resolve({ rows: [makeRow("KOSPI", "005930", "KRW")] }), 8_000);
       }));
 
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
     const reader = response.body!.getReader();
     const firstChunk = await reader.read();
     const waitingSince = Date.now();
@@ -311,7 +360,7 @@ describe("public gzip daily export", () => {
         return { rows: Array.from({ length: index === 0 ? 500 : 1 }, (_, rowIndex) => makeRow("KOSPI", `T${String(index * 500 + rowIndex).padStart(4, "0")}`, "KRW")) };
       });
 
-    const response = await getKrExport();
+    const response = await getKrExport(fullRequest());
     const reader = response.body!.getReader();
     const firstChunk = await reader.read();
     const waitingSince = Date.now();
@@ -352,7 +401,7 @@ describe("public gzip daily export", () => {
         return { rows: batch.map(({ market: itemMarket, code }) => makeRow(itemMarket, code, currency)) };
       });
 
-    const response = await getExport();
+    const response = await getExport(fullRequest());
     const compressed = Buffer.from(await response.arrayBuffer());
     const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
     const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
@@ -371,7 +420,7 @@ describe("public gzip daily export", () => {
   it("returns 503 when the read-only export query fails", async () => {
     queryMock.mockResolvedValue({ rows: null });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const response = await getUsExport();
+    const response = await getUsExport(fullRequest());
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ ok: false, error: "DAILY_EXPORT_UNAVAILABLE" });
