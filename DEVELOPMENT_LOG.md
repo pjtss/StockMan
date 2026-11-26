@@ -5,7 +5,8 @@
 - 자동 회귀 감지: route test가 KR batch500 분할, US batch1,000 분할 `[1000,1000,501]`, US 동시 query peak6, KR peak5를 검증했다. 대상 테스트 11개 통과. 전체 `npm run deploy:verify`도 통과: 283개 테스트 파일 통과/1 skip, 1,649 passed/3 skipped, typecheck, docs/API/security/cron audits, production build, standalone HTTP 및 Chrome desktop/mobile smoke.
 - 운영 실측/판정: candidate `662680cb`, OCI run `45767914380` 성공 후 US sequential 3회 38.570/43.290/40.937초(median40.937초), US+KR 동시 호출 US58.764초/KR18.782초였다. 이전 운영 batch500/US concurrency10 median36.885초보다 후보가 약 11% 느렸다. 로컬에서는 약 8% 빨랐지만 운영에 재현되지 않았으므로 이 후보는 기각하고 US batch500/concurrency10으로 복구한다. 연결이 닫힌 한 초기 grouped 실험은 제외했으며 오류를 HTTP 성공 측정으로 세지 않았다. 정상 응답은 HTTP200, XFL0, no-store, gzip/JSON 및 20봉 계약과 US ticker5,011을 통과했다.
 - 근본 원인/남은 위험: batch를 두 배로 키우면서 왕복 query 수와 wave 수는 줄었지만 각 query의 payload/DB 작업이 커져 per-query 완료 지연이 더해졌을 가능성이 있다. 운영 DB query phase가 직접 계측되지 않아 원인은 inference이며, 다음 후보는 운영 query latency와 gzip/전송 phase를 분리 측정해야 한다.
-- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. US batch500/concurrency10 복구를 전체 검증·배포한다.
+- 배포/복구 운영 확인: commit `1790f95b`, OCI run `45770981889`의 verify/package/upload/activation 모두 성공(최종 run success, 2026-11-26 06:56:47Z). 운영 호스트 `stockman.r-e.kr`에서 KR/US 순차 공개 GET을 각 2회 호출해 전체 gzip 해제와 JSON 필수 필드, ticker/marketCap, candles/returnedCount 일치, 최대20봉을 검사했다. KR 11.540/6.999초, 2,337 ticker, gzip1,524,715B; US 34.304/42.522초, 5,011 ticker, gzip3,464,301/3,464,587B. 모두 HTTP200, `application/gzip`, Content-Encoding 없음, `no-store`, XFL=0. 운영 표본 2회이며 부하 미통제라 batch500/10의 최적성이나 개선 인과는 주장하지 않는다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서, 본 로그. 복구 코드 전체 검증·OCI 배포 및 운영 API 확인은 완료했다. 실측 기록을 추가한 문서 커밋의 검증·배포 상태는 별도 기록한다.
 
 ### 2026-11-26 — 공개 일봉 gzip API 운영 성능 보고서 제출
 - 목적/범위: 두 차례 운영 배포 결과를 통합해 KR/US 순차·동시 운영 API 완료 시간, 응답 크기, JSON/gzip 계약, 비교 한계를 보고서로 작성했다. 문서 관리 규칙에 따라 운영 문서 카탈로그와 `docs/README.md` 인덱스에도 연결했다.
