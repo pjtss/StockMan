@@ -1,4 +1,12 @@
-### 2026-11-26 — gzip 스트림에서 미국 일봉 DB 조회 진행
+### 2026-11-26 — 운영 gzip 일봉 API 실측 결과
+- 배포: 코드 커밋 `239e7e53`의 GitHub Actions Deploy OCI run `45733164329` 성공. 운영 도메인 `https://stockman.r-e.kr`에서 각 무인증 GET을 1회씩 순차 호출했다. 캐시를 사용하지 않아 호출당 실제 DB 조회와 gzip 생성이 실행됐다.
+- KR `GET /api/public/daily-export/kr`: HTTP 200, gzip headers 0.271초, 첫 압축 바이트 0.276초, 전체 완료 17.809초, compressed 1,254,796B, 2,337종목, 종목별 daily 20봉, gzip 해제/JSON/세 필드 계약 통과.
+- US `GET /api/public/daily-export/us`: HTTP 200, gzip headers 7.742초, 첫 압축 바이트 7.743초, 전체 완료 94.754초, compressed 2,869,595B, 5,011종목, 종목별 daily 0–20봉(데이터 없는 ticker 포함), gzip 해제/JSON/세 필드 계약 통과. 스트림 최대 무응답 구간 26.610초로 60초 nginx 504를 피했다.
+- 운영 한계: 각각 단 한 번의 실측이며 반복 부하·동시 호출 p95/p99를 보증하지 않는다. 미국 전체 다운로드는 약 95초여서 수신 LLM/HTTP 클라이언트의 자체 timeout이 95초보다 짧으면 실패할 수 있다. `.json.gz` 자체를 반환하므로 자동 HTTP content-encoding 해제 대신 일반 gzip 파일로 해제한다.
+- 데이터 계약 점검: top-level keys는 `daily`, `marketCap`, `ticker`; HTTP `Content-Type: application/gzip`, `Content-Encoding` 없음, `Cache-Control: no-store`; 일봉 최대 20봉 준수.
+- 변경 파일: 본 로그만.
+- 검증: 앞선 코드 커밋에서 전체 `npm run deploy:verify` 통과(283 test files passed/1 skipped, 1,645 tests passed/3 skipped); 운영의 두 응답 모두 gunzip 후 JSON 계약 검사 통과.
+- 커밋·푸시·배포: feature 배포 성공. 이 운영 실측 기록은 문서 커밋과 뒤이은 CI 배포 후에도 최신 상태 확인 예정.### 2026-11-26 — gzip 스트림에서 미국 일봉 DB 조회 진행
 - 목적/범위: 250개 종목 batch로도 운영 US가 60.2초 504여서, batch 조회 결과를 전부 기다린 뒤 응답을 내던 구조를 바꿔 gzip HTTP body를 먼저 열고 최대 5개 DB query batch 결과를 순차적으로 흘려 보낸다.
 - 근거/동작: 운영 US 응답 헤더 도착 자체가 60초 후였으나 작은 batch로 분리해도 개선되지 않았다. 이는 압축 전에 DB 결과 전체를 대기하는 구조가 프록시 timeout을 유발할 수 있음을 보인다. 먼저 JSON 배열 gzip 시작 바이트를 flush하고 DB 결과를 받는 동안 5초마다 gzip sync flush heartbeat를 보낸다. 종목 데이터는 batch가 끝날 때마다 순차 전송하며 gzip level 9, 20봉 상한, 세 top-level 필드, no-store는 유지한다.
 - 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그.
