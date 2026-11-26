@@ -129,6 +129,37 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
+  it("logs database, streaming, first-byte, and gzip timings after the response completes", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", has_trading_value: true }] })
+      .mockResolvedValueOnce({ rows: [makeRow("KOSPI", "005930", "KRW")] });
+
+    const response = await getKrExport();
+    await response.arrayBuffer();
+
+    const performanceLog = infoSpy.mock.calls.find(([message]) =>
+      message === "[API /public/daily-export/kr] performance",
+    );
+    expect(performanceLog?.[1]).toMatchObject({
+      market: "KR",
+      tickerCount: 1,
+      batchCount: 1,
+      batchQueryCount: 1,
+      batchWaveCount: 1,
+    });
+    expect(performanceLog?.[1]).toEqual(expect.objectContaining({
+      universeQueryMs: expect.any(Number),
+      batchQueryWallMs: expect.any(Number),
+      batchQueryDurationMs: expect.any(Number),
+      maxBatchQueryMs: expect.any(Number),
+      timeToFirstGzipByteMs: expect.any(Number),
+      streamDurationMs: expect.any(Number),
+      totalElapsedMs: expect.any(Number),
+      gzipBytes: expect.any(Number),
+    }));
+  });
+
   it("uses the schema-compatible trading value fallback when an older DB lacks the column", async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", has_trading_value: false }] })

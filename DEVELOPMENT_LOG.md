@@ -9772,3 +9772,11 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 운영 실측: 전체 gzip 응답을 순차로 각각 5회 다운로드/해제했다. KR 시간 10.807/5.950/8.705/3.760/3.339초(median5.950), gzip1,524,715–1,525,055B/raw8,925,884B, 2,337 ticker·20봉. US 45.406/60.268/63.608/36.412/50.560초(median50.560), gzip3,542,946–3,543,067B/raw19,004,536B, 5,011 ticker·0–20봉. 모두 HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL0, JSON array/티커/시가총액/일봉/returnedCount/max20 계약 통과.
 - 판정/남은 위험: 직전 양시장 level2 운영 중앙값 KR13.877초/US52.211초와 단순 비교해 각각 57.1%/3.2% 짧았다. 부하를 통제하지 않아 gzip 레벨 변경의 인과 효과로 단정하지 않는다. gzip 크기와 payload 계약은 유지됐고 현 시장별 조합은 유지한다. 속도 자동 회귀 감지를 위해서는 DB 쿼리·gzip CPU·첫/마지막 byte 시간을 분리한 계측 및 동일 조건 반복이 남아 있다.
 - 문서/변경 파일: `lib/public-daily-export.ts`는 기존 코드 커밋에 포함; 운영 성능 보고서와 본 로그에 측정/배포 내용을 추가했다. 문서 커밋 `ae743c20`은 전체 `npm run deploy:verify` 성공 후 push했으며 OCI run `45797119333`이 성공했다. 배포된 운영 보고서 URL은 HTTP 200, `text/markdown; charset=UTF-8`이며 새 시장별 실측 섹션과 한글 UTF-8을 확인했다.
+
+### 2026-11-26 — 공개 gzip export 단계별 지연 계측
+- 목적/범위: 운영 API 전체 완료시간만으로는 느린 원인을 판별할 수 없어, 후속 속도 개선이 DB/query 또는 gzip 생성 중 실제 병목을 겨냥하도록 완료 시점 구조화 계측을 추가한다.
+- 근본 원인: 기존 운영 GET 검증은 클라이언트의 전체 다운로드 시간과 gzip bytes만 측정했다. 서버의 universe query, 병렬 batch query wave, 스트림 시작/완료 구간은 분리되지 않아 batch 크기·동시성 변경의 근거가 부족했다.
+- 변경: `lib/public-daily-export.ts`가 market/ticker/batch 수, universe query 시간, batch query count/waves/wall/누적/max 시간, gzip 첫 byte/stream/total 경과시간, gzip bytes를 스트림 완료 로그에 기록한다. ticker 식별자와 응답 필드는 로그하지 않으며 HTTP header/body 계약은 바꾸지 않는다.
+- 자동 회귀 감지: `app/api/public/daily-export/kr/route.test.ts`가 전체 응답 완료 후 단계별 계측의 필수 필드와 값 타입을 확인한다. 전체 배포 검증에도 이 route regression test, HTTP smoke, 전체 build/typecheck 게이트를 유지한다.
+- 위험/한계 및 다음 단계: gzip stream wall 시간은 DB wait/backpressure와 겹쳐 순수 CPU 시간이 아니며 네트워크 마지막 byte 도착을 측정하지 않는다. 취소된 요청은 완료 로그가 없을 수 있다. 배포 후 서버 로그의 KR/US 표본을 모아 병목 구간만 다음 후보로 수정하고, 다시 각 시장 5회 운영 GET으로 gzip/API 계약과 완료시간을 검증한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서, 본 로그. 대상 route 테스트 12개 통과 및 TypeScript typecheck 통과. 전체 `npm run deploy:verify`, commit/push/OCI 배포 및 운영 로그 실측은 이번 계측 배포 후 진행 예정이다.

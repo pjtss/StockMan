@@ -9,6 +9,19 @@ type ExportRow = { item_json: string };
 
 type ExportKey = { market: string; code: string; has_trading_value: boolean };
 
+type ExportPerformanceMetrics = {
+  market: ExportMarket;
+  requestStartedAt: number;
+  tickerCount: number;
+  batchCount: number;
+  universeQueryMs: number;
+  batchQueryCount: number;
+  batchWaveCount: number;
+  batchQueryWallMs: number;
+  batchQueryDurationMs: number;
+  maxBatchQueryMs: number;
+};
+
 const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
   candleTable: string;
@@ -26,11 +39,14 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   },
 };
 
-function gzipJsonStream(items: AsyncIterable<string>, level: 2 | 3) {
+function gzipJsonStream(items: AsyncIterable<string>, level: 2 | 3, metrics: ExportPerformanceMetrics) {
   let compressor: ReturnType<typeof createGzip> | null = null;
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
     start(controller) {
+      const streamStartedAt = performance.now();
+      let firstGzipByteAt: number | null = null;
+      let gzipBytes = 0;
       const activeCompressor = createGzip({ level });
       compressor = activeCompressor;
       let ended = false;
@@ -44,13 +60,33 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 2 | 3) {
         ended = true;
         clearInterval(heartbeat);
       };
-      activeCompressor.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+      activeCompressor.on("data", (chunk: Buffer) => {
+        firstGzipByteAt ??= performance.now();
+        gzipBytes += chunk.length;
+        controller.enqueue(new Uint8Array(chunk));
+      });
       activeCompressor.on("error", (error) => {
         stopHeartbeat();
         controller.error(error);
       });
       activeCompressor.on("end", () => {
         stopHeartbeat();
+        const completedAt = performance.now();
+        console.info(`[API /public/daily-export/${metrics.market.toLowerCase()}] performance`, {
+          market: metrics.market,
+          tickerCount: metrics.tickerCount,
+          batchCount: metrics.batchCount,
+          universeQueryMs: Math.round(metrics.universeQueryMs),
+          batchQueryCount: metrics.batchQueryCount,
+          batchWaveCount: metrics.batchWaveCount,
+          batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
+          batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
+          maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
+          timeToFirstGzipByteMs: firstGzipByteAt === null ? null : Math.round(firstGzipByteAt - metrics.requestStartedAt),
+          streamDurationMs: Math.round(completedAt - streamStartedAt),
+          totalElapsedMs: Math.round(completedAt - metrics.requestStartedAt),
+          gzipBytes,
+        });
         controller.close();
       });
 
@@ -93,9 +129,11 @@ function errorResponse() {
 }
 
 export async function getPublicDailyExport(market: ExportMarket) {
+  const requestStartedAt = performance.now();
   const { universeTable, candleTable, eligibility } = EXPORT_CONFIG[market];
   try {
     const pool = getPool();
+    const universeQueryStartedAt = performance.now();
     const eligible = await pool.query<ExportKey>(`
       SELECT u.market, u.code,
              EXISTS (
@@ -109,6 +147,18 @@ export async function getPublicDailyExport(market: ExportMarket) {
        WHERE ${eligibility}
        ORDER BY u.market, u.code
     `);
+    const metrics: ExportPerformanceMetrics = {
+      market,
+      requestStartedAt,
+      tickerCount: eligible.rows.length,
+      batchCount: 0,
+      universeQueryMs: performance.now() - universeQueryStartedAt,
+      batchQueryCount: 0,
+      batchWaveCount: 0,
+      batchQueryWallMs: 0,
+      batchQueryDurationMs: 0,
+      maxBatchQueryMs: 0,
+    };
     if (eligible.rows.length === 0) return errorResponse();
 
     const chunkSize = 500;
@@ -116,6 +166,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     for (let index = 0; index < eligible.rows.length; index += chunkSize) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
     }
+    metrics.batchCount = chunks.length;
     const concurrency = market === "US" ? 10 : 5;
     const tradingValueExpression = eligible.rows[0].has_trading_value
       ? `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
@@ -125,7 +176,11 @@ export async function getPublicDailyExport(market: ExportMarket) {
       : `c.close * c.volume`;
     const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {
-        const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`
+        const waveStartedAt = performance.now();
+        const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map(async (keys) => {
+          const queryStartedAt = performance.now();
+          try {
+            return await pool.query<ExportRow>(`
       WITH requested AS (
         SELECT market, code
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
@@ -186,7 +241,16 @@ export async function getPublicDailyExport(market: ExportMarket) {
         ) d ON TRUE
        WHERE ${eligibility}
        ORDER BY u.market, u.code
-    `, [JSON.stringify(keys)])));
+    `, [JSON.stringify(keys)]);
+          } finally {
+            const queryDurationMs = performance.now() - queryStartedAt;
+            metrics.batchQueryCount += 1;
+            metrics.batchQueryDurationMs += queryDurationMs;
+            metrics.maxBatchQueryMs = Math.max(metrics.maxBatchQueryMs, queryDurationMs);
+          }
+        }));
+        metrics.batchQueryWallMs += performance.now() - waveStartedAt;
+        metrics.batchWaveCount += 1;
         for (const result of chunkResults) {
           for (const row of result.rows) {
             yield row.item_json;
@@ -197,7 +261,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
 
     const filename = `daily-candles-${market.toLowerCase()}.json.gz`;
     const gzipLevel = market === "US" ? 2 : 3;
-    return new Response(gzipJsonStream(items, gzipLevel), {
+    return new Response(gzipJsonStream(items, gzipLevel, metrics), {
       status: 200,
       headers: {
         "content-type": "application/gzip",
