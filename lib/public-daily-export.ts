@@ -55,27 +55,54 @@ function toIsoOrNull(value: string | Date | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function gzipJsonStream(items: unknown[]) {
+function gzipJsonStream(items: AsyncIterable<unknown>) {
+  let compressor: ReturnType<typeof createGzip> | null = null;
+  let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      const compressor = createGzip({ level: 9 });
-      compressor.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
-      compressor.on("error", (error) => controller.error(error));
-      compressor.on("end", () => controller.close());
+      const activeCompressor = createGzip({ level: 9 });
+      compressor = activeCompressor;
+      let ended = false;
+      let flushing = false;
+      const heartbeat = setInterval(() => {
+        if (ended || flushing) return;
+        flushing = true;
+        activeCompressor.flush(() => { flushing = false; });
+      }, 5_000);
+      stopHeartbeat = () => {
+        ended = true;
+        clearInterval(heartbeat);
+      };
+      activeCompressor.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+      activeCompressor.on("error", (error) => {
+        stopHeartbeat();
+        controller.error(error);
+      });
+      activeCompressor.on("end", () => {
+        stopHeartbeat();
+        controller.close();
+      });
 
       const write = (chunk: string) => new Promise<void>((resolve, reject) => {
-        compressor.write(chunk, (error) => error ? reject(error) : resolve());
+        activeCompressor.write(chunk, (error) => error ? reject(error) : resolve());
       });
-      const flush = () => new Promise<void>((resolve) => compressor.flush(resolve));
+      const flush = () => new Promise<void>((resolve) => activeCompressor.flush(resolve));
 
       void (async () => {
         await write("[");
-        for (let index = 0; index < items.length; index += 1) {
-          await write(`${index === 0 ? "" : ","}${JSON.stringify(items[index])}`);
-          if ((index + 1) % 50 === 0) await flush();
+        await flush();
+        let index = 0;
+        for await (const item of items) {
+          await write(`${index === 0 ? "" : ","}${JSON.stringify(item)}`);
+          index += 1;
+          if (index % 50 === 0) await flush();
         }
-        compressor.end("]");
-      })().catch((error: unknown) => compressor.destroy(error instanceof Error ? error : new Error("GZIP_STREAM_FAILED")));
+        activeCompressor.end("]");
+      })().catch((error: unknown) => activeCompressor.destroy(error instanceof Error ? error : new Error("GZIP_STREAM_FAILED")));
+    },
+    cancel() {
+      stopHeartbeat();
+      compressor?.destroy();
     },
   });
 }
@@ -104,10 +131,10 @@ export async function getPublicDailyExport(market: ExportMarket) {
     for (let index = 0; index < eligible.rows.length; index += chunkSize) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
     }
-    const rows: ExportRow[] = [];
     const concurrency = 5;
-    for (let offset = 0; offset < chunks.length; offset += concurrency) {
-      const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`
+    const items = (async function* (): AsyncGenerator<unknown> {
+      for (let offset = 0; offset < chunks.length; offset += concurrency) {
+        const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`
       WITH requested AS (
         SELECT market, code
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
@@ -160,50 +187,50 @@ export async function getPublicDailyExport(market: ExportMarket) {
        WHERE ${eligibility}
        ORDER BY u.market, u.code
     `, [JSON.stringify(keys)])));
-      rows.push(...chunkResults.flatMap((result) => result.rows));
-    }
-    if (rows.length === 0) return errorResponse();
+        for (const result of chunkResults) {
+          for (const row of result.rows) {
+            const rawMarketCap = row.market_cap === null ? null : Number(row.market_cap);
+            const marketCapValue = rawMarketCap !== null && Number.isFinite(rawMarketCap) && rawMarketCap > 0
+              ? rawMarketCap
+              : null;
+            const candles = Array.isArray(row.candles) ? row.candles : [];
+            const latestDate = row.latest_candle_date ?? candles.at(-1)?.date ?? null;
+            const candleUpdatedAt = toIsoOrNull(row.data_updated_at)
+              ?? candles.reduce<string | null>((latest, candle) => {
+                const fetchedAt = toIsoOrNull(candle.fetchedAt);
+                return fetchedAt && (!latest || fetchedAt > latest) ? fetchedAt : latest;
+              }, null);
 
-    const items = rows.map((row) => {
-      const rawMarketCap = row.market_cap === null ? null : Number(row.market_cap);
-      const marketCapValue = rawMarketCap !== null && Number.isFinite(rawMarketCap) && rawMarketCap > 0
-        ? rawMarketCap
-        : null;
-      const candles = Array.isArray(row.candles) ? row.candles : [];
-      const latestDate = row.latest_candle_date ?? candles.at(-1)?.date ?? null;
-      const candleUpdatedAt = toIsoOrNull(row.data_updated_at)
-        ?? candles.reduce<string | null>((latest, candle) => {
-          const fetchedAt = toIsoOrNull(candle.fetchedAt);
-          return fetchedAt && (!latest || fetchedAt > latest) ? fetchedAt : latest;
-        }, null);
-
-      return {
-        ticker: { market: row.market, code: row.code, name: row.name },
-        marketCap: {
-          value: marketCapValue,
-          currency: row.market_cap_currency,
-          observedAt: toIsoOrNull(row.market_cap_observed_at),
-          fetchedAt: toIsoOrNull(row.market_cap_fetched_at),
-        },
-        daily: {
-          candles: candles.map((candle) => ({
-            date: candle.date,
-            open: Number(candle.open),
-            high: Number(candle.high),
-            low: Number(candle.low),
-            close: Number(candle.close),
-            volume: Number(candle.volume),
-            tradingValue: Number(candle.tradingValue),
-            fetchedAt: toIsoOrNull(candle.fetchedAt),
-          })),
-          metadata: {
-            latestCandleDate: latestDate,
-            dataUpdatedAt: candleUpdatedAt,
-            returnedCount: Number(row.returned_count ?? candles.length),
-          },
-        },
-      };
-    });
+            yield {
+              ticker: { market: row.market, code: row.code, name: row.name },
+              marketCap: {
+                value: marketCapValue,
+                currency: row.market_cap_currency,
+                observedAt: toIsoOrNull(row.market_cap_observed_at),
+                fetchedAt: toIsoOrNull(row.market_cap_fetched_at),
+              },
+              daily: {
+                candles: candles.map((candle) => ({
+                  date: candle.date,
+                  open: Number(candle.open),
+                  high: Number(candle.high),
+                  low: Number(candle.low),
+                  close: Number(candle.close),
+                  volume: Number(candle.volume),
+                  tradingValue: Number(candle.tradingValue),
+                  fetchedAt: toIsoOrNull(candle.fetchedAt),
+                })),
+                metadata: {
+                  latestCandleDate: latestDate,
+                  dataUpdatedAt: candleUpdatedAt,
+                  returnedCount: Number(row.returned_count ?? candles.length),
+                },
+              },
+            };
+          }
+        }
+      }
+    })();
 
     const filename = `daily-candles-${market.toLowerCase()}.json.gz`;
     return new Response(gzipJsonStream(items), {

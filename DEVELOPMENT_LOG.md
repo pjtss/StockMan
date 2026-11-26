@@ -1,4 +1,11 @@
-### 2026-11-26 — 공개 gzip 일봉 운영 조회 병렬 분할
+### 2026-11-26 — gzip 스트림에서 미국 일봉 DB 조회 진행
+- 목적/범위: 250개 종목 batch로도 운영 US가 60.2초 504여서, batch 조회 결과를 전부 기다린 뒤 응답을 내던 구조를 바꿔 gzip HTTP body를 먼저 열고 최대 5개 DB query batch 결과를 순차적으로 흘려 보낸다.
+- 근거/동작: 운영 US 응답 헤더 도착 자체가 60초 후였으나 작은 batch로 분리해도 개선되지 않았다. 이는 압축 전에 DB 결과 전체를 대기하는 구조가 프록시 timeout을 유발할 수 있음을 보인다. 먼저 JSON 배열 gzip 시작 바이트를 flush하고 DB 결과를 받는 동안 5초마다 gzip sync flush heartbeat를 보낸다. 종목 데이터는 batch가 끝날 때마다 순차 전송하며 gzip level 9, 20봉 상한, 세 top-level 필드, no-store는 유지한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그.
+- 자동 회귀 감지: 테스트가 batch 조회 8초 지연 상황에서도 gzip heartbeat를 7.5초 이내 수신하고, 최종 gzip을 온전히 해제해 ticker를 확인한다.
+- 검증: 스트리밍 dev-server + `.env.local` 주입 + localhost PostgreSQL 실측: KR 헤더 2.7초/총 4.5초/2,352종목/1,215,870B/최대 20봉, US 헤더 0.5초/총 4.2초/5,012종목/2,853,898B/최대 20봉. API 테스트 7개, typecheck 및 전체 `npm run deploy:verify` 통과(283 test files passed/1 skipped, 1,645 tests passed/3 skipped; build/docs/audits/standalone·Chrome smoke 포함). 운영 재배포 후 실측은 뒤따른다.
+- 남은 위험: Nginx/Next 프로덕션 경로가 중간 heartbeat를 전달하는지와 운영 DB batch 시간이 개선되는지 운영에서 확인한다. streaming 중 DB 오류가 발생하면 HTTP 200 이후 gzip body가 불완전해져 클라이언트 압축해제가 실패할 수 있다.
+- 커밋·푸시·배포: 전체 로컬 배포 검증 완료. gzip query streaming 변경 커밋·푸시 및 운영 GET 대기.### 2026-11-26 — 공개 gzip 일봉 운영 조회 병렬 분할
 - 목적/범위: gzip 스트리밍 배포 후 운영에서 KR 약 49초 200, US 약 60초 504가 재현돼 시장별 일봉 조회를 종목 250개 단위로 나누고 최대 5개씩 병렬 처리한다. 데이터 계약과 gzip level 9, 20봉 상한, 무캐시, 종목분류 정책은 유지한다.
 - 원인 근거: 첫 응답 헤더까지 US 약 60초가 걸려 지연이 응답 본문 gzip 전이 아닌 초기 DB 조회/결과 처리 구간에 있음을 확인했다. DB 서버 내부의 정확한 원인(스토리지, CPU, 실행 계획)은 아직 미확인이다.
 - 구현: 활성 COMMON_STOCK universe key를 먼저 읽고, key 집합을 JSON recordset으로 250개씩 최대 5개 DB query에 나눠 병렬 조회한다. 각 쿼리는 기존 복합인덱스 기반 종목별 최신 20봉 조회를 유지한다. 이전 set-based 전체 candle scan 시험은 로컬에서 US 65초로 느려 최종 변경에 채택하지 않았다.

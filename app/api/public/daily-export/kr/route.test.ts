@@ -106,7 +106,9 @@ describe("public gzip daily export", () => {
     queryMock.mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
     const first = await getKrExport();
+    await first.arrayBuffer();
     const second = await getKrExport();
+    await second.arrayBuffer();
 
     expect(first.headers.get("cache-control")).toContain("no-store");
     expect(second.headers.get("cache-control")).toContain("no-store");
@@ -121,6 +123,7 @@ describe("public gzip daily export", () => {
       .mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
     const response = await getKrExport();
+    await response.arrayBuffer();
     const batchSizes = queryMock.mock.calls.slice(1).map(([, parameters]) =>
       JSON.parse((parameters as [string])[0]).length,
     );
@@ -128,6 +131,34 @@ describe("public gzip daily export", () => {
     expect(response.status).toBe(200);
     expect(batchSizes).toEqual([250, 250, 1]);
     expect(queryMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps the gzip response flowing while a database batch is pending", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930" }] })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        setTimeout(() => resolve({ rows: [makeRow("KOSPI", "005930", "KRW")] }), 8_000);
+      }));
+
+    const response = await getKrExport();
+    const reader = response.body!.getReader();
+    const firstChunk = await reader.read();
+    const waitingSince = Date.now();
+    const heartbeatChunk = await reader.read();
+
+    expect(firstChunk.done).toBe(false);
+    expect(heartbeatChunk.done).toBe(false);
+    expect(Date.now() - waitingSince).toBeLessThan(7_500);
+
+    const chunks = [Buffer.from(firstChunk.value!), Buffer.from(heartbeatChunk.value!)];
+    for (;;) {
+      const part = await reader.read();
+      if (part.done) break;
+      chunks.push(Buffer.from(part.value));
+    }
+    const payload = JSON.parse(gunzipSync(Buffer.concat(chunks)).toString("utf8"));
+    expect(payload).toHaveLength(1);
+    expect(payload[0].ticker.code).toBe("005930");
   });
 
   it("returns 503 when the read-only export query fails", async () => {
