@@ -489,3 +489,13 @@ Node.js v22 공식 zlib 문서에서 `createGzip`의 `chunkSize` 기본값은16K
 | US | 51.713 / 45.181 / 44.797 / 40.143 / 42.547초 | 44.797초 | 0.400초 | 2,844,472–2,845,348 | 18,964,448 | 5,011 |
 
 바로 이전 level9 기본 16KB chunk의 운영 5회 중앙값은 KR8.003초, US42.947초였다. 이번 표본은 KR45.4% 짧고 US4.3% 길었다. Gzip 크기는 사실상 동일하고, 변경 전후 운영 네트워크·서버 부하가 통제되지 않았으므로 KR 개선을 인과 효과로 확정하거나 US 결과로 회귀를 판정할 수 없다. 로컬 실제 API에서는 기본16KB 대비 64KB 전체 응답 median이 KR629→614ms, US1,202→1,008ms였고 gzip bytes는 같았다. 따라서 64KB를 유지하고 더 많은 배포 표본으로 양 시장 결과를 추적한다. US에서 4.08초 첫-byte outlier가 하나 있어 해당 회차의 51.713초 전체시간은 다른 네 표본과 구분해 해석한다. 운영 DB/stream 내부 timing 접근은 현재 불가능하다.
+
+## 2026-11-27 — level9 gzip `Z_FILTERED` 전략 후보
+
+Node.js v22 `createGzip`는 `strategy` 옵션을 지원하고 [zlib 공식 설명](https://www.zlib.net/manual.html#Advanced)은 `Z_FILTERED`가 기본 전략보다 Huffman 코딩 비중을 높이고 문자열 매칭을 줄이도록 조정한다고 정의한다. JSON export payload에 적용해도 gzip 형식과 원본 JSON 바이트는 유지됐다.
+
+운영에서 받은 payload 원문을 대상으로 level9/chunk64KB를 유지하고 strategy만 바꿔 각 시장 7회 압축했다. 기본→`Z_FILTERED`의 CPU 중앙값은 KR342.74→330.16ms, US596.55→546.68ms였고 gzip 크기는 KR1,243,440→1,219,332B(-1.94%), US2,843,591→2,818,702B(-0.88%)였다. `HUFFMAN_ONLY`와 `RLE`는 압축이 약 5.37MB/11.57MB로 커져 제외했고 `FIXED`는 US 3.68MB로 기본보다 불리했다.
+
+같은 로컬 API 서버/DB에서 default와 candidate를 각 6회 실행하고 첫 compile 요청을 제외했다. 기본→candidate 전체 HTTP median KR628.678→622.125ms(-1.0%), US1,022.514→988.358ms(-3.3%)였다. gzip bytes KR1,201,818→1,178,244B(-1.96%), US2,828,164→2,797,603B(-1.08%), raw bytes는 8,966,992/19,359,853B 그대로였다. 양 시장의 gzip 해제 JSON SHA-256이 baseline과 candidate에서 각각 동일했고, ticker·marketCap·daily 필드/returnedCount/max20 계약을 통과했다. 이 local signal은 작으며 운영 부하를 통제한 인과 측정은 아니다.
+
+후보 구현은 `createGzip({ level: 9, chunkSize: 64 * 1024, strategy: Z_FILTERED })`다. 대상 route tests 13/13 통과. 전체 deploy verification 및 OCI 배포 후 동일한 공개 운영 GET을 시장별 반복 측정한다. 운영에서 이득이 재현되지 않거나 회귀하면 기본 strategy로 되돌린다. 공식 근거는 [Node.js v22 zlib options](https://nodejs.org/download/release/latest-v22.x/docs/api/zlib.html#class-options) 및 [zlib manual strategy](https://www.zlib.net/manual.html#Advanced)다.

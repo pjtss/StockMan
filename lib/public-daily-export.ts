@@ -1,4 +1,4 @@
-import { createGzip } from "node:zlib";
+import { constants as zlibConstants, createGzip } from "node:zlib";
 import { getPool } from "@/lib/db";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
@@ -49,7 +49,11 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       const streamStartedAt = performance.now();
       let firstGzipByteAt: number | null = null;
       let gzipBytes = 0;
-      const activeCompressor = createGzip({ level, chunkSize: 64 * 1024 });
+      const activeCompressor = createGzip({
+        level,
+        chunkSize: 64 * 1024,
+        strategy: zlibConstants.Z_FILTERED,
+      });
       compressor = activeCompressor;
       let ended = false;
       let flushing = false;
