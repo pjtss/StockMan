@@ -379,3 +379,14 @@ Relative to the immediately preceding three-call operating sample (KR median11.0
 - 수치 조건 후보 측정: 동일 scripts/dev-server.mjs/local DB에서 기준 warmed 호출 11회와 KR 후보 12회 비교. 기준 KR 중앙값354ms, KR finite-bound 후보315.5ms(약10.9% 단축). US는 기준 validation을 그대로 둔 최종 후보 code에서 warmed 중앙값689ms, 기준693ms로 사실상 동일. KR/US 양쪽 gzip 크기는 각각1,506,865B/3,491,027B이고 대표 기준/후보 gunzip JSON 원문은 바이트 단위로 동일했다(8,966,992B/19,359,853B). payload 티커·시총·daily 구조 및 max20/returnedCount 계약을 확인했고 관련 테스트15개 통과.
 - 원인/회귀 감지/위험: KR 매 캔들마다 발생하던 text formatting과 regex CPU를 제거했다. NUMERIC/DOUBLE PRECISION의 Infinity/NaN 순서는 PostgreSQL 공식 numeric/type docs에 맞춰 finite bounds를 쓴다. 테스트는 KR에서 두 numeric bounds와 text regex 부재, US에서는 기존 regex 유지, 컬럼 부재 fallback 유지 여부를 확인한다. 운영에서 HTTP 오류·gzip/JSON 차이·계약 위반이 생기면 즉시 이전 KR regex 경로로 복구한다. 로컬 효과는 반복 신호이며 운영 효과와 속도 개선률은 배포 후 반복 호출로 검증한다.
 - 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서, 본 로그. 커밋 전 전체 `npm run deploy:verify`를 완료한다.
+
+### KR turnover predicate 배포 후 운영 실측
+
+커밋 `cc522c6a`의 OCI Deploy OCI run `45858764226`은 전체 Verify deployment, standalone 패키징, release 업로드, Activate release까지 성공했다. 활성화 뒤 운영 공개 API를 시장별 순차 3회 요청했다. 여섯 응답 모두 HTTP200/application-gzip, Content-Encoding 없음, no-store, gzip 해제/JSON 파싱 및 각 항목 ticker·marketCap·daily, returnedCount 일치, 최대20봉을 통과했다. XFL은 전부0이었다.
+
+| 시장 | 전체 다운로드 시간 | 중앙값 | 티커 / raw bytes | gzip bytes | 유효/실패 |
+|---|---|---:|---:|---:|---:|
+| KR | 24.40 / 9.24 / 13.18초 | 13.18초 | 2,337 / 8,907,188B | 1,524,637 / 1,524,637 / 1,525,427B | 3/3 |
+| US | 35.07 / 54.66 / 63.93초 | 54.66초 | 5,011 / 18,964,448B | 3,542,403 / 3,543,019 / 3,542,756B | 3/3 |
+
+직전 운영 표본(KR 21.57초 중앙값, US 58.75초 중앙값)과 비교하면 관측 중앙값이 각각 약38.9%, 7.0% 짧다. 직전 표본은 KR 3회·US 2회였고 이번 역시 운영 부하와 경로 상태를 제어하지 않았으므로 인과 성능 개선률은 확정하지 않는다. 크기와 raw payload는 유지되었고 502는 이번 6회에서 재현되지 않았다. 로컬 KR warmed 중앙값은 354ms→315.5ms로 약10.9% 줄었다. 변경은 KR의 double precision turnover validation 하나에 한정하고 US regex는 보존한다. 더 많은 운영 반복과 서버 단계 timing을 모아 효과 및 502 재발 여부를 추적한다.
