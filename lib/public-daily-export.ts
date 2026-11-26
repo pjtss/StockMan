@@ -5,30 +5,7 @@ import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receip
 
 type ExportMarket = "KR" | "US";
 
-type CandleRow = {
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  tradingValue: number;
-  fetchedAt: string | Date | null;
-};
-
-type ExportRow = {
-  market: string;
-  code: string;
-  name: string | null;
-  market_cap: number | string | null;
-  market_cap_currency: string | null;
-  market_cap_observed_at: string | Date | null;
-  market_cap_fetched_at: string | Date | null;
-  candles: CandleRow[] | null;
-  latest_candle_date: string | null;
-  data_updated_at: string | Date | null;
-  returned_count: number | string | null;
-};
+type ExportRow = { item_json: string };
 
 type ExportKey = { market: string; code: string };
 
@@ -49,13 +26,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   },
 };
 
-function toIsoOrNull(value: string | Date | null | undefined) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function gzipJsonStream(items: AsyncIterable<unknown>) {
+function gzipJsonStream(items: AsyncIterable<string>) {
   let compressor: ReturnType<typeof createGzip> | null = null;
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
@@ -100,7 +71,7 @@ function gzipJsonStream(items: AsyncIterable<unknown>) {
           pending.length = 0;
         };
         for await (const item of items) {
-          pending.push(JSON.stringify(item));
+          pending.push(item);
           if (pending.length === 50) await writePending();
         }
         await writePending();
@@ -139,29 +110,41 @@ export async function getPublicDailyExport(market: ExportMarket) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
     }
     const concurrency = 5;
-    const items = (async function* (): AsyncGenerator<unknown> {
+    const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {
         const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`
       WITH requested AS (
         SELECT market, code
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
       )
-      SELECT u.market, u.code, u.name,
-             f.market_cap,
-             COALESCE(NULLIF(f.currency, ''), CASE WHEN u.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END) AS market_cap_currency,
-             f.observed_at AS market_cap_observed_at,
-             f.fetched_at AS market_cap_fetched_at,
-             COALESCE(d.candles, '[]'::jsonb) AS candles,
-             d.latest_candle_date,
-             d.data_updated_at,
-             COALESCE(d.returned_count, 0)::int AS returned_count
+      SELECT json_build_object(
+               'ticker', json_build_object('market', u.market, 'code', u.code, 'name', u.name),
+               'marketCap', json_build_object(
+                 'value', CASE
+                   WHEN f.market_cap > 0
+                    AND f.market_cap < '1.7976931348623157e308'::double precision THEN f.market_cap
+                   ELSE NULL
+                 END,
+                 'currency', COALESCE(NULLIF(f.currency, ''), CASE WHEN u.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END),
+                 'observedAt', CASE WHEN f.observed_at IS NULL THEN NULL ELSE to_char(f.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                 'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
+               ),
+               'daily', json_build_object(
+                 'candles', COALESCE(d.candles, '[]'::json),
+                 'metadata', json_build_object(
+                   'latestCandleDate', d.latest_candle_date,
+                   'dataUpdatedAt', CASE WHEN d.data_updated_at IS NULL THEN NULL ELSE to_char(d.data_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                   'returnedCount', COALESCE(d.returned_count, 0)::int
+                 )
+               )
+             )::text AS item_json
         FROM requested r
         JOIN ${universeTable} u ON u.market = r.market AND u.code = r.code
         LEFT JOIN instrument_fundamental_snapshots f
           ON f.market = u.market AND f.code = u.code
         LEFT JOIN LATERAL (
-          SELECT jsonb_agg(
-                   jsonb_build_object(
+          SELECT json_agg(
+                   json_build_object(
                      'date', recent.candle_date,
                      'open', recent.open,
                      'high', recent.high,
@@ -169,7 +152,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
                      'close', recent.close,
                      'volume', recent.volume,
                      'tradingValue', recent.trading_value,
-                     'fetchedAt', recent.fetched_at
+                     'fetchedAt', to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
                    ) ORDER BY recent.candle_date ASC
                  ) AS candles,
                  MAX(recent.candle_date) AS latest_candle_date,
@@ -196,44 +179,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     `, [JSON.stringify(keys)])));
         for (const result of chunkResults) {
           for (const row of result.rows) {
-            const rawMarketCap = row.market_cap === null ? null : Number(row.market_cap);
-            const marketCapValue = rawMarketCap !== null && Number.isFinite(rawMarketCap) && rawMarketCap > 0
-              ? rawMarketCap
-              : null;
-            const candles = Array.isArray(row.candles) ? row.candles : [];
-            const latestDate = row.latest_candle_date ?? candles.at(-1)?.date ?? null;
-            const candleUpdatedAt = toIsoOrNull(row.data_updated_at)
-              ?? candles.reduce<string | null>((latest, candle) => {
-                const fetchedAt = toIsoOrNull(candle.fetchedAt);
-                return fetchedAt && (!latest || fetchedAt > latest) ? fetchedAt : latest;
-              }, null);
-
-            yield {
-              ticker: { market: row.market, code: row.code, name: row.name },
-              marketCap: {
-                value: marketCapValue,
-                currency: row.market_cap_currency,
-                observedAt: toIsoOrNull(row.market_cap_observed_at),
-                fetchedAt: toIsoOrNull(row.market_cap_fetched_at),
-              },
-              daily: {
-                candles: candles.map((candle) => ({
-                  date: candle.date,
-                  open: candle.open,
-                  high: candle.high,
-                  low: candle.low,
-                  close: candle.close,
-                  volume: candle.volume,
-                  tradingValue: candle.tradingValue,
-                  fetchedAt: toIsoOrNull(candle.fetchedAt),
-                })),
-                metadata: {
-                  latestCandleDate: latestDate,
-                  dataUpdatedAt: candleUpdatedAt,
-                  returnedCount: Number(row.returned_count ?? candles.length),
-                },
-              },
-            };
+            yield row.item_json;
           }
         }
       }

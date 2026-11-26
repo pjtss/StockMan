@@ -20,17 +20,23 @@ const candle = {
 
 function makeRow(market: string, code: string, currency: string) {
   return {
-    market,
-    code,
-    name: "Example Common Stock",
-    market_cap: "123456789000",
-    market_cap_currency: currency,
-    market_cap_observed_at: "2026-11-24T07:00:00.000Z",
-    market_cap_fetched_at: "2026-11-24T07:01:00.000Z",
-    candles: [candle],
-    latest_candle_date: "20261124",
-    data_updated_at: "2026-11-24T07:00:00.000Z",
-    returned_count: 1,
+    item_json: JSON.stringify({
+      ticker: { market, code, name: "Example Common Stock" },
+      marketCap: {
+        value: 123456789000,
+        currency,
+        observedAt: "2026-11-24T07:00:00.000Z",
+        fetchedAt: "2026-11-24T07:01:00.000Z",
+      },
+      daily: {
+        candles: [candle],
+        metadata: {
+          latestCandleDate: "20261124",
+          dataUpdatedAt: "2026-11-24T07:00:00.000Z",
+          returnedCount: 1,
+        },
+      },
+    }),
   };
 }
 
@@ -84,6 +90,8 @@ describe("public gzip daily export", () => {
     expect(sql).toContain(`FROM ${candleTable} c`);
     expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
     expect(sql).toContain("to_jsonb(c)->>'trading_value'");
+    expect(sql).toContain("json_build_object(");
+    expect(sql).toContain("AS item_json");
     expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LIMIT 20");
     if (market === "US") {
