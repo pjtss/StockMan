@@ -168,11 +168,18 @@ export async function getPublicDailyExport(market: ExportMarket) {
     }
     metrics.batchCount = chunks.length;
     const concurrency = market === "US" ? 10 : 5;
+    // The KR migration stores this column as DOUBLE PRECISION. Compare finite bounds directly
+    // to avoid formatting every candle as text; keep the NUMERIC US validation unchanged.
     const tradingValueExpression = eligible.rows[0].has_trading_value
-      ? `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
-               THEN c.trading_value::double precision
-               ELSE c.close * c.volume
-          END`
+      ? market === "KR"
+        ? `CASE WHEN c.trading_value > '-Infinity' AND c.trading_value < 'Infinity'
+                 THEN c.trading_value::double precision
+                 ELSE c.close * c.volume
+            END`
+        : `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
+                 THEN c.trading_value::double precision
+                 ELSE c.close * c.volume
+            END`
       : `c.close * c.volume`;
     const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {

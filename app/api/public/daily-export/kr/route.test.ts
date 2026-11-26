@@ -93,7 +93,13 @@ describe("public gzip daily export", () => {
     expect(sql).toContain(`JOIN ${universeTable} u`);
     expect(sql).toContain(`FROM ${candleTable} c`);
     expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
-    expect(sql).toContain("c.trading_value::text ~");
+    if (market === "KR") {
+      expect(sql).toContain("c.trading_value > '-Infinity'");
+      expect(sql).toContain("c.trading_value < 'Infinity'");
+      expect(sql).not.toContain("c.trading_value::text ~");
+    } else {
+      expect(sql).toContain("c.trading_value::text ~");
+    }
     expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
     expect(sql).toContain("row_to_json(payload)::text AS item_json");
