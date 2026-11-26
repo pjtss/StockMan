@@ -3,7 +3,8 @@
 - 보고서: [`docs/operations/public-daily-export-performance-report.md`](docs/operations/public-daily-export-performance-report.md). baseline `87059c21`, 5/5 후보 `0ffb7903`, KR5/US10 후보 `edeea6ba`의 배포 run 및 측정 결과를 표로 정리했다. 최신 timestamped operating check는 2026-11-26 `05:41:16Z–05:43:01Z`; KR 19.441초·US 39.686초, 동시 KR 18.141초·US 45.152초. HTTP 200, gzip XFL=0, no-store, gzip 해제·JSON 계약·20봉 상한·ticker counts를 확인했다.
 - 해석: 반복 운영 응답시간이 넓게 흔들려 동시성 변경의 확정적 인과 효과를 단정하지 않는다. US sequential은 이전 기준보다 짧은 표본이 반복됐으나 KR은 느린 표본을 포함한다. 현재 코드 KR5/US10으로 운영 중이며 다음 단계는 DB/query와 gzip/전송 시간을 분리 측정한다.
 - 검증: 최신 보고서가 자동 `public/document-catalog.json`·`public/manuals/README.md`에 155번째 문서로 연결됨을 확인했다. `npm run deploy:verify` 전체 통과: 283개 테스트 파일 통과/1 skip, 1,648개 테스트 통과/3 skip, typecheck, 155개 문서 카탈로그 및 docs/API/security/cron 감사, production build, standalone HTTP 및 Chrome desktop/mobile smoke.
-- 변경 파일: `docs/operations/public-daily-export-performance-report.md`, `docs/README.md`, `public/document-catalog.json`, `public/manuals/README.md`, 본 로그. 문서-only 커밋/OCI 배포 후 API 문서 링크와 배포 상태를 확인한다.
+- 배포 확인: 문서 commit `27286606`, Deploy OCI run `45764713212` 성공. 운영에서 `/manuals/operations/public-daily-export-performance-report.md`, `/api/public/document-catalog?q=공개%20일봉%20gzip%20API&category=operations&limit=5`, `/document-catalog.json`을 각각 GET해 HTTP 200, UTF-8 markdown 및 보고서 catalog 검색 결과를 확인했다.
+- 변경 파일: `docs/operations/public-daily-export-performance-report.md`, `docs/README.md`, `public/document-catalog.json`, 자동 생성 `public/manuals/README.md`, 본 로그. 무인증 운영 GET만 사용했으며 cron·쓰기 API·DB 데이터 갱신은 실행하지 않았다.
 
 ### 2026-11-26 — 일봉 gzip API DB batch 동시성 상향 후보
 - 목적/범위: 사용자 지시에 따라 단일 gzip API 완료 시간을 줄이기 위해 KR/US export의 DB batch 동시성을 5에서 10으로 조정하는 후보를 실측했다. gzip level, payload 필드, no-store, batch 크기 500, 종목 자격, 20봉 상한은 유지한다.
