@@ -185,27 +185,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
         SELECT market, code
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
       )
-      SELECT json_build_object(
-               'ticker', json_build_object('market', u.market, 'code', u.code, 'name', u.name),
-               'marketCap', json_build_object(
-                 'value', CASE
-                   WHEN f.market_cap > 0
-                    AND f.market_cap < '1.7976931348623157e308'::double precision THEN f.market_cap
-                   ELSE NULL
-                 END,
-                 'currency', COALESCE(NULLIF(f.currency, ''), CASE WHEN u.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END),
-                 'observedAt', CASE WHEN f.observed_at IS NULL THEN NULL ELSE to_char(f.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
-                 'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
-               ),
-               'daily', json_build_object(
-                 'candles', COALESCE(d.candles, '[]'::json),
-                 'metadata', json_build_object(
-                   'latestCandleDate', d.latest_candle_date,
-                   'dataUpdatedAt', CASE WHEN d.data_updated_at IS NULL THEN NULL ELSE to_char(d.data_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
-                   'returnedCount', COALESCE(d.returned_count, 0)::int
-                 )
-               )
-             )::text AS item_json
+      SELECT row_to_json(payload)::text AS item_json
         FROM requested r
         JOIN ${universeTable} u ON u.market = r.market AND u.code = r.code
         LEFT JOIN instrument_fundamental_snapshots f
@@ -239,6 +219,27 @@ export async function getPublicDailyExport(market: ExportMarket) {
                LIMIT 20
             ) recent
         ) d ON TRUE
+        CROSS JOIN LATERAL (
+          SELECT json_build_object('market', u.market, 'code', u.code, 'name', u.name) AS ticker,
+                 json_build_object(
+                 'value', CASE
+                   WHEN f.market_cap > 0
+                    AND f.market_cap < '1.7976931348623157e308'::double precision THEN f.market_cap
+                   ELSE NULL
+                 END,
+                 'currency', COALESCE(NULLIF(f.currency, ''), CASE WHEN u.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END),
+                 'observedAt', CASE WHEN f.observed_at IS NULL THEN NULL ELSE to_char(f.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                 'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
+                 ) AS "marketCap",
+                 json_build_object(
+                 'candles', COALESCE(d.candles, '[]'::json),
+                 'metadata', json_build_object(
+                   'latestCandleDate', d.latest_candle_date,
+                   'dataUpdatedAt', CASE WHEN d.data_updated_at IS NULL THEN NULL ELSE to_char(d.data_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                   'returnedCount', COALESCE(d.returned_count, 0)::int
+                 )
+                 ) AS daily
+        ) payload
        WHERE ${eligibility}
        ORDER BY u.market, u.code
     `, [JSON.stringify(keys)]);

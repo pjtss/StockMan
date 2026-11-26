@@ -96,8 +96,8 @@ describe("public gzip daily export", () => {
     expect(sql).toContain("c.trading_value::text ~");
     expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
-    expect(sql).not.toContain("row_to_json(export_item)");
-    expect(sql).toContain("AS item_json");
+    expect(sql).toContain("row_to_json(payload)::text AS item_json");
+    expect(sql).toContain('AS "marketCap"');
     expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LIMIT 20");
     if (market === "US") {
