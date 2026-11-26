@@ -67,7 +67,7 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-encoding")).toBeNull();
     expect(response.headers.get("content-length")).toBeNull();
     expect(response.headers.get("x-accel-buffering")).toBe("no");
-    expect(compressed[8]).toBe(0); // RFC 1952 XFL=0 for gzip levels 2 through 8.
+    expect(compressed[8]).toBe(2); // RFC 1952 XFL=2 marks maximum deflate compression.
     expect(payload).toEqual([{
       ticker: { market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" },
       marketCap: {

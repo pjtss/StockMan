@@ -41,7 +41,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   },
 };
 
-function gzipJsonStream(items: AsyncIterable<string>, level: 2 | 3, metrics: ExportPerformanceMetrics) {
+function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportPerformanceMetrics) {
   let compressor: ReturnType<typeof createGzip> | null = null;
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
@@ -282,7 +282,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     })();
 
     const filename = `daily-candles-${market.toLowerCase()}.json.gz`;
-    const gzipLevel = market === "US" ? 2 : 3;
+    const gzipLevel = 9;
     return new Response(gzipJsonStream(items, gzipLevel, metrics), {
       status: 200,
       headers: {

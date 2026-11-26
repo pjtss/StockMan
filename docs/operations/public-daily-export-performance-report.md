@@ -134,6 +134,42 @@ commit 9948d0b4의 Deploy OCI run 45779156775는 2026-11-26에 CI 검증 및 Act
 
 ## 다음 속도 개선의 측정 게이트
 
+### 2026-11-27 운영 전송 대역폭 기반 gzip level9 후보
+
+운영 API를 각 시장 1회 전체 GET해 전송 구간 기준선을 얻었다. KR은 HTTP200/9.929초/first byte0.653초/gzip1,524,637B, US는 HTTP200/28.148초/first byte0.379초/gzip3,542,002B였다. 다운로드 속도는 각각153,548B/s 및125,835B/s였다. 원본 크기는 KR8,907,188B, US18,964,448B이며, 응답은 gzip 해제 및 ticker·marketCap·daily·returnedCount·max20 검증을 통과했다. 이 한 번씩의 표본은 운영 부하를 통제하지 않았다.
+
+로컬 API payload를 Node.js `gzipSync`로 8회 압축했다. KR level3→9은 median CPU42.53→349.25ms, 크기1,506,858→1,201,811B였다. US level2→9은 CPU78.97→483.06ms, 크기3,491,020→2,828,157B였다. Node.js 공식 문서는 높은 level이 압축률을 높이는 대신 처리시간을 늘린다고 설명한다([Node.js v22 zlib](https://nodejs.org/download/release/latest-v22.x/docs/api/zlib.html)). RFC 1952에서는 XFL=2가 maximum compression을 나타낸다([RFC 1952](https://www.rfc-editor.org/rfc/rfc1952)). 이번 운영 전송 속도에 로컬 크기 차이를 적용하면 추정 전송 절감은 KR 약2.10초/US 약5.67초이고, local compression CPU 증가는 약0.31/0.40초다. 서로 다른 환경에서 얻은 값을 결합한 예상치이므로 실제 운영 개선의 증거는 아니다.
+
+양 시장 level9 후보를 local Next API에서 6회 확인했다. 첫 요청을 제외한 median은 KR629ms, US1,202ms로 현재 level3/2의 기준 300/778ms보다 느렸다. Gzip 크기는1,201,818/2,828,164B(각각 약20.3%/19.0% 감소), raw JSON bytes 및 ticker 수/필드는 동일했다. HTTP200, gunzip/JSON, 최대20봉, returnedCount, XFL=2가 확인됐다. local link에서는 CPU 비용이 더 컸지만 운영 GET 표본은 전송 구간이 대부분이어서 양 시장 level9를 OCI에 배포해 실제 전체 수신시간으로 판정할 후보로 선택했다. 해당 후보의 route 테스트 15/15는 통과했으며 full deploy verification, OCI deployment, post-deploy operating GET은 아직 진행 중이다. 결과가 느리거나 개선이 없으면 기존 KR3/US2 설정으로 복구 배포한다.
+
+### 2026-11-27 현행 API 재측정 및 SQL 계획 조사
+
+현재 배포 코드의 local warmed endpoint를 `scripts/dev-server.mjs`와 `.env.local`의 로컬 DB 경로로 각 시장 6회 호출했다. 첫 cold 호출을 제외한 다섯 요청의 내부 `totalElapsedMs` median은 KR 256ms(218–327ms), US 587ms(531–740ms)였다. KR은 2,352 ticker/1,506,865 gzip bytes, US는 5,012 ticker/3,491,027 gzip bytes였다. 응답은 모두 gzip 해제 및 JSON 파싱 후 `ticker`, `marketCap`, `daily`, `returnedCount` 일치, 최대20봉을 확인했다. 이 로컬 수치는 운영망으로 일반화하지 않는다.
+
+개발 서버 구조화 로그에서 KR 단계 median은 universe 5ms, batch DB wall 149ms, stream 250ms였고 US는 93ms, 323ms, 498ms였다. DB query는 동시 실행되며 stream과 겹치므로 이를 더해 endpoint 시간으로 해석하지 않는다. PostgreSQL 공식 `EXPLAIN` 문서는 `ANALYZE`가 SELECT를 실제 실행하고 node timing 계측 오버헤드가 있을 수 있다고 설명한다([공식 문서](https://www.postgresql.org/docs/current/sql-explain.html)). `.env.local` host가 localhost인지 확인한 다음 실제 API에서 prepared SQL과 500-key 입력을 포착해 로컬 read-only 트랜잭션의 `EXPLAIN ANALYZE`에 전달했다. 한 batch 실행시간은 KR 63.4ms(9,569 shared-hit/990 read blocks), US 83.1ms(6,994 hit/3,134 read)였다. 양쪽 모두 candle lookup index로 `(market,code,timeframe)`를 찾고 ticker당 recent candle 20행을 읽었다. 처음 만든 representative query와 alias scope 오류(42P01)가 난 임시 재현은 endpoint와 일치하지 않아 최적화 근거에서 제외하고 트랜잭션을 롤백했다. exact route plan은 이보다 나중에 별도 실행해 정상 완료했다.
+
+현 최종 상태에서 기능 코드는 기준 구현으로 복구되어 있고 운영 배포는 하지 않았다. 원인은 아직 확정되지 않았고, 이 조사만으로 SQL/index/concurrency 후보를 정당화할 수 없다. 다음 단계는 endpoint의 정확한 SQL과 입력을 재현하는 로컬 진단, 이후 운영 단계 로그를 읽을 권한이 있는 경로를 확인하는 것이다. 잘못된 계획 재현을 최적화 근거로 쓰지 않으며, 후보 변경 시 기존의 전체 응답 계약·속도 반복 측정·`npm run deploy:verify`·운영 배포 후 GET 확인 절차를 적용한다.
+
+### 요청 순번 정렬 후보 기각
+
+batch SQL 최종 `ORDER BY u.market, u.code`를 요청 CTE에 추가한 `WITH ORDINALITY` 순번 정렬로 바꾸어 결과를 같은 순서로 유지하면서 문자열 두 열 비교를 줄이는 후보를 측정했다. SQL text가 바뀌므로 node-postgres prepared statement name도 `v1`에서 `v2`로 변경했다. 첫 문법 표현은 PostgreSQL 42601을 반환했으며, `ROWS FROM(jsonb_to_recordset(...) AS (...)) WITH ORDINALITY` 형태로 수정한 다음 대상 route 테스트 15/15와 실제 로컬 API GET을 통과했다. 이 첫 SQL 오류는 운영 배포 전에 로컬 smoke에서 발견되어 바로 수정했다.
+
+같은 로컬 Next API/DB에서 시장별 요청을 6회 실행하고 첫 요청을 제외해 비교했다. 기존 SQL median은 KR 300ms, US 778ms였고 순번 정렬 후보는 KR 411ms, US 779ms였다. gzip bytes와 압축 해제 payload bytes는 KR 1,506,865/8,966,992B, US 3,491,027/19,359,853B로 동일했다. 양쪽 2,352/5,012 ticker였으며 `ticker`·`marketCap`·`daily`, `returnedCount`, 최대20봉 검증도 통과했다.
+
+후보는 KR 전체 응답에서 약37% 느리고 US도 개선되지 않아 기각하고 코드 및 테스트 파일을 기존 구현으로 복구했다. 운영 배포하지 않았다. 근본 원인은 요청 순번 정렬이 PostgreSQL executor에서 비용을 줄이지 못했고 API 전체 응답에 이득을 만들지 못한 것으로 보인다(단, local sample에 한정한 관찰). 회귀 감지는 양 시장 반복 전체 응답시간과 gzip/payload 비교로 유지한다. 다음 후보는 정확한 route query plan에서 발견한 안정적 비용 기회에 근거해 선정하고 실제 DB API 호출 후 평가한다.
+
+### 날짜 유효성 predicate 후보 기각
+
+현재 일봉 품질 predicate는 문자열 형식 검증 후 연도 substring을 반복해 정수 변환한다. 해당 연도 범위를 ASCII 고정폭 범위 비교로 대체하고 기존 month/day 및 윤년 조건은 유지하는 후보를 실제 route에서 얻은 SQL에 적용했다. PostgreSQL은 text 비교에서 collation을 사용하므로 bytewise 순서를 명시하기 위해 `COLLATE "C"`를 사용했다([공식 collation 문서](https://www.postgresql.org/docs/current/collation.html)). 1~400년 날짜 조합, 9999년, 윤년 세기 경계, 잘못된 포맷·월·일을 포함한 184,815개 입력에서 기존과 후보 predicate 결과가 모두 일치했다. API KR/US 각 500-key batch에서 반환된 `item_json` 500행도 기존과 후보가 같았다.
+
+동일 로컬 DB 연결에서 기존/후보 batch query를 번갈아 8회 수행했다. 첫 회 제외 median은 KR 64.09→66.68ms(+4.0%), US 74.40→72.51ms(-2.5%)였다. 시장별 성능 방향이 달랐고 US 개선폭이 작아 전체 API에서 안정된 속도 향상이라고 판정하지 않았다. 후보 predicate는 코드에 적용하지 않았고 운영 배포도 하지 않았다. 다음 후보의 채택 기준은 계속 양 시장 전체 응답 반복측정과 gzip/payload 계약이다.
+
+### Positive/zero volume 분리 조회 후보 기각
+
+기존 positive-volume partial covering index를 이용하기 위해 `volume > 0` 행과 `volume = 0` 행을 별도 분기로 조회한 뒤 최신 20봉을 합치는 exact route SQL 후보를 조사했다. 현재 API 결과에는 0 거래량 봉이 KR 347/46,996, US 747/99,486개 있어 0 거래량을 제외할 수 없다. 계획 비교는 로컬 read-only 트랜잭션에서 기존 SQL과 split SQL을 각각 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`으로 실행했다.
+
+기존 500-key batch 실행시간은 KR 71.3ms/US 79.4ms였고 split 후보는 KR 1,048ms/US 4,833ms였다. 0 거래량 분기는 전용 index가 없어 ticker마다 candle lookup index를 오래 훑고도 첫 500-key batch에서는 0건을 찾았으며 shared block reads가 KR 13,129, US 52,100으로 늘었다. PostgreSQL 문서가 설명하는 `EXPLAIN ANALYZE` 계측 오버헤드가 있으나 차이는 각각 약14.7배/60.8배였다. 후보는 즉시 기각했고 코드·schema를 변경하거나 배포하지 않았다. 별도 zero-volume index는 크기·갱신 비용과 positive branch의 heap fetch 비용을 실제 API 전체시간에서 상쇄한다는 근거가 확보되기 전에는 추가하지 않는다.
+
 - 현재 쿼리는 ticker universe를 읽은 뒤 500개씩 나누고 US 10개/KR 5개 query를 `Promise.all`로 실행한다. 5,011개 US ticker면 11개 batch를 2개 wave로 처리하고, 마지막 wave는 1개 query다. 속도 후보는 batch 크기나 동시 query 수를 함께 변경하지 말고 한 번에 하나만 바꾼다.
 - 후보 비교는 같은 배포 호스트·같은 시장·같은 API 응답 계약으로 기준/후보를 번갈아 최소 5회씩 측정한다. 전체 응답 완료시간, gzip bytes, 첫 body byte 시각, 응답 크기, HTTP 결과를 기록한다. 각 JSON 응답을 gzip 해제해 ticker 수, 최대 20봉, `returnedCount` 일치와 주요 필드를 확인한다. 시간 개선이 측정 편차를 넘어서 재현되지 않으면 채택하지 않는다.
 - 쿼리 병목을 고칠 때는 운영 DB의 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` 결과를 read-only 트랜잭션에서 얻고, 유효 ticker/candle 행 수와 선택된 인덱스를 함께 기록한다. 운영 DB에 통계 초기화, 설정 변경, 인덱스 생성/삭제, 쓰기 쿼리를 실행하지 않는다. `EXPLAIN ANALYZE`가 부담스럽거나 허가된 read-only 경로가 없으면 로컬 복제 스키마에서만 실험하고 운영 원인으로 확대 해석하지 않는다.
