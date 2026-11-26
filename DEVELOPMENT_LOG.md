@@ -1,3 +1,8 @@
+### 2026-11-27 — gzip level8 + Z_FILTERED 후보 기각
+- 목적/범위: gzip 형식·최대20봉·티커/시가총액/일봉 응답을 유지하면서 level9→8로 낮추면 전체 API가 빨라지는지 평가했다. 운영 변경은 하지 않았다.
+- 검증: 로컬 `scripts/dev-server.mjs`와 `.env.local` DB를 이용해 KR/US 전체 export를 각 6회 이상 호출했고 모든 응답 HTTP200, gzip 해제/JSON parse, 항목별 ticker·marketCap·daily, returnedCount 일치, 최대20봉을 통과했다. 첫 호출 제외 단순 warmed 중앙값은 KR539.5ms/US1,006.7ms였다. 이어 baseline/candidate를 같은 서버 안에서 교차 8회씩 비교했다. KR level9/8 중앙값751/776.4ms(8은 3.4% 느림), US1,199.8/1,190.7ms(8은 0.8% 빠름; 변동폭 안)으로 공통 속도 개선이 없었다. 두 레벨 모두 gzip 중앙값 KR1,178,244B/US2,797,603B로 같았고 raw JSON SHA-256도 시장별 전 회차 동일했다. level9는 XFL2, level8은 XFL0으로 gzip header metadata가 바뀐다.
+- 판정/위험: 사용자의 속도 최우선 기준에 따라 일관된 전체 API 개선이 입증되지 않은 level8은 기각하고 level9+Z_FILTERED+64KB를 보존한다. XFL이 바뀌어 기존 XFL2 assertion도 level8 채택 시 명세 기반으로 조정해야 하지만, 현재 변경하지 않는다. 후보는 임시 적용 뒤 원복했으며 배포하지 않았다. 로컬 수치는 운영 경로의 인과 효과가 아니며 운영 phase timing 접근은 불가하다.
+- 변경/검증/배포: 확인 및 문서화 파일 `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 보고서와 `DEVELOPMENT_LOG.md`. 기능 코드 및 Next 자동생성 파일은 HEAD로 복구, `git diff --check` 성공. 이 문서 기록은 전체 `npm run deploy:verify` 후 커밋/OCI 배포하며, 다음에는 DB batch/query 병목 등 실제 endpoint 단계 timing에서 큰 구간을 겨냥한다.
 ### `Z_FILTERED` 운영 배포 검증
 - 변경 commit `28f245e0`, OCI Deploy OCI run `45889015154` success. level9 및 chunk64KB를 유지하며 `Z_FILTERED` 전략을 적용했다.
 - 운영 GET 각 5회 모두 HTTP200/application-gzip, Content-Encoding 없음, gzip XFL2, full gunzip/JSON/필수 ticker·marketCap·daily 필드/returnedCount/max20 계약을 통과했다. KR times14.950/10.408/17.750/13.904/10.114s median13.904s; first-byte median0.273s; gzip median1,219,342B/raw8,907,188B/ticker2,337. US46.502/52.735/48.566/47.499/48.347s median48.347s; first-byte median0.814s; gzip median2,820,137B/raw18,964,448B/ticker5,011.

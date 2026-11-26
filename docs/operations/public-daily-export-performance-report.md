@@ -512,3 +512,16 @@ Node.js v22 `createGzip`는 `strategy` 옵션을 지원하고 [zlib 공식 설�
 기본 strategy/chunk64KB 직전 5회 운영 median은 KR4.367초/US42.947초였다. 이번 completion median은 더 길었지만 운영부하를 통제하지 않았다. 계산상 first-byte 이후 유효 다운로드 속도는 KR 약299→89KB/s, US 약67→59KB/s로 바뀌어 작은 payload 차이만으로 completion 차이를 설명할 수 없다. `Z_FILTERED`는 로컬 전체 API warmed median을 KR1.0%, US3.3% 낮추고 wire bytes를 줄였으므로 현 구현을 유지하되 운영 속도 이득은 미확정으로 기록한다.
 
 다음 후보 측정: 실제 운영 raw payload로 level8+`Z_FILTERED`는 level9+`Z_FILTERED`보다 compressor CPU median이 KR315.44ms 대352.32ms(10.5% 단축), US546.99ms 대542.09ms(사실상 동률)였고 gzip 크기는 양쪽 약50B 증가했다. 이득이 API 전체에 나타나는지 확인하지 않았고 XFL metadata가 2→0으로 바뀌므로, 자동 계약 테스트 업데이트를 포함한 실제 endpoint 비교 후에만 선택한다.
+
+## 2026-11-27 — gzip level8 + Z_FILTERED 속도 후보 기각
+
+운영 배포본(level9 + `Z_FILTERED` + 64KB chunk)을 기준으로 gzip level만 8로 임시 변경해 로컬 `scripts/dev-server.mjs`/DB의 실제 KR·US 전체 API를 비교했다. 첫 요청과 route recompilation이 일부 샘플에 포함되어 단순 6회 median(KR 539.5ms/US1,006.7ms)은 참고치로만 보고, 같은 서버에서 level9/8을 번갈아 시장별 8회씩 실행한 paired 결과를 판정에 사용했다.
+
+| 시장 | level9 median | level8 median | gzip bytes(level9/8) | raw JSON bytes | 원문 일치 |
+|---|---:|---:|---:|---:|---|
+| KR | 751.0ms | 776.4ms | 1,178,244 / 1,178,244 | 8,966,992 | SHA-256 동일 |
+| US | 1,199.8ms | 1,190.7ms | 2,797,603 / 2,797,603 | 19,359,853 | SHA-256 동일 |
+
+8쌍마다 응답 HTTP200, gzip 해제·JSON parse, 필수 필드·returnedCount·최대20봉을 확인했다. level8은 KR에서 3.4% 느렸고 US의 0.8% 개선은 작은 노이즈 범위라 두 시장 공통 속도 개선으로 판정하지 않는다. gzip 크기도 같아 전송 이득이 없다. RFC1952 XFL은 level9에서2, level8에서0이므로 gzip 형식/압축해제는 유지되지만 기존 XFL2 테스트 단언은 level8 후보에 호환되지 않는다.
+
+판정은 level8 기각, 배포 없음이다. 기능 파일은 배포 HEAD 상태로 되돌렸고 `git diff --check`를 통과했다. 이 로컬 DB 측정은 OCI 운영 속도의 증거가 아니므로 기존 운영 기준(level9 + filtered + chunk64KB)을 유지한다. 더 큰 개선 기회는 API 로그의 DB query·stream timing을 분석해 실제 병목을 식별하는 것이며, 요청당 gzip 코드를 바꾸기 전에 동일 계약으로 대조 검증한다.
