@@ -245,7 +245,7 @@ Node.js 공식 zlib API에서 스트림 `chunkSize` 기본값은 16 KiB다. 출�
 Node.js 공식 zlib 문서는 더 큰 메모리 설정이 한 번의 write에서 더 많은 입력을 처리해 호출 수를 줄이고 속도를 높일 수 있다고 설명하며, 메모리 증가를 비용으로 든다. 현재 gzip stream의 `memLevel` 기본값 8을 9로 임시 변경해 로컬 API에서 시장별 6회 전체 요청을 수행했다. 첫 compile/cold 요청을 제외한 5회 warmed 중앙값은 KR0.344초, US0.862초였다. 같은 로컬 DB/API의 기본 설정 직전 warmed 중앙값(KR0.350초/US0.706초)과 비교하면 KR은 약1.7% 짧고 US는 약22.1% 길었다. gzip bytes는 KR1,506,947→1,504,980(-0.13%), US3,493,095→3,488,107(-0.14%)로 조금 줄었고 raw bytes와 ticker 수/봉 계약은 동일했다.
 
 시장별 결과가 엇갈리고 US 지연 회귀가 커 후보를 기각해 기본 `memLevel: 8`로 복구했으며 운영 배포하지 않았다. Node 공식 문서의 메모리 산식 기준으로 기본 memLevel8의 deflate 메모리는 약256 KiB이고 9는 약384 KiB여서 동시 요청당 약128 KiB가 추가될 수 있다. 근거: [Node.js v22 zlib 메모리 튜닝](https://nodejs.org/download/release/latest-jod/docs/api/zlib.html#memory-usage-tuning). 다음 최적화는 압축 설정의 로컬 차이를 운영 전송 개선으로 간주하지 않고, 단계별 운영 timing 또는 다회 운영 표본을 확보해 판단한다.
-# 2026-11-26 SQL compact row serialization candidate
+### 2026-11-26 SQL compact row serialization candidate
 
 The current endpoint asks PostgreSQL to produce each top-level JSON item with `json_build_object(...)::text`. PostgreSQL's text rendering includes formatting whitespace. The candidate keeps the same nested JSON values, aliases the three top-level fields (`ticker`, `marketCap`, `daily`) in a lateral row, and uses `row_to_json(payload)::text` to serialize that row compactly. The API response contract and single gzip stream are unchanged.
 
@@ -254,3 +254,14 @@ Local baseline from the previous implementation (same dev API/DB, warmed median,
 The operating baseline for the current SQL (3 valid downloads per market) was KR 14.187/19.509/11.103s (median 14.187s; gzip median 1,524,910B) and US 60.800/60.649/53.494s (median 60.649s; gzip median 3,543,221B). Two additional US attempts ended with a terminated connection and are excluded. These are end-to-end client-path observations and do not isolate server or network time. Since payload transfer dominates observed completion time while local query/serialization changes are small, the smaller SQL text representation is a candidate to verify in production; it is not yet an established speed improvement. Keep or revert after at least three valid post-deploy responses per market and contract checks. Record connection failures separately. No candle, market eligibility, cap, ordering, or output schema rules should change.
 
 Regression detection: route tests assert the compact serializer expression and `marketCap` alias; a gzip API smoke must decompress and validate every record and the 20-candle cap. Remaining risks are that `row_to_json` may have different database CPU characteristics, PostgreSQL numeric textual representations can differ while preserving JSON numeric values, and operating timing is noisy. Next measure server phase logs alongside full client completion when access permits.
+
+### Compact SQL serialization deployment check
+
+Commit `43f000a8` deployed through OCI workflow `45827914492`, with verify, standalone packaging, upload, and activation all successful. Health returned HTTP200. Three full response downloads per market completed and all gzip/JSON checks passed:
+
+| Market | Total seconds (3 runs) | gzip bytes (range) | raw bytes | tickers | max candles | valid | failed attempts |
+|---|---|---:|---:|---:|---:|---:|---:|
+| KR | 22.36 / 12.51 / 8.10 | 1,524,637–1,525,011 | 8,907,188 | 2,337 | 20 | 3/3 | 0 |
+| US | 62.37 / 44.54 / 75.82 | 3,542,002–3,542,764 | 18,964,448 | 5,011 | 20 | 3/3 | 0 |
+
+All six responses were HTTP200, `application/gzip`, no `Content-Encoding`, no-store, XFL0. Full gunzip and JSON parsing confirmed top-level ticker/marketCap/daily fields, returnedCount consistency and a 20-candle maximum. Median completion times are KR12.51s and US62.37s. Compared with the three-response current-SQL baseline (KR14.187s/US60.649s), KR median is 11.8% lower and US 2.8% higher. This small, noisy operating sample does not establish an across-market end-to-end speed improvement; it also does not show a material US regression. The candidate is retained for the confirmed 1.18%/1.47% smaller local gzip output, while speed benefit remains unproven. Continue collecting same-client operating measurements; investigate server-side phase logs when accessible.
