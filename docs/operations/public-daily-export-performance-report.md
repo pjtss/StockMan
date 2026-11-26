@@ -108,7 +108,7 @@ scripts/dev-server.mjs 로컬 API에서 변경 전 US warmed 완료 시간은 0.
 - `662680cb`: US batch1,000/concurrency6 실험 배포. 운영 개선이 재현되지 않아 후속 커밋에서 US batch500/concurrency10으로 복구하고 실측·배포 결과를 기록한다.
 - `1790f95b`: US batch500/concurrency10 복구, OCI run `45770981889` 전체 성공. 운영 KR/US gzip GET을 각 2회 검증했다.
 - `690607e7`: `trading_value` 컬럼 부재 fallback에서 per-candle `to_jsonb(c)` 변환을 제거하고 동일한 `close * volume` fallback을 직접 사용한다. 전체 검증 및 OCI run `45774860704` 성공.
-- gzip 레벨 4 후보(현재 검증 중): 응답 gzip 수준 3→4로 변경해 body 및 단일 gzip 계약을 유지하며 로컬 US gzip 크기를 약 6% 줄였다. 최종 채택은 운영 API 완료시간 및 응답 크기 비교 후 결정한다.
+- gzip level4 후보(commit `9948d0b4`, OCI run `45779156775`)는 배포와 운영 계약 검증에 성공했다. 로컬 레벨3→4로 US 크기는 약 5.95% 줄었지만 gzip CPU는 늘었다. 운영 level4에서 KR 1회는 23.113초/1,433,407B, US 2회는 전송 도중 스트림 오류(첫 시도)와 69.459초/3,244,621B(재시도)였다. US 재시도는 gzip 해제·JSON 파싱 및 5,011 ticker·0–20봉 계약까지 통과했다. 이전 level3의 유효 gzip 크기 KR 1,524,715B, US 3,464,301–3,464,986B보다 각각 약 6.0%/6.3% 작다. 그러나 운영 응답 완료시간은 비교 표본이 적고 부하가 통제되지 않았으며 US 재시도 시간도 이전 level3 범위보다 길어, 속도 향상은 입증되지 않았다. 이 후보는 압축 전송량을 우선 줄이는 설정으로 유지하되, 속도 개선 주장이나 최적성 판정은 보류한다. 다음에는 phase 계측과 반복 표본으로 DB/query/압축/전송 시간을 분리한다.
 
 ### 2026-11-26 구형 candle schema fallback 최적화 확인
 
@@ -120,3 +120,14 @@ V67 기준 US 봉 테이블에는 `trading_value` 컬럼이 없다. 컬럼 부�
 
 로컬 US export 응답은 레벨3에서 3,403,223B, 레벨4에서 3,200,714B였다(-5.95%). API warmed 중앙값은 기준 레벨3 0.712초, 레벨4 0.744초였으나 반복 편차가 크고 local network가 운영 전송 환경과 다르므로 끝까지 걸리는 시간은 개선되지 않았다고 단정하거나 개선됐다고 주장할 수 없다. 동일한 19,399,949B payload를 gzipSync로 압축했을 때 레벨3 median CPU 98.555ms, 레벨4 119.695ms였다. 전송량 절감과 CPU 증가의 균형을 실제 운영 KR/US API 응답 시간으로 확인한 뒤 채택한다.
 - 문서·회귀 테스트 변경 후 최종 검증 및 문서 커밋/배포 결과는 [`DEVELOPMENT_LOG.md`](../../DEVELOPMENT_LOG.md)에 기록한다.
+
+### gzip level4 운영 배포 및 검증
+
+commit 9948d0b4의 Deploy OCI run 45779156775는 2026-11-26에 CI 검증 및 Activate release를 성공 완료했다. 서비스 health가 200으로 복구된 뒤 운영 공개 GET을 수행했다. 초기 요청 중 한 번은 스트림이 중간 종료돼 재시도했다.
+
+| 시장 | 완료 시간 (초) | gzip bytes | 원본 bytes | 티커 | 봉 범위 |
+|---|---:|---:|---:|---:|---:|
+| KR | 23.113 / 10.722 | 1,433,407 / 1,433,839 | 8,925,884 | 2,337 | 20–20 |
+| US | 69.459 | 3,244,621 | 19,004,536 | 5,011 | 0–20 |
+
+두 응답은 HTTP 200, application/gzip, Content-Encoding 없음, Cache-Control: no-store, XFL=0을 확인했다. US 응답은 gzip 해제 및 JSON 파싱 후 5,011 ticker, 각 항목의 ticker/marketCap/daily 필드, returnedCount 일치, 최대20봉을 확인했다. KR 두 응답도 gzip 해제 및 JSON 검증 후 2,337 ticker, 필드·returnedCount 일치, 20봉을 확인했다. 운영 gzip 크기는 level3 표본 대비 KR 약 6.0%, US 약 6.3% 감소했다. 완료 시간은 서버 부하 통제 및 충분한 반복이 없어 level4의 인과적 속도 효과를 판정할 수 없다. 이번 완료 시간은 KR 23.113/10.722초, US 69.459초였고 level3 대비 속도 개선은 입증되지 않았다. 따라서 결과는 전송 용량 개선으로 기록하고 end-to-end 속도 개선으로 표현하지 않는다.
