@@ -48,7 +48,9 @@ describe("public gzip daily export", () => {
     ["KR", getKrExport, "kr_common_stock_universe", "kr_instrument_universe_candles", "005930", "KRW"],
     ["US", getUsExport, "us_common_stock_universe", "us_instrument_universe_candles", "AAPL", "USD"],
   ] as const)("returns a no-auth, no-store gzip JSON export for %s", async (market, getExport, universeTable, candleTable, code, currency) => {
-    queryMock.mockResolvedValue({ rows: [makeRow(market === "KR" ? "KOSPI" : "NAS", code, currency)] });
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ market: market === "KR" ? "KOSPI" : "NAS", code, has_trading_value: true }] })
+      .mockResolvedValue({ rows: [makeRow(market === "KR" ? "KOSPI" : "NAS", code, currency)] });
 
     const response = await getExport();
     const compressed = Buffer.from(await response.arrayBuffer());
@@ -83,13 +85,16 @@ describe("public gzip daily export", () => {
     }]);
     expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
     expect(eligibilitySql).toContain(`FROM ${universeTable} u`);
+    expect(eligibilitySql).toContain("AS has_trading_value");
+    expect(eligibilitySql).toContain("pg_attribute");
     expect(eligibilitySql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("FROM jsonb_to_recordset($1::jsonb)");
     expect(JSON.stringify(requestParameter)).toContain(code);
     expect(sql).toContain(`JOIN ${universeTable} u`);
     expect(sql).toContain(`FROM ${candleTable} c`);
     expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
-    expect(sql).toContain("to_jsonb(c)->>'trading_value'");
+    expect(sql).toContain("c.trading_value::text ~");
+    expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
     expect(sql).toContain("AS item_json");
     expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
@@ -123,10 +128,24 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
+  it("uses the schema-compatible trading value fallback when an older DB lacks the column", async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", has_trading_value: false }] })
+      .mockResolvedValueOnce({ rows: [makeRow("KOSPI", "005930", "KRW")] });
+
+    const response = await getKrExport();
+    await response.arrayBuffer();
+    const [sql] = queryMock.mock.calls[1] as [string];
+
+    expect(response.status).toBe(200);
+    expect(sql).toContain("to_jsonb(c)->>'trading_value'");
+    expect(sql).not.toContain("c.trading_value::text ~");
+  });
+
   it("splits large ticker universes into bounded 500-ticker lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
-        rows: Array.from({ length: 1_001 }, (_, index) => ({ market: "KOSPI", code: `T${index}` })),
+        rows: Array.from({ length: 1_001 }, (_, index) => ({ market: "KOSPI", code: `T${index}`, has_trading_value: true })),
       })
       .mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
@@ -143,7 +162,7 @@ describe("public gzip daily export", () => {
 
   it("keeps the gzip response flowing while a database batch is pending", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930" }] })
+      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", has_trading_value: true }] })
       .mockImplementationOnce(() => new Promise((resolve) => {
         setTimeout(() => resolve({ rows: [makeRow("KOSPI", "005930", "KRW")] }), 8_000);
       }));

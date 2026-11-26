@@ -7,7 +7,7 @@ type ExportMarket = "KR" | "US";
 
 type ExportRow = { item_json: string };
 
-type ExportKey = { market: string; code: string };
+type ExportKey = { market: string; code: string; has_trading_value: boolean };
 
 const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
@@ -97,7 +97,14 @@ export async function getPublicDailyExport(market: ExportMarket) {
   try {
     const pool = getPool();
     const eligible = await pool.query<ExportKey>(`
-      SELECT u.market, u.code
+      SELECT u.market, u.code,
+             EXISTS (
+                 SELECT 1
+                   FROM pg_attribute a
+                  WHERE a.attrelid = 'public.${candleTable}'::regclass
+                    AND a.attname = 'trading_value'
+                    AND NOT a.attisdropped
+               ) AS has_trading_value
         FROM ${universeTable} u
        WHERE ${eligibility}
        ORDER BY u.market, u.code
@@ -110,6 +117,15 @@ export async function getPublicDailyExport(market: ExportMarket) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
     }
     const concurrency = 5;
+    const tradingValueExpression = eligible.rows[0].has_trading_value
+      ? `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
+               THEN c.trading_value::double precision
+               ELSE c.close * c.volume
+          END`
+      : `CASE WHEN COALESCE(to_jsonb(c)->>'trading_value', '') ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
+               THEN (to_jsonb(c)->>'trading_value')::double precision
+               ELSE c.close * c.volume
+          END`;
     const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {
         const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`
@@ -160,10 +176,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
                  COUNT(*)::int AS returned_count
             FROM (
               SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume,
-                     CASE WHEN COALESCE(to_jsonb(c)->>'trading_value', '') ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
-                          THEN (to_jsonb(c)->>'trading_value')::double precision
-                          ELSE c.close * c.volume
-                     END AS trading_value,
+                     ${tradingValueExpression} AS trading_value,
                      c.fetched_at
                 FROM ${candleTable} c
                WHERE c.market = u.market
