@@ -1,11 +1,11 @@
-### 2026-11-26 — 운영 실측 후 gzip 속도·전송량 재조정
-- 목적/범위: gzip level 1 + 500 ticker batch 배포 후 운영 응답을 반복 측정하고 종단 간 속도를 다시 최적화한다. 무캐시·gzip 단일 파일·공개 무인증·ticker/marketCap/daily 계약·최대 20봉은 유지한다.
-- 이전 배포/실측: commit `7832ba98` GitHub Actions Deploy OCI run `45738535065` 성공. 이후 운영 API를 시장별 3회 순차 호출했다. KR 전체 시간 40.648/26.113/22.570초(중앙값 26.113초), gzip 1,551,933/1,551,933/1,552,223B, 2,337종목. US 89.328/82.971/53.177초(중앙값 82.971초), gzip 3,515,685/3,516,043/3,516,037B, 5,011종목. 모든 응답 200, gzip 해제/JSON 계약 및 일봉 20개 상한 통과. 이전 level9 기준선은 KR 2회 중앙값 22.946초/1,254,829B, US 2회 중앙값 112.265초/2,870,379B였다. 표본 규모/운영 부하가 통제되지 않아 성능 차이를 전부 코드 효과로 확정할 수 없다.
-- 해석: 미국 중앙값은 약 26.1% 줄었고 gzip은 약 22.5% 커졌다. 국내 중앙값은 약 13.8% 늘어 개선을 입증하지 못했다. 국내 첫 호출은 headers 4.832초, 두 다음 호출은 0.429/1.993초로 변동했다. DB query별 시간은 아직 계측하지 않았다. 500-ticker batch에서 미국 최대 chunk 무응답 51.396초가 한 번 관측되어 기존 60초 proxy timeout까지 여유가 작다. 다른 두 운영 호출에서는 24.813초 이하.
-- level3 선택 근거: level1 운영 API와 동일한 로컬 payload를 해제한 뒤 level1·3을 각각 5회 재압축했다. KR level1 36.49ms/1,541,006B, level3 42.81ms/1,465,067B; US level1 68.90ms/3,464,431B, level3 92.05ms/3,306,767B. level3의 CPU 추가는 6–23ms인 반면 전송 크기를 KR 75,939B, US 157,664B 줄였다. 관측된 낮은 전송 처리량에서는 level3가 종단 간 속도를 높일 가능성이 있어 적용한다. 이는 실제 운영 완료시간으로 재검증해야 하는 가설이다.
-- 후속 구현: `lib/public-daily-export.ts` compressor를 level3으로 조정하고 회귀 테스트의 gzip XFL 값을 0으로 변경한다. 500 batch는 미국 운영 중앙값 개선을 고려해 유지하되 DB 시간과 proxy timeout 여유를 다음 운영 계측 대상에 남긴다.
-- 자동 감지/검증: gzip 압축해제, API 계약, 20봉 상한, batch 경계, XFL=0를 전용 API 테스트에서 확인하고 전체 배포 검증 후 운영에서 다시 측정한다.
-- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. level3 운영 배포 전이다.
+### 2026-11-26 — gzip 일봉 API 속도 우선 최적화와 운영 측정
+- 목적/범위: 사용자 지시에 따라 종단 간 응답 속도를 우선 최적화한다. 무캐시·gzip 단일 파일·공개 무인증·ticker/marketCap/daily 필드·종목당 일봉 최대 20개와 활성 COMMON_STOCK 필터는 유지했다.
+- 구현: `lib/public-daily-export.ts`에서 gzip 레벨을 9에서 3으로 낮추고, 종목 50개 JSON write 묶음과 500 ticker DB batch를 적용했다. 동시 DB query 5개, 5초 heartbeat flush를 유지했고 50종목마다 수행하던 강제 flush를 제거했다. 레벨 1은 같은 API payload에서 압축을 조금 더 빨리 했으나 파일이 커졌다. level 3는 level 1 대비 압축 시간이 KR 6.32ms, US 23.15ms 늘고 gzip 크기를 KR 75,939B(4.9%), US 157,664B(4.6%) 줄였다. Node.js 공식 zlib 문서는 낮은 압축 레벨일수록 더 빠르지만 압축률이 낮다고 설명한다.
+- level 9 → 1 운영 측정: commit `7832ba98`, Deploy OCI run `45738535065` 성공 후 각 시장 3회 순차 호출. KR 완료 40.648/26.113/22.570초(중앙값 26.113초), gzip 중앙 1,551,933B, 2,337 ticker. US 89.328/82.971/53.177초(중앙값 82.971초), gzip 중앙 3,516,037B, 5,011 ticker. 모든 응답 200, gunzip/JSON/필드 계약/20봉 상한 통과. 직전 level9 기준선은 KR 2회 중앙값 22.946초/1,254,829B, US 2회 중앙값 112.265초/2,870,379B. level1은 미국 속도를 개선했지만 국내 개선은 입증하지 못했다. 미국 최대 chunk 무응답 51.396초도 관측됐다.
+- 최종 level 3 운영 실측: commit `c4602fa6`, Deploy OCI run `45741408909` 성공 후 각 시장 2회 순차 호출. KR 14.013/24.755초(중앙값 19.384초), gzip 1,484,790B, 2,337 ticker, 모든 종목 20봉. US 90.703/77.501초(중앙값 84.102초), gzip 중앙 3,371,786B, 5,011 ticker, 일봉 0–20봉. 모두 HTTP 200, XFL=0, `Content-Type: application/gzip`, Content-Encoding 없음, no-store, gunzip 및 JSON 계약 통과. 최대 chunk 무응답은 KR 23.424초, US 51.306초.
+- 비교/해석: level3 중앙값은 level9 기준선 대비 국내 약 15.5%, 미국 약 25.1% 빨랐다. level1 대비 level3은 국내가 25.8% 빨랐고 미국은 1.4% 느렸으며, 전송량은 각각 약 4.3%/4.1% 줄었다. 운영 호출 표본이 2–3회이고 부하가 통제되지 않아 p95 또는 인과 효과로 단정하지 않는다. DB batch별 쿼리 시간과 서버 CPU는 계측하지 않아 다음 최적화 대상이다. 500 ticker batch에서 미국 최대 응답 chunk 무응답이 51초여서 60초 proxy 한계까지 여유가 작다.
+- 자동 감지/검증: API 단위 테스트에서 gzip 해제, XFL=0, 응답 헤더, 필드, 무캐시, 20봉 상한, 500 ticker batch 경계를 확인. `npm run deploy:verify` 통과: 283 test files passed/1 skipped, 1,645 tests passed/3 skipped, production build, standalone·Chrome desktop/mobile smoke 및 문서/API 감사 완료.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `DEVELOPMENT_LOG.md`. 속도 우선 코드는 commit `7832ba98` 및 `c4602fa6`로 `oci`에 push했고, 두 OCI deployment run 모두 성공했다. 로컬 보관 기록과 전체 운영 표본은 아래 항목에 보존.
 
 ### 2026-11-26 — 공개 gzip 일봉 API 속도 우선 개선
 - 목적/범위: 사용자 지시에 따라 응답 속도를 최우선으로 두고 무캐시·gzip 단일 파일·ticker/marketCap/daily 필드·종목당 일봉 최대 20개와 활성 COMMON_STOCK 필터는 보존하면서 압축과 batch 처리 비용을 줄인다.
