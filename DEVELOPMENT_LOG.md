@@ -9757,6 +9757,11 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 ### 2026-11-26 — gzip level2 운영 속도 후보 선정
 - 목적/범위: level3 복귀 후 더 빠른 gzip level1/2가 기존 단일 gzip contract 안에서 운영시간을 줄일 가능성을 로컬 DB/API로 비교한다.
 - 실험: 동일 scripts/dev-server.mjs 및 local DB에서 level3/2/1을 각각 5회 순차 호출했다. 첫 request 제외 warmed 4회 median: level3 KR303ms/US737.5ms, 1 KR323.5ms/US655.5ms, 2 KR299.5ms/US644ms. gzip bytes (KR/US): level3 1,506,947/3,403,223; level1 1,585,372/3,584,665; level2 1,552,305/3,493,095. level2 US는 level3보다 12.7% 빠르고 bytes +2.64%; KR median은 1.2% 빠르다. level1 XFL4이고 level2/3 XFL0이다.
-- 결정/변경: `lib/public-daily-export.ts` gzip level을 2로 둔 후보. 기존 API는 단일 gzip 유지, XFL0 및 payload/max20/no-store 무변경. level2가 양 시장에서 level3보다 로컬상 같거나 빨랐고 US 이득이 더 커 운영 후보로 선택한다.
+- 결정/변경: `lib/public-daily-export.ts` gzip level을 2로 둔 후보. 기존 API는 단일 gzip 유지, XFL0 및 payload/max20/no-store 무변경. level2 운영 측정 후 US에는 level2, KR에는 level3를 쓰도록 시장별 적용하는 후보를 선택했다.
 - 남은 위험/다음 단계: 로컬 표본은 운영부하 및 운영 network와 다르므로 속도 개선은 운영 미확인. 전체 `npm run deploy:verify` 후 배포, 운영 KR/US 각 5회 gzip decompress/JSON contract 검증을 거쳐 채택 또는 복귀 결정한다.
 - 변경 파일: `lib/public-daily-export.ts`, `docs/operations/public-daily-export-performance-report.md`, 본 로그. 검증/커밋/푸시/배포 대기.
+### 2026-11-26 — gzip level2 운영 실측과 시장별 설정 후보
+- 운영 배포/표본: commit `2f83f798`, OCI run `45790675516` 성공. gzip level2 설정으로 KR/US 무인증 GET을 각 5회 실행했다. KR 중앙값13.877초(21.035/21.015/13.877/10.612/9.823), gzip1,562,780–1,563,066B/raw8,925,884B, ticker2,337·20봉. US 유효 5회 중앙값52.211초(42.438/52.211/51.508/67.332/55.848), gzip3,543,075–3,543,643B/raw19,004,536B, ticker5,011·0–20봉. US 중 1회는 63.541초에 전송 중 종료돼 retry 후 유효 응답을 대체 표본에 포함했다. 모두 valid gzip, XFL0, no-store, JSON/ticker/marketCap/daily/returnedCount/max20 계약 통과.
+- level3 기준(동일 운영 반복): KR median12.358초, US56.361초. level2는 KR 12.3% 느리고 US7.4% 빠르다. 양 시장 gzip bytes는 약2.5% 커졌다. 시간 표본은 부하 통제가 없어 인과효과를 확정할 수 없고 중간 종료가 있었음을 함께 기록한다.
+- 다음 후보: 시장별 `gzipLevel`로 KR3/US2 설정. 로컬 API smoke 5회씩에서 KR median warmed347ms/ gzip1,506,947B/XFL0, US median warmed658ms/3,493,095B/XFL0였다. 운영 속도는 다음 배포 실측으로 판정한다.
+- 변경 파일: `lib/public-daily-export.ts`, 성능 보고서, 본 로그. 전체 검증/커밋/푸시는 다음.
