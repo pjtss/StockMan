@@ -9,7 +9,7 @@ const EXPORT_BATCH_SIZE = 500;
 
 type ExportRow = { item_json: string };
 
-type ExportKey = { market: string; code: string; has_trading_value: boolean };
+type ExportKey = { market: string; code: string; name: string; has_trading_value: boolean };
 
 type ExportPerformanceMetrics = {
   market: ExportMarket;
@@ -145,7 +145,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     const pool = getPool();
     const universeQueryStartedAt = performance.now();
     const eligible = await pool.query<ExportKey>(`
-      SELECT u.market, u.code,
+      SELECT u.market, u.code, u.name,
              EXISTS (
                  SELECT 1
                    FROM pg_attribute a
@@ -200,14 +200,13 @@ export async function getPublicDailyExport(market: ExportMarket) {
               name: `public-daily-export-${market.toLowerCase()}-batch-v1`,
               text: `
       WITH requested AS (
-        SELECT market, code
-          FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text)
+        SELECT market, code, name
+          FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text, name text)
       )
       SELECT row_to_json(payload)::text AS item_json
         FROM requested r
-        JOIN ${universeTable} u ON u.market = r.market AND u.code = r.code
         LEFT JOIN instrument_fundamental_snapshots f
-          ON f.market = u.market AND f.code = u.code
+          ON f.market = r.market AND f.code = r.code
         LEFT JOIN LATERAL (
           SELECT json_agg(
                    json_build_object(
@@ -229,8 +228,8 @@ export async function getPublicDailyExport(market: ExportMarket) {
                      ${tradingValueExpression} AS trading_value,
                      c.fetched_at
                 FROM ${candleTable} c
-               WHERE c.market = u.market
-                 AND c.code = u.code
+               WHERE c.market = r.market
+                 AND c.code = r.code
                  AND c.timeframe = 'D'
                  AND ${validDailyCandleSql("c")}
                ORDER BY c.candle_date DESC
@@ -238,14 +237,14 @@ export async function getPublicDailyExport(market: ExportMarket) {
             ) recent
         ) d ON TRUE
         CROSS JOIN LATERAL (
-          SELECT json_build_object('market', u.market, 'code', u.code, 'name', u.name) AS ticker,
+          SELECT json_build_object('market', r.market, 'code', r.code, 'name', r.name) AS ticker,
                  json_build_object(
                  'value', CASE
                    WHEN f.market_cap > 0
                     AND f.market_cap < '1.7976931348623157e308'::double precision THEN f.market_cap
                    ELSE NULL
                  END,
-                 'currency', COALESCE(NULLIF(f.currency, ''), CASE WHEN u.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END),
+                 'currency', COALESCE(NULLIF(f.currency, ''), CASE WHEN r.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END),
                  'observedAt', CASE WHEN f.observed_at IS NULL THEN NULL ELSE to_char(f.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
                  'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
                  ) AS "marketCap",
@@ -258,8 +257,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
                  )
                  ) AS daily
         ) payload
-       WHERE ${eligibility}
-       ORDER BY u.market, u.code
+       ORDER BY r.market, r.code
               `,
               values: [JSON.stringify(keys)],
             });

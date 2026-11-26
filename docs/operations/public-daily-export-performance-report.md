@@ -553,3 +553,18 @@ US 동시 query 수는 10 이하로 유지되며 이 workload에서 6개 chunk�
 직전 level9+`Z_FILTERED`+64KB 운영 표본 중앙값(KR13.904초/US48.347초, first body byte KR0.273초/US0.814초) 대비 US full download는 약2.4% 길었고 first body byte는 약53.7% 짧았다. 압축 bytes와 raw bytes는 같은 수준이다. 서로 다른 시점의 비통제 서버/네트워크 표본이므로 두 시간 차이를 batch 설정의 인과 효과로 보지 않는다. API 완료시간은 first byte 뒤 수신 시간이 대부분을 차지한다.
 
 판정: 미국 1,000 batch는 DB query를 11개 두 wave에서 6개 한 wave로 줄이고 로컬 내부 DB wall timing 개선을 보였지만, 운영 full-download 이득은 아직 확인되지 않았다. 공개 JSON/gzip 계약 회귀와 오류는 없다. 현 설정을 유지하며 다음 반복 표본에서 US 전체시간과 first byte를 함께 추적한다. 개선 신호가 재현되지 않거나 운영 지연이 반복 상승하면 미국 batch500 복구 변경을 다시 전체 검증·배포한다. KR batch500은 변경하지 않았다.
+
+## 2026-11-27 — 배치 조회의 중복 종목 마스터 조인 제거 후보
+
+배치 조회마다 종목 마스터를 다시 조인하고 보통주/ETF/DR 자격조건을 재평가하는 작업을 제거했다. 첫 universe 조회가 적격 종목의 `market`, `code`, `name`을 이미 확정하므로 이를 각 candle batch의 JSON 입력으로 전달한다. 배치 쿼리는 그 스냅샷과 candle/fundamental 테이블만 조회한다. 국내/미국 자격조건은 첫 쿼리에 그대로 남아 fail-closed 분류 기준을 바꾸지 않으며, 응답 스키마와 gzip(level9 + `Z_FILTERED`, 64KB), batch 크기, 최대20봉은 변경하지 않았다.
+
+동일한 로컬 API/DB에서 워밍된 요청을 비교했다. 기준 버전은 시장별 6회, 후보는 시장별 5회였고 모든 응답을 gunzip/JSON parse 및 ticker·marketCap·daily·최대20봉 계약으로 검증했다.
+
+| 시장 | 기준 전체 GET 시간 | 후보 전체 GET 시간 | 기준/후보 중앙값 | gzip bytes | ticker |
+|---|---|---|---:|---:|---:|
+| KR | 588 / 591 / 622 / 634 / 649 / 661ms | 568 / 583 / 591 / 640 / 768ms | 634 / 591ms (-6.8%) | 1,178,244 | 2,352 |
+| US | 1,069 / 1,100 / 1,111 / 1,162 / 1,183 / 1,248ms | 949 / 983 / 1,101 / 1,109 / 1,158ms | 1,162 / 1,101ms (-5.2%) | 2,797,603 | 5,012 |
+
+측정 중 로컬 DB와 개발 서버 부하를 통제할 수 없고 표본 수도 작아 이 차이는 개선 신호로만 본다. 응답 gzip 크기는 변하지 않았으며 후보 실응답 2회(KR/US)는 HTTP200, 정상 gunzip 및 모든 항목의 ticker/marketCap/daily, 최대20봉을 확인했다. 후보 변경 후 실제 DB 쿼리에서 `u` alias 누락으로 첫 검증 GET이 HTTP500을 반환했다. `r.market`으로 참조를 수정한 뒤 두 시장 실응답과 대상 15개 테스트를 재검증했다. 배포 전에 전체 deploy verification을 수행하고 운영 API를 재측정한다. 운영에서 지연 증가나 잘못된 종목/이름이 발견되면 이 변경을 되돌리고 전체 검증 후 재배포한다.
+
+`app/api/public/daily-export/kr/route.test.ts`는 적격 universe 조회에서 이름을 선택하고 해당 이름을 batch 입력으로 전달하며 batch 쿼리가 universe 테이블에 다시 조인하지 않는 계약을 검사한다. 변경 파일은 `lib/public-daily-export.ts`, 해당 테스트, 본 성능 보고서 및 `DEVELOPMENT_LOG.md`다.

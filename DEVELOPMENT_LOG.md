@@ -1,3 +1,9 @@
+### 2026-11-27 — 일봉 export 배치 조회의 종목 마스터 재조인 제거 후보
+- 목적/원인: 기존 경로는 eligibility 쿼리에서 자격을 확인한 뒤 각 candle batch가 동일 universe 테이블을 다시 조인하고 보통주/ETF/DR 필터를 다시 평가했다. 첫 조회 결과의 market/code/name을 batch 입력에 전달하고 반복 조인을 없애 조회 비용을 줄이는 후보를 구현했다. 첫 조회의 fail-closed 공식 종목 분류 조건은 그대로 두고 응답 데이터 계약, gzip 단일형식, level9+Z_FILTERED+64KB, max20, KR500/US1000은 바꾸지 않았다.
+- 로컬 측정: 실제 local API/DB, warmed GET 기준 버전 KR/US 각각 6회, 후보 각각 5회. 중앙값은 KR634→591ms(-6.8%), US1,162→1,101ms(-5.2%); gzip bytes는 KR1,178,244/US2,797,603으로 동일했다. 표본이 작고 로컬 DB 부하를 통제하지 않아 개선 신호로만 판정한다. 후보 응답은 HTTP200, gunzip/JSON 및 ticker·marketCap·daily·20봉 상한을 통과했다.
+- 오류/재발감지: 최초 실 DB 실행에서 batch SQL에 남은 u.market 참조가 missing FROM-clause HTTP500을 만들었다. r.market으로 수정했다. 테스트는 15/15 통과; query mock은 첫 eligibility query에서 name을 반환하고 batch JSON에 이름이 전달되며 batch SQL에 universe 재조인이 없는지 검사한다. 실제 KR/US GET에서 동일 오류가 재발하면 즉시 배포를 중단하고 DB alias reference를 검토한다.
+- 변경/검증 범위: lib/public-daily-export.ts, app/api/public/daily-export/kr/route.test.ts, docs/operations/public-daily-export-performance-report.md, DEVELOPMENT_LOG.md. 전체 deploy:verify 후 commit/push 및 OCI 배포를 수행하고, release activation 뒤 운영 KR/US GET을 각각 5회 이상 실행해 HTTP/gzip/JSON 계약과 전체시간/first-byte를 보고서에 추가한다. 운영 결과에서 성능 개선이 재현되지 않거나 잘못된 이름/종목을 반환하면 원복 후 전체 검증·재배포한다. 현재 커밋/푸시/배포는 아직 하지 않았다.
+
 ### 미국 batch1,000 OCI 운영 결과
 - 코드 commit `43145d2e`, OCI Deploy run `45895497067` 성공 및 release activation 완료.
 - 배포 직후 운영 KR/US 공개 GET 각각 5회. 모두 HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL2, gzip 해제·JSON 파싱, ticker·marketCap·daily 필드, returnedCount 일치, 최대20봉 계약 통과.
