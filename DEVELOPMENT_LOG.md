@@ -1,4 +1,23 @@
-### 2026-11-26 — 운영 gzip 일봉 API 실측 결과
+### 2026-11-26 — 공개 gzip 일봉 API 속도 우선 개선
+- 목적/범위: 사용자 지시에 따라 응답 속도를 최우선으로 두고 무캐시·gzip 단일 파일·ticker/marketCap/daily 필드·종목당 일봉 최대 20개와 활성 COMMON_STOCK 필터는 보존하면서 압축과 batch 처리 비용을 줄인다.
+- 근거: 로컬 보관 gzip 일봉 파일에서 해제한 JSON을 재압축해 비교한 중앙값에서 gzip level 1은 level 9 대비 국내 JSON 73,859,836B를 2,955ms에서 135ms, 미국 JSON 158,160,687B를 8,114ms에서 356ms로 압축했다(5회 비교). 산출 gzip 크기는 국내 5,334,933B→7,597,034B(+42.4%), 미국 13,734,405B→18,547,157B(+35.0%)였다. Node.js 공식 zlib 문서도 더 낮은 압축 레벨은 압축률을 낮추는 대신 더 빠르다고 설명한다.
+- 구현: `lib/public-daily-export.ts`의 gzip level을 9에서 1로 낮추고, 레코드를 50개씩 묶어 compressor write를 호출해 개별 write callback 수를 줄였다. 기존 5초 heartbeat flush는 느린 batch 대기 중 프록시 연결을 유지하기 위해 보존하고, 매 50개마다 실행하던 강제 flush는 제거했다. DB 조회 batch는 250에서 500 ticker로 늘리고 동시 쿼리 수 5개를 유지했다.
+- 로컬 PostgreSQL 검증: 같은 dev-server 실행에서 변경 전 KR 4,091ms/1,215,870B, US 4,407ms/2,853,898B였고 변경 후 KR 624ms/1,541,010B, US 1,078ms/3,464,438B였다(각 1회 순차 실행). 개선 후 gzip 해제·JSON 파싱, ticker 수(2,352/5,012), top-level keys, 종목별 최대 20봉을 확인했다. gzip 크기는 KR +26.7%, US +21.4%였고 로컬 단일 표본은 운영 성능이나 p95를 보증하지 않는다.
+- 자동 회귀 감지: gzip 헤더 XFL=4(빠른 압축), 다운로드 이름/필드 계약, 무캐시, gzip 해제 및 20봉 상한을 기존 API 테스트에서 확인하고 500 ticker batch 분할 테스트를 갱신한다.
+- 남은 위험/다음 단계: 압축 payload가 커져 네트워크가 느린 소비자에게는 전체 완료시간이 되레 늘 수 있다. 로컬은 빠르지만 운영 완료 시간은 DB·네트워크 조건에 좌우되므로 전체 검증·배포 후 운영 API를 다시 호출해 결과 크기와 응답시간을 확인한다. 개선 폭이 충분하지 않으면 운영 batch SQL DB 시간부터 분리 계측한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. `npm run deploy:verify` 전체 통과. 커밋·푸시·운영 확인은 다음 단계다.
+
+### 2026-11-26 — 운영 gzip 일봉 API 추가 실측 및 속도 개선안
+- 목적/범위: 무인증 운영 KR/US 일봉 gzip API를 다시 각각 1회 호출해 이전 측정과 변동을 비교하고, 현재 구현에 맞춰 다음 성능 개선 순서를 제안한다. 애플리케이션 코드는 변경하지 않았다.
+- 측정 방식: 로컬 Node.js `fetch`로 운영 API를 순차 호출하고 응답 헤더/첫 gzip byte/전체 완료, 압축 byte, chunk 간 최대 무응답 구간을 기록했다. gzip을 해제하고 JSON/top-level keys/종목별 봉 수를 검증했다. `no-store` 헤더상 캐시 응답은 사용되지 않았다.
+- 추가 운영 실측: KR HTTP 200, 헤더 0.375초, 첫 byte 0.377초, 전체 28.082초, gzip 1,254,861B, 2,337종목, daily 20봉. US HTTP 200, 헤더·첫 byte 0.376초, 전체 129.775초, gzip 2,871,163B, 5,011종목, daily 0–20봉. 두 payload 모두 `daily`, `marketCap`, `ticker` 키와 `application/gzip`, Content-Encoding 없음, no-store 조건을 만족했다. 최대 chunk 무응답은 KR 17.823초, US 27.997초.
+- 비교/해석: 선행 1회 측정(KR 17.809초, US 94.754초) 대비 이번 전체 시간은 각각 1.58배, 1.37배였고 gzip byte 차이는 약 0.01%, 0.06%였다. 첫 byte는 양 시장 모두 0.4초 이내로 빨랐지만 전체 완료시간은 크게 변동했다. 따라서 현재 증거는 초기 응답 대기보다 DB batch 생산·JSON 직렬화·gzip/전송 중 어느 구간의 지속 처리량이 병목인지 분리 계측해야 함을 보여준다. 각 2회뿐이라 p50/p95나 원인 단정은 불가하다.
+- 개선 제안(아직 미구현): (1) 내부 구조화 로그로 batch별 DB 시간/row 수, 변환·직렬화 시간, gzip 출력량·전체 시간을 분리 계측, (2) 운영 query의 `EXPLAIN (ANALYZE, BUFFERS)` 및 buffer hit/read 근거로 기존 `(market, code, timeframe, candle_date DESC)` 인덱스 효용을 확인한 뒤 인덱스 변경 여부 결정, (3) 50종목 단위 gzip flush와 개별 write를 묶음 단위로 바꾸는 실험을 동일 payload로 비교, (4) 130초에 이르는 US 전체 다운로드가 소비자 timeout에 걸리면 cursor/page API를 별도 계약으로 검토한다. gzip level 9·무캐시·최대 20봉 계약은 유지하는 전제다.
+- 근거 문서: PostgreSQL 공식 `EXPLAIN` 문서(https://www.postgresql.org/docs/current/using-explain.html), index-only/covering index 한계(https://www.postgresql.org/docs/current/indexes-index-only-scans.html), Node.js 공식 zlib 문서(https://nodejs.org/api/zlib.html). 인덱스 추가는 heap 접근을 줄일 수도 있으나 visibility map, 변경 빈도, 인덱스 용량을 확인하기 전 효과를 단정하지 않는다.
+- 남은 위험/다음 단계: 운영 2회 순차 측정만으로 부하 조건이나 p95를 알 수 없다. 병목 계측을 먼저 추가하고 동일 시간대/동일 응답 계약으로 반복 표본을 모은 뒤, DB와 앱 CPU를 분리해 변경을 선택한다. 운영 DB EXPLAIN/서버 내부 CPU 계측은 이번 요청에서 수행하지 않았다.
+- 변경 파일: `DEVELOPMENT_LOG.md`만 수정. 테스트·빌드·실행은 문서 작업 범위상 수행하지 않음. 커밋·푸시·배포 없음.
+
+### 2026-11-26 — 최초 운영 gzip 일봉 API 실측 결과
 - 배포: 코드 커밋 `239e7e53`의 GitHub Actions Deploy OCI run `45733164329` 성공. 운영 도메인 `https://stockman.r-e.kr`에서 각 무인증 GET을 1회씩 순차 호출했다. 캐시를 사용하지 않아 호출당 실제 DB 조회와 gzip 생성이 실행됐다.
 - KR `GET /api/public/daily-export/kr`: HTTP 200, gzip headers 0.271초, 첫 압축 바이트 0.276초, 전체 완료 17.809초, compressed 1,254,796B, 2,337종목, 종목별 daily 20봉, gzip 해제/JSON/세 필드 계약 통과.
 - US `GET /api/public/daily-export/us`: HTTP 200, gzip headers 7.742초, 첫 압축 바이트 7.743초, 전체 완료 94.754초, compressed 2,869,595B, 5,011종목, 종목별 daily 0–20봉(데이터 없는 ticker 포함), gzip 해제/JSON/세 필드 계약 통과. 스트림 최대 무응답 구간 26.610초로 60초 nginx 504를 피했다.

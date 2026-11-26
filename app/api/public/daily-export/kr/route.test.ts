@@ -57,7 +57,7 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-encoding")).toBeNull();
     expect(response.headers.get("content-length")).toBeNull();
     expect(response.headers.get("x-accel-buffering")).toBe("no");
-    expect(compressed[8]).toBe(2); // RFC 1952 XFL=2 identifies maximum gzip compression.
+    expect(compressed[8]).toBe(4); // RFC 1952 XFL=4 identifies fastest gzip compression.
     expect(payload).toEqual([{
       ticker: { market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" },
       marketCap: {
@@ -115,10 +115,10 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
-  it("splits large ticker universes into bounded lookup batches", async () => {
+  it("splits large ticker universes into bounded 500-ticker lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
-        rows: Array.from({ length: 501 }, (_, index) => ({ market: "KOSPI", code: `T${index}` })),
+        rows: Array.from({ length: 1_001 }, (_, index) => ({ market: "KOSPI", code: `T${index}` })),
       })
       .mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
@@ -129,7 +129,7 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([250, 250, 1]);
+    expect(batchSizes).toEqual([500, 500, 1]);
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 

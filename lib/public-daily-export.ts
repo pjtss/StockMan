@@ -60,7 +60,7 @@ function gzipJsonStream(items: AsyncIterable<unknown>) {
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      const activeCompressor = createGzip({ level: 9 });
+      const activeCompressor = createGzip({ level: 1 });
       compressor = activeCompressor;
       let ended = false;
       let flushing = false;
@@ -92,11 +92,18 @@ function gzipJsonStream(items: AsyncIterable<unknown>) {
         await write("[");
         await flush();
         let index = 0;
+        const pending: string[] = [];
+        const writePending = async () => {
+          if (pending.length === 0) return;
+          await write(`${index === 0 ? "" : ","}${pending.join(",")}`);
+          index += pending.length;
+          pending.length = 0;
+        };
         for await (const item of items) {
-          await write(`${index === 0 ? "" : ","}${JSON.stringify(item)}`);
-          index += 1;
-          if (index % 50 === 0) await flush();
+          pending.push(JSON.stringify(item));
+          if (pending.length === 50) await writePending();
         }
+        await writePending();
         activeCompressor.end("]");
       })().catch((error: unknown) => activeCompressor.destroy(error instanceof Error ? error : new Error("GZIP_STREAM_FAILED")));
     },
@@ -126,7 +133,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
     `);
     if (eligible.rows.length === 0) return errorResponse();
 
-    const chunkSize = 250;
+    const chunkSize = 500;
     const chunks: ExportKey[][] = [];
     for (let index = 0; index < eligible.rows.length; index += chunkSize) {
       chunks.push(eligible.rows.slice(index, index + chunkSize));
