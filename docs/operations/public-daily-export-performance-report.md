@@ -568,3 +568,17 @@ US 동시 query 수는 10 이하로 유지되며 이 workload에서 6개 chunk�
 측정 중 로컬 DB와 개발 서버 부하를 통제할 수 없고 표본 수도 작아 이 차이는 개선 신호로만 본다. 응답 gzip 크기는 변하지 않았으며 후보 실응답 2회(KR/US)는 HTTP200, 정상 gunzip 및 모든 항목의 ticker/marketCap/daily, 최대20봉을 확인했다. 후보 변경 후 실제 DB 쿼리에서 `u` alias 누락으로 첫 검증 GET이 HTTP500을 반환했다. `r.market`으로 참조를 수정한 뒤 두 시장 실응답과 대상 15개 테스트를 재검증했다. 배포 전에 전체 deploy verification을 수행하고 운영 API를 재측정한다. 운영에서 지연 증가나 잘못된 종목/이름이 발견되면 이 변경을 되돌리고 전체 검증 후 재배포한다.
 
 `app/api/public/daily-export/kr/route.test.ts`는 적격 universe 조회에서 이름을 선택하고 해당 이름을 batch 입력으로 전달하며 batch 쿼리가 universe 테이블에 다시 조인하지 않는 계약을 검사한다. 변경 파일은 `lib/public-daily-export.ts`, 해당 테스트, 본 성능 보고서 및 `DEVELOPMENT_LOG.md`다.
+
+
+### 중복 universe 조인 제거 배포 후 운영 확인
+
+코드 commit `539361a1`의 [OCI Deploy run 45900026319](https://github.com/pjtss/StockMan/actions/runs/45900026319)는 원격 Verify deployment, standalone 패키징, release 업로드와 Activate release까지 성공했다. 활성화 후 운영 KR/US GET을 각각 5회 순차 호출했다. 10개 응답 모두 HTTP200, `application/gzip`, Content-Encoding 없음, no-store였고 gunzip, JSON parsing, ticker·marketCap·daily, returnedCount 일치, 최대20봉을 통과했다.
+
+| 시장 | 전체 완료 시간 | 중앙값 | first-body-byte 중앙값 | gzip bytes 중앙값 | raw bytes | ticker |
+|---|---|---:|---:|---:|---:|---:|
+| KR | 18.849 / 12.501 / 6.807 / 4.705 / 3.845초 | 6.807초 | 0.405초 | 1,219,867B | 8,907,188 | 2,337 |
+| US | 59.633 / 62.587 / 50.535 / 59.972 / 35.145초 | 59.633초 | 0.377초 | 2,819,256B | 18,964,448 | 5,011 |
+
+직전 운영 표본(동일 batch 설정, 변경 전 코드)은 KR 중앙값7.363초/first byte0.201초, US49.507초/first byte0.377초였다. 이번 완료시간은 KR 약7.6% 짧고 US 약20.5% 길다. raw/gzip 크기는 거의 같고 US first byte 중앙값도 같다. 따라서 US 차이는 전송 구간의 흔들림과 구분되지 않으며, 운영에서 반복 join 제거에 따른 종단간 속도 이득은 확인되지 않았다. 로컬 같은 API/DB A/B는 KR634→591ms, US1,162→1,101ms의 개선 신호였으나 표본이 작고 운영에서 재현되지 않아 인과 효과로 주장하지 않는다. payload 계약 오류는 없었다.
+
+판정: 변경은 활성 상태로 유지하되 운영 속도 효과는 미확정이다. 이후 각 운영 측정에서 TTFB와 전체 다운로드를 분리해서 계속 추적한다. DB 단계 timing이나 여러 배포에 걸친 일관된 개선이 없으면 이 변경을 되돌리는 A/B 배포를 검토한다. 이번 결과의 최종 로그는 `DEVELOPMENT_LOG.md`에 기록했다.
