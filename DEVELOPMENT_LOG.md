@@ -1,3 +1,9 @@
+### `Z_FILTERED` 운영 배포 검증
+- 변경 commit `28f245e0`, OCI Deploy OCI run `45889015154` success. level9 및 chunk64KB를 유지하며 `Z_FILTERED` 전략을 적용했다.
+- 운영 GET 각 5회 모두 HTTP200/application-gzip, Content-Encoding 없음, gzip XFL2, full gunzip/JSON/필수 ticker·marketCap·daily 필드/returnedCount/max20 계약을 통과했다. KR times14.950/10.408/17.750/13.904/10.114s median13.904s; first-byte median0.273s; gzip median1,219,342B/raw8,907,188B/ticker2,337. US46.502/52.735/48.566/47.499/48.347s median48.347s; first-byte median0.814s; gzip median2,820,137B/raw18,964,448B/ticker5,011.
+- 직전 default strategy+64KB 운영 median(KR4.367s/US42.947s)보다 이번 전체시간은 길다. 그러나 운영경로가 비통제이고 first-byte 이후 계산 throughput이 KR299→89KB/s, US67→59KB/s로 달라서 전략의 인과 회귀로 확정하지 않는다. payload bytes는 약 KR1.94%, US0.87% 감소했고 local paired API median은 KR1.0%/US3.3% 단축됐다. 현 후보를 유지하며 다음 운영 sample을 더 수집한다.
+- 다음 후보: level8+filtered direct compressor median KR315.44ms/US546.99ms 대비 level9+filtered KR352.32/542.09ms, gzip bytes는 양쪽 약50B 차이. Full API 효과 미측정, XFL2→0 변동 위험이므로 route-level A/B + XFL test 변경이 필요하기 전에는 production 코드에 적용하지 않는다.
+- 운영 성능 보고서에 전체 표본 및 원인 한계 추가. 운영 결과 포함 변경 뒤 full deploy:verify/문서 카탈로그 검사/OCI 배포를 마친다.
 ### 2026-11-27 — gzip `Z_FILTERED` strategy 속도 후보
 - 목적/범위: 공개 일봉 export에서 기본 zlib strategy보다 level9 압축 처리와 wire bytes가 줄어드는지 확인했다. zlib 공식 설명상 `Z_FILTERED`는 기본보다 Huffman 코딩을 늘리고 문자열 매칭을 줄이는 전략이며, gzip 단일 형식·JSON 스키마·max20·level9·64KB chunk는 유지한다.
 - 직접 압축 실험: 실제 운영 payload raw를 각 전략 7회 압축. default→`Z_FILTERED` CPU median KR342.74→330.16ms(-3.7%), US596.55→546.68ms(-8.4%). gzip bytes KR1,243,440→1,219,332(-1.94%), US2,843,591→2,818,702(-0.88%). `HUFFMAN_ONLY`/`RLE`는 각각 약5.37/11.57MB로 팽창하고 `FIXED`는 US3.68MB로 불리해 제외했다.

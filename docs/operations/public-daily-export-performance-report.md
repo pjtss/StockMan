@@ -499,3 +499,16 @@ Node.js v22 `createGzip`는 `strategy` 옵션을 지원하고 [zlib 공식 설�
 같은 로컬 API 서버/DB에서 default와 candidate를 각 6회 실행하고 첫 compile 요청을 제외했다. 기본→candidate 전체 HTTP median KR628.678→622.125ms(-1.0%), US1,022.514→988.358ms(-3.3%)였다. gzip bytes KR1,201,818→1,178,244B(-1.96%), US2,828,164→2,797,603B(-1.08%), raw bytes는 8,966,992/19,359,853B 그대로였다. 양 시장의 gzip 해제 JSON SHA-256이 baseline과 candidate에서 각각 동일했고, ticker·marketCap·daily 필드/returnedCount/max20 계약을 통과했다. 이 local signal은 작으며 운영 부하를 통제한 인과 측정은 아니다.
 
 후보 구현은 `createGzip({ level: 9, chunkSize: 64 * 1024, strategy: Z_FILTERED })`다. 대상 route tests 13/13 통과. 전체 deploy verification 및 OCI 배포 후 동일한 공개 운영 GET을 시장별 반복 측정한다. 운영에서 이득이 재현되지 않거나 회귀하면 기본 strategy로 되돌린다. 공식 근거는 [Node.js v22 zlib options](https://nodejs.org/download/release/latest-v22.x/docs/api/zlib.html#class-options) 및 [zlib manual strategy](https://www.zlib.net/manual.html#Advanced)다.
+
+### `Z_FILTERED` OCI 운영 결과
+
+커밋 `28f245e0`의 [OCI run 45889015154](https://github.com/pjtss/StockMan/actions/runs/45889015154)는 성공했고 운영 활성화가 확인됐다. KR/US 공개 GET을 각각 5회 순차 호출했다. 모든 10개 응답은 HTTP200, `application/gzip`, Content-Encoding 없음, XFL=2였고 gzip 해제 및 전체 JSON의 ticker·marketCap·daily 필드 존재, `returnedCount` 일치, 최대20봉을 통과했다.
+
+| 시장 | 전체 응답시간 | 중앙값 | first-byte 중앙값 | gzip 크기 중앙값 | raw bytes | 티커 |
+|---|---|---:|---:|---:|---:|---:|
+| KR | 14.950 / 10.408 / 17.750 / 13.904 / 10.114초 | 13.904초 | 0.273초 | 1,219,342B | 8,907,188 | 2,337 |
+| US | 46.502 / 52.735 / 48.566 / 47.499 / 48.347초 | 48.347초 | 0.814초 | 2,820,137B | 18,964,448 | 5,011 |
+
+기본 strategy/chunk64KB 직전 5회 운영 median은 KR4.367초/US42.947초였다. 이번 completion median은 더 길었지만 운영부하를 통제하지 않았다. 계산상 first-byte 이후 유효 다운로드 속도는 KR 약299→89KB/s, US 약67→59KB/s로 바뀌어 작은 payload 차이만으로 completion 차이를 설명할 수 없다. `Z_FILTERED`는 로컬 전체 API warmed median을 KR1.0%, US3.3% 낮추고 wire bytes를 줄였으므로 현 구현을 유지하되 운영 속도 이득은 미확정으로 기록한다.
+
+다음 후보 측정: 실제 운영 raw payload로 level8+`Z_FILTERED`는 level9+`Z_FILTERED`보다 compressor CPU median이 KR315.44ms 대352.32ms(10.5% 단축), US546.99ms 대542.09ms(사실상 동률)였고 gzip 크기는 양쪽 약50B 증가했다. 이득이 API 전체에 나타나는지 확인하지 않았고 XFL metadata가 2→0으로 바뀌므로, 자동 계약 테스트 업데이트를 포함한 실제 endpoint 비교 후에만 선택한다.
