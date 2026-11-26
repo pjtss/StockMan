@@ -139,7 +139,8 @@ describe("public gzip daily export", () => {
     const [sql] = queryMock.mock.calls[1] as [string];
 
     expect(response.status).toBe(200);
-    expect(sql).toContain("to_jsonb(c)->>'trading_value'");
+    expect(sql).toContain("c.close * c.volume AS trading_value");
+    expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).not.toContain("c.trading_value::text ~");
   });
 

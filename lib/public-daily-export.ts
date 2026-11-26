@@ -122,10 +122,7 @@ export async function getPublicDailyExport(market: ExportMarket) {
                THEN c.trading_value::double precision
                ELSE c.close * c.volume
           END`
-      : `CASE WHEN COALESCE(to_jsonb(c)->>'trading_value', '') ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
-               THEN (to_jsonb(c)->>'trading_value')::double precision
-               ELSE c.close * c.volume
-          END`;
+      : `c.close * c.volume`;
     const items = (async function* (): AsyncGenerator<string> {
       for (let offset = 0; offset < chunks.length; offset += concurrency) {
         const chunkResults = await Promise.all(chunks.slice(offset, offset + concurrency).map((keys) => pool.query<ExportRow>(`

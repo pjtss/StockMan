@@ -1,3 +1,10 @@
+### 2026-11-26 — 공개 일봉 gzip API 구형 스키마 경로의 봉 계산 최적화 후보
+- 목적/범위: gzip 일봉 API 속도 개선 후보로 `lib/public-daily-export.ts`의 `trading_value` 컬럼 부재 fallback을 확인했다. US 봉 테이블 생성 마이그레이션(V67)에는 해당 컬럼이 없고 현재 fallback은 각 봉을 `to_jsonb(c)`로 변환해 컬럼을 검사한 후, 없으면 `close * volume`을 계산한다. 스키마 조회가 컬럼 부재를 반환하면 해당 변환/검사를 건너뛰고 기존과 같은 `close * volume` 식을 직접 사용하도록 변경했다. 컬럼이 존재하는 DB는 기존 값 검증 및 fallback 분기를 그대로 사용한다.
+- 로컬 기준/후보 측정: scripts/dev-server.mjs로 띄운 로컬 API에서 같은 5,012 ticker payload를 순차 측정했다. 기존 SQL warmed 0.960/0.715/0.706초(중앙값 0.715초; 최초 4.537초 cold 제외), 수정 SQL 첫/hot 0.938초 제외 후 0.704/0.684/0.737/0.691/0.671초(중앙값 0.691초, 약 3.4% 단축). gzip 크기는 양쪽 모두 3,403,223B, candidate HTTP200/XFL0/no-store, JSON 및 봉 상한20 계약 통과. 작은 로컬 편차이므로 운영 확인 전 성능 개선으로 확정하지 않는다.
+- 회귀 감지: `app/api/public/daily-export/kr/route.test.ts`의 구형 스키마 분기 검증을 `close * volume` 직접 식과 JSON 변환 제거까지 검사하도록 수정했다. 대상 테스트 11개 통과. 다음으로 전체 deploy:verify, OCI 배포 및 운영 KR/US gzip API 계약과 완료 시간을 다시 검증한다.
+- 근본 원인/위험: 컬럼 부재 상태에서도 매 봉 row를 JSON 변환했던 불필요한 CPU 경로를 제거한다. `close * volume`은 기존 컬럼 부재 시 fallback과 의미상 동일하다. 운영 데이터베이스의 실제 schema branch 및 운영 속도 효과는 배포 후 API 계약·시간 실측으로 확인해야 한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그, 운영 성능 보고서. 커밋·배포 전 전체 검증 수행 예정.
+
 ### 2026-11-26 — US 일봉 export batch 크기와 동시성 재측정 후보
 - 목적/범위: 운영 US gzip API 완료시간을 줄이기 위해 US만 ticker batch를 500에서 1,000으로 늘리고 동시 query 상한을 10에서 6으로 낮추는 후보를 로컬 API에서 비교했다. KR은 기존 batch500/concurrency5를 유지한다.
 - 근거: US 적격 ticker 5,011개는 기존 batch500에서 query 11개가 필요했고 concurrency10은 2 wave다. batch1,000/concurrency6이면 query 6개가 한 wave로 실행되고 공유 pool max10 중 4개 연결을 남긴다.
