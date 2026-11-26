@@ -49,7 +49,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       const streamStartedAt = performance.now();
       let firstGzipByteAt: number | null = null;
       let gzipBytes = 0;
-      const activeCompressor = createGzip({ level });
+      const activeCompressor = createGzip({ level, chunkSize: 64 * 1024 });
       compressor = activeCompressor;
       let ended = false;
       let flushing = false;
