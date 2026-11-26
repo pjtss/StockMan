@@ -219,12 +219,12 @@ export async function getPublicDailyExport(market: ExportMarket) {
               daily: {
                 candles: candles.map((candle) => ({
                   date: candle.date,
-                  open: Number(candle.open),
-                  high: Number(candle.high),
-                  low: Number(candle.low),
-                  close: Number(candle.close),
-                  volume: Number(candle.volume),
-                  tradingValue: Number(candle.tradingValue),
+                  open: candle.open,
+                  high: candle.high,
+                  low: candle.low,
+                  close: candle.close,
+                  volume: candle.volume,
+                  tradingValue: candle.tradingValue,
                   fetchedAt: toIsoOrNull(candle.fetchedAt),
                 })),
                 metadata: {

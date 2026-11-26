@@ -9657,3 +9657,10 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 후속 분류 감사에서 `PRFX`의 정상 회사명 `PRF Technologies`가 일반 `\bPRF\b` 조건과 겹쳐 우선주로 오분류되는 오류를 찾았다. `PRF SHS/stock/날짜`처럼 증권 종류 문맥에 한해 우선주로 판단하도록 좁히고 PRFX ordinary-share 회귀 사례를 추가했다.
 - 문서 전용 배포 run `45339258847`은 Flyway V183 검증 후, 배포마다 변경이 없는 `market-impact-events.json`까지 다시 import하며 공식 COMMON_STOCK guard에 `QNRX, MRM, TKLF, FENG`가 걸려 실패했다. activation은 release path 교체 전에 실패해 기존 서비스 복구를 완료했고 health는 `ok`였다. 동일한 JSON 소스가 이미 배포된 release와 byte-identical이면 재 import를 생략하고, source가 달라진 경우에는 기존 official-stock gate를 계속 실행하도록 activation을 보강했다.
 - 후속 fix의 `npm run deploy:verify` 통과(1,637 tests passed/3 skipped, build, standalone+Chrome desktop/mobile smoke, typecheck, docs/Flyway/API/security/cron audits). Fix 커밋·푸시 및 후속 운영 배포: 대기.
+### 2026-11-26 — 일봉 API 변환 비용 추가 제거
+- 목적/범위: gzip level3 및 500종목 batch 운영 구현에서 일봉 JSONB 숫자 필드의 중복 `Number()` 변환 비용을 제거하고 로컬 API 응답 계약을 재확인했다.
+- 근본 원인/개선: SQL JSONB가 candle open/high/low/close/volume/tradingValue를 JSON 숫자로 반환해 `pg` 파서가 이미 JS number로 제공한다. 이를 다시 `Number()`로 감싸는 변환은 불필요하므로 제거했다. NUMERIC 문자열일 수 있는 marketCap과 count 변환은 유지했다. ISO 변환 캐시 실험은 효과가 분명하지 않아 채택하지 않았다.
+- 비교 결과: 로컬 PostgreSQL API 3회 순차 호출 결과 KR 3073/491/424ms, US 1681/1104/1088ms였다. ISO 캐시 적용 실험의 뒤이은 표본은 KR 656/442/467ms, US 1024/1097/1064ms여서 해당 캐시는 제외했다. 앞선 500x5 warmed 표본(KR 약 592ms, US 약 1134ms)과 비교하면 추정 차이는 KR 개선, US 소폭 개선 수준이나 표본·시스템 변동이 있어 운영 개선으로 단정하지 않는다. 250x10 및 400x5 batch 실험도 일관된 이득이 없어 기각했다.
+- 계약 검증: 변경 후 로컬 무인증 GET에서 gzip XFL=0, gzip 해제와 JSON 파싱, KR 2,352/US 5,012 ticker, 상위 키 `ticker`/`marketCap`/`daily`, 최대 20개 봉을 확인했다. payload 크기는 KR 1,465,073B, US 3,306,774B로 변경 전과 사실상 동일했다.
+- 자동 회귀 감지/남은 위험: 전체 `npm run deploy:verify`를 실행하고 기존 gzip API 테스트에서 무인증·필드·20봉 계약이 통과하는지 확인한다. 로컬 API timings는 운영 데이터베이스/호스트 성능을 대표하지 않으므로 배포 후 운영에서 같은 검증을 반복한다. 다음 개선은 운영 실측의 변동폭보다 큰 재현 가능한 이득이 확인될 때만 적용한다.
+- 변경 파일: `lib/public-daily-export.ts`, `DEVELOPMENT_LOG.md`. 검증 전이며 아직 커밋·푸시·배포하지 않았다.
