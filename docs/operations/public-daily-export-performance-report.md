@@ -618,3 +618,15 @@ Node.js v24.14.0 local API/DB에서 gzip level9, Z_FILTERED, output chunk64KB를
 | 후보→기준 | US | 1,081ms | 926ms | -14.3% | 2,797,603→2,807,759 (+0.36%) |
 
 candidate full API median이 양쪽 순서에서 줄고 DB query wall은 비슷했으며 gzip payload 크기 변화는 KR 감소/US +0.36%였다. local signal은 일관되나 개발 서버와 production Node 버전/하드웨어가 다르다. windowBits14를 OCI 운영 후보로 배포하고 동일 public GET을 시장별 최소5회 실행해 전체완료시간·first byte·gzip bytes·gzip 해제 계약을 확인한다. 운영에서 속도 이득이 사라지거나 US 전송 지연이 늘면 기본15로 원복하고 재검증·재배포한다. 현재 candidate 변경은 lib/public-daily-export.ts 한 파일이며 아직 커밋·배포하지 않았다.
+
+
+### windowBits14 OCI 운영 배포 후 확인
+
+코드 commit 8c220dcd의 [OCI Deploy run 45905604148](https://github.com/pjtss/StockMan/actions/runs/45905604148)은 원격 verify, standalone 패키징, release 업로드와 활성화까지 성공했다. Node22 운영 runtime에서 활성화 후 KR/US 공개 API를 각각 5회 순차 호출했다. 10회 모두 HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL2이며 전체 gzip 해제와 JSON 필드·returnedCount·max20 검사를 통과했다. 원본 bytes와 ticker 수는 기존과 동일했다.
+
+| 시장 | 전체 완료 시간 | 중앙값 | first-body-byte 중앙값 | gzip bytes 중앙값 | raw bytes | ticker |
+|---|---|---:|---:|---:|---:|---:|
+| KR | 22.570 / 18.050 / 6.085 / 3.847 / 3.559초 | 6.085초 | 0.242초 | 1,212,074B | 8,907,188 | 2,337 |
+| US | 49.896 / 45.863 / 57.260 / 43.422 / 52.223초 | 49.896초 | 0.385초 | 2,816,126B | 18,964,448 | 5,011 |
+
+직전 windowBits15 운영 표본 median(KR6.807초/US59.633초, first byte0.405/0.377초, gzip1,219,867/2,819,256B)과 단순 비교하면 완료시간은 KR10.6%, US16.3% 짧았고 gzip bytes는 KR0.64%, US0.11% 감소했다. US first-byte 중앙값은 사실상 동일했다. 각 표본 5회, 운영부하·전송률 비통제이므로 개선율은 관측치이지 통제된 인과 추정은 아니다. 그래도 양 시장 로컬 A/B와 운영 median이 같은 방향이고 계약 회귀가 없어 windowBits14를 유지한다. 향후 운영 표본에서 미국의 반복 지연 또는 payload 팽창이 관측되면 windowBits15 복원 A/B를 실행한다.
