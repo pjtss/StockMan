@@ -216,4 +216,6 @@ level3 운영 중앙값(KR12.358초/US56.361초)과 비교하면 level2는 KR 12
 
 로컬 계측으로 US의 500개 batch 기준을 새로 5회 측정한 뒤 batch 크기만 750으로 바꾸고 같은 API/DB 경로에서 5회 반복했다. 500개 기준의 첫 컴파일 요청을 제외한 client warmed median은 0.752초, 내부 `totalElapsedMs` median 713.5ms, `batchQueryWallMs` median 352ms였다. 750개 후보는 각각 0.673초/640ms/316.5ms로 약 10.5%/10.3%/10.1% 짧았다. 후보는 5,012 ticker를 11개 batch/2 wave에서 7개 batch/1 wave로 바꾸며, DB query concurrency 상한 10과 KR batch500은 유지한다. 로컬 gzip bytes와 raw bytes는 기준과 후보 모두 3,493,095B/19,399,949B다.
 
-이전 batch1,000/concurrency6 운영 후보가 로컬 약 8% 개선에도 운영 약 11% 악화되어 복구된 이력이 있다. 따라서 750은 운영 이득이 확인되기 전인 후보로만 취급한다. 동일한 공개 API 운영 5회 및 gzip/JSON/최대20 계약 검증 후 완료시간이 악화되거나 신뢰할 수 있는 이득이 없으면 batch500으로 복구한다.
+후보 커밋 `734eadf4`(OCI run `45809274075`, 성공) 배포 후 KR 공개 API 5/5는 유효했으며 13.316초 중앙값, gzip1,524,715–1,525,115B, raw8,925,884B였다. US는 9회 시도 중 4회만 전체 수신됐고 5회는 전송 중 연결 오류로 끝났다. 네 유효 완료시간 69.692/44.622/67.408/64.490초의 median은 66.049초로, 직전 level2 US 표본 5/5 중앙값56.997초보다 15.9% 길었다. 유효 응답의 gzip bytes는 3,542,720–3,543,416B, raw19,004,536B, 5,011 ticker·0–20봉이며 gzip/JSON contract는 통과했다.
+
+이전 batch1,000/concurrency6 후보와 마찬가지로 로컬 속도 이득이 운영에서 재현되지 않았고 유효 완료시간 및 전송 신뢰성이 악화되어 750 후보를 기각한다. `lib/public-daily-export.ts`의 US batch를 500으로 복구하고, 운영 rollback 배포 후 KR/US 응답을 다시 확인한다. 500 기준으로 돌아간 다음 계측 로그 접근이 가능해지기 전까지 batch/concurrency를 재변경하지 않는다.

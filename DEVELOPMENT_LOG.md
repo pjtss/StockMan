@@ -9784,10 +9784,11 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 운영 계측 한계: 현재 컴퓨터에 OCI SSH 자격증명이나 journald 연결 도구가 없어 계측 로그 필드 숫자를 직접 열람할 수 없었다. 완료 로그를 출력하는 코드와 필드 형식은 테스트에서 검증했고 운영 API 완료시간/데이터 계약은 확인했지만, 단계별 운영 병목의 실측은 미완료이며 다음 실제 속도 변경 전 로그 접근을 확보해야 한다. 배포 표본은 부하 통제가 없어서 직전 API 완료시간과 인과 비교하지 않는다.
 - 로컬 계측 확인: `npm run dev`가 `scripts/dev-server.mjs`를 통해 `.env.local`을 주입한 API에서 sequential KR/US GET을 실행했고 로그 필드와 body를 확인한 뒤 서버를 종료했다. KR 2,352 ticker/5 batch/1 wave, universe63ms, batch wall1,075ms, query sum5,108/max1,074ms, first gzip byte70ms, stream1,203ms, total1,268ms, gzip1,506,947B; US 5,012 ticker/11 batches/2 waves, universe149ms, batch wall1,630ms, sum14,692/max1,602ms, first151ms, stream1,876ms, total2,026ms, gzip3,493,095B. 개발 API 클라이언트 완료시간에는 최초 컴파일이 포함되어 운영과 비교하지 않는다. psql/OCI CLI/config/SSH key가 없어 read-only 운영 journald 접근은 불가함을 확인했다.
 
-### 2026-11-26 — US 공개 일봉 export batch 크기 750 후보
+### 2026-11-26 — US 공개 일봉 export batch 크기 750 후보 기각 및 복구
 - 목적/범위: 운영 US export API의 batch wave 지연을 줄일 수 있는지 `lib/public-daily-export.ts`에서 US batch size만 500→750으로 조정해 동일 로컬 DB/Next API로 후보를 비교한다. KR500, DB 동시성 KR5/US10, gzip level 및 API payload/필터/max20은 그대로 둔다.
 - 근거: 5,012 ticker 기준 기존 500은 11 query/2 wave(10+1), 750은 7 query/1 wave다. 단일 1,000 batch 후보는 앞선 운영에서 느려져 복구한 이력이 있어, 더 작은 750 후보만 비교한다.
 - 로컬 실측: baseline US 500 batch 5회 client 3.354/0.770/0.698/0.734/0.806초, 첫 dev compile 제외 warmed median0.752초. Candidate750 0.945/0.717/0.685/0.646/0.661초, warmed median0.673초(-10.5%). 내부 계측 total median713.5→640ms(-10.3%), batch wall median352→316.5ms(-10.1%); gzip/raw bytes는 3,493,095/19,399,949B 동일, 5,012 ticker와 max20 계약 통과.
 - 자동 회귀 감지: route test가 US batch sizes `[750,750,750,251]`, 동시 query 상한10 및 KR batch500/동시성5를 확인하도록 갱신했다. 대상 API test 12개 통과 및 typecheck 통과.
-- 위험/배포 판정: 앞선 1,000/6 후보가 로컬에서는 약8% 빠르고 운영에서는 약11% 느려 되돌린 이력이 있어 로컬 이득만으로 채택하지 않는다. 전체 deploy:verify 후 OCI 배포, 운영 KR/US API 각5회 gzip-decompress/JSON/max20 계약 실측을 진행한다. US 운영시간이 악화하거나 재현성 있는 이득이 없으면 즉시 500으로 복구한다.
-- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서, 본 로그. commit/push/deploy 및 운영 검증 대기.
+- 운영 반증: 후보 `734eadf4`, OCI run `45809274075` 성공 후 운영 KR5/5는 유효(13.316초 중앙값, gzip1,524,715–1,525,115B/raw8,925,884B, ticker2,337·20봉). US는 9회 중 4회 본문 수신 성공, 5회 전송 중 연결 오류. 유효 US 완료시간 69.692/44.622/67.408/64.490초(median66.049)는 직전 500 기준 US56.997초보다 15.9% 느렸다. 모든 유효 US response는 200, gzip XFL0/no-store, JSON 계약 통과. 운영 편차가 있지만 성공률과 중앙값 모두 후보 채택 근거가 없고 운영 저하 위험이 확인됐다.
+- 결정/복구: batch750은 기각하고 US도 batch500으로 복구한다. 기존 query concurrency KR5/US10, gzip levels KR3/US2, 응답 계약을 보존한다. rollback 배포 후 API 각 시장 5회 검증하고, 이후 운영 지연 개선을 계속하기 전 journald 단계 계측 접근을 확보한다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서, 본 로그. 750 candidate commit/run은 완료; rollback 전체 검증/commit/push/deploy 대기.
