@@ -1,3 +1,7 @@
+### 2026-11-26 — gzip write 실험 배포 후 운영 API 확인
+- 커밋·배포: 실험/기각 기록 커밋 `c3ac04f3`를 `oci`에 push했다. OCI run `45818683801`의 verify, standalone packaging, upload, activation 모두 success로 확인했다. 기능 코드는 write 묶음 50으로 복구되어 있어 배포 동작은 코드 성능 변경을 포함하지 않는다.
+- 운영 확인: 활성화 후 공개 API 전체 응답을 GET해 gzip 해제 및 ticker·marketCap·daily, 최대20봉, HTTP200/application-gzip/Content-Encoding 없음/no-store/XFL0을 검사했다. KR 32.342초/1,525,055B gzip/8,925,884B raw/2,337 ticker, US 75.861초/3,543,788B gzip/19,004,536B raw/5,011 ticker였다. Health API도 HTTP200.
+- 해석/남은 위험: 시장별 1회이므로 성능 방향 판단이나 회귀 주장에 사용하지 않는다. 간헐적인 긴 운영 전송시간의 원인은 여전히 분리되지 않았다. 운영 단계 로그가 확보되기 전 DB batch/concurrency 변경은 보류한다. 변경 파일은 운영 성능 보고서와 본 로그이며 후속 문서 반영분은 커밋·푸시·배포 전 검증한다.
 ### 2026-11-26 — gzip JSON write 묶음 크기 성능 후보 기각
 - 목적/범위: 사용자 요청대로 속도 우선을 유지하며 작은 gzip stream write 호출을 줄일 수 있는지 검사했다. `lib/public-daily-export.ts`의 pending item 묶음을 임시로 50→250으로 바꾸고 로컬 API를 각 시장 5회 전체 다운로드했다.
 - 측정 결과: 기존 50개 묶음 warmed median KR0.350초/US0.706초, 250개 후보 KR0.334초/US0.753초다. KR 차이는 16ms로 작고 US는 6.7% 느려져 안정적인 개선이 아니다. gzip/raw bytes와 ticker 수는 KR1,506,947/8,985,808B·2,352개, US3,493,095/19,399,949B·5,012개로 동일했고 HTTP200, gzip 해제, JSON 파싱이 성공했다.

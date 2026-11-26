@@ -225,3 +225,13 @@ level3 운영 중앙값(KR12.358초/US56.361초)과 비교하면 level2는 KR 12
 `lib/public-daily-export.ts`에서 gzip 스트림에 전달하는 JSON item 묶음을 50에서 250으로 늘려 로컬 API에서 시장별 5회 전체 응답을 비교했다. 기준 50의 warmed median은 KR 0.350초, US 0.706초였다. 250 후보는 KR 0.334초, US 0.753초로 KR 차이는 16ms에 그쳤고 US는 약 6.7% 느렸다. 전체 로컬 payload/gzip 크기는 KR 8,985,808/1,506,947B, US 19,399,949/3,493,095B로 동일했고 ticker 수는 2,352/5,012였다. 응답은 HTTP200이며 gzip 해제와 JSON 파싱이 성공했다.
 
 차이가 작고 시장 간 방향이 달라 속도 개선 근거가 없으므로 후보를 기각하고 묶음 크기 50으로 복구했다. DB query batching, 응답 schema, gzip level, flush heartbeat는 변경하지 않았다. 운영 배포하지 않았다. 로컬 API는 dev compile/cache 영향을 포함하며 운영 성능을 대표하지 않는다. 다음에는 운영 로그 단계 계측을 읽을 수 있는 접근이 마련되기 전 DB 동시성·batch 변경을 하지 않고, 로컬 후보도 충분히 반복되고 양 시장에서 안정된 이득이 보여야 운영 배포한다.
+### gzip write 후보 문서 커밋 배포 후 운영 확인
+
+write 묶음 후보를 기각하고 코드 변경 없이 기록한 커밋 `c3ac04f3`는 OCI run `45818683801`에서 전체 검증, standalone 패키징, 활성화까지 성공했다. 활성화 후 `stockman.r-e.kr` 공개 GET으로 전체 응답을 받아 gzip 해제·JSON 필드·최대20봉을 확인했다.
+
+| 시장 | 전체 수신시간 | gzip bytes | 원본 bytes | 종목 수 | 종목당 최대 봉 | 확인 |
+|---|---:|---:|---:|---:|---:|---|
+| KR | 32.342초 | 1,525,055 | 8,925,884 | 2,337 | 20 | HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL0, 계약 통과 |
+| US | 75.861초 | 3,543,788 | 19,004,536 | 5,011 | 20 | HTTP200, application/gzip, Content-Encoding 없음, no-store, XFL0, 계약 통과 |
+
+각 시장 1회 표본으로 네트워크와 서버 부하는 통제하지 않았다. 이 값은 배포 후 동작·데이터 계약 확인용이며 성능 회귀나 개선을 판정하는 반복 표본이 아니다. gzip 입력 묶음은 50개, KR level3/US level2, ticker DB batch500 설정이 기존대로 서비스된다. 운영 health GET도 HTTP200이었다.
