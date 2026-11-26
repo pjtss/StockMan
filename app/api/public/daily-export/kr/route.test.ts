@@ -54,7 +54,8 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-disposition")).toBe(`attachment; filename="daily-candles-${market.toLowerCase()}.json.gz"`);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("content-encoding")).toBeNull();
-    expect(Number(response.headers.get("content-length"))).toBe(compressed.byteLength);
+    expect(response.headers.get("content-length")).toBeNull();
+    expect(response.headers.get("x-accel-buffering")).toBe("no");
     expect(compressed[8]).toBe(2); // RFC 1952 XFL=2 identifies maximum gzip compression.
     expect(payload).toEqual([{
       ticker: { market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" },
@@ -76,9 +77,7 @@ describe("public gzip daily export", () => {
     expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
     expect(sql).toContain(`FROM ${universeTable} u`);
     expect(sql).toContain(`FROM ${candleTable} c`);
-    expect(sql).toContain("FROM instrument_fundamental_snapshots snapshot");
-    expect(sql).toContain("ORDER BY snapshot.observed_at DESC NULLS LAST, snapshot.fetched_at DESC NULLS LAST");
-    expect(sql).toContain("LIMIT 1");
+    expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
     expect(sql).toContain("to_jsonb(c)->>'trading_value'");
     expect(sql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LIMIT 20");

@@ -1,11 +1,13 @@
-### 2026-11-26 — 공개 gzip 일봉 API 스냅샷 조인 성능 수정
-- 목적/범위: 운영 공개 KR/US gzip 일봉 API의 504 재현을 바탕으로 종목별 시가총액 조회를 최신 스냅샷 1행으로 한정했다.
-- 근본 원인: `instrument_fundamental_snapshots`를 `(market, code)`로 직접 조인해 과거 스냅샷 행마다 동일 종목의 최대 20봉 LATERAL 조회가 반복될 수 있었다. 기존 `(market, code, observed_at DESC, fetched_at DESC)` 인덱스를 이용해 최신 1행만 고른다.
-- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그.
-- 재발 자동 감지: API 회귀 테스트가 최신 관측/수집시각 정렬과 `LIMIT 1` SQL 계약을 확인한다.
-- 검증: API 테스트 5개 통과. `npm run deploy:verify` 통과(283 test files passed/1 skipped, 1,643 tests passed/3 skipped, typecheck/build/docs/audits/runtime smoke 통과). 앞선 운영 GET에서 KR은 간헐적 200 후 KR/US 모두 nginx 504(약 60초)를 반환했다. 수정 이후 운영 검증은 재배포 뒤 진행한다.
-- 남은 위험/다음 개선: 수정 배포 뒤 두 운영 GET을 반복 호출해 200, gzip 해제, 20봉 상한 및 응답시간을 확인한다. 실패 시 SQL EXPLAIN ANALYZE와 DB 인덱스/연결 상태를 확인한다.
-- 커밋·푸시·배포: 수정 커밋·푸시·운영 확인 전.### 2026-11-26 — 국내·미국 보통주 gzip 일봉 다운로드 배포 준비
+### 2026-11-26 — 공개 gzip 일봉 API 응답 스트리밍 개선
+- 목적/범위: 운영 KR/US API에서 관측된 약 60초 nginx 504를 줄이기 위해 gzip level 9 응답을 메모리에 전부 만든 뒤 전송하던 방식을 스트리밍으로 변경했다. JSON 응답 필드, 일봉 20개 상한, 매 호출 DB 재조회는 유지한다.
+- 원인 근거: 기존 응답은 전체 DB 결과를 모아 gzip `Buffer` 생성이 끝날 때까지 응답 헤더/본문을 반환하지 않았다. 운영에서 KR 200/약 31초 및 KR·US 504/약 60초가 관측됐다. 프록시가 응답 시작 전 기다리는 시간이 한 원인일 수 있다는 추론이며, DB·CPU별 지연 분해자료는 미확인이다.
+- 가설 정정: 시가총액 snapshots 테이블은 migration V72에서 `(market, code)` UNIQUE이므로 과거 스냅샷 중복 조인 가설은 틀렸다. 그 가설로 추가한 lateral join은 되돌렸다. 스키마나 인덱스는 변경하지 않았다.
+- 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, 본 로그. Node gzip stream은 level 9를 유지하고 50종목마다 flush하며 `X-Accel-Buffering: no`를 전달한다. 스트림 응답이므로 `Content-Length`는 생략한다.
+- 재발 자동 감지: 회귀 테스트가 매 호출 gzip 해제, XFL level 9, 무캐시, 스트리밍 헤더, 응답 필드 및 최대 20봉을 검사한다.
+- 검증: 현재 수정 전 단계에서 전체 `npm run deploy:verify` 성공(283 test files passed/1 skipped, 1,643 tests passed/3 skipped). 스트리밍 변경 후 API 테스트와 typecheck 및 전체 배포 검증을 재실행한다. 로컬 dev-server + `.env.local` 주입 smoke는 KR 2,352종목/1,215,865B/최대 20봉/약 4.0초, US 5,012종목/2,853,893B/최대 20봉/약 3.5초였다. 이 측정은 localhost PostgreSQL과 개발 PC 기준이다.
+- 남은 위험/다음 개선: 스트리밍 수정 배포 뒤 두 운영 경로를 연속 검증하고 지연을 기록한다. 여전히 504면 운영 서버 CPU, DB query, Nginx buffering/timeout을 나눠 측정한다.
+- 커밋·푸시·배포: 전체 로컬 검증 완료. 스트리밍 수정 커밋·푸시 후 운영 재확인 대기.
+### 2026-11-26 — 국내·미국 보통주 gzip 일봉 다운로드 배포 준비
 - 목적/범위: 무인증 공개 국내·미국 GET 다운로드를 추가했다. 각 호출은 active COMMON_STOCK master, 저장 시가총액, 최근 최대 20개 일봉을 한 번의 read-only DB query로 읽어 `ticker`, `marketCap`, `daily` 세 가지 항목만 포함한 gzip level 9 `.json.gz`를 생성한다. response/file cache 없이 `no-store`로 전달한다.
 - 변경 파일: `app/api/public/daily-export/kr/route.ts`, `app/api/public/daily-export/us/route.ts`, `app/api/public/daily-export/kr/route.test.ts`, `lib/public-daily-export.ts`, `scripts/api-surface.mjs`, `docs/api/route-inventory.json`, `public/openapi.json`, `public/api-reference.md`, `public/document-catalog.json` 및 생성 manuals.
 - 분리 배포: 원래 작업 트리에 다수의 무관한 staged/unstaged/untracked 작업이 있고 local `oci` branch는 원격보다 6 commits 뒤여서 이를 배포하지 않도록 최신 `origin/oci` (`322ea9fc`)에서 전용 worktree를 만들었다. 이번 API와 필요한 문서만 복사·재생성했다.

@@ -1,4 +1,4 @@
-import { gzip } from "node:zlib";
+import { createGzip } from "node:zlib";
 import { getPool } from "@/lib/db";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
@@ -53,12 +53,28 @@ function toIsoOrNull(value: string | Date | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function gzipLevel9(input: Buffer) {
-  return new Promise<Buffer>((resolve, reject) => {
-    gzip(input, { level: 9 }, (error, compressed) => {
-      if (error) reject(error);
-      else resolve(compressed);
-    });
+function gzipJsonStream(items: unknown[]) {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      const compressor = createGzip({ level: 9 });
+      compressor.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+      compressor.on("error", (error) => controller.error(error));
+      compressor.on("end", () => controller.close());
+
+      const write = (chunk: string) => new Promise<void>((resolve, reject) => {
+        compressor.write(chunk, (error) => error ? reject(error) : resolve());
+      });
+      const flush = () => new Promise<void>((resolve) => compressor.flush(resolve));
+
+      void (async () => {
+        await write("[");
+        for (let index = 0; index < items.length; index += 1) {
+          await write(`${index === 0 ? "" : ","}${JSON.stringify(items[index])}`);
+          if ((index + 1) % 50 === 0) await flush();
+        }
+        compressor.end("]");
+      })().catch((error: unknown) => compressor.destroy(error instanceof Error ? error : new Error("GZIP_STREAM_FAILED")));
+    },
   });
 }
 
@@ -83,13 +99,8 @@ export async function getPublicDailyExport(market: ExportMarket) {
              d.data_updated_at,
              COALESCE(d.returned_count, 0)::int AS returned_count
         FROM ${universeTable} u
-        LEFT JOIN LATERAL (
-          SELECT snapshot.market_cap, snapshot.currency, snapshot.observed_at, snapshot.fetched_at
-            FROM instrument_fundamental_snapshots snapshot
-           WHERE snapshot.market = u.market AND snapshot.code = u.code
-           ORDER BY snapshot.observed_at DESC NULLS LAST, snapshot.fetched_at DESC NULLS LAST
-           LIMIT 1
-        ) f ON TRUE
+        LEFT JOIN instrument_fundamental_snapshots f
+          ON f.market = u.market AND f.code = u.code
         LEFT JOIN LATERAL (
           SELECT jsonb_agg(
                    jsonb_build_object(
@@ -169,18 +180,17 @@ export async function getPublicDailyExport(market: ExportMarket) {
       };
     });
 
-    const compressed = await gzipLevel9(Buffer.from(JSON.stringify(items), "utf8"));
     const filename = `daily-candles-${market.toLowerCase()}.json.gz`;
-    return new Response(new Uint8Array(compressed), {
+    return new Response(gzipJsonStream(items), {
       status: 200,
       headers: {
         "content-type": "application/gzip",
         "content-disposition": `attachment; filename="${filename}"`,
-        "content-length": String(compressed.byteLength),
         "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         pragma: "no-cache",
         expires: "0",
         "x-content-type-options": "nosniff",
+        "x-accel-buffering": "no",
       },
     });
   } catch (error) {
