@@ -83,8 +83,8 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
       const compressedChunks: Buffer[] = [];
       const activeCompressor = createGzip({
         level,
-        // Repeated gzip and full-API A/B runs favored windowBits 13 for both markets.
-        windowBits: 13,
+        // Production-payload streaming A/B favored windowBits 12 for both markets.
+        windowBits: 12,
         memLevel: metrics.market === "US" ? 9 : 8,
         chunkSize: 64 * 1024,
         // Production-payload A/B showed default is faster and smaller than filtered for both markets.

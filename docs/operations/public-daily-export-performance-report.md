@@ -1201,3 +1201,11 @@ US 종목 universe 6,321행에 대한 실제 기존 쿼리는 `english_name`과 
 | US compact HIT after MISS | 200 / HIT | 0.691s | — | — | 2,451,722 / 11,041,367 | same US raw SHA; 5,011 / max20 / invalid0 |
 
 US candidate 운영 universe phase는 세 MISS/refresh 표본에서754ms,158ms,5,990ms였고 중앙값754ms/범위158–5,990ms다. 직전 배포의 단일 compact 표본은897ms였지만 표본 수와 인스턴스/DB 상태가 통제되지 않아 운영에서의 인과적 universe-query 개선이나 전체 API 완료시간 개선을 주장하지 않는다. 오히려 5,990ms cold-process 표본은 인스턴스/DB 지연 변동이 계속 크다는 점을 보여준다. 로컬에서는 exact predicate A/B가 반복적으로84.1% 빨랐고 운영 응답 데이터·티커 수·SHA·gzip contract가 그대로여서 변경은 유지하되, 다음 운영 비교에서 동일 process/phase가 반복적으로 나빠지거나 payload 판정이 달라지면 기존 predicate로 되돌린다. 다음 후보는 이 API의 query/per-process 상관관계를 여러 fresh MISS에서 더 모으고, 대형 US batch 실행구간과 stream duration을 별도로 줄일 근거가 있을 때만 적용한다.
+
+### gzip windowBits 13→12 — 운영 payload stream replay 후보
+
+2026-11-28에 실제 운영 compact API gzip을 받아 raw payload SHA를 검증한 뒤 동일 Node.js v24.14.0에서 기존 exporter write pattern으로 재압축했다: level7, `memLevel` KR8/US9, `Z_DEFAULT_STRATEGY`, chunkSize64KiB, 처음 `[` write/flush, KR500·US1,000 ticker 크기의 raw JSON item group, 마지막 `]`. 각 후보 출력은 gunzip해 production raw buffer와 바이트 단위로 같음을 확인했다. 이는 정확한 운영 payload와 exporter의 gzip 입력 묶음을 사용한 압축 스트림 replay이지, Next.js/DB 전체 API A/B는 아니다.
+
+US는 windowBits13/12 총12회씩 interleave 후 첫2회 제외 시 중앙값161.204/142.271ms(-11.7%)였고 gzip 크기는2,451,310→2,454,714B(+3,404B,+0.14%)였다. raw payload는11,041,367B, SHA `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`로 동일했다. KR은 각14회 중 첫2회 제외 중앙값84.904/72.270ms(-14.9%), gzip1,051,479→1,043,357B(-8,122B,-0.77%); raw5,142,281B, SHA `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4` 동일했다.
+
+두 시장에서 압축 CPU가 줄고 bytes도 0.14% 안에서 유지/감소해 `windowBits=12` 후보를 채택했다. 공식 Node.js v22 문서는 windowBits 감소가 일반적으로 압축률을 낮출 수 있고 level이 속도에 가장 큰 영향을 준다고 설명한다([zlib memory/performance tuning](https://nodejs.org/download/release/v22.18.0/docs/api/zlib.html#memory-usage-tuning)). 운영 API 전체 완료시간에 미치는 영향은 이 압축 replay만으로 확정하지 않는다. 배포 후 KR/US fresh compact MISS와 해당 server timings를 확인하고 gzip 해제·JSON/schema·max20·raw SHA를 검사한다. 운영 단계에서 반복적인 전체 지연/크기 회귀가 나타나면13으로 복귀한다. 구현·focused/full verification·OCI 배포 결과와 실제 API 측정값은 뒤에 이어 기록한다.
