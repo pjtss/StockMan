@@ -67,7 +67,8 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
         windowBits: 13,
         memLevel: metrics.market === "US" ? 9 : 8,
         chunkSize: 64 * 1024,
-        strategy: zlibConstants.Z_FILTERED,
+        // Production-payload A/B showed default is faster and smaller than filtered for both markets.
+        strategy: zlibConstants.Z_DEFAULT_STRATEGY,
       });
       compressor = activeCompressor;
       let ended = false;

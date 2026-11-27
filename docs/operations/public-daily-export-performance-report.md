@@ -933,3 +933,39 @@ OCI run [45958252394](https://github.com/pjtss/StockMan/actions/runs/45958252394
 압축 CPU 측정은 전체 API 완료시간을 대신할 수 없어서 `scripts/dev-server.mjs`로 실행한 현재 프로젝트 API와 localhost DB에서 baseline→candidate→baseline→candidate 순서로 시장별 6회씩 추가 측정했다. 매 요청의 `X-Public-Daily-Export-Cache`가 `MISS`였고 각 블록 첫 요청(compile/cold)은 제외했다. 기준14/후보13의 warmed 전체 응답시간 중앙값은 KR337.25→293.0ms(-13.1%), US678.0→605.0ms(-10.8%). gzip 크기는 KR1,023,102→1,027,623B(+0.44%), US2,423,328→2,432,651B(+0.38%). 두 설정에서 해제한 raw JSON SHA-256은 시장별로 동일했고 각 응답은 HTTP200, ticker·marketCap·daily 구조, 2,352/5,012 ticker, 최대20봉 및 invalid row0을 만족했다. 이 반복은 로컬 데이터베이스/API의 MISS 경로이며 운영 35초급 US 응답에 같은 절대/상대 개선이 난다고 단정하지 않는다.
 
 이 결과에 따라 응답 gzip 단일 형식·level9·schema·일봉 상한을 유지하면서 `windowBits=13`을 후보 코드에 반영했다. 실측 크기 증가는 0.4% 미만이고 두 시장의 전체 로컬 MISS 중앙값이 모두 줄었다. 변경 파일은 `lib/public-daily-export.ts`, 이 보고서, `DEVELOPMENT_LOG.md`다. 이전에 임시로 낮춘 local response-cache TTL은 60초로 복구했고 작업 후 worktree `.env.local` 복사본을 삭제했다. 전체 deploy verification 및 OCI 배포 뒤 운영 MISS/HIT 구분, gzip/JSON/schema/max20 검사, 운영 완료시간을 추가 측정한다. 운영에서 완료시간이 반복적으로 악화하거나 데이터 계약이 깨지면 windowBits14로 복구하고 전체 검증·재배포한다.
+
+### gzip windowBits 13 운영 결과 및 병목 해석
+
+windowBits 후보를 포함한 commit `bdae4108`의 [OCI run 45974392765](https://github.com/pjtss/StockMan/actions/runs/45974392765)은 verify, standalone package, upload, activation 모두 성공했다. 운영 health는 HTTP200이었다. 공개 gzip GET은 모두 gzip magic·완전 gunzip·JSON parse·ticker/marketCap/daily·returnedCount·최대20봉·invalid row0 검사를 통과했다.
+
+| 시장 | 상태 | client 완료 | server total | batch query wall | gzip / raw bytes | ticker |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| KR | MISS | 13.417초 | 13.212초 | 11.312초 | 1,064,620 / 5,142,281 | 2,337 |
+| KR | MISS | 7.023초 | 6.823초 | 6.293초 | 1,064,995 / 5,142,281 | 2,337 |
+| KR | HIT | 0.411초 | — | — | 1,064,995 / 5,142,281 | 2,337 |
+| US | MISS | 36.092초 | 35.836초 | 31.782초 | 2,460,996 / 11,041,367 | 5,011 |
+| US | HIT | 0.452초 / 0.284초 | — | — | 2,460,996 / 11,041,367 | 5,011 |
+| US | MISS | 48.817초 | 48.593초 | 44.616초 | 2,460,928 / 11,041,367 | 5,011 |
+
+US miss의 대다수 server total은 batch query wall에서 발생했다. windowBits를 줄인 gzip CPU 절감은 실제 압축 payload bench에서 약50ms 수준이며 이 데이터베이스/서버 부하 변동보다 훨씬 작다. 이전 windowBits14 운영 표본 US35.686초/KR8.755초와 단순 대조하면 windowBits13의 여러 MISS 시간이 일관되게 빨라졌다고 입증되지 않는다. 표본과 DB/page-cache 부하가 달라 인과 결론은 내리지 않는다. process cache HIT은 빠르지만 인스턴스별 캐시여서 항상 적중하지 않는다.
+
+### gzip strategy 변경 후보: Z_FILTERED에서 Z_DEFAULT_STRATEGY
+
+Node.js 공식 zlib API가 `strategy`를 compression-only option으로 제공하고 `Z_DEFAULT_STRATEGY`, `Z_FILTERED`를 지원함을 확인했다([Node.js v22 zlib 문서](https://nodejs.org/download/release/v22.18.0/docs/api/zlib.html)). 현재 windowBits13/level9/memLevel market 설정에서 실제 운영 compact payload를 동일 Node v24.14 런타임으로 7회 interleaved 압축했다. 결과 gzip은 전부 gunzip 후 원본 길이가 같았다.
+
+| 시장 | 설정 | gzip median | gzip bytes |
+| --- | --- | ---: | ---: |
+| KR | window13 + FILTERED (현재) | 81.33ms | 1,064,614 |
+| KR | window13 + DEFAULT | 78.42ms | 1,050,525 |
+| KR | window14 + FILTERED | 115.78ms | 1,060,709 |
+| KR | window14 + DEFAULT | 110.91ms | 1,062,427 |
+| US | window13 + FILTERED (현재) | 163.31ms | 2,460,506 |
+| US | window13 + DEFAULT | 157.81ms | 2,442,640 |
+| US | window14 + FILTERED | 212.47ms | 2,443,441 |
+| US | window14 + DEFAULT | 198.39ms | 2,443,540 |
+
+실제 API end-to-end 교차 A/B는 `scripts/dev-server.mjs`와 localhost DB, 임시 cache TTL1ms로 baseline→candidate→baseline→candidate, 시장별 각 block 7회 수행했다. 각 block의 첫 cold/compile 요청을 제외한 12개씩의 중앙값은 KR FILTERED 299.05ms→DEFAULT 275.30ms(-7.9%), US626.70ms→592.35ms(-5.5%)였다. gzip 크기도 KR1,027,623→1,018,694B(-0.87%), US2,432,651→2,426,206B(-0.26%)로 줄었다. 모든 응답 HTTP200/MISS, raw JSON SHA-256 동일, JSON/ticker/marketCap/daily/max20/returnedCount 검증 통과, invalid row0이었다. 이 로컬 반복을 근거로 level9/windowBits13을 유지하고 strategy를 `Z_DEFAULT_STRATEGY`로 바꾼다. full `deploy:verify`, OCI 재배포, 운영 MISS/HIT 및 전체 응답 실측은 후속 기록한다.
+
+### 기각: US numeric turnover 문자열 정규식 대체
+
+US V92 schema의 `trading_value`가 `NUMERIC`임을 local DB에서 확인하고, 기존 text formatting + regex 유효성 검사 대신 `-Infinity < value < Infinity` numeric bounds를 쓰는 read-only SQL 후보를 비교했다. PostgreSQL 공식 문서는 numeric이 `Infinity`, `-Infinity`, `NaN`을 허용하고 NaN을 모든 비-NaN보다 크게 정렬한다고 설명한다([PostgreSQL 16 Numeric Types](https://www.postgresql.org/docs/16/datatype-numeric.html)). 결과 raw JSON/gzip 크기는 동일했지만 한 baseline/candidate local MISS block에서 client median635.6→620.95ms(-2.3%), server total median593→591.5ms(-0.3%)로 사실상 동률이었고 PostgreSQL batch-query duration 합 median1345→1393ms(+3.6%)였다. 재현 가능한 DB 단계 개선이 없으므로 정규식 코드를 유지하고 후보는 폐기했다. 동일 쿼리 처리량·정렬·volume/NaN/Infinity 의미를 바꾸지 않았다.
