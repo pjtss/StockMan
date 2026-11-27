@@ -663,3 +663,11 @@ US paired 측정에서는 JSON/gzip 처리 뒤 JSON parse median도 133.1→59.9
 | US (5,011 ticker) | 108.928 / 49.090 / 46.776 / 35.341 / 47.451초 | 47.451초 | 54.825 / 39.279 / 54.702 / 43.812 / 47.652초 | 47.652초 (+0.4%) | 0.634→0.377초 | 2,816,112→2,450,128B (-13.0%) |
 
 raw JSON median은 KR 8,907,188→5,142,281B (-42.3%), US 18,964,448→11,041,367B (-41.8%)였다. US gzip/JSON parse median은 149.4→106.3ms (-28.9%)였다. compact 응답은 양 시장 모두 bytes와 first-byte median을 줄였고 KR full download median은 관측상 12.5% 짧았다. US download median은 사실상 같고 compact가 0.4% 길었다. 5쌍, 부하·전송 조건 비통제, 첫 full 108.9초 outlier가 있어 전체 완료시간 개선을 확정할 수 없다. 따라서 compact는 크기/초기응답/파싱 비용 절감 선택지로 유지하되, US 종단간 속도 개선 주장은 하지 않는다. API 기본값은 기존 호환성을 위해 full로 둔다. 다음 표본은 운영 first-to-last byte 공백과 `batchQueryWallMs`를 서버 로그에서 함께 확인할 방법이 확보되면 추가 측정한다.
+
+### 2026-11-27 compact 응답 기본값 전환
+
+속도를 최우선으로 두라는 사용자 지시에 따라 기본 `format`을 `full`에서 `compact`로 전환한다. 기존 운영 paired 측정에서 compact는 KR gzip median 1,212,533→1,060,716B(-12.5%), US 2,816,112→2,450,128B(-13.0%)였고 raw JSON도 각각 42.3%, 41.8% 줄었다. US 전체 다운로드 시간은 해당 5쌍 표본에서 개선되지 않았으므로 종단간 속도 향상을 단정하지 않는다. 대신 매 호출에서 내려보내는 바이트와 소비자 JSON 파싱 비용을 줄이는 것을 기본 경로에 적용한다. 전송량이 실제 병목인 경우 완료시간도 감소할 것으로 예상하지만 운영 배포 후 재검증 대상이다.
+
+최상위 `ticker`, `marketCap`, `daily`, metadata, 데이터 값, 보통주 필터, gzip 단일 응답, 20봉 제한은 그대로다. 기본 봉 형식만 `tuple-v1`로 바뀐다. 기존 객체형 소비자는 `?format=full`을 명시해 유지할 수 있으며, 묵시적으로 full을 사용하던 기존 소비자는 URL을 수정해야 한다. 이 계약 변경은 성능 우선 지시를 반영한 명시적 호환성 비용이다. 운영 검증은 두 시장의 기본 URL이 compact tuple metadata와 gzip 형식으로 내려오는지, `?format=full`이 이전 객체형으로 남아 있는지를 각각 확인한다. 값 또는 형식 회귀가 확인되면 배포를 중단하고 기본값을 full로 복구한다.
+
+코드 기본값과 GET query resolver, 자동화 API 회귀검사, API reference, OpenAPI를 함께 갱신했다. 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `scripts/api-surface.mjs`, `public/api-reference.md`, 생성된 `public/openapi.json`, 본 보고서, `DEVELOPMENT_LOG.md`. targeted route test 17/17 통과. 이 기록 작성 시점에는 전체 배포 검증과 운영 배포 전이며, 결과를 아래에 이어 적는다.

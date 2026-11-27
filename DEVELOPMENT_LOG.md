@@ -1,3 +1,9 @@
+### 2026-11-27 — gzip 일봉 API compact 기본 응답으로 속도 우선 전환
+- 목적/판정: 사용자 요청에 따라 응답 속도를 1순위로 둔다. 기존 운영 paired 실측에서 compact는 full 대비 gzip bytes가 KR 1,212,533→1,060,716B(-12.5%), US 2,816,112→2,450,128B(-13.0%), raw JSON은 각각 -42.3%/-41.8%였다. US 종단간 완료시간은 5쌍 표본에서 개선되지 않아 빨라진다고 단정할 수 없지만, 호출마다 전송·LLM 파싱 부담이 줄어드는 compact를 기본으로 승격한다.
+- 변경: 미지정 format과 직접 API helper 기본값을 compact로 변경하고, `format=full`은 기존 객체형 봉을 보존한다. ticker/marketCap/daily, metadata, 데이터 값, 보통주 필터, 단일 gzip 파일, 일봉 최대20은 유지한다. 이전에 format 생략을 full로 사용한 API 소비자는 full 계약을 유지하려면 `?format=full`을 붙여야 한다. API reference와 OpenAPI default, default tuple 회귀검사도 함께 갱신했다.
+- 문서/오류 감지: 상세 운영 데이터·호환성 위험·개선 근거는 `docs/operations/public-daily-export-performance-report.md`의 compact 기본값 전환 섹션. route test는 기본 URL에서 tuple-v1과 candleFields를 확인하고, full 모드는 명시적으로 요청해 객체 구조를 검사한다. 운영 배포에서는 KR/US 기본 GET과 `?format=full` 모두 gzip 해제, JSON 구조, ticker·marketCap·daily, returnedCount 및 max20을 검증한다.
+- 검증/배포 상태: API 문서 생성 및 surface audit 통과, targeted route test 17/17, 전체 `npm run deploy:verify` 통과(283 test files passed/1 skipped, 1,655 tests passed/3 skipped, production build, typecheck, standalone runtime/Chrome smoke 및 API/docs/security/cron audits). 빌드가 자동 추가한 `next-env.d.ts`·`tsconfig.json` 변경을 원복했다. 코드 배포·운영 기본 URL/`format=full` GET 검증은 다음 단계이며 OCI run과 실측을 이후 기록에 반영한다.
+
 ### 2026-11-27 — public daily export gzip windowBits 15→14 후보
 - 공식문서/목적: Node.js v24 zlib 문서는 deflate 메모리에서 windowBits가 2의 거듭제곱으로 비용에 반영되고 작은 window가 일반적으로 압축률을 낮출 수 있다고 안내한다. level9/Z_FILTERED/chunk64KB/gzip API 계약은 유지하고 actual API 전체 응답 속도가 빨라지는지 측정했다. local Node는 v24.14.0, deploy workflow production runtime은 Node22라 운영 확인 필요.
 - 두 순서 A/B, 각 시장/버전 9 warmed GET: baseline→candidate median KR638→450ms, US1,127→910ms; reversed candidate→baseline KR448→609ms, US926→1,081ms. gzip bytes는 KR1,178,244→1,171,044(-0.61%), US2,797,603→2,807,759(+0.36%). 모든 응답 HTTP200/XFL2, gunzip, JSON schema/max20 통과; raw JSON SHA-256 동일.

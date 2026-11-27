@@ -41,7 +41,7 @@ function makeRow(market: string, code: string, currency: string) {
 }
 
 function fullRequest() {
-  return new Request("http://localhost/api/public/daily-export/test");
+  return new Request("http://localhost/api/public/daily-export/test?format=full");
 }
 
 describe("public gzip daily export", () => {
@@ -127,7 +127,7 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(2);
   });
 
-  it("returns compact daily candles as documented tuples and preserves the full-data fields", async () => {
+  it("defaults to compact tuples and preserves the full-data fields", async () => {
     const compactItem = JSON.parse(makeRow("KOSPI", "005930", "KRW").item_json);
     compactItem.daily = {
       ...compactItem.daily,
@@ -141,7 +141,7 @@ describe("public gzip daily export", () => {
       .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true }] })
       .mockResolvedValueOnce({ rows: [{ item_json: JSON.stringify(compactItem) }] });
 
-    const response = await getKrExport(new Request("http://localhost/api/public/daily-export/kr?format=compact"));
+    const response = await getKrExport(new Request("http://localhost/api/public/daily-export/kr"));
     const compressed = Buffer.from(await response.arrayBuffer());
     const payload = JSON.parse(gunzipSync(compressed).toString("utf8"));
     const sql = (queryMock.mock.calls[1]?.[0] as { text: string }).text;

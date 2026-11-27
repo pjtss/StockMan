@@ -78,10 +78,10 @@ function queryParameters(source, path) {
       limit: { type: "integer", minimum: 1, maximum: 300, default: 120 },
     },
     "/api/public/daily-export/kr": {
-      format: { type: "string", enum: ["full", "compact"], default: "full", description: "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다." },
+      format: { type: "string", enum: ["full", "compact"], default: "compact", description: "기본 compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다. 기존 객체형 봉은 full을 지정합니다." },
     },
     "/api/public/daily-export/us": {
-      format: { type: "string", enum: ["full", "compact"], default: "full", description: "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다." },
+      format: { type: "string", enum: ["full", "compact"], default: "compact", description: "기본 compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다. 기존 객체형 봉은 full을 지정합니다." },
     },
     "/api/public/instrument-fundamentals": {
       market: { type: "string", enum: ["KR", "US", "KOSPI", "KOSDAQ", "NAS", "NASDAQ", "NYS", "NYSE", "AMS", "AMEX"] },
@@ -382,7 +382,7 @@ async function makeOpenApi(allRoutes) {
       description: route.path === "/api/public/us-stock-metadata"
         ? "인증 없는 읽기 전용 티커 조회입니다. 공식 활성 COMMON_STOCK 마스터에서 ticker를 검증하고 회사 식별정보, 캐시된 SEC Company Facts, 저장된 시세 스냅샷과 freshness를 반환합니다. 요청 중 외부 시세 조회나 DB 쓰기는 하지 않습니다."
         : route.path.startsWith("/api/public/daily-export/")
-          ? "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. format=full(기본)은 기존 객체형 JSON이고 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 종목별 일봉은 최대 20개입니다."
+          ? "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. 기본 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 기존 객체형 JSON은 format=full로 요청합니다. 종목별 일봉은 최대 20개입니다."
         : `${route.path === "/api/automation-settings" ? "Deprecated: 응답 헤더 Deprecation=true이며 관리자 feature-module 설정으로 대체되었습니다. " : ""}인증 없이 호출할 수 있는 읽기 전용 GET endpoint. Query field와 검증 규칙은 ${source}의 현재 구현을 기준으로 합니다. 프로젝트별 응답 DTO는 수집원·데이터 가용성에 따라 달라질 수 있습니다.`,
       parameters: queryParameters(await readFile(join(root, source), "utf8"), route.path),
       security: [],

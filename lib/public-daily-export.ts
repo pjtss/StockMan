@@ -143,7 +143,7 @@ function errorResponse() {
   });
 }
 
-export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "full") {
+export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "compact") {
   const requestStartedAt = performance.now();
   const { universeTable, candleTable, eligibility, batchSize } = EXPORT_CONFIG[market];
   try {
@@ -336,5 +336,5 @@ export function getPublicDailyExportFromRequest(market: ExportMarket, requestedF
       headers: { "cache-control": "no-store" },
     });
   }
-  return getPublicDailyExport(market, requestedFormat === "compact" ? "compact" : "full");
+  return getPublicDailyExport(market, requestedFormat === "full" ? "full" : "compact");
 }

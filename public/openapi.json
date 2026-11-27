@@ -1893,7 +1893,7 @@
         ],
         "operationId": "getPublicDailyExportKr",
         "summary": "국내 활성 보통주 티커·시가총액·최근 20일봉 gzip 다운로드",
-        "description": "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. format=full(기본)은 기존 객체형 JSON이고 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 종목별 일봉은 최대 20개입니다.",
+        "description": "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. 기본 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 기존 객체형 JSON은 format=full로 요청합니다. 종목별 일봉은 최대 20개입니다.",
         "parameters": [
           {
             "name": "format",
@@ -1905,10 +1905,10 @@
                 "full",
                 "compact"
               ],
-              "default": "full",
-              "description": "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다."
+              "default": "compact",
+              "description": "기본 compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다. 기존 객체형 봉은 full을 지정합니다."
             },
-            "description": "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다."
+            "description": "기본 compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다. 기존 객체형 봉은 full을 지정합니다."
           }
         ],
         "security": [],
@@ -1951,7 +1951,7 @@
         ],
         "operationId": "getPublicDailyExportUs",
         "summary": "미국 활성 보통주 티커·시가총액·최근 20일봉 gzip 다운로드",
-        "description": "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. format=full(기본)은 기존 객체형 JSON이고 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 종목별 일봉은 최대 20개입니다.",
+        "description": "인증 없이 호출하는 국내 또는 미국 활성 COMMON_STOCK gzip 파일 다운로드입니다. 매 요청마다 운영 DB의 최신 캐시를 조회하고 gzip level 9로 새 .json.gz를 생성하며 응답 캐시를 사용하지 않습니다. 기본 format=compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 다운로드 크기를 줄입니다. 기존 객체형 JSON은 format=full로 요청합니다. 종목별 일봉은 최대 20개입니다.",
         "parameters": [
           {
             "name": "format",
@@ -1963,10 +1963,10 @@
                 "full",
                 "compact"
               ],
-              "default": "full",
-              "description": "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다."
+              "default": "compact",
+              "description": "기본 compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다. 기존 객체형 봉은 full을 지정합니다."
             },
-            "description": "compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다."
+            "description": "기본 compact은 daily.candles를 candleFields 순서의 tuple-v1 배열로 반환해 gzip 다운로드 크기를 줄입니다. 기존 객체형 봉은 full을 지정합니다."
           }
         ],
         "security": [],
