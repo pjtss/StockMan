@@ -702,4 +702,19 @@ To reduce that first ordered result wait without changing response order, an iso
 
 Candidate first-payload time was lower in both US comparisons (340ms vs 416/439ms), while total completion was mixed (722/689ms vs baseline 718/796ms). KR was not intentionally changed; its candidate window2 was 177/330ms vs baseline windows191/350 and204/356ms, showing background/cache variance. For the actual 5,012-ticker local US universe, both baseline and candidate used six queries in one wave; the candidate shifts 500 tickers from the first query to the final query and does not increase query count. A synthetic 5,501-ticker test uses seven simultaneous queries, still under the concurrency limit10. The local evidence supports earlier first useful payload, but does not yet prove a repeatable full-download improvement or production benefit.
 
-Decision: retain the candidate for a controlled production trial only after the complete deployment verification passes; post-deploy compare several KR/US requests, especially first useful payload and full completion. Roll back if US full completion regresses materially, DB load increases, or the first-payload improvement does not reproduce. Existing API remains gzip-only, no-store, max20, stable item ordering and identical payload bytes. This is an experiment, not an accepted performance improvement until production evidence confirms it.
+Decision at local stage: proceed to a controlled production trial after the full deployment verification passes; compare first useful payload and full completion in production. Existing API remains gzip-only, no-store, max20, stable item ordering and identical payload bytes. This was an experiment, not yet an accepted performance improvement.
+
+#### Production result and rollback
+
+Candidate commit `fff8072f` was deployed by successful [OCI run 45923977190](https://github.com/pjtss/StockMan/actions/runs/45923977190). Three sequential full, decoded and schema-validated responses per market were recorded:
+
+| Market | First gzip byte | First JSON item | Full download | Longest body chunk gap | Gzip bytes |
+|---|---:|---:|---:|---:|---:|
+| KR | 1.002 / 0.103 / 0.422s | 14.148 / 4.924 / 8.932s | 18.877 / 6.665 / 10.965s | 13.144 / 4.820 / 8.510s | 1,061,170–1,061,233 |
+| US candidate | 0.714 / 0.262 / 0.271s | 36.082 / 18.951 / 17.949s | 63.953 / 54.741 / 41.061s | 35.367 / 30.517 / 19.223s | 2,450,085–2,450,695 |
+
+All six responses returned HTTP200 `application/gzip`, no `Content-Encoding`, and no-store. Full gunzip/JSON/schema checks passed: KR 2,337 tickers/5,142,281 raw bytes, US 5,011/11,041,367 raw bytes; all had ticker, marketCap, daily, tuple-v1 eight-field candles, `returnedCount` consistency, and max20. The 86 US empty-candle arrays remain valid.
+
+Before deployment, five baseline US full-download observations were 31.586, 31.944, 47.061, 35.203 and 29.888s (median31.944s). Candidate median was54.741s (+71.4%). First useful payload arrived at17.949–36.082s; one baseline detailed sample showed it after about28.003s, so earlier first-item delivery was not consistently established either. The candidate is rejected: reducing only the first query batch improved local first-payload latency, but production total download time regressed materially and varied widely. KR, which the candidate did not change, also ranged 6.665–18.877s, confirming production load/DB/network variance.
+
+The current worktree restores US batches to 1,000 and retains KR at500. It will be fully verified and redeployed as rollback. Do not ship another first-batch size based on local results alone. The unresolved issue is slow first-query/query-stream production behavior; safe next progress requires authorized server query timing or a production A/B that can compare full downloads. No internal diagnostic was exposed publicly.
