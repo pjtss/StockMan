@@ -12,7 +12,7 @@ export const SERVER_JOURNAL_UNITS = [
 const MAX_UNITS = SERVER_JOURNAL_UNITS.length;
 const MAX_LINES_PER_UNIT = 100;
 const MAX_MESSAGE_LENGTH = 1_500;
-const MAX_BUFFER_BYTES = 1_048_576;
+const MAX_BUFFER_BYTES = 2_097_152;
 const JOURNAL_TIMEOUT_MS = 10_000;
 const PRIORITY_NAMES = ["EMERGENCY", "ALERT", "CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG"] as const;
 
@@ -116,12 +116,18 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
         return;
       }
       const parsed = parseServerJournalOutput(stdout);
+      const sinceMs = Date.parse(since);
+      const entriesInWindow = parsed.entries.filter((entry) => {
+        if (!entry.timestamp) return false;
+        const timestampMs = Date.parse(entry.timestamp);
+        return Number.isFinite(timestampMs) && timestampMs >= sinceMs && timestampMs <= Date.now();
+      });
       if (parsed.invalidLineCount > 0) {
-        const entries = parsed.entries.slice(-limit);
+        const entries = entriesInWindow.slice(-limit);
         resolve({ unit, available: false, errorCode: "JOURNAL_OUTPUT_INVALID", entries, returnedCount: entries.length, truncated: entries.length >= limit });
         return;
       }
-      const entries = parsed.entries.slice(-limit);
+      const entries = entriesInWindow.slice(-limit);
       resolve({ unit, available: true, entries, returnedCount: entries.length, truncated: entries.length >= limit });
     });
   });
@@ -129,7 +135,8 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
 
 export function buildJournalArgs(unit: string, since: string, limit: number) {
   const sourceFilter = unit === "nginx-access" ? "--identifier=stockman-nginx-access" : `--unit=${unit}`;
-  return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", `--lines=${limit}`, `--since=${since}`, "--until=now", sourceFilter];
+  const scanLimit = Math.min(MAX_LINES_PER_UNIT * 4, Math.max(limit * 4, 100));
+  return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", `--lines=${scanLimit}`, sourceFilter];
 }
 
 export function classifyJournalError(error: unknown, stderr: string | Buffer | undefined): NonNullable<ServerJournalUnitResult["errorCode"]> {
