@@ -65,11 +65,14 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
   });
 
   it("returns aggregated active exporter waits without exposing SQL", async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [{ wait_event_type: "IO", wait_event: "DataFileRead", active_count: 6, oldest_active_seconds: 42, average_active_seconds: 35 }] });
+    mocks.query.mockResolvedValueOnce({ rows: [{ visible_session_count: 8, visible_active_session_count: 6, query_hidden_session_count: 2, active_exporter_queries: [{ wait_event_type: "IO", wait_event: "DataFileRead", active_count: 6, oldest_active_seconds: 42, average_active_seconds: 35 }] }] });
     const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportActivityOnly=true"));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ activeExporterQueries: [{ waitEventType: "IO", waitEvent: "DataFileRead", activeCount: 6, oldestActiveSeconds: 42, averageActiveSeconds: 35 }] });
+    expect(await response.json()).toMatchObject({
+      activityVisibility: { visibleSessionCount: 8, visibleActiveSessionCount: 6, queryHiddenSessionCount: 2 },
+      activeExporterQueries: [{ waitEventType: "IO", waitEvent: "DataFileRead", activeCount: 6, oldestActiveSeconds: 42, averageActiveSeconds: 35 }],
+    });
     expect(mocks.query.mock.calls[0]?.[0]).toContain("pg_stat_activity");
     expect(mocks.query.mock.calls[0]?.[0]).not.toMatch(/SELECT\s+query/i);
     expect(mocks.query.mock.calls[0]?.[1]).toEqual(["%us_instrument_universe_candles%"]);

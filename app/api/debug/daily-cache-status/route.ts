@@ -105,25 +105,59 @@ export async function GET(request: Request) {
   if (searchParams.get("exportActivityOnly") === "true") {
     try {
       const activity = await getPool().query<{
-        wait_event_type: string | null;
-        wait_event: string | null;
-        active_count: number;
-        oldest_active_seconds: number;
-        average_active_seconds: number;
-      }>(`SELECT wait_event_type, wait_event, COUNT(*)::int AS active_count,
-                 MAX(EXTRACT(EPOCH FROM (NOW() - query_start)))::int AS oldest_active_seconds,
-                 AVG(EXTRACT(EPOCH FROM (NOW() - query_start)))::int AS average_active_seconds
-            FROM pg_stat_activity
-           WHERE datname = current_database() AND pid <> pg_backend_pid()
-             AND state = 'active' AND query ILIKE $1
-           GROUP BY wait_event_type, wait_event
-           ORDER BY active_count DESC, oldest_active_seconds DESC`,
+        visible_session_count: number;
+        visible_active_session_count: number;
+        query_hidden_session_count: number;
+        active_exporter_queries: Array<{
+          wait_event_type: string | null;
+          wait_event: string | null;
+          active_count: number;
+          oldest_active_seconds: number;
+          average_active_seconds: number;
+        }> | string;
+      }>(`WITH sessions AS (
+            SELECT state, query, query_start, wait_event_type, wait_event
+              FROM pg_stat_activity
+             WHERE datname = current_database() AND pid <> pg_backend_pid()
+          ), exporter_groups AS (
+              SELECT wait_event_type, wait_event, COUNT(*)::int AS active_count,
+                     MAX(EXTRACT(EPOCH FROM (NOW() - query_start)))::int AS oldest_active_seconds,
+                     AVG(EXTRACT(EPOCH FROM (NOW() - query_start)))::int AS average_active_seconds
+                FROM sessions
+               WHERE state = 'active' AND query ILIKE $1
+               GROUP BY wait_event_type, wait_event
+          )
+          SELECT (SELECT COUNT(*)::int FROM sessions) AS visible_session_count,
+                 (SELECT COUNT(*) FILTER (WHERE state = 'active')::int FROM sessions) AS visible_active_session_count,
+                 (SELECT COUNT(*) FILTER (WHERE query IS NULL)::int FROM sessions) AS query_hidden_session_count,
+                 COALESCE((SELECT json_agg(json_build_object(
+                   'wait_event_type', wait_event_type,
+                   'wait_event', wait_event,
+                   'active_count', active_count,
+                   'oldest_active_seconds', oldest_active_seconds,
+                   'average_active_seconds', average_active_seconds
+                 )) FROM exporter_groups), '[]'::json) AS active_exporter_queries`,
       [`%${market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles"}%`]);
+      const activityRow = activity.rows[0];
+      const exporterQueries = typeof activityRow?.active_exporter_queries === "string"
+        ? JSON.parse(activityRow.active_exporter_queries)
+        : activityRow?.active_exporter_queries ?? [];
       return NextResponse.json({
         ok: true,
         market,
         checkedAt: new Date().toISOString(),
-        activeExporterQueries: activity.rows.map((row) => ({
+        activityVisibility: {
+          visibleSessionCount: Number(activityRow?.visible_session_count ?? 0),
+          visibleActiveSessionCount: Number(activityRow?.visible_active_session_count ?? 0),
+          queryHiddenSessionCount: Number(activityRow?.query_hidden_session_count ?? 0),
+        },
+        activeExporterQueries: exporterQueries.map((row: {
+          wait_event_type: string | null;
+          wait_event: string | null;
+          active_count: number;
+          oldest_active_seconds: number;
+          average_active_seconds: number;
+        }) => ({
           waitEventType: row.wait_event_type,
           waitEvent: row.wait_event,
           activeCount: Number(row.active_count),
