@@ -98,6 +98,11 @@ export async function GET(request: Request) {
   if (includeServerLogs && serverJournalOptions == null) {
     return NextResponse.json({ ok: false, error: "INVALID_SERVER_LOG_QUERY", supportedUnits: ["stockman.service", "stockman-cron.service", "stockman-rss.service", "stockman-fundamentals.service", "nginx.service", "nginx-access"], logMinutesRange: [1, 1440], logLimitRange: [1, 100] }, { status: 400, headers: { "cache-control": "no-store" } });
   }
+  if (searchParams.get("logsOnly") === "true") {
+    if (!serverJournalOptions) return NextResponse.json({ ok: false, error: "SERVER_LOG_QUERY_REQUIRED" }, { status: 400, headers: { "cache-control": "no-store" } });
+    const serverLogs = await readServerJournal(serverJournalOptions);
+    return NextResponse.json({ ok: true, market, checkedAt: new Date().toISOString(), serverLogs }, { headers: { "cache-control": "no-store" } });
+  }
   const serverLogsPromise = serverJournalOptions
     ? readServerJournal(serverJournalOptions).catch(() => undefined)
     : undefined;

@@ -53,6 +53,14 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     expect(await response.json()).toMatchObject({ serverLogs: { source: "systemd-journal", units: [] } });
   });
 
+  it("supports a logs-only diagnostic without waiting for database queries", async () => {
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logsOnly=true&logUnit=stockman.service"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, market: "KR", serverLogs: { source: "systemd-journal" } });
+    expect(mocks.readServerJournal).toHaveBeenCalledWith({ units: ["stockman.service"], minutes: 60, limit: 50 });
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
   it("returns available server logs when database diagnostics fail", async () => {
     mocks.query.mockRejectedValue(new Error("database unavailable"));
     const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logUnit=stockman.service"));
