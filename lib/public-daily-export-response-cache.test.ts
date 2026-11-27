@@ -11,18 +11,24 @@ describe("public daily export response cache", () => {
     vi.useRealTimers();
   });
 
-  it("expires completed gzip bytes after 60 seconds and returns an isolated copy", () => {
+  it("serves an isolated stale copy for 60 seconds after the fresh TTL", () => {
     vi.useFakeTimers();
     const original = new Uint8Array([1, 2, 3]);
     setCachedPublicDailyExport("US", "compact", original);
     original[0] = 9;
 
     const hit = getCachedPublicDailyExport("US", "compact");
-    expect(hit).toEqual(new Uint8Array([1, 2, 3]));
-    hit![0] = 8;
-    expect(getCachedPublicDailyExport("US", "compact")).toEqual(new Uint8Array([1, 2, 3]));
+    expect(hit).toEqual({ bytes: new Uint8Array([1, 2, 3]), state: "HIT" });
+    hit!.bytes[0] = 8;
+    expect(getCachedPublicDailyExport("US", "compact")).toEqual({ bytes: new Uint8Array([1, 2, 3]), state: "HIT" });
 
     vi.advanceTimersByTime(60_001);
+    const stale = getCachedPublicDailyExport("US", "compact");
+    expect(stale).toEqual({ bytes: new Uint8Array([1, 2, 3]), state: "STALE" });
+    stale!.bytes[0] = 7;
+    expect(getCachedPublicDailyExport("US", "compact")).toEqual({ bytes: new Uint8Array([1, 2, 3]), state: "STALE" });
+
+    vi.advanceTimersByTime(60_000);
     expect(getCachedPublicDailyExport("US", "compact")).toBeNull();
   });
 

@@ -52,6 +52,30 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   },
 };
 
+const backgroundRefreshes = new Map<string, Promise<void>>();
+
+function startBackgroundRefresh(market: ExportMarket, format: PublicDailyExportFormat) {
+  const refreshKey = `${market}:${format}`;
+  if (backgroundRefreshes.has(refreshKey)) return;
+
+  const refresh = (async () => {
+    try {
+      const response = await getPublicDailyExport(market, format, { bypassResponseCache: true });
+      if (response.status !== 200) {
+        await response.body?.cancel();
+        console.warn(`[API /public/daily-export/${market.toLowerCase()}] stale refresh returned HTTP ${response.status}`);
+        return;
+      }
+      await response.arrayBuffer();
+    } catch (error) {
+      console.warn(`[API /public/daily-export/${market.toLowerCase()}] stale refresh failed:`, error instanceof Error ? error.message : "unknown error");
+    } finally {
+      backgroundRefreshes.delete(refreshKey);
+    }
+  })();
+  backgroundRefreshes.set(refreshKey, refresh);
+}
+
 function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportPerformanceMetrics) {
   let compressor: ReturnType<typeof createGzip> | null = null;
   let stopHeartbeat = () => undefined;
@@ -181,10 +205,15 @@ function errorResponse() {
   });
 }
 
-export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "compact") {
-  const cachedBytes = getCachedPublicDailyExport(market, format);
-  if (cachedBytes) {
-    return new Response(cachedBytes, {
+export async function getPublicDailyExport(
+  market: ExportMarket,
+  format: PublicDailyExportFormat = "compact",
+  options: { bypassResponseCache?: boolean } = {},
+) {
+  const cached = options.bypassResponseCache ? null : getCachedPublicDailyExport(market, format);
+  if (cached) {
+    if (cached.state === "STALE") startBackgroundRefresh(market, format);
+    return new Response(cached.bytes, {
       status: 200,
       headers: {
         "content-type": "application/gzip",
@@ -194,7 +223,7 @@ export async function getPublicDailyExport(market: ExportMarket, format: PublicD
         expires: "0",
         "x-content-type-options": "nosniff",
         "x-accel-buffering": "no",
-        "x-public-daily-export-cache": "HIT",
+        "x-public-daily-export-cache": cached.state,
       },
     });
   }

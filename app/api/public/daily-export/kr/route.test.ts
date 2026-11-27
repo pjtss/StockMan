@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gunzipSync } from "node:zlib";
-import { clearPublicDailyExportResponseCache } from "@/lib/public-daily-export-response-cache";
+import { clearPublicDailyExportResponseCache, getCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 vi.mock("@/lib/db", () => ({ getPool: () => ({ query: queryMock }) }));
@@ -43,6 +43,10 @@ function makeRow(market: string, code: string, currency: string) {
 
 function fullRequest() {
   return new Request("http://localhost/api/public/daily-export/test?format=full");
+}
+
+function waitForBackgroundStream() {
+  return new Promise<void>((resolve) => setTimeout(resolve, 100));
 }
 
 describe("public gzip daily export", () => {
@@ -201,6 +205,73 @@ describe("public gzip daily export", () => {
     expect(secondBytes).toEqual(firstBytes);
     expect(JSON.parse(gunzipSync(secondBytes).toString("utf8"))).toHaveLength(1);
     expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("serves stale gzip immediately and refreshes the snapshot in the background", async () => {
+    const eligible = { market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true };
+    const batch = makeRow("KOSPI", "005930", "KRW");
+    queryMock.mockResolvedValueOnce({ rows: [eligible] }).mockResolvedValueOnce({ rows: [batch] });
+
+    const initial = await getKrExport(fullRequest());
+    const initialBytes = Buffer.from(await initial.arrayBuffer());
+    expect(initial.headers.get("x-public-daily-export-cache")).toBe("MISS");
+
+    queryMock.mockClear();
+    queryMock.mockResolvedValueOnce({ rows: [eligible] }).mockResolvedValueOnce({ rows: [batch] });
+    const dateNow = Date.now();
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 60_001);
+
+    const stale = await getKrExport(fullRequest());
+    const staleBytes = Buffer.from(await stale.arrayBuffer());
+    expect(stale.status).toBe(200);
+    expect(stale.headers.get("cache-control")).toContain("no-store");
+    expect(stale.headers.get("x-public-daily-export-cache")).toBe("STALE");
+    expect(staleBytes).toEqual(initialBytes);
+
+    await waitForBackgroundStream();
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(getCachedPublicDailyExport("KR", "full")?.state).toBe("HIT");
+    dateNowSpy.mockRestore();
+
+    const refreshed = await getKrExport(fullRequest());
+    expect(refreshed.headers.get("x-public-daily-export-cache")).toBe("HIT");
+    expect(Buffer.from(await refreshed.arrayBuffer())).toEqual(initialBytes);
+    expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("coalesces concurrent stale requests into one background database refresh", async () => {
+    const eligible = { market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true };
+    const batch = makeRow("KOSPI", "005930", "KRW");
+    queryMock.mockResolvedValueOnce({ rows: [eligible] }).mockResolvedValueOnce({ rows: [batch] });
+    const initial = await getKrExport(fullRequest());
+    await initial.arrayBuffer();
+
+    let resolveUniverse: ((value: { rows: typeof eligible[] }) => void) | undefined;
+    let resolveBatch: ((value: { rows: typeof batch[] }) => void) | undefined;
+    queryMock.mockClear();
+    queryMock.mockImplementation(() => new Promise((resolve) => {
+      if (!resolveUniverse) resolveUniverse = resolve;
+      else resolveBatch = resolve;
+    }));
+    const dateNow = Date.now();
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 60_001);
+
+    const [firstStale, secondStale] = await Promise.all([
+      getKrExport(fullRequest()),
+      getKrExport(fullRequest()),
+    ]);
+    expect(firstStale.headers.get("x-public-daily-export-cache")).toBe("STALE");
+    expect(secondStale.headers.get("x-public-daily-export-cache")).toBe("STALE");
+    await Promise.all([firstStale.arrayBuffer(), secondStale.arrayBuffer()]);
+    expect(queryMock).toHaveBeenCalledTimes(1);
+
+    resolveUniverse?.({ rows: [eligible] });
+    await waitForBackgroundStream();
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    resolveBatch?.({ rows: [batch] });
+    await waitForBackgroundStream();
+    expect(getCachedPublicDailyExport("KR", "full")?.state).toBe("HIT");
+    dateNowSpy.mockRestore();
   });
 
   it("logs database, streaming, first-byte, and gzip timings after the response completes", async () => {
