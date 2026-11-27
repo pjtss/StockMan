@@ -128,6 +128,8 @@ describe("public gzip daily export", () => {
     expect(sql).not.toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("LIMIT 20");
     expect(sql).toMatch(/ORDER BY c\.candle_date DESC\s+LIMIT 20/);
+    expect(sql).not.toContain("c.candle_date ~ '^[0-9]{8}$'");
+    expect(sql).not.toContain("c.high >= GREATEST(c.open, c.low, c.close)");
     expect(sql).not.toContain("ORDER BY c.candle_date DESC, c.fetched_at DESC");
     if (market === "US") {
       expect(eligibilitySql).toContain("u.is_dr=false");

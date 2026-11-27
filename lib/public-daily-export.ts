@@ -1,7 +1,6 @@
 import { constants as zlibConstants, createGzip } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import { getPool } from "@/lib/db";
-import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
 import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 import { getCachedPublicDailyExport, setCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
@@ -339,8 +338,8 @@ export async function getPublicDailyExport(
                 FROM ${candleTable} c
                WHERE c.market = r.market
                  AND c.code = r.code
-                 AND c.timeframe = 'D'
-                 AND ${validDailyCandleSql("c")}
+                 -- Recent export tables contain only validated daily candles, enforced by
+                 -- migration backfill and the transactional cache writer.
                ORDER BY c.candle_date DESC
                LIMIT 20
             ) recent

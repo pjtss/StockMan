@@ -19,6 +19,9 @@ describe("recent daily candle cache maintenance", () => {
     expect(query.sql).toContain(`INSERT INTO ${cache}`);
     expect(query.sql).toContain(`DELETE FROM ${cache} cached`);
     expect(query.sql).toContain("c.timeframe = 'D'");
+    expect(query.sql).toContain("c.candle_date ~ '^[0-9]{8}$'");
+    expect(query.sql).toContain("c.volume >= 0");
+    expect(query.sql).toContain("c.high >= GREATEST(c.open, c.low, c.close)");
     expect(query.sql).toContain("LIMIT 20");
     expect(query.sql).toContain("ON CONFLICT (market, code, candle_date) DO UPDATE");
     expect(query.params).toEqual([market, "TEST1", market, "TEST1"]);
