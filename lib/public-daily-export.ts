@@ -4,6 +4,7 @@ import { getPool } from "@/lib/db";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
 import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
+import { getCachedPublicDailyExport, setCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
 
 type ExportMarket = PublicDailyExportMarket;
 export type PublicDailyExportFormat = "full" | "compact";
@@ -59,6 +60,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       const streamStartedAt = performance.now();
       let firstGzipByteAt: number | null = null;
       let gzipBytes = 0;
+      const compressedChunks: Uint8Array[] = [];
       const activeCompressor = createGzip({
         level,
         // Repeated API A/B runs were faster for both markets with this smaller window.
@@ -82,7 +84,9 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       activeCompressor.on("data", (chunk: Buffer) => {
         firstGzipByteAt ??= performance.now();
         gzipBytes += chunk.length;
-        controller.enqueue(new Uint8Array(chunk));
+        const copy = new Uint8Array(chunk);
+        compressedChunks.push(copy);
+        controller.enqueue(copy);
       });
       activeCompressor.on("error", (error) => {
         stopHeartbeat();
@@ -90,6 +94,13 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       });
       activeCompressor.on("end", () => {
         stopHeartbeat();
+        const completedBytes = new Uint8Array(gzipBytes);
+        let byteOffset = 0;
+        for (const chunk of compressedChunks) {
+          completedBytes.set(chunk, byteOffset);
+          byteOffset += chunk.length;
+        }
+        setCachedPublicDailyExport(metrics.market, metrics.format, completedBytes);
         const completedAt = performance.now();
         const timing: CompletedPublicDailyExportTiming = {
           requestId: metrics.requestId,
@@ -170,6 +181,22 @@ function errorResponse() {
 }
 
 export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "compact") {
+  const cachedBytes = getCachedPublicDailyExport(market, format);
+  if (cachedBytes) {
+    return new Response(cachedBytes, {
+      status: 200,
+      headers: {
+        "content-type": "application/gzip",
+        "content-disposition": `attachment; filename="daily-candles-${market.toLowerCase()}${format === "compact" ? "-compact" : ""}.json.gz"`,
+        "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        pragma: "no-cache",
+        expires: "0",
+        "x-content-type-options": "nosniff",
+        "x-accel-buffering": "no",
+        "x-public-daily-export-cache": "HIT",
+      },
+    });
+  }
   const requestStartedAt = performance.now();
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
@@ -351,6 +378,7 @@ export async function getPublicDailyExport(market: ExportMarket, format: PublicD
         expires: "0",
         "x-content-type-options": "nosniff",
         "x-accel-buffering": "no",
+        "x-public-daily-export-cache": "MISS",
       },
     });
   } catch (error) {

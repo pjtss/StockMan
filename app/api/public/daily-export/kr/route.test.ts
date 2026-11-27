@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gunzipSync } from "node:zlib";
+import { clearPublicDailyExportResponseCache } from "@/lib/public-daily-export-response-cache";
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 vi.mock("@/lib/db", () => ({ getPool: () => ({ query: queryMock }) }));
@@ -45,7 +46,10 @@ function fullRequest() {
 }
 
 describe("public gzip daily export", () => {
-  beforeEach(() => queryMock.mockReset());
+  beforeEach(() => {
+    queryMock.mockReset();
+    clearPublicDailyExportResponseCache();
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it.each([
@@ -71,6 +75,7 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-encoding")).toBeNull();
     expect(response.headers.get("content-length")).toBeNull();
     expect(response.headers.get("x-accel-buffering")).toBe("no");
+    expect(response.headers.get("x-public-daily-export-cache")).toBe("MISS");
     expect(compressed[8]).toBe(2); // RFC 1952 XFL=2 marks maximum deflate compression.
     expect(payload).toEqual([{
       ticker: { market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" },
@@ -181,17 +186,21 @@ describe("public gzip daily export", () => {
     expect(await response.json()).toEqual({ ok: false, error: "DAILY_EXPORT_UNAVAILABLE" });
   });
 
-  it("reads and recompresses the database snapshot on every request", async () => {
+  it("serves a completed gzip snapshot from the bounded server cache", async () => {
     queryMock.mockResolvedValue({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
     const first = await getKrExport(fullRequest());
-    await first.arrayBuffer();
+    const firstBytes = Buffer.from(await first.arrayBuffer());
     const second = await getKrExport(fullRequest());
-    await second.arrayBuffer();
+    const secondBytes = Buffer.from(await second.arrayBuffer());
 
     expect(first.headers.get("cache-control")).toContain("no-store");
+    expect(first.headers.get("x-public-daily-export-cache")).toBe("MISS");
     expect(second.headers.get("cache-control")).toContain("no-store");
-    expect(queryMock).toHaveBeenCalledTimes(4);
+    expect(second.headers.get("x-public-daily-export-cache")).toBe("HIT");
+    expect(secondBytes).toEqual(firstBytes);
+    expect(JSON.parse(gunzipSync(secondBytes).toString("utf8"))).toHaveLength(1);
+    expect(queryMock).toHaveBeenCalledTimes(2);
   });
 
   it("logs database, streaming, first-byte, and gzip timings after the response completes", async () => {
