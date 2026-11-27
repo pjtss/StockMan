@@ -651,4 +651,15 @@ candidate full API median이 양쪽 순서에서 줄고 DB query wall은 비슷�
 | KR | 2,352 | 0.450→0.340초 (-24.4%) | 8,966,992→5,181,748 (-42.2%) | 1,171,044→1,023,102 (-12.6%) |
 | US | 5,012 | 0.831→0.659초 (-20.7%) | 19,359,853→11,351,119 (-41.4%) | 2,807,759→2,429,301 (-13.5%) |
 
-US paired 측정에서는 JSON/gzip 처리 뒤 JSON parse median도 133.1→59.9ms로 감소했다. KR 첫 full 호출은 개발 서버/DB cold 영향이 있어 중앙값에서는 견고한 절사 처리를 하지 않았고 paired 중앙값은 유지했다. 운영 network에서의 지연 감소는 아직 미확인이다. 다운로드 크기 감소는 전송 속도에 따라 이득이 달라지고 compact consumer는 `candleFields`를 따라 tuple을 해석해야 한다. 기존 소비자를 깨지 않도록 `format=full` 기본값과 현 API JSON 객체 계약을 유지하고, 빠른 LLM 다운로드가 명시적으로 `?format=compact`를 사용하도록 문서와 OpenAPI에 추가했다. 해당 후보는 OCI 배포 후 양 시장 full/compact 운영 API의 gzip bytes, first byte, 전체 다운로드 시간과 완전 복원 동등성을 최소 5회 확인한 뒤 유지 여부를 결정한다.
+US paired 측정에서는 JSON/gzip 처리 뒤 JSON parse median도 133.1→59.9ms로 감소했다. KR 첫 full 호출은 개발 서버/DB cold 영향이 있어 중앙값에서는 견고한 절사 처리를 하지 않았고 paired 중앙값은 유지했다. 기존 소비자를 깨지 않도록 `format=full` 기본값과 현 API JSON 객체 계약을 유지하고, 빠른 LLM 다운로드가 명시적으로 `?format=compact`를 사용하도록 문서와 OpenAPI에 추가했다.
+
+### compact tuple OCI 배포 후 운영 검증
+
+코드 commit `993b96e2`의 [OCI Deploy run 45911987498](https://github.com/pjtss/StockMan/actions/runs/45911987498)은 전체 Verify deployment, standalone 패키징, release 업로드 및 Activate release까지 성공했다. 활성화 후 운영 API full/compact를 시장별 5쌍 순차 호출했다. 20개 응답 모두 HTTP200, `application/gzip`, Content-Encoding 없음, `no-store`, XFL2, gunzip/JSON과 max20/returnedCount를 통과했다. paired 10개 모두 compact tuple을 full object candle로 복원했을 때 ticker, marketCap, daily metadata 및 전체 봉이 깊은 동등성이었다.
+
+| 시장 | 전체 다운로드 시간 full 5회 | full median | compact 5회 | compact median | first-byte median full→compact | gzip median full→compact |
+|---|---|---:|---|---:|---:|---:|
+| KR (2,337 ticker) | 17.720 / 3.828 / 5.479 / 4.641 / 10.674초 | 5.479초 | 5.921 / 4.796 / 2.870 / 2.776 / 13.974초 | 4.796초 (-12.5%) | 0.202→0.194초 | 1,212,533→1,060,716B (-12.5%) |
+| US (5,011 ticker) | 108.928 / 49.090 / 46.776 / 35.341 / 47.451초 | 47.451초 | 54.825 / 39.279 / 54.702 / 43.812 / 47.652초 | 47.652초 (+0.4%) | 0.634→0.377초 | 2,816,112→2,450,128B (-13.0%) |
+
+raw JSON median은 KR 8,907,188→5,142,281B (-42.3%), US 18,964,448→11,041,367B (-41.8%)였다. US gzip/JSON parse median은 149.4→106.3ms (-28.9%)였다. compact 응답은 양 시장 모두 bytes와 first-byte median을 줄였고 KR full download median은 관측상 12.5% 짧았다. US download median은 사실상 같고 compact가 0.4% 길었다. 5쌍, 부하·전송 조건 비통제, 첫 full 108.9초 outlier가 있어 전체 완료시간 개선을 확정할 수 없다. 따라서 compact는 크기/초기응답/파싱 비용 절감 선택지로 유지하되, US 종단간 속도 개선 주장은 하지 않는다. API 기본값은 기존 호환성을 위해 full로 둔다. 다음 표본은 운영 first-to-last byte 공백과 `batchQueryWallMs`를 서버 로그에서 함께 확인할 방법이 확보되면 추가 측정한다.
