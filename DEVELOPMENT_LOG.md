@@ -1,3 +1,10 @@
+### 2026-11-28 — US full MISS query activity 운영 표본
+- 목적/범위: 첫 ticker write와 DB batch 구간이 큰 US full export 한 건을 실행하며 승인된 read-only `exportActivityOnly` 진단으로 PostgreSQL active query와 wait event를 관찰한다.
+- 실측: public US full response-cache MISS는 client/server 3,505/3,233ms, universe HIT/3ms, 6 batch query·1 wave, batch wall1,918ms/summed duration8,001ms/max1,917ms, gzip prefix5ms, first ticker write1,815ms, stream3,229ms였다. HTTP200 gzip3,274,760/raw18,964,448B; 5,011 ticker/max20/invalid0/raw SHA `51D9A4AD05FB2FDC1D57FDF832C0D6EB852F3B72E9B451FE83EB5D599FBEB619`.
+- DB 활동 표본: 응답 생성 중 authenticated diagnostics 6회 중 한 순간에 active exporter query5개와 visible active session6개를 관찰했다. 나머지 5회 snapshot은 active exporter query0개였다. 관측된 non-null PostgreSQL wait event는 없었다. 표본 구간이 짧고 진단 GET 자체의 지연/표본시각 편향이 있어, PostgreSQL CPU·디스크·호스트 경합을 원인으로 단정하지 않는다.
+- 판단: 이 한 건은 universe HIT 조건에서 실제 batch wall이 가장 큰 DB phase이고 gzip prefix 뒤 first ticker까지 약1.81초 대기했음을 재확인한다. 5개 active/wait 없음만으로 SQL/인덱스·동시성을 조정할 근거는 부족하다. batch size, schema/data, API 계약은 수정하지 않는다. 다음 조정 전에는 더 많은 fresh MISS의 상관 timing과 충분한 active snapshots가 동일 신호를 반복하는지 확인한다.
+- 변경/검증: 운영 read-only GET과 existing cron-authenticated GET diagnostics만 수행했다. 코드/DB/배포는 변경하지 않았고 response gzip/schema/max20/raw SHA를 검증했다. 본 로그와 성능 보고서에 기록한다.
+
 ### 2026-11-28 — gzip export 첫 종목 데이터 시각 계측
 - 목적/범위: 운영 gzip export의 첫 압축 byte와 첫 실제 ticker payload 기록 시점을 분리해 MISS 응답 지연 구간을 더 정확히 분석한다.
 - 발견/근거: 기존 `timeToFirstGzipByteMs`는 gzip stream을 열자마자 `[`를 쓰고 flush하는 단계에서 발생할 수 있어, 첫 ticker 데이터가 나온 시점으로 오인할 수 있다. 배포 commit `9f039be7`의 후속 운영 표본에서 KR compact MISS는 server total1,825ms/universe143ms/batch wall1,293ms/first gzip byte149ms/stream1,681ms, US는 2,953ms/427ms/1,808ms/428ms/2,526ms였다. `timeToFirstGzipByteMs`는 payload DB 대기 이전을 표시하므로 실제 첫 ticker 지연 지표로는 부족하다.
