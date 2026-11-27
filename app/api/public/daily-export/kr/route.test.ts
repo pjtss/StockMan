@@ -57,8 +57,8 @@ describe("public gzip daily export", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it.each([
-    ["KR", getKrExport, "kr_common_stock_universe", "kr_instrument_universe_candles", "005930", "KRW"],
-    ["US", getUsExport, "us_common_stock_universe", "us_instrument_universe_candles", "AAPL", "USD"],
+    ["KR", getKrExport, "kr_common_stock_universe", "kr_recent_daily_candles", "005930", "KRW"],
+    ["US", getUsExport, "us_common_stock_universe", "us_recent_daily_candles", "AAPL", "USD"],
   ] as const)("returns a no-auth, no-store gzip JSON export for %s", async (market, getExport, universeTable, candleTable, code, currency) => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock", has_trading_value: true }] })

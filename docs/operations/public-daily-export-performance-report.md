@@ -1000,3 +1000,24 @@ gzip snapshot은 기존대로 60초간 fresh다. 이후 추가 60초 grace에서
 로컬 `localhost` DB와 `scripts/dev-server.mjs`의 전체 US API integration에서 측정용 TTL을 5초로 잠시 설정한 뒤 원상복구했다. 순차 MISS/STALE/HIT client 완료시간은 1,749.7ms/221.1ms/165.8ms였다. Next server의 background refresh timing은 597ms였다. 모든 응답 HTTP200, gzip 2,426,206B, raw JSON 11,351,119B, 동일 SHA-256 `c19092639fa2ea307d81e32ff5e656c834eef8a6e287c21047902fa088a13905`, 5,012 ticker, 99,486 candle, 최대20봉, invalid0을 만족했다. 이는 한 번의 warm local DB sequence라 운영 지연 예상치로 일반화하지 않는다. 회귀검사는 fresh TTL/STALE grace/최종 만료와 반환 bytes 격리, 즉시 STALE 응답, single-flight background refresh, 갱신 후 HIT을 집중 route/cache tests로 확인한다.
 
 전체 deploy verification, OCI 배포, 운영 MISS→HIT→STALE/background-refresh→HIT 확인 결과는 배포 뒤 이어 기록한다. 남은 위험은 refresh 실패 시 기존 데이터가 마지막 성공 시각으로부터 최대120초까지 제공될 수 있는 점, 각 Node process가 cache/refresh 상태를 공유하지 않는 점, background refresh가 정상 API와 같은 DB 부하를 발생시키는 점이다. 다음 운영 검증은 stale 응답 latency, refresh completion timing, 새 HIT payload 무결성을 확인하고 stale response metadata age 및 배포 후 health를 기록한다.
+### 2026-11-27 — stale-while-revalidate 운영 실측
+
+`d2a608e6`에 반영한 메모리 gzip snapshot의 fresh TTL 60초 + stale 유예 60초 동작을 OCI 운영 API에서 US compact 한 경로로 순차 확인했다. 배포 workflow [45987582754](https://github.com/pjtss/StockMan/actions/runs/45987582754)의 Verify, standalone 패키징, 업로드, release 활성화가 모두 성공했고 `/api/health`는 HTTP200이었다.
+
+운영 요청 결과는 MISS 44.707초, HIT 0.493초, TTL 만료 후 STALE 1.349초였다. MISS 대비 HIT는 약90.9배, STALE은 약33.1배 빨랐다. STALE 요청은 이전 snapshot을 반환하면서 시장/format별 refresh를 시작했다. refresh 자체는 2026-11-27 11:17:25.201–11:17:58.333 UTC, 33.132초 걸렸고 완료 뒤 요청은 HIT로 바뀌었다. 완료 타이밍은 인증된 `exportTimingsOnly` 진단 GET에서 확인했다. 이 값들은 해당 시점의 단일 순차 표본으로, 일반적인 SLA나 인과적으로 확정된 개선 배수로 해석하지 않는다.
+
+MISS/HIT/STALE 응답 모두 HTTP200, 단일 gzip magic `1f8b`, `Cache-Control: no-store`, 동일 raw SHA-256(`cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`), 5,011 ticker, 98,500 candles, ticker별 최대20 candles 및 초과 ticker 0건을 확인했다. gzip은 2,442,647B, 해제 JSON은 11,041,367B였다. 기존 `totalElapsedMs=44,459` 운영 exporter timing도 첫 MISS 44,707ms와 대체로 일치한다. 첫 후속 GET은 background refresh 진행 중이라 STALE을 유지했고, 진단에서 새 refresh 완료 ID를 확인한 뒤 다음 GET에서 HIT를 확인했다.
+
+제한/위험: stale 응답 데이터는 마지막 성공 시점에서 최대 fresh 60초 + grace 60초까지 오래될 수 있다. refresh가 실패하면 grace 기간 안에는 이전 snapshot을 계속 제공하고, grace 종료 뒤 요청이 동기 MISS로 전환된다. 메모리 cache와 refresh 중복 방지는 OCI 프로세스 인스턴스 범위라 인스턴스 간 공유되지 않는다. 이번 확인은 US compact만 대상으로 했고 KR, full format, 동시 부하 및 장시간 장애 복구는 실측하지 않았다. 데이터 freshness는 payload의 기존 관측 시각 metadata로 소비자가 판단해야 한다.
+
+재발 감지/다음 단계: 운영 smoke에서 MISS/HIT/STALE 헤더, payload hash/schema/max20, `Cache-Control`을 확인하고 stale 진입 후 새 exporter timing 완료를 확인한 다음 HIT 전환을 검사한다. refresh 실패/인스턴스 교체에서 cache가 사라지는 경우는 동기 MISS로 돌아간다. 다음 성능 개선 후보는 이번 33초 background refresh의 DB batch query wall time과 운영 동시 부하를 분리 계측하는 것이다. `X-Public-Daily-Export-Cache`가 HIT/STALE이 아닌 응답은 cache latency 개선으로 집계하지 않는다.
+
+### 최신 20개 일봉 DB read cache 후보 — 운영 배포 검증 대기
+
+기존 US MISS 운영 timing은 exporter 전체 44.459초였고 후속 refresh는 33.132초, 그중 batch query wall 31.620초였다. 이 구간에 인증된 `exportActivityOnly=true`를 4초 간격으로 확인한 결과 활성 exporter query 4–5개가 `IO / DataFileRead` 대기 상태로 최대38초 유지됐다. PostgreSQL 통계에서 query text 숨김은 0건이었다. 이는 CPU 압축보다 원본 candle heap/index page read가 우선 병목이라는 증거이며, export가 읽는 최근 일봉을 작은 테이블에 유지하는 후보를 검토했다.
+
+로컬 PostgreSQL에서 원본과 동일한 유효성 predicate를 적용해 종목별 최신20개를 담은 시험 테이블을 만들었다. US는 110,430행/16,007,168B, KR은 51,036행/7,348,224B였다. 이는 production 테이블 크기가 아니며 local DB 측정값이다. API candle source만 시험 테이블로 바꾸고 매 요청을 MISS로 강제한 로컬 warmed 반복에서 US client median은 733.9→624.2ms(-14.9%), KR은 371.7→321.9ms(-13.4%)였다. 테스트 테이블의 source numeric type을 보존하지 않은 첫 후보는 payload hash가 달라져 즉시 폐기했고, source type을 보존한 최종 후보에서는 API 해제 JSON SHA-256과 gzip bytes가 시장별 baseline과 완전히 같았다. US는 2,426,206B/raw11,351,119B, KR은 1,018,694B/raw5,181,748B였다. 매 응답은 HTTP200, ticker/marketCap/daily 구조, US 5,012 및 KR 2,352 ticker, 최대20봉을 확인했다.
+
+후보 구현은 `us_recent_daily_candles`와 `kr_recent_daily_candles`를 추가하고 migration backfill에서 원본과 같은 predicate로 ticker별 최근20봉만 저장한다. Public export batch query는 해당 좁은 테이블을 읽는다. 일봉 저장 transaction은 source upsert 직후 동일 transaction 안에서 top20 upsert 및 오래된 cache row prune를 실행한다. 따라서 API가 관측하는 cache와 source candle은 함께 commit/rollback되고 기존 payload timestamps/value를 보존한다. 로컬 migration SQL을 임시 schema에서 실행해 backfill 16.688초와 US 110,430/KR 51,036행을 검증했다. 별도 local transaction에서는 양 시장 25개 fixture를 cache에 기록한 뒤 refresh해 최신20행만 남는 것을 확인하고 rollback했다. 실제 local Next API가 새 테이블 이름으로 MISS 응답을 생성해 양 시장 raw hash까지 재확인했다.
+
+재발 감지/남은 위험: route tests는 고정 recent-cache table, valid-candle filter와 LIMIT20을 확인하고 helper test는 market별 source/cache allowlist, bound, upsert/prune 및 parameter binding을 검사한다. production API 배포 뒤 MISS/HIT/STALE, gzip·schema·20봉·raw hash 및 server timing을 검증할 예정이다. migration backfill은 원본 두 candle table을 한 번 읽고 daily 저장마다 유지 query를 실행하므로 OCI migration 시간과 daily-cache refresh 실행시간/오류를 측정해야 한다. 운영에서 API 전체시간이 반복적으로 개선되지 않거나 daily refresh가 유의하게 느려지면 rollback 후보로 재평가한다.

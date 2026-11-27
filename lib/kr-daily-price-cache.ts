@@ -5,6 +5,7 @@ import type { OHLCVCandle } from "@/lib/kis-chart";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 import { loadRemoteDailyCandlesBulk } from "@/lib/remote-daily-candle-cache";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
+import { refreshRecentDailyCandleCache } from "@/lib/recent-daily-candle-cache";
 import { isValidCompactCalendarDate } from "./calendar-date-quality.mjs";
 
 export type CandleTimeframe = "D" | "W" | "M";
@@ -117,6 +118,7 @@ export async function saveKrDailyCandles(market: string, code: string, candles: 
       throw new Error(`KR candle UPSERT verification mismatch: market=${market} code=${code} timeframe=${timeframe} expected=${validCandles.length} returned=${savedRows.length}`);
     }
     if (timeframe === "D") {
+      await refreshRecentDailyCandleCache((statement) => tx.execute(statement), "KR", market, code);
       await tx.execute(sql`DELETE FROM kr_latest_daily_candles s WHERE s.market = ${market} AND s.code = ${code} AND NOT ${sql.raw(validDailyCandleSql("s"))}`);
       await tx.execute(sql`INSERT INTO kr_latest_daily_candles (market, code, candle_date, open, high, low, close, volume, fetched_at)
         SELECT c.market, c.code, c.candle_date, c.open, c.high, c.low, c.close, c.volume, NOW()

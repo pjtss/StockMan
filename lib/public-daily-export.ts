@@ -39,13 +39,13 @@ const EXPORT_CONFIG: Record<ExportMarket, {
 }> = {
   KR: {
     universeTable: "kr_common_stock_universe",
-    candleTable: "kr_instrument_universe_candles",
+    candleTable: "kr_recent_daily_candles",
     eligibility: "u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etp=false AND u.is_warrant=false AND u.is_preferred=false",
     batchSize: EXPORT_BATCH_SIZE,
   },
   US: {
     universeTable: "us_common_stock_universe",
-    candleTable: "us_instrument_universe_candles",
+    candleTable: "us_recent_daily_candles",
     eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL}`,
     // Six batches fit in one query wave and reduced US export latency locally.
     batchSize: 1_000,

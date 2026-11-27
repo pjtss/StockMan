@@ -5,6 +5,7 @@ import type { UsDailyCandle } from "@/lib/kis-us-daily-price";
 import { fetchUsDailyPrice, type UsDailyPriceResponse } from "@/lib/kis-us-daily-price";
 import { loadRemoteDailyCandlesBulk } from "@/lib/remote-daily-candle-cache";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
+import { refreshRecentDailyCandleCache } from "@/lib/recent-daily-candle-cache";
 import { isValidCompactCalendarDate } from "./calendar-date-quality.mjs";
 
 const memoryCache = new Map<string, { expiresAt: number; candles: UsDailyCandle[] }>();
@@ -178,6 +179,7 @@ export async function saveUsDailyCandles(market: string, code: string, candles: 
       throw new Error(`US candle UPSERT verification mismatch: market=${market} code=${code} timeframe=${timeframe} expected=${validCandles.length} returned=${savedRows.length}`);
     }
     if (timeframe === "D") {
+      await refreshRecentDailyCandleCache((statement) => tx.execute(statement), "US", market, code);
       await tx.execute(sql`DELETE FROM us_latest_daily_candles s WHERE s.market = ${market} AND s.code = ${code} AND NOT ${sql.raw(validDailyCandleSql("s"))}`);
       await tx.execute(sql`INSERT INTO us_latest_daily_candles (market, code, candle_date, open, high, low, close, volume, fetched_at)
       SELECT c.market, c.code, c.candle_date, c.open, c.high, c.low, c.close, c.volume, NOW()
