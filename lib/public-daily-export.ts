@@ -277,7 +277,7 @@ export async function getPublicDailyExport(
                  THEN c.trading_value::double precision
                  ELSE c.close * c.volume
             END`
-        : `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
+        : `CASE WHEN c.trading_value > '-Infinity'::numeric AND c.trading_value < 'Infinity'::numeric
                  THEN c.trading_value::double precision
                  ELSE c.close * c.volume
             END`

@@ -117,7 +117,9 @@ describe("public gzip daily export", () => {
       expect(sql).toContain("c.trading_value < 'Infinity'");
       expect(sql).not.toContain("c.trading_value::text ~");
     } else {
-      expect(sql).toContain("c.trading_value::text ~");
+      expect(sql).toContain("c.trading_value > '-Infinity'::numeric");
+      expect(sql).toContain("c.trading_value < 'Infinity'::numeric");
+      expect(sql).not.toContain("c.trading_value::text ~");
     }
     expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
