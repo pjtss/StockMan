@@ -123,11 +123,11 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
         return Number.isFinite(timestampMs) && timestampMs >= sinceMs && timestampMs <= Date.now();
       });
       if (parsed.invalidLineCount > 0) {
-        const entries = entriesInWindow.slice(-limit);
+        const entries = entriesInWindow.slice(0, limit).reverse();
         resolve({ unit, available: false, errorCode: "JOURNAL_OUTPUT_INVALID", entries, returnedCount: entries.length, truncated: entries.length >= limit });
         return;
       }
-      const entries = entriesInWindow.slice(-limit);
+      const entries = entriesInWindow.slice(0, limit).reverse();
       resolve({ unit, available: true, entries, returnedCount: entries.length, truncated: entries.length >= limit });
     });
   });
@@ -135,8 +135,8 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
 
 export function buildJournalArgs(unit: string, since: string, limit: number) {
   const sourceFilter = unit === "nginx-access" ? "--identifier=stockman_nginx_access" : `--unit=${unit}`;
-  const scanLimit = Math.min(MAX_LINES_PER_UNIT * 4, Math.max(limit * 4, 100));
-  return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", `--lines=${scanLimit}`, sourceFilter];
+  const scanLimit = Math.min(MAX_LINES_PER_UNIT, limit);
+  return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", "--reverse", `--lines=${scanLimit}`, sourceFilter];
 }
 
 export function classifyJournalError(error: unknown, stderr: string | Buffer | undefined): NonNullable<ServerJournalUnitResult["errorCode"]> {
