@@ -684,3 +684,22 @@ raw JSON median은 KR 8,907,188→5,142,281B (-42.3%), US 18,964,448→11,041,36
 | US | full 명시 | 5,011 | 0.397초 | 48.996초 | 2,815,676 | 18,964,448 |
 
 이 순차 단일쌍에서 compact 완료 시간은 KR 20.0%, US 11.1% 짧았고 gzip은 KR 12.6%, US 13.0% 작았다. 다만 시장·형식별 1회이고 요청 부하/경로가 통제되지 않아 완료시간 차이를 인과 효과로 보지 않는다. 특히 첫 byte는 compact에서 더 늦었으며 이번 표본은 이에 대한 개선을 보이지 않는다. 다수 paired 운영 측정의 byte 절감과 실제 기본·호환 형식 검증은 확인했다. 이후 같은 클라이언트에서 compact 기본 GET의 반복 전체 완료시간과 first-byte를 쌓고, 기준 median으로부터 지속 회귀하면 full 기본값 복구를 재검토한다.
+
+### 2026-11-27 production first-payload gap and first-batch experiment
+
+The canonical production host `stockman.r-e.kr` was read from the hostname-only value of local `PUBLIC_BASE_URL`; an earlier guessed host returned 404 and was not used as evidence. Several production KR/US GETs returned HTTP200 `application/gzip`. Fully decoded responses contained 2,337 KR and 5,011 US tickers. Every item had ticker/marketCap/daily, used `tuple-v1` with eight fields, and had at most20 candles. 86 US tickers have no stored daily candles, which is a valid empty array.
+
+Additional US downloads completed in 47.061s, 35.203s and 29.888s. The first body chunk arrived in 0.297–0.424s, but largest reader chunk gaps were 31.204s, 43.984s and 27.579s. In the detailed capture, only 17 gzip bytes/one chunk had arrived before the 27.579s gap. KR controls completed in 9.928s and 7.804s with maximum chunk gaps 8.575s and 5.272s. This is a repeated long wait before useful US payload, not a stable total-time estimate.
+
+The deployed generator sends/flushed `[` and starts all batch queries in a wave, then awaits results in input order to preserve market/code ordering. Production universe has six 1,000-ticker batches, so the 17-byte gap aligns with waiting for the first ordered query result while the other queries run concurrently. This is a plausible first-query wait, not a confirmed database cause: OCI server logs are not accessible from the current machine (only SSH known-host files, no SSH-agent socket), and no public diagnostic API was added.
+
+To reduce that first ordered result wait without changing response order, an isolated A/B candidate uses a 500-ticker first US batch followed by 1,000-ticker batches; KR remains 500. The same local API/DB was run in baseline → candidate → baseline order, six GETs per market/window with the first compile/warm request excluded from each median. Responses were fully gunzipped and JSON parsed; ticker count, ticker/marketCap/daily, tuple-8 shape and max20 passed in every request. Gzip sizes were unchanged: KR 1,023,102B (2,352 tickers), US 2,429,301B (5,012 tickers).
+
+| Market | baseline window 1 payload/total median | candidate window 1 payload/total median | candidate window 2 payload/total median | baseline window 2 payload/total median |
+|---|---:|---:|---:|---:|
+| KR | 204 / 356ms | — | 177 / 330ms | 191 / 350ms |
+| US | 416 / 718ms | 340 / 722ms | 340 / 689ms | 439 / 796ms |
+
+Candidate first-payload time was lower in both US comparisons (340ms vs 416/439ms), while total completion was mixed (722/689ms vs baseline 718/796ms). KR was not intentionally changed; its candidate window2 was 177/330ms vs baseline windows191/350 and204/356ms, showing background/cache variance. For the actual 5,012-ticker local US universe, both baseline and candidate used six queries in one wave; the candidate shifts 500 tickers from the first query to the final query and does not increase query count. A synthetic 5,501-ticker test uses seven simultaneous queries, still under the concurrency limit10. The local evidence supports earlier first useful payload, but does not yet prove a repeatable full-download improvement or production benefit.
+
+Decision: retain the candidate for a controlled production trial only after the complete deployment verification passes; post-deploy compare several KR/US requests, especially first useful payload and full completion. Roll back if US full completion regresses materially, DB load increases, or the first-payload improvement does not reproduce. Existing API remains gzip-only, no-store, max20, stable item ordering and identical payload bytes. This is an experiment, not an accepted performance improvement until production evidence confirms it.

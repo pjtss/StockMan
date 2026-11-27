@@ -31,6 +31,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   candleTable: string;
   eligibility: string;
   batchSize: number;
+  firstBatchSize?: number;
 }> = {
   KR: {
     universeTable: "kr_common_stock_universe",
@@ -42,8 +43,10 @@ const EXPORT_CONFIG: Record<ExportMarket, {
     universeTable: "us_common_stock_universe",
     candleTable: "us_instrument_universe_candles",
     eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL}`,
-    // Six batches fit in one query wave and reduced US export latency locally.
+    // Keep later US queries at 1,000 tickers while measuring first-payload latency
+    // with a smaller initial query batch.
     batchSize: 1_000,
+    firstBatchSize: 500,
   },
 };
 
@@ -145,7 +148,7 @@ function errorResponse() {
 
 export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "compact") {
   const requestStartedAt = performance.now();
-  const { universeTable, candleTable, eligibility, batchSize } = EXPORT_CONFIG[market];
+  const { universeTable, candleTable, eligibility, batchSize, firstBatchSize = batchSize } = EXPORT_CONFIG[market];
   try {
     const pool = getPool();
     const universeQueryStartedAt = performance.now();
@@ -178,8 +181,10 @@ export async function getPublicDailyExport(market: ExportMarket, format: PublicD
     if (eligible.rows.length === 0) return errorResponse();
 
     const chunks: ExportKey[][] = [];
-    for (let index = 0; index < eligible.rows.length; index += batchSize) {
-      chunks.push(eligible.rows.slice(index, index + batchSize));
+    for (let index = 0; index < eligible.rows.length;) {
+      const currentBatchSize = index === 0 ? firstBatchSize : batchSize;
+      chunks.push(eligible.rows.slice(index, index + currentBatchSize));
+      index += currentBatchSize;
     }
     metrics.batchCount = chunks.length;
     const concurrency = market === "US" ? 10 : 5;
