@@ -803,3 +803,7 @@ localhost PostgreSQL의 실제 Next.js API에서 memLevel8 기준 블록 → mem
 원인 분리를 위해 인증된 read-only daily-cache-status API에서 최근30분 `stockman.service` journal 20줄을 조회했다. 응답은 HTTP200이며 민감정보 redaction 표시는 true였으나, journalctl이 7초 제한에서 `JOURNAL_READ_TIMEOUT`을 반환해 API 내부 `batchQueryWallMs`와 stream 시간은 얻지 못했다. 운영 전체시간이 응답의 큰 gap 구간과 함께 흔들리고 있으나 현재는 DB/query와 전송/host 부하를 나눌 증거가 없다. 로그 조회를 넓혀 반복 호출하지 않는다.
 
 전체 검증은 OCI workflow에서 통과했고, 로컬 테스트 1,667 passed/3 skipped, 285 files passed/1 skipped, typecheck/build/runtime/Chrome smoke 및 API/security/docs/cron audits가 통과했다. 추후 회귀 감지는 동일한 gzip 계약 검증과 함께 시장별 전체시간 중앙값, first-byte, longest chunk gap, 압축 bytes를 기록한다. 다음 개선은 server-side timing을 제한 시간 안에 얻거나, 양 시장 운영 baseline을 같은 시간대에 더 많이 확보한 뒤 인과관계를 확인해 진행한다. memLevel9은 이번 배포에서 활성 상태로 두되, 후속 운영 표본에서 US median이 baseline보다 지속해서 나빠지거나 메모리 압박이 확인되면 US도8로 복귀하고 재검증·재배포한다.
+
+#### 후속 운영 로그 조회 수정
+
+2026-11-27에 제한된 journal 조회를 다시 수행했다. `stockman.service`는 현재 boot/최근10분/3줄 범위, 10초 timeout에서도 `JOURNAL_READ_TIMEOUT`을 반환했다. `nginx-access`는 10분/3줄 및 60분/5줄 조회 모두 가능하다고 응답했지만 항목 수가 0이었다. 원인은 검색 식별자 불일치였다. OCI nginx는 syslog tag `stockman_nginx_access`를 사용하지만 `lib/server-journal.ts`는 `stockman-nginx-access`를 조회했다. 진단 API의 검색 식별자와 회귀 테스트를 nginx 설정의 underscore tag와 일치시켰다. 이 수정은 인증된 진단에서 실제 요청 로그를 찾기 위한 운영 가시성 수정이며 gzip 응답 경로/데이터에는 영향이 없다. 전체 배포 검증 및 OCI 배포 후 60분 범위의 소량 조회로 로그를 확인한다.

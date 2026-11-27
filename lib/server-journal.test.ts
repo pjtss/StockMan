@@ -45,7 +45,7 @@ describe("systemd server journal diagnostics", () => {
 
   it("builds fixed unit and access-log filters without shell fragments", () => {
     expect(buildJournalArgs("stockman.service", "2026-11-27T00:00:00.000Z", 5)).toContain("--unit=stockman.service");
-    expect(buildJournalArgs("nginx-access", "2026-11-27T00:00:00.000Z", 5)).toContain("--identifier=stockman-nginx-access");
+    expect(buildJournalArgs("nginx-access", "2026-11-27T00:00:00.000Z", 5)).toContain("--identifier=stockman_nginx_access");
     expect(buildJournalArgs("stockman.service", "2026-11-27T00:00:00.000Z", 5)).toEqual([
       "--no-pager", "--quiet", "--output=json", "--utc", "--boot", "--lines=100", "--unit=stockman.service",
     ]);

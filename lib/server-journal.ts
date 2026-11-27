@@ -134,7 +134,7 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
 }
 
 export function buildJournalArgs(unit: string, since: string, limit: number) {
-  const sourceFilter = unit === "nginx-access" ? "--identifier=stockman-nginx-access" : `--unit=${unit}`;
+  const sourceFilter = unit === "nginx-access" ? "--identifier=stockman_nginx_access" : `--unit=${unit}`;
   const scanLimit = Math.min(MAX_LINES_PER_UNIT * 4, Math.max(limit * 4, 100));
   return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", `--lines=${scanLimit}`, sourceFilter];
 }
