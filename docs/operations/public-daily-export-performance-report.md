@@ -877,3 +877,18 @@ marker 배포 뒤 운영 `/api/debug/daily-cache-status?market=US&exportActivity
 같은 market의 완전한 HTTP200 gzip GET을 연속 수행해 전체 body를 gunzip 및 JSON parse했다. 첫 요청은60.821초/gzip2,443,942B/raw11,041,367B/5,011 tickers였고 서버 timing은 total60,486ms, universe3,848ms, batch wall54,519ms, batch duration sum272,289ms, max query54,518ms, first gzip byte3,873ms였다. 그 뒤 요청은45.248초/timing44,777ms/batch wall40,104ms/gzip2,443,448B, 세 번째는35.340초/timing35,057ms/batch wall33,017ms/gzip2,443,448B였다. 이후 약1분53초 idle 뒤 네 번째는43.878초/timing43,528ms/batch wall40,114ms/gzip2,443,448B였다. raw JSON은 매번11,041,367B, ticker5,011로 동일했다. 짧은 연속 호출의 감소와 idle 뒤 반등은 DB/OS page-cache warming 가능성과 일치하고 batch wall 대부분이 DataFileRead snapshot 구간과 시간상 겹쳤다. 호출 사이 DB 부하와 cache 상태는 통제하지 못해 인과 효과로 단정하지 않는다.
 
 반복 호출 속도를 우선해 완료된 gzip 바이트를 서버 프로세스 메모리에 최대 60초 보관하는 캐시를 적용한다. 최대 4개 market/format 항목, 항목당 16MiB 및 전체 32MiB 상한을 둔다. 만료 후에는 DB에서 새 snapshot을 만든다. 내부 캐시이며 응답의 `Cache-Control: no-store`는 유지한다. 따라서 캐시 적중 시 market-cap/daily 데이터가 최대 60초 늦을 수 있다. `X-Public-Daily-Export-Cache`의 `MISS`/`HIT` 헤더와 운영 gzip 검증으로 적중 여부·응답 계약을 확인한다. 다음 최적화 후보는 cache miss 경로의 query plan/index 및 데이터 파일 읽기를 read-only로 대조하는 것이다.
+
+### 완료 gzip 응답의 프로세스 캐시 운영 측정 (2026-11-27)
+
+속도 우선 개선으로 시장·format별 완료 gzip 응답을 서버 프로세스 메모리에 최대60초 보관한다. 캐시는 최대4 entry, entry당16MiB, 총32MiB로 제한했다. 전체 gzip stream이 정상 완료된 경우에만 채우며, 응답 `Cache-Control: no-store`는 계속 유지한다. `X-Public-Daily-Export-Cache`는 내부 캐시 상태를 `MISS`/`HIT`으로 표시한다. 따라서 사용자 측 CDN/browser 캐시와는 별개이며 캐시 적중 응답은 최대60초 이전 snapshot일 수 있다.
+
+OCI run [45958252394](https://github.com/pjtss/StockMan/actions/runs/45958252394)은 verify deployment, standalone packaging, upload 및 activation 모두 성공했다. 운영 health endpoint HTTP200을 확인한 뒤 공개 API GET을 순차 측정하고 gzip magic, 완전 gunzip/JSON parse, 각 row의 `ticker`/`marketCap`/`daily`, candle 최대20을 검사했다.
+
+| 시장 | cache | 전체 응답 시간 | gzip bytes | raw JSON bytes | 종목 | 최대 일봉 | 계약 검사 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| US | MISS | 60.997초 | 2,443,942 | 11,041,367 | 5,011 | 20 | 통과 |
+| US | 직후 HIT | 0.706초 | 2,443,942 | 11,041,367 | 5,011 | 20 | 통과 |
+| KR | MISS | 6.731초 | 1,061,170 | 5,142,281 | 2,337 | 20 | 통과 |
+| KR | 직후 HIT | 0.646초 | 1,061,170 | 5,142,281 | 2,337 | 20 | 통과 |
+
+이번 표본에서는 cache hit이 US 약98.8%, KR 약90.4% 짧은 응답시간을 보였다. 각 시장의 MISS와 HIT payload 크기가 같고 해제된 모든 row가 계약을 통과했다. 이는 같은 운영 인스턴스의 즉시 반복 요청에 대한 실측이다. 단일 MISS/HIT pair이므로 운영 전체 부하에서의 평균효과로 일반화하지 않으며, 프로세스 메모리 cache는 여러 app instance 사이에 공유되지 않아 load balancing에 따라 hit 비율이 달라진다. MISS 경로의 DB/압축 비용은 그대로다. 60초 stale 허용과 cache memory bound는 남은 tradeoff이며, 이후에는 운영 반복 표본과 cache hit ratio를 계속 확인한다.
