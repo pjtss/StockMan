@@ -892,3 +892,17 @@ OCI run [45958252394](https://github.com/pjtss/StockMan/actions/runs/45958252394
 | KR | 직후 HIT | 0.646초 | 1,061,170 | 5,142,281 | 2,337 | 20 | 통과 |
 
 이번 표본에서는 cache hit이 US 약98.8%, KR 약90.4% 짧은 응답시간을 보였다. 각 시장의 MISS와 HIT payload 크기가 같고 해제된 모든 row가 계약을 통과했다. 이는 같은 운영 인스턴스의 즉시 반복 요청에 대한 실측이다. 단일 MISS/HIT pair이므로 운영 전체 부하에서의 평균효과로 일반화하지 않으며, 프로세스 메모리 cache는 여러 app instance 사이에 공유되지 않아 load balancing에 따라 hit 비율이 달라진다. MISS 경로의 DB/압축 비용은 그대로다. 60초 stale 허용과 cache memory bound는 남은 tradeoff이며, 이후에는 운영 반복 표본과 cache hit ratio를 계속 확인한다.
+### 2026-11-27 운영 MISS 경로 I/O 대기 재확인
+
+60초 process-cache TTL이 지난 뒤 US 기본 compact export를 다시 요청했다. 응답은 `MISS`, HTTP200이며 완료까지50.134초였다. 압축 크기2,443,985B, 해제 JSON11,041,367B, 5,011 ticker, 최대20봉으로 gzip·JSON/schema 검사가 통과했다. 동일 request ID `3958376b-e33b-4c16-b256-1a0312a820f4`의 서버 timing은 total49,834ms, universe582ms, 6 batch queries/1 wave, batch query wall45,451ms, 개별 query duration 합221,715ms, 최대 query45,408ms, 첫 gzip byte585ms, stream49,251ms였다. batch query wall이 전체 완료시간의 약91%다.
+
+같은 요청 수행 중 인증된 `exportActivityOnly=true`를 약5초 간격으로 읽었다. 첫 관측은 빈 exporter list였고, 이후 33초 시점에 `IO/DataFileRead` 5개(active oldest33초), 39초에 5개(oldest39초), 44초에 1개(oldest44초)가 보였다. 약48초 관측에서는 active exporter가 없었다. PostgreSQL 공식 정의상 `DataFileRead`는 relation data file read 대기다([공식 PostgreSQL 문서](https://www.postgresql.org/docs/16/monitoring-stats.html)). 이는 exporter batch 실행 중 DB 파일 읽기 대기가 반복됐다는 증거지만, 어떤 relation/index block인지나 저장장치와 shared buffer 중 어느 지점이 근본 원인인지는 알려주지 않는다.
+
+이번 측정은 지난 운영 trace와 같은 병목 후보를 재확인한다. 현재 `(market, code, timeframe, candle_date DESC)` lookup index는 필터/정렬/limit과 맞지만 해당 row의 `trading_value`를 포함하지 않고, 기존 covering index의 partial predicate `volume > 0`은 API가 보존하는 `volume >= 0` 범위를 완전히 포함하지 않는다. 큰 covering index 또는 zero-volume union은 저장/갱신 비용이나 전량 운영 지연이 있고, 이전 full API 시험도 회귀해 이번에는 SQL/index를 바꾸지 않았다. 과거 단일 query 동시성 축소 및 partial-index split 결과도 이 보고서의 앞선 실험에서 개선 후보로 채택되지 않았다.
+
+다음 유효 단계는 production DB에서 대상 query의 실행계획·table/index read 통계를 안전한 인증 read-only 경로로 확보하는 것이다. 이를 얻기 전 새 대형 인덱스를 추가하거나 query/concurrency를 다시 바꾸지 않는다. 이번 조사는 공개 API 코드·응답 계약·스키마를 변경하지 않았고 운영은 GET만 수행했다.
+### 인증된 운영 저장소 통계 진단 경로 추가
+
+앞선 운영 trace에서 DB `DataFileRead` 대기를 확인했지만 어떤 인덱스/heap이 얼마나 읽혔는지는 알 수 없었다. 기존 cron-secret 보호 `/api/debug/daily-cache-status`에 `exportStorageOnly=true` 분기를 추가한다. 시장은 기존 KR/US allowlist로 고정된 candle table에만 매핑하며 쓰기 SQL은 없다. 응답은 테이블/heap/index bytes, catalog 추정 live row/page 수, all-visible 비율, 누적 heap/index block read/hit, 해당 테이블 인덱스 정의/partial predicate를 제공한다. `pg_stat_statements`가 활성화되어 있고 진단 역할에 접근 권한이 있으면 candle-table query의 calls/mean execution/shared block counters도 제공한다. SQL 원문, 요청 ticker, 사용자 데이터는 응답에서 제외한다. block counters는 DB 통계 reset 이후 누계라 한 요청 전용 수치로 오해하면 안 되며, `pg_stat_statements` 부재/권한 거부는 별도 상태로 표기한다.
+
+회귀검사는 인증 이전에 DB query를 수행하지 않는 점, 고정 table parameter, catalog/index 조회만 수행하는 점, 응답에 SQL 원문이 없는 점, extension 통계 가용/불가 상태를 확인한다. 집중 debug route test 12/12 통과. 전체 deploy verification 및 OCI 배포/운영 조회는 이 기록 뒤에 추가한다. 이번 기능은 원인 측정을 위한 내부 read-only 진단이며 public GET/payload를 바꾸지 않는다.

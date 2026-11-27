@@ -86,6 +86,68 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     expect(mocks.query).not.toHaveBeenCalled();
   });
 
+  it("returns authenticated, read-only exporter table and index statistics", async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{ table_bytes: "1600", heap_bytes: "1000", index_bytes: "600", estimated_live_rows: "250", heap_pages: "100", all_visible_pages: "80", heap_blocks_read: "12", heap_blocks_hit: "34", index_blocks_read: "56", index_blocks_hit: "78" }] })
+      .mockResolvedValueOnce({ rows: [{ index_name: "us_lookup_idx", index_bytes: "500", is_valid: true, is_ready: true, definition: "CREATE INDEX us_lookup_idx ON public.us_instrument_universe_candles USING btree (market, code, timeframe, candle_date DESC)", predicate: null }] })
+      .mockResolvedValueOnce({ rows: [{ available: false }] });
+
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportStorageOnly=true"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(body).toMatchObject({
+      ok: true,
+      market: "US",
+      tableName: "us_instrument_universe_candles",
+      table: {
+        totalBytes: 1600,
+        heapBytes: 1000,
+        indexBytes: 600,
+        estimatedLiveRows: 250,
+        allVisiblePercent: 80,
+        cumulativeHeapBlocksRead: 12,
+        cumulativeIndexBlocksRead: 56,
+      },
+      indexes: [{ name: "us_lookup_idx", valid: true, ready: true, predicate: null }],
+      pgStatStatements: { status: "unavailable", statements: [] },
+    });
+    expect(mocks.query).toHaveBeenCalledTimes(3);
+    expect(mocks.query.mock.calls[0]?.[0]).toContain("pg_statio_user_tables");
+    expect(mocks.query.mock.calls[1]?.[0]).toContain("pg_get_indexdef");
+    expect(mocks.query.mock.calls[2]?.[0]).toContain("to_regclass('pg_stat_statements')");
+    expect(mocks.query.mock.calls.map(([sql]) => sql).join("\n")).not.toMatch(/INSERT|UPDATE|DELETE|CREATE|DROP/i);
+    expect(mocks.query.mock.calls[0]?.[1]).toEqual(["us_instrument_universe_candles"]);
+    expect(mocks.query.mock.calls[1]?.[1]).toEqual(["us_instrument_universe_candles"]);
+  });
+
+  it("requires authorization before exporter storage queries", async () => {
+    mocks.authorized = false;
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportStorageOnly=true"));
+    expect(response.status).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
+  it("returns aggregate exporter statement I/O without disclosing SQL text", async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{ table_bytes: "1000", heap_bytes: "600", index_bytes: "400", estimated_live_rows: "250", heap_pages: "75", all_visible_pages: "50", heap_blocks_read: "5", heap_blocks_hit: "15", index_blocks_read: "25", index_blocks_hit: "35" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ queryid: "12345", calls: "6", rows: "6000", total_exec_time: "270000", mean_exec_time: "45000", shared_blks_hit: "100", shared_blks_read: "200", temp_blks_read: "0", temp_blks_written: "0" }] });
+
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportStorageOnly=true"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.pgStatStatements).toMatchObject({ status: "available", statements: [{ queryId: "12345", calls: 6, rows: 6000, meanExecutionMs: 45000, sharedBlocksHit: 100, sharedBlocksRead: 200 }] });
+    expect(JSON.stringify(body)).not.toMatch(/SELECT|FROM|INSERT|UPDATE|DELETE/i);
+    expect(mocks.query).toHaveBeenCalledTimes(4);
+    expect(mocks.query.mock.calls[3]?.[0]).toContain("shared_blks_read");
+    expect(mocks.query.mock.calls[3]?.[0]).not.toContain("query AS");
+    expect(mocks.query.mock.calls[3]?.[1]).toEqual(["%us_instrument_universe_candles%"]);
+  });
+
   it("reads only explicitly requested, validated server journal logs", async () => {
     const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logUnit=stockman.service&logMinutes=15&logLimit=10"));
     expect(response.status).toBe(200);

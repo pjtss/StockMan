@@ -169,6 +169,107 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, market, error: "EXPORT_ACTIVITY_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
     }
   }
+  if (searchParams.get("exportStorageOnly") === "true") {
+    const candleTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
+    try {
+      const pool = getPool();
+      const tableResult = await pool.query<Record<string, string | number>>(`SELECT pg_total_relation_size(c.oid)::bigint AS table_bytes,
+                   pg_relation_size(c.oid)::bigint AS heap_bytes,
+                   pg_indexes_size(c.oid)::bigint AS index_bytes,
+                   COALESCE(s.n_live_tup, c.reltuples)::bigint AS estimated_live_rows,
+                   c.relpages::bigint AS heap_pages,
+                   c.relallvisible::bigint AS all_visible_pages,
+                   COALESCE(io.heap_blks_read, 0)::bigint AS heap_blocks_read,
+                   COALESCE(io.heap_blks_hit, 0)::bigint AS heap_blocks_hit,
+                   COALESCE(io.idx_blks_read, 0)::bigint AS index_blocks_read,
+                   COALESCE(io.idx_blks_hit, 0)::bigint AS index_blocks_hit
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+              LEFT JOIN pg_statio_user_tables io ON io.relid = c.oid
+             WHERE n.nspname = 'public' AND c.relname = $1 AND c.relkind = 'r'`, [candleTable]);
+      const indexResult = await pool.query<{
+        index_name: string;
+        index_bytes: string | number;
+        is_valid: boolean;
+        is_ready: boolean;
+        definition: string;
+        predicate: string | null;
+      }>(`SELECT ci.relname AS index_name,
+                   pg_relation_size(ci.oid)::bigint AS index_bytes,
+                   i.indisvalid AS is_valid,
+                   i.indisready AS is_ready,
+                   pg_get_indexdef(ci.oid) AS definition,
+                   pg_get_expr(i.indpred, i.indrelid) AS predicate
+              FROM pg_index i
+              JOIN pg_class ct ON ct.oid = i.indrelid
+              JOIN pg_class ci ON ci.oid = i.indexrelid
+              JOIN pg_namespace n ON n.oid = ct.relnamespace
+             WHERE n.nspname = 'public' AND ct.relname = $1
+             ORDER BY pg_relation_size(ci.oid) DESC`, [candleTable]);
+      const extensionResult = await pool.query<{ available: boolean }>(`SELECT to_regclass('pg_stat_statements') IS NOT NULL AS available`);
+      let statementStatsStatus: "available" | "unavailable" | "permission_denied" = "unavailable";
+      let statementStats: Array<Record<string, unknown>> = [];
+      if (extensionResult.rows[0]?.available) {
+        try {
+          const stats = await pool.query<Record<string, string | number>>(`SELECT queryid, calls, rows, total_exec_time, mean_exec_time,
+                     shared_blks_hit, shared_blks_read, temp_blks_read, temp_blks_written
+                FROM pg_stat_statements
+               WHERE query ILIKE $1
+               ORDER BY total_exec_time DESC
+               LIMIT 10`, [`%${candleTable}%`]);
+          statementStats = stats.rows.map((row) => ({
+            queryId: String(row.queryid),
+            calls: Number(row.calls),
+            rows: Number(row.rows),
+            totalExecutionMs: Number(row.total_exec_time),
+            meanExecutionMs: Number(row.mean_exec_time),
+            sharedBlocksHit: Number(row.shared_blks_hit),
+            sharedBlocksRead: Number(row.shared_blks_read),
+            tempBlocksRead: Number(row.temp_blks_read),
+            tempBlocksWritten: Number(row.temp_blks_written),
+          }));
+          statementStatsStatus = "available";
+        } catch {
+          statementStatsStatus = "permission_denied";
+        }
+      }
+      const row = tableResult.rows[0];
+      if (!row) return NextResponse.json({ ok: false, market, error: "EXPORT_STORAGE_METADATA_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+      const heapPages = Number(row.heap_pages);
+      const allVisiblePages = Number(row.all_visible_pages);
+      return NextResponse.json({
+        ok: true,
+        market,
+        tableName: candleTable,
+        checkedAt: new Date().toISOString(),
+        table: {
+          totalBytes: Number(row.table_bytes),
+          heapBytes: Number(row.heap_bytes),
+          indexBytes: Number(row.index_bytes),
+          estimatedLiveRows: Number(row.estimated_live_rows),
+          heapPages,
+          allVisiblePages,
+          allVisiblePercent: heapPages > 0 ? Number((allVisiblePages * 100 / heapPages).toFixed(2)) : null,
+          cumulativeHeapBlocksRead: Number(row.heap_blocks_read),
+          cumulativeHeapBlocksHit: Number(row.heap_blocks_hit),
+          cumulativeIndexBlocksRead: Number(row.index_blocks_read),
+          cumulativeIndexBlocksHit: Number(row.index_blocks_hit),
+        },
+        indexes: indexResult.rows.map((index) => ({
+          name: index.index_name,
+          bytes: Number(index.index_bytes),
+          valid: index.is_valid,
+          ready: index.is_ready,
+          definition: index.definition,
+          predicate: index.predicate,
+        })),
+        pgStatStatements: { status: statementStatsStatus, statements: statementStats },
+      }, { headers: { "cache-control": "no-store" } });
+    } catch {
+      return NextResponse.json({ ok: false, market, error: "EXPORT_STORAGE_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+    }
+  }
   const includeServerLogs = searchParams.get("includeServerLogs") === "true";
   const serverJournalOptions = includeServerLogs ? parseServerJournalOptions(searchParams) : null;
   if (includeServerLogs && serverJournalOptions == null) {
