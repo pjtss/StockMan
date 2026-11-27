@@ -718,3 +718,73 @@ All six responses returned HTTP200 `application/gzip`, no `Content-Encoding`, an
 Before deployment, five baseline US full-download observations were 31.586, 31.944, 47.061, 35.203 and 29.888s (median31.944s). Candidate median was54.741s (+71.4%). First useful payload arrived at17.949–36.082s; one baseline detailed sample showed it after about28.003s, so earlier first-item delivery was not consistently established either. The candidate is rejected: reducing only the first query batch improved local first-payload latency, but production total download time regressed materially and varied widely. KR, which the candidate did not change, also ranged 6.665–18.877s, confirming production load/DB/network variance.
 
 The current worktree restores US batches to 1,000 and retains KR at500. It will be fully verified and redeployed as rollback. Do not ship another first-batch size based on local results alone. The unresolved issue is slow first-query/query-stream production behavior; safe next progress requires authorized server query timing or a production A/B that can compare full downloads. No internal diagnostic was exposed publicly.
+
+#### Rollback deployment verification
+
+Rollback commit `28add0cb` was activated successfully by [OCI run 45925679280](https://github.com/pjtss/StockMan/actions/runs/45925679280). Three post-rollback full downloads per market all returned HTTP200 gzip and passed the same gunzip/tuple/schema/max20 checks:
+
+| Market | First gzip byte | First JSON item | Full download | Longest body chunk gap | Gzip bytes |
+|---|---:|---:|---:|---:|---:|
+| KR baseline restored | 0.276 / 0.140 / 0.196s | 8.331 / 8.728 / 5.693s | 9.555 / 10.028 / 7.319s | 8.053 / 8.587 / 5.497s | 1,060,716 / 1,060,716 / 1,060,716 |
+| US batch1,000 restored | 0.203 / 0.401 / 0.269s | 49.582 / 48.715 / 41.815s | 51.655 / 50.501 / 43.822s | 49.316 / 48.313 / 41.545s | 2,450,124 / 2,449,623 / 2,449,623 |
+
+At each US gap only17 gzip bytes had arrived. Restored US full median50.501s was 7.8% shorter than the candidate median54.741s, but still 58.1% longer than the pre-candidate five-sample baseline median31.944s. The first-item median after rollback was48.715s versus candidate18.951s, so the smaller first batch did deliver earlier data in the trial, but did not improve full-file completion. KR timing also varied while its code was unchanged. This points to material production load/DB/network variation and prevents a causal claim for either change; the batch1,000 baseline is restored because candidate overall download time did not improve.
+
+The rollback and all six post-rollback API responses were verified. No speed code change remains deployed from the first-batch experiment. Continue to treat first query wait as a hypothesis and collect request-correlated production phase timings before another batch/concurrency adjustment.
+
+## 2026-11-27 — 반복 운영 측정 및 gzip heartbeat 후보 기각
+
+### 현재 운영 API 기준선
+
+공식 운영 호스트의 기본 compact gzip GET을 KR/US 각 5회 순차 호출했다. 모든 응답은 HTTP200, `application/gzip`, Content-Encoding 없음, no-store였고 전체 body를 끝까지 읽었다. 이 갱신 측정은 gzip 해제 및 응답 schema 검사 없이 body 전송 timing만 기록했으므로, 직전 배포별 표본에서 수행한 계약 검증을 대체하지 않는다.
+
+| 시장 | 전체 완료 시간 | 중앙값 | 첫 body byte 중앙값 | 최장 청크 공백 중앙값 | gzip bytes |
+|---|---|---:|---:|---:|---:|
+| KR | 19.073 / 5.976 / 5.311 / 2.735 / 2.092초 | 5.311초 | 0.173초 | 4.386초 | 1,060,716–1,061,170 |
+| US | 44.957 / 32.100 / 39.935 / 30.993 / 47.490초 | 39.935초 | 0.381초 | 37.691초 | 2,449,623–2,450,128 |
+
+미국 5회 모두 28.774–45.498초 청크 공백이 나타났다. 전체 전송은 첫 byte 후 큰 공백을 포함하고 완료까지 31–47초가 걸렸다. 11월27일 직전 rollback 표본 3회의 전체 중앙값 50.501초와 비교하면 이번 중앙값은 더 짧지만, 시장 load·DB 상태·네트워크 경로를 통제하지 않아 개선 원인을 코드에 귀속할 수 없다. 첫 gzip byte만 보면 서버가 빠르게 응답을 시작하지만 첫 useful JSON item 전후의 긴 정체는 남아 있다.
+
+### gzip heartbeat 5초→500ms 후보 — 기각
+
+heartbeat는 DB에서 item이 오지 않는 구간에도 compressor `flush()`를 부른다. 첫 17-byte gzip prefix 이후 주문된 첫 DB batch가 준비될 때까지 기다리는 가설적 gap을 줄일 수 있는지 확인하기 위해, 다른 코드는 그대로 두고 주기만 5,000ms에서 500ms로 임시 변경해 표준 개발 서버와 localhost PostgreSQL에서 full gzip 응답을 비교했다. 기준과 후보를 각 시장 5회씩 실행했으며 첫 compile/cold 요청은 median에서 제외했다.
+
+| 시장 | 기준 warmed `totalElapsedMs` median | 후보 median | 기준 `streamDurationMs` median | 후보 median | gzip bytes 기준→후보 |
+|---|---:|---:|---:|---:|---:|
+| KR | 301.5ms | 288.5ms (-4.3%) | 295.5ms | 283ms (-4.2%) | 1,023,102→1,023,102 |
+| US | 633.5ms | 621ms (-2.0%) | 512ms | 520ms (+1.6%) | 2,429,301→2,429,814–2,429,842 (+0.02%) |
+
+모든 응답은 HTTP200, 정상 gunzip/JSON, KR 2,352·US 5,012 ticker, ticker/marketCap/daily 필드와 최대20봉 검증을 통과했다. US 전체시간은 약2% 짧아졌지만 stream은 1.6% 느려지고 gzip은 513–541B 커졌다. KR 차이도 약4%이고 client 관측 median은 KR 361→356ms, US 739→751ms로 같은 방향의 종단간 이득을 보이지 않았다. 표본과 효과 크기로는 noise를 배제할 수 없어 후보를 기각했다.
+
+임시 heartbeat를 원래 5초로 복구했고, heartbeat 조정 자체는 최종 코드에 남지 않았다. 개발 서버를 중지하고 임시 worktree `.env.local` 복사본을 삭제했다. 타입스크립트 자동 생성 파일도 기존 상태로 복구했다. 이 결과는 timer flush가 준비되지 않은 DB row를 만들어낼 수 없다는 점과 일치한다. 긴 US 공백을 실제로 줄이려면 ordered batch 대기 자체를 개선해야 하나, 앞선 500행 첫 query 후보는 운영 전체시간을 악화해 이미 롤백됐다. 운영 query/stream correlation을 얻기 전 추가 batch/concurrency 조정은 보류한다.
+
+재발 감지: 다음 운영 측정도 첫 gzip byte, first useful item 가능 시점, 전체 마지막 byte, 최장 chunk gap 및 gzip bytes를 함께 기록한다. server-side DB/query 단계 timing을 확보할 수 있으면 같은 요청의 로그와 대조한다. 공개 diagnostic GET이나 내부 단계 정보를 응답 header/body에 추가하지 않는다.
+
+### JSON 출력 묶음 500→50 후보 — 기각
+
+generator의 `pending` JSON item 묶음을 500개에서 50개로 줄이면 첫 chunk를 더 일찍 내보낼 수 있는지 localhost DB/API에서 비교했다. 기존 gzip heartbeat 5초, level9/windowBits14/Z_FILTERED/chunk64KB, SQL/batch 설정은 그대로였다. 기준500→후보50→기준500 순서로 시장별 5회씩 실행해 cold 첫 요청은 median에서 제외했다. 전 응답을 끝까지 읽고 gunzip, JSON parse, ticker/marketCap/daily, 최대20봉, ticker 수를 검사했다.
+
+| 시장 | 기준500 warmed 전체시간 median (양쪽 기준 블록 합산) | 후보50 median | 기준500 첫 JSON item median | 후보50 median | gzip bytes |
+|---|---:|---:|---:|---:|---:|
+| KR | 370ms | 384ms (+3.8%) | 193ms | 173ms (-10.4%) | 1,023,102, 동일 |
+| US | 720ms | 950ms (+31.9%) | 404.5ms | 473ms (+16.9%) | 2,429,301, 동일 |
+
+후보는 US first item/전체 완료를 모두 악화했고, KR first item은 빨랐지만 전체 완료가 늘었다. 기준과 후보의 DB 및 개발 서버 부하를 완벽히 통제하지 못했으나 US의 230ms(32%) 회귀는 후보를 수용하기에 부정적 신호다. 따라서 `pending.length === EXPORT_BATCH_SIZE` 기준을 유지하며 코드 diff가 없고 운영 배포하지 않았다. 이 실험은 출력 묶음만 줄여도 운영에서 보이는 30–40초의 첫 유효 item 대기를 해결한다는 근거가 없음을 보여준다. 앞서 50→250 묶음 실험도 US 전체시간이 6.7% 증가해 기각됐으므로 작은 묶음의 반복 조정은 다음 우선 후보가 아니다.
+
+모든 후보 응답에서 raw/gzip bytes가 변하지 않아 데이터 계약 영향은 없었다. 임시 worktree `.env.local`, 개발 서버, Next 자동 생성 타입스크립트 변경을 정리했다. 출력 묶음 변경은 배포 기준 상태로 복구했으며 전체 배포 검증이나 배포는 수행하지 않았다. 다음 진행은 운영 요청별 `batchQueryWallMs`와 `streamDurationMs`를 함께 볼 수 있는 read-only OCI journal 접근 확보 후 query 대기와 row serialization 시간을 분리하는 것이다.
+### gzip memLevel8→9 후보 — US 전용 운영 trial
+
+Node.js v22 공식 [zlib memory tuning 문서](https://nodejs.org/download/release/v22.4.0/docs/api/zlib.html#memory-usage-tuning)는 deflate 메모리를 `(1 << (windowBits + 2)) + (1 << (memLevel + 9))` bytes로 계산하고, 기본 `memLevel=8`이며 더 큰 메모리는 write당 zlib 호출을 줄여 속도에 영향을 줄 수 있다고 설명한다. 현재 `windowBits=14`에서 memLevel8은 약192KiB, 9는 약320KiB이므로 compressor당 약128KiB가 늘어난다.
+
+localhost PostgreSQL의 실제 Next.js API에서 memLevel8 기준 블록 → memLevel9 → memLevel8 기준 블록 순으로 각 시장 5회씩 전체 GET했다. 첫 route compile 요청은 제외하고 전 응답을 gunzip·JSON parse해 ticker/marketCap/daily·max20 계약을 검사했다. 기준 블록의 평균 median과 후보를 비교한다.
+
+| 시장 | mem8 기준 block A/B median | mem9 candidate median | mem8→9 비교 | gzip bytes mem8→9 |
+|---|---:|---:|---:|---:|
+| KR client 전체 | 359.5 / 387ms | 335ms | 기준 medians 평균373.25→335ms (-10.2%) | 1,023,102→1,020,880B (-0.22%) |
+| US client 전체 | 727.5 / 791.5ms | 734.5ms | 기준 medians 평균759.5→734.5ms (-3.3%) | 2,429,301→2,423,328B (-0.25%) |
+| KR server stream | 293.5 / 315.5ms | 282ms | 기준 medians 평균304.5→282ms (-7.4%) | 동일 payload |
+| US server stream | 552.5 / 598.5ms | 530.5ms | 기준 medians 평균575.5→530.5ms (-7.8%) | 동일 payload |
+
+추가로 시장별 5개의 동시 GET을 실행했다. KR group wall은 mem8 2.126/2.084초, mem9 2.485초로 후보가 양쪽 기준보다 느렸다. US group wall은 mem8 4.646/4.998초, mem9 4.308초로 후보가 양쪽 기준보다 빨랐다. 동시 개별 요청 median도 KR 기준 중앙값의 평균1.845초→후보2.233초(+21%), US4.156초→3.696초(-11.1%)였다. 각 동시 응답 모두 HTTP200, gzip 해제·JSON/schema/max20 통과.
+
+전 시장 동일 설정은 부적합하므로 US에만 memLevel9을 적용하고 KR은 명시적으로 8을 유지하는 후보를 만든다. 단일 US request의 이득은 약3%이며 gzip 감소는 약0.25%라 제한적이지만, server stream과 5동시 표본이 모두 US 개선 방향을 보였다. KR 동시 회귀는 설정 분리로 피한다. 남은 위험은 production Node22/하드웨어와 local Node24 차이, 통제되지 않은 DB timing, US 호출 동시성이 더 높을 때 compressor당 128KiB 추가 사용이다. US 전용 후보의 전체 deploy verification 후 운영 KR/US 각5회와 동시 요청 검증을 수행한다. 운영 US 완료시간이 유지 baseline보다 나아지지 않거나 오류/메모리/압축 크기 회귀가 확인되면 memLevel9을 제거하고 재검증·재배포한다.

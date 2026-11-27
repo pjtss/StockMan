@@ -59,6 +59,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
         level,
         // Repeated API A/B runs were faster for both markets with this smaller window.
         windowBits: 14,
+        memLevel: metrics.market === "US" ? 9 : 8,
         chunkSize: 64 * 1024,
         strategy: zlibConstants.Z_FILTERED,
       });
