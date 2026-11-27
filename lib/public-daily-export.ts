@@ -63,8 +63,8 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       const compressedChunks: Uint8Array[] = [];
       const activeCompressor = createGzip({
         level,
-        // Repeated API A/B runs were faster for both markets with this smaller window.
-        windowBits: 14,
+        // Repeated gzip and full-API A/B runs favored windowBits 13 for both markets.
+        windowBits: 13,
         memLevel: metrics.market === "US" ? 9 : 8,
         chunkSize: 64 * 1024,
         strategy: zlibConstants.Z_FILTERED,
