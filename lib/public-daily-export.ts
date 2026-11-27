@@ -72,7 +72,7 @@ function startBackgroundRefresh(market: ExportMarket, format: PublicDailyExportF
   backgroundRefreshes.set(refreshKey, refresh);
 }
 
-function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportPerformanceMetrics) {
+function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportPerformanceMetrics) {
   let compressor: ReturnType<typeof createGzip> | null = null;
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
@@ -333,7 +333,7 @@ export async function getPublicDailyExport(
     })();
 
     const filename = `daily-candles-${market.toLowerCase()}${format === "compact" ? "-compact" : ""}.json.gz`;
-    const gzipLevel = 9;
+    const gzipLevel = 7;
     return new Response(gzipJsonStream(items, gzipLevel, metrics), {
       status: 200,
       headers: {

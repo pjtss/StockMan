@@ -84,7 +84,7 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-length")).toBeNull();
     expect(response.headers.get("x-accel-buffering")).toBe("no");
     expect(response.headers.get("x-public-daily-export-cache")).toBe("MISS");
-    expect(compressed[8]).toBe(2); // RFC 1952 XFL=2 marks maximum deflate compression.
+    expect(compressed[8]).toBe(0); // RFC 1952 XFL=0 for the speed-prioritized level 7 setting.
     expect(payload).toEqual([{
       ticker: { market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" },
       marketCap: {
@@ -157,7 +157,7 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-disposition")).toContain("daily-candles-kr-compact.json.gz");
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("content-encoding")).toBeNull();
-    expect(compressed[8]).toBe(2);
+    expect(compressed[8]).toBe(0);
     expect(payload).toHaveLength(1);
     expect(payload[0].ticker).toEqual({ market: "KOSPI", code: "005930", name: "Example Common Stock" });
     expect(payload[0].marketCap).toMatchObject({ value: 123456789000, currency: "KRW" });
