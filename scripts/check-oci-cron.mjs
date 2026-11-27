@@ -463,6 +463,7 @@ if (!publicKisRateLimitRepair
 }
 const sharedCronTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.timer"), "utf8");
 const sharedCronService = fs.readFileSync(path.resolve("deploy/oci/stockman-cron.service"), "utf8");
+const stockmanService = fs.readFileSync(path.resolve("deploy/oci/stockman.service"), "utf8");
 const activationScript = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
 if (!/OnCalendar=hourly/.test(sharedCronTimer) || !/Persistent=true/.test(sharedCronTimer)
   || !sharedCronService.includes("scripts/oci-cron.sh")
@@ -470,6 +471,11 @@ if (!/OnCalendar=hourly/.test(sharedCronTimer) || !/Persistent=true/.test(shared
   || !activationScript.includes("systemctl enable stockman-cron.timer")
   || !activationScript.includes("systemctl restart stockman-cron.timer")) {
   throw new Error("Database retention must be reachable from the persistent hourly OCI cron timer after activation");
+}
+if (!/^SupplementaryGroups=systemd-journal$/m.test(stockmanService)
+  || !activationScript.includes("getent group systemd-journal")
+  || !activationScript.includes('install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman.service" /etc/systemd/system/stockman.service')) {
+  throw new Error("Authenticated server journal diagnostics require the app unit to receive read-only systemd-journal access on deployment");
 }
 const obvSnapshotCall = 'run_cron_endpoint "us-obv-divergence-snapshot" 600 "/api/cron/us-obv-divergence-snapshot"';
 const healthProbeCall = 'run_cron_endpoint "health-probe-snapshot" 20 "/api/cron/health-probe-snapshot"';
@@ -503,6 +509,7 @@ const fundamentalsScript = fs.readFileSync(path.resolve("scripts/oci-fundamental
 const fundamentalsService = fs.readFileSync(path.resolve("deploy/oci/stockman-fundamentals.service"), "utf8");
 const fundamentalsTimer = fs.readFileSync(path.resolve("deploy/oci/stockman-fundamentals.timer"), "utf8");
 const nginx = fs.readFileSync(path.resolve("deploy/oci/nginx-stockman.conf"), "utf8");
+const appService = fs.readFileSync(path.resolve("deploy/oci/stockman.service"), "utf8");
 const activation = fs.readFileSync(path.resolve("deploy/oci/stockman-activate"), "utf8");
 const discordCommandRegistration = fs.readFileSync(path.resolve("scripts/register-discord-commands.mjs"), "utf8");
 const workflow = fs.readFileSync(path.resolve(".github/workflows/deploy-oci.yml"), "utf8");
@@ -526,6 +533,19 @@ if (!/TimeoutStartSec=4h30min/.test(fundamentalsService) || !fundamentalsService
 if (!/location\s*=\s*\/api\/cron\/instrument-fundamentals\s*\{[\s\S]*?proxy_read_timeout\s+4h25m;/.test(nginx) ||
     !nginx.includes("proxy_send_timeout 4h25m;")) {
   throw new Error("The fundamentals reverse-proxy route must outlive the client timeout without extending other routes");
+}
+if (!/^SupplementaryGroups=systemd-journal$/m.test(appService)
+  || !activation.includes('install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman.service" /etc/systemd/system/stockman.service')
+  || !workflow.includes('cp deploy/oci/stockman.service "$release_dir/deploy/oci/stockman.service"')
+  || !workflow.includes("./deploy/oci/stockman.service")
+  || !nginx.includes("error_log stderr warn;")
+  || !nginx.includes("tag=stockman-nginx-access")
+  || !nginx.includes("$upstream_response_time")
+  || !nginx.includes("if=$stockman_debug_loggable")
+  || !nginx.includes("~^[45]: 1;")
+  || !nginx.includes("~^[23]:[1-9] 1;")
+  || /log_format stockman_debug[^;]*(?:\$request_uri|\$args)/.test(nginx)) {
+  throw new Error("Authenticated diagnostics require app journal access and Nginx error/access records in the system journal");
 }
 if (!/OnCalendar=\*:0\/5/.test(fundamentalsTimer) || !/Persistent=true/.test(fundamentalsTimer)) {
   throw new Error("Dedicated fundamentals timer must poll the admin schedule and catch up after downtime");

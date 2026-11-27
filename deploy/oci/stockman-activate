@@ -5,10 +5,10 @@ SERVICES_QUIESCED=0
 collect_service_diagnostics() {
   local unit
   for unit in stockman.service stockman-cron.timer stockman-rss.timer stockman-fundamentals.timer \
-    stockman-cron.service stockman-rss.service stockman-fundamentals.service; do
+    stockman-cron.service stockman-rss.service stockman-fundamentals.service nginx.service; do
     systemctl --no-pager --full status "$unit" >&2 || true
   done
-  for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.service; do
+  for unit in stockman-cron.service stockman-rss.service stockman-fundamentals.service nginx.service; do
     journalctl --no-pager -u "$unit" -n 40 >&2 || true
   done
   journalctl --no-pager -u stockman.service -n 80 >&2 || true
@@ -95,6 +95,7 @@ required_release_files=(
   scripts/oci-rss-cron.sh
   scripts/oci-flyway-v168-preflight.mjs
   scripts/terminate-approved-oci-snapshot-holders.mjs
+  deploy/oci/stockman.service
   deploy/oci/stockman-cron.service
   deploy/oci/stockman-cron.timer
   deploy/oci/stockman-rss.service
@@ -108,6 +109,10 @@ for required_file in "${required_release_files[@]}"; do
     exit 1
   fi
 done
+if command -v getent >/dev/null 2>&1 && ! getent group systemd-journal >/dev/null; then
+  echo "release requires systemd-journal group for authenticated server-log diagnostics" >&2
+  exit 1
+fi
 versioned_migration_found=0
 for migration_file in "$TEMP_PATH"/db/migration/*.sql; do
   [ -f "$migration_file" ] || continue
@@ -269,6 +274,7 @@ else
 fi
 chown -R stockman:stockman "$DEPLOY_PATH"
 stage="service-restart"
+install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman.service" /etc/systemd/system/stockman.service
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.service" /etc/systemd/system/stockman-cron.service
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-cron.timer" /etc/systemd/system/stockman-cron.timer
 install -m 0644 "$DEPLOY_PATH/deploy/oci/stockman-rss.service" /etc/systemd/system/stockman-rss.service

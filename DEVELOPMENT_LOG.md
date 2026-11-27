@@ -1,3 +1,13 @@
+### 2026-11-27 — 인증 일봉 진단 API에 제한된 systemd 서버 로그 추가
+- 목적/범위: 기존 인증된 일봉 진단 API에 앱·cron·Nginx journal을 선택 조회하는 경로와 OCI 배포 구성을 추가한다.
+- 근본 원인/영향: 국내 일봉 수동 갱신에서 요청 후 응답 지연과 분산 lock 잔류가 관측됐지만, 기존 API에는 서버·proxy 로그가 없어 작업 시작/실행/완료 경로를 분리해 진단하기 어려웠다. 요청 수락만으로 작업 완료를 추정하지 않는다.
+- 구현: `includeServerLogs=true`일 때 allowlist source만 조회하고, 범위(1–1440분), source당 행수(1–100), subprocess timeout(7초), 출력 buffer(1MiB), 메시지 길이(1,500자)를 제한한다. journalctl은 고정 인자와 execFile로 실행하며 인증 실패 시 DB/journal에 접근하지 않는다. message credential pattern을 마스킹하고 per-source 실패는 code만 반환한다. Nginx error는 journal로 내보내고 access journal에는 query string을 제외한 4xx/5xx 또는 1초 이상 요청의 upstream 시간만 기록한다.
+- 권한/남은 위험: `stockman.service`에 `SupplementaryGroups=systemd-journal`을 주어 호스트 전체 journal read 권한이 생긴다. route allowlist는 응답 source를 제한하지만 OS 권한을 격리하지 않는다. 마스킹은 미지의 비밀 형식을 완전 보장하지 않으므로 서버 로그에 credential 원문을 남기지 않는다.
+- 변경 파일: `lib/server-journal.ts` 및 unit/parser test, `app/api/debug/daily-cache-status/route.ts`와 인증/옵션 route test, OCI service/nginx/activation/workflow/static checks, API reference, 국내 운영 runbook 및 생성된 public manual/catalog.
+- 재발 감지/다음 단계: 진단에서 run 상태·heartbeat·lock과 coverage가 맞지 않으면 `includeServerLogs=true`로 app/cron journal과 Nginx upstream 시간을 대조한다. 배포 후 실제 호출로 각 source 접근권한과 오류 격하 응답을 확인한다.
+- 검증: 신규 테스트 11/11 통과. 전체 `npm run deploy:verify` 통과(의존성 감사 0 취약점, OCI activation recovery smoke, docs/event-data checks, API/security/cron audits, production build, standalone health/API/static-assets/Chrome desktop·mobile smoke, 285 test files passed/1 skipped, 1,666 tests passed/3 skipped, typecheck). 첫 standalone smoke는 불완전한 worktree Next.js 설치에서 실패했으며 `npm ci`로 lockfile 기준 재설치 후 재검증해 통과했다.
+- 커밋·푸시·배포: 검증 후 `oci` direct push로 자동 배포할 예정이다. 성공한 workflow run, 배포 버전, production API 로그 조회 결과는 배포 완료 후 기록한다.
+
 ### 2026-11-27 — gzip 일봉 API compact 기본 응답으로 속도 우선 전환
 - 목적/판정: 사용자 요청에 따라 응답 속도를 1순위로 둔다. 기존 운영 paired 실측에서 compact는 full 대비 gzip bytes가 KR 1,212,533→1,060,716B(-12.5%), US 2,816,112→2,450,128B(-13.0%), raw JSON은 각각 -42.3%/-41.8%였다. US 종단간 완료시간은 5쌍 표본에서 개선되지 않아 빨라진다고 단정할 수 없지만, 호출마다 전송·LLM 파싱 부담이 줄어드는 compact를 기본으로 승격한다.
 - 변경: 미지정 format과 직접 API helper 기본값을 compact로 변경하고, `format=full`은 기존 객체형 봉을 보존한다. ticker/marketCap/daily, metadata, 데이터 값, 보통주 필터, 단일 gzip 파일, 일봉 최대20은 유지한다. 이전에 format 생략을 full로 사용한 API 소비자는 full 계약을 유지하려면 `?format=full`을 붙여야 한다. API reference와 OpenAPI default, default tuple 회귀검사도 함께 갱신했다.

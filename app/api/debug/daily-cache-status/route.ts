@@ -9,8 +9,10 @@ import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receip
 import { loadFeatureDiscordDebugWebhook } from "@/lib/discord-config";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
+import { parseServerJournalOptions, readServerJournal } from "@/lib/server-journal";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 const MARKET_CONFIG = {
   KR: {
@@ -90,6 +92,15 @@ export async function GET(request: Request) {
   if (market !== "KR" && market !== "US") return NextResponse.json({ ok: false, error: "INVALID_MARKET", supportedMarkets: ["KR", "US"] }, { status: 400, headers: { "cache-control": "no-store" } });
 
   const config = MARKET_CONFIG[market];
+  const searchParams = new URL(request.url).searchParams;
+  const includeServerLogs = searchParams.get("includeServerLogs") === "true";
+  const serverJournalOptions = includeServerLogs ? parseServerJournalOptions(searchParams) : null;
+  if (includeServerLogs && serverJournalOptions == null) {
+    return NextResponse.json({ ok: false, error: "INVALID_SERVER_LOG_QUERY", supportedUnits: ["stockman.service", "stockman-cron.service", "stockman-rss.service", "stockman-fundamentals.service", "nginx.service", "nginx-access"], logMinutesRange: [1, 1440], logLimitRange: [1, 100] }, { status: 400, headers: { "cache-control": "no-store" } });
+  }
+  const serverLogsPromise = serverJournalOptions
+    ? readServerJournal(serverJournalOptions).catch(() => undefined)
+    : undefined;
   try {
     const [settings, globalGateEnabled, debugWebhookConfigured, coverage, recentDates, retries, failures, runs, refreshLock, workerLock] = await Promise.all([
       loadFeatureModuleSettings(config.module),
@@ -139,7 +150,8 @@ export async function GET(request: Request) {
     ]);
 
     let sourceProbe: Array<Record<string, unknown>> | undefined;
-    if (new URL(request.url).searchParams.get("probeSource") === "true") {
+    const serverLogs = serverLogsPromise ? await serverLogsPromise : undefined;
+    if (searchParams.get("probeSource") === "true") {
       const exchangeMarkets = market === "KR" ? ["KOSPI", "KOSDAQ"] : ["NAS", "NYS", "AMS"];
       sourceProbe = await Promise.all(exchangeMarkets.map(async (exchange) => {
         const anchors = await getPool().query<{ market: string; code: string; cache_latest_date: string | null }>(
@@ -203,10 +215,12 @@ export async function GET(request: Request) {
         summary: compactRunSummary(row.summary),
       })),
       ...(sourceProbe ? { sourceProbe } : {}),
+      ...(serverLogs ? { serverLogs } : {}),
       notes: ["기본 진단은 DB 상태와 실행 이력만 읽습니다.", "probeSource=true이면 인증된 요청당 거래소별 최대 3개 종목의 KIS 일봉 GET을 실행합니다. DB 기록은 변경하지 않으며 원문 응답·자격증명·webhook URL은 반환하지 않습니다."],
     }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     console.error(`[API /debug/daily-cache-status] market=${market} diagnostic query failed:`, error instanceof Error ? error.name : "unknown error");
-    return NextResponse.json({ ok: false, market, error: "DAILY_CACHE_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+    const serverLogs = serverLogsPromise ? await serverLogsPromise : undefined;
+    return NextResponse.json({ ok: false, market, error: "DAILY_CACHE_DIAGNOSTICS_UNAVAILABLE", ...(serverLogs ? { serverLogs } : {}) }, { status: 503, headers: { "cache-control": "no-store" } });
   }
 }

@@ -76,6 +76,7 @@ jobs:
           cp scripts/local-env.mjs "$release_dir/scripts/local-env.mjs"
           cp data/market-impact-events.json "$release_dir/data/market-impact-events.json"
           cp deploy/oci/nginx-stockman.conf "$release_dir/deploy/oci/nginx-stockman.conf"
+          cp deploy/oci/stockman.service "$release_dir/deploy/oci/stockman.service"
           cp deploy/oci/stockman-cron.service "$release_dir/deploy/oci/stockman-cron.service"
           cp deploy/oci/stockman-cron.timer "$release_dir/deploy/oci/stockman-cron.timer"
           cp deploy/oci/stockman-rss.service "$release_dir/deploy/oci/stockman-rss.service"
@@ -101,6 +102,7 @@ jobs:
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-fundamentals-cron.sh'
           tar -tzf stockman-oci.tar.gz | grep -Fx './scripts/oci-rss-cron.sh'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.service'
+          tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman.service'
           tar -tzf stockman-oci.tar.gz | grep -Fx './deploy/oci/stockman-fundamentals.timer'
           tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V1__initial_schema.sql'
           tar -tzf stockman-oci.tar.gz | grep -Fx './db/migration/V168__bounded_non_daily_data_retention.sql.conf'

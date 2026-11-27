@@ -154,7 +154,7 @@ try {
     cpSync(path.resolve("scripts", filename), path.join(migrationlessRelease, "scripts", filename));
   }
   for (const filename of [
-    "stockman-cron.service", "stockman-cron.timer", "stockman-rss.service", "stockman-rss.timer",
+    "stockman.service", "stockman-cron.service", "stockman-cron.timer", "stockman-rss.service", "stockman-rss.timer",
     "stockman-fundamentals.service", "stockman-fundamentals.timer",
   ]) {
     writeFileSync(path.join(migrationlessRelease, "deploy", "oci", filename), "test unit\n", "utf8");
@@ -284,7 +284,7 @@ try {
   const capturedDiagnostics = readFileSync(diagnosticCapturePath, "utf8");
   for (const unit of [
     "stockman-cron.timer", "stockman-rss.timer", "stockman-fundamentals.timer",
-    "stockman-cron.service", "stockman-rss.service", "stockman-fundamentals.service",
+    "stockman-cron.service", "stockman-rss.service", "stockman-fundamentals.service", "nginx.service",
   ]) {
     if (!capturedDiagnostics.includes(unit)) throw new Error(`Activation ERR handler omitted diagnostics for ${unit}`);
   }
@@ -301,7 +301,7 @@ try {
   if (!readinessDiagnostics.includes("systemctl --no-pager --full status")) {
     throw new Error("Explicit service readiness timeout bypassed shared service status diagnostics");
   }
-  for (const unit of ["stockman-cron.service", "stockman-rss.service", "stockman-fundamentals.service"]) {
+  for (const unit of ["stockman-cron.service", "stockman-rss.service", "stockman-fundamentals.service", "nginx.service"]) {
     if (!readinessDiagnostics.includes(`journalctl --no-pager -u ${unit} -n 40`)) {
       throw new Error(`Explicit service readiness timeout omitted ${unit} journal diagnostics`);
     }

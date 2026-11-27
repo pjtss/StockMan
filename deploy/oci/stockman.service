@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=stockman
+SupplementaryGroups=systemd-journal
 WorkingDirectory=/opt/stockman/current
 EnvironmentFile=/etc/stockman/stockman.env
 Environment=NODE_ENV=production

@@ -1,0 +1,80 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  authorized: true,
+  query: vi.fn(),
+  readServerJournal: vi.fn(),
+}));
+
+vi.mock("@/lib/db", () => ({ getPool: () => ({ query: mocks.query }) }));
+vi.mock("@/lib/cron-auth", () => ({ isCronRequestAuthorized: () => mocks.authorized }));
+vi.mock("@/lib/feature-module-settings", () => ({ loadFeatureModuleSettings: vi.fn(async () => ({ enabled: true, startTime: "00:00", endTime: "23:59", activeDays: [1, 2, 3, 4, 5], intervalSeconds: 3600 })) }));
+vi.mock("@/lib/us-daily-global-gate", () => ({ isDailyCandleAutomationEnabled: vi.fn(async () => true) }));
+vi.mock("@/lib/schedule-time", () => ({ isWithinSchedule: () => true }));
+vi.mock("@/lib/discord-config", () => ({ loadFeatureDiscordDebugWebhook: vi.fn(async () => null) }));
+vi.mock("@/lib/kis-kr-daily-price", () => ({ fetchKrDailyPrice: vi.fn() }));
+vi.mock("@/lib/kis-us-daily-price", () => ({ fetchUsDailyPrice: vi.fn() }));
+vi.mock("@/lib/server-journal", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server-journal")>();
+  return { ...actual, readServerJournal: mocks.readServerJournal };
+});
+
+import { GET } from "./route";
+
+describe("GET /api/debug/daily-cache-status server journal option", () => {
+  beforeEach(() => {
+    mocks.authorized = true;
+    mocks.query.mockReset();
+    mocks.readServerJournal.mockReset();
+    mocks.readServerJournal.mockResolvedValue({ source: "systemd-journal", units: [] });
+    mocks.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("WITH eligible AS")) return { rows: [{ market: "KOSPI", eligible_count: 2, cached_count: 2, latest_date_count: 2, behind_latest_count: 0, latest_market_date: "20261126", latest_fetched_at: "2026-11-26T06:00:00Z", oldest_current_latest_fetched_at: "2026-11-26T05:00:00Z" }] };
+      if (sql.includes("instrument_candle_cache_retries")) return { rows: [] };
+      if (sql.includes("instrument_candle_cache_failures")) return { rows: [] };
+      if (sql.includes("FROM automation_runs")) return { rows: [] };
+      if (sql.includes("FROM pg_locks")) return { rows: [] };
+      if (sql.includes("GROUP BY market, candle_date")) return { rows: [] };
+      return { rows: [] };
+    });
+  });
+
+  it("requires cron authorization before any journal or database read", async () => {
+    mocks.authorized = false;
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true"));
+    expect(response.status).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.readServerJournal).not.toHaveBeenCalled();
+  });
+
+  it("reads only explicitly requested, validated server journal logs", async () => {
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logUnit=stockman.service&logMinutes=15&logLimit=10"));
+    expect(response.status).toBe(200);
+    expect(mocks.readServerJournal).toHaveBeenCalledWith({ units: ["stockman.service"], minutes: 15, limit: 10 });
+    expect(await response.json()).toMatchObject({ serverLogs: { source: "systemd-journal", units: [] } });
+  });
+
+  it("returns available server logs when database diagnostics fail", async () => {
+    mocks.query.mockRejectedValue(new Error("database unavailable"));
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logUnit=stockman.service"));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ ok: false, error: "DAILY_CACHE_DIAGNOSTICS_UNAVAILABLE", serverLogs: { source: "systemd-journal" } });
+    expect(mocks.readServerJournal).toHaveBeenCalledWith({ units: ["stockman.service"], minutes: 60, limit: 50 });
+  });
+
+  it("does not spawn journal readers on the normal diagnostics request", async () => {
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR"));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body).not.toHaveProperty("serverLogs");
+    expect(mocks.readServerJournal).not.toHaveBeenCalled();
+  });
+
+  it("rejects arbitrary units and out-of-range log windows", async () => {
+    const badUnit = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logUnit=../etc/passwd"));
+    expect(badUnit.status).toBe(400);
+    expect(await badUnit.json()).toMatchObject({ error: "INVALID_SERVER_LOG_QUERY" });
+    const badWindow = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logMinutes=1441"));
+    expect(badWindow.status).toBe(400);
+    expect(mocks.readServerJournal).not.toHaveBeenCalled();
+  });
+});
