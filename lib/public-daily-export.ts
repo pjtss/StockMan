@@ -83,7 +83,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       const streamStartedAt = performance.now();
       let firstGzipByteAt: number | null = null;
       let gzipBytes = 0;
-      const compressedChunks: Uint8Array[] = [];
+      const compressedChunks: Buffer[] = [];
       const activeCompressor = createGzip({
         level,
         // Repeated gzip and full-API A/B runs favored windowBits 13 for both markets.
@@ -108,9 +108,9 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       activeCompressor.on("data", (chunk: Buffer) => {
         firstGzipByteAt ??= performance.now();
         gzipBytes += chunk.length;
-        const copy = new Uint8Array(chunk);
-        compressedChunks.push(copy);
-        controller.enqueue(copy);
+        // Retain and enqueue the zlib-owned buffer directly; cache assembly happens once at stream end.
+        compressedChunks.push(chunk);
+        controller.enqueue(chunk);
       });
       activeCompressor.on("error", (error) => {
         stopHeartbeat();
@@ -118,13 +118,8 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       });
       activeCompressor.on("end", () => {
         stopHeartbeat();
-        const completedBytes = new Uint8Array(gzipBytes);
-        let byteOffset = 0;
-        for (const chunk of compressedChunks) {
-          completedBytes.set(chunk, byteOffset);
-          byteOffset += chunk.length;
-        }
-        setCachedPublicDailyExport(metrics.market, metrics.format, completedBytes);
+        const completedBytes = Buffer.concat(compressedChunks, gzipBytes);
+        setCachedPublicDailyExport(metrics.market, metrics.format, completedBytes, { takeOwnership: true });
         const completedAt = performance.now();
         const timing: CompletedPublicDailyExportTiming = {
           requestId: metrics.requestId,

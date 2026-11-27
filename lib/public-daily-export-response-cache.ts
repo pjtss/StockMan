@@ -45,13 +45,15 @@ export function setCachedPublicDailyExport(
   market: PublicDailyExportMarket,
   format: PublicDailyExportFormat,
   bytes: Uint8Array,
+  options: { takeOwnership?: boolean } = {},
 ) {
   const entries = cache();
   const entryKey = key(market, format);
   if (bytes.byteLength > MAX_ENTRY_BYTES) return;
   entries.delete(entryKey);
   const expiresAt = Date.now() + TTL_MS;
-  entries.set(entryKey, { bytes: bytes.slice(), expiresAt, staleUntil: expiresAt + STALE_GRACE_MS });
+  // takeOwnership is reserved for a completed exporter buffer that will never be mutated by its creator.
+  entries.set(entryKey, { bytes: options.takeOwnership ? bytes : bytes.slice(), expiresAt, staleUntil: expiresAt + STALE_GRACE_MS });
   const totalBytes = () => Array.from(entries.values()).reduce((total, entry) => total + entry.bytes.byteLength, 0);
   while (entries.size > MAX_ENTRIES || totalBytes() > MAX_TOTAL_BYTES) {
     const oldestKey = entries.keys().next().value as string | undefined;

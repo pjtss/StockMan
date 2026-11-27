@@ -36,4 +36,14 @@ describe("public daily export response cache", () => {
     setCachedPublicDailyExport("US", "full", new Uint8Array(16 * 1024 * 1024 + 1));
     expect(getCachedPublicDailyExport("US", "full")).toBeNull();
   });
+
+  it("isolates cache reads when the completed exporter buffer transfers ownership", () => {
+    const completed = new Uint8Array([4, 5, 6]);
+    setCachedPublicDailyExport("US", "compact", completed, { takeOwnership: true });
+
+    const firstRead = getCachedPublicDailyExport("US", "compact");
+    expect(firstRead?.bytes).toEqual(new Uint8Array([4, 5, 6]));
+    firstRead!.bytes[0] = 0;
+    expect(getCachedPublicDailyExport("US", "compact")?.bytes).toEqual(new Uint8Array([4, 5, 6]));
+  });
 });
