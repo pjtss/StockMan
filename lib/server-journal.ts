@@ -13,7 +13,7 @@ const MAX_UNITS = SERVER_JOURNAL_UNITS.length;
 const MAX_LINES_PER_UNIT = 100;
 const MAX_MESSAGE_LENGTH = 1_500;
 const MAX_BUFFER_BYTES = 1_048_576;
-const JOURNAL_TIMEOUT_MS = 7_000;
+const JOURNAL_TIMEOUT_MS = 25_000;
 const PRIORITY_NAMES = ["EMERGENCY", "ALERT", "CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "DEBUG"] as const;
 
 export type ServerJournalOptions = { units: string[]; minutes: number; limit: number };
@@ -129,7 +129,7 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
 
 export function buildJournalArgs(unit: string, since: string, limit: number) {
   const sourceFilter = unit === "nginx-access" ? "--identifier=stockman-nginx-access" : `--unit=${unit}`;
-  return ["--no-pager", "--quiet", "--output=json", `--lines=${limit}`, `--since=${since}`, sourceFilter];
+  return ["--no-pager", "--quiet", "--output=json", "--utc", `--lines=${limit}`, `--since=${since}`, "--until=now", sourceFilter];
 }
 
 export function classifyJournalError(error: unknown, stderr: string | Buffer | undefined): NonNullable<ServerJournalUnitResult["errorCode"]> {

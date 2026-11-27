@@ -47,7 +47,7 @@ describe("systemd server journal diagnostics", () => {
     expect(buildJournalArgs("stockman.service", "2026-11-27T00:00:00.000Z", 5)).toContain("--unit=stockman.service");
     expect(buildJournalArgs("nginx-access", "2026-11-27T00:00:00.000Z", 5)).toContain("--identifier=stockman-nginx-access");
     expect(buildJournalArgs("stockman.service", "2026-11-27T00:00:00.000Z", 5)).toEqual([
-      "--no-pager", "--quiet", "--output=json", "--lines=5", "--since=2026-11-27T00:00:00.000Z", "--unit=stockman.service",
+      "--no-pager", "--quiet", "--output=json", "--utc", "--lines=5", "--since=2026-11-27T00:00:00.000Z", "--until=now", "--unit=stockman.service",
     ]);
   });
 
