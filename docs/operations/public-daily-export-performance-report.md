@@ -964,7 +964,18 @@ Node.js 공식 zlib API가 `strategy`를 compression-only option으로 제공하
 | US | window14 + FILTERED | 212.47ms | 2,443,441 |
 | US | window14 + DEFAULT | 198.39ms | 2,443,540 |
 
-실제 API end-to-end 교차 A/B는 `scripts/dev-server.mjs`와 localhost DB, 임시 cache TTL1ms로 baseline→candidate→baseline→candidate, 시장별 각 block 7회 수행했다. 각 block의 첫 cold/compile 요청을 제외한 12개씩의 중앙값은 KR FILTERED 299.05ms→DEFAULT 275.30ms(-7.9%), US626.70ms→592.35ms(-5.5%)였다. gzip 크기도 KR1,027,623→1,018,694B(-0.87%), US2,432,651→2,426,206B(-0.26%)로 줄었다. 모든 응답 HTTP200/MISS, raw JSON SHA-256 동일, JSON/ticker/marketCap/daily/max20/returnedCount 검증 통과, invalid row0이었다. 이 로컬 반복을 근거로 level9/windowBits13을 유지하고 strategy를 `Z_DEFAULT_STRATEGY`로 바꾼다. full `deploy:verify`, OCI 재배포, 운영 MISS/HIT 및 전체 응답 실측은 후속 기록한다.
+실제 API end-to-end 교차 A/B는 `scripts/dev-server.mjs`와 localhost DB, 임시 cache TTL1ms로 baseline→candidate→baseline→candidate, 시장별 각 block 7회 수행했다. 각 block의 첫 cold/compile 요청을 제외한 12개씩의 중앙값은 KR FILTERED 299.05ms→DEFAULT 275.30ms(-7.9%), US626.70ms→592.35ms(-5.5%)였다. gzip 크기도 KR1,027,623→1,018,694B(-0.87%), US2,432,651→2,426,206B(-0.26%)로 줄었다. 모든 응답 HTTP200/MISS, raw JSON SHA-256 동일, JSON/ticker/marketCap/daily/max20/returnedCount 검증 통과, invalid row0이었다. 이 로컬 반복을 근거로 level9/windowBits13을 유지하고 strategy를 `Z_DEFAULT_STRATEGY`로 변경했다. 전체 `deploy:verify` 및 OCI 재배포 결과와 운영 MISS/HIT 실측은 아래에 기록한다.
+
+커밋 `cd5ee744`의 [OCI 배포 run 45978843679](https://github.com/pjtss/StockMan/actions/runs/45978843679)에서 Verify deployment, standalone package, upload, Activate release가 모두 성공했다. Release activation 이후 운영 `/api/health`는 HTTP200을 반환했다. 운영 API를 Node.js https로 요청해 wire gzip bytes를 직접 수신하고 gzip magic, `gunzipSync`, JSON parse 및 payload 계약을 확인했다.
+
+| 시장 | 상태 | client 완료 | gzip / raw bytes | ticker | 전체 candle | 종목당 최대 | invalid |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| KR | MISS | 18.196초 | 1,050,532 / 5,142,281 | 2,337 | 46,740 | 20 | 0 |
+| US | MISS | 43.778초 | 2,442,647 / 11,041,367 | 5,011 | 98,500 | 20 | 0 |
+| KR | HIT | 0.533초 | 1,050,532 / 5,142,281 | 2,337 | 검증 통과 | 20 | 0 |
+| US | HIT | 0.373초 | 2,442,647 / 11,041,367 | 5,011 | 검증 통과 | 20 | 0 |
+
+모든 응답은 HTTP200이며 `X-Public-Daily-Export-Cache` 상태와 gzip bytes를 비교했다. ticker code/name, marketCap, daily tuple-v1 구조, `metadata.returnedCount`, gzip magic 및 전체 압축 해제를 검증했다. gzip bytes가 시장별 MISS/HIT 간 동일했다. MISS 지연 중 DB batch query 대기와 gzip이 섞여 있어 DEFAULT 전략의 운영 전체 지연 효과를 분리할 수 없다. 로컬 반복 A/B에서 gzip CPU/크기 개선은 확인됐고 운영 단일 MISS 표본은 배포 전후의 통제된 동시 부하 실험이 아니므로 인과 효과로 보지 않는다. 후속 속도 개선은 query wall/I/O 병목을 중심으로 진단하되 payload·freshness·공식 종목 분류 계약을 유지하고, 후보별 API 실측 후 배포한다.
 
 ### 기각: US numeric turnover 문자열 정규식 대체
 
