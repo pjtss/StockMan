@@ -980,3 +980,13 @@ Node.js 공식 zlib API가 `strategy`를 compression-only option으로 제공하
 ### 기각: US numeric turnover 문자열 정규식 대체
 
 US V92 schema의 `trading_value`가 `NUMERIC`임을 local DB에서 확인하고, 기존 text formatting + regex 유효성 검사 대신 `-Infinity < value < Infinity` numeric bounds를 쓰는 read-only SQL 후보를 비교했다. PostgreSQL 공식 문서는 numeric이 `Infinity`, `-Infinity`, `NaN`을 허용하고 NaN을 모든 비-NaN보다 크게 정렬한다고 설명한다([PostgreSQL 16 Numeric Types](https://www.postgresql.org/docs/16/datatype-numeric.html)). 결과 raw JSON/gzip 크기는 동일했지만 한 baseline/candidate local MISS block에서 client median635.6→620.95ms(-2.3%), server total median593→591.5ms(-0.3%)로 사실상 동률이었고 PostgreSQL batch-query duration 합 median1345→1393ms(+3.6%)였다. 재현 가능한 DB 단계 개선이 없으므로 정규식 코드를 유지하고 후보는 폐기했다. 동일 쿼리 처리량·정렬·volume/NaN/Infinity 의미를 바꾸지 않았다.
+
+### 기각: US daily covering index 후보
+
+운영 read-only 분석에서 US export는 100 ticker당 약1,100 shared block을 읽었고 DB lookup이 MISS 지연의 주요 구간이라, `(market, code, candle_date DESC)`에 OHLCV·`trading_value`·`fetched_at`를 포함하는 index-only scan 후보를 로컬 DB에서 검토했다. 공식 PostgreSQL 문서에 따르면 index-only scan은 SELECT에 필요한 컬럼이 모두 index에 있어야 하고, heap page의 visibility-map all-visible bit가 없는 row는 결국 heap fetch가 필요하다([Index-Only Scans and Covering Indexes](https://www.postgresql.org/docs/16/indexes-index-only-scans.html)).
+
+운영이 아닌 `localhost:5432/stockman` 로컬 DB에서만 `CREATE INDEX CONCURRENTLY`로 임시 index를 생성했다. 시험 index는 `(market, code, candle_date DESC) INCLUDE (open, high, low, close, volume, trading_value, fetched_at) WHERE timeframe='D' AND volume>=0`이며 생성에 12.6초, 크기 492,797,952B가 들었다. 제한 100 ticker 분석은 후보에서 `Index Only Scan`을 선택했지만 `Heap Fetches=1,955`(실제 처리 약2,000 candle), shared read 752/hit 1,142였다. 후보 제거 뒤 baseline `Index Scan`은 shared read 631/hit 841, execution 70.5ms였고 후보는 17.7ms였다. 두 측정은 cache/build 상태가 달라 이 execution-time 차이를 후보 개선 효과로 보지 않는다. 후보는 block read 수를 줄이지 않았고 대부분의 row에서 heap 접근을 피하지 못했다.
+
+실제 Next API gzip `compact` MISS를 baseline 7회와 candidate 4회 교차 블록으로 내려받았다. baseline client median 714.4ms, candidate 745.9ms(+4.4%); 서버 `totalElapsedMs` median 611.5→652.5ms(+6.7%)로 후보가 느렸다. DB `batchQueryWallMs`만 302→284ms(-6.0%) 줄었지만 downstream streaming/완료시간에서 이득으로 이어지지 않았다. 전 응답의 raw JSON SHA-256은 `c19092639fa2ea307d81e32ff5e656c834eef8a6e287c21047902fa088a13905`로 같고 gzip 2,426,206B/raw 11,351,119B, 5,012 ticker/99,486 candle, 최대20봉, invalid0이었다. 이 후보는 폐기했고 임시 로컬 index를 삭제했다. 운영 DB와 migration은 변경하지 않았다.
+
+시험 중 response-cache TTL을 측정용 1ms로 임시 설정했다가 원래 60초로 복구했고, 로컬 `scripts/dev-server.mjs`를 종료하고 임시 worktree `.env.local`을 제거했다. generated `next-env.d.ts`/`tsconfig.json`도 원래대로 복구했다. 후속 인덱스 후보는 buffer/heap fetch 감소뿐 아니라 전체 API 완료시간 반복 A/B 이득을 입증해야 한다. 이 조사에서 운영 변경 또는 배포는 없다.
