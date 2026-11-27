@@ -1,7 +1,7 @@
 import { constants as zlibConstants, createGzip } from "node:zlib";
 import { randomUUID } from "node:crypto";
 import { getPool } from "@/lib/db";
-import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
+import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER } from "@/lib/us-depositary-receipt-classification";
 import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 import { getCachedPublicDailyExport, setCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
 
@@ -42,7 +42,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   },
   US: {
     universeTable: "us_common_stock_universe",
-    eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL}`,
+    eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER}`,
     // Six batches fit in one query wave and reduced US export latency locally.
     batchSize: 1_000,
   },

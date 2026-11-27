@@ -127,8 +127,10 @@ describe("public gzip daily export", () => {
     expect(sql).not.toContain("FROM us_recent_daily_candles c");
     if (market === "US") {
       expect(eligibilitySql).toContain("u.is_dr=false");
-      expect(eligibilitySql).toContain("COALESCE(u.english_name, '') !~*");
-      expect(eligibilitySql).toContain("COALESCE(u.name, '') !~*");
+      expect(eligibilitySql).toContain("CASE WHEN lower(COALESCE(u.english_name, '')) ~ '(adr|ads|deposit)'");
+      expect(eligibilitySql).toContain("CASE WHEN lower(COALESCE(u.name, '')) ~ '(adr|ads|deposit)'");
+      expect(eligibilitySql).toContain("THEN COALESCE(u.english_name, '') !~*");
+      expect(eligibilitySql).toContain("THEN COALESCE(u.name, '') !~*");
     }
     expect(queryMock).toHaveBeenCalledTimes(2);
   });
