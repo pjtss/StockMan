@@ -1,3 +1,15 @@
+### 2026-11-28 — US 일봉 export 첫 ticker batch 선행
+- 목적/범위: US public gzip export의 first ticker write 시간을 줄이기 위해 순서를 보존하는 첫 DB query batch만 축소하고, 나머지 query batch·payload 계약을 유지한다.
+- 근거: 운영 US compact MISS는 first ticker write2,418ms, universe MISS716ms, batch wall2,291ms, 총3,639ms였다. US full MISS는 first ticker2,628ms/batch wall2,621ms였다. 현재 코드는 앞선 batch 결과를 순서대로 기다린 뒤 ticker JSON을 zlib에 전달하므로 첫 1,000개가 첫 유효 데이터의 지연을 결정한다.
+- 변경: `lib/public-daily-export.ts`에서 US 첫 batch만250종목, 이후 batch는 기존1,000종목으로 설정했다. 관측된5,011 US 종목에서 총6개 query/1 wave 유지. KR batch와 ticker 정렬/압축/payload/최대20 일봉은 변경하지 않는다. 더 큰 유니버스에서는 순수1,000 배치보다 query가 하나 더 늘 수 있으므로 운영 응답시간을 관찰한다.
+- 검증: `app/api/public/daily-export/kr/route.test.ts`의 US batch 정책 및 controlled-delay 테스트를 보강했다. 첫 batch250, 후속 query 지연700ms 조건에서 first ticker write<500ms, 뒤 batch query가700ms 이상, 총2,501 ticker의 첫/마지막 순서 유지, batch `[250,1000,1000,251]`을 확인. 집중 테스트22/22 통과. 이는 scheduling 특성 검증이고 production 성능 증명은 아니다.
+- 문서/배포: 운영 성능 보고서에 baseline·트레이드오프·rollback 조건을 반영했다. `npm run deploy:verify` 통과: Next.js build, standalone HTTP/Chrome smoke, typecheck, docs/API/security audits, Vitest 1,696 passed/3 skipped. 변경을 커밋·푸시해 OCI에 배포하고 운영 US compact/full MISS의 server/client total, first ticker, batch wall, ticker count, gzip/raw bytes, SHA를 재측정한다. production 결과에 따라 적용 유지 또는 원복을 결정한다.
+### 2026-11-28 — gzip 응답 클라이언트 수신 구간 분리 측정
+- 목적/범위: US compact에서 관측된 client13.688s/server3.639s 편차가 재현되는지 확인하고 curl TTFB, 전체 본문, gzip 해제 후 첫 ticker JSON 도착 시간을 분리 측정한다. production GET과 진단 GET만 사용했다.
+- US 응답: compact HIT 3회는 curl 총0.650/0.603/0.763s, gzip2,454,714B, 측정 download rate3.22–4.07MB/s였다. 이전13.688s 편차는 재현되지 않았다. full MISS curl은4.886s, matched server4.608s였다. gzip prefix TTFB는0.197s이고 첫 ticker write는 server2.628s; 6 batch/1 wave/wall2.621s였다. gzip3,274,760B. prefix TTFB를 ticker 도착시간으로 보지 않는다.
+- KR 응답: compact MISS를 헤더 수신 후 gzip incremental decode로 읽었고 header385ms, first `{"ticker"` JSON object1,120ms, complete body1,552ms였다. matched server timing은 first gzip112ms/first ticker write641ms/batch wall652ms/total1,076ms, 5 query였다. 데이터2,337 ticker, gzip1,043,357B, required fields 정상, max20, invalid0, raw SHA `1341542869A38A0731A0330E728AE45A337851129C9F3D5E9046B81517C229F4`; 후속 HIT는 curl0.448s.
+- 판단/개선: 클라이언트 13.688초 outlier는 curl에서 재현되지 않았고 warm HIT도 0.6–0.76초로 반복되어 지속적인 proxy/API transfer 결함을 뒷받침하지 않는다. full MISS curl과 server timing도 유사하다. 첫 gzip byte는 useful ticker JSON보다 이르므로 서버 first ticker timing과 구분한다. 재현 없는 client outlier에 맞춰 API/프록시 설정을 바꾸지 않았다. 실측·한계는 성능 보고서에 기록했다.
+- 검증/배포: 데이터 전용 공개 GET 및 내부 timing GET; gzip/JSON contract·ticker 필드·일봉 max20·SHA 확인. 이번에 API 코드 변경은 없어 application deployment를 새로 만들지 않는다. 기록 반영 이후 git 상태와 파일 인코딩을 확인한다.
 ### 2026-11-28 — US full MISS 반복 운영 API 실측
 - 목적/범위: 배포된 gzip 일봉 export의 full 형식 cold response-cache MISS를 재측정하고 기존 운영 기준과 데이터 무결성을 비교한다. API/DB/압축 동작은 변경하지 않았다.
 - 확인 대상: 운영 `GET /api/public/daily-export/us?format=full`, 인증된 export timing 진단, `docs/operations/public-daily-export-performance-report.md` 및 현재 exporter 구현.

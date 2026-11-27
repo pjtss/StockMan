@@ -38,6 +38,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
   eligibility: string;
   batchSize: number;
+  firstBatchSize?: number;
 }> = {
   KR: {
     universeTable: "kr_common_stock_universe",
@@ -49,6 +50,8 @@ const EXPORT_CONFIG: Record<ExportMarket, {
     eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER}`,
     // Six batches fit in one query wave and reduced US export latency locally.
     batchSize: 1_000,
+    // Keep the first ordered result small so useful ticker JSON can reach the gzip stream sooner.
+    firstBatchSize: 250,
   },
 };
 
@@ -236,7 +239,7 @@ export async function getPublicDailyExport(
   const requestStartedAt = performance.now();
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
-  const { universeTable, eligibility, batchSize } = EXPORT_CONFIG[market];
+  const { universeTable, eligibility, batchSize, firstBatchSize } = EXPORT_CONFIG[market];
   try {
     const pool = getPool();
     const universeQueryStartedAt = performance.now();
@@ -269,7 +272,12 @@ export async function getPublicDailyExport(
     if (eligible.rows.length === 0) return errorResponse();
 
     const chunks: ExportKey[][] = [];
-    for (let index = 0; index < eligible.rows.length; index += batchSize) {
+    let chunkStart = 0;
+    if (firstBatchSize && eligible.rows.length > firstBatchSize) {
+      chunks.push(eligible.rows.slice(0, firstBatchSize));
+      chunkStart = firstBatchSize;
+    }
+    for (let index = chunkStart; index < eligible.rows.length; index += batchSize) {
       chunks.push(eligible.rows.slice(index, index + batchSize));
     }
     metrics.batchCount = chunks.length;

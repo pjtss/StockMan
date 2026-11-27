@@ -357,7 +357,37 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([1_000, 1_000, 501]);
+    expect(batchSizes).toEqual([250, 1_000, 1_000, 251]);
+  });
+
+  it("writes the ordered US first ticker batch before slower later database batches", async () => {
+    const universeRows = Array.from({ length: 2_501 }, (_, index) => ({
+      market: "NAS",
+      code: `T${String(index).padStart(5, "0")}`,
+      name: "Example Common Stock",
+      has_trading_value: true,
+    }));
+    queryMock
+      .mockResolvedValueOnce({ rows: universeRows })
+      .mockImplementation(async (query) => {
+        const requestedKeys = JSON.parse((query as { values: [string] }).values[0]) as Array<{ market: string; code: string }>;
+        if (requestedKeys.length > 250) await new Promise((resolve) => setTimeout(resolve, 700));
+        return { rows: [makeBatch(requestedKeys.map(({ market, code }) => makeRow(market, code, "USD")))] };
+      });
+
+    const response = await getUsExport(fullRequest());
+    const payload = JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8"));
+    const timing = getRecentPublicDailyExportTimings("US")[0];
+    const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
+      JSON.parse((query as { values: [string] }).values[0]).length,
+    );
+
+    expect(batchSizes).toEqual([250, 1_000, 1_000, 251]);
+    expect(timing?.maxBatchQueryMs).toBeGreaterThanOrEqual(650);
+    expect(timing?.timeToFirstTickerWriteMs).toBeLessThan(500);
+    expect(payload).toHaveLength(2_501);
+    expect(payload[0].ticker.code).toBe("T00000");
+    expect(payload.at(-1).ticker.code).toBe("T02500");
   });
 
   it("keeps US batch lookups in one wave below ten concurrent queries", async () => {
@@ -379,8 +409,8 @@ describe("public gzip daily export", () => {
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
-    expect(queryMock).toHaveBeenCalledTimes(7);
-    expect(peakActive).toBe(6);
+    expect(queryMock).toHaveBeenCalledTimes(8);
+    expect(peakActive).toBe(7);
   });
 
   it("shares identical US batch queries across concurrent cold exports", async () => {
@@ -499,21 +529,21 @@ describe("public gzip daily export", () => {
   });
 
   it.each([
-    ["KR", getKrExport, "KOSPI", "KRW", 500],
-    ["US", getUsExport, "NAS", "USD", 1_000],
-  ] as const)("uses the configured %s public export batch size", async (market, getExport, exchange, currency, batchSize) => {
+    ["KR", getKrExport, "KOSPI", "KRW", 500, [500, 1]],
+    ["US", getUsExport, "NAS", "USD", 1_000, [250, 751]],
+  ] as const)("uses the configured %s public export batch sizes", async (market, getExport, exchange, currency, batchSize, expectedBatchSizes) => {
     const universeRows = Array.from({ length: batchSize + 1 }, (_, index) => ({
       market: exchange,
       code: `T${String(index).padStart(5, "0")}`,
       name: "Example Common Stock",
       has_trading_value: true,
     }));
-    let offset = 0;
     queryMock
       .mockResolvedValueOnce({ rows: universeRows })
-      .mockImplementation(async () => {
-        const batch = universeRows.slice(offset, offset + batchSize);
-        offset += batchSize;
+      .mockImplementation(async (query) => {
+        const requestedKeys = JSON.parse((query as { values: [string] }).values[0]) as Array<{ market: string; code: string }>;
+        const requestedCodes = new Set(requestedKeys.map((key) => key.code));
+        const batch = universeRows.filter(({ code }) => requestedCodes.has(code));
         return { rows: batch.map(({ market: itemMarket, code }) => makeRow(itemMarket, code, currency)) };
       });
 
@@ -526,7 +556,7 @@ describe("public gzip daily export", () => {
 
     expect(response.status).toBe(200);
     expect(payload).toHaveLength(batchSize + 1);
-    expect(batchSizes).toEqual([batchSize, 1]);
+    expect(batchSizes).toEqual(expectedBatchSizes);
     expect(payload.every((item: { ticker: { market: string }; marketCap: unknown; daily: { candles: unknown[] } }) =>
       item.ticker.market === exchange && item.marketCap && item.daily.candles.length <= 20,
     )).toBe(true);
