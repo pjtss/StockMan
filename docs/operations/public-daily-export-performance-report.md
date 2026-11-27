@@ -671,3 +671,16 @@ raw JSON median은 KR 8,907,188→5,142,281B (-42.3%), US 18,964,448→11,041,36
 최상위 `ticker`, `marketCap`, `daily`, metadata, 데이터 값, 보통주 필터, gzip 단일 응답, 20봉 제한은 그대로다. 기본 봉 형식만 `tuple-v1`로 바뀐다. 기존 객체형 소비자는 `?format=full`을 명시해 유지할 수 있으며, 묵시적으로 full을 사용하던 기존 소비자는 URL을 수정해야 한다. 이 계약 변경은 성능 우선 지시를 반영한 명시적 호환성 비용이다. 운영 검증은 두 시장의 기본 URL이 compact tuple metadata와 gzip 형식으로 내려오는지, `?format=full`이 이전 객체형으로 남아 있는지를 각각 확인한다. 값 또는 형식 회귀가 확인되면 배포를 중단하고 기본값을 full로 복구한다.
 
 코드 기본값과 GET query resolver, 자동화 API 회귀검사, API reference, OpenAPI를 함께 갱신했다. 변경 파일: `lib/public-daily-export.ts`, `app/api/public/daily-export/kr/route.test.ts`, `scripts/api-surface.mjs`, `public/api-reference.md`, 생성된 `public/openapi.json`, 본 보고서, `DEVELOPMENT_LOG.md`. targeted route test 17/17 통과. 이 기록 작성 시점에는 전체 배포 검증과 운영 배포 전이며, 결과를 아래에 이어 적는다.
+
+### compact 기본값 배포 및 운영 검증
+
+코드 commit `b07a050e`의 [OCI Deploy run 45916444721](https://github.com/pjtss/StockMan/actions/runs/45916444721)은 Verify deployment, standalone 패키징, release 업로드 및 활성화까지 성공했다. 운영에서 KR/US 기본 URL과 `?format=full`을 각 1회씩 순차 호출했다. 네 응답 모두 HTTP200, `application/gzip`, Content-Encoding 없음, no-store, gzip XFL2였고 전체 gzip 해제/JSON parse, 필수 ticker·marketCap·daily, candle 개수와 `returnedCount`, 최대20봉 검사를 통과했다. 기본 URL은 두 시장 모두 `tuple-v1`·candleFields를 반환했고 full query는 기존 객체형 봉을 반환했다.
+
+| 시장 | 형식 | ticker | first body byte | 전체 완료 | gzip bytes | raw JSON bytes |
+|---|---|---:|---:|---:|---:|---:|
+| KR | compact 기본 | 2,337 | 0.281초 | 12.258초 | 1,060,716 | 5,142,281 |
+| KR | full 명시 | 2,337 | 0.171초 | 15.332초 | 1,213,001 | 8,907,188 |
+| US | compact 기본 | 5,011 | 1.852초 | 43.541초 | 2,450,155 | 11,041,367 |
+| US | full 명시 | 5,011 | 0.397초 | 48.996초 | 2,815,676 | 18,964,448 |
+
+이 순차 단일쌍에서 compact 완료 시간은 KR 20.0%, US 11.1% 짧았고 gzip은 KR 12.6%, US 13.0% 작았다. 다만 시장·형식별 1회이고 요청 부하/경로가 통제되지 않아 완료시간 차이를 인과 효과로 보지 않는다. 특히 첫 byte는 compact에서 더 늦었으며 이번 표본은 이에 대한 개선을 보이지 않는다. 다수 paired 운영 측정의 byte 절감과 실제 기본·호환 형식 검증은 확인했다. 이후 같은 클라이언트에서 compact 기본 GET의 반복 전체 완료시간과 first-byte를 쌓고, 기준 median으로부터 지속 회귀하면 full 기본값 복구를 재검토한다.
