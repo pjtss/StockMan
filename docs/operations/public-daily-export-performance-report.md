@@ -1188,4 +1188,16 @@ US 종목 universe 6,321행에 대한 실제 기존 쿼리는 `english_name`과 
 
 로컬 DB의 `BEGIN READ ONLY`에서 기존 predicate와 게이트 predicate를 모든 US 마스터 행에 대조해 판정 불일치0건을 확인했다. eligible output은 양쪽 모두5,012행이며 정렬된 `(market,code,name)` 전체 JSON의 SHA-256이 동일하게 `593a6cf0250168081384e0f3fb0e9f3855b119bf86b3a65d6ec104591b2ffcdc`였다. 별도 descriptor fixture에서도 ADR, ADS, American Depositary/Depository Shares/Receipts, 경계문자, 보통주명 및 유사 부분문자열의 판정이 모두 기존과 같았다.
 
-같은 연결·정확한 universe SELECT·warm local buffer에서 12회씩 번갈아 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`를 실행했다. 첫2회는 워밍업으로 제외했다. 기존 predicate median은89.74ms, 후보는14.23ms로 query executor 구간이84.1% 줄었다(후보/기존0.159배). 양쪽 모두 shared-buffer read0이었던 sample이다. 이는 로컬 PostgreSQL query-only 결과이며 운영 end-to-end 향상을 증명하지 않는다. 대상 gzip export route test는 US query에서 fast gate와 기존 정규식 branch가 함께 쓰이는지 검사한다. 현재 운영/전체 검증과 배포 뒤에는 public compact API MISS를 반복해 correlated `universeQueryMs`, client completion, raw JSON SHA, ticker count/marketCap/daily/max20를 다시 확인하고, output 불일치나 반복된 운영 universe/query 지연 회귀가 있으면 기존 정규식 predicate로 복귀한다.
+같은 연결·정확한 universe SELECT·warm local buffer에서 12회씩 번갈아 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`를 실행했다. 첫2회는 워밍업으로 제외했다. 기존 predicate median은89.74ms, 후보는14.23ms로 query executor 구간이84.1% 줄었다(후보/기존0.159배). 양쪽 모두 shared-buffer read0이었던 sample이다. 이는 로컬 PostgreSQL query-only 결과이며 운영 end-to-end 향상을 증명하지 않는다. 대상 gzip export route test는 US query에서 fast gate와 기존 정규식 branch가 함께 쓰이는지 검사한다.
+
+코드 commit `543bdf47`은 [OCI workflow 46044078463](https://github.com/pjtss/StockMan/actions/runs/46044078463)에서 원격 전체검증, standalone package, upload 및 activation까지 성공했다. 운영 공개 API 사후 검증은 다음과 같다.
+
+| Market / event | HTTP/cache | Client full body | Server total | Universe / batch wall / first gzip byte | gzip / raw bytes | Raw SHA / contract |
+| --- | --- | ---: | ---: | --- | --- | --- |
+| KR compact MISS | 200 / MISS | 3.202s | 2.955s | 269 / 1,986 / 272ms | 1,051,479 / 5,142,281 | `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4`; 2,337 tickers / 46,740 candles / max20 / invalid0 |
+| US compact MISS after activation | 200 / MISS | 9.011s | 7.656s | 754 / 3,803 / 760ms | 2,451,796 / 11,041,367 | `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`; 5,011 / 98,500 / max20 / invalid0 |
+| US stale response + background refresh | 200 / STALE | 1.270s | refresh 3.076s | 158 / 2,119 / 167ms (refresh) | stale body 2,451,796; refreshed 2,451,310 / raw11,041,367 | same US raw SHA; stale body max20 / invalid0 |
+| US compact cold-process MISS | 200 / MISS | 18.470s | 16.906s | 5,990 / 6,923 / 6,182ms | 2,451,722 / 11,041,367 | same US raw SHA; 5,011 / max20 / invalid0 |
+| US compact HIT after MISS | 200 / HIT | 0.691s | — | — | 2,451,722 / 11,041,367 | same US raw SHA; 5,011 / max20 / invalid0 |
+
+US candidate 운영 universe phase는 세 MISS/refresh 표본에서754ms,158ms,5,990ms였고 중앙값754ms/범위158–5,990ms다. 직전 배포의 단일 compact 표본은897ms였지만 표본 수와 인스턴스/DB 상태가 통제되지 않아 운영에서의 인과적 universe-query 개선이나 전체 API 완료시간 개선을 주장하지 않는다. 오히려 5,990ms cold-process 표본은 인스턴스/DB 지연 변동이 계속 크다는 점을 보여준다. 로컬에서는 exact predicate A/B가 반복적으로84.1% 빨랐고 운영 응답 데이터·티커 수·SHA·gzip contract가 그대로여서 변경은 유지하되, 다음 운영 비교에서 동일 process/phase가 반복적으로 나빠지거나 payload 판정이 달라지면 기존 predicate로 되돌린다. 다음 후보는 이 API의 query/per-process 상관관계를 여러 fresh MISS에서 더 모으고, 대형 US batch 실행구간과 stream duration을 별도로 줄일 근거가 있을 때만 적용한다.
