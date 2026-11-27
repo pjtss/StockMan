@@ -118,7 +118,7 @@ export async function GET(request: Request) {
              AND state = 'active' AND query ILIKE $1
            GROUP BY wait_event_type, wait_event
            ORDER BY active_count DESC, oldest_active_seconds DESC`,
-      [`%${market === "KR" ? "kr_latest_daily_candles" : "us_latest_daily_candles"}%`]);
+      [`%${market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles"}%`]);
       return NextResponse.json({
         ok: true,
         market,

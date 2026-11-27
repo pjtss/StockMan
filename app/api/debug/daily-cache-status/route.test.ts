@@ -72,6 +72,7 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     expect(await response.json()).toMatchObject({ activeExporterQueries: [{ waitEventType: "IO", waitEvent: "DataFileRead", activeCount: 6, oldestActiveSeconds: 42, averageActiveSeconds: 35 }] });
     expect(mocks.query.mock.calls[0]?.[0]).toContain("pg_stat_activity");
     expect(mocks.query.mock.calls[0]?.[0]).not.toMatch(/SELECT\s+query/i);
+    expect(mocks.query.mock.calls[0]?.[1]).toEqual(["%us_instrument_universe_candles%"]);
     expect(mocks.readServerJournal).not.toHaveBeenCalled();
   });
 
