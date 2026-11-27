@@ -22,7 +22,11 @@ function key(market: PublicDailyExportMarket, format: PublicDailyExportFormat) {
   return `${market}:${format}`;
 }
 
-export function getCachedPublicDailyExport(market: PublicDailyExportMarket, format: PublicDailyExportFormat) {
+export function getCachedPublicDailyExport(
+  market: PublicDailyExportMarket,
+  format: PublicDailyExportFormat,
+  options: { copyBytes?: boolean } = {},
+) {
   const entries = cache();
   const entryKey = key(market, format);
   const entry = entries.get(entryKey);
@@ -36,7 +40,8 @@ export function getCachedPublicDailyExport(market: PublicDailyExportMarket, form
   entries.delete(entryKey);
   entries.set(entryKey, entry);
   return {
-    bytes: entry.bytes.slice(),
+    // The export response path may borrow this immutable buffer for direct streaming.
+    bytes: options.copyBytes === false ? entry.bytes : entry.bytes.slice(),
     state: entry.expiresAt <= now ? "STALE" : "HIT",
   } satisfies CachedPublicDailyExport;
 }

@@ -46,4 +46,16 @@ describe("public daily export response cache", () => {
     firstRead!.bytes[0] = 0;
     expect(getCachedPublicDailyExport("US", "compact")?.bytes).toEqual(new Uint8Array([4, 5, 6]));
   });
+
+  it("only lends the cache-owned bytes when the caller opts into read-only streaming", () => {
+    const completed = new Uint8Array([7, 8, 9]);
+    setCachedPublicDailyExport("US", "compact", completed, { takeOwnership: true });
+
+    const shared = getCachedPublicDailyExport("US", "compact", { copyBytes: false });
+    const isolated = getCachedPublicDailyExport("US", "compact");
+
+    expect(shared?.bytes).toBe(completed);
+    expect(isolated?.bytes).not.toBe(completed);
+    expect(isolated?.bytes).toEqual(completed);
+  });
 });

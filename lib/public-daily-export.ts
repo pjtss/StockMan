@@ -197,10 +197,17 @@ export async function getPublicDailyExport(
   format: PublicDailyExportFormat = "compact",
   options: { bypassResponseCache?: boolean } = {},
 ) {
-  const cached = options.bypassResponseCache ? null : getCachedPublicDailyExport(market, format);
+  const cached = options.bypassResponseCache ? null : getCachedPublicDailyExport(market, format, { copyBytes: false });
   if (cached) {
     if (cached.state === "STALE") startBackgroundRefresh(market, format);
-    return new Response(cached.bytes, {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // This response borrows the cache-owned immutable bytes; avoid copying multi-megabyte gzip bodies.
+        controller.enqueue(cached.bytes);
+        controller.close();
+      },
+    });
+    return new Response(body, {
       status: 200,
       headers: {
         "content-type": "application/gzip",
