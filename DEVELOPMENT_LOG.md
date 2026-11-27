@@ -1,3 +1,11 @@
+### 2026-11-28 — gzip windowBits 후보 운영 배포 확인 및 API 사후검증
+- 목적/범위: gzip 단일 형식·compact ticker/marketCap/daily 계약·티커별 일봉 최대20개를 유지하면서 `windowBits=12` 압축 후보를 배포하고 운영 응답을 검증했다.
+- 변경 및 측정: 기능 변경은 앞선 커밋 `a5000d93`의 `lib/public-daily-export.ts` 한 줄 설정이다. 현재 작업은 운영 성능 보고서와 이 로그에 배포/검증 결과를 추가했다. 보고서의 exact-payload stream replay에서 windowBits13 대비12 압축 median은 US161.204→142.271ms(-11.7%, gzip +0.14%), KR84.904→72.270ms(-14.9%, gzip -0.77%)였으며 gunzip raw SHA는 동일했다. replay는 gzip 구간 실험으로 전체 Next.js/DB API 성능 향상 증거와 구분한다.
+- 배포/운영 검증: `a5000d93f63ae1a3aa2f93b247b2af3df0c0b2e1`을 `oci`에 push한 [OCI workflow 46049641432](https://github.com/pjtss/StockMan/actions/runs/46049641432)가 전체 배포 검증, standalone 패키징, 업로드, activation까지 성공했다. 운영 compact GET은 KR/US 모두 HTTP200·HIT·application/gzip이었다. KR gzip/raw1,043,357/5,142,281B, 2,337 ticker/46,740 candle; US2,454,714/11,041,367B, 5,011/98,500. 둘 다 max20, compact tuple-v1 8개 필드, raw SHA 일치(KR `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4`, US `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`)를 확인했다. Cache HIT full-download 시간은 KR471ms, US307ms였다.
+- 서버 timing 해석: authenticated diagnostics에 보존된 최근 동일 시장/압축 크기 MISS 기록은 KR total13.202s(universe3.416s, batch wall7.388s, first gzip byte3.503s, stream9.785s), US total3.355s(universe624ms, batch wall1.975s, first byte639ms, stream2.730s)였다. 공개 검증 GET 자체는 HIT이므로 해당 MISS timing과 같은 request ID로 묶을 수 없고, HIT 속도와 MISS 생성 시간을 섞어 인과 성능 비교를 하지 않는다. 서버 편차가 커 end-to-end 개선은 미확정이다.
+- 근본 원인/위험/재발 감지: 이전 stream replay는 압축 CPU 후보를 보이나 전체 route 시간은 universe/DB/stream/네트워크 및 instance scheduling의 영향을 받는다. 동일 서버 인스턴스의 request ID·gzip bytes·시간창이 맞지 않으면 stage timing correlation으로 채택하지 않는다. 이후 fresh MISS에서 repeated phase regression, raw hash/schema/max20 위반, 또는 gzip wire-size 급증을 발견하면 windowBits13 복귀 후보를 다시 측정한다.
+- 변경 파일: `docs/operations/public-daily-export-performance-report.md`, `DEVELOPMENT_LOG.md`. 코드 후보 커밋/배포는 위 workflow 완료. 현재 문서 변경은 전체 verify 뒤 별도 기록 배포한다.
+
 ### 2026-11-27 — 인증 일봉 진단 API에 제한된 systemd 서버 로그 추가
 - 목적/범위: 기존 인증된 일봉 진단 API에 앱·cron·Nginx journal을 선택 조회하는 경로와 OCI 배포 구성을 추가한다.
 - 근본 원인/영향: 국내 일봉 수동 갱신에서 요청 후 응답 지연과 분산 lock 잔류가 관측됐지만, 기존 API에는 서버·proxy 로그가 없어 작업 시작/실행/완료 경로를 분리해 진단하기 어려웠다. 요청 수락만으로 작업 완료를 추정하지 않는다.

@@ -1209,3 +1209,16 @@ US candidate 운영 universe phase는 세 MISS/refresh 표본에서754ms,158ms,5
 US는 windowBits13/12 총12회씩 interleave 후 첫2회 제외 시 중앙값161.204/142.271ms(-11.7%)였고 gzip 크기는2,451,310→2,454,714B(+3,404B,+0.14%)였다. raw payload는11,041,367B, SHA `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`로 동일했다. KR은 각14회 중 첫2회 제외 중앙값84.904/72.270ms(-14.9%), gzip1,051,479→1,043,357B(-8,122B,-0.77%); raw5,142,281B, SHA `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4` 동일했다.
 
 두 시장에서 압축 CPU가 줄고 bytes도 0.14% 안에서 유지/감소해 `windowBits=12` 후보를 채택했다. 공식 Node.js v22 문서는 windowBits 감소가 일반적으로 압축률을 낮출 수 있고 level이 속도에 가장 큰 영향을 준다고 설명한다([zlib memory/performance tuning](https://nodejs.org/download/release/v22.18.0/docs/api/zlib.html#memory-usage-tuning)). 운영 API 전체 완료시간에 미치는 영향은 이 압축 replay만으로 확정하지 않는다. 배포 후 KR/US fresh compact MISS와 해당 server timings를 확인하고 gzip 해제·JSON/schema·max20·raw SHA를 검사한다. 운영 단계에서 반복적인 전체 지연/크기 회귀가 나타나면13으로 복귀한다. 구현·focused/full verification·OCI 배포 결과와 실제 API 측정값은 뒤에 이어 기록한다.
+
+#### 배포 및 운영 API 사후검증 — 2026-11-28
+
+Commit `a5000d93f63ae1a3aa2f93b247b2af3df0c0b2e1`을 `oci`에 배포했다. [OCI workflow 46049641432](https://github.com/pjtss/StockMan/actions/runs/46049641432)는 전체 `npm run deploy:verify`, standalone 패키징, release 업로드 및 activation 성공으로 완료됐다.
+
+활성화 후 무인증 public compact gzip GET을 순차 실행해 전체 본문을 수신하고 gunzip/JSON 파싱 후 schema·봉 상한·원문 SHA를 확인했다. 두 요청은 response cache HIT이라 여기의 client elapsed는 캐시된 본문 다운로드 시간이다.
+
+| Market | HTTP/cache | Client full body | gzip / raw bytes | Tickers / candles | max candles | Raw SHA-256 |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| KR compact | 200 / HIT | 471ms | 1,043,357 / 5,142,281 | 2,337 / 46,740 | 20 | `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4` |
+| US compact | 200 / HIT | 307ms | 2,454,714 / 11,041,367 | 5,011 / 98,500 | 20 | `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228` |
+
+Both returned `application/gzip`; every row retained ticker, marketCap and daily data; `tuple-v1` candles had eight fields and no ticker exceeded20 candles. Raw payload hashes exactly match the validated preceding release. The endpoint's authenticated diagnostic buffer showed a recent KR MISS timing (total13.202s, universe3.416s, batch wall7.388s, first gzip byte3.503s, stream9.785s) and US timing (total3.355s, universe624ms, batch wall1.975s, first byte639ms, stream2.730s) with matching market and gzip length. Those records cannot be request-correlated to the public HIT GET by request ID, so they are not paired here as its generation duration and do not establish an end-to-end speed change. Production full-route speed remains unproven; next comparison should use a fresh compact MISS and an immediately matching diagnostic `requestId`/gzip-byte record per market.
