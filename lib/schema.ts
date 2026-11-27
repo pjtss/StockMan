@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, jsonb, doublePrecision, primaryKey, numeric } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, text, timestamp, date, boolean, integer, uniqueIndex, index, check, json, jsonb, doublePrecision, primaryKey, numeric } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // 1. DART ë° SEC ê³µì ì´ë ¥ ìí°í°
@@ -284,6 +284,16 @@ export const krRecentDailyCandles = pgTable("kr_recent_daily_candles", {
   market: text("market").notNull(), code: text("code").notNull(), timeframe: text("timeframe").notNull().default("D"), candleDate: text("candle_date").notNull(),
   open: numeric("open"), high: numeric("high"), low: numeric("low"), close: numeric("close"), volume: numeric("volume"), tradingValue: doublePrecision("trading_value"), fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
 }, (table) => [primaryKey({ columns: [table.market, table.code, table.candleDate], name: "kr_recent_daily_candles_pkey" })]);
+
+export const publicDailyExportCandleSummaries = pgTable("public_daily_export_candle_summaries", {
+  market: text("market").notNull(), code: text("code").notNull(),
+  compactCandles: json("compact_candles").notNull(), fullCandles: json("full_candles").notNull(),
+  latestCandleDate: text("latest_candle_date").notNull(), dataUpdatedAt: timestamp("data_updated_at", { withTimezone: true }).notNull(),
+  returnedCount: integer("returned_count").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.market, table.code], name: "public_daily_export_candle_summaries_pkey" }),
+  check("public_daily_export_candle_summaries_returned_count_check", sql`${table.returnedCount} BETWEEN 1 AND 20`),
+]);
 
 export const krLatestDailyCandles = pgTable("kr_latest_daily_candles", {
   market: text("market").notNull(), code: text("code").notNull(), candleDate: text("candle_date").notNull(),

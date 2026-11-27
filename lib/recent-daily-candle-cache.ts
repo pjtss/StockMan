@@ -15,6 +15,25 @@ const TABLES: Record<Market, { source: string; cache: string }> = {
   },
 };
 
+const tradingValueExpression = (region: Market, alias: string) => region === "KR"
+  ? `CASE WHEN ${alias}.trading_value > '-Infinity' AND ${alias}.trading_value < 'Infinity'
+       THEN ${alias}.trading_value::double precision
+       ELSE ${alias}.close * ${alias}.volume
+     END`
+  : `CASE WHEN ${alias}.trading_value > '-Infinity'::numeric AND ${alias}.trading_value < 'Infinity'::numeric
+       THEN ${alias}.trading_value::double precision
+       ELSE ${alias}.close * ${alias}.volume
+     END`;
+
+function candleSummarySql(region: Market) {
+  const value = tradingValueExpression(region, "recent");
+  const fetchedAt = `to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
+  return {
+    compact: `json_agg(json_build_array(recent.candle_date, recent.open, recent.high, recent.low, recent.close, recent.volume, ${value}, ${fetchedAt}) ORDER BY recent.candle_date ASC)`,
+    full: `json_agg(json_build_object('date', recent.candle_date, 'open', recent.open, 'high', recent.high, 'low', recent.low, 'close', recent.close, 'volume', recent.volume, 'tradingValue', ${value}, 'fetchedAt', ${fetchedAt}) ORDER BY recent.candle_date ASC)`,
+  };
+}
+
 /** Keep the API's bounded daily read table in the same transaction as a candle upsert. */
 export async function refreshRecentDailyCandleCache(
   execute: SqlExecutor,
@@ -26,6 +45,7 @@ export async function refreshRecentDailyCandleCache(
   const sourceTable = sql.raw(source);
   const cacheTable = sql.raw(cache);
   const validCandle = sql.raw(validDailyCandleSql("c"));
+  const summaryExpressions = candleSummarySql(region);
 
   await execute(sql`
     WITH recent AS MATERIALIZED (
@@ -53,6 +73,29 @@ export async function refreshRecentDailyCandleCache(
             trading_value = EXCLUDED.trading_value,
             fetched_at = EXCLUDED.fetched_at
       RETURNING candle_date
+    )
+    , summary_upserted AS (
+      INSERT INTO public_daily_export_candle_summaries
+        (market, code, compact_candles, full_candles, latest_candle_date, data_updated_at, returned_count)
+      SELECT recent.market, recent.code,
+             ${sql.raw(summaryExpressions.compact)},
+             ${sql.raw(summaryExpressions.full)},
+             MAX(recent.candle_date), MAX(recent.fetched_at), COUNT(*)::int
+        FROM recent
+       GROUP BY recent.market, recent.code
+      ON CONFLICT (market, code) DO UPDATE
+        SET compact_candles = EXCLUDED.compact_candles,
+            full_candles = EXCLUDED.full_candles,
+            latest_candle_date = EXCLUDED.latest_candle_date,
+            data_updated_at = EXCLUDED.data_updated_at,
+            returned_count = EXCLUDED.returned_count
+      RETURNING code
+    ), summary_deleted AS (
+      DELETE FROM public_daily_export_candle_summaries summary
+       WHERE summary.market = ${exchange}
+         AND summary.code = ${code}
+         AND NOT EXISTS (SELECT 1 FROM recent)
+      RETURNING summary.code
     )
     DELETE FROM ${cacheTable} cached
      WHERE cached.market = ${exchange}

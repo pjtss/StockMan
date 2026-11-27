@@ -61,11 +61,11 @@ describe("public gzip daily export", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it.each([
-    ["KR", getKrExport, "kr_common_stock_universe", "kr_recent_daily_candles", "005930", "KRW"],
-    ["US", getUsExport, "us_common_stock_universe", "us_recent_daily_candles", "AAPL", "USD"],
-  ] as const)("returns a no-auth, no-store gzip JSON export for %s", async (market, getExport, universeTable, candleTable, code, currency) => {
+    ["KR", getKrExport, "kr_common_stock_universe", "005930", "KRW"],
+    ["US", getUsExport, "us_common_stock_universe", "AAPL", "USD"],
+  ] as const)("returns a no-auth, no-store gzip JSON export for %s", async (market, getExport, universeTable, code, currency) => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock", has_trading_value: true }] })
+      .mockResolvedValueOnce({ rows: [{ market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" }] })
       .mockResolvedValue({ rows: [makeBatch([makeRow(market === "KR" ? "KOSPI" : "NAS", code, currency)])] });
 
     const response = await getExport(fullRequest());
@@ -105,26 +105,16 @@ describe("public gzip daily export", () => {
     expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
     expect(eligibilitySql).toContain(`FROM ${universeTable} u`);
     expect(eligibilitySql).toContain("SELECT u.market, u.code, u.name");
-    expect(eligibilitySql).toContain("AS has_trading_value");
-    expect(eligibilitySql).toContain("pg_attribute");
     expect(eligibilitySql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("FROM jsonb_to_recordset($1::jsonb)");
     expect(sql).toContain(`/* public-daily-export-market: ${market.toLowerCase()} */`);
     expect(JSON.stringify(requestParameter)).toContain(code);
-    expect(name).toBe(`public-daily-export-${market.toLowerCase()}-batch-v1`);
+    expect(name).toBe(`public-daily-export-${market.toLowerCase()}-batch-v2`);
     expect(sql).not.toContain(universeTable);
     expect(JSON.stringify(requestParameter)).toContain("Example Common Stock");
-    expect(sql).toContain(`FROM ${candleTable} c`);
+    expect(sql).toContain("LEFT JOIN public_daily_export_candle_summaries d");
     expect(sql).toContain("LEFT JOIN instrument_fundamental_snapshots f");
-    if (market === "KR") {
-      expect(sql).toContain("c.trading_value > '-Infinity'");
-      expect(sql).toContain("c.trading_value < 'Infinity'");
-      expect(sql).not.toContain("c.trading_value::text ~");
-    } else {
-      expect(sql).toContain("c.trading_value > '-Infinity'::numeric");
-      expect(sql).toContain("c.trading_value < 'Infinity'::numeric");
-      expect(sql).not.toContain("c.trading_value::text ~");
-    }
+    expect(sql).toContain("d.full_candles");
     expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
     expect(sql).toContain("string_agg(row_to_json(payload)::text, ',' ORDER BY r.market, r.code)");
@@ -132,11 +122,9 @@ describe("public gzip daily export", () => {
     expect(sql).toContain("item(market text, code text, name text)");
     expect(sql).toContain("'market', r.market, 'code', r.code, 'name', r.name");
     expect(sql).not.toContain("u.instrument_type='COMMON_STOCK'");
-    expect(sql).toContain("LIMIT 20");
-    expect(sql).toMatch(/ORDER BY c\.candle_date DESC\s+LIMIT 20/);
-    expect(sql).not.toContain("c.candle_date ~ '^[0-9]{8}$'");
-    expect(sql).not.toContain("c.high >= GREATEST(c.open, c.low, c.close)");
-    expect(sql).not.toContain("ORDER BY c.candle_date DESC, c.fetched_at DESC");
+    expect(sql).not.toContain("LIMIT 20");
+    expect(sql).not.toContain("FROM kr_recent_daily_candles c");
+    expect(sql).not.toContain("FROM us_recent_daily_candles c");
     if (market === "US") {
       expect(eligibilitySql).toContain("u.is_dr=false");
       expect(eligibilitySql).toContain("COALESCE(u.english_name, '') !~*");
@@ -179,7 +167,7 @@ describe("public gzip daily export", () => {
     expect(payload[0].daily.metadata.returnedCount).toBe(payload[0].daily.candles.length);
     expect(payload[0].daily.candles.length).toBeLessThanOrEqual(20);
     expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
-    expect(sql).toContain("json_agg(json_build_array(");
+    expect(sql).toContain("d.compact_candles");
   });
 
   it("rejects unsupported daily export formats without querying the DB", async () => {
@@ -313,19 +301,22 @@ describe("public gzip daily export", () => {
     }));
   });
 
-  it("uses the schema-compatible trading value fallback when an older DB lacks the column", async () => {
+  it("reads precomputed candle summaries without inspecting the candle schema", async () => {
     queryMock
-      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: false }] })
+      .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock" }] })
       .mockResolvedValueOnce({ rows: [makeRow("KOSPI", "005930", "KRW")] });
 
     const response = await getKrExport(fullRequest());
     await response.arrayBuffer();
+    const [universeSql] = queryMock.mock.calls[0] as [string];
     const [{ text: sql }] = queryMock.mock.calls[1] as [{ text: string }];
 
     expect(response.status).toBe(200);
-    expect(sql).toContain("c.close * c.volume AS trading_value");
-    expect(sql).not.toContain("to_jsonb(c)");
-    expect(sql).not.toContain("c.trading_value::text ~");
+    expect(universeSql).not.toContain("pg_attribute");
+    expect(sql).toContain("LEFT JOIN public_daily_export_candle_summaries d");
+    expect(sql).toContain("d.full_candles");
+    expect(sql).not.toContain("us_recent_daily_candles");
+    expect(sql).not.toContain("kr_recent_daily_candles");
   });
 
   it("splits large ticker universes into bounded 500-ticker lookup batches", async () => {

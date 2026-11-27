@@ -12,7 +12,7 @@ const EXPORT_BATCH_SIZE = 500;
 
 type ExportRow = { item_json?: string; items_json?: string };
 
-type ExportKey = { market: string; code: string; name: string; has_trading_value: boolean };
+type ExportKey = { market: string; code: string; name: string };
 
 type ExportPerformanceMetrics = {
   requestId: string;
@@ -32,19 +32,16 @@ type ExportPerformanceMetrics = {
 
 const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
-  candleTable: string;
   eligibility: string;
   batchSize: number;
 }> = {
   KR: {
     universeTable: "kr_common_stock_universe",
-    candleTable: "kr_recent_daily_candles",
     eligibility: "u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etp=false AND u.is_warrant=false AND u.is_preferred=false",
     batchSize: EXPORT_BATCH_SIZE,
   },
   US: {
     universeTable: "us_common_stock_universe",
-    candleTable: "us_recent_daily_candles",
     eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL}`,
     // Six batches fit in one query wave and reduced US export latency locally.
     batchSize: 1_000,
@@ -220,19 +217,12 @@ export async function getPublicDailyExport(
   const requestStartedAt = performance.now();
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
-  const { universeTable, candleTable, eligibility, batchSize } = EXPORT_CONFIG[market];
+  const { universeTable, eligibility, batchSize } = EXPORT_CONFIG[market];
   try {
     const pool = getPool();
     const universeQueryStartedAt = performance.now();
     const eligible = await pool.query<ExportKey>(`
-      SELECT u.market, u.code, u.name,
-             EXISTS (
-                 SELECT 1
-                   FROM pg_attribute a
-                  WHERE a.attrelid = 'public.${candleTable}'::regclass
-                    AND a.attname = 'trading_value'
-                    AND NOT a.attisdropped
-               ) AS has_trading_value
+      SELECT u.market, u.code, u.name
         FROM ${universeTable} u
        WHERE ${eligibility}
        ORDER BY u.market, u.code
@@ -260,40 +250,6 @@ export async function getPublicDailyExport(
     }
     metrics.batchCount = chunks.length;
     const concurrency = market === "US" ? 10 : 5;
-    // The KR migration stores this column as DOUBLE PRECISION. Compare finite bounds directly
-    // to avoid formatting every candle as text; keep the NUMERIC US validation unchanged.
-    const tradingValueExpression = eligible.rows[0].has_trading_value
-      ? market === "KR"
-        ? `CASE WHEN c.trading_value > '-Infinity' AND c.trading_value < 'Infinity'
-                 THEN c.trading_value::double precision
-                 ELSE c.close * c.volume
-            END`
-        : `CASE WHEN c.trading_value > '-Infinity'::numeric AND c.trading_value < 'Infinity'::numeric
-                 THEN c.trading_value::double precision
-                 ELSE c.close * c.volume
-            END`
-      : `c.close * c.volume`;
-    const candleJsonExpression = format === "compact"
-      ? `json_build_array(
-                     recent.candle_date,
-                     recent.open,
-                     recent.high,
-                     recent.low,
-                     recent.close,
-                     recent.volume,
-                     recent.trading_value,
-                     to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-                   )`
-      : `json_build_object(
-                     'date', recent.candle_date,
-                     'open', recent.open,
-                     'high', recent.high,
-                     'low', recent.low,
-                     'close', recent.close,
-                     'volume', recent.volume,
-                     'tradingValue', recent.trading_value,
-                     'fetchedAt', to_char(recent.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-                   )`;
     const compactCandleSchema = format === "compact"
       ? `, 'candleEncoding', 'tuple-v1',
                    'candleFields', json_build_array('date', 'open', 'high', 'low', 'close', 'volume', 'tradingValue', 'fetchedAt')`
@@ -306,8 +262,8 @@ export async function getPublicDailyExport(
           try {
             return await pool.query<ExportRow>({
               name: format === "full"
-                ? `public-daily-export-${market.toLowerCase()}-batch-v1`
-                : `public-daily-export-${market.toLowerCase()}-compact-batch-v1`,
+                ? `public-daily-export-${market.toLowerCase()}-batch-v2`
+                : `public-daily-export-${market.toLowerCase()}-compact-batch-v2`,
               text: `/* public-daily-export-market: ${market.toLowerCase()} */
       WITH requested AS (
         SELECT market, code, name
@@ -317,24 +273,8 @@ export async function getPublicDailyExport(
         FROM requested r
         LEFT JOIN instrument_fundamental_snapshots f
           ON f.market = r.market AND f.code = r.code
-        LEFT JOIN LATERAL (
-          SELECT json_agg(${candleJsonExpression} ORDER BY recent.candle_date ASC) AS candles,
-                 MAX(recent.candle_date) AS latest_candle_date,
-                 MAX(recent.fetched_at) AS data_updated_at,
-                 COUNT(*)::int AS returned_count
-            FROM (
-              SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume,
-                     ${tradingValueExpression} AS trading_value,
-                     c.fetched_at
-                FROM ${candleTable} c
-               WHERE c.market = r.market
-                 AND c.code = r.code
-                 -- Recent export tables contain only validated daily candles, enforced by
-                 -- migration backfill and the transactional cache writer.
-               ORDER BY c.candle_date DESC
-               LIMIT 20
-            ) recent
-        ) d ON TRUE
+        LEFT JOIN public_daily_export_candle_summaries d
+          ON d.market = r.market AND d.code = r.code
         CROSS JOIN LATERAL (
           SELECT json_build_object('market', r.market, 'code', r.code, 'name', r.name) AS ticker,
                  json_build_object(
@@ -348,7 +288,7 @@ export async function getPublicDailyExport(
                  'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
                  ) AS "marketCap",
                  json_build_object(
-                 'candles', COALESCE(d.candles, '[]'::json)${compactCandleSchema},
+                 'candles', COALESCE(d.${format === "compact" ? "compact_candles" : "full_candles"}, '[]'::json)${compactCandleSchema},
                  'metadata', json_build_object(
                    'latestCandleDate', d.latest_candle_date,
                    'dataUpdatedAt', CASE WHEN d.data_updated_at IS NULL THEN NULL ELSE to_char(d.data_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
