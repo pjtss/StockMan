@@ -1222,3 +1222,12 @@ Commit `a5000d93f63ae1a3aa2f93b247b2af3df0c0b2e1`을 `oci`에 배포했다. [OCI
 | US compact | 200 / HIT | 307ms | 2,454,714 / 11,041,367 | 5,011 / 98,500 | 20 | `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228` |
 
 Both returned `application/gzip`; every row retained ticker, marketCap and daily data; `tuple-v1` candles had eight fields and no ticker exceeded20 candles. Raw payload hashes exactly match the validated preceding release. The endpoint's authenticated diagnostic buffer showed a recent KR MISS timing (total13.202s, universe3.416s, batch wall7.388s, first gzip byte3.503s, stream9.785s) and US timing (total3.355s, universe624ms, batch wall1.975s, first byte639ms, stream2.730s) with matching market and gzip length. Those records cannot be request-correlated to the public HIT GET by request ID, so they are not paired here as its generation duration and do not establish an end-to-end speed change. Production full-route speed remains unproven; next comparison should use a fresh compact MISS and an immediately matching diagnostic `requestId`/gzip-byte record per market.
+
+After the documentation release activated, a new process produced fresh compact MISSes for KR and US. Each public response was followed immediately by the cron-authenticated timing diagnostics; market, gzip bytes and request timestamps matched the MISS records. Both payloads were gunzipped/parsed and retained the raw hashes, schema, tuple count and max20 contract above.
+
+| Market | HTTP/cache | Client full body | Server total | Universe / batch wall | First gzip byte / stream | gzip bytes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| KR compact | 200 / MISS | 2.705s | 2.479s | 351ms / 1.675s | 358ms / 2.127s | 1,043,357 |
+| US compact | 200 / MISS | 4.259s | 3.988s | 1.020s / 2.236s | 1.021s / 2.968s | 2,454,714 |
+
+The 226ms KR and 271ms US client/server differences include proxy/network delivery and measurement boundaries. This single post-release sample per market is a successful production verification and a useful correlated baseline; it is not enough to attribute end-to-end speed change to `windowBits=12`. Keep gathering fresh MISSes and compare correlated phase medians against the preceding release before another route/query candidate is accepted.
