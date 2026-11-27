@@ -136,7 +136,7 @@ function readJournalUnit(unit: string, minutes: number, limit: number): Promise<
 export function buildJournalArgs(unit: string, since: string, limit: number) {
   const sourceFilter = unit === "nginx-access" ? "--identifier=stockman_nginx_access" : `--unit=${unit}`;
   const scanLimit = Math.min(MAX_LINES_PER_UNIT, limit);
-  return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", "--reverse", `--lines=${scanLimit}`, sourceFilter];
+  return ["--no-pager", "--quiet", "--output=json", "--utc", "--boot", "--reverse", `--since=${since}`, `--lines=${scanLimit}`, sourceFilter];
 }
 
 export function classifyJournalError(error: unknown, stderr: string | Buffer | undefined): NonNullable<ServerJournalUnitResult["errorCode"]> {

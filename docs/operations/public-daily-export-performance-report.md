@@ -817,3 +817,36 @@ upstream의 reverse journal reader가 포함된 [OCI run 45937811392](https://gi
 upstream의 journal timeout 10→25초 변경은 [OCI run 45939504456](https://github.com/pjtss/StockMan/actions/runs/45939504456)으로 성공 배포됐다. 배포 후 `logsOnly=true` nginx-access 단일 조회(최근60분·최대5줄)는 HTTP200 JSON으로 끝났지만 43.876초가 걸리고 로그는0건이었다. nginx-access와 stockman.service 두 단위 동시 조회는 JSON 응답 대신 HTML을 반환해 구조화된 로그 자료를 얻지 못했다. 큰 timeout이 진단 요청을 길게 만들었으나 access 로그 수집과 app timing 문제를 해결하지 못했다. 이 추가 진단 조회를 중단한다.
 
 현재 US gzip 관측에는 39.442초 요청을 더해 네 표본 39.442/44.866/51.692/55.472초의 중앙값은48.279초다. rollback baseline의 보고된 중앙값50.501초보다 4.4% 낮지만, 같은 시간대 통제 A/B가 아니며 host/service journal이 없어 DB/network 부하를 분리하지 못했다. 속도 이득 확정으로 해석하지 않는다. 이 중앙값 계산은 gzip memLevel9이 후보 상태임을 유지할지 판단할 때 추가 생산 표본과 함께 비교한다.
+
+## 2026-11-27 — 문서 배포 완료 후 운영 gzip API 확인
+
+보고서 갱신 commit `4c6700bd93e53c1b38071f713709c33608ce8061`의 [OCI run 45941603704](https://github.com/pjtss/StockMan/actions/runs/45941603704)는 성공했다. `Verify deployment`, standalone package, upload, activation 단계가 모두 통과했고 새 릴리스가 운영에 활성화됐다.
+
+배포 후 각 시장의 공개 compact gzip GET을 순차 호출하고 raw gzip bytes를 직접 해제해 JSON 필드와 일봉 상한을 확인했다.
+
+| 시장 | HTTP / 시간 | gzip / 해제 크기 | 종목 / 최대 일봉 | 계약 검증 |
+|---|---:|---:|---:|---|
+| KR | 200 / 9.411초 | 1,060,716 / 5,142,281 bytes | 2,337 / 20 | 오류 레코드0 |
+| US | 200 / 60.114초 | 2,443,942 / 11,041,367 bytes | 5,011 / 20 | 오류 레코드0 |
+
+양쪽 모두 `application/gzip`이었고 전체 응답을 끝까지 읽고 gzip 해제 및 JSON parse를 완료했다. 모든 종목에 `ticker`, `marketCap`, `daily`가 있고 `daily.metadata.returnedCount`는20 이하였다. US는 이전 표본보다 늦은60.114초였으므로 memLevel9의 운영 속도 개선은 여전히 입증되지 않았다. 시장 부하와 DB/network 조건을 통제하지 못했고 server journal도 이용할 수 없어 이 단일 측정으로 회귀 원인을 특정할 수 없다. 다음 성능 작업은 gzip 매개변수만 추가 조정하기보다 주문된 DB batch 대기의 원인을 계측/개선하는 데 집중하고, 전체 운영 응답 계약 검증을 반복한다.
+
+### 스트리밍 공백과 로컬 DB batch 조사
+
+같은 운영 경로에서 body read 간격을 기록하며 추가 GET했다. US는 첫 body byte 1.053초, 전체46.377초, 최대 chunk 공백43.045초였고 gzip2,443,976B / 해제11,041,367B / 5,011 tickers였다. KR은 첫 body byte0.532초, 전체8.527초, 최대 공백6.590초, gzip1,060,716B / 해제5,142,281B / 2,337 tickers였다. 두 건 모두 HTTP200, gzip 해제·JSON parse·ticker/marketCap/daily·최대20봉 검사를 통과했다. 별도 US 관측60.114초도 함께 보면 운영 시간 분산은 여전히 크다.
+
+US 본문에서 긴 공백이 생기기 전 압축 stream이 시작된 뒤 JSON item이 늦게 공급된 것으로 보이므로, DB batch 대기가 원인일 가능성이 있다는 수준의 진단 신호다. chunk 간격은 서버 query timing 자체가 아니므로 네트워크/런타임 원인을 배제하지 않는다. 인증 journal은 timeout/무로그였고, 내부 `batchQueryWallMs`를 같은 요청에 연결하지 못했다.
+
+로컬 `localhost` PostgreSQL에서 현재 US eligible 정렬의 첫 1,000 ticker를 사용해 실제 daily candle lateral lookup 부분을 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` read-only 트랜잭션에서 실행했다. warm 실행은 planning1.966ms, execution249.426ms, shared hit73,240/read10 blocks였다. 앞선 cold 실행은 유사한 1,000-key candle query에서1,366.559ms와 shared read27,665 blocks였다. PostgreSQL 문서에 따르면 `EXPLAIN ANALYZE`는 쿼리를 실제 실행하고 `BUFFERS`는 계획 노드가 접근한 buffer 수를 표시한다([공식 문서](https://www.postgresql.org/docs/current/using-explain.html)). 이 로컬 수치는 운영 요청의 batch latency를 증명하지 않는다.
+
+US candle table 총 크기는 로컬에서5,894MB, 기존 lookup index422MB, 기존 screener covering index1,054MB였다. Index-only scan은 필요한 값을 모두 인덱스가 제공하고 visibility 조건도 맞아야 이점을 얻는다([PostgreSQL 공식 문서](https://www.postgresql.org/docs/current/indexes-index-only-scans.html)). 추가 대형 인덱스는 저장 공간과 갱신 비용이 크고, 현 데이터만으로 운영 지연을 해결한다는 근거가 부족해 생성하지 않았다. 이번 후속 조사는 보고서/작업 로그만 수정했으며 공개 API 코드·schema는 변경하지 않았다. 다음 구현 후보는 우선 운영과 연결된 DB batch phase timing을 확보하는 것이며, 이를 얻지 못하면 로컬 query 개선을 운영 성능으로 과장하지 않는다.
+
+이후 full exporter SQL을 다시 같은 로컬 DB의 read-only transaction에서 실행했다. 첫1,000 eligible ticker batch의 시가총액 join, daily JSON aggregation/metadata, row JSON serialization까지 포함한 `EXPLAIN ANALYZE`는 planning11.526ms, execution412.188ms, shared hit97,625/read940 blocks였으며 `instrument_fundamental_screener_latest_idx`와 `us_instrument_universe_candles_lookup_idx`를 사용했다. 로컬 쿼리 구현이 즉시 설명하는 수준의 지연은 관측하지 못했다. 운영 US 43.045초 chunk 공백을 로컬 측정치에 귀속할 수 없고, 이 상태에서는 SQL/인덱스 변경을 적용하지 않는다. 다음 유효한 구현 전제는 운영 요청과 batch duration을 결합한 phase timing을 정상적인 서버 운영 경로에서 얻는 것이다.
+
+### 운영 journal 시간 범위 필터 누락 수정
+
+진단 실패 원인을 코드에서 찾았다. `readJournalUnit`는 `logMinutes`에 맞춰 `since` 값을 계산하고 반환 레코드를 이후 필터링했지만, `buildJournalArgs`가 `journalctl` 호출에 `--since`를 전달하지 않았다. 실제 명령은 부팅 이후 journal에서 최근 줄 수만큼 역방향으로 찾고 난 뒤 시간 범위를 검사했으므로, 조회 제한은 데이터 출력에만 적용되고 journal 검색에는 적용되지 않았다. systemd 공식 [`journalctl --since`](https://www.freedesktop.org/software/systemd/man/latest/journalctl)는 지정 시각 이후 journal 항목부터 출력하도록 지원한다.
+
+`buildJournalArgs`에 `--since=<ISO timestamp>`를 추가하고, unit 및 nginx access 식별자 양쪽에서 정확한 인자가 만들어지는지 회귀 테스트를 보강했다. focused test는 7/7 통과했다. 이번 수정은 gzip exporter SQL/출력은 건드리지 않으며, 다음 단계에서 full deployment verification 후 운영에 배포해 인증 `logsOnly` 조회 시간 및 exporter의 `batchQueryWallMs`·`streamDurationMs` 로그 확보 여부를 확인한다. 속도 개선 판정은 배포 후 진단 응답과 연결된 로그가 실제로 반환된 경우에만 내린다.
+
+초기 전체 검증 한 번은 `.env.local` 전체를 verify process에 전달해 optional Google translation key 관련 테스트 2개가 실패하여 중단했다. 재검증은 임시 env 파일을 worktree에 둬 runtime smoke만 읽게 하고 test runner 환경은 분리했다. `npm run deploy:verify`가 통과해 npm audit 취약점0, 285 test files passed/1 skipped, 1,668 tests passed/3 skipped, typecheck, 문서/API/security/KIS/cron gates, Next production build, standalone HTTP/Chrome desktop·390px mobile smoke를 확인했다. OCI workflow 배포와 운영 진단 조회 결과는 완료 후 이어서 기록한다.
