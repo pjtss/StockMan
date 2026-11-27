@@ -1,3 +1,9 @@
+### 2026-11-28 — US full MISS 반복 운영 API 실측
+- 목적/범위: 배포된 gzip 일봉 export의 full 형식 cold response-cache MISS를 재측정하고 기존 운영 기준과 데이터 무결성을 비교한다. API/DB/압축 동작은 변경하지 않았다.
+- 확인 대상: 운영 `GET /api/public/daily-export/us?format=full`, 인증된 export timing 진단, `docs/operations/public-daily-export-performance-report.md` 및 현재 exporter 구현.
+- 실측 결과: HTTP200/MISS, client3,900ms, timing 진단의 server3,174ms; universe cache HIT/0ms; batch 6개·1 wave·wall1,946ms·누적 query6,915ms·최대1,945ms; 첫 gzip byte2ms, 첫 ticker write1,452ms, stream3,174ms. gzip3,274,760B/raw18,964,448B, ticker5,011개, 필수 필드 누락0, max candle20, invalid0, 기존 raw SHA와 동일.
+- 해석/개선: 이전 full MISS server3,233ms와 유사한 범위로 재현했다. 같은 프로세스의 compact MISS server4,116ms와 비교하면 universe cache MISS/791ms 및 batch wall2,514ms가 달라 단일 비교로 형식별 성능 차이를 말할 수 없다. response-cache HIT는 이미 압축 snapshot을 재사용해 재압축을 피한다. 반복 측정만으로 새 코드/DB 튜닝을 정당화할 병목은 확인되지 않아 기능 변경은 하지 않았다. 이후에는 반복 MISS 또는 동시 요청 부하에서 재현되는 병목을 찾아 속도 개선을 이어간다.
+- 문서 관리/검증: 해당 샘플과 판단 한계를 성능 보고서에도 연결 기록했다. `npm run deploy:verify` 통과: OCI activation preflight, docs/API/security audits, Next.js production build, standalone HTTP/Chrome smoke, Vitest 1,695 passed/3 skipped, typecheck 및 runtime smoke 성공. 검증 완료 후 이 문서 기록을 커밋·푸시하고 OCI workflow 및 운영 API를 확인한다.
 ### 2026-11-28 — US full MISS query activity 운영 표본
 - 목적/범위: 첫 ticker write와 DB batch 구간이 큰 US full export 한 건을 실행하며 승인된 read-only `exportActivityOnly` 진단으로 PostgreSQL active query와 wait event를 관찰한다.
 - 실측: public US full response-cache MISS는 client/server 3,505/3,233ms, universe HIT/3ms, 6 batch query·1 wave, batch wall1,918ms/summed duration8,001ms/max1,917ms, gzip prefix5ms, first ticker write1,815ms, stream3,229ms였다. HTTP200 gzip3,274,760/raw18,964,448B; 5,011 ticker/max20/invalid0/raw SHA `51D9A4AD05FB2FDC1D57FDF832C0D6EB852F3B72E9B451FE83EB5D599FBEB619`.
