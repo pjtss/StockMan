@@ -788,3 +788,18 @@ localhost PostgreSQL의 실제 Next.js API에서 memLevel8 기준 블록 → mem
 추가로 시장별 5개의 동시 GET을 실행했다. KR group wall은 mem8 2.126/2.084초, mem9 2.485초로 후보가 양쪽 기준보다 느렸다. US group wall은 mem8 4.646/4.998초, mem9 4.308초로 후보가 양쪽 기준보다 빨랐다. 동시 개별 요청 median도 KR 기준 중앙값의 평균1.845초→후보2.233초(+21%), US4.156초→3.696초(-11.1%)였다. 각 동시 응답 모두 HTTP200, gzip 해제·JSON/schema/max20 통과.
 
 전 시장 동일 설정은 부적합하므로 US에만 memLevel9을 적용하고 KR은 명시적으로 8을 유지하는 후보를 만든다. 단일 US request의 이득은 약3%이며 gzip 감소는 약0.25%라 제한적이지만, server stream과 5동시 표본이 모두 US 개선 방향을 보였다. KR 동시 회귀는 설정 분리로 피한다. 남은 위험은 production Node22/하드웨어와 local Node24 차이, 통제되지 않은 DB timing, US 호출 동시성이 더 높을 때 compressor당 128KiB 추가 사용이다. US 전용 후보의 전체 deploy verification 후 운영 KR/US 각5회와 동시 요청 검증을 수행한다. 운영 US 완료시간이 유지 baseline보다 나아지지 않거나 오류/메모리/압축 크기 회귀가 확인되면 memLevel9을 제거하고 재검증·재배포한다.
+
+#### US gzip memLevel9 운영 trial
+
+후보 commit `d1eebb64`는 US gzip compressor의 `memLevel`만 8에서9로 올리고 KR은8을 유지한다. 로컬 `npm run deploy:verify` 통과 후 [OCI run 45931578641](https://github.com/pjtss/StockMan/actions/runs/45931578641)이 성공해 2026-11-27 운영에 반영됐다. 운영 GET은 `https://stockman.r-e.kr/api/public/daily-export/{kr,us}` 경로에서 수행했다.
+
+| 시장 | 관측 전체 완료 시간 | gzip bytes | 해제 JSON bytes | 종목 | 일봉 범위 | 결과 |
+|---|---:|---:|---:|---:|---:|---|
+| KR | 45.861 / 5.957 / 6.790초 | 1,060,716 / 1,061,160 / 1,061,170 | 5,142,281 | 2,337 | 전부20 | HTTP200, gzip JSON 정상 |
+| US | 51.692 / 44.866 / 55.472초 | 2,443,448 / 2,443,448 / 2,444,040 | 11,041,367 | 5,011 | 0–20 | HTTP200, gzip JSON 정상 |
+
+응답은 `application/gzip`, `Content-Encoding` 없음, `no-store`였다. 모든 검증 응답은 gzip 해제와 JSON parse에 성공했고 각 row에 `ticker`, `marketCap`, `daily`가 존재했다. KR 모든 종목은 daily `returnedCount=20`; US는 캐시가 없어 0개인 종목부터 최대20개까지로 상한을 지켰다. 압축 크기와 raw payload는 이전 rollback 운영값과 대체로 동일하다. 세 표본의 운영시간 분산이 커서 memLevel9의 인과적 속도 개선을 입증하지 못했다. 운영 baseline KR 중앙값 약9.555초, US 약50.501초와 비교하면 이번 표본 중앙값 KR6.790초(-28.9%), US51.692초(+2.4%)로 시장 결과가 엇갈린다. 이 때문에 이번 배포는 후보를 운영에 올린 trial 완료이지 성능 개선 확정 판정이 아니다.
+
+원인 분리를 위해 인증된 read-only daily-cache-status API에서 최근30분 `stockman.service` journal 20줄을 조회했다. 응답은 HTTP200이며 민감정보 redaction 표시는 true였으나, journalctl이 7초 제한에서 `JOURNAL_READ_TIMEOUT`을 반환해 API 내부 `batchQueryWallMs`와 stream 시간은 얻지 못했다. 운영 전체시간이 응답의 큰 gap 구간과 함께 흔들리고 있으나 현재는 DB/query와 전송/host 부하를 나눌 증거가 없다. 로그 조회를 넓혀 반복 호출하지 않는다.
+
+전체 검증은 OCI workflow에서 통과했고, 로컬 테스트 1,667 passed/3 skipped, 285 files passed/1 skipped, typecheck/build/runtime/Chrome smoke 및 API/security/docs/cron audits가 통과했다. 추후 회귀 감지는 동일한 gzip 계약 검증과 함께 시장별 전체시간 중앙값, first-byte, longest chunk gap, 압축 bytes를 기록한다. 다음 개선은 server-side timing을 제한 시간 안에 얻거나, 양 시장 운영 baseline을 같은 시간대에 더 많이 확보한 뒤 인과관계를 확인해 진행한다. memLevel9은 이번 배포에서 활성 상태로 두되, 후속 운영 표본에서 US median이 baseline보다 지속해서 나빠지거나 메모리 압박이 확인되면 US도8로 복귀하고 재검증·재배포한다.
