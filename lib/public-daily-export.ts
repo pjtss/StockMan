@@ -261,7 +261,7 @@ export async function getPublicDailyExport(market: ExportMarket, format: PublicD
               name: format === "full"
                 ? `public-daily-export-${market.toLowerCase()}-batch-v1`
                 : `public-daily-export-${market.toLowerCase()}-compact-batch-v1`,
-              text: `
+              text: `/* public-daily-export-market: ${market.toLowerCase()} */
       WITH requested AS (
         SELECT market, code, name
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text, name text)

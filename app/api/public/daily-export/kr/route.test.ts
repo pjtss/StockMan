@@ -96,6 +96,7 @@ describe("public gzip daily export", () => {
     expect(eligibilitySql).toContain("pg_attribute");
     expect(eligibilitySql).toContain("u.instrument_type='COMMON_STOCK'");
     expect(sql).toContain("FROM jsonb_to_recordset($1::jsonb)");
+    expect(sql).toContain(`/* public-daily-export-market: ${market.toLowerCase()} */`);
     expect(JSON.stringify(requestParameter)).toContain(code);
     expect(name).toBe(`public-daily-export-${market.toLowerCase()}-batch-v1`);
     expect(sql).not.toContain(universeTable);

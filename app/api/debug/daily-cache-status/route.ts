@@ -137,7 +137,7 @@ export async function GET(request: Request) {
                    'oldest_active_seconds', oldest_active_seconds,
                    'average_active_seconds', average_active_seconds
                  )) FROM exporter_groups), '[]'::json) AS active_exporter_queries`,
-      [`%${market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles"}%`]);
+      [`%public-daily-export-market: ${market.toLowerCase()}%`]);
       const activityRow = activity.rows[0];
       const exporterQueries = typeof activityRow?.active_exporter_queries === "string"
         ? JSON.parse(activityRow.active_exporter_queries)
