@@ -270,7 +270,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, market, error: "EXPORT_STORAGE_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
     }
   }
-  if (searchParams.get("exportPlanOnly") === "true") {
+  if (searchParams.get("exportPlanOnly") === "true" || searchParams.get("exportAnalyzeOnly") === "true") {
+    const analyze = searchParams.get("exportAnalyzeOnly") === "true";
+    const tickerLimit = analyze ? 100 : 1_000;
     const universeTable = market === "KR" ? "kr_common_stock_universe" : "us_common_stock_universe";
     const candleTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
     const eligibility = market === "KR"
@@ -284,14 +286,15 @@ export async function GET(request: Request) {
           FROM ${universeTable} u
          WHERE ${eligibility}
          ORDER BY u.market, u.code
-         LIMIT 1000`);
+         LIMIT ${tickerLimit}`);
       if (keys.rows.length === 0) return NextResponse.json({ ok: false, market, error: "EXPORT_PLAN_UNIVERSE_EMPTY" }, { status: 503, headers: { "cache-control": "no-store" } });
       const tradingValueExpression = keys.rows[0].has_trading_value
         ? market === "KR"
           ? `CASE WHEN c.trading_value > '-Infinity' AND c.trading_value < 'Infinity' THEN c.trading_value::double precision ELSE c.close * c.volume END`
           : `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$' THEN c.trading_value::double precision ELSE c.close * c.volume END`
         : "c.close * c.volume";
-      const planResult = await pool.query<{ "QUERY PLAN": unknown }>(`EXPLAIN (FORMAT JSON)
+      const explainOptions = analyze ? "ANALYZE, BUFFERS, TIMING OFF, FORMAT JSON" : "FORMAT JSON";
+      const planResult = await pool.query<{ "QUERY PLAN": unknown }>(`EXPLAIN (${explainOptions})
         /* public-daily-export-market: ${market.toLowerCase()} */
         SELECT r.market, r.code,
                (SELECT json_agg(json_build_array(recent.candle_date, recent.open, recent.high, recent.low, recent.close, recent.volume, recent.trading_value, recent.fetched_at) ORDER BY recent.candle_date ASC)
@@ -306,7 +309,7 @@ export async function GET(request: Request) {
                   ) recent) AS candles
           FROM jsonb_to_recordset($1::jsonb) AS r(market text, code text, name text)
          ORDER BY r.market, r.code`, [JSON.stringify(keys.rows.map(({ market: keyMarket, code, name }) => ({ market: keyMarket, code, name })))]);
-      return NextResponse.json({ ok: true, market, checkedAt: new Date().toISOString(), plannedTickerCount: keys.rows.length, plan: planResult.rows[0]?.["QUERY PLAN"] ?? null }, { headers: { "cache-control": "no-store" } });
+      return NextResponse.json({ ok: true, market, checkedAt: new Date().toISOString(), plannedTickerCount: keys.rows.length, executed: analyze, plan: planResult.rows[0]?.["QUERY PLAN"] ?? null }, { headers: { "cache-control": "no-store" } });
     } catch {
       return NextResponse.json({ ok: false, market, error: "EXPORT_PLAN_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
     }
