@@ -856,3 +856,11 @@ US candle table 총 크기는 로컬에서5,894MB, 기존 lookup index422MB, 기
 다음 진단 접근은 systemd journal에 의존하지 않고 exporter가 완료 시 이미 계산하는 phase metrics를 `globalThis`의 versioned buffer에서 최대30건 보유하고, 기존 인증 `/api/debug/daily-cache-status?market=US&exportTimingsOnly=true` 응답에서 최근 시장별10건을 읽게 하는 것이다. `globalThis` 저장소는 Next route bundle이 모듈을 별도 로드해도 같은 Node server process 안에서 공유된다. request ID로 공개 API 클라이언트 완료 시간과 server batch/query timing을 대조할 수 있다. 이 진단 경로는 DB와 journal을 조회하지 않으며 public gzip 응답에는 request ID나 추가 필드를 노출하지 않는다. 시간 filter 수정만으로 속도 향상을 주장하지 않고, 이 timing buffer 기능은 focused test 및 전체 verification 후 별도 OCI 배포와 운영 재측정을 진행한다.
 
 route-bundle 간 공유를 위해 ring을 versioned `globalThis` store로 고정한 마지막 코드 state도 focused route/ring/journal tests 3 files/15 tests 및 전체 `npm run deploy:verify`를 통과했다. 전체 suite는286 files passed/1 skipped, 1,670 tests passed/3 skipped; npm audit 취약점0, typecheck, docs/API/auth/KIS/cron gates, production build, standalone HTTP 및 Chrome desktop/390px mobile smoke가 모두 성공했다. OCI 배포 뒤 실제 US gzip 요청과 authenticated `exportTimingsOnly=true` 호출로 timing 접근성을 검증한다.
+
+### 운영 exporter timing과 PostgreSQL 대기 유형 진단
+
+운영 US gzip 전체 응답은 HTTP200으로 46.003초가 걸렸다. 첫 body byte는0.850초였고 최대 chunk 공백은43.357초였다. gzip 2,443,448B를 해제한 JSON은11,041,367B, 5,011 ticker이며 일봉은 최대20개·잘못된 레코드0건이었다. 이어 인증된 timing 조회는165ms에 완료됐고 동일 request ID의 서버 측 total은45,713ms였다. universe query612ms, batch query wall43,277ms, batch query duration 합214,470ms, 최대 단일 query43,275ms, 6 queries/1 wave, 첫 gzip byte615ms, stream45,100ms였다. 클라이언트와 서버 총 시간 차이는 약290ms다.
+
+이 요청에서 긴 지연은 batch query wall 시간 및 body 공백과 일치한다. 합산 query duration은 동시 query들의 개별 wall duration 합계이며 CPU 실행시간이 아니다. 따라서 현재 증거는 DB query 대기 구간에 지연이 있음을 좁히지만 IO·lock·CPU·서버 자원 중 원인은 확정하지 못한다.
+
+다음 원인 판별을 위해 기존 인증 진단 API에 `exportActivityOnly=true` 경로를 추가한다. `pg_stat_activity`에서 공개 export cache 테이블을 참조하며 active인 SQL만 대상으로 wait event 유형/이벤트별 개수, 가장 오래된/평균 active 경과초를 집계하고 SQL 원문은 노출하지 않는다. 시장 값은 기존 KR/US allowlist로 고정된 cache table에 대응한다. 후속 운영 요청 중 이 경로를 호출해 대기 유형을 확인하고, 해당 증거가 나온 뒤에만 query concurrency/index/SQL 후보를 정한다. 검증 자동화는 route auth 및 aggregate 결과 테스트와 전체 deploy verification이며 운영 재발 감지는 동일 request ID timing과 함께 이 집계를 비교하는 절차다. 진단 API는 최대 1회의 짧은 read-only DB 집계를 더하므로 관찰 시점 자체가 바뀔 수 있고, snapshot은 호출 시점만 나타낸다.

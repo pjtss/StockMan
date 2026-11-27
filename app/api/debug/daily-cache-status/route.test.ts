@@ -64,6 +64,24 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     expect(mocks.readServerJournal).not.toHaveBeenCalled();
   });
 
+  it("returns aggregated active exporter waits without exposing SQL", async () => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ wait_event_type: "IO", wait_event: "DataFileRead", active_count: 6, oldest_active_seconds: 42, average_active_seconds: 35 }] });
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportActivityOnly=true"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ activeExporterQueries: [{ waitEventType: "IO", waitEvent: "DataFileRead", activeCount: 6, oldestActiveSeconds: 42, averageActiveSeconds: 35 }] });
+    expect(mocks.query.mock.calls[0]?.[0]).toContain("pg_stat_activity");
+    expect(mocks.query.mock.calls[0]?.[0]).not.toMatch(/SELECT\s+query/i);
+    expect(mocks.readServerJournal).not.toHaveBeenCalled();
+  });
+
+  it("requires authorization before exporter activity queries", async () => {
+    mocks.authorized = false;
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportActivityOnly=true"));
+    expect(response.status).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
   it("reads only explicitly requested, validated server journal logs", async () => {
     const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true&logUnit=stockman.service&logMinutes=15&logLimit=10"));
     expect(response.status).toBe(200);

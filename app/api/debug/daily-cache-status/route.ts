@@ -102,6 +102,39 @@ export async function GET(request: Request) {
       exportTimings: getRecentPublicDailyExportTimings(market),
     }, { headers: { "cache-control": "no-store" } });
   }
+  if (searchParams.get("exportActivityOnly") === "true") {
+    try {
+      const activity = await getPool().query<{
+        wait_event_type: string | null;
+        wait_event: string | null;
+        active_count: number;
+        oldest_active_seconds: number;
+        average_active_seconds: number;
+      }>(`SELECT wait_event_type, wait_event, COUNT(*)::int AS active_count,
+                 MAX(EXTRACT(EPOCH FROM (NOW() - query_start)))::int AS oldest_active_seconds,
+                 AVG(EXTRACT(EPOCH FROM (NOW() - query_start)))::int AS average_active_seconds
+            FROM pg_stat_activity
+           WHERE datname = current_database() AND pid <> pg_backend_pid()
+             AND state = 'active' AND query ILIKE $1
+           GROUP BY wait_event_type, wait_event
+           ORDER BY active_count DESC, oldest_active_seconds DESC`,
+      [`%${market === "KR" ? "kr_latest_daily_candles" : "us_latest_daily_candles"}%`]);
+      return NextResponse.json({
+        ok: true,
+        market,
+        checkedAt: new Date().toISOString(),
+        activeExporterQueries: activity.rows.map((row) => ({
+          waitEventType: row.wait_event_type,
+          waitEvent: row.wait_event,
+          activeCount: Number(row.active_count),
+          oldestActiveSeconds: Number(row.oldest_active_seconds),
+          averageActiveSeconds: Number(row.average_active_seconds),
+        })),
+      }, { headers: { "cache-control": "no-store" } });
+    } catch {
+      return NextResponse.json({ ok: false, market, error: "EXPORT_ACTIVITY_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+    }
+  }
   const includeServerLogs = searchParams.get("includeServerLogs") === "true";
   const serverJournalOptions = includeServerLogs ? parseServerJournalOptions(searchParams) : null;
   if (includeServerLogs && serverJournalOptions == null) {
