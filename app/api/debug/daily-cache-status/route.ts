@@ -10,6 +10,7 @@ import { loadFeatureDiscordDebugWebhook } from "@/lib/discord-config";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
 import { parseServerJournalOptions, readServerJournal } from "@/lib/server-journal";
+import { getRecentPublicDailyExportTimings } from "@/lib/public-daily-export-timing";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -93,6 +94,14 @@ export async function GET(request: Request) {
 
   const config = MARKET_CONFIG[market];
   const searchParams = new URL(request.url).searchParams;
+  if (searchParams.get("exportTimingsOnly") === "true") {
+    return NextResponse.json({
+      ok: true,
+      market,
+      checkedAt: new Date().toISOString(),
+      exportTimings: getRecentPublicDailyExportTimings(market),
+    }, { headers: { "cache-control": "no-store" } });
+  }
   const includeServerLogs = searchParams.get("includeServerLogs") === "true";
   const serverJournalOptions = includeServerLogs ? parseServerJournalOptions(searchParams) : null;
   if (includeServerLogs && serverJournalOptions == null) {

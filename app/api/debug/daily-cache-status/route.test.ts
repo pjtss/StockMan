@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   authorized: true,
   query: vi.fn(),
   readServerJournal: vi.fn(),
+  getRecentPublicDailyExportTimings: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ getPool: () => ({ query: mocks.query }) }));
@@ -18,6 +19,7 @@ vi.mock("@/lib/server-journal", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/server-journal")>();
   return { ...actual, readServerJournal: mocks.readServerJournal };
 });
+vi.mock("@/lib/public-daily-export-timing", () => ({ getRecentPublicDailyExportTimings: mocks.getRecentPublicDailyExportTimings }));
 
 import { GET } from "./route";
 
@@ -26,7 +28,9 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     mocks.authorized = true;
     mocks.query.mockReset();
     mocks.readServerJournal.mockReset();
+    mocks.getRecentPublicDailyExportTimings.mockReset();
     mocks.readServerJournal.mockResolvedValue({ source: "systemd-journal", units: [] });
+    mocks.getRecentPublicDailyExportTimings.mockReturnValue([]);
     mocks.query.mockImplementation(async (sql: string) => {
       if (sql.includes("WITH eligible AS")) return { rows: [{ market: "KOSPI", eligible_count: 2, cached_count: 2, latest_date_count: 2, behind_latest_count: 0, latest_market_date: "20261126", latest_fetched_at: "2026-11-26T06:00:00Z", oldest_current_latest_fetched_at: "2026-11-26T05:00:00Z" }] };
       if (sql.includes("instrument_candle_cache_retries")) return { rows: [] };
@@ -42,6 +46,20 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     mocks.authorized = false;
     const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=KR&includeServerLogs=true"));
     expect(response.status).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.readServerJournal).not.toHaveBeenCalled();
+    expect(mocks.getRecentPublicDailyExportTimings).not.toHaveBeenCalled();
+  });
+
+  it("returns bounded exporter timings through an authenticated database-free path", async () => {
+    const samples = [{ requestId: "request-1", market: "US", totalElapsedMs: 45_000 }];
+    mocks.getRecentPublicDailyExportTimings.mockReturnValue(samples);
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportTimingsOnly=true"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toMatchObject({ ok: true, market: "US", exportTimings: samples });
+    expect(mocks.getRecentPublicDailyExportTimings).toHaveBeenCalledWith("US");
     expect(mocks.query).not.toHaveBeenCalled();
     expect(mocks.readServerJournal).not.toHaveBeenCalled();
   });

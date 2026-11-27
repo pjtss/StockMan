@@ -1,9 +1,11 @@
 import { constants as zlibConstants, createGzip } from "node:zlib";
+import { randomUUID } from "node:crypto";
 import { getPool } from "@/lib/db";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
+import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 
-type ExportMarket = "KR" | "US";
+type ExportMarket = PublicDailyExportMarket;
 export type PublicDailyExportFormat = "full" | "compact";
 
 const EXPORT_BATCH_SIZE = 500;
@@ -13,9 +15,11 @@ type ExportRow = { item_json: string };
 type ExportKey = { market: string; code: string; name: string; has_trading_value: boolean };
 
 type ExportPerformanceMetrics = {
+  requestId: string;
   market: ExportMarket;
   format: PublicDailyExportFormat;
   requestStartedAt: number;
+  requestStartedAtIso: string;
   tickerCount: number;
   batchCount: number;
   universeQueryMs: number;
@@ -87,7 +91,28 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       activeCompressor.on("end", () => {
         stopHeartbeat();
         const completedAt = performance.now();
+        const timing: CompletedPublicDailyExportTiming = {
+          requestId: metrics.requestId,
+          market: metrics.market,
+          format: metrics.format,
+          startedAt: metrics.requestStartedAtIso,
+          completedAt: new Date().toISOString(),
+          tickerCount: metrics.tickerCount,
+          batchCount: metrics.batchCount,
+          batchQueryCount: metrics.batchQueryCount,
+          batchWaveCount: metrics.batchWaveCount,
+          universeQueryMs: Math.round(metrics.universeQueryMs),
+          batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
+          batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
+          maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
+          timeToFirstGzipByteMs: firstGzipByteAt === null ? null : Math.round(firstGzipByteAt - metrics.requestStartedAt),
+          streamDurationMs: Math.round(completedAt - streamStartedAt),
+          totalElapsedMs: Math.round(completedAt - metrics.requestStartedAt),
+          gzipBytes,
+        };
+        recordCompletedPublicDailyExportTiming(timing);
         console.info(`[API /public/daily-export/${metrics.market.toLowerCase()}] performance`, {
+          requestId: timing.requestId,
           market: metrics.market,
           format: metrics.format,
           tickerCount: metrics.tickerCount,
@@ -98,10 +123,10 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
-          timeToFirstGzipByteMs: firstGzipByteAt === null ? null : Math.round(firstGzipByteAt - metrics.requestStartedAt),
-          streamDurationMs: Math.round(completedAt - streamStartedAt),
-          totalElapsedMs: Math.round(completedAt - metrics.requestStartedAt),
-          gzipBytes,
+          timeToFirstGzipByteMs: timing.timeToFirstGzipByteMs,
+          streamDurationMs: timing.streamDurationMs,
+          totalElapsedMs: timing.totalElapsedMs,
+          gzipBytes: timing.gzipBytes,
         });
         controller.close();
       });
@@ -146,6 +171,8 @@ function errorResponse() {
 
 export async function getPublicDailyExport(market: ExportMarket, format: PublicDailyExportFormat = "compact") {
   const requestStartedAt = performance.now();
+  const requestId = randomUUID();
+  const requestStartedAtIso = new Date().toISOString();
   const { universeTable, candleTable, eligibility, batchSize } = EXPORT_CONFIG[market];
   try {
     const pool = getPool();
@@ -164,9 +191,11 @@ export async function getPublicDailyExport(market: ExportMarket, format: PublicD
        ORDER BY u.market, u.code
     `);
     const metrics: ExportPerformanceMetrics = {
+      requestId,
       market,
       format,
       requestStartedAt,
+      requestStartedAtIso,
       tickerCount: eligible.rows.length,
       batchCount: 0,
       universeQueryMs: performance.now() - universeQueryStartedAt,
