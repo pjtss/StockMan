@@ -129,6 +129,32 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     expect(mocks.query).not.toHaveBeenCalled();
   });
 
+  it("returns a bounded non-executing plan without ticker or SQL disclosure", async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{ market: "NAS", code: "TEST", name: "Private Name", has_trading_value: true }] })
+      .mockResolvedValueOnce({ rows: [{ "QUERY PLAN": [{ Plan: { "Node Type": "Nested Loop", Plans: [{ "Node Type": "Index Scan", "Index Name": "us_lookup_idx" }] } }] }] });
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportPlanOnly=true"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ ok: true, market: "US", plannedTickerCount: 1, plan: [{ Plan: { "Node Type": "Nested Loop" } }] });
+    expect(JSON.stringify(body)).not.toContain("Private Name");
+    expect(mocks.query).toHaveBeenCalledTimes(2);
+    expect(mocks.query.mock.calls[0]?.[0]).toContain("LIMIT 1000");
+    expect(mocks.query.mock.calls[0]?.[0]).toContain("is_dr=false");
+    expect(mocks.query.mock.calls[1]?.[0]).toContain("EXPLAIN (FORMAT JSON)");
+    expect(mocks.query.mock.calls[1]?.[0]).toContain("LIMIT 20");
+    expect(mocks.query.mock.calls[1]?.[0]).not.toMatch(/ANALYZE|INSERT|UPDATE|DELETE/i);
+    expect(mocks.query.mock.calls[1]?.[1]?.[0]).toContain('"code":"TEST"');
+  });
+
+  it("requires authorization before exporter plan queries", async () => {
+    mocks.authorized = false;
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportPlanOnly=true"));
+    expect(response.status).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
   it("returns aggregate exporter statement I/O without disclosing SQL text", async () => {
     mocks.query
       .mockResolvedValueOnce({ rows: [{ table_bytes: "1000", heap_bytes: "600", index_bytes: "400", estimated_live_rows: "250", heap_pages: "75", all_visible_pages: "50", heap_blocks_read: "5", heap_blocks_hit: "15", index_blocks_read: "25", index_blocks_hit: "35" }] })

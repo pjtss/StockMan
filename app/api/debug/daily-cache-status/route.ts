@@ -270,6 +270,47 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, market, error: "EXPORT_STORAGE_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
     }
   }
+  if (searchParams.get("exportPlanOnly") === "true") {
+    const universeTable = market === "KR" ? "kr_common_stock_universe" : "us_common_stock_universe";
+    const candleTable = market === "KR" ? "kr_instrument_universe_candles" : "us_instrument_universe_candles";
+    const eligibility = market === "KR"
+      ? "u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etp=false AND u.is_warrant=false AND u.is_preferred=false"
+      : `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL}`;
+    try {
+      const pool = getPool();
+      const keys = await pool.query<{ market: string; code: string; name: string; has_trading_value: boolean }>(`
+        SELECT u.market, u.code, u.name,
+               EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = 'public.${candleTable}'::regclass AND a.attname = 'trading_value' AND NOT a.attisdropped) AS has_trading_value
+          FROM ${universeTable} u
+         WHERE ${eligibility}
+         ORDER BY u.market, u.code
+         LIMIT 1000`);
+      if (keys.rows.length === 0) return NextResponse.json({ ok: false, market, error: "EXPORT_PLAN_UNIVERSE_EMPTY" }, { status: 503, headers: { "cache-control": "no-store" } });
+      const tradingValueExpression = keys.rows[0].has_trading_value
+        ? market === "KR"
+          ? `CASE WHEN c.trading_value > '-Infinity' AND c.trading_value < 'Infinity' THEN c.trading_value::double precision ELSE c.close * c.volume END`
+          : `CASE WHEN c.trading_value::text ~ '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$' THEN c.trading_value::double precision ELSE c.close * c.volume END`
+        : "c.close * c.volume";
+      const planResult = await pool.query<{ "QUERY PLAN": unknown }>(`EXPLAIN (FORMAT JSON)
+        /* public-daily-export-market: ${market.toLowerCase()} */
+        SELECT r.market, r.code,
+               (SELECT json_agg(json_build_array(recent.candle_date, recent.open, recent.high, recent.low, recent.close, recent.volume, recent.trading_value, recent.fetched_at) ORDER BY recent.candle_date ASC)
+                  FROM (
+                    SELECT c.candle_date, c.open, c.high, c.low, c.close, c.volume,
+                           ${tradingValueExpression} AS trading_value, c.fetched_at
+                      FROM ${candleTable} c
+                     WHERE c.market = r.market AND c.code = r.code AND c.timeframe = 'D'
+                       AND ${validDailyCandleSql("c")}
+                     ORDER BY c.candle_date DESC
+                     LIMIT 20
+                  ) recent) AS candles
+          FROM jsonb_to_recordset($1::jsonb) AS r(market text, code text, name text)
+         ORDER BY r.market, r.code`, [JSON.stringify(keys.rows.map(({ market: keyMarket, code, name }) => ({ market: keyMarket, code, name })))]);
+      return NextResponse.json({ ok: true, market, checkedAt: new Date().toISOString(), plannedTickerCount: keys.rows.length, plan: planResult.rows[0]?.["QUERY PLAN"] ?? null }, { headers: { "cache-control": "no-store" } });
+    } catch {
+      return NextResponse.json({ ok: false, market, error: "EXPORT_PLAN_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+    }
+  }
   const includeServerLogs = searchParams.get("includeServerLogs") === "true";
   const serverJournalOptions = includeServerLogs ? parseServerJournalOptions(searchParams) : null;
   if (includeServerLogs && serverJournalOptions == null) {
