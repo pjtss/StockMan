@@ -10,7 +10,7 @@ export type PublicDailyExportFormat = "full" | "compact";
 
 const EXPORT_BATCH_SIZE = 500;
 
-type ExportRow = { item_json: string };
+type ExportRow = { item_json?: string; items_json?: string };
 
 type ExportKey = { market: string; code: string; name: string; has_trading_value: boolean };
 
@@ -174,19 +174,15 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 9, metrics: ExportP
       void (async () => {
         await write("[");
         await flush();
-        let index = 0;
-        const pending: string[] = [];
-        const writePending = async () => {
-          if (pending.length === 0) return;
-          await write(`${index === 0 ? "" : ","}${pending.join(",")}`);
-          index += pending.length;
-          pending.length = 0;
-        };
-        for await (const item of items) {
-          pending.push(item);
-          if (pending.length === EXPORT_BATCH_SIZE) await writePending();
+        let hasWrittenBatch = false;
+        for await (const batchJson of items) {
+          const batchItems = batchJson.startsWith("[") && batchJson.endsWith("]")
+            ? batchJson.slice(1, -1)
+            : batchJson;
+          if (!batchItems) continue;
+          await write(`${hasWrittenBatch ? "," : ""}${batchItems}`);
+          hasWrittenBatch = true;
         }
-        await writePending();
         activeCompressor.end("]");
       })().catch((error: unknown) => activeCompressor.destroy(error instanceof Error ? error : new Error("GZIP_STREAM_FAILED")));
     },
@@ -322,7 +318,7 @@ export async function getPublicDailyExport(
         SELECT market, code, name
           FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text, name text)
       )
-      SELECT row_to_json(payload)::text AS item_json
+      SELECT '[' || COALESCE(string_agg(row_to_json(payload)::text, ',' ORDER BY r.market, r.code), '') || ']' AS items_json
         FROM requested r
         LEFT JOIN instrument_fundamental_snapshots f
           ON f.market = r.market AND f.code = r.code
@@ -365,7 +361,6 @@ export async function getPublicDailyExport(
                  )
                  ) AS daily
         ) payload
-       ORDER BY r.market, r.code
               `,
               values: [JSON.stringify(keys)],
             });
@@ -387,8 +382,15 @@ export async function getPublicDailyExport(
         // queries in this wave continue concurrently during gzip streaming.
         for (const resultPromise of chunkPromises) {
           const result = await resultPromise;
-          for (const row of result.rows) {
-            yield row.item_json;
+          const itemsJson = result.rows[0]?.items_json;
+          if (result.rows.length === 1 && typeof itemsJson === "string") {
+            if (itemsJson.length < 2) throw new Error("EMPTY_PUBLIC_DAILY_EXPORT_BATCH");
+            yield itemsJson;
+          } else {
+            for (const row of result.rows) {
+              if (typeof row.item_json !== "string") throw new Error("EMPTY_PUBLIC_DAILY_EXPORT_BATCH");
+              yield row.item_json;
+            }
           }
         }
         await waveResults;

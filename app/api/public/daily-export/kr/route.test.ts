@@ -41,6 +41,10 @@ function makeRow(market: string, code: string, currency: string) {
   };
 }
 
+function makeBatch(rows: Array<{ item_json: string }>) {
+  return { items_json: `[${rows.map((row) => row.item_json).join(",")}]` };
+}
+
 function fullRequest() {
   return new Request("http://localhost/api/public/daily-export/test?format=full");
 }
@@ -62,7 +66,7 @@ describe("public gzip daily export", () => {
   ] as const)("returns a no-auth, no-store gzip JSON export for %s", async (market, getExport, universeTable, candleTable, code, currency) => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock", has_trading_value: true }] })
-      .mockResolvedValue({ rows: [makeRow(market === "KR" ? "KOSPI" : "NAS", code, currency)] });
+      .mockResolvedValue({ rows: [makeBatch([makeRow(market === "KR" ? "KOSPI" : "NAS", code, currency)])] });
 
     const response = await getExport(fullRequest());
     const compressed = Buffer.from(await response.arrayBuffer());
@@ -123,7 +127,7 @@ describe("public gzip daily export", () => {
     }
     expect(sql).not.toContain("to_jsonb(c)");
     expect(sql).toContain("json_build_object(");
-    expect(sql).toContain("row_to_json(payload)::text AS item_json");
+    expect(sql).toContain("string_agg(row_to_json(payload)::text, ',' ORDER BY r.market, r.code)");
     expect(sql).toContain('AS "marketCap"');
     expect(sql).toContain("item(market text, code text, name text)");
     expect(sql).toContain("'market', r.market, 'code', r.code, 'name', r.name");
@@ -153,7 +157,7 @@ describe("public gzip daily export", () => {
     };
     queryMock
       .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true }] })
-      .mockResolvedValueOnce({ rows: [{ item_json: JSON.stringify(compactItem) }] });
+      .mockResolvedValueOnce({ rows: [makeBatch([{ item_json: JSON.stringify(compactItem) }])] });
 
     const response = await getKrExport(new Request("http://localhost/api/public/daily-export/kr"));
     const compressed = Buffer.from(await response.arrayBuffer());
