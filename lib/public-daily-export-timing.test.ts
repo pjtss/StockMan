@@ -18,6 +18,7 @@ const timing = (requestId: string, market: "KR" | "US"): CompletedPublicDailyExp
   batchQueryDurationMs: 1,
   maxBatchQueryMs: 1,
   timeToFirstGzipByteMs: 1,
+  timeToFirstTickerWriteMs: 1,
   streamDurationMs: 1,
   totalElapsedMs: 1,
   gzipBytes: 1,

@@ -1,3 +1,11 @@
+### 2026-11-28 — gzip export 첫 종목 데이터 시각 계측
+- 목적/범위: 운영 gzip export의 첫 압축 byte와 첫 실제 ticker payload 기록 시점을 분리해 MISS 응답 지연 구간을 더 정확히 분석한다.
+- 발견/근거: 기존 `timeToFirstGzipByteMs`는 gzip stream을 열자마자 `[`를 쓰고 flush하는 단계에서 발생할 수 있어, 첫 ticker 데이터가 나온 시점으로 오인할 수 있다. 배포 commit `9f039be7`의 후속 운영 표본에서 KR compact MISS는 server total1,825ms/universe143ms/batch wall1,293ms/first gzip byte149ms/stream1,681ms, US는 2,953ms/427ms/1,808ms/428ms/2,526ms였다. `timeToFirstGzipByteMs`는 payload DB 대기 이전을 표시하므로 실제 첫 ticker 지연 지표로는 부족하다.
+- 변경: `lib/public-daily-export.ts`에서 첫 non-empty batch를 gzip에 쓰기 직전의 elapsed time을 `timeToFirstTickerWriteMs`로 계측하고, 기존 first gzip byte metric은 유지한다. 새 값은 내부 performance log와 cron-authenticated timing diagnostics에만 추가하며 public API body/header는 바꾸지 않는다.
+- 검증/운영 계획: 기존 route/timing focused tests에 새 숫자 metric assertion을 추가해 2 files/22 tests 통과했다. 전체 `npm run deploy:verify` 뒤 OCI 배포하고 request-correlated KR/US compact cold MISS에서 first ticker write, universe/batch wall, server total을 수집해 실제 payload 대기 시각을 확인한다. 이 계측 변경 자체를 응답속도 개선이라고 주장하지 않고, 1회 단일 표본으로 설정 조정도 하지 않는다.
+- 남은 위험: 이 값은 첫 batch JSON을 zlib에 전달하기 직전 시각이며 실제 client가 해제한 첫 ticker byte의 전송시각은 아니다. 첫 ticker latency의 end-to-end 네트워크 계측과 batch 쿼리/stream 시간은 별도로 해석한다.
+- 변경 파일: `lib/public-daily-export.ts`, `lib/public-daily-export-timing.ts`(+test), `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서 및 본 로그. 기존 gzip contract와 DB/data는 변경하지 않는다.
+
 ### 2026-11-28 — 공개 gzip export 동시 cold MISS DB query 병합
 - 목적/범위: gzip·ticker·marketCap·daily·20봉 응답 계약을 유지하면서 동시에 들어온 같은 export MISS의 중복 DB batch 작업을 줄인다.
 - 운영 근거: 재활성화 직후 US full export GET 두 개를 동시 실행했다. 두 요청 모두 HTTP200/MISS, gzip/raw3,274,760/18,964,448B와3,274,929/18,964,448B, 5,011 ticker, max20이었고 client wall11.149s였다. request ID timing과 시작시각/gzip bytes가 맞았으며 server total10.740/10.431s, universe MISS/COALESCED2,034/2,022ms, 각각6 batch query·1 wave, batch wall5,912/5,180ms, 누적 query duration28,081/29,290ms, first gzip byte2,118/2,124ms, stream8,703/8,409ms다. Universe 조회는 이미 병합됐으나 동일한 여섯 batch query가 각 요청에서 재실행되어 두 요청에 총12회 물리 SQL이 수행됐다. pair 1회라 중복 경쟁이 전체 10초를 유발했다고 단정하지 않는다.

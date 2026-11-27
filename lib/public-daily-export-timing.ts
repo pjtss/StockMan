@@ -17,6 +17,7 @@ export type CompletedPublicDailyExportTiming = {
   batchQueryDurationMs: number;
   maxBatchQueryMs: number;
   timeToFirstGzipByteMs: number | null;
+  timeToFirstTickerWriteMs: number | null;
   streamDurationMs: number;
   totalElapsedMs: number;
   gzipBytes: number;

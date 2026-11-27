@@ -83,6 +83,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
     start(controller) {
       const streamStartedAt = performance.now();
       let firstGzipByteAt: number | null = null;
+      let firstTickerWriteAt: number | null = null;
       let gzipBytes = 0;
       const compressedChunks: Buffer[] = [];
       const activeCompressor = createGzip({
@@ -139,6 +140,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
           timeToFirstGzipByteMs: firstGzipByteAt === null ? null : Math.round(firstGzipByteAt - metrics.requestStartedAt),
+          timeToFirstTickerWriteMs: firstTickerWriteAt === null ? null : Math.round(firstTickerWriteAt - metrics.requestStartedAt),
           streamDurationMs: Math.round(completedAt - streamStartedAt),
           totalElapsedMs: Math.round(completedAt - metrics.requestStartedAt),
           gzipBytes,
@@ -159,6 +161,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
           timeToFirstGzipByteMs: timing.timeToFirstGzipByteMs,
+          timeToFirstTickerWriteMs: timing.timeToFirstTickerWriteMs,
           streamDurationMs: timing.streamDurationMs,
           totalElapsedMs: timing.totalElapsedMs,
           gzipBytes: timing.gzipBytes,
@@ -180,6 +183,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
             ? batchJson.slice(1, -1)
             : batchJson;
           if (!batchItems) continue;
+          firstTickerWriteAt ??= performance.now();
           await write(`${hasWrittenBatch ? "," : ""}${batchItems}`);
           hasWrittenBatch = true;
         }

@@ -300,6 +300,7 @@ describe("public gzip daily export", () => {
       batchQueryDurationMs: expect.any(Number),
       maxBatchQueryMs: expect.any(Number),
       timeToFirstGzipByteMs: expect.any(Number),
+      timeToFirstTickerWriteMs: expect.any(Number),
       streamDurationMs: expect.any(Number),
       totalElapsedMs: expect.any(Number),
       gzipBytes: expect.any(Number),
