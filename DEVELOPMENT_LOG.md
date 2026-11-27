@@ -1,3 +1,10 @@
+### 2026-11-28 — gzip API market universe 5분 캐시 후보
+- 목적/범위: 기존 public gzip 일봉 API의 compact/full 응답 계약, gzip 단일 형식, 공통 종목 판정, 시가총액 데이터, 최대20봉을 유지하면서 DB MISS의 universe SELECT 비용을 줄인다.
+- 운영 기준: 직전 두 개의 correlated compact MISS에서 같은 market gzip bytes·시간창인 server timing을 찾았다. KR universe median265.5ms(351/180), US897.5ms(1,020/775); server total KR2.479/1.929초, US3.988/3.485초다. n=2라 반복 분포의 대표 또는 인과 근거로 과대해석하지 않는다.
+- 후보 구현: `lib/public-daily-export-universe-cache.ts`에 process-global, market별 300초 TTL과 cold lookup single-flight를 추가한다. 성공한 비어있지 않은 master rows만 보존하고 빈 결과·예외는 캐시하지 않는다. 일봉·시가총액 snapshot 쿼리는 매 response MISS에서 그대로 실행한다. 내부 timing과 완료 로그에 `MISS/HIT/COALESCED`를 남기며 공개 response는 변경하지 않는다. 보통주/활성 상태 또는 이름 변경은 최대5분 지연될 수 있고 이것이 남은 신선도 위험이다. 기존 `lib/us-top-rising-universe.ts`의 stored scope도 process cache TTL300초를 사용한다.
+- 검증: cache TTL/빈 응답·오류/동시 요청 단위 테스트 및 KR route stale-refresh/response contract를 포함해 focused 3 files/24 tests 통과. 전체 `npm run deploy:verify` 및 OCI 배포·운영 검증은 후속 진행.
+- 변경 파일: `lib/public-daily-export-universe-cache.ts`(+test), `lib/public-daily-export.ts`, `lib/public-daily-export-timing.ts`(+test), `app/api/public/daily-export/kr/route.test.ts`, 운영 성능 보고서, 본 로그. 기능을 유지할지는 production MISS에서 timer `universeCacheStatus`와 raw SHA/max20 contract를 확인해 판정한다. 시각 변경 전 baseline 2표본뿐이므로 개선 주장은 보류한다.
+
 ### 2026-11-28 — gzip windowBits 후보 운영 배포 확인 및 API 사후검증
 - 목적/범위: gzip 단일 형식·compact ticker/marketCap/daily 계약·티커별 일봉 최대20개를 유지하면서 `windowBits=12` 압축 후보를 배포하고 운영 응답을 검증했다.
 - 변경 및 측정: 기능 변경은 앞선 커밋 `a5000d93`의 `lib/public-daily-export.ts` 한 줄 설정이다. 현재 작업은 운영 성능 보고서와 이 로그에 배포/검증 결과를 추가했다. 보고서의 exact-payload stream replay에서 windowBits13 대비12 압축 median은 US161.204→142.271ms(-11.7%, gzip +0.14%), KR84.904→72.270ms(-14.9%, gzip -0.77%)였으며 gunzip raw SHA는 동일했다. replay는 gzip 구간 실험으로 전체 Next.js/DB API 성능 향상 증거와 구분한다.

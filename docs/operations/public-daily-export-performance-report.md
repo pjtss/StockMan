@@ -1231,3 +1231,24 @@ After the documentation release activated, a new process produced fresh compact 
 | US compact | 200 / MISS | 4.259s | 3.988s | 1.020s / 2.236s | 1.021s / 2.968s | 2,454,714 |
 
 The 226ms KR and 271ms US client/server differences include proxy/network delivery and measurement boundaries. This single post-release sample per market is a successful production verification and a useful correlated baseline; it is not enough to attribute end-to-end speed change to `windowBits=12`. Keep gathering fresh MISSes and compare correlated phase medians against the preceding release before another route/query candidate is accepted.
+
+### Market universe process cache — 5 minute speed candidate
+
+The compact gzip API response cache lives for60s and is keyed by market plus format, while the eligible ticker/name list is identical for `compact` and `full`. Before this candidate, each response-cache MISS executed the same ordered common-stock universe SELECT before starting gzip or candle batch queries. Two fresh post-deployment compact MISSes per market were correlated with authenticated timing records by request time and exact gzip bytes:
+
+| Market | Client full body | Server total | Universe query | Batch wall | First gzip byte | Stream | gzip bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| KR sample A | 2.705s | 2.479s | 351ms | 1.675s | 358ms | 2.127s | 1,043,357 |
+| KR sample B | 5.910s | 1.929s | 180ms | 1.198s | 223ms | 1.746s | 1,043,357 |
+| US sample A | 4.259s | 3.988s | 1.020s | 2.236s | 1.021s | 2.968s | 2,454,714 |
+| US sample B | 4.736s | 3.485s | 775ms | 2.008s | 777ms | 2.709s | 2,454,714 |
+
+Each response had HTTP200/MISS, valid gzip and compact tuple-v1 JSON, ticker/marketCap/daily, eight candle fields, max20, and stable market raw SHA. The two-sample universe-query median was KR265.5ms and US897.5ms; each request's overall server/stream time also varied substantially. A successful 5-minute process cache can skip that SELECT for subsequent misses, including a different output format, and single-flight simultaneous loads by market. It retains only non-empty successful master results; an empty result or database error remains uncached and the API stays fail-closed.
+
+The candidate caches only the verified ordered `(market, code, name)` universe per market for at most300s. Candle summaries and market-cap snapshots continue to be read from PostgreSQL on every response MISS. A stock enable/product/name change may therefore take up to five minutes to appear in the export. This is bounded staleness, aligned with the existing five-minute stored-scope cache in `lib/us-top-rising-universe.ts`; it is the main correctness risk. Authenticated request timing now includes `universeCacheStatus` (`MISS`, `HIT`, `COALESCED`) so a production check can verify the SELECT is skipped without exposing details in the public API.
+
+Focused route/cache tests passed24/24 after updating stale-refresh expectations to assert that a valid universe cache reuses the keys while still querying current candle/fundamental summaries. Before retaining this candidate, run full `npm run deploy:verify`, deploy to OCI, and validate gzip/raw SHA/schema/max20. Then correlate at least two per-market MISS or background-refresh records within the cache TTL and require `universeCacheStatus=HIT`/`COALESCED` plus universe query time near zero. Revert the universe cache if status incorrectly remains stale past five minutes, if empty/failed master queries are reused, or if the five-minute propagation window violates stock eligibility expectations.
+
+#### Post-deploy measurement — pending
+
+Record OCI workflow, production request IDs, cache status and whether cached universes reduce repeated-MISS server totals after activation.

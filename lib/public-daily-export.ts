@@ -4,6 +4,7 @@ import { getPool } from "@/lib/db";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER } from "@/lib/us-depositary-receipt-classification";
 import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 import { getCachedPublicDailyExport, setCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
+import { getOrLoadPublicDailyExportUniverse, type PublicDailyExportUniverseCacheStatus } from "@/lib/public-daily-export-universe-cache";
 
 type ExportMarket = PublicDailyExportMarket;
 export type PublicDailyExportFormat = "full" | "compact";
@@ -21,6 +22,7 @@ type ExportPerformanceMetrics = {
   requestStartedAt: number;
   requestStartedAtIso: string;
   tickerCount: number;
+  universeCacheStatus: PublicDailyExportUniverseCacheStatus;
   batchCount: number;
   universeQueryMs: number;
   batchQueryCount: number;
@@ -125,6 +127,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           startedAt: metrics.requestStartedAtIso,
           completedAt: new Date().toISOString(),
           tickerCount: metrics.tickerCount,
+          universeCacheStatus: metrics.universeCacheStatus,
           batchCount: metrics.batchCount,
           batchQueryCount: metrics.batchQueryCount,
           batchWaveCount: metrics.batchWaveCount,
@@ -143,6 +146,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           market: metrics.market,
           format: metrics.format,
           tickerCount: metrics.tickerCount,
+          universeCacheStatus: metrics.universeCacheStatus,
           batchCount: metrics.batchCount,
           universeQueryMs: Math.round(metrics.universeQueryMs),
           batchQueryCount: metrics.batchQueryCount,
@@ -228,12 +232,15 @@ export async function getPublicDailyExport(
   try {
     const pool = getPool();
     const universeQueryStartedAt = performance.now();
-    const eligible = await pool.query<ExportKey>(`
-      SELECT u.market, u.code, u.name
-        FROM ${universeTable} u
-       WHERE ${eligibility}
-       ORDER BY u.market, u.code
-    `);
+    const eligible = await getOrLoadPublicDailyExportUniverse(market, async () => {
+      const result = await pool.query<ExportKey>(`
+        SELECT u.market, u.code, u.name
+          FROM ${universeTable} u
+         WHERE ${eligibility}
+         ORDER BY u.market, u.code
+      `);
+      return result.rows;
+    });
     const metrics: ExportPerformanceMetrics = {
       requestId,
       market,
@@ -241,6 +248,7 @@ export async function getPublicDailyExport(
       requestStartedAt,
       requestStartedAtIso,
       tickerCount: eligible.rows.length,
+      universeCacheStatus: eligible.status,
       batchCount: 0,
       universeQueryMs: performance.now() - universeQueryStartedAt,
       batchQueryCount: 0,

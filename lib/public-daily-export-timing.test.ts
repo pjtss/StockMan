@@ -8,6 +8,7 @@ const timing = (requestId: string, market: "KR" | "US"): CompletedPublicDailyExp
   startedAt: "2026-11-27T00:00:00.000Z",
   completedAt: "2026-11-27T00:00:01.000Z",
   tickerCount: 1,
+  universeCacheStatus: "MISS",
   batchCount: 1,
   batchQueryCount: 1,
   batchWaveCount: 1,

@@ -7,6 +7,7 @@ export type CompletedPublicDailyExportTiming = {
   startedAt: string;
   completedAt: string;
   tickerCount: number;
+  universeCacheStatus: "MISS" | "HIT" | "COALESCED";
   batchCount: number;
   batchQueryCount: number;
   batchWaveCount: number;
