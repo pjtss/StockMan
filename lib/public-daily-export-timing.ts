@@ -10,6 +10,7 @@ export type CompletedPublicDailyExportTiming = {
   universeCacheStatus: "MISS" | "HIT" | "COALESCED";
   batchCount: number;
   batchQueryCount: number;
+  batchQueryCoalescedCount: number;
   batchWaveCount: number;
   universeQueryMs: number;
   batchQueryWallMs: number;

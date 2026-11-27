@@ -1316,3 +1316,25 @@ After release activation, public KR and US compact GETs returned HTTP200/`applic
 | US compact | 0.641s | 0.417s | 2,454,714 / 11,041,367 | 5,011 | 20 |
 
 This proves the deployed process can serve the verified gzip snapshots as `HIT` more than60 seconds apart with the existing data contract. It does not establish a multi-instance hit ratio, p95, or a causal reduction in MISS generation time. The intended benefit is fewer MISS regenerations for repeat requests within five minutes; actual hit-rate impact must be assessed from future production request mix. A fresh entry can remain usable through the additional60-second stale grace while background refresh runs.
+
+The report commit `b80167e3` itself triggered a second release through [OCI workflow 46068494826](https://github.com/pjtss/StockMan/actions/runs/46068494826), and remote verify, packaging, upload and activation all succeeded. This was the same application code; activation restarted the process and reset its in-memory cache. Post-activation health was HTTP200. The first KR/US requests were MISS and the immediate follow-ups were HIT; a second pair65 seconds later again returned HIT:
+
+| Market | First MISS | Immediate HIT | HIT 65s later | gzip / raw bytes | Tickers / max candles |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| KR compact | 2.315s | 0.387s | 0.586s | 1,043,357 / 5,142,281 | 2,337 / 20 |
+| US compact | 3.765s | 0.590s | 0.604s | 2,454,714 / 11,041,367 | 5,011 / 20 |
+
+All six responses were HTTP200/application-gzip; bodies decompressed and parsed with `ticker`, `marketCap`, `daily`, and max20. The gzip/raw sizes and ticker counts matched the preceding release. The second release is not an independent TTL code change, but it provides a repeat production check after a fresh process restart. These short samples do not show real-world hit ratio or p95.
+
+### Concurrent US full-format cold MISS query coalescing candidate — 2026-11-28
+
+After the docs-triggered release reset the in-process response cache, two concurrent US `format=full` GETs both arrived as response-cache MISSes. Both responses completed successfully in an overall client wall time of11.149s. Their timing records matched the request start window and exact gzip sizes:
+
+| Request | Server total | Universe status / time | Batch calls / waves | Batch wall / summed duration | First gzip byte / stream | gzip / raw bytes |
+| --- | ---: | --- | --- | --- | --- | ---: |
+| A | 10.740s | MISS / 2.034s | 6 / 1 | 5.912s / 28.081s | 2.118s / 8.703s | 3,274,760 / 18,964,448 |
+| B | 10.431s | COALESCED / 2.022s | 6 / 1 | 5.180s / 29.290s | 2.124s / 8.409s | 3,274,929 / 18,964,448 |
+
+Both were HTTP200, fully gunzipped/parsed, 5,011 tickers with `ticker`/`marketCap`/`daily`, max20. The universe lookup already used single-flight (`MISS`/`COALESCED`), but each response then ran its own six identical candle/fundamental batch queries: twelve physical queries across the pair. This sample shows concurrent query duplication and contention; it is one unpaired pair and does not establish that duplication alone caused the10-second latency.
+
+The candidate adds a process-local in-flight-only map keyed by the prepared statement name plus the exact serialized ticker-key parameter. Concurrent identical batches await one `pool.query`; the entry is deleted on success or failure, so completed data is never reused as a cache. Each response still streams and gzips its own body. Internal timing adds `batchQueryCoalescedCount` to distinguish batch requests that joined an active query. This preserves freshness and response bytes while reducing duplicate DB work for overlapping identical exports. Focused route/flight/timing tests pass25/25. Production re-test requires two concurrent full MISS responses, with six total physical batch queries (the follower reporting six coalesced batches), valid gzip/schema/max20 and comparable or lower server/client times. The optimization is process-local; requests routed to separate Node processes continue to execute independently. It is not deployed yet.

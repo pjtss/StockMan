@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gunzipSync } from "node:zlib";
 import { clearPublicDailyExportResponseCache, getCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
 import { clearPublicDailyExportUniverseCache } from "@/lib/public-daily-export-universe-cache";
+import { clearPublicDailyExportQueryFlights } from "@/lib/public-daily-export-query-flight";
 import { getRecentPublicDailyExportTimings } from "@/lib/public-daily-export-timing";
 import { getPublicDailyExport } from "@/lib/public-daily-export";
 
@@ -61,6 +62,7 @@ describe("public gzip daily export", () => {
     queryMock.mockReset();
     clearPublicDailyExportResponseCache();
     clearPublicDailyExportUniverseCache();
+    clearPublicDailyExportQueryFlights();
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -289,6 +291,7 @@ describe("public gzip daily export", () => {
       universeCacheStatus: "MISS",
       batchCount: 1,
       batchQueryCount: 1,
+      batchQueryCoalescedCount: 0,
       batchWaveCount: 1,
     });
     expect(performanceLog?.[1]).toEqual(expect.objectContaining({
@@ -377,6 +380,36 @@ describe("public gzip daily export", () => {
     expect(response.status).toBe(200);
     expect(queryMock).toHaveBeenCalledTimes(7);
     expect(peakActive).toBe(6);
+  });
+
+  it("shares identical US batch queries across concurrent cold exports", async () => {
+    const eligible = { market: "NAS", code: "AAPL", name: "Example Common Stock" };
+    const batch = makeRow("NAS", "AAPL", "USD");
+    let resolveBatch: ((value: { rows: typeof batch[] }) => void) | undefined;
+    queryMock.mockResolvedValueOnce({ rows: [eligible] }).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveBatch = resolve;
+    }));
+
+    const [first, second] = await Promise.all([
+      getUsExport(fullRequest()),
+      getUsExport(fullRequest()),
+    ]);
+    expect(first.headers.get("x-public-daily-export-cache")).toBe("MISS");
+    expect(second.headers.get("x-public-daily-export-cache")).toBe("MISS");
+
+    const bodies = Promise.all([first.arrayBuffer(), second.arrayBuffer()]);
+    await waitForBackgroundStream();
+    expect(queryMock).toHaveBeenCalledTimes(2); // one universe load and one shared candle/fundamental batch.
+    const requestedKeys = JSON.parse((queryMock.mock.calls[1]?.[0] as { values: [string] }).values[0]);
+    expect(requestedKeys).toEqual([eligible].map(({ market, code, name }) => ({ market, code, name })));
+
+    resolveBatch?.({ rows: [batch] });
+    const [firstBytes, secondBytes] = await bodies;
+    expect(gunzipSync(Buffer.from(firstBytes)).toString("utf8"))
+      .toBe(gunzipSync(Buffer.from(secondBytes)).toString("utf8"));
+    expect(getRecentPublicDailyExportTimings("US").slice(0, 2)
+      .map((timing) => timing.batchQueryCoalescedCount).sort())
+      .toEqual([0, 1]);
   });
 
   it("keeps KR batch lookups at five concurrent queries", async () => {

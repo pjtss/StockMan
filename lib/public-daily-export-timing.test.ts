@@ -11,6 +11,7 @@ const timing = (requestId: string, market: "KR" | "US"): CompletedPublicDailyExp
   universeCacheStatus: "MISS",
   batchCount: 1,
   batchQueryCount: 1,
+  batchQueryCoalescedCount: 0,
   batchWaveCount: 1,
   universeQueryMs: 1,
   batchQueryWallMs: 1,

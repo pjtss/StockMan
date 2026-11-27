@@ -5,6 +5,7 @@ import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER } from "@/lib/us-de
 import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 import { getCachedPublicDailyExport, setCachedPublicDailyExport } from "@/lib/public-daily-export-response-cache";
 import { getOrLoadPublicDailyExportUniverse, type PublicDailyExportUniverseCacheStatus } from "@/lib/public-daily-export-universe-cache";
+import { getOrLoadPublicDailyExportQuery } from "@/lib/public-daily-export-query-flight";
 
 type ExportMarket = PublicDailyExportMarket;
 export type PublicDailyExportFormat = "full" | "compact";
@@ -26,6 +27,7 @@ type ExportPerformanceMetrics = {
   batchCount: number;
   universeQueryMs: number;
   batchQueryCount: number;
+  batchQueryCoalescedCount: number;
   batchWaveCount: number;
   batchQueryWallMs: number;
   batchQueryDurationMs: number;
@@ -130,6 +132,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           universeCacheStatus: metrics.universeCacheStatus,
           batchCount: metrics.batchCount,
           batchQueryCount: metrics.batchQueryCount,
+          batchQueryCoalescedCount: metrics.batchQueryCoalescedCount,
           batchWaveCount: metrics.batchWaveCount,
           universeQueryMs: Math.round(metrics.universeQueryMs),
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
@@ -150,6 +153,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           batchCount: metrics.batchCount,
           universeQueryMs: Math.round(metrics.universeQueryMs),
           batchQueryCount: metrics.batchQueryCount,
+          batchQueryCoalescedCount: metrics.batchQueryCoalescedCount,
           batchWaveCount: metrics.batchWaveCount,
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
@@ -252,6 +256,7 @@ export async function getPublicDailyExport(
       batchCount: 0,
       universeQueryMs: performance.now() - universeQueryStartedAt,
       batchQueryCount: 0,
+      batchQueryCoalescedCount: 0,
       batchWaveCount: 0,
       batchQueryWallMs: 0,
       batchQueryDurationMs: 0,
@@ -275,10 +280,12 @@ export async function getPublicDailyExport(
         const chunkPromises = chunks.slice(offset, offset + concurrency).map(async (keys) => {
           const queryStartedAt = performance.now();
           try {
-            return await pool.query<ExportRow>({
-              name: format === "full"
-                ? `public-daily-export-${market.toLowerCase()}-batch-v2`
-                : `public-daily-export-${market.toLowerCase()}-compact-batch-v2`,
+            const queryName = format === "full"
+              ? `public-daily-export-${market.toLowerCase()}-batch-v2`
+              : `public-daily-export-${market.toLowerCase()}-compact-batch-v2`;
+            const serializedKeys = JSON.stringify(keys);
+            const queryFlight = getOrLoadPublicDailyExportQuery(`${queryName}:${serializedKeys}`, () => pool.query<ExportRow>({
+              name: queryName,
               text: `/* public-daily-export-market: ${market.toLowerCase()} */
       WITH requested AS (
         SELECT market, code, name
@@ -312,8 +319,10 @@ export async function getPublicDailyExport(
                  ) AS daily
         ) payload
               `,
-              values: [JSON.stringify(keys)],
-            });
+              values: [serializedKeys],
+            }));
+            if (queryFlight.coalesced) metrics.batchQueryCoalescedCount += 1;
+            return await queryFlight.promise;
           } finally {
             const queryDurationMs = performance.now() - queryStartedAt;
             metrics.batchQueryCount += 1;
