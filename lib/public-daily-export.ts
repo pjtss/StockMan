@@ -39,6 +39,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
   eligibility: string;
   batchSize: number;
+  compactBatchSize?: number;
   firstBatchSize?: number;
 }> = {
   KR: {
@@ -49,8 +50,10 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   US: {
     universeTable: "us_common_stock_universe",
     eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER}`,
-    // Seven batches still fit in one query wave; smaller result groups may reduce each DB query's wall time.
+    // Full format is larger and showed a repeatable one-wave query wall improvement with 800-row batches.
     batchSize: 800,
+    // Compact is the default format; production totals did not consistently improve at 800 rows.
+    compactBatchSize: 1_000,
     // Keep the first ordered result small so useful ticker JSON can reach the gzip stream sooner.
     firstBatchSize: 250,
   },
@@ -247,7 +250,8 @@ export async function getPublicDailyExport(
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
   const processCpuUsageStart = process.cpuUsage();
-  const { universeTable, eligibility, batchSize, firstBatchSize } = EXPORT_CONFIG[market];
+  const { universeTable, eligibility, batchSize, compactBatchSize, firstBatchSize } = EXPORT_CONFIG[market];
+  const selectedBatchSize = format === "compact" ? compactBatchSize ?? batchSize : batchSize;
   try {
     const pool = getPool();
     const universeQueryStartedAt = performance.now();
@@ -286,8 +290,8 @@ export async function getPublicDailyExport(
       chunks.push(eligible.rows.slice(0, firstBatchSize));
       chunkStart = firstBatchSize;
     }
-    for (let index = chunkStart; index < eligible.rows.length; index += batchSize) {
-      chunks.push(eligible.rows.slice(index, index + batchSize));
+    for (let index = chunkStart; index < eligible.rows.length; index += selectedBatchSize) {
+      chunks.push(eligible.rows.slice(index, index + selectedBatchSize));
     }
     metrics.batchCount = chunks.length;
     const concurrency = market === "US" ? 10 : 5;

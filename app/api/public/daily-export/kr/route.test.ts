@@ -345,7 +345,7 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
-  it("splits US ticker universes into bounded 800-ticker lookup batches", async () => {
+  it("splits full-format US ticker universes into bounded 800-ticker lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
         rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "NAS", code: `T${index}`, name: "Example Common Stock", has_trading_value: true })),
@@ -414,6 +414,30 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(9);
     expect(peakActive).toBe(8);
     expect(getRecentPublicDailyExportTimings("US")[0]).toMatchObject({ batchCount: 8, batchWaveCount: 1, batchQueryCount: 8 });
+  });
+
+  it("uses the proven 1,000-ticker batches for default compact US exports", async () => {
+    const universeRows = Array.from({ length: 5_011 }, (_, index) => ({
+      market: "NAS",
+      code: `T${String(index).padStart(5, "0")}`,
+      name: "Example Common Stock",
+    }));
+    queryMock
+      .mockResolvedValueOnce({ rows: universeRows })
+      .mockImplementation(async (query) => {
+        const requestedKeys = JSON.parse((query as { values: [string] }).values[0]) as Array<{ market: string; code: string }>;
+        return { rows: [makeBatch(requestedKeys.map(({ market, code }) => makeRow(market, code, "USD")))] };
+      });
+
+    const response = await getPublicDailyExport("US", "compact", { bypassResponseCache: true });
+    expect(response.status).toBe(200);
+    await response.arrayBuffer();
+    const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
+      JSON.parse((query as { values: [string] }).values[0]).length,
+    );
+
+    expect(batchSizes).toEqual([250, 1_000, 1_000, 1_000, 1_000, 761]);
+    expect(getRecentPublicDailyExportTimings("US")[0]).toMatchObject({ batchCount: 6, batchWaveCount: 1, batchQueryCount: 6 });
   });
 
   it("shares identical US batch queries across concurrent cold exports", async () => {
