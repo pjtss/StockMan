@@ -10,6 +10,7 @@ const apiReferencePath = join(root, "public", "api-reference.md");
 const llmsPath = join(root, "public", "llms.txt");
 const docsIndexPath = join(docsRoot, "README.md");
 const allowedExtensions = new Set([".md", ".json"]);
+const MAX_DOCUMENT_BYTES = 350_000;
 const excludedSegments = new Set(["scratch", "__pycache__", "debug-history"]);
 const excludedFiles = new Set(["DEVELOPMENT_LOG.md", "route-inventory.json"]);
 
@@ -76,7 +77,7 @@ async function walk(directory) {
     if (entry.name.match(/(?:^|\D)20\d{2}[-_]?(?:0[1-9]|1[0-2])[-_]?(?:0[1-9]|[12]\d|3[01])(?:\D|$)/) && !managedEventReview && !/runbook|design|standard|schema|template/i.test(entry.name)) continue;
     if (extname(entry.name).toLowerCase() === ".json" && !/(?:schema|template|route-inventory)/i.test(entry.name)) continue;
     const details = await stat(fullPath);
-    if (details.size > 300_000) continue;
+    if (details.size > MAX_DOCUMENT_BYTES) continue;
     files.push({ fullPath, relativePath });
   }
   return files;
@@ -142,6 +143,9 @@ const mode = process.argv[2] ?? "check";
 const catalog = await buildCatalog();
 const failures = [];
 if (catalog.documents.length < 50) failures.push(`Expected at least 50 tracked documents; found ${catalog.documents.length}.`);
+if (!catalog.documents.some((document) => document.sourcePath === "docs/operations/public-daily-export-performance-report.md")) {
+  failures.push("docs/operations/public-daily-export-performance-report.md must remain in the document catalog.");
+}
 const ids = catalog.documents.map((document) => document.id);
 if (ids.some((id, index) => ids.indexOf(id) !== index)) failures.push("Document IDs are not unique.");
 for (const document of catalog.documents) {

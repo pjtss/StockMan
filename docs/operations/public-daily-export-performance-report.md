@@ -1514,6 +1514,12 @@ Keep compact1,000/full800, first batch250 and concurrency10. No repeatable bottl
 
 The fifth fresh-MISS pair was called sequentially, not concurrently. Compact took8.212s client/7.696s server (universe MISS1.512s, six batches/one wave, batch wall3.080s/max3.079s, first ticker2.408s, stream6.101s, CPU delta4.424s, gzip2,455,151B); full took8.173s client/7.788s server (universe HIT, seven batches/one wave, batch wall3.099s/max3.016s, first ticker589ms, stream7.788s, CPU delta5.979s, gzip3,274,983B). Both responses retained the validated raw SHA and 5,011-ticker/field/max20/returnedCount contract. This sequential high-latency pair shows that overlapping compact/full refreshes alone cannot explain the slow intervals. Without host-level or contemporaneous DB wait attribution, leave runtime settings unchanged and continue measuring before selecting another optimization.
 
+### First US batch 250→100 candidate — 2026-11-28
+
+Baseline: US compact MISS5.540s client/5.203s server (universe1.297s, batch wall3.288s, first ticker2.096s); full MISS3.473s/3.396s (universe HIT, batch wall2.214s, first ticker504ms). Both returned5,011 tickers/max20; compact raw SHA remained `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`. A following compact HIT was624ms.
+
+Candidate: reduce only the ordered first US batch250→100 to shorten first ticker latency. At5,011 tickers, full may add one query but remains one wave. Route tests pass23/23 after updating the expected partition. Deployment decision requires full `npm run deploy:verify`, then fresh-MISS client/server total, first ticker, batch wall/count, gzip/raw SHA and gzip/JSON/max20 validation. Keep only with repeated earlier first ticker and no material total regression; otherwise restore250 and deploy rollback. Candidate is not yet deployed. Process CPU delta3.482s in the baseline is process-wide, not gzip-only.
+
 
 ### Pool contention diagnostics — 2026-11-28
 

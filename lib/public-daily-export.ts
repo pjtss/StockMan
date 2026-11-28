@@ -83,8 +83,8 @@ const EXPORT_CONFIG: Record<ExportMarket, {
     batchSize: 800,
     // Compact is the default format; production totals did not consistently improve at 800 rows.
     compactBatchSize: 1_000,
-    // Keep the first ordered result small so useful ticker JSON can reach the gzip stream sooner.
-    firstBatchSize: 250,
+    // Smaller first results reduce the ordered-stream wait before useful ticker JSON is emitted.
+    firstBatchSize: 100,
   },
 };
 
