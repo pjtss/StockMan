@@ -1,7 +1,7 @@
 import type { PublicDailyExportFormat } from "@/lib/public-daily-export";
 import type { PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 
-const TTL_MS = 5 * 60_000;
+const TTL_MS = 8 * 60_000;
 const STALE_GRACE_MS = 60_000;
 const MAX_ENTRIES = 4;
 const MAX_ENTRY_BYTES = 16 * 1024 * 1024;

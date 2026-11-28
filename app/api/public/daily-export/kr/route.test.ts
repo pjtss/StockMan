@@ -254,7 +254,7 @@ describe("public gzip daily export", () => {
     queryMock.mockClear();
     queryMock.mockResolvedValueOnce({ rows: [batch] });
     const dateNow = Date.now();
-    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 5 * 60_000 + 1);
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 8 * 60_000 + 1);
 
     const stale = await getKrExport(fullRequest());
     const staleBytes = Buffer.from(await stale.arrayBuffer());
@@ -288,7 +288,7 @@ describe("public gzip daily export", () => {
       resolveBatch = resolve;
     }));
     const dateNow = Date.now();
-    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 5 * 60_000 + 1);
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 8 * 60_000 + 1);
 
     const [firstStale, secondStale] = await Promise.all([
       getKrExport(fullRequest()),
