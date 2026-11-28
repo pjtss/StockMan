@@ -21,6 +21,8 @@ const timing = (requestId: string, market: "KR" | "US"): CompletedPublicDailyExp
   timeToFirstTickerWriteMs: 1,
   streamDurationMs: 1,
   totalElapsedMs: 1,
+  processCpuUserMs: 1,
+  processCpuSystemMs: 1,
   gzipBytes: 1,
 });
 

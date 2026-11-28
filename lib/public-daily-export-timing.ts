@@ -20,6 +20,8 @@ export type CompletedPublicDailyExportTiming = {
   timeToFirstTickerWriteMs: number | null;
   streamDurationMs: number;
   totalElapsedMs: number;
+  processCpuUserMs: number;
+  processCpuSystemMs: number;
   gzipBytes: number;
 };
 

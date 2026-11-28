@@ -22,6 +22,7 @@ type ExportPerformanceMetrics = {
   format: PublicDailyExportFormat;
   requestStartedAt: number;
   requestStartedAtIso: string;
+  processCpuUsageStart: { user: number; system: number };
   tickerCount: number;
   universeCacheStatus: PublicDailyExportUniverseCacheStatus;
   batchCount: number;
@@ -126,6 +127,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
         const completedBytes = Buffer.concat(compressedChunks, gzipBytes);
         setCachedPublicDailyExport(metrics.market, metrics.format, completedBytes, { takeOwnership: true });
         const completedAt = performance.now();
+        const processCpuUsage = process.cpuUsage(metrics.processCpuUsageStart);
         const timing: CompletedPublicDailyExportTiming = {
           requestId: metrics.requestId,
           market: metrics.market,
@@ -146,6 +148,9 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           timeToFirstTickerWriteMs: firstTickerWriteAt === null ? null : Math.round(firstTickerWriteAt - metrics.requestStartedAt),
           streamDurationMs: Math.round(completedAt - streamStartedAt),
           totalElapsedMs: Math.round(completedAt - metrics.requestStartedAt),
+          // These are process-wide deltas; overlapping requests can contribute to the same interval.
+          processCpuUserMs: Math.round(processCpuUsage.user / 1_000),
+          processCpuSystemMs: Math.round(processCpuUsage.system / 1_000),
           gzipBytes,
         };
         recordCompletedPublicDailyExportTiming(timing);
@@ -167,6 +172,8 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           timeToFirstTickerWriteMs: timing.timeToFirstTickerWriteMs,
           streamDurationMs: timing.streamDurationMs,
           totalElapsedMs: timing.totalElapsedMs,
+          processCpuUserMs: timing.processCpuUserMs,
+          processCpuSystemMs: timing.processCpuSystemMs,
           gzipBytes: timing.gzipBytes,
         });
         controller.close();
@@ -239,6 +246,7 @@ export async function getPublicDailyExport(
   const requestStartedAt = performance.now();
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
+  const processCpuUsageStart = process.cpuUsage();
   const { universeTable, eligibility, batchSize, firstBatchSize } = EXPORT_CONFIG[market];
   try {
     const pool = getPool();
@@ -258,6 +266,7 @@ export async function getPublicDailyExport(
       format,
       requestStartedAt,
       requestStartedAtIso,
+      processCpuUsageStart,
       tickerCount: eligible.rows.length,
       universeCacheStatus: eligible.status,
       batchCount: 0,

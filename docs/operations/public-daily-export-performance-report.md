@@ -1398,3 +1398,61 @@ The latest production US compact MISS timing had first ticker write2,418ms after
 A targeted change now uses250 keys for only the first US batch and keeps subsequent US batches at1,000; KR remains unchanged at500. At the production universe size of5,011 US tickers, this remains six queries in one wave (`250 + 1,000 + 1,000 + 1,000 + 1,000 + 761`), preserves the existing key order and payload schema, and should let a smaller first query complete earlier while other batches continue. For larger universes, the additional small first batch may increase total query count by one relative to pure 1,000-key chunking; query-wave concurrency remains10. This trades no additional query at today's observed universe size, though the actual production latency effect remains to be measured after deployment.
 
 The focused route suite passes22/22, including an added controlled-delay test: for2,501 US tickers the batch order is `[250,1000,1000,251]`; later batches are delayed700ms; the first ticker write stays below500ms; the final JSON still has2,501 rows and retains the first/last ticker order. Local synthetic latency proves the scheduling property, not production speed. Full `npm run deploy:verify` passed: Next.js build, standalone HTTP/Chrome smoke, typecheck, docs/security audits and Vitest (1,696 passed/3 skipped). OCI deployment and production compact/full MISS measurements remain required before claiming an improvement. Raw body SHA, gzip size, server total, first ticker write, batch wall, query count and client first-JSON time will be compared; rollback the first-batch setting if repeated operational samples show slower total response or no useful first-data improvement.
+### gzip level 5–9 CPU/size replay — 2026-11-28
+
+To test whether reducing compression level would improve cold export latency, production gzip responses were fetched for KR/US and full/compact. Their gzip bodies were decompressed and their exact raw bytes were replayed through Node.js v24.14.0 `createGzip` with the production `windowBits=12`, 64KiB input chunks, default strategy, and market-specific `memLevel` (US9/KR8). Levels4–9 were run in interleaved order for eight rounds for KR/US compact and full KR; US full levels5–7 were run for five rounds. Every source payload was fully gunzipped and parsed; the raw SHA values matched the established production payloads. This measures local compression only, not DB time, ticker-by-ticker writes/backpressure, OCI CPU, or client transfer.
+
+| Market / format | level5 median / gzip | level6 median / gzip | level7 median / gzip |
+|---|---:|---:|---:|
+| KR compact | 60.50ms / 1,064,945B | 64.67ms / 1,063,290B | 64.20ms / 1,043,350B |
+| US compact | 115.56ms / 2,502,903B | 120.11ms / 2,501,195B | 121.41ms / 2,454,707B |
+| KR full | 63.17ms / 1,372,448B | 79.51ms / 1,364,438B | 88.56ms / 1,358,159B |
+| US full | 155.77ms / 3,324,899B | 172.41ms / 3,316,123B | 186.06ms / 3,274,753B |
+
+Levels5/6 reduce compressor CPU for full responses, most clearly US full (level5 was16.3% faster than7), but increase gzip bytes. Compact US level6 saves only1.1% CPU while adding46,488B; compact KR level6 was marginally slower than7. Level5 adds roughly1.5–2.1% bytes across the four cases. Since measured fresh-cache HITs are typically0.45–1.1s and cold MISS server time is dominated by universe/batch/stream phases of seconds, these local CPU savings do not establish a total API speedup; extra transfer can erase the savings on compact responses. Keep the deployed level7 setting. No code/config change or deployment was made. Revisit only with matched OCI fresh-MISS timings demonstrating that compression CPU is a repeatable bottleneck and client completion improves after accounting for the larger body. Node zlib option behavior is documented in the [official Node.js zlib API](https://nodejs.org/download/release/v24.14.0/docs/api/zlib.html).
+
+### gzip memLevel exact-stream replay and current warm-cache check — 2026-11-28
+
+The previous memLevel sweep used 64KiB raw-input writes and did not mirror the exporter's per-batch write/backpressure pattern. To close that gap, the exact decompressed production JSON bytes were split at top-level item boundaries and replayed with the current ordered batch sizes (KR500; US250 first, then1,000), including the opening `[` write and zlib flush. Each output was gunzipped and byte-compared with its source. Node.js v24.14.0, level7, windowBits12, 64KiB chunks, six interleaved rounds:
+
+| Market / format | current memLevel | current median | adjacent candidate | candidate median | gzip size delta |
+|---|---:|---:|---:|---:|---:|
+| KR compact | 8 | 98.82ms | 7 / 9 | 105.43 / 103.64ms | +3,509 / -1,919B |
+| US compact | 9 | 215.32ms | 8 | 217.42ms | +5,026B |
+| KR full | 8 | 158.22ms | 7 / 9 | 157.67 / 158.66ms | +5,257 / -2,874B |
+| US full | 9 | 334.47ms | 8 | 337.42ms | +6,686B |
+
+No alternate memory level produced a repeatable speed benefit in the exact batch-stream replay. KR full differences are within this small sample's noise; US8 was about1% slower. Keep market memLevel 8/9. These are local Node v24 compression replay times; they exclude database, server load and client transfer. The API candidate requires an end-to-end production MISS win before changing compression settings.
+
+A read-only production check returned `STALE` for both compact responses (KR 984/987ms, US 1,177/1,137ms) and then `HIT` on the next pair (KR522ms, US652ms). Each response gunzipped and parsed; ticker counts were2,337/5,011, invalid rows0, max20, and raw SHA values remained KR `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4` and US `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`. The current KR refresh timing record showed1.711s total, universe MISS224ms, five-batch wall1.117s, first ticker write893ms and stream1.487s. No settings changed and no deployment was made.
+
+Local Next.js GETs were also attempted through `scripts/dev-server.mjs` on a separate port. Both markets returned the route's HTTP503; the local timing ring was empty, so local API/DB comparisons were unavailable. The server was stopped and the temporary worktree `.env.local` copy and `node_modules` junction were removed. This environment mismatch does not change the production result above.
+
+### zlib threadpool concurrency and fresh-cache stale response verification — 2026-11-28
+
+A production US compact cold MISS had previously completed in19.628s client /19.339s server: eligible universe673ms, six batch queries/one wave with4.769s wall, first ticker write1.045s, stream18.666s, gzip2,456,051B. The unchanged raw body SHA was `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228` (5,011 tickers, max20, invalid0). This is a material outlier relative to the next request-correlated refresh and remains unexplained; it is not evidence by itself that gzip or PostgreSQL was the cause.
+
+To test whether Node's default four-thread libuv pool was limiting gzip throughput during overlapping exports, exact US production full/compact JSON bytes were replayed with the exporter's item grouping and zlib write/flush pattern. Node.js v24.14.0, level7/windowBits12/memLevel9, 64KiB output chunks, three rounds per concurrency level:
+
+| Format | Concurrent gzip streams | pool4 wall median | pool8 wall median |
+|---|---:|---:|---:|
+| compact | 1 | 174.3ms | 173.9ms |
+| compact | 2 | 217.1ms | 212.5ms |
+| compact | 4 | 329.2ms | 338.7ms |
+| full | 1 | 270.4ms | 263.7ms |
+| full | 2 | 335.9ms | 337.5ms |
+| full | 4 | 546.1ms | 539.4ms |
+
+There is no repeatable throughput win at concurrency1–4; differences are small and mixed, so do not set `UV_THREADPOOL_SIZE=8`. This is local CPU evidence and does not reproduce unrelated threadpool consumers on OCI. Node documents that asynchronous zlib work uses the shared internal libuv pool ([zlib API](https://nodejs.org/download/release/v24.14.0/docs/api/zlib.html), [CLI threadpool setting](https://nodejs.org/download/release/v24.14.0/docs/api/cli.html#uv_threadpool_sizesize)).
+
+A later cache-expiry check intentionally omitted activity polling while the US compact stale-while-revalidate refresh ran. The public stale gzip response arrived in1.189s total (343.5ms headers, 873.1ms body); it decompressed and parsed with5,011 tickers, max20, invalid0, and the same raw SHA. The matched background refresh completed in4.987s server time, with universe query301ms, six-batch wall2.511s, first ticker write2.119s, stream4.686s. An immediate follow-up HIT took1.920s client-side. These few timings vary and are not percentiles. In a separate earlier run, frequent 0.5-second `exportActivityOnly` polling overlapped a stale response and took9.459s; those diagnostic requests themselves became slow, so that observation is excluded as a clean baseline. The currently available timing data does not explain the19.339s MISS outlier.
+
+No compression, query, cache or deployment change resulted. The full batch SQL joins an indexed summary table; previous batch-size and all-at-once query trials are recorded above and did not show an end-to-end win. Next diagnosis should correlate a repeated long MISS with server CPU/event-loop pressure and query activity without high-frequency DB polling, then change only the phase that is shown to dominate. Local route A/B remains unavailable because the local DB returned HTTP503 for both markets.
+
+### Process CPU deltas for cold-export diagnosis — 2026-11-28
+
+The production timing samples include cases where one MISS took19.3s while a later refresh took about5s, but they did not show how much CPU the Next.js process consumed during each interval. Cold-export timing now records `processCpuUserMs` and `processCpuSystemMs` from `process.cpuUsage(startValue)`, both in the existing authenticated in-process timing buffer and its structured server log. This distinguishes a CPU-heavy interval from long wall time with comparatively little process CPU, which would direct the next investigation toward I/O, scheduling, or another wait source.
+
+These are **process-wide CPU deltas**, not CPU attribution to one request. Overlapping application requests can contribute to the same interval, and the metrics do not identify PostgreSQL CPU on the separate DB host. The public gzip response body, headers, data selection, cache, and compression behavior are unchanged. The Node.js v22 production runtime documents the previous-value delta and microsecond units in the [official `process.cpuUsage()` API](https://nodejs.org/download/release/v22.18.0/docs/api/process.html#processcpuusagepreviousvalue).
+
+The route regression test checks that both CPU fields are present on a completed MISS timing/log. Full local deploy verification passed: all1,696 tests (3 skipped), typecheck, build, standalone HTTP/Chrome smoke, docs/API/security/cron gates. OCI deployment and one request-correlated production US full or compact MISS are the next validation steps. Compare `(processCpuUserMs + processCpuSystemMs)` with `totalElapsedMs`, `batchQueryWallMs`, and `streamDurationMs`; interpret overlaps separately and do not call high elapsed/low process CPU a DB wait without matching activity evidence.
