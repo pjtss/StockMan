@@ -16,6 +16,10 @@ export type CompletedPublicDailyExportTiming = {
   batchQueryWallMs: number;
   batchQueryDurationMs: number;
   maxBatchQueryMs: number;
+  poolAcquireDurationMs: number;
+  maxPoolAcquireMs: number;
+  queryExecutionDurationMs: number;
+  maxQueryExecutionMs: number;
   poolTotalCountPeakObserved: number;
   poolIdleCountMinObserved: number;
   poolWaitingCountPeakObserved: number;

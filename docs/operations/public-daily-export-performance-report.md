@@ -10,6 +10,12 @@
 
 API 사용 계약은 [공개 API 매뉴얼](../../public/api-reference.md)을, 구현은 [`lib/public-daily-export.ts`](../../lib/public-daily-export.ts)를 참조한다.
 
+### Pool acquisition과 PostgreSQL query 실행 시간 분리 계측 후보 — 2026-11-28
+
+현 운영 instrumentation은 `pool.query()` 호출 전체시간과 process-wide pool counter의 순간값만 기록한다. `pool.query()`는 pool connection acquisition과 DB command 결과 대기를 모두 포함하므로 batch wall이 높은 원인을 분리하지 못한다. 최근 운영 샘플에서 US full pool total peak10/waiting peak7이 관측됐으나 exporter-active query 분류는 비어 있었고, 응답 뒤 activity sampling은 query 완료를 놓쳤다.
+
+후보는 exporter의 유니버스/배치 query를 `pool.connect()` 후 `PoolClient.query()`로 수행하고, pool acquisition 경과시간과 checkout 후 query 경과시간을 합계/최댓값으로 timing record에 남기는 것이다. node-postgres의 [Pool API](https://node-postgres.com/apis/pool)는 `connect()`와 `release()`를 제공한다. 이 계측은 SQL, concurrency, pool size, gzip 및 응답 payload를 바꾸지 않으며, query 실패 시 기존과 같이 오류 client를 pool에 반환해 제거한다. route/timing focused test와 full `npm run deploy:verify` 후 OCI에 배포하고, 운영 cold MISS에서 acquisition/query duration과 batch wall/total을 함께 확인해야 한다. 이 변경은 원인 계측일 뿐 그 자체로 속도 개선이라고 주장하지 않는다. 계측에 따른 latency/누수 징후 또는 contract 불변 실패 시 원복한다.
+
 ### 서버 시작 시 대상 유니버스 예열 배포 검증 — 2026-11-28
 
 시작 시 KR/US eligible ticker universe를 process-local 10분 캐시에 채워 첫 export 요청의 cold universe query를 피하는 후보를 구현했다. Next.js 공식 [Instrumentation 가이드](https://nextjs.org/docs/pages/guides/instrumentation)에 맞춰 Node instrumentation의 `register`에서 동적 import를 시작하되 background IIFE를 기다리지 않도록 해 서버 ready 지연을 피한다. 후보 `284a9828`은 OCI workflow [46119218620](https://github.com/pjtss/StockMan/actions/runs/46119218620)에서 Activate release까지 성공했다.
@@ -40,7 +46,17 @@ Rollback commit `f278aba2` restored100 and passed the same local full verifier. 
 
 이번 변경은 전체 gzip 응답 fresh 기간을 기존5분에서8분으로 늘려 최대 stale age를 기존6분에서9분으로 증가시키는 명시적인 신선도 tradeoff다. ticker eligibility 목록 TTL10분, stale grace60초, public `Cache-Control: no-store`, gzip body/schema/source query와 max20은 변경하지 않는다. `marketCap`의 observedAt/fetchedAt 및 `daily.metadata`의 latest/dataUpdatedAt을 유지해 소비자가 데이터 시점을 확인할 수 있다. Response cache는 process-local이며 32MiB 총 메모리 상한을 유지한다.
 
-Focused response-cache/route tests pass28/28. 테스트는5분 경과 뒤에도 `HIT`, 8분 이후 `STALE`, stale grace 종료 시 eviction, stale-triggered background refresh/coalescing을 검증한다. Full `npm run deploy:verify`와 OCI 배포 후 운영에서 삽입 5분 경과 뒤 8분 전의 `HIT`와 기존 gzip SHA/count/fields/max20을 확인한다. 이 HIT는 instance-local 결과이므로 하나의 관측만으로 multi-instance hit ratio나 일반 latency 개선률을 주장하지 않는다. Freshness가 기대 범위를 벗어나거나 반복 HIT 비율 개선이 확인되지 않으면 5분으로 복구한다.
+Focused response-cache/route tests pass28/28. 전체 `npm run deploy:verify` 통과(290 files passed/1 skipped,1,700 tests passed/3 skipped) 후 commit `081119cc`를 OCI run [46124929810](https://github.com/pjtss/StockMan/actions/runs/46124929810)으로 배포했고 Verify/Package/Upload/Activate 성공을 확인했다.
+
+운영 US compact MISS는 HTTP200/client13,445ms, gzip2,455,711B/raw11,041,367B, raw SHA `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`,5,011 ticker, 필수필드 누락0, returnedCount 불일치0,max20이다. 연결 timing request `e1ee3e92-2e41-4a00-80b5-f61fd535c348`는 universe HIT/0ms,6 batches/1 wave, batch wall8,711ms, first ticker write1,503ms, total11,722ms, process CPU user/system8,646/950ms를 기록했다. 직후 HIT는678ms였고, cache 생성 뒤 약6분 시점인 08:28:06Z에도 HIT/746ms, 동일 gzip/raw bytes와 SHA 및 데이터 계약을 반환했다. 따라서 같은 인스턴스에서 기존 5분 경과 후 8분 전까지 fresh HIT 연장을 운영 확인했다. process-local cache routing 특성상 이 표본은 multi-instance hit ratio나 일반 latency 개선률을 증명하지 않는다. 8분 이후 STALE은 unit test만으로 확인했고 운영에서는 미측정이다.
+
+테스트는5분 경과 뒤 `HIT`,8분 이후 `STALE`, stale grace 종료 시 eviction, stale-triggered background refresh/coalescing을 검증한다. 8분 fresh window로 최대 응답 age는9분이다. `marketCap`/daily source timestamps와 소비자용 시점 정보는 유지한다. Freshness가 기대 범위를 벗어나거나 반복 HIT 비율 이득이 확인되지 않으면5분으로 복구한다.
+
+### gzip compression level 후보 검토 — 2026-11-28
+
+gzip 단일 압축은 고정한 채 Node zlib의 level1/3/4/6/7/9를 같은 운영 US compact raw payload(11,041,367B)로 로컬 microbenchmark했다(각 level 1 warmup + 4회, median). level7은229ms/2,469,523B, level4는92ms/2,657,019B, level3은91ms/2,755,442B, level1은61ms/2,858,041B였다. 운영 gzip 본문은2,455,711B였다. level7에서4로 낮추면 이 실험에서 압축 약137ms가 줄지만 body는 현재 운영 크기보다 약8% 커진다. 배포 MISS의 batch wall8,711ms/total11,722ms보다 작아 end-to-end latency 이득을 단정할 수 없고, 저속 네트워크에서 전송량 증가가 더 느릴 수 있다. 로컬 단일 payload 압축 실험은 OCI streaming 및 DB와 겹치는 처리의 성능 측정이 아니므로 현재 level7/windowBits12/default strategy 설정을 유지했다. 다음 병목 조사 대상은 6개 DB batch query와 pool 대기이며, 근거 없이 query 동시성·batch size를 바꾸지 않는다.
+
+8분 응답 캐시 경과 뒤 수행한 추가 US compact MISS는 client4,024ms, timing `71c8d217-498e-4b2f-add5-bc8fc97908aa` 기준 universe MISS529ms, six batches/one wave, batch wall2,497ms, summed query duration12,022ms, first ticker write1,236ms, server total3,849ms였다. 앞서 기록한 같은 배포의 batch wall8,711ms/total11,722ms와 큰 차이가 있어 이 구간의 가변성이 크다. API activity sampler는 응답 완료 뒤 실행되어 query active snapshot을 포착하지 못했다. 이 두 표본은 여러 host/process/DB load가 통제되지 않았으므로 query plan, batch size 또는 concurrency 조정 근거로 부족하다. 다음 개선은 대표 조건에서 반복되는 query-phase 측정 또는 실제 query plan 확보 후에 정한다.
 
 ## 배포별 동시성 변경
 

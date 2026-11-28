@@ -1,5 +1,6 @@
 import { constants as zlibConstants, createGzip } from "node:zlib";
 import { randomUUID } from "node:crypto";
+import type { PoolClient } from "pg";
 import { getPool } from "@/lib/db";
 import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER } from "@/lib/us-depositary-receipt-classification";
 import { recordCompletedPublicDailyExportTiming, type CompletedPublicDailyExportTiming, type PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
@@ -33,13 +34,18 @@ type ExportPerformanceMetrics = {
   batchQueryWallMs: number;
   batchQueryDurationMs: number;
   maxBatchQueryMs: number;
+  poolAcquireDurationMs: number;
+  maxPoolAcquireMs: number;
+  queryExecutionDurationMs: number;
+  maxQueryExecutionMs: number;
   poolTotalCountPeakObserved: number;
   poolIdleCountMinObserved: number;
   poolWaitingCountPeakObserved: number;
 };
 
 type PoolDiagnostics = Pick<ExportPerformanceMetrics,
-  "poolTotalCountPeakObserved" | "poolIdleCountMinObserved" | "poolWaitingCountPeakObserved"
+  | "poolTotalCountPeakObserved" | "poolIdleCountMinObserved" | "poolWaitingCountPeakObserved"
+  | "poolAcquireDurationMs" | "maxPoolAcquireMs" | "queryExecutionDurationMs" | "maxQueryExecutionMs"
 >;
 
 // Sample process-wide pool counters around existing queries; this adds no SQL or timer polling.
@@ -52,13 +58,34 @@ function observePool(pool: ReturnType<typeof getPool>, diagnostics: PoolDiagnost
 async function queryWithPoolDiagnostics<T>(
   pool: ReturnType<typeof getPool>,
   diagnostics: PoolDiagnostics,
-  runQuery: () => Promise<T>,
+  runQuery: (client: PoolClient) => Promise<T>,
 ) {
   observePool(pool, diagnostics);
+  const acquireStartedAt = performance.now();
+  let client: PoolClient;
   try {
-    const pending = runQuery();
+    client = await pool.connect();
+  } finally {
+    const acquireDurationMs = performance.now() - acquireStartedAt;
+    diagnostics.poolAcquireDurationMs += acquireDurationMs;
+    diagnostics.maxPoolAcquireMs = Math.max(diagnostics.maxPoolAcquireMs, acquireDurationMs);
     observePool(pool, diagnostics);
-    return await pending;
+  }
+
+  try {
+    const queryStartedAt = performance.now();
+    let releaseError: Error | undefined;
+    try {
+      return await runQuery(client);
+    } catch (error) {
+      releaseError = error instanceof Error ? error : new Error("PUBLIC_DAILY_EXPORT_QUERY_FAILED");
+      throw error;
+    } finally {
+      const queryExecutionMs = performance.now() - queryStartedAt;
+      diagnostics.queryExecutionDurationMs += queryExecutionMs;
+      diagnostics.maxQueryExecutionMs = Math.max(diagnostics.maxQueryExecutionMs, queryExecutionMs);
+      client.release(releaseError);
+    }
   } finally {
     observePool(pool, diagnostics);
   }
@@ -93,7 +120,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
 
 const backgroundRefreshes = new Map<string, Promise<void>>();
 
-function queryEligibleUniverse(pool: ReturnType<typeof getPool>, market: ExportMarket) {
+function queryEligibleUniverse(pool: Pick<PoolClient, "query">, market: ExportMarket) {
   const { universeTable, eligibility } = EXPORT_CONFIG[market];
   return pool.query<ExportKey>(`
         SELECT u.market, u.code, u.name
@@ -209,6 +236,10 @@ function gzipJsonStream(
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
+          poolAcquireDurationMs: Math.round(metrics.poolAcquireDurationMs),
+          maxPoolAcquireMs: Math.round(metrics.maxPoolAcquireMs),
+          queryExecutionDurationMs: Math.round(metrics.queryExecutionDurationMs),
+          maxQueryExecutionMs: Math.round(metrics.maxQueryExecutionMs),
           poolTotalCountPeakObserved: metrics.poolTotalCountPeakObserved,
           poolIdleCountMinObserved: metrics.poolIdleCountMinObserved,
           poolWaitingCountPeakObserved: metrics.poolWaitingCountPeakObserved,
@@ -236,6 +267,10 @@ function gzipJsonStream(
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
+          poolAcquireDurationMs: Math.round(metrics.poolAcquireDurationMs),
+          maxPoolAcquireMs: Math.round(metrics.maxPoolAcquireMs),
+          queryExecutionDurationMs: Math.round(metrics.queryExecutionDurationMs),
+          maxQueryExecutionMs: Math.round(metrics.maxQueryExecutionMs),
           poolTotalCountPeakObserved: metrics.poolTotalCountPeakObserved,
           poolIdleCountMinObserved: metrics.poolIdleCountMinObserved,
           poolWaitingCountPeakObserved: metrics.poolWaitingCountPeakObserved,
@@ -324,13 +359,17 @@ export async function getPublicDailyExport(
   try {
     const pool = getPool();
     const poolDiagnostics: PoolDiagnostics = {
+      poolAcquireDurationMs: 0,
+      maxPoolAcquireMs: 0,
+      queryExecutionDurationMs: 0,
+      maxQueryExecutionMs: 0,
       poolTotalCountPeakObserved: pool.totalCount,
       poolIdleCountMinObserved: pool.idleCount,
       poolWaitingCountPeakObserved: pool.waitingCount,
     };
     const universeQueryStartedAt = performance.now();
     const eligible = await getOrLoadPublicDailyExportUniverse(market, async () => {
-      const result = await queryWithPoolDiagnostics(pool, poolDiagnostics, () => queryEligibleUniverse(pool, market));
+      const result = await queryWithPoolDiagnostics(pool, poolDiagnostics, (client) => queryEligibleUniverse(client, market));
       return result.rows;
     });
     const metrics: ExportPerformanceMetrics = {
@@ -379,7 +418,7 @@ export async function getPublicDailyExport(
               ? `public-daily-export-${market.toLowerCase()}-batch-v2`
               : `public-daily-export-${market.toLowerCase()}-compact-batch-v2`;
             const serializedKeys = JSON.stringify(keys);
-            const queryFlight = getOrLoadPublicDailyExportQuery(`${queryName}:${serializedKeys}`, () => queryWithPoolDiagnostics(pool, poolDiagnostics, () => pool.query<ExportRow>({
+            const queryFlight = getOrLoadPublicDailyExportQuery(`${queryName}:${serializedKeys}`, () => queryWithPoolDiagnostics(pool, poolDiagnostics, (client) => client.query<ExportRow>({
               name: queryName,
               text: `/* public-daily-export-market: ${market.toLowerCase()} */
       WITH requested AS (

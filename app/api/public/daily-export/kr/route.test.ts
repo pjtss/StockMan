@@ -12,6 +12,7 @@ const { queryMock, poolStats } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ getPool: () => ({
   query: queryMock,
+  connect: async () => ({ query: queryMock, release: vi.fn() }),
   get totalCount() { return poolStats.totalCount; },
   get idleCount() { return poolStats.idleCount; },
   get waitingCount() { return poolStats.waitingCount; },
@@ -334,6 +335,10 @@ describe("public gzip daily export", () => {
       batchQueryWallMs: expect.any(Number),
       batchQueryDurationMs: expect.any(Number),
       maxBatchQueryMs: expect.any(Number),
+      poolAcquireDurationMs: expect.any(Number),
+      maxPoolAcquireMs: expect.any(Number),
+      queryExecutionDurationMs: expect.any(Number),
+      maxQueryExecutionMs: expect.any(Number),
       timeToFirstGzipByteMs: expect.any(Number),
       timeToFirstTickerWriteMs: expect.any(Number),
       streamDurationMs: expect.any(Number),
