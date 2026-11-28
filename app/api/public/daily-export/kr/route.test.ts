@@ -345,7 +345,7 @@ describe("public gzip daily export", () => {
     expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
-  it("splits US ticker universes into bounded 1,000-ticker lookup batches", async () => {
+  it("splits US ticker universes into bounded 800-ticker lookup batches", async () => {
     queryMock
       .mockResolvedValueOnce({
         rows: Array.from({ length: 2_501 }, (_, index) => ({ market: "NAS", code: `T${index}`, name: "Example Common Stock", has_trading_value: true })),
@@ -359,7 +359,7 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([250, 1_000, 1_000, 251]);
+    expect(batchSizes).toEqual([250, 800, 800, 651]);
   });
 
   it("writes the ordered US first ticker batch before slower later database batches", async () => {
@@ -384,7 +384,7 @@ describe("public gzip daily export", () => {
       JSON.parse((query as { values: [string] }).values[0]).length,
     );
 
-    expect(batchSizes).toEqual([250, 1_000, 1_000, 251]);
+    expect(batchSizes).toEqual([250, 800, 800, 651]);
     expect(timing?.maxBatchQueryMs).toBeGreaterThanOrEqual(650);
     expect(timing?.timeToFirstTickerWriteMs).toBeLessThan(500);
     expect(payload).toHaveLength(2_501);
@@ -411,8 +411,9 @@ describe("public gzip daily export", () => {
     await response.arrayBuffer();
 
     expect(response.status).toBe(200);
-    expect(queryMock).toHaveBeenCalledTimes(8);
-    expect(peakActive).toBe(7);
+    expect(queryMock).toHaveBeenCalledTimes(9);
+    expect(peakActive).toBe(8);
+    expect(getRecentPublicDailyExportTimings("US")[0]).toMatchObject({ batchCount: 8, batchWaveCount: 1, batchQueryCount: 8 });
   });
 
   it("shares identical US batch queries across concurrent cold exports", async () => {
@@ -532,7 +533,7 @@ describe("public gzip daily export", () => {
 
   it.each([
     ["KR", getKrExport, "KOSPI", "KRW", 500, [500, 1]],
-    ["US", getUsExport, "NAS", "USD", 1_000, [250, 751]],
+    ["US", getUsExport, "NAS", "USD", 800, [250, 551]],
   ] as const)("uses the configured %s public export batch sizes", async (market, getExport, exchange, currency, batchSize, expectedBatchSizes) => {
     const universeRows = Array.from({ length: batchSize + 1 }, (_, index) => ({
       market: exchange,

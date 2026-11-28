@@ -49,8 +49,8 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   US: {
     universeTable: "us_common_stock_universe",
     eligibility: `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER}`,
-    // Six batches fit in one query wave and reduced US export latency locally.
-    batchSize: 1_000,
+    // Seven batches still fit in one query wave; smaller result groups may reduce each DB query's wall time.
+    batchSize: 800,
     // Keep the first ordered result small so useful ticker JSON can reach the gzip stream sooner.
     firstBatchSize: 250,
   },
