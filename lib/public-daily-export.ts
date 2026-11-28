@@ -168,7 +168,7 @@ function startBackgroundRefresh(market: ExportMarket, format: PublicDailyExportF
 
 function gzipJsonStream(
   items: AsyncIterable<string>,
-  level: 7,
+  level: number,
   metrics: ExportPerformanceMetrics,
   poolDiagnostics: PoolDiagnostics,
 ) {
@@ -492,7 +492,7 @@ export async function getPublicDailyExport(
     })();
 
     const filename = `daily-candles-${market.toLowerCase()}${format === "compact" ? "-compact" : ""}.json.gz`;
-    const gzipLevel = 7;
+    const gzipLevel = format === "full" ? 5 : 7;
     return new Response(gzipJsonStream(items, gzipLevel, metrics, poolDiagnostics), {
       status: 200,
       headers: {

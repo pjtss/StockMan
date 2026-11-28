@@ -100,7 +100,7 @@ describe("public gzip daily export", () => {
     expect(response.headers.get("content-length")).toBeNull();
     expect(response.headers.get("x-accel-buffering")).toBe("no");
     expect(response.headers.get("x-public-daily-export-cache")).toBe("MISS");
-    expect(compressed[8]).toBe(0); // RFC 1952 XFL=0 for the speed-prioritized level 7 setting.
+    expect(compressed[8]).toBe(0); // RFC 1952 XFL=0 for the configured gzip levels 5 and 7.
     expect(payload).toEqual([{
       ticker: { market: market === "KR" ? "KOSPI" : "NAS", code, name: "Example Common Stock" },
       marketCap: {
