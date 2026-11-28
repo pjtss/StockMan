@@ -33,7 +33,36 @@ type ExportPerformanceMetrics = {
   batchQueryWallMs: number;
   batchQueryDurationMs: number;
   maxBatchQueryMs: number;
+  poolTotalCountPeakObserved: number;
+  poolIdleCountMinObserved: number;
+  poolWaitingCountPeakObserved: number;
 };
+
+type PoolDiagnostics = Pick<ExportPerformanceMetrics,
+  "poolTotalCountPeakObserved" | "poolIdleCountMinObserved" | "poolWaitingCountPeakObserved"
+>;
+
+// Sample process-wide pool counters around existing queries; this adds no SQL or timer polling.
+function observePool(pool: ReturnType<typeof getPool>, diagnostics: PoolDiagnostics) {
+  diagnostics.poolTotalCountPeakObserved = Math.max(diagnostics.poolTotalCountPeakObserved, pool.totalCount);
+  diagnostics.poolIdleCountMinObserved = Math.min(diagnostics.poolIdleCountMinObserved, pool.idleCount);
+  diagnostics.poolWaitingCountPeakObserved = Math.max(diagnostics.poolWaitingCountPeakObserved, pool.waitingCount);
+}
+
+async function queryWithPoolDiagnostics<T>(
+  pool: ReturnType<typeof getPool>,
+  diagnostics: PoolDiagnostics,
+  runQuery: () => Promise<T>,
+) {
+  observePool(pool, diagnostics);
+  try {
+    const pending = runQuery();
+    observePool(pool, diagnostics);
+    return await pending;
+  } finally {
+    observePool(pool, diagnostics);
+  }
+}
 
 const EXPORT_CONFIG: Record<ExportMarket, {
   universeTable: string;
@@ -83,7 +112,12 @@ function startBackgroundRefresh(market: ExportMarket, format: PublicDailyExportF
   backgroundRefreshes.set(refreshKey, refresh);
 }
 
-function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportPerformanceMetrics) {
+function gzipJsonStream(
+  items: AsyncIterable<string>,
+  level: 7,
+  metrics: ExportPerformanceMetrics,
+  poolDiagnostics: PoolDiagnostics,
+) {
   let compressor: ReturnType<typeof createGzip> | null = null;
   let stopHeartbeat = () => undefined;
   return new ReadableStream<Uint8Array>({
@@ -131,6 +165,7 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
         setCachedPublicDailyExport(metrics.market, metrics.format, completedBytes, { takeOwnership: true });
         const completedAt = performance.now();
         const processCpuUsage = process.cpuUsage(metrics.processCpuUsageStart);
+        Object.assign(metrics, poolDiagnostics);
         const timing: CompletedPublicDailyExportTiming = {
           requestId: metrics.requestId,
           market: metrics.market,
@@ -147,6 +182,9 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
+          poolTotalCountPeakObserved: metrics.poolTotalCountPeakObserved,
+          poolIdleCountMinObserved: metrics.poolIdleCountMinObserved,
+          poolWaitingCountPeakObserved: metrics.poolWaitingCountPeakObserved,
           timeToFirstGzipByteMs: firstGzipByteAt === null ? null : Math.round(firstGzipByteAt - metrics.requestStartedAt),
           timeToFirstTickerWriteMs: firstTickerWriteAt === null ? null : Math.round(firstTickerWriteAt - metrics.requestStartedAt),
           streamDurationMs: Math.round(completedAt - streamStartedAt),
@@ -171,6 +209,9 @@ function gzipJsonStream(items: AsyncIterable<string>, level: 7, metrics: ExportP
           batchQueryWallMs: Math.round(metrics.batchQueryWallMs),
           batchQueryDurationMs: Math.round(metrics.batchQueryDurationMs),
           maxBatchQueryMs: Math.round(metrics.maxBatchQueryMs),
+          poolTotalCountPeakObserved: metrics.poolTotalCountPeakObserved,
+          poolIdleCountMinObserved: metrics.poolIdleCountMinObserved,
+          poolWaitingCountPeakObserved: metrics.poolWaitingCountPeakObserved,
           timeToFirstGzipByteMs: timing.timeToFirstGzipByteMs,
           timeToFirstTickerWriteMs: timing.timeToFirstTickerWriteMs,
           streamDurationMs: timing.streamDurationMs,
@@ -254,14 +295,19 @@ export async function getPublicDailyExport(
   const selectedBatchSize = format === "compact" ? compactBatchSize ?? batchSize : batchSize;
   try {
     const pool = getPool();
+    const poolDiagnostics: PoolDiagnostics = {
+      poolTotalCountPeakObserved: pool.totalCount,
+      poolIdleCountMinObserved: pool.idleCount,
+      poolWaitingCountPeakObserved: pool.waitingCount,
+    };
     const universeQueryStartedAt = performance.now();
     const eligible = await getOrLoadPublicDailyExportUniverse(market, async () => {
-      const result = await pool.query<ExportKey>(`
+      const result = await queryWithPoolDiagnostics(pool, poolDiagnostics, () => pool.query<ExportKey>(`
         SELECT u.market, u.code, u.name
           FROM ${universeTable} u
          WHERE ${eligibility}
          ORDER BY u.market, u.code
-      `);
+      `));
       return result.rows;
     });
     const metrics: ExportPerformanceMetrics = {
@@ -281,6 +327,7 @@ export async function getPublicDailyExport(
       batchQueryWallMs: 0,
       batchQueryDurationMs: 0,
       maxBatchQueryMs: 0,
+      ...poolDiagnostics,
     };
     if (eligible.rows.length === 0) return errorResponse();
 
@@ -309,7 +356,7 @@ export async function getPublicDailyExport(
               ? `public-daily-export-${market.toLowerCase()}-batch-v2`
               : `public-daily-export-${market.toLowerCase()}-compact-batch-v2`;
             const serializedKeys = JSON.stringify(keys);
-            const queryFlight = getOrLoadPublicDailyExportQuery(`${queryName}:${serializedKeys}`, () => pool.query<ExportRow>({
+            const queryFlight = getOrLoadPublicDailyExportQuery(`${queryName}:${serializedKeys}`, () => queryWithPoolDiagnostics(pool, poolDiagnostics, () => pool.query<ExportRow>({
               name: queryName,
               text: `/* public-daily-export-market: ${market.toLowerCase()} */
       WITH requested AS (
@@ -345,7 +392,7 @@ export async function getPublicDailyExport(
         ) payload
               `,
               values: [serializedKeys],
-            }));
+            })));
             if (queryFlight.coalesced) metrics.batchQueryCoalescedCount += 1;
             return await queryFlight.promise;
           } finally {
@@ -353,6 +400,7 @@ export async function getPublicDailyExport(
             metrics.batchQueryCount += 1;
             metrics.batchQueryDurationMs += queryDurationMs;
             metrics.maxBatchQueryMs = Math.max(metrics.maxBatchQueryMs, queryDurationMs);
+            observePool(pool, poolDiagnostics);
           }
         });
         const waveResults = Promise.all(chunkPromises);
@@ -383,7 +431,7 @@ export async function getPublicDailyExport(
 
     const filename = `daily-candles-${market.toLowerCase()}${format === "compact" ? "-compact" : ""}.json.gz`;
     const gzipLevel = 7;
-    return new Response(gzipJsonStream(items, gzipLevel, metrics), {
+    return new Response(gzipJsonStream(items, gzipLevel, metrics, poolDiagnostics), {
       status: 200,
       headers: {
         "content-type": "application/gzip",

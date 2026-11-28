@@ -6,8 +6,16 @@ import { clearPublicDailyExportQueryFlights } from "@/lib/public-daily-export-qu
 import { getRecentPublicDailyExportTimings } from "@/lib/public-daily-export-timing";
 import { getPublicDailyExport } from "@/lib/public-daily-export";
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
-vi.mock("@/lib/db", () => ({ getPool: () => ({ query: queryMock }) }));
+const { queryMock, poolStats } = vi.hoisted(() => ({
+  queryMock: vi.fn(),
+  poolStats: { totalCount: 2, idleCount: 2, waitingCount: 0 },
+}));
+vi.mock("@/lib/db", () => ({ getPool: () => ({
+  query: queryMock,
+  get totalCount() { return poolStats.totalCount; },
+  get idleCount() { return poolStats.idleCount; },
+  get waitingCount() { return poolStats.waitingCount; },
+}) }));
 
 import { GET as getKrExport } from "./route";
 import { GET as getUsExport } from "../us/route";
@@ -60,6 +68,7 @@ function waitForBackgroundStream() {
 describe("public gzip daily export", () => {
   beforeEach(() => {
     queryMock.mockReset();
+    Object.assign(poolStats, { totalCount: 2, idleCount: 2, waitingCount: 0 });
     clearPublicDailyExportResponseCache();
     clearPublicDailyExportUniverseCache();
     clearPublicDailyExportQueryFlights();
@@ -277,7 +286,10 @@ describe("public gzip daily export", () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
     queryMock
       .mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock", has_trading_value: true }] })
-      .mockResolvedValueOnce({ rows: [makeRow("KOSPI", "005930", "KRW")] });
+      .mockImplementationOnce(async () => {
+        Object.assign(poolStats, { totalCount: 10, idleCount: 0, waitingCount: 3 });
+        return { rows: [makeRow("KOSPI", "005930", "KRW")] };
+      });
 
     const response = await getKrExport(fullRequest());
     await response.arrayBuffer();
@@ -305,8 +317,16 @@ describe("public gzip daily export", () => {
       totalElapsedMs: expect.any(Number),
       processCpuUserMs: expect.any(Number),
       processCpuSystemMs: expect.any(Number),
+      poolTotalCountPeakObserved: 10,
+      poolIdleCountMinObserved: 0,
+      poolWaitingCountPeakObserved: 3,
       gzipBytes: expect.any(Number),
     }));
+    expect(getRecentPublicDailyExportTimings("KR")[0]).toMatchObject({
+      poolTotalCountPeakObserved: 10,
+      poolIdleCountMinObserved: 0,
+      poolWaitingCountPeakObserved: 3,
+    });
   });
 
   it("reads precomputed candle summaries without inspecting the candle schema", async () => {

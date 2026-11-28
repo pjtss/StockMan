@@ -16,6 +16,9 @@ export type CompletedPublicDailyExportTiming = {
   batchQueryWallMs: number;
   batchQueryDurationMs: number;
   maxBatchQueryMs: number;
+  poolTotalCountPeakObserved: number;
+  poolIdleCountMinObserved: number;
+  poolWaitingCountPeakObserved: number;
   timeToFirstGzipByteMs: number | null;
   timeToFirstTickerWriteMs: number | null;
   streamDurationMs: number;

@@ -1492,4 +1492,44 @@ The post-deploy operating samples passed the same gzip and payload contract: com
 
 A following compact cache HIT completed in565ms client-side. Across the four compact candidate timings, median refresh/server time is5.2205s and median batch wall is3.0035s. Compared with the three preceding 1,000-row compact samples (4.660s server and3.088s batch wall), this is about12% slower overall while batch wall improved only2.7%. The candidate compact cold MISS and later refresh also show substantial universe-query variation. Therefore800 is not an end-to-end speed improvement for the default compact format; the next candidate restores compact to1,000 while retaining800 only for full.
 
-The two full 800-row MISS observations have median server time3.467s and batch wall2.115s, versus the single 1,000-row baseline sample4.237s and2.820s (about18% and25% lower). This is favorable but unpaired evidence with only one baseline sample. The local candidate now uses full800 and compact1,000, keeps first batch250, concurrency10 and payload contract unchanged. Focused route tests pass23/23; full deploy verification, commit, OCI deployment and post-deploy measurements for this split are pending. Treat the full-format setting as provisional and gather repeated MISS samples before attributing causality.
+The two full 800-row MISS observations have median server time3.467s and batch wall2.115s, versus the single 1,000-row baseline sample4.237s and2.820s (about18% and25% lower). This is favorable but unpaired evidence with only one baseline sample. The candidate uses full800 and compact1,000, keeps first batch250, concurrency10 and payload contract unchanged. Focused route tests pass23/23; full deploy verification, commit `85dd8e04`, OCI activation and post-deploy contract checks are complete. Treat the full-format setting as provisional and gather repeated MISS samples before attributing causality.
+
+#### Format-specific batch deployment verification — 2026-11-28
+
+Commit `85dd8e04` was activated successfully by [OCI Deploy run 46097179779](https://github.com/pjtss/StockMan/actions/runs/46097179779). The first post-deploy compact/full calls returned cache HIT (so their client elapsed values are not cold-MISS comparisons). Their authenticated timing records were matched by format, gzip bytes and ticker count and were created during cache refresh:
+
+| Format | Public client GET | Matched refresh server timing | Universe | Batch queries / waves | Batch wall / max | Gzip / raw bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| Compact (1,000 rows) | 649ms, HIT | 3.952s | 116ms, MISS | 6 / 1 | 3.110s / 3.109s | 2,454,714 / 11,041,367 |
+| Full (800 rows) | 1.432s, HIT | 5.168s | 0ms, HIT | 7 / 1 | 2.474s / 2.473s | 3,274,767 / 18,964,448 |
+
+Both decompressed raw SHA-256 values match the established payloads: compact `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`; full `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619`. Each response contained5,011 tickers, all ticker/marketCap/daily fields, zero returnedCount mismatch, and at most20 candles. No payload or gzip configuration changed. A first diagnostic attempt used a nonexistent timing URL and returned HTML; it was discarded. The correct protected read-only path is `/api/debug/daily-cache-status?market=US&exportTimingsOnly=true`, and it returned matching timing records.
+
+This confirms the format-specific batch counts and response contract after deployment, but the public calls were cache HIT and the refresh timing is from the preceding refresh. The observations are not sufficient for a fresh-MISS latency comparison. Continue collecting matched production MISS timings before claiming a speed improvement for full800; compact remains at1,000 based on its prior candidate end-to-end regression.
+#### Post-split fresh MISS and stale-refresh observations — 2026-11-28
+
+The format-specific build (compact1,000/full800) deployed as commit `85dd8e04` in [OCI run 46097179779](https://github.com/pjtss/StockMan/actions/runs/46097179779). First post-deploy bodies were HITs, but their matched refresh timings confirmed compact6 batches and full7 batches, each one wave. Server totals were3.952s compact and5.168s full; batch walls3.110s and2.474s. gzip/raw bytes were2,454,714/11,041,367 compact and3,274,767/18,964,448 full.
+
+Four later fresh-MISS pairs were request-correlated through authenticated process timing. Every body gunzipped/parsed with established raw SHA-256 (compact `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`, full `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619`), 5,011 tickers, required ticker/marketCap/daily fields, max20 candles and zero returnedCount mismatches.
+
+| Fresh MISS pair (UTC) | Compact server / batch wall | Full server / batch wall | Universe status (compact/full) |
+|---|---:|---:|---|
+| 02:31 | 4.025 / 2.757s | 5.120 / 2.526s | MISS / HIT |
+| 02:43 | 2.621 / 1.701s | 2.752 / 1.575s | MISS / HIT |
+| 02:55 | 4.684 / 3.168s | 3.834 / 2.753s | MISS / HIT |
+| 03:02 | 4.071 / 2.457s | 5.689 / 3.483s | MISS / HIT |
+| 03:08 | 7.696 / 3.080s | 7.788 / 3.099s | MISS / HIT |
+
+Across five split-config fresh MISS pairs, compact medians are4.071s server/2.757s batch wall versus the earlier three-sample1,000-row baseline4.660s/3.088s. This is a favorable but unpaired direction. Full800 medians are5.120s/2.753s versus a single earlier1,000-row baseline4.237s/2.820s: DB batch wall is slightly lower, but total server time is higher. Neither comparison controls host load, so these are not causal estimates or evidence of an overall full-format speedup.
+
+Two stale-refresh pairs were much slower: one compact/full refresh was9.963s/6.478s server with5.771s/4.177s batch walls; a near-simultaneous pair started02:49:23Z/02:49:25Z and took11.788s/10.253s, batch walls5.028s/5.007s. The latter had universe MISS2.837s/COALESCED800ms and process CPU deltas8.980s/9.090s. Thirteen combined batch query promises may compete for the process's default ten PostgreSQL pool connections, but no contemporaneous DB wait measurement proves queueing. Process CPU deltas overlap and are process-wide. A single-export concurrency reduction was slower in prior local measurements.
+
+Keep compact1,000/full800, first batch250 and concurrency10. No repeatable bottleneck justifies another runtime edit yet. Continue low-frequency matched measurements; any shared admission/queue candidate must improve combined completion and tail latency without reducing DB pool availability. No runtime change or deployment resulted from these observations.
+
+
+The fifth fresh-MISS pair was called sequentially, not concurrently. Compact took8.212s client/7.696s server (universe MISS1.512s, six batches/one wave, batch wall3.080s/max3.079s, first ticker2.408s, stream6.101s, CPU delta4.424s, gzip2,455,151B); full took8.173s client/7.788s server (universe HIT, seven batches/one wave, batch wall3.099s/max3.016s, first ticker589ms, stream7.788s, CPU delta5.979s, gzip3,274,983B). Both responses retained the validated raw SHA and 5,011-ticker/field/max20/returnedCount contract. This sequential high-latency pair shows that overlapping compact/full refreshes alone cannot explain the slow intervals. Without host-level or contemporaneous DB wait attribution, leave runtime settings unchanged and continue measuring before selecting another optimization.
+
+
+### Pool contention diagnostics candidate — 2026-11-28
+
+After five fresh production MISS pairs varied from about2.6s to7.8s and two overlapping refresh pairs exceeded10s, current timings could not separate node-postgres connection-queue delay from query/network time. The candidate records peak observed 	otalCount/waitingCount and minimum idleCount around existing universe and batch pool.query calls. These are process-wide edge samples, not continuous gauges or per-query queue time; no SQL, timer polling, pool size, query scheduling or response behavior changes. node-postgres documents these counters and the default max10 connections in its [official pool API](https://node-postgres.com/apis/pool). Use nonzero waiting samples correlated with long query wall as evidence to investigate pool queueing; zero waiting does not isolate PostgreSQL CPU/network cost.
