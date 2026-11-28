@@ -10,6 +10,31 @@
 
 API 사용 계약은 [공개 API 매뉴얼](../../public/api-reference.md)을, 구현은 [`lib/public-daily-export.ts`](../../lib/public-daily-export.ts)를 참조한다.
 
+### 운영 공개 API 최신 기준선 확인 — 2026-11-28
+
+운영 공개 compact GET을 순차 호출해 현행 payload와 다운로드 완료시간을 확인했다. KR은 HTTP200/2,073ms, gzip1,113,428B/raw5,142,281B, 2,337 ticker였고 US는 HTTP200/2,561ms, gzip2,643,817B/raw11,041,367B, 5,011 ticker였다. 양쪽 모두 `application/gzip`이었으며 gunzip/JSON 파싱 성공, 필수 `ticker`·`marketCap`·`daily` 구조 유효, 봉 상한20, 구조 위반0이었다. raw SHA는 기존 운영 데이터와 일치했다(KR `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4`, US `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`).
+
+직후 인증 진단에서 KR/US 각각 한 건의 compact 타이밍이 확인됐다. KR universe HIT, batch wall1,272ms, query completion 합계4,766ms, pool acquisition 합계332ms, first ticker988ms, stream1,670ms, server total1,677ms, process CPU 합계1,259ms였다. US는 universe HIT, batch wall1,576ms, query completion 합계7,172ms, acquisition28ms, first ticker168ms, stream/total2,164ms, process CPU1,442ms였다. query 합계는 병렬 쿼리 누계라 경과시간보다 클 수 있고 CPU는 프로세스 전역 사용량이다. 요청 시작시각과 public GET을 신뢰성 있게 1:1 연결하지 못했고 운영 프로세스별 ring은 각 요청 때 조회한 경우 비어 있었으므로 이 timing 두 건을 위 다운로드 시간과 짝지어 해석하지 않는다. 단일 시점이며 쿼리 부하도 통제되지 않았다.
+
+이 측정에서는 응답 계약과 gzip 결과가 정상임을 재확인했지만, batch 크기·동시성·SQL을 바꿀 근거가 되는 반복 가능한 개선 효과는 관측되지 않았다. 그러므로 런타임 설정은 그대로 유지했다. 다음 개선 후보는 동일 instance/request ID를 수집하는 측정 경로를 활용해 여러 fresh MISS의 batch wall, first ticker, total을 시장별로 비교한 뒤 결정한다. 검증된 runtime 개선이 나오면 전체 배포 검증 후 OCI에 배포하고 공개 API 응답을 다시 검사한다.
+
+추가 후보로 batch 입력의 `jsonb_to_recordset($1::jsonb)`를 세 개의 typed array를 받는 `unnest`로 바꾸는 방안을 검토했다. 기존 SQL과 같은 eligible ticker batch를 사용한 read-only A/B, 출력 바이트 동등성 및 시장별 반복 시간이 필요하다. 현재 worktree `.env.local`은 DB host `localhost`를 가리키고 실행 환경에는 로컬 PostgreSQL이 열려 있지 않아 접속이 거부됐다. 따라서 SQL A/B는 수행하지 못했다. 운영 DB에 후보 쿼리를 임의로 실행하거나 이 입력 방식이 더 빠르다고 가정하지 않았으며 코드/SQL 변경과 배포는 없다. 다음 유효 조치는 운영 접근 가능한 실제 query benchmark 경로를 확보해 같은 query/batch 조건에서 측정하는 것이다.
+
+### 운영 full gzip level4 대 5 replay — 2026-11-28
+
+기존 full API는 level5를 사용한다. 배포된 응답을 운영 GET에서 가져와 gunzip한 정확한 raw JSON을 ticker별 원문 slice로 분리하고 현재 stream의 실제 query batch 경계(KR `[500,500,500,500,337]`, US `[250,800,800,800,800,800,761]`)와 `flush`/write 순서를 재현했다. zlib 설정은 `windowBits=12`, `chunkSize=64KiB`, `Z_DEFAULT_STRATEGY`, KR `memLevel=8`/US `memLevel=9`로 고정했다. 시장별 level마다 20회 interleaved replay를 하고 warmup2회 및 양 끝 outlier를 제외한 중앙값을 계산했다. 모든 replay gzip은 gunzip 후 원문 바이트와 일치했고 level5 재생 출력 크기는 KR 운영 본문과 일치, US는 6B 차이였다.
+
+| 시장 | level | gzip replay median | gzip bytes | level5 대비 크기 | 운영 cache HIT 수신시간 중앙값 |
+|---|---:|---:|---:|---:|---:|
+| KR full | 4 | 77.54ms | 1,525,040 | +152,585B (+11.1%) | level5: 211ms |
+| KR full | 5 | 88.66ms | 1,372,455 | 기준 | 211ms |
+| US full | 4 | 174.87ms | 3,666,463 | +341,557B (+10.3%) | level5: 513ms |
+| US full | 5 | 199.39ms | 3,324,906 | 기준 | 513ms |
+
+각 시장의 운영 gzip HIT는 순차 5회 모두 HTTP200/HIT였다. KR 수신은551/426/211/210/210ms, US는383/406/591/513/765ms였고 중앙값으로 계산한 관측 전송률은 약6.5MB/s다. level4 압축 단계는 KR11ms/US25ms 줄지만, gzip 증가분은 그 전송률에서 약24ms/53ms 전송시간에 해당한다. 단순 합산은 전체 완료시간에 KR 약13ms/US 약28ms 불리한 방향을 시사하지만 압축과 전송의 중첩 및 서버 부하를 생략한다. 후속 full MISS에서는 server total 2.858/5.212초와 process-wide CPU delta3.029/5.282초가 관측돼, 압축 replay/HIT 합산만으로 실제 MISS를 예측하기 부족하다는 점이 확인됐다. CPU delta는 프로세스 전역이라 exporter 압축만의 값이라고 볼 수 없지만, 실제 OCI MISS에서 level4가 파일 증가분을 상쇄하는지 직접 확인할 후보 근거로 삼는다. 따라서 이번 차수에서는 full만 level4로 낮춘 release를 시험 배포하고, post-deploy 양 시장 MISS 완료시간·gzip bytes·JSON 계약을 확인한다. 개선이 재현되지 않거나 늦어지면 full level5로 되돌린다. 이 후보는 level4 replay가 운영 server CPU에 동일하게 적용된다는 가정이 아니라 OCI 전체 응답으로 판정한다.
+
+운영 full fresh MISS도 양 시장 각 1건 연결했다. KR client3,457ms/server2,858ms, universe HIT, batch wall1,444ms, pool acquisition 합계725ms/max343ms, post-checkout query completion 합계3,712ms/max1,103ms, first ticker961ms, gzip1,372,455B였다. US client5,321ms/server5,212ms, universe HIT, batch wall1,817ms, acquisition238ms/max102ms, query completion 합계9,645ms/max1,809ms, first ticker402ms, gzip3,324,912B였다. KR pool total peak7/waiting peak0, US peak9/waiting peak6이었다. query completion은 PostgreSQL 실행만이 아니라 결과 직렬화·전송과 driver completion을 포함한다. full payload 각각 2,337/5,011 ticker, raw 8,907,188/18,964,448B였으며 raw SHA는 `6ca5306267a18c2d2368a9d2dfa51487730e4e8733a016f02fda907f8113f1a6`/`51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619`이다. request gzip bytes가 timing ring과 같아 요청을 연결했지만 한 건씩이며 process/database 부하가 통제되지 않아 pool max/concurrency를 바꾸는 근거로 사용하지 않았다. 특히 US waiting peak만으로 pool queue가 batch wall을 유의하게 늘렸다고 단정할 수 없고, KR acquisition은 새 연결 개설 비용과 checkout wait를 분리하지 않는다.
+
 ### Pool acquisition과 PostgreSQL query 실행 시간 분리 계측 후보 — 2026-11-28
 
 현 운영 instrumentation은 `pool.query()` 호출 전체시간과 process-wide pool counter의 순간값만 기록한다. `pool.query()`는 pool connection acquisition과 DB command 결과 대기를 모두 포함하므로 batch wall이 높은 원인을 분리하지 못한다. 최근 운영 샘플에서 US full pool total peak10/waiting peak7이 관측됐으나 exporter-active query 분류는 비어 있었고, 응답 뒤 activity sampling은 query 완료를 놓쳤다.

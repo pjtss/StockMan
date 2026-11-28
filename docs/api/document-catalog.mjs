@@ -10,7 +10,7 @@ const apiReferencePath = join(root, "public", "api-reference.md");
 const llmsPath = join(root, "public", "llms.txt");
 const docsIndexPath = join(docsRoot, "README.md");
 const allowedExtensions = new Set([".md", ".json"]);
-const MAX_DOCUMENT_BYTES = 350_000;
+const MAX_DOCUMENT_BYTES = 360_000;
 const excludedSegments = new Set(["scratch", "__pycache__", "debug-history"]);
 const excludedFiles = new Set(["DEVELOPMENT_LOG.md", "route-inventory.json"]);
 

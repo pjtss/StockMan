@@ -492,7 +492,7 @@ export async function getPublicDailyExport(
     })();
 
     const filename = `daily-candles-${market.toLowerCase()}${format === "compact" ? "-compact" : ""}.json.gz`;
-    const gzipLevel = format === "full" ? 5 : 4;
+    const gzipLevel = 4;
     return new Response(gzipJsonStream(items, gzipLevel, metrics, poolDiagnostics), {
       status: 200,
       headers: {

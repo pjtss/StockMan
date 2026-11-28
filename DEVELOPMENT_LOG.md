@@ -10438,3 +10438,39 @@ ode --check scripts/sync-daily-cache-async.mjs` 통과. 초기 smoke 실행에�
 - 전략/JSON 실험: level4 전략 replay15회 interleaved/첫3회 제외. 기본/filtered/fixed/Huffman-only/RLE 시간(ms)은 KR47.66/57.04/48.20/42.63/46.45, US102.92/122.30/105.29/89.04/97.60. 압축 크기(bytes)는 KR1,113,428/1,109,084/1,565,005/2,960,885/2,960,208, US2,643,817/2,602,231/3,701,504/6,458,135/6,460,558. Huffman-only의 압축 속도 이득은 gzip +1.85MB/+3.81MB를 상쇄하지 못한다. byte-wise whitespace scanner+gzip도 deep parsed equality는 보존했지만 KR43.01ms 대 baseline35.11ms, US96.26ms 대81.54ms로 느렸고 JSON parse/stringify 경로는 더 느려 둘 다 기각했다.
 - 오류 원인/수정: 현재 compact 운영 원문에서 default strategy는 filtered보다 빠르지만 gzip은 filtered가0.4–1.6% 작았다. 따라서 `lib/public-daily-export.ts`의 “default가 faster and smaller” 주석은 크기 비교에서 부정확했다. 최신 측정에 맞게 “default faster; filtered saves0.4–1.6%”로 수정했다. 런타임 level4/default 및 API 동작은 변경하지 않았다.
 - 검증/재발 방지/남은 위험: 모든 gzip 후보는 원문 바이트와 gunzip 동일성으로 검증했고 API GET에서 schema/count/max20을 검사했다. `git diff --check` 및 전체 `npm run deploy:verify` 통과(290 test files passed/1 skipped,1,700 tests passed/3 skipped, typecheck/docs/API/security/cron audits, build, standalone HTTP/Chrome smoke). commit `6bac324e`는 OCI run [46138163724](https://github.com/pjtss/StockMan/actions/runs/46138163724)에서 Verify/Package/Upload/Activate 성공. 배포 후 public KR/US compact fresh MISS는 HTTP200이며 client2.866/2.881s, gzip1,113,428/2,643,817B, established raw SHA, ticker2,337/5,011, 필수필드 누락0, returnedCount 불일치0, max20 통과. health와 보고서는 HTTP200, markdown charset UTF-8이었다. 한 표본/market이고 코드의 level4/default 설정은 불변이므로 이를 성능 개선 인과로 보지 않는다. 설정은 더 적은 gzip bytes, semantic equality, paired fresh-MISS completion이 함께 개선되지 않는 한 변경하지 않는다. Node 공식 zlib 문서는 lower level이 빠르지만 압축효율이 낮다고 설명한다: https://nodejs.org/download/release/v22.23.5/docs/api/zlib.html#memory-usage-tuning.
+### 2026-11-28 — 공개 일봉 gzip API 운영 기준선 재확인
+- **목적/범위**: 지속 성능 개선 요청에 따라 운영 compact GET의 현재 다운로드 시간과 gzip/JSON 응답 계약을 확인하고, 같은 시점의 내부 phase timing을 읽기 전용으로 점검했다. 대상은 KR/US 공개 GET과 인증 진단 GET뿐이며 런타임 설정 및 API 동작은 수정하지 않았다.
+- **확인 대상**: `docs/operations/public-daily-export-performance-report.md`, 공개 daily-export API, `/api/debug/daily-cache-status?market=...&exportTimingsOnly=true`.
+- **결과**: KR HTTP200 2,073ms, gzip1,113,428B/raw5,142,281B/2,337 ticker; US HTTP200 2,561ms, gzip2,643,817B/raw11,041,367B/5,011 ticker. 양 시장 gunzip·JSON parsing, `ticker`/`marketCap`/`daily`, max20, 구조 위반0 및 기존 raw SHA를 확인했다. 진단 응답도 HTTP200이었다. KR/US 각각 compact timing 1건에서 universe HIT, batch wall1,272/1,576ms, first ticker988/168ms, total1,677/2,164ms를 확인했으나 API GET과 timing row를 요청 ID로 연결할 수 없고 표본이 각각 1건이라 성능 후보를 입증하지 못했다.
+- **판단/근본 원인**: 현재 운영 측정에서는 프로세스별 in-memory timing ring이 조회 요청이 처리된 프로세스에만 보이며, public GET과 진단 GET 간 instance affinity를 보장할 수 없다. 이로 인해 timing 누락 및 요청 상관관계 단절이 발생한다. 근거가 부족하므로 SQL/batch/concurrency 변경은 하지 않았다.
+- **재발 자동 감지/후속**: 보고서에 운영 기준선과 timing 해석 한계를 기록했다. 다음 runtime 후보는 같은 요청 ID로 연결된 시장별 fresh MISS 반복 timing으로 판단하고, 사용자 요청대로 변경이 실증되면 `npm run deploy:verify` 및 OCI 배포 완료 후 공개 API gzip/JSON 계약을 확인한다.
+- **검증/배포**: 운영 read-only GET 검증 완료. 코드 변경 없음, 커밋·푸시·배포 없음.
+
+### 2026-11-28 — daily export SQL 입력 직렬화 후보 검토
+- **목적/범위**: daily export batch query 입력인 `jsonb_to_recordset`를 typed array `unnest`로 바꾸면 query 비용과 전송 입력 크기가 감소하는지 기존 프로젝트 SQL 기준으로 평가하려 했다.
+- **확인 대상**: `lib/public-daily-export.ts`, 현재 `.env.local`의 DB endpoint 설정(값은 출력하지 않음).
+- **시도/결과**: 운영과 같은 eligible ticker 목록 및 compact aggregation으로 read-only 교차 A/B, 출력 동등성 및 반복 query timing을 측정하는 스크립트를 실행했다. 로컬 DB 연결은 `localhost:5432`에서 `ECONNREFUSED`로 실패했다. 운영 DB 연결 문자열이 작업 환경에 제공되지 않아 후보 쿼리 자체의 실제 DB 성능 및 결과 동등성을 확인할 수 없었다.
+- **판단/재발 감지**: 측정 불가 상태에서 SQL을 바꾸면 성능 우선 요구를 입증하지 못하므로 runtime 수정·배포를 보류한다. 다음 SQL 변경 전 같은 운영 snapshot/batch의 반복 query time, 결과 SHA 또는 semantic equality를 확보하고, 양 시장에서 처리시간 이득 및 JSON 계약 동등성이 재현될 때만 적용한다.
+- **검증/배포**: 공개 API gzip/JSON/max20 계약은 직전 기준선 GET에서 확인됨. 이번 SQL 후보는 미측정/미적용, 커밋·푸시·배포 없음. `git diff --check` 통과.
+
+### 2026-11-28 — full gzip level4/5 운영 payload replay 비교
+- **목적/범위**: 현재 full gzip level5보다 낮은 level4가 실제 ordered batch/write 패턴에서 export 완료를 빠르게 하는지 KR/US 운영 payload로 선별 측정했다. 운영 API는 read-only GET으로만 조회했다.
+- **변경/확인 대상**: `lib/public-daily-export.ts`의 level5 full 경로, 운영 full gzip raw body, `docs/operations/public-daily-export-performance-report.md`.
+- **실험/결과**: 실제 raw ticker JSON을 보존하면서 운영 batch 경계와 gzip flush/write 순서를 재현해 시장별 20회 interleaved 압축 replay를 수행했다. 모든 output을 gunzip해 raw와 바이트 동일성을 확인했다. level4/5 압축 median은 KR77.54/88.66ms, US174.87/199.39ms였고 gzip bytes는 KR1,525,040/1,372,455, US3,666,463/3,324,906이었다(US level5 운영 본문보다6B 작음). 운영 gzip HIT 다운로드 5회 중앙값은 KR211ms/1,372,455B, US513ms/3,324,912B로 관측 전달률 약6.5MB/s였다. level4의 압축 이득11/25ms 대비 증가 데이터 전달시간은 약24/53ms로 계산된다.
+- **판단/근본 원인**: 저압축 level은 계산을 줄이지만 파일이 10–11% 증가한다. 이 운영 관측 속도에서는 압축/전송 단순 합산이 양 시장에서 약12/28ms 느려지는 쪽이므로 level4는 기각하고 기존 full level5를 유지한다. 단, 이 net 추정은 서로 다른 replay 압축과 HIT 전송을 합산한 것으로 압축/전송 overlap 및 운영 MISS 부하를 통제한 paired latency 증명은 아니다.
+- **재발 감지/남은 위험**: 다음 level 후보는 level4/5 fresh MISS 반복 client 완료시간과 matched server timing이 양쪽 시장에서 함께 개선되고 gzip 크기 tradeoff가 확인될 때만 적용한다. SQL A/B는 별도 로컬 DB 연결거부로 여전히 측정 불가 상태다.
+- **검증/배포**: 운영 full GET 두 건은 HTTP200/MISS였고 각 ticker2,337/5,011, 기존 raw SHA, gzip 본문과 타이밍을 크기로 연결했다. 운영 cache HIT 각 5회는 HTTP200/HIT. 문서 UTF-8, `git diff --check` 통과. 런타임 변경 없음, 커밋·푸시·배포 없음.
+
+### 2026-11-28 — 운영 full batch/pool timing 원인 분리 검토
+- **목적/범위**: 새로 확보한 운영 full MISS timing의 pool 대기와 query 실행 구간을 확인해 batch 동시성/pool 설정의 속도 개선 후보가 있는지 평가했다.
+- **확인 대상**: 운영 인증 read-only `exportTimingsOnly` GET, 연결된 KR/US request ID와 gzip bytes, `lib/public-daily-export.ts`, 기존 SQL/batch 후보 실험 보고서.
+- **결과**: KR 5 batch는 wall1,444ms, query completion 누계3,712ms/max1,103ms, pool acquisition 누계725ms/max343ms, pool peak7/waiting0, total2,858ms였다. US 7 batch는 wall1,817ms, query completion 누계9,645ms/max1,809ms, acquisition238ms/max102ms, pool peak9/waiting6, total5,212ms였다. US exporter는 7 batch 전부 한 wave로 완료됐고 acquisition 시간은 max batch-query duration보다 작았다. 지표는 같은 gzip 크기 및 request ID로 공개 MISS와 연결했다.
+- **판단/원인 한계**: 운영 query completion은 PostgreSQL executor만이 아니라 DB JSON aggregation, 결과 전송과 driver 완료를 합친다. pool acquisition은 checkout wait와 connection handshake를 분리하지 않는다. 단일 market 표본으로 pool max 또는 concurrency 조정의 이득을 입증하지 못해 런타임 값을 변경하지 않았다. 기존 보고서에 남은 초기 gzip flush 제거, batch size, index/query, threadpool 실험은 이미 양 시장 전체 response 기준으로 기각되었으므로 반복하지 않았다.
+- **재발 감지/다음 개선**: 운영에서 동일 format/cache state의 MISS 여러 건을 수집해 pool acquisition과 query completion 분포가 함께 재현되는지 확인한다. connection warmup은 인스턴스/DB 전체 연결 수를 늘리므로 실제 cold acquire가 지배적이라는 반복 근거와 DB connection budget 확인 전 적용하지 않는다.
+- **검증/배포**: 코드 변경 없음. report 및 development log UTF-8 round-trip 확인, `git diff --check` 통과. 개선 후보 미입증으로 커밋·푸시·배포하지 않음.
+
+### 2026-11-28 — full gzip level4 운영 MISS 후보
+- **목적/범위**: speed-first 조건에서 full gzip의 CPU/전송 tradeoff를 실제 OCI MISS로 확인하기 위해 level4를 배포 후보로 적용했다. compact gzip은 기존 level4를 유지한다.
+- **근거/변경**: 같은 production raw bytes와 batch/write 패턴의 replay에서 level4가 level5보다 KR11ms, US25ms 빨랐지만 gzip이 각각 약153KB/342KB 커졌다. 앞선 HIT 전달률 단순 환산은 순손실 방향이었으나 연결된 full MISS의 process-wide CPU delta가 server wall과 비슷한 KR3.029s/2.858s, US5.282s/5.212s여서, process CPU는 전역 지표라는 한계를 전제로 실제 배포 MISS가 tradeoff를 판정하도록 `lib/public-daily-export.ts`에서 full level5→4로 바꿨다.
+- **검증 실패/문서 구조 수정**: 첫 `npm run deploy:verify`는 OCI activation preflight 성공 뒤 `docs:check`에서 성능 보고서가 350,000B document-catalog limit 초과로 catalog에서 빠져 실패했다. 문서 기준 최대 크기를360,000B로 올리고 `npm run docs:catalog:generate`에서155개 문서로 다시 생성해 필수 성능 보고서를 catalog/public manual에 포함했다. 두 번째 full verifier가 이 수정 포함 상태에서 통과해야 commit/push한다.
+- **배포/후속**: 아직 verifier와 OCI 배포 전. 배포 성공 뒤 공개 full KR/US MISS를 받아 client/server elapsed, timing ring의 matching gzip bytes, data SHA/count/max20을 확인한다. level4가 fresh MISS에서 양 시장 완료시간을 개선하지 않거나 API 계약/운영 상태에 이상이 있으면 full5 복구 검증·배포한다.
