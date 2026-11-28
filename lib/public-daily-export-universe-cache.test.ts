@@ -9,7 +9,7 @@ describe("public daily export universe cache", () => {
     vi.useRealTimers();
   });
 
-  it("reuses only a successful non-empty market universe for five minutes", async () => {
+  it("reuses only a successful non-empty market universe for ten minutes", async () => {
     vi.useFakeTimers();
     const load = vi.fn(async () => rows);
 
@@ -18,6 +18,10 @@ describe("public daily export universe cache", () => {
     expect(load).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(5 * 60_000 + 1);
+    expect(await getOrLoadPublicDailyExportUniverse("US", load)).toEqual({ rows, status: "HIT" });
+    expect(load).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(5 * 60_000);
     expect(await getOrLoadPublicDailyExportUniverse("US", load)).toEqual({ rows, status: "MISS" });
     expect(load).toHaveBeenCalledTimes(2);
   });

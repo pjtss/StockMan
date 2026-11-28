@@ -230,7 +230,7 @@ describe("public gzip daily export", () => {
     expect(initial.headers.get("x-public-daily-export-cache")).toBe("MISS");
 
     queryMock.mockClear();
-    queryMock.mockResolvedValueOnce({ rows: [eligible] }).mockResolvedValueOnce({ rows: [batch] });
+    queryMock.mockResolvedValueOnce({ rows: [batch] });
     const dateNow = Date.now();
     const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(dateNow + 5 * 60_000 + 1);
 
@@ -242,14 +242,15 @@ describe("public gzip daily export", () => {
     expect(staleBytes).toEqual(initialBytes);
 
     await waitForBackgroundStream();
-    expect(queryMock).toHaveBeenCalledTimes(2); // both five-minute caches expired, so the universe and summaries refresh.
+    expect(queryMock).toHaveBeenCalledTimes(1); // response expired; eligible universe remains warm for ten minutes.
+    expect(getRecentPublicDailyExportTimings("KR")[0]?.universeCacheStatus).toBe("HIT");
     expect(getCachedPublicDailyExport("KR", "full")?.state).toBe("HIT");
     dateNowSpy.mockRestore();
 
     const refreshed = await getKrExport(fullRequest());
     expect(refreshed.headers.get("x-public-daily-export-cache")).toBe("HIT");
     expect(Buffer.from(await refreshed.arrayBuffer())).toEqual(initialBytes);
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(1);
   });
 
   it("coalesces concurrent stale requests into one background database refresh after cache expiry", async () => {
@@ -261,7 +262,7 @@ describe("public gzip daily export", () => {
 
     let resolveBatch: ((value: { rows: typeof batch[] }) => void) | undefined;
     queryMock.mockClear();
-    queryMock.mockResolvedValueOnce({ rows: [eligible] }).mockImplementationOnce(() => new Promise((resolve) => {
+    queryMock.mockImplementationOnce(() => new Promise((resolve) => {
       resolveBatch = resolve;
     }));
     const dateNow = Date.now();
@@ -275,7 +276,7 @@ describe("public gzip daily export", () => {
     expect(secondStale.headers.get("x-public-daily-export-cache")).toBe("STALE");
     await Promise.all([firstStale.arrayBuffer(), secondStale.arrayBuffer()]);
     await waitForBackgroundStream();
-    expect(queryMock).toHaveBeenCalledTimes(2); // one universe read plus one shared background batch query.
+    expect(queryMock).toHaveBeenCalledTimes(1); // one shared background batch query; the universe is still warm.
     resolveBatch?.({ rows: [batch] });
     await waitForBackgroundStream();
     expect(getCachedPublicDailyExport("KR", "full")?.state).toBe("HIT");

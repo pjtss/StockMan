@@ -3,7 +3,7 @@ import type { PublicDailyExportMarket } from "@/lib/public-daily-export-timing";
 export type PublicDailyExportUniverseKey = Readonly<{ market: string; code: string; name: string }>;
 export type PublicDailyExportUniverseCacheStatus = "MISS" | "HIT" | "COALESCED";
 
-const TTL_MS = 5 * 60_000;
+const TTL_MS = 10 * 60_000;
 type Entry = { rows: readonly PublicDailyExportUniverseKey[]; expiresAt: number };
 type CacheGlobal = typeof globalThis & {
   __publicDailyExportUniverseCache?: Map<PublicDailyExportMarket, Entry>;
