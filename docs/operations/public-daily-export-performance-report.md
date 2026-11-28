@@ -1,6 +1,6 @@
 # 공개 일봉 gzip API 운영 성능 보고서
 
-<!-- catalog-description: KR/US 공개 일봉 gzip API의 동시 DB 조회 조정, OCI 배포별 운영 실측, 응답 계약 및 측정 한계를 기록합니다. -->
+<!-- catalog-description: KR/US 공개 일봉 gzip API의 응답 속도 최적화, OCI 배포별 운영 실측, gzip·응답 계약 검증 및 성능 측정 한계를 기록합니다. -->
 
 ## 목적과 범위
 
@@ -66,7 +66,35 @@ Focused response-cache/route tests pass28/28. 전체 `npm run deploy:verify` 통
 
 ### gzip level5 full-format speed candidate — 2026-11-28
 
-운영 설정과 동일한 zlib replay에서 US full level5는 level7보다 compression CPU median이155.77ms 대186.06ms로 약16.3% 낮고, body는3,324,899B 대3,274,753B로 약1.5% 크다. KR full은63.17ms 대88.56ms(-28.7%), body 약1.1% 증가였다. compact payload에서는 level5 CPU 차이가작고 body가약2% 커져 compact는 level7을 유지하고 full만 level5로 낮춘다. 변경은 gzip 단일 stream·JSON/schema·API fields·max20에 영향이 없다. Focused tests 및 전체 deploy verifier 후 OCI deploy하고, fresh US full MISS client/server completion과 gzip size/SHA/schema를 운영 측정한다. Full-format MISS에서 client completion이 개선되지 않거나 payload transfer penalty가 compression saving을 상쇄하면 level7로 복구한다.
+운영 설정과 동일한 zlib replay에서 US full level5는 level7보다 compression CPU median이155.77ms 대186.06ms로 약16.3% 낮고, body는3,324,899B 대3,274,753B로 약1.5% 크다. KR full은63.17ms 대88.56ms(-28.7%), body 약1.1% 증가였다. compact payload에서는 level5 CPU 차이가 작고 body가 약2% 커져 compact는 level7을 유지하고 full만 level5로 낮췄다. 변경은 gzip 단일 stream·JSON/schema·API fields·max20에 영향이 없다.
+
+Focused tests 및 전체 deploy verifier 통과 뒤 commit `22a6fd1a`를 OCI run [46128908438](https://github.com/pjtss/StockMan/actions/runs/46128908438)으로 배포해 Verify/Package/Upload/Activate 성공. 배포 후 US full MISS 두 건의 gzip body 모두 gunzip/JSON 검증,5,011 ticker, `ticker`/`marketCap`/`daily`, max20, `returnedCount`, raw SHA `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619`를 통과했다.
+
+| US full MISS | Client / server total | Universe | Batch wall | Pool acquire sum / max | `client.query()` sum / max | Gzip bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| level5 #1, request `bf7f73f3-77aa-41ea-a655-cce24aa9db0d` | 8.369 / 7.924s | HIT / 0ms | 5.182s | 245 / 80ms | 26.381 / 5.175s | 3,324,998 |
+| level5 #2, request `af100292-83bf-4b2e-ada4-d553f4b2a707` | 5.121 / 4.799s | MISS / 611ms | 3.164s | 836 / 156ms | 18.053 / 3.012s | 3,324,906 |
+
+이전 level7 full sample는 client4.871s/server4.565s, universe HIT/0ms,batch wall3.298s,gzip3,274,760B였다. 두 level5 표본의 분산이 크고 두 번째는 universe MISS라 이 결과만으로 full end-to-end 속도 개선을 입증하지 못한다. 비교 가능한 같은-phase query wall은 두 번째에서 level7 baseline보다134ms 짧았으나 cache/host load가 맞지 않는다. level5 gzip은 기존 level7 gzip보다 약50KB(1.53%) 크며 raw SHA/contract는 같다. Full level5는 provisional로 유지하고 이후 matched low-load full MISS pair에서 client/server latency 및 batch wall을 함께 판정한다. 속도 이득이 없거나 transfer 비용이 이를 상쇄하면 full도 level7로 복구한다.
+
+### level5/7 실제 배치 경계 gzip replay — 2026-11-28
+
+이전 level5/7 비교는 운영 zlib 옵션과 64KiB 입력 chunk를 맞췄지만 API가 전달하는 250+1,000개 단위 JSON write 경계와 backpressure 대기를 재현하지 않았다. 공개 US full gzip HIT 원문을 gunzip해 길이18,964,448B와 raw SHA `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619`를 확인한 뒤, JSON top-level item을 현재 full 배치 `[250, 1000, 1000, 1000, 1000, 761]`로 묶어 Node `createGzip`에 callback 완료를 기다리며 순서대로 썼다. 두 레벨 모두 opening `[` write 후 flush, closing `]`, windowBits12, US memLevel9, chunkSize64KiB, default strategy를 사용했고 결과 gunzip bytes가 원문과 완전히 일치함을 검사했다. 순서를 교차한8회 실행에서 앞 2회를 제외한 중앙값은 level5 197.62ms/3,324,906B, level7 234.35ms/3,274,760B였다. 이 로컬 조건에서 level5 압축 구간은 약15.7% 짧고 body는50,146B(1.53%) 증가했다. 이는 동일 Node process에서 compressor write/backpressure 패턴을 반영한 실험이며 OCI CPU 및 API 전체 완료시간/전송 이득을 증명하지는 않는다.
+
+추가 read-only 운영 확인은 US full API HTTP200, `application/gzip`, cache HIT, gzip3,324,906B를 받았다. gunzip/JSON 검사에서 raw18,964,448B, 동일 SHA, 5,011 ticker, `ticker`/`marketCap`/`daily` 필드 누락0, candle-count metadata 불일치0, 최대20봉을 확인했다. payload/데이터 계약은 보존됐다. level5는 exact-stream 재생에서 압축 구간 비용이 낮아 provisional로 유지하고 다음 운영 fresh MISS에서 matched client/server 완료시간 및 batch timing을 확인한다. 재발검증은 교차순서 stream replay, raw hash, gzip bytes, row/schema/count/max20으로 하며 matched 운영 client 시간이 개선되지 않으면 level7로 복구한다.
+
+### Compact gzip level4 후보 — 2026-11-28
+
+양 시장 compact의 실제 운영 fresh MISS 응답을 받아 각 raw payload를 level1–7의 production zlib 설정·정확한 ticker batch/write/backpressure 경계로 여섯 번 교차 재생했다. 앞 두 회를 제외한 중앙값과 gzip bytes는 다음과 같다. 모든 출력은 gunzip 후 각 운영 원문과 byte-identical했다.
+
+| 시장/형식 | 현재 level7 | 후보 level4 | 절감/증가 |
+|---|---:|---:|---:|
+| US compact | 153.03ms / 2,454,714B | 113.56ms / 2,643,817B | 압축39.47ms 감소 / body189,103B(+7.70%) |
+| KR compact | 72.61ms / 1,043,357B | 47.75ms / 1,113,428B | 압축24.86ms 감소 / body70,071B(+6.72%) |
+
+동일 구간에서 level5는 level7보다 US compact 13.82ms 빠른 대신48,195B(1.96%) 크고, KR compact 9.11ms 빠른 대신21,595B(2.07%) 컸다. 따라서 compact 전체의 단순 level5 저하는 CPU 절감이 작아 우선 후보로 적합하지 않았다. 운영 HIT로 추가 측정한 기존 gzip 응답은 KR compact 1,043,357B가 5회 중간값272ms, US compact 2,454,714B가 중간값331ms였으며 이 값에는 server header/route/network 지연이 섞여 throughput으로 직접 해석할 수 없다. body 크기 비율로 계산하면 level4 전송 증분은 현재 body 수신시간의 약6.7%/7.7%로 상한을 추정할 수 있다. 운영 MISS 전체는 초 단위이며 DB/query 구간이 대부분이라 gzip 감소가 실제 end-to-end에 미치는 양은 배포 뒤 확인한다.
+
+후보는 default compact에서만 level7→4로 변경하고 full은 level5를 유지한다. 단일 gzip, 헤더·schema·ticker universe·max20 및 DB SQL은 불변이다. 전체 검증 뒤 배포하고 양 시장 fresh MISS에서 client 완료시간, gzip size, raw hash·ticker/schema/returnedCount/max20을 확인한다. 안정된 end-to-end 이득이 없거나 응답시간이 악화하면 compact level7로 복구한다. level4가 level5보다 효율적일 수 있는지는 Network path를 포함한 운영 MISS로 재검증한다.
 
 ## 배포별 동시성 변경
 

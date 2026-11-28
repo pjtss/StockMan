@@ -1084,7 +1084,7 @@
       "title": "공개 일봉 gzip API 운영 성능 보고서",
       "category": "operations",
       "format": "md",
-      "description": "KR/US 공개 일봉 gzip API의 동시 DB 조회 조정, OCI 배포별 운영 실측, 응답 계약 및 측정 한계를 기록합니다.",
+      "description": "KR/US 공개 일봉 gzip API의 응답 속도 최적화, OCI 배포별 운영 실측, gzip·응답 계약 검증 및 성능 측정 한계를 기록합니다.",
       "url": "/manuals/operations/public-daily-export-performance-report.md",
       "relatedPaths": [],
       "sourcePath": "docs/operations/public-daily-export-performance-report.md",
