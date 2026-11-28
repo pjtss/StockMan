@@ -60,24 +60,9 @@ OCI run `45761566890` 성공 후 순차 호출을 각 3회 실행했다.
 
 모든 순차 반복에서도 같은 gzip/JSON/20봉 계약을 검사했다. KR은 모든 적격 종목에서 20봉, US는 데이터가 없는 종목을 포함해 0–20봉이었다. 압축 파일의 크기 편차는 스트림 flush/압축 chunk 분할을 포함하며 payload ticker 수와 봉 수는 반복 간 동일했다.
 
-## 로컬 비교와 회귀 검사
+## 초기 batch 동시성 비교 요약
 
-같은 로컬 PostgreSQL과 Next.js dev API에서 warmed 순차 호출을 비교했다.
-
-| 동시성 | KR 중앙값 | US 중앙값 | KR+US 병렬 완료 중앙값 |
-|---|---:|---:|---:|
-| 5 / 5 | 356ms | 751ms | 979.5ms |
-| 10 / 10 | 359.5ms | 689ms | 886ms |
-
-로컬 결과에서 US는 약 8% 짧았고 KR은 거의 차이가 없었다. route 테스트는 US에서 최대 동시 10개, KR에서 최대 동시 5개 batch query를 회귀 검사한다. 전체 `npm run deploy:verify`는 시장별 조정에서 283개 테스트 파일 통과/1개 skip, 1,648개 테스트 통과/3개 skip, production build, typecheck, 문서/API/security/cron 감사, standalone HTTP 및 Chrome desktop/mobile smoke를 통과했다.
-
-## 판단과 다음 개선
-
-- 현재 설정은 KR 5, US 10이다. 운영 관측상 US 순차 완료 시간은 이전 기준보다 짧았지만 측정 시점 부하와 표본 수가 통제되지 않아 개선률을 확정하지 않는다.
-- KR 완료 시간은 운영 기준보다 느린 표본이 있어 속도 개선이 입증되지 않았다. 이후 최적화는 DB query 시간, gzip 시간, 마지막 chunk 전송까지의 시간을 분리 계측해 병목을 확인한다.
-- pool 공유 때문에 여러 API나 동시 요청이 있을 때 query fanout이 다른 endpoint를 늦출 수 있다. 재측정에서 KR 또는 US 성능이 지속적으로 악화되면 동시성을 낮추거나 시장별 query 스케줄링을 다시 평가한다.
-- 운영 데이터는 무인증 GET만 사용했다. 쓰기 API, cron 실행, 운영 DB 갱신은 하지 않았다.
-
+2026-11-26 baseline에서 KR/US 동시성5/5 대비10/10의 warmed local median은 각각 KR356→359.5ms, US751→689ms, 병렬 완료979.5→886ms였다. 후속 US batch1,000/concurrency6 운영 중앙값은40.937초로 기존500/10의36.885초보다 약11% 느려500/10으로 복귀했다. 이 초기 phase 결과는 현재 compact1,000/full800 설정의 근거가 아니며, 전체 이력 및 배포별 상세는 아래 항목에 남겨둔다.
 ### US batch 1,000 실험 후속
 
 커밋 `662680cb`(OCI run `45767914380`)에서 US batch를 1,000개, 동시성을 6으로 조정했다. US 순차 운영 응답 3회는 38.570/43.290/40.937초(median 40.937초)였다. 이 설정 전 batch500/동시성10의 순차 중앙값 36.885초보다 약 11% 느려졌다. KR+US 동시 요청은 US 58.764초, KR 18.782초였다. 압축 전후 파일 계약은 유지됐고, US 5,011 ticker 및 최대20봉, gzip XFL=0, no-store를 확인했다.
@@ -1530,6 +1515,26 @@ Keep compact1,000/full800, first batch250 and concurrency10. No repeatable bottl
 The fifth fresh-MISS pair was called sequentially, not concurrently. Compact took8.212s client/7.696s server (universe MISS1.512s, six batches/one wave, batch wall3.080s/max3.079s, first ticker2.408s, stream6.101s, CPU delta4.424s, gzip2,455,151B); full took8.173s client/7.788s server (universe HIT, seven batches/one wave, batch wall3.099s/max3.016s, first ticker589ms, stream7.788s, CPU delta5.979s, gzip3,274,983B). Both responses retained the validated raw SHA and 5,011-ticker/field/max20/returnedCount contract. This sequential high-latency pair shows that overlapping compact/full refreshes alone cannot explain the slow intervals. Without host-level or contemporaneous DB wait attribution, leave runtime settings unchanged and continue measuring before selecting another optimization.
 
 
-### Pool contention diagnostics candidate — 2026-11-28
+### Pool contention diagnostics — 2026-11-28
 
-After five fresh production MISS pairs varied from about2.6s to7.8s and two overlapping refresh pairs exceeded10s, current timings could not separate node-postgres connection-queue delay from query/network time. The candidate records peak observed 	otalCount/waitingCount and minimum idleCount around existing universe and batch pool.query calls. These are process-wide edge samples, not continuous gauges or per-query queue time; no SQL, timer polling, pool size, query scheduling or response behavior changes. node-postgres documents these counters and the default max10 connections in its [official pool API](https://node-postgres.com/apis/pool). Use nonzero waiting samples correlated with long query wall as evidence to investigate pool queueing; zero waiting does not isolate PostgreSQL CPU/network cost.
+Prior timing could not separate pool acquisition from query/network time. The diagnostic samples node-postgres counters around existing universe/batch queries and logs process-wide peak total/waiting plus minimum idle. These are edge snapshots, not queue durations. No SQL, timer, pool size, query schedule or response changes. See the [official node-postgres pool API](https://node-postgres.com/apis/pool).
+
+Commit `1a53ea4f` deployed successfully in [OCI run 46102562368](https://github.com/pjtss/StockMan/actions/runs/46102562368).
+
+| Sequential MISS | Client / server | Batch wall | Pool total / idle / waiting peaks | Process CPU |
+|---|---:|---:|---:|---:|
+| Compact, sample1 | 5.511 / 3.831s | 2.589s | 6 / 1 / 6 | 2.232s |
+| Full, sample1 | 9.156 / 8.940s | 3.317s | 7 / 0 / 0 | 7.530s |
+| Compact, sample2 | 5.307 / 4.870s | 2.875s | 6 / 0 / 6 | 2.140s |
+| Full, sample2 | 3.540 / 3.367s | 1.368s | 7 / 1 / 7 | 3.196s |
+| Compact, 03:43Z | client n/a / 9.590s | 3.018s | 8 / 0 / 6 | n/a |
+| Full, 03:43Z | client n/a / 4.094s | 2.501s | 9 / 1 / 7 | n/a |
+| Compact, 03:55Z | 8.814 / 8.102s | 2.889s | 7 / 0 / 6 | n/a |
+| Full, 03:55Z | 2.925 / 2.689s | 1.468s | 7 / 1 / 7 | n/a |
+
+All four passed HTTP200, gzip/SHA, ticker, fields, max20 and count checks. No tuning.
+
+03:43Z/03:55Z payloads matched established raw SHA; each had5,011 tickers, required fields, max20 and count consistency. Sequential samples show universe lookup variability; pool counters are edge snapshots only. No runtime change.
+
+The existing bounded plan/analyze diagnostic reads source candles, not the V185 summary query. A cron-authenticated summary-query plan/analyze path now mirrors the exporter joins/JSON; ANALYZE is capped at100 tickers and awaits deployment/production measurement.
+After the later public GETs were classified STALE (client683ms compact/1,728ms full), their background refresh timing records completed at04:01:40Z/04:01:47Z: compact server3.204s (universe MISS635ms, batch1.877s), full5.464s (universe HIT, batch2.654s). gzip/raw SHA,5,011 tickers, fields,max20 and count checks passed. The stale GET duration is not refresh duration; instance-local cache routing remains a source of variance.

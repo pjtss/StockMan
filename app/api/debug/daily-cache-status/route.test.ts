@@ -169,13 +169,39 @@ describe("GET /api/debug/daily-cache-status server journal option", () => {
     expect(mocks.query.mock.calls[0]?.[0]).toContain("LIMIT 100");
     expect(mocks.query.mock.calls[1]?.[0]).toContain("EXPLAIN (ANALYZE, BUFFERS, TIMING OFF, FORMAT JSON)");
     expect(mocks.query.mock.calls[1]?.[0]).toContain("LIMIT 20");
-    expect(mocks.query.mock.calls[1]?.[0]).not.toMatch(/INSERT|UPDATE|DELETE/i);
+    expect(mocks.query.mock.calls[1]?.[0]).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/i);
     expect(mocks.query.mock.calls[1]?.[1]?.[0]).toContain('"code":"TEST"');
   });
 
   it("requires authorization before exporter analyze queries", async () => {
     mocks.authorized = false;
     const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportAnalyzeOnly=true"));
+    expect(response.status).toBe(401);
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+
+  it("analyzes the exact bounded public summary export query without disclosing ticker data", async () => {
+    mocks.query
+      .mockResolvedValueOnce({ rows: [{ market: "NAS", code: "TEST", name: "Private Name" }] })
+      .mockResolvedValueOnce({ rows: [{ "QUERY PLAN": [{ Plan: { "Node Type": "Aggregate", Plans: [{ "Node Type": "Index Scan", "Index Name": "public_daily_export_candle_summaries_pkey", "Shared Read Blocks": 3 }] } }] }] });
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportSummaryAnalyzeOnly=true&format=compact"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ ok: true, market: "US", format: "compact", plannedTickerCount: 1, executed: true });
+    expect(JSON.stringify(body)).not.toContain("Private Name");
+    expect(mocks.query).toHaveBeenCalledTimes(2);
+    expect(mocks.query.mock.calls[0]?.[0]).toContain("LIMIT 100");
+    expect(mocks.query.mock.calls[1]?.[0]).toContain("EXPLAIN (ANALYZE, BUFFERS, TIMING OFF, FORMAT JSON)");
+    expect(mocks.query.mock.calls[1]?.[0]).toContain("public_daily_export_candle_summaries");
+    expect(mocks.query.mock.calls[1]?.[0]).toContain("compact_candles");
+    expect(mocks.query.mock.calls[1]?.[0]).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/i);
+    expect(mocks.query.mock.calls[1]?.[1]?.[0]).toContain('"code":"TEST"');
+  });
+
+  it("requires authorization before summary export analysis", async () => {
+    mocks.authorized = false;
+    const response = await GET(new Request("https://example.test/api/debug/daily-cache-status?market=US&exportSummaryAnalyzeOnly=true"));
     expect(response.status).toBe(401);
     expect(mocks.query).not.toHaveBeenCalled();
   });

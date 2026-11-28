@@ -5,7 +5,7 @@ import { loadFeatureModuleSettings } from "@/lib/feature-module-settings";
 import { isDailyCandleAutomationEnabled } from "@/lib/us-daily-global-gate";
 import { isWithinSchedule } from "@/lib/schedule-time";
 import { validDailyCandleSql } from "@/lib/candle-sql-quality";
-import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL } from "@/lib/us-depositary-receipt-classification";
+import { US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL, US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER } from "@/lib/us-depositary-receipt-classification";
 import { loadFeatureDiscordDebugWebhook } from "@/lib/discord-config";
 import { fetchKrDailyPrice } from "@/lib/kis-kr-daily-price";
 import { fetchUsDailyPrice } from "@/lib/kis-us-daily-price";
@@ -268,6 +268,62 @@ export async function GET(request: Request) {
       }, { headers: { "cache-control": "no-store" } });
     } catch {
       return NextResponse.json({ ok: false, market, error: "EXPORT_STORAGE_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
+    }
+  }
+  if (searchParams.get("exportSummaryPlanOnly") === "true" || searchParams.get("exportSummaryAnalyzeOnly") === "true") {
+    const analyze = searchParams.get("exportSummaryAnalyzeOnly") === "true";
+    const tickerLimit = analyze ? 100 : 1_000;
+    const universeTable = market === "KR" ? "kr_common_stock_universe" : "us_common_stock_universe";
+    const eligibility = market === "KR"
+      ? "u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etp=false AND u.is_warrant=false AND u.is_preferred=false"
+      : `u.enabled=true AND u.instrument_type='COMMON_STOCK' AND u.is_etf=false AND u.is_warrant=false AND u.is_derivative=false AND u.is_dr=false AND u.is_leveraged=false AND u.is_inverse=false AND ${US_MASTER_NOT_DEPOSITARY_RECEIPT_SQL_WITH_PREFILTER}`;
+    const format = searchParams.get("format") === "full" ? "full" : "compact";
+    const candleColumn = format === "compact" ? "compact_candles" : "full_candles";
+    const candleSchema = format === "compact"
+      ? ", 'candleEncoding', 'tuple-v1', 'candleFields', json_build_array('date', 'open', 'high', 'low', 'close', 'volume', 'tradingValue', 'fetchedAt')"
+      : "";
+    try {
+      const pool = getPool();
+      const keys = await pool.query<{ market: string; code: string; name: string }>(`
+        SELECT u.market, u.code, u.name
+          FROM ${universeTable} u
+         WHERE ${eligibility}
+         ORDER BY u.market, u.code
+         LIMIT ${tickerLimit}`);
+      if (keys.rows.length === 0) return NextResponse.json({ ok: false, market, error: "EXPORT_SUMMARY_UNIVERSE_EMPTY" }, { status: 503, headers: { "cache-control": "no-store" } });
+      const explainOptions = analyze ? "ANALYZE, BUFFERS, TIMING OFF, FORMAT JSON" : "FORMAT JSON";
+      const planResult = await pool.query<{ "QUERY PLAN": unknown }>(`EXPLAIN (${explainOptions})
+        /* public-daily-export-market: ${market.toLowerCase()} */
+        WITH requested AS (
+          SELECT market, code, name
+            FROM jsonb_to_recordset($1::jsonb) AS item(market text, code text, name text)
+        )
+        SELECT '[' || COALESCE(string_agg(row_to_json(payload)::text, ',' ORDER BY r.market, r.code), '') || ']' AS items_json
+          FROM requested r
+          LEFT JOIN instrument_fundamental_snapshots f
+            ON f.market = r.market AND f.code = r.code
+          LEFT JOIN public_daily_export_candle_summaries d
+            ON d.market = r.market AND d.code = r.code
+          CROSS JOIN LATERAL (
+            SELECT json_build_object('market', r.market, 'code', r.code, 'name', r.name) AS ticker,
+                   json_build_object(
+                     'value', CASE WHEN f.market_cap > 0 AND f.market_cap < '1.7976931348623157e308'::double precision THEN f.market_cap ELSE NULL END,
+                     'currency', COALESCE(NULLIF(f.currency, ''), CASE WHEN r.market IN ('KOSPI', 'KOSDAQ') THEN 'KRW' ELSE 'USD' END),
+                     'observedAt', CASE WHEN f.observed_at IS NULL THEN NULL ELSE to_char(f.observed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                     'fetchedAt', CASE WHEN f.fetched_at IS NULL THEN NULL ELSE to_char(f.fetched_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END
+                   ) AS "marketCap",
+                   json_build_object(
+                     'candles', COALESCE(d.${candleColumn}, '[]'::json)${candleSchema},
+                     'metadata', json_build_object(
+                       'latestCandleDate', d.latest_candle_date,
+                       'dataUpdatedAt', CASE WHEN d.data_updated_at IS NULL THEN NULL ELSE to_char(d.data_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') END,
+                       'returnedCount', COALESCE(d.returned_count, 0)::int
+                     )
+                   ) AS daily
+          ) payload`, [JSON.stringify(keys.rows)]);
+      return NextResponse.json({ ok: true, market, format, checkedAt: new Date().toISOString(), plannedTickerCount: keys.rows.length, executed: analyze, plan: planResult.rows[0]?.["QUERY PLAN"] ?? null }, { headers: { "cache-control": "no-store" } });
+    } catch {
+      return NextResponse.json({ ok: false, market, error: "EXPORT_SUMMARY_DIAGNOSTICS_UNAVAILABLE" }, { status: 503, headers: { "cache-control": "no-store" } });
     }
   }
   if (searchParams.get("exportPlanOnly") === "true" || searchParams.get("exportAnalyzeOnly") === "true") {
