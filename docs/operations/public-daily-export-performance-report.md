@@ -105,7 +105,26 @@ Focused tests 및 전체 deploy verifier 통과 뒤 commit `22a6fd1a`를 OCI run
 | KR full level5 | 1.403s | 1,372,455 | 8,907,188 / `6ca5306267a18c2d2368a9d2dfa51487730e4e8733a016f02fda907f8113f1a6` | 2,337 / 0 / 0 / 20 |
 | US full level5 | 2.702s | 3,324,906 | 18,964,448 / `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619` | 5,011 / 0 / 0 / 20 |
 
-Compact deployed gzip byte lengths exactly match the level4 replay. The measured client completion values are initial one-off post-restart MISS samples without prior-deployment matched samples or authenticated server phase timings, so they validate service and output but do not establish causal latency improvement. Keep compact level4 provisionally because exact-stream CPU savings exceed the observed body-size transfer budget estimate; collect repeated same-instance MISS timings, and restore level7 if client completion regresses consistently.
+The first deployment's compact gzip byte lengths exactly matched the level4 replay. After documentation commit `5c83ff13` was activated by OCI run [46132942993](https://github.com/pjtss/StockMan/actions/runs/46132942993), a second fresh-MISS set returned KR compact1,113,844B and US compact2,644,255B while raw byte lengths and SHA values stayed identical. This small gzip size variation on the same raw bodies means comparisons should use repeated stream samples rather than a single exact length. The new release health was HTTP200 and the report was served as UTF-8 markdown. Four post-release API responses were HTTP200/MISS with the same row counts, schema, returnedCount and max20.
+
+The measured client completion values are one-off post-restart MISS samples without prior-deployment matched samples or authenticated server phase timings, so they validate service and output but do not establish causal latency improvement. Keep compact level4 provisionally because exact-stream CPU savings exceed the observed body-size transfer budget estimate; collect repeated same-instance MISS timings, and restore level7 if client completion regresses consistently.
+
+### Compact level4 windowBits follow-up replay — 2026-11-28
+
+After selecting compact level4, exact KR/US production raw bodies were replayed with the API's batch write/backpressure shape while sweeping only `windowBits=9..15`; all outputs gunzipped byte-identically to source. Five interleaved rounds were run and the first two excluded. The level4/window12 baseline median was KR62.76ms/1,113,428B and US139.86ms/2,643,817B. The nearest candidate was KR window14 at59.10ms/1,136,308B (+22,880B, +2.05%) and US window13 at136.93ms/2,653,338B (+9,521B, +0.36%). Thus the apparent CPU savings were only3.66ms and2.93ms in the remaining three samples; adjacent windows were slower in one or both markets, and KR's larger body could consume the time difference in transfer. Windows9–11 increased sizes by roughly39–49% and were rejected. Keep windowBits12; do not deploy this noisy marginal candidate. Revisit only if a longer repeated replay shows stable improvement with transfer-inclusive operating MISS measurements.
+
+### Compact gzip output chunkSize 64/128KiB follow-up — 2026-11-28
+
+The earlier seven-round replay suggested US compact might benefit from increasing zlib output `chunkSize` to128KiB. To check whether that survived a longer sample and affected other formats, exact KR/US compact/full raw bodies were replayed at the deployed level4/level5, windowBits12, market memLevel, default strategy, and ordered ticker write/backpressure boundaries. Only `chunkSize` varied between64 and128KiB. Twelve alternating pairs were run per payload and the first three excluded; each gzip decompressed byte-identically and gzip byte size was unchanged.
+
+| Market / format | 64KiB median | 128KiB median | Difference |
+|---|---:|---:|---:|
+| KR compact | 57.44ms | 62.96ms | 128KiB +9.6% |
+| US compact | 134.34ms | 134.30ms | effectively tied |
+| KR full | 96.00ms | 97.28ms | 128KiB +1.3% |
+| US full | 228.43ms | 226.40ms | 128KiB -0.9% |
+
+The earlier US compact improvement was not reproduced; cross-format differences are small and point in mixed directions. Keep `chunkSize=64KiB` for both markets and formats. No runtime change or deployment follows. Change the output slab only after repeated results show a stable compact speed gain for both markets without a larger full response regression.
 
 ## 배포별 동시성 변경
 
@@ -1683,6 +1702,10 @@ After the successful documentation release at06:44Z, the first observed US compa
 Candidate: at production Node server initialization, start asynchronous eligible-universe warmup for KR then US in sequence. The first public export can share the in-flight warmup or reuse the 10-minute process cache; the warmup is not awaited by Next startup and its failure leaves the existing request path to retry. It runs one market scan at a time to avoid competing warm queries. No API payload, freshness, SQL predicate, or gzip settings change. Regression test verifies a warmed first export reports universe HIT/0ms and only issues the summary batch query. Next.js documents the `register` server-initialization lifecycle and runtime-specific dynamic import in its [official instrumentation guide](https://nextjs.org/docs/pages/guides/instrumentation).
 
 Risk: each production process restart now performs up to two additional universe reads even if no export is requested, and an export arriving before a scan completes can still wait on the shared in-flight query. Roll back if startup/readiness is delayed, DB pressure rises, or early export timing fails to report HIT/COALESCED with equivalent payload SHA/count/max20. Post-deploy verification must read startup warm logs and compare the first fresh compact requests for both markets; do not attribute total response improvement to warmup from a single cold sample.
+
+### JSON whitespace reduction candidate — 2026-11-28
+
+Re-serializing the validated production JSON through `JSON.stringify(JSON.parse(raw))` preserved parsed JSON values in a local deep-equality check while removing whitespace. For KR compact, raw bytes changed5,142,281→4,665,533 (-476,748 / -9.27%) and an offline level4 gzip replay changed1,113,428→1,053,140B (-60,288 / -5.41%). US compact changed11,041,367→10,032,797 raw (-1,008,570 / -9.13%) and2,644,260→2,465,246 gzip (-179,014 / -6.77%). Full KR changed8,907,188→7,712,981 raw (-13.41%) and1,372,455→1,224,235 gzip (-10.80%); full US changed18,964,448→16,445,021 raw (-13.29%) and3,324,906→2,853,203 gzip (-14.19%). These are size/recompression estimates, not a route performance result: parsing and re-stringifying in Node would add work, and SQL JSONB output formatting, CPU cost, numeric representation, and DB-to-Node transfer remain unmeasured. Existing `json_build_object` plus `row_to_json` also preserves the current key order and exact raw SHA, so replacing it without a production SQL A/B would alter bytes and carry compatibility risk. Do not deploy the Node parse/stringify path. Next candidate must benchmark an equivalent SQL-side compact serializer against current query using full representative batches, confirm semantic JSON equality and ticker order, and then compare request-correlated MISS completion and gzip bytes before retaining it.
 
 ### Post-document-release runtime observation — 2026-11-28
 
