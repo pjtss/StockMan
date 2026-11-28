@@ -70,6 +70,7 @@ const EXPORT_CONFIG: Record<ExportMarket, {
   batchSize: number;
   compactBatchSize?: number;
   firstBatchSize?: number;
+  compactFirstBatchSize?: number;
 }> = {
   KR: {
     universeTable: "kr_common_stock_universe",
@@ -83,8 +84,10 @@ const EXPORT_CONFIG: Record<ExportMarket, {
     batchSize: 800,
     // Compact is the default format; production totals did not consistently improve at 800 rows.
     compactBatchSize: 1_000,
-    // Smaller first results reduce the ordered-stream wait before useful ticker JSON is emitted.
-    firstBatchSize: 100,
+    // Compact stays at100 to improve first-data time without adding a query at current universe size.
+    compactFirstBatchSize: 100,
+    // Full returns to250 to avoid the extra query observed with a100-key first batch.
+    firstBatchSize: 250,
   },
 };
 
@@ -291,8 +294,9 @@ export async function getPublicDailyExport(
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
   const processCpuUsageStart = process.cpuUsage();
-  const { universeTable, eligibility, batchSize, compactBatchSize, firstBatchSize } = EXPORT_CONFIG[market];
+  const { universeTable, eligibility, batchSize, compactBatchSize, firstBatchSize, compactFirstBatchSize } = EXPORT_CONFIG[market];
   const selectedBatchSize = format === "compact" ? compactBatchSize ?? batchSize : batchSize;
+  const selectedFirstBatchSize = format === "compact" ? compactFirstBatchSize ?? firstBatchSize : firstBatchSize;
   try {
     const pool = getPool();
     const poolDiagnostics: PoolDiagnostics = {
@@ -333,9 +337,9 @@ export async function getPublicDailyExport(
 
     const chunks: ExportKey[][] = [];
     let chunkStart = 0;
-    if (firstBatchSize && eligible.rows.length > firstBatchSize) {
-      chunks.push(eligible.rows.slice(0, firstBatchSize));
-      chunkStart = firstBatchSize;
+    if (selectedFirstBatchSize && eligible.rows.length > selectedFirstBatchSize) {
+      chunks.push(eligible.rows.slice(0, selectedFirstBatchSize));
+      chunkStart = selectedFirstBatchSize;
     }
     for (let index = chunkStart; index < eligible.rows.length; index += selectedBatchSize) {
       chunks.push(eligible.rows.slice(index, index + selectedBatchSize));

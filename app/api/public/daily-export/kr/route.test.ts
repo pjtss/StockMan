@@ -379,10 +379,10 @@ describe("public gzip daily export", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(batchSizes).toEqual([100, 800, 800, 800, 1]);
+    expect(batchSizes).toEqual([250, 800, 800, 651]);
   });
 
-  it("writes the ordered US first ticker batch before slower later database batches", async () => {
+  it("writes the ordered compact US first ticker batch before slower later database batches", async () => {
     const universeRows = Array.from({ length: 2_501 }, (_, index) => ({
       market: "NAS",
       code: `T${String(index).padStart(5, "0")}`,
@@ -397,14 +397,14 @@ describe("public gzip daily export", () => {
         return { rows: [makeBatch(requestedKeys.map(({ market, code }) => makeRow(market, code, "USD")))] };
       });
 
-    const response = await getUsExport(fullRequest());
+    const response = await getUsExport(new Request("http://localhost/api/public/daily-export/us?format=compact"));
     const payload = JSON.parse(gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8"));
     const timing = getRecentPublicDailyExportTimings("US")[0];
     const batchSizes = queryMock.mock.calls.slice(1).map(([query]) =>
       JSON.parse((query as { values: [string] }).values[0]).length,
     );
 
-    expect(batchSizes).toEqual([100, 800, 800, 800, 1]);
+    expect(batchSizes).toEqual([100, 1_000, 1_000, 401]);
     expect(timing?.maxBatchQueryMs).toBeGreaterThanOrEqual(650);
     expect(timing?.timeToFirstTickerWriteMs).toBeLessThan(500);
     expect(payload).toHaveLength(2_501);
@@ -577,7 +577,7 @@ describe("public gzip daily export", () => {
 
   it.each([
     ["KR", getKrExport, "KOSPI", "KRW", 500, [500, 1]],
-    ["US", getUsExport, "NAS", "USD", 800, [100, 701]],
+    ["US", getUsExport, "NAS", "USD", 800, [250, 551]],
   ] as const)("uses the configured %s public export batch sizes", async (market, getExport, exchange, currency, batchSize, expectedBatchSizes) => {
     const universeRows = Array.from({ length: batchSize + 1 }, (_, index) => ({
       market: exchange,
