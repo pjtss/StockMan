@@ -96,6 +96,17 @@ Focused tests 및 전체 deploy verifier 통과 뒤 commit `22a6fd1a`를 OCI run
 
 후보는 default compact에서만 level7→4로 변경하고 full은 level5를 유지한다. 단일 gzip, 헤더·schema·ticker universe·max20 및 DB SQL은 불변이다. 전체 검증 뒤 배포하고 양 시장 fresh MISS에서 client 완료시간, gzip size, raw hash·ticker/schema/returnedCount/max20을 확인한다. 안정된 end-to-end 이득이 없거나 응답시간이 악화하면 compact level7로 복구한다. level4가 level5보다 효율적일 수 있는지는 Network path를 포함한 운영 MISS로 재검증한다.
 
+커밋 `91660ace`의 OCI 배포 [run 46131845603](https://github.com/pjtss/StockMan/actions/runs/46131845603)이 remote Verify·Package·Upload·Activate 모두 성공했다. 활성화 직후 Node fetch로 시장·형식별 공개 GET을 순차 실행했고, 네 요청 모두 HTTP200/fresh MISS였다. API 응답은 `application/gzip` 첨부 본문으로 내려와 content-encoding은 없었다. 각 body를 gunzip/parse하고 필수 object fields, returnedCount, max20을 검사했다.
+
+| 운영 응답 | Client 완료 | Gzip bytes | Raw bytes / SHA-256 | 티커 / 필드누락 / count불일치 / max봉 |
+|---|---:|---:|---|---:|
+| KR compact level4 | 2.186s | 1,113,428 | 5,142,281 / `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4` | 2,337 / 0 / 0 / 20 |
+| US compact level4 | 3.572s | 2,643,817 | 11,041,367 / `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228` | 5,011 / 0 / 0 / 20 |
+| KR full level5 | 1.403s | 1,372,455 | 8,907,188 / `6ca5306267a18c2d2368a9d2dfa51487730e4e8733a016f02fda907f8113f1a6` | 2,337 / 0 / 0 / 20 |
+| US full level5 | 2.702s | 3,324,906 | 18,964,448 / `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619` | 5,011 / 0 / 0 / 20 |
+
+Compact deployed gzip byte lengths exactly match the level4 replay. The measured client completion values are initial one-off post-restart MISS samples without prior-deployment matched samples or authenticated server phase timings, so they validate service and output but do not establish causal latency improvement. Keep compact level4 provisionally because exact-stream CPU savings exceed the observed body-size transfer budget estimate; collect repeated same-instance MISS timings, and restore level7 if client completion regresses consistently.
+
 ## 배포별 동시성 변경
 
 각 ticker batch는 500개다. 공유 PostgreSQL pool의 기본 최대 연결 수는 10이다.
