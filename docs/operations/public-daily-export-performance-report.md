@@ -1531,7 +1531,16 @@ At the five-minute expiry, compact/full returned `STALE` in721/1,027ms. Both dec
 
 ### Format-specific first batch refinement — 2026-11-28
 
-The100-key experiment raised full from7 to8 batch queries at5,011 tickers. Its matched refresh was4.143s total/2.910s batch wall versus the preceding250-key sample3.396s/2.214s; first ticker improved504→210ms. Samples are unpaired, but the extra query is a predictable cost. Compact retained6 queries and measured4.739s total/3.106s batch wall/1.354s first ticker versus the250 baseline5.203s/3.288s/2.096s. Refine configuration to compact first batch100, full250. Focused route suite passed23/23; compact's synthetic delayed-query case preserves order and emits the first result before later batches. Full deploy verification and production remeasurement are pending. This narrows the candidate to the default compact response; keep only if subsequent production timing confirms total speed remains favorable. The local response-cache process spread prevented correlation of the later STALE-triggered refresh, and remains a measurement limitation.
+The100-key experiment raised full from7 to8 batch queries at5,011 tickers. Its matched refresh was4.143s total/2.910s batch wall versus the preceding250-key sample3.396s/2.214s; first ticker improved504→210ms. Samples are unpaired, but the extra query is a predictable cost. Compact retained6 queries and measured4.739s total/3.106s batch wall/1.354s first ticker versus the250 baseline5.203s/3.288s/2.096s. Refine configuration to compact first batch100, full250. Focused route suite passed23/23. Full `npm run deploy:verify` passed and commit `aeea3a22` activated in [OCI run 46111643579](https://github.com/pjtss/StockMan/actions/runs/46111643579). Post-deploy health was200; sequential public GETs returned fresh MISS and matched timing diagnostics:
+
+| Format | Client / server | Universe | Batch count/wall | First ticker | Gzip / raw bytes |
+|---|---:|---:|---:|---:|---:|
+| Compact | 4.747 / 4.626s | MISS64ms | 6 / 3.617s | 917ms | 2,454,714 / 11,041,367 |
+| Full | 5.535 / 5.434s | HIT0ms | 7 / 3.162s | 286ms | 3,274,912 / 18,964,448 |
+
+Both formats retained established raw SHA (compact `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`, full `51d9a4ad05fb2fdc1d57fdf832c0d6eb852f3b72e9b451fe83eb5d599fbeb619`),5,011 tickers and max20 candles. Current compact first ticker was56% earlier than the250 baseline2,096ms; server total was11% lower, but universe lookup fell1.297s→64ms while batch wall rose3.288→3.617s. The compact total delta therefore cannot be attributed to first-batch size. Full is back to7 queries; current first ticker286ms, but batch wall3.162s/server5.434s exceeded the prior unpaired250 sample2.214s/3.396s. Keep compact100 provisionally for earlier useful data, with total speed still unproven; full250 avoids the known extra query. All comparisons are unpaired and host/load timing varies. Repeat a matched fresh-MISS/refresh before claiming an end-to-end speed gain. Process-local cache/timing routing remains a sampling limitation.
+
+At the next five-minute expiry, both formats returned `STALE` (compact1,478ms; full1,602ms), with established raw SHA,5,011 tickers and max20 candles. Five authenticated timing reads did not expose the background refresh records. This reiterates the process-local observability limitation; stale client duration is not refresh time and no end-to-end inference follows.
 
 
 ### Pool contention diagnostics — 2026-11-28
