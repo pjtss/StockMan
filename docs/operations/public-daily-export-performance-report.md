@@ -10,6 +10,24 @@
 
 API 사용 계약은 [공개 API 매뉴얼](../../public/api-reference.md)을, 구현은 [`lib/public-daily-export.ts`](../../lib/public-daily-export.ts)를 참조한다.
 
+### 서버 시작 시 대상 유니버스 예열 배포 검증 — 2026-11-28
+
+시작 시 KR/US eligible ticker universe를 process-local 10분 캐시에 채워 첫 export 요청의 cold universe query를 피하는 후보를 구현했다. Next.js 공식 [Instrumentation 가이드](https://nextjs.org/docs/pages/guides/instrumentation)에 맞춰 Node instrumentation의 `register`에서 동적 import를 시작하되 background IIFE를 기다리지 않도록 해 서버 ready 지연을 피한다. 후보 `284a9828`은 OCI workflow [46119218620](https://github.com/pjtss/StockMan/actions/runs/46119218620)에서 Activate release까지 성공했다.
+
+배포 후 운영 KR compact GET은 HTTP200, client 관측 445ms(별도 동일 형태 요청에서는 525ms 및 1,485ms), `application/gzip`, gzip 1,043,357B, gunzip JSON 5,142,281B였다. JSON 파싱 결과 2,337 ticker와 일봉 최대20개를 확인했고 SHA-256은 `1341542869a38a0731a0330e728ae45a337851129c9f3d5e9046b81517c229f4`로 앞선 동일 payload 실측과 일치했다. 이후 cron 인증 timing 조회(2026-11-28 07:13:24Z)는 동일 KR compact 완료 기록을 찾아 `universeCacheStatus=HIT`, `universeQueryMs=0`, batch wall1,871ms, server total2,215ms, 첫 ticker write1,692ms를 반환했다. 이는 운영 process-local universe cache가 실제 요청에 제공됐다는 직접 증거다. 별도 startup journal 조회는 18초 timeout되어 이 HIT가 instrumentation startup warm 또는 그 이전의 요청 중 어느 경로로 채워졌는지 확정할 수 없다. US timing route는 조회 시점에 record가 없어 US warm 수행도 미확인이다. 이전 cold 표본(총4.807s, universe MISS1.100s)과 이번 요청은 단일 비대응 표본이므로 총시간 감소를 warmup의 인과 효과로 주장하지 않는다.
+
+재발 감지/후속: 운영에서는 KR 첫 compact 요청의 `HIT` 및 0ms universe query를 확인했다. startup journal 지연으로 warm 완료 로그와 US 동작은 아직 미확인이다. 다음 안전한 운영 기회에 US의 first-request timing과 startup 로그를 확인한다. 예열 쿼리가 시작 구간 DB 부하를 높이거나 cold export latency를 악화하면 instrumentation 예열을 되돌린다. 현재 표본은 반복 횟수가 적고 통제되지 않아 일반적인 latency 개선률이나 인과효과로 해석하지 않는다.
+
+추가 운영 대조: GitHub Actions run metadata의 실제 release 활성화 workflow는07:00:54Z 시작,07:07:26Z 완료였다. KR timing은07:10:19Z 시작된 요청에서 universe HIT/0ms였고, 배포 완료 약3분 뒤 관측됐다. US compact MISS timing은07:18:46Z 시작,07:18:52Z 완료, total5,224ms, universe MISS1,209ms, 6 batches/1 wave, batch wall2,913ms, first ticker1,726ms, stream4,013ms, gzip2,454,714B, 5,011 tickers였다. 이 US 요청은 배포 종료 뒤 약11분20초에 시작되어 10분 universe TTL이 경과한 시점과 부합한다. 따라서 MISS는 startup warmup 실패의 증거로 분류하지 않는다. 같은 시간대 public US GET은 HTTP200 및 gzip2,454,714B를 받았으나 최초 검사기는 `Content-Encoding` 헤더 부재를 고려하지 않아 gunzip 없이 JSON 파싱을 시도했다. 재요청은 `application/gzip`을 명시적으로 gunzip해 성공했고 raw JSON11,041,367B, 5,011 ticker, 필수 fields 누락0, returnedCount 불일치0, 최대20 candles, 기존 SHA `cec0b31fa79190e38b539a81ba68ab1cdd57d517099fea2157a25ee0a70ee228`를 확인했다. 이 두 응답의 gzip byte와 시각은 일치하지만 첫 client 측 검증은 잘못되어 폐기했으며, 진단 timing은 서버 측 실측으로만 보고 client 완료시간을 연결하지 않는다. startup journal은18초 timeout이라 warm 완료 log 자체는 여전히 미확인이다.
+
+응답 캐시 5분 경과 뒤07:25:01Z에는 두 번째 US compact fresh MISS를 관측했고, gzip body는 이전과 같은 SHA/길이/5,011 ticker/max20이었다. 근접 timing record `a2499ccd-1ac2-4dcb-8e1c-c1c835fe2d9c`는 universe HIT/0ms, 6 batches/1 wave, batch wall2,516ms, first ticker686ms, stream3,594ms, total3,601ms, process CPU2,630ms를 기록했다. public body client 완료는3.972초였다. 앞선7:18 MISS 대비 universe phase 제거1,209ms와 일치하는 방향으로 server total은1.623초, first ticker는1.040초 짧았고, batch wall도397ms 낮았다. 두 timing은 동일 배포·형식·batch config이며 gzip 크기 같지만 서로 다른 요청/부하이고, 전 요청의 초기 parser 오류 때문에 client timing 비교에는 이를 사용하지 않는다. 서버 timing은 phase evidence이며 반복쌍 없이 안정적인 개선률이나 오직 warmup의 인과 효과로 일반화하지 않는다. batch wall이2.5–2.9초 수준으로 남아 있어 아직 batch size 변경을 정당화할 재현 증거가 없다.
+
+### US compact 첫 batch 100→50 실험 후보 — 2026-11-28
+
+Current compact configuration uses a50-key ordered first batch followed by1,000-key batches. The validated five-minute response-cache MISS at07:25:01Z under the preceding100-key config had universe HIT/0ms, batch wall2,516ms, first ticker write686ms, server total3,601ms and six batches/one wave. The earlier MISS had first ticker1,726ms but included a1,209ms universe query. Because batch wall still spans2.5–2.9s across only two unpaired samples, this does not identify a query-size bottleneck; the smaller first batch tests only the ordered first-useful-data delay.
+
+With5,011 eligible US tickers, 50 + five later batches produces `[50, 1000, 1000, 1000, 1000, 961]`, retaining six concurrent queries in one wave. The focused route suite passes24/24. Its controlled-delay case confirms the smaller first batch is yielded before later 1,000-key query completions and preserves first/last ticker order. This is a scheduling regression test, not a production performance result. The experiment does not change gzip format/level, fields, master predicate or max20 candle selection. Full `npm run deploy:verify` and OCI deployment are required before production comparison. Keep50 only if matched fresh compact MISSes show consistently earlier first ticker without a repeated total/batch-wall regression and unchanged gzip raw SHA/count/schema; otherwise restore100 and redeploy.
+
 ## 배포별 동시성 변경
 
 각 ticker batch는 500개다. 공유 PostgreSQL pool의 기본 최대 연결 수는 10이다.

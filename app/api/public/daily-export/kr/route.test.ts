@@ -416,7 +416,7 @@ describe("public gzip daily export", () => {
       .mockResolvedValueOnce({ rows: universeRows })
       .mockImplementation(async (query) => {
         const requestedKeys = JSON.parse((query as { values: [string] }).values[0]) as Array<{ market: string; code: string }>;
-        if (requestedKeys.length > 100) await new Promise((resolve) => setTimeout(resolve, 700));
+        if (requestedKeys.length > 50) await new Promise((resolve) => setTimeout(resolve, 700));
         return { rows: [makeBatch(requestedKeys.map(({ market, code }) => makeRow(market, code, "USD")))] };
       });
 
@@ -427,7 +427,7 @@ describe("public gzip daily export", () => {
       JSON.parse((query as { values: [string] }).values[0]).length,
     );
 
-    expect(batchSizes).toEqual([100, 1_000, 1_000, 401]);
+    expect(batchSizes).toEqual([50, 1_000, 1_000, 451]);
     expect(timing?.maxBatchQueryMs).toBeGreaterThanOrEqual(650);
     expect(timing?.timeToFirstTickerWriteMs).toBeLessThan(500);
     expect(payload).toHaveLength(2_501);
@@ -479,7 +479,7 @@ describe("public gzip daily export", () => {
       JSON.parse((query as { values: [string] }).values[0]).length,
     );
 
-    expect(batchSizes).toEqual([100, 1_000, 1_000, 1_000, 1_000, 911]);
+    expect(batchSizes).toEqual([50, 1_000, 1_000, 1_000, 1_000, 961]);
     expect(getRecentPublicDailyExportTimings("US")[0]).toMatchObject({ batchCount: 6, batchWaveCount: 1, batchQueryCount: 6 });
   });
 

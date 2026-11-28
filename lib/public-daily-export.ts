@@ -84,8 +84,8 @@ const EXPORT_CONFIG: Record<ExportMarket, {
     batchSize: 800,
     // Compact is the default format; production totals did not consistently improve at 800 rows.
     compactBatchSize: 1_000,
-    // Compact stays at100 to improve first-data time without adding a query at current universe size.
-    compactFirstBatchSize: 100,
+    // Compact stays at50 to reduce the ordered first query while retaining six one-wave queries today.
+    compactFirstBatchSize: 50,
     // Full returns to250 to avoid the extra query observed with a100-key first batch.
     firstBatchSize: 250,
   },
