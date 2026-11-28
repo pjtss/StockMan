@@ -93,6 +93,30 @@ const EXPORT_CONFIG: Record<ExportMarket, {
 
 const backgroundRefreshes = new Map<string, Promise<void>>();
 
+function queryEligibleUniverse(pool: ReturnType<typeof getPool>, market: ExportMarket) {
+  const { universeTable, eligibility } = EXPORT_CONFIG[market];
+  return pool.query<ExportKey>(`
+        SELECT u.market, u.code, u.name
+          FROM ${universeTable} u
+         WHERE ${eligibility}
+         ORDER BY u.market, u.code
+      `);
+}
+
+export async function warmPublicDailyExportUniverse(market: ExportMarket) {
+  const startedAt = performance.now();
+  const pool = getPool();
+  const eligible = await getOrLoadPublicDailyExportUniverse(market, async () => {
+    const result = await queryEligibleUniverse(pool, market);
+    return result.rows;
+  });
+  return {
+    cacheStatus: eligible.status,
+    tickerCount: eligible.rows.length,
+    elapsedMs: Math.round(performance.now() - startedAt),
+  };
+}
+
 function startBackgroundRefresh(market: ExportMarket, format: PublicDailyExportFormat) {
   const refreshKey = `${market}:${format}`;
   if (backgroundRefreshes.has(refreshKey)) return;
@@ -294,7 +318,7 @@ export async function getPublicDailyExport(
   const requestId = randomUUID();
   const requestStartedAtIso = new Date().toISOString();
   const processCpuUsageStart = process.cpuUsage();
-  const { universeTable, eligibility, batchSize, compactBatchSize, firstBatchSize, compactFirstBatchSize } = EXPORT_CONFIG[market];
+  const { batchSize, compactBatchSize, firstBatchSize, compactFirstBatchSize } = EXPORT_CONFIG[market];
   const selectedBatchSize = format === "compact" ? compactBatchSize ?? batchSize : batchSize;
   const selectedFirstBatchSize = format === "compact" ? compactFirstBatchSize ?? firstBatchSize : firstBatchSize;
   try {
@@ -306,12 +330,7 @@ export async function getPublicDailyExport(
     };
     const universeQueryStartedAt = performance.now();
     const eligible = await getOrLoadPublicDailyExportUniverse(market, async () => {
-      const result = await queryWithPoolDiagnostics(pool, poolDiagnostics, () => pool.query<ExportKey>(`
-        SELECT u.market, u.code, u.name
-          FROM ${universeTable} u
-         WHERE ${eligibility}
-         ORDER BY u.market, u.code
-      `));
+      const result = await queryWithPoolDiagnostics(pool, poolDiagnostics, () => queryEligibleUniverse(pool, market));
       return result.rows;
     });
     const metrics: ExportPerformanceMetrics = {

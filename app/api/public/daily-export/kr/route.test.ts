@@ -4,7 +4,7 @@ import { clearPublicDailyExportResponseCache, getCachedPublicDailyExport } from 
 import { clearPublicDailyExportUniverseCache } from "@/lib/public-daily-export-universe-cache";
 import { clearPublicDailyExportQueryFlights } from "@/lib/public-daily-export-query-flight";
 import { getRecentPublicDailyExportTimings } from "@/lib/public-daily-export-timing";
-import { getPublicDailyExport } from "@/lib/public-daily-export";
+import { getPublicDailyExport, warmPublicDailyExportUniverse } from "@/lib/public-daily-export";
 
 const { queryMock, poolStats } = vi.hoisted(() => ({
   queryMock: vi.fn(),
@@ -185,6 +185,28 @@ describe("public gzip daily export", () => {
     expect(payload[0].daily.candles.length).toBeLessThanOrEqual(20);
     expect(Object.keys(payload[0])).toEqual(["ticker", "marketCap", "daily"]);
     expect(sql).toContain("d.compact_candles");
+  });
+
+  it("prewarms the eligible universe so the first export skips its cold universe query", async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ market: "KOSPI", code: "005930", name: "Example Common Stock" }] });
+
+    const warmed = await warmPublicDailyExportUniverse("KR");
+
+    expect(warmed).toMatchObject({ cacheStatus: "MISS", tickerCount: 1, elapsedMs: expect.any(Number) });
+    expect(queryMock).toHaveBeenCalledTimes(1);
+
+    queryMock.mockResolvedValueOnce({ rows: [makeBatch([makeRow("KOSPI", "005930", "KRW")])] });
+    const response = await getKrExport(fullRequest());
+    await response.arrayBuffer();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-public-daily-export-cache")).toBe("MISS");
+    expect(getRecentPublicDailyExportTimings("KR")[0]).toMatchObject({
+      universeCacheStatus: "HIT",
+      universeQueryMs: 0,
+      tickerCount: 1,
+    });
+    expect(queryMock).toHaveBeenCalledTimes(2);
   });
 
   it("rejects unsupported daily export formats without querying the DB", async () => {
