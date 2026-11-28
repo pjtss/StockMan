@@ -187,7 +187,7 @@ function gzipJsonStream(
         windowBits: 12,
         memLevel: metrics.market === "US" ? 9 : 8,
         chunkSize: 64 * 1024,
-        // Production-payload A/B showed default is faster and smaller than filtered for both markets.
+        // Latest compact production replay was faster with default; filtered saved 0.4–1.6% bytes.
         strategy: zlibConstants.Z_DEFAULT_STRATEGY,
       });
       compressor = activeCompressor;
